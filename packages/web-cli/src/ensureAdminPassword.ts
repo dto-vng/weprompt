@@ -133,7 +133,10 @@ export async function ensureAdminPassword(
       return;
     }
     const username = await fetchAdminUsername(deps, opts.backendPort);
-    deps.log(`[aionui-web] Generated initial admin password: ${newPassword}`);
+    // SECURITY (#5): never print the generated password to stdout/logs.
+    deps.log(
+      `[aionui-web] Generated an initial admin password. Retrieve it once via \`${resetCmd}\` or the desktop Settings; it is not logged.`
+    );
     deps.log(`[aionui-web] Log in with username "${username}" and change it from the UI.`);
   } catch (err) {
     deps.warn(
