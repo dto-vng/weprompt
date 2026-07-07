@@ -113,11 +113,10 @@ function resolvePort(flags: Map<string, string | true>): number {
   return DEFAULT_PORT;
 }
 
-function resolveAllowRemote(flags: Map<string, string | true>): boolean {
-  if (flags.has('remote')) return true;
-  const env = process.env.AIONUI_ALLOW_REMOTE ?? process.env.AIONUI_REMOTE;
-  if (!env) return false;
-  return ['1', 'true', 'yes', 'on'].includes(env.trim().toLowerCase());
+export function resolveAllowRemote(_flags: Map<string, string | true>): boolean {
+  // Forge is desktop-only (decision D1). Remote binding is disabled; the flag and
+  // AIONUI_ALLOW_REMOTE / AIONUI_REMOTE env vars are intentionally ignored.
+  return false;
 }
 
 function readPackageVersion(): string {
