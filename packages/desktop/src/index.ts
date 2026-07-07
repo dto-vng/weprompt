@@ -762,7 +762,9 @@ const handleAppReady = async (): Promise<void> => {
       // Config file loaded from user directory
     }
     const resolvedPort = resolveWebUIPort(userConfigInfo.config, getSwitchValue);
-    const allowRemote = resolveRemoteAccess(userConfigInfo.config, isRemoteMode);
+    // Forge desktop-only (D1): resolved but intentionally unused — startWebHost
+    // below is always called with allowRemote: false, regardless of this value.
+    const _allowRemote = resolveRemoteAccess(userConfigInfo.config, isRemoteMode);
     try {
       // Inside Electron (`AionUi --webui` or packaged `aionui-web` mode that
       // launches via the Electron shell), reuse the desktop app's data-dir so
@@ -785,7 +787,8 @@ const handleAppReady = async (): Promise<void> => {
         },
         staticDir: path.join(__dirname, '../renderer'),
         port: resolvedPort,
-        allowRemote,
+        // Forge desktop-only (D1) — ignore any resolved remote flag
+        allowRemote: false,
         dataDir: getDataPath(),
         logDir: sysDirWebUI.logDir,
         // Expose the same AIONUI_{CACHE,WORK,LOG}_DIR env the desktop IPC path
