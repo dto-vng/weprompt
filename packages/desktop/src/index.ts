@@ -13,7 +13,7 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -408,6 +408,89 @@ function applyDebugBackendStartupFailure(failure: BackendStartupFailureInfo): vo
   (globalThis as typeof globalThis & { __backendStartupFailed?: boolean }).__backendStartupFailed = true;
 }
 
+// ============ Renderer navigation allowlist ============
+// The renderer is loaded either from a local file (`loadFile` → file:// in
+// production and when the dev server is unreachable) or from the Vite dev
+// server URL (`ELECTRON_RENDERER_URL`, e.g. http://localhost:5173) in dev.
+// Pet windows load the same way (file:// or the dev server). Top-level
+// BrowserWindow contents must never navigate away from that app content;
+// this allowlist encodes what is legitimately part of the app shell.
+//
+// NOTE: this list intentionally governs only top-level `window`-type contents.
+// The <webview> guest contents (HTML preview, external OAuth/settings pages)
+// are meant to browse arbitrary URLs and are handled separately — see
+// installWebContentsSecurity() below, which does NOT block guest navigation.
+const isAllowedTopLevelNavigation = (targetUrl: string): boolean => {
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return false;
+  }
+  // Local built renderer (production) and pet windows loaded via loadFile.
+  if (parsed.protocol === 'file:') {
+    return true;
+  }
+  // Dev server (Vite) and the local backend. Port is dynamic in both cases
+  // (Vite may auto-increment; backend port is assigned at runtime), so allow
+  // any port on the loopback hosts rather than hardcoding one.
+  if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+    return true;
+  }
+  return false;
+};
+
+// ============ web-contents-created security guard (Task 1.5 / #2b) ============
+// Defense-in-depth in the main process: even if the renderer is compromised it
+// cannot escalate by attaching a privileged <webview>, navigating the app shell
+// to attacker content, or spawning a new Electron window. Installed once from
+// the app-ready path (see handleAppReady) so it covers every WebContents the
+// app ever creates (main window, pet windows, and their <webview> guests).
+const installWebContentsSecurity = (): void => {
+  app.on('web-contents-created', (_event, contents) => {
+    // Harden any <webview> the renderer attaches: strip its preload and force
+    // an unprivileged, isolated, sandboxed guest. The app's own <webview>
+    // usage (HTML preview, external pages) never sets a preload, so this is a
+    // no-op for legitimate use and closes the injected-<webview> escalation.
+    contents.on('will-attach-webview', (_attachEvent, webPreferences, _params) => {
+      // No preload allowlist exists today; strip unconditionally.
+      delete webPreferences.preload;
+      webPreferences.nodeIntegration = false;
+      webPreferences.contextIsolation = true;
+      webPreferences.sandbox = true;
+    });
+
+    // Block top-level navigation away from the app shell. Only applies to
+    // `window`-type contents (main + pet windows); <webview> guests are meant
+    // to browse arbitrary content, so their navigation is left untouched.
+    contents.on('will-navigate', (navEvent, targetUrl) => {
+      if (contents.getType() !== 'window') {
+        return;
+      }
+      if (!isAllowedTopLevelNavigation(targetUrl)) {
+        console.warn(`[AionUi][security] Blocked top-level navigation to: ${targetUrl}`);
+        navEvent.preventDefault();
+      }
+    });
+
+    // Never let content open a new Electron window. External http(s) links are
+    // handed to the OS browser (preserving legitimate external-link behavior);
+    // everything else is denied. Note the renderer normally routes external
+    // links through the backend (ipcBridge.shell.openExternal); this handler is
+    // the safety net for any raw window.open / target=_blank that reaches here.
+    contents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        void shell.openExternal(url).catch((error) => {
+          console.error('[AionUi][security] shell.openExternal failed:', error);
+        });
+      } else {
+        console.warn(`[AionUi][security] Denied window.open for non-http(s) URL: ${url}`);
+      }
+      return { action: 'deny' };
+    });
+  });
+};
+
 const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): void => {
   console.log('[AionUi] Creating main window...');
   const { x: windowX, y: windowY, width: windowWidth, height: windowHeight } = resolveInitialBounds();
@@ -604,6 +687,11 @@ const handleAppReady = async (): Promise<void> => {
   const t0 = performance.now();
   const mark = (label: string) => console.log(`[AionUi:ready] ${label} +${Math.round(performance.now() - t0)}ms`);
   mark('start');
+
+  // Install the web-contents security guard before any WebContents is created,
+  // so it covers the very first renderer load (main + pet windows + webviews).
+  installWebContentsSecurity();
+  mark('installWebContentsSecurity');
 
   if (!app.isPackaged) {
     try {
