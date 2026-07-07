@@ -7,7 +7,9 @@ import { join } from 'node:path';
 const {
   assertHttpsUrl,
   computeSha256,
+  isIntegrityError,
   isVerificationSkipped,
+  makeIntegrityError,
   verifyArchiveDigest,
 } = require('../../../packages/shared-scripts/src/prepare-aioncore');
 const aioncoreChecksums = require('../../../packages/shared-scripts/src/aioncore-checksums');
@@ -104,6 +106,44 @@ describe('assertHttpsUrl (Forge #1 HTTPS enforcement)', () => {
     'rejects non-https URL %s',
     (url) => {
       expect(() => assertHttpsUrl(url)).toThrow(/non-HTTPS/i);
+    }
+  );
+});
+
+// This predicate is the sole gate in prepareAioncore's release-download catch
+// (prepare-aioncore.js): integrity failures re-throw (fatal, no fallback) while
+// plain download/network errors are swallowed and allowed to fall back to
+// another source. A future refactor that breaks the tagging or the predicate
+// would silently reopen the "reject artifact, then fall back" hole (Forge #1).
+// verifyArchiveDigest already produces tagged errors (mismatch / missing-pin),
+// so guarding this predicate locks the exact discrimination the catch relies on.
+describe('isIntegrityError discriminates fatal integrity failures from recoverable errors (Forge #1)', () => {
+  it('returns true for a tagged integrity error (fatal → must re-throw, no fallback)', () => {
+    const error = makeIntegrityError('artifact integrity check FAILED');
+    expect(error).toBeInstanceOf(Error);
+    expect(isIntegrityError(error)).toBe(true);
+  });
+
+  it('the errors thrown by verifyArchiveDigest are recognized as integrity errors', () => {
+    // Missing-pin path (fail-closed) — reuse the real predicate on the real throw.
+    let caught: unknown;
+    try {
+      verifyArchiveDigest({ archivePath: __filename, assetName: 'no-such-asset.tar.gz', version: 'v0.0.0-none' });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(isIntegrityError(caught)).toBe(true);
+  });
+
+  it('returns false for a plain download/network error (recoverable → allowed to fall back)', () => {
+    expect(isIntegrityError(new Error('curl: (7) Failed to connect: network is down'))).toBe(false);
+  });
+
+  it.each([[null], [undefined], ['string error'], [{ isAioncoreIntegrityError: 'yes' }], [{}]])(
+    'returns false for a non-tagged value: %o',
+    (value) => {
+      expect(isIntegrityError(value)).toBe(false);
     }
   );
 });

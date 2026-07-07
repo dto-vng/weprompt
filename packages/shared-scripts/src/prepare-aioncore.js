@@ -692,7 +692,7 @@ function prepareAioncore(options) {
       if (isIntegrityError(error)) {
         throw error;
       }
-      console.warn(`  Download failed: ${error.message}`);
+      console.warn(`  Download failed: ${error?.message ?? error}`);
     }
   }
 
@@ -749,7 +749,9 @@ module.exports = {
   computeSha256,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
+  isIntegrityError,
   isVerificationSkipped,
+  makeIntegrityError,
   prepareAioncore,
   verifyArchiveDigest,
 };
