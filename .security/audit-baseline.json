@@ -1,0 +1,105 @@
+{
+  "description": "Accepted-risk baseline for `bun audit` critical/high advisories. Consumed by scripts/check-audit.js. Any critical/high advisory ID NOT listed here is a NEW finding and fails the gate. Each entry must be re-reviewed by its review_by date.",
+  "generatedFrom": "bun audit --json (Forge security finding #6 dependency remediation)",
+  "advisories": [
+    {
+      "id": 1120422,
+      "package": "shell-quote",
+      "severity": "critical",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "quote() newline-in-object-.op path is never reached: all AionUi call sites pass plain strings, never objects with an .op field. 1.8.3 is latest; no upstream fix available."
+    },
+    {
+      "id": 1120252,
+      "package": "@opentelemetry/sdk-node",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "Telemetry is opt-in and the Prometheus exporter is never instantiated in AionUi. Fix requires >=0.217.0 but aioncli-core pins @opentelemetry/sdk-node ^0.211.0; cannot bump without an upstream aioncli-core release."
+    },
+    {
+      "id": 1120253,
+      "package": "@opentelemetry/exporter-prometheus",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "Prometheus exporter crash via malformed HTTP request. Exporter is never started (telemetry opt-in). Fix requires >=0.217.0, blocked by aioncli-core's ^0.211.0 caret pin."
+    },
+    {
+      "id": 1116060,
+      "package": "electron",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "No in-range fix: repo pins electron ^37.10.3 (latest 37.x is 37.10.3); the fix requires a major upgrade to >=39.8.1. Deferred to a dedicated electron-upgrade change with a packaged-app smoke test."
+    },
+    {
+      "id": 1116072,
+      "package": "electron",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "No in-range fix on the 37.x line; fix requires major upgrade to >=38.8.6. Deferred to a dedicated electron-upgrade change."
+    },
+    {
+      "id": 1116076,
+      "package": "electron",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "No in-range fix on the 37.x line; fix requires major upgrade to >=38.8.6. Deferred to a dedicated electron-upgrade change."
+    },
+    {
+      "id": 1117459,
+      "package": "electron",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "No in-range fix on the 37.x line; fix requires major upgrade to >=38.8.6. Deferred to a dedicated electron-upgrade change."
+    },
+    {
+      "id": 1113465,
+      "package": "minimatch",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "ReDoS requires an attacker-controlled glob pattern. The only runtime minimatch call uses a hardcoded '**' pattern, so the vulnerable path is unreachable. Transitive 9.0.x copy cannot be pinned cleanly across the multiple minimatch major lines in the tree without risking build tooling."
+    },
+    {
+      "id": 1113544,
+      "package": "minimatch",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "ReDoS requires an attacker-controlled glob pattern; AionUi's only runtime call uses a hardcoded '**'. See id 1113465."
+    },
+    {
+      "id": 1113552,
+      "package": "minimatch",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "ReDoS requires an attacker-controlled glob pattern; AionUi's only runtime call uses a hardcoded '**'. See id 1113465."
+    },
+    {
+      "id": 1115573,
+      "package": "path-to-regexp",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-10-07",
+      "note": "Reached only via a never-instantiated Express/router surface (transitive via express@5 -> router). MCP transport is stdio, so no HTTP route parsing runs. The vulnerable 8.3.0 copy is pulled by router@2 with ^8.0.0; a flat resolution would also force serve-handler's exact path-to-regexp@3.3.0 and break it, so left as accepted-risk."
+    }
+  ]
+}
