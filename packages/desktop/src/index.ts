@@ -13,7 +13,7 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -491,6 +491,59 @@ const installWebContentsSecurity = (): void => {
   });
 };
 
+// ============ Content-Security-Policy (Task 1.6b / #2) ============
+// Applied as **Content-Security-Policy-Report-Only** — it REPORTS violations to
+// the DevTools console but does NOT block anything, so it cannot white-screen
+// the renderer. This is deliberate: the CSP below is grounded in code evidence
+// (see comments per directive) but CANNOT be runtime-verified in this
+// environment. A human must promote it to the enforcing `Content-Security-Policy`
+// header only after launching the app, exercising the main flows + HTML preview
+// + charts/markdown (mermaid, katex, syntax highlighting, web-tree-sitter WASM),
+// reading the reported violations, and confirming the policy is complete.
+//
+// Directive rationale (desktop Electron renderer, loaded from file:// or the
+// Vite dev server):
+//   default-src 'self'                     — baseline; app shell is same-origin.
+//   script-src 'self' 'wasm-unsafe-eval'   — web-tree-sitter loads WASM; mermaid
+//     'unsafe-eval'                            historically evaluates code. Dev
+//                                              server also needs eval for HMR.
+//   style-src 'self' 'unsafe-inline'       — Arco Design + UnoCSS inject inline
+//                                              <style>/style attributes at runtime.
+//   img-src 'self' data: blob:            — icons/data-URIs; blob: from
+//                                              URL.createObjectURL previews.
+//   font-src 'self' data:                  — bundled fonts / data-URI fonts.
+//   connect-src 'self' http://127.0.0.1:*  — httpBridge fetches the local backend
+//     http://localhost:* ws://127.0.0.1:*    at http://127.0.0.1:<dynamic port>
+//     ws://localhost:*                       and the ws://.../ws realtime channel;
+//                                              dev/HMR uses localhost. Ports are
+//                                              runtime-assigned → wildcard port.
+//   worker-src 'self' blob:                — workers spawned from blob URLs.
+//   object-src 'none'; frame-src 'self'    — lock down plugins/embedding.
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "frame-src 'self'",
+].join('; ');
+
+const installContentSecurityPolicy = (): void => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        // Report-Only for now — see block comment above. Promote to
+        // 'Content-Security-Policy' after human runtime verification.
+        'Content-Security-Policy-Report-Only': [CSP_DIRECTIVES],
+      },
+    });
+  });
+};
+
 const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): void => {
   console.log('[AionUi] Creating main window...');
   const { x: windowX, y: windowY, width: windowWidth, height: windowHeight } = resolveInitialBounds();
@@ -539,6 +592,14 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       webviewTag: true, // 启用 webview 标签用于 HTML 预览 / Enable webview tag for HTML preview
+      // Explicit security posture (was relying on Electron 37 defaults).
+      // contextIsolation + nodeIntegration:false are already the effective defaults
+      // → adding them is zero behavior change. sandbox:true is verified safe here:
+      // the preload (src/preload/main.ts) only uses contextBridge/ipcRenderer/webUtils
+      // plus the bundled @sentry/electron/preload, none of which require Node built-ins.
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
   console.log(`[AionUi] Main window created (id=${mainWindow.id})`);
@@ -688,10 +749,11 @@ const handleAppReady = async (): Promise<void> => {
   const mark = (label: string) => console.log(`[AionUi:ready] ${label} +${Math.round(performance.now() - t0)}ms`);
   mark('start');
 
-  // Install the web-contents security guard before any WebContents is created,
-  // so it covers the very first renderer load (main + pet windows + webviews).
+  // Install main-process security guards before any WebContents is created or
+  // any content is loaded, so they cover the very first renderer load.
   installWebContentsSecurity();
-  mark('installWebContentsSecurity');
+  installContentSecurityPolicy();
+  mark('installSecurityGuards');
 
   if (!app.isPackaged) {
     try {
