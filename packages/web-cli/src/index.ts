@@ -381,7 +381,6 @@ Commands:
 
 Options for start:
   --port <n>              Listen port (default: ${DEFAULT_PORT})
-  --remote                Bind 0.0.0.0 instead of 127.0.0.1
   --open                  Force opening the local URL in a browser
   --no-open               Disable automatic browser opening
   --data-dir <path>       Override data dir (default: ~/.aionui-web)
@@ -394,7 +393,7 @@ Options for resetpass:
   --backend-bin <path>    Override backend binary path
 
 Environment variables:
-  AIONUI_PORT, AIONUI_ALLOW_REMOTE, AIONUI_DATA_DIR, AIONUI_LOG_DIR,
+  AIONUI_PORT, AIONUI_DATA_DIR, AIONUI_LOG_DIR,
   AIONUI_BACKEND_BIN, AIONUI_OPEN_BROWSER
 `);
     return;
