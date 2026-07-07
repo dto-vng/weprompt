@@ -36,7 +36,7 @@
       "disposition": "accept-risk",
       "owner": "security-lead",
       "review_by": "2026-10-07",
-      "note": "No in-range fix: repo pins electron ^37.10.3 (latest 37.x is 37.10.3); the fix requires a major upgrade to >=39.8.1. Deferred to a dedicated electron-upgrade change with a packaged-app smoke test."
+      "note": "No in-range fix: repo pins electron ^37.10.3 (latest 37.x is 37.10.3). This advisory's vulnerable range is <39.8.1, so the fix requires a major upgrade off the 37.x line. Deferred to a dedicated electron-upgrade change with a packaged-app smoke test."
     },
     {
       "id": 1116072,
@@ -72,7 +72,7 @@
       "disposition": "accept-risk",
       "owner": "security-lead",
       "review_by": "2026-10-07",
-      "note": "ReDoS requires an attacker-controlled glob pattern. The only runtime minimatch call uses a hardcoded '**' pattern, so the vulnerable path is unreachable. Transitive 9.0.x copy cannot be pinned cleanly across the multiple minimatch major lines in the tree without risking build tooling."
+      "note": "ReDoS requires an attacker-controlled glob pattern. There is no shipped-runtime minimatch consumer in AionUi: the vulnerable 9.0.x copy is pulled only by build/packaging/test tooling (via glob@10 -> @electron/universal, jest, typescript, rimraf, ts-morph, sentry build), none of which run in the shipped app on attacker input. The copy cannot be pinned cleanly across the multiple minimatch major lines in the tree without risking that tooling."
     },
     {
       "id": 1113544,
@@ -81,7 +81,7 @@
       "disposition": "accept-risk",
       "owner": "security-lead",
       "review_by": "2026-10-07",
-      "note": "ReDoS requires an attacker-controlled glob pattern; AionUi's only runtime call uses a hardcoded '**'. See id 1113465."
+      "note": "ReDoS requires an attacker-controlled glob pattern; no shipped-runtime minimatch consumer exists — all vulnerable copies are build/packaging/test tooling. See id 1113465."
     },
     {
       "id": 1113552,
@@ -90,7 +90,7 @@
       "disposition": "accept-risk",
       "owner": "security-lead",
       "review_by": "2026-10-07",
-      "note": "ReDoS requires an attacker-controlled glob pattern; AionUi's only runtime call uses a hardcoded '**'. See id 1113465."
+      "note": "ReDoS requires an attacker-controlled glob pattern; no shipped-runtime minimatch consumer exists — all vulnerable copies are build/packaging/test tooling. See id 1113465."
     },
     {
       "id": 1115573,

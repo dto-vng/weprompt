@@ -7,12 +7,18 @@
  *
  * Exit codes:
  *   0  - no new critical/high advisories (all present ones are in the baseline)
- *   1  - one or more critical/high advisories are NOT in the baseline (new finding)
+ *   1  - one or more critical/high advisories are NOT in the baseline (new finding),
+ *        OR the audit looks degraded/empty and cannot be trusted (fail-closed)
  *   2  - the audit could not be run or parsed
+ *
+ * Fail-closed sanity floor: a non-empty baseline expects its known advisory IDs
+ * to still be reported. If the audit returns zero advisories total, or every
+ * baselined ID has simultaneously disappeared, the audit is treated as degraded
+ * (it must not silently mask vulnerabilities) and the gate fails.
  *
  * Non-fatal warnings are printed for:
  *   - baseline entries whose `review_by` date has passed
- *   - baseline entries that are no longer present in the audit (stale IDs)
+ *   - SOME (but not all) baseline entries no longer present in the audit (prune hint)
  *
  * Usage: node scripts/check-audit.js
  */
@@ -68,6 +74,15 @@ function runAudit() {
   }
 }
 
+/** Total number of advisories across all severities in the audit map. */
+function countAllAdvisories(auditMap) {
+  let total = 0;
+  for (const advisories of Object.values(auditMap)) {
+    if (Array.isArray(advisories)) total += advisories.length;
+  }
+  return total;
+}
+
 /** Flatten the audit map into an array of critical/high advisories. */
 function extractGated(auditMap) {
   const rows = [];
@@ -108,7 +123,9 @@ function loadBaseline() {
 
 function main() {
   const baseline = loadBaseline();
-  const gated = extractGated(runAudit());
+  const auditMap = runAudit();
+  const totalAdvisories = countAllAdvisories(auditMap);
+  const gated = extractGated(auditMap);
   const seenIds = new Set();
 
   const newFindings = [];
@@ -117,6 +134,29 @@ function main() {
     if (!baseline.has(advisory.id)) {
       newFindings.push(advisory);
     }
+  }
+
+  // Which baselined IDs are still reported vs. gone this run.
+  const missingBaselineIds = [];
+  for (const [id] of baseline) {
+    if (!seenIds.has(id)) missingBaselineIds.push(id);
+  }
+
+  // Fail-closed sanity floor: a well-formed but empty/degraded audit must not
+  // silently pass. If the baseline is non-empty but the audit reports zero
+  // advisories at all, or every single baselined ID vanished at once, the audit
+  // is untrustworthy this run — fail rather than mask potential vulnerabilities.
+  if (baseline.size > 0 && (totalAdvisories === 0 || missingBaselineIds.length === baseline.size)) {
+    const reason =
+      totalAdvisories === 0
+        ? 'the audit reported zero advisories of any severity'
+        : `all ${baseline.size} baselined advisories disappeared from the audit at once`;
+    console.error(`\n❌ Audit looks degraded: ${reason}.`);
+    console.error('   A trustworthy audit should still report the known accepted-risk advisories.');
+    console.error('   This is treated as a failure (fail-closed) so a broken audit cannot mask vulnerabilities.');
+    console.error('   If the disappearance is genuine (all advisories truly fixed/removed), clear the resolved');
+    console.error(`   entries from ${path.relative(process.cwd(), BASELINE_PATH)} and re-run.`);
+    process.exit(1);
   }
 
   // Warn about baseline entries that are past their review date.
@@ -131,13 +171,13 @@ function main() {
     }
   }
 
-  // Note baseline entries no longer present in the audit (candidates for removal).
-  for (const [id, entry] of baseline) {
-    if (!seenIds.has(id)) {
-      console.log(
-        `ℹ️  Baseline advisory ${id} (${entry.package}) is no longer reported by the audit — it may be removed from the baseline.`
-      );
-    }
+  // Note baseline entries no longer present in the audit (partial disappearance
+  // only; a total disappearance is handled by the fail-closed floor above).
+  for (const id of missingBaselineIds) {
+    const entry = baseline.get(id);
+    console.log(
+      `ℹ️  Baseline advisory ${id} (${entry.package}) is no longer reported by the audit — it may be removed from the baseline.`
+    );
   }
 
   if (newFindings.length > 0) {
