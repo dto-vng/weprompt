@@ -452,6 +452,12 @@ const installWebContentsSecurity = (): void => {
     // an unprivileged, isolated, sandboxed guest. The app's own <webview>
     // usage (HTML preview, external pages) never sets a preload, so this is a
     // no-op for legitimate use and closes the injected-<webview> escalation.
+    // NOTE: this only hardens the guest's *privileges*; it intentionally does
+    // NOT vet the guest's `src` / navigation destination. Restricting where a
+    // guest may go is delegated to the app's own webview usage and is fenced
+    // separately (the `will-navigate` guard below applies to `window` contents,
+    // not guests — guests are meant to browse arbitrary content). Do not assume
+    // this is where guest destinations are restricted.
     contents.on('will-attach-webview', (_attachEvent, webPreferences, _params) => {
       // No preload allowlist exists today; strip unconditionally.
       delete webPreferences.preload;
@@ -478,6 +484,10 @@ const installWebContentsSecurity = (): void => {
     // everything else is denied. Note the renderer normally routes external
     // links through the backend (ipcBridge.shell.openExternal); this handler is
     // the safety net for any raw window.open / target=_blank that reaches here.
+    // Non-http(s) schemes — including conventionally-safe `mailto:` / `tel:` —
+    // are deliberately denied for now (the app has no such links today). If
+    // mail/tel links are ever added to the UI, allowlist those schemes here so
+    // they too are passed to shell.openExternal.
     contents.setWindowOpenHandler(({ url }) => {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         void shell.openExternal(url).catch((error) => {
@@ -500,6 +510,26 @@ const installWebContentsSecurity = (): void => {
 // header only after launching the app, exercising the main flows + HTML preview
 // + charts/markdown (mermaid, katex, syntax highlighting, web-tree-sitter WASM),
 // reading the reported violations, and confirming the policy is complete.
+//
+// ⚠️ SHARED-SESSION CAVEAT — READ BEFORE PROMOTING TO ENFORCING ⚠️
+// This header is installed on `session.defaultSession`, which is SHARED with
+// partition-less <webview> guests — specifically `URLViewer` (arbitrary remote
+// URL preview) and `OfficeWatchViewer` (local office server), both of which
+// render <WebviewHost> WITHOUT a `partition` and therefore inherit
+// defaultSession. In Report-Only this is harmless (nothing is blocked). But
+// this app-shell CSP is authored for the app's OWN content ('self'); imposing
+// it on arbitrary external / office guest pages will very likely BREAK them
+// (their inline scripts and remote connect-src targets are not covered by
+// 'self'). Therefore, BEFORE renaming the header to the enforcing
+// `Content-Security-Policy`, the maintainer MUST do ONE of:
+//   (a) scope the header to the app-shell/main-frame document only — e.g. gate
+//       the onHeadersReceived callback so it only adds CSP to the app's own
+//       document requests, not to guest (webview) page loads; OR
+//   (b) move every external/remote webview onto a DEDICATED `partition` (a
+//       separate session that this defaultSession policy does not touch), so
+//       the app-shell CSP never applies to guest pages.
+// (Extension-settings webviews already use `persist:ext-settings-*` partitions
+// and are unaffected; only the two partition-less viewers above are at risk.)
 //
 // Directive rationale (desktop Electron renderer, loaded from file:// or the
 // Vite dev server):
