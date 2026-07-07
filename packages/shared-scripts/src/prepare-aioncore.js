@@ -16,12 +16,26 @@
  */
 
 const { execSync, execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const aioncoreChecksums = require('./aioncore-checksums');
+
 const GITHUB_OWNER = 'iOfficeAI';
 const GITHUB_REPO = 'AionCore';
+
+/**
+ * Break-glass env override for LOCAL DEVELOPMENT ONLY.
+ *
+ * When set to '1', the pinned-digest integrity check is skipped and a LOUD
+ * warning is printed. This exists so a developer can test against a locally
+ * built / unreleased AionCore archive that has no committed digest. It must
+ * NEVER be set in CI or production — doing so re-opens the remote-code-execution
+ * path this verification closes (Forge finding #1).
+ */
+const SKIP_VERIFY_ENV = 'AIONUI_SKIP_AIONCORE_VERIFY';
 
 const ACTIONS_ARTIFACT_TARGETS = {
   'darwin-arm64': {
@@ -85,8 +99,113 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
 }
 
+/**
+ * Reject any download URL that is not https before it is handed to a downloader.
+ * Defense-in-depth alongside the client-side https-only redirect flags.
+ * @param {string} url
+ * @throws {Error} when the URL is not https.
+ */
+function assertHttpsUrl(url) {
+  if (!/^https:\/\//i.test(String(url))) {
+    throw new Error(`Refusing to download AionCore over a non-HTTPS URL: ${url}`);
+  }
+}
+
 function getBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+}
+
+// ---------------------------------------------------------------------------
+// Integrity verification (Forge finding #1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the pinned-digest verification is skipped via the break-glass env.
+ * @returns {boolean}
+ */
+function isVerificationSkipped() {
+  return (process.env[SKIP_VERIFY_ENV] || '').trim() === '1';
+}
+
+/**
+ * Compute the SHA-256 digest of a file as lowercase hex.
+ * @param {string} filePath
+ * @returns {string}
+ */
+function computeSha256(filePath) {
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+/**
+ * Build an Error tagged as an integrity failure. Callers use isIntegrityError()
+ * to distinguish it from a recoverable download failure (a network glitch may
+ * fall back to another source; a failed integrity check must NEVER fall back).
+ * @param {string} message
+ * @returns {Error}
+ */
+function makeIntegrityError(message) {
+  const error = new Error(message);
+  error.isAioncoreIntegrityError = true;
+  return error;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean} true when the error is a tagged integrity failure.
+ */
+function isIntegrityError(error) {
+  return Boolean(error && error.isAioncoreIntegrityError === true);
+}
+
+/**
+ * Verify a downloaded release archive against the digest pinned in our repo,
+ * BEFORE it is extracted or executed.
+ *
+ * Trust model: the pin committed in `aioncore-checksums.js` is the trust anchor.
+ * We do NOT trust the release-served checksums file (it is unsigned). Fail-closed:
+ * a mismatch OR a missing pin throws, so the archive is never extracted/executed.
+ *
+ * @param {object} params
+ * @param {string} params.archivePath - Path to the downloaded archive on disk.
+ * @param {string} params.assetName - Release asset file name (pin lookup key).
+ * @param {string} params.version - AionCore release tag (pin lookup key).
+ * @throws {Error} on missing pin or digest mismatch.
+ */
+function verifyArchiveDigest({ archivePath, assetName, version }) {
+  if (isVerificationSkipped()) {
+    console.warn(
+      `  ⚠️  ${SKIP_VERIFY_ENV}=1 — SKIPPING AionCore integrity verification for ${assetName}. ` +
+        `This is for LOCAL DEVELOPMENT ONLY and must NEVER be used in CI or production.`
+    );
+    return;
+  }
+
+  // Resolve the pin through the module object (not a captured reference) so the
+  // lookup is easy to stub in unit tests and always reflects the committed map.
+  const expected = aioncoreChecksums.getPinnedDigest(version, assetName);
+  if (!expected) {
+    throw makeIntegrityError(
+      `No pinned SHA-256 digest for AionCore asset "${assetName}" at version "${version}". ` +
+        `Refusing to extract or execute an unverified artifact (fail-closed). ` +
+        `Add the digest to packages/shared-scripts/src/aioncore-checksums.js ` +
+        `(see the regeneration instructions in that file), or set ${SKIP_VERIFY_ENV}=1 for local dev only.`
+    );
+  }
+
+  const actual = computeSha256(archivePath);
+  if (actual.toLowerCase() !== expected.toLowerCase()) {
+    throw makeIntegrityError(
+      `AionCore artifact integrity check FAILED for "${assetName}" (version "${version}").\n` +
+        `  expected SHA-256: ${expected}\n` +
+        `  actual   SHA-256: ${actual}\n` +
+        `The downloaded archive does not match the pinned digest. It will NOT be extracted or executed. ` +
+        `This may indicate a corrupted download, a tampered release, or a man-in-the-middle attack.`
+    );
+  }
+
+  console.log(`  Verified AionCore artifact SHA-256 against pinned digest: ${assetName}`);
 }
 
 function getActionsTarget(platform, arch) {
@@ -198,7 +317,13 @@ function getDownloadUrl(assetName, tag) {
 
 function downloadFile(url, outputPath) {
   console.log(`  Downloading aioncore from ${url}`);
+  // SECURITY (Forge #1): enforce HTTPS on the initial request AND across any
+  // redirect. A downgrade to http on a redirect would expose the download to
+  // MITM tampering before the digest check runs.
+  assertHttpsUrl(url);
   if (process.platform === 'win32') {
+    // Invoke-WebRequest follows redirects; the scheme is validated up front and
+    // curl/wget below (used on non-Windows) refuse http redirects at the client.
     const ps = `$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '${url}' -OutFile '${outputPath.replace(/'/g, "''")}'`;
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
       timeout: 120000,
@@ -206,9 +331,28 @@ function downloadFile(url, outputPath) {
     return;
   }
   try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', '-o', outputPath, url], { timeout: 120000 });
+    // --proto '=https' / --proto-redir '=https' → curl aborts if the URL or any
+    // redirect target is not https.
+    execFileSync(
+      'curl',
+      [
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        '-o',
+        outputPath,
+        url,
+      ],
+      { timeout: 120000 }
+    );
   } catch {
-    execFileSync('wget', ['-q', '-O', outputPath, url], { timeout: 120000 });
+    // --https-only → wget refuses to follow a redirect to a non-https URL.
+    execFileSync('wget', ['--https-only', '-q', '-O', outputPath, url], { timeout: 120000 });
   }
 }
 
@@ -300,15 +444,38 @@ function downloadFileWithAuth(url, outputPath) {
     headers.push('-H', `Authorization: Bearer ${token}`);
   }
 
+  // SECURITY (Forge #1): enforce HTTPS on the request and every redirect so an
+  // authenticated download cannot be downgraded to plaintext http.
+  assertHttpsUrl(url);
+
   try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', ...headers, '-o', outputPath, url], {
-      timeout: 120000,
-    });
+    execFileSync(
+      'curl',
+      [
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        ...headers,
+        '-o',
+        outputPath,
+        url,
+      ],
+      {
+        timeout: 120000,
+      }
+    );
     return;
   } catch {
     // curl may be unavailable in some local environments; try gh before failing.
   }
 
+  // `gh api` only ever talks to the GitHub API over https; the URL is validated
+  // above for defense-in-depth.
   execFileSync('gh', ['api', url, '--output', outputPath], {
     timeout: 120000,
     env: {
@@ -401,6 +568,10 @@ function downloadAndExtract(platform, arch, tag) {
   ensureDirectory(tempDir);
 
   downloadFile(url, archivePath);
+  // SECURITY (Forge #1): verify the archive against the digest pinned in our
+  // repo BEFORE extracting or executing anything. Fail-closed on mismatch or
+  // missing pin — this is the RCE mitigation for the release-download path.
+  verifyArchiveDigest({ archivePath, assetName, version: tag });
   extractArchive(archivePath, extractDir, platform);
 
   const binaryName = getBinaryName(platform);
@@ -515,6 +686,12 @@ function prepareAioncore(options) {
       sourceDetail = { url: result.url };
       console.log(`  Downloaded from GitHub releases`);
     } catch (error) {
+      // SECURITY (Forge #1): a failed integrity check must be fatal — never fall
+      // back to another source (which could serve the very artifact we rejected).
+      // Only genuine download/network failures are recoverable here.
+      if (isIntegrityError(error)) {
+        throw error;
+      }
       console.warn(`  Download failed: ${error.message}`);
     }
   }
@@ -568,7 +745,11 @@ function prepareAioncore(options) {
 }
 
 module.exports = {
+  assertHttpsUrl,
+  computeSha256,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
+  isVerificationSkipped,
   prepareAioncore,
+  verifyArchiveDigest,
 };
