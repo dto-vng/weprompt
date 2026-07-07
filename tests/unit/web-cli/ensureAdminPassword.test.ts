@@ -69,7 +69,7 @@ describe('ensureAdminPassword', () => {
     expect(calls[0].url).toBe('http://127.0.0.1:25808/api/auth/status');
     expect(calls[1].url).toBe('http://127.0.0.1:25808/api/webui/reset-password');
     expect(calls[1].init?.method).toBe('POST');
-    expect(logs.some((m) => m.includes('Generated an initial admin password'))).toBe(true);
+    expect(logs.some((m) => m.includes('generated and is NOT logged'))).toBe(true);
     expect(logs.some((m) => m.includes('Log in with username "admin"'))).toBe(true);
     // SECURITY (#5): the generated password must never appear in any log line.
     expect(logs.every((m) => !m.includes('SuperSecret123'))).toBe(true);
@@ -87,7 +87,7 @@ describe('ensureAdminPassword', () => {
 
     await ensureAdminPassword({ backendPort: 25808 }, deps);
 
-    expect(logs.some((m) => m.includes('Generated an initial admin password'))).toBe(true);
+    expect(logs.some((m) => m.includes('generated and is NOT logged'))).toBe(true);
     // SECURITY (#5): the generated password must never appear in any log line.
     expect(logs.every((m) => !m.includes('FromTopLevel'))).toBe(true);
   });
@@ -120,7 +120,7 @@ describe('ensureAdminPassword', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1].url).toBe('http://127.0.0.1:25808/api/auth/internal/users/system');
     expect(logs.some((m) => m.includes('resetpass'))).toBe(true);
-    expect(logs.every((m) => !m.includes('Generated an initial admin password'))).toBe(true);
+    expect(logs.every((m) => !m.includes('generated and is NOT logged'))).toBe(true);
     expect(warns).toEqual([]);
   });
 
@@ -150,7 +150,7 @@ describe('ensureAdminPassword', () => {
 
     expect(statusAttempts).toBe(3);
     expect(sleeps.length).toBeGreaterThanOrEqual(2);
-    expect(logs.some((m) => m.includes('Generated an initial admin password'))).toBe(true);
+    expect(logs.some((m) => m.includes('generated and is NOT logged'))).toBe(true);
   });
 
   it('warns (not throws) when status never comes up within budget', async () => {

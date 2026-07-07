@@ -6,16 +6,22 @@
  * On first tarball launch, the aioncore's SQLite `users` table holds the
  * seeded `system_default_user` row with an empty password_hash. We probe
  * /api/auth/status; if `needs_setup === true`, ask the backend to generate and
- * persist a random password via POST /api/webui/reset-password and print it to
- * stdout so the user can log in.
+ * persist a random password via POST /api/webui/reset-password.
+ *
+ * SECURITY (#5): the generated password is deliberately NOT written to
+ * stdout/logs — that would persist it in terminal scrollback, journald,
+ * container/CI logs, and log shippers. We only log that a password was
+ * generated and how to obtain a working credential. To get a usable password,
+ * run the `resetpass` subcommand (runResetPassword in index.ts), which sets and
+ * prints a NEW password, or manage it in the desktop app's Settings.
  *
  * Mirrors Electron's maybeSeedInitialPassword in
  * packages/desktop/src/process/bridge/webuiBridge.ts:52-77 and the Bun dev
  * helper in scripts/webui.ts — when either changes, keep this in sync.
  *
- * The printed format is load-bearing: scripts/smoke-test-web-cli.sh greps for
- * "Generated initial admin password: <pw>". Do not change it without updating
- * that script.
+ * scripts/smoke-test-web-cli.sh no longer greps this seed log for the password;
+ * it obtains one via `resetpass` instead. If you change the resetpass stdout
+ * format ("[aionui-web] new password: <pw>"), update that script's grep too.
  */
 
 export type EnsureAdminPasswordDeps = {
@@ -135,7 +141,7 @@ export async function ensureAdminPassword(
     const username = await fetchAdminUsername(deps, opts.backendPort);
     // SECURITY (#5): never print the generated password to stdout/logs.
     deps.log(
-      `[aionui-web] Generated an initial admin password. Retrieve it once via \`${resetCmd}\` or the desktop Settings; it is not logged.`
+      `[aionui-web] A random initial admin password was generated and is NOT logged for security. To sign in, set a new password with \`${resetCmd}\`, or manage it in the desktop app's Settings.`
     );
     deps.log(`[aionui-web] Log in with username "${username}" and change it from the UI.`);
   } catch (err) {
