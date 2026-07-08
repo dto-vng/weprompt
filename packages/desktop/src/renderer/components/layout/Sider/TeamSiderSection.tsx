@@ -152,7 +152,7 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
             data-testid='team-section-toggle'
             onClick={() => setExpanded((v) => !v)}
           >
-            <span className='text-14px text-t-tertiary sider-section-title group-hover/label:text-t-primary transition-colors font-[500] leading-none'>
+            <span className='text-14px text-t-secondary sider-section-title group-hover/label:text-t-primary transition-colors font-600 leading-none'>
               {t('team.sider.title')}
             </span>
             <span className='ml-2px flex items-center justify-center opacity-0 group-hover/label:opacity-100 transition-opacity text-t-tertiary shrink-0'>
@@ -167,7 +167,7 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
             <Tooltip content={t('team.sider.createTeam')} position='top'>
               <div
                 data-testid='team-create-btn'
-                className='ml-auto -mr-4px size-20px rd-4px flex items-center justify-center hover:bg-fill-4 transition-all shrink-0 cursor-pointer text-t-secondary hover:text-t-primary'
+                className='ml-auto -mr-4px size-20px rd-4px flex items-center justify-center hover:bg-fill-4 transition-all shrink-0 cursor-pointer text-primary'
                 onClick={(e) => {
                   e.stopPropagation();
                   setCreateTeamVisible(true);

@@ -169,7 +169,14 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
 
   return (
     <>
-      <div className={classNames('min-w-0 flex flex-col group', isUserMessage ? 'items-end' : 'items-start')}>
+      <div
+        className={classNames(
+          'flex flex-col group',
+          // User column sizes to content up to 85% (no min-w-0, which would let the
+          // flex item collapse to min-content and wrap short text prematurely).
+          isUserMessage ? 'items-end max-w-[85%] ml-auto' : 'min-w-0 items-start'
+        )}
+      >
         {cronMeta && <MessageCronBadge meta={cronMeta} />}
         {isTeammateMessage && senderName && (
           <div className='flex items-center gap-6px mb-4px'>
@@ -198,16 +205,21 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
         )}
         <div
           className={classNames('min-w-0 [&>p:first-child]:mt-0px [&>p:last-child]:mb-0px', {
-            'bg-aou-2 p-6px md:p-8px': isUserMessage || cronMeta,
+            // User messages get a subtle warm bubble; cron/teammate keep their box.
+            'bg-message-user p-8px md:px-12px md:py-8px': isUserMessage && !cronMeta,
+            'bg-aou-2 p-6px md:p-8px': cronMeta,
             'bg-3 p-6px md:p-8px': isTeammateMessage,
             'w-full': !(isUserMessage || cronMeta || isTeammateMessage),
           })}
           style={{
-            ...(isUserMessage || cronMeta
+            ...(cronMeta
               ? { borderRadius: '8px 0 8px 8px', color: 'var(--text-primary)' }
               : isTeammateMessage
                 ? { borderRadius: '0 8px 8px 8px' }
                 : undefined),
+            ...(isUserMessage && !cronMeta
+              ? { borderRadius: '12px 2px 12px 12px', color: 'var(--text-primary)' }
+              : undefined),
           }}
         >
           {/* JSON 内容使用折叠组件 Use CollapsibleContent for JSON content */}
