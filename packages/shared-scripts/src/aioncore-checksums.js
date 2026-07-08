@@ -1,0 +1,75 @@
+/**
+ * Pinned SHA-256 digests for AionCore release artifacts.
+ *
+ * SECURITY (Forge finding #1): AionUi downloads AionCore release archives and
+ * executes the extracted binary. These pinned digests are the trust anchor for
+ * that flow — the archive is verified against the digest committed HERE (in our
+ * repo) BEFORE it is ever extracted or executed. This defeats MITM tampering,
+ * mutable re-tags of the upstream release, and post-vetting release tampering.
+ *
+ * The digests are NOT anchored on the release-served `aioncore-checksums.txt`
+ * (that file is unsigned and lives next to the artifacts, so an attacker who can
+ * swap an artifact can swap the checksums file too). We may fetch it as a
+ * secondary cross-check when regenerating, but the value below is what we trust.
+ *
+ * Keyed by AionCore release tag → { assetFileName: sha256Hex }.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * HOW TO REGENERATE ON A VERSION BUMP
+ * ─────────────────────────────────────────────────────────────────────────────
+ * When `aioncoreVersion` in the repo-root package.json changes (see the
+ * `bump-version` skill, step 5–6), add a new entry to CHECKSUMS below keyed by
+ * the new tag. Obtain the digests from the release's checksums file:
+ *
+ *   curl -fsSL --proto '=https' --proto-redir '=https' \
+ *     "https://github.com/iOfficeAI/AionCore/releases/download/<tag>/aioncore-checksums.txt"
+ *
+ * Then CROSS-VERIFY at least one artifact by downloading it and hashing it
+ * locally, confirming the value matches the checksums file before trusting it:
+ *
+ *   curl -fsSL --proto '=https' --proto-redir '=https' -o /tmp/a.tar.gz \
+ *     "https://github.com/iOfficeAI/AionCore/releases/download/<tag>/<asset>"
+ *   node -e "const c=require('crypto'),f=require('fs');\
+ *     console.log(c.createHash('sha256').update(f.readFileSync('/tmp/a.tar.gz')).digest('hex'))"
+ *
+ * Only after the local hash matches the checksums file should the values be
+ * committed here. Keep old versions in the map so older pins remain reproducible.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * v0.1.43
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Source: https://github.com/iOfficeAI/AionCore/releases/download/v0.1.43/aioncore-checksums.txt
+ * Cross-verified: aioncore-v0.1.43-x86_64-apple-darwin.tar.gz downloaded and
+ * hashed with node:crypto — matched the checksums file (30073347 bytes).
+ */
+
+const CHECKSUMS = {
+  'v0.1.43': {
+    'aioncore-v0.1.43-aarch64-apple-darwin.tar.gz': '6eab591336bf3a69ef08bdb7262b994617f48dd6d10547e7feda812939c8075f',
+    'aioncore-v0.1.43-aarch64-pc-windows-msvc.zip': '473d9e24c7f33cec6580f846bc2c9dd967a88283f1e393f572b5d9630f9e9586',
+    'aioncore-v0.1.43-aarch64-unknown-linux-gnu.tar.gz':
+      'd8f86dc1538b85f136466c0e9ef011ceb5357276e9beb5a3715673ff1d28594b',
+    'aioncore-v0.1.43-x86_64-apple-darwin.tar.gz': '8d857d49a2bf47fc90eee67d2baceb4f9c2d19975fe6f5a4c2ed38f9416b2376',
+    'aioncore-v0.1.43-x86_64-pc-windows-msvc.zip': 'c91a2a7be4b72cebbad7291212d1d65518ab5ef7f16eeabc8b7537a162b8bf93',
+    'aioncore-v0.1.43-x86_64-unknown-linux-gnu.tar.gz':
+      'f198875cf25fc39365db2cb3f6e6921ef6b0adfcbe4664e3ba53239cd0f2e85d',
+  },
+};
+
+/**
+ * Look up the pinned SHA-256 digest for a release asset.
+ *
+ * @param {string} version - AionCore release tag (e.g. 'v0.1.43').
+ * @param {string} assetName - Release asset file name.
+ * @returns {string | null} lowercase hex digest, or null when no pin exists.
+ */
+function getPinnedDigest(version, assetName) {
+  const forVersion = CHECKSUMS[version];
+  if (!forVersion) return null;
+  return forVersion[assetName] || null;
+}
+
+module.exports = {
+  CHECKSUMS,
+  getPinnedDigest,
+};
