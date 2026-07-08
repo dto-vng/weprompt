@@ -216,12 +216,16 @@ const toDesktopHandle = (handle: WebHostHandle, allowRemote: boolean): DesktopWe
  * Settings → "Enable WebUI" IPC handler.
  */
 export async function startDesktopWebUI(opts: { port?: number; allowRemote?: boolean }): Promise<DesktopWebUIHandle> {
-  // If already running, tear down first so we honour the new port / allowRemote.
+  // If already running, tear down first so we honour the new port.
   if (currentHandle) {
     await stopDesktopWebUI();
   }
 
-  const allowRemote = opts.allowRemote === true;
+  // Forge desktop-only (D1) — authoritative guard; ignore any caller/persisted allowRemote.
+  // This is the single chokepoint every caller (webui.start bridge, index.ts WebUI mode,
+  // and the boot-time restoreDesktopWebUIFromPreferences path) funnels through, so forcing
+  // false here guarantees the WebUI can only ever bind to loopback.
+  const allowRemote = false;
   const preferredPort = parsePortValue(opts.port) ?? DEFAULT_WEBUI_PORT;
   const sysDir = getSystemDir();
 
