@@ -17,7 +17,11 @@ import {
 import { BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
-import { seedGreenNodeProvider, seedOpenCodeGreenNodeConfig } from './seedBuiltinProviders';
+import {
+  ensureOpenCodeAgentInstalled,
+  seedGreenNodeProvider,
+  seedOpenCodeGreenNodeConfig,
+} from './seedBuiltinProviders';
 
 type ConfigFile = typeof ProcessConfigType;
 type MigrationStepResult = boolean;
@@ -378,6 +382,7 @@ const MIGRATION_STEPS: Array<{
   { name: 'migrateAssistantsToBackend', run: async (configFile) => migrateAssistantsToBackend(configFile) },
   { name: 'seedGreenNodeProvider', run: async (configFile) => seedGreenNodeProvider(configFile) },
   { name: 'seedOpenCodeGreenNodeConfig', run: async (configFile) => seedOpenCodeGreenNodeConfig(configFile) },
+  { name: 'ensureOpenCodeAgentInstalled', run: async (configFile) => ensureOpenCodeAgentInstalled(configFile) },
 ];
 
 async function syncBuiltinMcpConfig(configFile: ConfigFile): Promise<void> {

@@ -11,7 +11,12 @@ import {
   GREENNODE_OPENCODE_DEFAULT_MODEL,
   GREENNODE_OPENCODE_PROVIDER_ID,
 } from '@/common/config/builtinSeed';
-import { mergeGreenNodeIntoOpenCodeConfig, type OpenCodeConfig } from './seedBuiltinProviders';
+import type { IHubAgentItem } from '@/common/types/agent/hub';
+import {
+  findOpenCodeHubExtension,
+  mergeGreenNodeIntoOpenCodeConfig,
+  type OpenCodeConfig,
+} from './seedBuiltinProviders';
 
 describe('mergeGreenNodeIntoOpenCodeConfig', () => {
   it('seeds an empty config with provider, both models, and default model', () => {
@@ -56,5 +61,38 @@ describe('mergeGreenNodeIntoOpenCodeConfig', () => {
     const changedAgain = mergeGreenNodeIntoOpenCodeConfig(config);
 
     expect(changedAgain).toBe(false);
+  });
+});
+
+const hubItem = (overrides: Partial<IHubAgentItem>): IHubAgentItem =>
+  ({
+    name: 'ext-something',
+    display_name: 'Something',
+    description: '',
+    author: '',
+    dist: { tarball: '', integrity: '', unpackedSize: 0 },
+    engines: { aionui: '0.0.0' },
+    hubs: ['acpAdapters'],
+    status: 'not_installed',
+    ...overrides,
+  }) as IHubAgentItem;
+
+describe('findOpenCodeHubExtension', () => {
+  it('matches an extension by name regardless of prefix or case', () => {
+    const extensions = [hubItem({ name: 'ext-claude-code' }), hubItem({ name: 'ext-OpenCode' })];
+    expect(findOpenCodeHubExtension(extensions)?.name).toBe('ext-OpenCode');
+  });
+
+  it('matches an extension by contributed acp adapter id', () => {
+    const extensions = [
+      hubItem({ name: 'ext-claude-code' }),
+      hubItem({ name: 'ext-sst-agent', contributes: { acpAdapters: ['opencode'] } }),
+    ];
+    expect(findOpenCodeHubExtension(extensions)?.name).toBe('ext-sst-agent');
+  });
+
+  it('returns undefined when no extension matches', () => {
+    expect(findOpenCodeHubExtension([hubItem({ name: 'ext-codex' })])).toBeUndefined();
+    expect(findOpenCodeHubExtension([])).toBeUndefined();
   });
 });

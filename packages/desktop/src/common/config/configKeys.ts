@@ -41,6 +41,7 @@ export type ConfigKeyMap = {
   // `seedBuiltinProviders.ts`.
   'migration.greennodeProviderSeeded_v1': boolean | undefined;
   'migration.opencodeGreenNodeSeeded_v1': boolean | undefined;
+  'migration.opencodeAgentInstalled_v1': boolean | undefined;
 };
 
 export type ConfigKey = keyof ConfigKeyMap;

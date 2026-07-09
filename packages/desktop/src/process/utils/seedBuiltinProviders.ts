@@ -18,6 +18,7 @@ import {
   GREENNODE_PROVIDER_NAME,
   getGreenNodeApiKey,
 } from '@/common/config/builtinSeed';
+import type { IHubAgentItem } from '@/common/types/agent/hub';
 import type { IProvider } from '@/common/config/storage';
 import type { ProcessConfig as ProcessConfigType } from './initStorage';
 
@@ -25,11 +26,11 @@ type ConfigFile = typeof ProcessConfigType;
 
 const GREENNODE_PROVIDER_SEED_FLAG = 'migration.greennodeProviderSeeded_v1' as const;
 const OPENCODE_SEED_FLAG = 'migration.opencodeGreenNodeSeeded_v1' as const;
+const OPENCODE_AGENT_INSTALL_FLAG = 'migration.opencodeAgentInstalled_v1' as const;
 
-async function readSeedFlag(
-  configFile: ConfigFile,
-  flag: typeof GREENNODE_PROVIDER_SEED_FLAG | typeof OPENCODE_SEED_FLAG
-): Promise<boolean> {
+type SeedFlag = typeof GREENNODE_PROVIDER_SEED_FLAG | typeof OPENCODE_SEED_FLAG | typeof OPENCODE_AGENT_INSTALL_FLAG;
+
+async function readSeedFlag(configFile: ConfigFile, flag: SeedFlag): Promise<boolean> {
   try {
     return Boolean(await configFile.get(flag));
   } catch {
@@ -189,5 +190,46 @@ export async function seedOpenCodeGreenNodeConfig(configFile: ConfigFile): Promi
   }
 
   await configFile.set(OPENCODE_SEED_FLAG, true);
+  return true;
+}
+
+/**
+ * Find the OpenCode agent extension in the Agent Hub index. The hub id is
+ * owned by the backend index (e.g. 'opencode' or 'ext-opencode'), so match
+ * by name or by contributed ACP adapter id. Pure — exported for tests.
+ */
+export function findOpenCodeHubExtension(extensions: IHubAgentItem[]): IHubAgentItem | undefined {
+  return extensions.find(
+    (ext) =>
+      ext.name.toLowerCase().includes('opencode') ||
+      (ext.contributes?.acpAdapters ?? []).some((id) => id.toLowerCase().includes('opencode'))
+  );
+}
+
+/**
+ * Request an Agent Hub install of the OpenCode agent on first launch — the
+ * same call the Agent Hub UI's Install button makes. One-shot: once the
+ * install has been requested, a later user uninstall is never replayed.
+ * Returns false (step incomplete, retried next launch) while the hub index
+ * has no OpenCode entry, e.g. offline first run.
+ */
+export async function ensureOpenCodeAgentInstalled(configFile: ConfigFile): Promise<boolean> {
+  if (await readSeedFlag(configFile, OPENCODE_AGENT_INSTALL_FLAG)) {
+    return true;
+  }
+
+  const extensions = (await httpRequest<IHubAgentItem[]>('GET', '/api/hub/extensions')) || [];
+  const openCode = findOpenCodeHubExtension(extensions);
+  if (!openCode) {
+    console.warn('[Seed] OpenCode extension not found in Agent Hub index (%d extensions)', extensions.length);
+    return false;
+  }
+
+  if (openCode.status === 'not_installed' || openCode.status === 'install_failed') {
+    await httpRequest('POST', '/api/hub/install', { name: openCode.name });
+    console.info('[Seed] OpenCode agent install requested via Agent Hub (%s)', openCode.name);
+  }
+
+  await configFile.set(OPENCODE_AGENT_INSTALL_FLAG, true);
   return true;
 }
