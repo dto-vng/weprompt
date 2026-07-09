@@ -613,6 +613,8 @@ const AionrsSendBox: React.FC<{
   };
   const effectiveHandleStop = teamRuntime?.onStop ?? handleStop;
   const sendBoxWidthClass = getChatSurfaceWidthClass(Boolean(teamPermission));
+  const thoughtDisplayRunning = teamRuntime?.loading ?? (runtimeView.hydrated ? runtimeView.isProcessing : running);
+  const thoughtDisplayThought = thoughtDisplayRunning ? thought : undefined;
 
   return (
     <div className={`${sendBoxWidthClass} flex flex-col mt-auto mb-16px`}>
@@ -626,7 +628,7 @@ const AionrsSendBox: React.FC<{
         onRemove={remove}
         onClear={clear}
       />
-      <ThoughtDisplay thought={thought} running={teamRuntime?.loading ?? running} onStop={effectiveHandleStop} />
+      <ThoughtDisplay thought={thoughtDisplayThought} running={thoughtDisplayRunning} onStop={effectiveHandleStop} />
 
       <SendBox
         data-testid='aionrs-sendbox'

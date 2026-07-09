@@ -62,7 +62,7 @@
 }
 
 .thought-display--running {
-  border-color: color-mix(in srgb, var(--aou-6-brand) 22%, var(--color-border-2));
+  border-color: var(--color-border-2);
   background: color-mix(in srgb, var(--aou-1) 56%, var(--color-bg-1));
 }
 

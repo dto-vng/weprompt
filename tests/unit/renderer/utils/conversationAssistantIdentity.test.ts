@@ -5,7 +5,7 @@
  */
 
 import type { TChatConversation } from '@/common/config/storage';
-import type { PresetAssistantInfo } from '@/renderer/hooks/agent/usePresetAssistantInfo';
+import forgeMark from '@/renderer/assets/logos/brand/forge-mark.svg';
 import { resolveConversationLeadingMark } from '@/renderer/pages/conversation/utils/conversationAssistantIdentity';
 import { describe, expect, it } from 'vitest';
 
@@ -15,7 +15,7 @@ const TEST_LOGOS = {
 };
 
 describe('resolveConversationLeadingMark', () => {
-  it('prefers the assistant image avatar when assistant info exists', () => {
+  it('uses the Forge brand mark instead of assistant image avatars', () => {
     const result = resolveConversationLeadingMark(
       makeConversation(),
       {
@@ -30,7 +30,7 @@ describe('resolveConversationLeadingMark', () => {
 
     expect(result).toEqual({
       kind: 'image',
-      value: '/api/assistants/academic-paper/avatar',
+      value: forgeMark,
       label: 'Academic Paper',
     });
   });
@@ -55,7 +55,7 @@ describe('resolveConversationLeadingMark', () => {
     });
   });
 
-  it('falls back to the backend logo when there is no assistant info', () => {
+  it('uses the Forge brand mark instead of backend logos when there is no assistant info', () => {
     const result = resolveConversationLeadingMark(
       makeConversation({
         type: 'acp',
@@ -67,7 +67,7 @@ describe('resolveConversationLeadingMark', () => {
 
     expect(result).toEqual({
       kind: 'image',
-      value: '/api/assets/logos/gemini.svg',
+      value: forgeMark,
       label: 'gemini',
     });
   });

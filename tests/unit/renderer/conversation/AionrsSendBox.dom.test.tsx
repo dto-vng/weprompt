@@ -4,15 +4,77 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
 
+type AionrsMessageStateMock = {
+  thought: {
+    subject: string;
+    description: string;
+  };
+  running: boolean;
+  setActiveMsgId: ReturnType<typeof vi.fn>;
+  setWaitingResponse: ReturnType<typeof vi.fn>;
+  resetState: ReturnType<typeof vi.fn>;
+};
+
+type RuntimeViewStateMock = {
+  hydrated: boolean;
+  canSendMessage: boolean;
+  isProcessing: boolean;
+  state: string;
+  activeTurnId: string | null;
+  markSendStarted: ReturnType<typeof vi.fn>;
+  markSendAccepted: ReturnType<typeof vi.fn>;
+  markSendFailed: ReturnType<typeof vi.fn>;
+  markStopRequested: ReturnType<typeof vi.fn>;
+  markStopAcknowledged: ReturnType<typeof vi.fn>;
+  resetLocalGate: ReturnType<typeof vi.fn>;
+};
+
+type ThoughtDisplayPropsMock = {
+  thought?: {
+    subject: string;
+    description: string;
+  };
+  running?: boolean;
+  onStop?: () => void;
+};
+
 const {
+  aionrsMessageState,
+  createAionrsMessageState,
+  createRuntimeViewState,
   ensureConversationRuntimeMock,
+  runtimeViewState,
   sendMessageInvokeMock,
+  thoughtDisplayProps,
   translateMock,
   useTeamPermissionMock,
   setSendBoxHandlerMock,
 } = vi.hoisted(() => ({
+  createAionrsMessageState: (): AionrsMessageStateMock => ({
+    thought: { subject: '', description: '' },
+    running: false,
+    setActiveMsgId: vi.fn(),
+    setWaitingResponse: vi.fn(),
+    resetState: vi.fn(),
+  }),
+  createRuntimeViewState: (): RuntimeViewStateMock => ({
+    hydrated: true,
+    canSendMessage: true,
+    isProcessing: false,
+    state: 'idle',
+    activeTurnId: null,
+    markSendStarted: vi.fn(),
+    markSendAccepted: vi.fn(),
+    markSendFailed: vi.fn(),
+    markStopRequested: vi.fn(),
+    markStopAcknowledged: vi.fn(),
+    resetLocalGate: vi.fn(),
+  }),
   ensureConversationRuntimeMock: vi.fn().mockResolvedValue({ recovered: false, config_options: [], runtime: null }),
+  aionrsMessageState: { current: undefined as AionrsMessageStateMock | undefined },
+  runtimeViewState: { current: undefined as RuntimeViewStateMock | undefined },
   sendMessageInvokeMock: vi.fn().mockResolvedValue(undefined),
+  thoughtDisplayProps: { current: null as ThoughtDisplayPropsMock | null },
   translateMock: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
   useTeamPermissionMock: vi.fn(),
   setSendBoxHandlerMock: vi.fn(),
@@ -63,7 +125,15 @@ vi.mock('@/renderer/components/chat/MobileActionSheet', () => ({
   default: () => null,
   useAttachEntry: () => ({ entries: [], hiddenFileInput: null }),
 }));
-vi.mock('@/renderer/components/chat/ThoughtDisplay', () => ({ default: () => null }));
+vi.mock('@/renderer/components/chat/ThoughtDisplay', () => ({
+  default: (props: ThoughtDisplayPropsMock) => {
+    thoughtDisplayProps.current = props;
+    if (!props.running && !props.thought?.subject) {
+      return null;
+    }
+    return <div data-testid='thought-display'>processing</div>;
+  },
+}));
 vi.mock('@/renderer/components/media/FileAttachButton', () => ({ default: () => null }));
 vi.mock('@/renderer/components/media/FilePreview', () => ({ default: () => null }));
 vi.mock('@/renderer/components/media/HorizontalFileList', () => ({
@@ -142,13 +212,7 @@ vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', (
   }),
 }));
 vi.mock('@/renderer/pages/conversation/runtime/useConversationRuntimeView', () => ({
-  useConversationRuntimeView: () => ({
-    hydrated: true,
-    canSendMessage: true,
-    isProcessing: false,
-    state: 'idle',
-    markSendStarted: vi.fn(),
-  }),
+  useConversationRuntimeView: () => runtimeViewState.current,
 }));
 vi.mock('@/renderer/pages/conversation/utils/conversationCache', () => ({
   getConversationOrNull: vi.fn().mockResolvedValue({
@@ -204,13 +268,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: translateMock }),
 }));
 vi.mock('@/renderer/pages/conversation/platforms/aionrs/useAionrsMessage', () => ({
-  useAionrsMessage: () => ({
-    thought: { subject: '', description: '' },
-    running: false,
-    setActiveMsgId: vi.fn(),
-    setWaitingResponse: vi.fn(),
-    resetState: vi.fn(),
-  }),
+  useAionrsMessage: () => aionrsMessageState.current,
 }));
 
 const modelSelection = {
@@ -224,6 +282,9 @@ const modelSelection = {
 describe('AionrsSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    aionrsMessageState.current = createAionrsMessageState();
+    runtimeViewState.current = createRuntimeViewState();
+    thoughtDisplayProps.current = null;
     ensureConversationRuntimeMock.mockResolvedValue({ recovered: false, config_options: [], runtime: null });
     useTeamPermissionMock.mockReturnValue(null);
   });
@@ -297,5 +358,40 @@ describe('AionrsSendBox', () => {
 
     expect(screen.getByTestId('composer-model-selector')).toBeInTheDocument();
     expect(screen.getByTestId('composer-permission-control')).toBeInTheDocument();
+  });
+
+  it('hides stale processing when the hydrated runtime view is idle', () => {
+    aionrsMessageState.current = {
+      ...createAionrsMessageState(),
+      running: true,
+    };
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      hydrated: true,
+      isProcessing: false,
+      canSendMessage: true,
+      state: 'idle',
+    };
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(screen.queryByTestId('thought-display')).not.toBeInTheDocument();
+    expect(thoughtDisplayProps.current?.running).toBe(false);
+  });
+
+  it('shows processing while the hydrated runtime view is processing', () => {
+    aionrsMessageState.current = createAionrsMessageState();
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      hydrated: true,
+      isProcessing: true,
+      canSendMessage: false,
+      state: 'running',
+    };
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(screen.getByTestId('thought-display')).toBeInTheDocument();
+    expect(thoughtDisplayProps.current?.running).toBe(true);
   });
 });
