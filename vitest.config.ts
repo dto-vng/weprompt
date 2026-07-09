@@ -29,6 +29,7 @@ export default defineConfig({
           include: [
             'packages/web-host/src/**/*.test.ts',
             'packages/web-cli/src/**/*.test.ts',
+            'packages/desktop/src/**/*.test.ts',
             'tests/unit/**/*.test.ts',
             'tests/unit/**/test_*.ts',
             'tests/integration/**/*.test.ts',
