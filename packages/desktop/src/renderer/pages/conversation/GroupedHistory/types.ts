@@ -70,6 +70,7 @@ export type WorkspaceGroupedHistoryProps = {
   tooltipEnabled?: boolean;
   batchMode?: boolean;
   onBatchModeChange?: (value: boolean) => void;
+  onNewChat?: () => void;
   afterPinnedContent?: ReactNode;
 };
 

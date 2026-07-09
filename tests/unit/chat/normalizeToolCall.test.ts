@@ -9,6 +9,26 @@ import { normalizeAcpToolCall } from '@/common/chat/normalizeToolCall';
 import { describe, expect, it } from 'vitest';
 
 describe('normalizeAcpToolCall', () => {
+  it('drops token watermark telemetry tool calls', () => {
+    const message: IMessageAcpToolCall = {
+      id: 'token-watermark-1',
+      conversation_id: 'conv-1',
+      type: 'acp_tool_call',
+      content: {
+        sessionId: 'sess-1',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          tool_call_id: 'token-watermark-1',
+          status: 'completed',
+          title: 'Token watermark override: provider=0, local_estimate=19756, using=19756',
+          kind: 'info',
+        },
+      },
+    };
+
+    expect(normalizeAcpToolCall(message)).toBeUndefined();
+  });
+
   it('preserves generated image paths for grouped tool summaries', () => {
     const message: IMessageAcpToolCall = {
       id: 'ig_test_image',

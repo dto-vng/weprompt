@@ -383,6 +383,8 @@ const CapabilityRow: React.FC<{
   useEffect(() => setValue(initialValue), [initialValue]);
 
   const placeholder = t(descriptor.credential?.placeholderKey ?? 'settings.capabilitiesSection');
+  const isDirty = value !== initialValue;
+  const canSave = !disabled && isDirty;
 
   return (
     <div>
@@ -399,7 +401,15 @@ const CapabilityRow: React.FC<{
         ) : (
           <Input value={value} onChange={setValue} placeholder={placeholder} disabled={disabled} />
         )}
-        <Button type='primary' disabled={disabled || value === initialValue} onClick={() => onSave(value)}>
+        <Button
+          type={canSave ? 'primary' : 'secondary'}
+          disabled={!canSave}
+          className={classNames(
+            '!min-w-72px !rounded-8px !font-600',
+            canSave && '!shadow-[0_6px_14px_rgba(var(--primary-6),0.20)]'
+          )}
+          onClick={() => onSave(value)}
+        >
           {t('common.save')}
         </Button>
       </div>

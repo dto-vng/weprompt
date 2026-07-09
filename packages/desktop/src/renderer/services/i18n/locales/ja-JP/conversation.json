@@ -67,7 +67,7 @@
     "deleteSuccess": "削除しました",
     "deleteFailed": "削除に失敗しました",
     "projectsSection": "プロジェクト",
-    "conversationsSection": "会話",
+    "conversationsSection": "チャット",
     "removeProjectTitle": "プロジェクトを削除",
     "removeProject": "プロジェクトを削除",
     "removeProjectConfirm": "プロジェクト「{{name}}」を削除しますか？プロジェクト内の {{count}} 件の会話も削除されます。",

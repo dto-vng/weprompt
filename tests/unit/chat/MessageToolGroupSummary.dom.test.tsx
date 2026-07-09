@@ -223,6 +223,29 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       },
     }) as unknown as IMessageAcpToolCall;
 
+  it('does not show token watermark telemetry in technical details', () => {
+    const diagnosticStep: IMessageAcpToolCall = {
+      id: 'token-watermark-1',
+      conversation_id: 'conv-1',
+      type: 'acp_tool_call',
+      content: {
+        sessionId: 'sess-1',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          tool_call_id: 'token-watermark-1',
+          status: 'completed',
+          title: 'Token watermark override: provider=0, local_estimate=19756, using=19756',
+          kind: 'info',
+        },
+      },
+    };
+
+    render(<MessageToolGroupSummary messages={[acpStep('completed', 't1'), diagnosticStep]} />);
+    fireEvent.click(screen.getByText('common.technical_details'));
+
+    expect(screen.queryByText(/Token watermark override/)).not.toBeInTheDocument();
+  });
+
   it('shows a single live line with the running label while working', () => {
     render(<MessageToolGroupSummary messages={[acpStep('in_progress', 't1')]} />);
     expect(screen.getByText('messages.toolActivity.tools.render_report.running')).toBeInTheDocument();

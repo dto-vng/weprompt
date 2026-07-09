@@ -44,8 +44,8 @@
     "switchFailed": "思考強度切換失敗"
   },
   "brand": {
-    "forgeChat": "Forge Chat",
-    "forgeCode": "Forge Code",
-    "forgeAssistant": "Forge Assistant"
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

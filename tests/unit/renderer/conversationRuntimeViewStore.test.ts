@@ -8,6 +8,7 @@ import {
   localStopAcknowledged,
   localStopRequested,
   resetConversationRuntimeViewStoreForTest,
+  streamTerminalObserved,
   turnCompleted,
 } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
 
@@ -63,6 +64,26 @@ describe('conversationRuntimeViewStore turn id contract', () => {
     localSendStarted('conv-1');
     localSendAccepted('conv-1', 'turn-1', runningRuntime('turn-1'), 'msg-1');
     turnCompleted('conv-1', 'turn-1', idleRuntime());
+    const logs = hydrateSucceeded('conv-1', runningRuntime('turn-1'));
+
+    const view = getConversationRuntimeViewSnapshot('conv-1');
+    expect(view.state).toBe('idle');
+    expect(view.isProcessing).toBe(false);
+    expect(view.canSendMessage).toBe(true);
+    expect(view.activeTurnId).toBeNull();
+    expect(logs[0]).toMatchObject({
+      event: 'runtime_hydrated',
+      data: {
+        stale_after_completed: true,
+        source: 'hydrate',
+      },
+    });
+  });
+
+  it('keeps idle when a stale running hydrate arrives after a terminal stream event', () => {
+    localSendStarted('conv-1');
+    localSendAccepted('conv-1', 'turn-1', runningRuntime('turn-1'), 'msg-1');
+    streamTerminalObserved('conv-1', 'turn-1');
     const logs = hydrateSucceeded('conv-1', runningRuntime('turn-1'));
 
     const view = getConversationRuntimeViewSnapshot('conv-1');

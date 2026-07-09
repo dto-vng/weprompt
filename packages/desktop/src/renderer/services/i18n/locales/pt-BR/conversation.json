@@ -67,7 +67,7 @@
     "recent7Days": "Últimos 7 Dias",
     "earlier": "Mais Antigos",
     "projectsSection": "Projetos",
-    "conversationsSection": "Conversas",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Remover projeto",
     "removeProject": "Remover projeto",
     "removeProjectConfirm": "Remover o projeto \"{{name}}\"? Suas {{count}} conversa(s) também serão removidas.",

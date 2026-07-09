@@ -26,6 +26,14 @@ const formatValue = (value: unknown): string => {
   }
 };
 
+const DIAGNOSTIC_TELEMETRY_PATTERNS = [/^\s*Token watermark override\b/i, /\blocal_estimate=\d/i];
+
+export const isDiagnosticTelemetryText = (value?: string): boolean =>
+  typeof value === 'string' && DIAGNOSTIC_TELEMETRY_PATTERNS.some((pattern) => pattern.test(value));
+
+const isDiagnosticToolCall = (item: NormalizedToolCall): boolean =>
+  isDiagnosticTelemetryText(item.name) || isDiagnosticTelemetryText(item.description);
+
 // ===== tool_group → NormalizedToolCall[] =====
 
 function normalizeToolGroupStatus(status: string): NormalizedToolStatus {
@@ -150,6 +158,7 @@ export function normalizeAcpToolCall(message: IMessageAcpToolCall): NormalizedTo
   const content = message.content as AcpToolCallContentCompat | undefined;
   const update = content?.update;
   if (!update) return undefined;
+  if (isDiagnosticTelemetryText(update.title)) return undefined;
 
   const rawInput = update.rawInput ?? update.raw_input;
   const input = rawInput ? formatValue(rawInput) : undefined;
@@ -201,6 +210,7 @@ function normalizeToolCallStatus(status?: string): NormalizedToolStatus {
 export function normalizeToolCall(message: IMessageToolCall): NormalizedToolCall | undefined {
   const { call_id, name, status, input, output, args, description } = message.content;
   if (!call_id) return undefined;
+  if (isDiagnosticTelemetryText(name) || isDiagnosticTelemetryText(description)) return undefined;
 
   const displayInput = input
     ? formatValue(input)
@@ -230,7 +240,7 @@ export function normalizeToolMessages(messages: ToolMessage[]): NormalizedToolCa
       if (m.type === 'tool_call') return normalizeToolCall(m);
       return undefined;
     })
-    .filter((item): item is NormalizedToolCall => item !== undefined);
+    .filter((item): item is NormalizedToolCall => item !== undefined && !isDiagnosticToolCall(item));
 }
 
 export function hasRunningToolMessages(messages: ToolMessage[]): boolean {
