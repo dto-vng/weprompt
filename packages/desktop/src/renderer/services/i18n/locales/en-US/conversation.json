@@ -67,7 +67,7 @@
     "recent7Days": "Last 7 Days",
     "earlier": "Earlier",
     "projectsSection": "Projects",
-    "conversationsSection": "Conversations",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Remove project",
     "removeProject": "Remove project",
     "removeProjectConfirm": "Remove project \"{{name}}\"? Its {{count}} conversation(s) will be removed too.",
