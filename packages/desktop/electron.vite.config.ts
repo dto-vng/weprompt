@@ -153,6 +153,7 @@ export default defineConfig(({ mode }) => {
         'process.env.NODE_ENV': JSON.stringify(mode),
         'process.env.env': JSON.stringify(process.env.env),
         'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
+        'process.env.FORGE_GREENNODE_API_KEY': JSON.stringify(process.env.FORGE_GREENNODE_API_KEY ?? ''),
       },
     },
 

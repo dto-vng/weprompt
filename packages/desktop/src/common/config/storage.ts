@@ -72,6 +72,10 @@ export interface IConfigStorageRefer {
    * still-on-disk legacy field.
    */
   'migration.assistantsMigrated_v1'?: boolean;
+  /** One-shot flag: built-in GreenNode provider seeded (see seedBuiltinProviders.ts). */
+  'migration.greennodeProviderSeeded_v1'?: boolean;
+  /** One-shot flag: GreenNode mirrored into local OpenCode config (see seedBuiltinProviders.ts). */
+  'migration.opencodeGreenNodeSeeded_v1'?: boolean;
   // Desktop Pet: whether the desktop pet feature is enabled
   'pet.enabled'?: boolean;
   // Desktop Pet: size in pixels (200, 280, or 360)
