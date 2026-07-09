@@ -256,7 +256,7 @@
   "rule_content": "Содержание правил / инструкции",
   "delete_preset_confirm": "Вы уверены, что хотите удалить этот пресет?",
   "cssTheme": {
-    "selectOrCustomize": "Выберите или настройте тему",
+    "selectOrCustomize": "Выберите тему",
     "followSystem": "Как в системе",
     "addManually": "Добавить тему",
     "default": "По умолчанию",

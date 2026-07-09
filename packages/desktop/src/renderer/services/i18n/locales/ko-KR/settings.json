@@ -256,7 +256,7 @@
   "rule_content": "규칙 내용 / 지침",
   "delete_preset_confirm": "이 프리셋을 삭제하시겠습니까?",
   "cssTheme": {
-    "selectOrCustomize": "테마 선택 또는 사용자 지정",
+    "selectOrCustomize": "테마 선택",
     "followSystem": "시스템 따라가기",
     "addManually": "테마 추가",
     "default": "기본",
