@@ -256,7 +256,7 @@
   "rule_content": "محتوای قوانین / دستورالعمل‌ها",
   "delete_preset_confirm": "آیا مطمئن هستید که می‌خواهید این پیش‌تنظیم را حذف کنید؟",
   "cssTheme": {
-    "selectOrCustomize": "یک تم انتخاب یا سفارشی کنید",
+    "selectOrCustomize": "یک تم انتخاب کنید",
     "followSystem": "سیستم",
     "addManually": "افزودن پوسته",
     "default": "پیش‌فرض",

@@ -256,7 +256,7 @@
   "rule_content": "规则内容 / 指令",
   "delete_preset_confirm": "确定要删除该预设吗？",
   "cssTheme": {
-    "selectOrCustomize": "选择或自定义主题",
+    "selectOrCustomize": "选择主题",
     "followSystem": "跟随系统",
     "addManually": "添加主题",
     "default": "默认",

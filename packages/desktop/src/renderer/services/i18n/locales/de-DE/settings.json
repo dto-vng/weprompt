@@ -256,7 +256,7 @@
   "rule_content": "Regelinhalt / Anweisungen",
   "delete_preset_confirm": "Bist du sicher, dass du diese Voreinstellung löschen möchtest?",
   "cssTheme": {
-    "selectOrCustomize": "Voreingestelltes Theme auswählen oder benutzerdefiniertes CSS",
+    "selectOrCustomize": "Theme auswählen",
     "followSystem": "Systemeinstellung folgen",
     "addManually": "Theme hinzufügen",
     "default": "Standard",
