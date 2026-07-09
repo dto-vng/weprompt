@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BUILTIN_HTTP_MCP_SERVERS,
   GREENNODE_BASE_URL,
   GREENNODE_MODELS,
   GREENNODE_OPENCODE_DEFAULT_MODEL,
@@ -13,6 +14,7 @@ import {
 } from '@/common/config/builtinSeed';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
 import {
+  buildBuiltinHttpMcpServers,
   findOpenCodeHubExtension,
   mergeGreenNodeIntoOpenCodeConfig,
   type OpenCodeConfig,
@@ -94,5 +96,38 @@ describe('findOpenCodeHubExtension', () => {
   it('returns undefined when no extension matches', () => {
     expect(findOpenCodeHubExtension([hubItem({ name: 'ext-codex' })])).toBeUndefined();
     expect(findOpenCodeHubExtension([])).toBeUndefined();
+  });
+});
+
+describe('buildBuiltinHttpMcpServers', () => {
+  it('builds one enabled builtin http server per seed entry', () => {
+    const servers = buildBuiltinHttpMcpServers();
+
+    expect(servers.map((server) => server.name)).toEqual(BUILTIN_HTTP_MCP_SERVERS.map((seed) => seed.name));
+    for (const [index, server] of servers.entries()) {
+      const seed = BUILTIN_HTTP_MCP_SERVERS[index];
+      expect(server.enabled).toBe(true);
+      expect(server.builtin).toBe(true);
+      expect(server.description).toBe(seed.description);
+      expect(server.transport).toEqual({ type: 'http', url: seed.url });
+    }
+  });
+
+  it('emits original_json that round-trips to the transport config', () => {
+    for (const server of buildBuiltinHttpMcpServers()) {
+      const parsed = JSON.parse(server.original_json ?? '') as {
+        mcpServers: Record<string, { type: string; url: string }>;
+      };
+      expect(parsed.mcpServers[server.name]).toEqual({
+        type: 'http',
+        url: server.transport.type === 'http' ? server.transport.url : '',
+      });
+    }
+  });
+
+  it('seeds the TSE Datahub and Outlook Advanced endpoints', () => {
+    const urls = BUILTIN_HTTP_MCP_SERVERS.map((seed) => seed.url);
+    expect(urls).toContain('https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4');
+    expect(urls).toContain('https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp');
   });
 });

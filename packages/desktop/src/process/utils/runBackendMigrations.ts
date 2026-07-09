@@ -18,6 +18,7 @@ import { BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/commo
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
 import {
+  buildBuiltinHttpMcpServers,
   ensureOpenCodeAgentInstalled,
   seedGreenNodeProvider,
   seedOpenCodeGreenNodeConfig,
@@ -184,6 +185,7 @@ function buildDefaultMcpServers(): McpImportServer[] {
       },
       original_json: JSON.stringify({ mcpServers: { [BUILTIN_CHROME_DEVTOOLS_NAME]: chromeConfig } }, null, 2),
     },
+    ...buildBuiltinHttpMcpServers(),
   ];
 }
 

@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 import stripJsonComments from 'strip-json-comments';
 import { httpRequest } from '@/common/adapter/httpBridge';
 import {
+  BUILTIN_HTTP_MCP_SERVERS,
   GREENNODE_BASE_URL,
   GREENNODE_MODELS,
   GREENNODE_OPENCODE_DEFAULT_MODEL,
@@ -19,7 +20,7 @@ import {
   getGreenNodeApiKey,
 } from '@/common/config/builtinSeed';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
-import type { IProvider } from '@/common/config/storage';
+import type { IMcpServer, IProvider } from '@/common/config/storage';
 import type { ProcessConfig as ProcessConfigType } from './initStorage';
 
 type ConfigFile = typeof ProcessConfigType;
@@ -232,4 +233,25 @@ export async function ensureOpenCodeAgentInstalled(configFile: ConfigFile): Prom
 
   await configFile.set(OPENCODE_AGENT_INSTALL_FLAG, true);
   return true;
+}
+
+type BuiltinMcpImportServer = Partial<IMcpServer> & Pick<IMcpServer, 'name' | 'transport'>;
+
+/**
+ * Default HTTP MCP servers in the shape `mcpService.batchImportServers`
+ * expects. Pure — exported for tests and for `buildDefaultMcpServers` in
+ * runBackendMigrations.ts.
+ */
+export function buildBuiltinHttpMcpServers(): BuiltinMcpImportServer[] {
+  return BUILTIN_HTTP_MCP_SERVERS.map((seed) => {
+    const transport = { type: 'http' as const, url: seed.url };
+    return {
+      name: seed.name,
+      description: seed.description,
+      enabled: true,
+      builtin: true,
+      transport,
+      original_json: JSON.stringify({ mcpServers: { [seed.name]: transport } }, null, 2),
+    };
+  });
 }

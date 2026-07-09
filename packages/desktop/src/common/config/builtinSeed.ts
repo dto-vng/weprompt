@@ -39,3 +39,22 @@ export const GREENNODE_OPENCODE_PROVIDER_ID = 'vngcloud';
 export function getGreenNodeApiKey(): string {
   return process.env.FORGE_GREENNODE_API_KEY || '';
 }
+
+/**
+ * Built-in HTTP MCP servers Forge ships enabled by default. Both endpoints
+ * are OAuth-protected (standard MCP authorization flow with discovery) — no
+ * credentials are baked in; each user signs in once via the Login button in
+ * Settings > Tools or the session MCP picker.
+ */
+export const BUILTIN_HTTP_MCP_SERVERS = [
+  {
+    name: 'tse-datahub',
+    description: 'TSE Datahub MCP with HR headcount data. Click Login to sign in on first use.',
+    url: 'https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4',
+  },
+  {
+    name: 'outlook-advanced',
+    description: 'Outlook Advanced MCP for email, calendar and meeting rooms. Click Login to sign in on first use.',
+    url: 'https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp',
+  },
+] as const;
