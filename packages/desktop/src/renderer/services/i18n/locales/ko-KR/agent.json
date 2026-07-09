@@ -44,8 +44,8 @@
     "switchFailed": "사고 강도 전환에 실패했습니다"
   },
   "brand": {
-    "forgeChat": "Forge Chat",
-    "forgeCode": "Forge Code",
-    "forgeAssistant": "Forge Assistant"
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }
