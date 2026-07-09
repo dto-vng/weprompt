@@ -37,11 +37,14 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
   default: ({
     onSend,
     onChange,
+    rightTools,
   }: {
     onSend: (message: string) => Promise<void>;
     onChange?: (value: string) => void;
+    rightTools?: React.ReactNode;
   }) => (
     <div>
+      {rightTools}
       <button type='button' onClick={() => onChange?.('hello')}>
         change
       </button>
@@ -52,7 +55,9 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
   ),
 }));
 
-vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({ default: () => null }));
+vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
+  default: () => <span data-testid='composer-permission-control' />,
+}));
 vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({ default: () => null }));
 vi.mock('@/renderer/components/chat/MobileActionSheet', () => ({
   default: () => null,
@@ -279,5 +284,18 @@ describe('AionrsSendBox', () => {
     await waitFor(() => {
       expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1');
     });
+  });
+
+  it('renders model and permission controls in the composer action row', () => {
+    render(
+      <AionrsSendBox
+        conversation_id='conv-1'
+        modelSelection={modelSelection}
+        modelSelector={<span data-testid='composer-model-selector'>Model</span>}
+      />
+    );
+
+    expect(screen.getByTestId('composer-model-selector')).toBeInTheDocument();
+    expect(screen.getByTestId('composer-permission-control')).toBeInTheDocument();
   });
 });
