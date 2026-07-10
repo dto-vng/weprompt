@@ -11,6 +11,7 @@ import { toLocalFileHref } from '@/renderer/components/Markdown/markdownUtils';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { PreviewToolbarExtrasProvider, type PreviewToolbarExtras } from '../../context/PreviewToolbarExtrasContext';
 import { usePreviewContext } from '../../context/PreviewContext';
+import { getOfficePreviewRefreshToken } from '../../context/officePreviewRevision';
 import { useResizableSplit } from '@/renderer/hooks/ui/useResizableSplit';
 import { Link } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -89,7 +90,6 @@ const PreviewPanel: React.FC = () => {
   useEffect(() => {
     setViewMode('preview');
     setOfficeEditState('ready');
-    setManualOfficeRefreshRevision(0);
   }, [activeTabId, activeTab?.metadata?.file_path, activeTab?.content_type]);
 
   // 确认对话框状态 / Confirmation dialog states
@@ -284,7 +284,11 @@ const PreviewPanel: React.FC = () => {
   const isOfficeDocument = content_type === 'word' || content_type === 'excel';
   const canEditOfficeExternally =
     isElectronDesktop() && isOfficeDocument && Boolean(metadata?.file_path && metadata.workspace);
-  const officeRefreshToken = `${activeTab.officePreviewRevision ?? 0}:${manualOfficeRefreshRevision}`;
+  const officeRefreshToken = getOfficePreviewRefreshToken(
+    metadata?.file_path,
+    activeTab.officePreviewRevision,
+    manualOfficeRefreshRevision
+  );
   const isEditable = metadata?.editable !== false; // 默认可编辑 / Default editable
 
   // 检查文件类型是否已有内置的打开按钮（Word、PPT、PDF、Excel 组件内部已提供）

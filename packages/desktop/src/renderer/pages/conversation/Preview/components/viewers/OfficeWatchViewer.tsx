@@ -11,7 +11,7 @@ import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Pr
 import { openExternalUrl } from '@/renderer/utils/platform';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Spin } from '@arco-design/web-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type DocType = 'ppt' | 'word' | 'excel';
@@ -88,6 +88,39 @@ type OfficeWatchErrorState = {
 
 export const shouldRestartOfficeWatch = (previousToken: string | undefined, nextToken: string | undefined): boolean =>
   previousToken !== undefined && nextToken !== undefined && previousToken !== nextToken;
+
+export const shouldReportOfficeWatchRefresh = (
+  previousFilePath: string | undefined,
+  nextFilePath: string | undefined,
+  previousToken: string | undefined,
+  nextToken: string | undefined
+): boolean => previousFilePath === nextFilePath && shouldRestartOfficeWatch(previousToken, nextToken);
+
+export const shouldApplyOfficeWatchStartResult = (cancelled: boolean): boolean => !cancelled;
+
+type OfficeWatchStopQueue = {
+  waitForStop: () => Promise<void>;
+  queueStop: (stop: () => Promise<unknown>) => void;
+};
+
+export const createOfficeWatchStopQueue = (): OfficeWatchStopQueue => {
+  let pendingStop: Promise<void> = Promise.resolve();
+
+  return {
+    waitForStop: () => pendingStop,
+    queueStop: (stop) => {
+      pendingStop = pendingStop
+        .catch((): void => {})
+        .then(async (): Promise<void> => {
+          await stop();
+        })
+        .catch((): void => {});
+    },
+  };
+};
+
+export const getOfficeWatchViewKey = (url: string, refreshToken: string | undefined): string =>
+  refreshToken ? `${url}:${refreshToken}` : url;
 
 export function resolveOfficeWatchUrl(url: string, docType: DocType): string {
   const proxyMatch = url.match(/^\/api\/(?:office-watch-proxy|ppt-proxy)\/(\d+)(\/.*)?$/);
@@ -175,13 +208,32 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   const [status, setStatus] = useState<'starting' | 'installing'>('starting');
   const [error, setError] = useState<OfficeWatchErrorState | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const file_pathRef = useRef(file_path);
+  const filePathRef = useRef(file_path);
   const refreshTokenRef = useRef<string | undefined>(refreshToken);
+  const stopQueueRef = useRef<OfficeWatchStopQueue>(createOfficeWatchStopQueue());
+  const pendingRefreshRef = useRef(false);
+
+  const handlePreviewLoaded = useCallback(() => {
+    if (!pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    onRefreshStateChange?.('refreshed');
+  }, [onRefreshStateChange]);
+
+  const handlePreviewLoadFailed = useCallback(() => {
+    if (!pendingRefreshRef.current) return;
+    pendingRefreshRef.current = false;
+    onRefreshStateChange?.('refreshFailed');
+  }, [onRefreshStateChange]);
 
   useEffect(() => {
-    file_pathRef.current = file_path;
     const bridge = BRIDGE[docType];
-    const isRefresh = shouldRestartOfficeWatch(refreshTokenRef.current, refreshToken);
+    const isRefresh = shouldReportOfficeWatchRefresh(
+      filePathRef.current,
+      file_path,
+      refreshTokenRef.current,
+      refreshToken
+    );
+    filePathRef.current = file_path;
     refreshTokenRef.current = refreshToken;
     const notifyRefreshState = (state: OfficePreviewRefreshState): void => {
       if (isRefresh) onRefreshStateChange?.(state);
@@ -202,20 +254,28 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       else if (evt.state === 'starting') setStatus('starting');
     });
 
+    let watchStarted = false;
+
     const start = async () => {
+      await stopQueueRef.current.waitForStop();
+      if (cancelled) return;
       setLoading(true);
       setStatus('starting');
       setError(null);
+      if (isRefresh) pendingRefreshRef.current = true;
       notifyRefreshState('refreshing');
       try {
         const result = await bridge.start.invoke({ file_path, workspace });
         const errorCode = normalizeOfficeWatchErrorCode(result.error);
+        watchStarted = !errorCode;
+        if (!shouldApplyOfficeWatchStartResult(cancelled)) return;
         if (errorCode) {
           setError({
             code: errorCode,
             message: t(OFFICE_ERROR_I18N_KEYS[errorCode]),
           });
           setLoading(false);
+          pendingRefreshRef.current = false;
           notifyRefreshState('refreshFailed');
           return;
         }
@@ -230,10 +290,9 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           const resolvedUrl = resolveOfficeWatchUrl(url, docType);
           setWatchUrl(resolvedUrl);
           setLoading(false);
-          notifyRefreshState('refreshed');
         }
       } catch (err) {
-        if (!cancelled) {
+        if (shouldApplyOfficeWatchStartResult(cancelled)) {
           const backendCode = isBackendHttpError(err) ? normalizeOfficeWatchErrorCode(err.code) : undefined;
           if (backendCode) {
             setError({
@@ -241,25 +300,29 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
               message: t(OFFICE_ERROR_I18N_KEYS[backendCode]),
             });
             setLoading(false);
+            pendingRefreshRef.current = false;
             notifyRefreshState('refreshFailed');
             return;
           }
           const msg = err instanceof Error ? err.message : t(keys.startFailed);
           setError({ message: msg });
           setLoading(false);
+          pendingRefreshRef.current = false;
           notifyRefreshState('refreshFailed');
         }
       }
     };
 
-    void start();
+    const startPromise = start();
 
     return () => {
       cancelled = true;
+      pendingRefreshRef.current = false;
       unsubStatus();
-      if (file_pathRef.current) {
-        bridge.stop.invoke({ file_path: file_pathRef.current }).catch(() => {});
-      }
+      stopQueueRef.current.queueStop(async () => {
+        await startPromise;
+        if (watchStarted) await bridge.stop.invoke({ file_path });
+      });
     };
   }, [docType, file_path, onRefreshStateChange, refreshToken, retryKey, t, workspace]);
 
@@ -320,9 +383,26 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   // Electron: use <webview> via WebviewHost for full Electron integration.
   // Web server mode: use <iframe> since <webview> is Electron-only.
   if (isElectronDesktop()) {
-    return <WebviewHost url={watchUrl} className='bg-bg-1' />;
+    return (
+      <WebviewHost
+        key={getOfficeWatchViewKey(watchUrl, refreshToken)}
+        url={watchUrl}
+        className='bg-bg-1'
+        onDidFinishLoad={handlePreviewLoaded}
+        onDidFailLoad={handlePreviewLoadFailed}
+      />
+    );
   }
-  return <iframe src={watchUrl} className='w-full h-full border-0 bg-bg-1' title={IFRAME_TITLE[docType]} />;
+  return (
+    <iframe
+      key={getOfficeWatchViewKey(watchUrl, refreshToken)}
+      src={watchUrl}
+      className='w-full h-full border-0 bg-bg-1'
+      title={IFRAME_TITLE[docType]}
+      onLoad={handlePreviewLoaded}
+      onError={handlePreviewLoadFailed}
+    />
+  );
 };
 
 export default OfficeWatchViewer;

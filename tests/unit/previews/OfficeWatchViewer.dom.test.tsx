@@ -54,6 +54,54 @@ describe('shouldRestartOfficeWatch', () => {
   });
 });
 
+describe('shouldReportOfficeWatchRefresh', () => {
+  it('does not report a refresh when the viewer switches to another file', async () => {
+    const mod = await import('@/renderer/pages/conversation/Preview/components/viewers/OfficeWatchViewer');
+
+    expect(mod.shouldReportOfficeWatchRefresh('/workspace/a.docx', '/workspace/b.docx', 'a:0:1', 'b:0:1')).toBe(false);
+  });
+});
+
+describe('shouldApplyOfficeWatchStartResult', () => {
+  it('ignores a start result after its watcher has been cancelled', async () => {
+    const mod = await import('@/renderer/pages/conversation/Preview/components/viewers/OfficeWatchViewer');
+
+    expect(mod.shouldApplyOfficeWatchStartResult(true)).toBe(false);
+  });
+});
+
+describe('Office watch refresh lifecycle', () => {
+  it('waits for a queued stop before allowing the next watcher to start', async () => {
+    const mod = await import('@/renderer/pages/conversation/Preview/components/viewers/OfficeWatchViewer');
+    const queue = mod.createOfficeWatchStopQueue();
+    let releaseStop: () => void;
+    const stopPromise = new Promise<void>((resolve) => {
+      releaseStop = resolve;
+    });
+    queue.queueStop(() => stopPromise);
+
+    let didStart = false;
+    const waitForStop = queue.waitForStop().then(() => {
+      didStart = true;
+    });
+    await Promise.resolve();
+
+    expect(didStart).toBe(false);
+
+    releaseStop();
+    await waitForStop;
+
+    expect(didStart).toBe(true);
+  });
+
+  it('changes the embedded preview key when a refresh token changes', async () => {
+    const mod = await import('@/renderer/pages/conversation/Preview/components/viewers/OfficeWatchViewer');
+    const url = 'http://127.0.0.1:40123/';
+
+    expect(mod.getOfficeWatchViewKey(url, '0:0')).not.toBe(mod.getOfficeWatchViewKey(url, '0:1'));
+  });
+});
+
 /**
  * Issue #3212: in web (browser) mode the preview iframe URL must match the
  * backend proxy routes exactly. The backend registers /api/ppt-proxy/{port}

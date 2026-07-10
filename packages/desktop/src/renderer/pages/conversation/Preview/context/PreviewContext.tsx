@@ -623,6 +623,22 @@ export const PreviewProvider: React.FC<{ children: React.ReactNode }> = ({ child
           fileMtimeRef.current.set(file_path, metadata.lastModified);
           if (prevMtime === undefined || metadata.lastModified === prevMtime) return;
 
+          if (isOfficePreviewContentType(tab.content_type)) {
+            setTabs((latest) =>
+              latest.map((t) => {
+                if (t.metadata?.file_path !== file_path) return t;
+                if (savingFilesRef.current.has(file_path) || t.isDirty) return t;
+                return {
+                  ...t,
+                  officePreviewRevision: isOfficePreviewContentType(t.content_type)
+                    ? nextOfficePreviewRevision(t.officePreviewRevision)
+                    : t.officePreviewRevision,
+                };
+              })
+            );
+            return;
+          }
+
           const readPromise =
             tab.content_type === 'image'
               ? ipcBridge.fs.getImageBase64.invoke({ path: file_path, workspace: tab.metadata?.workspace })
@@ -640,9 +656,6 @@ export const PreviewProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     content,
                     originalContent: content,
                     isDirty: false,
-                    officePreviewRevision: isOfficePreviewContentType(t.content_type)
-                      ? nextOfficePreviewRevision(t.officePreviewRevision)
-                      : t.officePreviewRevision,
                   };
                 })
               );
