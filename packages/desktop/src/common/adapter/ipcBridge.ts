@@ -22,6 +22,8 @@ import type {
   IProvider,
   ISessionMcpServer,
   TChatConversation,
+  TContextHandoffItem,
+  TConversationContextHandoffExtra,
   TConversationRuntimeSummary,
   TProviderWithModel,
 } from '../config/storage';
@@ -245,6 +247,7 @@ export const conversation = {
       files: p.files,
       loading_id: p.loading_id,
       inject_skills: p.inject_skills,
+      pinned_context: p.pinned_context,
     })
   ),
   getSlashCommands: httpGet<AcpSlashCommandApiItem[], { conversation_id: string }>(
@@ -1478,6 +1481,7 @@ interface ISendMessageParams {
   files?: string[];
   loading_id?: string;
   inject_skills?: string[];
+  pinned_context?: TContextHandoffItem[];
 }
 
 // Server-assigned identifier for the newly created user message. Clients must
@@ -1528,6 +1532,7 @@ export interface ICreateConversationParams {
     web_search_engine?: 'google' | 'default';
     context?: string;
     context_file_name?: string;
+    context_handoff?: TConversationContextHandoffExtra;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];

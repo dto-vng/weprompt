@@ -42,5 +42,10 @@
     "label": "Nível de raciocínio",
     "switchSuccess": "Nível de raciocínio alterado",
     "switchFailed": "Falha ao alterar o nível de raciocínio"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

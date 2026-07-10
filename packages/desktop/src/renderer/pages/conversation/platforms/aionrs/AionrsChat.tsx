@@ -29,6 +29,7 @@ const AionrsChat: React.FC<{
   conversation_id: string;
   workspace: string;
   modelSelection: AionrsModelSelection;
+  modelSelector?: React.ReactNode;
   session_mode?: string;
   cron_job_id?: string;
   emptySlot?: React.ReactNode;
@@ -43,6 +44,7 @@ const AionrsChat: React.FC<{
   conversation_id,
   workspace,
   modelSelection,
+  modelSelector,
   session_mode,
   cron_job_id,
   emptySlot,
@@ -83,6 +85,7 @@ const AionrsChat: React.FC<{
           <AionrsSendBox
             conversation_id={conversation_id}
             modelSelection={modelSelection}
+            modelSelector={modelSelector}
             session_mode={session_mode}
             agent_name={agent_name}
             teamSendMessage={teamSendMessage}

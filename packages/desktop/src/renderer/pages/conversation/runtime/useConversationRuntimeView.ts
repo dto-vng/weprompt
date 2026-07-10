@@ -20,6 +20,7 @@ import {
   localStopAcknowledged,
   localStopRequested,
   resetLocalGate,
+  streamTerminalObserved,
   subscribeConversationRuntimeView,
   turnCompleted,
   type ConversationRuntimeView,
@@ -190,6 +191,10 @@ export const logStreamTerminalObserved = (
   platform: 'acp' | 'aionrs',
   stream_type: string
 ): void => {
+  if (turn_id) {
+    flushRuntimeViewLogs(streamTerminalObserved(conversation_id, turn_id));
+  }
+
   const rendererLogger = ipcBridge.application?.writeRendererLog;
   if (!rendererLogger) {
     return;

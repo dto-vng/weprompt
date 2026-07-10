@@ -25,6 +25,7 @@ export type ConversationRuntimeViewLogEvent =
   | 'turn_completed_applied'
   | 'turn_completed_missing_runtime'
   | 'runtime_release_confirmed'
+  | 'stream_terminal_applied'
   | 'local_send_started'
   | 'local_send_accepted'
   | 'local_send_failed'
@@ -350,6 +351,37 @@ export const resetLocalGateConversationRuntimeView = (
   return withLogs(view, [createLog('info', 'runtime_view_cleaned', view, { reason })]);
 };
 
+export const streamTerminalObservedConversationRuntimeView = (
+  previous: ConversationRuntimeView | undefined,
+  conversation_id: string,
+  turn_id: string
+): ConversationRuntimeSnapshot => {
+  const base = previous ?? createDefaultConversationRuntimeView(conversation_id);
+  const shouldRelease = base.activeTurnId === turn_id;
+  const view: ConversationRuntimeView = shouldRelease
+    ? {
+        ...base,
+        activeTurnId: null,
+        state: 'idle',
+        isProcessing: false,
+        canSendMessage: true,
+        localSubmitting: false,
+        localStopping: false,
+        hydrated: true,
+      }
+    : {
+        ...base,
+        hydrated: true,
+      };
+
+  return withLogs(view, [
+    createLog('info', 'stream_terminal_applied', view, {
+      turn_id,
+      released: shouldRelease,
+    }),
+  ]);
+};
+
 const setConversationRuntimeSnapshot = (conversation_id: string, snapshot: ConversationRuntimeSnapshot) => {
   runtimeViews.set(conversation_id, snapshot.view);
   fallbackSnapshots.set(conversation_id, snapshot.view);
@@ -431,6 +463,20 @@ export const turnCompleted = (
   return setConversationRuntimeSnapshot(
     conversation_id,
     turnCompletedConversationRuntimeView(runtimeViews.get(conversation_id), conversation_id, turn_id, runtime, metadata)
+  );
+};
+
+export const streamTerminalObserved = (conversation_id: string, turn_id: string): ConversationRuntimeViewLogEntry[] => {
+  const metadata = getRuntimeMetadata(conversation_id);
+  metadata.pendingLocalSendSeq = null;
+  if (metadata.pendingStopTurnId === turn_id) {
+    metadata.pendingStopTurnId = null;
+  }
+  metadata.lastCompletedTurnId = turn_id;
+
+  return setConversationRuntimeSnapshot(
+    conversation_id,
+    streamTerminalObservedConversationRuntimeView(runtimeViews.get(conversation_id), conversation_id, turn_id)
   );
 };
 

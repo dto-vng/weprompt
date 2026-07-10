@@ -82,7 +82,9 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
   ),
 }));
 
-vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({ default: () => null }));
+vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
+  default: () => <span data-testid='composer-permission-control' />,
+}));
 vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({ default: () => null }));
 vi.mock('@/renderer/components/chat/MobileActionSheet', () => ({
   default: ({
@@ -374,6 +376,21 @@ describe('AcpSendBox', () => {
 
     expect(useAcpConfigOptionsMock).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }));
     expect(screen.queryByTestId('mock-thought-selector')).not.toBeInTheDocument();
+  });
+
+  it('renders model and permission controls in the composer action row', () => {
+    render(
+      <AcpSendBox
+        conversation_id='conv-1'
+        backend='codex'
+        workspacePath='/tmp/workspace'
+        messageState={makeMessageState()}
+        modelSelector={<span data-testid='composer-model-selector'>Model</span>}
+      />
+    );
+
+    expect(screen.getByTestId('composer-model-selector')).toBeInTheDocument();
+    expect(screen.getByTestId('composer-permission-control')).toBeInTheDocument();
   });
 
   it('applies runtime thought level from the mobile action sheet without persisting a global preference', async () => {

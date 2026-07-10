@@ -21,6 +21,7 @@ interface EventTypes {
   'aionrs.selected.file.append': [Array<string | FileOrFolderItem>];
   'aionrs.selected.file.clear': void;
   'aionrs.workspace.refresh': void;
+  'aionrs.context-usage.refresh': [string];
   'acp.selected.file': [Array<string | FileOrFolderItem>];
   'acp.selected.file.append': [Array<string | FileOrFolderItem>];
   'acp.selected.file.clear': void;

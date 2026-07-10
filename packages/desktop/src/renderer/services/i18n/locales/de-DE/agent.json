@@ -42,5 +42,10 @@
     "label": "Denk-Stufe",
     "switchSuccess": "Denk-Stufe gewechselt",
     "switchFailed": "Wechsel der Denk-Stufe fehlgeschlagen"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

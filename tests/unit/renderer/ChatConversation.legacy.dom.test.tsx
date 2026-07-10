@@ -6,7 +6,9 @@ import type { TChatConversation } from '@/common/config/storage';
 import ChatConversation from '@/renderer/pages/conversation/components/ChatConversation';
 
 const usePresetAssistantInfoMock = vi.fn();
-const acpChatMock = vi.fn(() => <div data-testid='mock-acp-chat'>acp chat</div>);
+const acpChatMock = vi.fn((props: { modelSelector?: React.ReactNode }) => (
+  <div data-testid='mock-acp-chat'>acp chat{props.modelSelector}</div>
+));
 const acpModelSelectorMock = vi.fn(() => <div data-testid='mock-acp-model-selector'>model selector</div>);
 
 vi.mock('@/renderer/pages/conversation/Messages/MessageList', () => ({
@@ -142,7 +144,7 @@ describe('ChatConversation legacy runtime rendering', () => {
     );
   });
 
-  it('passes the resolved assistant backend to the ACP model selector for ACP conversations', () => {
+  it('passes the resolved assistant backend to the composer ACP model selector', () => {
     usePresetAssistantInfoMock.mockReturnValue({
       info: {
         name: 'Research Assistant',

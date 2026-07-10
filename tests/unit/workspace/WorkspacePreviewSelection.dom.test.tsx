@@ -6,26 +6,22 @@
 
 import type { IDirOrFile } from '@/common/adapter/ipcBridge';
 import ChatWorkspace from '@/renderer/pages/conversation/Workspace';
-import type { NodeInstance } from '@arco-design/web-react/es/Tree/interface';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-type TreeProps = {
-  onSelect?: (_keys: string[], extra: { node: NodeInstance }) => void;
-};
 
 const mocks = vi.hoisted(() => ({
   ensureNodeSelected: vi.fn(),
   handlePreviewFile: vi.fn(),
   writeRendererLogInvoke: vi.fn(),
 }));
-let latestTreeProps: TreeProps | null = null;
+let titlebarProjectSlot: HTMLDivElement | null = null;
 
 const selectedFile: IDirOrFile = {
   name: 'financial-wechat-miniapp.html',
   relativePath: 'financial-wechat-miniapp.html',
   fullPath: '/workspace/financial-wechat-miniapp.html',
+  isDir: false,
   isFile: true,
 };
 
@@ -51,18 +47,58 @@ vi.mock('@/renderer/components/layout/FlexFullContainer', () => ({
 }));
 
 vi.mock('@arco-design/web-react', () => ({
+  Button: ({
+    children,
+    className,
+    onClick,
+    ...props
+  }: React.PropsWithChildren<{ className?: string; onClick?: React.MouseEventHandler<HTMLButtonElement> }>) => (
+    <button className={className} onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
+  Collapse: Object.assign(
+    ({ children }: { children: React.ReactNode }) => <div data-testid='workspace-sections'>{children}</div>,
+    {
+      Item: ({ header, name, children }: { header: React.ReactNode; name: string; children: React.ReactNode }) => (
+        <section data-testid={`workspace-section-${name}`}>
+          <div>{header}</div>
+          {children}
+        </section>
+      ),
+    }
+  ),
   Empty: () => <div data-testid='empty' />,
+  Input: ({
+    className,
+    onChange,
+    placeholder,
+    value,
+  }: {
+    className?: string;
+    onChange?: (value: string) => void;
+    placeholder?: string;
+    value?: string;
+  }) => (
+    <input
+      className={className}
+      onChange={(event) => onChange?.(event.currentTarget.value)}
+      placeholder={placeholder}
+      value={value}
+    />
+  ),
   Message: {
     useMessage: () => [{ error: vi.fn(), success: vi.fn(), info: vi.fn() }, null],
-  },
-  Tree: (props: TreeProps) => {
-    latestTreeProps = props;
-    return <div data-testid='workspace-tree' />;
   },
 }));
 
 vi.mock('@icon-park/react', () => ({
+  BranchOne: () => <span />,
+  Down: () => <span />,
+  FileText: () => <span />,
+  FolderOpen: () => <span />,
   Right: () => <span />,
+  Search: () => <span />,
 }));
 
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
@@ -73,6 +109,14 @@ vi.mock('@/renderer/pages/conversation/Preview', () => ({
   usePreviewContext: () => ({
     openPreview: vi.fn(),
   }),
+}));
+
+vi.mock('@/renderer/pages/conversation/utils/conversationCache', () => ({
+  getConversationOrNull: vi.fn(async () => null),
+}));
+
+vi.mock('@/renderer/utils/emitter', () => ({
+  useAddEventListener: vi.fn(),
 }));
 
 vi.mock('@/renderer/pages/conversation/Workspace/hooks/useWorkspaceCollapse', () => ({
@@ -211,31 +255,38 @@ vi.mock('@/renderer/pages/conversation/Workspace/components/FileTypeIcon', () =>
   default: () => <span data-testid='file-type-icon' />,
 }));
 
+vi.mock('@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel', () => ({
+  default: ({ conversationId, workspace }: { conversationId: string; workspace: string }) => (
+    <div data-testid='context-handoff-panel'>
+      {conversationId}:{workspace}
+    </div>
+  ),
+}));
+
 describe('ChatWorkspace preview selection', () => {
   beforeEach(() => {
-    latestTreeProps = null;
+    titlebarProjectSlot = document.createElement('div');
+    titlebarProjectSlot.id = 'app-titlebar-project-slot';
+    document.body.append(titlebarProjectSlot);
     vi.clearAllMocks();
   });
 
   afterEach(() => {
     cleanup();
+    titlebarProjectSlot?.remove();
+    titlebarProjectSlot = null;
   });
 
-  it('opens preview when the already highlighted file is clicked again', () => {
+  it('opens preview when a file is selected from the compact Project Files flyout', () => {
     render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' />);
 
-    expect(screen.getByTestId('workspace-tree')).toBeInTheDocument();
+    const projectTrigger = screen.getByRole('button', { name: /conversation.workspace.projectMenu.trigger/ });
+    expect(titlebarProjectSlot?.contains(projectTrigger)).toBe(true);
+    expect(document.querySelector('.chat-workspace .workspace-project-trigger')).toBeNull();
 
-    const node = {
-      key: selectedFile.relativePath,
-      props: {
-        dataRef: selectedFile,
-      },
-    } as unknown as NodeInstance;
-
-    act(() => {
-      latestTreeProps?.onSelect?.([], { node });
-    });
+    fireEvent.click(projectTrigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: /conversation.workspace.changes.filesTab/ }));
+    fireEvent.click(screen.getByRole('button', { name: selectedFile.name }));
 
     expect(mocks.ensureNodeSelected).toHaveBeenCalledWith(selectedFile);
     expect(mocks.writeRendererLogInvoke).toHaveBeenCalledWith({
@@ -249,5 +300,16 @@ describe('ChatWorkspace preview selection', () => {
       },
     });
     expect(mocks.handlePreviewFile).toHaveBeenCalledWith(selectedFile);
+    expect(screen.queryByRole('menuitem', { name: /conversation.workspace.changes.filesTab/ })).not.toBeInTheDocument();
+  });
+
+  it('renders context management in the project panel for Aionrs workspaces', () => {
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    expect(screen.queryByTestId('context-handoff-panel')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /conversation.workspace.projectMenu.trigger/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /conversation.contextHandoff.sectionTitle/ }));
+
+    expect(screen.getByTestId('context-handoff-panel')).toHaveTextContent('conversation-1:/workspace');
   });
 });
