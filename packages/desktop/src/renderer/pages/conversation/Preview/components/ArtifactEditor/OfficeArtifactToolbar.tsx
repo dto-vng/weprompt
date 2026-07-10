@@ -34,6 +34,7 @@ const STATUS_KEYS: Partial<Record<OfficeArtifactEditorStatus, string>> = {
   saved: 'preview.office.editor.saved',
   saveFailed: 'preview.office.editor.saveFailed',
   fileChanged: 'preview.office.editor.fileChanged',
+  unsupported: 'preview.office.editor.unsupported',
   openedDesktop: 'preview.office.editor.openedDesktop',
 };
 
@@ -59,20 +60,27 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
       : inspection.cells.length !== 1 || !inspection.canEdit);
   const statusKey = STATUS_KEYS[status];
   const statusText = statusKey ? t(statusKey) : unsupported ? t('preview.office.editor.unsupported') : '';
-  const statusIsError = status === 'saveFailed' || status === 'fileChanged' || (unsupported && !statusKey);
+  const statusIsError =
+    status === 'saveFailed' || status === 'fileChanged' || status === 'unsupported' || (unsupported && !statusKey);
 
   const moreMenu = (
     <Menu>
       <Menu.Item
         key='undo'
         className={styles.compactMenuItem}
+        data-testid='office-toolbar-compact-undo'
         disabled={undoDepth <= 0 || busy}
         onClick={() => void undo()}
       >
         <Undo size={ICON_SIZE} />
         {t('preview.office.editor.undo')}
       </Menu.Item>
-      <Menu.Item key='open' className={styles.compactMenuItem} onClick={() => void openInDesktopApp()}>
+      <Menu.Item
+        key='open'
+        className={styles.compactMenuItem}
+        data-testid='office-toolbar-compact-open'
+        onClick={() => void openInDesktopApp()}
+      >
         <EditTwo size={ICON_SIZE} />
         {t('preview.office.editor.openDesktop')}
       </Menu.Item>

@@ -9,6 +9,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { OfficeArtifactToolbar } from '@/renderer/pages/conversation/Preview/components/ArtifactEditor/OfficeArtifactToolbar';
+import styles from '@/renderer/pages/conversation/Preview/components/ArtifactEditor/OfficeArtifactToolbar.module.css';
 
 const translations: Record<string, string> = {
   'preview.office.editor.editSelection': 'Edit selection',
@@ -137,6 +138,16 @@ describe('OfficeArtifactToolbar', () => {
     expect(props.refresh).toHaveBeenCalledOnce();
   });
 
+  it('keeps compact secondary actions available from More', async () => {
+    const user = userEvent.setup();
+    render(<OfficeArtifactToolbar {...createProps()} />);
+
+    await user.click(screen.getByRole('button', { name: 'More' }));
+
+    expect(screen.getByTestId('office-toolbar-compact-undo')).toHaveClass(styles.compactMenuItem);
+    expect(screen.getByTestId('office-toolbar-compact-open')).toHaveClass(styles.compactMenuItem);
+  });
+
   it('announces successful saves only when the status is saved', () => {
     const props = createProps({ status: 'saving' });
     const view = render(<OfficeArtifactToolbar {...props} />);
@@ -146,6 +157,28 @@ describe('OfficeArtifactToolbar', () => {
     view.rerender(<OfficeArtifactToolbar {...props} status='saved' />);
 
     expect(screen.getByText('Saved to workspace')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('announces the explicit unsupported state instead of a save failure', () => {
+    render(<OfficeArtifactToolbar {...createProps({ status: 'unsupported' })} />);
+
+    expect(screen.getByText('This selection needs the desktop app')).toHaveAttribute('role', 'alert');
+    expect(screen.queryByText('Save failed')).not.toBeInTheDocument();
+  });
+
+  it('uses primary Apply buttons for Excel and Word editing', async () => {
+    const user = userEvent.setup();
+    render(<OfficeArtifactToolbar {...createProps()} />);
+    expect(screen.getByRole('button', { name: 'Apply' })).toHaveClass('arco-btn-primary');
+
+    render(<OfficeArtifactToolbar {...createProps({ inspection: wordInspection })} />);
+    await user.click(screen.getByRole('button', { name: 'Edit selection' }));
+
+    expect(
+      (await screen.findAllByRole('button', { name: 'Apply' })).every((button) =>
+        button.classList.contains('arco-btn-primary')
+      )
+    ).toBe(true);
   });
 
   it('disables destructive editing for a multi-cell selection while keeping Ask Forge available', () => {

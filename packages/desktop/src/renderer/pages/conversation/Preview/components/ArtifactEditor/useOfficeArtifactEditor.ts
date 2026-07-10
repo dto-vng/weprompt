@@ -23,6 +23,7 @@ export type OfficeArtifactEditorStatus =
   | 'saved'
   | 'saveFailed'
   | 'fileChanged'
+  | 'unsupported'
   | 'openingDesktop'
   | 'openedDesktop';
 
@@ -52,6 +53,7 @@ export type UseOfficeArtifactEditorResult = {
 };
 
 function failureStatus(code: OfficeArtifactErrorCode): OfficeArtifactEditorStatus {
+  if (code === 'UNSUPPORTED_CONTENT' || code === 'AMBIGUOUS_TEXT') return 'unsupported';
   return code === 'FILE_CHANGED' || code === 'STALE_SELECTION' ? 'fileChanged' : 'saveFailed';
 }
 
@@ -125,6 +127,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
 
   const handleSelectionChange = useCallback(
     (selection: OfficeArtifactSelection): void => {
+      if (mutationPendingRef.current) return;
       const expectedVersion = versionRef.current;
       const sessionId = sessionRequestRef.current;
       const requestId = inspectRequestRef.current + 1;

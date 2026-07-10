@@ -62,7 +62,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
             {t('preview.office.editor.cancel')}
           </Button>
           <Button
-            type={saving ? 'primary' : 'secondary'}
+            type='primary'
             size='small'
             loading={saving}
             disabled={saving || !inspection.canReplace || unchanged}
@@ -197,7 +197,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
         onKeyDown={handleKeyDown}
       />
       <Button
-        type={saving ? 'primary' : 'secondary'}
+        type='primary'
         size='small'
         loading={saving}
         disabled={saving || !inspection.canEdit || draft === originalInput}

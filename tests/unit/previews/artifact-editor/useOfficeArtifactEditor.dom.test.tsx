@@ -129,6 +129,30 @@ describe('useOfficeArtifactEditor', () => {
     expect(options.onArtifactMutated).toHaveBeenCalledOnce();
   });
 
+  it('retains the active selection while a guest selection event arrives during a pending apply', async () => {
+    const pending = deferred<OfficeArtifactMutationResult>();
+    mocks.inspect.mockResolvedValue(firstInspection);
+    mocks.apply.mockReturnValue(pending.promise);
+    const { result } = renderHook(() => useOfficeArtifactEditor(createOptions()));
+    await waitFor(() => expect(result.current.version).toBe('v1'));
+    act(() => result.current.handleSelectionChange(firstSelection));
+    await waitFor(() => expect(result.current.inspection).not.toBeNull());
+
+    let applyPromise: Promise<boolean>;
+    act(() => {
+      applyPromise = result.current.apply({ kind: 'replaceText', value: 'New text' });
+      result.current.handleSelectionChange(secondSelection);
+    });
+
+    expect(result.current.status).toBe('saving');
+    expect(result.current.inspection?.kind === 'word' && result.current.inspection.selectedText).toBe('Quarterly');
+    expect(mocks.inspect).toHaveBeenCalledOnce();
+
+    pending.resolve({ ok: true, version: 'v2', snapshotId: 's1', undoDepth: 1 });
+    await act(async () => expect(await applyPromise).toBe(true));
+    expect(result.current.status).toBe('saved');
+  });
+
   it('discards an inspection response that arrives after a newer selection', async () => {
     const oldResponse = deferred<OfficeArtifactInspectResult>();
     const newResponse = deferred<OfficeArtifactInspectResult>();
@@ -194,6 +218,22 @@ describe('useOfficeArtifactEditor', () => {
     expect(result.current.version).toBe('v1');
     expect(options.onArtifactMutated).not.toHaveBeenCalled();
   });
+
+  it.each(['UNSUPPORTED_CONTENT', 'AMBIGUOUS_TEXT'] as const)(
+    'reports %s mutation failures as unsupported editor state',
+    async (code) => {
+      mocks.inspect.mockResolvedValue(firstInspection);
+      mocks.apply.mockResolvedValue({ ok: false, code });
+      const { result } = renderHook(() => useOfficeArtifactEditor(createOptions()));
+      await waitFor(() => expect(result.current.version).toBe('v1'));
+      act(() => result.current.handleSelectionChange(firstSelection));
+      await waitFor(() => expect(result.current.inspection).not.toBeNull());
+
+      await act(() => result.current.apply({ kind: 'replaceText', value: 'New text' }));
+
+      expect(result.current.status).toBe('unsupported');
+    }
+  );
 
   it('undoes the current version transactionally and refreshes only after success', async () => {
     const pending = deferred<OfficeArtifactMutationResult>();

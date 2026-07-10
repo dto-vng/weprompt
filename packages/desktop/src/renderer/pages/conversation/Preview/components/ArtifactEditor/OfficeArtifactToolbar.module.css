@@ -108,6 +108,10 @@
   .secondaryAction {
     display: none;
   }
+
+  .compactMenuItem {
+    display: flex;
+  }
 }
 
 @container (max-width: 519px) {
@@ -143,10 +147,6 @@
 
   .secondaryAction {
     display: none;
-  }
-
-  .compactMenuItem {
-    display: flex;
   }
 }
 
