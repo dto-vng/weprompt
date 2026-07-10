@@ -301,6 +301,33 @@ describe('ContextHandoffPanel', () => {
     expect(await screen.findByText(expectedKey)).toBeInTheDocument();
   });
 
+  it('shows a budget percentage for an aionrs conversation using the per-model fallback window', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        backend: 'aionrs',
+        context_handoff: conversation.extra.context_handoff,
+        // No last_context_limit — aionrs conversations never receive one from the backend.
+        last_token_usage: { total_tokens: 9_000 },
+        workspace: '/workspace',
+      },
+      model: {
+        ...conversation.model,
+        use_model: 'minimax-m2.5',
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    await screen.findByRole('button', { name: /Context\.md/ });
+
+    expect(screen.queryByText('--')).not.toBeInTheDocument();
+    expect(screen.getByText(/%$/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThan(0)
+    );
+  });
+
   it('shows updating immediately while the always-mounted controller is compacting', async () => {
     mocks.getConversationOrNull.mockResolvedValue({
       ...conversation,

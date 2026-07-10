@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { estimateContextBudget } from './contextBudget';
 import { buildContextHandoffExtraPatch } from './contextConversationUpdate';
 import { resolveContextFile } from './contextFile';
+import { resolveConversationContextLimit } from './contextLimit';
 import { buildContextMarkdown } from './contextMarkdown';
 import { loadContextHandoffMessages, selectContextHandoffMessages } from './contextMessages';
 import {
@@ -63,12 +64,6 @@ const budgetPercent = (ratio: number | null): number => {
 
 const isAionrsConversation = (conversation: TChatConversation | null): conversation is AionrsConversation => {
   return conversation?.type === 'aionrs';
-};
-
-const getConversationContextLimit = (conversation: TChatConversation | null): number | undefined => {
-  if (!conversation || !('last_context_limit' in conversation.extra)) return undefined;
-  const contextLimit = conversation.extra.last_context_limit;
-  return typeof contextLimit === 'number' && contextLimit > 0 ? contextLimit : undefined;
 };
 
 const getConversationTokenUsage = (conversation: TChatConversation | null): TokenUsageData | null => {
@@ -149,7 +144,7 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
     : getGenerationStateKey(currentContextFile);
   const hasContextFile = Boolean(currentContextFile.context_file_path);
   const contextFileName = currentContextFile.context_file_name || resolveContextFile(workspace).fileName;
-  const contextLimit = getConversationContextLimit(conversation);
+  const contextLimit = resolveConversationContextLimit(conversation);
   const runtimeTokenUsage = getConversationTokenUsage(conversation);
   const contextMarkdown = useMemo(
     () =>
