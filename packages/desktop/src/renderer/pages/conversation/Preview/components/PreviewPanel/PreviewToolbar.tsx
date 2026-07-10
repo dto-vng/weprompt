@@ -23,7 +23,7 @@ const SHOW_SNAPSHOT_HISTORY = false;
  * PreviewToolbar 组件属性
  * PreviewToolbar component props
  */
-interface PreviewToolbarProps {
+type PreviewToolbarProps = {
   /**
    * 内容类型
    * Content type
@@ -149,7 +149,12 @@ interface PreviewToolbarProps {
    * Extra content rendered on the right section
    */
   rightExtra?: React.ReactNode;
-}
+
+  /**
+   * Office document actions rendered beside source tabs and file metadata.
+   */
+  officeActions?: React.ReactNode;
+};
 
 /**
  * 预览面板工具栏组件
@@ -181,6 +186,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   onInspectModeToggle,
   leftExtra,
   rightExtra,
+  officeActions,
 }) => {
   const { t } = useTranslation();
   const isDiff = content_type === 'diff';
@@ -253,6 +259,8 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
               )}
             </>
           )}
+
+          {officeActions}
 
           {preferActionButtonsInFront && showOpenInSystemButton && (
             <div className={toolbarBtn} onClick={onOpenInSystem} title={t('preview.openInSystemApp')}>

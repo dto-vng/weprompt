@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import { getBaseUrl, isBackendHttpError } from '@/common/adapter/httpBridge';
 import WebviewHost from '@/renderer/components/media/WebviewHost';
+import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Preview/types';
 import { openExternalUrl } from '@/renderer/utils/platform';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Spin } from '@arco-design/web-react';
@@ -71,17 +72,22 @@ const OFFICE_ERROR_I18N_KEYS: Record<OfficeWatchErrorCode, string> = {
 
 export const OFFICECLI_INSTALL_URL = 'https://github.com/iOfficeAI/OfficeCLI/releases';
 
-interface OfficeWatchViewerProps {
+type OfficeWatchViewerProps = {
   docType: DocType;
   file_path?: string;
   content?: string;
   workspace?: string;
-}
+  refreshToken?: string;
+  onRefreshStateChange?: (state: OfficePreviewRefreshState) => void;
+};
 
-interface OfficeWatchErrorState {
+type OfficeWatchErrorState = {
   code?: OfficeWatchErrorCode;
   message: string;
-}
+};
+
+export const shouldRestartOfficeWatch = (previousToken: string | undefined, nextToken: string | undefined): boolean =>
+  previousToken !== undefined && nextToken !== undefined && previousToken !== nextToken;
 
 export function resolveOfficeWatchUrl(url: string, docType: DocType): string {
   const proxyMatch = url.match(/^\/api\/(?:office-watch-proxy|ppt-proxy)\/(\d+)(\/.*)?$/);
@@ -154,7 +160,13 @@ export function resolveOfficeErrorActions(
  * Used by PptViewer, OfficeDocViewer, and ExcelViewer — each passes its
  * docType to select the correct IPC bridge, proxy path, and i18n keys.
  */
-const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_path, workspace }) => {
+const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
+  docType,
+  file_path,
+  workspace,
+  refreshToken,
+  onRefreshStateChange,
+}) => {
   const { t } = useTranslation();
   const keys = I18N_KEYS[docType];
 
@@ -164,14 +176,21 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
   const [error, setError] = useState<OfficeWatchErrorState | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const file_pathRef = useRef(file_path);
+  const refreshTokenRef = useRef<string | undefined>(refreshToken);
 
   useEffect(() => {
     file_pathRef.current = file_path;
     const bridge = BRIDGE[docType];
+    const isRefresh = shouldRestartOfficeWatch(refreshTokenRef.current, refreshToken);
+    refreshTokenRef.current = refreshToken;
+    const notifyRefreshState = (state: OfficePreviewRefreshState): void => {
+      if (isRefresh) onRefreshStateChange?.(state);
+    };
 
     if (!file_path) {
       setLoading(false);
       setError({ message: t('preview.errors.missingFilePath') });
+      notifyRefreshState('refreshFailed');
       return;
     }
 
@@ -187,6 +206,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
       setLoading(true);
       setStatus('starting');
       setError(null);
+      notifyRefreshState('refreshing');
       try {
         const result = await bridge.start.invoke({ file_path, workspace });
         const errorCode = normalizeOfficeWatchErrorCode(result.error);
@@ -196,6 +216,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
             message: t(OFFICE_ERROR_I18N_KEYS[errorCode]),
           });
           setLoading(false);
+          notifyRefreshState('refreshFailed');
           return;
         }
 
@@ -209,6 +230,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
           const resolvedUrl = resolveOfficeWatchUrl(url, docType);
           setWatchUrl(resolvedUrl);
           setLoading(false);
+          notifyRefreshState('refreshed');
         }
       } catch (err) {
         if (!cancelled) {
@@ -219,11 +241,13 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
               message: t(OFFICE_ERROR_I18N_KEYS[backendCode]),
             });
             setLoading(false);
+            notifyRefreshState('refreshFailed');
             return;
           }
           const msg = err instanceof Error ? err.message : t(keys.startFailed);
           setError({ message: msg });
           setLoading(false);
+          notifyRefreshState('refreshFailed');
         }
       }
     };
@@ -237,7 +261,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({ docType, file_pat
         bridge.stop.invoke({ file_path: file_pathRef.current }).catch(() => {});
       }
     };
-  }, [docType, file_path, retryKey, t, workspace]);
+  }, [docType, file_path, onRefreshStateChange, refreshToken, retryKey, t, workspace]);
 
   if (loading) {
     return (

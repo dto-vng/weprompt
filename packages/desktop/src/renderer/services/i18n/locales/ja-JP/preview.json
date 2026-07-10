@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge はサーバー上で動作しています。プレビューコンポーネントはそのサーバーにインストールする必要があります。サーバーで次のコマンドを実行してから再試行してください：",
       "icuNote": "それでも起動しない場合は、サーバーに ICU ライブラリをインストールしてください（Debian/Ubuntu：apt-get install -y libicu-dev）。"
+    },
+    "externalEdit": {
+      "editInDefaultApp": "既定のアプリで編集",
+      "editInDefaultAppTooltip": "このワークスペース ファイルを既定のアプリで開く",
+      "refreshPreview": "プレビューを更新",
+      "refreshPreviewTooltip": "この Forge プレビューをワークスペース ファイルから再読み込み",
+      "revealInFolder": "フォルダーに表示",
+      "revealInFolderTooltip": "このワークスペース ファイルを含むフォルダーに表示",
+      "status": {
+        "ready": "既定のアプリで編集できます",
+        "opening": "既定のアプリを開いています...",
+        "editingExternally": "外部アプリで編集中",
+        "refreshing": "プレビューを更新しています...",
+        "refreshed": "プレビューを更新しました",
+        "openFailed": "既定のアプリを開けませんでした",
+        "refreshFailed": "プレビューを更新できませんでした。ファイルがこの表示より新しい可能性があります。"
+      }
     }
   },
   "word": {

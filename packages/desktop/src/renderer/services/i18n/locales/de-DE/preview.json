@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge läuft auf einem Server. Installiere die Vorschau-Komponente auf diesem Server und versuche es erneut:",
       "icuNote": "Falls es immer noch nicht startet, installiere die ICU-Bibliothek auf dem Server (Debian/Ubuntu: apt-get install -y libicu-dev)."
+    },
+    "externalEdit": {
+      "editInDefaultApp": "In Standard-App bearbeiten",
+      "editInDefaultAppTooltip": "Diese Arbeitsbereichsdatei in ihrer Standard-App öffnen",
+      "refreshPreview": "Vorschau aktualisieren",
+      "refreshPreviewTooltip": "Diese Forge-Vorschau aus der Arbeitsbereichsdatei neu laden",
+      "revealInFolder": "Im Ordner anzeigen",
+      "revealInFolderTooltip": "Diese Arbeitsbereichsdatei in ihrem Ordner anzeigen",
+      "status": {
+        "ready": "Bereit zur Bearbeitung in der Standard-App",
+        "opening": "Standard-App wird geöffnet...",
+        "editingExternally": "Wird in externer App bearbeitet",
+        "refreshing": "Vorschau wird aktualisiert...",
+        "refreshed": "Vorschau aktualisiert",
+        "openFailed": "Standard-App konnte nicht geöffnet werden",
+        "refreshFailed": "Vorschau konnte nicht aktualisiert werden. Die Datei könnte neuer als diese Ansicht sein."
+      }
     }
   },
   "word": {

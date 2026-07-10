@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge bir sunucuda çalışıyor. Önizleme bileşeni o sunucuya kurulmalıdır. Aşağıdaki komutu sunucuda çalıştırıp yeniden deneyin:",
       "icuNote": "Yine de başlamazsa sunucuya ICU kitaplığını kurun (Debian/Ubuntu: apt-get install -y libicu-dev)."
+    },
+    "externalEdit": {
+      "editInDefaultApp": "Varsayılan uygulamada düzenle",
+      "editInDefaultAppTooltip": "Bu çalışma alanı dosyasını varsayılan uygulamasında aç",
+      "refreshPreview": "Önizlemeyi yenile",
+      "refreshPreviewTooltip": "Bu Forge önizlemesini çalışma alanı dosyasından yeniden yükle",
+      "revealInFolder": "Klasörde göster",
+      "revealInFolderTooltip": "Bu çalışma alanı dosyasını klasöründe göster",
+      "status": {
+        "ready": "Varsayılan uygulamada düzenlemeye hazır",
+        "opening": "Varsayılan uygulama açılıyor...",
+        "editingExternally": "Harici uygulamada düzenleniyor",
+        "refreshing": "Önizleme yenileniyor...",
+        "refreshed": "Önizleme yenilendi",
+        "openFailed": "Varsayılan uygulama açılamadı",
+        "refreshFailed": "Önizleme yenilenemedi. Dosya bu görünümden daha yeni olabilir."
+      }
     }
   },
   "word": {

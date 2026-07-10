@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge روی سرور اجرا می‌شود. مؤلفه پیش‌نمایش را روی همان سرور نصب کنید، سپس دوباره تلاش کنید:",
       "icuNote": "اگر همچنان شروع نشد، کتابخانه ICU را روی سرور نصب کنید (Debian/Ubuntu: apt-get install -y libicu-dev)."
+    },
+    "externalEdit": {
+      "editInDefaultApp": "ویرایش در برنامه پیش فرض",
+      "editInDefaultAppTooltip": "باز کردن این فایل فضای کاری در برنامه پیش فرض آن",
+      "refreshPreview": "تازه سازی پیش نمایش",
+      "refreshPreviewTooltip": "بارگیری دوباره این پیش نمایش Forge از فایل فضای کاری",
+      "revealInFolder": "نمایش در پوشه",
+      "revealInFolderTooltip": "نمایش این فایل فضای کاری در پوشه آن",
+      "status": {
+        "ready": "آماده ویرایش در برنامه پیش فرض",
+        "opening": "در حال باز کردن برنامه پیش فرض...",
+        "editingExternally": "در حال ویرایش در برنامه خارجی",
+        "refreshing": "در حال تازه سازی پیش نمایش...",
+        "refreshed": "پیش نمایش تازه شد",
+        "openFailed": "برنامه پیش فرض باز نشد",
+        "refreshFailed": "پیش نمایش تازه نشد. ممکن است فایل از این نما جدیدتر باشد."
+      }
     }
   },
   "word": {

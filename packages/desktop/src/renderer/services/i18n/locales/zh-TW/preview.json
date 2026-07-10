@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge 執行於伺服器上，預覽元件需要安裝在該伺服器上。請在伺服器執行以下指令後重試：",
       "icuNote": "若安裝後仍無法啟動，請在伺服器安裝 ICU 函式庫（Debian/Ubuntu：apt-get install -y libicu-dev）。"
+    },
+    "externalEdit": {
+      "editInDefaultApp": "在預設應用程式中編輯",
+      "editInDefaultAppTooltip": "在預設應用程式中開啟此工作區檔案",
+      "refreshPreview": "重新整理預覽",
+      "refreshPreviewTooltip": "從工作區檔案重新載入此 Forge 預覽",
+      "revealInFolder": "在資料夾中顯示",
+      "revealInFolderTooltip": "在其資料夾中顯示此工作區檔案",
+      "status": {
+        "ready": "可在預設應用程式中編輯",
+        "opening": "正在開啟預設應用程式...",
+        "editingExternally": "正在外部應用程式中編輯",
+        "refreshing": "正在重新整理預覽...",
+        "refreshed": "預覽已重新整理",
+        "openFailed": "無法開啟預設應用程式",
+        "refreshFailed": "預覽無法重新整理。檔案可能比目前檢視更新。"
+      }
     }
   },
   "word": {

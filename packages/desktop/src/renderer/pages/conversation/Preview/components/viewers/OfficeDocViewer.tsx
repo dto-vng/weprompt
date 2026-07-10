@@ -5,13 +5,16 @@
  */
 
 import React from 'react';
+import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Preview/types';
 import OfficeWatchViewer from './OfficeWatchViewer';
 
-interface OfficeDocPreviewProps {
+type OfficeDocPreviewProps = {
   file_path?: string;
   content?: string;
   workspace?: string;
-}
+  refreshToken?: string;
+  onRefreshStateChange?: (state: OfficePreviewRefreshState) => void;
+};
 
 const OfficeDocPreview: React.FC<OfficeDocPreviewProps> = (props) => <OfficeWatchViewer docType='word' {...props} />;
 

@@ -5,13 +5,16 @@
  */
 
 import React from 'react';
+import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Preview/types';
 import OfficeWatchViewer from './OfficeWatchViewer';
 
-interface ExcelPreviewProps {
+type ExcelPreviewProps = {
   file_path?: string;
   content?: string;
   workspace?: string;
-}
+  refreshToken?: string;
+  onRefreshStateChange?: (state: OfficePreviewRefreshState) => void;
+};
 
 const ExcelPreview: React.FC<ExcelPreviewProps> = (props) => <OfficeWatchViewer docType='excel' {...props} />;
 

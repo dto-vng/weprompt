@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "O Forge está sendo executado em um servidor. O componente de pré-visualização precisa ser instalado nesse servidor. Execute o comando abaixo no servidor e tente novamente:",
       "icuNote": "Se ainda não iniciar, instale a biblioteca ICU no servidor (Debian/Ubuntu: apt-get install -y libicu-dev)."
+    },
+    "externalEdit": {
+      "editInDefaultApp": "Editar no aplicativo padrão",
+      "editInDefaultAppTooltip": "Abrir este arquivo do espaço de trabalho no aplicativo padrão",
+      "refreshPreview": "Atualizar visualização",
+      "refreshPreviewTooltip": "Recarregar esta visualização do Forge a partir do arquivo do espaço de trabalho",
+      "revealInFolder": "Mostrar na pasta",
+      "revealInFolderTooltip": "Mostrar este arquivo do espaço de trabalho na pasta",
+      "status": {
+        "ready": "Pronto para editar no aplicativo padrão",
+        "opening": "Abrindo o aplicativo padrão...",
+        "editingExternally": "Editando no aplicativo externo",
+        "refreshing": "Atualizando visualização...",
+        "refreshed": "Visualização atualizada",
+        "openFailed": "Não foi possível abrir o aplicativo padrão",
+        "refreshFailed": "Não foi possível atualizar a visualização. O arquivo pode estar mais recente que esta exibição."
+      }
     }
   },
   "word": {

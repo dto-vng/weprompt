@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import { downloadFileFromPath, downloadTextContent } from '@/renderer/utils/file/download';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { toLocalFileHref } from '@/renderer/components/Markdown/markdownUtils';
+import { isElectronDesktop } from '@/renderer/utils/platform';
 import { PreviewToolbarExtrasProvider, type PreviewToolbarExtras } from '../../context/PreviewToolbarExtrasContext';
 import { usePreviewContext } from '../../context/PreviewContext';
 import { useResizableSplit } from '@/renderer/hooks/ui/useResizableSplit';
@@ -25,6 +26,8 @@ import OfficeDocPreview from '../viewers/OfficeDocViewer';
 import PptViewer from '../viewers/PptViewer';
 import CodeEditor from '../editors/CodeEditor';
 import URLViewer from '../viewers/URLViewer';
+import type { OfficeEditState, OfficePreviewRefreshState } from '../../types';
+import OfficeEditControls from './OfficeEditControls';
 import {
   PreviewTabs,
   PreviewToolbar,
@@ -74,6 +77,8 @@ const PreviewPanel: React.FC = () => {
   const [isSplitScreenEnabled, setIsSplitScreenEnabled] = useState(false);
   const [inspectMode, setInspectMode] = useState(false);
   const [toolbarExtras, setToolbarExtras] = useState<PreviewToolbarExtras | null>(null);
+  const [officeEditState, setOfficeEditState] = useState<OfficeEditState>('ready');
+  const [manualOfficeRefreshRevision, setManualOfficeRefreshRevision] = useState(0);
 
   // 切换文件时把视图模式复位为预览，避免上一个文件的 source 模式串到下一个文件（如代码文件丢失语法高亮）。
   // 注意：单预览浏览模式下打开新文件会复用当前 tab 的 id，所以这里要监听实际显示的文件标识（路径 + 类型），
@@ -83,6 +88,8 @@ const PreviewPanel: React.FC = () => {
   // new file reuses the active tab's id, so we key on the file identity (path + type), not activeTabId.
   useEffect(() => {
     setViewMode('preview');
+    setOfficeEditState('ready');
+    setManualOfficeRefreshRevision(0);
   }, [activeTabId, activeTab?.metadata?.file_path, activeTab?.content_type]);
 
   // 确认对话框状态 / Confirmation dialog states
@@ -274,6 +281,10 @@ const PreviewPanel: React.FC = () => {
   const { content, content_type, metadata } = activeTab;
   const isMarkdown = content_type === 'markdown';
   const isHTML = content_type === 'html';
+  const isOfficeDocument = content_type === 'word' || content_type === 'excel';
+  const canEditOfficeExternally =
+    isElectronDesktop() && isOfficeDocument && Boolean(metadata?.file_path && metadata.workspace);
+  const officeRefreshToken = `${activeTab.officePreviewRevision ?? 0}:${manualOfficeRefreshRevision}`;
   const isEditable = metadata?.editable !== false; // 默认可编辑 / Default editable
 
   // 检查文件类型是否已有内置的打开按钮（Word、PPT、PDF、Excel 组件内部已提供）
@@ -283,7 +294,7 @@ const PreviewPanel: React.FC = () => {
 
   // 对所有有 file_path 的文件显示"在系统中打开"按钮（统一在工具栏显示）
   // Show "Open in System" button for all files with file_path (unified in toolbar)
-  const showOpenInSystemButton = Boolean(metadata?.file_path);
+  const showOpenInSystemButton = Boolean(metadata?.file_path) && !isOfficeDocument;
 
   // 下载文件到本地 / Download file to local system
   const handleDownload = useCallback(async () => {
@@ -383,6 +394,32 @@ const PreviewPanel: React.FC = () => {
       }
     }
   }, [metadata?.file_path, messageApi, t]);
+
+  const handleEditOfficeExternally = useCallback(async () => {
+    if (!metadata?.file_path) return;
+
+    setOfficeEditState('opening');
+    try {
+      await ipcBridge.shell.openFile.invoke(metadata.file_path);
+      setOfficeEditState('editingExternally');
+    } catch {
+      setOfficeEditState('openFailed');
+    }
+  }, [metadata?.file_path]);
+
+  const handleManualOfficeRefresh = useCallback(() => {
+    setOfficeEditState('refreshing');
+    setManualOfficeRefreshRevision((revision) => revision + 1);
+  }, []);
+
+  const handleOfficeRefreshStateChange = useCallback((state: OfficePreviewRefreshState) => {
+    setOfficeEditState(state);
+  }, []);
+
+  const handleRevealOfficeInFolder = useCallback(() => {
+    if (!metadata?.file_path) return;
+    void ipcBridge.shell.showItemInFolder.invoke(metadata.file_path).catch(() => {});
+  }, [metadata?.file_path]);
 
   // 渲染历史下拉菜单 / Render history dropdown
   const renderHistoryDropdown = () => {
@@ -620,9 +657,25 @@ const PreviewPanel: React.FC = () => {
     } else if (content_type === 'ppt') {
       return <PptViewer file_path={metadata?.file_path} content={content} workspace={metadata?.workspace} />;
     } else if (content_type === 'word') {
-      return <OfficeDocPreview file_path={metadata?.file_path} content={content} workspace={metadata?.workspace} />;
+      return (
+        <OfficeDocPreview
+          file_path={metadata?.file_path}
+          content={content}
+          workspace={metadata?.workspace}
+          refreshToken={officeRefreshToken}
+          onRefreshStateChange={handleOfficeRefreshStateChange}
+        />
+      );
     } else if (content_type === 'excel') {
-      return <ExcelPreview file_path={metadata?.file_path} content={content} workspace={metadata?.workspace} />;
+      return (
+        <ExcelPreview
+          file_path={metadata?.file_path}
+          content={content}
+          workspace={metadata?.workspace}
+          refreshToken={officeRefreshToken}
+          onRefreshStateChange={handleOfficeRefreshStateChange}
+        />
+      );
     } else if (content_type === 'image') {
       return (
         <ImagePreview
@@ -701,6 +754,16 @@ const PreviewPanel: React.FC = () => {
             onInspectModeToggle={() => setInspectMode(!inspectMode)}
             leftExtra={toolbarExtras?.left}
             rightExtra={toolbarExtras?.right}
+            officeActions={
+              canEditOfficeExternally ? (
+                <OfficeEditControls
+                  state={officeEditState}
+                  onEditInDefaultApp={() => void handleEditOfficeExternally()}
+                  onRefreshPreview={handleManualOfficeRefresh}
+                  onRevealInFolder={handleRevealOfficeInFolder}
+                />
+              ) : undefined
+            }
           />
         )}
 

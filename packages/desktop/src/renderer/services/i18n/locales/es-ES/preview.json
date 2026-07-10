@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge se está ejecutando en un servidor. Instala el componente de vista previa en ese servidor y reintenta:",
       "icuNote": "Si sigue sin iniciar, instala la biblioteca ICU en el servidor (Debian/Ubuntu: apt-get install -y libicu-dev)."
+    },
+    "externalEdit": {
+      "editInDefaultApp": "Editar en la aplicación predeterminada",
+      "editInDefaultAppTooltip": "Abrir este archivo del espacio de trabajo en su aplicación predeterminada",
+      "refreshPreview": "Actualizar vista previa",
+      "refreshPreviewTooltip": "Volver a cargar esta vista previa de Forge desde el archivo del espacio de trabajo",
+      "revealInFolder": "Mostrar en la carpeta",
+      "revealInFolderTooltip": "Mostrar este archivo del espacio de trabajo en su carpeta",
+      "status": {
+        "ready": "Listo para editar en la aplicación predeterminada",
+        "opening": "Abriendo la aplicación predeterminada...",
+        "editingExternally": "Editando en una aplicación externa",
+        "refreshing": "Actualizando vista previa...",
+        "refreshed": "Vista previa actualizada",
+        "openFailed": "No se pudo abrir la aplicación predeterminada",
+        "refreshFailed": "No se pudo actualizar la vista previa. El archivo puede ser más reciente que esta vista."
+      }
     }
   },
   "word": {

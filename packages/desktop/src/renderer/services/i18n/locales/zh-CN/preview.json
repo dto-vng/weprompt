@@ -81,6 +81,23 @@
     "serverInstall": {
       "hint": "Forge 运行在服务器上，预览组件需要安装在该服务器上。请在服务器执行以下命令后重试：",
       "icuNote": "若安装后仍无法启动，请在服务器安装 ICU 库（Debian/Ubuntu：apt-get install -y libicu-dev）。"
+    },
+    "externalEdit": {
+      "editInDefaultApp": "在默认应用中编辑",
+      "editInDefaultAppTooltip": "在默认应用中打开此工作区文件",
+      "refreshPreview": "刷新预览",
+      "refreshPreviewTooltip": "从工作区文件重新加载此 Forge 预览",
+      "revealInFolder": "在文件夹中显示",
+      "revealInFolderTooltip": "在其文件夹中显示此工作区文件",
+      "status": {
+        "ready": "可在默认应用中编辑",
+        "opening": "正在打开默认应用...",
+        "editingExternally": "正在外部应用中编辑",
+        "refreshing": "正在刷新预览...",
+        "refreshed": "预览已刷新",
+        "openFailed": "无法打开默认应用",
+        "refreshFailed": "预览无法刷新。文件可能比当前视图更新。"
+      }
     }
   },
   "word": {

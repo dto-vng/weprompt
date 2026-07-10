@@ -45,6 +45,15 @@ describe('OfficeWatchViewer module shape', () => {
   });
 });
 
+describe('shouldRestartOfficeWatch', () => {
+  it('restarts only when a refresh token changes after initial mount', async () => {
+    const mod = await import('@/renderer/pages/conversation/Preview/components/viewers/OfficeWatchViewer');
+    expect(mod.shouldRestartOfficeWatch(undefined, '0:0')).toBe(false);
+    expect(mod.shouldRestartOfficeWatch('0:0', '0:1')).toBe(true);
+    expect(mod.shouldRestartOfficeWatch('1:1', '1:1')).toBe(false);
+  });
+});
+
 /**
  * Issue #3212: in web (browser) mode the preview iframe URL must match the
  * backend proxy routes exactly. The backend registers /api/ppt-proxy/{port}
