@@ -34,6 +34,13 @@ function cellEnvelope(value: Record<string, unknown>): unknown {
   return { matches: 1, results: [value] };
 }
 
+function sheetEnvelope(format: CellFormat = {}): unknown {
+  return {
+    matches: 1,
+    results: [{ path: '/Forecast', type: 'sheet', format, children: [] }],
+  };
+}
+
 function rangeEnvelope(paths: string[]): unknown {
   const children = paths.map((path, index) => cell(path, String(index + 1)));
   return {
@@ -73,9 +80,13 @@ const runner = {
   validate: vi.fn<OfficeCliRunner['validate']>(),
 } satisfies OfficeCliRunner;
 
+function mockInspectionResult(result: unknown, sheetFormat: CellFormat = {}): void {
+  runner.get.mockImplementation(async (_file, path) => (path === '/Forecast' ? sheetEnvelope(sheetFormat) : result));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
-  runner.get.mockResolvedValue(cellEnvelope(cell('/Forecast/B4', '84', { formula: 'A1*2' })));
+  mockInspectionResult(cellEnvelope(cell('/Forecast/B4', '84', { formula: 'A1*2' })));
   runner.setCell.mockResolvedValue({});
 });
 
@@ -91,7 +102,7 @@ describe('inspectXlsxSelection', () => {
   });
 
   it('inspects a contiguous range for Ask Forge but keeps direct editing disabled', async () => {
-    runner.get.mockResolvedValue(rangeEnvelope(['/Forecast/B4', '/Forecast/C4']));
+    mockInspectionResult(rangeEnvelope(['/Forecast/B4', '/Forecast/C4']));
 
     await expect(inspectXlsxSelection(runner, FILE_PATH, twoCellSelection)).resolves.toMatchObject({
       kind: 'excel',
@@ -125,18 +136,29 @@ describe('inspectXlsxSelection', () => {
   it.each([
     ['rich text', { richtext: true }],
     ['a merged non-anchor', { mergeAnchor: false }],
+    ['a merged non-anchor without an explicit flag', { merge: 'B4:C4' }],
     ['a protected cell', { 'protection.locked': true }],
     ['an unsupported cell', { unsupported: true }],
   ])('preserves %s', async (_name, format) => {
-    runner.get.mockResolvedValue(cellEnvelope(cell('/Forecast/B4', '84', format)));
+    mockInspectionResult(cellEnvelope(cell('/Forecast/B4', '84', format)));
 
     await expect(inspectXlsxSelection(runner, FILE_PATH, oneCellSelection)).rejects.toMatchObject({
       code: 'UNSUPPORTED_CONTENT',
     });
   });
 
+  it('rejects cells on a protected worksheet', async () => {
+    mockInspectionResult(cellEnvelope(cell('/Forecast/B4', '84')), { protect: true });
+
+    await expect(inspectXlsxSelection(runner, FILE_PATH, oneCellSelection)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CONTENT',
+    });
+    expect(runner.get).toHaveBeenCalledTimes(1);
+    expect(runner.get).toHaveBeenCalledWith(FILE_PATH, '/Forecast');
+  });
+
   it('rejects an unsupported OfficeCLI response', async () => {
-    runner.get.mockResolvedValue({ unsupported: true, matches: 1, results: [cell('/Forecast/B4', '84')] });
+    mockInspectionResult({ unsupported: true, matches: 1, results: [cell('/Forecast/B4', '84')] });
 
     await expect(inspectXlsxSelection(runner, FILE_PATH, oneCellSelection)).rejects.toMatchObject({
       code: 'UNSUPPORTED_CONTENT',
@@ -144,7 +166,7 @@ describe('inspectXlsxSelection', () => {
   });
 
   it('rejects a stale display value from the guest selection', async () => {
-    runner.get.mockResolvedValue(cellEnvelope(cell('/Forecast/B4', '85')));
+    mockInspectionResult(cellEnvelope(cell('/Forecast/B4', '85')));
 
     await expect(inspectXlsxSelection(runner, FILE_PATH, oneCellSelection)).rejects.toMatchObject({
       code: 'STALE_SELECTION',
@@ -152,7 +174,7 @@ describe('inspectXlsxSelection', () => {
   });
 
   it('rejects OfficeCLI results that do not exactly match the selected paths', async () => {
-    runner.get.mockResolvedValue(rangeEnvelope(['/Forecast/B4', '/Forecast/D4']));
+    mockInspectionResult(rangeEnvelope(['/Forecast/B4', '/Forecast/D4']));
 
     await expect(inspectXlsxSelection(runner, FILE_PATH, twoCellSelection)).rejects.toMatchObject({
       code: 'UNSUPPORTED_CONTENT',
@@ -176,7 +198,7 @@ describe('mutateXlsxSelection', () => {
   });
 
   it('rejects a formula that changed while preserving the same display text', async () => {
-    runner.get.mockResolvedValue(cellEnvelope(cell('/Forecast/B4', '84', { formula: 'A1*4' })));
+    mockInspectionResult(cellEnvelope(cell('/Forecast/B4', '84', { formula: 'A1*4' })));
 
     await expect(
       mutateXlsxSelection(runner, FILE_PATH, inspection, { kind: 'setCell', input: '=A1*3' })

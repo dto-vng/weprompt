@@ -6,12 +6,20 @@
 
 import { ipcBridge } from '@/common';
 import { getBaseUrl, isBackendHttpError } from '@/common/adapter/httpBridge';
-import WebviewHost from '@/renderer/components/media/WebviewHost';
+import { OFFICE_PREVIEW_PARTITION, type OfficeArtifactSelection } from '@/common/types/office/artifactEditor';
+import WebviewHost, {
+  type WebviewHostConsoleMessage,
+  type WebviewHostScriptRequest,
+} from '@/renderer/components/media/WebviewHost';
+import {
+  buildOfficeGuestScript,
+  parseOfficeGuestMessage,
+} from '@/renderer/pages/conversation/Preview/components/ArtifactEditor/officeGuestBridge';
 import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Preview/types';
 import { openExternalUrl } from '@/renderer/utils/platform';
 import { isElectronDesktop } from '@/renderer/utils/platform';
-import { Button, Spin } from '@arco-design/web-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Button, Spin } from '@arco-design/web-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type DocType = 'ppt' | 'word' | 'excel';
@@ -79,6 +87,8 @@ type OfficeWatchViewerProps = {
   workspace?: string;
   refreshToken?: string;
   onRefreshStateChange?: (state: OfficePreviewRefreshState) => void;
+  onSelectionChange?: (selection: OfficeArtifactSelection) => void;
+  scriptRequest?: WebviewHostScriptRequest;
 };
 
 type OfficeWatchErrorState = {
@@ -199,50 +209,98 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   workspace,
   refreshToken,
   onRefreshStateChange,
+  onSelectionChange,
+  scriptRequest,
 }) => {
   const { t } = useTranslation();
   const keys = I18N_KEYS[docType];
 
   const [watchUrl, setWatchUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState<'starting' | 'installing'>('starting');
   const [error, setError] = useState<OfficeWatchErrorState | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const watchUrlRef = useRef<string | null>(null);
+  const contentReadyRef = useRef(false);
   const filePathRef = useRef(file_path);
+  const workspaceRef = useRef(workspace);
+  const docTypeRef = useRef(docType);
   const refreshTokenRef = useRef<string | undefined>(refreshToken);
   const stopQueueRef = useRef<OfficeWatchStopQueue>(createOfficeWatchStopQueue());
-  const pendingRefreshRef = useRef(false);
+  const pendingRefreshLoadRef = useRef(false);
+
+  const guestScript = useMemo(() => (docType === 'ppt' ? undefined : buildOfficeGuestScript(docType)), [docType]);
+
+  const updateWatchUrl = useCallback((url: string | null): void => {
+    watchUrlRef.current = url;
+    setWatchUrl(url);
+  }, []);
 
   const handlePreviewLoaded = useCallback(() => {
-    if (!pendingRefreshRef.current) return;
-    pendingRefreshRef.current = false;
-    onRefreshStateChange?.('refreshed');
+    contentReadyRef.current = true;
+    setInitialLoading(false);
+    setError(null);
+
+    if (pendingRefreshLoadRef.current) {
+      pendingRefreshLoadRef.current = false;
+      setRefreshing(false);
+      onRefreshStateChange?.('refreshed');
+    }
   }, [onRefreshStateChange]);
 
   const handlePreviewLoadFailed = useCallback(() => {
-    if (!pendingRefreshRef.current) return;
-    pendingRefreshRef.current = false;
-    onRefreshStateChange?.('refreshFailed');
-  }, [onRefreshStateChange]);
+    if (pendingRefreshLoadRef.current) {
+      pendingRefreshLoadRef.current = false;
+      setRefreshing(false);
+      onRefreshStateChange?.('refreshFailed');
+      return;
+    }
+
+    if (contentReadyRef.current) return;
+    setInitialLoading(false);
+    setError({ message: t(keys.startFailed) });
+  }, [keys.startFailed, onRefreshStateChange, t]);
+
+  const handleConsoleMessage = useCallback(
+    (event: WebviewHostConsoleMessage): void => {
+      if (!onSelectionChange) return;
+      const selection = parseOfficeGuestMessage(event.message, event.sourceId);
+      if (selection) onSelectionChange(selection);
+    },
+    [onSelectionChange]
+  );
 
   useEffect(() => {
     const bridge = BRIDGE[docType];
-    const isRefresh = shouldReportOfficeWatchRefresh(
+    const contextChanged =
+      filePathRef.current !== file_path || workspaceRef.current !== workspace || docTypeRef.current !== docType;
+    const refreshRequested = shouldReportOfficeWatchRefresh(
       filePathRef.current,
       file_path,
       refreshTokenRef.current,
       refreshToken
     );
+    const isRefresh = !contextChanged && refreshRequested && contentReadyRef.current && watchUrlRef.current !== null;
     filePathRef.current = file_path;
+    workspaceRef.current = workspace;
+    docTypeRef.current = docType;
     refreshTokenRef.current = refreshToken;
     const notifyRefreshState = (state: OfficePreviewRefreshState): void => {
       if (isRefresh) onRefreshStateChange?.(state);
     };
 
+    if (!isRefresh && (contextChanged || !contentReadyRef.current)) {
+      contentReadyRef.current = false;
+      pendingRefreshLoadRef.current = false;
+      setRefreshing(false);
+      setInitialLoading(true);
+      updateWatchUrl(null);
+    }
+
     if (!file_path) {
-      setLoading(false);
+      setInitialLoading(false);
       setError({ message: t('preview.errors.missingFilePath') });
-      notifyRefreshState('refreshFailed');
       return;
     }
 
@@ -259,24 +317,31 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
     const start = async () => {
       await stopQueueRef.current.waitForStop();
       if (cancelled) return;
-      setLoading(true);
       setStatus('starting');
-      setError(null);
-      if (isRefresh) pendingRefreshRef.current = true;
-      notifyRefreshState('refreshing');
+      if (isRefresh) {
+        setRefreshing(true);
+        notifyRefreshState('refreshing');
+      } else {
+        setInitialLoading(true);
+        setError(null);
+      }
       try {
         const result = await bridge.start.invoke({ file_path, workspace });
         const errorCode = normalizeOfficeWatchErrorCode(result.error);
         watchStarted = !errorCode;
         if (!shouldApplyOfficeWatchStartResult(cancelled)) return;
         if (errorCode) {
-          setError({
+          const nextError = {
             code: errorCode,
             message: t(OFFICE_ERROR_I18N_KEYS[errorCode]),
-          });
-          setLoading(false);
-          pendingRefreshRef.current = false;
-          notifyRefreshState('refreshFailed');
+          };
+          if (isRefresh) {
+            setRefreshing(false);
+            notifyRefreshState('refreshFailed');
+          } else {
+            setError(nextError);
+            setInitialLoading(false);
+          }
           return;
         }
 
@@ -288,27 +353,34 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         await new Promise((r) => setTimeout(r, 300));
         if (!cancelled) {
           const resolvedUrl = resolveOfficeWatchUrl(url, docType);
-          setWatchUrl(resolvedUrl);
-          setLoading(false);
+          pendingRefreshLoadRef.current = isRefresh;
+          updateWatchUrl(resolvedUrl);
         }
       } catch (err) {
         if (shouldApplyOfficeWatchStartResult(cancelled)) {
           const backendCode = isBackendHttpError(err) ? normalizeOfficeWatchErrorCode(err.code) : undefined;
           if (backendCode) {
-            setError({
+            const nextError = {
               code: backendCode,
               message: t(OFFICE_ERROR_I18N_KEYS[backendCode]),
-            });
-            setLoading(false);
-            pendingRefreshRef.current = false;
-            notifyRefreshState('refreshFailed');
+            };
+            if (isRefresh) {
+              setRefreshing(false);
+              notifyRefreshState('refreshFailed');
+            } else {
+              setError(nextError);
+              setInitialLoading(false);
+            }
             return;
           }
           const msg = err instanceof Error ? err.message : t(keys.startFailed);
-          setError({ message: msg });
-          setLoading(false);
-          pendingRefreshRef.current = false;
-          notifyRefreshState('refreshFailed');
+          if (isRefresh) {
+            setRefreshing(false);
+            notifyRefreshState('refreshFailed');
+          } else {
+            setError({ message: msg });
+            setInitialLoading(false);
+          }
         }
       }
     };
@@ -317,27 +389,13 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
 
     return () => {
       cancelled = true;
-      pendingRefreshRef.current = false;
       unsubStatus();
       stopQueueRef.current.queueStop(async () => {
         await startPromise;
         if (watchStarted) await bridge.stop.invoke({ file_path });
       });
     };
-  }, [docType, file_path, onRefreshStateChange, refreshToken, retryKey, t, workspace]);
-
-  if (loading) {
-    return (
-      <div className='h-full w-full flex items-center justify-center bg-bg-1'>
-        <div className='flex flex-col items-center gap-12px'>
-          <Spin size={32} />
-          <span className='text-13px text-t-secondary'>
-            {status === 'installing' ? t(keys.installing) : t(keys.loading)}
-          </span>
-        </div>
-      </div>
-    );
-  }
+  }, [docType, file_path, onRefreshStateChange, refreshToken, retryKey, t, updateWatchUrl, workspace]);
 
   if (error) {
     const { showServerInstallGuide, showInstallLink, showRetry } = resolveOfficeErrorActions(
@@ -347,61 +405,92 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
 
     return (
       <div className='h-full w-full flex items-center justify-center bg-bg-1'>
-        <div className='text-center max-w-400px'>
-          <div className='text-16px text-danger mb-8px'>{error.message}</div>
-          {!error.code && <div className='text-12px text-t-secondary mb-12px'>{t(keys.installHint)}</div>}
-          {showServerInstallGuide && (
-            <div className='text-left mb-12px'>
-              <div className='text-12px text-t-secondary mb-8px'>{t('preview.office.serverInstall.hint')}</div>
-              <code className='block select-all rounded-8px bg-2 px-10px py-8px text-12px text-t-primary'>
-                {OFFICECLI_SERVER_INSTALL_COMMAND}
-              </code>
-              <div className='text-12px text-t-secondary mt-8px'>{t('preview.office.serverInstall.icuNote')}</div>
+        <Alert
+          type='error'
+          className='max-w-400px'
+          content={
+            <div>
+              <div className='text-14px text-t-primary mb-8px'>{error.message}</div>
+              {!error.code && <div className='text-12px text-t-secondary mb-12px'>{t(keys.installHint)}</div>}
+              {showServerInstallGuide && (
+                <div className='text-left mb-12px'>
+                  <div className='text-12px text-t-secondary mb-8px'>{t('preview.office.serverInstall.hint')}</div>
+                  <code className='block select-all rounded-8px bg-2 px-10px py-8px text-12px text-t-primary'>
+                    {OFFICECLI_SERVER_INSTALL_COMMAND}
+                  </code>
+                  <div className='text-12px text-t-secondary mt-8px'>{t('preview.office.serverInstall.icuNote')}</div>
+                </div>
+              )}
+              <div className='flex justify-center gap-8px'>
+                {showInstallLink && (
+                  <Button type='text' size='small' onClick={() => void openExternalUrl(OFFICECLI_INSTALL_URL)}>
+                    {t('preview.office.installLinkText')}
+                  </Button>
+                )}
+                {showRetry && (
+                  <Button size='small' type='primary' onClick={() => setRetryKey((value) => value + 1)}>
+                    {t('common.retry', { defaultValue: 'Retry' })}
+                  </Button>
+                )}
+              </div>
             </div>
-          )}
-          {showInstallLink && (
-            <div className='flex justify-center'>
-              <Button type='text' size='small' onClick={() => void openExternalUrl(OFFICECLI_INSTALL_URL)}>
-                {t('preview.office.installLinkText')}
-              </Button>
-            </div>
-          )}
-          {showRetry && (
-            <div className='flex justify-center'>
-              <Button size='small' type='primary' onClick={() => setRetryKey((value) => value + 1)}>
-                {t('common.retry', { defaultValue: 'Retry' })}
-              </Button>
-            </div>
-          )}
-        </div>
+          }
+        />
       </div>
     );
   }
 
-  if (!watchUrl) return null;
-
-  // Electron: use <webview> via WebviewHost for full Electron integration.
-  // Web server mode: use <iframe> since <webview> is Electron-only.
-  if (isElectronDesktop()) {
-    return (
-      <WebviewHost
-        key={getOfficeWatchViewKey(watchUrl, refreshToken)}
-        url={watchUrl}
-        className='bg-bg-1'
-        onDidFinishLoad={handlePreviewLoaded}
-        onDidFailLoad={handlePreviewLoadFailed}
-      />
-    );
-  }
   return (
-    <iframe
-      key={getOfficeWatchViewKey(watchUrl, refreshToken)}
-      src={watchUrl}
-      className='w-full h-full border-0 bg-bg-1'
-      title={IFRAME_TITLE[docType]}
-      onLoad={handlePreviewLoaded}
-      onError={handlePreviewLoadFailed}
-    />
+    <div className='relative h-full w-full overflow-hidden bg-bg-1'>
+      {watchUrl && (
+        <div data-testid='office-preview-webview' className='h-full w-full'>
+          {isElectronDesktop() ? (
+            <WebviewHost
+              url={watchUrl}
+              className='bg-bg-1'
+              partition={OFFICE_PREVIEW_PARTITION}
+              injectedScript={guestScript}
+              scriptRequest={scriptRequest}
+              onConsoleMessage={handleConsoleMessage}
+              onDidFinishLoad={handlePreviewLoaded}
+              onDidFailLoad={handlePreviewLoadFailed}
+            />
+          ) : (
+            <iframe
+              src={watchUrl}
+              className='w-full h-full border-0 bg-bg-1'
+              title={IFRAME_TITLE[docType]}
+              onLoad={handlePreviewLoaded}
+              onError={handlePreviewLoadFailed}
+            />
+          )}
+        </div>
+      )}
+
+      {initialLoading && (
+        <div
+          data-testid='office-preview-loading'
+          className='absolute inset-0 z-10 flex items-center justify-center bg-bg-1'
+        >
+          <div className='flex flex-col items-center gap-12px'>
+            <Spin size={32} />
+            <span className='text-13px text-t-secondary'>
+              {status === 'installing' ? t(keys.installing) : t(keys.loading)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {refreshing && (
+        <div
+          data-testid='office-preview-refreshing'
+          className='pointer-events-none absolute right-12px top-12px z-10 flex items-center gap-6px rounded-6px bg-bg-2 px-8px py-6px text-12px text-t-secondary shadow-sm'
+        >
+          <Spin size={14} />
+          <span>{t(keys.loading)}</span>
+        </div>
+      )}
+    </div>
   );
 };
 

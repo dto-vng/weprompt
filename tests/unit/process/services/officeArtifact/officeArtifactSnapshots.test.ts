@@ -29,6 +29,19 @@ async function createArtifact(): Promise<{ filePath: string; historyRoot: string
   return { filePath, historyRoot: join(workspace, 'history') };
 }
 
+async function commitSuccessiveVersions(
+  store: OfficeArtifactSnapshotStore,
+  filePath: string,
+  index: number,
+  lastIndex: number
+): Promise<void> {
+  if (index > lastIndex) return;
+  const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+  await writeFile(filePath, String(index));
+  await store.commit(pending, await hashOfficeArtifact(filePath));
+  await commitSuccessiveVersions(store, filePath, index + 1, lastIndex);
+}
+
 afterEach(async () => {
   await Promise.all(temporaryPaths.splice(0).map((path) => rm(path, { force: true, recursive: true })));
 });
@@ -72,11 +85,7 @@ describe('OfficeArtifactSnapshotStore', () => {
     const { filePath, historyRoot } = await createArtifact();
     const store = new OfficeArtifactSnapshotStore(historyRoot, { maxDepth: 21 });
 
-    for (let index = 1; index <= 21; index += 1) {
-      const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
-      await writeFile(filePath, String(index));
-      await store.commit(pending, await hashOfficeArtifact(filePath));
-    }
+    await commitSuccessiveVersions(store, filePath, 1, 21);
 
     const discarded = await store.prepare(filePath, await hashOfficeArtifact(filePath));
     await writeFile(filePath, 'mutated after prepare');
@@ -109,6 +118,18 @@ describe('OfficeArtifactSnapshotStore', () => {
 
     await expect(readFile(filePath, 'utf8')).resolves.toBe('A');
     expect(store.getUndoDepth(filePath)).toBe(0);
+  });
+
+  it('discards a pending snapshot without overwriting a later file change', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+    const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+    await writeFile(filePath, 'external');
+
+    await store.discardPending(pending);
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('external');
+    await expect(stat(pending.snapshotPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('keeps a failed undo snapshot for retry', async () => {

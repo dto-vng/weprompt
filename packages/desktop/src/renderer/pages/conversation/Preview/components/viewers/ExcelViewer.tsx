@@ -5,6 +5,8 @@
  */
 
 import React from 'react';
+import type { OfficeArtifactSelection } from '@/common/types/office/artifactEditor';
+import type { WebviewHostScriptRequest } from '@/renderer/components/media/WebviewHost';
 import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Preview/types';
 import OfficeWatchViewer from './OfficeWatchViewer';
 
@@ -14,6 +16,8 @@ type ExcelPreviewProps = {
   workspace?: string;
   refreshToken?: string;
   onRefreshStateChange?: (state: OfficePreviewRefreshState) => void;
+  onSelectionChange?: (selection: OfficeArtifactSelection) => void;
+  scriptRequest?: WebviewHostScriptRequest;
 };
 
 const ExcelPreview: React.FC<ExcelPreviewProps> = (props) => <OfficeWatchViewer docType='excel' {...props} />;

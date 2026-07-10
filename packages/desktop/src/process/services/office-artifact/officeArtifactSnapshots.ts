@@ -132,6 +132,16 @@ export class OfficeArtifactSnapshotStore {
     this.pendingSnapshots.delete(storedPending.id);
   }
 
+  async discardPending(pending: OfficeArtifactPendingSnapshot): Promise<void> {
+    const storedPending = this.pendingSnapshots.get(pending.id);
+    if (!storedPending || storedPending.snapshotPath !== pending.snapshotPath) {
+      throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
+    }
+
+    await this.removeSnapshot(storedPending.snapshotPath);
+    this.pendingSnapshots.delete(storedPending.id);
+  }
+
   async undo(filePath: string, expectedVersion: string): Promise<OfficeArtifactUndoResult> {
     const canonicalFilePath = await this.resolveKnownPath(filePath);
     const stack = canonicalFilePath ? this.stacks.get(canonicalFilePath) : undefined;

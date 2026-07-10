@@ -14,13 +14,18 @@ import { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
 import { createOfficeCliRunner } from './officeCliRunner';
 
 const historyRoot = join(tmpdir(), 'aionui-office-artifact-history', `${process.pid}-${randomUUID()}`);
+const snapshotStore = new OfficeArtifactSnapshotStore(historyRoot);
 
 export const officeArtifactService = new OfficeArtifactService({
   runner: createOfficeCliRunner(),
-  snapshots: new OfficeArtifactSnapshotStore(historyRoot),
+  snapshots: snapshotStore,
   resolveArtifact: resolveOfficeArtifactPath,
   hashArtifact: hashOfficeArtifact,
 });
+
+export async function disposeOfficeArtifactService(): Promise<void> {
+  await snapshotStore.dispose();
+}
 
 export * from './OfficeArtifactService';
 export * from './docxArtifactStrategy';

@@ -15,6 +15,7 @@ import { OfficeArtifactError } from './officeCliJson';
 import type { OfficeCliRunner } from './officeCliRunner';
 
 const STABLE_PARAGRAPH_PATH = /^\/body\/p\[@paraId=[A-Fa-f0-9]+\]$/;
+const PREVIEW_PARAGRAPH_PATH = /^\/body\/p\[[1-9]\d*\]$/;
 const FORMAT_PROPERTIES = ['bold', 'italic', 'underline'] as const;
 
 type OfficeCliFormat = Record<string, unknown>;
@@ -25,6 +26,7 @@ type OfficeCliRun = {
 };
 
 type OfficeCliParagraph = {
+  path: string;
   text: string;
   children: OfficeCliRun[];
 };
@@ -38,7 +40,7 @@ function rejectUnsupported(): never {
 }
 
 function validateSelection(selection: DocxSelectionSnapshot): void {
-  if (!STABLE_PARAGRAPH_PATH.test(selection.path)) rejectUnsupported();
+  if (!STABLE_PARAGRAPH_PATH.test(selection.path) && !PREVIEW_PARAGRAPH_PATH.test(selection.path)) rejectUnsupported();
   if (selection.selectedText.startsWith('r"') && selection.selectedText.endsWith('"')) rejectUnsupported();
 
   const hasValidOffsets =
@@ -92,6 +94,8 @@ function parseParagraph(result: unknown, expectedText: string): OfficeCliParagra
   if (
     !isRecord(paragraph) ||
     paragraph.type !== 'paragraph' ||
+    typeof paragraph.path !== 'string' ||
+    !STABLE_PARAGRAPH_PATH.test(paragraph.path) ||
     typeof paragraph.text !== 'string' ||
     !Array.isArray(paragraph.children)
   ) {
@@ -100,6 +104,7 @@ function parseParagraph(result: unknown, expectedText: string): OfficeCliParagra
   if (paragraph.text !== expectedText) throw new OfficeArtifactError('STALE_SELECTION');
 
   return {
+    path: paragraph.path,
     text: paragraph.text,
     children: paragraph.children.map(parseRun),
   };
@@ -109,7 +114,7 @@ function stableFormat(format: OfficeCliFormat): string {
   return JSON.stringify(
     Object.entries(format)
       .filter(([key]) => !key.endsWith('.src'))
-      .sort(([left], [right]) => left.localeCompare(right))
+      .toSorted(([left], [right]) => left.localeCompare(right))
   );
 }
 
@@ -179,7 +184,7 @@ export async function inspectDocxSelection(
   const format = touchedRuns[0].format;
   return {
     kind: 'word',
-    path: selection.path,
+    path: paragraph.path,
     selectedText: selection.selectedText,
     start: selection.start,
     end: selection.end,

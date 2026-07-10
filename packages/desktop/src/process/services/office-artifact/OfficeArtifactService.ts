@@ -26,7 +26,7 @@ import { inspectXlsxSelection, mutateXlsxSelection } from './xlsxArtifactStrateg
 
 export type OfficeArtifactSnapshotStoreApi = Pick<
   OfficeArtifactSnapshotStore,
-  'prepare' | 'commit' | 'rollbackPending' | 'undo' | 'getUndoDepth'
+  'prepare' | 'commit' | 'rollbackPending' | 'discardPending' | 'undo' | 'getUndoDepth'
 >;
 
 export type OfficeArtifactServiceDependencies = {
@@ -43,11 +43,20 @@ function toOfficeArtifactFailure(error: unknown): OfficeArtifactFailure {
   };
 }
 
+function createMutationGate(): { promise: Promise<void>; release: () => void } {
+  let releaseGate: (() => void) | undefined;
+  const promise = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+  return { promise, release: () => releaseGate?.() };
+}
+
 export class OfficeArtifactService {
   private readonly runner: OfficeCliRunner;
   private readonly snapshots: OfficeArtifactSnapshotStoreApi;
   private readonly resolveArtifact: typeof resolveOfficeArtifactPath;
   private readonly hashArtifact: typeof hashOfficeArtifact;
+  private readonly mutationTails = new Map<string, Promise<void>>();
 
   constructor(dependencies: OfficeArtifactServiceDependencies) {
     this.runner = dependencies.runner;
@@ -87,10 +96,21 @@ export class OfficeArtifactService {
   }
 
   async apply(request: OfficeArtifactApplyRequest): Promise<OfficeArtifactMutationResult> {
+    try {
+      const artifact = await this.resolveArtifact(request.workspace, request.filePath);
+      return await this.withMutationLock(artifact.filePath, () => this.applyResolved(request, artifact));
+    } catch (error) {
+      return toOfficeArtifactFailure(error);
+    }
+  }
+
+  private async applyResolved(
+    request: OfficeArtifactApplyRequest,
+    artifact: ResolvedOfficeArtifact
+  ): Promise<OfficeArtifactMutationResult> {
     let pending: Awaited<ReturnType<OfficeArtifactSnapshotStoreApi['prepare']>> | undefined;
 
     try {
-      const artifact = await this.resolveArtifact(request.workspace, request.filePath);
       const currentVersion = await this.hashArtifact(artifact.filePath);
       if (currentVersion !== request.expectedVersion) throw new OfficeArtifactError('FILE_CHANGED');
 
@@ -107,7 +127,11 @@ export class OfficeArtifactService {
     } catch (error) {
       if (pending) {
         try {
-          await this.snapshots.rollbackPending(pending);
+          if (error instanceof OfficeArtifactError && ['FILE_CHANGED', 'STALE_SELECTION'].includes(error.code)) {
+            await this.snapshots.discardPending(pending);
+          } else {
+            await this.snapshots.rollbackPending(pending);
+          }
         } catch (rollbackError) {
           return toOfficeArtifactFailure(rollbackError);
         }
@@ -119,16 +143,18 @@ export class OfficeArtifactService {
   async undo(request: OfficeArtifactUndoRequest): Promise<OfficeArtifactMutationResult> {
     try {
       const artifact = await this.resolveArtifact(request.workspace, request.filePath);
-      const currentVersion = await this.hashArtifact(artifact.filePath);
-      if (currentVersion !== request.expectedVersion) throw new OfficeArtifactError('FILE_CHANGED');
+      return await this.withMutationLock(artifact.filePath, async () => {
+        const currentVersion = await this.hashArtifact(artifact.filePath);
+        if (currentVersion !== request.expectedVersion) throw new OfficeArtifactError('FILE_CHANGED');
 
-      const result = await this.snapshots.undo(artifact.filePath, currentVersion);
-      return {
-        ok: true,
-        version: result.version,
-        snapshotId: request.expectedVersion,
-        undoDepth: result.undoDepth,
-      };
+        const result = await this.snapshots.undo(artifact.filePath, currentVersion);
+        return {
+          ok: true,
+          version: result.version,
+          snapshotId: request.expectedVersion,
+          undoDepth: result.undoDepth,
+        };
+      });
     } catch (error) {
       return toOfficeArtifactFailure(error);
     }
@@ -155,5 +181,20 @@ export class OfficeArtifactService {
     return artifact.kind === 'word'
       ? mutateDocxSelection(this.runner, artifact.filePath, inspection, edit)
       : mutateXlsxSelection(this.runner, artifact.filePath, inspection, edit);
+  }
+
+  private async withMutationLock<T>(filePath: string, action: () => Promise<T>): Promise<T> {
+    const previous = this.mutationTails.get(filePath) ?? Promise.resolve();
+    const gate = createMutationGate();
+    const tail = previous.catch((): void => {}).then(() => gate.promise);
+    this.mutationTails.set(filePath, tail);
+
+    await previous.catch((): void => {});
+    try {
+      return await action();
+    } finally {
+      gate.release();
+      if (this.mutationTails.get(filePath) === tail) this.mutationTails.delete(filePath);
+    }
   }
 }

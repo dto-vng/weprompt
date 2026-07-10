@@ -93,6 +93,15 @@ describe('inspectDocxSelection', () => {
     expect(runner.get).toHaveBeenCalledWith(FILE_PATH, PARAGRAPH_PATH);
   });
 
+  it('normalizes an OfficeCLI preview index path to the canonical paragraph id', async () => {
+    const previewSelection = { ...safeSelection, path: '/body/p[1]' };
+
+    await expect(inspectDocxSelection(runner, FILE_PATH, previewSelection)).resolves.toMatchObject({
+      path: PARAGRAPH_PATH,
+    });
+    expect(runner.get).toHaveBeenCalledWith(FILE_PATH, '/body/p[1]');
+  });
+
   it('accepts uniform effective formatting when only diagnostic sources differ', async () => {
     const selection: DocxSelectionSnapshot = {
       ...safeSelection,

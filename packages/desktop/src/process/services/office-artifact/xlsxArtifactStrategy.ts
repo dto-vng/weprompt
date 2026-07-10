@@ -150,9 +150,28 @@ function hasUnsupportedMetadata(node: Record<string, unknown>, format: Record<st
     format.unsupported === true ||
     format.richtext === true ||
     format.mergeAnchor === false ||
+    (format.merge !== undefined && format.mergeAnchor !== true) ||
+    format.protect === true ||
     format['protection.locked'] === true ||
     format['protection.hidden'] === true
   );
+}
+
+function assertSheetEditable(result: unknown, sheet: string): void {
+  if (!isRecord(result) || result.matches !== 1 || !Array.isArray(result.results) || result.results.length !== 1) {
+    return rejectUnsupported();
+  }
+
+  const node = result.results[0];
+  if (
+    !isRecord(node) ||
+    node.type !== 'sheet' ||
+    node.path !== `/${sheet}` ||
+    !isRecord(node.format) ||
+    hasUnsupportedMetadata(node, node.format)
+  ) {
+    return rejectUnsupported();
+  }
 }
 
 function parseCanonicalCell(value: unknown): CanonicalCell {
@@ -245,6 +264,7 @@ export async function inspectXlsxSelection(
   selection: ExcelSelectionSnapshot
 ): Promise<OfficeArtifactExcelInspection> {
   const geometry = parseSelection(selection);
+  assertSheetEditable(await runner.get(filePath, `/${geometry.sheet}`), geometry.sheet);
   const cells = parseCanonicalCells(await runner.get(filePath, geometry.rangePath), geometry);
 
   for (const cell of cells) {
