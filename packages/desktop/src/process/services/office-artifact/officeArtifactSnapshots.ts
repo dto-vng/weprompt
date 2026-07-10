@@ -35,7 +35,7 @@ export type OfficeArtifactUndoResult = {
 const DEFAULT_MAX_DEPTH = 20;
 
 function getMaxDepth(maxDepth: number | undefined): number {
-  return Number.isSafeInteger(maxDepth) && maxDepth > 0 ? maxDepth : DEFAULT_MAX_DEPTH;
+  return Number.isSafeInteger(maxDepth) && maxDepth > 0 ? Math.min(maxDepth, DEFAULT_MAX_DEPTH) : DEFAULT_MAX_DEPTH;
 }
 
 function snapshotDirectoryName(filePath: string): string {
@@ -146,9 +146,9 @@ export class OfficeArtifactSnapshotStore {
     }
 
     await restoreAtomically(entry.snapshotPath, canonicalFilePath, entry.preVersion);
-    await this.removeSnapshot(entry.snapshotPath);
     stack.pop();
     if (stack.length === 0) this.stacks.delete(canonicalFilePath);
+    await this.removeSnapshot(entry.snapshotPath);
 
     return { version: entry.preVersion, undoDepth: stack.length };
   }

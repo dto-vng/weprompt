@@ -6,7 +6,7 @@
 
 import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -62,15 +62,15 @@ describe('OfficeArtifactSnapshotStore', () => {
     await store.commit(pending, versionB);
     await writeFile(filePath, 'external');
 
-    await expect(store.undo(filePath, await hashOfficeArtifact(filePath))).rejects.toMatchObject({
-      code: 'FILE_CHANGED',
-    });
+    await expect(store.undo(filePath, versionB)).rejects.toMatchObject({ code: 'FILE_CHANGED' });
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('external');
     expect(store.getUndoDepth(filePath)).toBe(1);
+    await expect(stat(pending.snapshotPath)).resolves.toBeDefined();
   });
 
-  it('retains only the newest snapshots and removes discarded pending snapshots', async () => {
+  it('caps configured retention at 20 and removes discarded pending snapshots', async () => {
     const { filePath, historyRoot } = await createArtifact();
-    const store = new OfficeArtifactSnapshotStore(historyRoot, { maxDepth: 20 });
+    const store = new OfficeArtifactSnapshotStore(historyRoot, { maxDepth: 21 });
 
     for (let index = 1; index <= 21; index += 1) {
       const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
@@ -79,13 +79,36 @@ describe('OfficeArtifactSnapshotStore', () => {
     }
 
     const discarded = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+    await writeFile(filePath, 'mutated after prepare');
     await store.rollbackPending(discarded);
 
     const snapshotFiles = (await readdir(historyRoot, { recursive: true })).filter((path) => path.endsWith('.bin'));
     expect(store.getUndoDepth(filePath)).toBe(20);
     expect(snapshotFiles).toHaveLength(20);
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('21');
     await expect(stat(discarded.snapshotPath)).rejects.toMatchObject({ code: 'ENOENT' });
     expect(snapshotFiles).not.toContain(basename(discarded.snapshotPath));
+  });
+
+  it('keeps history consistent when snapshot cleanup fails after undo', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+    const versionA = await hashOfficeArtifact(filePath);
+    const pending = await store.prepare(filePath, versionA);
+    await writeFile(filePath, 'B');
+    const versionB = await hashOfficeArtifact(filePath);
+    await store.commit(pending, versionB);
+
+    const snapshotDirectory = dirname(pending.snapshotPath);
+    await chmod(snapshotDirectory, 0o500);
+    try {
+      await expect(store.undo(filePath, versionB)).rejects.toMatchObject({ code: 'SNAPSHOT_FAILED' });
+    } finally {
+      await chmod(snapshotDirectory, 0o700);
+    }
+
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('A');
+    expect(store.getUndoDepth(filePath)).toBe(0);
   });
 
   it('keeps a failed undo snapshot for retry', async () => {
