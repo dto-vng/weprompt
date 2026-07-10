@@ -110,6 +110,17 @@ describe('useOfficeArtifactEditor', () => {
     mocks.openFile.mockResolvedValue(undefined);
   });
 
+  it('does not invoke Office IPC while the editor is disabled', async () => {
+    const options = { ...createOptions(), enabled: false };
+
+    const { result } = renderHook(() => useOfficeArtifactEditor(options));
+    await act(async () => Promise.resolve());
+
+    expect(result.current.status).toBe('ready');
+    expect(mocks.getState).not.toHaveBeenCalled();
+    expect(mocks.inspect).not.toHaveBeenCalled();
+  });
+
   it('reports saving and then saved only after apply succeeds', async () => {
     const pending = deferred<OfficeArtifactMutationResult>();
     mocks.inspect.mockResolvedValue(firstInspection);
@@ -232,6 +243,26 @@ describe('useOfficeArtifactEditor', () => {
       await act(() => result.current.apply({ kind: 'replaceText', value: 'New text' }));
 
       expect(result.current.status).toBe('unsupported');
+    }
+  );
+
+  it.each(['UNSUPPORTED_CONTENT', 'AMBIGUOUS_TEXT'] as const)(
+    'prevents a second apply after %s rejects the active selection',
+    async (code) => {
+      mocks.inspect.mockResolvedValue(firstInspection);
+      mocks.apply.mockResolvedValue({ ok: false, code });
+      const { result } = renderHook(() => useOfficeArtifactEditor(createOptions()));
+      await waitFor(() => expect(result.current.version).toBe('v1'));
+      act(() => result.current.handleSelectionChange(firstSelection));
+      await waitFor(() => expect(result.current.inspection).not.toBeNull());
+
+      await act(() => result.current.apply({ kind: 'replaceText', value: 'New text' }));
+      const secondApplyResult = await act(() => result.current.apply({ kind: 'replaceText', value: 'Retry' }));
+
+      expect(result.current.status).toBe('unsupported');
+      expect(result.current.inspection).toBeNull();
+      expect(secondApplyResult).toBe(false);
+      expect(mocks.apply).toHaveBeenCalledOnce();
     }
   );
 

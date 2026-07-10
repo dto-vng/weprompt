@@ -98,6 +98,32 @@
         "openFailed": "No se pudo abrir la aplicación predeterminada",
         "refreshFailed": "No se pudo actualizar la vista previa. El archivo puede ser más reciente que esta vista."
       }
+    },
+    "editor": {
+      "editSelection": "Editar selección",
+      "formulaBar": "Barra de fórmulas",
+      "apply": "Aplicar",
+      "cancel": "Cancelar",
+      "bold": "Negrita",
+      "italic": "Cursiva",
+      "underline": "Subrayado",
+      "undo": "Deshacer",
+      "askForge": "Preguntar a Forge",
+      "openDesktop": "Abrir en la aplicación de escritorio",
+      "openedDesktop": "Abierto en la aplicación de escritorio",
+      "more": "Más",
+      "reveal": "Mostrar en la carpeta",
+      "refresh": "Actualizar vista previa",
+      "saving": "Guardando",
+      "saved": "Guardado en el espacio de trabajo",
+      "saveFailed": "Error al guardar",
+      "fileChanged": "El archivo se modificó en otro lugar",
+      "refreshing": "Actualizando vista previa",
+      "previewOutdated": "La vista previa puede estar desactualizada",
+      "unsupported": "Esta selección requiere la aplicación de escritorio",
+      "requestPlaceholder": "Describe el cambio que quieres que haga Forge.",
+      "askWordContext": "Archivo: {{fileName}}\nPárrafo: {{path}}\nTexto seleccionado: {{text}}\nSolicitud: {{placeholder}}",
+      "askExcelContext": "Archivo: {{fileName}}\nRango: {{range}}\nCeldas:\n{{cells}}\nSolicitud: {{placeholder}}"
     }
   },
   "word": {

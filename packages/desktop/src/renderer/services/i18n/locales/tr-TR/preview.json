@@ -98,6 +98,32 @@
         "openFailed": "Varsayılan uygulama açılamadı",
         "refreshFailed": "Önizleme yenilenemedi. Dosya bu görünümden daha yeni olabilir."
       }
+    },
+    "editor": {
+      "editSelection": "Seçimi düzenle",
+      "formulaBar": "Formül çubuğu",
+      "apply": "Uygula",
+      "cancel": "İptal",
+      "bold": "Kalın",
+      "italic": "İtalik",
+      "underline": "Altı çizili",
+      "undo": "Geri al",
+      "askForge": "Forge'a sor",
+      "openDesktop": "Masaüstü uygulamasında aç",
+      "openedDesktop": "Masaüstü uygulamasında açıldı",
+      "more": "Daha fazla",
+      "reveal": "Klasörde göster",
+      "refresh": "Önizlemeyi yenile",
+      "saving": "Kaydediliyor",
+      "saved": "Çalışma alanına kaydedildi",
+      "saveFailed": "Kaydetme başarısız",
+      "fileChanged": "Dosya başka bir yerde değiştirildi",
+      "refreshing": "Önizleme yenileniyor",
+      "previewOutdated": "Önizleme güncel olmayabilir",
+      "unsupported": "Bu seçim için masaüstü uygulaması gerekiyor",
+      "requestPlaceholder": "Forge'un yapmasını istediğiniz değişikliği açıklayın.",
+      "askWordContext": "Dosya: {{fileName}}\nParagraf: {{path}}\nSeçili metin: {{text}}\nİstek: {{placeholder}}",
+      "askExcelContext": "Dosya: {{fileName}}\nAralık: {{range}}\nHücreler:\n{{cells}}\nİstek: {{placeholder}}"
     }
   },
   "word": {

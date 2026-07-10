@@ -98,6 +98,32 @@
         "openFailed": "既定のアプリを開けませんでした",
         "refreshFailed": "プレビューを更新できませんでした。ファイルがこの表示より新しい可能性があります。"
       }
+    },
+    "editor": {
+      "editSelection": "選択範囲を編集",
+      "formulaBar": "数式バー",
+      "apply": "適用",
+      "cancel": "キャンセル",
+      "bold": "太字",
+      "italic": "斜体",
+      "underline": "下線",
+      "undo": "元に戻す",
+      "askForge": "Forge に依頼",
+      "openDesktop": "デスクトップアプリで開く",
+      "openedDesktop": "デスクトップアプリで開きました",
+      "more": "その他",
+      "reveal": "フォルダーに表示",
+      "refresh": "プレビューを更新",
+      "saving": "保存中",
+      "saved": "ワークスペースに保存しました",
+      "saveFailed": "保存に失敗しました",
+      "fileChanged": "ファイルが外部で変更されました",
+      "refreshing": "プレビューを更新中",
+      "previewOutdated": "プレビューが最新でない可能性があります",
+      "unsupported": "この選択範囲にはデスクトップアプリが必要です",
+      "requestPlaceholder": "Forge に適用してほしい変更を入力してください。",
+      "askWordContext": "ファイル：{{fileName}}\n段落：{{path}}\n選択したテキスト：{{text}}\n依頼：{{placeholder}}",
+      "askExcelContext": "ファイル：{{fileName}}\n範囲：{{range}}\nセル：\n{{cells}}\n依頼：{{placeholder}}"
     }
   },
   "word": {

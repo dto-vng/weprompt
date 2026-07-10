@@ -98,6 +98,32 @@
         "openFailed": "برنامه پیش فرض باز نشد",
         "refreshFailed": "پیش نمایش تازه نشد. ممکن است فایل از این نما جدیدتر باشد."
       }
+    },
+    "editor": {
+      "editSelection": "ویرایش بخش انتخاب‌شده",
+      "formulaBar": "نوار فرمول",
+      "apply": "اعمال",
+      "cancel": "لغو",
+      "bold": "ضخیم",
+      "italic": "مورب",
+      "underline": "زیرخط",
+      "undo": "واگرد",
+      "askForge": "از Forge بپرسید",
+      "openDesktop": "باز کردن در برنامه دسکتاپ",
+      "openedDesktop": "در برنامه دسکتاپ باز شد",
+      "more": "بیشتر",
+      "reveal": "نمایش در پوشه",
+      "refresh": "تازه‌سازی پیش‌نمایش",
+      "saving": "در حال ذخیره",
+      "saved": "در فضای کاری ذخیره شد",
+      "saveFailed": "ذخیره ناموفق بود",
+      "fileChanged": "فایل در جای دیگری تغییر کرده است",
+      "refreshing": "در حال تازه‌سازی پیش‌نمایش",
+      "previewOutdated": "ممکن است پیش‌نمایش قدیمی باشد",
+      "unsupported": "این بخش انتخاب‌شده به برنامه دسکتاپ نیاز دارد",
+      "requestPlaceholder": "تغییری را که می‌خواهید Forge اعمال کند توضیح دهید.",
+      "askWordContext": "فایل: {{fileName}}\nپاراگراف: {{path}}\nمتن انتخاب‌شده: {{text}}\nدرخواست: {{placeholder}}",
+      "askExcelContext": "فایل: {{fileName}}\nمحدوده: {{range}}\nسلول‌ها:\n{{cells}}\nدرخواست: {{placeholder}}"
     }
   },
   "word": {

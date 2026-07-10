@@ -98,6 +98,32 @@
         "openFailed": "Não foi possível abrir o aplicativo padrão",
         "refreshFailed": "Não foi possível atualizar a visualização. O arquivo pode estar mais recente que esta exibição."
       }
+    },
+    "editor": {
+      "editSelection": "Editar seleção",
+      "formulaBar": "Barra de fórmulas",
+      "apply": "Aplicar",
+      "cancel": "Cancelar",
+      "bold": "Negrito",
+      "italic": "Itálico",
+      "underline": "Sublinhado",
+      "undo": "Desfazer",
+      "askForge": "Perguntar ao Forge",
+      "openDesktop": "Abrir no aplicativo para desktop",
+      "openedDesktop": "Aberto no aplicativo para desktop",
+      "more": "Mais",
+      "reveal": "Mostrar na pasta",
+      "refresh": "Atualizar visualização",
+      "saving": "Salvando",
+      "saved": "Salvo no espaço de trabalho",
+      "saveFailed": "Falha ao salvar",
+      "fileChanged": "O arquivo foi alterado em outro local",
+      "refreshing": "Atualizando visualização",
+      "previewOutdated": "A visualização pode estar desatualizada",
+      "unsupported": "Esta seleção requer o aplicativo para desktop",
+      "requestPlaceholder": "Descreva a alteração que você quer que o Forge faça.",
+      "askWordContext": "Arquivo: {{fileName}}\nParágrafo: {{path}}\nTexto selecionado: {{text}}\nSolicitação: {{placeholder}}",
+      "askExcelContext": "Arquivo: {{fileName}}\nIntervalo: {{range}}\nCélulas:\n{{cells}}\nSolicitação: {{placeholder}}"
     }
   },
   "word": {

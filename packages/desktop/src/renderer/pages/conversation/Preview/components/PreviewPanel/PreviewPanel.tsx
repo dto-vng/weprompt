@@ -9,6 +9,7 @@ import { downloadFileFromPath, downloadTextContent } from '@/renderer/utils/file
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { toLocalFileHref } from '@/renderer/components/Markdown/markdownUtils';
 import { isElectronDesktop } from '@/renderer/utils/platform';
+import { OfficeArtifactToolbar, useOfficeArtifactEditor } from '../ArtifactEditor';
 import { PreviewToolbarExtrasProvider, type PreviewToolbarExtras } from '../../context/PreviewToolbarExtrasContext';
 import { usePreviewContext } from '../../context/PreviewContext';
 import { getOfficePreviewRefreshToken } from '../../context/officePreviewRevision';
@@ -27,8 +28,6 @@ import OfficeDocPreview from '../viewers/OfficeDocViewer';
 import PptViewer from '../viewers/PptViewer';
 import CodeEditor from '../editors/CodeEditor';
 import URLViewer from '../viewers/URLViewer';
-import type { OfficeEditState, OfficePreviewRefreshState } from '../../types';
-import OfficeEditControls from './OfficeEditControls';
 import {
   PreviewTabs,
   PreviewToolbar,
@@ -69,6 +68,7 @@ const PreviewPanel: React.FC = () => {
     closePreview,
     updateContent,
     saveContent,
+    addToSendBox,
     addDomSnippet,
   } = usePreviewContext();
   const layout = useLayoutContext();
@@ -78,7 +78,6 @@ const PreviewPanel: React.FC = () => {
   const [isSplitScreenEnabled, setIsSplitScreenEnabled] = useState(false);
   const [inspectMode, setInspectMode] = useState(false);
   const [toolbarExtras, setToolbarExtras] = useState<PreviewToolbarExtras | null>(null);
-  const [officeEditState, setOfficeEditState] = useState<OfficeEditState>('ready');
   const [manualOfficeRefreshRevision, setManualOfficeRefreshRevision] = useState(0);
 
   // 切换文件时把视图模式复位为预览，避免上一个文件的 source 模式串到下一个文件（如代码文件丢失语法高亮）。
@@ -89,7 +88,6 @@ const PreviewPanel: React.FC = () => {
   // new file reuses the active tab's id, so we key on the file identity (path + type), not activeTabId.
   useEffect(() => {
     setViewMode('preview');
-    setOfficeEditState('ready');
   }, [activeTabId, activeTab?.metadata?.file_path, activeTab?.content_type]);
 
   // 确认对话框状态 / Confirmation dialog states
@@ -151,6 +149,23 @@ const PreviewPanel: React.FC = () => {
     }),
     [setToolbarExtrasCallback]
   );
+
+  const officeEditorEnabled =
+    isElectronDesktop() &&
+    (activeTab?.content_type === 'word' || activeTab?.content_type === 'excel') &&
+    Boolean(activeTab.metadata?.workspace && activeTab.metadata.file_path);
+  const handleOfficeArtifactMutated = useCallback(() => {
+    setManualOfficeRefreshRevision((revision) => revision + 1);
+  }, []);
+  const officeEditor = useOfficeArtifactEditor({
+    enabled: officeEditorEnabled,
+    workspace: activeTab?.metadata?.workspace ?? '',
+    filePath: activeTab?.metadata?.file_path ?? '',
+    fileName: activeTab?.metadata?.file_name ?? activeTab?.title,
+    externalRevision: activeTab?.officePreviewRevision,
+    addToSendBox,
+    onArtifactMutated: handleOfficeArtifactMutated,
+  });
 
   // 内层分割：编辑器和预览的分割比例（默认 50/50）
   // Inner split: Split ratio between editor and preview (default 50/50)
@@ -282,8 +297,6 @@ const PreviewPanel: React.FC = () => {
   const isMarkdown = content_type === 'markdown';
   const isHTML = content_type === 'html';
   const isOfficeDocument = content_type === 'word' || content_type === 'excel';
-  const canEditOfficeExternally =
-    isElectronDesktop() && isOfficeDocument && Boolean(metadata?.file_path && metadata.workspace);
   const officeRefreshToken = getOfficePreviewRefreshToken(
     metadata?.file_path,
     activeTab.officePreviewRevision,
@@ -399,25 +412,8 @@ const PreviewPanel: React.FC = () => {
     }
   }, [metadata?.file_path, messageApi, t]);
 
-  const handleEditOfficeExternally = useCallback(async () => {
-    if (!metadata?.file_path) return;
-
-    setOfficeEditState('opening');
-    try {
-      await ipcBridge.shell.openFile.invoke(metadata.file_path);
-      setOfficeEditState('editingExternally');
-    } catch {
-      setOfficeEditState('openFailed');
-    }
-  }, [metadata?.file_path]);
-
   const handleManualOfficeRefresh = useCallback(() => {
-    setOfficeEditState('refreshing');
     setManualOfficeRefreshRevision((revision) => revision + 1);
-  }, []);
-
-  const handleOfficeRefreshStateChange = useCallback((state: OfficePreviewRefreshState) => {
-    setOfficeEditState(state);
   }, []);
 
   const handleRevealOfficeInFolder = useCallback(() => {
@@ -667,7 +663,8 @@ const PreviewPanel: React.FC = () => {
           content={content}
           workspace={metadata?.workspace}
           refreshToken={officeRefreshToken}
-          onRefreshStateChange={handleOfficeRefreshStateChange}
+          onSelectionChange={officeEditorEnabled ? officeEditor.handleSelectionChange : undefined}
+          scriptRequest={officeEditorEnabled ? officeEditor.scriptRequest : undefined}
         />
       );
     } else if (content_type === 'excel') {
@@ -677,7 +674,8 @@ const PreviewPanel: React.FC = () => {
           content={content}
           workspace={metadata?.workspace}
           refreshToken={officeRefreshToken}
-          onRefreshStateChange={handleOfficeRefreshStateChange}
+          onSelectionChange={officeEditorEnabled ? officeEditor.handleSelectionChange : undefined}
+          scriptRequest={officeEditorEnabled ? officeEditor.scriptRequest : undefined}
         />
       );
     } else if (content_type === 'image') {
@@ -758,13 +756,20 @@ const PreviewPanel: React.FC = () => {
             onInspectModeToggle={() => setInspectMode(!inspectMode)}
             leftExtra={toolbarExtras?.left}
             rightExtra={toolbarExtras?.right}
-            officeActions={
-              canEditOfficeExternally ? (
-                <OfficeEditControls
-                  state={officeEditState}
-                  onEditInDefaultApp={() => void handleEditOfficeExternally()}
-                  onRefreshPreview={handleManualOfficeRefresh}
-                  onRevealInFolder={handleRevealOfficeInFolder}
+            officeToolbar={
+              officeEditorEnabled ? (
+                <OfficeArtifactToolbar
+                  inspection={officeEditor.inspection}
+                  status={officeEditor.status}
+                  undoDepth={officeEditor.undoDepth}
+                  apply={officeEditor.apply}
+                  undo={officeEditor.undo}
+                  askForge={officeEditor.askForge}
+                  openInDesktopApp={officeEditor.openInDesktopApp}
+                  download={handleDownload}
+                  revealInFolder={handleRevealOfficeInFolder}
+                  refresh={handleManualOfficeRefresh}
+                  moveSelection={officeEditor.moveSelection}
                 />
               ) : undefined
             }

@@ -30,6 +30,7 @@ export type OfficeArtifactEditorStatus =
 export type OfficeSelectionDirection = 'up' | 'down' | 'left' | 'right';
 
 export type UseOfficeArtifactEditorOptions = {
+  enabled?: boolean;
   workspace: string;
   filePath: string;
   fileName?: string;
@@ -64,7 +65,7 @@ function displayName(fileName: string | undefined, filePath: string): string {
 
 /** Coordinate versioned Office inspection, mutation, undo, and composer context. */
 export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions): UseOfficeArtifactEditorResult {
-  const { workspace, filePath, fileName, externalRevision } = options;
+  const { enabled = true, workspace, filePath, fileName, externalRevision } = options;
   const { t } = useTranslation();
   const [version, setVersion] = useState<string | null>(null);
   const [undoDepth, setUndoDepth] = useState(0);
@@ -104,6 +105,12 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     setScriptRequest(undefined);
     clearSelection();
 
+    if (!enabled) {
+      return () => {
+        if (sessionRequestRef.current === requestId) sessionRequestRef.current += 1;
+      };
+    }
+
     void ipcBridge.officeArtifact.getState
       .invoke({ workspace, filePath })
       .then((result) => {
@@ -123,7 +130,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     return () => {
       if (sessionRequestRef.current === requestId) sessionRequestRef.current += 1;
     };
-  }, [clearSelection, externalRevision, filePath, workspace]);
+  }, [clearSelection, enabled, externalRevision, filePath, workspace]);
 
   const handleSelectionChange = useCallback(
     (selection: OfficeArtifactSelection): void => {
@@ -166,7 +173,14 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     (result: OfficeArtifactMutationResult, sessionId: number, mutationId: number): boolean => {
       if (sessionRequestRef.current !== sessionId || mutationRequestRef.current !== mutationId) return false;
       if (result.ok === false) {
-        if (result.code === 'FILE_CHANGED' || result.code === 'STALE_SELECTION') clearSelection();
+        if (
+          result.code === 'FILE_CHANGED' ||
+          result.code === 'STALE_SELECTION' ||
+          result.code === 'UNSUPPORTED_CONTENT' ||
+          result.code === 'AMBIGUOUS_TEXT'
+        ) {
+          clearSelection();
+        }
         setStatus(failureStatus(result.code));
         return false;
       }

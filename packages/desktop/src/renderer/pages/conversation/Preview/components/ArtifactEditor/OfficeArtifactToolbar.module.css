@@ -148,6 +148,10 @@
   .secondaryAction {
     display: none;
   }
+
+  .compactMenuItem {
+    display: flex;
+  }
 }
 
 @media (max-width: 519px) {

@@ -5,6 +5,7 @@
  */
 
 import { iconColors } from '@/renderer/styles/colors';
+import { Button, Tooltip } from '@arco-design/web-react';
 import { Close } from '@icon-park/react';
 import { IconShrink } from '@arco-design/web-react/icon';
 import React from 'react';
@@ -111,6 +112,30 @@ const PreviewTabs: React.FC<PreviewTabsProps> = ({
   const { t } = useTranslation();
   const { left: showLeftFade, right: showRightFade } = tabFadeState;
 
+  const focusTab = (index: number) => {
+    const tabElements = tabsContainerRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
+    tabElements?.[index]?.focus();
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent, index: number, tabId: string) => {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = tabs.length - 1;
+
+    if (nextIndex !== null) {
+      event.preventDefault();
+      focusTab(nextIndex);
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar') {
+      event.preventDefault();
+      onSwitchTab(tabId);
+    }
+  };
+
   return (
     <div
       className='relative flex-shrink-0 bg-bg-2'
@@ -118,32 +143,43 @@ const PreviewTabs: React.FC<PreviewTabsProps> = ({
     >
       <div className='flex items-center h-36px w-full'>
         {/* Tabs 滚动区域 / Tabs scroll area */}
-        <div ref={tabsContainerRef} className='flex items-center h-full flex-1 overflow-x-auto'>
+        <div ref={tabsContainerRef} role='tablist' className='flex items-center h-full flex-1 overflow-x-auto'>
           {tabs.length > 0 ? (
-            tabs.map((tab) => (
+            tabs.map((tab, index) => (
               <div
                 key={tab.id}
-                className={`flex items-center gap-6px px-10px h-full cursor-pointer transition-colors flex-shrink-0 ${tab.id === activeTabId ? 'bg-bg-1 text-t-primary' : 'text-t-secondary hover:bg-bg-3'}`}
-                onClick={() => onSwitchTab(tab.id)}
+                className={`flex h-full flex-shrink-0 items-center transition-colors ${tab.id === activeTabId ? 'bg-bg-1 text-t-primary' : 'text-t-secondary hover:bg-bg-3'}`}
                 onContextMenu={(e) => onContextMenu(e, tab.id)}
               >
-                <span className='text-12px whitespace-nowrap flex items-center gap-4px'>
-                  {tab.title}
-                  {/* 未保存指示器 / Unsaved indicator */}
-                  {tab.isDirty && (
-                    <span className='w-6px h-6px rd-full bg-primary' title={t('preview.unsavedChangesTitle')} />
-                  )}
-                </span>
-                <Close
-                  theme='outline'
-                  size='14'
-                  fill={iconColors.secondary}
-                  className='hover:fill-primary'
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseTab(tab.id);
-                  }}
-                />
+                <Button
+                  type='text'
+                  role='tab'
+                  aria-selected={tab.id === activeTabId}
+                  tabIndex={tab.id === activeTabId ? 0 : -1}
+                  className='!h-full !rd-0 !px-10px !text-inherit'
+                  onClick={() => onSwitchTab(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index, tab.id)}
+                >
+                  <span className='flex items-center gap-4px whitespace-nowrap text-12px'>
+                    {tab.title}
+                    {tab.isDirty && (
+                      <span className='h-6px w-6px rd-full bg-primary' title={t('preview.unsavedChangesTitle')} />
+                    )}
+                  </span>
+                </Button>
+                <Tooltip content={t('preview.closeTabTitle')}>
+                  <Button
+                    type='text'
+                    size='mini'
+                    aria-label={t('preview.closeTabTitle')}
+                    icon={<Close theme='outline' size='14' fill={iconColors.secondary} />}
+                    className='!mr-6px hover:!text-primary'
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCloseTab(tab.id);
+                    }}
+                  />
+                </Tooltip>
               </div>
             ))
           ) : (
@@ -154,13 +190,16 @@ const PreviewTabs: React.FC<PreviewTabsProps> = ({
         {/* 收起面板按钮 / Collapse panel button */}
         {onClosePanel && (
           <div className='flex items-center h-full px-10px flex-shrink-0 rounded-tr-[16px]'>
-            <div
-              className='flex items-center justify-center w-20px h-20px rd-4px cursor-pointer hover:bg-bg-3 transition-colors'
-              onClick={onClosePanel}
-              title={t('preview.collapsePanel')}
-            >
-              <IconShrink style={{ fontSize: 14, color: iconColors.secondary }} />
-            </div>
+            <Tooltip content={t('preview.collapsePanel')}>
+              <Button
+                type='text'
+                size='mini'
+                aria-label={t('preview.collapsePanel')}
+                icon={<IconShrink style={{ fontSize: 14, color: iconColors.secondary }} />}
+                className='!h-20px !w-20px !p-0'
+                onClick={onClosePanel}
+              />
+            </Tooltip>
           </div>
         )}
       </div>

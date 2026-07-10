@@ -98,6 +98,32 @@
         "openFailed": "Standard-App konnte nicht geöffnet werden",
         "refreshFailed": "Vorschau konnte nicht aktualisiert werden. Die Datei könnte neuer als diese Ansicht sein."
       }
+    },
+    "editor": {
+      "editSelection": "Auswahl bearbeiten",
+      "formulaBar": "Bearbeitungsleiste",
+      "apply": "Anwenden",
+      "cancel": "Abbrechen",
+      "bold": "Fett",
+      "italic": "Kursiv",
+      "underline": "Unterstrichen",
+      "undo": "Rückgängig",
+      "askForge": "Forge fragen",
+      "openDesktop": "In Desktop-App öffnen",
+      "openedDesktop": "In Desktop-App geöffnet",
+      "more": "Mehr",
+      "reveal": "Im Ordner anzeigen",
+      "refresh": "Vorschau aktualisieren",
+      "saving": "Wird gespeichert",
+      "saved": "Im Arbeitsbereich gespeichert",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "fileChanged": "Datei wurde an anderer Stelle geändert",
+      "refreshing": "Vorschau wird aktualisiert",
+      "previewOutdated": "Vorschau ist möglicherweise veraltet",
+      "unsupported": "Diese Auswahl erfordert die Desktop-App",
+      "requestPlaceholder": "Beschreibe die Änderung, die Forge vornehmen soll.",
+      "askWordContext": "Datei: {{fileName}}\nAbsatz: {{path}}\nAusgewählter Text: {{text}}\nAnfrage: {{placeholder}}",
+      "askExcelContext": "Datei: {{fileName}}\nBereich: {{range}}\nZellen:\n{{cells}}\nAnfrage: {{placeholder}}"
     }
   },
   "word": {

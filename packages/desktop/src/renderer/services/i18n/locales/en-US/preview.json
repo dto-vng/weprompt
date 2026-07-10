@@ -98,6 +98,32 @@
         "openFailed": "Could not open the default app",
         "refreshFailed": "Preview could not refresh. The file may be newer than this view."
       }
+    },
+    "editor": {
+      "editSelection": "Edit selection",
+      "formulaBar": "Formula bar",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "undo": "Undo",
+      "askForge": "Ask Forge",
+      "openDesktop": "Open in desktop app",
+      "openedDesktop": "Opened in desktop app",
+      "more": "More",
+      "reveal": "Reveal in folder",
+      "refresh": "Refresh preview",
+      "saving": "Saving",
+      "saved": "Saved to workspace",
+      "saveFailed": "Save failed",
+      "fileChanged": "File changed elsewhere",
+      "refreshing": "Refreshing preview",
+      "previewOutdated": "Preview may be outdated",
+      "unsupported": "This selection needs the desktop app",
+      "requestPlaceholder": "Describe the change you want Forge to make.",
+      "askWordContext": "File: {{fileName}}\nParagraph: {{path}}\nSelected text: {{text}}\nRequest: {{placeholder}}",
+      "askExcelContext": "File: {{fileName}}\nRange: {{range}}\nCells:\n{{cells}}\nRequest: {{placeholder}}"
     }
   },
   "word": {

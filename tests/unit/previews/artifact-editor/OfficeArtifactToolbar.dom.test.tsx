@@ -1,6 +1,8 @@
 import type { OfficeArtifactInspection } from '@/common/types/office/artifactEditor';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 
@@ -66,6 +68,18 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof OfficeArtifa
   moveSelection: vi.fn(),
   ...overrides,
 });
+
+const readAtRule = (css: string, header: string): string => {
+  const start = css.indexOf(header);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let index = css.indexOf('{', start); index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    if (css[index] === '}') depth -= 1;
+    if (depth === 0) return css.slice(start, index + 1);
+  }
+  return '';
+};
 
 describe('OfficeArtifactToolbar', () => {
   afterEach(() => document.body.replaceChildren());
@@ -146,6 +160,21 @@ describe('OfficeArtifactToolbar', () => {
 
     expect(screen.getByTestId('office-toolbar-compact-undo')).toHaveClass(styles.compactMenuItem);
     expect(screen.getByTestId('office-toolbar-compact-open')).toHaveClass(styles.compactMenuItem);
+  });
+
+  it('restores compact menu items in container and viewport responsive fallbacks', () => {
+    const css = readFileSync(
+      path.join(
+        process.cwd(),
+        'packages/desktop/src/renderer/pages/conversation/Preview/components/ArtifactEditor/OfficeArtifactToolbar.module.css'
+      ),
+      'utf8'
+    );
+
+    const containerFallback = readAtRule(css, '@container (max-width: 719px)');
+    const viewportFallback = readAtRule(css, '@media (max-width: 719px)');
+    expect(containerFallback).toMatch(/\.compactMenuItem\s*\{\s*display:\s*flex;/);
+    expect(viewportFallback).toMatch(/\.compactMenuItem\s*\{\s*display:\s*flex;/);
   });
 
   it('announces successful saves only when the status is saved', () => {
