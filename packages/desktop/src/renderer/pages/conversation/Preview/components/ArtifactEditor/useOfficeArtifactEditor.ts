@@ -1,0 +1,282 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { ipcBridge } from '@/common';
+import type {
+  OfficeArtifactEdit,
+  OfficeArtifactErrorCode,
+  OfficeArtifactInspection,
+  OfficeArtifactMutationResult,
+  OfficeArtifactSelection,
+} from '@/common/types/office/artifactEditor';
+import type { WebviewHostScriptRequest } from '@/renderer/components/media/WebviewHost';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { buildOfficeAssistantContext } from './assistantContext';
+
+export type OfficeArtifactEditorStatus =
+  | 'ready'
+  | 'saving'
+  | 'saved'
+  | 'saveFailed'
+  | 'fileChanged'
+  | 'openingDesktop'
+  | 'openedDesktop';
+
+export type OfficeSelectionDirection = 'up' | 'down' | 'left' | 'right';
+
+export type UseOfficeArtifactEditorOptions = {
+  workspace: string;
+  filePath: string;
+  fileName?: string;
+  externalRevision?: number | string;
+  addToSendBox: (text: string) => void;
+  onArtifactMutated: () => void;
+};
+
+export type UseOfficeArtifactEditorResult = {
+  version: string | null;
+  undoDepth: number;
+  inspection: OfficeArtifactInspection | null;
+  status: OfficeArtifactEditorStatus;
+  scriptRequest: WebviewHostScriptRequest | undefined;
+  handleSelectionChange: (selection: OfficeArtifactSelection) => void;
+  apply: (edit: OfficeArtifactEdit) => Promise<boolean>;
+  undo: () => Promise<boolean>;
+  askForge: () => void;
+  openInDesktopApp: () => Promise<boolean>;
+  moveSelection: (direction: OfficeSelectionDirection) => void;
+};
+
+function failureStatus(code: OfficeArtifactErrorCode): OfficeArtifactEditorStatus {
+  return code === 'FILE_CHANGED' || code === 'STALE_SELECTION' ? 'fileChanged' : 'saveFailed';
+}
+
+function displayName(fileName: string | undefined, filePath: string): string {
+  const normalized = filePath.replaceAll('\\', '/');
+  return fileName || normalized.slice(normalized.lastIndexOf('/') + 1);
+}
+
+/** Coordinate versioned Office inspection, mutation, undo, and composer context. */
+export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions): UseOfficeArtifactEditorResult {
+  const { workspace, filePath, fileName, externalRevision } = options;
+  const { t } = useTranslation();
+  const [version, setVersion] = useState<string | null>(null);
+  const [undoDepth, setUndoDepth] = useState(0);
+  const [inspection, setInspection] = useState<OfficeArtifactInspection | null>(null);
+  const [status, setStatus] = useState<OfficeArtifactEditorStatus>('ready');
+  const [scriptRequest, setScriptRequest] = useState<WebviewHostScriptRequest>();
+
+  const versionRef = useRef<string | null>(null);
+  const selectionRef = useRef<OfficeArtifactSelection | null>(null);
+  const inspectionRef = useRef<OfficeArtifactInspection | null>(null);
+  const sessionRequestRef = useRef(0);
+  const inspectRequestRef = useRef(0);
+  const mutationRequestRef = useRef(0);
+  const navigationRequestRef = useRef(0);
+  const mutationPendingRef = useRef(false);
+  const addToSendBoxRef = useRef(options.addToSendBox);
+  const onArtifactMutatedRef = useRef(options.onArtifactMutated);
+  addToSendBoxRef.current = options.addToSendBox;
+  onArtifactMutatedRef.current = options.onArtifactMutated;
+
+  const clearSelection = useCallback((): void => {
+    inspectRequestRef.current += 1;
+    selectionRef.current = null;
+    inspectionRef.current = null;
+    setInspection(null);
+  }, []);
+
+  useEffect(() => {
+    const requestId = sessionRequestRef.current + 1;
+    sessionRequestRef.current = requestId;
+    mutationRequestRef.current += 1;
+    mutationPendingRef.current = false;
+    versionRef.current = null;
+    setVersion(null);
+    setUndoDepth(0);
+    setStatus('ready');
+    setScriptRequest(undefined);
+    clearSelection();
+
+    void ipcBridge.officeArtifact.getState
+      .invoke({ workspace, filePath })
+      .then((result) => {
+        if (sessionRequestRef.current !== requestId) return;
+        if (result.ok === false) {
+          setStatus(failureStatus(result.code));
+          return;
+        }
+        versionRef.current = result.version;
+        setVersion(result.version);
+        setUndoDepth(result.undoDepth);
+      })
+      .catch(() => {
+        if (sessionRequestRef.current === requestId) setStatus('saveFailed');
+      });
+
+    return () => {
+      if (sessionRequestRef.current === requestId) sessionRequestRef.current += 1;
+    };
+  }, [clearSelection, externalRevision, filePath, workspace]);
+
+  const handleSelectionChange = useCallback(
+    (selection: OfficeArtifactSelection): void => {
+      const expectedVersion = versionRef.current;
+      const sessionId = sessionRequestRef.current;
+      const requestId = inspectRequestRef.current + 1;
+      inspectRequestRef.current = requestId;
+      selectionRef.current = null;
+      inspectionRef.current = null;
+      setInspection(null);
+      setStatus('ready');
+      if (!expectedVersion) return;
+
+      void ipcBridge.officeArtifact.inspect
+        .invoke({ workspace, filePath, expectedVersion, selection })
+        .then((result) => {
+          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
+          if (result.ok === false) {
+            selectionRef.current = null;
+            setStatus(failureStatus(result.code));
+            return;
+          }
+          versionRef.current = result.version;
+          selectionRef.current = selection;
+          inspectionRef.current = result.inspection;
+          setVersion(result.version);
+          setInspection(result.inspection);
+        })
+        .catch(() => {
+          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
+          selectionRef.current = null;
+          setStatus('saveFailed');
+        });
+    },
+    [filePath, workspace]
+  );
+
+  const applyMutationResult = useCallback(
+    (result: OfficeArtifactMutationResult, sessionId: number, mutationId: number): boolean => {
+      if (sessionRequestRef.current !== sessionId || mutationRequestRef.current !== mutationId) return false;
+      if (result.ok === false) {
+        if (result.code === 'FILE_CHANGED' || result.code === 'STALE_SELECTION') clearSelection();
+        setStatus(failureStatus(result.code));
+        return false;
+      }
+
+      versionRef.current = result.version;
+      setVersion(result.version);
+      setUndoDepth(result.undoDepth);
+      clearSelection();
+      setStatus('saved');
+      onArtifactMutatedRef.current();
+      return true;
+    },
+    [clearSelection]
+  );
+
+  const apply = useCallback(
+    async (edit: OfficeArtifactEdit): Promise<boolean> => {
+      const expectedVersion = versionRef.current;
+      const selection = selectionRef.current;
+      if (!expectedVersion || !selection || mutationPendingRef.current) return false;
+
+      mutationPendingRef.current = true;
+      inspectRequestRef.current += 1;
+      const sessionId = sessionRequestRef.current;
+      const mutationId = mutationRequestRef.current + 1;
+      mutationRequestRef.current = mutationId;
+      setStatus('saving');
+
+      try {
+        const result = await ipcBridge.officeArtifact.apply.invoke({
+          workspace,
+          filePath,
+          expectedVersion,
+          selection,
+          edit,
+        });
+        return applyMutationResult(result, sessionId, mutationId);
+      } catch {
+        if (sessionRequestRef.current === sessionId && mutationRequestRef.current === mutationId) {
+          setStatus('saveFailed');
+        }
+        return false;
+      } finally {
+        if (mutationRequestRef.current === mutationId) mutationPendingRef.current = false;
+      }
+    },
+    [applyMutationResult, filePath, workspace]
+  );
+
+  const undo = useCallback(async (): Promise<boolean> => {
+    const expectedVersion = versionRef.current;
+    if (!expectedVersion || undoDepth <= 0 || mutationPendingRef.current) return false;
+
+    mutationPendingRef.current = true;
+    inspectRequestRef.current += 1;
+    const sessionId = sessionRequestRef.current;
+    const mutationId = mutationRequestRef.current + 1;
+    mutationRequestRef.current = mutationId;
+    setStatus('saving');
+
+    try {
+      const result = await ipcBridge.officeArtifact.undo.invoke({ workspace, filePath, expectedVersion });
+      return applyMutationResult(result, sessionId, mutationId);
+    } catch {
+      if (sessionRequestRef.current === sessionId && mutationRequestRef.current === mutationId) {
+        setStatus('saveFailed');
+      }
+      return false;
+    } finally {
+      if (mutationRequestRef.current === mutationId) mutationPendingRef.current = false;
+    }
+  }, [applyMutationResult, filePath, undoDepth, workspace]);
+
+  const askForge = useCallback((): void => {
+    const currentInspection = inspectionRef.current;
+    if (!currentInspection) return;
+    const translate = (key: string, values?: Record<string, string>): string => t(key, values);
+    addToSendBoxRef.current(buildOfficeAssistantContext(translate, displayName(fileName, filePath), currentInspection));
+  }, [fileName, filePath, t]);
+
+  const openInDesktopApp = useCallback(async (): Promise<boolean> => {
+    const sessionId = sessionRequestRef.current;
+    setStatus('openingDesktop');
+    try {
+      await ipcBridge.shell.openFile.invoke(filePath);
+      if (sessionRequestRef.current !== sessionId) return false;
+      setStatus('openedDesktop');
+      return true;
+    } catch {
+      if (sessionRequestRef.current === sessionId) setStatus('ready');
+      return false;
+    }
+  }, [filePath]);
+
+  const moveSelection = useCallback((direction: OfficeSelectionDirection): void => {
+    navigationRequestRef.current += 1;
+    setScriptRequest({
+      id: navigationRequestRef.current,
+      script: `typeof window.__forgeOfficeMoveSelection === 'function' && window.__forgeOfficeMoveSelection('${direction}');`,
+    });
+  }, []);
+
+  return {
+    version,
+    undoDepth,
+    inspection,
+    status,
+    scriptRequest,
+    handleSelectionChange,
+    apply,
+    undo,
+    askForge,
+    openInDesktopApp,
+    moveSelection,
+  };
+}
