@@ -415,6 +415,9 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
           })()}
       </div>
       <div ref={toolbarRef} className='app-titlebar__toolbar'>
+        {workspaceAvailable && (
+          <div id='app-titlebar-project-slot' className='app-titlebar__actions-slot app-titlebar__project-slot' />
+        )}
         {layout?.isMobile && <div id='app-titlebar-actions-slot' className='app-titlebar__actions-slot' />}
         <button
           type='button'

@@ -303,13 +303,7 @@ const ChatConversation: React.FC<{
     acpAssistantId,
   ]);
 
-  const sliderTitle = useMemo(() => {
-    return (
-      <div className='flex items-center justify-between'>
-        <span className='text-16px font-bold text-t-primary'>{t('conversation.workspace.title')}</span>
-      </div>
-    );
-  }, [t]);
+  const sliderTitle: React.ReactNode = null;
 
   // For ACP/Codex conversations, use AcpModelSelector that can show/switch models.
   // For other conversations, show disabled model selector.
