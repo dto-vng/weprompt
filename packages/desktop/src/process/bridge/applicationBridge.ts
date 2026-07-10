@@ -11,6 +11,7 @@ import { ProcessConfig } from '@process/utils/initStorage';
 import { getZoomFactor, setZoomFactor } from '@process/utils/zoom';
 import { getCdpStatus, updateCdpConfig } from '@process/utils/configureChromium';
 import { getGpuStatus, setGpuUserOverride } from '@process/utils/gpuRecovery';
+import { officeArtifactService } from '@process/services/office-artifact';
 import { initApplicationBridgeCore } from './applicationBridgeCore';
 import type { IStartOnBootStatus } from '@/common/adapter/ipcBridge';
 import { restartApplication } from './restartApplication';
@@ -98,6 +99,11 @@ export function setApplicationMainWindow(win: BrowserWindow): void {
 export function initApplicationBridge(): void {
   // Platform-agnostic handlers: systemInfo, updateSystemInfo, getPath
   initApplicationBridgeCore();
+
+  ipcBridge.officeArtifact.getState.provider((request) => officeArtifactService.getState(request));
+  ipcBridge.officeArtifact.inspect.provider((request) => officeArtifactService.inspect(request));
+  ipcBridge.officeArtifact.apply.provider((request) => officeArtifactService.apply(request));
+  ipcBridge.officeArtifact.undo.provider((request) => officeArtifactService.undo(request));
 
   ipcBridge.application.restart.provider(async () => {
     // Backend subprocess shutdown is handled by backendManager.stop() in the
