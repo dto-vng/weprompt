@@ -242,6 +242,23 @@ describe('inspectDocxSelection', () => {
     expect(runner.get).not.toHaveBeenCalled();
   });
 
+  it('rejects literal text that OfficeCLI would interpret as a regex', async () => {
+    const paragraphText = 'Prefix r"foo" suffix';
+    const selection: DocxSelectionSnapshot = {
+      ...safeSelection,
+      paragraphText,
+      selectedText: 'r"foo"',
+      start: 7,
+      end: 13,
+    };
+
+    await expect(inspectDocxSelection(runner, FILE_PATH, selection)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CONTENT',
+    });
+    expect(runner.get).not.toHaveBeenCalled();
+    expect(runner.replaceText).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed OfficeCLI results', async () => {
     runner.get.mockResolvedValue({ matches: 0, results: [] });
 

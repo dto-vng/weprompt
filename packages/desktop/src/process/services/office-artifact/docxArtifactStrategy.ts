@@ -39,6 +39,7 @@ function rejectUnsupported(): never {
 
 function validateSelection(selection: DocxSelectionSnapshot): void {
   if (!STABLE_PARAGRAPH_PATH.test(selection.path)) rejectUnsupported();
+  if (selection.selectedText.startsWith('r"') && selection.selectedText.endsWith('"')) rejectUnsupported();
 
   const hasValidOffsets =
     Number.isInteger(selection.start) &&
