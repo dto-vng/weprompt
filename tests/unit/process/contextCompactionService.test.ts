@@ -101,6 +101,29 @@ describe('compactContextLocally', () => {
     );
   });
 
+  it('falls back to matching a provider by model name when the persisted provider id is stale', async () => {
+    const dependencies = createDependencies();
+
+    const result = await compactContextLocally(
+      {
+        conversation_id: 'conversation-1',
+        provider_id: 'stale-provider',
+        model: 'model-1',
+        trigger: 'manual',
+        pinned_context: [],
+        target_turn_id: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(result.snapshot).toEqual(snapshot);
+    expect(result.model).toEqual({ provider_id: 'provider-1', model: 'model-1' });
+    expect(dependencies.createClient).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'provider-1', use_model: 'model-1' }),
+      expect.objectContaining({ timeout: expect.any(Number) })
+    );
+  });
+
   it('uses the final JSON object when provider reasoning contains an earlier object', async () => {
     const dependencies = createDependencies(
       `<think>Consider a draft like {"goal":"temporary"} before answering.</think>\n${JSON.stringify(snapshot)}`

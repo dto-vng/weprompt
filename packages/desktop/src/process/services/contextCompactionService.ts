@@ -205,7 +205,11 @@ export const compactContextLocally = async (
   dependencies: ContextCompactionServiceDependencies = defaultDependencies
 ): Promise<ILocalContextCompactionResult> => {
   const providers = await dependencies.listProviders();
-  const provider = providers.find((candidate) => candidate.id === input.provider_id);
+  // The persisted provider id can go stale when the provider is re-created;
+  // fall back to any provider that still serves the requested model.
+  const provider =
+    providers.find((candidate) => candidate.id === input.provider_id) ??
+    providers.find((candidate) => candidate.models.includes(input.model));
   if (!provider) throw new ContextCompactionServiceError('provider_not_found');
 
   const selectedProvider: TProviderWithModel = {
@@ -256,7 +260,7 @@ export const compactContextLocally = async (
     return {
       snapshot,
       through_turn_id: input.target_turn_id || input.last_compacted_turn_id || '',
-      model: { provider_id: input.provider_id, model: input.model },
+      model: { provider_id: provider.id, model: input.model },
     };
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
