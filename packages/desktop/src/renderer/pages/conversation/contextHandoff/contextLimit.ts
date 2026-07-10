@@ -33,9 +33,13 @@ export const resolveConversationContextLimit = (conversation: TChatConversation 
   const conversationLimit = positiveOrUndefined(extra?.last_context_limit);
   if (conversationLimit !== undefined) return conversationLimit;
 
-  const model = (conversation as { model?: TProviderWithModel }).model;
+  const model = (conversation as { model?: TProviderWithModel & { model?: string } }).model;
   const providerLimit = positiveOrUndefined(model?.context_limit);
   if (providerLimit !== undefined) return providerLimit;
 
-  return getKnownModelContextLimit(model?.use_model);
+  // aionrs conversations can surface the untransformed backend shape
+  // ({ provider_id, model, use_model: null }), so read the model name from
+  // either field before consulting the per-model map.
+  const modelName = model?.use_model || model?.model;
+  return getKnownModelContextLimit(modelName);
 };

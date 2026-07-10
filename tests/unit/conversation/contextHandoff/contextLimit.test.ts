@@ -59,4 +59,17 @@ describe('resolveConversationContextLimit', () => {
     const conversation = aionrsConversation({}, { use_model: 'totally-made-up-model' });
     expect(resolveConversationContextLimit(conversation)).toBeUndefined();
   });
+
+  it('resolves the model default from the raw model field when use_model is absent', () => {
+    // aionrs conversations can surface the untransformed backend shape
+    // { provider_id, model, use_model: null }, so the model name must be read
+    // from either field.
+    const conversation = aionrsConversation();
+    conversation.model = {
+      ...conversation.model,
+      use_model: null as unknown as string,
+      model: 'minimax-m2.5',
+    } as typeof conversation.model;
+    expect(resolveConversationContextLimit(conversation)).toBe(192_000);
+  });
 });
