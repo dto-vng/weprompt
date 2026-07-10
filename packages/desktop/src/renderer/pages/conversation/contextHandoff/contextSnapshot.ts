@@ -77,12 +77,17 @@ const normalizeModelString = (value: unknown, maxLength: number): string | null 
   return trimmed ? trimmed.slice(0, maxLength) : null;
 };
 
-const normalizeModelSnapshotSection = (value: unknown): string[] | null => {
-  if (!Array.isArray(value)) return null;
-  const items = value
+// Coerce a model-produced section into a clean string list. A capable model at
+// low temperature is mostly consistent but occasionally deviates per field
+// (omits a key, returns null, a bare string, or an item that isn't a string).
+// Coerce those instead of rejecting, so one stray field can't discard the whole
+// AI snapshot and force a rules fallback.
+const coerceModelSnapshotSection = (value: unknown): string[] => {
+  const entries = Array.isArray(value) ? value : value == null ? [] : [value];
+  return entries
     .slice(0, CONTEXT_SNAPSHOT_MAX_ITEMS_PER_SECTION)
-    .map((entry) => normalizeModelString(entry, CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH));
-  return items.every((entry): entry is string => entry !== null) ? items : null;
+    .map((entry) => normalizeModelString(entry, CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH))
+    .filter((entry): entry is string => entry !== null);
 };
 
 export const normalizeModelContextSnapshot = (value: unknown): TContextSnapshot | null => {
@@ -91,25 +96,15 @@ export const normalizeModelContextSnapshot = (value: unknown): TContextSnapshot 
   const goal = normalizeModelString(value.goal, CONTEXT_SNAPSHOT_MAX_GOAL_LENGTH);
   if (goal === null) return null;
 
-  const sections = CONTEXT_SNAPSHOT_ARRAY_SECTION_KEYS.reduce<Partial<Record<TContextSnapshotArraySection, string[]>>>(
-    (accumulator, section) => {
-      const normalized = normalizeModelSnapshotSection(value[section]);
-      if (normalized !== null) accumulator[section] = normalized;
-      return accumulator;
-    },
-    {}
-  );
-  if (CONTEXT_SNAPSHOT_ARRAY_SECTION_KEYS.some((section) => !sections[section])) return null;
-
   return {
     goal,
-    current_state: sections.current_state ?? [],
-    decisions: sections.decisions ?? [],
-    artifacts: sections.artifacts ?? [],
-    user_preferences: sections.user_preferences ?? [],
-    open_questions: sections.open_questions ?? [],
-    next_steps: sections.next_steps ?? [],
-    do_not_forget: sections.do_not_forget ?? [],
+    current_state: coerceModelSnapshotSection(value.current_state),
+    decisions: coerceModelSnapshotSection(value.decisions),
+    artifacts: coerceModelSnapshotSection(value.artifacts),
+    user_preferences: coerceModelSnapshotSection(value.user_preferences),
+    open_questions: coerceModelSnapshotSection(value.open_questions),
+    next_steps: coerceModelSnapshotSection(value.next_steps),
+    do_not_forget: coerceModelSnapshotSection(value.do_not_forget),
   };
 };
 

@@ -5,6 +5,7 @@ import {
   CONTEXT_SNAPSHOT_MAX_ITEMS_PER_SECTION,
   CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH,
   mergeContextSnapshotState,
+  normalizeModelContextSnapshot,
   parseContextSnapshot,
 } from '@/renderer/pages/conversation/contextHandoff/contextSnapshot';
 
@@ -18,6 +19,64 @@ const validSnapshot: TContextSnapshot = {
   next_steps: ['Validate the LLM snapshot before persisting it.'],
   do_not_forget: ['Do not mutate manual pins from model output.'],
 };
+
+describe('normalizeModelContextSnapshot', () => {
+  it('accepts a clean model snapshot', () => {
+    expect(normalizeModelContextSnapshot(validSnapshot)).toEqual(validSnapshot);
+  });
+
+  it('coerces an omitted section to an empty list instead of discarding the whole snapshot', () => {
+    const { open_questions: _omitted, ...withoutOneSection } = validSnapshot;
+    expect(normalizeModelContextSnapshot(withoutOneSection)).toEqual({
+      ...validSnapshot,
+      open_questions: [],
+    });
+  });
+
+  it('coerces a null section to an empty list', () => {
+    expect(normalizeModelContextSnapshot({ ...validSnapshot, decisions: null })).toEqual({
+      ...validSnapshot,
+      decisions: [],
+    });
+  });
+
+  it('wraps a single-string section into a list', () => {
+    expect(normalizeModelContextSnapshot({ ...validSnapshot, next_steps: 'Verify the snapshot.' })).toEqual({
+      ...validSnapshot,
+      next_steps: ['Verify the snapshot.'],
+    });
+  });
+
+  it('drops empty and non-string items rather than rejecting the section', () => {
+    expect(
+      normalizeModelContextSnapshot({
+        ...validSnapshot,
+        artifacts: ['/workspace/Context.md', '', '   ', 42, { path: 'nested' }, 'dashboard.tsx'],
+      })
+    ).toEqual({
+      ...validSnapshot,
+      artifacts: ['/workspace/Context.md', 'dashboard.tsx'],
+    });
+  });
+
+  it('still rejects output that is not an object or lacks a usable goal', () => {
+    expect(normalizeModelContextSnapshot('not an object')).toBeNull();
+    expect(normalizeModelContextSnapshot([validSnapshot])).toBeNull();
+    expect(normalizeModelContextSnapshot({ ...validSnapshot, goal: '' })).toBeNull();
+    expect(normalizeModelContextSnapshot({ ...validSnapshot, goal: 42 })).toBeNull();
+  });
+
+  it('produces a snapshot that survives the strict persistence parser', () => {
+    const normalized = normalizeModelContextSnapshot({
+      ...validSnapshot,
+      decisions: null,
+      next_steps: 'Verify the snapshot.',
+      artifacts: ['keep.tsx', '', 7],
+    });
+    expect(normalized).not.toBeNull();
+    expect(parseContextSnapshot(normalized)).toEqual(normalized);
+  });
+});
 
 describe('parseContextSnapshot', () => {
   it('accepts a valid structured snapshot', () => {
