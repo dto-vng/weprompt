@@ -3,6 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ICreateConversationParams, ISendMessageParams } from '@/common/adapter/ipcBridge';
 
 type HttpCall = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -84,6 +85,82 @@ describe('ipcBridge conversation adapter', () => {
       method: 'DELETE',
       path: '/api/conversations/conv-1',
       body: undefined,
+    });
+  });
+
+  it('passes context handoff metadata through create conversation requests', async () => {
+    const { conversation } = await import('@/common/adapter/ipcBridge');
+    const input: ICreateConversationParams = {
+      type: 'aionrs',
+      name: 'Handoff continuation',
+      extra: {
+        workspace: '/tmp/workspace',
+        context: '# Conversation Context\n\n## Goal\nContinue safely.',
+        context_file_name: 'Context.md',
+        context_handoff: {
+          pinned_context: [
+            {
+              id: 'ctx-1',
+              title: 'Decision',
+              content: 'Use VND millions.',
+              source: 'context_md',
+              created_at: 1,
+              updated_at: 1,
+            },
+          ],
+          context_file_path: '/tmp/workspace/Context.md',
+          context_file_name: 'Context.md',
+          last_budget_status: 'healthy',
+          last_exported_at: 2,
+        },
+      },
+    };
+
+    await conversation.create.invoke(input);
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/conversations',
+      body: {
+        type: 'aionrs',
+        id: undefined,
+        name: 'Handoff continuation',
+        assistant: undefined,
+        extra: input.extra,
+      },
+    });
+  });
+
+  it('passes pinned context through send message requests', async () => {
+    const { conversation } = await import('@/common/adapter/ipcBridge');
+    const input: ISendMessageParams = {
+      conversation_id: 'conv-1',
+      input: 'Continue',
+      files: [],
+      pinned_context: [
+        {
+          id: 'ctx-1',
+          title: 'Decision',
+          content: 'Use VND millions.',
+          source: 'manual',
+          created_at: 1,
+          updated_at: 1,
+        },
+      ],
+    };
+
+    await conversation.sendMessage.invoke(input);
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/conversations/conv-1/messages',
+      body: {
+        content: input.input,
+        files: input.files,
+        loading_id: undefined,
+        inject_skills: undefined,
+        pinned_context: input.pinned_context,
+      },
     });
   });
 });

@@ -32,6 +32,7 @@ import {
   useConversationCommandQueue,
   type ConversationCommandQueueItem,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import { getConversationPinnedContext } from '@/renderer/pages/conversation/contextHandoff/pinnedContext';
 import { useConversationRuntimeView } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { getConversationRuntimeWorkspaceErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
@@ -273,10 +274,12 @@ const AionrsSendBox: React.FC<{
 
         runtimeView.markSendStarted();
         setWaitingResponse(true);
+        const latestConversation = await getConversationOrNull(conversation_id);
         const res = await ipcBridge.conversation.sendMessage.invoke({
           input: displayMessage,
           conversation_id,
           files,
+          pinned_context: getConversationPinnedContext(latestConversation),
         });
         setActiveMsgId(res.msg_id);
         runtimeView.markSendAccepted(res.turn_id, res.runtime, res.msg_id);

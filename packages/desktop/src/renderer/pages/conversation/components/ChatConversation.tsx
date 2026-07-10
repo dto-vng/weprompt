@@ -328,13 +328,7 @@ const ChatConversation: React.FC<{
     acpAssistantId,
   ]);
 
-  const sliderTitle = useMemo(() => {
-    return (
-      <div className='flex items-center justify-between'>
-        <span className='text-16px font-bold text-t-primary'>{t('conversation.workspace.title')}</span>
-      </div>
-    );
-  }, [t]);
+  const sliderTitle: React.ReactNode = null;
 
   if (conversation && conversation.type === 'aionrs') {
     return <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />;
