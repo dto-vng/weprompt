@@ -615,7 +615,14 @@
       "rulesFallback": "Kural tabanlı yedek yöntemle güncellendi",
       "stale": "Güncelleme bekleniyor",
       "failed": "Güncelleme başarısız",
-      "edited": "Düzenlenmiş bağlam"
+      "edited": "Düzenlenmiş bağlam",
+      "error": {
+        "invalidModelOutput": "Yapay zekâ beklenmeyen bir sonuç döndürdü; bağlam güncellenmedi.",
+        "providerRequestFailed": "Model isteği başarısız oldu. Sağlayıcı bağlantısını kontrol edip tekrar deneyin.",
+        "providerNotFound": "Model sağlayıcısı bulunamadı. Bu konuşmanın model ayarlarını kontrol edin.",
+        "interrupted": "Bağlam güncellemesi tamamlanmadan kesildi.",
+        "unknown": "Bağlam güncellemesi beklenmedik şekilde başarısız oldu. Tekrar deneyin."
+      }
     }
   }
 }

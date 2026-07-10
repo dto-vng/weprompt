@@ -614,7 +614,14 @@
       "rulesFallback": "Mit regelbasierter Rückfallebene aktualisiert",
       "stale": "Aktualisierung ausstehend",
       "failed": "Aktualisierung fehlgeschlagen",
-      "edited": "Bearbeiteter Kontext"
+      "edited": "Bearbeiteter Kontext",
+      "error": {
+        "invalidModelOutput": "Die KI hat ein unerwartetes Ergebnis geliefert, daher wurde der Kontext nicht aktualisiert.",
+        "providerRequestFailed": "Die Modellanfrage ist fehlgeschlagen. Prüfen Sie die Anbieterverbindung und versuchen Sie es erneut.",
+        "providerNotFound": "Der Modellanbieter wurde nicht gefunden. Prüfen Sie die Modelleinstellungen dieser Unterhaltung.",
+        "interrupted": "Die Kontextaktualisierung wurde vor dem Abschluss unterbrochen.",
+        "unknown": "Die Kontextaktualisierung ist unerwartet fehlgeschlagen. Bitte erneut versuchen."
+      }
     }
   }
 }

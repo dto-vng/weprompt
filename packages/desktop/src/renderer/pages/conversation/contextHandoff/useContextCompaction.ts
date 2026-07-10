@@ -20,6 +20,7 @@ import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conve
 import { emitter } from '@/renderer/utils/emitter';
 import { buildContextHandoffExtraPatch, buildContextSnapshotStatePatch } from './contextConversationUpdate';
 import { resolveContextFile } from './contextFile';
+import { resolveConversationContextLimit } from './contextLimit';
 import { buildContextMarkdown, buildFallbackContextMarkdown, buildFallbackContextSnapshot } from './contextMarkdown';
 import { loadContextHandoffMessages } from './contextMessages';
 import { addPinnedContext, getConversationContextHandoffExtra, getConversationPinnedContext } from './pinnedContext';
@@ -500,7 +501,7 @@ const runtimeBudgetStatus = (
 ): TContextBudgetStatus => {
   const extra = conversation.extra as Record<string, unknown>;
   const usage = extra.last_token_usage;
-  const limit = extra.last_context_limit;
+  const limit = resolveConversationContextLimit(conversation);
   if (!usage || typeof usage !== 'object' || typeof limit !== 'number' || limit <= 0) return fallback;
   const total = (usage as { total_tokens?: unknown }).total_tokens;
   if (typeof total !== 'number' || total < 0) return fallback;

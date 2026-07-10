@@ -478,6 +478,58 @@ describe('automatic context compaction policy', () => {
     );
   });
 
+  it('derives the runtime budget status from the per-model window when no context limit is stored', async () => {
+    let listener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    const runCompaction = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      snapshot,
+      source: 'llm' as const,
+      throughTurnId: 'turn-1',
+    }));
+    const budgetConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      model: { ...conversation.model, use_model: 'minimax-m2.5' },
+      extra: {
+        ...conversation.extra,
+        // No last_context_limit — aionrs conversations never receive one.
+        last_token_usage: { total_tokens: 180_000 },
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          snapshot,
+        },
+      },
+    };
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        listener = next;
+        return vi.fn();
+      }),
+      getConversation: vi.fn(async () => budgetConversation),
+      updateConversation: vi.fn(async () => true),
+      runCompaction,
+      now: () => 100,
+    };
+
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+
+    act(() => listener?.(completedTurn()));
+
+    await waitFor(() =>
+      expect(runCompaction).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'auto', budgetStatus: 'too_large' })
+      )
+    );
+  });
+
   it('marks an interrupted compaction as pending when the hook mounts', async () => {
     const updateConversation = vi.fn(async () => true);
     const interruptedConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
