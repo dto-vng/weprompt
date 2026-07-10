@@ -29,11 +29,11 @@ describe('createOfficeCliRunner', () => {
 
   it('builds fixed argument shapes for each supported mutation', async () => {
     const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
-      callback(null, JSON.stringify({ success: true, data: {} }), '');
+      callback(null, JSON.stringify({ success: true, data: {}, matched: 1 }), '');
     });
     const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
 
-    await runner.replaceText('/workspace/a.docx', '/body/p[1]', 'old', 'new');
+    await expect(runner.replaceText('/workspace/a.docx', '/body/p[1]', 'old', 'new')).resolves.toEqual({ matched: 1 });
     await runner.formatRange('/workspace/a.docx', '/body/p[1]', 2, 4, 'underline', false);
     await runner.setCell('/workspace/a.xlsx', '/sheets/1/cells/A1', '=SUM(B1:B2)');
     await runner.validate('/workspace/a.docx');

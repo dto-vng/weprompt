@@ -19,6 +19,7 @@ export class OfficeArtifactError extends Error {
 type OfficeCliEnvelope = {
   success: boolean;
   data?: unknown;
+  matched?: unknown;
 };
 
 function isOfficeCliEnvelope(value: unknown): value is OfficeCliEnvelope {
@@ -26,6 +27,16 @@ function isOfficeCliEnvelope(value: unknown): value is OfficeCliEnvelope {
 }
 
 export function parseOfficeCliEnvelope<T = unknown>(output: string): T {
+  return parseOfficeCliOutput(output).data as T;
+}
+
+export function parseOfficeCliMatchedEnvelope(output: string): { matched: number } {
+  const parsed = parseOfficeCliOutput(output);
+  if (typeof parsed.matched !== 'number') throw new OfficeArtifactError('OFFICECLI_FAILED');
+  return { matched: parsed.matched };
+}
+
+function parseOfficeCliOutput(output: string): OfficeCliEnvelope {
   let parsed: unknown;
 
   try {
@@ -38,5 +49,5 @@ export function parseOfficeCliEnvelope<T = unknown>(output: string): T {
     throw new OfficeArtifactError('OFFICECLI_FAILED');
   }
 
-  return parsed.data as T;
+  return parsed;
 }

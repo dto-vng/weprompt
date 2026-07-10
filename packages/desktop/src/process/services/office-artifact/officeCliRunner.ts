@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
-import { OfficeArtifactError, parseOfficeCliEnvelope } from './officeCliJson';
+import { OfficeArtifactError, parseOfficeCliEnvelope, parseOfficeCliMatchedEnvelope } from './officeCliJson';
 
 type OfficeCliExecFileOptions = {
   shell: false;
@@ -91,7 +91,10 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
   const binaryPath = resolveOfficeCliBinary(dependencies);
   const execFile = dependencies.execFile ?? defaultExecFile;
 
-  const invoke = (args: string[]): Promise<unknown> =>
+  const invoke = (
+    args: string[],
+    parseOutput: (output: string) => unknown = parseOfficeCliEnvelope
+  ): Promise<unknown> =>
     new Promise((resolve, reject) => {
       try {
         execFile(binaryPath, args, EXEC_OPTIONS, (error, stdout) => {
@@ -101,7 +104,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
           }
 
           try {
-            resolve(parseOfficeCliEnvelope(stdout));
+            resolve(parseOutput(stdout));
           } catch (parseError) {
             reject(parseError);
           }
@@ -114,7 +117,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
   return {
     get: (file, path) => invoke(['get', file, path, '--json']),
     replaceText: (file, path, find, replace) =>
-      invoke(['set', file, path, '--find', find, '--replace', replace, '--json']),
+      invoke(['set', file, path, '--find', find, '--replace', replace, '--json'], parseOfficeCliMatchedEnvelope),
     formatRange: (file, path, start, end, property, enabled) =>
       invoke([
         'set',
