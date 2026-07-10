@@ -64,4 +64,23 @@ describe('createOfficeCliRunner', () => {
 
     await expect(runner.validate('/workspace/a.docx')).rejects.toMatchObject({ code: 'OFFICECLI_NOT_FOUND' });
   });
+
+  it('maps a synchronous missing OfficeCLI binary error to a typed error', async () => {
+    const error = Object.assign(new Error('/private/workspace/a.docx'), { code: 'ENOENT' });
+    const execFile = vi.fn<OfficeCliExecFile>(() => {
+      throw error;
+    });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await expect(runner.validate('/workspace/a.docx')).rejects.toMatchObject({ code: 'OFFICECLI_NOT_FOUND' });
+  });
+
+  it('maps a synchronous OfficeCLI throw to a typed error', async () => {
+    const execFile = vi.fn<OfficeCliExecFile>(() => {
+      throw new Error('/private/workspace/a.docx');
+    });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await expect(runner.get('/workspace/a.docx', '/body/p[1]')).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+  });
 });

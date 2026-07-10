@@ -82,8 +82,9 @@ function resolveOfficeCliBinary(dependencies: OfficeCliRunnerDependencies): stri
   return 'officecli';
 }
 
-function isMissingBinaryError(error: OfficeCliExecFileError): boolean {
-  return error.code === 'ENOENT';
+function toOfficeArtifactError(error: unknown): OfficeArtifactError {
+  const isMissingBinary = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+  return new OfficeArtifactError(isMissingBinary ? 'OFFICECLI_NOT_FOUND' : 'OFFICECLI_FAILED');
 }
 
 export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies = {}): OfficeCliRunner {
@@ -92,18 +93,22 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
 
   const invoke = (args: string[]): Promise<unknown> =>
     new Promise((resolve, reject) => {
-      execFile(binaryPath, args, EXEC_OPTIONS, (error, stdout) => {
-        if (error) {
-          reject(new OfficeArtifactError(isMissingBinaryError(error) ? 'OFFICECLI_NOT_FOUND' : 'OFFICECLI_FAILED'));
-          return;
-        }
+      try {
+        execFile(binaryPath, args, EXEC_OPTIONS, (error, stdout) => {
+          if (error) {
+            reject(toOfficeArtifactError(error));
+            return;
+          }
 
-        try {
-          resolve(parseOfficeCliEnvelope(stdout));
-        } catch (parseError) {
-          reject(parseError);
-        }
-      });
+          try {
+            resolve(parseOfficeCliEnvelope(stdout));
+          } catch (parseError) {
+            reject(parseError);
+          }
+        });
+      } catch (error) {
+        reject(toOfficeArtifactError(error));
+      }
     });
 
   return {
