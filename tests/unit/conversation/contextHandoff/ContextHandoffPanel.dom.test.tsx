@@ -149,6 +149,7 @@ vi.mock('@icon-park/react', () => {
   const Icon = () => <span aria-hidden='true' />;
   return {
     Add: Icon,
+    Attention: Icon,
     Delete: Icon,
     Edit: Icon,
     FileText: Icon,
@@ -279,10 +280,8 @@ describe('ContextHandoffPanel', () => {
 
   it.each([
     ['updating', 'llm', 'conversation.contextHandoff.status.updating'],
-    ['fresh', 'llm', 'conversation.contextHandoff.status.updatedByAi'],
     ['fresh', 'rules', 'conversation.contextHandoff.status.rulesFallback'],
     ['stale', 'llm', 'conversation.contextHandoff.status.stale'],
-    ['failed', 'llm', 'conversation.contextHandoff.status.failed'],
   ] as const)('shows compact generation state for %s/%s', async (status, source, expectedKey) => {
     mocks.getConversationOrNull.mockResolvedValue({
       ...conversation,
@@ -299,6 +298,48 @@ describe('ContextHandoffPanel', () => {
     render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
 
     expect(await screen.findByText(expectedKey)).toBeInTheDocument();
+  });
+
+  it('shows no AI status text after a successful AI update', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'fresh',
+          source: 'llm',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(await screen.findByText('conversation.contextHandoff.activeFileDescription')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.contextHandoff.status.updatedByAi')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /status\.error/ })).not.toBeInTheDocument();
+  });
+
+  it('surfaces a failed AI update as a hover-able alert instead of status text', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'failed',
+          source: 'llm',
+          last_error_code: 'provider_request_failed',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(
+      await screen.findByRole('img', { name: 'conversation.contextHandoff.status.error.providerRequestFailed' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('conversation.contextHandoff.status.failed')).not.toBeInTheDocument();
   });
 
   it('shows a budget percentage for an aionrs conversation using the per-model fallback window', async () => {

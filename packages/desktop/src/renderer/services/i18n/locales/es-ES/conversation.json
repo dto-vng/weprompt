@@ -614,7 +614,14 @@
       "rulesFallback": "Actualizado con reglas alternativas",
       "stale": "Actualización pendiente",
       "failed": "Error de actualización",
-      "edited": "Contexto editado"
+      "edited": "Contexto editado",
+      "error": {
+        "invalidModelOutput": "La IA devolvió un resultado inesperado, por lo que no se actualizó el contexto.",
+        "providerRequestFailed": "La solicitud al modelo falló. Comprueba la conexión del proveedor e inténtalo de nuevo.",
+        "providerNotFound": "No se encontró el proveedor del modelo. Comprueba la configuración del modelo de esta conversación.",
+        "interrupted": "La actualización del contexto se interrumpió antes de finalizar.",
+        "unknown": "La actualización del contexto falló inesperadamente. Inténtalo de nuevo."
+      }
     }
   }
 }

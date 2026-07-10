@@ -12,7 +12,7 @@ import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { Button, Input, Message, Modal, Progress, Space, Tooltip, Typography } from '@arco-design/web-react';
-import { Add, Delete, Edit, FileText, Pin } from '@icon-park/react';
+import { Add, Attention, Delete, Edit, FileText, Pin } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { estimateContextBudget } from './contextBudget';
@@ -73,18 +73,29 @@ const getConversationTokenUsage = (conversation: TChatConversation | null): Toke
 };
 
 const getGenerationStateKey = (contextState: TContextHandoffExtra) => {
+  // A failed update is surfaced as a hover-able "!" badge, not as inline text.
+  // Successful AI updates intentionally show no status — the file tile just
+  // reads "Active handoff".
   if (contextState.status === 'updating') return 'conversation.contextHandoff.status.updating' as const;
-  if (contextState.status === 'failed') return 'conversation.contextHandoff.status.failed' as const;
   if (contextState.status === 'stale') return 'conversation.contextHandoff.status.stale' as const;
   if (contextState.source === 'rules') return 'conversation.contextHandoff.status.rulesFallback' as const;
-  if (contextState.source === 'llm' && contextState.status === 'fresh') {
-    return 'conversation.contextHandoff.status.updatedByAi' as const;
-  }
   if (contextState.source === 'user' && contextState.status === 'fresh') {
     return 'conversation.contextHandoff.status.edited' as const;
   }
   return null;
 };
+
+const CONTEXT_ERROR_KEYS = {
+  invalid_model_output: 'conversation.contextHandoff.status.error.invalidModelOutput',
+  provider_request_failed: 'conversation.contextHandoff.status.error.providerRequestFailed',
+  provider_not_found: 'conversation.contextHandoff.status.error.providerNotFound',
+  interrupted: 'conversation.contextHandoff.status.error.interrupted',
+} as const;
+
+const getContextErrorKey = (code?: string) =>
+  code && code in CONTEXT_ERROR_KEYS
+    ? CONTEXT_ERROR_KEYS[code as keyof typeof CONTEXT_ERROR_KEYS]
+    : ('conversation.contextHandoff.status.error.unknown' as const);
 
 const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
   conversationId,
@@ -143,6 +154,8 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
     ? ('conversation.contextHandoff.status.updating' as const)
     : getGenerationStateKey(currentContextFile);
   const hasContextFile = Boolean(currentContextFile.context_file_path);
+  const hasContextError = !isCompacting && currentContextFile.status === 'failed';
+  const contextErrorMessage = t(getContextErrorKey(currentContextFile.last_error_code));
   const contextFileName = currentContextFile.context_file_name || resolveContextFile(workspace).fileName;
   const contextLimit = resolveConversationContextLimit(conversation);
   const runtimeTokenUsage = getConversationTokenUsage(conversation);
@@ -340,6 +353,13 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
               </div>
             </Button>
           </Tooltip>
+          {hasContextError && (
+            <Tooltip content={contextErrorMessage}>
+              <span className='context-handoff-file-alert' role='img' aria-label={contextErrorMessage}>
+                <Attention theme='outline' size='16' />
+              </span>
+            </Tooltip>
+          )}
         </div>
         <div className='context-handoff-budget'>
           <div className='context-handoff-budget-label'>
