@@ -34,6 +34,15 @@ import type {
   SetAssistantStateRequest,
   UpdateAssistantRequest,
 } from '../types/agent/assistantTypes';
+import type {
+  OfficeArtifactApplyRequest,
+  OfficeArtifactGetStateRequest,
+  OfficeArtifactInspectRequest,
+  OfficeArtifactInspectResult,
+  OfficeArtifactMutationResult,
+  OfficeArtifactStateResult,
+  OfficeArtifactUndoRequest,
+} from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
 import type {
   EnsureConversationRuntimeResponse,
@@ -1147,6 +1156,13 @@ export const document = {
 // ---------------------------------------------------------------------------
 // Office Previews — routed to /api/*-preview/*
 // ---------------------------------------------------------------------------
+
+export const officeArtifact = {
+  getState: bridge.buildProvider<OfficeArtifactStateResult, OfficeArtifactGetStateRequest>('office-artifact.get-state'),
+  inspect: bridge.buildProvider<OfficeArtifactInspectResult, OfficeArtifactInspectRequest>('office-artifact.inspect'),
+  apply: bridge.buildProvider<OfficeArtifactMutationResult, OfficeArtifactApplyRequest>('office-artifact.apply'),
+  undo: bridge.buildProvider<OfficeArtifactMutationResult, OfficeArtifactUndoRequest>('office-artifact.undo'),
+};
 
 export const pptPreview = {
   start: httpPost<{ url: string; error?: string }, { file_path: string; workspace?: string }>('/api/ppt-preview/start'),
