@@ -162,7 +162,7 @@ const PreviewPanel: React.FC = () => {
     workspace: activeTab?.metadata?.workspace ?? '',
     filePath: activeTab?.metadata?.file_path ?? '',
     fileName: activeTab?.metadata?.file_name ?? activeTab?.title,
-    externalRevision: activeTab?.officePreviewRevision,
+    externalRevision: `${activeTab?.officePreviewRevision ?? 0}:${manualOfficeRefreshRevision}`,
     addToSendBox,
     onArtifactMutated: handleOfficeArtifactMutated,
   });

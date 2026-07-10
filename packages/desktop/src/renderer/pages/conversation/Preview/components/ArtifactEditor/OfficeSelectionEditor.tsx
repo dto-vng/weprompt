@@ -64,6 +64,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
           <Button
             type='primary'
             size='small'
+            aria-label={t('preview.office.editor.apply')}
             loading={saving}
             disabled={saving || !inspection.canReplace || unchanged}
             onClick={() => void applyReplacement()}
@@ -86,6 +87,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
         >
           <Button
             size='small'
+            aria-label={t('preview.office.editor.editSelection')}
             icon={<EditTwo size={ICON_SIZE} />}
             disabled={!inspection.canReplace || saving}
             className={styles.actionButton}
@@ -199,6 +201,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
       <Button
         type='primary'
         size='small'
+        aria-label={t('preview.office.editor.apply')}
         loading={saving}
         disabled={saving || !inspection.canEdit || draft === originalInput}
         className={styles.formulaApply}

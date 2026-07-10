@@ -158,8 +158,10 @@ describe('OfficeArtifactToolbar', () => {
 
     await user.click(screen.getByRole('button', { name: 'More' }));
 
-    expect(screen.getByTestId('office-toolbar-compact-undo')).toHaveClass(styles.compactMenuItem);
+    const compactUndo = screen.getByTestId('office-toolbar-compact-undo');
+    expect(compactUndo).toHaveClass(styles.compactMenuItem);
     expect(screen.getByTestId('office-toolbar-compact-open')).toHaveClass(styles.compactMenuItem);
+    expect(compactUndo.closest('[data-testid="office-artifact-toolbar"]')).toBeInTheDocument();
   });
 
   it('restores compact menu items in container and viewport responsive fallbacks', () => {
@@ -199,9 +201,12 @@ describe('OfficeArtifactToolbar', () => {
     const user = userEvent.setup();
     render(<OfficeArtifactToolbar {...createProps()} />);
     expect(screen.getByRole('button', { name: 'Apply' })).toHaveClass('arco-btn-primary');
+    expect(screen.getByRole('button', { name: 'Apply' })).toHaveAttribute('aria-label', 'Apply');
 
     render(<OfficeArtifactToolbar {...createProps({ inspection: wordInspection })} />);
-    await user.click(screen.getByRole('button', { name: 'Edit selection' }));
+    const editSelection = screen.getByRole('button', { name: 'Edit selection' });
+    expect(editSelection).toHaveAttribute('aria-label', 'Edit selection');
+    await user.click(editSelection);
 
     expect(
       (await screen.findAllByRole('button', { name: 'Apply' })).every((button) =>

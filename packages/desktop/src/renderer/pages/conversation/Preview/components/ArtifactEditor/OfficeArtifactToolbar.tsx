@@ -7,7 +7,7 @@
 import type { OfficeArtifactEdit, OfficeArtifactInspection } from '@/common/types/office/artifactEditor';
 import { Button, Dropdown, Menu, Tooltip, Typography } from '@arco-design/web-react';
 import { Download, EditTwo, FolderOpen, MoreOne, Refresh, Robot, Undo } from '@icon-park/react';
-import React from 'react';
+import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { OfficeSelectionEditor } from './OfficeSelectionEditor';
 import type { OfficeArtifactEditorStatus, OfficeSelectionDirection } from './useOfficeArtifactEditor';
@@ -52,6 +52,7 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
   moveSelection,
 }) => {
   const { t } = useTranslation();
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const busy = status === 'saving' || status === 'openingDesktop';
   const unsupported =
     inspection !== null &&
@@ -100,7 +101,7 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
   );
 
   return (
-    <div className={styles.toolbar} data-testid='office-artifact-toolbar'>
+    <div ref={toolbarRef} className={styles.toolbar} data-testid='office-artifact-toolbar'>
       <div className={styles.leftActions}>
         <OfficeSelectionEditor inspection={inspection} status={status} apply={apply} moveSelection={moveSelection} />
         <Typography.Text
@@ -152,7 +153,12 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
             <span className={styles.actionLabel}>{t('preview.office.editor.openDesktop')}</span>
           </Button>
         </Tooltip>
-        <Dropdown trigger='click' position='br' droplist={moreMenu}>
+        <Dropdown
+          trigger='click'
+          position='br'
+          droplist={moreMenu}
+          getPopupContainer={() => toolbarRef.current ?? document.body}
+        >
           <Tooltip content={t('preview.office.editor.more')}>
             <Button
               type='text'

@@ -242,6 +242,18 @@ describe('PreviewPanel Office artifact integration', () => {
     await waitFor(() => expect(mocks.wordViewerProps.current?.refreshToken).not.toBe(initialRefreshToken));
   });
 
+  it('resynchronizes editor state when the user manually refreshes the Office preview', async () => {
+    setActiveTab('word');
+    render(<PreviewPanel />);
+    const initialEditorRevision = mocks.editorOptions.current?.externalRevision;
+    const initialRefreshToken = mocks.wordViewerProps.current?.refreshToken;
+
+    act(() => (mocks.toolbarProps.current?.refresh as (() => void) | undefined)?.());
+
+    await waitFor(() => expect(mocks.wordViewerProps.current?.refreshToken).not.toBe(initialRefreshToken));
+    expect(mocks.editorOptions.current?.externalRevision).not.toBe(initialEditorRevision);
+  });
+
   it.each([
     { contentType: 'ppt' as const, desktop: true },
     { contentType: 'word' as const, desktop: false },
