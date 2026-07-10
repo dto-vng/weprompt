@@ -139,6 +139,9 @@ export class OfficeArtifactService {
 
       installAttempted = true;
       await this.workingFiles.install(stagedPath, artifact.filePath);
+      if ((await this.hashArtifact(artifact.filePath)) !== stagedVersion) {
+        throw new OfficeArtifactError('FILE_CHANGED');
+      }
 
       const undoDepth = await this.snapshots.commit(pending, stagedVersion);
       return { ok: true, version: stagedVersion, snapshotId: pending.id, undoDepth };

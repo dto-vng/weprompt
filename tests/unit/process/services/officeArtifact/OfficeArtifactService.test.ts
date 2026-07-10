@@ -226,7 +226,8 @@ describe('OfficeArtifactService apply', () => {
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_B)
-      .mockResolvedValueOnce(VERSION_A);
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B);
 
     await expect(createService().apply(applyRequest)).resolves.toEqual({
       ok: true,
@@ -249,7 +250,8 @@ describe('OfficeArtifactService apply', () => {
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_B)
-      .mockResolvedValueOnce(VERSION_A);
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B);
     snapshots.prepare.mockResolvedValue({ ...pending, filePath: DOCX_FILE });
     const request: OfficeArtifactApplyRequest = {
       workspace: WORKSPACE,
@@ -335,6 +337,7 @@ describe('OfficeArtifactService apply', () => {
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_B)
       .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B)
       .mockResolvedValueOnce(VERSION_B);
     snapshots.commit.mockRejectedValue(new OfficeArtifactError('SNAPSHOT_FAILED'));
     snapshots.rollbackPending.mockRejectedValue(new OfficeArtifactError('RESTORE_FAILED'));
@@ -361,6 +364,23 @@ describe('OfficeArtifactService apply', () => {
     expect(snapshots.rollbackPending).not.toHaveBeenCalled();
   });
 
+  it('preserves an external save detected after staged installation', async () => {
+    hashArtifact
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B)
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_C)
+      .mockResolvedValueOnce(VERSION_C);
+
+    await expect(createService().apply(applyRequest)).resolves.toEqual({ ok: false, code: 'FILE_CHANGED' });
+
+    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE);
+    expect(snapshots.commit).not.toHaveBeenCalled();
+    expect(snapshots.discardPending).toHaveBeenCalledWith(pending);
+    expect(snapshots.rollbackPending).not.toHaveBeenCalled();
+  });
+
   it('serializes concurrent mutations of the same artifact', async () => {
     let releaseFirstMutation: (() => void) | undefined;
     runner.setCell
@@ -378,8 +398,10 @@ describe('OfficeArtifactService apply', () => {
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_B)
       .mockResolvedValueOnce(VERSION_B)
+      .mockResolvedValueOnce(VERSION_B)
       .mockResolvedValueOnce(VERSION_C)
-      .mockResolvedValueOnce(VERSION_B);
+      .mockResolvedValueOnce(VERSION_B)
+      .mockResolvedValueOnce(VERSION_C);
     snapshots.prepare
       .mockResolvedValueOnce(pending)
       .mockResolvedValueOnce({ ...pending, id: 'snapshot-2', preVersion: VERSION_B });
@@ -409,7 +431,8 @@ describe('OfficeArtifactService apply', () => {
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_A)
       .mockResolvedValueOnce(VERSION_B)
-      .mockResolvedValueOnce(VERSION_A);
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B);
     const service = createService();
 
     const mutation = service.apply(applyRequest);
