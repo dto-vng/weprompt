@@ -16,6 +16,7 @@ import type { OfficeCliRunner } from './officeCliRunner';
 
 const STABLE_PARAGRAPH_PATH = /^\/body\/p\[@paraId=[A-Fa-f0-9]+\]$/;
 const PREVIEW_PARAGRAPH_PATH = /^\/body\/p\[[1-9]\d*\]$/;
+const OFFICECLI_REGEX_LITERAL = /^r(?:"[\s\S]*"|'[\s\S]*')$/;
 const FORMAT_PROPERTIES = ['bold', 'italic', 'underline'] as const;
 
 type OfficeCliFormat = Record<string, unknown>;
@@ -41,7 +42,7 @@ function rejectUnsupported(): never {
 
 function validateSelection(selection: DocxSelectionSnapshot): void {
   if (!STABLE_PARAGRAPH_PATH.test(selection.path) && !PREVIEW_PARAGRAPH_PATH.test(selection.path)) rejectUnsupported();
-  if (selection.selectedText.startsWith('r"') && selection.selectedText.endsWith('"')) rejectUnsupported();
+  if (OFFICECLI_REGEX_LITERAL.test(selection.selectedText)) rejectUnsupported();
 
   const hasValidOffsets =
     Number.isInteger(selection.start) &&

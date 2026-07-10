@@ -96,6 +96,11 @@ type OfficeWatchErrorState = {
   message: string;
 };
 
+type OfficeWatchView = {
+  key: string;
+  url: string;
+};
+
 export const shouldRestartOfficeWatch = (previousToken: string | undefined, nextToken: string | undefined): boolean =>
   previousToken !== undefined && nextToken !== undefined && previousToken !== nextToken;
 
@@ -215,57 +220,73 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   const { t } = useTranslation();
   const keys = I18N_KEYS[docType];
 
-  const [watchUrl, setWatchUrl] = useState<string | null>(null);
+  const [watchView, setWatchView] = useState<OfficeWatchView | null>(null);
+  const [refreshView, setRefreshView] = useState<OfficeWatchView | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState<'starting' | 'installing'>('starting');
   const [error, setError] = useState<OfficeWatchErrorState | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const watchUrlRef = useRef<string | null>(null);
+  const refreshViewRef = useRef<OfficeWatchView | null>(null);
   const contentReadyRef = useRef(false);
   const filePathRef = useRef(file_path);
   const workspaceRef = useRef(workspace);
   const docTypeRef = useRef(docType);
   const refreshTokenRef = useRef<string | undefined>(refreshToken);
   const stopQueueRef = useRef<OfficeWatchStopQueue>(createOfficeWatchStopQueue());
-  const pendingRefreshLoadRef = useRef(false);
 
   const guestScript = useMemo(() => (docType === 'ppt' ? undefined : buildOfficeGuestScript(docType)), [docType]);
 
-  const updateWatchUrl = useCallback((url: string | null): void => {
-    watchUrlRef.current = url;
-    setWatchUrl(url);
+  const updateWatchView = useCallback((view: OfficeWatchView | null): void => {
+    watchUrlRef.current = view?.url ?? null;
+    setWatchView(view);
+  }, []);
+
+  const updateRefreshView = useCallback((view: OfficeWatchView | null): void => {
+    refreshViewRef.current = view;
+    setRefreshView(view);
   }, []);
 
   const handlePreviewLoaded = useCallback(() => {
     contentReadyRef.current = true;
     setInitialLoading(false);
     setError(null);
-
-    if (pendingRefreshLoadRef.current) {
-      pendingRefreshLoadRef.current = false;
-      setRefreshing(false);
-      onRefreshStateChange?.('refreshed');
-    }
-  }, [onRefreshStateChange]);
+  }, []);
 
   const handlePreviewLoadFailed = useCallback(() => {
-    if (pendingRefreshLoadRef.current) {
-      pendingRefreshLoadRef.current = false;
-      setRefreshing(false);
-      onRefreshStateChange?.('refreshFailed');
-      return;
-    }
-
     if (contentReadyRef.current) return;
     setInitialLoading(false);
     setError({ message: t(keys.startFailed) });
-  }, [keys.startFailed, onRefreshStateChange, t]);
+  }, [keys.startFailed, t]);
+
+  const handleRefreshLoaded = useCallback(
+    (view: OfficeWatchView): void => {
+      if (refreshViewRef.current?.key !== view.key) return;
+      contentReadyRef.current = true;
+      updateWatchView(view);
+      updateRefreshView(null);
+      setRefreshing(false);
+      setError(null);
+      onRefreshStateChange?.('refreshed');
+    },
+    [onRefreshStateChange, updateRefreshView, updateWatchView]
+  );
+
+  const handleRefreshLoadFailed = useCallback(
+    (view: OfficeWatchView): void => {
+      if (refreshViewRef.current?.key !== view.key) return;
+      updateRefreshView(null);
+      setRefreshing(false);
+      onRefreshStateChange?.('refreshFailed');
+    },
+    [onRefreshStateChange, updateRefreshView]
+  );
 
   const handleConsoleMessage = useCallback(
     (event: WebviewHostConsoleMessage): void => {
       if (!onSelectionChange) return;
-      const selection = parseOfficeGuestMessage(event.message, event.sourceId);
+      const selection = parseOfficeGuestMessage(event.message, event.sourceId || watchUrlRef.current || '');
       if (selection) onSelectionChange(selection);
     },
     [onSelectionChange]
@@ -292,10 +313,10 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
 
     if (!isRefresh && (contextChanged || !contentReadyRef.current)) {
       contentReadyRef.current = false;
-      pendingRefreshLoadRef.current = false;
       setRefreshing(false);
       setInitialLoading(true);
-      updateWatchUrl(null);
+      updateRefreshView(null);
+      updateWatchView(null);
     }
 
     if (!file_path) {
@@ -319,6 +340,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       if (cancelled) return;
       setStatus('starting');
       if (isRefresh) {
+        updateRefreshView(null);
         setRefreshing(true);
         notifyRefreshState('refreshing');
       } else {
@@ -353,8 +375,9 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         await new Promise((r) => setTimeout(r, 300));
         if (!cancelled) {
           const resolvedUrl = resolveOfficeWatchUrl(url, docType);
-          pendingRefreshLoadRef.current = isRefresh;
-          updateWatchUrl(resolvedUrl);
+          const view = { key: getOfficeWatchViewKey(resolvedUrl, refreshToken), url: resolvedUrl };
+          if (isRefresh) updateRefreshView(view);
+          else updateWatchView(view);
         }
       } catch (err) {
         if (shouldApplyOfficeWatchStartResult(cancelled)) {
@@ -395,7 +418,17 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         if (watchStarted) await bridge.stop.invoke({ file_path });
       });
     };
-  }, [docType, file_path, onRefreshStateChange, refreshToken, retryKey, t, updateWatchUrl, workspace]);
+  }, [
+    docType,
+    file_path,
+    onRefreshStateChange,
+    refreshToken,
+    retryKey,
+    t,
+    updateRefreshView,
+    updateWatchView,
+    workspace,
+  ]);
 
   if (error) {
     const { showServerInstallGuide, showInstallLink, showRetry } = resolveOfficeErrorActions(
@@ -442,30 +475,37 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
 
   return (
     <div className='relative h-full w-full overflow-hidden bg-bg-1'>
-      {watchUrl && (
-        <div data-testid='office-preview-webview' className='h-full w-full'>
+      {[
+        ...(watchView ? [{ active: true, view: watchView }] : []),
+        ...(refreshView ? [{ active: false, view: refreshView }] : []),
+      ].map(({ active, view }) => (
+        <div
+          key={view.key}
+          data-testid='office-preview-webview'
+          className={active ? 'h-full w-full' : 'pointer-events-none invisible absolute inset-0'}
+        >
           {isElectronDesktop() ? (
             <WebviewHost
-              url={watchUrl}
+              url={view.url}
               className='bg-bg-1'
               partition={OFFICE_PREVIEW_PARTITION}
               injectedScript={guestScript}
-              scriptRequest={scriptRequest}
-              onConsoleMessage={handleConsoleMessage}
-              onDidFinishLoad={handlePreviewLoaded}
-              onDidFailLoad={handlePreviewLoadFailed}
+              scriptRequest={active ? scriptRequest : undefined}
+              onConsoleMessage={active ? handleConsoleMessage : undefined}
+              onDidFinishLoad={active ? handlePreviewLoaded : () => handleRefreshLoaded(view)}
+              onDidFailLoad={active ? handlePreviewLoadFailed : () => handleRefreshLoadFailed(view)}
             />
           ) : (
             <iframe
-              src={watchUrl}
+              src={view.url}
               className='w-full h-full border-0 bg-bg-1'
               title={IFRAME_TITLE[docType]}
-              onLoad={handlePreviewLoaded}
-              onError={handlePreviewLoadFailed}
+              onLoad={active ? handlePreviewLoaded : () => handleRefreshLoaded(view)}
+              onError={active ? handlePreviewLoadFailed : () => handleRefreshLoadFailed(view)}
             />
           )}
         </div>
-      )}
+      ))}
 
       {initialLoading && (
         <div

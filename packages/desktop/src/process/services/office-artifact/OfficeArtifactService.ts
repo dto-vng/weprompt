@@ -20,13 +20,14 @@ import type {
 import { inspectDocxSelection, mutateDocxSelection } from './docxArtifactStrategy';
 import type { hashOfficeArtifact, resolveOfficeArtifactPath, ResolvedOfficeArtifact } from './officeArtifactPath';
 import type { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
+import type { OfficeArtifactWorkingFilesApi } from './officeArtifactWorkingFiles';
 import { OfficeArtifactError } from './officeCliJson';
 import type { OfficeCliRunner } from './officeCliRunner';
 import { inspectXlsxSelection, mutateXlsxSelection } from './xlsxArtifactStrategy';
 
 export type OfficeArtifactSnapshotStoreApi = Pick<
   OfficeArtifactSnapshotStore,
-  'prepare' | 'commit' | 'rollbackPending' | 'discardPending' | 'undo' | 'getUndoDepth'
+  'prepare' | 'commit' | 'rollbackPending' | 'discardPending' | 'undo' | 'getUndoDepth' | 'dispose'
 >;
 
 export type OfficeArtifactServiceDependencies = {
@@ -34,6 +35,7 @@ export type OfficeArtifactServiceDependencies = {
   snapshots: OfficeArtifactSnapshotStoreApi;
   resolveArtifact: typeof resolveOfficeArtifactPath;
   hashArtifact: typeof hashOfficeArtifact;
+  workingFiles: OfficeArtifactWorkingFilesApi;
 };
 
 function toOfficeArtifactFailure(error: unknown): OfficeArtifactFailure {
@@ -56,13 +58,17 @@ export class OfficeArtifactService {
   private readonly snapshots: OfficeArtifactSnapshotStoreApi;
   private readonly resolveArtifact: typeof resolveOfficeArtifactPath;
   private readonly hashArtifact: typeof hashOfficeArtifact;
+  private readonly workingFiles: OfficeArtifactWorkingFilesApi;
   private readonly mutationTails = new Map<string, Promise<void>>();
+  private disposing = false;
+  private disposePromise: Promise<void> | undefined;
 
   constructor(dependencies: OfficeArtifactServiceDependencies) {
     this.runner = dependencies.runner;
     this.snapshots = dependencies.snapshots;
     this.resolveArtifact = dependencies.resolveArtifact;
     this.hashArtifact = dependencies.hashArtifact;
+    this.workingFiles = dependencies.workingFiles;
   }
 
   async getState(request: OfficeArtifactGetStateRequest): Promise<OfficeArtifactStateResult> {
@@ -109,6 +115,9 @@ export class OfficeArtifactService {
     artifact: ResolvedOfficeArtifact
   ): Promise<OfficeArtifactMutationResult> {
     let pending: Awaited<ReturnType<OfficeArtifactSnapshotStoreApi['prepare']>> | undefined;
+    let stagedPath: string | undefined;
+    let stagedVersion: string | undefined;
+    let installAttempted = false;
 
     try {
       const currentVersion = await this.hashArtifact(artifact.filePath);
@@ -116,28 +125,50 @@ export class OfficeArtifactService {
 
       const inspection = await this.inspectResolved(artifact, request.selection);
       pending = await this.snapshots.prepare(artifact.filePath, currentVersion);
-      await this.mutateResolved(artifact, inspection, request.edit);
-      await this.runner.validate(artifact.filePath);
+      stagedPath = await this.workingFiles.create(artifact.filePath);
+      if ((await this.hashArtifact(stagedPath)) !== currentVersion) throw new OfficeArtifactError('FILE_CHANGED');
 
-      const version = await this.hashArtifact(artifact.filePath);
-      if (version === currentVersion) throw new OfficeArtifactError('OFFICECLI_FAILED');
+      const stagedArtifact = { ...artifact, filePath: stagedPath };
+      await this.mutateResolved(stagedArtifact, inspection, request.edit);
+      await this.runner.validate(stagedPath);
 
-      const undoDepth = await this.snapshots.commit(pending, version);
-      return { ok: true, version, snapshotId: pending.id, undoDepth };
+      stagedVersion = await this.hashArtifact(stagedPath);
+      if (stagedVersion === currentVersion) throw new OfficeArtifactError('OFFICECLI_FAILED');
+      if ((await this.hashArtifact(artifact.filePath)) !== currentVersion)
+        throw new OfficeArtifactError('FILE_CHANGED');
+
+      installAttempted = true;
+      await this.workingFiles.install(stagedPath, artifact.filePath);
+
+      const undoDepth = await this.snapshots.commit(pending, stagedVersion);
+      return { ok: true, version: stagedVersion, snapshotId: pending.id, undoDepth };
     } catch (error) {
       if (pending) {
         try {
-          if (error instanceof OfficeArtifactError && ['FILE_CHANGED', 'STALE_SELECTION'].includes(error.code)) {
-            await this.snapshots.discardPending(pending);
-          } else {
+          if (await this.ownsInstalledVersion(artifact.filePath, stagedVersion, installAttempted)) {
             await this.snapshots.rollbackPending(pending);
+          } else {
+            await this.snapshots.discardPending(pending);
           }
         } catch (rollbackError) {
           return toOfficeArtifactFailure(rollbackError);
         }
       }
       return toOfficeArtifactFailure(error);
+    } finally {
+      if (stagedPath) await this.workingFiles.remove(stagedPath);
     }
+  }
+
+  async dispose(): Promise<void> {
+    if (!this.disposePromise) {
+      this.disposing = true;
+      this.disposePromise = (async () => {
+        await Promise.all([...this.mutationTails.values()].map((tail) => tail.catch((): void => {})));
+        await this.snapshots.dispose();
+      })();
+    }
+    await this.disposePromise;
   }
 
   async undo(request: OfficeArtifactUndoRequest): Promise<OfficeArtifactMutationResult> {
@@ -184,6 +215,8 @@ export class OfficeArtifactService {
   }
 
   private async withMutationLock<T>(filePath: string, action: () => Promise<T>): Promise<T> {
+    if (this.disposing) throw new OfficeArtifactError('OFFICECLI_FAILED');
+
     const previous = this.mutationTails.get(filePath) ?? Promise.resolve();
     const gate = createMutationGate();
     const tail = previous.catch((): void => {}).then(() => gate.promise);
@@ -195,6 +228,20 @@ export class OfficeArtifactService {
     } finally {
       gate.release();
       if (this.mutationTails.get(filePath) === tail) this.mutationTails.delete(filePath);
+    }
+  }
+
+  private async ownsInstalledVersion(
+    filePath: string,
+    stagedVersion: string | undefined,
+    installAttempted: boolean
+  ): Promise<boolean> {
+    if (!stagedVersion || !installAttempted) return false;
+
+    try {
+      return (await this.hashArtifact(filePath)) === stagedVersion;
+    } catch {
+      return false;
     }
   }
 }

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   parseOfficeGuestMessage: vi.fn(),
   translate: (key: string) => key,
   webviewProps: { current: null as WebviewHostProps | null },
+  webviewPropsByUrl: new Map<string, WebviewHostProps>(),
 }));
 
 vi.mock('@/common', () => {
@@ -54,6 +55,7 @@ vi.mock('@/renderer/pages/conversation/Preview/components/ArtifactEditor/officeG
 vi.mock('@/renderer/components/media/WebviewHost', () => ({
   default: (props: WebviewHostProps) => {
     mocks.webviewProps.current = props;
+    mocks.webviewPropsByUrl.set(props.url, props);
     return <div data-testid='webview-host' data-url={props.url} />;
   },
 }));
@@ -121,6 +123,7 @@ describe('OfficeWatchViewer lifecycle', () => {
     mocks.buildOfficeGuestScript.mockReturnValue('install-word-selection-bridge');
     mocks.parseOfficeGuestMessage.mockReset();
     mocks.webviewProps.current = null;
+    mocks.webviewPropsByUrl.clear();
   });
 
   afterEach(() => {
@@ -227,6 +230,44 @@ describe('OfficeWatchViewer lifecycle', () => {
     expect(onRefreshStateChange).toHaveBeenLastCalledWith('refreshFailed');
   });
 
+  it('keeps the active canvas when a refresh candidate fails to load', async () => {
+    const onRefreshStateChange = vi.fn();
+    const view = render(
+      <OfficeWatchViewer
+        docType='word'
+        file_path='/w/a.docx'
+        workspace='/w'
+        refreshToken='1'
+        onRefreshStateChange={onRefreshStateChange}
+      />
+    );
+    await flushOfficeWatchStart();
+    act(() => mocks.webviewPropsByUrl.get('http://127.0.0.1:18791/')?.onDidFinishLoad?.());
+    mocks.startInvoke.mockResolvedValueOnce({ url: '/api/office-watch-proxy/18888' });
+
+    view.rerender(
+      <OfficeWatchViewer
+        docType='word'
+        file_path='/w/a.docx'
+        workspace='/w'
+        refreshToken='2'
+        onRefreshStateChange={onRefreshStateChange}
+      />
+    );
+    await flushOfficeWatchStart();
+
+    expect(screen.getAllByTestId('webview-host').map((host) => host.getAttribute('data-url'))).toEqual([
+      'http://127.0.0.1:18791/',
+      'http://127.0.0.1:18888/',
+    ]);
+
+    act(() => mocks.webviewPropsByUrl.get('http://127.0.0.1:18888/')?.onDidFailLoad?.(-105, 'NAME_NOT_RESOLVED'));
+
+    expect(screen.getByTestId('webview-host')).toHaveAttribute('data-url', 'http://127.0.0.1:18791/');
+    expect(screen.queryByTestId('office-preview-refreshing')).not.toBeInTheDocument();
+    expect(onRefreshStateChange).toHaveBeenLastCalledWith('refreshFailed');
+  });
+
   it('configures the offline guest bridge and forwards parsed selections', async () => {
     const onSelectionChange = vi.fn();
     const scriptRequest = { id: 7, script: "window.__forgeOfficeMoveSelection('right')" };
@@ -257,6 +298,29 @@ describe('OfficeWatchViewer lifecycle', () => {
     expect(mocks.parseOfficeGuestMessage).toHaveBeenCalledWith(
       '__FORGE_OFFICE_SELECTION__{}',
       'http://127.0.0.1:18791/app.js'
+    );
+    expect(onSelectionChange).toHaveBeenCalledWith(wordSelection);
+  });
+
+  it('uses the trusted active watch URL when Electron omits the injected script source', async () => {
+    const onSelectionChange = vi.fn();
+    mocks.parseOfficeGuestMessage.mockReturnValue(wordSelection);
+
+    render(
+      <OfficeWatchViewer docType='word' file_path='/w/a.docx' workspace='/w' onSelectionChange={onSelectionChange} />
+    );
+    await flushOfficeWatchStart();
+
+    act(() =>
+      mocks.webviewProps.current?.onConsoleMessage?.({
+        message: '__FORGE_OFFICE_SELECTION__{}',
+        sourceId: '',
+      })
+    );
+
+    expect(mocks.parseOfficeGuestMessage).toHaveBeenCalledWith(
+      '__FORGE_OFFICE_SELECTION__{}',
+      'http://127.0.0.1:18791/'
     );
     expect(onSelectionChange).toHaveBeenCalledWith(wordSelection);
   });

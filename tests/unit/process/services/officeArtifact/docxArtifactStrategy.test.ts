@@ -251,14 +251,14 @@ describe('inspectDocxSelection', () => {
     expect(runner.get).not.toHaveBeenCalled();
   });
 
-  it('rejects literal text that OfficeCLI would interpret as a regex', async () => {
-    const paragraphText = 'Prefix r"foo" suffix';
+  it.each(['r"foo"', "r'foo'"])('rejects literal %s text that OfficeCLI would interpret as a regex', async (text) => {
+    const paragraphText = `Prefix ${text} suffix`;
     const selection: DocxSelectionSnapshot = {
       ...safeSelection,
       paragraphText,
-      selectedText: 'r"foo"',
+      selectedText: text,
       start: 7,
-      end: 13,
+      end: 7 + text.length,
     };
 
     await expect(inspectDocxSelection(runner, FILE_PATH, selection)).rejects.toMatchObject({
