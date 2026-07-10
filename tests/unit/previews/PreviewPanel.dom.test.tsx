@@ -59,6 +59,11 @@ vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: false }),
 }));
 
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useParams: () => ({ id: 'conversation-1' }),
+}));
+
 vi.mock('@/renderer/styles/colors', () => ({
   iconColors: { secondary: 'currentColor' },
 }));
@@ -199,12 +204,14 @@ describe('PreviewPanel Office artifact integration', () => {
     expect(screen.queryByText('preview.office.externalEdit.editInDefaultApp')).not.toBeInTheDocument();
     expect(mocks.editorOptions.current).toMatchObject({
       enabled: true,
+      conversationId: 'conversation-1',
       workspace: '/workspace',
       filePath: '/workspace/report.word',
       fileName: 'report.word',
       addToSendBox: mocks.previewContext.current.addToSendBox,
     });
     expect(mocks.wordViewerProps.current).toMatchObject({
+      conversationId: 'conversation-1',
       onSelectionChange: mocks.handleSelectionChange,
       scriptRequest: { id: 7, script: 'move-selection' },
     });
@@ -216,7 +223,7 @@ describe('PreviewPanel Office artifact integration', () => {
     expect(mocks.handleSelectionChange).toHaveBeenCalledWith(wordSelection);
   });
 
-  it('wires artifact actions and refreshes the Office viewer after a successful mutation', async () => {
+  it('wires artifact actions without restarting Office watch after a successful mutation', async () => {
     setActiveTab('word');
     render(<PreviewPanel />);
     const initialRefreshToken = mocks.wordViewerProps.current?.refreshToken;
@@ -239,7 +246,25 @@ describe('PreviewPanel Office artifact integration', () => {
     expect(mocks.showItemInFolder).toHaveBeenCalledWith('/workspace/report.word');
 
     act(() => (mocks.editorOptions.current?.onArtifactMutated as (() => void) | undefined)?.());
-    await waitFor(() => expect(mocks.wordViewerProps.current?.refreshToken).not.toBe(initialRefreshToken));
+    expect(mocks.wordViewerProps.current?.refreshToken).toBe(initialRefreshToken);
+  });
+
+  it('resynchronizes editor state and refreshes the isolated Office copy for a workspace revision', () => {
+    setActiveTab('word');
+    const view = render(<PreviewPanel />);
+    const initialEditorRevision = mocks.editorOptions.current?.externalRevision;
+    const initialRefreshToken = mocks.wordViewerProps.current?.refreshToken;
+    const activeTab = mocks.previewContext.current.activeTab as ReturnType<typeof createTab>;
+    mocks.previewContext.current = {
+      ...mocks.previewContext.current,
+      tabs: [{ ...activeTab, officePreviewRevision: 3 }],
+      activeTab: { ...activeTab, officePreviewRevision: 3 },
+    };
+
+    view.rerender(<PreviewPanel />);
+
+    expect(mocks.editorOptions.current?.externalRevision).not.toBe(initialEditorRevision);
+    expect(mocks.wordViewerProps.current?.refreshToken).not.toBe(initialRefreshToken);
   });
 
   it('resynchronizes editor state when the user manually refreshes the Office preview', async () => {

@@ -1,5 +1,12 @@
-.toolbar {
+.toolbarFrame {
   container-type: inline-size;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 100%;
+}
+
+.toolbar {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -64,11 +71,16 @@
 }
 
 .status,
-.errorStatus {
+.errorStatus,
+.zeroState {
   min-width: 0;
   max-width: 220px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.zeroState {
+  max-width: 360px;
 }
 
 .errorStatus {
@@ -98,6 +110,36 @@
 
 .compactMenuItem {
   display: none;
+}
+
+.recoveryBanner {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--warning) 10%, var(--bg-2));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border-base));
+}
+
+.recoveryIcon {
+  flex: 0 0 auto;
+  color: var(--warning);
+}
+
+.recoveryText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.recoveryActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
 }
 
 @container (max-width: 719px) {
@@ -138,6 +180,20 @@
   .formulaInput {
     width: min(42cqw, 180px);
   }
+
+  .recoveryBanner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .recoveryText {
+    min-width: calc(100% - 24px);
+  }
+
+  .recoveryActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 @media (max-width: 719px) {
@@ -173,5 +229,19 @@
 
   .formulaInput {
     width: min(42vw, 180px);
+  }
+
+  .recoveryBanner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .recoveryText {
+    min-width: calc(100% - 24px);
+  }
+
+  .recoveryActions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

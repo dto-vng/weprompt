@@ -47,6 +47,7 @@ import {
   useThemeDetection,
 } from '../../hooks';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 import './preview.css';
 
 /**
@@ -58,6 +59,7 @@ import './preview.css';
  */
 const PreviewPanel: React.FC = () => {
   const { t } = useTranslation();
+  const { id: conversationId = '' } = useParams<{ id: string }>();
   const {
     isOpen,
     tabs,
@@ -153,12 +155,12 @@ const PreviewPanel: React.FC = () => {
   const officeEditorEnabled =
     isElectronDesktop() &&
     (activeTab?.content_type === 'word' || activeTab?.content_type === 'excel') &&
-    Boolean(activeTab.metadata?.workspace && activeTab.metadata.file_path);
-  const handleOfficeArtifactMutated = useCallback(() => {
-    setManualOfficeRefreshRevision((revision) => revision + 1);
-  }, []);
+    Boolean(conversationId && activeTab.metadata?.workspace && activeTab.metadata.file_path);
+  // Workspace revisions resync editor state and refresh the isolated Office preview copy.
+  const handleOfficeArtifactMutated = useCallback((): void => {}, []);
   const officeEditor = useOfficeArtifactEditor({
     enabled: officeEditorEnabled,
+    conversationId,
     workspace: activeTab?.metadata?.workspace ?? '',
     filePath: activeTab?.metadata?.file_path ?? '',
     fileName: activeTab?.metadata?.file_name ?? activeTab?.title,
@@ -659,6 +661,7 @@ const PreviewPanel: React.FC = () => {
     } else if (content_type === 'word') {
       return (
         <OfficeDocPreview
+          conversationId={conversationId}
           file_path={metadata?.file_path}
           content={content}
           workspace={metadata?.workspace}
@@ -670,6 +673,7 @@ const PreviewPanel: React.FC = () => {
     } else if (content_type === 'excel') {
       return (
         <ExcelPreview
+          conversationId={conversationId}
           file_path={metadata?.file_path}
           content={content}
           workspace={metadata?.workspace}

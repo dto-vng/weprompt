@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
@@ -65,6 +65,34 @@ describe('OfficeArtifactSnapshotStore', () => {
     await expect(readFile(filePath, 'utf8')).resolves.toBe('A');
   });
 
+  it('restores through same-filesystem staging instead of linking the private snapshot', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+    const versionA = await hashOfficeArtifact(filePath);
+    const pending = await store.prepare(filePath, versionA);
+    const snapshotInode = (await stat(pending.snapshotPath)).ino;
+    await writeFile(filePath, 'B');
+    const versionB = await hashOfficeArtifact(filePath);
+    await store.commit(pending, versionB);
+
+    await store.undo(filePath, versionB);
+
+    expect((await stat(filePath)).ino).not.toBe(snapshotInode);
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('A');
+  });
+
+  it('stores snapshots in exact private modes', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    await mkdir(historyRoot, { mode: 0o755 });
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+
+    const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+
+    expect((await stat(historyRoot)).mode & 0o777).toBe(0o700);
+    expect((await stat(dirname(pending.snapshotPath))).mode & 0o777).toBe(0o700);
+    expect((await stat(pending.snapshotPath)).mode & 0o777).toBe(0o600);
+  });
+
   it('rejects undo after an external file change', async () => {
     const { filePath, historyRoot } = await createArtifact();
     const store = new OfficeArtifactSnapshotStore(historyRoot, { maxDepth: 20 });
@@ -74,11 +102,69 @@ describe('OfficeArtifactSnapshotStore', () => {
     const versionB = await hashOfficeArtifact(filePath);
     await store.commit(pending, versionB);
     await writeFile(filePath, 'external');
+    const externalVersion = await hashOfficeArtifact(filePath);
 
     await expect(store.undo(filePath, versionB)).rejects.toMatchObject({ code: 'FILE_CHANGED' });
     await expect(readFile(filePath, 'utf8')).resolves.toBe('external');
     expect(store.getUndoDepth(filePath)).toBe(1);
+    expect(store.getUndoDepth(filePath, externalVersion)).toBe(0);
     await expect(stat(pending.snapshotPath)).resolves.toBeDefined();
+  });
+
+  it('does not overwrite a target changed after the undo version check', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    let raceArmed = false;
+    const store = new OfficeArtifactSnapshotStore(historyRoot, {
+      hashArtifact: async (path) => {
+        const version = await hashOfficeArtifact(path);
+        if (raceArmed) {
+          raceArmed = false;
+          await writeFile(filePath, 'external');
+        }
+        return version;
+      },
+    });
+    const versionA = await hashOfficeArtifact(filePath);
+    const pending = await store.prepare(filePath, versionA);
+    await writeFile(filePath, 'B');
+    const versionB = await hashOfficeArtifact(filePath);
+    await store.commit(pending, versionB);
+    raceArmed = true;
+
+    await expect(store.undo(filePath, versionB)).rejects.toMatchObject({ code: 'FILE_CHANGED' });
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('external');
+    expect(store.getUndoDepth(filePath)).toBe(1);
+  });
+
+  it('does not commit a snapshot for a stale installed version', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+    const pending = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+    await writeFile(filePath, 'B');
+    const versionB = await hashOfficeArtifact(filePath);
+    await writeFile(filePath, 'external');
+
+    await expect(store.commit(pending, versionB)).rejects.toMatchObject({ code: 'FILE_CHANGED' });
+    expect(store.getUndoDepth(filePath)).toBe(0);
+    await expect(stat(pending.snapshotPath)).resolves.toBeDefined();
+  });
+
+  it('starts a new contiguous history after an external file change', async () => {
+    const { filePath, historyRoot } = await createArtifact();
+    const store = new OfficeArtifactSnapshotStore(historyRoot);
+    const first = await store.prepare(filePath, await hashOfficeArtifact(filePath));
+    await writeFile(filePath, 'B');
+    await store.commit(first, await hashOfficeArtifact(filePath));
+    await writeFile(filePath, 'external');
+    const externalVersion = await hashOfficeArtifact(filePath);
+    const second = await store.prepare(filePath, externalVersion);
+    await writeFile(filePath, 'F');
+    const versionF = await hashOfficeArtifact(filePath);
+
+    await expect(store.commit(second, versionF)).resolves.toBe(1);
+    await expect(store.undo(filePath, versionF)).resolves.toMatchObject({ version: externalVersion, undoDepth: 0 });
+    await expect(readFile(filePath, 'utf8')).resolves.toBe('external');
+    await expect(stat(first.snapshotPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('caps configured retention at 20 and removes discarded pending snapshots', async () => {
@@ -89,7 +175,7 @@ describe('OfficeArtifactSnapshotStore', () => {
 
     const discarded = await store.prepare(filePath, await hashOfficeArtifact(filePath));
     await writeFile(filePath, 'mutated after prepare');
-    await store.rollbackPending(discarded);
+    await store.rollbackPending(discarded, await hashOfficeArtifact(filePath));
 
     const snapshotFiles = (await readdir(historyRoot, { recursive: true })).filter((path) => path.endsWith('.bin'));
     expect(store.getUndoDepth(filePath)).toBe(20);

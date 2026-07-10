@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type {
   OfficeArtifactApplyRequest,
   OfficeArtifactFailure,
@@ -12,8 +14,14 @@ import type {
   OfficeArtifactInspectResult,
   OfficeArtifactInspection,
   OfficeArtifactMutationResult,
+  OfficeArtifactPreparePreviewRequest,
+  OfficeArtifactPreparePreviewResult,
+  OfficeArtifactReleasePreviewRequest,
+  OfficeArtifactReleasePreviewResult,
   OfficeArtifactSelection,
   OfficeArtifactStateResult,
+  OfficeArtifactStartPreviewRequest,
+  OfficeArtifactStartPreviewResult,
   OfficeArtifactUndoRequest,
 } from '@/common/types/office/artifactEditor';
 
@@ -22,7 +30,8 @@ import type { hashOfficeArtifact, resolveOfficeArtifactPath, ResolvedOfficeArtif
 import type { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
 import type { OfficeArtifactWorkingFilesApi } from './officeArtifactWorkingFiles';
 import { OfficeArtifactError } from './officeCliJson';
-import type { OfficeCliRunner } from './officeCliRunner';
+import type { OfficeCliPreviewSession, OfficeCliRunner } from './officeCliRunner';
+import type { RetainedOfficePreviewOrigin } from './officePreviewSession';
 import { inspectXlsxSelection, mutateXlsxSelection } from './xlsxArtifactStrategy';
 
 export type OfficeArtifactSnapshotStoreApi = Pick<
@@ -36,6 +45,7 @@ export type OfficeArtifactServiceDependencies = {
   resolveArtifact: typeof resolveOfficeArtifactPath;
   hashArtifact: typeof hashOfficeArtifact;
   workingFiles: OfficeArtifactWorkingFilesApi;
+  retainPreviewOrigin: (url: string) => RetainedOfficePreviewOrigin;
 };
 
 function toOfficeArtifactFailure(error: unknown): OfficeArtifactFailure {
@@ -59,7 +69,18 @@ export class OfficeArtifactService {
   private readonly resolveArtifact: typeof resolveOfficeArtifactPath;
   private readonly hashArtifact: typeof hashOfficeArtifact;
   private readonly workingFiles: OfficeArtifactWorkingFilesApi;
+  private readonly retainPreviewOrigin: OfficeArtifactServiceDependencies['retainPreviewOrigin'];
   private readonly mutationTails = new Map<string, Promise<void>>();
+  private readonly previewPreparationTails = new Set<Promise<void>>();
+  private readonly previewStartTails = new Set<Promise<void>>();
+  private readonly previewLeases = new Map<
+    string,
+    {
+      filePath: string;
+      origin?: RetainedOfficePreviewOrigin;
+      session?: OfficeCliPreviewSession;
+    }
+  >();
   private disposing = false;
   private disposePromise: Promise<void> | undefined;
 
@@ -69,6 +90,7 @@ export class OfficeArtifactService {
     this.resolveArtifact = dependencies.resolveArtifact;
     this.hashArtifact = dependencies.hashArtifact;
     this.workingFiles = dependencies.workingFiles;
+    this.retainPreviewOrigin = dependencies.retainPreviewOrigin;
   }
 
   async getState(request: OfficeArtifactGetStateRequest): Promise<OfficeArtifactStateResult> {
@@ -78,8 +100,81 @@ export class OfficeArtifactService {
       return {
         ok: true,
         version,
-        undoDepth: this.snapshots.getUndoDepth(artifact.filePath),
+        undoDepth: this.snapshots.getUndoDepth(artifact.filePath, version),
       };
+    } catch (error) {
+      return toOfficeArtifactFailure(error);
+    }
+  }
+
+  async preparePreview(request: OfficeArtifactPreparePreviewRequest): Promise<OfficeArtifactPreparePreviewResult> {
+    if (this.disposing) return toOfficeArtifactFailure(new OfficeArtifactError('PREVIEW_FAILED'));
+    const preparationGate = createMutationGate();
+    this.previewPreparationTails.add(preparationGate.promise);
+    let preview: Awaited<ReturnType<OfficeArtifactWorkingFilesApi['createPreview']>> | undefined;
+
+    try {
+      const artifact = await this.resolveArtifact(request.workspace, request.filePath);
+      const version = await this.hashArtifact(artifact.filePath);
+      preview = await this.workingFiles.createPreview(artifact.filePath);
+      if (
+        (await this.hashArtifact(preview.filePath)) !== version ||
+        (await this.hashArtifact(artifact.filePath)) !== version
+      ) {
+        throw new OfficeArtifactError('FILE_CHANGED');
+      }
+      if (this.disposing) throw new OfficeArtifactError('PREVIEW_FAILED');
+
+      const leaseId = randomUUID();
+      this.previewLeases.set(leaseId, { filePath: preview.filePath });
+      return { ok: true, leaseId, filePath: preview.filePath, workspace: preview.workspace };
+    } catch (error) {
+      if (preview) await this.workingFiles.remove(preview.filePath);
+      return toOfficeArtifactFailure(error);
+    } finally {
+      preparationGate.release();
+      this.previewPreparationTails.delete(preparationGate.promise);
+    }
+  }
+
+  async startPreview(request: OfficeArtifactStartPreviewRequest): Promise<OfficeArtifactStartPreviewResult> {
+    const lease = this.previewLeases.get(request.leaseId);
+    if (!lease || this.disposing) return toOfficeArtifactFailure(new OfficeArtifactError('PREVIEW_FAILED'));
+    if (lease.origin) return { ok: true, url: lease.origin.url };
+
+    const startGate = createMutationGate();
+    this.previewStartTails.add(startGate.promise);
+    let session: OfficeCliPreviewSession | undefined;
+    let origin: RetainedOfficePreviewOrigin | undefined;
+    try {
+      session = request.url ? undefined : await this.runner.watch(lease.filePath);
+      origin = this.retainPreviewOrigin(request.url ?? session?.url ?? '');
+      if (this.disposing || this.previewLeases.get(request.leaseId) !== lease) {
+        throw new OfficeArtifactError('PREVIEW_FAILED');
+      }
+      lease.session = session;
+      lease.origin = origin;
+      return { ok: true, url: origin.url };
+    } catch (error) {
+      origin?.release();
+      await session?.stop().catch((): undefined => undefined);
+      return toOfficeArtifactFailure(error);
+    } finally {
+      startGate.release();
+      this.previewStartTails.delete(startGate.promise);
+    }
+  }
+
+  async releasePreview(request: OfficeArtifactReleasePreviewRequest): Promise<OfficeArtifactReleasePreviewResult> {
+    const lease = this.previewLeases.get(request.leaseId);
+    if (!lease) return toOfficeArtifactFailure(new OfficeArtifactError('PREVIEW_FAILED'));
+
+    try {
+      await lease.session?.stop();
+      lease.origin?.release();
+      await this.workingFiles.remove(lease.filePath);
+      this.previewLeases.delete(request.leaseId);
+      return { ok: true };
     } catch (error) {
       return toOfficeArtifactFailure(error);
     }
@@ -117,6 +212,7 @@ export class OfficeArtifactService {
     let pending: Awaited<ReturnType<OfficeArtifactSnapshotStoreApi['prepare']>> | undefined;
     let stagedPath: string | undefined;
     let stagedVersion: string | undefined;
+    let stagedResidentClosed = false;
     let installAttempted = false;
 
     try {
@@ -131,6 +227,8 @@ export class OfficeArtifactService {
       const stagedArtifact = { ...artifact, filePath: stagedPath };
       await this.mutateResolved(stagedArtifact, inspection, request.edit);
       await this.runner.validate(stagedPath);
+      await this.runner.close(stagedPath);
+      stagedResidentClosed = true;
 
       stagedVersion = await this.hashArtifact(stagedPath);
       if (stagedVersion === currentVersion) throw new OfficeArtifactError('OFFICECLI_FAILED');
@@ -138,7 +236,7 @@ export class OfficeArtifactService {
         throw new OfficeArtifactError('FILE_CHANGED');
 
       installAttempted = true;
-      await this.workingFiles.install(stagedPath, artifact.filePath);
+      await this.workingFiles.install(stagedPath, artifact.filePath, currentVersion, stagedVersion);
       if ((await this.hashArtifact(artifact.filePath)) !== stagedVersion) {
         throw new OfficeArtifactError('FILE_CHANGED');
       }
@@ -149,7 +247,7 @@ export class OfficeArtifactService {
       if (pending) {
         try {
           if (await this.ownsInstalledVersion(artifact.filePath, stagedVersion, installAttempted)) {
-            await this.snapshots.rollbackPending(pending);
+            await this.snapshots.rollbackPending(pending, stagedVersion);
           } else {
             await this.snapshots.discardPending(pending);
           }
@@ -159,7 +257,10 @@ export class OfficeArtifactService {
       }
       return toOfficeArtifactFailure(error);
     } finally {
-      if (stagedPath) await this.workingFiles.remove(stagedPath);
+      if (stagedPath) {
+        if (!stagedResidentClosed) await this.runner.close(stagedPath).catch((): undefined => undefined);
+        await this.workingFiles.remove(stagedPath);
+      }
     }
   }
 
@@ -167,8 +268,19 @@ export class OfficeArtifactService {
     if (!this.disposePromise) {
       this.disposing = true;
       this.disposePromise = (async () => {
-        await Promise.all([...this.mutationTails.values()].map((tail) => tail.catch((): void => {})));
-        await this.snapshots.dispose();
+        await Promise.all([
+          ...[...this.mutationTails.values()].map((tail) => tail.catch((): void => {})),
+          ...[...this.previewPreparationTails].map((tail) => tail.catch((): void => {})),
+          ...[...this.previewStartTails].map((tail) => tail.catch((): void => {})),
+        ]);
+        await Promise.all(
+          [...this.previewLeases.values()].map(async (lease) => {
+            await lease.session?.stop().catch((): undefined => undefined);
+            lease.origin?.release();
+          })
+        );
+        this.previewLeases.clear();
+        await Promise.all([this.snapshots.dispose(), this.workingFiles.dispose()]);
       })();
     }
     await this.disposePromise;
@@ -194,17 +306,21 @@ export class OfficeArtifactService {
     }
   }
 
-  private inspectResolved(
+  private async inspectResolved(
     artifact: ResolvedOfficeArtifact,
     selection: OfficeArtifactSelection
   ): Promise<OfficeArtifactInspection> {
-    if (artifact.kind === 'word') {
-      if (selection.kind !== 'word') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
-      return inspectDocxSelection(this.runner, artifact.filePath, selection);
-    }
+    try {
+      if (artifact.kind === 'word') {
+        if (selection.kind !== 'word') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
+        return await inspectDocxSelection(this.runner, artifact.filePath, selection);
+      }
 
-    if (selection.kind !== 'excel') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
-    return inspectXlsxSelection(this.runner, artifact.filePath, selection);
+      if (selection.kind !== 'excel') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
+      return await inspectXlsxSelection(this.runner, artifact.filePath, selection);
+    } finally {
+      await this.runner.close(artifact.filePath);
+    }
   }
 
   private mutateResolved(

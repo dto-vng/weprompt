@@ -76,7 +76,8 @@
       "installFailed": "Automatische Installation von officecli fehlgeschlagen. Überprüfe Backend-Logs und versuche es erneut.",
       "portTimeout": "Vorschau-Dienst gestartet, wurde aber nicht rechtzeitig bereit. Versuche es erneut.",
       "startFailed": "Office-Vorschau-Dienst konnte nicht gestartet werden.",
-      "outsideSandbox": "Diese Datei befindet sich außerhalb der aktuellen Projekt-Sandbox."
+      "outsideSandbox": "Diese Datei befindet sich außerhalb der aktuellen Projekt-Sandbox.",
+      "originalSafe": "Die ursprüngliche Workspace-Datei wurde nicht geändert."
     },
     "serverInstall": {
       "hint": "Forge läuft auf einem Server. Installiere die Vorschau-Komponente auf diesem Server und versuche es erneut:",
@@ -121,6 +122,11 @@
       "refreshing": "Vorschau wird aktualisiert",
       "previewOutdated": "Vorschau ist möglicherweise veraltet",
       "unsupported": "Diese Auswahl erfordert die Desktop-App",
+      "selectToEdit": "Offline-Schnellbearbeitung bereit",
+      "conflictRecovery": "Ihre Bearbeitung wurde nicht gespeichert und ist weiterhin hier. Die Workspace-Datei ist sicher.",
+      "saveFailureRecovery": "Ihre Bearbeitung ist weiterhin hier und die Workspace-Datei wurde nicht geändert.",
+      "copyDraft": "Entwurf kopieren",
+      "refreshLatest": "Neueste Version laden",
       "requestPlaceholder": "Beschreibe die Änderung, die Forge vornehmen soll.",
       "askWordContext": "Datei: {{fileName}}\nAbsatz: {{path}}\nAusgewählter Text: {{text}}\nAnfrage: {{placeholder}}",
       "askExcelContext": "Datei: {{fileName}}\nBereich: {{range}}\nZellen:\n{{cells}}\nAnfrage: {{placeholder}}"

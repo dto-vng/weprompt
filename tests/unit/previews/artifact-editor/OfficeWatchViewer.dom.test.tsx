@@ -6,13 +6,18 @@
 
 import type { OfficeArtifactSelection } from '@/common/types/office/artifactEditor';
 import type { WebviewHostProps } from '@/renderer/components/media/WebviewHost';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   startInvoke: vi.fn(),
   stopInvoke: vi.fn(),
+  preparePreviewInvoke: vi.fn(),
+  releasePreviewInvoke: vi.fn(),
+  startPreviewInvoke: vi.fn(),
+  openFileInvoke: vi.fn(),
+  showItemInFolderInvoke: vi.fn(),
   statusOn: vi.fn(),
   buildOfficeGuestScript: vi.fn(),
   parseOfficeGuestMessage: vi.fn(),
@@ -30,6 +35,15 @@ vi.mock('@/common', () => {
 
   return {
     ipcBridge: {
+      officeArtifact: {
+        preparePreview: { invoke: mocks.preparePreviewInvoke },
+        startPreview: { invoke: mocks.startPreviewInvoke },
+        releasePreview: { invoke: mocks.releasePreviewInvoke },
+      },
+      shell: {
+        openFile: { invoke: mocks.openFileInvoke },
+        showItemInFolder: { invoke: mocks.showItemInFolderInvoke },
+      },
       pptPreview: bridge,
       wordPreview: bridge,
       excelPreview: bridge,
@@ -117,6 +131,24 @@ describe('OfficeWatchViewer lifecycle', () => {
     mocks.startInvoke.mockResolvedValue({ url: '/api/office-watch-proxy/18791' });
     mocks.stopInvoke.mockReset();
     mocks.stopInvoke.mockResolvedValue(undefined);
+    mocks.preparePreviewInvoke.mockReset();
+    mocks.preparePreviewInvoke.mockResolvedValue({
+      ok: true,
+      leaseId: 'preview-lease-1',
+      filePath: '/preview/a.docx',
+      workspace: '/preview',
+    });
+    mocks.releasePreviewInvoke.mockReset();
+    mocks.releasePreviewInvoke.mockResolvedValue({ ok: true });
+    mocks.startPreviewInvoke.mockReset();
+    mocks.startPreviewInvoke.mockImplementation(async (request: { url?: string }) => ({
+      ok: true,
+      url: request.url ?? 'http://127.0.0.1:26318/',
+    }));
+    mocks.openFileInvoke.mockReset();
+    mocks.openFileInvoke.mockResolvedValue(undefined);
+    mocks.showItemInFolderInvoke.mockReset();
+    mocks.showItemInFolderInvoke.mockResolvedValue(undefined);
     mocks.statusOn.mockReset();
     mocks.statusOn.mockImplementation(() => vi.fn());
     mocks.buildOfficeGuestScript.mockReset();
@@ -143,6 +175,109 @@ describe('OfficeWatchViewer lifecycle', () => {
     act(() => mocks.webviewProps.current?.onDidFinishLoad?.());
 
     expect(screen.queryByTestId('office-preview-loading')).not.toBeInTheDocument();
+  });
+
+  it('watches an isolated Word copy and releases it after the watcher stops', async () => {
+    const view = render(
+      <OfficeWatchViewer
+        docType='word'
+        conversationId='conversation-1'
+        file_path='/w/a.docx'
+        workspace='/w'
+        refreshToken='1'
+      />
+    );
+    await flushOfficeWatchStart();
+
+    expect(mocks.preparePreviewInvoke).toHaveBeenCalledWith({
+      conversationId: 'conversation-1',
+      workspace: '/w',
+      filePath: '/w/a.docx',
+    });
+    expect(mocks.startInvoke).toHaveBeenCalledWith({ file_path: '/preview/a.docx', workspace: '/preview' });
+    expect(mocks.startPreviewInvoke).toHaveBeenCalledWith({
+      leaseId: 'preview-lease-1',
+      url: 'http://127.0.0.1:18791/',
+    });
+
+    view.unmount();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stopInvoke).toHaveBeenCalledWith({ file_path: '/preview/a.docx' });
+    expect(mocks.releasePreviewInvoke).toHaveBeenCalledWith({ leaseId: 'preview-lease-1' });
+  });
+
+  it('retains the preview lease when watcher shutdown fails', async () => {
+    mocks.stopInvoke.mockRejectedValueOnce(new Error('watcher still running'));
+    const view = render(
+      <OfficeWatchViewer
+        docType='word'
+        conversationId='conversation-1'
+        file_path='/w/a.docx'
+        workspace='/w'
+        refreshToken='1'
+      />
+    );
+    await flushOfficeWatchStart();
+
+    view.unmount();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stopInvoke).toHaveBeenCalledWith({ file_path: '/preview/a.docx' });
+    expect(mocks.releasePreviewInvoke).not.toHaveBeenCalled();
+  });
+
+  it('uses the main-process watch session for a slow desktop Excel preview', async () => {
+    const view = render(
+      <OfficeWatchViewer
+        docType='excel'
+        conversationId='conversation-1'
+        file_path='/w/model.xlsx'
+        workspace='/w'
+        refreshToken='1'
+      />
+    );
+    await flushOfficeWatchStart();
+
+    expect(mocks.startPreviewInvoke).toHaveBeenCalledWith({ leaseId: 'preview-lease-1' });
+    expect(mocks.startInvoke).not.toHaveBeenCalled();
+    expect(screen.getByTestId('webview-host')).toHaveAttribute('data-url', 'http://127.0.0.1:26318/');
+
+    view.unmount();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stopInvoke).not.toHaveBeenCalled();
+    expect(mocks.releasePreviewInvoke).toHaveBeenCalledWith({ leaseId: 'preview-lease-1' });
+  });
+
+  it('keeps the original file safe and offers desktop fallbacks when preview startup fails', async () => {
+    mocks.startInvoke.mockResolvedValueOnce({ error: 'OFFICECLI_NOT_FOUND' });
+    render(<OfficeWatchViewer docType='word' conversationId='conversation-1' file_path='/w/a.docx' workspace='/w' />);
+    await flushOfficeWatchStart();
+
+    expect(screen.getByText('preview.office.errors.originalSafe')).toBeVisible();
+    fireEvent.click(screen.getByText('preview.office.editor.openDesktop'));
+    fireEvent.click(screen.getByText('preview.office.editor.reveal'));
+
+    expect(mocks.openFileInvoke).toHaveBeenCalledWith('/w/a.docx');
+    expect(mocks.showItemInFolderInvoke).toHaveBeenCalledWith('/w/a.docx');
+  });
+
+  it('keeps PPT on its existing source path', async () => {
+    render(<OfficeWatchViewer docType='ppt' file_path='/w/slides.pptx' workspace='/w' refreshToken='1' />);
+    await flushOfficeWatchStart();
+
+    expect(mocks.preparePreviewInvoke).not.toHaveBeenCalled();
+    expect(mocks.startInvoke).toHaveBeenCalledWith({ file_path: '/w/slides.pptx', workspace: '/w' });
   });
 
   it('retains the loaded host with a nonblocking indicator while a refresh starts', async () => {

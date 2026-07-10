@@ -13,6 +13,7 @@ import { hashOfficeArtifact, resolveOfficeArtifactPath } from './officeArtifactP
 import { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
 import { OfficeArtifactWorkingFiles } from './officeArtifactWorkingFiles';
 import { createOfficeCliRunner } from './officeCliRunner';
+import { retainOfficePreviewOrigin } from './officePreviewSession';
 
 const historyRoot = join(tmpdir(), 'aionui-office-artifact-history', `${process.pid}-${randomUUID()}`);
 const snapshotStore = new OfficeArtifactSnapshotStore(historyRoot);
@@ -23,6 +24,7 @@ export const officeArtifactService = new OfficeArtifactService({
   resolveArtifact: resolveOfficeArtifactPath,
   hashArtifact: hashOfficeArtifact,
   workingFiles: new OfficeArtifactWorkingFiles(),
+  retainPreviewOrigin: retainOfficePreviewOrigin,
 });
 
 export async function disposeOfficeArtifactService(): Promise<void> {

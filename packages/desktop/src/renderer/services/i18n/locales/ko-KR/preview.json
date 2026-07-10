@@ -76,7 +76,8 @@
       "installFailed": "officecli 자동 설치에 실패했습니다. 백엔드 로그를 확인한 뒤 다시 시도하세요.",
       "portTimeout": "미리보기 서비스가 시작되었지만 제시간에 준비되지 않았습니다. 다시 시도하세요.",
       "startFailed": "Office 미리보기 서비스 시작에 실패했습니다.",
-      "outsideSandbox": "이 파일은 현재 프로젝트 샌드박스 범위 밖에 있습니다."
+      "outsideSandbox": "이 파일은 현재 프로젝트 샌드박스 범위 밖에 있습니다.",
+      "originalSafe": "원본 작업 공간 파일은 변경되지 않았습니다."
     },
     "serverInstall": {
       "hint": "Forge가 서버에서 실행 중입니다. 미리보기 구성 요소는 해당 서버에 설치해야 합니다. 서버에서 다음 명령을 실행한 후 다시 시도하세요:",
@@ -121,6 +122,11 @@
       "refreshing": "미리보기 새로 고침 중",
       "previewOutdated": "미리보기가 최신 상태가 아닐 수 있습니다",
       "unsupported": "이 선택 영역은 데스크톱 앱이 필요합니다",
+      "selectToEdit": "빠른 오프라인 편집 준비됨",
+      "conflictRecovery": "편집 내용은 저장되지 않았지만 여기에 남아 있습니다. 작업 공간 파일은 안전합니다.",
+      "saveFailureRecovery": "편집 내용은 여기에 남아 있으며 작업 공간 파일은 변경되지 않았습니다.",
+      "copyDraft": "초안 복사",
+      "refreshLatest": "최신 버전 불러오기",
       "requestPlaceholder": "Forge가 적용할 변경 사항을 설명하세요.",
       "askWordContext": "파일: {{fileName}}\n문단: {{path}}\n선택한 텍스트: {{text}}\n요청: {{placeholder}}",
       "askExcelContext": "파일: {{fileName}}\n범위: {{range}}\n셀:\n{{cells}}\n요청: {{placeholder}}"

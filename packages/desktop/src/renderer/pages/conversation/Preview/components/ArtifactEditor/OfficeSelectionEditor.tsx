@@ -17,6 +17,7 @@ export type OfficeSelectionEditorProps = {
   status: OfficeArtifactEditorStatus;
   apply: (edit: OfficeArtifactEdit) => Promise<boolean> | boolean | void;
   moveSelection: (direction: OfficeSelectionDirection) => void;
+  onDraftChange?: (draft: string) => void;
 };
 
 const ICON_SIZE = 16;
@@ -26,27 +27,37 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
   status,
   apply,
   moveSelection,
+  onDraftChange,
 }) => {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [wordEditorOpen, setWordEditorOpen] = useState(false);
   const saving = status === 'saving';
+  const conflicted = status === 'fileChanged';
 
   useEffect(() => {
-    setDraft(inspection?.kind === 'word' ? inspection.selectedText : (inspection?.cells[0]?.input ?? ''));
+    const nextDraft = inspection?.kind === 'word' ? inspection.selectedText : (inspection?.cells[0]?.input ?? '');
+    setDraft(nextDraft);
+    onDraftChange?.(nextDraft);
     setWordEditorOpen(false);
-  }, [inspection]);
+  }, [inspection, onDraftChange]);
+
+  const updateDraft = (nextDraft: string): void => {
+    setDraft(nextDraft);
+    onDraftChange?.(nextDraft);
+  };
 
   if (!inspection) return null;
 
   if (inspection.kind === 'word') {
     const unchanged = draft === inspection.selectedText;
     const applyReplacement = async (): Promise<void> => {
+      if (conflicted) return;
       const applied = await apply({ kind: 'replaceText', value: draft });
       if (applied !== false) setWordEditorOpen(false);
     };
     const resetReplacement = (): void => {
-      setDraft(inspection.selectedText);
+      updateDraft(inspection.selectedText);
       setWordEditorOpen(false);
     };
     const editor = (
@@ -55,7 +66,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
           aria-label={t('preview.office.editor.editSelection')}
           value={draft}
           rows={4}
-          onChange={setDraft}
+          onChange={updateDraft}
         />
         <div className={styles.wordEditorActions}>
           <Button size='small' disabled={saving} onClick={resetReplacement}>
@@ -66,7 +77,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
             size='small'
             aria-label={t('preview.office.editor.apply')}
             loading={saving}
-            disabled={saving || !inspection.canReplace || unchanged}
+            disabled={saving || conflicted || !inspection.canReplace || unchanged}
             onClick={() => void applyReplacement()}
           >
             {t('preview.office.editor.apply')}
@@ -103,7 +114,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
                 size='small'
                 aria-label={t('preview.office.editor.bold')}
                 icon={<TextBold size={ICON_SIZE} />}
-                disabled={saving}
+                disabled={saving || conflicted}
                 onClick={() =>
                   void apply({ kind: 'formatText', property: 'bold', enabled: !inspection.formatting.bold })
                 }
@@ -115,7 +126,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
                 size='small'
                 aria-label={t('preview.office.editor.italic')}
                 icon={<TextItalic size={ICON_SIZE} />}
-                disabled={saving}
+                disabled={saving || conflicted}
                 onClick={() =>
                   void apply({ kind: 'formatText', property: 'italic', enabled: !inspection.formatting.italic })
                 }
@@ -127,7 +138,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
                 size='small'
                 aria-label={t('preview.office.editor.underline')}
                 icon={<TextUnderline size={ICON_SIZE} />}
-                disabled={saving}
+                disabled={saving || conflicted}
                 onClick={() =>
                   void apply({
                     kind: 'formatText',
@@ -153,7 +164,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
 
   const originalInput = inspection.cells[0].input;
   const commitFormula = (): void => {
-    if (!inspection.canEdit || saving || draft === originalInput) return;
+    if (!inspection.canEdit || saving || conflicted || draft === originalInput) return;
     void apply({ kind: 'setCell', input: draft });
   };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -164,7 +175,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      setDraft(originalInput);
+      updateDraft(originalInput);
       return;
     }
 
@@ -195,7 +206,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
         value={draft}
         disabled={!inspection.canEdit || saving}
         className={styles.formulaInput}
-        onChange={setDraft}
+        onChange={updateDraft}
         onKeyDown={handleKeyDown}
       />
       <Button
@@ -203,7 +214,7 @@ export const OfficeSelectionEditor: React.FC<OfficeSelectionEditorProps> = ({
         size='small'
         aria-label={t('preview.office.editor.apply')}
         loading={saving}
-        disabled={saving || !inspection.canEdit || draft === originalInput}
+        disabled={saving || conflicted || !inspection.canEdit || draft === originalInput}
         className={styles.formulaApply}
         onClick={commitFormula}
       >

@@ -60,7 +60,6 @@ describe('installQuitCleanup', () => {
       'mark-explicit-quit',
       'destroy-tray',
       'dispose-cron',
-      'dispose-office-artifacts',
       'stop-backend-start',
     ]);
 
@@ -73,8 +72,8 @@ describe('installQuitCleanup', () => {
       'mark-explicit-quit',
       'destroy-tray',
       'dispose-cron',
-      'dispose-office-artifacts',
       'stop-backend-start',
+      'dispose-office-artifacts',
       'destroy-pet',
       'quit-app',
     ]);

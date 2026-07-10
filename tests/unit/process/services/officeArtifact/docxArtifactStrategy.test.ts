@@ -78,6 +78,7 @@ const runner = {
   formatRange: vi.fn<OfficeCliRunner['formatRange']>(),
   setCell: vi.fn<OfficeCliRunner['setCell']>(),
   validate: vi.fn<OfficeCliRunner['validate']>(),
+  close: vi.fn<OfficeCliRunner['close']>(),
 } satisfies OfficeCliRunner;
 
 beforeEach(() => {

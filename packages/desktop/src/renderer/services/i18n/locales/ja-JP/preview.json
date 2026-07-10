@@ -76,7 +76,8 @@
       "installFailed": "officecli の自動インストールに失敗しました。バックエンドログを確認して再試行してください。",
       "portTimeout": "プレビューサービスは起動しましたが、時間内に準備完了になりませんでした。再試行してください。",
       "startFailed": "Office プレビューサービスの起動に失敗しました。",
-      "outsideSandbox": "このファイルは現在のプロジェクトサンドボックスの外にあります。"
+      "outsideSandbox": "このファイルは現在のプロジェクトサンドボックスの外にあります。",
+      "originalSafe": "元のワークスペースファイルは変更されていません。"
     },
     "serverInstall": {
       "hint": "Forge はサーバー上で動作しています。プレビューコンポーネントはそのサーバーにインストールする必要があります。サーバーで次のコマンドを実行してから再試行してください：",
@@ -121,6 +122,11 @@
       "refreshing": "プレビューを更新中",
       "previewOutdated": "プレビューが最新でない可能性があります",
       "unsupported": "この選択範囲にはデスクトップアプリが必要です",
+      "selectToEdit": "オフライン簡易編集の準備完了",
+      "conflictRecovery": "編集内容は保存されていませんが、ここに残っています。ワークスペースのファイルは安全です。",
+      "saveFailureRecovery": "編集内容はここに残っており、ワークスペースのファイルは変更されていません。",
+      "copyDraft": "下書きをコピー",
+      "refreshLatest": "最新版を読み込む",
       "requestPlaceholder": "Forge に適用してほしい変更を入力してください。",
       "askWordContext": "ファイル：{{fileName}}\n段落：{{path}}\n選択したテキスト：{{text}}\n依頼：{{placeholder}}",
       "askExcelContext": "ファイル：{{fileName}}\n範囲：{{range}}\nセル：\n{{cells}}\n依頼：{{placeholder}}"

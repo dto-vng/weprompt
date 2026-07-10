@@ -76,7 +76,8 @@
       "installFailed": "Failed to install officecli automatically. Check backend logs and retry.",
       "portTimeout": "Preview service started but did not become ready in time. Retry.",
       "startFailed": "Failed to start the Office preview service.",
-      "outsideSandbox": "This file is outside the current project sandbox."
+      "outsideSandbox": "This file is outside the current project sandbox.",
+      "originalSafe": "The original workspace file was not changed."
     },
     "serverInstall": {
       "hint": "Forge is running on a server. Install the preview component on that server, then retry:",
@@ -121,6 +122,11 @@
       "refreshing": "Refreshing preview",
       "previewOutdated": "Preview may be outdated",
       "unsupported": "This selection needs the desktop app",
+      "selectToEdit": "Offline quick edit ready",
+      "conflictRecovery": "Your edit was not saved and is still here. The workspace file is safe.",
+      "saveFailureRecovery": "Your edit is still here and the workspace file was not changed.",
+      "copyDraft": "Copy draft",
+      "refreshLatest": "Refresh latest",
       "requestPlaceholder": "Describe the change you want Forge to make.",
       "askWordContext": "File: {{fileName}}\nParagraph: {{path}}\nSelected text: {{text}}\nRequest: {{placeholder}}",
       "askExcelContext": "File: {{fileName}}\nRange: {{range}}\nCells:\n{{cells}}\nRequest: {{placeholder}}"

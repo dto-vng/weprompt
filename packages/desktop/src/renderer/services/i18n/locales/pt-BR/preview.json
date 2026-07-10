@@ -76,7 +76,8 @@
       "installFailed": "Falha ao instalar o officecli automaticamente. Verifique os logs do backend e tente novamente.",
       "portTimeout": "O serviço de visualização iniciou, mas não ficou pronto a tempo. Tente novamente.",
       "startFailed": "Falha ao iniciar o serviço de visualização do Office.",
-      "outsideSandbox": "Este arquivo está fora da sandbox atual do projeto."
+      "outsideSandbox": "Este arquivo está fora da sandbox atual do projeto.",
+      "originalSafe": "O arquivo original do espaço de trabalho não foi alterado."
     },
     "serverInstall": {
       "hint": "O Forge está sendo executado em um servidor. O componente de pré-visualização precisa ser instalado nesse servidor. Execute o comando abaixo no servidor e tente novamente:",
@@ -121,6 +122,11 @@
       "refreshing": "Atualizando visualização",
       "previewOutdated": "A visualização pode estar desatualizada",
       "unsupported": "Esta seleção requer o aplicativo para desktop",
+      "selectToEdit": "Edição rápida offline pronta",
+      "conflictRecovery": "Sua edição não foi salva e continua aqui. O arquivo do espaço de trabalho está seguro.",
+      "saveFailureRecovery": "Sua edição continua aqui e o arquivo do espaço de trabalho não foi alterado.",
+      "copyDraft": "Copiar rascunho",
+      "refreshLatest": "Carregar versão mais recente",
       "requestPlaceholder": "Descreva a alteração que você quer que o Forge faça.",
       "askWordContext": "Arquivo: {{fileName}}\nParágrafo: {{path}}\nTexto selecionado: {{text}}\nSolicitação: {{placeholder}}",
       "askExcelContext": "Arquivo: {{fileName}}\nIntervalo: {{range}}\nCélulas:\n{{cells}}\nSolicitação: {{placeholder}}"

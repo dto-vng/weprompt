@@ -6,11 +6,12 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { copyFile, mkdir, realpath, rename, rm } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, realpath, rm } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 import { OfficeArtifactError } from './officeCliJson';
 import { hashOfficeArtifact } from './officeArtifactPath';
+import { replaceOfficeArtifactConditionally } from './officeArtifactWorkingFiles';
 
 export type OfficeArtifactPendingSnapshot = {
   id: string;
@@ -25,6 +26,7 @@ type OfficeArtifactCommittedSnapshot = OfficeArtifactPendingSnapshot & {
 
 export type OfficeArtifactSnapshotStoreOptions = {
   maxDepth?: number;
+  hashArtifact?: typeof hashOfficeArtifact;
 };
 
 export type OfficeArtifactUndoResult = {
@@ -42,23 +44,32 @@ function snapshotDirectoryName(filePath: string): string {
   return createHash('sha256').update(filePath).digest('hex');
 }
 
-async function restoreAtomically(snapshotPath: string, filePath: string, expectedHash: string): Promise<void> {
-  const tempPath = join(dirname(filePath), `.${basename(filePath)}.${randomUUID()}.forge-restore`);
+async function restoreConditionally(
+  snapshotPath: string,
+  filePath: string,
+  expectedVersion: string,
+  snapshotVersion: string
+): Promise<void> {
+  const stagedPath = join(dirname(filePath), `.${basename(filePath)}.${randomUUID()}.forge-restore`);
 
   try {
-    await copyFile(snapshotPath, tempPath, constants.COPYFILE_EXCL);
-    await rename(tempPath, filePath);
-    if ((await hashOfficeArtifact(filePath)) !== expectedHash) throw new OfficeArtifactError('RESTORE_FAILED');
+    await copyFile(snapshotPath, stagedPath, constants.COPYFILE_EXCL);
+    await chmod(stagedPath, 0o600);
+    if ((await hashOfficeArtifact(stagedPath)) !== snapshotVersion) {
+      throw new OfficeArtifactError('RESTORE_FAILED');
+    }
+    await replaceOfficeArtifactConditionally(stagedPath, filePath, expectedVersion, snapshotVersion, 'RESTORE_FAILED');
   } catch (error) {
     if (error instanceof OfficeArtifactError) throw error;
     throw new OfficeArtifactError('RESTORE_FAILED');
   } finally {
-    await rm(tempPath, { force: true }).catch((): undefined => undefined);
+    await rm(stagedPath, { force: true }).catch((): undefined => undefined);
   }
 }
 
 export class OfficeArtifactSnapshotStore {
   private readonly maxDepth: number;
+  private readonly hashArtifact: typeof hashOfficeArtifact;
   private readonly stacks = new Map<string, OfficeArtifactCommittedSnapshot[]>();
   private readonly pendingSnapshots = new Map<string, OfficeArtifactPendingSnapshot>();
   private readonly canonicalPaths = new Map<string, string>();
@@ -68,6 +79,7 @@ export class OfficeArtifactSnapshotStore {
     options: OfficeArtifactSnapshotStoreOptions = {}
   ) {
     this.maxDepth = getMaxDepth(options.maxDepth);
+    this.hashArtifact = options.hashArtifact ?? hashOfficeArtifact;
   }
 
   async prepare(filePath: string, preVersion: string): Promise<OfficeArtifactPendingSnapshot> {
@@ -78,10 +90,14 @@ export class OfficeArtifactSnapshotStore {
       const snapshotDirectory = join(this.historyRoot, snapshotDirectoryName(canonicalFilePath));
       const id = randomUUID();
       snapshotPath = join(snapshotDirectory, `${id}.bin`);
-      await mkdir(snapshotDirectory, { recursive: true });
+      await mkdir(this.historyRoot, { recursive: true, mode: 0o700 });
+      await chmod(this.historyRoot, 0o700);
+      await mkdir(snapshotDirectory, { recursive: true, mode: 0o700 });
+      await chmod(snapshotDirectory, 0o700);
       await copyFile(canonicalFilePath, snapshotPath, constants.COPYFILE_EXCL);
+      await chmod(snapshotPath, 0o600);
 
-      if ((await hashOfficeArtifact(snapshotPath)) !== preVersion) {
+      if ((await this.hashArtifact(snapshotPath)) !== preVersion) {
         throw new OfficeArtifactError('FILE_CHANGED');
       }
 
@@ -102,8 +118,19 @@ export class OfficeArtifactSnapshotStore {
     if (!storedPending || storedPending.snapshotPath !== pending.snapshotPath) {
       throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
     }
+    if (!(await this.matchesCurrentVersion(storedPending.filePath, postVersion))) {
+      throw new OfficeArtifactError('FILE_CHANGED');
+    }
 
     const stack = this.stacks.get(storedPending.filePath) ?? [];
+    if (stack.length > 0 && stack.at(-1)?.postVersion !== storedPending.preVersion) {
+      try {
+        await Promise.all(stack.map(({ snapshotPath }) => rm(snapshotPath)));
+      } catch {
+        throw new OfficeArtifactError('SNAPSHOT_FAILED');
+      }
+      stack.splice(0);
+    }
     const entry = { ...storedPending, postVersion };
     stack.push(entry);
     this.stacks.set(storedPending.filePath, stack);
@@ -121,13 +148,18 @@ export class OfficeArtifactSnapshotStore {
     return stack.length;
   }
 
-  async rollbackPending(pending: OfficeArtifactPendingSnapshot): Promise<void> {
+  async rollbackPending(pending: OfficeArtifactPendingSnapshot, expectedVersion: string): Promise<void> {
     const storedPending = this.pendingSnapshots.get(pending.id);
     if (!storedPending || storedPending.snapshotPath !== pending.snapshotPath) {
       throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
     }
 
-    await restoreAtomically(storedPending.snapshotPath, storedPending.filePath, storedPending.preVersion);
+    await restoreConditionally(
+      storedPending.snapshotPath,
+      storedPending.filePath,
+      expectedVersion,
+      storedPending.preVersion
+    );
     await this.removeSnapshot(storedPending.snapshotPath);
     this.pendingSnapshots.delete(storedPending.id);
   }
@@ -155,7 +187,7 @@ export class OfficeArtifactSnapshotStore {
       throw new OfficeArtifactError('FILE_CHANGED');
     }
 
-    await restoreAtomically(entry.snapshotPath, canonicalFilePath, entry.preVersion);
+    await restoreConditionally(entry.snapshotPath, canonicalFilePath, entry.postVersion, entry.preVersion);
     stack.pop();
     if (stack.length === 0) this.stacks.delete(canonicalFilePath);
     await this.removeSnapshot(entry.snapshotPath);
@@ -163,9 +195,11 @@ export class OfficeArtifactSnapshotStore {
     return { version: entry.preVersion, undoDepth: stack.length };
   }
 
-  getUndoDepth(filePath: string): number {
+  getUndoDepth(filePath: string, expectedVersion?: string): number {
     const canonicalFilePath = this.canonicalPaths.get(filePath) ?? filePath;
-    return this.stacks.get(canonicalFilePath)?.length ?? 0;
+    const stack = this.stacks.get(canonicalFilePath);
+    if (expectedVersion !== undefined && stack?.at(-1)?.postVersion !== expectedVersion) return 0;
+    return stack?.length ?? 0;
   }
 
   async dispose(): Promise<void> {
@@ -216,7 +250,7 @@ export class OfficeArtifactSnapshotStore {
 
   private async matchesCurrentVersion(filePath: string, expectedVersion: string): Promise<boolean> {
     try {
-      return (await hashOfficeArtifact(filePath)) === expectedVersion;
+      return (await this.hashArtifact(filePath)) === expectedVersion;
     } catch {
       return false;
     }

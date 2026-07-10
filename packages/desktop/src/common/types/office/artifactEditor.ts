@@ -42,8 +42,16 @@ export type OfficeArtifactEdit =
   | { kind: 'formatText'; property: 'bold' | 'italic' | 'underline'; enabled: boolean }
   | { kind: 'setCell'; input: string };
 
-export type OfficeArtifactRequestBase = { workspace: string; filePath: string };
+export type OfficeArtifactRequestBase = {
+  /** Required at the renderer IPC boundary; main-only service callers already hold a trusted workspace. */
+  conversationId?: string;
+  workspace: string;
+  filePath: string;
+};
 export type OfficeArtifactGetStateRequest = OfficeArtifactRequestBase;
+export type OfficeArtifactPreparePreviewRequest = OfficeArtifactRequestBase;
+export type OfficeArtifactStartPreviewRequest = { leaseId: string; url?: string };
+export type OfficeArtifactReleasePreviewRequest = { leaseId: string };
 export type OfficeArtifactInspectRequest = OfficeArtifactRequestBase & {
   expectedVersion: string;
   selection: OfficeArtifactSelection;
@@ -77,3 +85,8 @@ export type OfficeArtifactInspectResult =
 export type OfficeArtifactMutationResult =
   | { ok: true; version: string; snapshotId: string; undoDepth: number }
   | OfficeArtifactFailure;
+export type OfficeArtifactPreparePreviewResult =
+  | { ok: true; leaseId: string; filePath: string; workspace: string }
+  | OfficeArtifactFailure;
+export type OfficeArtifactStartPreviewResult = { ok: true; url: string } | OfficeArtifactFailure;
+export type OfficeArtifactReleasePreviewResult = { ok: true } | OfficeArtifactFailure;

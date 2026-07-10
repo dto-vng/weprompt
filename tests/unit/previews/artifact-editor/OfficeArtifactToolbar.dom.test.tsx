@@ -3,8 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
+
+const mocks = vi.hoisted(() => ({ copyText: vi.fn() }));
+
+vi.mock('@/renderer/utils/ui/clipboard', () => ({ copyText: mocks.copyText }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => translations[key] ?? key }),
@@ -33,6 +37,12 @@ const translations: Record<string, string> = {
   'preview.office.editor.saveFailed': 'Save failed',
   'preview.office.editor.fileChanged': 'File changed elsewhere',
   'preview.office.editor.unsupported': 'This selection needs the desktop app',
+  'preview.office.editor.selectToEdit': 'Offline quick edit ready',
+  'preview.office.editor.conflictRecovery': 'Your edit was not saved and is still here. The workspace file is safe.',
+  'preview.office.editor.saveFailureRecovery': 'Your edit is still here and the workspace file was not changed.',
+  'preview.office.editor.copyDraft': 'Copy draft',
+  'preview.office.editor.refreshLatest': 'Refresh latest',
+  'preview.office.editor.retrySave': 'Retry save',
   'common.download': 'Download',
 };
 
@@ -82,7 +92,21 @@ const readAtRule = (css: string, header: string): string => {
 };
 
 describe('OfficeArtifactToolbar', () => {
-  afterEach(() => document.body.replaceChildren());
+  beforeEach(() => {
+    mocks.copyText.mockReset();
+    mocks.copyText.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('explains the offline selection-edit workflow before a selection is made', () => {
+    render(<OfficeArtifactToolbar {...createProps({ inspection: null, undoDepth: 0 })} />);
+
+    expect(screen.getByText('Offline quick edit ready')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Open in desktop app' })).toBeEnabled();
+  });
 
   it('commits an Excel formula with Enter and cancels with Escape', async () => {
     const user = userEvent.setup();
@@ -139,6 +163,26 @@ describe('OfficeArtifactToolbar', () => {
     fireEvent.change(input, { target: { value: 'Net revenue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     expect(props.apply).toHaveBeenCalledWith({ kind: 'replaceText', value: 'Net revenue' });
+  });
+
+  it('preserves and exposes a Word draft when the workspace file changes', async () => {
+    const user = userEvent.setup();
+    const props = createProps({ inspection: wordInspection });
+    const view = render(<OfficeArtifactToolbar {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Edit selection' }));
+    const input = await screen.findByRole('textbox', { name: 'Edit selection' });
+    fireEvent.change(input, { target: { value: 'Draft kept locally' } });
+
+    view.rerender(<OfficeArtifactToolbar {...props} status='fileChanged' />);
+
+    expect(screen.getByRole('textbox', { name: 'Edit selection' })).toHaveValue('Draft kept locally');
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    expect(screen.getByText('Your edit was not saved and is still here. The workspace file is safe.')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Copy draft' }));
+    expect(mocks.copyText).toHaveBeenCalledWith('Draft kept locally');
+    await user.click(screen.getByRole('button', { name: 'Refresh latest' }));
+    expect(props.refresh).toHaveBeenCalledOnce();
   });
 
   it('exposes secondary file actions from More', async () => {

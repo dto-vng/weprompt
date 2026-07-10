@@ -137,6 +137,8 @@ describe.skipIf(officeCliPath === undefined)('OfficeArtifactService real DOCX in
     expect(formatResult.ok).toBe(true);
     const formatted = assertMutationSuccess(formatResult);
     expect(formatted.undoDepth).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    expect(await hashOfficeArtifact(filePath)).toBe(formatted.version);
 
     const after = await getDocxParagraph(context.runner, filePath, replacedParagraph.path);
     const unaffectedAfter = after.runs.filter((run) => run.text !== REPLACEMENT_TEXT).map(stableRunFidelity);

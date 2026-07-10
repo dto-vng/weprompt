@@ -91,6 +91,7 @@ const secondInspection: OfficeArtifactInspectResult = {
 };
 
 const createOptions = () => ({
+  conversationId: 'conversation-1',
   workspace: '/workspace',
   filePath: '/workspace/report.docx',
   fileName: 'report.docx',
@@ -121,6 +122,18 @@ describe('useOfficeArtifactEditor', () => {
     expect(mocks.inspect).not.toHaveBeenCalled();
   });
 
+  it('uses the conversation identity when loading artifact state', async () => {
+    renderHook(() => useOfficeArtifactEditor(createOptions()));
+
+    await waitFor(() =>
+      expect(mocks.getState).toHaveBeenCalledWith({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        filePath: '/workspace/report.docx',
+      })
+    );
+  });
+
   it('reports saving and then saved only after apply succeeds', async () => {
     const pending = deferred<OfficeArtifactMutationResult>();
     mocks.inspect.mockResolvedValue(firstInspection);
@@ -136,6 +149,7 @@ describe('useOfficeArtifactEditor', () => {
 
     pending.resolve({ ok: true, version: 'v2', snapshotId: 's1', undoDepth: 1 });
     await waitFor(() => expect(result.current.status).toBe('saved'));
+    expect(mocks.apply).toHaveBeenCalledWith(expect.objectContaining({ conversationId: 'conversation-1' }));
     expect(result.current.version).toBe('v2');
     expect(options.onArtifactMutated).toHaveBeenCalledOnce();
   });
@@ -214,6 +228,35 @@ describe('useOfficeArtifactEditor', () => {
     await waitFor(() => expect(view.result.current.version).toBe('external-v2'));
   });
 
+  it('defers an external revision reload until an in-flight apply commits', async () => {
+    const pending = deferred<OfficeArtifactMutationResult>();
+    mocks.getState
+      .mockResolvedValueOnce({ ok: true, version: 'v1', undoDepth: 0 })
+      .mockResolvedValueOnce({ ok: true, version: 'v2', undoDepth: 1 });
+    mocks.inspect.mockResolvedValue(firstInspection);
+    mocks.apply.mockReturnValue(pending.promise);
+    const options = createOptions();
+    const view = renderHook((props: typeof options) => useOfficeArtifactEditor(props), { initialProps: options });
+    await waitFor(() => expect(view.result.current.version).toBe('v1'));
+    act(() => view.result.current.handleSelectionChange(firstSelection));
+    await waitFor(() => expect(view.result.current.inspection).not.toBeNull());
+
+    let applyPromise: Promise<boolean>;
+    act(() => {
+      applyPromise = view.result.current.apply({ kind: 'replaceText', value: 'New text' });
+    });
+    view.rerender({ ...options, externalRevision: 1 });
+
+    expect(view.result.current.status).toBe('saving');
+    expect(mocks.getState).toHaveBeenCalledOnce();
+
+    pending.resolve({ ok: true, version: 'v2', snapshotId: 's1', undoDepth: 1 });
+    await act(async () => expect(await applyPromise).toBe(true));
+    await waitFor(() => expect(mocks.getState).toHaveBeenCalledTimes(2));
+    expect(view.result.current.version).toBe('v2');
+    expect(view.result.current.undoDepth).toBe(1);
+  });
+
   it('marks a conflict without refreshing the preview or version', async () => {
     mocks.inspect.mockResolvedValue(firstInspection);
     mocks.apply.mockResolvedValue({ ok: false, code: 'FILE_CHANGED' });
@@ -227,6 +270,12 @@ describe('useOfficeArtifactEditor', () => {
 
     expect(result.current.status).toBe('fileChanged');
     expect(result.current.version).toBe('v1');
+    expect(result.current.inspection).toEqual(firstInspection.inspection);
+    act(() => result.current.handleSelectionChange(secondSelection));
+    expect(result.current.inspection).toEqual(firstInspection.inspection);
+    expect(mocks.inspect).toHaveBeenCalledOnce();
+    await expect(result.current.apply({ kind: 'replaceText', value: 'Retry' })).resolves.toBe(false);
+    expect(mocks.apply).toHaveBeenCalledOnce();
     expect(options.onArtifactMutated).not.toHaveBeenCalled();
   });
 
@@ -280,6 +329,7 @@ describe('useOfficeArtifactEditor', () => {
 
     pending.resolve({ ok: true, version: 'v1', snapshotId: 's1', undoDepth: 0 });
     await waitFor(() => expect(result.current.status).toBe('saved'));
+    expect(mocks.undo).toHaveBeenCalledWith(expect.objectContaining({ conversationId: 'conversation-1' }));
     expect(result.current.version).toBe('v1');
     expect(result.current.undoDepth).toBe(0);
     expect(options.onArtifactMutated).toHaveBeenCalledOnce();

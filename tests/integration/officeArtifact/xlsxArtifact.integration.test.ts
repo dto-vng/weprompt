@@ -77,7 +77,7 @@ describe.skipIf(officeCliPath === undefined)('OfficeArtifactService real XLSX in
       },
       edit: { kind: 'setCell', input: '42' },
     });
-    expect(valueResult.ok).toBe(true);
+    expect(valueResult, JSON.stringify(valueResult)).toMatchObject({ ok: true });
     const value = assertMutationSuccess(valueResult);
     expect(value.undoDepth).toBe(1);
     expect((await getXlsxCell(context.runner, filePath, '/Sheet1/A1')).input).toBe('42');

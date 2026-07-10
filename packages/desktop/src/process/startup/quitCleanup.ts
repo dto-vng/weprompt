@@ -56,11 +56,11 @@ async function runQuitCleanup(deps: QuitCleanupDeps): Promise<void> {
   const cleanup = async () => {
     deps.disposeCronResumeListener();
 
+    await deps.stopBackend().catch((err) => deps.logError('[App] Failed to stop backend:', err));
+
     await deps
       .disposeOfficeArtifacts()
       .catch((err) => deps.logError('[App] Failed to dispose Office artifact history:', err));
-
-    await deps.stopBackend().catch((err) => deps.logError('[App] Failed to stop backend:', err));
 
     try {
       await deps.destroyPetWindow();

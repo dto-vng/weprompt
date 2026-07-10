@@ -26,6 +26,8 @@ const XLSX_FILE = '/workspace/forecast.xlsx';
 const DOCX_FILE = '/workspace/report.docx';
 const STAGED_XLSX_FILE = '/workspace/.forecast.forge-edit.xlsx';
 const STAGED_DOCX_FILE = '/workspace/.report.forge-edit.docx';
+const PREVIEW_XLSX_FILE = '/preview/preview.xlsx';
+const PREVIEW_WORKSPACE = '/preview';
 const VERSION_A = 'a'.repeat(64);
 const VERSION_B = 'b'.repeat(64);
 const VERSION_C = 'c'.repeat(64);
@@ -109,7 +111,13 @@ const runner = {
   formatRange: vi.fn<OfficeCliRunner['formatRange']>(),
   setCell: vi.fn<OfficeCliRunner['setCell']>(),
   validate: vi.fn<OfficeCliRunner['validate']>(),
+  close: vi.fn<OfficeCliRunner['close']>(),
+  watch: vi.fn<OfficeCliRunner['watch']>(),
 } satisfies OfficeCliRunner;
+
+const stopPreview = vi.fn<() => Promise<void>>();
+const releasePreviewOrigin = vi.fn<() => void>();
+const retainPreviewOrigin = vi.fn<(url: string) => { url: string; release: () => void }>();
 
 const snapshots = {
   prepare: vi.fn<OfficeArtifactSnapshotStoreApi['prepare']>(),
@@ -123,8 +131,10 @@ const snapshots = {
 
 const workingFiles = {
   create: vi.fn<(filePath: string) => Promise<string>>(),
+  createPreview: vi.fn<(filePath: string) => Promise<{ filePath: string; workspace: string }>>(),
   install: vi.fn<(stagedPath: string, filePath: string) => Promise<void>>(),
   remove: vi.fn<(stagedPath: string) => Promise<void>>(),
+  dispose: vi.fn<() => Promise<void>>(),
 };
 
 const resolveArtifact = vi.fn<OfficeArtifactServiceDependencies['resolveArtifact']>();
@@ -135,7 +145,7 @@ function artifact(kind: ResolvedOfficeArtifact['kind'], filePath: string): Resol
 }
 
 function createService(): OfficeArtifactService {
-  const dependencies = { runner, snapshots, resolveArtifact, hashArtifact, workingFiles };
+  const dependencies = { runner, snapshots, resolveArtifact, hashArtifact, workingFiles, retainPreviewOrigin };
   return new OfficeArtifactService(dependencies);
 }
 
@@ -147,6 +157,11 @@ beforeEach(() => {
   runner.setCell.mockResolvedValue({});
   runner.replaceText.mockResolvedValue({ matched: 1 });
   runner.validate.mockResolvedValue({});
+  runner.close.mockResolvedValue({});
+  runner.watch.mockResolvedValue({ url: 'http://127.0.0.1:26318/', stop: stopPreview });
+  stopPreview.mockResolvedValue();
+  releasePreviewOrigin.mockReset();
+  retainPreviewOrigin.mockImplementation((url) => ({ url, release: releasePreviewOrigin }));
   snapshots.prepare.mockResolvedValue(pending);
   snapshots.commit.mockResolvedValue(1);
   snapshots.rollbackPending.mockResolvedValue();
@@ -157,8 +172,142 @@ beforeEach(() => {
   workingFiles.create.mockImplementation(async (filePath) =>
     filePath === DOCX_FILE ? STAGED_DOCX_FILE : STAGED_XLSX_FILE
   );
+  workingFiles.createPreview.mockResolvedValue({ filePath: PREVIEW_XLSX_FILE, workspace: PREVIEW_WORKSPACE });
   workingFiles.install.mockResolvedValue();
   workingFiles.remove.mockResolvedValue();
+  workingFiles.dispose.mockResolvedValue();
+});
+
+describe('OfficeArtifactService preview leases', () => {
+  it('creates a version-matched preview copy outside the workspace artifact path', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+
+    const result = await createService().preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+
+    expect(result).toMatchObject({
+      ok: true,
+      filePath: PREVIEW_XLSX_FILE,
+      workspace: PREVIEW_WORKSPACE,
+    });
+    expect(workingFiles.createPreview).toHaveBeenCalledWith(XLSX_FILE);
+  });
+
+  it('releases only a preview lease created by the service', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    const service = createService();
+    const prepared = await service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    if (prepared.ok === false) throw new Error('preview preparation failed');
+
+    await expect(service.releasePreview({ leaseId: prepared.leaseId })).resolves.toEqual({ ok: true });
+    expect(workingFiles.remove).toHaveBeenCalledWith(PREVIEW_XLSX_FILE);
+    await expect(service.releasePreview({ leaseId: prepared.leaseId })).resolves.toEqual({
+      ok: false,
+      code: 'PREVIEW_FAILED',
+    });
+  });
+
+  it('starts and stops a private preview session through its opaque lease', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    const service = createService();
+    const prepared = await service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    if (prepared.ok === false) throw new Error('preview preparation failed');
+
+    await expect(service.startPreview({ leaseId: prepared.leaseId })).resolves.toEqual({
+      ok: true,
+      url: 'http://127.0.0.1:26318/',
+    });
+    expect(runner.watch).toHaveBeenCalledWith(PREVIEW_XLSX_FILE);
+    expect(retainPreviewOrigin).toHaveBeenCalledWith('http://127.0.0.1:26318/');
+
+    await expect(service.releasePreview({ leaseId: prepared.leaseId })).resolves.toEqual({ ok: true });
+    expect(stopPreview.mock.invocationCallOrder[0]).toBeLessThan(workingFiles.remove.mock.invocationCallOrder[0]);
+    expect(releasePreviewOrigin).toHaveBeenCalledOnce();
+  });
+
+  it('retains a backend Word preview origin against the same private-copy lease', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    const service = createService();
+    const prepared = await service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    if (prepared.ok === false) throw new Error('preview preparation failed');
+
+    await expect(
+      service.startPreview({ leaseId: prepared.leaseId, url: '/api/office-watch-proxy/18791' })
+    ).resolves.toEqual({ ok: true, url: '/api/office-watch-proxy/18791' });
+    expect(runner.watch).not.toHaveBeenCalled();
+    expect(retainPreviewOrigin).toHaveBeenCalledWith('/api/office-watch-proxy/18791');
+  });
+
+  it('retains a private preview copy when its watch process cannot be stopped', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    stopPreview.mockRejectedValueOnce(new Error('still running'));
+    const service = createService();
+    const prepared = await service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    if (prepared.ok === false) throw new Error('preview preparation failed');
+    await service.startPreview({ leaseId: prepared.leaseId });
+
+    await expect(service.releasePreview({ leaseId: prepared.leaseId })).resolves.toEqual({
+      ok: false,
+      code: 'OFFICECLI_FAILED',
+    });
+    expect(workingFiles.remove).not.toHaveBeenCalled();
+  });
+
+  it('waits for in-flight preview preparation during disposal and removes a late copy', async () => {
+    let finishPreviewCopy: (() => void) | undefined;
+    workingFiles.createPreview.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishPreviewCopy = () => resolve({ filePath: PREVIEW_XLSX_FILE, workspace: PREVIEW_WORKSPACE });
+        })
+    );
+    hashArtifact.mockResolvedValue(VERSION_A);
+    const service = createService();
+
+    const preparation = service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    await vi.waitFor(() => expect(workingFiles.createPreview).toHaveBeenCalledOnce());
+    const disposal = service.dispose();
+    await Promise.resolve();
+
+    expect(workingFiles.dispose).not.toHaveBeenCalled();
+    finishPreviewCopy?.();
+
+    await expect(preparation).resolves.toEqual({ ok: false, code: 'PREVIEW_FAILED' });
+    await disposal;
+    expect(workingFiles.remove).toHaveBeenCalledWith(PREVIEW_XLSX_FILE);
+    expect(workingFiles.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('waits for an in-flight preview start during disposal and stops the late child', async () => {
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    let finishWatchStart: (() => void) | undefined;
+    runner.watch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishWatchStart = () => resolve({ url: 'http://127.0.0.1:26318/', stop: stopPreview });
+        })
+    );
+    const service = createService();
+    const prepared = await service.preparePreview({ workspace: WORKSPACE, filePath: XLSX_FILE });
+    if (prepared.ok === false) throw new Error('preview preparation failed');
+
+    const starting = service.startPreview({ leaseId: prepared.leaseId });
+    await vi.waitFor(() => expect(runner.watch).toHaveBeenCalledOnce());
+    const disposal = service.dispose();
+    let disposalFinished = false;
+    void disposal.then(() => {
+      disposalFinished = true;
+    });
+    await Promise.resolve();
+
+    expect(workingFiles.dispose).not.toHaveBeenCalled();
+    expect(disposalFinished).toBe(false);
+    finishWatchStart?.();
+
+    await expect(starting).resolves.toEqual({ ok: false, code: 'PREVIEW_FAILED' });
+    await disposal;
+    expect(stopPreview).toHaveBeenCalledOnce();
+    expect(workingFiles.dispose).toHaveBeenCalledOnce();
+  });
 });
 
 describe('OfficeArtifactService state and inspection', () => {
@@ -170,7 +319,7 @@ describe('OfficeArtifactService state and inspection', () => {
       version: VERSION_A,
       undoDepth: 2,
     });
-    expect(snapshots.getUndoDepth).toHaveBeenCalledWith(XLSX_FILE);
+    expect(snapshots.getUndoDepth).toHaveBeenCalledWith(XLSX_FILE, VERSION_A);
   });
 
   it('rejects an inspection when the file version changed', async () => {
@@ -239,8 +388,25 @@ describe('OfficeArtifactService apply', () => {
     expect(workingFiles.create).toHaveBeenCalledWith(XLSX_FILE);
     expect(runner.setCell).toHaveBeenCalledWith(STAGED_XLSX_FILE, '/Forecast/B4', '=A1*3');
     expect(runner.validate).toHaveBeenCalledWith(STAGED_XLSX_FILE);
-    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE);
+    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE, VERSION_A, VERSION_B);
     expect(snapshots.commit).toHaveBeenCalledWith(pending, VERSION_B);
+  });
+
+  it('closes the staged resident before atomic installation', async () => {
+    hashArtifact
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B)
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B);
+
+    await expect(createService().apply(applyRequest)).resolves.toMatchObject({ ok: true });
+
+    const stagedCloseIndex = runner.close.mock.calls.findIndex(([filePath]) => filePath === STAGED_XLSX_FILE);
+    expect(stagedCloseIndex).toBeGreaterThanOrEqual(0);
+    expect(runner.close.mock.invocationCallOrder[stagedCloseIndex]).toBeLessThan(
+      workingFiles.install.mock.invocationCallOrder[0]
+    );
   });
 
   it('dispatches a DOCX mutation transaction', async () => {
@@ -346,8 +512,8 @@ describe('OfficeArtifactService apply', () => {
       ok: false,
       code: 'RESTORE_FAILED',
     });
-    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE);
-    expect(snapshots.rollbackPending).toHaveBeenCalledWith(pending);
+    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE, VERSION_A, VERSION_B);
+    expect(snapshots.rollbackPending).toHaveBeenCalledWith(pending, VERSION_B);
   });
 
   it('preserves an external save detected before staged installation', async () => {
@@ -364,6 +530,21 @@ describe('OfficeArtifactService apply', () => {
     expect(snapshots.rollbackPending).not.toHaveBeenCalled();
   });
 
+  it('does not commit a snapshot when conditional installation loses a race', async () => {
+    hashArtifact
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_A)
+      .mockResolvedValueOnce(VERSION_B)
+      .mockResolvedValueOnce(VERSION_A);
+    workingFiles.install.mockRejectedValue(new OfficeArtifactError('FILE_CHANGED'));
+
+    await expect(createService().apply(applyRequest)).resolves.toEqual({ ok: false, code: 'FILE_CHANGED' });
+
+    expect(snapshots.commit).not.toHaveBeenCalled();
+    expect(snapshots.discardPending).toHaveBeenCalledWith(pending);
+    expect(snapshots.rollbackPending).not.toHaveBeenCalled();
+  });
+
   it('preserves an external save detected after staged installation', async () => {
     hashArtifact
       .mockResolvedValueOnce(VERSION_A)
@@ -375,7 +556,7 @@ describe('OfficeArtifactService apply', () => {
 
     await expect(createService().apply(applyRequest)).resolves.toEqual({ ok: false, code: 'FILE_CHANGED' });
 
-    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE);
+    expect(workingFiles.install).toHaveBeenCalledWith(STAGED_XLSX_FILE, XLSX_FILE, VERSION_A, VERSION_B);
     expect(snapshots.commit).not.toHaveBeenCalled();
     expect(snapshots.discardPending).toHaveBeenCalledWith(pending);
     expect(snapshots.rollbackPending).not.toHaveBeenCalled();

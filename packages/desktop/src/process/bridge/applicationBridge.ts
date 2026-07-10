@@ -7,6 +7,7 @@
 import type { BrowserWindow } from 'electron';
 import { app } from 'electron';
 import { ipcBridge } from '@/common';
+import type { OfficeArtifactFailure, OfficeArtifactRequestBase } from '@/common/types/office/artifactEditor';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { getZoomFactor, setZoomFactor } from '@process/utils/zoom';
 import { getCdpStatus, updateCdpConfig } from '@process/utils/configureChromium';
@@ -19,7 +20,29 @@ import { restartApplication } from './restartApplication';
 let mainWindowRef: BrowserWindow | null = null;
 
 const START_ON_BOOT_UNSUPPORTED_MESSAGE = 'Start on boot is only available in packaged macOS and Windows apps.';
+const OFFICE_ARTIFACT_AUTHORIZATION_FAILURE: OfficeArtifactFailure = { ok: false, code: 'OUTSIDE_WORKSPACE' };
 export const START_ON_BOOT_WINDOWS_ARG = '--start-on-boot';
+
+async function callAuthorizedOfficeArtifact<TRequest extends OfficeArtifactRequestBase, TResult>(
+  request: TRequest,
+  operation: (authorizedRequest: TRequest) => Promise<TResult>
+): Promise<TResult | OfficeArtifactFailure> {
+  if (!request.conversationId) return OFFICE_ARTIFACT_AUTHORIZATION_FAILURE;
+
+  let workspace: string | undefined;
+  try {
+    const conversation = await ipcBridge.conversation.get.invoke({ id: request.conversationId });
+    workspace = conversation.extra?.workspace;
+  } catch {
+    return OFFICE_ARTIFACT_AUTHORIZATION_FAILURE;
+  }
+
+  if (typeof workspace !== 'string' || workspace.trim().length === 0) {
+    return OFFICE_ARTIFACT_AUTHORIZATION_FAILURE;
+  }
+
+  return operation({ ...request, workspace });
+}
 
 const isStartOnBootSupported = (): boolean => {
   return app.isPackaged && (process.platform === 'darwin' || process.platform === 'win32');
@@ -100,10 +123,25 @@ export function initApplicationBridge(): void {
   // Platform-agnostic handlers: systemInfo, updateSystemInfo, getPath
   initApplicationBridgeCore();
 
-  ipcBridge.officeArtifact.getState.provider((request) => officeArtifactService.getState(request));
-  ipcBridge.officeArtifact.inspect.provider((request) => officeArtifactService.inspect(request));
-  ipcBridge.officeArtifact.apply.provider((request) => officeArtifactService.apply(request));
-  ipcBridge.officeArtifact.undo.provider((request) => officeArtifactService.undo(request));
+  ipcBridge.officeArtifact.getState.provider((request) =>
+    callAuthorizedOfficeArtifact(request, (authorizedRequest) => officeArtifactService.getState(authorizedRequest))
+  );
+  ipcBridge.officeArtifact.preparePreview.provider((request) =>
+    callAuthorizedOfficeArtifact(request, (authorizedRequest) =>
+      officeArtifactService.preparePreview(authorizedRequest)
+    )
+  );
+  ipcBridge.officeArtifact.startPreview.provider((request) => officeArtifactService.startPreview(request));
+  ipcBridge.officeArtifact.releasePreview.provider((request) => officeArtifactService.releasePreview(request));
+  ipcBridge.officeArtifact.inspect.provider((request) =>
+    callAuthorizedOfficeArtifact(request, (authorizedRequest) => officeArtifactService.inspect(authorizedRequest))
+  );
+  ipcBridge.officeArtifact.apply.provider((request) =>
+    callAuthorizedOfficeArtifact(request, (authorizedRequest) => officeArtifactService.apply(authorizedRequest))
+  );
+  ipcBridge.officeArtifact.undo.provider((request) =>
+    callAuthorizedOfficeArtifact(request, (authorizedRequest) => officeArtifactService.undo(authorizedRequest))
+  );
 
   ipcBridge.application.restart.provider(async () => {
     // Backend subprocess shutdown is handled by backendManager.stop() in the

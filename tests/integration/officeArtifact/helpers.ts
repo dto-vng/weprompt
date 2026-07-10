@@ -129,47 +129,55 @@ export async function getDocxParagraph(
   filePath: string,
   path: string
 ): Promise<OfficeCliParagraph> {
-  const paragraph = singleResult(await runner.get(filePath, path));
-  if (
-    paragraph.type !== 'paragraph' ||
-    typeof paragraph.path !== 'string' ||
-    typeof paragraph.text !== 'string' ||
-    !Array.isArray(paragraph.children)
-  ) {
-    throw new Error('OfficeCLI returned an invalid DOCX paragraph');
-  }
-
-  const runs = paragraph.children.map((child): OfficeCliRun => {
-    if (!isRecord(child) || child.type !== 'run' || typeof child.text !== 'string' || !isRecord(child.format)) {
-      throw new Error('OfficeCLI returned an invalid DOCX run');
+  try {
+    const paragraph = singleResult(await runner.get(filePath, path));
+    if (
+      paragraph.type !== 'paragraph' ||
+      typeof paragraph.path !== 'string' ||
+      typeof paragraph.text !== 'string' ||
+      !Array.isArray(paragraph.children)
+    ) {
+      throw new Error('OfficeCLI returned an invalid DOCX paragraph');
     }
-    return { text: child.text, format: child.format };
-  });
 
-  return { path: paragraph.path, text: paragraph.text, runs };
+    const runs = paragraph.children.map((child): OfficeCliRun => {
+      if (!isRecord(child) || child.type !== 'run' || typeof child.text !== 'string' || !isRecord(child.format)) {
+        throw new Error('OfficeCLI returned an invalid DOCX run');
+      }
+      return { text: child.text, format: child.format };
+    });
+
+    return { path: paragraph.path, text: paragraph.text, runs };
+  } finally {
+    await runner.close(filePath);
+  }
 }
 
 export async function getXlsxCell(runner: OfficeCliRunner, filePath: string, path: string): Promise<OfficeCliCell> {
-  const cell = singleResult(await runner.get(filePath, path));
-  if (
-    cell.type !== 'cell' ||
-    typeof cell.path !== 'string' ||
-    typeof cell.text !== 'string' ||
-    !isRecord(cell.format)
-  ) {
-    throw new Error('OfficeCLI returned an invalid XLSX cell');
-  }
+  try {
+    const cell = singleResult(await runner.get(filePath, path));
+    if (
+      cell.type !== 'cell' ||
+      typeof cell.path !== 'string' ||
+      typeof cell.text !== 'string' ||
+      !isRecord(cell.format)
+    ) {
+      throw new Error('OfficeCLI returned an invalid XLSX cell');
+    }
 
-  const formula = cell.format.formula;
-  if (formula !== undefined && typeof formula !== 'string') {
-    throw new Error('OfficeCLI returned an invalid XLSX formula');
-  }
+    const formula = cell.format.formula;
+    if (formula !== undefined && typeof formula !== 'string') {
+      throw new Error('OfficeCLI returned an invalid XLSX formula');
+    }
 
-  return {
-    path: cell.path,
-    displayText: cell.text,
-    input: formula === undefined ? cell.text : `=${formula}`,
-  };
+    return {
+      path: cell.path,
+      displayText: cell.text,
+      input: formula === undefined ? cell.text : `=${formula}`,
+    };
+  } finally {
+    await runner.close(filePath);
+  }
 }
 
 export function getRunsInRange(paragraph: OfficeCliParagraph, start: number, end: number): OfficeCliRun[] {

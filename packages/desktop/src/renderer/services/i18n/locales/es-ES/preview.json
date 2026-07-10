@@ -76,7 +76,8 @@
       "installFailed": "Error al instalar officecli automáticamente. Revisa los registros del backend y reintenta.",
       "portTimeout": "El servicio de vista previa inició pero no estuvo listo a tiempo. Reintenta.",
       "startFailed": "Error al iniciar el servicio de vista previa de Office.",
-      "outsideSandbox": "Este archivo está fuera del sandbox del proyecto actual."
+      "outsideSandbox": "Este archivo está fuera del sandbox del proyecto actual.",
+      "originalSafe": "El archivo original del espacio de trabajo no se modificó."
     },
     "serverInstall": {
       "hint": "Forge se está ejecutando en un servidor. Instala el componente de vista previa en ese servidor y reintenta:",
@@ -121,6 +122,11 @@
       "refreshing": "Actualizando vista previa",
       "previewOutdated": "La vista previa puede estar desactualizada",
       "unsupported": "Esta selección requiere la aplicación de escritorio",
+      "selectToEdit": "Edición rápida sin conexión lista",
+      "conflictRecovery": "Tu edición no se guardó y sigue aquí. El archivo del espacio de trabajo está seguro.",
+      "saveFailureRecovery": "Tu edición sigue aquí y el archivo del espacio de trabajo no se modificó.",
+      "copyDraft": "Copiar borrador",
+      "refreshLatest": "Cargar la versión más reciente",
       "requestPlaceholder": "Describe el cambio que quieres que haga Forge.",
       "askWordContext": "Archivo: {{fileName}}\nPárrafo: {{path}}\nTexto seleccionado: {{text}}\nSolicitud: {{placeholder}}",
       "askExcelContext": "Archivo: {{fileName}}\nRango: {{range}}\nCeldas:\n{{cells}}\nSolicitud: {{placeholder}}"

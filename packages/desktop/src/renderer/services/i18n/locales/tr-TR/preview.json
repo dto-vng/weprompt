@@ -76,7 +76,8 @@
       "installFailed": "officecli otomatik olarak yüklenemedi. Arka uç günlüklerini kontrol edip yeniden deneyin.",
       "portTimeout": "Önizleme servisi başladı ancak zamanında hazır olmadı. Yeniden deneyin.",
       "startFailed": "Office önizleme servisi başlatılamadı.",
-      "outsideSandbox": "Bu dosya geçerli çalışma alanı sandbox'ının dışında."
+      "outsideSandbox": "Bu dosya geçerli çalışma alanı sandbox'ının dışında.",
+      "originalSafe": "Çalışma alanındaki özgün dosya değiştirilmedi."
     },
     "serverInstall": {
       "hint": "Forge bir sunucuda çalışıyor. Önizleme bileşeni o sunucuya kurulmalıdır. Aşağıdaki komutu sunucuda çalıştırıp yeniden deneyin:",
@@ -121,6 +122,11 @@
       "refreshing": "Önizleme yenileniyor",
       "previewOutdated": "Önizleme güncel olmayabilir",
       "unsupported": "Bu seçim için masaüstü uygulaması gerekiyor",
+      "selectToEdit": "Hızlı çevrimdışı düzenleme hazır",
+      "conflictRecovery": "Düzenlemeniz kaydedilmedi ve hâlâ burada. Çalışma alanı dosyası güvende.",
+      "saveFailureRecovery": "Düzenlemeniz hâlâ burada ve çalışma alanı dosyası değiştirilmedi.",
+      "copyDraft": "Taslağı kopyala",
+      "refreshLatest": "En son sürümü yükle",
       "requestPlaceholder": "Forge'un yapmasını istediğiniz değişikliği açıklayın.",
       "askWordContext": "Dosya: {{fileName}}\nParagraf: {{path}}\nSeçili metin: {{text}}\nİstek: {{placeholder}}",
       "askExcelContext": "Dosya: {{fileName}}\nAralık: {{range}}\nHücreler:\n{{cells}}\nİstek: {{placeholder}}"

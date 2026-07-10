@@ -82,6 +82,7 @@ export const OFFICECLI_INSTALL_URL = 'https://github.com/iOfficeAI/OfficeCLI/rel
 
 type OfficeWatchViewerProps = {
   docType: DocType;
+  conversationId?: string;
   file_path?: string;
   content?: string;
   workspace?: string;
@@ -175,6 +176,9 @@ function normalizeOfficeWatchErrorCode(error?: string | null): OfficeWatchErrorC
     case 'OFFICECLI_START_FAILED':
     case 'PATH_OUTSIDE_SANDBOX':
       return error;
+    case 'OFFICECLI_FAILED':
+    case 'PREVIEW_FAILED':
+      return 'OFFICECLI_START_FAILED';
     default:
       return undefined;
   }
@@ -210,6 +214,7 @@ export function resolveOfficeErrorActions(
  */
 const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   docType,
+  conversationId,
   file_path,
   workspace,
   refreshToken,
@@ -334,6 +339,9 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
     });
 
     let watchStarted = false;
+    let previewLeaseId: string | undefined;
+    let watchedFilePath = file_path;
+    let watchedWorkspace = workspace;
 
     const start = async () => {
       await stopQueueRef.current.waitForStop();
@@ -348,9 +356,43 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         setError(null);
       }
       try {
-        const result = await bridge.start.invoke({ file_path, workspace });
-        const errorCode = normalizeOfficeWatchErrorCode(result.error);
-        watchStarted = !errorCode;
+        if (docType !== 'ppt' && isElectronDesktop()) {
+          const preview = await ipcBridge.officeArtifact.preparePreview.invoke({
+            conversationId,
+            workspace: workspace ?? '',
+            filePath: file_path,
+          });
+          if (preview.ok === false) throw new Error(t(keys.startFailed));
+          previewLeaseId = preview.leaseId;
+          watchedFilePath = preview.filePath;
+          watchedWorkspace = preview.workspace;
+          if (cancelled) return;
+        }
+
+        const usesMainProcessWatch = docType === 'excel' && isElectronDesktop() && previewLeaseId;
+        let result = usesMainProcessWatch
+          ? await ipcBridge.officeArtifact.startPreview.invoke({ leaseId: previewLeaseId })
+          : await bridge.start.invoke({ file_path: watchedFilePath, workspace: watchedWorkspace });
+        if (!usesMainProcessWatch && !('ok' in result) && !result.error) {
+          watchStarted = true;
+          if (docType === 'word' && isElectronDesktop() && previewLeaseId && result.url) {
+            result = await ipcBridge.officeArtifact.startPreview.invoke({
+              leaseId: previewLeaseId,
+              url: resolveOfficeWatchUrl(result.url, docType),
+            });
+          }
+        }
+        let resultError: string | undefined;
+        let url: string | undefined;
+        if ('ok' in result) {
+          if (result.ok === false) resultError = result.code;
+          else url = result.url;
+        } else {
+          resultError = result.error;
+          url = result.url;
+        }
+        const errorCode = normalizeOfficeWatchErrorCode(resultError);
+        watchStarted = watchStarted || (!errorCode && !usesMainProcessWatch);
         if (!shouldApplyOfficeWatchStartResult(cancelled)) return;
         if (errorCode) {
           const nextError = {
@@ -367,7 +409,6 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           return;
         }
 
-        const url = result.url;
         if (!url) {
           throw new Error(t(keys.startFailed));
         }
@@ -415,11 +456,19 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       unsubStatus();
       stopQueueRef.current.queueStop(async () => {
         await startPromise;
-        if (watchStarted) await bridge.stop.invoke({ file_path });
+        if (watchStarted) {
+          await bridge.stop.invoke({ file_path: watchedFilePath });
+        }
+        if (previewLeaseId) {
+          await ipcBridge.officeArtifact.releasePreview
+            .invoke({ leaseId: previewLeaseId })
+            .catch((): undefined => undefined);
+        }
       });
     };
   }, [
     docType,
+    conversationId,
     file_path,
     onRefreshStateChange,
     refreshToken,
@@ -435,6 +484,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       error.code,
       isElectronDesktop()
     );
+    const desktopFallbackPath = docType !== 'ppt' && isElectronDesktop() ? file_path : undefined;
 
     return (
       <div className='h-full w-full flex items-center justify-center bg-bg-1'>
@@ -444,6 +494,9 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           content={
             <div>
               <div className='text-14px text-t-primary mb-8px'>{error.message}</div>
+              {docType !== 'ppt' && (
+                <div className='text-12px text-t-secondary mb-12px'>{t('preview.office.errors.originalSafe')}</div>
+              )}
               {!error.code && <div className='text-12px text-t-secondary mb-12px'>{t(keys.installHint)}</div>}
               {showServerInstallGuide && (
                 <div className='text-left mb-12px'>
@@ -463,6 +516,29 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
                 {showRetry && (
                   <Button size='small' type='primary' onClick={() => setRetryKey((value) => value + 1)}>
                     {t('common.retry', { defaultValue: 'Retry' })}
+                  </Button>
+                )}
+                {desktopFallbackPath && (
+                  <Button
+                    size='small'
+                    onClick={() =>
+                      void ipcBridge.shell.openFile.invoke(desktopFallbackPath).catch((): undefined => undefined)
+                    }
+                  >
+                    {t('preview.office.editor.openDesktop')}
+                  </Button>
+                )}
+                {desktopFallbackPath && (
+                  <Button
+                    size='small'
+                    type='text'
+                    onClick={() =>
+                      void ipcBridge.shell.showItemInFolder
+                        .invoke(desktopFallbackPath)
+                        .catch((): undefined => undefined)
+                    }
+                  >
+                    {t('preview.office.editor.reveal')}
                   </Button>
                 )}
               </div>
@@ -488,7 +564,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
             <WebviewHost
               url={view.url}
               className='bg-bg-1'
-              partition={OFFICE_PREVIEW_PARTITION}
+              partition={docType === 'ppt' ? undefined : OFFICE_PREVIEW_PARTITION}
               injectedScript={guestScript}
               scriptRequest={active ? scriptRequest : undefined}
               onConsoleMessage={active ? handleConsoleMessage : undefined}

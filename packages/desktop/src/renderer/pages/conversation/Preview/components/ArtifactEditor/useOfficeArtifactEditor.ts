@@ -31,6 +31,7 @@ export type OfficeSelectionDirection = 'up' | 'down' | 'left' | 'right';
 
 export type UseOfficeArtifactEditorOptions = {
   enabled?: boolean;
+  conversationId: string;
   workspace: string;
   filePath: string;
   fileName?: string;
@@ -65,7 +66,7 @@ function displayName(fileName: string | undefined, filePath: string): string {
 
 /** Coordinate versioned Office inspection, mutation, undo, and composer context. */
 export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions): UseOfficeArtifactEditorResult {
-  const { enabled = true, workspace, filePath, fileName, externalRevision } = options;
+  const { enabled = true, conversationId, workspace, filePath, fileName, externalRevision } = options;
   const { t } = useTranslation();
   const [version, setVersion] = useState<string | null>(null);
   const [undoDepth, setUndoDepth] = useState(0);
@@ -81,10 +82,15 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
   const mutationRequestRef = useRef(0);
   const navigationRequestRef = useRef(0);
   const mutationPendingRef = useRef(false);
+  const conflictPendingRef = useRef(false);
+  const deferredStateReloadRef = useRef(false);
+  const observedExternalRevisionRef = useRef(externalRevision);
+  const currentExternalRevisionRef = useRef(externalRevision);
   const addToSendBoxRef = useRef(options.addToSendBox);
   const onArtifactMutatedRef = useRef(options.onArtifactMutated);
   addToSendBoxRef.current = options.addToSendBox;
   onArtifactMutatedRef.current = options.onArtifactMutated;
+  currentExternalRevisionRef.current = externalRevision;
 
   const clearSelection = useCallback((): void => {
     inspectRequestRef.current += 1;
@@ -93,11 +99,13 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     setInspection(null);
   }, []);
 
-  useEffect(() => {
+  const reloadState = useCallback((): void => {
     const requestId = sessionRequestRef.current + 1;
     sessionRequestRef.current = requestId;
     mutationRequestRef.current += 1;
     mutationPendingRef.current = false;
+    conflictPendingRef.current = false;
+    deferredStateReloadRef.current = false;
     versionRef.current = null;
     setVersion(null);
     setUndoDepth(0);
@@ -105,14 +113,10 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     setScriptRequest(undefined);
     clearSelection();
 
-    if (!enabled) {
-      return () => {
-        if (sessionRequestRef.current === requestId) sessionRequestRef.current += 1;
-      };
-    }
+    if (!enabled) return;
 
     void ipcBridge.officeArtifact.getState
-      .invoke({ workspace, filePath })
+      .invoke({ conversationId, workspace, filePath })
       .then((result) => {
         if (sessionRequestRef.current !== requestId) return;
         if (result.ok === false) {
@@ -126,15 +130,42 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
       .catch(() => {
         if (sessionRequestRef.current === requestId) setStatus('saveFailed');
       });
+  }, [clearSelection, conversationId, enabled, filePath, workspace]);
+
+  useEffect(() => {
+    observedExternalRevisionRef.current = currentExternalRevisionRef.current;
+    reloadState();
 
     return () => {
-      if (sessionRequestRef.current === requestId) sessionRequestRef.current += 1;
+      sessionRequestRef.current += 1;
     };
-  }, [clearSelection, enabled, externalRevision, filePath, workspace]);
+  }, [reloadState]);
+
+  useEffect(() => {
+    if (Object.is(observedExternalRevisionRef.current, externalRevision)) return;
+    observedExternalRevisionRef.current = externalRevision;
+    if (!enabled) return;
+    if (mutationPendingRef.current) {
+      deferredStateReloadRef.current = true;
+      return;
+    }
+    reloadState();
+  }, [enabled, externalRevision, reloadState]);
+
+  const finishMutation = useCallback(
+    (mutationId: number): void => {
+      if (mutationRequestRef.current !== mutationId) return;
+      mutationPendingRef.current = false;
+      if (!deferredStateReloadRef.current) return;
+      deferredStateReloadRef.current = false;
+      reloadState();
+    },
+    [reloadState]
+  );
 
   const handleSelectionChange = useCallback(
     (selection: OfficeArtifactSelection): void => {
-      if (mutationPendingRef.current) return;
+      if (mutationPendingRef.current || conflictPendingRef.current) return;
       const expectedVersion = versionRef.current;
       const sessionId = sessionRequestRef.current;
       const requestId = inspectRequestRef.current + 1;
@@ -146,7 +177,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
       if (!expectedVersion) return;
 
       void ipcBridge.officeArtifact.inspect
-        .invoke({ workspace, filePath, expectedVersion, selection })
+        .invoke({ conversationId, workspace, filePath, expectedVersion, selection })
         .then((result) => {
           if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
           if (result.ok === false) {
@@ -155,6 +186,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
             return;
           }
           versionRef.current = result.version;
+          conflictPendingRef.current = false;
           selectionRef.current = selection;
           inspectionRef.current = result.inspection;
           setVersion(result.version);
@@ -166,19 +198,16 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
           setStatus('saveFailed');
         });
     },
-    [filePath, workspace]
+    [conversationId, filePath, workspace]
   );
 
   const applyMutationResult = useCallback(
     (result: OfficeArtifactMutationResult, sessionId: number, mutationId: number): boolean => {
       if (sessionRequestRef.current !== sessionId || mutationRequestRef.current !== mutationId) return false;
       if (result.ok === false) {
-        if (
-          result.code === 'FILE_CHANGED' ||
-          result.code === 'STALE_SELECTION' ||
-          result.code === 'UNSUPPORTED_CONTENT' ||
-          result.code === 'AMBIGUOUS_TEXT'
-        ) {
+        if (result.code === 'FILE_CHANGED' || result.code === 'STALE_SELECTION') {
+          conflictPendingRef.current = true;
+        } else if (result.code === 'UNSUPPORTED_CONTENT' || result.code === 'AMBIGUOUS_TEXT') {
           clearSelection();
         }
         setStatus(failureStatus(result.code));
@@ -200,7 +229,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     async (edit: OfficeArtifactEdit): Promise<boolean> => {
       const expectedVersion = versionRef.current;
       const selection = selectionRef.current;
-      if (!expectedVersion || !selection || mutationPendingRef.current) return false;
+      if (!expectedVersion || !selection || mutationPendingRef.current || conflictPendingRef.current) return false;
 
       mutationPendingRef.current = true;
       inspectRequestRef.current += 1;
@@ -211,6 +240,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
 
       try {
         const result = await ipcBridge.officeArtifact.apply.invoke({
+          conversationId,
           workspace,
           filePath,
           expectedVersion,
@@ -224,10 +254,10 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
         }
         return false;
       } finally {
-        if (mutationRequestRef.current === mutationId) mutationPendingRef.current = false;
+        finishMutation(mutationId);
       }
     },
-    [applyMutationResult, filePath, workspace]
+    [applyMutationResult, conversationId, filePath, finishMutation, workspace]
   );
 
   const undo = useCallback(async (): Promise<boolean> => {
@@ -242,7 +272,12 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
     setStatus('saving');
 
     try {
-      const result = await ipcBridge.officeArtifact.undo.invoke({ workspace, filePath, expectedVersion });
+      const result = await ipcBridge.officeArtifact.undo.invoke({
+        conversationId,
+        workspace,
+        filePath,
+        expectedVersion,
+      });
       return applyMutationResult(result, sessionId, mutationId);
     } catch {
       if (sessionRequestRef.current === sessionId && mutationRequestRef.current === mutationId) {
@@ -250,9 +285,9 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
       }
       return false;
     } finally {
-      if (mutationRequestRef.current === mutationId) mutationPendingRef.current = false;
+      finishMutation(mutationId);
     }
-  }, [applyMutationResult, filePath, undoDepth, workspace]);
+  }, [applyMutationResult, conversationId, filePath, finishMutation, undoDepth, workspace]);
 
   const askForge = useCallback((): void => {
     const currentInspection = inspectionRef.current;

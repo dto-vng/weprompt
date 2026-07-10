@@ -11,6 +11,7 @@ import type { OfficePreviewRefreshState } from '@/renderer/pages/conversation/Pr
 import OfficeWatchViewer from './OfficeWatchViewer';
 
 type OfficeDocPreviewProps = {
+  conversationId: string;
   file_path?: string;
   content?: string;
   workspace?: string;
