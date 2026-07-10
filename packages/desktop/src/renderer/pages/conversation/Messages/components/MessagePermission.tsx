@@ -7,6 +7,7 @@
 import type { IMessagePermission } from '@/common/chat/chatLib';
 import { ipcBridge } from '@/common';
 import { Button, Card, Radio, Typography } from '@arco-design/web-react';
+import classNames from 'classnames';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,6 +34,15 @@ const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ messag
 
   const icon = actionIcons[action || ''] || '🔐';
   const displayTitle = title || description || t('messages.permissionRequest');
+  const confirmDisabled = !selected || isResponding;
+  const confirmButtonStyle: React.CSSProperties | undefined = !selected
+    ? {
+        backgroundColor: 'var(--color-fill-2)',
+        borderColor: 'var(--color-border-2)',
+        color: 'var(--color-text-2)',
+        opacity: 1,
+      }
+    : undefined;
 
   const handleConfirm = async () => {
     if (hasResponded || !selected) return;
@@ -94,9 +104,14 @@ const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ messag
             </Radio.Group>
             <div className='flex justify-start pl-20px'>
               <Button
-                type='primary'
+                type={selected ? 'primary' : 'secondary'}
                 size='mini'
-                disabled={!selected || isResponding}
+                disabled={confirmDisabled}
+                className={classNames(
+                  '!min-w-74px !h-30px !rounded-8px !font-600',
+                  selected && '!shadow-[0_6px_14px_rgba(var(--primary-6),0.20)]'
+                )}
+                style={confirmButtonStyle}
                 onClick={handleConfirm}
                 data-testid='message-permission-confirm'
               >

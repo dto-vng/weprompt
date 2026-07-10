@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { IMcpServer } from '@/common/config/storage';
 import {
@@ -112,6 +112,11 @@ const stdioServer = (id: string, name: string): IMcpServer => ({
   original_json: '{}',
 });
 
+const stdioServerWithEnv = (id: string, name: string, env: Record<string, string>): IMcpServer => ({
+  ...stdioServer(id, name),
+  transport: { type: 'stdio', command: 'npx', args: ['-y', 'pkg'], env },
+});
+
 describe('CapabilitiesSection', () => {
   const servers = [
     stdioServer(BUILTIN_TAVILY_ID, BUILTIN_TAVILY_NAME),
@@ -130,5 +135,31 @@ describe('CapabilitiesSection', () => {
     expect(screen.getByText('settings.capabilityWebSearch')).toBeTruthy();
     expect(screen.getByText('settings.capabilityGithub')).toBeTruthy();
     expect(screen.getByText('settings.capabilityPostgres')).toBeTruthy();
+  });
+
+  it('keeps capability Save quiet until the credential changes', () => {
+    render(
+      <CapabilitiesSection
+        mcpServers={[
+          stdioServerWithEnv(BUILTIN_TAVILY_ID, BUILTIN_TAVILY_NAME, {
+            TAVILY_API_KEY: 'saved-key',
+          }),
+        ]}
+        saveMcpServers={vi.fn().mockResolvedValue(undefined)}
+        message={{ error: vi.fn(), success: vi.fn() } as never}
+      />
+    );
+
+    const saveButton = screen.getAllByRole('button', { name: 'common.save' })[0];
+    expect(saveButton).toBeDefined();
+    expect(saveButton).toBeDisabled();
+    expect(saveButton).toHaveClass('arco-btn-secondary');
+
+    fireEvent.change(screen.getByPlaceholderText('settings.capabilityWebSearchPlaceholder'), {
+      target: { value: 'new-key' },
+    });
+
+    expect(saveButton).not.toBeDisabled();
+    expect(saveButton).toHaveClass('arco-btn-primary');
   });
 });

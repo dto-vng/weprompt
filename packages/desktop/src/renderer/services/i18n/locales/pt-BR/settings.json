@@ -256,7 +256,7 @@
   "rule_content": "Conteúdo da Regra / Instruções",
   "delete_preset_confirm": "Tem certeza de que deseja excluir esta predefinição?",
   "cssTheme": {
-    "selectOrCustomize": "Selecione ou personalize um tema",
+    "selectOrCustomize": "Selecione um tema",
     "followSystem": "Seguir o sistema",
     "addManually": "Adicionar tema",
     "default": "Padrão",

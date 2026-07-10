@@ -67,7 +67,7 @@
     "deleteSuccess": "삭제되었습니다",
     "deleteFailed": "삭제에 실패했습니다",
     "projectsSection": "프로젝트",
-    "conversationsSection": "대화",
+    "conversationsSection": "채팅",
     "removeProjectTitle": "프로젝트 제거",
     "removeProject": "프로젝트 제거",
     "removeProjectConfirm": "\"{{name}}\" 프로젝트를 제거하시겠습니까? 프로젝트의 {{count}}개 대화도 함께 제거됩니다.",
