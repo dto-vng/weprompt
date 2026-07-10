@@ -163,4 +163,39 @@ describe('ipcBridge conversation adapter', () => {
       },
     });
   });
+
+  it('requests invisible context compaction through the dedicated conversation endpoint', async () => {
+    const { conversation } = await import('@/common/adapter/ipcBridge');
+    const input = {
+      conversation_id: 'conv-1',
+      trigger: 'manual' as const,
+      previous_snapshot: {
+        goal: 'Finish the context manager',
+        current_state: ['The deterministic fallback exists.'],
+        decisions: [],
+        artifacts: ['Context.md'],
+        user_preferences: [],
+        open_questions: [],
+        next_steps: ['Add LLM compaction.'],
+        do_not_forget: [],
+      },
+      previous_markdown: '# Conversation Context',
+      pinned_context: [],
+      last_compacted_turn_id: 'turn-3',
+    };
+
+    await conversation.compactContext.invoke(input);
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/conversations/conv-1/context/compact',
+      body: {
+        trigger: input.trigger,
+        previous_snapshot: input.previous_snapshot,
+        previous_markdown: input.previous_markdown,
+        pinned_context: input.pinned_context,
+        last_compacted_turn_id: input.last_compacted_turn_id,
+      },
+    });
+  });
 });

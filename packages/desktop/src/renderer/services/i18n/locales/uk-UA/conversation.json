@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Керування, стиснення, закріплення та передавання контексту розмови",
+      "missingPinText": "Додайте текст після /context pin",
+      "unexpectedArguments": "Команда контексту містить зайві аргументи",
+      "unsupportedSubcommand": "Невідома команда контексту. Використовуйте open, compact, pin або handoff.",
+      "fallbackComplete": "Контекст оновлено за допомогою локального резервного режиму",
+      "compactSuccess": "Контекст оновлено",
+      "pinSuccess": "Контекст закріплено й оновлено",
+      "failed": "Не вдалося виконати команду контексту"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,14 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Оновлення за допомогою ШІ...",
+      "updatedByAi": "Оновлено ШІ",
+      "rulesFallback": "Оновлено за допомогою резервних правил",
+      "stale": "Очікує оновлення",
+      "failed": "Помилка оновлення",
+      "edited": "Відредагований контекст"
+    }
   }
 }

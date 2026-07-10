@@ -27,12 +27,16 @@ import {
   removePinnedContext,
   updatePinnedContext,
 } from './pinnedContext';
+import type { CompactConversationContextResult } from './useContextCompaction';
 
 type ContextHandoffPanelProps = {
   conversationId: string;
   workspace: string;
   loadedSkills?: string[];
   loadedMcpStatuses?: IConversationMcpStatus[];
+  onCreateContext?: () => Promise<CompactConversationContextResult | null>;
+  onPreviewOpen?: () => void;
+  isCompacting?: boolean;
 };
 
 type PinDraft = {
@@ -73,11 +77,28 @@ const getConversationTokenUsage = (conversation: TChatConversation | null): Toke
   return usage && usage.total_tokens > 0 ? usage : null;
 };
 
+const getGenerationStateKey = (contextState: TContextHandoffExtra) => {
+  if (contextState.status === 'updating') return 'conversation.contextHandoff.status.updating' as const;
+  if (contextState.status === 'failed') return 'conversation.contextHandoff.status.failed' as const;
+  if (contextState.status === 'stale') return 'conversation.contextHandoff.status.stale' as const;
+  if (contextState.source === 'rules') return 'conversation.contextHandoff.status.rulesFallback' as const;
+  if (contextState.source === 'llm' && contextState.status === 'fresh') {
+    return 'conversation.contextHandoff.status.updatedByAi' as const;
+  }
+  if (contextState.source === 'user' && contextState.status === 'fresh') {
+    return 'conversation.contextHandoff.status.edited' as const;
+  }
+  return null;
+};
+
 const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
   conversationId,
   workspace,
   loadedSkills = [],
   loadedMcpStatuses = [],
+  onCreateContext,
+  onPreviewOpen,
+  isCompacting = false,
 }) => {
   const { t } = useTranslation();
   const liveMessages = useMessageList();
@@ -123,6 +144,9 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
   );
   const pinnedContext = useMemo(() => getConversationPinnedContext(conversation), [conversation]);
   const currentContextFile = getConversationContextHandoffExtra(conversation);
+  const generationStateKey = isCompacting
+    ? ('conversation.contextHandoff.status.updating' as const)
+    : getGenerationStateKey(currentContextFile);
   const hasContextFile = Boolean(currentContextFile.context_file_path);
   const contextFileName = currentContextFile.context_file_name || resolveContextFile(workspace).fileName;
   const contextLimit = getConversationContextLimit(conversation);
@@ -196,6 +220,16 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
     if (!isAionrsConversation(source)) return;
     setLoading(true);
     try {
+      if (onCreateContext) {
+        const result = await onCreateContext();
+        if (!result) throw new Error(t('conversation.contextHandoff.exportFailed'));
+        openContextPreview(result.markdown, result.fileName, result.filePath);
+        await Promise.all([refreshConversation(), refreshMessages()]);
+        Message.success(t('conversation.contextHandoff.replaceSuccess'));
+        onPreviewOpen?.();
+        return;
+      }
+
       const { fileName, filePath } = resolveContextFile(workspace);
       const markdown = buildContextMarkdown({ conversation: source, messages });
       const saved = await ipcBridge.fs.writeFile.invoke({ path: filePath, data: markdown, workspace });
@@ -209,13 +243,26 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
       openContextPreview(markdown, fileName, filePath);
       emitter.emit('aionrs.workspace.refresh');
       Message.success(t('conversation.contextHandoff.replaceSuccess'));
+      onPreviewOpen?.();
     } catch (error) {
       console.error('[ContextHandoff] Failed to write Context.md:', error);
       Message.error(error instanceof Error ? error.message : t('conversation.contextHandoff.exportFailed'));
     } finally {
       setLoading(false);
     }
-  }, [budget.status, conversationId, messages, openContextPreview, t, updateContextHandoff, workspace]);
+  }, [
+    budget.status,
+    conversationId,
+    messages,
+    onCreateContext,
+    onPreviewOpen,
+    openContextPreview,
+    refreshConversation,
+    refreshMessages,
+    t,
+    updateContextHandoff,
+    workspace,
+  ]);
 
   const handleOpenContext = useCallback(async () => {
     const filePath = currentContextFile.context_file_path;
@@ -230,10 +277,12 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
       return;
     }
     openContextPreview(content, fileName, filePath);
+    onPreviewOpen?.();
   }, [
     currentContextFile.context_file_name,
     currentContextFile.context_file_path,
     handleNewContext,
+    onPreviewOpen,
     openContextPreview,
     workspace,
   ]);
@@ -278,7 +327,7 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
             <Button
               className='context-handoff-file'
               type='text'
-              loading={loading}
+              loading={loading || isCompacting}
               onClick={() => void handleOpenContext()}
             >
               <span className='context-handoff-file-icon'>
@@ -287,9 +336,11 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
               <div className='context-handoff-file-copy'>
                 <div className='context-handoff-file-name'>{contextFileName}</div>
                 <div className='context-handoff-file-state'>
-                  {hasContextFile
-                    ? t('conversation.contextHandoff.activeFileDescription')
-                    : t('conversation.contextHandoff.emptyFileDescription')}
+                  {generationStateKey
+                    ? t(generationStateKey)
+                    : hasContextFile
+                      ? t('conversation.contextHandoff.activeFileDescription')
+                      : t('conversation.contextHandoff.emptyFileDescription')}
                 </div>
               </div>
             </Button>

@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "대화 컨텍스트 관리, 압축, 고정 또는 인계",
+      "missingPinText": "/context pin 뒤에 고정할 내용을 입력하세요",
+      "unexpectedArguments": "이 컨텍스트 명령에 불필요한 인수가 있습니다",
+      "unsupportedSubcommand": "알 수 없는 컨텍스트 명령입니다. open, compact, pin 또는 handoff를 사용하세요.",
+      "fallbackComplete": "로컬 대체 방식으로 컨텍스트를 업데이트했습니다",
+      "compactSuccess": "컨텍스트를 업데이트했습니다",
+      "pinSuccess": "컨텍스트를 고정하고 업데이트했습니다",
+      "failed": "컨텍스트 명령에 실패했습니다"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,14 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "AI로 업데이트 중...",
+      "updatedByAi": "AI로 업데이트됨",
+      "rulesFallback": "규칙 기반 대체 방식으로 업데이트됨",
+      "stale": "업데이트 대기 중",
+      "failed": "업데이트 실패",
+      "edited": "편집된 컨텍스트"
+    }
   }
 }

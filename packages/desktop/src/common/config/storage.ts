@@ -194,12 +194,35 @@ export type TContextHandoffBudgetSnapshot = {
   buckets: Record<TContextBudgetBucketKey, TContextBudgetBucket>;
 };
 
+export type TContextSnapshot = {
+  goal: string;
+  current_state: string[];
+  decisions: string[];
+  artifacts: string[];
+  user_preferences: string[];
+  open_questions: string[];
+  next_steps: string[];
+  do_not_forget: string[];
+};
+
+export type TContextGenerationSource = 'llm' | 'rules' | 'user';
+
+export type TContextGenerationStatus = 'fresh' | 'updating' | 'stale' | 'failed';
+
 export type TContextHandoffExtra = {
   pinned_context?: TContextHandoffItem[];
   context_file_path?: string;
   context_file_name?: string;
   last_budget_status?: TContextBudgetStatus;
   last_exported_at?: number;
+  snapshot?: TContextSnapshot;
+  revision?: number;
+  source?: TContextGenerationSource;
+  status?: TContextGenerationStatus;
+  last_compacted_turn_id?: string;
+  turns_since_compaction?: number;
+  updated_at?: number;
+  last_error_code?: string;
 };
 
 export type TConversationContextHandoffExtra = TContextHandoffExtra;

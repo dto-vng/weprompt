@@ -205,7 +205,10 @@ describe('ContextHandoffPanel', () => {
   });
 
   it('opens Context.md from the file tile without showing standalone context actions', async () => {
-    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+    const onPreviewOpen = vi.fn();
+    render(
+      <ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' onPreviewOpen={onPreviewOpen} />
+    );
 
     const contextTile = await screen.findByRole('button', { name: /Context\.md/ });
 
@@ -230,5 +233,89 @@ describe('ContextHandoffPanel', () => {
         workspace: '/workspace',
       })
     );
+    expect(onPreviewOpen).toHaveBeenCalledOnce();
+  });
+
+  it('uses LLM-first compaction when Context.md has not been created yet', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {},
+      },
+    });
+    const onCreateContext = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# LLM-managed context',
+      snapshot: {
+        goal: 'Continue the work.',
+        current_state: [],
+        decisions: [],
+        artifacts: [],
+        user_preferences: [],
+        open_questions: [],
+        next_steps: [],
+        do_not_forget: [],
+      },
+      source: 'llm' as const,
+      throughTurnId: 'turn-1',
+    }));
+
+    render(
+      <ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' onCreateContext={onCreateContext} />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /Context\.md/ }));
+
+    await waitFor(() => expect(onCreateContext).toHaveBeenCalledOnce());
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.openPreview).toHaveBeenCalledWith(
+      '# LLM-managed context',
+      'markdown',
+      expect.objectContaining({ file_name: 'Context.md', file_path: '/workspace/Context.md', editable: true })
+    );
+  });
+
+  it.each([
+    ['updating', 'llm', 'conversation.contextHandoff.status.updating'],
+    ['fresh', 'llm', 'conversation.contextHandoff.status.updatedByAi'],
+    ['fresh', 'rules', 'conversation.contextHandoff.status.rulesFallback'],
+    ['stale', 'llm', 'conversation.contextHandoff.status.stale'],
+    ['failed', 'llm', 'conversation.contextHandoff.status.failed'],
+  ] as const)('shows compact generation state for %s/%s', async (status, source, expectedKey) => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status,
+          source,
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(await screen.findByText(expectedKey)).toBeInTheDocument();
+  });
+
+  it('shows updating immediately while the always-mounted controller is compacting', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'fresh',
+          source: 'llm',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' isCompacting />);
+
+    expect(await screen.findByText('conversation.contextHandoff.status.updating')).toBeInTheDocument();
   });
 });

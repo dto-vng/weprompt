@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "مدیریت، فشرده‌سازی، سنجاق‌کردن یا انتقال زمینهٔ گفتگو",
+      "missingPinText": "پس از /context pin متن موردنظر را وارد کنید",
+      "unexpectedArguments": "این فرمان زمینه آرگومان‌های اضافی دارد",
+      "unsupportedSubcommand": "فرمان زمینه ناشناخته است. از open، compact، pin یا handoff استفاده کنید.",
+      "fallbackComplete": "زمینه با روش جایگزین محلی به‌روزرسانی شد",
+      "compactSuccess": "زمینه به‌روزرسانی شد",
+      "pinSuccess": "زمینه سنجاق و به‌روزرسانی شد",
+      "failed": "فرمان زمینه ناموفق بود"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,14 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "در حال به‌روزرسانی با هوش مصنوعی...",
+      "updatedByAi": "به‌روزرسانی‌شده با هوش مصنوعی",
+      "rulesFallback": "به‌روزرسانی‌شده با قواعد جایگزین",
+      "stale": "در انتظار به‌روزرسانی",
+      "failed": "به‌روزرسانی ناموفق بود",
+      "edited": "زمینهٔ ویرایش‌شده"
+    }
   }
 }

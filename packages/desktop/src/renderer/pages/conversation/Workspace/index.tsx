@@ -10,14 +10,22 @@ import type { TChatConversation } from '@/common/config/storage';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useAbortUploadsOnConversationChange } from '@/renderer/hooks/file/useAbortUploadsOnConversationChange';
 import ContextHandoffPanel from '@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel';
+import { resolveContextFile } from '@/renderer/pages/conversation/contextHandoff/contextFile';
+import { getConversationContextHandoffExtra } from '@/renderer/pages/conversation/contextHandoff/pinnedContext';
+import {
+  handoffConversationContext,
+  pinConversationContext,
+  useContextCompaction,
+} from '@/renderer/pages/conversation/contextHandoff/useContextCompaction';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
-import { useAddEventListener } from '@/renderer/utils/emitter';
+import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { getWorkspaceDisplayName as getDisplayName } from '@/renderer/utils/workspace/workspace';
 import { Message } from '@arco-design/web-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import FileChangeList from './components/FileChangeList';
 import PasteConfirmModal from './components/PasteConfirmModal';
 import WorkspaceDialogs from './components/WorkspaceDialogs';
@@ -62,6 +70,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   messageApi: externalMessageApi,
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { openPreview } = usePreviewContext();
   const conversationContext = useConversationContextSafe();
   const loadedSkills = conversationContext?.loadedSkills ?? [];
@@ -72,6 +81,13 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
       name,
       status: 'loaded' as const,
     }));
+  const showContextSection = eventPrefix === 'aionrs';
+  const contextCompaction = useContextCompaction({
+    conversationId: conversation_id,
+    workspace,
+    enabled: showContextSection,
+  });
+  const contextCommandInFlightRef = useRef(false);
 
   // Message API setup
   const [internalMessageApi, messageContext] = Message.useMessage();
@@ -164,7 +180,6 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // public contract. Default to false when the prop is unavailable (e.g.
   // tests that render the panel outside a conversation).
   const isTemporaryWorkspace = isTemporaryWorkspaceProp ?? false;
-  const showContextSection = eventPrefix === 'aionrs';
   const isChangesPanelActive = projectMenuOpen && activeProjectPanel === 'changes';
 
   // Get workspace display name using shared utility
@@ -197,6 +212,11 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const handleProjectPanelSelect = useCallback((panel: WorkspaceTab) => {
     setProjectMenuOpen(true);
     setActiveProjectPanel((current) => (current === panel ? null : panel));
+  }, []);
+
+  const handleProjectMenuClose = useCallback(() => {
+    setProjectMenuOpen(false);
+    setActiveProjectPanel(null);
   }, []);
 
   // Auto-refresh changes when switching to changes tab
@@ -237,6 +257,103 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
       }
     },
     [conversation_id, refreshProjectContextBudget]
+  );
+
+  const compactFromContextAction = useCallback(
+    (input: Parameters<typeof contextCompaction.compact>) => contextCompaction.compact(input[0], input[1], input[2]),
+    [contextCompaction]
+  );
+
+  const openContextFromCommand = useCallback(async () => {
+    const conversation = await getConversationOrNull(conversation_id);
+    if (conversation?.type !== 'aionrs') return;
+
+    const contextState = getConversationContextHandoffExtra(conversation);
+    const resolved = resolveContextFile(workspace);
+    let filePath = contextState.context_file_path || resolved.filePath;
+    let fileName = contextState.context_file_name || resolved.fileName;
+    let markdown = contextState.context_file_path
+      ? await ipcBridge.fs.readFile.invoke({ path: filePath, workspace })
+      : null;
+
+    if (markdown === null) {
+      const compacted = await contextCompaction.compact('manual');
+      if (!compacted) return;
+      filePath = compacted.filePath;
+      fileName = compacted.fileName;
+      markdown = compacted.markdown;
+    }
+
+    openPreview(markdown, 'markdown', {
+      title: fileName,
+      file_name: fileName,
+      file_path: filePath,
+      workspace,
+      editable: true,
+    });
+  }, [contextCompaction, conversation_id, openPreview, workspace]);
+
+  useAddEventListener(
+    'aionrs.context-command',
+    ({ conversationId, command }) => {
+      if (!showContextSection || conversationId !== conversation_id || contextCommandInFlightRef.current) return;
+      contextCommandInFlightRef.current = true;
+
+      void (async () => {
+        if (command.action === 'open') {
+          await openContextFromCommand();
+          return;
+        }
+        if (command.action === 'compact') {
+          const result = await contextCompaction.compact('manual');
+          if (result?.source === 'rules') {
+            messageApi.warning?.(t('conversation.contextHandoff.command.fallbackComplete'));
+          } else if (result) {
+            messageApi.success(t('conversation.contextHandoff.command.compactSuccess'));
+          }
+          return;
+        }
+        if (command.action === 'pin') {
+          await pinConversationContext(
+            { conversationId, workspace, text: command.text },
+            {
+              compactContext: ({ trigger, targetTurnId, budgetStatus }) =>
+                compactFromContextAction([trigger, targetTurnId, budgetStatus]),
+            }
+          );
+          messageApi.success(t('conversation.contextHandoff.command.pinSuccess'));
+          return;
+        }
+
+        const result = await handoffConversationContext(
+          { conversationId, workspace },
+          {
+            compactContext: ({ trigger, targetTurnId, budgetStatus }) =>
+              compactFromContextAction([trigger, targetTurnId, budgetStatus]),
+          }
+        );
+        emitter.emit('chat.history.refresh');
+        void navigate(`/conversation/${result.conversation.id}`);
+      })()
+        .catch((error) => {
+          console.error('[ContextHandoff] Context command failed:', error);
+          messageApi.error(t('conversation.contextHandoff.command.failed'));
+        })
+        .finally(() => {
+          contextCommandInFlightRef.current = false;
+        });
+    },
+    [
+      compactFromContextAction,
+      contextCompaction,
+      conversation_id,
+      messageApi,
+      navigate,
+      openContextFromCommand,
+      showContextSection,
+      t,
+      workspace,
+    ]
   );
 
   useEffect(() => {
@@ -299,10 +416,9 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
         },
       });
       void fileOpsHook.handlePreviewFile(node);
-      setProjectMenuOpen(false);
-      setActiveProjectPanel(null);
+      handleProjectMenuClose();
     },
-    [fileOpsHook.handlePreviewFile, treeHook.ensureNodeSelected, treeHook.selectedKeysRef]
+    [fileOpsHook.handlePreviewFile, handleProjectMenuClose, treeHook.ensureNodeSelected, treeHook.selectedKeysRef]
   );
 
   // Get target folder path for paste confirm modal
@@ -352,6 +468,9 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
       workspace={workspace}
       loadedSkills={loadedSkills}
       loadedMcpStatuses={loadedMcpStatuses}
+      onCreateContext={() => contextCompaction.compact('manual')}
+      onPreviewOpen={handleProjectMenuClose}
+      isCompacting={contextCompaction.isCompacting}
     />
   ) : undefined;
 

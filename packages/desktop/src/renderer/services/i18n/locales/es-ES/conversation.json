@@ -573,6 +573,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Gestionar, compactar, fijar o transferir el contexto de la conversación",
+      "missingPinText": "Añade texto después de /context pin",
+      "unexpectedArguments": "Este comando de contexto contiene argumentos inesperados",
+      "unsupportedSubcommand": "Comando de contexto desconocido. Usa open, compact, pin o handoff.",
+      "fallbackComplete": "Contexto actualizado con el método local alternativo",
+      "compactSuccess": "Contexto actualizado",
+      "pinSuccess": "Contexto fijado y actualizado",
+      "failed": "El comando de contexto ha fallado"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -597,6 +607,14 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Actualizando con IA...",
+      "updatedByAi": "Actualizado por IA",
+      "rulesFallback": "Actualizado con reglas alternativas",
+      "stale": "Actualización pendiente",
+      "failed": "Error de actualización",
+      "edited": "Contexto editado"
+    }
   }
 }
