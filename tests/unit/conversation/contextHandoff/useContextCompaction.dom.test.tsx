@@ -227,6 +227,37 @@ describe('compactConversationContext', () => {
     );
   });
 
+  it('resolves the fallback provider from the persisted aionrs model shape', async () => {
+    const dependencies = createDependencies();
+    // Aionrs conversations persist { provider_id, model, use_model: null } —
+    // not the TProviderWithModel shape the type declares.
+    dependencies.getConversation = vi.fn(async () => ({
+      ...conversation,
+      model: { provider_id: 'provider-1', model: 'model-1', use_model: null } as unknown as typeof conversation.model,
+    }));
+    dependencies.compactRemote = vi.fn(async () => {
+      throw new BackendHttpError({ method: 'POST', path: '/context/compact', status: 404, body: {} });
+    });
+
+    await compactConversationContext(
+      {
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        trigger: 'manual',
+        targetTurnId: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(dependencies.compactLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: 'conversation-1',
+        provider_id: 'provider-1',
+        model: 'model-1',
+      })
+    );
+  });
+
   it('writes a preservation-oriented rules snapshot when both LLM paths fail', async () => {
     const dependencies = createDependencies();
     dependencies.compactRemote = vi.fn(async () => {

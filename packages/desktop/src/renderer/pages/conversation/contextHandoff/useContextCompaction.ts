@@ -112,6 +112,23 @@ const errorCode = (error: unknown, fallback: string): string => {
 const isUnsupportedCompactEndpoint = (error: unknown): boolean =>
   isBackendHttpError(error) && (error.status === 404 || error.status === 501);
 
+/** Backend persists aionrs models as { provider_id, model, use_model: null },
+ *  not the TProviderWithModel shape the type declares. Accept both. */
+type PersistedConversationModel = {
+  id?: string;
+  provider_id?: string;
+  model?: string;
+  use_model?: string | null;
+};
+
+const resolveConversationModelRef = (model: AionrsConversation['model']): { providerId: string; modelName: string } => {
+  const persisted = model as PersistedConversationModel;
+  return {
+    providerId: persisted.provider_id || persisted.id || '',
+    modelName: persisted.use_model || persisted.model || '',
+  };
+};
+
 const conversationWithSnapshot = (
   conversation: AionrsConversation,
   snapshot: CompactConversationContextResult['snapshot']
@@ -186,10 +203,11 @@ export const compactConversationContext = async (
   } catch (remoteError) {
     if (isUnsupportedCompactEndpoint(remoteError)) {
       try {
+        const modelRef = resolveConversationModelRef(conversation.model);
         const local = await dependencies.compactLocal({
           ...baseRequest,
-          provider_id: conversation.model.id,
-          model: conversation.model.use_model,
+          provider_id: modelRef.providerId,
+          model: modelRef.modelName,
           target_turn_id: input.targetTurnId,
         });
         snapshot = normalizeModelContextSnapshot(local.snapshot);
