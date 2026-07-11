@@ -825,7 +825,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
             renderHistoryDropdown={renderHistoryDropdown}
             onOpenInSystem={handleOpenInSystem}
             onDownload={handleDownload}
-            onClose={closePreview}
             inspectMode={inspectMode}
             onInspectModeToggle={() => setInspectMode(!inspectMode)}
             leftExtra={toolbarExtras?.left}
