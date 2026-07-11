@@ -254,7 +254,7 @@
   "rule_content": "Contenido de regla / Instrucciones",
   "delete_preset_confirm": "¿Estás seguro de que deseas eliminar este preset?",
   "cssTheme": {
-    "selectOrCustomize": "Seleccionar o personalizar un tema",
+    "selectOrCustomize": "Seleccionar un tema",
     "followSystem": "Seguir al sistema",
     "addManually": "Agregar tema",
     "default": "Predeterminado",

@@ -22,6 +22,9 @@ import type {
   IProvider,
   ISessionMcpServer,
   TChatConversation,
+  TContextSnapshot,
+  TContextHandoffItem,
+  TConversationContextHandoffExtra,
   TConversationRuntimeSummary,
   TProviderWithModel,
 } from '../config/storage';
@@ -260,6 +263,17 @@ export const conversation = {
       files: p.files,
       loading_id: p.loading_id,
       inject_skills: p.inject_skills,
+      pinned_context: p.pinned_context,
+    })
+  ),
+  compactContext: httpPost<ICompactContextResult, ICompactContextParams>(
+    (p) => `/api/conversations/${p.conversation_id}/context/compact`,
+    (p) => ({
+      trigger: p.trigger,
+      previous_snapshot: p.previous_snapshot,
+      previous_markdown: p.previous_markdown,
+      pinned_context: p.pinned_context,
+      last_compacted_turn_id: p.last_compacted_turn_id,
     })
   ),
   getSlashCommands: httpGet<AcpSlashCommandApiItem[], { conversation_id: string }>(
@@ -915,6 +929,41 @@ export const acpConversation = {
   ),
 };
 
+export interface ILocalContextCompactionParams extends ICompactContextParams {
+  provider_id: string;
+  model: string;
+  target_turn_id?: string;
+}
+
+export interface ILocalContextCompactionResult {
+  snapshot: unknown;
+  through_turn_id: string;
+  model: {
+    provider_id: string;
+    model: string;
+  };
+}
+
+export type TLocalContextCompactionErrorCode =
+  | 'provider_not_found'
+  | 'provider_timeout'
+  | 'provider_auth_failed'
+  | 'provider_rate_limited'
+  | 'provider_request_failed'
+  | 'invalid_model_output'
+  | 'empty_model_output';
+
+export type ILocalContextCompactionBridgeResult =
+  | { ok: true; result: ILocalContextCompactionResult }
+  | { ok: false; error_code: TLocalContextCompactionErrorCode };
+
+/** Desktop fallback when the installed backend does not yet expose the compact endpoint. */
+export const localContextCompaction = {
+  generate: bridge.buildProvider<ILocalContextCompactionBridgeResult, ILocalContextCompactionParams>(
+    'context.compaction.generate'
+  ),
+};
+
 // ---------------------------------------------------------------------------
 // MCP Service — routed to /api/mcp/*
 // ---------------------------------------------------------------------------
@@ -1509,6 +1558,27 @@ interface ISendMessageParams {
   files?: string[];
   loading_id?: string;
   inject_skills?: string[];
+  pinned_context?: TContextHandoffItem[];
+}
+
+export type TContextCompactionTrigger = 'auto' | 'manual' | 'handoff';
+
+export interface ICompactContextParams {
+  conversation_id: string;
+  trigger: TContextCompactionTrigger;
+  previous_snapshot?: TContextSnapshot;
+  previous_markdown?: string;
+  pinned_context?: TContextHandoffItem[];
+  last_compacted_turn_id?: string;
+}
+
+export interface ICompactContextResult {
+  snapshot: unknown;
+  through_turn_id: string;
+  model?: {
+    provider_id?: string;
+    model?: string;
+  };
 }
 
 // Server-assigned identifier for the newly created user message. Clients must
@@ -1559,6 +1629,7 @@ export interface ICreateConversationParams {
     web_search_engine?: 'google' | 'default';
     context?: string;
     context_file_name?: string;
+    context_handoff?: TConversationContextHandoffExtra;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];

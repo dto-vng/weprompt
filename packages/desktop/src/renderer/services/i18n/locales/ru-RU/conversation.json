@@ -561,5 +561,59 @@
       }
     }
   },
-  "notFound": "Беседа не найдена или была удалена"
+  "notFound": "Беседа не найдена или была удалена",
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "Управление, сжатие, закрепление и передача контекста беседы",
+      "missingPinText": "Добавьте текст после /context pin",
+      "unexpectedArguments": "В команде контекста есть лишние аргументы",
+      "unsupportedSubcommand": "Неизвестная команда контекста. Используйте open, compact, pin или handoff.",
+      "fallbackComplete": "Контекст обновлён с помощью локального резервного режима",
+      "compactSuccess": "Контекст обновлён",
+      "pinSuccess": "Контекст закреплён и обновлён",
+      "failed": "Не удалось выполнить команду контекста"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Обновление с помощью ИИ...",
+      "updatedByAi": "Обновлено ИИ",
+      "rulesFallback": "Обновлено с помощью резервных правил",
+      "stale": "Ожидает обновления",
+      "failed": "Ошибка обновления",
+      "edited": "Отредактированный контекст"
+    }
+  }
 }

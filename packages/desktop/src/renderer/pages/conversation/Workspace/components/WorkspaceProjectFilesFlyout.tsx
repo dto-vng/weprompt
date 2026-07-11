@@ -61,7 +61,11 @@ const WorkspaceProjectFilesFlyout: React.FC<WorkspaceProjectFilesFlyoutProps> = 
         <React.Fragment key={node.relativePath}>
           <Button
             type='text'
-            className='workspace-project-files-row'
+            className={
+              node.name === 'Context.md'
+                ? 'workspace-project-files-row workspace-project-files-row-context'
+                : 'workspace-project-files-row'
+            }
             style={rowStyle}
             aria-expanded={isFolder ? isExpanded : undefined}
             onClick={() => {
@@ -92,6 +96,9 @@ const WorkspaceProjectFilesFlyout: React.FC<WorkspaceProjectFilesFlyoutProps> = 
               {isFolder ? <FolderOpen theme='outline' size='16' /> : <FileText theme='outline' size='16' />}
             </span>
             <span className='workspace-project-files-name'>{node.name}</span>
+            {node.name === 'Context.md' && (
+              <span className='workspace-project-files-context-indicator' aria-hidden='true' />
+            )}
           </Button>
           {showChildren && node.children && renderFiles(node.children, depth + 1)}
         </React.Fragment>

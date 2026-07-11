@@ -6,13 +6,26 @@
 
 import { ipcBridge } from '@/common';
 import type { IDirOrFile } from '@/common/adapter/ipcBridge';
+import type { TChatConversation } from '@/common/config/storage';
+import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useAbortUploadsOnConversationChange } from '@/renderer/hooks/file/useAbortUploadsOnConversationChange';
+import ContextHandoffPanel from '@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel';
+import { resolveContextFile } from '@/renderer/pages/conversation/contextHandoff/contextFile';
+import { getConversationContextHandoffExtra } from '@/renderer/pages/conversation/contextHandoff/pinnedContext';
+import {
+  handoffConversationContext,
+  pinConversationContext,
+  useContextCompaction,
+} from '@/renderer/pages/conversation/contextHandoff/useContextCompaction';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
+import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
+import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { getWorkspaceDisplayName as getDisplayName } from '@/renderer/utils/workspace/workspace';
 import { Message } from '@arco-design/web-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import FileChangeList from './components/FileChangeList';
 import PasteConfirmModal from './components/PasteConfirmModal';
 import WorkspaceContextMenu from './components/WorkspaceContextMenu';
@@ -31,6 +44,25 @@ import type { WorkspaceProps, WorkspaceTab } from './types';
 import { computeContextMenuPosition, flattenSingleRoot, getTargetFolderPath } from './utils/treeHelpers';
 import './workspace.css';
 
+const formatProjectContextBudgetLabel = (ratio: number | null): string => {
+  if (ratio === null) return '--';
+  const percent = ratio * 100;
+  if (percent > 0 && percent < 1) return '<1%';
+  return `${Math.round(percent)}%`;
+};
+
+const getProjectContextBudgetLabel = (conversation: TChatConversation | null): string => {
+  if (!conversation || !('last_token_usage' in conversation.extra) || !('last_context_limit' in conversation.extra)) {
+    return '--';
+  }
+  const totalTokens = conversation.extra.last_token_usage?.total_tokens;
+  const contextLimit = conversation.extra.last_context_limit;
+  if (typeof totalTokens !== 'number' || totalTokens <= 0 || typeof contextLimit !== 'number' || contextLimit <= 0) {
+    return '--';
+  }
+  return formatProjectContextBudgetLabel(totalTokens / contextLimit);
+};
+
 const ChatWorkspace: React.FC<WorkspaceProps> = ({
   conversation_id,
   workspace,
@@ -39,7 +71,24 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   messageApi: externalMessageApi,
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { openPreview } = usePreviewContext();
+  const conversationContext = useConversationContextSafe();
+  const loadedSkills = conversationContext?.loadedSkills ?? [];
+  const loadedMcpStatuses =
+    conversationContext?.loadedMcpStatuses ??
+    (conversationContext?.loadedMcpServers ?? []).map((name) => ({
+      id: name,
+      name,
+      status: 'loaded' as const,
+    }));
+  const showContextSection = eventPrefix === 'aionrs';
+  const contextCompaction = useContextCompaction({
+    conversationId: conversation_id,
+    workspace,
+    enabled: showContextSection,
+  });
+  const contextCommandInFlightRef = useRef(false);
 
   // Message API setup
   const [internalMessageApi, messageContext] = Message.useMessage();
@@ -50,6 +99,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [activeProjectPanel, setActiveProjectPanel] = useState<WorkspaceTab | null>(null);
   const [projectMenuSlot, setProjectMenuSlot] = useState<HTMLElement | null>(null);
+  const [contextBudgetLabel, setContextBudgetLabel] = useState('--');
   const fileChangesHook = useFileChanges({ workspace });
 
   // Bind workspace uploads to the conversation lifecycle: switching the
@@ -148,14 +198,9 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const openNodeContextMenu = useCallback(
     (node: IDirOrFile, x: number, y: number) => {
       treeHook.ensureNodeSelected(node);
-      modalsHook.setContextMenu({
-        visible: true,
-        x,
-        y,
-        node,
-      });
+      modalsHook.setContextMenu({ visible: true, x, y, node });
     },
-    [treeHook.ensureNodeSelected, modalsHook.setContextMenu]
+    [modalsHook.setContextMenu, treeHook.ensureNodeSelected]
   );
 
   const handleOpenChangeDiff = useCallback(
@@ -172,7 +217,9 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const handleProjectMenuToggle = useCallback(() => {
     setProjectMenuOpen((current) => {
       const nextOpen = !current;
-      if (nextOpen) setActiveProjectPanel(null);
+      if (nextOpen) {
+        setActiveProjectPanel(null);
+      }
       return nextOpen;
     });
   }, []);
@@ -195,18 +242,142 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   }, [isChangesPanelActive, fileChangesHook.refreshChanges, fileChangesHook.snapshotInfo]);
 
   useEffect(() => {
-    const findSlot = () => document.getElementById('app-titlebar-project-slot');
-    const initialSlot = findSlot();
-    if (initialSlot) {
-      setProjectMenuSlot(initialSlot);
+    if (!showContextSection && activeProjectPanel === 'context') {
+      setActiveProjectPanel(null);
+    }
+  }, [activeProjectPanel, showContextSection]);
+
+  const refreshProjectContextBudget = useCallback(async () => {
+    if (!showContextSection) {
+      setContextBudgetLabel('--');
       return;
     }
+    try {
+      setContextBudgetLabel(getProjectContextBudgetLabel(await getConversationOrNull(conversation_id)));
+    } catch (error) {
+      console.error('[Workspace] Failed to load project context budget:', error);
+      setContextBudgetLabel('--');
+    }
+  }, [conversation_id, showContextSection]);
+
+  useEffect(() => {
+    void refreshProjectContextBudget();
+  }, [refreshProjectContextBudget]);
+
+  useAddEventListener(
+    'aionrs.context-usage.refresh',
+    (updatedConversationId) => {
+      if (updatedConversationId === conversation_id) {
+        void refreshProjectContextBudget();
+      }
+    },
+    [conversation_id, refreshProjectContextBudget]
+  );
+
+  const compactFromContextAction = useCallback(
+    (input: Parameters<typeof contextCompaction.compact>) => contextCompaction.compact(input[0], input[1], input[2]),
+    [contextCompaction]
+  );
+
+  const openContextFromCommand = useCallback(async () => {
+    const conversation = await getConversationOrNull(conversation_id);
+    if (conversation?.type !== 'aionrs') return;
+
+    const contextState = getConversationContextHandoffExtra(conversation);
+    const resolved = resolveContextFile(workspace);
+    let filePath = contextState.context_file_path || resolved.filePath;
+    let fileName = contextState.context_file_name || resolved.fileName;
+    let markdown = contextState.context_file_path
+      ? await ipcBridge.fs.readFile.invoke({ path: filePath, workspace })
+      : null;
+
+    if (markdown === null) {
+      const compacted = await contextCompaction.compact('manual');
+      if (!compacted) return;
+      filePath = compacted.filePath;
+      fileName = compacted.fileName;
+      markdown = compacted.markdown;
+    }
+
+    openPreview(markdown, 'markdown', {
+      title: fileName,
+      file_name: fileName,
+      file_path: filePath,
+      workspace,
+      editable: true,
+    });
+  }, [contextCompaction, conversation_id, openPreview, workspace]);
+
+  useAddEventListener(
+    'aionrs.context-command',
+    ({ conversationId, command }) => {
+      if (!showContextSection || conversationId !== conversation_id || contextCommandInFlightRef.current) return;
+      contextCommandInFlightRef.current = true;
+
+      void (async () => {
+        if (command.action === 'open') {
+          await openContextFromCommand();
+          return;
+        }
+        if (command.action === 'compact') {
+          const result = await contextCompaction.compact('manual');
+          if (result?.source === 'rules') {
+            messageApi.warning?.(t('conversation.contextHandoff.command.fallbackComplete'));
+          } else if (result) {
+            messageApi.success(t('conversation.contextHandoff.command.compactSuccess'));
+          }
+          return;
+        }
+        if (command.action === 'pin') {
+          await pinConversationContext(
+            { conversationId, workspace, text: command.text },
+            {
+              compactContext: ({ trigger, targetTurnId, budgetStatus }) =>
+                compactFromContextAction([trigger, targetTurnId, budgetStatus]),
+            }
+          );
+          messageApi.success(t('conversation.contextHandoff.command.pinSuccess'));
+          return;
+        }
+
+        const result = await handoffConversationContext(
+          { conversationId, workspace },
+          {
+            compactContext: ({ trigger, targetTurnId, budgetStatus }) =>
+              compactFromContextAction([trigger, targetTurnId, budgetStatus]),
+          }
+        );
+        emitter.emit('chat.history.refresh');
+        void navigate(`/conversation/${result.conversation.id}`);
+      })()
+        .catch((error) => {
+          console.error('[ContextHandoff] Context command failed:', error);
+          messageApi.error(t('conversation.contextHandoff.command.failed'));
+        })
+        .finally(() => {
+          contextCommandInFlightRef.current = false;
+        });
+    },
+    [
+      compactFromContextAction,
+      contextCompaction,
+      conversation_id,
+      messageApi,
+      navigate,
+      openContextFromCommand,
+      showContextSection,
+      t,
+      workspace,
+    ]
+  );
+
+  useEffect(() => {
+    const findSlot = () => document.getElementById('app-titlebar-project-slot');
+    setProjectMenuSlot(findSlot());
 
     const observer = new MutationObserver(() => {
       const nextSlot = findSlot();
-      if (!nextSlot) return;
-      setProjectMenuSlot(nextSlot);
-      observer.disconnect();
+      setProjectMenuSlot((current) => (current === nextSlot ? current : nextSlot));
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -323,16 +494,31 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
     </div>
   ) : null;
 
+  const contextPanel = showContextSection ? (
+    <ContextHandoffPanel
+      conversationId={conversation_id}
+      workspace={workspace}
+      loadedSkills={loadedSkills}
+      loadedMcpStatuses={loadedMcpStatuses}
+      onCreateContext={() => contextCompaction.compact('manual')}
+      onPreviewOpen={handleProjectMenuClose}
+      isCompacting={contextCompaction.isCompacting}
+    />
+  ) : undefined;
+
   const projectMenu = (
     <WorkspaceProjectMenu
       t={t}
       open={projectMenuOpen}
       activePanel={activeProjectPanel}
       changeCount={fileChangesHook.changeCount}
+      contextBudgetLabel={contextBudgetLabel}
+      showContext={showContextSection}
       onToggle={handleProjectMenuToggle}
       onSelectPanel={handleProjectPanelSelect}
       filesPanel={filesPanel}
       changesPanel={changesPanel}
+      contextPanel={contextPanel}
     />
   );
 

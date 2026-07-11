@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { parseContextCommand, type ContextCommandInvalidCode } from '@/common/chat/slash/contextCommands';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
@@ -32,6 +33,7 @@ import {
   useConversationCommandQueue,
   type ConversationCommandQueueItem,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import { getConversationPinnedContext } from '@/renderer/pages/conversation/contextHandoff/pinnedContext';
 import { useConversationRuntimeView } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { getConversationRuntimeWorkspaceErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
@@ -59,6 +61,12 @@ const configErrorMessageKey = (error: unknown) => {
   if (errorKind === 'confirmation_timeout') return 'agent.config.timeout';
   if (errorKind === 'config_update_in_progress') return 'agent.config.busy';
   return 'agent.config.failed';
+};
+
+const contextCommandErrorMessageKey = (code: ContextCommandInvalidCode): string => {
+  if (code === 'missing_pin_text') return 'conversation.contextHandoff.command.missingPinText';
+  if (code === 'unexpected_arguments') return 'conversation.contextHandoff.command.unexpectedArguments';
+  return 'conversation.contextHandoff.command.unsupportedSubcommand';
 };
 
 const toModeLabel = (value: string): string =>
@@ -273,10 +281,12 @@ const AionrsSendBox: React.FC<{
 
         runtimeView.markSendStarted();
         setWaitingResponse(true);
+        const latestConversation = await getConversationOrNull(conversation_id);
         const res = await ipcBridge.conversation.sendMessage.invoke({
           input: displayMessage,
           conversation_id,
           files,
+          pinned_context: getConversationPinnedContext(latestConversation),
         });
         setActiveMsgId(res.msg_id);
         runtimeView.markSendAccepted(res.turn_id, res.runtime, res.msg_id);
@@ -354,6 +364,19 @@ const AionrsSendBox: React.FC<{
   }, [conversation_id, current_model?.use_model, executeCommand]);
 
   const onSendHandler = async (message: string) => {
+    const contextCommand = parseContextCommand(message);
+    if (contextCommand.kind === 'invalid') {
+      Message.error(t(contextCommandErrorMessageKey(contextCommand.code)));
+      return;
+    }
+    if (contextCommand.kind === 'valid') {
+      emitter.emit('aionrs.context-command', {
+        conversationId: conversation_id,
+        command: contextCommand.command,
+      });
+      return;
+    }
+
     const filesToSend = collectSelectedFiles(uploadFile, atPath);
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
@@ -613,6 +636,8 @@ const AionrsSendBox: React.FC<{
   };
   const effectiveHandleStop = teamRuntime?.onStop ?? handleStop;
   const sendBoxWidthClass = getChatSurfaceWidthClass(Boolean(teamPermission));
+  const thoughtDisplayRunning = teamRuntime?.loading ?? (runtimeView.hydrated ? runtimeView.isProcessing : running);
+  const thoughtDisplayThought = thoughtDisplayRunning ? thought : undefined;
 
   return (
     <div className={`${sendBoxWidthClass} flex flex-col mt-auto mb-16px`}>
@@ -626,7 +651,7 @@ const AionrsSendBox: React.FC<{
         onRemove={remove}
         onClear={clear}
       />
-      <ThoughtDisplay thought={thought} running={teamRuntime?.loading ?? running} onStop={effectiveHandleStop} />
+      <ThoughtDisplay thought={thoughtDisplayThought} running={thoughtDisplayRunning} onStop={effectiveHandleStop} />
 
       <SendBox
         data-testid='aionrs-sendbox'
@@ -725,6 +750,7 @@ const AionrsSendBox: React.FC<{
         onSend={onSendHandler}
         slash_commands={slash_commands}
         onSlashBuiltinCommand={onSlashBuiltinCommand}
+        enableContextCommand
         allowSendWhileLoading
       />
       {isMobile && (

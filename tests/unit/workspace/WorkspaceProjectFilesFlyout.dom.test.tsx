@@ -13,26 +13,37 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@arco-design/web-react', () => ({
   Button: ({
     children,
+    className,
     onClick,
+    onContextMenu,
     ...props
   }: {
     children?: React.ReactNode;
     onClick?: () => void;
     [key: string]: unknown;
   }) => (
-    <button type='button' onClick={onClick} {...props}>
+    <button type='button' className={className} onClick={onClick} onContextMenu={onContextMenu} {...props}>
       {children}
     </button>
   ),
   Input: ({
+    className,
     value,
     onChange,
     placeholder,
   }: {
+    className?: string;
     value?: string;
     onChange?: (value: string) => void;
     placeholder?: string;
-  }) => <input value={value} onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} />,
+  }) => (
+    <input
+      className={className}
+      value={value}
+      onChange={(event) => onChange?.(event.currentTarget.value)}
+      placeholder={placeholder}
+    />
+  ),
 }));
 
 vi.mock('@icon-park/react', () => ({
@@ -46,6 +57,14 @@ const sourceFile: IDirOrFile = {
   name: 'app.ts',
   fullPath: '/workspace/src/app.ts',
   relativePath: 'src/app.ts',
+  isDir: false,
+  isFile: true,
+};
+
+const contextFile: IDirOrFile = {
+  name: 'Context.md',
+  fullPath: '/workspace/Context.md',
+  relativePath: 'Context.md',
   isDir: false,
   isFile: true,
 };
@@ -65,6 +84,15 @@ const readmeFile: IDirOrFile = {
   relativePath: 'README.md',
   isDir: false,
   isFile: true,
+};
+
+const aionrsFolder: IDirOrFile = {
+  name: '.aionrs',
+  fullPath: '/workspace/.aionrs',
+  relativePath: '.aionrs',
+  isDir: true,
+  isFile: false,
+  children: [],
 };
 
 const t = (key: string) => key;
@@ -162,7 +190,24 @@ describe('WorkspaceProjectFilesFlyout', () => {
     );
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'missing-file' } });
-
     expect(screen.getByText('conversation.workspace.search.empty')).toBeInTheDocument();
+  });
+
+  it('marks Context.md as the managed context file', () => {
+    render(
+      <WorkspaceProjectFilesFlyout
+        t={t}
+        workspaceDisplayName='Temporary Space'
+        files={[aionrsFolder, contextFile]}
+        expandedKeys={[]}
+        onToggleFolder={vi.fn()}
+        onOpenFile={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Context.md' })).toHaveClass('workspace-project-files-row-context');
+    expect(
+      screen.getByRole('button', { name: 'Context.md' }).querySelector('.workspace-project-files-context-indicator')
+    ).toBeInTheDocument();
   });
 });

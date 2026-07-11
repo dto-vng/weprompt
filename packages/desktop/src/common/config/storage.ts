@@ -167,6 +167,66 @@ export interface TokenUsageData {
   total_tokens: number;
 }
 
+export type TContextHandoffItemSource = 'manual' | 'context_md';
+
+export type TContextHandoffItem = {
+  id: string;
+  title: string;
+  content: string;
+  source: TContextHandoffItemSource;
+  created_at: number;
+  updated_at: number;
+};
+
+export type TContextBudgetStatus = 'healthy' | 'watch' | 'compress' | 'too_large';
+
+export type TContextBudgetBucketKey = 'messages' | 'files' | 'skills' | 'memory' | 'tools';
+
+export type TContextBudgetBucket = {
+  estimatedTokens: number;
+};
+
+export type TContextHandoffBudgetSnapshot = {
+  status: TContextBudgetStatus;
+  ratio: number | null;
+  totalEstimatedTokens: number;
+  contextLimit?: number;
+  buckets: Record<TContextBudgetBucketKey, TContextBudgetBucket>;
+};
+
+export type TContextSnapshot = {
+  goal: string;
+  current_state: string[];
+  decisions: string[];
+  artifacts: string[];
+  user_preferences: string[];
+  open_questions: string[];
+  next_steps: string[];
+  do_not_forget: string[];
+};
+
+export type TContextGenerationSource = 'llm' | 'rules' | 'user';
+
+export type TContextGenerationStatus = 'fresh' | 'updating' | 'stale' | 'failed';
+
+export type TContextHandoffExtra = {
+  pinned_context?: TContextHandoffItem[];
+  context_file_path?: string;
+  context_file_name?: string;
+  last_budget_status?: TContextBudgetStatus;
+  last_exported_at?: number;
+  snapshot?: TContextSnapshot;
+  revision?: number;
+  source?: TContextGenerationSource;
+  status?: TContextGenerationStatus;
+  last_compacted_turn_id?: string;
+  turns_since_compaction?: number;
+  updated_at?: number;
+  last_error_code?: string;
+};
+
+export type TConversationContextHandoffExtra = TContextHandoffExtra;
+
 export type TChatConversation =
   | Omit<
       IChatConversation<
@@ -206,6 +266,8 @@ export type TChatConversation =
           last_token_usage?: TokenUsageData;
           /** Context window capacity from usage_update */
           last_context_limit?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
           session_mode?: string;
           /** Persisted model ID for resume support / 持久化的模型 ID，用于恢复 */
@@ -240,6 +302,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
           session_mode?: string;
           /** User-selected Codex model from Guid page / 用户在引导页选择的 Codex 模型 */
@@ -290,6 +354,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -315,6 +381,8 @@ export type TChatConversation =
           preset_assistant_id?: string;
           pinned?: boolean;
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           cron_job_id?: string;
@@ -339,6 +407,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -366,6 +436,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -399,6 +471,12 @@ export type TChatConversation =
         pinned?: boolean;
         /** Pin timestamp in milliseconds */
         pinned_at?: number;
+        /** Context handoff artifact and pinned context metadata. */
+        context_handoff?: TConversationContextHandoffExtra;
+        /** Edited Context.md content used to seed a continuation conversation. */
+        context?: string;
+        /** File name for the Context.md artifact used to seed this conversation. */
+        context_file_name?: string;
         /** Max tokens per response */
         maxTokens?: number;
         /** Max agentic turns */

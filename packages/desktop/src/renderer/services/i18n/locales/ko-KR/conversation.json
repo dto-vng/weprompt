@@ -561,5 +561,59 @@
       }
     }
   },
-  "notFound": "대화를 찾을 수 없거나 삭제되었습니다"
+  "notFound": "대화를 찾을 수 없거나 삭제되었습니다",
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "대화 컨텍스트 관리, 압축, 고정 또는 인계",
+      "missingPinText": "/context pin 뒤에 고정할 내용을 입력하세요",
+      "unexpectedArguments": "이 컨텍스트 명령에 불필요한 인수가 있습니다",
+      "unsupportedSubcommand": "알 수 없는 컨텍스트 명령입니다. open, compact, pin 또는 handoff를 사용하세요.",
+      "fallbackComplete": "로컬 대체 방식으로 컨텍스트를 업데이트했습니다",
+      "compactSuccess": "컨텍스트를 업데이트했습니다",
+      "pinSuccess": "컨텍스트를 고정하고 업데이트했습니다",
+      "failed": "컨텍스트 명령에 실패했습니다"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "AI로 업데이트 중...",
+      "updatedByAi": "AI로 업데이트됨",
+      "rulesFallback": "규칙 기반 대체 방식으로 업데이트됨",
+      "stale": "업데이트 대기 중",
+      "failed": "업데이트 실패",
+      "edited": "편집된 컨텍스트"
+    }
+  }
 }

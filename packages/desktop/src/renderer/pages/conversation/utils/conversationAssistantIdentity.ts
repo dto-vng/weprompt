@@ -1,4 +1,5 @@
 import type { TChatConversation } from '@/common/config/storage';
+import forgeMark from '@/renderer/assets/logos/brand/forge-mark.svg';
 import type { PresetAssistantInfo } from '@/renderer/hooks/agent/usePresetAssistantInfo';
 import { resolveAssistantAvatar } from '@/renderer/utils/model/assistantAvatar';
 import { resolveAgentLogo } from '@/renderer/utils/model/agentLogo';
@@ -82,7 +83,7 @@ export function resolveConversationLeadingMark(
         }
       : {
           kind: 'image',
-          value: assistantInfo.logo,
+          value: forgeMark,
           label: assistantInfo.name,
         };
   }
@@ -100,7 +101,7 @@ export function resolveConversationLeadingMark(
     if (assistantAvatar.kind === 'image') {
       return {
         kind: 'image',
-        value: assistantAvatar.value,
+        value: forgeMark,
         label: assistantLabel,
       };
     }
@@ -116,7 +117,7 @@ export function resolveConversationLeadingMark(
   if (logo) {
     return {
       kind: 'image',
-      value: logo,
+      value: forgeMark,
       label: backendKey,
     };
   }

@@ -5,25 +5,27 @@
  */
 
 import { Button } from '@arco-design/web-react';
-import { BranchOne, Down, FolderOpen, Right } from '@icon-park/react';
+import { BranchOne, Down, FileText, FolderOpen, Right } from '@icon-park/react';
 import type { TFunction } from 'i18next';
 import React from 'react';
-
-type ProjectPanel = 'files' | 'changes';
+import type { WorkspaceTab } from '../types';
 
 type WorkspaceProjectMenuProps = {
   t: TFunction;
   open: boolean;
-  activePanel: ProjectPanel | null;
+  activePanel: WorkspaceTab | null;
   changeCount: number;
+  contextBudgetLabel?: string;
+  showContext?: boolean;
   onToggle: () => void;
-  onSelectPanel: (panel: ProjectPanel) => void;
+  onSelectPanel: (panel: WorkspaceTab) => void;
   filesPanel: React.ReactNode;
   changesPanel: React.ReactNode;
+  contextPanel?: React.ReactNode;
 };
 
 type WorkspaceProjectMenuItem = {
-  key: ProjectPanel;
+  key: WorkspaceTab;
   label: string;
   meta?: string;
   icon: React.ReactNode;
@@ -34,10 +36,13 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
   open,
   activePanel,
   changeCount,
+  contextBudgetLabel = '--',
+  showContext = false,
   onToggle,
   onSelectPanel,
   filesPanel,
   changesPanel,
+  contextPanel,
 }) => {
   const rootRef = React.useRef<HTMLDivElement>(null);
 
@@ -45,7 +50,6 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
     if (!open) return;
 
     const getMenuItems = () => Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
-
     const handlePointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
         onToggle();
@@ -98,6 +102,16 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
       label: t('conversation.workspace.changes.filesTab'),
       icon: <FolderOpen theme='outline' size='17' />,
     },
+    ...(showContext
+      ? [
+          {
+            key: 'context' as const,
+            label: t('conversation.contextHandoff.sectionTitle'),
+            meta: contextBudgetLabel,
+            icon: <FileText theme='outline' size='17' />,
+          },
+        ]
+      : []),
     {
       key: 'changes',
       label: t('conversation.workspace.changes.tab'),
@@ -107,7 +121,8 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
   ];
 
   const activeItem = items.find((item) => item.key === activePanel);
-  const activePanelContent = activePanel === 'files' ? filesPanel : activePanel === 'changes' ? changesPanel : null;
+  const activePanelContent =
+    activePanel === 'files' ? filesPanel : activePanel === 'changes' ? changesPanel : contextPanel;
 
   return (
     <div ref={rootRef} className='workspace-project-menu-root'>
@@ -149,8 +164,14 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
                 >
                   <span className='workspace-project-menu-icon'>{item.icon}</span>
                   <span className='workspace-project-menu-label'>{item.label}</span>
-                  {item.meta && <span className='workspace-project-menu-badge'>{item.meta}</span>}
-                  {item.key === 'files' && <Right theme='outline' size='15' className='workspace-project-menu-arrow' />}
+                  {item.key === 'changes' && item.meta ? (
+                    <span className='workspace-project-menu-badge'>{item.meta}</span>
+                  ) : (
+                    item.meta && <span className='workspace-project-menu-meta'>{item.meta}</span>
+                  )}
+                  {item.key !== 'changes' && (
+                    <Right theme='outline' size='15' className='workspace-project-menu-arrow' />
+                  )}
                 </Button>
               </React.Fragment>
             ))}

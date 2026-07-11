@@ -8,7 +8,6 @@ import type { Theme } from '@/common/theme/types';
 import { LIGHT_THEME_ID, DARK_THEME_ID } from '@/common/theme/constants';
 
 import {
-  defaultThemeCover,
   misakaMikotoCover,
   helloKittyCover,
   retroWindowsCover,
@@ -26,6 +25,8 @@ import glitteringInputFieldCss from '@renderer/pages/settings/AppearanceSettings
 
 const T0 = 0;
 
+export const OFFICIAL_THEME_IDS: ReadonlySet<string> = new Set([LIGHT_THEME_ID, DARK_THEME_ID]);
+
 const decorative = (id: string, name: string, appearance: Theme['appearance'], css: string, cover?: string): Theme => ({
   id,
   name,
@@ -40,9 +41,8 @@ const decorative = (id: string, name: string, appearance: Theme['appearance'], c
 export const BUILTIN_THEMES: Theme[] = [
   {
     id: LIGHT_THEME_ID,
-    name: 'Forge',
+    name: 'Forge Light',
     appearance: 'light',
-    cover: defaultThemeCover,
     builtin: true,
     created_at: T0,
     updated_at: T0,
