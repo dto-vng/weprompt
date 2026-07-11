@@ -317,65 +317,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
     contentType: tab.content_type,
   }));
 
-  // 没有打开的 tab 时展示占位空状态，而不是按类型渲染内容
-  // Show a placeholder empty state instead of type-specific content when no tab is open
-  if (!activeTab) {
-    return (
-      <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
-        <div
-          data-testid='preview-panel-surface'
-          className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
-        >
-          {messageContextHolder}
-
-          {/* 确认对话框 / Confirmation modals */}
-          <PreviewConfirmModals
-            closeTabConfirm={closeTabConfirm}
-            onSaveAndCloseTab={handleSaveAndCloseTab}
-            onCloseWithoutSave={handleCloseWithoutSave}
-            onCancelCloseTab={handleCancelCloseTab}
-          />
-
-          {/* Tab 栏 / Tab bar */}
-          <PreviewTabs
-            tabs={previewTabs}
-            activeTabId={activeTabId}
-            tabFadeState={tabFadeState}
-            tabsContainerRef={tabsContainerRef}
-            onSwitchTab={switchTab}
-            onCloseTab={handleCloseTab}
-            onContextMenu={handleTabContextMenu}
-            onClosePanel={handleClosePanel}
-          />
-
-          {/* 空状态 / Empty state */}
-          <div className='flex-1 overflow-hidden'>
-            <ArtifactEmptyState />
-          </div>
-
-          {/* Tab 右键菜单 / Tab context menu */}
-          <PreviewContextMenu
-            contextMenu={contextMenu}
-            tabs={previewTabs}
-            currentTheme={currentTheme}
-            onClose={() => setContextMenu({ show: false, x: 0, y: 0, tabId: null })}
-            onCloseLeft={handleCloseLeft}
-            onCloseRight={handleCloseRight}
-            onCloseOthers={handleCloseOthers}
-            onCloseAll={handleCloseAll}
-          />
-        </div>
-      </PreviewToolbarExtrasProvider>
-    );
-  }
-
-  const { content, content_type, metadata } = activeTab;
+  // Derived from the active tab. Null-safe so every hook below (notably the four
+  // useCallbacks) is constructed unconditionally even when there is no active
+  // tab — the empty-state early return lives AFTER the last hook to respect the
+  // Rules of Hooks. These fields are only ever read on the with-tab render path
+  // (guarded below) or inside interaction callbacks that never fire while empty.
+  const { content, content_type, metadata } = (activeTab ?? {}) as NonNullable<typeof activeTab>;
   const isMarkdown = content_type === 'markdown';
   const isHTML = content_type === 'html';
   const isOfficeDocument = content_type === 'word' || content_type === 'excel';
   const officeRefreshToken = getOfficePreviewRefreshToken(
     metadata?.file_path,
-    activeTab.officePreviewRevision,
+    activeTab?.officePreviewRevision,
     manualOfficeRefreshRevision
   );
   const isEditable = metadata?.editable !== false; // 默认可编辑 / Default editable
@@ -496,6 +449,60 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
     if (!metadata?.file_path) return;
     void ipcBridge.shell.showItemInFolder.invoke(metadata.file_path).catch(() => {});
   }, [metadata?.file_path]);
+
+  // 没有打开的 tab 时展示占位空状态，而不是按类型渲染内容
+  // Show a placeholder empty state instead of type-specific content when no tab is
+  // open. This early return lives AFTER every hook above so the hook order is
+  // identical between the empty and with-tab renders (Rules of Hooks).
+  if (!activeTab) {
+    return (
+      <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
+        <div
+          data-testid='preview-panel-surface'
+          className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
+        >
+          {messageContextHolder}
+
+          {/* 确认对话框 / Confirmation modals */}
+          <PreviewConfirmModals
+            closeTabConfirm={closeTabConfirm}
+            onSaveAndCloseTab={handleSaveAndCloseTab}
+            onCloseWithoutSave={handleCloseWithoutSave}
+            onCancelCloseTab={handleCancelCloseTab}
+          />
+
+          {/* Tab 栏 / Tab bar */}
+          <PreviewTabs
+            tabs={previewTabs}
+            activeTabId={activeTabId}
+            tabFadeState={tabFadeState}
+            tabsContainerRef={tabsContainerRef}
+            onSwitchTab={switchTab}
+            onCloseTab={handleCloseTab}
+            onContextMenu={handleTabContextMenu}
+            onClosePanel={handleClosePanel}
+          />
+
+          {/* 空状态 / Empty state */}
+          <div className='flex-1 overflow-hidden'>
+            <ArtifactEmptyState />
+          </div>
+
+          {/* Tab 右键菜单 / Tab context menu */}
+          <PreviewContextMenu
+            contextMenu={contextMenu}
+            tabs={previewTabs}
+            currentTheme={currentTheme}
+            onClose={() => setContextMenu({ show: false, x: 0, y: 0, tabId: null })}
+            onCloseLeft={handleCloseLeft}
+            onCloseRight={handleCloseRight}
+            onCloseOthers={handleCloseOthers}
+            onCloseAll={handleCloseAll}
+          />
+        </div>
+      </PreviewToolbarExtrasProvider>
+    );
+  }
 
   // 渲染历史下拉菜单 / Render history dropdown
   const renderHistoryDropdown = () => {
