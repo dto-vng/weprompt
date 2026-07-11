@@ -261,7 +261,7 @@ export const compactContextLocally = async (
             { role: 'system', content: buildSystemPrompt() },
             { role: 'user', content: buildContextData(input, messages) },
           ],
-          max_tokens: 2_000,
+          max_tokens: 4_000,
           temperature: 0.1,
           response_format: { type: 'json_object' },
         },

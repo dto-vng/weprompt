@@ -94,7 +94,7 @@ describe('compactContextLocally', () => {
     );
     expect(dependencies.completionMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        max_tokens: 2_000,
+        max_tokens: 4_000,
         temperature: 0.1,
         response_format: { type: 'json_object' },
       }),
