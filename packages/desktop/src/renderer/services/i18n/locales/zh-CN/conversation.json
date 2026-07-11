@@ -613,7 +613,14 @@
       "rulesFallback": "使用规则回退更新",
       "stale": "等待更新",
       "failed": "更新失败",
-      "edited": "已编辑的上下文"
+      "edited": "已编辑的上下文",
+      "error": {
+        "invalidModelOutput": "AI 返回了异常结果，未能更新上下文。",
+        "providerRequestFailed": "模型请求失败。请检查服务商连接后重试。",
+        "providerNotFound": "未找到模型服务商，请检查该会话的模型设置。",
+        "interrupted": "上下文更新在完成前被中断。",
+        "unknown": "上下文更新意外失败，请重试。"
+      }
     }
   }
 }

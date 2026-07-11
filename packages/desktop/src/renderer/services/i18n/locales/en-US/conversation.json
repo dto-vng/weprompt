@@ -136,7 +136,14 @@
       "rulesFallback": "Updated with rules fallback",
       "stale": "Update pending",
       "failed": "Update failed",
-      "edited": "Edited context"
+      "edited": "Edited context",
+      "error": {
+        "invalidModelOutput": "The AI returned an unexpected result, so the context wasn't updated.",
+        "providerRequestFailed": "The model request failed. Check the provider connection and try again.",
+        "providerNotFound": "The model provider wasn't found. Check this conversation's model settings.",
+        "interrupted": "The context update was interrupted before it finished.",
+        "unknown": "The context update failed unexpectedly. Try again."
+      }
     }
   },
   "dropdown": {

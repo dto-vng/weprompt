@@ -227,6 +227,37 @@ describe('compactConversationContext', () => {
     );
   });
 
+  it('resolves the fallback provider from the persisted aionrs model shape', async () => {
+    const dependencies = createDependencies();
+    // Aionrs conversations persist { provider_id, model, use_model: null } —
+    // not the TProviderWithModel shape the type declares.
+    dependencies.getConversation = vi.fn(async () => ({
+      ...conversation,
+      model: { provider_id: 'provider-1', model: 'model-1', use_model: null } as unknown as typeof conversation.model,
+    }));
+    dependencies.compactRemote = vi.fn(async () => {
+      throw new BackendHttpError({ method: 'POST', path: '/context/compact', status: 404, body: {} });
+    });
+
+    await compactConversationContext(
+      {
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        trigger: 'manual',
+        targetTurnId: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(dependencies.compactLocal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: 'conversation-1',
+        provider_id: 'provider-1',
+        model: 'model-1',
+      })
+    );
+  });
+
   it('writes a preservation-oriented rules snapshot when both LLM paths fail', async () => {
     const dependencies = createDependencies();
     dependencies.compactRemote = vi.fn(async () => {
@@ -444,6 +475,58 @@ describe('automatic context compaction policy', () => {
 
     await waitFor(() =>
       expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-1' }))
+    );
+  });
+
+  it('derives the runtime budget status from the per-model window when no context limit is stored', async () => {
+    let listener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    const runCompaction = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      snapshot,
+      source: 'llm' as const,
+      throughTurnId: 'turn-1',
+    }));
+    const budgetConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      model: { ...conversation.model, use_model: 'minimax-m2.5' },
+      extra: {
+        ...conversation.extra,
+        // No last_context_limit — aionrs conversations never receive one.
+        last_token_usage: { total_tokens: 180_000 },
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          snapshot,
+        },
+      },
+    };
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        listener = next;
+        return vi.fn();
+      }),
+      getConversation: vi.fn(async () => budgetConversation),
+      updateConversation: vi.fn(async () => true),
+      runCompaction,
+      now: () => 100,
+    };
+
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+
+    act(() => listener?.(completedTurn()));
+
+    await waitFor(() =>
+      expect(runCompaction).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'auto', budgetStatus: 'too_large' })
+      )
     );
   });
 

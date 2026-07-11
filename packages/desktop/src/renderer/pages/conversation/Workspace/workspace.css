@@ -61,7 +61,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .workspace-project-menu-popover,
@@ -76,13 +76,13 @@
 
 .workspace-project-menu-popover {
   flex: 0 0 auto;
-  width: 246px;
-  padding: 7px;
+  width: 220px;
+  padding: 4px;
   animation: workspace-project-menu-in 0.17s ease both;
 }
 
 .workspace-project-menu-title {
-  padding: 6px 10px 7px;
+  padding: 2px 10px 3px;
   color: var(--color-text-3);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
   font-size: 9.5px;
@@ -95,10 +95,10 @@
 .workspace-project-menu-item {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto auto;
-  column-gap: 12px;
+  column-gap: 10px;
   align-items: center;
   width: 100%;
-  height: 40px;
+  height: 28px;
   padding: 0 10px;
   border: 0;
   border-radius: 9px;
@@ -108,7 +108,7 @@
 }
 
 .workspace-project-menu-item + .workspace-project-menu-item {
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .workspace-project-menu-item:hover,
@@ -168,7 +168,7 @@
 
 .workspace-project-menu-separator {
   height: 1px;
-  margin: 5px 8px;
+  margin: 2px 8px;
   background: var(--color-border);
 }
 
@@ -178,12 +178,12 @@
   flex-direction: column;
   width: min(252px, calc(100vw - 340px));
   max-height: min(560px, calc(100vh - 150px));
-  padding: 7px;
+  padding: 4px;
   animation: workspace-project-submenu-in 0.16s ease both;
 }
 
 .workspace-project-flyout-context {
-  width: min(288px, calc(100vw - 340px));
+  width: min(264px, calc(100vw - 340px));
 }
 .workspace-project-flyout-changes {
   width: min(360px, calc(100vw - 340px));
@@ -388,7 +388,7 @@
 .context-handoff-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .context-handoff-summary {
@@ -410,10 +410,10 @@
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  width: 100%;
+  flex: 1 1 auto;
   height: auto;
-  min-height: 48px;
-  padding: 8px;
+  min-height: 34px;
+  padding: 5px 8px;
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -442,8 +442,8 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 7px;
   color: var(--color-text-2);
   background: var(--color-fill-2);
@@ -451,6 +451,17 @@
 
 .context-handoff-file-copy {
   min-width: 0;
+}
+
+.context-handoff-file-alert {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  color: rgb(var(--danger-6));
+  cursor: help;
 }
 
 .context-handoff-file-name {
@@ -473,7 +484,7 @@
 }
 
 .context-handoff-budget {
-  margin-top: 8px;
+  margin-top: 2px;
   padding: 0 2px;
 }
 
@@ -482,7 +493,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   color: var(--color-text-3);
   font-size: 12px;
   line-height: 16px;
@@ -501,19 +512,19 @@
 .context-handoff-pin-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .context-handoff-pin-item {
   align-items: flex-start;
-  padding: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-fill-1);
 }
 
 .context-handoff-empty {
-  padding: 2px 2px 0 20px;
+  padding: 0 2px 0 20px;
   color: var(--color-text-3);
   font-size: 12px;
   line-height: 16px;
