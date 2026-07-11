@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Tag, Spin } from '@arco-design/web-react';
-import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { useThemeContext } from '@/renderer/hooks/context/ThemeContext';
+import { Spin, Tag } from '@arco-design/web-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import './SendBox/sendbox.css';
 
 export interface ThoughtData {
   subject: string;
@@ -21,17 +21,12 @@ interface ThoughtDisplayProps {
   onStop?: () => void;
 }
 
-// Background gradient constants
-const GRADIENT_DARK = 'linear-gradient(135deg, #464767 0%, #323232 100%)';
-const GRADIENT_LIGHT = 'linear-gradient(90deg, #F0F3FF 0%, #F2F2F2 100%)';
-
 const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   thought,
   style = 'default',
   running = false,
   onStop: _onStop,
 }) => {
-  const { theme } = useThemeContext();
   const { t } = useTranslation();
 
   // Format elapsed time with localized units
@@ -68,23 +63,13 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
     return () => clearInterval(timer);
   }, [running, thought?.subject]);
 
-  // Calculate final style based on theme and style prop
-  const containerStyle = useMemo(() => {
-    const background = theme === 'dark' ? GRADIENT_DARK : GRADIENT_LIGHT;
-
-    if (style === 'compact') {
-      return {
-        background,
-        marginBottom: '8px',
-        maxHeight: '100px',
-        overflow: 'scroll' as const,
-      };
-    }
-
-    return {
-      background,
-    };
-  }, [theme, style]);
+  const className = [
+    'thought-display',
+    running ? 'thought-display--running' : '',
+    style === 'compact' ? 'thought-display--compact' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   // Hide when not running and no thought data
   if (!thought?.subject && !running) {
@@ -94,14 +79,11 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   // Loading-only mode: running without thought data (used by ACP when thinking is inline)
   if (running && !thought?.subject) {
     return (
-      <div
-        className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary flex items-center gap-8px'
-        style={containerStyle}
-      >
+      <div data-testid='thought-display' className={className}>
         <Spin size={14} />
-        <span className='text-t-secondary'>
+        <span className='thought-display__label'>
           {t('conversation.chat.processing')}
-          <span className='ml-8px opacity-60'>({formatElapsedTime(elapsedTime)})</span>
+          <span className='thought-display__elapsed'>({formatElapsedTime(elapsedTime)})</span>
         </span>
       </div>
     );
@@ -111,19 +93,14 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   const showDescription = thought?.description && thought.description !== thought.subject;
 
   return (
-    <div
-      className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary'
-      style={containerStyle}
-    >
-      <div className='flex items-center gap-8px'>
+    <div data-testid='thought-display' className={className}>
+      <div className='thought-display__content'>
         {running && <Spin size={14} />}
         <Tag color='arcoblue' size='small'>
           {thought?.subject}
         </Tag>
-        {showDescription && <span className='flex-1 truncate'>{thought?.description}</span>}
-        {running && (
-          <span className='text-t-tertiary text-12px whitespace-nowrap'>({formatElapsedTime(elapsedTime)})</span>
-        )}
+        {showDescription && <span className='thought-display__description'>{thought?.description}</span>}
+        {running && <span className='thought-display__elapsed'>({formatElapsedTime(elapsedTime)})</span>}
       </div>
     </div>
   );

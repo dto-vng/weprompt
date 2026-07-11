@@ -67,7 +67,7 @@
     "recent7Days": "最近7天",
     "earlier": "更早",
     "projectsSection": "项目",
-    "conversationsSection": "对话",
+    "conversationsSection": "聊天",
     "removeProjectTitle": "移除项目",
     "removeProject": "移除项目",
     "removeProjectConfirm": "确定要移除项目「{{name}}」吗？项目下的 {{count}} 个对话也会被一起移除。",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "项目",
+    "projectMenu": {
+      "trigger": "项目"
+    },
     "pasteConfirm_title": "粘贴文件",
     "pasteConfirm_message": "确定要将 '{{name}}' 粘贴到选中的文件夹 ({{target}}) 吗？",
     "pasteConfirm_paste": "粘贴",

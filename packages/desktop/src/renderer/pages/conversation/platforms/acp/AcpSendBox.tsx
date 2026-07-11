@@ -106,6 +106,7 @@ const AcpSendBox: React.FC<{
   agent_name?: string;
   workspacePath?: string;
   messageState: UseAcpMessageReturn;
+  modelSelector?: React.ReactNode;
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
 }> = ({
@@ -115,6 +116,7 @@ const AcpSendBox: React.FC<{
   agent_name,
   workspacePath,
   messageState,
+  modelSelector,
   teamSendMessage,
   teamRuntime,
 }) => {
@@ -685,6 +687,7 @@ Please check your local CLI tool authentication status`,
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
+            {modelSelector}
             {showModeSelector && (
               <AgentModeSelector
                 backend={backend}

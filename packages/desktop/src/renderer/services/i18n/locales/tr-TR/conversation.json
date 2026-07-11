@@ -67,7 +67,7 @@
     "deleteSuccess": "Başarıyla silindi",
     "deleteFailed": "Silme başarısız oldu",
     "projectsSection": "Projeler",
-    "conversationsSection": "Konuşmalar",
+    "conversationsSection": "Sohbetler",
     "removeProjectTitle": "Projeyi kaldır",
     "removeProject": "Projeyi kaldır",
     "removeProjectConfirm": "\"{{name}}\" projesi kaldırılsın mı? Projedeki {{count}} konuşma da kaldırılacak.",
@@ -319,6 +319,9 @@
   },
   "workspace": {
     "title": "Proje",
+    "projectMenu": {
+      "trigger": "Proje"
+    },
     "pasteConfirm_title": "Dosyaları yapıştır",
     "pasteConfirm_message": "'{{name}}' dosyasını seçili klasöre ({{target}}) yapıştırmak istediğinizden emin misiniz?",
     "pasteConfirm_paste": "Yapıştır",

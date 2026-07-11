@@ -172,8 +172,8 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
   const { info: presetAssistantInfo } = usePresetAssistantInfo(conversation);
   const aionrsAssistantId = presetAssistantInfo?.assistantId;
   const layout = useLayoutContext();
-  // Mobile: model selection moved into the sendbox `+` action sheet to free up
-  // header space; the dropdown stays available on desktop and tablets ≥768px.
+  // Desktop: model selection sits in the composer action row.
+  // Mobile: model selection moves into the sendbox `+` action sheet.
   const isMobile = Boolean(layout?.isMobile);
   const { t } = useTranslation();
   const runtimeConfig = useAcpConfigOptions({
@@ -193,6 +193,14 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
     },
     [runtimeConfig, t]
   );
+  const modelSelector = !isMobile ? (
+    <AionrsModelSelector
+      selection={modelSelection}
+      thoughtLevel={runtimeConfig.thoughtLevel}
+      setStatus={runtimeConfig.setStatus}
+      onSetThoughtLevel={handleThoughtLevelSetOption}
+    />
+  ) : undefined;
 
   const chatLayoutProps = {
     title: conversation.name,
@@ -201,17 +209,10 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
     headerExtra: (
       <div className='flex items-center gap-8px'>
         <CronJobManager conversation_id={conversation.id} cron_job_id={cronJobId} />
-        {!isMobile && (
-          <AionrsModelSelector
-            selection={modelSelection}
-            thoughtLevel={runtimeConfig.thoughtLevel}
-            setStatus={runtimeConfig.setStatus}
-            onSetThoughtLevel={handleThoughtLevelSetOption}
-          />
-        )}
       </div>
     ),
     workspaceEnabled,
+    workspacePresentation: 'project-menu' as const,
     workspacePath: conversation.extra?.workspace,
     isTemporaryWorkspace: (conversation.extra as { is_temporary_workspace?: boolean } | undefined)
       ?.is_temporary_workspace,
@@ -225,6 +226,7 @@ const AionrsConversationPanel: React.FC<{ conversation: AionrsConversation; slid
         conversation_id={conversation.id}
         workspace={conversation.extra.workspace}
         modelSelection={modelSelection}
+        modelSelector={modelSelector}
         session_mode={conversation.extra?.session_mode}
         cron_job_id={cronJobId}
         loadedSkills={(conversation.extra as { skills?: string[] } | undefined)?.skills}
@@ -264,6 +266,28 @@ const ChatConversation: React.FC<{
   const conversationAgentName = (conversation?.extra as { agent_name?: string } | undefined)?.agent_name;
   const assistantDisplayName = presetAssistantInfo?.name || conversationAgentName;
 
+  // For ACP/Codex conversations, use AcpModelSelector that can show/switch models.
+  // For other conversations, show disabled model selector.
+  // Desktop: model selection is passed into the composer action row.
+  // Mobile: model selection moves into the sendbox `+` action sheet.
+  const modelSelector = useMemo(() => {
+    if (!conversation || isAionrsConversation) return undefined;
+    if (isMobile) return undefined;
+    if (isLegacyReadOnlyConversation) return undefined;
+    if (conversation.type === 'acp') {
+      const extra = conversation.extra as { current_model_id?: string };
+      return (
+        <AcpModelSelector
+          conversation_id={conversation.id}
+          backend={resolvedConversationBackend}
+          initialModelId={extra.current_model_id}
+          waitForWarmup
+        />
+      );
+    }
+    return <GoogleModelSelector disabled={true} />;
+  }, [conversation, isAionrsConversation, isMobile, isLegacyReadOnlyConversation, resolvedConversationBackend]);
+
   const conversationNode = useMemo(() => {
     if (!conversation || isAionrsConversation) return null;
     if (isLegacyReadOnlyConversation) {
@@ -279,6 +303,7 @@ const ChatConversation: React.FC<{
             backend={resolvedConversationBackend || 'claude'}
             session_mode={conversation.extra?.session_mode}
             agent_name={assistantDisplayName}
+            modelSelector={resolvedHideSendBox ? undefined : modelSelector}
             cron_job_id={cronJobId}
             hideSendBox={resolvedHideSendBox}
             loadedSkills={(conversation.extra as { skills?: string[] } | undefined)?.skills}
@@ -298,6 +323,7 @@ const ChatConversation: React.FC<{
     isLegacyReadOnlyConversation,
     resolvedConversationBackend,
     assistantDisplayName,
+    modelSelector,
     cronJobId,
     resolvedHideSendBox,
     acpAssistantId,
@@ -310,28 +336,6 @@ const ChatConversation: React.FC<{
       </div>
     );
   }, [t]);
-
-  // For ACP/Codex conversations, use AcpModelSelector that can show/switch models.
-  // For other conversations, show disabled model selector.
-  // Mobile: model selection moves into the sendbox `+` action sheet, so the
-  // header selector is suppressed to free up vertical space.
-  const modelSelector = useMemo(() => {
-    if (!conversation || isAionrsConversation) return undefined;
-    if (isMobile) return undefined;
-    if (isLegacyReadOnlyConversation) return undefined;
-    if (conversation.type === 'acp') {
-      const extra = conversation.extra as { current_model_id?: string };
-      return (
-        <AcpModelSelector
-          conversation_id={conversation.id}
-          backend={resolvedConversationBackend}
-          initialModelId={extra.current_model_id}
-          waitForWarmup
-        />
-      );
-    }
-    return <GoogleModelSelector disabled={true} />;
-  }, [conversation, isAionrsConversation, isMobile, isLegacyReadOnlyConversation, resolvedConversationBackend]);
 
   if (conversation && conversation.type === 'aionrs') {
     return <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />;
@@ -357,7 +361,7 @@ const ChatConversation: React.FC<{
           <CronJobManager conversation_id={conversation.id} cron_job_id={cronJobId} />
         </div>
       )}
-      {modelSelector && <div className='shrink-0'>{modelSelector}</div>}
+      {resolvedHideSendBox && modelSelector && <div className='shrink-0'>{modelSelector}</div>}
     </div>
   );
 
@@ -369,6 +373,7 @@ const ChatConversation: React.FC<{
       siderTitle={sliderTitle}
       sider={<ChatSlider conversation={conversation} />}
       workspaceEnabled={workspaceEnabled}
+      workspacePresentation='project-menu'
       workspacePath={conversation?.extra?.workspace}
       isTemporaryWorkspace={
         (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace

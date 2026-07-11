@@ -669,6 +669,26 @@ const getMessageMergeKey = (message: TMessage): string => {
   return `id:${message.id}`;
 };
 
+const normalizeDedupeTextContent = (content: string): string => content.trim().replace(/\s+/g, ' ');
+
+const isRenderableAssistantText = (message: TMessage): message is IMessageText =>
+  message.type === 'text' && message.position === 'left' && !message.hidden;
+
+const isDuplicateAssistantAnswer = (first: TMessage, second: TMessage): boolean => {
+  if (!isRenderableAssistantText(first) || !isRenderableAssistantText(second)) {
+    return false;
+  }
+  if (first.conversation_id !== second.conversation_id) {
+    return false;
+  }
+  if (normalizeDedupeTextContent(first.content.content) !== normalizeDedupeTextContent(second.content.content)) {
+    return false;
+  }
+  const firstCreatedAt = first.created_at ?? 0;
+  const secondCreatedAt = second.created_at ?? 0;
+  return Math.abs(firstCreatedAt - secondCreatedAt) <= 5 * 60 * 1000;
+};
+
 const preferPersistedOrLiveMessage = (persisted: TMessage, live: TMessage): TMessage => {
   if (persisted.type === 'text' && live.type === 'text') {
     return preferTextMessageVersion(persisted, live);
@@ -692,7 +712,10 @@ function mergeLoadedPageWithCurrent(conversationId: string, messages: TMessage[]
     return live ? preferPersistedOrLiveMessage(message, live) : message;
   });
   const liveOnly = sameConversation.filter(
-    (message) => !loadedIds.has(message.id) && !loadedKeys.has(getMessageMergeKey(message))
+    (message) =>
+      !loadedIds.has(message.id) &&
+      !loadedKeys.has(getMessageMergeKey(message)) &&
+      !messages.some((loadedMessage) => isDuplicateAssistantAnswer(loadedMessage, message))
   );
 
   return liveOnly.length ? [...mergedMessages, ...liveOnly] : mergedMessages;

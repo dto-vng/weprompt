@@ -67,7 +67,7 @@
     "recent7Days": "Últimos 7 días",
     "earlier": "Anterior",
     "projectsSection": "Proyectos",
-    "conversationsSection": "Conversaciones",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Quitar proyecto",
     "removeProject": "Quitar proyecto",
     "removeProjectConfirm": "¿Quitar el proyecto \"{{name}}\"? Sus {{count}} conversación(es) también se quitarán.",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "Proyecto",
+    "projectMenu": {
+      "trigger": "Proyecto"
+    },
     "pasteConfirm_title": "Pegar archivos",
     "pasteConfirm_message": "¿Estás seguro de que deseas pegar '{{name}}' en la carpeta seleccionada ({{target}})?",
     "pasteConfirm_paste": "Pegar",

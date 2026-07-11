@@ -12,7 +12,7 @@ import { useCronJobsMap } from '@/renderer/pages/cron';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button, Dropdown, Empty, Input, Menu, Modal, Tooltip } from '@arco-design/web-react';
-import { Delete, FolderOpen, MoreOne, Plus, Right } from '@icon-park/react';
+import { Delete, FolderOpen, ListCheckbox, MoreOne, Plus, Right } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   tooltipEnabled = false,
   batchMode = false,
   onBatchModeChange,
+  onNewChat,
   afterPinnedContent,
 }) => {
   const { id } = useParams();
@@ -160,6 +161,47 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       collapsed,
     });
 
+  const conversationSectionActions = !collapsed ? (
+    <span className='flex items-center gap-4px'>
+      {onNewChat && (
+        <Tooltip content={t('conversation.welcome.newConversation')} position='top'>
+          <Button
+            aria-label={t('conversation.welcome.newConversation')}
+            className='!w-22px !h-22px !p-0 !rounded-6px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3'
+            size='mini'
+            type='text'
+            icon={<Plus theme='outline' size='14' fill='currentColor' className='block leading-none' />}
+            onClick={(event) => {
+              event.stopPropagation();
+              onNewChat();
+            }}
+          />
+        </Tooltip>
+      )}
+      {onBatchModeChange && (
+        <Tooltip
+          content={batchMode ? t('conversation.history.batchModeExit') : t('conversation.history.batchManage')}
+          position='top'
+        >
+          <Button
+            aria-label={batchMode ? t('conversation.history.batchModeExit') : t('conversation.history.batchManage')}
+            className={classNames(
+              '!w-22px !h-22px !p-0 !rounded-6px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3',
+              batchMode && '!bg-[rgba(var(--primary-6),0.12)] !text-primary'
+            )}
+            size='mini'
+            type='text'
+            icon={<ListCheckbox theme='outline' size='14' className='block leading-none' />}
+            onClick={(event) => {
+              event.stopPropagation();
+              onBatchModeChange(!batchMode);
+            }}
+          />
+        </Tooltip>
+      )}
+    </span>
+  ) : null;
+
   const getConversationRowProps = useCallback(
     (conversation: TChatConversation): ConversationRowProps => ({
       conversation,
@@ -243,6 +285,38 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         .filter((section) => section.items.length > 0),
     [timelineSections]
   );
+
+  const batchSelectionPanel =
+    batchMode && !collapsed ? (
+      <div className='px-12px pb-8px pt-2px sticky top-28px z-20 bg-[var(--bg-2)]'>
+        <div className='rd-8px bg-fill-1 p-10px flex flex-col gap-8px border border-solid border-[rgba(var(--primary-6),0.08)]'>
+          <div className='text-12px leading-18px text-t-secondary'>
+            {t('conversation.history.selectedCount', { count: selectedCount })}
+          </div>
+          {/* Batch export UI entry intentionally disabled (kanban #14): the
+              button is removed so select-all + delete share the two columns.
+              handleBatchExport from useExport is kept for a future re-enable. */}
+          <div className='grid grid-cols-2 gap-6px'>
+            <Button
+              className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
+              size='mini'
+              type='secondary'
+              onClick={handleToggleSelectAll}
+            >
+              {allSelected ? t('common.cancel') : t('conversation.history.selectAll')}
+            </Button>
+            <Button
+              className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
+              size='mini'
+              status='warning'
+              onClick={handleBatchDelete}
+            >
+              {t('conversation.history.batchDelete')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   if (timelineSections.length === 0 && pinnedConversations.length === 0) {
     return (
@@ -378,37 +452,6 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         onConfirm={handleSelectExportDirectoryFromModal}
         onCancel={() => setShowExportDirectorySelector(false)}
       />
-
-      {batchMode && !collapsed && (
-        <div className='px-12px pb-8px pt-2px sticky top-0 z-20 bg-[var(--bg-2)]'>
-          <div className='rd-8px bg-fill-1 p-10px flex flex-col gap-8px border border-solid border-[rgba(var(--primary-6),0.08)]'>
-            <div className='text-12px leading-18px text-t-secondary'>
-              {t('conversation.history.selectedCount', { count: selectedCount })}
-            </div>
-            {/* Batch export UI entry intentionally disabled (kanban #14): the
-                button is removed so select-all + delete share the two columns.
-                handleBatchExport from useExport is kept for a future re-enable. */}
-            <div className='grid grid-cols-2 gap-6px'>
-              <Button
-                className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
-                size='mini'
-                type='secondary'
-                onClick={handleToggleSelectAll}
-              >
-                {allSelected ? t('common.cancel') : t('conversation.history.selectAll')}
-              </Button>
-              <Button
-                className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
-                size='mini'
-                status='warning'
-                onClick={handleBatchDelete}
-              >
-                {t('conversation.history.batchDelete')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 移除项目确认弹窗 — 使用项目自家 AionModal + 圆角线框按钮（红色危险态） */}
       <AionModal
@@ -610,8 +653,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         {conversationOnlySections.length > 0 && (
           <div className='min-w-0'>
             {!collapsed && (
-              <SectionLabel sectionKey='conversations' label={t('conversation.history.conversationsSection')} />
+              <SectionLabel
+                sectionKey='conversations'
+                label={t('conversation.history.conversationsSection')}
+                trailing={conversationSectionActions}
+              />
             )}
+            {batchSelectionPanel}
             {!collapsedSections.has('conversations') &&
               conversationOnlySections.map((section) => (
                 <div key={section.timeline} className='min-w-0'>

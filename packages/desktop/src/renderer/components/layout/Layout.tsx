@@ -357,7 +357,12 @@ const Layout: React.FC<{
                   })}
                   onClick={onClick}
                 >
-                  <img src={forgeMark} alt='Forge' className='w-full h-full object-contain' draggable={false} />
+                  <img
+                    src={forgeMark}
+                    alt={t('login.brand')}
+                    className='w-full h-full object-contain'
+                    draggable={false}
+                  />
                 </div>
                 {isSettingsRoute ? (
                   <Tooltip content={t('common.back', { defaultValue: 'Back to Chat' })} position='bottom'>
@@ -374,11 +379,11 @@ const Layout: React.FC<{
                         }
                       }}
                     >
-                      Forge
+                      {t('login.brand')}
                     </div>
                   </Tooltip>
                 ) : (
-                  <div className='text-16px text-t-primary collapsed-hidden font-semibold'>Forge</div>
+                  <div className='text-16px text-t-primary collapsed-hidden font-semibold'>{t('login.brand')}</div>
                 )}
                 {isMobile && !collapsed && (
                   <button

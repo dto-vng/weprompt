@@ -67,7 +67,7 @@
     "recent7Days": "Letzte 7 Tage",
     "earlier": "Früher",
     "projectsSection": "Projekte",
-    "conversationsSection": "Unterhaltungen",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Projekt entfernen",
     "removeProject": "Projekt entfernen",
     "removeProjectConfirm": "Projekt \"{{name}}\" entfernen? Die {{count}} zugehörige(n) Unterhaltung(en) werden ebenfalls entfernt.",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "Arbeitsbereich",
+    "projectMenu": {
+      "trigger": "Projekt"
+    },
     "pasteConfirm_title": "Dateien einfügen",
     "pasteConfirm_message": "Soll '{{name}}' wirklich in den ausgewählten Ordner ({{target}}) eingefügt werden?",
     "pasteConfirm_paste": "Einfügen",

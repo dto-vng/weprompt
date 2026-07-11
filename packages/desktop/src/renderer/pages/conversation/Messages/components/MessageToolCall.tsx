@@ -5,7 +5,7 @@
  */
 
 import type { IMessageToolCall } from '@/common/chat/chatLib';
-import { normalizeToolCall } from '@/common/chat/normalizeToolCall';
+import { isDiagnosticTelemetryText, normalizeToolCall } from '@/common/chat/normalizeToolCall';
 import type { NormalizedToolStatus } from '@/common/chat/normalizeToolCall';
 import FileChangesPanel from '@/renderer/components/base/FileChangesPanel';
 import { useDiffPreviewHandlers } from '@/renderer/hooks/file/useDiffPreviewHandlers';
@@ -64,6 +64,9 @@ const MessageToolCall: React.FC<{ message: IMessageToolCall }> = ({ message }) =
 
   const normalized = normalizeToolCall(message);
   if (!normalized) {
+    if (isDiagnosticTelemetryText(name) || isDiagnosticTelemetryText(message.content.description)) {
+      return null;
+    }
     return <div className='text-t-primary'>{name}</div>;
   }
 

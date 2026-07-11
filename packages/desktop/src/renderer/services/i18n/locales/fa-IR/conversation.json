@@ -67,7 +67,7 @@
     "recent7Days": "۷ روز اخیر",
     "earlier": "قدیمی‌تر",
     "projectsSection": "پروژه‌ها",
-    "conversationsSection": "مکالمات",
+    "conversationsSection": "چت‌ها",
     "removeProjectTitle": "حذف پروژه",
     "removeProject": "حذف پروژه",
     "removeProjectConfirm": "پروژه «{{name}}» حذف شود؟ {{count}} مکالمه مرتبط نیز حذف خواهند شد.",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "پروژه",
+    "projectMenu": {
+      "trigger": "پروژه"
+    },
     "pasteConfirm_title": "جای‌گذاری فایل‌ها",
     "pasteConfirm_message": "آیا مطمئن هستید که می‌خواهید «{{name}}» را در پوشه انتخاب‌شده ({{target}}) جای‌گذاری کنید؟",
     "pasteConfirm_paste": "جای‌گذاری",

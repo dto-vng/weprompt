@@ -258,8 +258,13 @@ export const useAionrsMessage = (
               });
             }
             setStreamRunning(false);
+            streamRunningRef.current = false;
             setWaitingResponse(false);
+            waitingResponseRef.current = false;
+            setHasActiveTools(false);
+            hasActiveToolsRef.current = false;
             setThought({ subject: '', description: '' });
+            hasContentInTurnRef.current = false;
             if (message.msg_id) {
               void processCompletedAssistantMessage(message.msg_id);
             }

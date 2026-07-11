@@ -67,7 +67,7 @@
     "recent7Days": "Останні 7 днів",
     "earlier": "Раніше",
     "projectsSection": "Проєкти",
-    "conversationsSection": "Розмови",
+    "conversationsSection": "Чати",
     "removeProjectTitle": "Видалити проєкт",
     "removeProject": "Видалити проєкт",
     "removeProjectConfirm": "Видалити проєкт «{{name}}»? Також буде видалено {{count}} розмов у ньому.",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "Проєкт",
+    "projectMenu": {
+      "trigger": "Проєкт"
+    },
     "pasteConfirm_title": "Вставка файлів",
     "pasteConfirm_message": "Ви впевнені, що хочете вставити «{{name}}» у вибрану папку ({{target}})?",
     "pasteConfirm_paste": "Вставити",

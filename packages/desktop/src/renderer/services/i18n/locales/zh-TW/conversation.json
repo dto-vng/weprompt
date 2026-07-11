@@ -67,7 +67,7 @@
     "deleteSuccess": "刪除成功",
     "deleteFailed": "刪除失敗",
     "projectsSection": "專案",
-    "conversationsSection": "對話",
+    "conversationsSection": "聊天",
     "removeProjectTitle": "移除專案",
     "removeProject": "移除專案",
     "removeProjectConfirm": "確定要移除專案「{{name}}」嗎？專案下的 {{count}} 個對話也會被一起移除。",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "專案",
+    "projectMenu": {
+      "trigger": "專案"
+    },
     "pasteConfirm_title": "貼上檔案",
     "pasteConfirm_message": "確定要將 '{{name}}' 貼上到選中的資料夾 ({{target}}) 嗎？",
     "pasteConfirm_paste": "貼上",

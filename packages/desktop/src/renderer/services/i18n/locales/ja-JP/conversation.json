@@ -67,7 +67,7 @@
     "deleteSuccess": "削除しました",
     "deleteFailed": "削除に失敗しました",
     "projectsSection": "プロジェクト",
-    "conversationsSection": "会話",
+    "conversationsSection": "チャット",
     "removeProjectTitle": "プロジェクトを削除",
     "removeProject": "プロジェクトを削除",
     "removeProjectConfirm": "プロジェクト「{{name}}」を削除しますか？プロジェクト内の {{count}} 件の会話も削除されます。",
@@ -336,6 +336,9 @@
   },
   "workspace": {
     "title": "プロジェクト",
+    "projectMenu": {
+      "trigger": "プロジェクト"
+    },
     "pasteConfirm_title": "ファイルを貼り付け",
     "pasteConfirm_message": "'{{name}}' を選択したフォルダー ({{target}}) に貼り付けてもよろしいですか？",
     "pasteConfirm_paste": "貼り付け",

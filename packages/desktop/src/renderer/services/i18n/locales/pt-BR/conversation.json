@@ -67,7 +67,7 @@
     "recent7Days": "Últimos 7 Dias",
     "earlier": "Mais Antigos",
     "projectsSection": "Projetos",
-    "conversationsSection": "Conversas",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Remover projeto",
     "removeProject": "Remover projeto",
     "removeProjectConfirm": "Remover o projeto \"{{name}}\"? Suas {{count}} conversa(s) também serão removidas.",
@@ -342,6 +342,9 @@
   },
   "workspace": {
     "title": "Projeto",
+    "projectMenu": {
+      "trigger": "Projeto"
+    },
     "pasteConfirm_title": "Colar arquivos",
     "pasteConfirm_message": "Tem certeza de que deseja colar '{{name}}' na pasta selecionada ({{target}})?",
     "pasteConfirm_paste": "Colar",

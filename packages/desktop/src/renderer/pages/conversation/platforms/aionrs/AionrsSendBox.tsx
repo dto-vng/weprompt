@@ -116,11 +116,12 @@ const useSendBoxDraft = (conversation_id: string) => {
 const AionrsSendBox: React.FC<{
   conversation_id: string;
   modelSelection: AionrsModelSelection;
+  modelSelector?: React.ReactNode;
   session_mode?: string;
   agent_name?: string;
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
-}> = ({ conversation_id, modelSelection, session_mode, agent_name, teamSendMessage, teamRuntime }) => {
+}> = ({ conversation_id, modelSelection, modelSelector, session_mode, agent_name, teamSendMessage, teamRuntime }) => {
   const [workspacePath, setWorkspacePath] = useState('');
   const [dynamicModes, setDynamicModes] = useState<AgentModeOption[]>([]);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
@@ -663,6 +664,7 @@ const AionrsSendBox: React.FC<{
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
+            {modelSelector}
             <AgentModeSelector
               backend='aionrs'
               conversation_id={conversation_id}
