@@ -11,6 +11,7 @@ const requestsRemote = (value: string | true | undefined): boolean => {
   return typeof value === 'string' && TRUE_VALUES.has(value.trim().toLowerCase());
 };
 
+/** Resolves retired remote-access controls while keeping the standalone host local-only. */
 export function resolveRemoteAccessPolicy(
   flags: ReadonlyMap<string, string | true>,
   env: NodeJS.ProcessEnv = process.env
@@ -23,6 +24,7 @@ export function resolveRemoteAccessPolicy(
   return { allowRemote: false, requestedBy };
 }
 
+/** Warns once when retired remote-access controls were requested. */
 export function warnUnsupportedRemoteAccess(
   policy: RemoteAccessPolicy,
   warn: (message: string) => void = console.warn
