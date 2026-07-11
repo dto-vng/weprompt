@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { parseContextCommand, type ContextCommandInvalidCode } from '@/common/chat/slash/contextCommands';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
@@ -60,6 +61,12 @@ const configErrorMessageKey = (error: unknown) => {
   if (errorKind === 'confirmation_timeout') return 'agent.config.timeout';
   if (errorKind === 'config_update_in_progress') return 'agent.config.busy';
   return 'agent.config.failed';
+};
+
+const contextCommandErrorMessageKey = (code: ContextCommandInvalidCode): string => {
+  if (code === 'missing_pin_text') return 'conversation.contextHandoff.command.missingPinText';
+  if (code === 'unexpected_arguments') return 'conversation.contextHandoff.command.unexpectedArguments';
+  return 'conversation.contextHandoff.command.unsupportedSubcommand';
 };
 
 const toModeLabel = (value: string): string =>
@@ -357,6 +364,19 @@ const AionrsSendBox: React.FC<{
   }, [conversation_id, current_model?.use_model, executeCommand]);
 
   const onSendHandler = async (message: string) => {
+    const contextCommand = parseContextCommand(message);
+    if (contextCommand.kind === 'invalid') {
+      Message.error(t(contextCommandErrorMessageKey(contextCommand.code)));
+      return;
+    }
+    if (contextCommand.kind === 'valid') {
+      emitter.emit('aionrs.context-command', {
+        conversationId: conversation_id,
+        command: contextCommand.command,
+      });
+      return;
+    }
+
     const filesToSend = collectSelectedFiles(uploadFile, atPath);
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
@@ -730,6 +750,7 @@ const AionrsSendBox: React.FC<{
         onSend={onSendHandler}
         slash_commands={slash_commands}
         onSlashBuiltinCommand={onSlashBuiltinCommand}
+        enableContextCommand
         allowSendWhileLoading
       />
       {isMobile && (

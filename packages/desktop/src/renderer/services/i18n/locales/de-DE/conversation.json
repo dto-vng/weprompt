@@ -573,6 +573,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Konversationskontext verwalten, komprimieren, anheften oder übergeben",
+      "missingPinText": "Text nach /context pin hinzufügen",
+      "unexpectedArguments": "Dieser Kontextbefehl enthält unerwartete Argumente",
+      "unsupportedSubcommand": "Unbekannter Kontextbefehl. Verwende open, compact, pin oder handoff.",
+      "fallbackComplete": "Kontext mit lokaler Rückfallebene aktualisiert",
+      "compactSuccess": "Kontext aktualisiert",
+      "pinSuccess": "Kontext angeheftet und aktualisiert",
+      "failed": "Kontextbefehl fehlgeschlagen"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -597,6 +607,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Wird mit KI aktualisiert...",
+      "updatedByAi": "Von KI aktualisiert",
+      "rulesFallback": "Mit regelbasierter Rückfallebene aktualisiert",
+      "stale": "Aktualisierung ausstehend",
+      "failed": "Aktualisierung fehlgeschlagen",
+      "edited": "Bearbeiteter Kontext",
+      "error": {
+        "invalidModelOutput": "Die KI hat ein unerwartetes Ergebnis geliefert, daher wurde der Kontext nicht aktualisiert.",
+        "providerRequestFailed": "Die Modellanfrage ist fehlgeschlagen. Prüfen Sie die Anbieterverbindung und versuchen Sie es erneut.",
+        "providerNotFound": "Der Modellanbieter wurde nicht gefunden. Prüfen Sie die Modelleinstellungen dieser Unterhaltung.",
+        "interrupted": "Die Kontextaktualisierung wurde vor dem Abschluss unterbrochen.",
+        "unknown": "Die Kontextaktualisierung ist unerwartet fehlgeschlagen. Bitte erneut versuchen."
+      }
+    }
   }
 }

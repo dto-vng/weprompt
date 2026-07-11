@@ -6,14 +6,27 @@
 
 import type { IDirOrFile } from '@/common/adapter/ipcBridge';
 import ChatWorkspace from '@/renderer/pages/conversation/Workspace';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  compactContext: vi.fn(),
+  emit: vi.fn(),
   ensureNodeSelected: vi.fn(),
+  getConversationOrNull: vi.fn(),
+  handoffConversationContext: vi.fn(),
   handlePreviewFile: vi.fn(),
+  listeners: new Map<string, (payload: unknown) => void>(),
+  messageError: vi.fn(),
+  messageSuccess: vi.fn(),
+  messageWarning: vi.fn(),
+  navigate: vi.fn(),
+  openPreview: vi.fn(),
+  pinConversationContext: vi.fn(),
+  readFile: vi.fn(),
   writeRendererLogInvoke: vi.fn(),
+  useContextCompaction: vi.fn(() => ({ compact: mocks.compactContext, isCompacting: false })),
 }));
 let titlebarProjectSlot: HTMLDivElement | null = null;
 
@@ -31,10 +44,17 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mocks.navigate,
+}));
+
 vi.mock('@/common', () => ({
   ipcBridge: {
     conversation: {
       getWorkspace: { invoke: vi.fn() },
+    },
+    fs: {
+      readFile: { invoke: mocks.readFile },
     },
     application: {
       writeRendererLog: { invoke: mocks.writeRendererLogInvoke },
@@ -88,7 +108,15 @@ vi.mock('@arco-design/web-react', () => ({
     />
   ),
   Message: {
-    useMessage: () => [{ error: vi.fn(), success: vi.fn(), info: vi.fn() }, null],
+    useMessage: () => [
+      {
+        error: mocks.messageError,
+        success: mocks.messageSuccess,
+        warning: mocks.messageWarning,
+        info: vi.fn(),
+      },
+      null,
+    ],
   },
 }));
 
@@ -107,16 +135,19 @@ vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
 
 vi.mock('@/renderer/pages/conversation/Preview', () => ({
   usePreviewContext: () => ({
-    openPreview: vi.fn(),
+    openPreview: mocks.openPreview,
   }),
 }));
 
 vi.mock('@/renderer/pages/conversation/utils/conversationCache', () => ({
-  getConversationOrNull: vi.fn(async () => null),
+  getConversationOrNull: mocks.getConversationOrNull,
 }));
 
 vi.mock('@/renderer/utils/emitter', () => ({
-  useAddEventListener: vi.fn(),
+  emitter: { emit: mocks.emit },
+  useAddEventListener: vi.fn((event: string, listener: (payload: unknown) => void) => {
+    mocks.listeners.set(event, listener);
+  }),
 }));
 
 vi.mock('@/renderer/pages/conversation/Workspace/hooks/useWorkspaceCollapse', () => ({
@@ -256,11 +287,26 @@ vi.mock('@/renderer/pages/conversation/Workspace/components/FileTypeIcon', () =>
 }));
 
 vi.mock('@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel', () => ({
-  default: ({ conversationId, workspace }: { conversationId: string; workspace: string }) => (
+  default: ({
+    conversationId,
+    onPreviewOpen,
+    workspace,
+  }: {
+    conversationId: string;
+    onPreviewOpen?: () => void;
+    workspace: string;
+  }) => (
     <div data-testid='context-handoff-panel'>
       {conversationId}:{workspace}
+      <button onClick={onPreviewOpen}>open context preview</button>
     </div>
   ),
+}));
+
+vi.mock('@/renderer/pages/conversation/contextHandoff/useContextCompaction', () => ({
+  useContextCompaction: mocks.useContextCompaction,
+  handoffConversationContext: mocks.handoffConversationContext,
+  pinConversationContext: mocks.pinConversationContext,
 }));
 
 describe('ChatWorkspace preview selection', () => {
@@ -269,6 +315,20 @@ describe('ChatWorkspace preview selection', () => {
     titlebarProjectSlot.id = 'app-titlebar-project-slot';
     document.body.append(titlebarProjectSlot);
     vi.clearAllMocks();
+    mocks.listeners.clear();
+    mocks.compactContext.mockResolvedValue({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      source: 'llm',
+    });
+    mocks.getConversationOrNull.mockResolvedValue(null);
+    mocks.handoffConversationContext.mockResolvedValue({
+      conversation: { id: 'conversation-2' },
+      markdown: '# Context',
+    });
+    mocks.pinConversationContext.mockResolvedValue({ pin: { id: 'pin-1' }, compaction: null });
+    mocks.readFile.mockResolvedValue('# Context');
   });
 
   afterEach(() => {
@@ -306,10 +366,146 @@ describe('ChatWorkspace preview selection', () => {
   it('renders context management in the project panel for Aionrs workspaces', () => {
     render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
 
+    expect(mocks.useContextCompaction).toHaveBeenCalledWith({
+      conversationId: 'conversation-1',
+      workspace: '/workspace',
+      enabled: true,
+    });
+
     expect(screen.queryByTestId('context-handoff-panel')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /conversation.workspace.projectMenu.trigger/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: /conversation.contextHandoff.sectionTitle/ }));
 
     expect(screen.getByTestId('context-handoff-panel')).toHaveTextContent('conversation-1:/workspace');
+  });
+
+  it('dismisses the Project menu after Context.md opens in Preview', async () => {
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /conversation.workspace.projectMenu.trigger/ }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: /conversation.contextHandoff.sectionTitle/ }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'open context preview' }));
+    });
+
+    expect(
+      screen.queryByRole('menuitem', { name: /conversation.contextHandoff.sectionTitle/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('routes native context commands through the always-mounted context controller', async () => {
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    const listener = mocks.listeners.get('aionrs.context-command');
+    expect(listener).toBeDefined();
+
+    await act(async () => {
+      listener?.({ conversationId: 'conversation-1', command: { action: 'compact' } });
+    });
+
+    await waitFor(() => expect(mocks.compactContext).toHaveBeenCalledWith('manual'));
+  });
+
+  it('ignores context commands intended for another conversation', async () => {
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    await act(async () => {
+      mocks.listeners.get('aionrs.context-command')?.({
+        conversationId: 'conversation-2',
+        command: { action: 'compact' },
+      });
+    });
+
+    expect(mocks.compactContext).not.toHaveBeenCalled();
+  });
+
+  it('opens an existing Context.md in the editable Preview surface', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      id: 'conversation-1',
+      type: 'aionrs',
+      extra: {
+        workspace: '/workspace',
+        context_handoff: {
+          context_file_path: '/workspace/Context.md',
+          context_file_name: 'Context.md',
+        },
+      },
+    });
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    await act(async () => {
+      mocks.listeners.get('aionrs.context-command')?.({
+        conversationId: 'conversation-1',
+        command: { action: 'open' },
+      });
+    });
+
+    await waitFor(() =>
+      expect(mocks.openPreview).toHaveBeenCalledWith(
+        '# Context',
+        'markdown',
+        expect.objectContaining({
+          editable: true,
+          file_name: 'Context.md',
+          file_path: '/workspace/Context.md',
+        })
+      )
+    );
+    expect(mocks.compactContext).not.toHaveBeenCalled();
+  });
+
+  it('routes pin commands through protected pin persistence and compaction', async () => {
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+
+    await act(async () => {
+      mocks.listeners.get('aionrs.context-command')?.({
+        conversationId: 'conversation-1',
+        command: { action: 'pin', text: 'Keep the UI compact.' },
+      });
+    });
+
+    await waitFor(() =>
+      expect(mocks.pinConversationContext).toHaveBeenCalledWith(
+        {
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          text: 'Keep the UI compact.',
+        },
+        expect.objectContaining({ compactContext: expect.any(Function) })
+      )
+    );
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('conversation.contextHandoff.command.pinSuccess');
+  });
+
+  it('deduplicates handoff commands and navigates only after creation succeeds', async () => {
+    let resolveHandoff: ((value: { conversation: { id: string }; markdown: string }) => void) | undefined;
+    mocks.handoffConversationContext.mockReturnValue(
+      new Promise((resolve) => {
+        resolveHandoff = resolve;
+      })
+    );
+    render(<ChatWorkspace conversation_id='conversation-1' workspace='/workspace' eventPrefix='aionrs' />);
+    const listener = mocks.listeners.get('aionrs.context-command');
+    const payload = { conversationId: 'conversation-1', command: { action: 'handoff' as const } };
+
+    act(() => {
+      listener?.(payload);
+      listener?.(payload);
+    });
+
+    expect(mocks.handoffConversationContext).toHaveBeenCalledTimes(1);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveHandoff?.({ conversation: { id: 'conversation-2' }, markdown: '# Context' });
+      await Promise.resolve();
+    });
+
+    expect(mocks.emit).toHaveBeenCalledWith('chat.history.refresh');
+    expect(mocks.navigate).toHaveBeenCalledWith('/conversation/conversation-2');
   });
 });

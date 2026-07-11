@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "会話コンテキストの管理、圧縮、固定、引き継ぎ",
+      "missingPinText": "/context pin の後に固定する内容を入力してください",
+      "unexpectedArguments": "このコンテキストコマンドには不要な引数があります",
+      "unsupportedSubcommand": "不明なコンテキストコマンドです。open、compact、pin、handoff を使用してください。",
+      "fallbackComplete": "ローカルフォールバックでコンテキストを更新しました",
+      "compactSuccess": "コンテキストを更新しました",
+      "pinSuccess": "コンテキストを固定して更新しました",
+      "failed": "コンテキストコマンドに失敗しました"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "AI で更新中...",
+      "updatedByAi": "AI で更新済み",
+      "rulesFallback": "ルールフォールバックで更新済み",
+      "stale": "更新待ち",
+      "failed": "更新に失敗しました",
+      "edited": "編集済みコンテキスト",
+      "error": {
+        "invalidModelOutput": "AI が予期しない結果を返したため、コンテキストを更新できませんでした。",
+        "providerRequestFailed": "モデルへのリクエストに失敗しました。プロバイダーの接続を確認して再試行してください。",
+        "providerNotFound": "モデルプロバイダーが見つかりません。この会話のモデル設定を確認してください。",
+        "interrupted": "コンテキストの更新が完了前に中断されました。",
+        "unknown": "コンテキストの更新が予期せず失敗しました。再試行してください。"
+      }
+    }
   }
 }

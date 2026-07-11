@@ -573,6 +573,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Gestionar, compactar, fijar o transferir el contexto de la conversación",
+      "missingPinText": "Añade texto después de /context pin",
+      "unexpectedArguments": "Este comando de contexto contiene argumentos inesperados",
+      "unsupportedSubcommand": "Comando de contexto desconocido. Usa open, compact, pin o handoff.",
+      "fallbackComplete": "Contexto actualizado con el método local alternativo",
+      "compactSuccess": "Contexto actualizado",
+      "pinSuccess": "Contexto fijado y actualizado",
+      "failed": "El comando de contexto ha fallado"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -597,6 +607,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Actualizando con IA...",
+      "updatedByAi": "Actualizado por IA",
+      "rulesFallback": "Actualizado con reglas alternativas",
+      "stale": "Actualización pendiente",
+      "failed": "Error de actualización",
+      "edited": "Contexto editado",
+      "error": {
+        "invalidModelOutput": "La IA devolvió un resultado inesperado, por lo que no se actualizó el contexto.",
+        "providerRequestFailed": "La solicitud al modelo falló. Comprueba la conexión del proveedor e inténtalo de nuevo.",
+        "providerNotFound": "No se encontró el proveedor del modelo. Comprueba la configuración del modelo de esta conversación.",
+        "interrupted": "La actualización del contexto se interrumpió antes de finalizar.",
+        "unknown": "La actualización del contexto falló inesperadamente. Inténtalo de nuevo."
+      }
+    }
   }
 }

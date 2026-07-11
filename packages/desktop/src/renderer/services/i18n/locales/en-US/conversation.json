@@ -95,6 +95,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Manage, compact, pin, or hand off conversation context",
+      "missingPinText": "Add text after /context pin",
+      "unexpectedArguments": "This context command has unexpected arguments",
+      "unsupportedSubcommand": "Unknown context command. Use open, compact, pin, or handoff.",
+      "fallbackComplete": "Context updated with the local fallback",
+      "compactSuccess": "Context updated",
+      "pinSuccess": "Context pinned and updated",
+      "failed": "Context command failed"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -119,7 +129,22 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Updating with AI...",
+      "updatedByAi": "Updated by AI",
+      "rulesFallback": "Updated with rules fallback",
+      "stale": "Update pending",
+      "failed": "Update failed",
+      "edited": "Edited context",
+      "error": {
+        "invalidModelOutput": "The AI returned an unexpected result, so the context wasn't updated.",
+        "providerRequestFailed": "The model request failed. Check the provider connection and try again.",
+        "providerNotFound": "The model provider wasn't found. Check this conversation's model settings.",
+        "interrupted": "The context update was interrupted before it finished.",
+        "unknown": "The context update failed unexpectedly. Try again."
+      }
+    }
   },
   "dropdown": {
     "cliAgents": "CLI Agents",

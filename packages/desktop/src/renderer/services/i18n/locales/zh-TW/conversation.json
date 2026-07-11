@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "管理、壓縮、釘選或交接對話上下文",
+      "missingPinText": "請在 /context pin 後輸入要釘選的內容",
+      "unexpectedArguments": "此上下文命令包含多餘參數",
+      "unsupportedSubcommand": "未知的上下文命令。請使用 open、compact、pin 或 handoff。",
+      "fallbackComplete": "已使用本機備援更新上下文",
+      "compactSuccess": "上下文已更新",
+      "pinSuccess": "上下文已釘選並更新",
+      "failed": "上下文命令失敗"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "正在使用 AI 更新...",
+      "updatedByAi": "由 AI 更新",
+      "rulesFallback": "使用規則備援更新",
+      "stale": "等待更新",
+      "failed": "更新失敗",
+      "edited": "已編輯的上下文",
+      "error": {
+        "invalidModelOutput": "AI 回傳了非預期的結果，未能更新上下文。",
+        "providerRequestFailed": "模型請求失敗。請檢查服務商連線後重試。",
+        "providerNotFound": "找不到模型服務商，請檢查此對話的模型設定。",
+        "interrupted": "上下文更新在完成前被中斷。",
+        "unknown": "上下文更新意外失敗，請重試。"
+      }
+    }
   }
 }

@@ -1,7 +1,6 @@
 import { extractDiagnosticTokenEstimate, type TMessage } from '@/common/chat/chatLib';
 import type { TContextHandoffItem, TContextHandoffBudgetSnapshot, TokenUsageData } from '@/common/config/storage';
 import { readMessageContent } from '@/renderer/utils/chat/conversationExport';
-import { DEFAULT_CONTEXT_LIMIT } from '@/renderer/utils/model/modelContextLimits';
 
 type EstimateContextBudgetInput = {
   messages?: TMessage[];
@@ -74,8 +73,8 @@ export const estimateContextBudget = (input: EstimateContextBudgetInput): TConte
   }
 
   const totalEstimatedTokens = Object.values(buckets).reduce((sum, bucket) => sum + bucket.estimatedTokens, 0);
-  const contextLimit = input.contextLimit ?? DEFAULT_CONTEXT_LIMIT;
-  const ratio = contextLimit > 0 ? totalEstimatedTokens / contextLimit : null;
+  const contextLimit = input.contextLimit;
+  const ratio = contextLimit && contextLimit > 0 ? totalEstimatedTokens / contextLimit : null;
 
   return {
     status: resolveStatus(ratio),

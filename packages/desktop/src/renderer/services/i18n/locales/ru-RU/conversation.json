@@ -572,6 +572,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Управление, сжатие, закрепление и передача контекста беседы",
+      "missingPinText": "Добавьте текст после /context pin",
+      "unexpectedArguments": "В команде контекста есть лишние аргументы",
+      "unsupportedSubcommand": "Неизвестная команда контекста. Используйте open, compact, pin или handoff.",
+      "fallbackComplete": "Контекст обновлён с помощью локального резервного режима",
+      "compactSuccess": "Контекст обновлён",
+      "pinSuccess": "Контекст закреплён и обновлён",
+      "failed": "Не удалось выполнить команду контекста"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -596,6 +606,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Обновление с помощью ИИ...",
+      "updatedByAi": "Обновлено ИИ",
+      "rulesFallback": "Обновлено с помощью резервных правил",
+      "stale": "Ожидает обновления",
+      "failed": "Ошибка обновления",
+      "edited": "Отредактированный контекст",
+      "error": {
+        "invalidModelOutput": "ИИ вернул неожиданный результат, поэтому контекст не обновлён.",
+        "providerRequestFailed": "Запрос к модели не выполнен. Проверьте подключение провайдера и повторите попытку.",
+        "providerNotFound": "Провайдер модели не найден. Проверьте настройки модели этого разговора.",
+        "interrupted": "Обновление контекста было прервано до завершения.",
+        "unknown": "Обновление контекста неожиданно завершилось ошибкой. Повторите попытку."
+      }
+    }
   }
 }

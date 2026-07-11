@@ -574,6 +574,16 @@
       "too_large": "Context large {{percent}}"
     },
     "budgetLabel": "Budget",
+    "command": {
+      "description": "Konuşma bağlamını yönet, sıkıştır, sabitle veya devret",
+      "missingPinText": "/context pin sonrasına metin ekleyin",
+      "unexpectedArguments": "Bu bağlam komutunda beklenmeyen bağımsız değişkenler var",
+      "unsupportedSubcommand": "Bilinmeyen bağlam komutu. open, compact, pin veya handoff kullanın.",
+      "fallbackComplete": "Bağlam yerel yedek yöntemle güncellendi",
+      "compactSuccess": "Bağlam güncellendi",
+      "pinSuccess": "Bağlam sabitlendi ve güncellendi",
+      "failed": "Bağlam komutu başarısız oldu"
+    },
     "contextMissing": "Context.md could not be read",
     "continue": "Continue",
     "continuationName": "{{name}} continuation",
@@ -598,6 +608,21 @@
     "pinTitlePlaceholder": "Title",
     "pinnedTitle": "Pinned context",
     "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context"
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Yapay zekâ ile güncelleniyor...",
+      "updatedByAi": "Yapay zekâ tarafından güncellendi",
+      "rulesFallback": "Kural tabanlı yedek yöntemle güncellendi",
+      "stale": "Güncelleme bekleniyor",
+      "failed": "Güncelleme başarısız",
+      "edited": "Düzenlenmiş bağlam",
+      "error": {
+        "invalidModelOutput": "Yapay zekâ beklenmeyen bir sonuç döndürdü; bağlam güncellenmedi.",
+        "providerRequestFailed": "Model isteği başarısız oldu. Sağlayıcı bağlantısını kontrol edip tekrar deneyin.",
+        "providerNotFound": "Model sağlayıcısı bulunamadı. Bu konuşmanın model ayarlarını kontrol edin.",
+        "interrupted": "Bağlam güncellemesi tamamlanmadan kesildi.",
+        "unknown": "Bağlam güncellemesi beklenmedik şekilde başarısız oldu. Tekrar deneyin."
+      }
+    }
   }
 }
