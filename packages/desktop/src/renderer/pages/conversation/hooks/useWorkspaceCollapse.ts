@@ -35,7 +35,8 @@ type UseWorkspaceCollapseReturn = {
 };
 
 /**
- * Manages workspace panel collapse/expand state.
+ * Manages the artifact-pane collapse/expand state (`rightSiderCollapsed`).
+ * ChatLayout consumes this as `artifactCollapsed`.
  *
  * Default: collapsed. Auto-expand fires when WORKSPACE_HAS_FILES_EVENT arrives
  * and either:
@@ -59,7 +60,7 @@ export function useWorkspaceCollapse({
   preferenceKey,
   isTemporaryWorkspace,
 }: UseWorkspaceCollapseParams): UseWorkspaceCollapseReturn {
-  // Workspace panel always starts collapsed; preference and hasFiles events
+  // Artifact pane always starts collapsed; preference and hasFiles events
   // drive expand. See WORKSPACE_HAS_FILES_EVENT handler below.
   const [rightSiderCollapsed, setRightSiderCollapsed] = useState(true);
 

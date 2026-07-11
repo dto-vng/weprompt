@@ -1,20 +1,12 @@
-import {
-  MAX_WORKSPACE_PANEL_PX,
-  MIN_CHAT_PANEL_PX,
-  MIN_PREVIEW_PANEL_PX,
-  MIN_WORKSPACE_PANEL_PX,
-} from '@/renderer/pages/conversation/utils/layoutCalc';
+import { MIN_ARTIFACT_PANEL_PX, MIN_CHAT_PANEL_PX } from '@/renderer/pages/conversation/utils/layoutCalc';
 import { useEffect } from 'react';
 
 type UseLayoutConstraintsParams = {
   containerWidth: number;
   workspaceEnabled: boolean;
   isDesktop: boolean;
-  isPreviewOpen: boolean;
-  rightSiderCollapsed: boolean;
-  setRightSiderCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  workspaceWidthPx: number;
-  setWorkspaceWidthPx: (px: number) => void;
+  artifactCollapsed: boolean;
+  setArtifactCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   chatSplitRatio: number;
   setChatSplitRatio: (ratio: number) => void;
   dynamicChatMinRatio: number;
@@ -22,56 +14,38 @@ type UseLayoutConstraintsParams = {
 };
 
 /**
- * Constrains the user-preferred workspace width and chat-preview ratio so
- * that all panels remain above their minimum pixel widths; auto-collapses
- * workspace when the container is too narrow to fit chat + preview + workspace.
+ * Constrains the two-region (chat | artifact) layout: auto-collapses the
+ * artifact pane when the container is too narrow to fit both panes above their
+ * minimum pixel widths, and clamps the chat<->artifact split ratio into its
+ * dynamic bounds.
  */
 export function useLayoutConstraints({
   containerWidth,
   workspaceEnabled,
   isDesktop,
-  isPreviewOpen,
-  rightSiderCollapsed,
-  setRightSiderCollapsed,
-  workspaceWidthPx,
-  setWorkspaceWidthPx,
+  artifactCollapsed,
+  setArtifactCollapsed,
   chatSplitRatio,
   setChatSplitRatio,
   dynamicChatMinRatio,
   dynamicChatMaxRatio,
 }: UseLayoutConstraintsParams): void {
-  // Constrain workspace width when preview is open
+  // Auto-collapse the artifact pane when the container is too narrow to fit
+  // both the chat and artifact panes side by side.
   useEffect(() => {
-    if (!workspaceEnabled || !isPreviewOpen || !isDesktop || rightSiderCollapsed) {
+    if (!workspaceEnabled || !isDesktop || artifactCollapsed) {
       return;
     }
     const safeContainerWidth = Math.max(containerWidth || 0, 1);
-    const maxWorkspaceByContainer = Math.max(
-      MIN_WORKSPACE_PANEL_PX,
-      safeContainerWidth - MIN_CHAT_PANEL_PX - MIN_PREVIEW_PANEL_PX
-    );
-    const maxWorkspace = Math.min(MAX_WORKSPACE_PANEL_PX, maxWorkspaceByContainer);
-    if (workspaceWidthPx > maxWorkspace) {
-      setWorkspaceWidthPx(maxWorkspace);
+    if (safeContainerWidth < MIN_CHAT_PANEL_PX + MIN_ARTIFACT_PANEL_PX) {
+      setArtifactCollapsed(true);
     }
-    // Auto-collapse workspace when container is too narrow for all three panels
-    if (safeContainerWidth < MIN_CHAT_PANEL_PX + MIN_PREVIEW_PANEL_PX + MIN_WORKSPACE_PANEL_PX) {
-      setRightSiderCollapsed(true);
-    }
-  }, [
-    containerWidth,
-    isDesktop,
-    isPreviewOpen,
-    rightSiderCollapsed,
-    setRightSiderCollapsed,
-    setWorkspaceWidthPx,
-    workspaceEnabled,
-    workspaceWidthPx,
-  ]);
+  }, [artifactCollapsed, containerWidth, isDesktop, setArtifactCollapsed, workspaceEnabled]);
 
-  // Clamp chat split ratio within dynamic bounds
+  // Clamp the chat split ratio within the dynamic bounds while the artifact
+  // pane is visible.
   useEffect(() => {
-    if (!workspaceEnabled || !isPreviewOpen || !isDesktop) {
+    if (!workspaceEnabled || !isDesktop || artifactCollapsed) {
       return;
     }
     const clampedChat = Math.max(dynamicChatMinRatio, Math.min(dynamicChatMaxRatio, chatSplitRatio));
@@ -79,11 +53,11 @@ export function useLayoutConstraints({
       setChatSplitRatio(clampedChat);
     }
   }, [
+    artifactCollapsed,
     chatSplitRatio,
     dynamicChatMaxRatio,
     dynamicChatMinRatio,
     isDesktop,
-    isPreviewOpen,
     setChatSplitRatio,
     workspaceEnabled,
   ]);
