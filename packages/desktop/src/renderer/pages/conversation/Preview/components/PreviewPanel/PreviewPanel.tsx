@@ -10,6 +10,7 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { toLocalFileHref } from '@/renderer/components/Markdown/markdownUtils';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { OfficeArtifactToolbar, useOfficeArtifactEditor } from '../ArtifactEditor';
+import ArtifactEmptyState from '../ArtifactEmptyState';
 import { PreviewToolbarExtrasProvider, type PreviewToolbarExtras } from '../../context/PreviewToolbarExtrasContext';
 import { usePreviewContext } from '../../context/PreviewContext';
 import { getOfficePreviewRefreshToken } from '../../context/officePreviewRevision';
@@ -297,8 +298,68 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
     setContextMenu({ show: false, x: 0, y: 0, tabId: null });
   }, [tabs, closeTab]);
 
+  // 将 tabs 转换为 PreviewTab 类型 / Convert tabs to PreviewTab type
+  const previewTabs: PreviewTab[] = tabs.map((tab) => ({
+    id: tab.id,
+    title: tab.title,
+    isDirty: tab.isDirty,
+    contentType: tab.content_type,
+  }));
+
   // 如果预览面板未打开，不渲染 / Don't render if preview panel is not open
-  if (!isOpen || !activeTab) return null;
+  if (!isOpen) return null;
+
+  // 没有打开的 tab 时展示占位空状态，而不是按类型渲染内容
+  // Show a placeholder empty state instead of type-specific content when no tab is open
+  if (!activeTab) {
+    return (
+      <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
+        <div
+          data-testid='preview-panel-surface'
+          className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
+        >
+          {messageContextHolder}
+
+          {/* 确认对话框 / Confirmation modals */}
+          <PreviewConfirmModals
+            closeTabConfirm={closeTabConfirm}
+            onSaveAndCloseTab={handleSaveAndCloseTab}
+            onCloseWithoutSave={handleCloseWithoutSave}
+            onCancelCloseTab={handleCancelCloseTab}
+          />
+
+          {/* Tab 栏 / Tab bar */}
+          <PreviewTabs
+            tabs={previewTabs}
+            activeTabId={activeTabId}
+            tabFadeState={tabFadeState}
+            tabsContainerRef={tabsContainerRef}
+            onSwitchTab={switchTab}
+            onCloseTab={handleCloseTab}
+            onContextMenu={handleTabContextMenu}
+            onClosePanel={closePreview}
+          />
+
+          {/* 空状态 / Empty state */}
+          <div className='flex-1 overflow-hidden'>
+            <ArtifactEmptyState />
+          </div>
+
+          {/* Tab 右键菜单 / Tab context menu */}
+          <PreviewContextMenu
+            contextMenu={contextMenu}
+            tabs={previewTabs}
+            currentTheme={currentTheme}
+            onClose={() => setContextMenu({ show: false, x: 0, y: 0, tabId: null })}
+            onCloseLeft={handleCloseLeft}
+            onCloseRight={handleCloseRight}
+            onCloseOthers={handleCloseOthers}
+            onCloseAll={handleCloseAll}
+          />
+        </div>
+      </PreviewToolbarExtrasProvider>
+    );
+  }
 
   const { content, content_type, metadata } = activeTab;
   const isMarkdown = content_type === 'markdown';
@@ -703,14 +764,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
 
     return null;
   };
-
-  // 将 tabs 转换为 PreviewTab 类型 / Convert tabs to PreviewTab type
-  const previewTabs: PreviewTab[] = tabs.map((tab) => ({
-    id: tab.id,
-    title: tab.title,
-    isDirty: tab.isDirty,
-    contentType: tab.content_type,
-  }));
 
   return (
     <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
