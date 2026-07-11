@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 const ctx = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
@@ -107,22 +108,47 @@ vi.mock('@/renderer/pages/conversation/Preview/components/ArtifactEditor', () =>
 
 import PreviewPanel from '@/renderer/pages/conversation/Preview/components/PreviewPanel/PreviewPanel';
 
+const emptyContext = (overrides: Record<string, unknown> = {}) => ({
+  isOpen: true,
+  tabs: [],
+  activeTabId: null,
+  activeTab: null,
+  closeTab: vi.fn(),
+  switchTab: vi.fn(),
+  closePreview: vi.fn(),
+  updateContent: vi.fn(),
+  saveContent: vi.fn(),
+  addToSendBox: vi.fn(),
+  addDomSnippet: vi.fn(),
+  ...overrides,
+});
+
 describe('PreviewPanel empty state', () => {
   it('shows the artifact empty state when there are no tabs', () => {
-    ctx.value = {
-      isOpen: true,
-      tabs: [],
-      activeTabId: null,
-      activeTab: null,
-      closeTab: vi.fn(),
-      switchTab: vi.fn(),
-      closePreview: vi.fn(),
-      updateContent: vi.fn(),
-      saveContent: vi.fn(),
-      addToSendBox: vi.fn(),
-      addDomSnippet: vi.fn(),
-    };
+    ctx.value = emptyContext();
     render(<PreviewPanel />);
     expect(screen.getByText('conversation.artifact.emptyTitle')).toBeInTheDocument();
+  });
+
+  it('renders the empty state even when the preview is closed (isOpen=false)', () => {
+    // The pane is always mounted while expanded; visibility is owned by
+    // ChatLayout's collapse state, not the preview `isOpen` flag.
+    ctx.value = emptyContext({ isOpen: false });
+    render(<PreviewPanel />);
+    expect(screen.getByText('conversation.artifact.emptyTitle')).toBeInTheDocument();
+  });
+
+  it('collapses the pane from the tab-bar close button via onRequestCollapse', async () => {
+    const user = userEvent.setup();
+    const onRequestCollapse = vi.fn();
+    const closePreview = vi.fn();
+    ctx.value = emptyContext({ closePreview });
+
+    render(<PreviewPanel onRequestCollapse={onRequestCollapse} />);
+
+    await user.click(screen.getByRole('button', { name: 'preview.collapsePanel' }));
+    expect(onRequestCollapse).toHaveBeenCalledOnce();
+    // The collapse request must not fall through to closePreview when a handler exists.
+    expect(closePreview).not.toHaveBeenCalled();
   });
 });

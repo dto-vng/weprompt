@@ -61,13 +61,18 @@ import './preview.css';
  */
 type PreviewPanelProps = {
   fullBleed?: boolean;
+  /**
+   * Collapse the surrounding artifact pane. When provided, the tab bar's
+   * "close panel" button collapses the pane (owned by ChatLayout) instead of
+   * merely clearing the preview state. Falls back to `closePreview` when absent.
+   */
+  onRequestCollapse?: () => void;
 };
 
-const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
+const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onRequestCollapse }) => {
   const { t } = useTranslation();
   const { id: conversationId = '' } = useParams<{ id: string }>();
   const {
-    isOpen,
     tabs,
     activeTabId,
     activeTab,
@@ -79,6 +84,12 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
     addToSendBox,
     addDomSnippet,
   } = usePreviewContext();
+
+  // The artifact pane is always mounted while expanded; ChatLayout owns its
+  // visibility via collapse state, so the pane no longer self-hides on the
+  // preview `isOpen` flag. When there is no active tab it renders the empty
+  // state below.
+  const handleClosePanel = onRequestCollapse ?? closePreview;
   const layout = useLayoutContext();
 
   // 视图状态 / View states
@@ -306,9 +317,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
     contentType: tab.content_type,
   }));
 
-  // 如果预览面板未打开，不渲染 / Don't render if preview panel is not open
-  if (!isOpen) return null;
-
   // 没有打开的 tab 时展示占位空状态，而不是按类型渲染内容
   // Show a placeholder empty state instead of type-specific content when no tab is open
   if (!activeTab) {
@@ -337,7 +345,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
             onSwitchTab={switchTab}
             onCloseTab={handleCloseTab}
             onContextMenu={handleTabContextMenu}
-            onClosePanel={closePreview}
+            onClosePanel={handleClosePanel}
           />
 
           {/* 空状态 / Empty state */}
@@ -792,7 +800,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
           onSwitchTab={switchTab}
           onCloseTab={handleCloseTab}
           onContextMenu={handleTabContextMenu}
-          onClosePanel={closePreview}
+          onClosePanel={handleClosePanel}
         />
 
         {/* 工具栏（URL 类型不显示工具栏，因为不需要下载/编辑等功能）/ Toolbar (hidden for URL type as it doesn't need download/edit features) */}

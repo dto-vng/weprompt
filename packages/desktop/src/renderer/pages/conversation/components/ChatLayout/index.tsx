@@ -63,6 +63,9 @@ const ChatLayout: React.FC<{
     workspacePreferenceKey,
     workspacePresentation = 'panel',
   } = props;
+  // `panel` (team) keeps its workspace file tree in the pane; `project-menu`
+  // (single chat) renders the always-open artifact preview instead.
+  const isWorkspacePanePresentation = workspacePresentation === 'panel';
   const layout = useLayoutContext();
   const isMacRuntime = isMacEnvironment();
   const isWindowsRuntime = isWindowsEnvironment();
@@ -113,10 +116,12 @@ const ChatLayout: React.FC<{
     createDragHandle: createArtifactDragHandle,
   } = useResizableSplit({
     unit: 'ratio',
-    defaultWidth: 50,
+    // Team keeps the workspace as a narrower sidebar (chat gets more room);
+    // single chat splits evenly with the artifact preview.
+    defaultWidth: isWorkspacePanePresentation ? 70 : 50,
     minWidth: dynamicChatMinRatio,
     maxWidth: dynamicChatMaxRatio,
-    storageKey: 'chat-artifact-split-ratio',
+    storageKey: isWorkspacePanePresentation ? 'chat-workspace-split-ratio' : 'chat-artifact-split-ratio',
   });
 
   // Full metrics with the real chatSplitRatio
@@ -245,8 +250,47 @@ const ChatLayout: React.FC<{
             {props.children}
           </ArcoLayout.Content>
         </div>
-        {/* Artifact pane — always mounts PreviewPanel while expanded on desktop. */}
-        {artifactVisible && (
+        {/*
+          Artifact pane — the single region right of chat. Its content and mount
+          behavior are presentation dependent:
+          - `panel` (team) keeps the workspace file tree behind the
+            WorkspacePanelHeader chrome, and — like the pre-refactor right sider —
+            stays mounted at 0 width while collapsed so its WORKSPACE_HAS_FILES
+            events keep firing and can auto-expand the pane.
+          - `project-menu` (single chat) mounts the always-open PreviewPanel as a
+            single-bar artifact surface whose tab-bar close button collapses the
+            pane. It is removed from the DOM while collapsed (its file events come
+            from the always-mounted project-menu controller above, not the pane).
+        */}
+        {isWorkspacePanePresentation && workspaceEnabled && !isMobile && (
+          <div
+            data-testid='artifact-pane'
+            className='!bg-1 relative flex flex-col min-w-0 layout-sider'
+            style={{
+              flexGrow: artifactCollapsed ? 0 : 1,
+              flexShrink: 0,
+              flexBasis: artifactCollapsed ? '0px' : 0,
+              width: artifactCollapsed ? '0px' : undefined,
+              overflow: 'hidden',
+              borderLeft: artifactCollapsed ? 'none' : '1px solid var(--bg-3)',
+            }}
+          >
+            {!artifactCollapsed &&
+              createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', reverse: true })}
+            <WorkspacePanelHeader
+              showToggle={!isMacRuntime && !isWindowsRuntime}
+              collapsed={artifactCollapsed}
+              onToggle={() => dispatchWorkspaceToggleEvent()}
+              togglePlacement='right'
+              workspacePath={workspacePath}
+              isTemporaryWorkspace={isTemporaryWorkspace}
+            >
+              {props.siderTitle}
+            </WorkspacePanelHeader>
+            <div className='flex-1 min-h-0 overflow-hidden'>{props.sider}</div>
+          </div>
+        )}
+        {!isWorkspacePanePresentation && artifactVisible && (
           <div
             data-testid='artifact-pane'
             className='!bg-1 relative flex flex-col min-w-0 layout-sider'
@@ -259,18 +303,8 @@ const ChatLayout: React.FC<{
             }}
           >
             {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', reverse: true })}
-            <WorkspacePanelHeader
-              showToggle={!isMacRuntime && !isWindowsRuntime}
-              collapsed={artifactCollapsed}
-              onToggle={() => dispatchWorkspaceToggleEvent()}
-              togglePlacement='right'
-              workspacePath={workspacePath}
-              isTemporaryWorkspace={isTemporaryWorkspace}
-            >
-              {props.siderTitle}
-            </WorkspacePanelHeader>
             <div className='flex-1 min-h-0 overflow-hidden'>
-              <PreviewPanel fullBleed />
+              <PreviewPanel fullBleed onRequestCollapse={() => setArtifactCollapsed(true)} />
             </div>
           </div>
         )}
@@ -283,7 +317,13 @@ const ChatLayout: React.FC<{
             workspaceWidthPx={mobileWorkspaceWidthPx}
             mobileWorkspaceHandleRight={mobileWorkspaceHandleRight}
             siderTitle={props.siderTitle}
-            sider={<PreviewPanel fullBleed />}
+            sider={
+              isWorkspacePanePresentation ? (
+                props.sider
+              ) : (
+                <PreviewPanel fullBleed onRequestCollapse={() => setArtifactCollapsed(true)} />
+              )
+            }
             workspacePath={workspacePath}
             isTemporaryWorkspace={isTemporaryWorkspace}
           />

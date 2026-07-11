@@ -95,7 +95,7 @@ vi.mock('@/renderer/pages/conversation/utils/detectPlatform', () => ({
 
 import ChatLayout from '@/renderer/pages/conversation/components/ChatLayout';
 
-const renderLayout = (workspacePresentation: 'panel' | 'project-menu' = 'panel') =>
+const renderLayout = (workspacePresentation: 'panel' | 'project-menu' = 'project-menu') =>
   render(
     <ChatLayout
       title='Chat'
@@ -107,7 +107,7 @@ const renderLayout = (workspacePresentation: 'panel' | 'project-menu' = 'panel')
     </ChatLayout>
   );
 
-describe('ChatLayout chat + artifact two-region split', () => {
+describe('ChatLayout chat + artifact two-region split (single chat / project-menu)', () => {
   beforeEach(() => {
     mocks.mobile = false;
     mocks.artifactCollapsed = false;
@@ -117,24 +117,24 @@ describe('ChatLayout chat + artifact two-region split', () => {
 
   afterEach(() => cleanup());
 
-  it('renders the always-open artifact pane without any preview-open flag', () => {
+  it('renders the always-open artifact preview pane as a single-bar surface', () => {
     renderLayout();
 
     const artifactPane = screen.getByTestId('artifact-pane');
     expect(artifactPane).toBeInTheDocument();
-    // The pane opts into the shared drag-handle hover styling.
     expect(artifactPane).toHaveClass('layout-sider');
+    // Single bar: the PreviewPanel owns the pane chrome, no extra workspace header.
+    expect(artifactPane.querySelector('[data-testid="workspace-panel-header"]')).toBeNull();
   });
 
-  it('mounts PreviewPanel inside the artifact pane (not the legacy workspace sider body)', () => {
+  it('mounts PreviewPanel inside the pane (not the legacy workspace sider body)', () => {
     renderLayout();
 
     const artifactPane = screen.getByTestId('artifact-pane');
     const previewPanel = screen.getByTestId('preview-panel');
-    expect(previewPanel).toBeInTheDocument();
     expect(artifactPane).toContainElement(previewPanel);
-    // props.sider is no longer mounted inside the pane.
-    expect(screen.queryByTestId('legacy-sider')).not.toBeInTheDocument();
+    // props.sider is not mounted inside the artifact pane.
+    expect(artifactPane).not.toContainElement(screen.getByTestId('legacy-sider'));
   });
 
   it('drives the layout from a single chat<->artifact ratio split', () => {
@@ -167,7 +167,45 @@ describe('ChatLayout chat + artifact two-region split', () => {
     renderLayout();
 
     expect(screen.getByTestId('mobile-workspace-overlay')).toBeInTheDocument();
-    // The inline desktop artifact pane is not rendered on mobile.
     expect(screen.queryByTestId('artifact-pane')).not.toBeInTheDocument();
+  });
+});
+
+describe('ChatLayout team workspace pane (panel presentation)', () => {
+  beforeEach(() => {
+    mocks.mobile = false;
+    mocks.artifactCollapsed = false;
+    mocks.resizableSplitOptions.length = 0;
+    localStorage.clear();
+  });
+
+  afterEach(() => cleanup());
+
+  it('keeps the workspace file tree (props.sider) in the pane, not PreviewPanel', () => {
+    renderLayout('panel');
+
+    const artifactPane = screen.getByTestId('artifact-pane');
+    expect(artifactPane).toContainElement(screen.getByTestId('legacy-sider'));
+    expect(artifactPane).toContainElement(screen.getByTestId('workspace-panel-header'));
+    expect(screen.queryByTestId('preview-panel')).not.toBeInTheDocument();
+  });
+
+  it('uses its own workspace split storage key and a narrower default', () => {
+    renderLayout('panel');
+
+    expect(mocks.resizableSplitOptions).toHaveLength(1);
+    expect(mocks.resizableSplitOptions[0]).toEqual(
+      expect.objectContaining({ unit: 'ratio', defaultWidth: 70, storageKey: 'chat-workspace-split-ratio' })
+    );
+  });
+
+  it('keeps the file tree mounted at zero width when collapsed (auto-expand preserved)', () => {
+    mocks.artifactCollapsed = true;
+    renderLayout('panel');
+
+    // The pane stays in the DOM (unlike project-menu) so WORKSPACE_HAS_FILES keeps firing.
+    const artifactPane = screen.getByTestId('artifact-pane');
+    expect(artifactPane).toContainElement(screen.getByTestId('legacy-sider'));
+    expect(artifactPane).toHaveStyle({ width: '0px' });
   });
 });

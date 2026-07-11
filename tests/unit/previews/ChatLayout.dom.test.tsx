@@ -46,7 +46,7 @@ vi.mock('@/renderer/pages/conversation/components/ChatLayout/MobileWorkspaceOver
 }));
 
 vi.mock('@/renderer/pages/conversation/components/ChatLayout/WorkspacePanelHeader', () => ({
-  default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => <div data-testid='workspace-panel-header'>{children}</div>,
   DesktopWorkspaceToggle: () => null,
 }));
 
@@ -108,8 +108,8 @@ describe('ChatLayout artifact pane', () => {
 
   afterEach(() => cleanup());
 
-  it.each(['panel', 'project-menu'] as const)('uses a single chat<->artifact split for %s', (presentation) => {
-    renderLayout(presentation);
+  it('mounts a single-bar, full-bleed PreviewPanel for the single-chat (project-menu) pane', () => {
+    renderLayout('project-menu');
 
     expect(mocks.resizableSplitOptions).toHaveLength(1);
     expect(mocks.resizableSplitOptions[0]).toEqual(
@@ -120,20 +120,28 @@ describe('ChatLayout artifact pane', () => {
     const artifactPane = screen.getByTestId('artifact-pane');
     expect(chatPane.compareDocumentPosition(artifactPane) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chatPane).toHaveStyle({ flexBasis: '50%' });
-  });
-
-  it('mounts a full-bleed PreviewPanel inside the artifact pane, not the legacy sider body', () => {
-    renderLayout('panel');
-
-    const artifactPane = screen.getByTestId('artifact-pane');
     expect(artifactPane).toContainElement(screen.getByTestId('mock-preview-panel'));
     expect(mocks.previewPanelProps).toHaveBeenCalledWith(expect.objectContaining({ fullBleed: true }));
-    // props.sider is no longer mounted inside the artifact pane.
-    expect(screen.queryByTestId('legacy-sider')).not.toBeInTheDocument();
+    // Single bar: no WorkspacePanelHeader stacked above the preview.
+    expect(artifactPane.querySelector('[data-testid="workspace-panel-header"]')).toBeNull();
   });
 
-  it('drops the legacy preview pane and the separate workspace sider', () => {
+  it('keeps the team (panel) workspace file tree in the pane with its own split key', () => {
     renderLayout('panel');
+
+    expect(mocks.resizableSplitOptions).toHaveLength(1);
+    expect(mocks.resizableSplitOptions[0]).toEqual(
+      expect.objectContaining({ unit: 'ratio', defaultWidth: 70, storageKey: 'chat-workspace-split-ratio' })
+    );
+
+    const artifactPane = screen.getByTestId('artifact-pane');
+    expect(artifactPane).toContainElement(screen.getByTestId('legacy-sider'));
+    expect(artifactPane).toContainElement(screen.getByTestId('workspace-panel-header'));
+    expect(screen.queryByTestId('mock-preview-panel')).not.toBeInTheDocument();
+  });
+
+  it('drops the legacy preview pane and the separate workspace sider markup', () => {
+    renderLayout('project-menu');
 
     expect(screen.queryByTestId('chat-layout-preview-pane')).not.toBeInTheDocument();
     expect(document.querySelector('.chat-layout-right-sider')).not.toBeInTheDocument();
@@ -148,11 +156,21 @@ describe('ChatLayout artifact pane', () => {
     expect(document.querySelector('.workspace-project-controller')).not.toBeInTheDocument();
   });
 
-  it('gives chat the full content area when the artifact pane is collapsed', () => {
+  it('removes the project-menu pane from the DOM when collapsed and fills chat', () => {
     mocks.artifactCollapsed = true;
     renderLayout('project-menu');
 
     expect(screen.queryByTestId('artifact-pane')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-layout-chat-pane')).toHaveStyle({ flexGrow: '1', flexBasis: '0px' });
+  });
+
+  it('keeps the team (panel) pane mounted at zero width when collapsed', () => {
+    mocks.artifactCollapsed = true;
+    renderLayout('panel');
+
+    const artifactPane = screen.getByTestId('artifact-pane');
+    expect(artifactPane).toContainElement(screen.getByTestId('legacy-sider'));
+    expect(artifactPane).toHaveStyle({ width: '0px' });
     expect(screen.getByTestId('chat-layout-chat-pane')).toHaveStyle({ flexGrow: '1', flexBasis: '0px' });
   });
 
