@@ -59,9 +59,10 @@ import {
 } from './process/utils/mainWindowLifecycle';
 import {
   loadUserWebUIConfig,
-  resolveRemoteAccess,
+  resolveRemoteAccessRequestSources,
   resolveWebUIPort,
   restoreDesktopWebUIFromPreferences,
+  warnUnsupportedDesktopRemoteAccess,
 } from './process/utils/webuiConfig';
 import {
   createOrUpdateTray,
@@ -945,9 +946,8 @@ const handleAppReady = async (): Promise<void> => {
       // Config file loaded from user directory
     }
     const resolvedPort = resolveWebUIPort(userConfigInfo.config, getSwitchValue);
-    // Forge desktop-only (D1): resolved but intentionally unused — startWebHost
-    // below is always called with allowRemote: false, regardless of this value.
-    const _allowRemote = resolveRemoteAccess(userConfigInfo.config, isRemoteMode);
+    const remoteAccessRequests = resolveRemoteAccessRequestSources(userConfigInfo.config, isRemoteMode);
+    warnUnsupportedDesktopRemoteAccess(remoteAccessRequests);
     try {
       // Inside Electron (`AionUi --webui` or packaged `aionui-web` mode that
       // launches via the Electron shell), reuse the desktop app's data-dir so

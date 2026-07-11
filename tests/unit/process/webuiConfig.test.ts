@@ -56,11 +56,13 @@ describe('startDesktopWebUI — Forge desktop-only chokepoint (D1)', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     delete (globalThis as typeof globalThis & { __backendPort?: number }).__backendPort;
   });
 
   it('forces allowRemote:false into startWebHost even when the caller asks for remote (boot-restore bypass)', async () => {
     const { startDesktopWebUI } = await import('@process/utils/webuiConfig');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     // Simulate restoreDesktopWebUIFromPreferences() replaying a stale persisted
     // `webui.desktop.allowRemote: true` into the shared chokepoint.
@@ -73,6 +75,9 @@ describe('startDesktopWebUI — Forge desktop-only chokepoint (D1)', () => {
     // The recorded/handle value must stay consistent with the effective bind.
     expect(handle.allowRemote).toBe(false);
     expect(handle.networkUrl).toBeUndefined();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).not.toContain('true');
+    warn.mockRestore();
   });
 
   it('forces allowRemote:false into startWebHost when the caller omits the flag', async () => {
@@ -82,5 +87,52 @@ describe('startDesktopWebUI — Forge desktop-only chokepoint (D1)', () => {
 
     const hostOpts = startWebHostMock.mock.calls[0][0] as { allowRemote?: boolean };
     expect(hostOpts.allowRemote).toBe(false);
+  });
+});
+
+describe('desktop WebUI remote-access compatibility policy', () => {
+  it('detects truthy CLI, environment, host, and config requests', async () => {
+    const { resolveRemoteAccessRequestSources } = await import('@process/utils/webuiConfig');
+
+    expect(
+      resolveRemoteAccessRequestSources({ allowRemote: true }, true, {
+        AIONUI_ALLOW_REMOTE: 'yes',
+        AIONUI_REMOTE: '1',
+        AIONUI_HOST: '::',
+      })
+    ).toEqual(['--remote', 'AIONUI_ALLOW_REMOTE', 'AIONUI_REMOTE', 'AIONUI_HOST', 'allowRemote']);
+  });
+
+  it('ignores false-valued and loopback controls', async () => {
+    const { resolveRemoteAccessRequestSources } = await import('@process/utils/webuiConfig');
+
+    expect(
+      resolveRemoteAccessRequestSources({ allowRemote: false }, false, {
+        AIONUI_ALLOW_REMOTE: 'false',
+        AIONUI_REMOTE: 'off',
+        AIONUI_HOST: '127.0.0.1',
+      })
+    ).toEqual([]);
+  });
+
+  it('emits one warning without configuration values', async () => {
+    const { warnUnsupportedDesktopRemoteAccess } = await import('@process/utils/webuiConfig');
+    const warn = vi.fn();
+
+    warnUnsupportedDesktopRemoteAccess(['--remote', 'AIONUI_HOST'], warn);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[WebUI] Remote access requested by --remote, AIONUI_HOST, but Forge WebUI is local-only; binding to 127.0.0.1.'
+    );
+  });
+
+  it('does not warn without a remote request', async () => {
+    const { warnUnsupportedDesktopRemoteAccess } = await import('@process/utils/webuiConfig');
+    const warn = vi.fn();
+
+    warnUnsupportedDesktopRemoteAccess([], warn);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -150,13 +150,35 @@ export const resolveWebUIPort = (
   return DEFAULT_WEBUI_PORT;
 };
 
-export const resolveRemoteAccess = (config: WebUIUserConfig, isRemoteMode: boolean): boolean => {
-  const envRemote = parseBooleanEnv(process.env.AIONUI_ALLOW_REMOTE || process.env.AIONUI_REMOTE);
-  const hostHint = process.env.AIONUI_HOST?.trim();
-  const hostRequestsRemote = hostHint ? ['0.0.0.0', '::', '::0'].includes(hostHint) : false;
-  const configRemote = config.allowRemote === true;
+/**
+ * Identify retired remote-access controls requested for Electron WebUI mode.
+ */
+export const resolveRemoteAccessRequestSources = (
+  config: WebUIUserConfig,
+  isRemoteMode: boolean,
+  env: NodeJS.ProcessEnv = process.env
+): string[] => {
+  const requestedBy: string[] = [];
+  if (isRemoteMode) requestedBy.push('--remote');
+  if (parseBooleanEnv(env.AIONUI_ALLOW_REMOTE) === true) requestedBy.push('AIONUI_ALLOW_REMOTE');
+  if (parseBooleanEnv(env.AIONUI_REMOTE) === true) requestedBy.push('AIONUI_REMOTE');
+  const hostHint = env.AIONUI_HOST?.trim();
+  if (hostHint && ['0.0.0.0', '::', '::0'].includes(hostHint)) requestedBy.push('AIONUI_HOST');
+  if (config.allowRemote === true) requestedBy.push('allowRemote');
+  return requestedBy;
+};
 
-  return isRemoteMode || hostRequestsRemote || envRemote === true || configRemote;
+/**
+ * Warn when a retired desktop remote-access control is requested.
+ */
+export const warnUnsupportedDesktopRemoteAccess = (
+  requestedBy: readonly string[],
+  warn: (message: string) => void = console.warn
+): void => {
+  if (requestedBy.length === 0) return;
+  warn(
+    `[WebUI] Remote access requested by ${requestedBy.join(', ')}, but Forge WebUI is local-only; binding to 127.0.0.1.`
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -219,6 +241,10 @@ export async function startDesktopWebUI(opts: { port?: number; allowRemote?: boo
   // If already running, tear down first so we honour the new port.
   if (currentHandle) {
     await stopDesktopWebUI();
+  }
+
+  if (opts.allowRemote === true) {
+    warnUnsupportedDesktopRemoteAccess(['allowRemote']);
   }
 
   // Forge desktop-only (D1) — authoritative guard; ignore any caller/persisted allowRemote.
