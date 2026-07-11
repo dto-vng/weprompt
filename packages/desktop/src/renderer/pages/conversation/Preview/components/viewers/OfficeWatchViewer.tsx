@@ -564,6 +564,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
             <WebviewHost
               url={view.url}
               className='bg-bg-1'
+              showViewerControls={docType === 'word' || docType === 'excel'}
               partition={docType === 'ppt' ? undefined : OFFICE_PREVIEW_PARTITION}
               injectedScript={guestScript}
               scriptRequest={active ? scriptRequest : undefined}

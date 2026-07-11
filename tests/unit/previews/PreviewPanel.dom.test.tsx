@@ -223,6 +223,16 @@ describe('PreviewPanel Office artifact integration', () => {
     expect(mocks.handleSelectionChange).toHaveBeenCalledWith(wordSelection);
   });
 
+  it('removes only the decorative outer radius in full-bleed mode', () => {
+    setActiveTab('word');
+    const view = render(<PreviewPanel fullBleed />);
+
+    expect(screen.getByTestId('preview-panel-surface')).not.toHaveClass('rounded-[16px]');
+
+    view.rerender(<PreviewPanel />);
+    expect(screen.getByTestId('preview-panel-surface')).toHaveClass('rounded-[16px]');
+  });
+
   it('wires artifact actions without restarting Office watch after a successful mutation', async () => {
     setActiveTab('word');
     render(<PreviewPanel />);

@@ -12,13 +12,54 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 40px;
-  padding: 0 10px;
+  height: 48px;
+  padding: 0 12px;
   gap: 8px;
   overflow: hidden;
   color: var(--text-primary);
-  background: var(--bg-2);
+  background: var(--bg-1);
   border-bottom: 1px solid var(--border-base);
+}
+
+.statusStrip {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-base);
+}
+
+.statusMarker {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.statusNeutral {
+  color: var(--text-secondary);
+  background: var(--bg-2);
+}
+
+.statusProgress {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-1));
+  border-bottom-color: color-mix(in srgb, var(--primary) 22%, var(--border-base));
+}
+
+.statusSuccess {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, var(--bg-1));
+  border-bottom-color: color-mix(in srgb, var(--success) 22%, var(--border-base));
+}
+
+.statusError {
+  color: var(--color-danger-6);
+  background: color-mix(in srgb, var(--color-danger-6) 8%, var(--bg-1));
+  border-bottom-color: color-mix(in srgb, var(--color-danger-6) 22%, var(--border-base));
 }
 
 .leftActions,
@@ -73,18 +114,19 @@
 .status,
 .errorStatus,
 .zeroState {
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 220px;
-  color: var(--text-secondary);
+  max-width: 100%;
+  color: inherit;
   font-size: 12px;
 }
 
 .zeroState {
-  max-width: 360px;
+  max-width: 100%;
 }
 
 .errorStatus {
-  color: var(--color-danger-6);
+  color: inherit;
 }
 
 .actionButton,
@@ -144,7 +186,7 @@
 
 @container (max-width: 719px) {
   .toolbar {
-    height: 44px;
+    height: 48px;
   }
 
   .secondaryAction {
@@ -158,9 +200,7 @@
 
 @container (max-width: 519px) {
   .actionLabel,
-  .cellLabel,
-  .status,
-  .errorStatus {
+  .cellLabel {
     display: none;
   }
 
@@ -198,7 +238,7 @@
 
 @media (max-width: 719px) {
   .toolbar {
-    height: 44px;
+    height: 48px;
   }
 
   .secondaryAction {
@@ -212,9 +252,7 @@
 
 @media (max-width: 519px) {
   .actionLabel,
-  .cellLabel,
-  .status,
-  .errorStatus {
+  .cellLabel {
     display: none;
   }
 

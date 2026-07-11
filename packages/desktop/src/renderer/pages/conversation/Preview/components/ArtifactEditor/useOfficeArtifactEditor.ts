@@ -19,6 +19,7 @@ import { buildOfficeAssistantContext } from './assistantContext';
 
 export type OfficeArtifactEditorStatus =
   | 'ready'
+  | 'inspecting'
   | 'saving'
   | 'saved'
   | 'saveFailed'
@@ -75,6 +76,7 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
   const [scriptRequest, setScriptRequest] = useState<WebviewHostScriptRequest>();
 
   const versionRef = useRef<string | null>(null);
+  const pendingSelectionRef = useRef<OfficeArtifactSelection | null>(null);
   const selectionRef = useRef<OfficeArtifactSelection | null>(null);
   const inspectionRef = useRef<OfficeArtifactInspection | null>(null);
   const sessionRequestRef = useRef(0);
@@ -94,10 +96,49 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
 
   const clearSelection = useCallback((): void => {
     inspectRequestRef.current += 1;
+    pendingSelectionRef.current = null;
     selectionRef.current = null;
     inspectionRef.current = null;
     setInspection(null);
   }, []);
+
+  const inspectSelection = useCallback(
+    (selection: OfficeArtifactSelection, expectedVersion: string, sessionId: number): void => {
+      const requestId = inspectRequestRef.current + 1;
+      inspectRequestRef.current = requestId;
+      pendingSelectionRef.current = selection;
+      selectionRef.current = null;
+      inspectionRef.current = null;
+      setInspection(null);
+      setStatus('inspecting');
+
+      void ipcBridge.officeArtifact.inspect
+        .invoke({ conversationId, workspace, filePath, expectedVersion, selection })
+        .then((result) => {
+          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
+          pendingSelectionRef.current = null;
+          if (result.ok === false) {
+            selectionRef.current = null;
+            setStatus(failureStatus(result.code));
+            return;
+          }
+          versionRef.current = result.version;
+          conflictPendingRef.current = false;
+          selectionRef.current = selection;
+          inspectionRef.current = result.inspection;
+          setVersion(result.version);
+          setInspection(result.inspection);
+          setStatus('ready');
+        })
+        .catch(() => {
+          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
+          pendingSelectionRef.current = null;
+          selectionRef.current = null;
+          setStatus('saveFailed');
+        });
+    },
+    [conversationId, filePath, workspace]
+  );
 
   const reloadState = useCallback((): void => {
     const requestId = sessionRequestRef.current + 1;
@@ -120,17 +161,23 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
       .then((result) => {
         if (sessionRequestRef.current !== requestId) return;
         if (result.ok === false) {
+          pendingSelectionRef.current = null;
           setStatus(failureStatus(result.code));
           return;
         }
         versionRef.current = result.version;
         setVersion(result.version);
         setUndoDepth(result.undoDepth);
+        const pendingSelection = pendingSelectionRef.current;
+        if (pendingSelection) inspectSelection(pendingSelection, result.version, requestId);
       })
       .catch(() => {
-        if (sessionRequestRef.current === requestId) setStatus('saveFailed');
+        if (sessionRequestRef.current === requestId) {
+          pendingSelectionRef.current = null;
+          setStatus('saveFailed');
+        }
       });
-  }, [clearSelection, conversationId, enabled, filePath, workspace]);
+  }, [clearSelection, conversationId, enabled, filePath, inspectSelection, workspace]);
 
   useEffect(() => {
     observedExternalRevisionRef.current = currentExternalRevisionRef.current;
@@ -168,37 +215,15 @@ export function useOfficeArtifactEditor(options: UseOfficeArtifactEditorOptions)
       if (mutationPendingRef.current || conflictPendingRef.current) return;
       const expectedVersion = versionRef.current;
       const sessionId = sessionRequestRef.current;
-      const requestId = inspectRequestRef.current + 1;
-      inspectRequestRef.current = requestId;
+      pendingSelectionRef.current = selection;
       selectionRef.current = null;
       inspectionRef.current = null;
       setInspection(null);
-      setStatus('ready');
+      setStatus('inspecting');
       if (!expectedVersion) return;
-
-      void ipcBridge.officeArtifact.inspect
-        .invoke({ conversationId, workspace, filePath, expectedVersion, selection })
-        .then((result) => {
-          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
-          if (result.ok === false) {
-            selectionRef.current = null;
-            setStatus(failureStatus(result.code));
-            return;
-          }
-          versionRef.current = result.version;
-          conflictPendingRef.current = false;
-          selectionRef.current = selection;
-          inspectionRef.current = result.inspection;
-          setVersion(result.version);
-          setInspection(result.inspection);
-        })
-        .catch(() => {
-          if (sessionRequestRef.current !== sessionId || inspectRequestRef.current !== requestId) return;
-          selectionRef.current = null;
-          setStatus('saveFailed');
-        });
+      inspectSelection(selection, expectedVersion, sessionId);
     },
-    [conversationId, filePath, workspace]
+    [inspectSelection]
   );
 
   const applyMutationResult = useCallback(

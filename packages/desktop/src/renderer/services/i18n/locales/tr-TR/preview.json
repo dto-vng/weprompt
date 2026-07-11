@@ -122,7 +122,10 @@
       "refreshing": "Önizleme yenileniyor",
       "previewOutdated": "Önizleme güncel olmayabilir",
       "unsupported": "Bu seçim için masaüstü uygulaması gerekiyor",
-      "selectToEdit": "Hızlı çevrimdışı düzenleme hazır",
+      "inspecting": "Düzenleme denetimleri hazırlanıyor...",
+      "selectWordToEdit": "Düzenlemek için belgedeki metni seçin",
+      "selectExcelToEdit": "Düzenlemek için bir hücre seçin",
+      "readyToEdit": "Seçili içerik düzenlenmeye hazır",
       "conflictRecovery": "Düzenlemeniz kaydedilmedi ve hâlâ burada. Çalışma alanı dosyası güvende.",
       "saveFailureRecovery": "Düzenlemeniz hâlâ burada ve çalışma alanı dosyası değiştirilmedi.",
       "copyDraft": "Taslağı kopyala",
@@ -130,6 +133,12 @@
       "requestPlaceholder": "Forge'un yapmasını istediğiniz değişikliği açıklayın.",
       "askWordContext": "Dosya: {{fileName}}\nParagraf: {{path}}\nSeçili metin: {{text}}\nİstek: {{placeholder}}",
       "askExcelContext": "Dosya: {{fileName}}\nAralık: {{range}}\nHücreler:\n{{cells}}\nİstek: {{placeholder}}"
+    },
+    "viewer": {
+      "zoomOut": "Uzaklaştır",
+      "zoomIn": "Yakınlaştır",
+      "resetZoom": "Yakınlaştırmayı sıfırla",
+      "fitWidth": "Genişliğe sığdır"
     }
   },
   "word": {

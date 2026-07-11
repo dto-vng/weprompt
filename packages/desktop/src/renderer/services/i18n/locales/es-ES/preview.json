@@ -122,7 +122,10 @@
       "refreshing": "Actualizando vista previa",
       "previewOutdated": "La vista previa puede estar desactualizada",
       "unsupported": "Esta selección requiere la aplicación de escritorio",
-      "selectToEdit": "Edición rápida sin conexión lista",
+      "inspecting": "Preparando controles de edición...",
+      "selectWordToEdit": "Selecciona texto del documento para editarlo",
+      "selectExcelToEdit": "Selecciona una celda para editarla",
+      "readyToEdit": "El contenido seleccionado está listo para editarse",
       "conflictRecovery": "Tu edición no se guardó y sigue aquí. El archivo del espacio de trabajo está seguro.",
       "saveFailureRecovery": "Tu edición sigue aquí y el archivo del espacio de trabajo no se modificó.",
       "copyDraft": "Copiar borrador",
@@ -130,6 +133,12 @@
       "requestPlaceholder": "Describe el cambio que quieres que haga Forge.",
       "askWordContext": "Archivo: {{fileName}}\nPárrafo: {{path}}\nTexto seleccionado: {{text}}\nSolicitud: {{placeholder}}",
       "askExcelContext": "Archivo: {{fileName}}\nRango: {{range}}\nCeldas:\n{{cells}}\nSolicitud: {{placeholder}}"
+    },
+    "viewer": {
+      "zoomOut": "Alejar",
+      "zoomIn": "Acercar",
+      "resetZoom": "Restablecer zoom",
+      "fitWidth": "Ajustar al ancho"
     }
   },
   "word": {

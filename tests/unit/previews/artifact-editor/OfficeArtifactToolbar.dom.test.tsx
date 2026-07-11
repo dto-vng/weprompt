@@ -37,7 +37,10 @@ const translations: Record<string, string> = {
   'preview.office.editor.saveFailed': 'Save failed',
   'preview.office.editor.fileChanged': 'File changed elsewhere',
   'preview.office.editor.unsupported': 'This selection needs the desktop app',
-  'preview.office.editor.selectToEdit': 'Offline quick edit ready',
+  'preview.office.editor.inspecting': 'Preparing edit controls',
+  'preview.office.editor.selectWordToEdit': 'Select text in the document to edit it',
+  'preview.office.editor.selectExcelToEdit': 'Select a cell to edit it',
+  'preview.office.editor.readyToEdit': 'Ready to edit the selected content',
   'preview.office.editor.conflictRecovery': 'Your edit was not saved and is still here. The workspace file is safe.',
   'preview.office.editor.saveFailureRecovery': 'Your edit is still here and the workspace file was not changed.',
   'preview.office.editor.copyDraft': 'Copy draft',
@@ -65,6 +68,7 @@ const wordInspection: OfficeArtifactInspection = {
 };
 
 const createProps = (overrides: Partial<React.ComponentProps<typeof OfficeArtifactToolbar>> = {}) => ({
+  documentKind: 'excel' as const,
   inspection: excelInspection,
   status: 'ready' as const,
   undoDepth: 1,
@@ -101,11 +105,47 @@ describe('OfficeArtifactToolbar', () => {
     document.body.replaceChildren();
   });
 
-  it('explains the offline selection-edit workflow before a selection is made', () => {
-    render(<OfficeArtifactToolbar {...createProps({ inspection: null, undoDepth: 0 })} />);
+  it.each([
+    ['word', 'Select text in the document to edit it'],
+    ['excel', 'Select a cell to edit it'],
+  ] as const)('explains how to start editing a %s file', (documentKind, instruction) => {
+    render(<OfficeArtifactToolbar {...createProps({ documentKind, inspection: null, undoDepth: 0 })} />);
 
-    expect(screen.getByText('Offline quick edit ready')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Open in desktop app' })).toBeEnabled();
+    expect(screen.getByText(instruction)).toBeVisible();
+    expect(screen.getByText(instruction).closest('[data-testid="office-toolbar-status-strip"]')).toHaveClass(
+      styles.statusNeutral
+    );
+    expect(screen.getByTestId('office-toolbar-actions')).toContainElement(
+      screen.getByRole('button', { name: 'Open in desktop app' })
+    );
+  });
+
+  it('uses semantic status-strip treatments without mixing status into the action row', () => {
+    const props = createProps({ inspection: null, status: 'saving' });
+    const view = render(<OfficeArtifactToolbar {...props} />);
+
+    expect(screen.getByTestId('office-toolbar-status-strip')).toHaveClass(styles.statusProgress);
+    expect(screen.getByTestId('office-toolbar-actions')).not.toHaveTextContent('Saving');
+
+    view.rerender(<OfficeArtifactToolbar {...props} status='saved' />);
+    expect(screen.getByTestId('office-toolbar-status-strip')).toHaveClass(styles.statusSuccess);
+
+    view.rerender(<OfficeArtifactToolbar {...props} status='unsupported' />);
+    expect(screen.getByTestId('office-toolbar-status-strip')).toHaveClass(styles.statusError);
+    expect(screen.getByText('This selection needs the desktop app')).toHaveAttribute('role', 'alert');
+  });
+
+  it('keeps a successful ready status visible after selecting editable content', () => {
+    render(<OfficeArtifactToolbar {...createProps()} />);
+
+    expect(screen.getByText('Ready to edit the selected content')).toBeVisible();
+    expect(screen.getByTestId('office-toolbar-status-strip')).toHaveClass(styles.statusSuccess);
+  });
+
+  it('announces selection inspection while preparing edit controls', () => {
+    render(<OfficeArtifactToolbar {...createProps({ inspection: null, status: 'inspecting' })} />);
+
+    expect(screen.getByText('Preparing edit controls')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('commits an Excel formula with Enter and cancels with Escape', async () => {
@@ -219,8 +259,14 @@ describe('OfficeArtifactToolbar', () => {
 
     const containerFallback = readAtRule(css, '@container (max-width: 719px)');
     const viewportFallback = readAtRule(css, '@media (max-width: 719px)');
+    const narrowContainerFallback = readAtRule(css, '@container (max-width: 519px)');
+    const narrowViewportFallback = readAtRule(css, '@media (max-width: 519px)');
     expect(containerFallback).toMatch(/\.compactMenuItem\s*\{\s*display:\s*flex;/);
     expect(viewportFallback).toMatch(/\.compactMenuItem\s*\{\s*display:\s*flex;/);
+    expect(narrowContainerFallback).not.toContain('.status,');
+    expect(narrowContainerFallback).not.toContain('.errorStatus');
+    expect(narrowViewportFallback).not.toContain('.status,');
+    expect(narrowViewportFallback).not.toContain('.errorStatus');
   });
 
   it('announces successful saves only when the status is saved', () => {

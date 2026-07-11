@@ -122,7 +122,10 @@
       "refreshing": "Vorschau wird aktualisiert",
       "previewOutdated": "Vorschau ist möglicherweise veraltet",
       "unsupported": "Diese Auswahl erfordert die Desktop-App",
-      "selectToEdit": "Offline-Schnellbearbeitung bereit",
+      "inspecting": "Bearbeitungswerkzeuge werden vorbereitet...",
+      "selectWordToEdit": "Text im Dokument zum Bearbeiten auswählen",
+      "selectExcelToEdit": "Zelle zum Bearbeiten auswählen",
+      "readyToEdit": "Der ausgewählte Inhalt kann bearbeitet werden",
       "conflictRecovery": "Ihre Bearbeitung wurde nicht gespeichert und ist weiterhin hier. Die Workspace-Datei ist sicher.",
       "saveFailureRecovery": "Ihre Bearbeitung ist weiterhin hier und die Workspace-Datei wurde nicht geändert.",
       "copyDraft": "Entwurf kopieren",
@@ -130,6 +133,12 @@
       "requestPlaceholder": "Beschreibe die Änderung, die Forge vornehmen soll.",
       "askWordContext": "Datei: {{fileName}}\nAbsatz: {{path}}\nAusgewählter Text: {{text}}\nAnfrage: {{placeholder}}",
       "askExcelContext": "Datei: {{fileName}}\nBereich: {{range}}\nZellen:\n{{cells}}\nAnfrage: {{placeholder}}"
+    },
+    "viewer": {
+      "zoomOut": "Verkleinern",
+      "zoomIn": "Vergrößern",
+      "resetZoom": "Zoom zurücksetzen",
+      "fitWidth": "An Breite anpassen"
     }
   },
   "word": {

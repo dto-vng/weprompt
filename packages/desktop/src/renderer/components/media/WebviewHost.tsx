@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Left, Right, Refresh, Loading } from '@icon-park/react';
+import { Button, Tooltip } from '@arco-design/web-react';
+import { AutoWidth, Left, Loading, Refresh, Right, ZoomIn, ZoomOut } from '@icon-park/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type WebviewHostScriptRequest = {
   id: number;
@@ -24,6 +26,8 @@ export type WebviewHostProps = {
   id?: string;
   /** Whether to show the navigation bar (back/forward/refresh/URL) */
   showNavBar?: boolean;
+  /** Whether to show compact zoom controls over an embedded Office viewer. */
+  showViewerControls?: boolean;
   /** Webview partition for cache/session isolation, e.g. "persist:ext-settings-feishu" */
   partition?: string;
   /** Extra class names for root container */
@@ -69,6 +73,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
   url,
   id: _id,
   showNavBar = false,
+  showViewerControls = false,
   partition,
   className,
   style,
@@ -79,6 +84,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
   onConsoleMessage,
   onDomReady,
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const webviewRef = useRef<Electron.WebviewTag | null>(null);
@@ -112,6 +118,8 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
   }, []);
 
   const isStarOffice = isStarOfficeUrl(currentUrl);
+  const zoomEnabled = showViewerControls || isStarOffice;
+  const viewerControlsReady = zoomEnabled && webviewReady && !isLoading;
 
   const setWebviewRef = useCallback((element: HTMLWebViewElement | null): void => {
     webviewRef.current = element && isElectronWebviewTag(element) ? element : null;
@@ -136,11 +144,11 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
     const webviewEl = webviewRef.current;
     if (!webviewReady || !webviewEl) return;
     try {
-      webviewEl.setZoomFactor(isStarOffice ? zoomFactor : 1);
+      webviewEl.setZoomFactor(zoomEnabled ? zoomFactor : 1);
     } catch {
       // Ignore zoom timing errors
     }
-  }, [isStarOffice, zoomFactor, webviewReady]);
+  }, [webviewReady, zoomEnabled, zoomFactor]);
 
   // Navigate to new URL (add to history)
   const navigateToWithHistory = useCallback(
@@ -304,7 +312,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
         )
         .catch(() => {});
 
-      if (isStarOfficeUrl(currentUrl)) {
+      if (zoomEnabled) {
         webviewEl
           .executeJavaScript(
             `
@@ -402,6 +410,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
     onDidFailLoad,
     onDidFinishLoad,
     onDomReady,
+    zoomEnabled,
   ]);
 
   useEffect(() => {
@@ -440,14 +449,24 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
   }, []);
 
   const handleZoomReset = useCallback(() => {
-    if (!isStarOffice) return;
+    if (!viewerControlsReady) return;
     setZoomFactor(1);
-  }, [isStarOffice]);
+  }, [viewerControlsReady]);
+
+  const handleZoomOut = useCallback(() => {
+    if (!viewerControlsReady) return;
+    setZoomFactor((previous) => Math.max(MIN_ZOOM_FACTOR, Number((previous - 0.1).toFixed(2))));
+  }, [viewerControlsReady]);
+
+  const handleZoomIn = useCallback(() => {
+    if (!viewerControlsReady) return;
+    setZoomFactor((previous) => Math.min(MAX_ZOOM_FACTOR, Number((previous + 0.1).toFixed(2))));
+  }, [viewerControlsReady]);
 
   const handleZoomFit = useCallback(() => {
     const currentWebview = webviewRef.current;
     const currentContent = contentRef.current;
-    if (!isStarOffice || !currentWebview || !currentContent) return;
+    if (!viewerControlsReady || !currentWebview || !currentContent) return;
     void currentWebview
       .executeJavaScript(
         `
@@ -467,15 +486,16 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
       .then((result: unknown) => {
         const stageWidth = isWidthResult(result) ? result.width : 0;
         if (!stageWidth) return;
-        const next = Number((currentContent.clientWidth / stageWidth).toFixed(2));
+        const unzoomedStageWidth = stageWidth * zoomFactor;
+        const next = Number((currentContent.clientWidth / unzoomedStageWidth).toFixed(2));
         setZoomFactor(Math.max(MIN_ZOOM_FACTOR, Math.min(MAX_ZOOM_FACTOR, next)));
       })
       .catch(() => {});
-  }, [isStarOffice]);
+  }, [viewerControlsReady, zoomFactor]);
 
   const handleOuterWheelZoom = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
-      if (!isStarOffice) return;
+      if (!viewerControlsReady) return;
       if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
       const step = event.deltaY < 0 ? 0.08 : -0.08;
@@ -484,7 +504,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
         return Math.max(MIN_ZOOM_FACTOR, Math.min(MAX_ZOOM_FACTOR, next));
       });
     },
-    [isStarOffice]
+    [viewerControlsReady]
   );
 
   // Back
@@ -707,6 +727,59 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
           }}
           {...webviewAttrs}
         />
+        {showViewerControls && viewerControlsReady && (
+          <div
+            data-testid='office-viewer-controls'
+            className='absolute right-12px bottom-12px z-20 flex h-32px items-center gap-2px rounded-8px border border-border-1 bg-bg-1 p-2px shadow-sm'
+          >
+            <Tooltip content={t('preview.office.viewer.zoomOut')}>
+              <Button
+                type='text'
+                size='mini'
+                aria-label={t('preview.office.viewer.zoomOut')}
+                icon={<ZoomOut size={15} />}
+                className='!h-26px !w-26px !p-0'
+                disabled={!viewerControlsReady || zoomFactor <= MIN_ZOOM_FACTOR}
+                onClick={handleZoomOut}
+              />
+            </Tooltip>
+            <Tooltip content={t('preview.office.viewer.resetZoom')}>
+              <Button
+                type='text'
+                size='mini'
+                aria-label={t('preview.office.viewer.resetZoom')}
+                className='!h-26px !min-w-44px !px-6px !text-11px tabular-nums'
+                disabled={!viewerControlsReady}
+                onClick={handleZoomReset}
+              >
+                {Math.round(zoomFactor * 100)}%
+              </Button>
+            </Tooltip>
+            <Tooltip content={t('preview.office.viewer.zoomIn')}>
+              <Button
+                type='text'
+                size='mini'
+                aria-label={t('preview.office.viewer.zoomIn')}
+                icon={<ZoomIn size={15} />}
+                className='!h-26px !w-26px !p-0'
+                disabled={!viewerControlsReady || zoomFactor >= MAX_ZOOM_FACTOR}
+                onClick={handleZoomIn}
+              />
+            </Tooltip>
+            <span className='mx-2px h-16px w-1px bg-border-1' aria-hidden='true' />
+            <Tooltip content={t('preview.office.viewer.fitWidth')}>
+              <Button
+                type='text'
+                size='mini'
+                aria-label={t('preview.office.viewer.fitWidth')}
+                icon={<AutoWidth size={15} />}
+                className='!h-26px !w-26px !p-0'
+                disabled={!viewerControlsReady}
+                onClick={handleZoomFit}
+              />
+            </Tooltip>
+          </div>
+        )}
       </div>
     </div>
   );

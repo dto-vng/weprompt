@@ -15,6 +15,7 @@ import { usePreviewContext } from '../../context/PreviewContext';
 import { getOfficePreviewRefreshToken } from '../../context/officePreviewRevision';
 import { useResizableSplit } from '@/renderer/hooks/ui/useResizableSplit';
 import { Link } from '@arco-design/web-react';
+import classNames from 'classnames';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DiffPreview from '../viewers/DiffViewer';
 import ExcelPreview from '../viewers/ExcelViewer';
@@ -57,7 +58,11 @@ import './preview.css';
  * 支持多 Tab 切换，每个 Tab 可以显示不同类型的内容
  * Supports multiple tabs, each tab can display different types of content
  */
-const PreviewPanel: React.FC = () => {
+type PreviewPanelProps = {
+  fullBleed?: boolean;
+};
+
+const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false }) => {
   const { t } = useTranslation();
   const { id: conversationId = '' } = useParams<{ id: string }>();
   const {
@@ -704,11 +709,15 @@ const PreviewPanel: React.FC = () => {
     id: tab.id,
     title: tab.title,
     isDirty: tab.isDirty,
+    contentType: tab.content_type,
   }));
 
   return (
     <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
-      <div className='h-full flex flex-col bg-1 rounded-[16px]'>
+      <div
+        data-testid='preview-panel-surface'
+        className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
+      >
         {messageContextHolder}
 
         {/* 确认对话框 / Confirmation modals */}
@@ -763,6 +772,7 @@ const PreviewPanel: React.FC = () => {
             officeToolbar={
               officeEditorEnabled ? (
                 <OfficeArtifactToolbar
+                  documentKind={content_type === 'word' ? 'word' : 'excel'}
                   inspection={officeEditor.inspection}
                   status={officeEditor.status}
                   undoDepth={officeEditor.undoDepth}

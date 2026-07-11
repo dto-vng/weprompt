@@ -134,6 +134,21 @@ describe('useOfficeArtifactEditor', () => {
     );
   });
 
+  it('inspects a selection that arrives before artifact state finishes loading', async () => {
+    const pendingState = deferred<OfficeArtifactStateResult>();
+    mocks.getState.mockReturnValue(pendingState.promise);
+    mocks.inspect.mockResolvedValue(firstInspection);
+    const { result } = renderHook(() => useOfficeArtifactEditor(createOptions()));
+
+    act(() => result.current.handleSelectionChange(firstSelection));
+    expect(mocks.inspect).not.toHaveBeenCalled();
+
+    pendingState.resolve({ ok: true, version: 'v1', undoDepth: 0 });
+
+    await waitFor(() => expect(result.current.inspection).toEqual(firstInspection.inspection));
+    expect(mocks.inspect).toHaveBeenCalledWith(expect.objectContaining({ selection: firstSelection }));
+  });
+
   it('reports saving and then saved only after apply succeeds', async () => {
     const pending = deferred<OfficeArtifactMutationResult>();
     mocks.inspect.mockResolvedValue(firstInspection);

@@ -170,6 +170,7 @@ describe('OfficeWatchViewer lifecycle', () => {
     await flushOfficeWatchStart();
 
     expect(screen.getByTestId('office-preview-webview')).toBeVisible();
+    expect(mocks.webviewProps.current?.showViewerControls).toBe(true);
     expect(screen.getByTestId('office-preview-loading')).toBeVisible();
 
     act(() => mocks.webviewProps.current?.onDidFinishLoad?.());
@@ -248,6 +249,7 @@ describe('OfficeWatchViewer lifecycle', () => {
     expect(mocks.startPreviewInvoke).toHaveBeenCalledWith({ leaseId: 'preview-lease-1' });
     expect(mocks.startInvoke).not.toHaveBeenCalled();
     expect(screen.getByTestId('webview-host')).toHaveAttribute('data-url', 'http://127.0.0.1:26318/');
+    expect(mocks.webviewProps.current?.showViewerControls).toBe(true);
 
     view.unmount();
     await act(async () => {
@@ -278,6 +280,7 @@ describe('OfficeWatchViewer lifecycle', () => {
 
     expect(mocks.preparePreviewInvoke).not.toHaveBeenCalled();
     expect(mocks.startInvoke).toHaveBeenCalledWith({ file_path: '/w/slides.pptx', workspace: '/w' });
+    expect(mocks.webviewProps.current?.showViewerControls).toBeFalsy();
   });
 
   it('retains the loaded host with a nonblocking indicator while a refresh starts', async () => {

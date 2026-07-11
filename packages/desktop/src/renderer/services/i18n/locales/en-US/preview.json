@@ -122,7 +122,10 @@
       "refreshing": "Refreshing preview",
       "previewOutdated": "Preview may be outdated",
       "unsupported": "This selection needs the desktop app",
-      "selectToEdit": "Offline quick edit ready",
+      "inspecting": "Preparing edit controls...",
+      "selectWordToEdit": "Select text in the document to edit it",
+      "selectExcelToEdit": "Select a cell to edit it",
+      "readyToEdit": "Ready to edit the selected content",
       "conflictRecovery": "Your edit was not saved and is still here. The workspace file is safe.",
       "saveFailureRecovery": "Your edit is still here and the workspace file was not changed.",
       "copyDraft": "Copy draft",
@@ -130,6 +133,12 @@
       "requestPlaceholder": "Describe the change you want Forge to make.",
       "askWordContext": "File: {{fileName}}\nParagraph: {{path}}\nSelected text: {{text}}\nRequest: {{placeholder}}",
       "askExcelContext": "File: {{fileName}}\nRange: {{range}}\nCells:\n{{cells}}\nRequest: {{placeholder}}"
+    },
+    "viewer": {
+      "zoomOut": "Zoom out",
+      "zoomIn": "Zoom in",
+      "resetZoom": "Reset zoom",
+      "fitWidth": "Fit to width"
     }
   },
   "word": {

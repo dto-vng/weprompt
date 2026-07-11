@@ -122,7 +122,10 @@
       "refreshing": "プレビューを更新中",
       "previewOutdated": "プレビューが最新でない可能性があります",
       "unsupported": "この選択範囲にはデスクトップアプリが必要です",
-      "selectToEdit": "オフライン簡易編集の準備完了",
+      "inspecting": "編集コントロールを準備しています...",
+      "selectWordToEdit": "ドキュメント内のテキストを選択して編集",
+      "selectExcelToEdit": "セルを選択して編集",
+      "readyToEdit": "選択した内容を編集できます",
       "conflictRecovery": "編集内容は保存されていませんが、ここに残っています。ワークスペースのファイルは安全です。",
       "saveFailureRecovery": "編集内容はここに残っており、ワークスペースのファイルは変更されていません。",
       "copyDraft": "下書きをコピー",
@@ -130,6 +133,12 @@
       "requestPlaceholder": "Forge に適用してほしい変更を入力してください。",
       "askWordContext": "ファイル：{{fileName}}\n段落：{{path}}\n選択したテキスト：{{text}}\n依頼：{{placeholder}}",
       "askExcelContext": "ファイル：{{fileName}}\n範囲：{{range}}\nセル：\n{{cells}}\n依頼：{{placeholder}}"
+    },
+    "viewer": {
+      "zoomOut": "縮小",
+      "zoomIn": "拡大",
+      "resetZoom": "ズームをリセット",
+      "fitWidth": "幅に合わせる"
     }
   },
   "word": {

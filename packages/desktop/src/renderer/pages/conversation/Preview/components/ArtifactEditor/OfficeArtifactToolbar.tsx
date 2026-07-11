@@ -15,6 +15,7 @@ import type { OfficeArtifactEditorStatus, OfficeSelectionDirection } from './use
 import styles from './OfficeArtifactToolbar.module.css';
 
 export type OfficeArtifactToolbarProps = {
+  documentKind: 'word' | 'excel';
   inspection: OfficeArtifactInspection | null;
   status: OfficeArtifactEditorStatus;
   undoDepth: number;
@@ -31,6 +32,7 @@ export type OfficeArtifactToolbarProps = {
 const ICON_SIZE = 16;
 
 const STATUS_KEYS: Partial<Record<OfficeArtifactEditorStatus, string>> = {
+  inspecting: 'preview.office.editor.inspecting',
   saving: 'preview.office.editor.saving',
   saved: 'preview.office.editor.saved',
   saveFailed: 'preview.office.editor.saveFailed',
@@ -40,6 +42,7 @@ const STATUS_KEYS: Partial<Record<OfficeArtifactEditorStatus, string>> = {
 };
 
 export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
+  documentKind,
   inspection,
   status,
   undoDepth,
@@ -67,8 +70,12 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
     : unsupported
       ? t('preview.office.editor.unsupported')
       : inspection
-        ? ''
-        : t('preview.office.editor.selectToEdit');
+        ? t('preview.office.editor.readyToEdit')
+        : t(
+            documentKind === 'word'
+              ? 'preview.office.editor.selectWordToEdit'
+              : 'preview.office.editor.selectExcelToEdit'
+          );
   const statusIsError =
     status === 'saveFailed' || status === 'fileChanged' || status === 'unsupported' || (unsupported && !statusKey);
   const recoveryText =
@@ -77,6 +84,13 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
       : status === 'saveFailed'
         ? t('preview.office.editor.saveFailureRecovery')
         : null;
+  const statusTone = statusIsError
+    ? styles.statusError
+    : status === 'saving' || status === 'inspecting'
+      ? styles.statusProgress
+      : status === 'saved' || status === 'openedDesktop' || (status === 'ready' && inspection)
+        ? styles.statusSuccess
+        : styles.statusNeutral;
 
   const moreMenu = (
     <Menu>
@@ -116,15 +130,9 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
 
   return (
     <div ref={toolbarRef} className={styles.toolbarFrame} data-testid='office-artifact-toolbar'>
-      <div className={styles.toolbar}>
-        <div className={styles.leftActions}>
-          <OfficeSelectionEditor
-            inspection={inspection}
-            status={status}
-            apply={apply}
-            moveSelection={moveSelection}
-            onDraftChange={setDraft}
-          />
+      {statusText && (
+        <div className={`${styles.statusStrip} ${statusTone}`} data-testid='office-toolbar-status-strip'>
+          <span className={styles.statusMarker} aria-hidden='true' />
           <Typography.Text
             className={statusIsError ? styles.errorStatus : inspection ? styles.status : styles.zeroState}
             aria-live='polite'
@@ -133,6 +141,17 @@ export const OfficeArtifactToolbar: React.FC<OfficeArtifactToolbarProps> = ({
           >
             {statusText}
           </Typography.Text>
+        </div>
+      )}
+      <div className={styles.toolbar} data-testid='office-toolbar-actions'>
+        <div className={styles.leftActions}>
+          <OfficeSelectionEditor
+            inspection={inspection}
+            status={status}
+            apply={apply}
+            moveSelection={moveSelection}
+            onDraftChange={setDraft}
+          />
         </div>
         <div className={styles.rightActions}>
           <Tooltip content={t('preview.office.editor.undo')}>
