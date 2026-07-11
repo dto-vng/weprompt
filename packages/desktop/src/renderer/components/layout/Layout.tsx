@@ -255,10 +255,14 @@ const Layout: React.FC<{
     collapsedRef.current = collapsed;
   }, [collapsed]);
 
-  // Persist the explicit collapse toggle independently of the draggable width.
-  useEffect(() => {
-    persistSiderCollapsed(collapsed);
-  }, [collapsed]);
+  // Explicit collapse toggle (collapse button / Titlebar). Persists the choice
+  // independently of the draggable width. Auto force-collapse paths (mobile)
+  // call the raw `setCollapsed` and are intentionally NOT persisted, so
+  // narrowing the window never writes a collapsed preference for desktop.
+  const setSiderCollapsedExplicit = useCallback((value: boolean) => {
+    persistSiderCollapsed(value);
+    setCollapsed(value);
+  }, []);
 
   const siderStyle = isMobile
     ? {
@@ -275,7 +279,9 @@ const Layout: React.FC<{
       };
 
   return (
-    <LayoutContext.Provider value={{ isMobile, siderCollapsed: collapsed, setSiderCollapsed: setCollapsed }}>
+    <LayoutContext.Provider
+      value={{ isMobile, siderCollapsed: collapsed, setSiderCollapsed: setSiderCollapsedExplicit }}
+    >
       <NavigationHistoryProvider>
         <div className='app-shell flex flex-col size-full min-h-0'>
           <Titlebar workspaceAvailable={workspaceAvailable} />

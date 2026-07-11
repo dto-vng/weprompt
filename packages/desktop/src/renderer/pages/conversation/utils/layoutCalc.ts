@@ -11,7 +11,6 @@ export type LayoutCalcInput = {
   workspaceEnabled: boolean;
   isDesktop: boolean;
   artifactCollapsed: boolean;
-  isMobile: boolean;
 };
 
 export type LayoutMetrics = {
@@ -32,7 +31,7 @@ export type LayoutMetrics = {
  * the artifact pane can be fully collapsed to give chat the full width.
  */
 export const calcLayoutMetrics = (input: LayoutCalcInput): LayoutMetrics => {
-  const { containerWidth, chatSplitRatio, workspaceEnabled, isDesktop, artifactCollapsed, isMobile: _isMobile } = input;
+  const { containerWidth, chatSplitRatio, workspaceEnabled, isDesktop, artifactCollapsed } = input;
 
   const safeContainerWidth = Math.max(containerWidth || 0, 1);
   const artifactVisible = workspaceEnabled && isDesktop && !artifactCollapsed;

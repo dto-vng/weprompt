@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   mobile: false,
   artifactCollapsed: false,
   resizableSplitOptions: [] as Array<Record<string, unknown>>,
+  dragHandleOptions: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/renderer/components/agent/AgentBadge', () => ({ AgentLogoIcon: () => null }));
@@ -44,7 +45,10 @@ vi.mock('@/renderer/hooks/ui/useResizableSplit', () => ({
     return {
       splitRatio,
       setSplitRatio: vi.fn(),
-      createDragHandle: () => <div data-testid='split-handle' />,
+      createDragHandle: (opts: Record<string, unknown> = {}) => {
+        mocks.dragHandleOptions.push(opts);
+        return <div data-testid='split-handle' />;
+      },
     };
   },
 }));
@@ -112,6 +116,7 @@ describe('ChatLayout chat + artifact two-region split (single chat / project-men
     mocks.mobile = false;
     mocks.artifactCollapsed = false;
     mocks.resizableSplitOptions.length = 0;
+    mocks.dragHandleOptions.length = 0;
     localStorage.clear();
   });
 
@@ -153,6 +158,16 @@ describe('ChatLayout chat + artifact two-region split (single chat / project-men
     expect(screen.getByTestId('chat-layout-chat-pane')).toHaveStyle({ flexBasis: '40%' });
   });
 
+  it('places the divider handle so dragging right grows chat (chat-is-left semantics)', () => {
+    renderLayout();
+
+    // The handle drives chatSplitRatio (the LEFT/chat pane), so it must NOT be
+    // reversed — reverse:true would drag the divider backwards.
+    expect(mocks.dragHandleOptions).toHaveLength(1);
+    expect(mocks.dragHandleOptions[0].reverse).toBeFalsy();
+    expect(mocks.dragHandleOptions[0].linePlacement).toBe('start');
+  });
+
   it('removes the artifact pane from the DOM when collapsed and gives chat the full width', () => {
     mocks.artifactCollapsed = true;
     renderLayout();
@@ -176,6 +191,7 @@ describe('ChatLayout team workspace pane (panel presentation)', () => {
     mocks.mobile = false;
     mocks.artifactCollapsed = false;
     mocks.resizableSplitOptions.length = 0;
+    mocks.dragHandleOptions.length = 0;
     localStorage.clear();
   });
 
@@ -197,6 +213,13 @@ describe('ChatLayout team workspace pane (panel presentation)', () => {
     expect(mocks.resizableSplitOptions[0]).toEqual(
       expect.objectContaining({ unit: 'ratio', defaultWidth: 70, storageKey: 'chat-workspace-split-ratio' })
     );
+  });
+
+  it('does not reverse the divider handle (chat-is-left semantics)', () => {
+    renderLayout('panel');
+
+    expect(mocks.dragHandleOptions).toHaveLength(1);
+    expect(mocks.dragHandleOptions[0].reverse).toBeFalsy();
   });
 
   it('keeps the file tree mounted at zero width when collapsed (auto-expand preserved)', () => {

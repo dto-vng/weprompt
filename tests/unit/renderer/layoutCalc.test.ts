@@ -11,7 +11,6 @@ const base = {
   workspaceEnabled: true,
   isDesktop: true,
   artifactCollapsed: false,
-  isMobile: false,
 };
 
 describe('calcLayoutMetrics (2-region)', () => {

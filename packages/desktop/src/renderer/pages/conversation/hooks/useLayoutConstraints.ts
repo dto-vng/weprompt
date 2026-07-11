@@ -7,17 +7,17 @@ type UseLayoutConstraintsParams = {
   isDesktop: boolean;
   artifactCollapsed: boolean;
   setArtifactCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  chatSplitRatio: number;
-  setChatSplitRatio: (ratio: number) => void;
-  dynamicChatMinRatio: number;
-  dynamicChatMaxRatio: number;
 };
 
 /**
- * Constrains the two-region (chat | artifact) layout: auto-collapses the
- * artifact pane when the container is too narrow to fit both panes above their
- * minimum pixel widths, and clamps the chat<->artifact split ratio into its
- * dynamic bounds.
+ * Auto-collapses the artifact pane when the container is too narrow to fit both
+ * the chat and artifact panes side by side above their minimum pixel widths.
+ *
+ * The chat<->artifact split ratio is NOT clamped here: the stored preference is
+ * mutated only by explicit user action (drag / double-click reset, both clamped
+ * inside `useResizableSplit`). Container-driven clamping is applied at render
+ * time (see ChatLayout's effective ratio) so a transient narrow width never
+ * overwrites the persisted ratio.
  */
 export function useLayoutConstraints({
   containerWidth,
@@ -25,13 +25,7 @@ export function useLayoutConstraints({
   isDesktop,
   artifactCollapsed,
   setArtifactCollapsed,
-  chatSplitRatio,
-  setChatSplitRatio,
-  dynamicChatMinRatio,
-  dynamicChatMaxRatio,
 }: UseLayoutConstraintsParams): void {
-  // Auto-collapse the artifact pane when the container is too narrow to fit
-  // both the chat and artifact panes side by side.
   useEffect(() => {
     if (!workspaceEnabled || !isDesktop || artifactCollapsed) {
       return;
@@ -41,24 +35,4 @@ export function useLayoutConstraints({
       setArtifactCollapsed(true);
     }
   }, [artifactCollapsed, containerWidth, isDesktop, setArtifactCollapsed, workspaceEnabled]);
-
-  // Clamp the chat split ratio within the dynamic bounds while the artifact
-  // pane is visible.
-  useEffect(() => {
-    if (!workspaceEnabled || !isDesktop || artifactCollapsed) {
-      return;
-    }
-    const clampedChat = Math.max(dynamicChatMinRatio, Math.min(dynamicChatMaxRatio, chatSplitRatio));
-    if (clampedChat !== chatSplitRatio) {
-      setChatSplitRatio(clampedChat);
-    }
-  }, [
-    artifactCollapsed,
-    chatSplitRatio,
-    dynamicChatMaxRatio,
-    dynamicChatMinRatio,
-    isDesktop,
-    setChatSplitRatio,
-    workspaceEnabled,
-  ]);
 }

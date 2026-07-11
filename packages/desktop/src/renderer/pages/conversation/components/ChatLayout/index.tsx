@@ -106,15 +106,10 @@ const ChatLayout: React.FC<{
     workspaceEnabled,
     isDesktop,
     artifactCollapsed,
-    isMobile,
   });
 
   // Single ratio split between chat and the always-open artifact pane.
-  const {
-    splitRatio: chatSplitRatio,
-    setSplitRatio: setChatSplitRatio,
-    createDragHandle: createArtifactDragHandle,
-  } = useResizableSplit({
+  const { splitRatio: chatSplitRatio, createDragHandle: createArtifactDragHandle } = useResizableSplit({
     unit: 'ratio',
     // Team keeps the workspace as a narrower sidebar (chat gets more room);
     // single chat splits evenly with the artifact preview.
@@ -124,15 +119,19 @@ const ChatLayout: React.FC<{
     storageKey: isWorkspacePanePresentation ? 'chat-workspace-split-ratio' : 'chat-artifact-split-ratio',
   });
 
-  // Full metrics with the real chatSplitRatio
+  // Clamp only the RENDERED ratio into the container-driven bounds. The stored
+  // preference (`chatSplitRatio`) is left untouched so a transient narrow width
+  // never overwrites it — only explicit drag/reset mutate the stored value.
+  const effectiveChatSplitRatio = Math.max(dynamicChatMinRatio, Math.min(dynamicChatMaxRatio, chatSplitRatio));
+
+  // Full metrics with the effective (clamped) chatSplitRatio
   const { artifactVisible, chatFlex, mobileWorkspaceWidthPx, titleAreaMaxWidth, mobileWorkspaceHandleRight } =
     calcLayoutMetrics({
       containerWidth,
-      chatSplitRatio,
+      chatSplitRatio: effectiveChatSplitRatio,
       workspaceEnabled,
       isDesktop,
       artifactCollapsed,
-      isMobile,
     });
 
   // --- Hook E: layout constraints ---
@@ -142,10 +141,6 @@ const ChatLayout: React.FC<{
     isDesktop,
     artifactCollapsed,
     setArtifactCollapsed,
-    chatSplitRatio,
-    setChatSplitRatio,
-    dynamicChatMinRatio,
-    dynamicChatMaxRatio,
   });
 
   const [mobileActionsSlot, setMobileActionsSlot] = useState<HTMLElement | null>(null);
@@ -276,7 +271,7 @@ const ChatLayout: React.FC<{
             }}
           >
             {!artifactCollapsed &&
-              createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', reverse: true })}
+              createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
             <WorkspacePanelHeader
               showToggle={!isMacRuntime && !isWindowsRuntime}
               collapsed={artifactCollapsed}
@@ -302,7 +297,7 @@ const ChatLayout: React.FC<{
               borderLeft: '1px solid var(--bg-3)',
             }}
           >
-            {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', reverse: true })}
+            {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
             <div className='flex-1 min-h-0 overflow-hidden'>
               <PreviewPanel fullBleed onRequestCollapse={() => setArtifactCollapsed(true)} />
             </div>
