@@ -629,7 +629,7 @@ brew install aionui
 - [⚙️ LLM 配置指南](https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration) — 多平台 AI 模型怎么配置
 - [🤖 多 Agent 模式设置](https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup) — 把终端 AI Agent 集成进来
 - [🔌 MCP 工具配置](https://github.com/iOfficeAI/AionUi/wiki/MCP-Configuration-Guide) — 模型上下文协议服务器设置
-- [🌐 WebUI 配置指南](https://github.com/iOfficeAI/AionUi/wiki/WebUI-Configuration-Guide) — WebUI 完整设置教程
+- [🌐 本机 WebUI 使用指南](../guides/webui.md) — 在此电脑浏览器中使用 WebUI 的指南
 
 **🎯 使用场景**
 

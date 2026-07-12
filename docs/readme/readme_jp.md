@@ -588,7 +588,7 @@ brew install aionui
 - [⚙️ LLM 設定ガイド](https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration) — マルチプラットフォーム AI モデル設定
 - [🤖 マルチ Agent モード設定](https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup) — ターミナル AI Agent を統合
 - [🔌 MCP ツール設定](https://github.com/iOfficeAI/AionUi/wiki/MCP-Configuration-Guide) — Model Context Protocol サーバー設定
-- [🌐 WebUI 設定ガイド](https://github.com/iOfficeAI/AionUi/wiki/WebUI-Configuration-Guide) — 完全な WebUI セットアップと設定チュートリアル
+- [🌐 ローカル WebUI ガイド](../guides/webui.md) — このコンピューターのブラウザーで WebUI を使用するためのガイド
 
 **🎯 使用例**
 

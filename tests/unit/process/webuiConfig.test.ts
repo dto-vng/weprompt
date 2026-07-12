@@ -91,6 +91,27 @@ describe('startDesktopWebUI — Forge desktop-only chokepoint (D1)', () => {
 });
 
 describe('desktop WebUI remote-access compatibility policy', () => {
+  const remoteSwitchCases: ReadonlyArray<[string, string | undefined, boolean, string[]]> = [
+    ['a bare remote switch', undefined, true, ['--remote']],
+    ['a truthy remote switch', 'true', true, ['--remote']],
+    ['a false-valued remote switch', 'false', true, []],
+    ['an off-valued remote switch', 'off', true, []],
+    ['a zero-valued remote switch', '0', true, []],
+    ['an absent remote switch', undefined, false, []],
+  ];
+
+  it.each(remoteSwitchCases)(
+    'preserves %s when passing it to the policy',
+    async (_label, switchValue, hasRemoteSwitch, expected) => {
+      const { resolveRemoteAccessRequestSources, resolveRemoteSwitchValue } =
+        await import('@process/utils/webuiConfig');
+
+      const remoteSwitchValue = resolveRemoteSwitchValue(hasRemoteSwitch, switchValue);
+
+      expect(resolveRemoteAccessRequestSources({}, remoteSwitchValue)).toEqual(expected);
+    }
+  );
+
   it('detects truthy CLI, environment, host, and config requests', async () => {
     const { resolveRemoteAccessRequestSources } = await import('@process/utils/webuiConfig');
 

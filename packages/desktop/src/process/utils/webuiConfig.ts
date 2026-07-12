@@ -65,6 +65,8 @@ export type WebUIUserConfig = {
   adminUsername?: string;
 };
 
+type RemoteSwitchValue = string | true | undefined;
+
 export const parsePortValue = (value: unknown): number | null => {
   if (value === undefined || value === null || value === '') {
     return null;
@@ -151,15 +153,24 @@ export const resolveWebUIPort = (
 };
 
 /**
+ * Preserve an Electron remote-switch value for compatibility-policy evaluation.
+ * A present switch with no value is represented as `true`.
+ */
+export const resolveRemoteSwitchValue = (
+  hasRemoteSwitch: boolean,
+  switchValue: string | undefined
+): RemoteSwitchValue => (hasRemoteSwitch ? (switchValue ?? true) : undefined);
+
+/**
  * Identify retired remote-access controls requested for Electron WebUI mode.
  */
 export const resolveRemoteAccessRequestSources = (
   config: WebUIUserConfig,
-  isRemoteMode: boolean,
+  remoteSwitchValue: RemoteSwitchValue,
   env: NodeJS.ProcessEnv = process.env
 ): string[] => {
   const requestedBy: string[] = [];
-  if (isRemoteMode) requestedBy.push('--remote');
+  if (remoteSwitchValue === true || parseBooleanEnv(remoteSwitchValue) === true) requestedBy.push('--remote');
   if (parseBooleanEnv(env.AIONUI_ALLOW_REMOTE) === true) requestedBy.push('AIONUI_ALLOW_REMOTE');
   if (parseBooleanEnv(env.AIONUI_REMOTE) === true) requestedBy.push('AIONUI_REMOTE');
   const hostHint = env.AIONUI_HOST?.trim();

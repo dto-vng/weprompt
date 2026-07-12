@@ -575,7 +575,7 @@ brew install aionui
 - [⚙️ LLM Yapılandırma Kılavuzu](https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration) — Çoklu platform AI model yapılandırması
 - [🤖 Çoklu Agent Modu Kurulumu](https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup) — Terminal AI Agent'larını entegre edin
 - [🔌 MCP Araç Yapılandırması](https://github.com/iOfficeAI/AionUi/wiki/MCP-Configuration-Guide) — Model Context Protocol sunucu kurulumu
-- [🌐 WebUI Yapılandırma Kılavuzu](https://github.com/iOfficeAI/AionUi/wiki/WebUI-Configuration-Guide) — Tam WebUI kurulum ve yapılandırma öğreticisi
+- [🌐 Yerel WebUI Kılavuzu](../guides/webui.md) — WebUI'yi bu bilgisayardaki tarayıcıda kullanma kılavuzu
 
 **🎯 Kullanım Senaryoları**
 

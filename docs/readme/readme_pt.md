@@ -575,7 +575,7 @@ brew install aionui
 - [⚙️ Guia de configuração LLM](https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration) — Configuração de modelos AI multiplataforma
 - [🤖 Configuração do modo Multi-Agent](https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup) — Integrar Agents AI de terminal
 - [🔌 Configuração de ferramentas MCP](https://github.com/iOfficeAI/AionUi/wiki/MCP-Configuration-Guide) — Configuração do servidor Model Context Protocol
-- [🌐 Guia de configuração WebUI](https://github.com/iOfficeAI/AionUi/wiki/WebUI-Configuration-Guide) — Tutorial completo de configuração e instalação do WebUI
+- [🌐 Guia da WebUI local](../guides/webui.md) — Guia para usar a WebUI em um navegador neste computador
 
 **🎯 Casos de uso**
 

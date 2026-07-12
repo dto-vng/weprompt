@@ -9,13 +9,13 @@ Forge WebUI opens the Forge interface in a browser on the same computer where Fo
 1. Open **Settings**.
 2. Select **WebUI**.
 3. Turn on **Enable WebUI**.
-4. Open or copy the displayed \`localhost\` URL on this computer.
+4. Open or copy the displayed `localhost` URL on this computer.
 
-The default production port is \`25808\`. Development builds may use a different port; use the URL shown by Forge.
+The default production port is `25808`. Development builds may use a different port; use the URL shown by Forge.
 
 ## Start Electron in WebUI Mode
 
-\`\`\`bash
+```bash
 
 # macOS
 
@@ -28,23 +28,23 @@ Forge.exe --webui
 # Linux
 
 forge --webui
-\`\`\`
+```
 
 Open the local URL printed by Forge in a browser on the same computer.
 
 ## Start the Standalone Web CLI
 
-\`\`\`bash
+```bash
 aionui-web start
-\`\`\`
+```
 
 Choose a local port when needed:
 
-\`\`\`bash
+```bash
 aionui-web start --port 8080
-\`\`\`
+```
 
-You can also set \`AIONUI_PORT\`. Port configuration does not change the local-only bind policy.
+You can also set `AIONUI_PORT`. Port configuration does not change the local-only bind policy.
 
 ## Sign In
 
@@ -54,13 +54,13 @@ Use the WebUI username and password shown or configured in Forge. If necessary, 
 
 The following controls are accepted only so older launch scripts continue to start:
 
-- \`--remote\`
-- \`AIONUI_ALLOW_REMOTE\`
-- \`AIONUI_REMOTE\`
-- \`AIONUI_HOST=0.0.0.0\`
-- \`allowRemote: true\` in legacy configuration
+- `--remote`
+- `AIONUI_ALLOW_REMOTE`
+- `AIONUI_REMOTE`
+- `AIONUI_HOST=0.0.0.0`
+- `allowRemote: true` in legacy configuration
 
-They do not enable network access. Forge prints a warning and continues binding to \`127.0.0.1\`.
+They do not enable network access. Forge prints a warning and continues binding to `127.0.0.1`.
 
 ## Troubleshooting
 
@@ -69,7 +69,7 @@ They do not enable network access. Forge prints a warning and continues binding 
 - Confirm WebUI is running in Forge Settings or in the terminal output.
 - Use the exact local URL and port shown by Forge.
 - Confirm another process is not already using the selected port.
-- Try \`http://localhost:<port>\` and \`http://127.0.0.1:<port>\` on the same computer.
+- Try `http://localhost:<port>` and `http://127.0.0.1:<port>` on the same computer.
 
 ### Another device cannot connect
 

@@ -575,7 +575,7 @@ brew install aionui
 - [⚙️ LLM 구성 가이드](https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration) — 멀티 플랫폼 AI 모델 구성
 - [🤖 멀티 Agent 모드 설정](https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup) — 터미널 AI Agent 통합
 - [🔌 MCP 도구 구성](https://github.com/iOfficeAI/AionUi/wiki/MCP-Configuration-Guide) — Model Context Protocol 서버 설정
-- [🌐 WebUI 구성 가이드](https://github.com/iOfficeAI/AionUi/wiki/WebUI-Configuration-Guide) — 완전한 WebUI 설정 및 구성 튜토리얼
+- [🌐 로컬 WebUI 가이드](../guides/webui.md) — 이 컴퓨터의 브라우저에서 WebUI를 사용하는 안내서
 
 **🎯 사용 사례**
 
