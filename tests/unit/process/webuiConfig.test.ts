@@ -112,6 +112,15 @@ describe('desktop WebUI remote-access compatibility policy', () => {
     }
   );
 
+  it.each(remoteSwitchCases)(
+    'coordinates %s from the Electron entrypoint boundary',
+    async (_label, switchValue, hasRemoteSwitch, expected) => {
+      const { resolveElectronRemoteAccessRequestSources } = await import('@process/utils/webuiConfig');
+
+      expect(resolveElectronRemoteAccessRequestSources({}, hasRemoteSwitch, switchValue, {})).toEqual(expected);
+    }
+  );
+
   it('detects truthy CLI, environment, host, and config requests', async () => {
     const { resolveRemoteAccessRequestSources } = await import('@process/utils/webuiConfig');
 

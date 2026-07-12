@@ -161,6 +161,14 @@ export const resolveRemoteSwitchValue = (
   switchValue: string | undefined
 ): RemoteSwitchValue => (hasRemoteSwitch ? (switchValue ?? true) : undefined);
 
+/** Coordinates Electron switch state with the desktop compatibility policy. */
+export const resolveElectronRemoteAccessRequestSources = (
+  config: WebUIUserConfig,
+  hasRemoteSwitch: boolean,
+  switchValue: string | undefined,
+  env: NodeJS.ProcessEnv = process.env
+): string[] => resolveRemoteAccessRequestSources(config, resolveRemoteSwitchValue(hasRemoteSwitch, switchValue), env);
+
 /**
  * Identify retired remote-access controls requested for Electron WebUI mode.
  */

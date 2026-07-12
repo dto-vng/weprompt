@@ -1,7 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveRemoteAccessPolicy, warnUnsupportedRemoteAccess } from '../remoteAccessPolicy';
+import {
+  normalizeRemoteAccessArgs,
+  resolveRemoteAccessPolicy,
+  warnUnsupportedRemoteAccess,
+} from '../remoteAccessPolicy';
 
 describe('standalone WebUI remote-access compatibility policy', () => {
+  const cliCases: ReadonlyArray<[string, string[], string[]]> = [
+    ['a bare switch', ['--remote'], ['--remote']],
+    ['an equals-form truthy switch', ['--remote=true'], ['--remote']],
+    ['a spaced truthy switch', ['--remote', 'on'], ['--remote']],
+    ['an equals-form false switch', ['--remote=false'], []],
+    ['a spaced off switch', ['--remote', 'off'], []],
+    ['a zero switch', ['--remote=0'], []],
+  ];
+
+  it.each(cliCases)('normalizes %s for shared policy evaluation', (_label, args, expected) => {
+    const flags = normalizeRemoteAccessArgs(args);
+
+    expect(resolveRemoteAccessPolicy(flags, {}).requestedBy).toEqual(expected);
+  });
+
   it('uses loopback without warning when no retired control requests remote access', () => {
     const policy = resolveRemoteAccessPolicy(new Map(), {});
 

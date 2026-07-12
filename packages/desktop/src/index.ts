@@ -59,8 +59,7 @@ import {
 } from './process/utils/mainWindowLifecycle';
 import {
   loadUserWebUIConfig,
-  resolveRemoteAccessRequestSources,
-  resolveRemoteSwitchValue,
+  resolveElectronRemoteAccessRequestSources,
   resolveWebUIPort,
   restoreDesktopWebUIFromPreferences,
   warnUnsupportedDesktopRemoteAccess,
@@ -946,8 +945,11 @@ const handleAppReady = async (): Promise<void> => {
       // Config file loaded from user directory
     }
     const resolvedPort = resolveWebUIPort(userConfigInfo.config, getSwitchValue);
-    const remoteSwitchValue = resolveRemoteSwitchValue(hasSwitch('remote'), getSwitchValue('remote'));
-    const remoteAccessRequests = resolveRemoteAccessRequestSources(userConfigInfo.config, remoteSwitchValue);
+    const remoteAccessRequests = resolveElectronRemoteAccessRequestSources(
+      userConfigInfo.config,
+      hasSwitch('remote'),
+      getSwitchValue('remote')
+    );
     warnUnsupportedDesktopRemoteAccess(remoteAccessRequests);
     try {
       // Inside Electron (`AionUi --webui` or packaged `aionui-web` mode that

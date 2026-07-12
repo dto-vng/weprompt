@@ -170,19 +170,6 @@ Use the Rust MSVC toolchain and install Microsoft C++ Build Tools. After install
 | `bun run build-deb`       | Build Linux (.deb) distributable                        |
 | `bun run build`           | Alias for `bun run build-mac`                           |
 
-### Standalone WebUI (non-Electron, local-only)
-
-| Command                            | Description                                                                       |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `bun run build:renderer:web`       | Build renderer for local-only standalone WebUI                                    |
-| `bun run build:server`             | Build local-only standalone WebUI bundle to `dist-server/`                        |
-| `bun run server:start`             | Run local-only standalone WebUI in development mode                               |
-| `bun run server:start:remote`      | Retired compatibility alias; starts local-only WebUI and warns                    |
-| `bun run server:start:prod`        | Run local-only standalone WebUI in production mode                                |
-| `bun run server:start:prod:remote` | Retired compatibility alias; starts local-only WebUI in production mode and warns |
-| `bun run server:resetpass`         | Reset password via local-only standalone WebUI CLI                                |
-| `bun run server:resetpass:prod`    | Reset password via local-only standalone WebUI CLI (production)                   |
-
 ### Code Quality
 
 | Command                | Description                               |
@@ -205,7 +192,6 @@ Use the Rust MSVC toolchain and install Microsoft C++ Build Tools. After install
 | `bun run test:bun`           | Run Bun-specific database driver tests            |
 | `bun run test:e2e`           | Run end-to-end tests (Playwright)                 |
 | `bun run test:packaged:i18n` | Run i18n integration tests against packaged build |
-| `bun run test:packaged:bun`  | Run Bun packaged integration tests                |
 
 ### Debug
 
