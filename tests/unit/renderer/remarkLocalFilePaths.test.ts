@@ -57,13 +57,22 @@ describe('splitTextValue', () => {
     const parts = splitTextValue('saved to C:\\Users\\demo\\report.pptx');
     expect(parts).toEqual([
       { type: 'text', value: 'saved to ' },
-      { type: 'link', url: 'C:\\Users\\demo\\report.pptx', title: null, children: [{ type: 'text', value: 'C:\\Users\\demo\\report.pptx' }] },
+      {
+        type: 'link',
+        url: 'C:\\Users\\demo\\report.pptx',
+        title: null,
+        children: [{ type: 'text', value: 'C:\\Users\\demo\\report.pptx' }],
+      },
     ]);
   });
 
   it('does not mangle non-http URL schemes into local-file links', () => {
-    expect(splitTextValue('grab ftp://server/data/file.txt now')).toEqual([{ type: 'text', value: 'grab ftp://server/data/file.txt now' }]);
-    expect(splitTextValue('clone git://host/repo.git here')).toEqual([{ type: 'text', value: 'clone git://host/repo.git here' }]);
+    expect(splitTextValue('grab ftp://server/data/file.txt now')).toEqual([
+      { type: 'text', value: 'grab ftp://server/data/file.txt now' },
+    ]);
+    expect(splitTextValue('clone git://host/repo.git here')).toEqual([
+      { type: 'text', value: 'clone git://host/repo.git here' },
+    ]);
   });
 });
 

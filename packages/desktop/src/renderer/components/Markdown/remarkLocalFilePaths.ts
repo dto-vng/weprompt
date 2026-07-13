@@ -102,8 +102,10 @@ export const linkifyMarkdownTree = (tree: MdastNode): void => {
 };
 
 /** remark plugin: linkify absolute file paths so they open in the preview pane. */
-const remarkLocalFilePaths = () => (tree: MdastNode): void => {
-  linkifyMarkdownTree(tree);
-};
+const remarkLocalFilePaths =
+  () =>
+  (tree: MdastNode): void => {
+    linkifyMarkdownTree(tree);
+  };
 
 export default remarkLocalFilePaths;

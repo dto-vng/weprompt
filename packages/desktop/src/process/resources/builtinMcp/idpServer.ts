@@ -46,7 +46,9 @@ Output: the raw IDP extraction JSON. Summarize the extracted fields for the user
       const config = getConfigFromEnv();
       if (!config) {
         return {
-          content: [{ type: 'text' as const, text: 'Error: GreenNode IDP is not configured (missing API key/base URL).' }],
+          content: [
+            { type: 'text' as const, text: 'Error: GreenNode IDP is not configured (missing API key/base URL).' },
+          ],
           isError: true,
         };
       }

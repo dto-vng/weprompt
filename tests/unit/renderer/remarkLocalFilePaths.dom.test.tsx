@@ -96,9 +96,7 @@ describe('MarkdownView auto-linkifies artifact paths', () => {
   it('does not linkify paths inside fenced code blocks', () => {
     const onLocalFileLink = vi.fn();
     render(
-      <MarkdownView onLocalFileLink={onLocalFileLink}>
-        {'```sh\ncat /Users/demo/project/report.pptx\n```'}
-      </MarkdownView>
+      <MarkdownView onLocalFileLink={onLocalFileLink}>{'```sh\ncat /Users/demo/project/report.pptx\n```'}</MarkdownView>
     );
 
     expect(screen.queryByRole('button', { name: '/Users/demo/project/report.pptx' })).not.toBeInTheDocument();

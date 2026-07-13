@@ -57,7 +57,9 @@ const resolvePath = (filePath: string, workspaceDir?: string): string => {
 };
 
 const isComplete = (progress: { total_doc?: number; ignored?: number; finished?: number } | undefined): boolean =>
-  progress != null && (progress.total_doc ?? 0) > 0 && (progress.finished ?? 0) + (progress.ignored ?? 0) >= (progress.total_doc ?? 0);
+  progress != null &&
+  (progress.total_doc ?? 0) > 0 &&
+  (progress.finished ?? 0) + (progress.ignored ?? 0) >= (progress.total_doc ?? 0);
 
 export const executeIdp = async (req: IdpRequest, config: IdpConfig, deps?: IdpDeps): Promise<IdpResult> => {
   if (!config.ingestUrl || !config.apiKey) {
@@ -81,14 +83,22 @@ export const executeIdp = async (req: IdpRequest, config: IdpConfig, deps?: IdpD
   // 1) ingest
   let requestId: string;
   try {
-    const resp = await fetchImpl(config.ingestUrl, { method: 'POST', headers: auth, body: buildIdpFormData(bytes, getFileName(absolute), req) });
+    const resp = await fetchImpl(config.ingestUrl, {
+      method: 'POST',
+      headers: auth,
+      body: buildIdpFormData(bytes, getFileName(absolute), req),
+    });
     const body = await resp.text();
     if (!resp.ok) return { success: false, text: `GreenNode IDP ingest failed (HTTP ${resp.status}): ${body}` };
     const parsed = JSON.parse(body) as { data?: { request_id?: string } };
-    if (!parsed.data?.request_id) return { success: false, text: `GreenNode IDP ingest returned no request_id: ${body}` };
+    if (!parsed.data?.request_id)
+      return { success: false, text: `GreenNode IDP ingest returned no request_id: ${body}` };
     requestId = parsed.data.request_id;
   } catch (error) {
-    return { success: false, text: `GreenNode IDP ingest error: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      success: false,
+      text: `GreenNode IDP ingest error: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 
   // 2) poll
@@ -100,13 +110,21 @@ export const executeIdp = async (req: IdpRequest, config: IdpConfig, deps?: IdpD
       const resp = await fetchImpl(resultUrl, { method: 'GET', headers: auth });
       lastBody = await resp.text();
       if (!resp.ok) return { success: false, text: `GreenNode IDP result failed (HTTP ${resp.status}): ${lastBody}` };
-      const parsed = JSON.parse(lastBody) as { data?: { progress?: { total_doc?: number; ignored?: number; finished?: number }; documents?: unknown } };
+      const parsed = JSON.parse(lastBody) as {
+        data?: { progress?: { total_doc?: number; ignored?: number; finished?: number }; documents?: unknown };
+      };
       if (isComplete(parsed.data?.progress)) {
         return { success: true, text: JSON.stringify(parsed.data?.documents ?? parsed.data ?? {}) };
       }
     } catch (error) {
-      return { success: false, text: `GreenNode IDP result error: ${error instanceof Error ? error.message : String(error)}` };
+      return {
+        success: false,
+        text: `GreenNode IDP result error: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
-  return { success: false, text: `GreenNode IDP timed out waiting for extraction after ${maxPolls} polls. Last: ${lastBody}` };
+  return {
+    success: false,
+    text: `GreenNode IDP timed out waiting for extraction after ${maxPolls} polls. Last: ${lastBody}`,
+  };
 };
