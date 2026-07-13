@@ -18,6 +18,10 @@ import {
   GREENNODE_OPENCODE_PROVIDER_ID,
   GREENNODE_PROVIDER_NAME,
   getGreenNodeApiKey,
+  MOONSHOT_BASE_URL,
+  MOONSHOT_MODELS,
+  MOONSHOT_OPENCODE_PROVIDER_ID,
+  MOONSHOT_PROVIDER_NAME,
 } from '@/common/config/builtinSeed';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
 import type { IMcpServer, IProvider } from '@/common/config/storage';
@@ -28,8 +32,13 @@ type ConfigFile = typeof ProcessConfigType;
 const GREENNODE_PROVIDER_SEED_FLAG = 'migration.greennodeProviderSeeded_v1' as const;
 const OPENCODE_SEED_FLAG = 'migration.opencodeGreenNodeSeeded_v1' as const;
 const OPENCODE_AGENT_INSTALL_FLAG = 'migration.opencodeAgentInstalled_v1' as const;
+const OPENCODE_MOONSHOT_SEED_FLAG = 'migration.opencodeMoonshotSeeded_v1' as const;
 
-type SeedFlag = typeof GREENNODE_PROVIDER_SEED_FLAG | typeof OPENCODE_SEED_FLAG | typeof OPENCODE_AGENT_INSTALL_FLAG;
+type SeedFlag =
+  | typeof GREENNODE_PROVIDER_SEED_FLAG
+  | typeof OPENCODE_SEED_FLAG
+  | typeof OPENCODE_AGENT_INSTALL_FLAG
+  | typeof OPENCODE_MOONSHOT_SEED_FLAG;
 
 async function readSeedFlag(configFile: ConfigFile, flag: SeedFlag): Promise<boolean> {
   try {
@@ -191,6 +200,100 @@ export async function seedOpenCodeGreenNodeConfig(configFile: ConfigFile): Promi
   }
 
   await configFile.set(OPENCODE_SEED_FLAG, true);
+  return true;
+}
+
+/**
+ * Non-destructive merge of the Moonshot (Kimi) seed into an OpenCode config
+ * object: existing user providers/models/settings are kept; only missing
+ * pieces are added. Unlike the GreenNode merge, this never sets
+ * `config.model` — GreenNode stays the default model. Pure — exported for
+ * tests.
+ */
+export function mergeMoonshotIntoOpenCodeConfig(config: OpenCodeConfig): boolean {
+  let configChanged = false;
+  config.provider ??= {};
+  const provider = (config.provider[MOONSHOT_OPENCODE_PROVIDER_ID] ??= {});
+  if (!provider.npm) {
+    provider.npm = '@ai-sdk/openai-compatible';
+    configChanged = true;
+  }
+  if (!provider.name) {
+    provider.name = MOONSHOT_PROVIDER_NAME;
+    configChanged = true;
+  }
+  provider.options ??= {};
+  if (!provider.options.baseURL) {
+    provider.options.baseURL = MOONSHOT_BASE_URL;
+    configChanged = true;
+  }
+  provider.models ??= {};
+  for (const model of MOONSHOT_MODELS) {
+    if (!provider.models[model]) {
+      provider.models[model] = { name: model };
+      configChanged = true;
+    }
+  }
+  return configChanged;
+}
+
+/**
+ * Mirror the Moonshot (Kimi) seed into the local OpenCode CLI config so the
+ * OpenCode agent offers the same models. Unlike the GreenNode seed, the API
+ * key is sourced from the backend Moonshot provider record (not a build-time
+ * env var) — the step is retried on later launches until that provider
+ * exists with a key. Rewriting opencode.jsonc drops comments — acceptable
+ * for a one-shot seed.
+ */
+export async function seedOpenCodeMoonshotConfig(configFile: ConfigFile): Promise<boolean> {
+  if (await readSeedFlag(configFile, OPENCODE_MOONSHOT_SEED_FLAG)) {
+    return true;
+  }
+
+  const providers = (await httpRequest<IProvider[]>('GET', '/api/providers')) || [];
+  const provider = providers.find(
+    (p) => p.name === MOONSHOT_PROVIDER_NAME || (p.base_url ?? '').includes('moonshot.ai')
+  );
+  const apiKey = (provider?.api_key ?? '').trim();
+  if (!apiKey) {
+    // No Moonshot provider yet — try again next launch (flag not set).
+    console.warn('[Seed] Moonshot provider/API key not available, skipping OpenCode Moonshot seed');
+    return false;
+  }
+
+  const configPath = openCodeConfigPath();
+  let config: OpenCodeConfig;
+  try {
+    config = (await readJsoncFile<OpenCodeConfig>(configPath)) ?? { $schema: 'https://opencode.ai/config.json' };
+  } catch (error) {
+    // Unparseable user config — leave it alone rather than clobber it.
+    console.warn('[Seed] OpenCode config unreadable, skipping Moonshot seed', error);
+    return false;
+  }
+
+  const configChanged = mergeMoonshotIntoOpenCodeConfig(config);
+
+  if (configChanged) {
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  }
+
+  const authPath = openCodeAuthPath();
+  let auth: Record<string, unknown>;
+  try {
+    auth = (await readJsoncFile<Record<string, unknown>>(authPath)) ?? {};
+  } catch (error) {
+    console.warn('[Seed] OpenCode auth store unreadable, skipping Moonshot key', error);
+    return false;
+  }
+  if (!auth[MOONSHOT_OPENCODE_PROVIDER_ID]) {
+    auth[MOONSHOT_OPENCODE_PROVIDER_ID] = { type: 'api', key: apiKey };
+    await mkdir(dirname(authPath), { recursive: true });
+    await writeFile(authPath, JSON.stringify(auth, null, 2) + '\n', 'utf8');
+    console.info('[Seed] OpenCode Moonshot API key installed');
+  }
+
+  await configFile.set(OPENCODE_MOONSHOT_SEED_FLAG, true);
   return true;
 }
 

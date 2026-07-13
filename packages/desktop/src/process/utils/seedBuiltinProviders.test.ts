@@ -17,6 +17,7 @@ import {
   buildBuiltinHttpMcpServers,
   findOpenCodeHubExtension,
   mergeGreenNodeIntoOpenCodeConfig,
+  mergeMoonshotIntoOpenCodeConfig,
   type OpenCodeConfig,
 } from './seedBuiltinProviders';
 
@@ -63,6 +64,23 @@ describe('mergeGreenNodeIntoOpenCodeConfig', () => {
     const changedAgain = mergeGreenNodeIntoOpenCodeConfig(config);
 
     expect(changedAgain).toBe(false);
+  });
+});
+
+describe('mergeMoonshotIntoOpenCodeConfig', () => {
+  it('adds the moonshot provider and models without touching config.model', () => {
+    const config: OpenCodeConfig = {
+      provider: { vngcloud: { name: 'GreenNode' } },
+      model: 'vngcloud/minimax/minimax-m2.5',
+    };
+    const changed = mergeMoonshotIntoOpenCodeConfig(config);
+
+    expect(changed).toBe(true);
+    expect(config.provider!.moonshot.npm).toBe('@ai-sdk/openai-compatible');
+    expect(config.provider!.moonshot.options!.baseURL).toBe('https://api.moonshot.ai/v1');
+    expect(Object.keys(config.provider!.moonshot.models!)).toEqual(['kimi-k2.6', 'kimi-k2.5']);
+    expect(config.provider!.vngcloud).toBeDefined(); // existing provider preserved
+    expect(config.model).toBe('vngcloud/minimax/minimax-m2.5'); // unchanged
   });
 });
 

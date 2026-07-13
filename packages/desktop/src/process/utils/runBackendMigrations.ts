@@ -41,6 +41,7 @@ import {
   ensureOpenCodeAgentInstalled,
   seedGreenNodeProvider,
   seedOpenCodeGreenNodeConfig,
+  seedOpenCodeMoonshotConfig,
 } from './seedBuiltinProviders';
 
 type ConfigFile = typeof ProcessConfigType;
@@ -567,6 +568,7 @@ const MIGRATION_STEPS: Array<{
   { name: 'migrateAssistantsToBackend', run: async (configFile) => migrateAssistantsToBackend(configFile) },
   { name: 'seedGreenNodeProvider', run: async (configFile) => seedGreenNodeProvider(configFile) },
   { name: 'seedOpenCodeGreenNodeConfig', run: async (configFile) => seedOpenCodeGreenNodeConfig(configFile) },
+  { name: 'seedOpenCodeMoonshotConfig', run: async (configFile) => seedOpenCodeMoonshotConfig(configFile) },
   { name: 'ensureOpenCodeAgentInstalled', run: async (configFile) => ensureOpenCodeAgentInstalled(configFile) },
 ];
 
