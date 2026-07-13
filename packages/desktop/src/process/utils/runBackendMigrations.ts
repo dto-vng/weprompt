@@ -404,7 +404,11 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
     const updatedTransport = idpServer.transport;
     const idpTransportChanged = !isSameStdioTransport(existingIdpServer.transport, updatedTransport);
     const idpOriginalJsonChanged = existingIdpServer.original_json !== idpServer.original_json;
-    const idpServerChanged = idpTransportChanged || idpOriginalJsonChanged;
+    // IDP has no user-facing toggle (hidden from all UI lists), so `enabled` is
+    // derived purely from key presence — reconcile it here so a keyless→keyed
+    // upgrade can re-enable it (otherwise it would be stuck disabled forever).
+    const idpEnabledChanged = existingIdpServer.enabled !== idpServer.enabled;
+    const idpServerChanged = idpTransportChanged || idpOriginalJsonChanged || idpEnabledChanged;
     console.info(
       '[Migration] idp MCP bootstrap decision, server id: %s, transport changed: %s, json changed: %s, will update: %s',
       existingIdpServer.id,
@@ -412,7 +416,7 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
       idpOriginalJsonChanged ? 'yes' : 'no',
       idpServerChanged ? 'yes' : 'no'
     );
-    if (idpServerChanged) {
+    if (idpTransportChanged || idpOriginalJsonChanged) {
       await mcpService.updateServer.invoke({
         id: existingIdpServer.id,
         data: {
@@ -420,6 +424,13 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
           original_json: idpServer.original_json,
         },
       });
+    }
+    // `enabled` isn't part of updateServer's payload; flip it via toggleServer
+    // when the key-derived desired state differs from what's stored.
+    if (idpEnabledChanged) {
+      await mcpService.toggleServer.invoke({ id: existingIdpServer.id });
+    }
+    if (idpServerChanged) {
       idpServerUpdated = true;
     }
   }
