@@ -22,10 +22,11 @@ import {
   MOONSHOT_MODELS,
   MOONSHOT_OPENCODE_PROVIDER_ID,
   MOONSHOT_PROVIDER_NAME,
+  MOONSHOT_VISION_MODEL,
 } from '@/common/config/builtinSeed';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
 import type { IMcpServer, IProvider } from '@/common/config/storage';
-import type { ProcessConfig as ProcessConfigType } from './initStorage';
+import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 
 type ConfigFile = typeof ProcessConfigType;
 
@@ -33,12 +34,14 @@ const GREENNODE_PROVIDER_SEED_FLAG = 'migration.greennodeProviderSeeded_v1' as c
 const OPENCODE_SEED_FLAG = 'migration.opencodeGreenNodeSeeded_v1' as const;
 const OPENCODE_AGENT_INSTALL_FLAG = 'migration.opencodeAgentInstalled_v1' as const;
 const OPENCODE_MOONSHOT_SEED_FLAG = 'migration.opencodeMoonshotSeeded_v1' as const;
+const OPENCODE_VISION_MCP_SEED_FLAG = 'migration.opencodeVisionMcpSeeded_v1' as const;
 
 type SeedFlag =
   | typeof GREENNODE_PROVIDER_SEED_FLAG
   | typeof OPENCODE_SEED_FLAG
   | typeof OPENCODE_AGENT_INSTALL_FLAG
-  | typeof OPENCODE_MOONSHOT_SEED_FLAG;
+  | typeof OPENCODE_MOONSHOT_SEED_FLAG
+  | typeof OPENCODE_VISION_MCP_SEED_FLAG;
 
 async function readSeedFlag(configFile: ConfigFile, flag: SeedFlag): Promise<boolean> {
   try {
@@ -96,6 +99,15 @@ export type OpenCodeConfig = {
       name?: string;
       options?: Record<string, unknown>;
       models?: Record<string, { name?: string }>;
+    }
+  >;
+  mcp?: Record<
+    string,
+    {
+      type?: string;
+      command?: string[];
+      environment?: Record<string, string>;
+      enabled?: boolean;
     }
   >;
   [key: string]: unknown;
@@ -294,6 +306,77 @@ export async function seedOpenCodeMoonshotConfig(configFile: ConfigFile): Promis
   }
 
   await configFile.set(OPENCODE_MOONSHOT_SEED_FLAG, true);
+  return true;
+}
+
+/**
+ * Non-destructive merge of the built-in image-analysis (Kimi vision) MCP
+ * tool into an OpenCode config object: existing `mcp` entries (including a
+ * pre-existing `image-analysis` entry) are never touched. Pure — exported
+ * for tests.
+ */
+export function mergeVisionMcpIntoOpenCodeConfig(config: OpenCodeConfig, scriptPath: string, apiKey: string): boolean {
+  config.mcp ??= {};
+  if (config.mcp['image-analysis']) {
+    return false;
+  }
+
+  config.mcp['image-analysis'] = {
+    type: 'local',
+    command: ['node', scriptPath],
+    environment: {
+      AIONUI_VISION_BASE_URL: MOONSHOT_BASE_URL,
+      AIONUI_VISION_API_KEY: apiKey,
+      AIONUI_VISION_MODEL: MOONSHOT_VISION_MODEL,
+    },
+    enabled: true,
+  };
+  return true;
+}
+
+/**
+ * Register the built-in image-analysis (Kimi vision) MCP tool in the local
+ * OpenCode CLI config so OpenCode/WePromptCode agents can call
+ * `analyze_image`. Mirrors {@link seedOpenCodeMoonshotConfig}: the API key is
+ * sourced from the backend Moonshot provider record, so the step is retried
+ * on later launches until that provider exists with a key. Rewriting
+ * opencode.jsonc drops comments — acceptable for a one-shot seed.
+ */
+export async function seedOpenCodeVisionMcp(configFile: ConfigFile): Promise<boolean> {
+  if (await readSeedFlag(configFile, OPENCODE_VISION_MCP_SEED_FLAG)) {
+    return true;
+  }
+
+  const providers = (await httpRequest<IProvider[]>('GET', '/api/providers')) || [];
+  const provider = providers.find(
+    (p) => p.name === MOONSHOT_PROVIDER_NAME || (p.base_url ?? '').includes('moonshot.ai')
+  );
+  const apiKey = (provider?.api_key ?? '').trim();
+  if (!apiKey) {
+    // No Moonshot provider yet — try again next launch (flag not set).
+    console.warn('[Seed] Moonshot provider/API key not available, skipping OpenCode vision MCP seed');
+    return false;
+  }
+
+  const configPath = openCodeConfigPath();
+  let config: OpenCodeConfig;
+  try {
+    config = (await readJsoncFile<OpenCodeConfig>(configPath)) ?? { $schema: 'https://opencode.ai/config.json' };
+  } catch (error) {
+    // Unparseable user config — leave it alone rather than clobber it.
+    console.warn('[Seed] OpenCode config unreadable, skipping vision MCP seed', error);
+    return false;
+  }
+
+  const scriptPath = getBuiltinMcpScriptPath('builtin-mcp-vision');
+  const configChanged = mergeVisionMcpIntoOpenCodeConfig(config, scriptPath, apiKey);
+
+  if (configChanged) {
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  }
+
+  await configFile.set(OPENCODE_VISION_MCP_SEED_FLAG, true);
   return true;
 }
 

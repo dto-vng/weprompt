@@ -18,6 +18,7 @@ import {
   findOpenCodeHubExtension,
   mergeGreenNodeIntoOpenCodeConfig,
   mergeMoonshotIntoOpenCodeConfig,
+  mergeVisionMcpIntoOpenCodeConfig,
   type OpenCodeConfig,
 } from './seedBuiltinProviders';
 
@@ -81,6 +82,36 @@ describe('mergeMoonshotIntoOpenCodeConfig', () => {
     expect(Object.keys(config.provider!.moonshot.models!)).toEqual(['kimi-k2.6', 'kimi-k2.5']);
     expect(config.provider!.vngcloud).toBeDefined(); // existing provider preserved
     expect(config.model).toBe('vngcloud/minimax/minimax-m2.5'); // unchanged
+  });
+});
+
+describe('mergeVisionMcpIntoOpenCodeConfig', () => {
+  it('adds the image-analysis MCP entry to an empty config', () => {
+    const config: OpenCodeConfig = {};
+    const changed = mergeVisionMcpIntoOpenCodeConfig(config, '/abs/vision.js', 'key-1');
+
+    expect(changed).toBe(true);
+    const entry = config.mcp?.['image-analysis'];
+    expect(entry?.type).toBe('local');
+    expect(entry?.command).toEqual(['node', '/abs/vision.js']);
+    expect(entry?.environment?.AIONUI_VISION_API_KEY).toBe('key-1');
+    expect(entry?.environment?.AIONUI_VISION_MODEL).toBeDefined();
+    expect(entry?.enabled).toBe(true);
+  });
+
+  it('is non-destructive — preserves other mcp entries and skips an existing image-analysis entry', () => {
+    const existingEntry = { type: 'local', command: ['node', '/other.js'], enabled: false };
+    const config: OpenCodeConfig = {
+      mcp: {
+        other: { type: 'local', command: ['node', '/other-tool.js'] },
+        'image-analysis': existingEntry,
+      },
+    };
+    const changed = mergeVisionMcpIntoOpenCodeConfig(config, '/abs/vision.js', 'key-1');
+
+    expect(changed).toBe(false);
+    expect(config.mcp!.other).toEqual({ type: 'local', command: ['node', '/other-tool.js'] });
+    expect(config.mcp!['image-analysis']).toBe(existingEntry);
   });
 });
 

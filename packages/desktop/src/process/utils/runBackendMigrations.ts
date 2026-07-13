@@ -42,6 +42,7 @@ import {
   seedGreenNodeProvider,
   seedOpenCodeGreenNodeConfig,
   seedOpenCodeMoonshotConfig,
+  seedOpenCodeVisionMcp,
 } from './seedBuiltinProviders';
 
 type ConfigFile = typeof ProcessConfigType;
@@ -569,6 +570,7 @@ const MIGRATION_STEPS: Array<{
   { name: 'seedGreenNodeProvider', run: async (configFile) => seedGreenNodeProvider(configFile) },
   { name: 'seedOpenCodeGreenNodeConfig', run: async (configFile) => seedOpenCodeGreenNodeConfig(configFile) },
   { name: 'seedOpenCodeMoonshotConfig', run: async (configFile) => seedOpenCodeMoonshotConfig(configFile) },
+  { name: 'seedOpenCodeVisionMcp', run: async (configFile) => seedOpenCodeVisionMcp(configFile) },
   { name: 'ensureOpenCodeAgentInstalled', run: async (configFile) => ensureOpenCodeAgentInstalled(configFile) },
 ];
 

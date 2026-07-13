@@ -80,6 +80,8 @@ export interface IConfigStorageRefer {
   'migration.opencodeAgentInstalled_v1'?: boolean;
   /** One-shot flag: Moonshot (Kimi) mirrored into local OpenCode config (see seedBuiltinProviders.ts). */
   'migration.opencodeMoonshotSeeded_v1'?: boolean;
+  /** One-shot flag: image-analysis (vision) MCP tool registered in local OpenCode config (see seedBuiltinProviders.ts). */
+  'migration.opencodeVisionMcpSeeded_v1'?: boolean;
   // Desktop Pet: whether the desktop pet feature is enabled
   'pet.enabled'?: boolean;
   // Desktop Pet: size in pixels (200, 280, or 360)
