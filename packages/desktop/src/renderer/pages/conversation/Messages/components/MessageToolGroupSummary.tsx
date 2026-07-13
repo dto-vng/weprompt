@@ -1,9 +1,9 @@
 import type { BadgeProps } from '@arco-design/web-react';
-import { Badge, Button, Message, Tooltip } from '@arco-design/web-react';
+import { Badge } from '@arco-design/web-react';
 import { IconDown, IconRight } from '@arco-design/web-react/icon';
-import { Attention, CheckOne, Download, LoadingOne, Right } from '@icon-park/react';
+import { Attention, CheckOne, LoadingOne, Right } from '@icon-park/react';
 import { theme } from '@office-ai/platform';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import { getAcpImageFileName } from '@/common/chat/acpToolCallOutput';
@@ -13,7 +13,6 @@ import type { NormalizedToolCall, NormalizedToolStatus, ToolMessage } from '@/co
 import { normalizeToolMessages } from '@/common/chat/normalizeToolCall';
 import LocalImageView from '@/renderer/components/media/LocalImageView';
 import { iconColors } from '@/renderer/styles/colors';
-import { downloadFileFromPath } from '@/renderer/utils/file/download';
 import ToolActivityError from './toolActivity/ToolActivityError';
 import { useToolActionText } from './toolActivity/useToolActionText';
 import './MessageToolGroupSummary.css';
@@ -41,20 +40,9 @@ const ToolItemDetail: React.FC<{ item: NormalizedToolCall }> = ({ item }) => {
   const [loadingFull, setLoadingFull] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const displayItem = fullItem ?? item;
-  const hasDetail = displayItem.input || displayItem.output || item.truncated || item.imagePath;
-  const [messageApi, messageContext] = Message.useMessage();
-  const handleDownloadImage = useCallback(
-    async (path: string) => {
-      try {
-        await downloadFileFromPath(path, getAcpImageFileName(path));
-        messageApi.success(t('acp.image.download_success'));
-      } catch (error) {
-        console.error('[MessageToolGroupSummary] Failed to download image:', error);
-        messageApi.error(t('acp.image.download_error'));
-      }
-    },
-    [messageApi, t]
-  );
+  // Image output is surfaced prominently at the turn level (see below), so it no
+  // longer gates the detail toggle here.
+  const hasDetail = displayItem.input || displayItem.output || item.truncated;
 
   const loadFullItem = async () => {
     if (!item.truncated || fullItem || loadingFull || !item.conversationId || !item.messageId) return;
@@ -82,7 +70,6 @@ const ToolItemDetail: React.FC<{ item: NormalizedToolCall }> = ({ item }) => {
 
   return (
     <div className='flex flex-col'>
-      {messageContext}
       <div className='flex flex-row color-#86909C gap-12px items-center'>
         <Badge status={statusToBadge(item.status)} className={item.status === 'running' ? 'badge-breathing' : ''} />
         <span
@@ -122,29 +109,22 @@ const ToolItemDetail: React.FC<{ item: NormalizedToolCall }> = ({ item }) => {
           )}
         </div>
       )}
-      {item.imagePath && (
-        <div className='group relative m-l-20px m-t-8px overflow-hidden rounded border bg-1 p-2 max-w-280px'>
-          <LocalImageView
-            src={item.imagePath}
-            alt={getAcpImageFileName(item.imagePath)}
-            className='max-w-full max-h-320px object-contain rounded'
-          />
-          <Tooltip content={t('acp.image.download')}>
-            <Button
-              aria-label={t('acp.image.download_aria')}
-              className='!absolute right-10px top-10px !h-28px !w-28px !p-0 opacity-0 shadow-sm transition-opacity group-hover:opacity-90 focus:opacity-100'
-              type='secondary'
-              size='mini'
-              shape='circle'
-              icon={<Download theme='outline' size='14' />}
-              onClick={() => void handleDownloadImage(item.imagePath)}
-            />
-          </Tooltip>
-        </div>
-      )}
     </div>
   );
 };
+
+// Prominent inline preview for images produced by a tool (e.g. image generation),
+// shown in the turn rather than hidden behind the Technical details toggle.
+// LocalImageView provides click-to-enlarge and full-resolution download.
+const ToolImagePreview: React.FC<{ path: string }> = ({ path }) => (
+  <div className='m-t-8px overflow-hidden rounded border bg-1 p-2 w-fit max-w-full'>
+    <LocalImageView
+      src={path}
+      alt={getAcpImageFileName(path)}
+      className='max-w-full max-h-500px w-auto object-contain rounded'
+    />
+  </div>
+);
 
 const StepRow: React.FC<{ label: string; status: NormalizedToolStatus }> = ({ label, status }) => {
   const icon =
@@ -185,7 +165,8 @@ const MessageToolGroupSummary: React.FC<{ messages: ToolMessage[] }> = ({ messag
     );
   }
 
-  // Settled: a compact step list + one block-level Technical details toggle.
+  // Settled: a compact step list + any generated images + one block-level toggle.
+  const imageTools = tools.filter((item) => item.imagePath);
   return (
     <div className='tool-group-summary flex flex-col gap-6px'>
       {steps.map((step) =>
@@ -195,6 +176,9 @@ const MessageToolGroupSummary: React.FC<{ messages: ToolMessage[] }> = ({ messag
           <StepRow key={step.key} label={action.label(step)} status={step.status} />
         )
       )}
+      {imageTools.map((item) => (
+        <ToolImagePreview key={`image-${item.key}`} path={item.imagePath as string} />
+      ))}
       <div className='tool-group-summary__header' onClick={() => setShowDetails(!showDetails)}>
         <span className='tool-group-summary__label'>{t('common.technical_details')}</span>
         <span className={`tool-group-summary__arrow${showDetails ? ' tool-group-summary__arrow--open' : ''}`}>

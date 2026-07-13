@@ -8,6 +8,7 @@
 // MCP servers. Imported by both the main-process seeding migration and the
 // renderer settings UI, so keep this side-effect free (type-only storage import).
 import type { IMcpServer, IMcpServerTransportStdio } from './storage';
+import { BUILTIN_IMAGE_GEN_NAME } from './storage';
 
 export type BuiltinCapabilityTier = 'tier1' | 'tier2';
 export type BuiltinCapabilityCredentialKind = 'apiKey' | 'connectionString';
@@ -203,11 +204,20 @@ export const isCommodityBuiltinServer = (server: Pick<IMcpServer, 'name' | 'buil
   server.builtin === true && COMMODITY_BUILTIN_SERVER_NAMES.includes(server.name);
 
 /**
+ * True when `server` is the built-in image-generation server. Image gen is not a
+ * "commodity" default (it needs an image model configured), but once enabled it
+ * should attach to new conversations automatically like the commodity servers so
+ * the agent can invoke it without the user selecting it per chat.
+ */
+export const isImageGenBuiltinServer = (server: Pick<IMcpServer, 'name'>): boolean =>
+  server.name === BUILTIN_IMAGE_GEN_NAME;
+
+/**
  * Union the assistant's default MCP server ids with the ids of any *enabled*
- * commodity built-in servers, so our on-by-default capabilities attach to new
- * conversations even when the assistant has no saved selection. De-duped,
- * assistant defaults kept first. Intended for the default (no explicit user
- * selection) path only.
+ * commodity built-in servers (and the enabled image-gen server), so our
+ * on-by-default capabilities attach to new conversations even when the assistant
+ * has no saved selection. De-duped, assistant defaults kept first. Intended for
+ * the default (no explicit user selection) path only.
  */
 export const mergeCommodityMcpServerIds = (
   assistantDefaultIds: string[],
@@ -216,7 +226,8 @@ export const mergeCommodityMcpServerIds = (
   const ids = [...assistantDefaultIds];
   const seen = new Set(ids);
   for (const server of availableServers) {
-    if (server.enabled === true && isCommodityBuiltinServer(server) && !seen.has(server.id)) {
+    const autoAttach = isCommodityBuiltinServer(server) || isImageGenBuiltinServer(server);
+    if (server.enabled === true && autoAttach && !seen.has(server.id)) {
       seen.add(server.id);
       ids.push(server.id);
     }

@@ -15,11 +15,17 @@ import * as path from 'path';
 import { jsonrepair } from 'jsonrepair';
 import type OpenAI from 'openai';
 import { ClientFactory, type RotatingClient } from '@/common/api/ClientFactory';
+import { OpenAIRotatingClient } from '@/common/api/OpenAIRotatingClient';
 import type { TProviderWithModel } from '@/common/config/storage';
 import type { UnifiedChatCompletionResponse } from '@/common/api/RotatingApiClient';
+import { isImagesApiModel } from '@/common/utils/imageModelAllowlist';
 import { IMAGE_EXTENSIONS, MIME_TYPE_MAP, MIME_TO_EXT_MAP, DEFAULT_IMAGE_EXTENSION } from '@/common/config/constants';
 
 const API_TIMEOUT_MS = 120000; // 2 minutes for image generation API calls
+
+// Default request size for the images API ("form A"). The built-in tool exposes
+// only a text prompt, so generation uses a square default rather than a param.
+const DEFAULT_IMAGE_SIZE = '1024x1024';
 
 type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
 
@@ -171,6 +177,75 @@ export interface ImageGenResult {
 }
 
 /**
+ * Extract the first image from an OpenAI images API ("form A") response as a
+ * data URL. `gpt-image-1` always returns `b64_json`; other models may return a
+ * hosted `url`. Returns null when the response carries no image payload.
+ */
+export function extractImagesApiDataUrl(response: OpenAI.Images.ImagesResponse): string | null {
+  const first = response.data?.[0];
+  if (!first) return null;
+  if (first.b64_json) return `data:image/png;base64,${first.b64_json}`;
+  if (first.url) return first.url;
+  return null;
+}
+
+/**
+ * Generate an image through the OpenAI images endpoint (`/v1/images/generations`).
+ * Used for models like `gpt-image-1` that return images via the images API
+ * rather than inline in a chat-completions response.
+ */
+async function generateViaImagesApi(
+  params: ImageGenParams,
+  provider: TProviderWithModel,
+  workspaceDir: string,
+  proxy?: string,
+  signal?: AbortSignal
+): Promise<ImageGenResult> {
+  const hasInputImages = Array.isArray(params.image_uris) ? params.image_uris.length > 0 : !!params.image_uris;
+  if (hasInputImages) {
+    return {
+      success: false,
+      text: `Image editing is not supported for ${provider.use_model}; this model only supports text-to-image generation.`,
+      error: 'image_editing_unsupported',
+    };
+  }
+
+  const rotatingClient = await ClientFactory.createRotatingClient(provider, {
+    proxy,
+    rotatingOptions: { maxRetries: 3, retryDelay: 1000 },
+  });
+
+  if (!(rotatingClient instanceof OpenAIRotatingClient)) {
+    return {
+      success: false,
+      text: `The images API is only supported for OpenAI-compatible providers. Current model: ${provider.use_model}`,
+      error: 'images_api_unsupported_provider',
+    };
+  }
+
+  // `response_format` is intentionally omitted: gpt-image-1 rejects it and
+  // always returns base64. extractImagesApiDataUrl handles b64_json and url.
+  const response = await rotatingClient.createImage(
+    { model: provider.use_model, prompt: params.prompt, size: DEFAULT_IMAGE_SIZE, n: 1 },
+    { signal, timeout: API_TIMEOUT_MS }
+  );
+
+  const dataUrl = extractImagesApiDataUrl(response);
+  if (!dataUrl) {
+    return { success: false, text: 'Image generation did not return any image data.', error: 'no_image_data' };
+  }
+
+  const imagePath = await saveGeneratedImage(dataUrl, workspaceDir);
+  const relativeImagePath = path.relative(workspaceDir, imagePath);
+  return {
+    success: true,
+    text: `Generated image saved to: ${imagePath}`,
+    imagePath,
+    relativeImagePath,
+  };
+}
+
+/**
  * Core image generation function shared between MCP server and Gemini tool.
  */
 export async function executeImageGeneration(
@@ -185,6 +260,11 @@ export async function executeImageGeneration(
   }
 
   try {
+    // Form-A models (gpt-image-1, dall-e-*) use the images endpoint, not chat.
+    if (isImagesApiModel(provider.use_model)) {
+      return await generateViaImagesApi(params, provider, workspaceDir, proxy, signal);
+    }
+
     // Parse image URIs
     let imageUris: string[] = [];
     if (params.image_uris) {

@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import { mergeCommodityMcpServerIds } from '@/common/config/builtinCapabilities';
+import { isImageGenBuiltinServer, mergeCommodityMcpServerIds } from '@/common/config/builtinCapabilities';
 import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
 import { toSessionMcpServer } from '@/renderer/hooks/mcp/catalog';
 import { emitter } from '@/renderer/utils/emitter';
@@ -129,16 +129,32 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const defaultSelectedUserMcpServerIds = availableMcpServers
       .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id) && server.builtin !== true)
       .map((server) => server.id);
-    const assistantOverrideMcpIds =
+    // Image generation is a globally-enabled capability (toggled in Settings > Tools),
+    // not a per-chat pick — and its built-in server is hidden from the MCP picker.
+    // Always attach the enabled image-gen server so the agent can invoke it without
+    // the user selecting it per conversation.
+    const imageGenServer = availableMcpServers.find(
+      (server) => server.enabled === true && isImageGenBuiltinServer(server)
+    );
+
+    const assistantOverrideMcpIdsBase =
       selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : defaultSelectedMcpServerIds;
+    const assistantOverrideMcpIds =
+      imageGenServer && !assistantOverrideMcpIdsBase.includes(imageGenServer.id)
+        ? [...assistantOverrideMcpIdsBase, imageGenServer.id]
+        : assistantOverrideMcpIdsBase;
     const selectedUserMcpServerIdsToSend =
       selectedMcpServerIds !== undefined ? selectedUserMcpServerIds : defaultSelectedUserMcpServerIds;
-    const selectedSessionMcpServersToSend =
+    const selectedSessionMcpServersBase =
       selectedMcpServerIds !== undefined
         ? selectedAllSessionMcpServers
         : availableMcpServers
             .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id))
             .map((server) => toSessionMcpServer(server));
+    const selectedSessionMcpServersToSend =
+      imageGenServer && !selectedSessionMcpServersBase.some((server) => server.id === imageGenServer.id)
+        ? [...selectedSessionMcpServersBase, toSessionMcpServer(imageGenServer)]
+        : selectedSessionMcpServersBase;
 
     const assistantOverrideModel =
       selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined;

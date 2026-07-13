@@ -215,7 +215,12 @@ const createInitStyle = (
   }
   img {
     max-width: 100%;
+    /* Keep inline images viewable in full within the chat without dominating it;
+       the underlying file stays full resolution. */
+    max-height: 500px;
+    width: auto;
     height: auto;
+    object-fit: contain;
   }
    /* Table border styles */
   table {

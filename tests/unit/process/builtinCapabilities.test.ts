@@ -97,13 +97,20 @@ describe('mergeCommodityMcpServerIds', () => {
     expect(result).toEqual(['assistant-default', BUILTIN_MEMORY_ID, 'chrome']);
   });
 
-  it('does not add disabled commodity servers, non-builtin servers, or non-commodity builtins', () => {
+  it('does not add disabled commodity servers or non-builtin servers', () => {
     const servers = [
       srv(BUILTIN_MEMORY_ID, BUILTIN_MEMORY_NAME, false, true), // disabled
-      srv('image', 'aionui-image-generation', true, true), // builtin but not commodity
       srv('user-1', 'User MCP', true, false), // non-builtin
     ];
     expect(mergeCommodityMcpServerIds([], servers)).toEqual([]);
+  });
+
+  it('auto-attaches the enabled image-gen server, but not when it is disabled', () => {
+    const enabled = [srv('image', 'aionui-image-generation', true, true)];
+    expect(mergeCommodityMcpServerIds([], enabled)).toEqual(['image']);
+
+    const disabled = [srv('image', 'aionui-image-generation', false, true)];
+    expect(mergeCommodityMcpServerIds([], disabled)).toEqual([]);
   });
 
   it('does not duplicate an id already in the assistant defaults', () => {

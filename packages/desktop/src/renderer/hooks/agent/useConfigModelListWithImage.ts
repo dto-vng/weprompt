@@ -39,6 +39,9 @@ const useConfigModelListWithImage = () => {
         // AntigravityTools 平台：添加常用图像模型
         // AntigravityTools platform: add common image models
         nextPlatform.models = nextPlatform.models.concat(['gemini-3-pro-image-1x1']);
+      } else if (nextPlatform.base_url?.includes('vngcloud.vn') && !hasImageModel) {
+        // VNG MaaS (GreenNode): OpenAI images endpoint via the form-A adapter.
+        nextPlatform.models = nextPlatform.models.concat(['openai/gpt-image-1']);
       }
 
       return nextPlatform;

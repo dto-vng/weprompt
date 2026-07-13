@@ -1,11 +1,16 @@
 import { ipcBridge } from '@/common';
 import { joinPath } from '@/common/chat/chatLib';
-import { LoadingTwo } from '@icon-park/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Message } from '@arco-design/web-react';
+import { Download, LoadingTwo } from '@icon-park/react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createContext } from '@renderer/utils/ui/createContext';
+import { downloadFileFromPath } from '@renderer/utils/file/download';
 import { iconColors } from '@/renderer/styles/colors';
 
 const [useLocalImage, LocalImageProvider, useUpdateLocalImage] = createContext({ root: '' });
+
+const getImageFileName = (path: string): string => path.split(/[/\\]/).pop() || 'image.png';
 
 const LocalImageView: React.FC<{
   src: string;
@@ -15,9 +20,12 @@ const LocalImageView: React.FC<{
   Provider: typeof LocalImageProvider;
   useUpdateLocalImage: typeof useUpdateLocalImage;
 } = ({ src, alt, className }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState(src);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const { root } = useLocalImage();
+  const [messageApi, messageContext] = Message.useMessage();
 
   const absolutePath = useMemo(() => {
     if (!root) return src;
@@ -52,6 +60,18 @@ const LocalImageView: React.FC<{
         setLoading(false);
       });
   }, [absolutePath]);
+
+  // Download the original file (full resolution), not the (possibly downscaled) view.
+  const handleDownload = useCallback(async () => {
+    try {
+      await downloadFileFromPath(absolutePath, getImageFileName(absolutePath), root || undefined);
+      messageApi.success(t('acp.image.download_success', { defaultValue: 'Download successful' }));
+    } catch (error) {
+      console.error('[LocalImageView] Failed to download image:', error);
+      messageApi.error(t('acp.image.download_error', { defaultValue: 'Failed to download' }));
+    }
+  }, [absolutePath, root, messageApi, t]);
+
   if (loading)
     return (
       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -66,7 +86,32 @@ const LocalImageView: React.FC<{
         <span>{alt}</span>
       </span>
     );
-  return <img src={url} alt={alt} className={className} />;
+  return (
+    <>
+      {messageContext}
+      {/* Bounded inline thumbnail; click opens a full-resolution zoomable preview. */}
+      <img
+        src={url}
+        alt={alt}
+        className={className}
+        style={{ cursor: 'zoom-in' }}
+        onClick={() => setPreviewVisible(true)}
+      />
+      <Image.Preview
+        src={url}
+        visible={previewVisible}
+        onVisibleChange={setPreviewVisible}
+        actions={[
+          {
+            key: 'download',
+            name: t('acp.image.download', { defaultValue: 'Download' }),
+            content: <Download theme='outline' size='16' />,
+            onClick: () => void handleDownload(),
+          },
+        ]}
+      />
+    </>
+  );
 };
 
 LocalImageView.Provider = LocalImageProvider;

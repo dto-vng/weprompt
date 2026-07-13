@@ -207,6 +207,25 @@ function normalizeToolCallStatus(status?: string): NormalizedToolStatus {
   }
 }
 
+// Built-in image generation returns "Generated image saved to: <abs path>" (or a
+// Markdown image). Recover the saved path so the chat can render the image inline,
+// independent of how the model phrases its reply. Paths may contain spaces (e.g.
+// ".../Application Support/...") and be percent-encoded, so decode after matching.
+const SAVED_IMAGE_PATH_RE = /saved to:\s*(.+\.(?:png|jpe?g|webp|gif))\s*$/im;
+const MARKDOWN_IMAGE_PATH_RE = /!\[[^\]]*\]\(([^)]+\.(?:png|jpe?g|webp|gif))\)/i;
+
+function extractImagePathFromOutput(output?: string): string | undefined {
+  if (!output) return undefined;
+  const match = output.match(MARKDOWN_IMAGE_PATH_RE) ?? output.match(SAVED_IMAGE_PATH_RE);
+  if (!match) return undefined;
+  const raw = match[1].trim();
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export function normalizeToolCall(message: IMessageToolCall): NormalizedToolCall | undefined {
   const { call_id, name, status, input, output, args, description } = message.content;
   if (!call_id) return undefined;
@@ -225,6 +244,7 @@ export function normalizeToolCall(message: IMessageToolCall): NormalizedToolCall
     description: description || undefined,
     input: displayInput,
     output,
+    imagePath: extractImagePathFromOutput(output),
   };
 }
 
