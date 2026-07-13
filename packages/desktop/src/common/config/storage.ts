@@ -200,12 +200,35 @@ export type TContextHandoffBudgetSnapshot = {
   buckets: Record<TContextBudgetBucketKey, TContextBudgetBucket>;
 };
 
+export type TContextSnapshot = {
+  goal: string;
+  current_state: string[];
+  decisions: string[];
+  artifacts: string[];
+  user_preferences: string[];
+  open_questions: string[];
+  next_steps: string[];
+  do_not_forget: string[];
+};
+
+export type TContextGenerationSource = 'llm' | 'rules' | 'user';
+
+export type TContextGenerationStatus = 'fresh' | 'updating' | 'stale' | 'failed';
+
 export type TContextHandoffExtra = {
   pinned_context?: TContextHandoffItem[];
   context_file_path?: string;
   context_file_name?: string;
   last_budget_status?: TContextBudgetStatus;
   last_exported_at?: number;
+  snapshot?: TContextSnapshot;
+  revision?: number;
+  source?: TContextGenerationSource;
+  status?: TContextGenerationStatus;
+  last_compacted_turn_id?: string;
+  turns_since_compaction?: number;
+  updated_at?: number;
+  last_error_code?: string;
 };
 
 export type TConversationContextHandoffExtra = TContextHandoffExtra;
@@ -215,6 +238,7 @@ export type TChatConversation =
       IChatConversation<
         'acp',
         {
+          project_id?: string;
           workspace?: string;
           backend: string;
           cli_path?: string;
@@ -271,6 +295,7 @@ export type TChatConversation =
       IChatConversation<
         'codex',
         {
+          project_id?: string;
           workspace?: string;
           cli_path?: string;
           custom_workspace?: boolean;
@@ -303,6 +328,7 @@ export type TChatConversation =
       IChatConversation<
         'openclaw-gateway',
         {
+          project_id?: string;
           workspace?: string;
           backend?: string;
           agent_name?: string;
@@ -358,6 +384,7 @@ export type TChatConversation =
       IChatConversation<
         'gemini',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           agent_name?: string;
@@ -379,6 +406,7 @@ export type TChatConversation =
       IChatConversation<
         'nanobot',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           /** Skills snapshot for this conversation — authoritative list, written
@@ -404,6 +432,7 @@ export type TChatConversation =
       IChatConversation<
         'remote',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           /** Remote agent config ID (FK to remote_agents table) */
@@ -432,6 +461,7 @@ export type TChatConversation =
   | IChatConversation<
       'aionrs',
       {
+        project_id?: string;
         workspace: string;
         custom_workspace?: boolean;
         proxy?: string;

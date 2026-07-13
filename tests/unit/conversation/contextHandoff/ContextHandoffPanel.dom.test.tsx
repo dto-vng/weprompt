@@ -149,6 +149,7 @@ vi.mock('@icon-park/react', () => {
   const Icon = () => <span aria-hidden='true' />;
   return {
     Add: Icon,
+    Attention: Icon,
     Delete: Icon,
     Edit: Icon,
     FileText: Icon,
@@ -205,7 +206,10 @@ describe('ContextHandoffPanel', () => {
   });
 
   it('opens Context.md from the file tile without showing standalone context actions', async () => {
-    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+    const onPreviewOpen = vi.fn();
+    render(
+      <ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' onPreviewOpen={onPreviewOpen} />
+    );
 
     const contextTile = await screen.findByRole('button', { name: /Context\.md/ });
 
@@ -230,5 +234,156 @@ describe('ContextHandoffPanel', () => {
         workspace: '/workspace',
       })
     );
+    expect(onPreviewOpen).toHaveBeenCalledOnce();
+  });
+
+  it('uses LLM-first compaction when Context.md has not been created yet', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {},
+      },
+    });
+    const onCreateContext = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# LLM-managed context',
+      snapshot: {
+        goal: 'Continue the work.',
+        current_state: [],
+        decisions: [],
+        artifacts: [],
+        user_preferences: [],
+        open_questions: [],
+        next_steps: [],
+        do_not_forget: [],
+      },
+      source: 'llm' as const,
+      throughTurnId: 'turn-1',
+    }));
+
+    render(
+      <ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' onCreateContext={onCreateContext} />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /Context\.md/ }));
+
+    await waitFor(() => expect(onCreateContext).toHaveBeenCalledOnce());
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.openPreview).toHaveBeenCalledWith(
+      '# LLM-managed context',
+      'markdown',
+      expect.objectContaining({ file_name: 'Context.md', file_path: '/workspace/Context.md', editable: true })
+    );
+  });
+
+  it.each([
+    ['updating', 'llm', 'conversation.contextHandoff.status.updating'],
+    ['fresh', 'rules', 'conversation.contextHandoff.status.rulesFallback'],
+    ['stale', 'llm', 'conversation.contextHandoff.status.stale'],
+  ] as const)('shows compact generation state for %s/%s', async (status, source, expectedKey) => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status,
+          source,
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(await screen.findByText(expectedKey)).toBeInTheDocument();
+  });
+
+  it('shows no AI status text after a successful AI update', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'fresh',
+          source: 'llm',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(await screen.findByText('conversation.contextHandoff.activeFileDescription')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.contextHandoff.status.updatedByAi')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /status\.error/ })).not.toBeInTheDocument();
+  });
+
+  it('surfaces a failed AI update as a hover-able alert instead of status text', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'failed',
+          source: 'llm',
+          last_error_code: 'provider_request_failed',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    expect(
+      await screen.findByRole('img', { name: 'conversation.contextHandoff.status.error.providerRequestFailed' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('conversation.contextHandoff.status.failed')).not.toBeInTheDocument();
+  });
+
+  it('shows a budget percentage for an aionrs conversation using the per-model fallback window', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        backend: 'aionrs',
+        context_handoff: conversation.extra.context_handoff,
+        // No last_context_limit — aionrs conversations never receive one from the backend.
+        last_token_usage: { total_tokens: 9_000 },
+        workspace: '/workspace',
+      },
+      model: {
+        ...conversation.model,
+        use_model: 'minimax-m2.5',
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    await screen.findByRole('button', { name: /Context\.md/ });
+
+    expect(screen.queryByText('--')).not.toBeInTheDocument();
+    expect(screen.getByText(/%$/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThan(0)
+    );
+  });
+
+  it('shows updating immediately while the always-mounted controller is compacting', async () => {
+    mocks.getConversationOrNull.mockResolvedValue({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          status: 'fresh',
+          source: 'llm',
+        },
+      },
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' isCompacting />);
+
+    expect(await screen.findByText('conversation.contextHandoff.status.updating')).toBeInTheDocument();
   });
 });

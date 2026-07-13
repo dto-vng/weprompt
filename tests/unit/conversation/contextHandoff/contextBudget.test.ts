@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { TMessage } from '@/common/chat/chatLib';
 import type { TContextHandoffItem } from '@/common/config/storage';
 import { estimateContextBudget } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
-import { DEFAULT_CONTEXT_LIMIT } from '@/renderer/utils/model/modelContextLimits';
 
 const textMessage = (content: string): TMessage => ({
   id: content,
@@ -63,11 +62,11 @@ describe('estimateContextBudget', () => {
     );
   });
 
-  it('uses the app default limit when no backend context limit is available', () => {
+  it('does not invent a precise percentage when backend capacity is unknown', () => {
     const snapshot = estimateContextBudget({ messages: [textMessage('Summarize this conversation.')] });
 
-    expect(snapshot.contextLimit).toBe(DEFAULT_CONTEXT_LIMIT);
-    expect(snapshot.ratio).not.toBeNull();
+    expect(snapshot.contextLimit).toBeUndefined();
+    expect(snapshot.ratio).toBeNull();
   });
 
   it('uses backend token watermark telemetry as the minimum message usage estimate', () => {

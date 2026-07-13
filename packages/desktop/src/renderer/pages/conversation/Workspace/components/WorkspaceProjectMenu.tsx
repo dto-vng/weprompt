@@ -1,7 +1,13 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { Button } from '@arco-design/web-react';
 import { BranchOne, Down, FileText, FolderOpen, Right } from '@icon-park/react';
-import React from 'react';
 import type { TFunction } from 'i18next';
+import React from 'react';
 import type { WorkspaceTab } from '../types';
 
 type WorkspaceProjectMenuProps = {
@@ -10,7 +16,7 @@ type WorkspaceProjectMenuProps = {
   activePanel: WorkspaceTab | null;
   changeCount: number;
   contextBudgetLabel?: string;
-  showContext: boolean;
+  showContext?: boolean;
   onToggle: () => void;
   onSelectPanel: (panel: WorkspaceTab) => void;
   filesPanel: React.ReactNode;
@@ -31,7 +37,7 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
   activePanel,
   changeCount,
   contextBudgetLabel = '--',
-  showContext,
+  showContext = false,
   onToggle,
   onSelectPanel,
   filesPanel,
@@ -43,14 +49,51 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
   React.useEffect(() => {
     if (!open) return;
 
+    const getMenuItems = () => Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
     const handlePointerDown = (event: PointerEvent) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
         onToggle();
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onToggle();
+        rootRef.current?.querySelector<HTMLElement>('.workspace-project-trigger')?.focus();
+        return;
+      }
+
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      if (!(document.activeElement instanceof HTMLElement)) return;
+      if (document.activeElement.getAttribute('role') !== 'menuitem') return;
+      const menuItems = getMenuItems();
+      if (menuItems.length === 0) return;
+      event.preventDefault();
+
+      const activeIndex = menuItems.findIndex((item) => item === document.activeElement);
+      if (event.key === 'Home') {
+        menuItems[0]?.focus();
+        return;
+      }
+      if (event.key === 'End') {
+        menuItems.at(-1)?.focus();
+        return;
+      }
+
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = activeIndex < 0 ? (direction > 0 ? 0 : menuItems.length - 1) : activeIndex + direction;
+      menuItems[(nextIndex + menuItems.length) % menuItems.length]?.focus();
+    };
+
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    getMenuItems()[0]?.focus();
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [onToggle, open]);
 
   const items: WorkspaceProjectMenuItem[] = [
@@ -111,6 +154,7 @@ const WorkspaceProjectMenu: React.FC<WorkspaceProjectMenuProps> = ({
                 {item.key === 'changes' && <div className='workspace-project-menu-separator' />}
                 <Button
                   role='menuitem'
+                  tabIndex={-1}
                   className={
                     activePanel === item.key
                       ? 'workspace-project-menu-item workspace-project-menu-item-active'

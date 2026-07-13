@@ -13,7 +13,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const startWebHostMock = vi.fn();
+const startWebHostMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@aionui/web-host', () => ({
   startWebHost: startWebHostMock,
