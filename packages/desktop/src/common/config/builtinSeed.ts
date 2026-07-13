@@ -45,6 +45,19 @@ export function getGreenNodeApiKey(): string {
 export const GREENNODE_IDP_BASE_URL =
   'https://maas-llm-aiplatform-hcm.api.vngcloud.vn/maas/user-111470/greennode/idp/v1/ocr/ingest';
 
+export const MOONSHOT_PROVIDER_NAME = 'Moonshot (Kimi)';
+
+export const MOONSHOT_BASE_URL = 'https://api.moonshot.ai/v1';
+
+/** Exactly the models Forge ships with for the Moonshot provider — keep to the approved set. */
+export const MOONSHOT_MODELS = ['kimi-k2.6', 'kimi-k2.5'] as const;
+
+/** Model the built-in image-analysis (vision) MCP server uses. */
+export const MOONSHOT_VISION_MODEL = 'kimi-k2.6';
+
+/** Provider id OpenCode uses for this endpoint (namespaces its model ids). */
+export const MOONSHOT_OPENCODE_PROVIDER_ID = 'moonshot';
+
 /**
  * Built-in HTTP MCP servers Forge ships enabled by default. Both endpoints
  * are OAuth-protected (standard MCP authorization flow with discovery) — no

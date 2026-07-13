@@ -7,6 +7,8 @@ import {
   BUILTIN_IDP_NAME,
   BUILTIN_IMAGE_GEN_ID,
   BUILTIN_IMAGE_GEN_NAME,
+  BUILTIN_VISION_ID,
+  BUILTIN_VISION_NAME,
   type IMcpServer,
 } from '@/common/config/storage';
 import { isTier2CapabilityServer } from '@/common/config/builtinCapabilities';
@@ -21,6 +23,7 @@ interface McpManagementProps {
 const isVisibleMcpServer = (server: IMcpServer) =>
   !(server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME)) &&
   !(server.builtin === true && (server.id === BUILTIN_IDP_ID || server.name === BUILTIN_IDP_NAME)) &&
+  !(server.builtin === true && (server.id === BUILTIN_VISION_ID || server.name === BUILTIN_VISION_NAME)) &&
   !isTier2CapabilityServer(server);
 
 const isOAuthCapableServer = (server: IMcpServer) =>

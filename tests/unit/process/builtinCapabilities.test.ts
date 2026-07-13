@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IMcpServerTransportStdio } from '@/common/config/storage';
-import { BUILTIN_IDP_NAME } from '@/common/config/storage';
+import { BUILTIN_IDP_NAME, BUILTIN_VISION_NAME } from '@/common/config/storage';
 import {
   BUILTIN_CAPABILITIES,
   BUILTIN_MEMORY_ID,
@@ -16,6 +16,7 @@ import {
   findCapabilityDescriptor,
   isCommodityBuiltinServer,
   isIdpBuiltinServer,
+  isVisionBuiltinServer,
   mergeCommodityMcpServerIds,
 } from '@/common/config/builtinCapabilities';
 
@@ -137,6 +138,19 @@ describe('mergeCommodityMcpServerIds', () => {
     expect(mergeCommodityMcpServerIds([], enabled)).toEqual(['idp-1']);
 
     const disabled = [srv('idp-1', BUILTIN_IDP_NAME, false, true)];
+    expect(mergeCommodityMcpServerIds([], disabled)).toEqual([]);
+  });
+
+  it('isVisionBuiltinServer recognizes the vision builtin server by name', () => {
+    expect(isVisionBuiltinServer({ name: BUILTIN_VISION_NAME })).toBe(true);
+    expect(isVisionBuiltinServer({ name: 'something-else' })).toBe(false);
+  });
+
+  it('auto-attaches an enabled vision server to default conversation MCP ids, but not when disabled', () => {
+    const enabled = [srv('vision-1', BUILTIN_VISION_NAME, true, true)];
+    expect(mergeCommodityMcpServerIds([], enabled)).toEqual(['vision-1']);
+
+    const disabled = [srv('vision-1', BUILTIN_VISION_NAME, false, true)];
     expect(mergeCommodityMcpServerIds([], disabled)).toEqual([]);
   });
 });

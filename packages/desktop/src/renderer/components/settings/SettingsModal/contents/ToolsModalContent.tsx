@@ -13,6 +13,8 @@ import {
   BUILTIN_IDP_NAME,
   BUILTIN_IMAGE_GEN_ID,
   BUILTIN_IMAGE_GEN_NAME,
+  BUILTIN_VISION_ID,
+  BUILTIN_VISION_NAME,
 } from '@/common/config/storage';
 import { isImageGenSupported } from '@/common/utils/imageModelAllowlist';
 import {
@@ -56,6 +58,8 @@ const isBuiltinImageGenServer = (server: IMcpServer) =>
   server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME);
 const isBuiltinIdpServer = (server: IMcpServer) =>
   server.builtin === true && (server.id === BUILTIN_IDP_ID || server.name === BUILTIN_IDP_NAME);
+const isBuiltinVisionServer = (server: IMcpServer) =>
+  server.builtin === true && (server.id === BUILTIN_VISION_ID || server.name === BUILTIN_VISION_NAME);
 const areEnvRecordsEqual = (a: Record<string, string>, b: Record<string, string>) => {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -74,7 +78,11 @@ const ModalMcpManagementSection: React.FC<{
   const visibleMcpServers = useMemo(
     () =>
       mcpServers.filter(
-        (server) => !isBuiltinImageGenServer(server) && !isBuiltinIdpServer(server) && !isTier2CapabilityServer(server)
+        (server) =>
+          !isBuiltinImageGenServer(server) &&
+          !isBuiltinIdpServer(server) &&
+          !isBuiltinVisionServer(server) &&
+          !isTier2CapabilityServer(server)
       ),
     [mcpServers]
   );

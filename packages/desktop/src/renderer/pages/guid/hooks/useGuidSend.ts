@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import {
   isIdpBuiltinServer,
   isImageGenBuiltinServer,
+  isVisionBuiltinServer,
   mergeCommodityMcpServerIds,
 } from '@/common/config/builtinCapabilities';
 import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
@@ -137,15 +138,19 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const defaultSelectedUserMcpServerIds = availableMcpServers
       .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id) && server.builtin !== true)
       .map((server) => server.id);
-    // Image generation and the IDP (GreenNode) server are globally-enabled capabilities
-    // (toggled in Settings > Tools), not per-chat picks — and their built-in servers are
-    // hidden from the MCP picker. Always attach the enabled hidden servers so the agent
-    // can invoke them without the user selecting them per conversation.
+    // Image generation, the IDP (GreenNode) server, and the vision (image-analysis)
+    // server are globally-enabled capabilities (toggled in Settings > Tools), not
+    // per-chat picks — and their built-in servers are hidden from the MCP picker.
+    // Always attach the enabled hidden servers so the agent can invoke them without
+    // the user selecting them per conversation.
     const imageGenServer = availableMcpServers.find(
       (server) => server.enabled === true && isImageGenBuiltinServer(server)
     );
     const idpServer = availableMcpServers.find((server) => server.enabled === true && isIdpBuiltinServer(server));
-    const hiddenAutoAttachServers = [imageGenServer, idpServer].filter((server): server is IMcpServer => !!server);
+    const visionServer = availableMcpServers.find((server) => server.enabled === true && isVisionBuiltinServer(server));
+    const hiddenAutoAttachServers = [imageGenServer, idpServer, visionServer].filter(
+      (server): server is IMcpServer => !!server
+    );
 
     const assistantOverrideMcpIdsBase =
       selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : defaultSelectedMcpServerIds;

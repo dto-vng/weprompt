@@ -19,8 +19,21 @@ import {
   resolveImageGenerationMcpEnv,
   type ImageGenerationMcpEnvResolveResult,
 } from '@/common/config/imageGenerationMcpEnv';
-import { GREENNODE_IDP_BASE_URL, GREENNODE_PROVIDER_NAME, getGreenNodeApiKey } from '@/common/config/builtinSeed';
-import { BUILTIN_IDP_NAME, BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
+import {
+  GREENNODE_IDP_BASE_URL,
+  GREENNODE_PROVIDER_NAME,
+  getGreenNodeApiKey,
+  MOONSHOT_BASE_URL,
+  MOONSHOT_PROVIDER_NAME,
+  MOONSHOT_VISION_MODEL,
+} from '@/common/config/builtinSeed';
+import {
+  BUILTIN_IDP_NAME,
+  BUILTIN_IMAGE_GEN_NAME,
+  BUILTIN_VISION_NAME,
+  type IMcpServer,
+  type IProvider,
+} from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
 import {
@@ -151,7 +164,9 @@ function buildBuiltinImageGenerationServer(
 // backend DB), falling back to the build-time FORGE_GREENNODE_API_KEY. In dev the
 // build-time env is often absent while the provider still holds a valid key.
 function resolveGreenNodeApiKey(providers: IProvider[]): string {
-  const provider = providers.find((p) => p.name === GREENNODE_PROVIDER_NAME || (p.base_url ?? '').includes('vngcloud.vn'));
+  const provider = providers.find(
+    (p) => p.name === GREENNODE_PROVIDER_NAME || (p.base_url ?? '').includes('vngcloud.vn')
+  );
   return (provider?.api_key ?? '').trim() || getGreenNodeApiKey();
 }
 
@@ -176,6 +191,44 @@ function buildBuiltinIdpServer(apiKey: string): McpImportServer {
       env,
     },
     original_json: JSON.stringify({ mcpServers: { [BUILTIN_IDP_NAME]: serverConfig } }, null, 2),
+  };
+}
+
+// Prefer the API key from the seeded Moonshot provider record (persisted in the
+// backend DB), matched by provider name or base_url, mirroring resolveGreenNodeApiKey.
+function resolveMoonshotApiKey(providers: IProvider[]): string {
+  const provider = providers.find(
+    (p) => p.name === MOONSHOT_PROVIDER_NAME || (p.base_url ?? '').includes('moonshot.ai')
+  );
+  return (provider?.api_key ?? '').trim();
+}
+
+function buildBuiltinVisionServer(apiKey: string): McpImportServer {
+  const scriptPath = getBuiltinMcpScriptPath('builtin-mcp-vision');
+  const env = {
+    AIONUI_VISION_BASE_URL: MOONSHOT_BASE_URL,
+    AIONUI_VISION_API_KEY: apiKey,
+    AIONUI_VISION_MODEL: MOONSHOT_VISION_MODEL,
+  };
+  const serverConfig = {
+    command: 'node',
+    args: [scriptPath],
+    env,
+  };
+
+  return {
+    name: BUILTIN_VISION_NAME,
+    description:
+      'Analyze images (screenshots, photos, UI, charts) with a multimodal model — usable from any chat model.',
+    enabled: apiKey.length > 0,
+    builtin: true,
+    transport: {
+      type: 'stdio',
+      command: 'node',
+      args: [scriptPath],
+      env,
+    },
+    original_json: JSON.stringify({ mcpServers: { [BUILTIN_VISION_NAME]: serverConfig } }, null, 2),
   };
 }
 
@@ -315,10 +368,15 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
   const imageServer = buildBuiltinImageGenerationServer(imageEnvResolution, imageConfig);
   const existingIdpServer = existingByName.get(BUILTIN_IDP_NAME);
   const idpServer = buildBuiltinIdpServer(resolveGreenNodeApiKey(providers));
+  const existingVisionServer = existingByName.get(BUILTIN_VISION_NAME);
+  const visionServer = buildBuiltinVisionServer(resolveMoonshotApiKey(providers));
   const defaultServers = buildDefaultMcpServers();
-  const missing = [...defaultServers, imageServer, idpServer].filter((server) => !existingByName.has(server.name));
+  const missing = [...defaultServers, imageServer, idpServer, visionServer].filter(
+    (server) => !existingByName.has(server.name)
+  );
   let imageServerUpdated = false;
   let idpServerUpdated = false;
+  let visionServerUpdated = false;
 
   if (missing.length > 0) {
     await mcpService.batchImportServers.invoke({ servers: missing });
@@ -442,13 +500,53 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
     }
   }
 
+  if (
+    existingVisionServer &&
+    existingVisionServer.transport.type === 'stdio' &&
+    visionServer.transport.type === 'stdio'
+  ) {
+    const updatedTransport = visionServer.transport;
+    const visionTransportChanged = !isSameStdioTransport(existingVisionServer.transport, updatedTransport);
+    const visionOriginalJsonChanged = existingVisionServer.original_json !== visionServer.original_json;
+    // Vision has no user-facing toggle (hidden from all UI lists), so `enabled` is
+    // derived purely from key presence — reconcile it here so a keyless→keyed
+    // upgrade can re-enable it (otherwise it would be stuck disabled forever).
+    const visionEnabledChanged = existingVisionServer.enabled !== visionServer.enabled;
+    const visionServerChanged = visionTransportChanged || visionOriginalJsonChanged || visionEnabledChanged;
+    console.info(
+      '[Migration] vision MCP bootstrap decision, server id: %s, transport changed: %s, json changed: %s, will update: %s',
+      existingVisionServer.id,
+      visionTransportChanged ? 'yes' : 'no',
+      visionOriginalJsonChanged ? 'yes' : 'no',
+      visionServerChanged ? 'yes' : 'no'
+    );
+    if (visionTransportChanged || visionOriginalJsonChanged) {
+      await mcpService.updateServer.invoke({
+        id: existingVisionServer.id,
+        data: {
+          transport: updatedTransport,
+          original_json: visionServer.original_json,
+        },
+      });
+    }
+    // `enabled` isn't part of updateServer's payload; flip it via toggleServer
+    // when the key-derived desired state differs from what's stored.
+    if (visionEnabledChanged) {
+      await mcpService.toggleServer.invoke({ id: existingVisionServer.id });
+    }
+    if (visionServerChanged) {
+      visionServerUpdated = true;
+    }
+  }
+
   console.info(
-    '[Migration] MCP bootstrap completed, imported %d missing defaults, updated image server: %s, image config source: %s, image enabled: %s, updated idp server: %s',
+    '[Migration] MCP bootstrap completed, imported %d missing defaults, updated image server: %s, image config source: %s, image enabled: %s, updated idp server: %s, updated vision server: %s',
     missing.length,
     imageServerUpdated ? 'yes' : 'no',
     imageConfigSource,
     imageConfig?.switch === true ? 'yes' : 'no',
-    idpServerUpdated ? 'yes' : 'no'
+    idpServerUpdated ? 'yes' : 'no',
+    visionServerUpdated ? 'yes' : 'no'
   );
 }
 
