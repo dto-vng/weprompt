@@ -664,6 +664,10 @@ export const BUILTIN_IMAGE_GEN_LEGACY_NAMES = ['AionUi Image Generation', BUILTI
 export const BUILTIN_IDP_ID = 'builtin-idp';
 export const BUILTIN_IDP_NAME = 'greennode-idp';
 
+/** Stable ID for the built-in image-analysis (vision) MCP server */
+export const BUILTIN_VISION_ID = 'builtin-vision';
+export const BUILTIN_VISION_NAME = 'aionui-image-analysis';
+
 export interface IMcpTool {
   name: string;
   description?: string;

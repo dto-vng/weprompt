@@ -44,3 +44,18 @@ export function isBuiltinIdpTransport(
     transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_IDP_SCRIPT}.js`))
   );
 }
+
+export const BUILTIN_VISION_ID = 'builtin-vision';
+export const BUILTIN_VISION_NAME = 'aionui-image-analysis';
+export const BUILTIN_VISION_SCRIPT = 'builtin-mcp-vision';
+
+export function isBuiltinVisionTransport(
+  transport: { type?: string; command?: string; args?: string[] } | undefined
+): boolean {
+  return (
+    transport?.type === 'stdio' &&
+    transport?.command === 'node' &&
+    Array.isArray(transport?.args) &&
+    transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_VISION_SCRIPT}.js`))
+  );
+}
