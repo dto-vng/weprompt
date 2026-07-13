@@ -20,7 +20,7 @@ export type MdastNode = {
 
 // Candidate absolute path: POSIX (/…), Windows (C:\ / C:/), or /C:/… .
 // Consume non-whitespace, stopping at quotes/backticks/closing brackets/angle.
-const PATH_CANDIDATE_RE = /(?:\/[A-Za-z]:[\\/]|[A-Za-z]:[\\/]|\/)[^\s"'`)>\]}]+/g;
+const PATH_CANDIDATE_RE = /(?:\/[A-Za-z]:[\\/]|(?<![A-Za-z])[A-Za-z]:[\\/]|\/)[^\s"'`)>\]}]+/g;
 const TRAILING_PUNCT_RE = /[.,;:!?)\]}'"]$/;
 
 const makeLink = (path: string, reference: { rawReference: string }): MdastNode => ({
