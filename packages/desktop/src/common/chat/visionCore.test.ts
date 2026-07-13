@@ -25,7 +25,10 @@ describe('executeVision', () => {
       status: 200,
       text: async () => JSON.stringify({ choices: [{ message: { content: 'A red apple on a table.' } }] }),
     });
-    const res = await executeVision({ filePath: '/w/pic.png', question: 'What is this?' }, cfg, { readFile, fetchImpl });
+    const res = await executeVision({ filePath: '/w/pic.png', question: 'What is this?' }, cfg, {
+      readFile,
+      fetchImpl,
+    });
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe('https://api.moonshot.ai/v1/chat/completions');
     const body = JSON.parse((init as { body: string }).body);
@@ -33,14 +36,22 @@ describe('executeVision', () => {
     expect((init as { headers: Record<string, string> }).headers.Authorization).toBe('Bearer k-1');
     const parts = body.messages[0].content;
     expect(parts.some((p: { type: string }) => p.type === 'image_url')).toBe(true);
-    expect(parts.some((p: { type: string; text?: string }) => p.type === 'text' && p.text === 'What is this?')).toBe(true);
+    expect(parts.some((p: { type: string; text?: string }) => p.type === 'text' && p.text === 'What is this?')).toBe(
+      true
+    );
     expect(res.success).toBe(true);
     expect(res.text).toBe('A red apple on a table.');
   });
 
   it('defaults the question when none is given', async () => {
     const readFile = vi.fn().mockResolvedValue(new Uint8Array([1]));
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: 'ok' } }] }) });
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+      });
     await executeVision({ filePath: '/w/x.png' }, cfg, { readFile, fetchImpl });
     const parts = JSON.parse(fetchImpl.mock.calls[0][1].body).messages[0].content;
     expect(parts.find((p: { type: string }) => p.type === 'text').text.length).toBeGreaterThan(0);
