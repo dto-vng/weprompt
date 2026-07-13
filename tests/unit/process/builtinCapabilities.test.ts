@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IMcpServerTransportStdio } from '@/common/config/storage';
+import { BUILTIN_IDP_NAME } from '@/common/config/storage';
 import {
   BUILTIN_CAPABILITIES,
   BUILTIN_MEMORY_ID,
@@ -14,6 +15,7 @@ import {
   hasCapabilityCredential,
   findCapabilityDescriptor,
   isCommodityBuiltinServer,
+  isIdpBuiltinServer,
   mergeCommodityMcpServerIds,
 } from '@/common/config/builtinCapabilities';
 
@@ -123,5 +125,18 @@ describe('mergeCommodityMcpServerIds', () => {
     expect(isCommodityBuiltinServer({ name: BUILTIN_CHROME_DEVTOOLS_NAME, builtin: true })).toBe(true);
     expect(isCommodityBuiltinServer({ name: 'aionui-image-generation', builtin: true })).toBe(false);
     expect(isCommodityBuiltinServer({ name: BUILTIN_MEMORY_NAME, builtin: false })).toBe(false);
+  });
+
+  it('isIdpBuiltinServer recognizes the IDP builtin server by name', () => {
+    expect(isIdpBuiltinServer({ name: BUILTIN_IDP_NAME })).toBe(true);
+    expect(isIdpBuiltinServer({ name: 'something-else' })).toBe(false);
+  });
+
+  it('auto-attaches an enabled IDP server to default conversation MCP ids, but not when disabled', () => {
+    const enabled = [srv('idp-1', BUILTIN_IDP_NAME, true, true)];
+    expect(mergeCommodityMcpServerIds([], enabled)).toEqual(['idp-1']);
+
+    const disabled = [srv('idp-1', BUILTIN_IDP_NAME, false, true)];
+    expect(mergeCommodityMcpServerIds([], disabled)).toEqual([]);
   });
 });

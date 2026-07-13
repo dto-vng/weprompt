@@ -2,7 +2,13 @@ import { Button, Collapse, Dropdown, Menu, Modal } from '@arco-design/web-react'
 import { Down, Plus } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { BUILTIN_IMAGE_GEN_ID, BUILTIN_IMAGE_GEN_NAME, type IMcpServer } from '@/common/config/storage';
+import {
+  BUILTIN_IDP_ID,
+  BUILTIN_IDP_NAME,
+  BUILTIN_IMAGE_GEN_ID,
+  BUILTIN_IMAGE_GEN_NAME,
+  type IMcpServer,
+} from '@/common/config/storage';
 import { isTier2CapabilityServer } from '@/common/config/builtinCapabilities';
 import { useMcpConnection, useMcpModal, useMcpOAuth, useMcpServerCRUD, useMcpServers } from '@/renderer/hooks/mcp';
 import AddMcpServerModal from '../components/AddMcpServerModal';
@@ -14,6 +20,7 @@ interface McpManagementProps {
 
 const isVisibleMcpServer = (server: IMcpServer) =>
   !(server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME)) &&
+  !(server.builtin === true && (server.id === BUILTIN_IDP_ID || server.name === BUILTIN_IDP_NAME)) &&
   !isTier2CapabilityServer(server);
 
 const isOAuthCapableServer = (server: IMcpServer) =>

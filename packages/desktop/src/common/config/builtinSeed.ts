@@ -40,6 +40,11 @@ export function getGreenNodeApiKey(): string {
   return process.env.FORGE_GREENNODE_API_KEY || '';
 }
 
+// GreenNode IDP OCR ingest endpoint. The `user-111470` tenant segment is not
+// part of the chat provider's base_url, so it is captured here explicitly.
+export const GREENNODE_IDP_BASE_URL =
+  'https://maas-llm-aiplatform-hcm.api.vngcloud.vn/maas/user-111470/greennode/idp/v1/ocr/ingest';
+
 /**
  * Built-in HTTP MCP servers Forge ships enabled by default. Both endpoints
  * are OAuth-protected (standard MCP authorization flow with discovery) — no

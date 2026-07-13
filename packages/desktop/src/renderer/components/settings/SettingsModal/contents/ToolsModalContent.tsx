@@ -7,7 +7,13 @@
 import type { ImageGenerationModelSetting } from '@/common/config/clientSettings';
 import { removeImageGenerationEnvKeys, resolveImageGenerationMcpEnv } from '@/common/config/imageGenerationMcpEnv';
 import { mcpService } from '@/common/adapter/ipcBridge';
-import { type IMcpServer, BUILTIN_IMAGE_GEN_ID, BUILTIN_IMAGE_GEN_NAME } from '@/common/config/storage';
+import {
+  type IMcpServer,
+  BUILTIN_IDP_ID,
+  BUILTIN_IDP_NAME,
+  BUILTIN_IMAGE_GEN_ID,
+  BUILTIN_IMAGE_GEN_NAME,
+} from '@/common/config/storage';
 import { isImageGenSupported } from '@/common/utils/imageModelAllowlist';
 import {
   TIER2_CAPABILITIES,
@@ -48,6 +54,8 @@ type MessageInstance = ReturnType<typeof Message.useMessage>[0];
 
 const isBuiltinImageGenServer = (server: IMcpServer) =>
   server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME);
+const isBuiltinIdpServer = (server: IMcpServer) =>
+  server.builtin === true && (server.id === BUILTIN_IDP_ID || server.name === BUILTIN_IDP_NAME);
 const areEnvRecordsEqual = (a: Record<string, string>, b: Record<string, string>) => {
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -64,7 +72,10 @@ const ModalMcpManagementSection: React.FC<{
   const { t } = useTranslation();
   const { oauthStatus, loggingIn, checkOAuthStatus, markLoginRequired, clearLoginRequired, login } = useMcpOAuth();
   const visibleMcpServers = useMemo(
-    () => mcpServers.filter((server) => !isBuiltinImageGenServer(server) && !isTier2CapabilityServer(server)),
+    () =>
+      mcpServers.filter(
+        (server) => !isBuiltinImageGenServer(server) && !isBuiltinIdpServer(server) && !isTier2CapabilityServer(server)
+      ),
     [mcpServers]
   );
 

@@ -8,7 +8,7 @@
 // MCP servers. Imported by both the main-process seeding migration and the
 // renderer settings UI, so keep this side-effect free (type-only storage import).
 import type { IMcpServer, IMcpServerTransportStdio } from './storage';
-import { BUILTIN_IMAGE_GEN_NAME } from './storage';
+import { BUILTIN_IMAGE_GEN_NAME, BUILTIN_IDP_NAME } from './storage';
 
 export type BuiltinCapabilityTier = 'tier1' | 'tier2';
 export type BuiltinCapabilityCredentialKind = 'apiKey' | 'connectionString';
@@ -212,6 +212,9 @@ export const isCommodityBuiltinServer = (server: Pick<IMcpServer, 'name' | 'buil
 export const isImageGenBuiltinServer = (server: Pick<IMcpServer, 'name'>): boolean =>
   server.name === BUILTIN_IMAGE_GEN_NAME;
 
+/** True when `server` is the built-in GreenNode IDP server. Auto-attaches like image-gen once enabled. */
+export const isIdpBuiltinServer = (server: Pick<IMcpServer, 'name'>): boolean => server.name === BUILTIN_IDP_NAME;
+
 /**
  * Union the assistant's default MCP server ids with the ids of any *enabled*
  * commodity built-in servers (and the enabled image-gen server), so our
@@ -226,7 +229,8 @@ export const mergeCommodityMcpServerIds = (
   const ids = [...assistantDefaultIds];
   const seen = new Set(ids);
   for (const server of availableServers) {
-    const autoAttach = isCommodityBuiltinServer(server) || isImageGenBuiltinServer(server);
+    const autoAttach =
+      isCommodityBuiltinServer(server) || isImageGenBuiltinServer(server) || isIdpBuiltinServer(server);
     if (server.enabled === true && autoAttach && !seen.has(server.id)) {
       seen.add(server.id);
       ids.push(server.id);

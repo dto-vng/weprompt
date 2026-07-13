@@ -19,7 +19,8 @@ import {
   resolveImageGenerationMcpEnv,
   type ImageGenerationMcpEnvResolveResult,
 } from '@/common/config/imageGenerationMcpEnv';
-import { BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
+import { GREENNODE_IDP_BASE_URL, getGreenNodeApiKey } from '@/common/config/builtinSeed';
+import { BUILTIN_IDP_NAME, BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
 import {
@@ -143,6 +144,31 @@ function buildBuiltinImageGenerationServer(
       env,
     },
     original_json: JSON.stringify({ mcpServers: { [BUILTIN_IMAGE_GEN_NAME]: serverConfig } }, null, 2),
+  };
+}
+
+function buildBuiltinIdpServer(): McpImportServer {
+  const scriptPath = getBuiltinMcpScriptPath('builtin-mcp-idp');
+  const apiKey = getGreenNodeApiKey();
+  const env = { AIONUI_IDP_BASE_URL: GREENNODE_IDP_BASE_URL, AIONUI_IDP_API_KEY: apiKey };
+  const serverConfig = {
+    command: 'node',
+    args: [scriptPath],
+    env,
+  };
+
+  return {
+    name: BUILTIN_IDP_NAME,
+    description: 'GreenNode IDP: OCR + GenAI document understanding for IDs, invoices, receipts, and KYC docs.',
+    enabled: apiKey.length > 0,
+    builtin: true,
+    transport: {
+      type: 'stdio',
+      command: 'node',
+      args: [scriptPath],
+      env,
+    },
+    original_json: JSON.stringify({ mcpServers: { [BUILTIN_IDP_NAME]: serverConfig } }, null, 2),
   };
 }
 
@@ -280,9 +306,12 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
   const imageEnvResolution = resolveImageGenerationMcpEnv(imageConfig, providers, existingImageEnv);
   logImageGenerationEnvResolution(imageEnvResolution, 'bootstrap');
   const imageServer = buildBuiltinImageGenerationServer(imageEnvResolution, imageConfig);
+  const existingIdpServer = existingByName.get(BUILTIN_IDP_NAME);
+  const idpServer = buildBuiltinIdpServer();
   const defaultServers = buildDefaultMcpServers();
-  const missing = [...defaultServers, imageServer].filter((server) => !existingByName.has(server.name));
+  const missing = [...defaultServers, imageServer, idpServer].filter((server) => !existingByName.has(server.name));
   let imageServerUpdated = false;
+  let idpServerUpdated = false;
 
   if (missing.length > 0) {
     await mcpService.batchImportServers.invoke({ servers: missing });
@@ -371,12 +400,37 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
     );
   }
 
+  if (existingIdpServer && existingIdpServer.transport.type === 'stdio' && idpServer.transport.type === 'stdio') {
+    const updatedTransport = idpServer.transport;
+    const idpTransportChanged = !isSameStdioTransport(existingIdpServer.transport, updatedTransport);
+    const idpOriginalJsonChanged = existingIdpServer.original_json !== idpServer.original_json;
+    const idpServerChanged = idpTransportChanged || idpOriginalJsonChanged;
+    console.info(
+      '[Migration] idp MCP bootstrap decision, server id: %s, transport changed: %s, json changed: %s, will update: %s',
+      existingIdpServer.id,
+      idpTransportChanged ? 'yes' : 'no',
+      idpOriginalJsonChanged ? 'yes' : 'no',
+      idpServerChanged ? 'yes' : 'no'
+    );
+    if (idpServerChanged) {
+      await mcpService.updateServer.invoke({
+        id: existingIdpServer.id,
+        data: {
+          transport: updatedTransport,
+          original_json: idpServer.original_json,
+        },
+      });
+      idpServerUpdated = true;
+    }
+  }
+
   console.info(
-    '[Migration] MCP bootstrap completed, imported %d missing defaults, updated image server: %s, image config source: %s, image enabled: %s',
+    '[Migration] MCP bootstrap completed, imported %d missing defaults, updated image server: %s, image config source: %s, image enabled: %s, updated idp server: %s',
     missing.length,
     imageServerUpdated ? 'yes' : 'no',
     imageConfigSource,
-    imageConfig?.switch === true ? 'yes' : 'no'
+    imageConfig?.switch === true ? 'yes' : 'no',
+    idpServerUpdated ? 'yes' : 'no'
   );
 }
 
