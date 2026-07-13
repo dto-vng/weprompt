@@ -52,8 +52,9 @@ describe('TeamSiderSection', () => {
 
     const createButton = screen.getByTestId('team-create-btn');
 
-    expect(createButton).toHaveClass('text-t-secondary');
-    expect(createButton).toHaveClass('hover:text-t-primary');
+    expect(createButton).toHaveClass('!text-t-secondary');
+    expect(createButton).toHaveClass('hover:!text-t-primary');
+    expect(createButton).toHaveClass('sider-section-action');
     expect(createButton).not.toHaveClass('text-primary');
   });
 });

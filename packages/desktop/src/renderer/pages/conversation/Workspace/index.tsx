@@ -18,7 +18,6 @@ import FileChangeList from './components/FileChangeList';
 import PasteConfirmModal from './components/PasteConfirmModal';
 import WorkspaceContextMenu from './components/WorkspaceContextMenu';
 import WorkspaceDialogs from './components/WorkspaceDialogs';
-import WorkspaceTabBar from './components/WorkspaceTabBar';
 import WorkspaceToolbar from './components/WorkspaceToolbar';
 import FileTypeIcon from './components/FileTypeIcon';
 import { useFileChanges } from './hooks/useFileChanges';
@@ -271,15 +270,6 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
           handleDeleteConfirm={fileOpsHook.handleDeleteConfirm}
         />
 
-        {/* Tab bar */}
-        <WorkspaceTabBar
-          t={t}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          changeCount={fileChangesHook.changeCount}
-          branch={fileChangesHook.snapshotInfo?.branch ?? null}
-        />
-
         {/* Toolbar: search input + directory name + action buttons */}
         {activeTab === 'files' && (
           <WorkspaceToolbar
@@ -297,6 +287,8 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
             handleSelectHostFiles={pasteHook.handleSelectHostFiles}
             handleUploadDeviceFiles={pasteHook.handleUploadDeviceFiles}
             setShowHostFileSelector={searchHook.setShowHostFileSelector}
+            workspacePath={workspace}
+            isTemporaryWorkspace={isTemporaryWorkspace}
           />
         )}
 

@@ -649,7 +649,7 @@ const PreviewPanel: React.FC = () => {
 
   return (
     <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
-      <div className='h-full flex flex-col bg-1 rounded-[16px]'>
+      <div className='preview-panel-surface h-full flex flex-col' style={{ background: 'var(--bg-artifact-surface)' }}>
         {messageContextHolder}
 
         {/* 确认对话框 / Confirmation modals */}
