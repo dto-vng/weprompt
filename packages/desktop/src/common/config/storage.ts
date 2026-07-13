@@ -660,6 +660,10 @@ export const BUILTIN_IMAGE_GEN_ID = 'builtin-image-gen';
 export const BUILTIN_IMAGE_GEN_NAME = 'aionui-image-generation';
 export const BUILTIN_IMAGE_GEN_LEGACY_NAMES = ['AionUi Image Generation', BUILTIN_IMAGE_GEN_ID] as const;
 
+/** Stable ID for the built-in GreenNode IDP MCP server */
+export const BUILTIN_IDP_ID = 'builtin-idp';
+export const BUILTIN_IDP_NAME = 'greennode-idp';
+
 export interface IMcpTool {
   name: string;
   description?: string;
