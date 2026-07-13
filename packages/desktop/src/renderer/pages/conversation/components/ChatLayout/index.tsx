@@ -241,7 +241,10 @@ const ChatLayout: React.FC<{
           }}
         >
           <div className='shrink-0 !bg-1'>{headerBlock}</div>
-          <ArcoLayout.Content className='flex flex-col flex-1 bg-1 overflow-hidden'>
+          <ArcoLayout.Content
+            className='flex flex-col flex-1 overflow-hidden'
+            style={{ background: 'var(--bg-chat-surface)' }}
+          >
             {props.children}
           </ArcoLayout.Content>
         </div>
@@ -260,8 +263,9 @@ const ChatLayout: React.FC<{
         {isWorkspacePanePresentation && workspaceEnabled && !isMobile && (
           <div
             data-testid='artifact-pane'
-            className='!bg-1 relative flex flex-col min-w-0 layout-sider'
+            className='relative flex flex-col min-w-0 layout-sider'
             style={{
+              background: 'var(--bg-artifact-surface)',
               flexGrow: artifactCollapsed ? 0 : 1,
               flexShrink: 0,
               flexBasis: artifactCollapsed ? '0px' : 0,
@@ -288,8 +292,9 @@ const ChatLayout: React.FC<{
         {!isWorkspacePanePresentation && artifactVisible && (
           <div
             data-testid='artifact-pane'
-            className='!bg-1 relative flex flex-col min-w-0 layout-sider'
+            className='relative flex flex-col min-w-0 layout-sider'
             style={{
+              background: 'var(--bg-artifact-surface)',
               flexGrow: 1,
               flexShrink: 1,
               flexBasis: 0,

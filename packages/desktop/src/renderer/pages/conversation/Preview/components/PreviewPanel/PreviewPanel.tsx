@@ -467,7 +467,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
       <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
         <div
           data-testid='preview-panel-surface'
-          className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
+          className={classNames('h-full flex flex-col', !fullBleed && 'rounded-[8px]')}
+          style={{ background: 'var(--bg-artifact-surface)' }}
         >
           {messageContextHolder}
 
@@ -790,7 +791,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
     <PreviewToolbarExtrasProvider value={toolbarExtrasContextValue}>
       <div
         data-testid='preview-panel-surface'
-        className={classNames('h-full flex flex-col bg-1', !fullBleed && 'rounded-[16px]')}
+        className={classNames('h-full flex flex-col', !fullBleed && 'rounded-[8px]')}
+        style={{ background: 'var(--bg-artifact-surface)' }}
       >
         {messageContextHolder}
 

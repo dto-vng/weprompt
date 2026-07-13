@@ -211,10 +211,10 @@ describe('PreviewPanel Office artifact integration', () => {
     setActiveTab('word');
     const view = render(<PreviewPanel fullBleed />);
 
-    expect(screen.getByTestId('preview-panel-surface')).not.toHaveClass('rounded-[16px]');
+    expect(screen.getByTestId('preview-panel-surface')).not.toHaveClass('rounded-[8px]');
 
     view.rerender(<PreviewPanel />);
-    expect(screen.getByTestId('preview-panel-surface')).toHaveClass('rounded-[16px]');
+    expect(screen.getByTestId('preview-panel-surface')).toHaveClass('rounded-[8px]');
   });
 
   it('wires artifact actions without restarting Office watch after a successful mutation', async () => {
