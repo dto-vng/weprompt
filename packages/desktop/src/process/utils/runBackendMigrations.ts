@@ -19,7 +19,7 @@ import {
   resolveImageGenerationMcpEnv,
   type ImageGenerationMcpEnvResolveResult,
 } from '@/common/config/imageGenerationMcpEnv';
-import { GREENNODE_IDP_BASE_URL, getGreenNodeApiKey } from '@/common/config/builtinSeed';
+import { GREENNODE_IDP_BASE_URL, GREENNODE_PROVIDER_NAME, getGreenNodeApiKey } from '@/common/config/builtinSeed';
 import { BUILTIN_IDP_NAME, BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
@@ -147,9 +147,16 @@ function buildBuiltinImageGenerationServer(
   };
 }
 
-function buildBuiltinIdpServer(): McpImportServer {
+// Prefer the API key from the seeded GreenNode provider record (persisted in the
+// backend DB), falling back to the build-time FORGE_GREENNODE_API_KEY. In dev the
+// build-time env is often absent while the provider still holds a valid key.
+function resolveGreenNodeApiKey(providers: IProvider[]): string {
+  const provider = providers.find((p) => p.name === GREENNODE_PROVIDER_NAME || (p.base_url ?? '').includes('vngcloud.vn'));
+  return (provider?.api_key ?? '').trim() || getGreenNodeApiKey();
+}
+
+function buildBuiltinIdpServer(apiKey: string): McpImportServer {
   const scriptPath = getBuiltinMcpScriptPath('builtin-mcp-idp');
-  const apiKey = getGreenNodeApiKey();
   const env = { AIONUI_IDP_BASE_URL: GREENNODE_IDP_BASE_URL, AIONUI_IDP_API_KEY: apiKey };
   const serverConfig = {
     command: 'node',
@@ -307,7 +314,7 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
   logImageGenerationEnvResolution(imageEnvResolution, 'bootstrap');
   const imageServer = buildBuiltinImageGenerationServer(imageEnvResolution, imageConfig);
   const existingIdpServer = existingByName.get(BUILTIN_IDP_NAME);
-  const idpServer = buildBuiltinIdpServer();
+  const idpServer = buildBuiltinIdpServer(resolveGreenNodeApiKey(providers));
   const defaultServers = buildDefaultMcpServers();
   const missing = [...defaultServers, imageServer, idpServer].filter((server) => !existingByName.has(server.name));
   let imageServerUpdated = false;
