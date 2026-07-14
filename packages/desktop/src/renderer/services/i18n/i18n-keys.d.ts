@@ -686,6 +686,7 @@ export type I18nKey =
   | 'conversation.skill_generator.type_skill'
   | 'conversation.skills.loaded'
   | 'conversation.skills.slashHint'
+  | 'conversation.status.waitingApproval'
   | 'conversation.thinking.complete'
   | 'conversation.thinking.label'
   | 'conversation.welcome.clearWorkspace'
