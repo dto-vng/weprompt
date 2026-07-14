@@ -4,6 +4,7 @@ import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { isSideQuestionSupported } from '@/common/chat/sideQuestion';
 import { parseError, uuid } from '@/common/utils';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
+import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndicator';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -23,6 +24,7 @@ import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useS
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useAddOrUpdateMessage } from '@/renderer/pages/conversation/Messages/hooks';
 import {
@@ -38,6 +40,7 @@ import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionCon
 import type { TeamSendBoxRuntime } from '@/renderer/pages/team/components/teamSendRuntime';
 import { allSupportedExts } from '@/renderer/services/FileService';
 import { iconColors } from '@/renderer/styles/colors';
+import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
@@ -120,8 +123,17 @@ const AcpSendBox: React.FC<{
   teamSendMessage,
   teamRuntime,
 }) => {
-  const { aiProcessing, setAiProcessing, resetState, hasThinkingMessage, slashCommands, fetchSlashCommands } =
-    messageState;
+  const {
+    aiProcessing,
+    setAiProcessing,
+    resetState,
+    tokenUsage,
+    context_limit,
+    hasThinkingMessage,
+    slashCommands,
+    fetchSlashCommands,
+  } = messageState;
+  const localUsage = useLocalTokenUsage();
   const { t } = useTranslation();
   const teamPermission = useTeamPermission();
   // In team mode, all agents show the permission mode selector (members don't propagate)
@@ -464,14 +476,16 @@ Please check your local CLI tool authentication status`,
     const modelOptions: MobileActionSheetOption[] = canSwitchModel
       ? (model_info?.available_models ?? []).map((model) => ({
           key: model.id,
-          label: model.label || model.id,
+          label: formatCompactModelName(model.label || model.id),
           description: model.description,
           active: model_info?.current_model_id === model.id,
         }))
       : [];
 
     const currentModelLabel =
-      model_info?.current_model_label || model_info?.current_model_id || t('conversation.welcome.useCliModel');
+      model_info?.current_model_label || model_info?.current_model_id
+        ? formatCompactModelName(model_info?.current_model_label || model_info?.current_model_id || '')
+        : t('conversation.welcome.useCliModel');
     const currentModeLabel =
       modeOptions.find((opt) => opt.active)?.label ?? t('agentMode.default', { defaultValue: 'Default' });
 
@@ -695,13 +709,22 @@ Please check your local CLI tool authentication status`,
                 compact
                 initialMode={session_mode}
                 compactLeadingIcon={<Shield theme='outline' size='14' fill={iconColors.secondary} />}
-                modeLabelFormatter={(mode) => t(`agentMode.${mode.value}`, { defaultValue: mode.label })}
-                compactLabelPrefix={t('agentMode.permission')}
-                hideCompactLabelPrefixOnMobile
+                modeLabelFormatter={(mode) =>
+                  mode.value === 'auto_edit'
+                    ? t('agentMode.auto')
+                    : mode.value === 'yolo'
+                      ? t('agentMode.full-access')
+                      : t(`agentMode.${mode.value}`, { defaultValue: mode.label })
+                }
                 onModeChanged={isLeaderInTeam ? teamPermission?.propagateMode : undefined}
                 beforeRuntimeSync={prepareRuntimeConfig}
               />
             )}
+            <ContextUsageIndicator
+              tokenUsage={tokenUsage}
+              context_limit={context_limit > 0 ? context_limit : undefined}
+              localUsage={localUsage}
+            />
           </div>
         }
         prefix={

@@ -45,7 +45,7 @@ describe('TeamSiderSection', () => {
     localStorage.clear();
   });
 
-  it('shows the number of teams in the collapsible section header', () => {
+  it('uses a prominent section heading without a team count', () => {
     mocks.teams = [
       { id: 'team-a', name: 'aaa' },
       { id: 'team-report', name: 'report' },
@@ -58,9 +58,10 @@ describe('TeamSiderSection', () => {
     );
 
     expect(screen.getByText('Teams')).toBeInTheDocument();
-    const teamLabel = screen.getByText('Teams');
-    const teamCount = screen.getByText('2');
-    expect(teamCount.compareDocumentPosition(teamLabel)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
+    expect(screen.getByText('Teams')).toHaveClass('text-15px');
+    expect(screen.getByText('Teams')).toHaveClass('text-t-primary');
+    expect(screen.getByText('Teams')).toHaveClass('font-700');
   });
 
   it('uses the neutral sidebar action color for the Teams create button', () => {

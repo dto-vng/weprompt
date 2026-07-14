@@ -119,6 +119,11 @@
     background-color 0.2s ease;
 }
 
+.conversation-status-mark {
+  width: 16px;
+  height: 16px;
+}
+
 .chat-history__item-name,
 .chat-history__item-editor,
 .settings-sider__item-label {
@@ -188,6 +193,7 @@
   .chat-history__placeholder,
   .chat-history__section {
     transition: none;
+    animation: none;
   }
 }
 

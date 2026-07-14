@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import { parseContextCommand, type ContextCommandInvalidCode } from '@/common/chat/slash/contextCommands';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
+import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndicator';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -27,7 +28,9 @@ import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/cha
 import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useSendBoxFiles';
 import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
+import { getKnownModelContextLimit } from '@/renderer/utils/model/modelContextLimits';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
@@ -47,6 +50,7 @@ import { iconColors } from '@/renderer/styles/colors';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage, collectSelectedFiles } from '@/renderer/utils/file/messageFiles';
+import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
 import { Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
@@ -148,17 +152,22 @@ const AionrsSendBox: React.FC<{
   const { t } = useTranslation();
   const { checkAndUpdateTitle } = useAutoTitle();
   const { current_model } = modelSelection;
+  const contextLimit = getKnownModelContextLimit(current_model?.use_model);
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
 
-  const { thought, running, setActiveMsgId, setWaitingResponse, resetState } = useAionrsMessage(conversation_id, {
-    onConfigChanged: (capabilities) => {
-      const modes = (capabilities as { modes?: string[] })?.modes;
-      if (modes && modes.length > 0) {
-        setDynamicModes(modeOptionsFromCapabilities(modes));
-      }
-    },
-  });
+  const { thought, running, setActiveMsgId, setWaitingResponse, resetState, tokenUsage } = useAionrsMessage(
+    conversation_id,
+    {
+      onConfigChanged: (capabilities) => {
+        const modes = (capabilities as { modes?: string[] })?.modes;
+        if (modes && modes.length > 0) {
+          setDynamicModes(modeOptionsFromCapabilities(modes));
+        }
+      },
+    }
+  );
+  const localUsage = useLocalTokenUsage();
   const runtimeView = useConversationRuntimeView(conversation_id);
 
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
@@ -475,7 +484,7 @@ const AionrsSendBox: React.FC<{
     const modelOptions: MobileActionSheetOption[] = modelSelection.providers.flatMap((provider) =>
       modelSelection.getAvailableModels(provider).map((modelName) => ({
         key: `${provider.id}::${modelName}`,
-        label: modelName,
+        label: formatCompactModelName(modelName),
         description: provider.name,
         active:
           modelSelection.current_model?.id === provider.id && modelSelection.current_model?.use_model === modelName,
@@ -484,7 +493,9 @@ const AionrsSendBox: React.FC<{
 
     const currentModeLabel =
       modeOptions.find((opt) => opt.active)?.label ?? t('agentMode.default', { defaultValue: 'Default' });
-    const currentModelLabel = modelSelection.current_model?.use_model || t('conversation.welcome.selectModel');
+    const currentModelLabel = modelSelection.current_model?.use_model
+      ? formatCompactModelName(modelSelection.current_model.use_model)
+      : t('conversation.welcome.selectModel');
 
     const entries: MobileActionSheetEntry[] = [
       {
@@ -697,12 +708,17 @@ const AionrsSendBox: React.FC<{
               initialMode={session_mode}
               dynamicModes={dynamicModes}
               compactLeadingIcon={<Shield theme='outline' size='14' fill={iconColors.secondary} />}
-              modeLabelFormatter={(mode) => t(`agentMode.${mode.value}`, { defaultValue: mode.label })}
-              compactLabelPrefix={t('agentMode.permission')}
-              hideCompactLabelPrefixOnMobile
+              modeLabelFormatter={(mode) =>
+                mode.value === 'auto_edit'
+                  ? t('agentMode.auto')
+                  : mode.value === 'yolo'
+                    ? t('agentMode.full-access')
+                    : t(`agentMode.${mode.value}`, { defaultValue: mode.label })
+              }
               onModeChanged={propagateMode}
               beforeRuntimeSync={prepareRuntimeConfig}
             />
+            <ContextUsageIndicator tokenUsage={tokenUsage} localUsage={localUsage} context_limit={contextLimit} />
           </div>
         }
         prefix={

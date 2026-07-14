@@ -107,7 +107,7 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversations', (
   useConversations: () => ({
     conversations: [conversation],
     isConversationGenerating: () => false,
-    hasCompletionUnread: () => false,
+    getRecentCompletionAt: () => undefined,
     expandedWorkspaces: [],
     pinnedConversations: [],
     timelineSections: [
@@ -205,8 +205,10 @@ describe('sidebar Chats controls', () => {
     const chatsLabel = screen.getByText('Chats');
     const chatsHeader = chatsLabel.closest('.sider-section-label');
     expect(chatsHeader).toBeInstanceOf(HTMLElement);
-    const chatsCount = within(chatsHeader as HTMLElement).getByText('2');
-    expect(chatsCount.compareDocumentPosition(chatsLabel)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(chatsHeader as HTMLElement).queryByText('2')).not.toBeInTheDocument();
+    expect(chatsLabel).toHaveClass('text-15px');
+    expect(chatsLabel).toHaveClass('text-t-primary');
+    expect(chatsLabel).toHaveClass('font-700');
 
     const newChatButton = within(chatsHeader as HTMLElement).getByLabelText('New Chat');
     expect(newChatButton).toHaveClass('sider-section-add-action');
@@ -220,14 +222,13 @@ describe('sidebar Chats controls', () => {
 
     const projectsHeader = screen.getByText('Projects').closest('.sider-section-label');
     expect(projectsHeader).toBeInstanceOf(HTMLElement);
-    const projectsCount = within(projectsHeader as HTMLElement).getByText('0');
-    expect(projectsCount.compareDocumentPosition(screen.getByText('Projects'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(projectsHeader as HTMLElement).queryByText('0')).not.toBeInTheDocument();
     expect(within(projectsHeader as HTMLElement).getByLabelText('conversation.history.newProject')).toHaveClass(
       'sider-section-add-action'
     );
   });
 
-  it('shows section counts without a sidebar search field', () => {
+  it('shows sections without counts or a sidebar search field', () => {
     render(
       <MemoryRouter>
         <GroupedHistoryWithNewChat
@@ -240,7 +241,7 @@ describe('sidebar Chats controls', () => {
 
     expect(screen.queryByPlaceholderText('Search chats & projects')).not.toBeInTheDocument();
     expect(screen.getByText('Chats')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
     expect(screen.getByText('Quarterly planning')).toBeInTheDocument();
     expect(screen.getByText('Remote access notes')).toBeInTheDocument();
     expect(capturedDisplayTimes).not.toContainEqual(expect.any(String));

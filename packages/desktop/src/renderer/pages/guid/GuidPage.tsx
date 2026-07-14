@@ -13,13 +13,11 @@ import type { AssistantDetail } from '@/common/types/agent/assistantTypes';
 
 import { useInputFocusRing } from '@/renderer/hooks/chat/useInputFocusRing';
 import { getFuzzyMatchIndices, useSlashCommandController } from '@/renderer/hooks/chat/useSlashCommandController';
-import { openExternalUrl } from '@/renderer/utils/platform';
 import SlashCommandMenu, { type SlashCommandMenuItem } from '@/renderer/components/chat/SlashCommandMenu';
 import AssistantSelectionArea from './components/AssistantSelectionArea';
 import GuidActionRow from './components/GuidActionRow';
 import GuidInputCard from './components/GuidInputCard';
 import GuidModelSelector from './components/GuidModelSelector';
-import QuickActionButtons from './components/QuickActionButtons';
 import { useGuidAssistantSelection } from './hooks/useGuidAssistantSelection';
 import { useGuidInput } from './hooks/useGuidInput';
 import { useGuidModelSelection } from './hooks/useGuidModelSelection';
@@ -48,16 +46,6 @@ const GuidPage: React.FC = () => {
   const { activeBorderColor, inactiveBorderColor, activeShadow } = useInputFocusRing();
 
   const localeKey = resolveLocaleKey(i18n.language);
-
-  // Open external link
-  const openLink = useCallback(async (url: string) => {
-    try {
-      await openExternalUrl(url);
-    } catch (error) {
-      console.error('Failed to open external link:', error);
-    }
-  }, []);
-
   // --- Skills state ---
   // Skill metadata comes from the database-backed catalog. Built-in auto-inject
   // skills default checked; the rest are opt-in per conversation or pre-checked
@@ -310,6 +298,13 @@ const GuidPage: React.FC = () => {
 
   // Typewriter placeholder
   const typewriterPlaceholder = useTypewriterPlaceholder(t('conversation.welcome.placeholder'));
+  const selectedAssistantRecord = useMemo(() => {
+    if (!selectedAssistantId) return undefined;
+    const selectedId = agentSelection.selectedAssistantId;
+    const strippedId = selectedId.replace(/^builtin-/, '');
+    const candidates = new Set([selectedId, `builtin-${strippedId}`, strippedId]);
+    return agentSelection.assistants.find((item) => candidates.has(item.id));
+  }, [agentSelection.assistants, selectedAssistantId, agentSelection.selectedAssistantId]);
   const projectWelcomeName = useMemo(() => {
     if (!guidInput.dir) {
       return null;
@@ -328,13 +323,6 @@ const GuidPage: React.FC = () => {
     ? t('conversation.welcome.projectTitle', { name: projectWelcomeName })
     : t('conversation.welcome.title');
   const isProjectWelcome = Boolean(projectWelcomeName);
-  const selectedAssistantRecord = useMemo(() => {
-    if (!selectedAssistantId) return undefined;
-    const selectedId = agentSelection.selectedAssistantId;
-    const strippedId = selectedId.replace(/^builtin-/, '');
-    const candidates = new Set([selectedId, `builtin-${strippedId}`, strippedId]);
-    return agentSelection.assistants.find((item) => candidates.has(item.id));
-  }, [agentSelection.assistants, selectedAssistantId, agentSelection.selectedAssistantId]);
   const selectedAssistantPrompts = useMemo(() => {
     if (!selectedAssistantId) return [];
     const resolvedPrompts =
@@ -724,8 +712,6 @@ const GuidPage: React.FC = () => {
             </section>
           ) : null}
         </div>
-
-        <QuickActionButtons onOpenLink={openLink} />
       </div>
     </ConfigProvider>
   );

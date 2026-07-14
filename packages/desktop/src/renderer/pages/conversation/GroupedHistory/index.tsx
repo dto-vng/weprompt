@@ -57,7 +57,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   const {
     conversations,
     isConversationGenerating,
-    hasCompletionUnread,
+    getRecentCompletionAt,
     expandedWorkspaces,
     pinnedConversations,
     timelineSections,
@@ -67,29 +67,14 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   } = useConversations();
 
   const SectionLabel = useCallback(
-    ({
-      sectionKey,
-      label,
-      count,
-      trailing,
-    }: {
-      sectionKey: string;
-      label: string;
-      count?: number;
-      trailing?: React.ReactNode;
-    }) => {
+    ({ sectionKey, label, trailing }: { sectionKey: string; label: string; trailing?: React.ReactNode }) => {
       const isCollapsed = collapsedSections.has(sectionKey);
       return (
         <div
           className='group/label sider-section-label flex items-center pl-4px pr-12px h-28px select-none sticky top-0 z-10 mt-8px cursor-pointer'
           onClick={() => toggleSection(sectionKey)}
         >
-          {count !== undefined ? (
-            <span className='mr-6px min-w-18px rounded-999px bg-fill-2 px-5px py-1px text-right text-11px tabular-nums leading-16px text-t-secondary'>
-              {count}
-            </span>
-          ) : null}
-          <span className='text-14px text-t-secondary sider-section-title group-hover/label:text-t-primary transition-colors font-600 leading-none'>
+          <span className='text-15px text-t-primary sider-section-title group-hover/label:text-primary transition-colors font-700 leading-none'>
             {label}
           </span>
           <span className='ml-2px flex items-center justify-center opacity-0 group-hover/label:opacity-100 transition-opacity text-t-tertiary shrink-0'>
@@ -224,7 +209,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     (conversation: TChatConversation): ConversationRowProps => ({
       conversation,
       isGenerating: isConversationGenerating(conversation.id),
-      hasCompletionUnread: hasCompletionUnread(conversation.id),
+      recentCompletionAt: getRecentCompletionAt(conversation.id),
       collapsed,
       tooltipEnabled,
       batchMode,
@@ -249,7 +234,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       tooltipEnabled,
       batchMode,
       isConversationGenerating,
-      hasCompletionUnread,
+      getRecentCompletionAt,
       selectedConversationIds,
       id,
       dropdownVisibleId,
@@ -378,9 +363,6 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         .filter((section) => section.items.length > 0),
     [timelineSections]
   );
-
-  const visibleProjectCount = projectGroups.length;
-  const visibleConversationCount = conversationOnlySections.reduce((count, section) => count + section.items.length, 0);
 
   const batchSelectionPanel =
     batchMode && !collapsed ? (
@@ -605,7 +587,6 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               <SectionLabel
                 sectionKey='projects'
                 label={t('conversation.history.projectsSection')}
-                count={visibleProjectCount}
                 trailing={projectSectionActions}
               />
             )}
@@ -728,7 +709,6 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               <SectionLabel
                 sectionKey='conversations'
                 label={t('conversation.history.conversationsSection')}
-                count={visibleConversationCount}
                 trailing={conversationSectionActions}
               />
             )}
