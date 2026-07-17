@@ -7,11 +7,11 @@ All layout constants assume a 16:9 slide (13.333 x 7.5 in).
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Inches, Pt
+from pptx.util import Inches, Pt, Emu
 import os
 
-SLIDE_W = Inches(13.333)
-SLIDE_H = Inches(7.5)
+SLIDE_W = Emu(12192000)  # 13.333 in, exact 16:9
+SLIDE_H = Emu(6858000)   # 7.5 in
 MARGIN = Inches(0.83)  # consistent outer margin on every slide
 CONTENT_W = Inches(13.333 - 2 * 0.83)
 
