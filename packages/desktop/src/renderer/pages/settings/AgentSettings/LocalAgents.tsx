@@ -20,11 +20,7 @@ import InlineAgentEditor, { type CustomAgentDraft } from './InlineAgentEditor';
 import { getBoundAssistants, useAssistantsForAgents } from './BoundAssistants';
 import SettingsPageHeader from '../components/SettingsPageHeader';
 import { useNavigate } from 'react-router-dom';
-import {
-  filterAgentsByAvailability,
-  getAgentAvailabilityFilterStats,
-  type AgentAvailabilityFilter,
-} from './agentFilters';
+import { getAvailableAgents } from './agentFilters';
 
 const LOCAL_AGENT_SETUP_GUIDE_URL = 'https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup';
 
@@ -32,7 +28,6 @@ const LocalAgents: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [testingAgentId, setTestingAgentId] = useState<string | null>(null);
-  const [agentFilter, setAgentFilter] = useState<AgentAvailabilityFilter>('all');
   const { assistants } = useAssistantsForAgents();
 
   // Management view: includes user-disabled custom agents so they stay
@@ -113,8 +108,9 @@ const LocalAgents: React.FC = () => {
     }
     return left.name.localeCompare(right.name);
   });
-  const officialFilterStats = getAgentAvailabilityFilterStats(sortedOfficialAgents);
-  const visibleOfficialAgents = filterAgentsByAvailability(sortedOfficialAgents, agentFilter);
+  // Only agents whose CLI is actually detected on this device are listed;
+  // not-installed catalog entries stay hidden to keep the page clean.
+  const visibleOfficialAgents = getAvailableAgents(sortedOfficialAgents);
 
   const openCustomAgentEditor = useCallback(() => {
     setEditingAgent(null);
@@ -200,25 +196,6 @@ const LocalAgents: React.FC = () => {
             data-testid='btn-add-custom-agent'
           />
         }
-        tabs={[
-          {
-            key: 'all',
-            label: t('settings.agentManagement.filterAll', { defaultValue: 'All' }),
-            count: officialFilterStats.all,
-          },
-          {
-            key: 'available',
-            label: t('settings.agentManagement.filterAvailable', { defaultValue: 'Available' }),
-            count: officialFilterStats.available,
-          },
-          {
-            key: 'unavailable',
-            label: t('settings.agentManagement.filterUnavailable', { defaultValue: 'Unavailable' }),
-            count: officialFilterStats.unavailable,
-          },
-        ]}
-        activeTab={agentFilter}
-        onTabChange={(key) => setAgentFilter(key as AgentAvailabilityFilter)}
       />
 
       {isRefreshing ? (
