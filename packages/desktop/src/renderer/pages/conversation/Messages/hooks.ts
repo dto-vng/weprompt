@@ -9,6 +9,7 @@ import type { AgentStreamErrorInfo, IMessageText, IMessageTips, TMessage } from 
 import {
   composeMessage,
   isDiagnosticTelemetryTip,
+  isTextContentReplacement,
   mergeAcpToolCallContent,
   mergeTextMessageContent,
   normalizeAgentStreamError,
@@ -160,6 +161,32 @@ const sanitizeMessageForList = (message: TMessage): TMessage =>
     ? ({ ...message, content: sanitizeAcpToolCallContent(message.content) } as TMessage)
     : message;
 
+// A replace-marked text message is a full-turn snapshot of the reply: it must
+// absorb every streamed segment sharing its msg_id, not just the last one —
+// otherwise earlier segments survive and the reply renders twice.
+const collapseReplaceTextSnapshot = (list: TMessage[], message: IMessageText): TMessage[] | null => {
+  const segmentIndexes: number[] = [];
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    if (item.type === 'text' && item.position === 'left' && item.msg_id === message.msg_id) {
+      segmentIndexes.push(i);
+    }
+  }
+  if (!segmentIndexes.length) return null;
+
+  const firstIndex = segmentIndexes[0];
+  const first = list[firstIndex] as IMessageText;
+  const collapsed: IMessageText = {
+    ...first,
+    status: first.status === 'finish' || message.status === 'finish' ? 'finish' : (message.status ?? first.status),
+    content: mergeTextMessageContent(first.content, message.content),
+  };
+  const laterSegments = new Set(segmentIndexes.slice(1));
+  const newList = list.filter((_, i) => !laterSegments.has(i));
+  newList[firstIndex] = collapsed;
+  return newList;
+};
+
 // 使用索引优化的消息合并函数
 // Index-optimized message compose function
 function composeMessageWithIndex(message: TMessage | undefined, list: TMessage[], index: MessageIndex): TMessage[] {
@@ -260,6 +287,18 @@ function composeMessageWithIndex(message: TMessage | undefined, list: TMessage[]
   // text message: merge only with the latest contiguous streaming chunk.
   // text 消息: 只与最后一条连续的流式片段合并，保留被工具/思考打断后的消息边界。
   if (message.type === 'text' && message.msg_id) {
+    if (message.position === 'left' && isTextContentReplacement(message.content)) {
+      const collapsed = collapseReplaceTextSnapshot(list, message);
+      if (collapsed) {
+        const rebuilt = buildMessageIndex(collapsed);
+        index.msgIdIndex = rebuilt.msgIdIndex;
+        index.call_idIndex = rebuilt.call_idIndex;
+        index.tool_call_idIndex = rebuilt.tool_call_idIndex;
+        index.permission_call_idIndex = rebuilt.permission_call_idIndex;
+        return collapsed;
+      }
+    }
+
     const existingIdx = index.msgIdIndex.get(message.msg_id);
     if (existingIdx !== undefined && existingIdx < list.length) {
       const existingMsg = list[existingIdx];
