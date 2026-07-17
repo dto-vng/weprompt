@@ -590,6 +590,20 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     [handleContentRef]
   );
 
+  const loadEarlierMessagesPreservingScroll = useCallback(
+    async (scroller: HTMLElement): Promise<boolean> => {
+      const previousHeight = contentElementRef.current?.scrollHeight ?? 0;
+      const loaded = await loadPreviousMessagePage();
+      if (!loaded) return false;
+      requestAnimationFrame(() => {
+        const nextHeight = contentElementRef.current?.scrollHeight ?? previousHeight;
+        scroller.scrollTop += nextHeight - previousHeight;
+      });
+      return true;
+    },
+    [loadPreviousMessagePage]
+  );
+
   const handleMessageListScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       handleScroll(event);
@@ -597,18 +611,49 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (!pagination.hasMoreBefore || pagination.isLoadingBefore || scroller.scrollTop > 160) {
         return;
       }
-
-      const previousHeight = contentElementRef.current?.scrollHeight ?? 0;
-      void loadPreviousMessagePage().then((loaded) => {
-        if (!loaded) return;
-        requestAnimationFrame(() => {
-          const nextHeight = contentElementRef.current?.scrollHeight ?? previousHeight;
-          scroller.scrollTop += nextHeight - previousHeight;
-        });
-      });
+      void loadEarlierMessagesPreservingScroll(scroller);
     },
-    [handleScroll, loadPreviousMessagePage, pagination.hasMoreBefore, pagination.isLoadingBefore]
+    [handleScroll, loadEarlierMessagesPreservingScroll, pagination.hasMoreBefore, pagination.isLoadingBefore]
   );
+
+  // Scrolling is the primary load-more trigger, but a wheel-up at the very top
+  // produces no scroll event; treat it as an explicit request for older history.
+  const handleMessageListWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      handleWheel(event);
+      const scroller = event.currentTarget;
+      if (event.deltaY >= 0 || scroller.scrollTop > 160) return;
+      if (!pagination.hasMoreBefore || pagination.isLoadingBefore) return;
+      void loadEarlierMessagesPreservingScroll(scroller);
+    },
+    [handleWheel, loadEarlierMessagesPreservingScroll, pagination.hasMoreBefore, pagination.isLoadingBefore]
+  );
+
+  // A reopened conversation's newest page can collapse into a single short
+  // work-summary card (one long tool-only turn), so the scroller never
+  // overflows and scroll events — the load-more trigger above — can never
+  // fire. Keep pulling earlier pages until the content overflows the viewport
+  // or history runs out. A failed load stops the auto-fill (instead of
+  // retrying forever); the wheel/scroll paths remain as manual retries.
+  const historyAutoFillStoppedRef = useRef(false);
+  useEffect(() => {
+    historyAutoFillStoppedRef.current = false;
+  }, [conversationContext?.conversation_id]);
+  useEffect(() => {
+    if (historyAutoFillStoppedRef.current || isMessageListLoading) return;
+    if (!pagination.hasMoreBefore || pagination.isLoadingBefore) return;
+    const scroller = scrollerElementRef.current;
+    if (!scroller || scroller.scrollHeight > scroller.clientHeight) return;
+    void loadEarlierMessagesPreservingScroll(scroller).then((loaded) => {
+      if (!loaded) historyAutoFillStoppedRef.current = true;
+    });
+  }, [
+    isMessageListLoading,
+    loadEarlierMessagesPreservingScroll,
+    pagination.hasMoreBefore,
+    pagination.isLoadingBefore,
+    processedList.length,
+  ]);
 
   useEffect(() => {
     if (!targetMessageId || processedList.length === 0) {
@@ -805,7 +850,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
             style={{ overflowAnchor: 'none' }}
             onPointerDown={handlePointerDown}
             onScroll={handleMessageListScroll}
-            onWheel={handleWheel}
+            onWheel={handleMessageListWheel}
           >
             <div ref={setContentRef} data-testid='message-list-content' style={{ overflowAnchor: 'none' }}>
               <div className='h-10px' />

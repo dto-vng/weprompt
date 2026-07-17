@@ -5,9 +5,10 @@
  */
 
 import React, { type PropsWithChildren } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IMessageAcpToolCall, IMessageText, TMessage } from '@/common/chat/chatLib';
+import type { MessagePaginationState } from '@/renderer/pages/conversation/Messages/hooks';
 import {
   MessageListLoadingProvider,
   MessageListProvider,
@@ -23,6 +24,12 @@ const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissi
   useTeamPermissionMock: vi.fn(),
 }));
 const workSummaryMessagesMock = vi.hoisted(() => vi.fn());
+const loadConversationMessagePageMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/renderer/utils/chat/messagePagination', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/renderer/utils/chat/messagePagination')>();
+  return { ...actual, loadConversationMessagePage: loadConversationMessagePageMock };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -181,12 +188,11 @@ function Wrapper({
   children,
   messages = [createTextMessage()],
   loading = false,
-}: PropsWithChildren<{ messages?: TMessage[]; loading?: boolean }>): JSX.Element {
+  pagination = { hasMoreBefore: false, hasMoreAfter: false, isLoadingBefore: false, isLoadingAnchor: false },
+}: PropsWithChildren<{ messages?: TMessage[]; loading?: boolean; pagination?: MessagePaginationState }>): JSX.Element {
   return (
     <MessageListLoadingProvider value={loading}>
-      <MessagePaginationProvider
-        value={{ hasMoreBefore: false, hasMoreAfter: false, isLoadingBefore: false, isLoadingAnchor: false }}
-      >
+      <MessagePaginationProvider value={pagination}>
         <MessageListProvider value={messages}>{children}</MessageListProvider>
       </MessagePaginationProvider>
     </MessageListLoadingProvider>
@@ -200,6 +206,7 @@ describe('MessageList', () => {
     useConversationArtifactsMock.mockReturnValue([]);
     useTeamPermissionMock.mockReturnValue(null);
     workSummaryMessagesMock.mockReset();
+    loadConversationMessagePageMock.mockReset();
   });
 
   afterEach(() => {
@@ -883,6 +890,116 @@ describe('MessageList', () => {
     });
 
     expect(screen.getByText('empty state')).toBeInTheDocument();
+  });
+
+  describe('earlier-history loading for short pages', () => {
+    // Reproduces the reopened-conversation bug: the newest 50-message page can be
+    // a single long tool-only turn that collapses into one short work-summary
+    // card, so the scroller never overflows and scroll events (the only
+    // load-more trigger) can never fire — the older history became unreachable.
+    const toolOnlyPageMessages = [
+      {
+        id: 'tool-1',
+        conversation_id: 'conversation-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Write', status: 'completed' },
+        created_at: 10,
+      },
+    ] as unknown as TMessage[];
+
+    const paginationWithHistory: MessagePaginationState = {
+      oldestCursor: 'cursor-1',
+      newestCursor: 'cursor-2',
+      hasMoreBefore: true,
+      hasMoreAfter: false,
+      isLoadingBefore: false,
+      isLoadingAnchor: false,
+    };
+
+    const olderHistoryPage = {
+      items: [
+        {
+          id: 'older-user-1',
+          conversation_id: 'conversation-1',
+          type: 'text',
+          position: 'right',
+          content: { content: 'older user question' },
+          created_at: 1,
+        },
+      ],
+      oldest_cursor: 'cursor-0',
+      newest_cursor: 'cursor-1',
+      has_more_before: false,
+      has_more_after: false,
+    };
+
+    const stubScrollerOverflow = (scrollHeight: number, clientHeight: number) => {
+      const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(scrollHeight);
+      const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(clientHeight);
+      return () => {
+        scrollHeightSpy.mockRestore();
+        clientHeightSpy.mockRestore();
+      };
+    };
+
+    it('auto-loads earlier pages until the viewport can scroll when the newest page is too short', async () => {
+      loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+      render(<MessageList />, {
+        wrapper: ({ children }) => (
+          <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+            {children}
+          </Wrapper>
+        ),
+      });
+
+      expect(await screen.findByTestId('msgtext-older-user-1')).toHaveTextContent('older user question');
+      expect(loadConversationMessagePageMock).toHaveBeenCalledWith(
+        'conversation-1',
+        expect.objectContaining({ before: 'cursor-1' })
+      );
+    });
+
+    it('does not auto-load earlier pages when the content already overflows the scroller', () => {
+      const restoreOverflow = stubScrollerOverflow(2000, 500);
+      try {
+        loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+        render(<MessageList />, {
+          wrapper: ({ children }) => (
+            <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+              {children}
+            </Wrapper>
+          ),
+        });
+
+        expect(loadConversationMessagePageMock).not.toHaveBeenCalled();
+      } finally {
+        restoreOverflow();
+      }
+    });
+
+    it('loads earlier pages when the user wheels up near the top of an overflowing list', async () => {
+      const restoreOverflow = stubScrollerOverflow(2000, 500);
+      try {
+        loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+        render(<MessageList />, {
+          wrapper: ({ children }) => (
+            <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+              {children}
+            </Wrapper>
+          ),
+        });
+
+        fireEvent.wheel(screen.getByTestId('message-list-scroller'), { deltaY: -40 });
+
+        expect(await screen.findByTestId('msgtext-older-user-1')).toHaveTextContent('older user question');
+      } finally {
+        restoreOverflow();
+      }
+    });
   });
 
   it('renders a skeleton while the initial message batch is loading', () => {
