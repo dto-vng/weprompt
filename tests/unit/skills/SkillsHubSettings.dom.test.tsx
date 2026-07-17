@@ -369,6 +369,31 @@ describe('SkillsHubSettings', () => {
     expect(screen.queryByTestId('my-skill-card-sample-single')).not.toBeInTheDocument();
   });
 
+  it('opens the auto-injected skills hint tooltip on hover without crashing', async () => {
+    mocks.listAvailableSkills.mockResolvedValue([
+      {
+        name: 'cron',
+        description: 'Auto injected cron skill.',
+        location: '/tmp/builtin-skills/auto-inject/cron/SKILL.md',
+        is_auto_inject: true,
+        is_custom: false,
+        source: 'builtin',
+      },
+    ]);
+
+    render(<SkillsHubSettings withWrapper={false} />);
+
+    await waitFor(() => expect(screen.getByTestId('settings-tab-official')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('settings-tab-official'));
+    await waitFor(() => expect(screen.getByTestId('auto-skills-section')).toBeInTheDocument());
+
+    const hintTrigger = screen.getByTestId('auto-skills-section').querySelector('.cursor-help');
+    expect(hintTrigger).not.toBeNull();
+    fireEvent.mouseEnter(hintTrigger!);
+
+    await waitFor(() => expect(screen.getByText(/Loaded automatically into every conversation/)).toBeInTheDocument());
+  });
+
   it('does not expose the local skills directory path on the skills page', async () => {
     render(<SkillsHubSettings withWrapper={false} />);
 

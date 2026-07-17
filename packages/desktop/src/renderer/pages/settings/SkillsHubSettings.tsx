@@ -620,7 +620,10 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
         <span className='text-14px font-bold text-t-primary'>{title}</span>
         {hint ? (
           <Tooltip content={hint}>
-            <Help theme='outline' size={14} className='text-t-tertiary hover:text-t-secondary cursor-help shrink-0' />
+            {/* Arco Tooltip needs a ref-forwarding child; icon-park icons don't forward refs. */}
+            <span className='inline-flex items-center cursor-help shrink-0'>
+              <Help theme='outline' size={14} className='text-t-tertiary hover:text-t-secondary' />
+            </span>
           </Tooltip>
         ) : null}
         <span className={`text-12px px-10px py-2px rd-[100px] font-medium ${countClass}`}>{count}</span>
@@ -717,7 +720,7 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
       <div data-testid='official-skills-section'>
         <p className='m-0 mb-12px text-12px leading-relaxed text-t-tertiary'>
           {t('settings.skillsHub.officialHint', {
-            defaultValue: 'Built-in skills maintained by Forge — read-only and updated with each release.',
+            defaultValue: 'Built-in skills maintained by WePrompt — read-only and updated with each release.',
           })}
         </p>
         {officialSkills.length > 0 ? (
