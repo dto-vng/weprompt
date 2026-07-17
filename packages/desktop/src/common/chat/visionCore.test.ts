@@ -45,13 +45,11 @@ describe('executeVision', () => {
 
   it('defaults the question when none is given', async () => {
     const readFile = vi.fn().mockResolvedValue(new Uint8Array([1]));
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
-      });
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ choices: [{ message: { content: 'ok' } }] }),
+    });
     await executeVision({ filePath: '/w/x.png' }, cfg, { readFile, fetchImpl });
     const parts = JSON.parse(fetchImpl.mock.calls[0][1].body).messages[0].content;
     expect(parts.find((p: { type: string }) => p.type === 'text').text.length).toBeGreaterThan(0);

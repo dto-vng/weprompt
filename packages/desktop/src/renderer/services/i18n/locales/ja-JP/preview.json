@@ -66,14 +66,14 @@
       "originalSafe": "元のワークスペースファイルは変更されていません。"
     },
     "serverInstall": {
-      "hint": "Forge はサーバー上で動作しています。プレビューコンポーネントはそのサーバーにインストールする必要があります。サーバーで次のコマンドを実行してから再試行してください：",
+      "hint": "WePrompt はサーバー上で動作しています。プレビューコンポーネントはそのサーバーにインストールする必要があります。サーバーで次のコマンドを実行してから再試行してください：",
       "icuNote": "それでも起動しない場合は、サーバーに ICU ライブラリをインストールしてください（Debian/Ubuntu：apt-get install -y libicu-dev）。"
     },
     "externalEdit": {
       "editInDefaultApp": "既定のアプリで編集",
       "editInDefaultAppTooltip": "このワークスペース ファイルを既定のアプリで開く",
       "refreshPreview": "プレビューを更新",
-      "refreshPreviewTooltip": "この Forge プレビューをワークスペース ファイルから再読み込み",
+      "refreshPreviewTooltip": "この WePrompt プレビューをワークスペース ファイルから再読み込み",
       "revealInFolder": "フォルダーに表示",
       "revealInFolderTooltip": "このワークスペース ファイルを含むフォルダーに表示",
       "status": {
@@ -115,7 +115,7 @@
       "saveFailureRecovery": "編集内容はここに残っており、ワークスペースのファイルは変更されていません。",
       "copyDraft": "下書きをコピー",
       "refreshLatest": "最新版を読み込む",
-      "requestPlaceholder": "Forge に適用してほしい変更を入力してください。",
+      "requestPlaceholder": "WePrompt に適用してほしい変更を入力してください。",
       "askWordContext": "ファイル：{{fileName}}\n段落：{{path}}\n選択したテキスト：{{text}}\n依頼：{{placeholder}}",
       "askExcelContext": "ファイル：{{fileName}}\n範囲：{{range}}\nセル：\n{{cells}}\n依頼：{{placeholder}}"
     },

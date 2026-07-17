@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -37,6 +37,31 @@ describe('WePrompt white-label branding', () => {
       expect(agent.brand.forgeChat).toBe('WePrompt Chat');
       expect(agent.brand.forgeCode).toBe('WePrompt Code');
       expect(agent.brand.forgeAssistant).toBe('WePrompt Assistant');
+    }
+  });
+
+  it('never mentions the Forge wordmark in any locale value', () => {
+    const localesRoot = path.join(repoRoot, 'packages/desktop/src/renderer/services/i18n/locales');
+    for (const language of i18nConfig.supportedLanguages) {
+      const dir = path.join(localesRoot, language);
+      for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+        const content = readFileSync(path.join(dir, file), 'utf8');
+        expect(content, `${language}/${file} should not mention Forge`).not.toMatch(/(^|[^A-Za-z])Forge([^A-Za-z]|$)/);
+      }
+    }
+  });
+
+  it('renders the brand name from login.brand instead of a hardcoded wordmark', () => {
+    const chromeFiles = [
+      'packages/desktop/src/renderer/components/settings/SettingsModal/contents/AboutModalContent.tsx',
+      'packages/desktop/src/renderer/components/layout/Titlebar/index.tsx',
+      'packages/desktop/src/process/utils/tray.ts',
+    ];
+
+    for (const file of chromeFiles) {
+      const source = readFileSync(path.join(repoRoot, file), 'utf8');
+      expect(source, `${file} should use t('login.brand')`).toContain("t('login.brand')");
+      expect(source, `${file} should not hardcode the Forge wordmark`).not.toMatch(/'Forge'|>\s*Forge\s*</);
     }
   });
 });

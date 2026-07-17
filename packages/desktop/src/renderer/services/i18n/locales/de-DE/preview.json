@@ -66,14 +66,14 @@
       "originalSafe": "Die ursprüngliche Workspace-Datei wurde nicht geändert."
     },
     "serverInstall": {
-      "hint": "Forge läuft auf einem Server. Installiere die Vorschau-Komponente auf diesem Server und versuche es erneut:",
+      "hint": "WePrompt läuft auf einem Server. Installiere die Vorschau-Komponente auf diesem Server und versuche es erneut:",
       "icuNote": "Falls es immer noch nicht startet, installiere die ICU-Bibliothek auf dem Server (Debian/Ubuntu: apt-get install -y libicu-dev)."
     },
     "externalEdit": {
       "editInDefaultApp": "In Standard-App bearbeiten",
       "editInDefaultAppTooltip": "Diese Arbeitsbereichsdatei in ihrer Standard-App öffnen",
       "refreshPreview": "Vorschau aktualisieren",
-      "refreshPreviewTooltip": "Diese Forge-Vorschau aus der Arbeitsbereichsdatei neu laden",
+      "refreshPreviewTooltip": "Diese WePrompt-Vorschau aus der Arbeitsbereichsdatei neu laden",
       "revealInFolder": "Im Ordner anzeigen",
       "revealInFolderTooltip": "Diese Arbeitsbereichsdatei in ihrem Ordner anzeigen",
       "status": {
@@ -115,7 +115,7 @@
       "saveFailureRecovery": "Ihre Bearbeitung ist weiterhin hier und die Workspace-Datei wurde nicht geändert.",
       "copyDraft": "Entwurf kopieren",
       "refreshLatest": "Neueste Version laden",
-      "requestPlaceholder": "Beschreibe die Änderung, die Forge vornehmen soll.",
+      "requestPlaceholder": "Beschreibe die Änderung, die WePrompt vornehmen soll.",
       "askWordContext": "Datei: {{fileName}}\nAbsatz: {{path}}\nAusgewählter Text: {{text}}\nAnfrage: {{placeholder}}",
       "askExcelContext": "Datei: {{fileName}}\nBereich: {{range}}\nZellen:\n{{cells}}\nAnfrage: {{placeholder}}"
     },

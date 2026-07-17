@@ -123,6 +123,7 @@ import {
   wsEmitter,
   wsMappedEmitter,
 } from './httpBridge';
+import { HIDDEN_BUILTIN_SKILLS } from '@/common/config/constants';
 import { fromApiSearchResult, type ApiMessageSearchItem } from './searchMapper';
 import type { IAddTeamAssistantParams, ICreateTeamParams } from './teamMapper';
 import {
@@ -617,18 +618,22 @@ export const fs = {
   deleteAssistantRule: httpDelete<boolean, { assistant_id: string }>(
     (p) => `/api/skills/assistant-rule/${p.assistant_id}`
   ),
-  listAvailableSkills: httpGet<
-    Array<{
-      name: string;
-      description: string;
-      location: string;
-      relative_location?: string;
-      is_auto_inject: boolean;
-      is_custom: boolean;
-      source: 'builtin' | 'custom' | 'cron' | 'extension';
-    }>,
-    void
-  >('/api/skills'),
+  listAvailableSkills: withResponseMap(
+    httpGet<
+      Array<{
+        name: string;
+        description: string;
+        location: string;
+        relative_location?: string;
+        is_auto_inject: boolean;
+        is_custom: boolean;
+        source: 'builtin' | 'custom' | 'cron' | 'extension';
+      }>,
+      void
+    >('/api/skills'),
+    // Hide blocklisted official skills bundled with the backend (see HIDDEN_BUILTIN_SKILLS)
+    (skills) => skills.filter((s) => s.source !== 'builtin' || !HIDDEN_BUILTIN_SKILLS.includes(s.name))
+  ),
   materializeSkillsForAgent: httpPost<
     { skills: Array<{ name: string; source_path: string }> },
     { conversation_id: string; skills: string[] }

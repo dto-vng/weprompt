@@ -66,14 +66,14 @@
       "originalSafe": "فایل اصلی فضای کاری تغییر نکرده است."
     },
     "serverInstall": {
-      "hint": "Forge روی سرور اجرا می‌شود. مؤلفه پیش‌نمایش را روی همان سرور نصب کنید، سپس دوباره تلاش کنید:",
+      "hint": "WePrompt روی سرور اجرا می‌شود. مؤلفه پیش‌نمایش را روی همان سرور نصب کنید، سپس دوباره تلاش کنید:",
       "icuNote": "اگر همچنان شروع نشد، کتابخانه ICU را روی سرور نصب کنید (Debian/Ubuntu: apt-get install -y libicu-dev)."
     },
     "externalEdit": {
       "editInDefaultApp": "ویرایش در برنامه پیش فرض",
       "editInDefaultAppTooltip": "باز کردن این فایل فضای کاری در برنامه پیش فرض آن",
       "refreshPreview": "تازه سازی پیش نمایش",
-      "refreshPreviewTooltip": "بارگیری دوباره این پیش نمایش Forge از فایل فضای کاری",
+      "refreshPreviewTooltip": "بارگیری دوباره این پیش نمایش WePrompt از فایل فضای کاری",
       "revealInFolder": "نمایش در پوشه",
       "revealInFolderTooltip": "نمایش این فایل فضای کاری در پوشه آن",
       "status": {
@@ -115,7 +115,7 @@
       "saveFailureRecovery": "ویرایش شما همچنان اینجاست و فایل فضای کاری تغییر نکرده است.",
       "copyDraft": "کپی پیش‌نویس",
       "refreshLatest": "بارگیری آخرین نسخه",
-      "requestPlaceholder": "تغییری را که می‌خواهید Forge اعمال کند توضیح دهید.",
+      "requestPlaceholder": "تغییری را که می‌خواهید WePrompt اعمال کند توضیح دهید.",
       "askWordContext": "فایل: {{fileName}}\nپاراگراف: {{path}}\nمتن انتخاب‌شده: {{text}}\nدرخواست: {{placeholder}}",
       "askExcelContext": "فایل: {{fileName}}\nمحدوده: {{range}}\nسلول‌ها:\n{{cells}}\nدرخواست: {{placeholder}}"
     },

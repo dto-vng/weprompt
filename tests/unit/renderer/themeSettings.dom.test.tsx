@@ -104,8 +104,8 @@ describe('CssThemeSettings', () => {
     render(<CssThemeSettings />);
 
     expect(screen.getByText('Select a theme')).toBeInTheDocument();
-    expect(await screen.findByText('Forge Light')).toBeInTheDocument();
-    expect(screen.getByText('Forge Dark')).toBeInTheDocument();
+    expect(await screen.findByText('WePrompt Light')).toBeInTheDocument();
+    expect(screen.getByText('WePrompt Dark')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mocks.getExtensionThemes).toHaveBeenCalled();
@@ -122,8 +122,8 @@ describe('CssThemeSettings', () => {
   it('renders official themes as radio options and applies the selected theme', async () => {
     render(<CssThemeSettings />);
 
-    const lightRadio = await screen.findByRole('radio', { name: 'Forge Light' });
-    const darkRadio = screen.getByRole('radio', { name: 'Forge Dark' });
+    const lightRadio = await screen.findByRole('radio', { name: 'WePrompt Light' });
+    const darkRadio = screen.getByRole('radio', { name: 'WePrompt Dark' });
 
     expect(screen.getAllByRole('radio')).toHaveLength(2);
     expect(lightRadio).toBeChecked();
@@ -139,7 +139,7 @@ describe('CssThemeSettings', () => {
   it('does not expose custom theme creation from the normal theme screen', async () => {
     render(<CssThemeSettings />);
 
-    expect(await screen.findByText('Forge Light')).toBeInTheDocument();
+    expect(await screen.findByText('WePrompt Light')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add Theme' })).not.toBeInTheDocument();
   });
 });

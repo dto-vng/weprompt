@@ -12,10 +12,10 @@
     "clearWorkspace": "حذف پروژه",
     "openFolder": "باز کردن پوشه",
     "none": "هیچ",
-    "quickActionsTitle": "Forge چه کارهایی می‌تواند انجام دهد؟",
+    "quickActionsTitle": "WePrompt چه کارهایی می‌تواند انجام دهد؟",
     "quickActionFeedback": "گزارش مشکل",
     "quickActionStar": "خوشتان آمد؟ به ما ستاره بدهید!",
-    "skillsMarket": "بازار مهارت‌های Forge",
+    "skillsMarket": "بازار مهارت‌های WePrompt",
     "skillsMarketDesc": "مهارت‌های جامعه را جستجو و فعال کنید. یک‌بار پیکربندی کنید، برای همه ایجنت‌ها در دسترس باشد.",
     "skillsMarketDetails": "مشاهده بیشتر >>",
     "projectTitle": "What's next in {{name}}?",
@@ -88,7 +88,7 @@
     "conversationsSection": "چت‌ها",
     "removeProjectTitle": "حذف پروژه",
     "removeProject": "حذف پروژه",
-    "removeProjectConfirm": "Remove project \"{{name}}\" from Forge? Its {{count}} chat(s) and folder files will stay where they are.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "چت جدید در این پروژه",
     "deleting": "در حال حذف...",
     "newProject": "New project",
@@ -341,7 +341,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "خواندن پاسخ دستیار تیم ناموفق بود",
-        "body": "Forge نتوانست پاسخ دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید؛ اگر تکرار شد، برنامه را ری‌استارت کنید."
+        "body": "WePrompt نتوانست پاسخ دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید؛ اگر تکرار شد، برنامه را ری‌استارت کنید."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "دستیار تیم محلی درخواست را رد کرد",
@@ -349,11 +349,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "دستیار تیم پاسخ غیرمنتظره‌ای برگرداند",
-        "body": "Forge پاسخ غیرمنتظره‌ای از دستیار تیم محلی دریافت کرد. یک‌بار دوباره تلاش کنید و اگر مشکل ادامه داشت گزارش دهید."
+        "body": "WePrompt پاسخ غیرمنتظره‌ای از دستیار تیم محلی دریافت کرد. یک‌بار دوباره تلاش کنید و اگر مشکل ادامه داشت گزارش دهید."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "خواندن از دستیار تیم محلی ناموفق بود",
-        "body": "Forge نتوانست پاسخ TCP دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید و اگر ادامه داشت برنامه را ری‌استارت کنید."
+        "body": "WePrompt نتوانست پاسخ TCP دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید و اگر ادامه داشت برنامه را ری‌استارت کنید."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "سرویس تیم هنوز آماده نیست",

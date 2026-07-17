@@ -12,10 +12,10 @@
     "clearWorkspace": "Projeyi kaldır",
     "openFolder": "Klasör Aç",
     "none": "Hiçbiri",
-    "quickActionsTitle": "Forge neler yapabilir?",
+    "quickActionsTitle": "WePrompt neler yapabilir?",
     "quickActionFeedback": "Sorun Bildir",
     "quickActionStar": "Bizi beğendiniz mi? Yıldız verin!",
-    "skillsMarket": "Forge Skills Market",
+    "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "Topluluk Skills'lerini ihtiyaç duyduğunuzda arayın ve etkinleştirin. Bir kez yapılandırın, tüm Agent'larda kullanılabilir.",
     "skillsMarketDetails": "Ayrıntılar >>",
     "projectTitle": "What's next in {{name}}?",
@@ -88,7 +88,7 @@
     "conversationsSection": "Sohbetler",
     "removeProjectTitle": "Projeyi kaldır",
     "removeProject": "Projeyi kaldır",
-    "removeProjectConfirm": "Remove project \"{{name}}\" from Forge? Its {{count}} chat(s) and folder files will stay where they are.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
     "deleting": "Siliniyor...",
     "newProject": "New project",
@@ -324,7 +324,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "Failed to read the team helper response",
-        "body": "Forge could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
+        "body": "WePrompt could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "The local team helper rejected the request",
@@ -332,11 +332,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "The team helper returned an unexpected response",
-        "body": "Forge received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
+        "body": "WePrompt received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "Failed to read from the local team helper",
-        "body": "Forge could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
+        "body": "WePrompt could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "Team service is not ready yet",

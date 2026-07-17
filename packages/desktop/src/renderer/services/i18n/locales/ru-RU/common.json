@@ -74,26 +74,26 @@
   "backendStartup": {
     "incompatibleRuntime": {
       "title": "Эта система не поддерживается встроенным backend",
-      "description": "Forge открылся, но локальный backend AionCore не может работать в этой версии Linux. Обновитесь до поддерживаемого дистрибутива Linux и перезапустите Forge.",
+      "description": "WePrompt открылся, но локальный backend AionCore не может работать в этой версии Linux. Обновитесь до поддерживаемого дистрибутива Linux и перезапустите WePrompt.",
       "requiredVersions": "Требуемые символы среды выполнения: {{versions}}"
     },
     "incompleteInstallation": {
-      "title": "Установка Forge неполная",
-      "description": "В этой установке отсутствуют обязательные локальные ресурсы, поэтому AionCore не может запуститься. Загрузите и переустановите последнюю версию Forge. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО AionCore в карантин.",
+      "title": "Установка WePrompt неполная",
+      "description": "В этой установке отсутствуют обязательные локальные ресурсы, поэтому AionCore не может запуститься. Загрузите и переустановите последнюю версию WePrompt. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО AionCore в карантин.",
       "downloadLatest": "Скачать последнюю версию",
       "sendDiagnostics": "Отправить диагностику",
       "diagnosticsSent": "Диагностика отправлена",
       "diagnosticsReportSuccess": "Диагностический отчет отправлен",
       "diagnosticsReportFailed": "Не удалось отправить диагностический отчет",
-      "runtimeComponentDescription": "В этой установке отсутствуют необходимые встроенные компоненты среды выполнения, поэтому {{resource}} не может запуститься. Переустановите последнюю версию Forge. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО компоненты Forge в карантин."
+      "runtimeComponentDescription": "В этой установке отсутствуют необходимые встроенные компоненты среды выполнения, поэтому {{resource}} не может запуститься. Переустановите последнюю версию WePrompt. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО компоненты WePrompt в карантин."
     },
     "packageArchitectureMismatch": {
-      "title": "Forge package architecture mismatch",
-      "description": "This Forge package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "WePrompt package architecture mismatch",
+      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
     },
     "dataMigration": {
       "title": "Local data migration failed",
-      "description": "Forge opened, but AionCore stopped while initializing local data. Reinstalling Forge may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
+      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsSent": "Diagnostics sent",
       "diagnosticsReportSuccess": "Diagnostics report sent",
@@ -101,7 +101,7 @@
     },
     "localDataRepair": {
       "title": "Local data repair failed",
-      "description": "Forge opened, but AionCore stopped while repairing local agent cache data. Reinstalling Forge may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
+      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsSent": "Diagnostics sent",
       "diagnosticsReportSuccess": "Diagnostics report sent",
@@ -109,7 +109,7 @@
     },
     "recoverableDatabaseCorruption": {
       "title": "Локальные данные повреждены",
-      "description": "Forge обнаружил повреждение локальной базы данных и не может продолжить запуск. После подтверждения старая база данных будет сохранена как резервная копия, а для продолжения запуска будет создана новая локальная база данных. Исторические локальные данные пока не будут отображаться, старая база данных будет сохранена как резервная копия.",
+      "description": "WePrompt обнаружил повреждение локальной базы данных и не может продолжить запуск. После подтверждения старая база данных будет сохранена как резервная копия, а для продолжения запуска будет создана новая локальная база данных. Исторические локальные данные пока не будут отображаться, старая база данных будет сохранена как резервная копия.",
       "confirmRebuild": "Сохранить старую БД и создать новую",
       "sendDiagnostics": "Отправить диагностику",
       "diagnosticsHint": "Отправка диагностики не изменит локальную базу данных.",

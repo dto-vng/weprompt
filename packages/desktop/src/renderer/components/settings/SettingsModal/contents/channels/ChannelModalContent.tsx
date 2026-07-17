@@ -826,7 +826,7 @@ const ChannelModalContent: React.FC = () => {
     return undefined;
   };
   const channelGuideText = t('settings.webui.featureChannelsDesc', {
-    defaultValue: 'Connect Telegram, Lark, and DingTalk to interact with Forge from IM apps.',
+    defaultValue: 'Connect Telegram, Lark, and DingTalk to interact with WePrompt from IM apps.',
   });
   const channelSetupSteps = [
     t('settings.channels.selectFirst', {

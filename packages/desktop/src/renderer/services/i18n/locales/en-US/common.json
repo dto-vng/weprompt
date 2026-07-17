@@ -75,26 +75,26 @@
   "backendStartup": {
     "incompatibleRuntime": {
       "title": "This system is not supported by the bundled backend",
-      "description": "Forge opened, but the local AionCore backend cannot run on this Linux version. Please upgrade to a supported Linux distribution and restart Forge.",
+      "description": "WePrompt opened, but the local AionCore backend cannot run on this Linux version. Please upgrade to a supported Linux distribution and restart WePrompt.",
       "requiredVersions": "Required runtime symbols: {{versions}}"
     },
     "incompleteInstallation": {
-      "title": "Forge installation is incomplete",
-      "description": "This installation is missing required local resources, so AionCore cannot start. Please download and reinstall the latest Forge. If the issue returns after reinstalling, check whether security or antivirus software quarantined AionCore.",
+      "title": "WePrompt installation is incomplete",
+      "description": "This installation is missing required local resources, so AionCore cannot start. Please download and reinstall the latest WePrompt. If the issue returns after reinstalling, check whether security or antivirus software quarantined AionCore.",
       "downloadLatest": "Download latest",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsSent": "Diagnostics sent",
       "diagnosticsReportSuccess": "Diagnostics report sent",
       "diagnosticsReportFailed": "Failed to send diagnostics report",
-      "runtimeComponentDescription": "This installation is missing required bundled runtime components, so {{resource}} cannot start. Reinstall the latest Forge package. If it still happens after reinstalling, check whether security or antivirus software quarantined Forge components."
+      "runtimeComponentDescription": "This installation is missing required bundled runtime components, so {{resource}} cannot start. Reinstall the latest WePrompt package. If it still happens after reinstalling, check whether security or antivirus software quarantined WePrompt components."
     },
     "packageArchitectureMismatch": {
-      "title": "Forge package architecture mismatch",
-      "description": "This Forge package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "WePrompt package architecture mismatch",
+      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
     },
     "dataMigration": {
       "title": "Local data migration failed",
-      "description": "Forge opened, but AionCore stopped while initializing local data. Reinstalling Forge may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
+      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsSent": "Diagnostics sent",
       "diagnosticsReportSuccess": "Diagnostics report sent",
@@ -102,7 +102,7 @@
     },
     "localDataRepair": {
       "title": "Local data repair failed",
-      "description": "Forge opened, but AionCore stopped while repairing local agent cache data. Reinstalling Forge may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
+      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsSent": "Diagnostics sent",
       "diagnosticsReportSuccess": "Diagnostics report sent",
@@ -110,7 +110,7 @@
     },
     "recoverableDatabaseCorruption": {
       "title": "Local data is corrupted",
-      "description": "Forge detected that the local database is corrupted and cannot continue startup. After confirmation, Forge will back up the old database and create a new local database to continue startup. Historical local data will not be shown for now, and the old database will be kept as a backup.",
+      "description": "WePrompt detected that the local database is corrupted and cannot continue startup. After confirmation, WePrompt will back up the old database and create a new local database to continue startup. Historical local data will not be shown for now, and the old database will be kept as a backup.",
       "confirmRebuild": "Back up old DB and rebuild new DB",
       "sendDiagnostics": "Send diagnostics",
       "diagnosticsHint": "Sending diagnostics will not modify the local database.",

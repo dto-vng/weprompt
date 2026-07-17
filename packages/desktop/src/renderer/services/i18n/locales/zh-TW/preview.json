@@ -66,14 +66,14 @@
       "originalSafe": "工作區中的原始檔案未被變更。"
     },
     "serverInstall": {
-      "hint": "Forge 執行於伺服器上，預覽元件需要安裝在該伺服器上。請在伺服器執行以下指令後重試：",
+      "hint": "WePrompt 執行於伺服器上，預覽元件需要安裝在該伺服器上。請在伺服器執行以下指令後重試：",
       "icuNote": "若安裝後仍無法啟動，請在伺服器安裝 ICU 函式庫（Debian/Ubuntu：apt-get install -y libicu-dev）。"
     },
     "externalEdit": {
       "editInDefaultApp": "在預設應用程式中編輯",
       "editInDefaultAppTooltip": "在預設應用程式中開啟此工作區檔案",
       "refreshPreview": "重新整理預覽",
-      "refreshPreviewTooltip": "從工作區檔案重新載入此 Forge 預覽",
+      "refreshPreviewTooltip": "從工作區檔案重新載入此 WePrompt 預覽",
       "revealInFolder": "在資料夾中顯示",
       "revealInFolderTooltip": "在其資料夾中顯示此工作區檔案",
       "status": {
@@ -115,7 +115,7 @@
       "saveFailureRecovery": "你的編輯仍保留在此處，工作區檔案未被變更。",
       "copyDraft": "複製草稿",
       "refreshLatest": "載入最新版本",
-      "requestPlaceholder": "描述您希望 Forge 進行的變更。",
+      "requestPlaceholder": "描述您希望 WePrompt 進行的變更。",
       "askWordContext": "檔案：{{fileName}}\n段落：{{path}}\n選取文字：{{text}}\n要求：{{placeholder}}",
       "askExcelContext": "檔案：{{fileName}}\n範圍：{{range}}\n儲存格：\n{{cells}}\n要求：{{placeholder}}"
     },

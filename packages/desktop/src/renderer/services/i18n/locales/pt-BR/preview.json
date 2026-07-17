@@ -66,14 +66,14 @@
       "originalSafe": "O arquivo original do espaço de trabalho não foi alterado."
     },
     "serverInstall": {
-      "hint": "O Forge está sendo executado em um servidor. O componente de pré-visualização precisa ser instalado nesse servidor. Execute o comando abaixo no servidor e tente novamente:",
+      "hint": "O WePrompt está sendo executado em um servidor. O componente de pré-visualização precisa ser instalado nesse servidor. Execute o comando abaixo no servidor e tente novamente:",
       "icuNote": "Se ainda não iniciar, instale a biblioteca ICU no servidor (Debian/Ubuntu: apt-get install -y libicu-dev)."
     },
     "externalEdit": {
       "editInDefaultApp": "Editar no aplicativo padrão",
       "editInDefaultAppTooltip": "Abrir este arquivo do espaço de trabalho no aplicativo padrão",
       "refreshPreview": "Atualizar visualização",
-      "refreshPreviewTooltip": "Recarregar esta visualização do Forge a partir do arquivo do espaço de trabalho",
+      "refreshPreviewTooltip": "Recarregar esta visualização do WePrompt a partir do arquivo do espaço de trabalho",
       "revealInFolder": "Mostrar na pasta",
       "revealInFolderTooltip": "Mostrar este arquivo do espaço de trabalho na pasta",
       "status": {
@@ -115,7 +115,7 @@
       "saveFailureRecovery": "Sua edição continua aqui e o arquivo do espaço de trabalho não foi alterado.",
       "copyDraft": "Copiar rascunho",
       "refreshLatest": "Carregar versão mais recente",
-      "requestPlaceholder": "Descreva a alteração que você quer que o Forge faça.",
+      "requestPlaceholder": "Descreva a alteração que você quer que o WePrompt faça.",
       "askWordContext": "Arquivo: {{fileName}}\nParágrafo: {{path}}\nTexto selecionado: {{text}}\nSolicitação: {{placeholder}}",
       "askExcelContext": "Arquivo: {{fileName}}\nIntervalo: {{range}}\nCélulas:\n{{cells}}\nSolicitação: {{placeholder}}"
     },
