@@ -14,6 +14,9 @@ Follow every step below in order. Do not skip the validate loop.
    - Output `{"status": "OK"}` → continue.
    - Output `{"status": "MISSING_DEPS", ...}` → show the user the exact `fix`
      command from the output, ask permission to run it, run it, re-run preflight.
+   - Output `{"status": "PYTHON_TOO_OLD", ...}` → show the user the `fix`
+     message from the output (upgrade Python), and offer the HTML fallback
+     (read `guidance/html-fallback.md`) for this session.
    - `python3` itself not found → treat as MISSING_PYTHON: tell the user how to
      install Python 3 (macOS: `brew install python3`), and offer the HTML
      fallback (read `guidance/html-fallback.md`) instead. Never start building
