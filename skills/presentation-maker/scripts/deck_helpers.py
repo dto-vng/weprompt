@@ -38,9 +38,17 @@ def _luminance(hex6):
     return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
 
 
+def _contrast(l1, l2):
+    lighter, darker = max(l1, l2), min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 def _on_color(hex6):
-    """Black or white text, whichever reads on the given fill color."""
-    return "1A1A1A" if _luminance(hex6) > 0.4 else "FFFFFF"
+    """Black or white text, whichever has the higher WCAG contrast on the fill."""
+    lum = _luminance(hex6)
+    if _contrast(lum, _luminance("1A1A1A")) >= _contrast(lum, 1.0):
+        return "1A1A1A"
+    return "FFFFFF"
 
 
 def _fill_slide(slide, hex6):
