@@ -9,6 +9,7 @@ Heuristics (no rendering deps):
 Usage: validate.py <deck.pptx> | validate.py --self-test
 """
 import json
+import os
 import sys
 import tempfile
 
@@ -58,6 +59,12 @@ def _is_background_sized(shape):
     return (shape.width or 0) * (shape.height or 0) >= 0.9 * SLIDE_W * SLIDE_H
 
 
+def _is_decorative(shape):
+    """Helpers name intentional background shapes (cards, bands, rules)
+    with a 'deco:' prefix — they may sit under content by design."""
+    return (shape.name or "").startswith("deco:")
+
+
 def _shape_name(shape):
     text = ""
     if shape.has_text_frame:
@@ -81,7 +88,7 @@ def validate(path):
                     issues.append({"slide": i, "shape": _shape_name(shape), "type": "overflow",
                                    "detail": "text needs ~%.2fin, frame is %.2fin"
                                              % (est / 914400.0, shape.height / 914400.0)})
-        visible = [s for s in shapes if not _is_background_sized(s)]
+        visible = [s for s in shapes if not _is_background_sized(s) and not _is_decorative(s)]
         for a_idx in range(len(visible)):
             for b_idx in range(a_idx + 1, len(visible)):
                 a, b = visible[a_idx], visible[b_idx]
@@ -98,7 +105,7 @@ def validate(path):
     return {"slides": len(prs.slides), "ok": not issues, "issues": issues}
 
 
-def _build_fixture(broken):
+def _build_fixture(kind):
     prs = Presentation()
     prs.slide_width = Emu(SLIDE_W)
     prs.slide_height = Emu(SLIDE_H)
@@ -111,12 +118,21 @@ def _build_fixture(broken):
         b.text_frame.paragraphs[0].runs[0].font.size = Pt(size)
         return b
 
-    if broken:
+    if kind == "broken":
         box(0.8, 0.8, 3.0, 0.4, "word " * 60, 24)          # overflow
         box(1.0, 3.0, 4.0, 1.0, "left card", 18)           # overlap pair
         box(2.0, 3.2, 4.0, 1.0, "right card", 18)
         box(11.0, 6.8, 4.0, 1.5, "runs off the slide", 18)  # off_slide
-    else:
+    elif kind == "cards":
+        # A decorative surface card with content text on top of it must NOT
+        # be flagged as overlap — this is the v2 card pattern.
+        from pptx.enum.shapes import MSO_SHAPE
+        card = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.0), Inches(2.0), Inches(4.0), Inches(2.5))
+        card.name = "deco:card-0"
+        box(1.2, 2.4, 3.6, 0.8, "42%", 40)
+        box(1.2, 3.4, 3.6, 0.6, "retention", 14)
+    else:  # clean
         box(0.8, 0.8, 11.7, 1.0, "Clean title", 28)
         box(0.8, 2.2, 11.7, 3.0, "One short line of body text.", 18)
 
@@ -126,13 +142,29 @@ def _build_fixture(broken):
 
 
 def self_test():
-    broken = validate(_build_fixture(broken=True))
-    kinds = {issue["type"] for issue in broken["issues"]}
-    assert not broken["ok"], "broken fixture passed"
-    for expected in ("overflow", "overlap", "off_slide"):
-        assert expected in kinds, "missing %s in %s" % (expected, sorted(kinds))
-    clean = validate(_build_fixture(broken=False))
-    assert clean["ok"], "clean fixture flagged: %s" % clean["issues"]
+    paths = []
+    try:
+        broken_path = _build_fixture("broken")
+        paths.append(broken_path)
+        broken = validate(broken_path)
+        kinds = {issue["type"] for issue in broken["issues"]}
+        assert not broken["ok"], "broken fixture passed"
+        for expected in ("overflow", "overlap", "off_slide"):
+            assert expected in kinds, "missing %s in %s" % (expected, sorted(kinds))
+        clean_path = _build_fixture("clean")
+        paths.append(clean_path)
+        clean = validate(clean_path)
+        assert clean["ok"], "clean fixture flagged: %s" % clean["issues"]
+        cards_path = _build_fixture("cards")
+        paths.append(cards_path)
+        cards = validate(cards_path)
+        assert cards["ok"], "card fixture flagged: %s" % cards["issues"]
+    finally:
+        for path in paths:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
     print("SELF-TEST OK")
     return 0
 
