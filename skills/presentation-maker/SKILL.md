@@ -48,10 +48,16 @@ Follow every step below in order. Do not skip the validate loop.
 
 5. **Build.** Write one Python script that imports `scripts/deck_helpers.py`
    and assembles the deck ONLY through its functions:
-   `new_deck`, `add_title_slide`, `add_section_slide`, `add_bullets_slide`,
-   `add_two_column_slide`, `add_stats_slide`, `add_quote_slide`,
-   `add_closing_slide`, `save_deck`. Run it. Keep bullets ≤ 12 words where
-   possible; the guidance file has per-slide-type content limits.
+   `new_deck(THEME, footer="<short deck label>")`, `add_title_slide`,
+   `add_section_slide`, `add_bullets_slide`, `add_two_column_slide`,
+   `add_stats_slide`, `add_quote_slide`, `add_image_slide`,
+   `add_closing_slide`, `save_deck`. Run it. Section and closing slides
+   render on a full-color background automatically; stats and two-column
+   content sit on cards — you never draw shapes yourself. Use
+   `add_image_slide` (and the title slide's `logo_path`) only with image
+   files the user provided or that already exist on disk — never invent
+   paths. Keep bullets ≤ 12 words where possible; the guidance file has
+   per-slide-type content limits.
 
 6. **Validate loop (max 3 iterations).** Run
    `python3 scripts/validate.py <deck.pptx>`.

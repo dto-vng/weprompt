@@ -20,9 +20,9 @@ one accent color, tight word counts.
 Each palette lists the five theme-dict color slots as 6-digit hex, no `#`.
 Paste them directly into `THEME["colors"]`. `bg` is the slide background,
 `primary` is the single accent, `text` is body/heading text, `muted` is
-secondary text and captions. `surface` fills out the palette for tonal
-harmony but is not rendered by any `deck_helpers` function — never draw
-a panel, card, or box to fill it in; keep the slide on open `bg`.
+secondary text and captions. `surface` is the card fill: `add_stats_slide`
+and `add_two_column_slide` render it automatically as rounded panels. Never
+draw panel shapes yourself — the helpers place every decorative shape.
 
 - **Dark corporate navy** (executive, finance, product) — bg `0F1B2D`, surface `1B2C44`, primary `4DA3FF`, text `F5F8FC`, muted `9FB2CC`.
 - **Charcoal minimal** (bold, modern, understated) — bg `141414`, surface `232323`, primary `E0A82E`, text `F2F2F2`, muted `A0A0A0`.
@@ -36,7 +36,7 @@ Palette rules:
 - Never recolor text or background per slide; the five slots are fixed for the whole deck.
 - Use `primary` sparingly — for one keyword, a stat number, a rule line, or a section marker — not for large text blocks.
 - Use `muted` only for captions, sources, footnotes, and secondary labels, never for the main message.
-- Do not invent extra hexes. If you need emphasis, use `primary`; `surface` is not rendered by any helper, so it cannot supply a lighter shade anywhere in the deck.
+- Do not invent extra hexes. If you need emphasis, use `primary`; if you need grouping, use the card slides (stats, two-column) — never freehand shapes.
 - Every palette above already clears high text-on-background contrast; do not darken `text` or lighten `bg` to "improve" it.
 
 ## Typography
@@ -74,7 +74,9 @@ Typography rules:
 - Present stats in groups of three; two or four read as unbalanced, five-plus becomes a table.
 - Limit each content slide to five bullets and one visual idea; move overflow to a new slide.
 - Establish clear hierarchy: title, then one supporting line or list, then optional caption — in that vertical order.
-- Group related content with spacing and alignment, not panels; `surface` is not rendered by any helper, so never attempt to draw your own panel shapes — leave the slide as open `bg`.
+- Open with the title slide, close with the closing slide — both carry the accent color as full blocks and bookend the deck.
+- Insert a section divider (`add_section_slide`) before each chapter of 2-5 content slides; 2-4 dividers per deck give it rhythm. Give each a kicker like "Part 1".
+- Give `new_deck` a short `footer` label (≤ 40 characters); content slides then carry the footer and page number automatically.
 - Keep the accent line, section marker, or footer in the same position on every slide for rhythm.
 - Repeat layout patterns across similar slides so the deck feels like one document, not a collage.
 
@@ -85,10 +87,11 @@ end with `save_deck(path)`. Respect each helper's caps — the geometric
 validator rejects text that overflows its frame, and every overflow burns a
 validate/fix iteration.
 
-- **`add_title_slide`** — title **≤ 34 characters** (44pt, single line); optional subtitle ≤ 60 characters on one line. No bullets.
+- **`add_title_slide`** — title **≤ 34 characters** (44pt, wraps to two lines at most); optional subtitle ≤ 60 characters; optional `logo_path` for a real logo file. The accent band is drawn automatically.
 - **`add_section_slide`** — title **≤ 40 characters** (36pt). One divider per major section; no body content.
 - **`add_bullets_slide`** — title **≤ 50 characters** (28pt); **≤ 5 bullets**, each **≤ 12 words**, ideally 6–8. No sub-bullets.
 - **`add_two_column_slide`** — title **≤ 50 characters** (28pt); **≤ 4 bullets per column**, each **≤ 12 words**. Use for compare/contrast or before/after only.
+- **`add_image_slide`** — title **≤ 50 characters** (28pt); caption ≤ 90 characters; image must be a real file on disk (user-provided or generated earlier in the conversation) — never a guessed path or URL.
 - **`add_stats_slide`** — title **≤ 50 characters** (28pt); exactly **3 stats**; each stat number short (≤ 6 characters) with a ≤ 5-word label.
 - **`add_quote_slide`** — quote text **≤ 200 characters**; attribution ≤ 40 characters. One quote per slide, no other content.
 - **`add_closing_slide`** — title **≤ 35 characters** (40pt); one call-to-action or contact line ≤ 50 characters.
@@ -102,3 +105,4 @@ validate/fix iteration.
 - **Centered body copy.** Centered bullet lists and paragraphs. Fix: left-align everything except single titles, quotes, and stats.
 - **Cramped edges.** Text or boxes touching the slide border. Fix: keep the 0.83in margin and let the message breathe.
 - **Too many stats.** Five or more numbers crammed on one slide. Fix: show three, or move the rest to a follow-up slide.
+- **Flat monotony.** Ten identical text slides in a row. Fix: break chapters with section dividers, put numbers on stat cards, and use an image slide when the user supplied a picture.
