@@ -131,6 +131,7 @@
   "noAgentsAvailable": "Sin agentes disponibles",
   "noModelConfigured": "Sin modelo configurado. Por favor configura uno en ajustes.",
   "createFailed": "Error al crear la conversación",
+  "emptyModelReply": "El modelo terminó el turno sin producir una respuesta visible. Envía la solicitud de nuevo; para salidas grandes, pide el resultado en partes más pequeñas.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "La ruta del área de trabajo seleccionada no está disponible. Asegúrate de que la ruta \"{{workspacePath}}\" exista y sea accesible."

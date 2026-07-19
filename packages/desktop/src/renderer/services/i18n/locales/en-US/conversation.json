@@ -192,6 +192,7 @@
   "noAgentsAvailable": "No agents available",
   "noModelConfigured": "No model configured. Please configure in settings.",
   "createFailed": "Failed to create conversation",
+  "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "The selected workspace path is unavailable. Make sure the workspace path \"{{workspacePath}}\" exists and is accessible."

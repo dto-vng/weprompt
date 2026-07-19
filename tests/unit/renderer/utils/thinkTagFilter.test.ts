@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { stripThinkTags, hasThinkTags, filterMessageContent } from '@/renderer/utils/chat/thinkTagFilter';
+import {
+  stripThinkTags,
+  hasThinkTags,
+  filterMessageContent,
+  isThinkOnlyContent,
+} from '@/renderer/utils/chat/thinkTagFilter';
 
 describe('thinkTagFilter', () => {
   describe('stripThinkTags', () => {
@@ -183,6 +188,33 @@ describe('thinkTagFilter', () => {
       const content: any = { content: 'Text<think>x</think>' };
       content.self = content;
       expect(() => filterMessageContent(content)).not.toThrow();
+    });
+  });
+
+  describe('isThinkOnlyContent', () => {
+    it('detects a complete think block with no visible reply', () => {
+      expect(isThinkOnlyContent('<think>planning the answer</think>\n')).toBe(true);
+    });
+
+    it('detects MiniMax-style reasoning ending in an orphaned closing tag', () => {
+      expect(isThinkOnlyContent('reasoning without opening tag\n</think>\n')).toBe(true);
+    });
+
+    it('returns false when a visible reply follows the think block', () => {
+      expect(isThinkOnlyContent('<think>plan</think>Here is the answer')).toBe(false);
+    });
+
+    it('returns false for plain text without think tags', () => {
+      expect(isThinkOnlyContent('just a normal reply')).toBe(false);
+    });
+
+    it('returns false for empty and whitespace-only content', () => {
+      expect(isThinkOnlyContent('')).toBe(false);
+      expect(isThinkOnlyContent('   \n  ')).toBe(false);
+    });
+
+    it('returns false for an unterminated think block (aborted stream keeps its text visible)', () => {
+      expect(isThinkOnlyContent('<think>partial reasoning that never closed')).toBe(false);
     });
   });
 });

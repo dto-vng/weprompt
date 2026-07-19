@@ -125,6 +125,7 @@
   "noAgentsAvailable": "没有可用的 Agent",
   "noModelConfigured": "未配置模型，请前往设置页面配置。",
   "createFailed": "创建会话失败",
+  "emptyModelReply": "模型在没有生成可见回复的情况下结束了本轮对话。请重新发送请求；如果需要较大的输出，请分多次索取结果。",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "所选工作区路径不可用。请确保工作区路径“{{workspacePath}}”真实存在且可访问。"

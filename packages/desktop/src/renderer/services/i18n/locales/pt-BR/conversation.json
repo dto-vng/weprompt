@@ -131,6 +131,7 @@
   "noAgentsAvailable": "Nenhum agente disponível",
   "noModelConfigured": "Nenhum modelo configurado. Por favor, configure nas configurações.",
   "createFailed": "Falha ao criar a conversa",
+  "emptyModelReply": "O modelo encerrou o turno sem produzir uma resposta visível. Envie a solicitação novamente; para saídas grandes, peça o resultado em partes menores.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "O caminho do projeto selecionado não está disponível. Verifique se o caminho do projeto \"{{workspacePath}}\" existe e está acessível.",

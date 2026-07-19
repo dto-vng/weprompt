@@ -131,6 +131,7 @@
   "noAgentsAvailable": "利用可能なエージェントはありません",
   "noModelConfigured": "モデルが設定されていません。設定ページで設定してください。",
   "createFailed": "会話の作成に失敗しました",
+  "emptyModelReply": "モデルは表示可能な返答を生成せずにターンを終了しました。もう一度送信してください。大きな出力が必要な場合は、結果を分割して依頼してください。",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "選択したワークスペースパスは利用できません。ワークスペースパス「{{workspacePath}}」が実在し、アクセス可能であることを確認してください。"

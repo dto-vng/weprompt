@@ -44,6 +44,24 @@ export function stripThinkTags(content: string): string {
 }
 
 /**
+ * Detect content that disappears entirely once think tags are stripped —
+ * the model produced only internal reasoning and no visible reply.
+ * Whitespace-only and tag-free content both return false, so callers can
+ * distinguish "empty turn" from "reasoning-only turn".
+ * @param content - The raw accumulated assistant text for a turn
+ * @returns True when the content is non-empty but strips to nothing
+ */
+export function isThinkOnlyContent(content: string): boolean {
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    return false;
+  }
+  if (!hasThinkTags(content)) {
+    return false;
+  }
+  return stripThinkTags(content).trim().length === 0;
+}
+
+/**
  * Check if content contains think tags (opening or closing)
  * Also detects orphaned closing tags like </think> without opening <think>
  * @param content - The content to check

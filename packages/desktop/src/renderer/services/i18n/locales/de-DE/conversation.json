@@ -131,6 +131,7 @@
   "noAgentsAvailable": "Keine Agenten verfügbar",
   "noModelConfigured": "Kein Modell konfiguriert. Bitte in den Einstellungen konfigurieren.",
   "createFailed": "Gespräch konnte nicht erstellt werden",
+  "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Der ausgewählte Arbeitsbereichspfad ist nicht verfügbar. Stelle sicher, dass der Arbeitsbereichspfad \"{{workspacePath}}\" vorhanden und zugänglich ist."

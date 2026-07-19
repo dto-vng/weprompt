@@ -560,6 +560,7 @@
   "noAgentsAvailable": "No agents available",
   "noModelConfigured": "No model configured. Please configure in settings.",
   "createFailed": "Failed to create conversation",
+  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Seçilen çalışma alanı yolu kullanılamıyor. Çalışma alanı yolu \"{{workspacePath}}\" gerçekten var ve erişilebilir olduğundan emin olun."

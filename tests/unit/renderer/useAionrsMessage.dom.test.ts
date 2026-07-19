@@ -25,6 +25,10 @@ vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useMergeLiveMessage: () => mergeLiveMessageMock,
 }));
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 vi.mock('@/renderer/pages/conversation/runtime/useConversationRuntimeView', () => ({
   logStreamTerminalObserved: vi.fn(),
 }));
@@ -268,6 +272,95 @@ describe('useAionrsMessage runtime state', () => {
       expect(updateConversationInvokeMock).not.toHaveBeenCalled();
     }
   );
+
+  describe('reasoning-only turn detection', () => {
+    const emptyReplyTips = () =>
+      mergeLiveMessageMock.mock.calls.filter(
+        ([message]) => message?.type === 'tips' && message?.content?.content === 'conversation.emptyModelReply'
+      );
+
+    const streamTurn = async (msgId: string, chunks: string[], extraEvents: IResponseMessage[] = []) => {
+      const { result } = renderHook(() => useAionrsMessage('conv-1'));
+      await waitFor(() => {
+        expect(result.current.hasHydratedRunningState).toBe(true);
+      });
+      act(() => {
+        result.current.setActiveMsgId(msgId);
+        for (const chunk of chunks) {
+          responseStreamHandlerRef.current?.({
+            type: 'text',
+            data: { content: chunk },
+            msg_id: msgId,
+            turn_id: 'turn-1',
+            conversation_id: 'conv-1',
+          });
+        }
+        for (const event of extraEvents) {
+          responseStreamHandlerRef.current?.(event);
+        }
+      });
+      return result;
+    };
+
+    const finishEvent = (msgId: string): IResponseMessage => ({
+      type: 'finish',
+      data: null,
+      msg_id: msgId,
+      turn_id: 'turn-1',
+      conversation_id: 'conv-1',
+    });
+
+    it('surfaces an error tip when a turn ends with reasoning-only output', async () => {
+      await streamTurn('msg-think', ['<think>planning the reply</think>\n'], [finishEvent('msg-think')]);
+
+      expect(emptyReplyTips()).toHaveLength(1);
+      const [message, forceUpdate] = emptyReplyTips()[0];
+      expect(message.content.type).toBe('error');
+      expect(forceUpdate).toBe(true);
+    });
+
+    it('does not flag a turn that produced a visible reply after thinking', async () => {
+      await streamTurn('msg-ok', ['<think>plan</think>', 'Here is the answer'], [finishEvent('msg-ok')]);
+
+      expect(emptyReplyTips()).toHaveLength(0);
+    });
+
+    it('does not flag a reasoning-only response that ran tools', async () => {
+      await streamTurn(
+        'msg-tools',
+        ['<think>calling a tool</think>'],
+        [
+          {
+            type: 'tool_group',
+            data: [{ status: 'Success', name: 'Read' }],
+            msg_id: 'msg-tools',
+            turn_id: 'turn-1',
+            conversation_id: 'conv-1',
+          },
+          finishEvent('msg-tools'),
+        ]
+      );
+
+      expect(emptyReplyTips()).toHaveLength(0);
+    });
+
+    it('flags a duplicated finish event only once', async () => {
+      await streamTurn('msg-dup', ['<think>planning</think>'], [finishEvent('msg-dup'), finishEvent('msg-dup')]);
+
+      expect(emptyReplyTips()).toHaveLength(1);
+    });
+
+    it('does not flag a finish that arrives after the user stopped the turn', async () => {
+      const result = await streamTurn('msg-stopped', ['<think>partial plan</think>']);
+
+      act(() => {
+        result.current.resetState();
+        responseStreamHandlerRef.current?.(finishEvent('msg-stopped'));
+      });
+
+      expect(emptyReplyTips()).toHaveLength(0);
+    });
+  });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 'malformed'])(
     'keeps valid input when output usage is invalid: %p',

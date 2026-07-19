@@ -16,7 +16,9 @@ import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conve
 import { isConversationProcessing } from '@/renderer/pages/conversation/utils/conversationRuntime';
 import { emitter } from '@/renderer/utils/emitter';
 import { recordLocalTokenUsage } from '@/renderer/pages/conversation/utils/localTokenUsage';
+import { isThinkOnlyContent } from '@/renderer/utils/chat/thinkTagFilter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { processLocalCronResponse } from './localCronCommands';
 
 type TokenUsage = {
@@ -44,6 +46,8 @@ export const useAionrsMessage = (
   const onError = options?.onError;
   const onConfigChanged = options?.onConfigChanged;
   const onConfigChangedRef = useRef(onConfigChanged);
+  const { t } = useTranslation();
+  const tRef = useRef(t);
   const mergeLiveMessage = useMergeLiveMessage();
   const [streamRunning, setStreamRunning] = useState(false);
   const [hasActiveTools, setHasActiveTools] = useState(false);
@@ -60,6 +64,12 @@ export const useAionrsMessage = (
   const activeMsgIdRef = useRef<string | null>(null);
   const messageBufferRef = useRef(new Map<string, string>());
   const processedCronMsgIdsRef = useRef(new Set<string>());
+  // Some models (e.g. MiniMax M2.5) can end a turn right after their <think>
+  // block, so the visible reply strips to nothing. Track tool activity since
+  // the last finish and which msg_ids were already flagged, so we can surface
+  // that failure once instead of silently showing an empty message.
+  const turnHadToolActivityRef = useRef(false);
+  const emptyReplyNoticeMsgIdsRef = useRef(new Set<string>());
 
   // Use refs to avoid useEffect re-subscription when these states change
   const hasActiveToolsRef = useRef(hasActiveTools);
@@ -73,6 +83,9 @@ export const useAionrsMessage = (
   useEffect(() => {
     onConfigChangedRef.current = onConfigChanged;
   }, [onConfigChanged]);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   useEffect(() => {
     hasActiveToolsRef.current = hasActiveTools;
   }, [hasActiveTools]);
@@ -324,6 +337,34 @@ export const useAionrsMessage = (
             hasActiveToolsRef.current = false;
             setThought({ subject: '', description: '' });
             hasContentInTurnRef.current = false;
+            // Surface reasoning-only turns instead of ending on an empty
+            // message. Guarded to the active request so a manual stop
+            // (resetState nulls activeMsgIdRef) never triggers it.
+            if (
+              message.msg_id &&
+              activeMsgIdRef.current === message.msg_id &&
+              !turnHadToolActivityRef.current &&
+              !emptyReplyNoticeMsgIdsRef.current.has(message.msg_id) &&
+              isThinkOnlyContent(messageBufferRef.current.get(message.msg_id) ?? '')
+            ) {
+              emptyReplyNoticeMsgIdsRef.current.add(message.msg_id);
+              mergeLiveMessage(
+                {
+                  id: uuid(),
+                  msg_id: `empty-reply-${message.msg_id}`,
+                  type: 'tips',
+                  position: 'center',
+                  conversation_id,
+                  created_at: Date.now(),
+                  content: {
+                    content: tRef.current('conversation.emptyModelReply'),
+                    type: 'error',
+                  },
+                },
+                true
+              );
+            }
+            turnHadToolActivityRef.current = false;
             if (message.msg_id) {
               void processCompletedAssistantMessage(message.msg_id);
             }
@@ -333,6 +374,7 @@ export const useAionrsMessage = (
           {
             // Mark that current turn has content output
             hasContentInTurnRef.current = true;
+            turnHadToolActivityRef.current = true;
 
             // Auto-recover streamRunning if tool_group arrives after finish
             if (!streamRunningRef.current) {
@@ -435,6 +477,7 @@ export const useAionrsMessage = (
     tokenUsageRef.current = null;
     pendingDiagnosticTokenEstimateRef.current = null;
     hasContentInTurnRef.current = false;
+    turnHadToolActivityRef.current = false;
     setHasHydratedRunningState(false);
 
     // Check actual conversation status from backend before resetting all running states
@@ -487,6 +530,7 @@ export const useAionrsMessage = (
     hasActiveToolsRef.current = false;
     setThought({ subject: '', description: '' });
     hasContentInTurnRef.current = false;
+    turnHadToolActivityRef.current = false;
     pendingDiagnosticTokenEstimateRef.current = null;
     // Clear active message ID to prevent filtering events from new messages after stop
     activeMsgIdRef.current = null;
