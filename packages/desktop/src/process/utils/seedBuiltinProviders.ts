@@ -31,6 +31,7 @@ import {
   buildCapabilityOriginalJson,
   BUILTIN_TAVILY_NAME,
   findCapabilityDescriptor,
+  getCapabilityCredentialValue,
   hasCapabilityCredential,
 } from '@/common/config/builtinCapabilities';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
@@ -475,6 +476,20 @@ export function buildTavilyCredentialUpdate(server: IMcpServer, apiKey: string):
 }
 
 /**
+ * True when the web-search server's stored credential equals the build-time
+ * key — i.e. it was installed by this seed (possibly by an earlier pass
+ * whose enable toggle failed), not configured by the user. Pure — exported
+ * for tests.
+ */
+export function hasSeededTavilyCredential(server: IMcpServer, apiKey: string): boolean {
+  const descriptor = findCapabilityDescriptor(BUILTIN_TAVILY_NAME);
+  if (!descriptor || server.transport.type !== 'stdio') {
+    return false;
+  }
+  return getCapabilityCredentialValue(descriptor, server.transport) === apiKey;
+}
+
+/**
  * Install the build-time Tavily key on the built-in web-search server and
  * enable it, so a fresh install can search the web with zero setup.
  * One-shot: after a successful pass the flag is set, so a user who later
@@ -503,14 +518,19 @@ export async function seedTavilyWebSearch(configFile: ConfigFile): Promise<boole
   const update = buildTavilyCredentialUpdate(server, apiKey);
   if (update) {
     await mcpService.updateServer.invoke({ id: server.id, data: update });
-    if (!server.enabled) {
-      // `enabled` isn't part of updateServer's payload; flip it via toggleServer.
-      await mcpService.toggleServer.invoke({ id: server.id });
-    }
+  }
+
+  // Enable when we installed the key this pass, or when an earlier partial
+  // pass installed it but failed before the enable toggle. A foreign
+  // (user-configured) credential means the whole setup is the user's —
+  // leave it, including its enabled state, untouched.
+  if ((update !== null || hasSeededTavilyCredential(server, apiKey)) && !server.enabled) {
+    // `enabled` isn't part of updateServer's payload; flip it via toggleServer.
+    await mcpService.toggleServer.invoke({ id: server.id });
+  }
+  if (update) {
     console.info('[Seed] Built-in Tavily web search enabled with shared key');
   }
-  // update === null means the user already configured (or rewired) the
-  // server — set the flag without touching their setup.
 
   await configFile.set(TAVILY_SEED_FLAG, true);
   return true;

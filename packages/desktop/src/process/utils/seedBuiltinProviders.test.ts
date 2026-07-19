@@ -19,6 +19,7 @@ import {
   buildBuiltinHttpMcpServers,
   buildTavilyCredentialUpdate,
   findOpenCodeHubExtension,
+  hasSeededTavilyCredential,
   mergeGreenNodeIntoOpenCodeConfig,
   mergeMoonshotIntoOpenCodeConfig,
   mergeVisionMcpIntoOpenCodeConfig,
@@ -223,5 +224,27 @@ describe('buildTavilyCredentialUpdate', () => {
   it('returns null when the transport is not stdio (user rewired the server)', () => {
     const httpTransport = { type: 'http' as const, url: 'https://example.com/mcp' };
     expect(buildTavilyCredentialUpdate(webSearchServer(httpTransport), 'tvly-test-key')).toBeNull();
+  });
+});
+
+describe('hasSeededTavilyCredential', () => {
+  const stdioWithKey = (key: string) => ({
+    type: 'stdio' as const,
+    command: 'npx',
+    args: ['-y', 'tavily-mcp@latest'],
+    env: { TAVILY_API_KEY: key },
+  });
+
+  it('is true when the stored credential equals the build-time key', () => {
+    expect(hasSeededTavilyCredential(webSearchServer(stdioWithKey('tvly-shared')), 'tvly-shared')).toBe(true);
+  });
+
+  it('is false for a foreign (user-configured) credential', () => {
+    expect(hasSeededTavilyCredential(webSearchServer(stdioWithKey('user-own-key')), 'tvly-shared')).toBe(false);
+  });
+
+  it('is false when the transport is not stdio', () => {
+    const httpTransport = { type: 'http' as const, url: 'https://example.com/mcp' };
+    expect(hasSeededTavilyCredential(webSearchServer(httpTransport), 'tvly-shared')).toBe(false);
   });
 });
