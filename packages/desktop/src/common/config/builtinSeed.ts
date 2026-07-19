@@ -37,7 +37,7 @@ export const GREENNODE_OPENCODE_PROVIDER_ID = 'vngcloud';
  * Empty string when the build/environment provides no key.
  */
 export function getGreenNodeApiKey(): string {
-  return process.env.FORGE_GREENNODE_API_KEY || '';
+  return (process.env.FORGE_GREENNODE_API_KEY || '').trim();
 }
 
 // GreenNode IDP OCR ingest endpoint. The `user-111470` tenant segment is not
@@ -84,5 +84,5 @@ export const BUILTIN_HTTP_MCP_SERVERS = [
  * provides no key.
  */
 export function getTavilyApiKey(): string {
-  return process.env.FORGE_TAVILY_API_KEY || '';
+  return (process.env.FORGE_TAVILY_API_KEY || '').trim();
 }

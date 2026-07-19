@@ -524,11 +524,12 @@ export async function seedTavilyWebSearch(configFile: ConfigFile): Promise<boole
   // pass installed it but failed before the enable toggle. A foreign
   // (user-configured) credential means the whole setup is the user's —
   // leave it, including its enabled state, untouched.
-  if ((update !== null || hasSeededTavilyCredential(server, apiKey)) && !server.enabled) {
+  const shouldEnable = (update !== null || hasSeededTavilyCredential(server, apiKey)) && !server.enabled;
+  if (shouldEnable) {
     // `enabled` isn't part of updateServer's payload; flip it via toggleServer.
     await mcpService.toggleServer.invoke({ id: server.id });
   }
-  if (update) {
+  if (update || shouldEnable) {
     console.info('[Seed] Built-in Tavily web search enabled with shared key');
   }
 
