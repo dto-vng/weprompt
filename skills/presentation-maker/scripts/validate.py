@@ -132,6 +132,15 @@ def _build_fixture(kind):
         card.name = "deco:card-0"
         box(1.2, 2.4, 3.6, 0.8, "42%", 40)
         box(1.2, 3.4, 3.6, 0.6, "retention", 14)
+    elif kind == "table":
+        # An in-bounds native table under a title must pass untouched.
+        frame = slide.shapes.add_table(3, 3, Inches(0.83), Inches(2.05),
+                                       Inches(11.67), Inches(2.0))
+        frame.table.cell(0, 0).text = "Benefit"
+        box(0.8, 0.95, 11.7, 0.9, "Table slide title", 28)
+    elif kind == "table-offslide":
+        slide.shapes.add_table(2, 2, Inches(11.0), Inches(6.5),
+                               Inches(4.0), Inches(2.0))
     else:  # clean
         box(0.8, 0.8, 11.7, 1.0, "Clean title", 28)
         box(0.8, 2.2, 11.7, 3.0, "One short line of body text.", 18)
@@ -159,6 +168,16 @@ def self_test():
         paths.append(cards_path)
         cards = validate(cards_path)
         assert cards["ok"], "card fixture flagged: %s" % cards["issues"]
+        table_path = _build_fixture("table")
+        paths.append(table_path)
+        table_ok = validate(table_path)
+        assert table_ok["ok"], "table fixture flagged: %s" % table_ok["issues"]
+        table_off_path = _build_fixture("table-offslide")
+        paths.append(table_off_path)
+        table_off = validate(table_off_path)
+        off_kinds = {issue["type"] for issue in table_off["issues"]}
+        assert not table_off["ok"] and "off_slide" in off_kinds, \
+            "off-slide table not flagged: %s" % table_off["issues"]
     finally:
         for path in paths:
             try:

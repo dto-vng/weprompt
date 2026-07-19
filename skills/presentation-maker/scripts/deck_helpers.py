@@ -15,7 +15,7 @@ import os
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 SLIDE_W = Emu(12192000)  # 13.333 in, exact 16:9
@@ -249,6 +249,103 @@ def add_closing_slide(prs, theme, title, lines):
         para = lf.paragraphs[0] if i == 0 else lf.add_paragraph()
         _style_run(para, str(item), theme["fonts"]["body"], 16, on)
         para.space_after = Pt(10)
+
+
+TABLE_MAX_ROWS = 8
+TABLE_MAX_COLS = 5
+
+
+def _mix(hex_a, hex_b, ratio):
+    """Blend hex_a over hex_b; ratio=1.0 -> pure hex_a. Returns 6-digit hex."""
+    a = [int(hex_a[i:i + 2], 16) for i in (0, 2, 4)]
+    b = [int(hex_b[i:i + 2], 16) for i in (0, 2, 4)]
+    return "".join("%02X" % round(ca * ratio + cb * (1 - ratio)) for ca, cb in zip(a, b))
+
+
+def _is_numeric_cell(text):
+    value = str(text).strip()
+    for token in (" ", ".", ",", "%", "đ", "₫", "VND", "VNĐ", "+", "-"):
+        value = value.replace(token, "")
+    return bool(value) and value.isdigit()
+
+
+def _style_cell(cell, text, font_name, size, hex6, bold=False, align=PP_ALIGN.LEFT):
+    cell.margin_left = Inches(0.08)
+    cell.margin_right = Inches(0.08)
+    cell.margin_top = Inches(0.03)
+    cell.margin_bottom = Inches(0.03)
+    cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf = cell.text_frame
+    tf.word_wrap = True
+    para = tf.paragraphs[0]
+    para.alignment = align
+    _style_run(para, str(text), font_name, size, hex6, bold=bold)
+
+
+def add_table_slide(prs, theme, title, headers, rows, highlight_col=None, source=None, kicker=""):
+    """Action title over a styled native table. Max 8 body rows x 5 columns;
+    split larger data across slides. highlight_col tints one column with the
+    primary color; source renders a small caption under the table."""
+    n_cols = len(headers)
+    if not 2 <= n_cols <= TABLE_MAX_COLS:
+        raise ValueError("add_table_slide supports 2-%d columns" % TABLE_MAX_COLS)
+    if not 1 <= len(rows) <= TABLE_MAX_ROWS:
+        raise ValueError(
+            "add_table_slide supports 1-%d body rows; split larger data across slides" % TABLE_MAX_ROWS)
+    for row in rows:
+        if len(row) != n_cols:
+            raise ValueError("every row must have %d cells to match headers" % n_cols)
+    if highlight_col is not None and not 0 <= highlight_col < n_cols:
+        raise ValueError("highlight_col out of range")
+
+    slide = _blank_slide(prs, theme)
+    _header(prs, slide, theme, title, kicker)
+
+    n_rows = len(rows)
+    size = 14 if n_rows <= 4 else 13 if n_rows <= 6 else 12 if n_rows == 7 else 11
+    top = Inches(2.05)
+    bottom = Inches(6.45) if source else Inches(6.85)
+    header_h = Inches(0.5)
+    body_h = int((bottom - top - header_h) / n_rows)
+    frame = slide.shapes.add_table(n_rows + 1, n_cols, MARGIN, top,
+                                   CONTENT_W, header_h + body_h * n_rows)
+    table = frame.table
+    table.first_row = False
+    table.horz_banding = False
+
+    unit_w = int(CONTENT_W / (1.6 + (n_cols - 1)))
+    table.columns[0].width = int(CONTENT_W) - unit_w * (n_cols - 1)
+    for c in range(1, n_cols):
+        table.columns[c].width = unit_w
+    table.rows[0].height = header_h
+    for r in range(1, n_rows + 1):
+        table.rows[r].height = body_h
+
+    numeric_cols = [all(_is_numeric_cell(row[c]) for row in rows) for c in range(n_cols)]
+    on_primary = _on_color(theme["colors"]["primary"])
+    highlight_fill = _mix(theme["colors"]["primary"], theme["colors"]["bg"], 0.18)
+
+    for c, head in enumerate(headers):
+        cell = table.cell(0, c)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = _rgb(theme["colors"]["primary"])
+        align = PP_ALIGN.RIGHT if numeric_cols[c] else PP_ALIGN.LEFT
+        _style_cell(cell, head, theme["fonts"]["body"], size, on_primary, bold=True, align=align)
+
+    for r, row in enumerate(rows, start=1):
+        band = theme["colors"]["surface"] if r % 2 else theme["colors"]["bg"]
+        for c, value in enumerate(row):
+            cell = table.cell(r, c)
+            cell.fill.solid()
+            fill_hex = highlight_fill if c == highlight_col else band
+            cell.fill.fore_color.rgb = _rgb(fill_hex)
+            align = PP_ALIGN.RIGHT if numeric_cols[c] else PP_ALIGN.LEFT
+            _style_cell(cell, value, theme["fonts"]["body"], size,
+                        theme["colors"]["text"], bold=(c == 0), align=align)
+
+    if source:
+        _, sf = _textbox(slide, MARGIN, Inches(6.55), Inches(8.0), Inches(0.32))
+        _style_run(sf.paragraphs[0], source, theme["fonts"]["body"], 9, theme["colors"]["muted"])
 
 
 def save_deck(prs, path):
