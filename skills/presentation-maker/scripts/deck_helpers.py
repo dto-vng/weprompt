@@ -388,6 +388,50 @@ def add_agenda_slide(prs, theme, items, title="Agenda"):
         para.space_after = Pt(14)
 
 
+def add_process_slide(prs, theme, title, steps):
+    """3-6 numbered step cards with arrow connectors. Each step is
+    {"label": str, "desc": str}. With 5-6 steps keep label <= 14 chars and
+    desc <= 45 chars; with 3-4 steps desc may reach 90 chars."""
+    if not 3 <= len(steps) <= 6:
+        raise ValueError("add_process_slide supports 3-6 steps")
+    slide = _blank_slide(prs, theme)
+    _header(prs, slide, theme, title)
+    n = len(steps)
+    gap = Inches(0.5)
+    card_w = int((CONTENT_W - gap * (n - 1)) / n)
+    card_y, card_h = Inches(2.5), Inches(3.2)
+    pad = Inches(0.22)
+    on_primary = _on_color(theme["colors"]["primary"])
+    for i, step in enumerate(steps):
+        x = MARGIN + i * (card_w + gap)
+        _deco_rect(slide, x, card_y, card_w, card_h,
+                   theme["colors"]["surface"], "deco:step-%d" % i, rounded=True)
+        badge = slide.shapes.add_shape(MSO_SHAPE.OVAL, x + pad, card_y + pad,
+                                       Inches(0.5), Inches(0.5))
+        badge.name = "deco:step-num-%d" % i
+        badge.fill.solid()
+        badge.fill.fore_color.rgb = _rgb(theme["colors"]["primary"])
+        badge.line.fill.background()
+        badge.shadow.inherit = False
+        badge.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+        _style_run(badge.text_frame.paragraphs[0], str(i + 1),
+                   theme["fonts"]["body"], 16, on_primary, bold=True)
+        inner_w = card_w - int(pad) * 2
+        _, lf = _textbox(slide, x + pad, card_y + Inches(0.9), inner_w, Inches(0.75))
+        _set_run(lf.paragraphs[0], str(step["label"]), theme, 15, "text", "heading", bold=True)
+        _, df = _textbox(slide, x + pad, card_y + Inches(1.7), inner_w, Inches(1.35))
+        _set_run(df.paragraphs[0], str(step["desc"]), theme, 11, "muted")
+        if i < n - 1:
+            arrow = slide.shapes.add_shape(
+                MSO_SHAPE.CHEVRON, x + card_w + Inches(0.1),
+                int(card_y + card_h / 2 - Inches(0.14)), Inches(0.3), Inches(0.28))
+            arrow.name = "deco:arrow-%d" % i
+            arrow.fill.solid()
+            arrow.fill.fore_color.rgb = _rgb(theme["colors"]["primary"])
+            arrow.line.fill.background()
+            arrow.shadow.inherit = False
+
+
 def save_deck(prs, path):
     path = os.path.abspath(path)
     prs.save(path)
