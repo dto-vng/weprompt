@@ -80,6 +80,31 @@ Typography rules:
 - Keep the accent line, section marker, or footer in the same position on every slide for rhythm.
 - Repeat layout patterns across similar slides so the deck feels like one document, not a collage.
 
+## Density floor
+
+- Every content slide needs one dominant anchor: a table, a big number, a process, or an image.
+- A slide carrying only 2–4 short bullets is a defect when the source has data that could fill an anchor.
+- For a tabular source, target at least 3 table slides in a 12-slide deck.
+- The restraint limits still cap the maximum; this rule floors the minimum. Restraint means "one idea per slide", not "one thin slide per idea".
+
+## Action titles
+
+- Titles state the takeaway, not the topic. Lead with the fact, and include the number when you have one.
+- A topic label makes the audience read the body to learn the point; an action title delivers the point in the title.
+- Vietnamese good/bad pairs:
+  - Bad `Quyền lợi nội trú` → good `Nội trú được chi trả tới 80 triệu đ/năm`.
+  - Bad `Gói bảo hiểm S.1` → good `Gói S.1 phù hợp với nhân viên L1-2`.
+  - Bad `Thời gian chờ` → good `Thai sản có thời gian chờ 270 ngày`.
+
+## Tables
+
+- No vertical gridlines — `add_table_slide` omits them for you; do not try to add borders.
+- Put the unit in the header (`Chi trả (triệu đ)`), never repeated in every cell.
+- Numbers are right-aligned automatically when a whole column is numeric; do not pad cells to fake alignment.
+- Highlight at most one column — the audience's own package or tier — via `highlight_col`.
+- More than 8 rows → split across slides. Never shrink cell text below 11pt to force extra rows onto one slide.
+- Always pass `source=` when the data came from a document, so the slide cites where the figures live.
+
 ## Per-slide-type content limits
 
 Build the deck with the helper functions. Start with `new_deck(THEME)` and
@@ -95,6 +120,10 @@ validate/fix iteration.
 - **`add_stats_slide`** — title **≤ 50 characters** (28pt); exactly **3 stats**; each stat number short (≤ 6 characters) with a ≤ 5-word label.
 - **`add_quote_slide`** — quote text **≤ 200 characters**; attribution ≤ 40 characters. One quote per slide, no other content.
 - **`add_closing_slide`** — title **≤ 35 characters** (40pt); one call-to-action or contact line ≤ 50 characters.
+- **`add_agenda_slide`** — **3–8 items**, each **≤ 6 words**; items mirror the section-divider titles (`title` defaults to `Agenda`).
+- **`add_table_slide`** — title **≤ 50 characters**; **≤ 8 body rows × 5 columns**; header cells **≤ 3 words**; first-column cells **≤ 8 words**; `source` **≤ 70 characters**.
+- **`add_big_number_slide`** — number **≤ 16 characters**; unit **≤ 20 characters**; **≤ 3 support lines**, each **≤ 12 words**; kicker **≤ 30 characters**.
+- **`add_process_slide`** — title **≤ 50 characters**; **3–6 steps**. With 5–6 steps keep each `label` **≤ 14 characters** and `desc` **≤ 45 characters**; with 3–4 steps `label` **≤ 20 characters** and `desc` **≤ 90 characters**.
 - **General** — keep the deck to 8–15 slides; if a slide breaks two caps, split it rather than shrinking text.
 
 ## Common mistakes
@@ -106,3 +135,5 @@ validate/fix iteration.
 - **Cramped edges.** Text or boxes touching the slide border. Fix: keep the 0.83in margin and let the message breathe.
 - **Too many stats.** Five or more numbers crammed on one slide. Fix: show three, or move the rest to a follow-up slide.
 - **Flat monotony.** Ten identical text slides in a row. Fix: break chapters with section dividers, put numbers on stat cards, and use an image slide when the user supplied a picture.
+- **Thin slides.** Three-line bullet slides while the source workbook holds real figures. Fix: extract the figures to `facts.md`, then anchor the slide with a table or a big number.
+- **Table flattened to bullets.** Tabular data paraphrased into prose bullets. Fix: never narrate a table — render it with `add_table_slide`.

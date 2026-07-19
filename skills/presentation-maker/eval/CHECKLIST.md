@@ -11,6 +11,14 @@ if ALL of the following hold:
 4. Slide count matches the confirmed outline (+/- 1).
 5. Visual review: one consistent theme throughout; no unreadable
    text-on-background combination; margins respected on every slide.
+6. When the brief includes a data file, `facts.md` exists next to the deck
+   and every figure shown on the slides appears in it.
+7. For a tabular source, the deck contains at least 3 `add_table_slide`
+   tables, and their figures match the source.
+8. Every content-slide title is an action title (states the takeaway, not a
+   bare topic label).
+9. When the brief describes a process, the deck contains at least one
+   `add_process_slide`.
 
 Record results here per run (date, brief, model, pass/fail, notes).
 Acceptance for the package = all 4 briefs pass.
