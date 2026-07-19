@@ -82,6 +82,8 @@ export interface IConfigStorageRefer {
   'migration.opencodeMoonshotSeeded_v1'?: boolean;
   /** One-shot flag: image-analysis (vision) MCP tool registered in local OpenCode config (see seedBuiltinProviders.ts). */
   'migration.opencodeVisionMcpSeeded_v1'?: boolean;
+  /** One-shot flag: built-in Tavily web search seeded with the shared key (see seedBuiltinProviders.ts). */
+  'migration.tavilyWebSearchSeeded_v1'?: boolean;
   // Desktop Pet: whether the desktop pet feature is enabled
   'pet.enabled'?: boolean;
   // Desktop Pet: size in pixels (200, 280, or 360)

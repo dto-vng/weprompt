@@ -42,6 +42,7 @@ export type ConfigKeyMap = {
   'migration.greennodeProviderSeeded_v1': boolean | undefined;
   'migration.opencodeGreenNodeSeeded_v1': boolean | undefined;
   'migration.opencodeAgentInstalled_v1': boolean | undefined;
+  'migration.tavilyWebSearchSeeded_v1': boolean | undefined;
 };
 
 export type ConfigKey = keyof ConfigKeyMap;

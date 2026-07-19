@@ -10,6 +10,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import stripJsonComments from 'strip-json-comments';
 import { httpRequest } from '@/common/adapter/httpBridge';
+import { mcpService } from '@/common/adapter/ipcBridge';
 import {
   BUILTIN_HTTP_MCP_SERVERS,
   GREENNODE_BASE_URL,
@@ -18,6 +19,7 @@ import {
   GREENNODE_OPENCODE_PROVIDER_ID,
   GREENNODE_PROVIDER_NAME,
   getGreenNodeApiKey,
+  getTavilyApiKey,
   MOONSHOT_BASE_URL,
   MOONSHOT_MODELS,
   MOONSHOT_OPENCODE_PROVIDER_ID,
@@ -42,13 +44,15 @@ const OPENCODE_SEED_FLAG = 'migration.opencodeGreenNodeSeeded_v1' as const;
 const OPENCODE_AGENT_INSTALL_FLAG = 'migration.opencodeAgentInstalled_v1' as const;
 const OPENCODE_MOONSHOT_SEED_FLAG = 'migration.opencodeMoonshotSeeded_v1' as const;
 const OPENCODE_VISION_MCP_SEED_FLAG = 'migration.opencodeVisionMcpSeeded_v1' as const;
+const TAVILY_SEED_FLAG = 'migration.tavilyWebSearchSeeded_v1' as const;
 
 type SeedFlag =
   | typeof GREENNODE_PROVIDER_SEED_FLAG
   | typeof OPENCODE_SEED_FLAG
   | typeof OPENCODE_AGENT_INSTALL_FLAG
   | typeof OPENCODE_MOONSHOT_SEED_FLAG
-  | typeof OPENCODE_VISION_MCP_SEED_FLAG;
+  | typeof OPENCODE_VISION_MCP_SEED_FLAG
+  | typeof TAVILY_SEED_FLAG;
 
 async function readSeedFlag(configFile: ConfigFile, flag: SeedFlag): Promise<boolean> {
   try {
@@ -468,4 +472,46 @@ export function buildTavilyCredentialUpdate(server: IMcpServer, apiKey: string):
   }
   const transport = applyCapabilityCredential(descriptor, server.transport, apiKey);
   return { transport, original_json: buildCapabilityOriginalJson(server.name, transport) };
+}
+
+/**
+ * Install the build-time Tavily key on the built-in web-search server and
+ * enable it, so a fresh install can search the web with zero setup.
+ * One-shot: after a successful pass the flag is set, so a user who later
+ * disables web search or replaces/removes the key keeps their choice.
+ * Returns false (step incomplete, retried next launch) while the build has
+ * no key or the MCP bootstrap has not created the builtin server yet.
+ */
+export async function seedTavilyWebSearch(configFile: ConfigFile): Promise<boolean> {
+  if (await readSeedFlag(configFile, TAVILY_SEED_FLAG)) {
+    return true;
+  }
+
+  const apiKey = getTavilyApiKey();
+  if (!apiKey) {
+    console.warn('[Seed] FORGE_TAVILY_API_KEY not available, skipping Tavily web-search seed');
+    return false;
+  }
+
+  const servers = await mcpService.listServers.invoke();
+  const server = servers.find((candidate) => candidate.name === BUILTIN_TAVILY_NAME);
+  if (!server) {
+    console.warn('[Seed] Builtin web-search server not bootstrapped yet, skipping Tavily seed');
+    return false;
+  }
+
+  const update = buildTavilyCredentialUpdate(server, apiKey);
+  if (update) {
+    await mcpService.updateServer.invoke({ id: server.id, data: update });
+    if (!server.enabled) {
+      // `enabled` isn't part of updateServer's payload; flip it via toggleServer.
+      await mcpService.toggleServer.invoke({ id: server.id });
+    }
+    console.info('[Seed] Built-in Tavily web search enabled with shared key');
+  }
+  // update === null means the user already configured (or rewired) the
+  // server — set the flag without touching their setup.
+
+  await configFile.set(TAVILY_SEED_FLAG, true);
+  return true;
 }

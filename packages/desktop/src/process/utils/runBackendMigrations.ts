@@ -43,6 +43,7 @@ import {
   seedOpenCodeGreenNodeConfig,
   seedOpenCodeMoonshotConfig,
   seedOpenCodeVisionMcp,
+  seedTavilyWebSearch,
 } from './seedBuiltinProviders';
 
 type ConfigFile = typeof ProcessConfigType;
@@ -572,6 +573,7 @@ const MIGRATION_STEPS: Array<{
   { name: 'seedOpenCodeMoonshotConfig', run: async (configFile) => seedOpenCodeMoonshotConfig(configFile) },
   { name: 'seedOpenCodeVisionMcp', run: async (configFile) => seedOpenCodeVisionMcp(configFile) },
   { name: 'ensureOpenCodeAgentInstalled', run: async (configFile) => ensureOpenCodeAgentInstalled(configFile) },
+  { name: 'seedTavilyWebSearch', run: async (configFile) => seedTavilyWebSearch(configFile) },
 ];
 
 async function syncBuiltinMcpConfig(configFile: ConfigFile): Promise<void> {
