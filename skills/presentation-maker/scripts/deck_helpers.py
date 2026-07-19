@@ -348,6 +348,46 @@ def add_table_slide(prs, theme, title, headers, rows, highlight_col=None, source
         _style_run(sf.paragraphs[0], source, theme["fonts"]["body"], 9, theme["colors"]["muted"])
 
 
+def add_big_number_slide(prs, theme, kicker, number, unit, support_lines):
+    """One hero figure per slide. Keep number <= 16 characters; put detail
+    in up to 3 support lines, not in the number."""
+    if len(support_lines) > 3:
+        raise ValueError("add_big_number_slide supports at most 3 support lines")
+    slide = _blank_slide(prs, theme)
+    if kicker:
+        _, kf = _textbox(slide, MARGIN, Inches(1.25), CONTENT_W, Inches(0.45))
+        _set_run(kf.paragraphs[0], str(kicker).upper(), theme, 14, "primary", bold=True)
+    _, nf = _textbox(slide, MARGIN, Inches(1.85), CONTENT_W, Inches(1.55))
+    _set_run(nf.paragraphs[0], str(number), theme, 80, "primary", "heading", bold=True)
+    if unit:
+        _, uf = _textbox(slide, MARGIN, Inches(3.5), CONTENT_W, Inches(0.55))
+        _set_run(uf.paragraphs[0], str(unit), theme, 24, "muted")
+    _, sf = _textbox(slide, MARGIN, Inches(4.35), Inches(9.5), Inches(2.1))
+    for i, line in enumerate(support_lines):
+        para = sf.paragraphs[0] if i == 0 else sf.add_paragraph()
+        _set_run(para, str(line), theme, 18, "text")
+        para.space_after = Pt(10)
+    _page_furniture(prs, slide, theme)
+
+
+def add_agenda_slide(prs, theme, items, title="Agenda"):
+    """Numbered agenda matching the deck's section dividers (3-8 items)."""
+    if not 3 <= len(items) <= 8:
+        raise ValueError("add_agenda_slide supports 3-8 items")
+    slide = _blank_slide(prs, theme)
+    _header(prs, slide, theme, title)
+    _, tf = _textbox(slide, MARGIN, Inches(2.15), CONTENT_W, Inches(4.6))
+    for i, item in enumerate(items):
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        _set_run(para, "%02d" % (i + 1), theme, 18, "primary", "heading", bold=True)
+        run = para.add_run()
+        run.text = "   " + str(item)
+        run.font.name = theme["fonts"]["body"]
+        run.font.size = Pt(18)
+        run.font.color.rgb = _rgb(theme["colors"]["text"])
+        para.space_after = Pt(14)
+
+
 def save_deck(prs, path):
     path = os.path.abspath(path)
     prs.save(path)
