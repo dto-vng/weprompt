@@ -12,9 +12,12 @@ import {
   GREENNODE_OPENCODE_DEFAULT_MODEL,
   GREENNODE_OPENCODE_PROVIDER_ID,
 } from '@/common/config/builtinSeed';
+import { BUILTIN_TAVILY_NAME } from '@/common/config/builtinCapabilities';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
+import type { IMcpServer } from '@/common/config/storage';
 import {
   buildBuiltinHttpMcpServers,
+  buildTavilyCredentialUpdate,
   findOpenCodeHubExtension,
   mergeGreenNodeIntoOpenCodeConfig,
   mergeMoonshotIntoOpenCodeConfig,
@@ -178,5 +181,47 @@ describe('buildBuiltinHttpMcpServers', () => {
     const urls = BUILTIN_HTTP_MCP_SERVERS.map((seed) => seed.url);
     expect(urls).toContain('https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4');
     expect(urls).toContain('https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp');
+  });
+});
+
+const webSearchServer = (transport: IMcpServer['transport'], overrides: Partial<IMcpServer> = {}): IMcpServer =>
+  ({
+    id: 'builtin-tavily',
+    name: BUILTIN_TAVILY_NAME,
+    description: 'Web search powered by Tavily. Requires a Tavily API key.',
+    enabled: false,
+    builtin: true,
+    transport,
+    ...overrides,
+  }) as IMcpServer;
+
+describe('buildTavilyCredentialUpdate', () => {
+  const stdioTransport = () => ({
+    type: 'stdio' as const,
+    command: 'npx',
+    args: ['-y', 'tavily-mcp@latest'],
+    env: {},
+  });
+
+  it('applies the key to TAVILY_API_KEY and regenerates original_json', () => {
+    const update = buildTavilyCredentialUpdate(webSearchServer(stdioTransport()), 'tvly-test-key');
+
+    expect(update).not.toBeNull();
+    expect(update!.transport.env?.TAVILY_API_KEY).toBe('tvly-test-key');
+    const parsed = JSON.parse(update!.original_json) as {
+      mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>;
+    };
+    expect(parsed.mcpServers[BUILTIN_TAVILY_NAME].env?.TAVILY_API_KEY).toBe('tvly-test-key');
+    expect(parsed.mcpServers[BUILTIN_TAVILY_NAME].command).toBe('npx');
+  });
+
+  it('returns null when the user already configured a credential', () => {
+    const transport = { ...stdioTransport(), env: { TAVILY_API_KEY: 'user-own-key' } };
+    expect(buildTavilyCredentialUpdate(webSearchServer(transport), 'tvly-test-key')).toBeNull();
+  });
+
+  it('returns null when the transport is not stdio (user rewired the server)', () => {
+    const httpTransport = { type: 'http' as const, url: 'https://example.com/mcp' };
+    expect(buildTavilyCredentialUpdate(webSearchServer(httpTransport), 'tvly-test-key')).toBeNull();
   });
 });

@@ -76,3 +76,13 @@ export const BUILTIN_HTTP_MCP_SERVERS = [
     url: 'https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp',
   },
 ] as const;
+
+/**
+ * Tavily API key for the built-in web-search capability, injected at build
+ * time from FORGE_TAVILY_API_KEY via electron-vite `define` (in dev and tests
+ * this reads the real process env). Empty string when the build/environment
+ * provides no key.
+ */
+export function getTavilyApiKey(): string {
+  return process.env.FORGE_TAVILY_API_KEY || '';
+}

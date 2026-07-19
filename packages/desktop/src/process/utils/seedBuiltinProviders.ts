@@ -24,8 +24,15 @@ import {
   MOONSHOT_PROVIDER_NAME,
   MOONSHOT_VISION_MODEL,
 } from '@/common/config/builtinSeed';
+import {
+  applyCapabilityCredential,
+  buildCapabilityOriginalJson,
+  BUILTIN_TAVILY_NAME,
+  findCapabilityDescriptor,
+  hasCapabilityCredential,
+} from '@/common/config/builtinCapabilities';
 import type { IHubAgentItem } from '@/common/types/agent/hub';
-import type { IMcpServer, IProvider } from '@/common/config/storage';
+import type { IMcpServer, IMcpServerTransportStdio, IProvider } from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 
 type ConfigFile = typeof ProcessConfigType;
@@ -440,4 +447,25 @@ export function buildBuiltinHttpMcpServers(): BuiltinMcpImportServer[] {
       original_json: JSON.stringify({ mcpServers: { [seed.name]: transport } }, null, 2),
     };
   });
+}
+
+export type TavilyCredentialUpdate = { transport: IMcpServerTransportStdio; original_json: string };
+
+/**
+ * Build the transport/original_json update that installs the shared Tavily
+ * key on the built-in web-search server. Returns null when there is nothing
+ * to seed: the transport is not stdio (user rewired the server) or a
+ * credential is already present (user configured their own key). Pure —
+ * exported for tests.
+ */
+export function buildTavilyCredentialUpdate(server: IMcpServer, apiKey: string): TavilyCredentialUpdate | null {
+  const descriptor = findCapabilityDescriptor(BUILTIN_TAVILY_NAME);
+  if (!descriptor || server.transport.type !== 'stdio') {
+    return null;
+  }
+  if (hasCapabilityCredential(descriptor, server.transport)) {
+    return null;
+  }
+  const transport = applyCapabilityCredential(descriptor, server.transport, apiKey);
+  return { transport, original_json: buildCapabilityOriginalJson(server.name, transport) };
 }
