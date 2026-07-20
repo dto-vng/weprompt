@@ -9,7 +9,10 @@ Windows native modules cannot be cross-compiled from macOS.
 
 1. **Repo must be private.** `khoapnt-vng/WePrompt` → Settings → General →
    Danger Zone → Change visibility → Private. On a public repo, anyone can
-   download Actions artifacts — which embed the shared API key.
+   download Actions artifacts — which embed the shared API key. The same
+   applies to GitHub Releases: tag pushes run the release pipeline through
+   the same keyed build steps, so release assets embed the key too. Keep the
+   repo private for as long as these secrets are configured.
 2. **Add the key as an Actions secret.** Settings → Secrets and variables →
    Actions → New repository secret → name `FORGE_GREENNODE_API_KEY`, value =
    the shared GreenNode key. **Never commit the key.**
