@@ -12,6 +12,28 @@ vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
   useConversationHistoryContext: () => ({ conversations: [] }),
 }));
 
+// ProjectFilesCard (C5) fetches the workspace tree on mount via ipcBridge —
+// mock it so this page-level test stays hermetic (no real IPC/network call).
+vi.mock('@/common', () => ({
+  ipcBridge: {
+    fs: {
+      getFilesByDir: {
+        invoke: vi.fn().mockResolvedValue([]),
+      },
+    },
+    shell: {
+      showItemInFolder: {
+        invoke: vi.fn(),
+      },
+    },
+    dialog: {
+      showOpen: {
+        invoke: vi.fn(),
+      },
+    },
+  },
+}));
+
 import ProjectHomePage from '@renderer/pages/project/ProjectHomePage';
 
 const project = { id: 'p1', name: 'Alpha Project', workspace: '/w/alpha', created_at: 1, updated_at: 1 };

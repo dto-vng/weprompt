@@ -14,6 +14,7 @@ import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 
 import styles from './ProjectHomePage.module.css';
 import ProjectChatList from './components/ProjectChatList';
+import ProjectFilesCard from './components/ProjectFilesCard';
 import ProjectHeader from './components/ProjectHeader';
 import ProjectInstructionsCard from './components/ProjectInstructionsCard';
 import { useProjectChats } from './hooks/useProjectChats';
@@ -27,14 +28,16 @@ import { useProjectHome } from './hooks/useProjectHome';
  * column (composer + chats) and a right rail (instructions + files) that
  * collapses to a single stacked column on narrow viewports. The header slot
  * renders `ProjectHeader` (C2), the chats slot renders `ProjectChatList`
- * (C3), and the instructions slot renders `ProjectInstructionsCard` (C4);
- * the remaining slots are still empty placeholders — later tasks (C5 files,
- * C6 composer) replace each with its real component.
+ * (C3), the instructions slot renders `ProjectInstructionsCard` (C4), and
+ * the files slot renders `ProjectFilesCard` (C5); the composer slot is still
+ * an empty placeholder — a later task (C6) replaces it with its real
+ * component.
  *
  * `useProjectHome` resolves synchronously from localStorage, so there is no
  * async page-level loading gap — a page-level loading skeleton would be dead
- * code. The mockup's loading skeleton belongs to the async Files card (a
- * later task), not this scaffold.
+ * code. The mockup's loading skeleton belongs to the async Files card
+ * (`ProjectFilesCard`, which loads its tree via IPC and shows its own
+ * loading state), not this scaffold.
  */
 const ProjectHomePage: React.FC = () => {
   const { t } = useTranslation();
@@ -76,7 +79,9 @@ const ProjectHomePage: React.FC = () => {
           <div data-testid='project-instructions-slot'>
             <ProjectInstructionsCard project={project} />
           </div>
-          <div data-testid='project-files-slot' />
+          <div data-testid='project-files-slot'>
+            <ProjectFilesCard project={project} />
+          </div>
         </div>
       </div>
     </div>
