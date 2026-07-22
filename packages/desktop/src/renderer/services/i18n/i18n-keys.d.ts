@@ -1089,6 +1089,7 @@ export type I18nKey =
   | 'messages.permission.intent.tool'
   | 'messages.permissionRequest'
   | 'messages.processing'
+  | 'messages.reasoning'
   | 'messages.responseSentSuccessfully'
   | 'messages.scrollToBottom'
   | 'messages.slash.empty'
