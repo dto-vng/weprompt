@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 
 import styles from './ProjectHomePage.module.css';
+import ProjectHeader from './components/ProjectHeader';
 import { useProjectChats } from './hooks/useProjectChats';
 import { useProjectHome } from './hooks/useProjectHome';
 
@@ -22,10 +23,10 @@ import { useProjectHome } from './hooks/useProjectHome';
  * Resolves the project by route id and renders either a whole-page not-found
  * state, or the two-column hub layout — a full-width header on top, a main
  * column (composer + chats) and a right rail (instructions + files) that
- * collapses to a single stacked column on narrow viewports. Every region is
- * an empty placeholder slot here; later tasks (C2 header, C3 chats,
- * C4 instructions, C5 files, C6 composer) replace each slot with its real
- * component.
+ * collapses to a single stacked column on narrow viewports. The header slot
+ * renders `ProjectHeader` (C2); the remaining slots are still empty
+ * placeholders — later tasks (C3 chats, C4 instructions, C5 files,
+ * C6 composer) replace each with its real component.
  *
  * `useProjectHome` resolves synchronously from localStorage, so there is no
  * async page-level loading gap — a page-level loading skeleton would be dead
@@ -58,7 +59,9 @@ const ProjectHomePage: React.FC = () => {
 
   return (
     <div data-testid='project-home' className={styles.page}>
-      <div data-testid='project-header-slot' className={styles.headerSlot} />
+      <div data-testid='project-header-slot' className={styles.headerSlot}>
+        <ProjectHeader project={project} />
+      </div>
       <div className={classNames(styles.hub, isMobile && styles.hubMobile)}>
         <div className={styles.main}>
           <div data-testid='project-composer-slot' />
