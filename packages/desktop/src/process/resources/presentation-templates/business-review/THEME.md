@@ -72,6 +72,8 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
 - No centered body text (center only titles and hero numbers).
 - No invented facts: if data for a slot is missing, mark it clearly (e.g. "[metric owner to supply]") and say so in the reply.
 - No leftover reference content: every sample name, number and date must be replaced or the slide deleted.
+- Template slots ≠ your items: when you have fewer items than the reference shows (e.g. 2 priorities on a 3-row slide, 3 KPIs on a 4-card grid), delete EVERY shape of the unused row or card — circle, lead, body, owner label, card background — and re-space the remainder. A partial or displaced leftover row is a defect.
+- KPI hero slots hold short values only ('$4.2M', '48%', '+22%', 'Flat' — ≤6 characters). Hero text must never wrap to a second line; a longer status belongs in the sublabel, not the hero slot.
 
 ## Delivery gates (all must pass before the deck is done)
 

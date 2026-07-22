@@ -71,6 +71,7 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
 - No centered body text (center only titles and text inside boxes/badges).
 - No invented facts: if a name, date or figure is missing, mark it clearly (e.g. "[sponsor to confirm]") and say so in the reply.
 - No leftover reference content: every sample project, person and date must be replaced or the slide deleted.
+- Template slots ≠ your items: when you have fewer items than the reference shows (e.g. 3 phases on a 4-box timeline, 3 risks on a 2×2 grid), delete EVERY shape of the unused row, box or card — badge, lead, body, date label, card background, its connectors — and re-space the remainder. A partial or displaced leftover is a defect.
 - Flow connectors keep their arrowheads — a directionless line between phases is a defect.
 
 ## Delivery gates (all must pass before the deck is done)
