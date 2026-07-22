@@ -15,6 +15,7 @@ import { initThemeBridge } from './themeBridge';
 import { ipcBridge } from '@/common';
 import type { TLocalContextCompactionErrorCode } from '@/common/adapter/ipcBridge';
 import { compactContextLocally } from '@process/services/contextCompactionService';
+import { initPresentationTemplateBridge } from '@process/services/presentation-template/bridge';
 
 const CONTEXT_COMPACTION_ERROR_CODES = new Set<TLocalContextCompactionErrorCode>([
   'provider_not_found',
@@ -48,6 +49,7 @@ export type BridgeDependencies = Record<string, never>;
 
 export function initAllBridges(_deps: BridgeDependencies = {}): void {
   initDialogBridge();
+  initPresentationTemplateBridge();
   initApplicationBridge();
   initWindowControlsBridge();
   initUpdateBridge();

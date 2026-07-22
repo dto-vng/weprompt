@@ -53,6 +53,7 @@ import type {
   OfficeArtifactUndoRequest,
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
+import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
 import type {
   EnsureConversationRuntimeResponse,
   SetConfigOptionRequest,
@@ -569,6 +570,19 @@ export const dialog = {
     | { defaultPath?: string; properties?: OpenDialogOptions['properties']; filters?: OpenDialogOptions['filters'] }
     | undefined
   >('show-open'),
+};
+
+// ---------------------------------------------------------------------------
+// Presentation templates — Electron main-process pack directory (bridge IPC)
+// ---------------------------------------------------------------------------
+
+export const presentationTemplates = {
+  list: bridge.buildProvider<PresentationTemplateSummary[], void>('presentation-templates.list'),
+  importSpec: bridge.buildProvider<
+    { ok: true; template: PresentationTemplateSummary } | { ok: false; error: string },
+    { file_path: string }
+  >('presentation-templates.import-spec'),
+  remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
 };
 
 // ---------------------------------------------------------------------------
