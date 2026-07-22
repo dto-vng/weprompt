@@ -578,6 +578,18 @@
     "loaded": "Habilidades cargadas",
     "slashHint": "Skill"
   },
+  "presentationTemplates": {
+    "title": "Plantillas",
+    "buttonTooltip": "Plantillas de presentación",
+    "slashDescription": "Elegir una plantilla de presentación",
+    "importCard": "Importar tema (.md)",
+    "empty": "No hay plantillas disponibles",
+    "chipTooltip": "Este mensaje usará la plantilla",
+    "importSuccess": "Plantilla importada",
+    "importError": "Error al importar: {{error}}",
+    "deleteTooltip": "Eliminar plantilla",
+    "deleteConfirm": "¿Eliminar esta plantilla?"
+  },
   "mcp": {
     "loaded": "MCP cargado",
     "managementHint": "Si un MCP parece anormal, generalmente es causado por la configuración JSON del MCP. Ve a la configuración de herramientas y pruébalo allí.",

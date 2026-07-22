@@ -577,6 +577,18 @@
     "loaded": "Загруженные навыки",
     "slashHint": "Навык"
   },
+  "presentationTemplates": {
+    "title": "Шаблоны",
+    "buttonTooltip": "Шаблоны презентаций",
+    "slashDescription": "Выбрать шаблон презентации",
+    "importCard": "Импорт темы (.md)",
+    "empty": "Нет доступных шаблонов",
+    "chipTooltip": "Это сообщение использует шаблон",
+    "importSuccess": "Шаблон импортирован",
+    "importError": "Ошибка импорта: {{error}}",
+    "deleteTooltip": "Удалить шаблон",
+    "deleteConfirm": "Удалить этот шаблон?"
+  },
   "mcp": {
     "loaded": "Загруженный MCP",
     "managementHint": "Если MCP выглядит некорректно, обычно проблема в конфигурации MCP JSON. Откройте настройки инструментов и проверьте его вручную.",

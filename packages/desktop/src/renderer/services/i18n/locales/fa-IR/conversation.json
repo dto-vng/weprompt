@@ -577,6 +577,18 @@
     "loaded": "مهارت‌های لود شده",
     "slashHint": "مهارت"
   },
+  "presentationTemplates": {
+    "title": "قالب‌ها",
+    "buttonTooltip": "قالب‌های ارائه",
+    "slashDescription": "انتخاب قالب ارائه",
+    "importCard": "وارد کردن تم (.md)",
+    "empty": "قالبی موجود نیست",
+    "chipTooltip": "این پیام از قالب استفاده می‌کند",
+    "importSuccess": "قالب وارد شد",
+    "importError": "خطا در وارد کردن: {{error}}",
+    "deleteTooltip": "حذف قالب",
+    "deleteConfirm": "این قالب حذف شود؟"
+  },
   "mcp": {
     "loaded": "MCP لود شد",
     "managementHint": "اگر MCP غیرعادی به نظر می‌رسد، معمولاً به دلیل پیکربندی JSON MCP است. به تنظیمات ابزارها بروید و آنجا آزمایش کنید.",

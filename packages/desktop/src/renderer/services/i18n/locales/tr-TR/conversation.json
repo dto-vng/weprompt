@@ -579,6 +579,18 @@
     "loaded": "Yüklenen Beceriler",
     "slashHint": "Beceri"
   },
+  "presentationTemplates": {
+    "title": "Şablonlar",
+    "buttonTooltip": "Sunum şablonları",
+    "slashDescription": "Sunum şablonu seçin",
+    "importCard": "Tema içe aktar (.md)",
+    "empty": "Kullanılabilir şablon yok",
+    "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "importSuccess": "Şablon içe aktarıldı",
+    "importError": "İçe aktarma başarısız: {{error}}",
+    "deleteTooltip": "Şablonu sil",
+    "deleteConfirm": "Bu şablon silinsin mi?"
+  },
   "mcp": {
     "loaded": "Yüklü MCP",
     "managementHint": "Bir MCP anormal görünüyorsa, bunun nedeni genellikle MCP JSON yapılandırmasıdır. Araç ayarlarına gidip manuel olarak test edin.",

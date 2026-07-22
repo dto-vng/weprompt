@@ -583,6 +583,18 @@
     "loaded": "Habilidades Carregadas",
     "slashHint": "Habilidade"
   },
+  "presentationTemplates": {
+    "title": "Modelos",
+    "buttonTooltip": "Modelos de apresentação",
+    "slashDescription": "Escolher um modelo de apresentação",
+    "importCard": "Importar tema (.md)",
+    "empty": "Nenhum modelo disponível",
+    "chipTooltip": "Esta mensagem usará o modelo",
+    "importSuccess": "Modelo importado",
+    "importError": "Falha na importação: {{error}}",
+    "deleteTooltip": "Excluir modelo",
+    "deleteConfirm": "Excluir este modelo?"
+  },
   "mcp": {
     "loaded": "MCP carregado",
     "managementHint": "Se algum MCP parecer anormal, isso normalmente é causado pela configuração JSON do MCP. Vá para as configurações de Ferramentas e teste por lá.",

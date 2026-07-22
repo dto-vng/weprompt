@@ -577,6 +577,18 @@
     "loaded": "ロード済みスキル",
     "slashHint": "スキル"
   },
+  "presentationTemplates": {
+    "title": "テンプレート",
+    "buttonTooltip": "プレゼンテーションテンプレート",
+    "slashDescription": "プレゼンテーションテンプレートを選択",
+    "importCard": "テーマをインポート (.md)",
+    "empty": "利用可能なテンプレートがありません",
+    "chipTooltip": "このメッセージはテンプレートを使用します",
+    "importSuccess": "テンプレートをインポートしました",
+    "importError": "インポートに失敗しました: {{error}}",
+    "deleteTooltip": "テンプレートを削除",
+    "deleteConfirm": "このテンプレートを削除しますか？"
+  },
   "mcp": {
     "loaded": "ロード済み MCP",
     "managementHint": "MCP が異常に見える場合、通常は MCP JSON 設定が原因です。ツール設定で確認し、手動で検査してください。",

@@ -578,6 +578,18 @@
     "loaded": "Geladene Skills",
     "slashHint": "Skill"
   },
+  "presentationTemplates": {
+    "title": "Vorlagen",
+    "buttonTooltip": "Präsentationsvorlagen",
+    "slashDescription": "Präsentationsvorlage auswählen",
+    "importCard": "Thema importieren (.md)",
+    "empty": "Keine Vorlagen verfügbar",
+    "chipTooltip": "Diese Nachricht verwendet die Vorlage",
+    "importSuccess": "Vorlage importiert",
+    "importError": "Import fehlgeschlagen: {{error}}",
+    "deleteTooltip": "Vorlage löschen",
+    "deleteConfirm": "Diese Vorlage löschen?"
+  },
   "mcp": {
     "loaded": "MCP geladen",
     "managementHint": "Falls ein MCP unnormal aussieht, wird dies normalerweise durch die MCP-JSON-Konfiguration verursacht. Gehe zu den Tool-Einstellungen und teste es dort.",

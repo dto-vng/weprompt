@@ -571,6 +571,18 @@
     "loaded": "已載入技能",
     "slashHint": "技能"
   },
+  "presentationTemplates": {
+    "title": "範本",
+    "buttonTooltip": "簡報範本",
+    "slashDescription": "選擇簡報範本",
+    "importCard": "匯入主題 (.md)",
+    "empty": "沒有可用的範本",
+    "chipTooltip": "此訊息將使用該範本",
+    "importSuccess": "範本已匯入",
+    "importError": "匯入失敗：{{error}}",
+    "deleteTooltip": "刪除範本",
+    "deleteConfirm": "確定刪除該範本？"
+  },
   "mcp": {
     "loaded": "已載入 MCP",
     "managementHint": "如果某個 MCP 載入異常，通常是 MCP JSON 設定有問題。請到工具設定頁檢查並手動檢測。",

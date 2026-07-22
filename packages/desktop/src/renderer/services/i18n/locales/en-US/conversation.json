@@ -638,6 +638,18 @@
     "loaded": "Loaded Skills",
     "slashHint": "Skill"
   },
+  "presentationTemplates": {
+    "title": "Templates",
+    "buttonTooltip": "Presentation templates",
+    "slashDescription": "Choose a presentation template",
+    "importCard": "Import theme (.md)",
+    "empty": "No templates available",
+    "chipTooltip": "This message will use the template",
+    "importSuccess": "Template imported",
+    "importError": "Import failed: {{error}}",
+    "deleteTooltip": "Delete template",
+    "deleteConfirm": "Delete this template?"
+  },
   "mcp": {
     "loaded": "Loaded MCP",
     "managementHint": "If an MCP looks abnormal, it is usually caused by the MCP JSON configuration. Go to Tools settings and test it there.",

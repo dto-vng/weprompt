@@ -571,6 +571,18 @@
     "loaded": "로드된 스킬",
     "slashHint": "스킬"
   },
+  "presentationTemplates": {
+    "title": "템플릿",
+    "buttonTooltip": "프레젠테이션 템플릿",
+    "slashDescription": "프레젠테이션 템플릿 선택",
+    "importCard": "테마 가져오기 (.md)",
+    "empty": "사용 가능한 템플릿이 없습니다",
+    "chipTooltip": "이 메시지는 템플릿을 사용합니다",
+    "importSuccess": "템플릿을 가져왔습니다",
+    "importError": "가져오기 실패: {{error}}",
+    "deleteTooltip": "템플릿 삭제",
+    "deleteConfirm": "이 템플릿을 삭제하시겠습니까?"
+  },
   "mcp": {
     "loaded": "로드된 MCP",
     "managementHint": "MCP가 비정상적으로 보인다면 보통 MCP JSON 설정 문제입니다. 도구 설정으로 이동해 직접 테스트하세요.",
