@@ -238,6 +238,42 @@ describe('app operations broker provider execution', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
+  it('marks a non-transient provider request failure as not retryable', async () => {
+    const request = vi
+      .fn<AppOperationsClient['createChatCompletion']>()
+      .mockRejectedValue(Object.assign(new Error('private bad request detail'), { status: 400 }));
+    const { broker } = createHarness({
+      task: echoTask({ maxTransientRetries: 2 }),
+      dependencies: { createClient: vi.fn(async () => ({ createChatCompletion: request })) },
+    });
+
+    const result = await broker.runTask('test.echo', { value: 'hello' });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'provider_request_failed', retryable: false },
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('private bad request detail');
+  });
+
+  it('marks an exhausted transient provider request failure as retryable', async () => {
+    const request = vi.fn<AppOperationsClient['createChatCompletion']>().mockRejectedValue({ status: 503 });
+    const { broker } = createHarness({
+      task: echoTask({ maxTransientRetries: 1 }),
+      dependencies: { createClient: vi.fn(async () => ({ createChatCompletion: request })) },
+    });
+
+    const result = await broker.runTask('test.echo', { value: 'hello' });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'provider_request_failed', retryable: true },
+      operation: { attempts: 2 },
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it('accepts validated text output and maps token usage', async () => {
     const { broker } = createHarness();
 
@@ -366,6 +402,66 @@ describe('app operations broker queue and deduplication', () => {
     gates[1].resolve(completion('queued done'));
     expect(await queued).toMatchObject({ ok: true, operation: { deduplicated: false } });
     expect(await joined).toMatchObject({ ok: true, operation: { deduplicated: true } });
+  });
+
+  it('starts fresh same-key work immediately after the last running joiner cancels', async () => {
+    const abandoned = deferred<AppOperationsCompletion>();
+    const request = vi
+      .fn<AppOperationsClient['createChatCompletion']>()
+      .mockImplementationOnce(() => abandoned.promise)
+      .mockResolvedValueOnce(completion('fresh result'));
+    const controller = new AbortController();
+    const { broker } = createHarness({
+      dependencies: { createClient: vi.fn(async () => ({ createChatCompletion: request })) },
+    });
+
+    const canceled = broker.runTask(
+      'test.echo',
+      { value: 'abandoned' },
+      { signal: controller.signal, dedupeKey: 'same' }
+    );
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    controller.abort();
+    expectFailureCode(await canceled, 'canceled');
+
+    const fresh = broker.runTask('test.echo', { value: 'fresh' }, { dedupeKey: 'same' });
+
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    expect(await fresh).toMatchObject({ ok: true, output: 'fresh result', operation: { deduplicated: false } });
+    abandoned.reject(Object.assign(new Error('abandoned'), { name: 'AbortError' }));
+  });
+
+  it('does not let stale finalization remove a newer same-key operation', async () => {
+    const abandoned = deferred<AppOperationsCompletion>();
+    const current = deferred<AppOperationsCompletion>();
+    const request = vi
+      .fn<AppOperationsClient['createChatCompletion']>()
+      .mockImplementationOnce(() => abandoned.promise)
+      .mockImplementationOnce(() => current.promise);
+    const controller = new AbortController();
+    const { broker, audits } = createHarness({
+      dependencies: { createClient: vi.fn(async () => ({ createChatCompletion: request })) },
+    });
+
+    const canceled = broker.runTask(
+      'test.echo',
+      { value: 'abandoned' },
+      { signal: controller.signal, dedupeKey: 'same' }
+    );
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    controller.abort();
+    expectFailureCode(await canceled, 'canceled');
+    const currentResult = broker.runTask('test.echo', { value: 'current' }, { dedupeKey: 'same' });
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+
+    abandoned.reject(Object.assign(new Error('abandoned'), { name: 'AbortError' }));
+    await vi.waitFor(() => expect(audits).toContainEqual(expect.objectContaining({ error_code: 'canceled' })));
+    const joined = broker.runTask('test.echo', { value: 'current' }, { dedupeKey: 'same' });
+    current.resolve(completion('current result'));
+
+    expect(await currentResult).toMatchObject({ ok: true, operation: { deduplicated: false } });
+    expect(await joined).toMatchObject({ ok: true, operation: { deduplicated: true } });
+    expect(request).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -515,6 +611,36 @@ describe('app operations broker cancellation', () => {
 
     expectFailureCode(await running, 'canceled');
     expectFailureCode(await queued, 'canceled');
+  });
+
+  it('keeps cancelAll authoritative when model resolution later rejects', async () => {
+    const resolution = deferred<AppOperationsModelResponse>();
+    const { broker, dependencies } = createHarness({
+      dependencies: { resolveModel: vi.fn(() => resolution.promise) },
+    });
+    const running = broker.runTask('test.echo', { value: 'hello' });
+    await vi.waitFor(() => expect(dependencies.resolveModel).toHaveBeenCalledTimes(1));
+
+    broker.cancelAll();
+    resolution.reject({ status: 404 });
+
+    expectFailureCode(await running, 'canceled');
+    expect(dependencies.listProviders).not.toHaveBeenCalled();
+  });
+
+  it('keeps cancelAll authoritative when provider listing later rejects', async () => {
+    const providers = deferred<IProvider[]>();
+    const { broker, dependencies } = createHarness({
+      dependencies: { listProviders: vi.fn(() => providers.promise) },
+    });
+    const running = broker.runTask('test.echo', { value: 'hello' });
+    await vi.waitFor(() => expect(dependencies.listProviders).toHaveBeenCalledTimes(1));
+
+    broker.cancelAll();
+    providers.reject({ status: 500 });
+
+    expectFailureCode(await running, 'canceled');
+    expect(dependencies.createClient).not.toHaveBeenCalled();
   });
 });
 

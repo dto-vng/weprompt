@@ -145,8 +145,10 @@ export class AppOperationsBroker {
     const dedupeId = options.dedupeKey === undefined ? undefined : `${task.id}\u0000${options.dedupeKey}`;
     if (dedupeId) {
       const existing = this.deduplicatedOperations.get(dedupeId);
-      if (existing)
+      if (existing && existing.status !== 'settled' && !existing.controller.signal.aborted) {
         return this.attachJoiner(existing, options.signal, true) as Promise<AppOperationsTaskResult<Output>>;
+      }
+      if (existing) this.removeDedupeEntry(existing);
     }
 
     if (this.runningCount >= this.concurrency && this.queue.length >= this.maxQueue) {
@@ -226,6 +228,7 @@ export class AppOperationsBroker {
         resolve(this.cloneForJoiner(this.failure(shared, 'canceled'), deduplicated));
 
         if (shared.joiners.size > 0 || shared.status === 'settled') return;
+        this.removeDedupeEntry(shared);
         if (shared.status === 'queued') {
           const queueIndex = this.queue.indexOf(shared);
           if (queueIndex >= 0) this.queue.splice(queueIndex, 1);
@@ -250,7 +253,12 @@ export class AppOperationsBroker {
 
     void this.execute(shared)
       .then((result) => this.finalize(shared, result))
-      .catch(() => this.finalize(shared, this.failure(shared, 'provider_request_failed')))
+      .catch(() =>
+        this.finalize(
+          shared,
+          this.failure(shared, shared.controller.signal.aborted ? 'canceled' : 'provider_request_failed')
+        )
+      )
       .finally(() => {
         this.runningOperations.delete(shared);
         this.runningCount -= 1;
@@ -272,6 +280,7 @@ export class AppOperationsBroker {
     try {
       resolution = await this.dependencies.resolveModel();
     } catch (error) {
+      if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
       const status = readStatus(error);
       return this.failure(shared, status === 404 || status === 501 ? 'not_configured' : 'provider_request_failed');
     }
@@ -290,6 +299,7 @@ export class AppOperationsBroker {
     try {
       providers = await this.dependencies.listProviders();
     } catch {
+      if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
       return this.failure(shared, 'provider_request_failed');
     }
     if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
@@ -323,7 +333,8 @@ export class AppOperationsBroker {
       });
     } catch (error) {
       if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
-      return this.failure(shared, normalizeProviderError(error, false).code);
+      const failure = normalizeProviderError(error, false);
+      return this.failure(shared, failure.code, failure.transient && retryableByCode(failure.code));
     }
 
     const maxAttempts = 1 + shared.task.maxTransientRetries;
@@ -348,7 +359,9 @@ export class AppOperationsBroker {
 
       if (attempt.code === 'canceled') return this.failure(shared, 'canceled');
       const hasRetry = attemptIndex < maxAttempts - 1;
-      if (!hasRetry || !attempt.transient) return this.failure(shared, attempt.code);
+      if (!hasRetry || !attempt.transient) {
+        return this.failure(shared, attempt.code, attempt.transient && retryableByCode(attempt.code));
+      }
 
       const delay = RETRY_BASE_DELAY_MS * 2 ** attemptIndex + Math.max(0, this.dependencies.jitter());
       // Backoff must complete before the next sequential provider attempt.
@@ -436,10 +449,14 @@ export class AppOperationsBroker {
     };
   }
 
-  private failure(shared: SharedOperation, code: AppOperationErrorCode): AppOperationResult<unknown> {
+  private failure(
+    shared: SharedOperation,
+    code: AppOperationErrorCode,
+    retryable = retryableByCode(code)
+  ): AppOperationResult<unknown> {
     return {
       ok: false,
-      error: { code, retryable: retryableByCode(code) },
+      error: { code, retryable },
       operation: this.metadata(shared, false),
     };
   }
@@ -448,10 +465,16 @@ export class AppOperationsBroker {
     return { ...result, operation: { ...result.operation, deduplicated } };
   }
 
+  private removeDedupeEntry(shared: SharedOperation): void {
+    if (shared.dedupeId && this.deduplicatedOperations.get(shared.dedupeId) === shared) {
+      this.deduplicatedOperations.delete(shared.dedupeId);
+    }
+  }
+
   private finalize(shared: SharedOperation, result: AppOperationResult<unknown>): void {
     if (shared.status === 'settled') return;
     shared.status = 'settled';
-    if (shared.dedupeId) this.deduplicatedOperations.delete(shared.dedupeId);
+    this.removeDedupeEntry(shared);
 
     for (const joiner of shared.joiners.values()) {
       if (joiner.onAbort && joiner.signal) joiner.signal.removeEventListener('abort', joiner.onAbort);
