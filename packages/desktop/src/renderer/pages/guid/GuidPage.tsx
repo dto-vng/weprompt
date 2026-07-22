@@ -27,10 +27,15 @@ import { getWorkspaceBasename, readProjects } from '@/renderer/pages/conversatio
 import { ensureBackendMcpCatalog } from '@/renderer/hooks/mcp/catalog';
 import { resolveGuidAssistantDefaults } from './utils/assistantDefaults';
 import SpeechInputButton from '@/renderer/components/chat/SpeechInputButton';
+import {
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { appendSpeechTranscript } from '@/renderer/hooks/system/useSpeechInput';
 import { useLiveTranscriptInsertion } from '@/renderer/hooks/system/useLiveTranscriptInsertion';
-import { Button, ConfigProvider } from '@arco-design/web-react';
+import { Button, ConfigProvider, Tag, Tooltip } from '@arco-design/web-react';
 import { FolderOpen, Layers, Lightning, Paperclip, Star } from '@icon-park/react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -132,6 +137,7 @@ const GuidPage: React.FC = () => {
   const { onSlashBuiltinCommand } = useOpenFileSelector({
     onFilesSelected: appendSelectedFiles,
   });
+  const presentationTemplates = usePresentationTemplates();
 
   const resetMentionOpen = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(() => {}, []);
   const resetMentionQuery = useCallback<React.Dispatch<React.SetStateAction<string | null>>>(() => {}, []);
@@ -178,6 +184,14 @@ const GuidPage: React.FC = () => {
         kind: 'builtin',
         source: 'builtin',
       },
+      {
+        name: 'presentation',
+        description: t('conversation.presentationTemplates.slashDescription', {
+          defaultValue: 'Choose a presentation template',
+        }),
+        kind: 'builtin',
+        source: 'builtin',
+      },
     ],
     [t]
   );
@@ -202,6 +216,11 @@ const GuidPage: React.FC = () => {
     input: guidInput.input,
     commands: guidSlashCommands,
     onExecuteBuiltin: (name) => {
+      if (name === 'presentation') {
+        presentationTemplates.openGallery();
+        guidInput.setInput('');
+        return;
+      }
       onSlashBuiltinCommand(name);
       guidInput.setInput('');
     },
@@ -253,6 +272,9 @@ const GuidPage: React.FC = () => {
     selectedMcpServerIds: guidSelectedMcpServerIds,
     assistantDefaultMcpIds: resolvedAssistantDefaults.mcpIds,
     isGoogleAuth: modelSelection.isGoogleAuth,
+
+    composePresentationSend: presentationTemplates.composeSend,
+    onPresentationTemplateConsumed: presentationTemplates.clearSelection,
 
     // Mention state reset
     setMentionOpen: resetMentionOpen,
@@ -597,6 +619,7 @@ const GuidPage: React.FC = () => {
       files={guidInput.files}
       onFilesUploaded={guidInput.handleFilesUploaded}
       modelSelectorNode={modelSelectorNode}
+      extraTools={<TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />}
       modeBackend={agentSelection.selectedAssistantBackend}
       selectedMode={agentSelection.selectedMode}
       dynamicModes={agentSelection.currentAgentModeOptions}
@@ -679,6 +702,29 @@ const GuidPage: React.FC = () => {
             onRemoveFile={guidInput.handleRemoveFile}
             actionRow={actionRowNode}
             slashCommandMenu={slashCommandMenuNode}
+            templateChip={
+              presentationTemplates.selectedTemplate ? (
+                <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                  <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
+                    <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
+                      {presentationTemplates.selectedTemplate.manifest.name}
+                    </Tag>
+                  </Tooltip>
+                </div>
+              ) : null
+            }
+            templateGallery={
+              presentationTemplates.galleryOpen ? (
+                <TemplateGalleryPanel
+                  templates={presentationTemplates.templates}
+                  loading={presentationTemplates.templatesLoading}
+                  onSelect={presentationTemplates.selectTemplate}
+                  onImport={presentationTemplates.importFromDialog}
+                  onRemove={presentationTemplates.removeTemplate}
+                  onClose={presentationTemplates.closeGallery}
+                />
+              ) : null
+            }
             workspaceDir={guidInput.dir}
             onSelectWorkspace={(dir) => guidInput.setDir(dir)}
             onClearWorkspace={() => guidInput.setDir('')}

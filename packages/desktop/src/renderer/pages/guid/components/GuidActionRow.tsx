@@ -26,6 +26,9 @@ type GuidActionRowProps = {
   // Model selector node (rendered by parent)
   modelSelectorNode: React.ReactNode;
 
+  // Extra tool buttons rendered next to the attach entry (e.g. template gallery)
+  extraTools?: React.ReactNode;
+
   // Agent mode
   modeBackend?: string;
   selectedMode: string;
@@ -52,6 +55,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
   files,
   onFilesUploaded,
   modelSelectorNode,
+  extraTools,
   modeBackend,
   selectedMode,
   dynamicModes = [],
@@ -271,6 +275,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
             />
           )}
         </div>
+        {extraTools}
       </div>
       <div className={styles.actionSubmit}>
         {configOptionCount > 0 && (
