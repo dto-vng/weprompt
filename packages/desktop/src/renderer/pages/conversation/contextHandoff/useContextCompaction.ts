@@ -35,6 +35,7 @@ export type CompactConversationContextInput = {
   targetTurnId?: string;
   budgetStatus?: TContextBudgetStatus;
   operationId?: string;
+  signal?: AbortSignal;
 };
 
 export type CompactConversationContextResult = {
@@ -90,6 +91,10 @@ export class ContextCompactionCanceledError extends Error {
   }
 }
 
+const throwIfContextCompactionCanceled = (signal?: AbortSignal): void => {
+  if (signal?.aborted) throw new ContextCompactionCanceledError();
+};
+
 const defaultDependencies: ContextCompactionDependencies = {
   getConversation: getConversationOrNull,
   loadMessages: loadContextHandoffMessages,
@@ -132,19 +137,24 @@ const conversationWithSnapshot = (
 const patchContextState = async (
   conversation: AionrsConversation,
   updates: ReturnType<typeof buildContextSnapshotStatePatch>['context_handoff'],
-  dependencies: ContextCompactionDependencies
-): Promise<boolean> =>
-  dependencies.updateConversation({
+  dependencies: ContextCompactionDependencies,
+  signal?: AbortSignal
+): Promise<boolean> => {
+  throwIfContextCompactionCanceled(signal);
+  return dependencies.updateConversation({
     id: conversation.id,
     updates: { extra: { context_handoff: updates } as TChatConversation['extra'] },
     merge_extra: true,
   });
+};
 
 export const compactConversationContext = async (
   input: CompactConversationContextInput,
   dependencies: ContextCompactionDependencies = defaultDependencies
 ): Promise<CompactConversationContextResult> => {
+  throwIfContextCompactionCanceled(input.signal);
   const conversation = await dependencies.getConversation(input.conversationId);
+  throwIfContextCompactionCanceled(input.signal);
   if (!conversation) throw new ContextCompactionOperationError('conversation_not_found');
   if (!isAionrsConversation(conversation)) throw new ContextCompactionOperationError('unsupported_conversation');
 
@@ -155,6 +165,7 @@ export const compactConversationContext = async (
     dependencies.loadMessages(input.conversationId),
     dependencies.readFile({ path: filePath, workspace: input.workspace }),
   ]);
+  throwIfContextCompactionCanceled(input.signal);
   const now = dependencies.now();
 
   const updating = buildContextSnapshotStatePatch(conversation, {
@@ -165,7 +176,8 @@ export const compactConversationContext = async (
     lastErrorCode: null,
     didPersistFileUpdate: false,
   });
-  await patchContextState(conversation, updating.context_handoff, dependencies);
+  await patchContextState(conversation, updating.context_handoff, dependencies, input.signal);
+  throwIfContextCompactionCanceled(input.signal);
 
   const operationId = input.operationId ?? uuid();
   const request: AppOperationsContextCompactRequest = {
@@ -186,7 +198,9 @@ export const compactConversationContext = async (
   let operation: AppOperationMetadata | undefined;
 
   try {
+    throwIfContextCompactionCanceled(input.signal);
     const result = await dependencies.compactWithAppOperations(request);
+    throwIfContextCompactionCanceled(input.signal);
     operation = result.operation;
     if (result.ok === true) {
       snapshot = normalizeModelContextSnapshot(result.output.snapshot);
@@ -204,6 +218,7 @@ export const compactConversationContext = async (
     llmErrorCode = errorCode(operationError, 'provider_request_failed');
   }
 
+  throwIfContextCompactionCanceled(input.signal);
   let markdown: string;
   if (snapshot) {
     markdown = buildContextMarkdown({
@@ -217,7 +232,9 @@ export const compactConversationContext = async (
     markdown = buildFallbackContextMarkdown({ conversation, messages, currentMarkdown });
   }
 
+  throwIfContextCompactionCanceled(input.signal);
   const saved = await dependencies.writeFile({ path: filePath, data: markdown, workspace: input.workspace });
+  throwIfContextCompactionCanceled(input.signal);
   if (!saved) {
     const failed = buildContextSnapshotStatePatch(conversation, {
       source,
@@ -227,7 +244,8 @@ export const compactConversationContext = async (
       lastErrorCode: 'file_write_failed',
       didPersistFileUpdate: false,
     });
-    await patchContextState(conversation, failed.context_handoff, dependencies);
+    await patchContextState(conversation, failed.context_handoff, dependencies, input.signal);
+    throwIfContextCompactionCanceled(input.signal);
     throw new ContextCompactionOperationError('file_write_failed');
   }
 
@@ -250,9 +268,11 @@ export const compactConversationContext = async (
       ...(input.budgetStatus ? { last_budget_status: input.budgetStatus } : {}),
     }
   );
-  const updated = await patchContextState(conversation, committed.context_handoff, dependencies);
+  const updated = await patchContextState(conversation, committed.context_handoff, dependencies, input.signal);
+  throwIfContextCompactionCanceled(input.signal);
   if (!updated) throw new ContextCompactionOperationError('metadata_write_failed');
 
+  throwIfContextCompactionCanceled(input.signal);
   dependencies.emitRefresh(input.conversationId);
   return { fileName, filePath, markdown, snapshot, source, throughTurnId, operation };
 };
@@ -494,7 +514,9 @@ const runtimeBudgetStatus = (
   return 'healthy';
 };
 
-type HookCompactionRequest = CompactConversationContextInput;
+type HookCompactionRequest = CompactConversationContextInput & {
+  abortController: AbortController;
+};
 
 export type ContextCompactionHookDependencies = {
   subscribeTurnCompleted: (listener: (event: IConversationTurnCompletedEvent) => void) => () => void;
@@ -542,6 +564,7 @@ export const useContextCompaction = ({
   const pendingTurnRef = useRef<IConversationTurnCompletedEvent | null>(null);
   const processingTurnRef = useRef(false);
   const inFlightOperationIdRef = useRef<string | null>(null);
+  const inFlightAbortControllerRef = useRef<AbortController | null>(null);
   const disposedRef = useRef(false);
 
   const compact = useCallback(
@@ -557,6 +580,7 @@ export const useContextCompaction = ({
         targetTurnId,
         budgetStatus,
         operationId: uuid(),
+        abortController: new AbortController(),
       };
       if (inFlightRef.current) {
         pendingRequestRef.current = request;
@@ -571,13 +595,16 @@ export const useContextCompaction = ({
         while (current) {
           pendingRequestRef.current = null;
           inFlightOperationIdRef.current = current.operationId ?? null;
+          inFlightAbortControllerRef.current = current.abortController;
           try {
+            const { abortController, ...compactionInput } = current;
             // eslint-disable-next-line no-await-in-loop -- coalesced compactions must commit in request order
-            result = await dependencies.runCompaction(current);
+            result = await dependencies.runCompaction({ ...compactionInput, signal: abortController.signal });
           } catch (error) {
             firstError ??= error;
           }
           inFlightOperationIdRef.current = null;
+          inFlightAbortControllerRef.current = null;
           current = disposedRef.current ? null : pendingRequestRef.current;
         }
         if (firstError) throw firstError;
@@ -587,6 +614,7 @@ export const useContextCompaction = ({
       const promise = run().finally(() => {
         inFlightRef.current = null;
         inFlightOperationIdRef.current = null;
+        inFlightAbortControllerRef.current = null;
         setIsCompacting(false);
       });
       inFlightRef.current = promise;
@@ -599,6 +627,8 @@ export const useContextCompaction = ({
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
+      inFlightAbortControllerRef.current?.abort();
+      pendingRequestRef.current?.abortController.abort();
       pendingRequestRef.current = null;
       const operationId = inFlightOperationIdRef.current;
       if (operationId) {

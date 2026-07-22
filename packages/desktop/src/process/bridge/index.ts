@@ -34,7 +34,9 @@ export function initAppOperationsBridge(
     try {
       return await dependencies.runContextCompact(input, { signal: controller.signal });
     } finally {
-      controllers.delete(operation_id);
+      if (controllers.get(operation_id) === controller) {
+        controllers.delete(operation_id);
+      }
     }
   });
 

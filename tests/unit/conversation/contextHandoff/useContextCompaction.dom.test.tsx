@@ -775,22 +775,16 @@ describe('automatic context compaction policy', () => {
     );
   });
 
-  it('cancels the in-flight app operation on unmount without starting a follow-up run', async () => {
-    let resolveCompaction: ((result: CompactConversationContextResult) => void) | undefined;
-    const compactResult: CompactConversationContextResult = {
-      fileName: 'Context.md',
-      filePath: '/workspace/Context.md',
-      markdown: '# Context',
-      snapshot,
-      source: 'llm',
-      throughTurnId: 'turn-1',
-    };
-    const runCompaction = vi.fn(
+  it('stops before broker registration when unmounted during preliminary loading', async () => {
+    let resolveConversation: ((value: TChatConversation | null) => void) | undefined;
+    const compactionDependencies = createDependencies();
+    compactionDependencies.getConversation = vi.fn(
       () =>
-        new Promise<CompactConversationContextResult>((resolve) => {
-          resolveCompaction = resolve;
+        new Promise((resolve) => {
+          resolveConversation = resolve;
         })
     );
+    const runCompaction = vi.fn((input) => compactConversationContext(input, compactionDependencies));
     const cancelAppOperation = vi.fn(async () => {});
     const dependencies = {
       subscribeTurnCompleted: vi.fn(() => vi.fn()),
@@ -804,6 +798,7 @@ describe('automatic context compaction policy', () => {
       useContextCompaction({
         conversationId: 'conversation-1',
         workspace: '/workspace',
+        enabled: false,
         dependencies,
       })
     );
@@ -813,14 +808,66 @@ describe('automatic context compaction policy', () => {
       compactPromise = result.current.compact('manual');
     });
     const operationId = runCompaction.mock.calls[0]?.[0].operationId;
-    expect(operationId).toEqual(expect.any(String));
+    await waitFor(() => expect(compactionDependencies.getConversation).toHaveBeenCalledOnce());
 
     unmount();
-    await waitFor(() => expect(cancelAppOperation).toHaveBeenCalledWith(operationId));
+    resolveConversation?.(conversation);
 
-    resolveCompaction?.(compactResult);
-    await compactPromise;
-    expect(runCompaction).toHaveBeenCalledOnce();
+    await expect(compactPromise).rejects.toBeInstanceOf(ContextCompactionCanceledError);
+    expect(cancelAppOperation).toHaveBeenCalledWith(operationId);
+    expect(compactionDependencies.compactWithAppOperations).not.toHaveBeenCalled();
+    expect(compactionDependencies.writeFile).not.toHaveBeenCalled();
+    expect(compactionDependencies.updateConversation).not.toHaveBeenCalled();
+  });
+
+  it('stops before Context.md and revision writes when unmounted after broker completion', async () => {
+    let resolveBroker: ((value: AppOperationResult<AppOperationsContextCompactOutput>) => void) | undefined;
+    const compactionDependencies = createDependencies();
+    compactionDependencies.compactWithAppOperations = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveBroker = resolve;
+        })
+    );
+    const runCompaction = vi.fn((input) => compactConversationContext(input, compactionDependencies));
+    let signalAtRemoteCancel: AbortSignal | undefined;
+    const cancelAppOperation = vi.fn(async () => {
+      signalAtRemoteCancel = runCompaction.mock.calls[0]?.[0].signal;
+    });
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn(() => vi.fn()),
+      getConversation: vi.fn(async () => conversation),
+      updateConversation: vi.fn(async () => true),
+      runCompaction,
+      cancelAppOperation,
+      now: () => 100,
+    };
+    const { result, unmount } = renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: false,
+        dependencies,
+      })
+    );
+
+    let compactPromise: Promise<CompactConversationContextResult | null> | undefined;
+    act(() => {
+      compactPromise = result.current.compact('manual');
+    });
+    await waitFor(() => expect(compactionDependencies.compactWithAppOperations).toHaveBeenCalledOnce());
+
+    unmount();
+    resolveBroker?.(compactSuccess());
+
+    await expect(compactPromise).rejects.toBeInstanceOf(ContextCompactionCanceledError);
+    expect(cancelAppOperation).toHaveBeenCalledOnce();
+    expect(signalAtRemoteCancel?.aborted).toBe(true);
+    expect(compactionDependencies.writeFile).not.toHaveBeenCalled();
+    expect(compactionDependencies.updates).toHaveLength(1);
+    expect(compactionDependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({ status: 'updating' }),
+    });
   });
 
   it('unsubscribes from completed turns on unmount', () => {

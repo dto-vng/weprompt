@@ -122,6 +122,42 @@ describe('initAppOperationsBridge', () => {
     await operation;
   });
 
+  it('keeps a newer duplicate-id controller cancelable after the older request completes', async () => {
+    const signals: AbortSignal[] = [];
+    const resolveOperations: Array<(result: AppOperationResult<AppOperationsContextCompactOutput>) => void> = [];
+    mocks.runContextCompact.mockImplementation(
+      (_input, options) =>
+        new Promise((resolve) => {
+          if (options.signal) signals.push(options.signal);
+          resolveOperations.push(resolve);
+        })
+    );
+    initAppOperationsBridge();
+    const contextCompact = mocks.contextCompactProvider.mock.calls[0]?.[0] as ContextCompactHandler;
+    const cancel = mocks.cancelProvider.mock.calls[0]?.[0] as CancelHandler;
+
+    const older = contextCompact({
+      operation_id: 'duplicate-operation',
+      conversation_id: 'conversation-1',
+      trigger: 'auto',
+    });
+    const newer = contextCompact({
+      operation_id: 'duplicate-operation',
+      conversation_id: 'conversation-2',
+      trigger: 'auto',
+    });
+
+    resolveOperations[0]?.(brokerResult);
+    await older;
+    await cancel({ operation_id: 'duplicate-operation' });
+
+    expect(signals[0]?.aborted).toBe(false);
+    expect(signals[1]?.aborted).toBe(true);
+
+    resolveOperations[1]?.(brokerResult);
+    await newer;
+  });
+
   it('treats cancellation for unknown and completed operation ids as idempotent', async () => {
     initAppOperationsBridge();
     const contextCompact = mocks.contextCompactProvider.mock.calls[0]?.[0] as ContextCompactHandler;
