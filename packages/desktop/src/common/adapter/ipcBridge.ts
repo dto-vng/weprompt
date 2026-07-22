@@ -104,6 +104,13 @@ import type {
 } from '../update/updateTypes';
 import type { AgentMetadata } from '@/renderer/utils/model/agentTypes';
 import type { Theme } from '@/common/theme/types';
+import type {
+  AppOperationResult,
+  AppOperationsContextCompactOutput,
+  AppOperationsContextCompactRequest,
+  AppOperationsModelResponse,
+  AppOperationsModelSetting,
+} from '@/common/types/appOperations';
 import type { ProtocolDetectionRequest, ProtocolDetectionResponse } from '../utils/protocolDetector';
 import {
   buildCreateConversationBody,
@@ -967,6 +974,20 @@ export const localContextCompaction = {
   generate: bridge.buildProvider<ILocalContextCompactionBridgeResult, ILocalContextCompactionParams>(
     'context.compaction.generate'
   ),
+};
+
+export const appOperations = {
+  contextCompact: bridge.buildProvider<
+    AppOperationResult<AppOperationsContextCompactOutput>,
+    AppOperationsContextCompactRequest
+  >('app-operations.context-compact'),
+  cancel: bridge.buildProvider<void, { operation_id: string }>('app-operations.cancel'),
+};
+
+export const appOperationsModel = {
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
+  check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };
 
 // ---------------------------------------------------------------------------
