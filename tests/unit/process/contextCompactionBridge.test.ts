@@ -1,12 +1,28 @@
+import type { AppOperationResult, AppOperationsContextCompactOutput } from '@/common/types/appOperations';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  compactContextLocally: vi.fn(async () => ({
+const brokerResult: AppOperationResult<AppOperationsContextCompactOutput> = {
+  ok: true,
+  output: {
     snapshot: {},
     through_turn_id: 'turn-1',
-    model: { provider_id: 'provider-1', model: 'model-1' },
-  })),
-  provider: vi.fn(),
+  },
+  operation: {
+    task_id: 'context.compact',
+    prompt_version: 'context.compact.v1',
+    provider_id: 'operations-provider',
+    model_id: 'operations-model',
+    duration_ms: 25,
+    queue_wait_ms: 2,
+    attempts: 1,
+    deduplicated: false,
+  },
+};
+
+const mocks = vi.hoisted(() => ({
+  runContextCompact: vi.fn(async () => brokerResult),
+  contextCompactProvider: vi.fn(),
+  cancelProvider: vi.fn(),
   initApplicationBridge: vi.fn(),
   initDialogBridge: vi.fn(),
   initNotificationBridge: vi.fn(),
@@ -31,58 +47,99 @@ vi.mock('@process/bridge/windowControlsBridge', () => ({
 
 vi.mock('@/common', () => ({
   ipcBridge: {
-    localContextCompaction: {
-      generate: { provider: mocks.provider },
+    appOperations: {
+      contextCompact: { provider: mocks.contextCompactProvider },
+      cancel: { provider: mocks.cancelProvider },
     },
   },
 }));
 
-vi.mock('@process/services/contextCompactionService', () => ({
-  compactContextLocally: mocks.compactContextLocally,
+vi.mock('@process/services/appOperations', () => ({
+  runContextCompact: mocks.runContextCompact,
 }));
 
-import { initAllBridges, initContextCompactionBridge } from '@process/bridge';
+import { initAllBridges, initAppOperationsBridge } from '@process/bridge';
 
-describe('initContextCompactionBridge', () => {
+type ContextCompactHandler = (input: {
+  operation_id: string;
+  conversation_id: string;
+  trigger: 'auto' | 'manual' | 'handoff';
+}) => Promise<AppOperationResult<AppOperationsContextCompactOutput>>;
+
+type CancelHandler = (input: { operation_id: string }) => Promise<void>;
+
+describe('initAppOperationsBridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.runContextCompact.mockResolvedValue(brokerResult);
   });
 
-  it('registers the main-process provider and delegates compaction requests', async () => {
-    initContextCompactionBridge();
+  it('forwards context compaction input without model selection and returns the broker envelope', async () => {
+    initAppOperationsBridge();
 
-    expect(mocks.provider).toHaveBeenCalledOnce();
-    const handler = mocks.provider.mock.calls[0]?.[0] as (input: { conversation_id: string }) => Promise<unknown>;
-    const input = { conversation_id: 'conversation-1' };
+    expect(mocks.contextCompactProvider).toHaveBeenCalledOnce();
+    const handler = mocks.contextCompactProvider.mock.calls[0]?.[0] as ContextCompactHandler;
+    const input = {
+      operation_id: 'operation-1',
+      conversation_id: 'conversation-1',
+      trigger: 'manual' as const,
+    };
 
-    await expect(handler(input)).resolves.toEqual({
-      ok: true,
-      result: {
-        snapshot: {},
-        through_turn_id: 'turn-1',
-        model: { provider_id: 'provider-1', model: 'model-1' },
+    await expect(handler(input)).resolves.toEqual(brokerResult);
+    expect(mocks.runContextCompact).toHaveBeenCalledWith(
+      {
+        conversation_id: 'conversation-1',
+        trigger: 'manual',
       },
-    });
-
-    expect(mocks.compactContextLocally).toHaveBeenCalledWith(input);
-  });
-
-  it('returns a fulfilled error envelope so renderer invocations cannot hang', async () => {
-    mocks.compactContextLocally.mockRejectedValueOnce(
-      Object.assign(new Error('provider_rate_limited'), { code: 'provider_rate_limited' })
+      { signal: expect.any(AbortSignal) }
     );
-    initContextCompactionBridge();
-    const handler = mocks.provider.mock.calls[0]?.[0] as (input: { conversation_id: string }) => Promise<unknown>;
-
-    await expect(handler({ conversation_id: 'conversation-1' })).resolves.toEqual({
-      ok: false,
-      error_code: 'provider_rate_limited',
-    });
   });
 
-  it('keeps context compaction registered in the top-level bridge initializer', () => {
+  it('aborts the controller tracked by operation id', async () => {
+    let resolveOperation: ((result: AppOperationResult<AppOperationsContextCompactOutput>) => void) | undefined;
+    mocks.runContextCompact.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOperation = resolve;
+        })
+    );
+    initAppOperationsBridge();
+    const contextCompact = mocks.contextCompactProvider.mock.calls[0]?.[0] as ContextCompactHandler;
+    const cancel = mocks.cancelProvider.mock.calls[0]?.[0] as CancelHandler;
+
+    const operation = contextCompact({
+      operation_id: 'operation-1',
+      conversation_id: 'conversation-1',
+      trigger: 'auto',
+    });
+    const signal = mocks.runContextCompact.mock.calls[0]?.[1]?.signal;
+
+    expect(signal?.aborted).toBe(false);
+    await cancel({ operation_id: 'operation-1' });
+    expect(signal?.aborted).toBe(true);
+
+    resolveOperation?.(brokerResult);
+    await operation;
+  });
+
+  it('treats cancellation for unknown and completed operation ids as idempotent', async () => {
+    initAppOperationsBridge();
+    const contextCompact = mocks.contextCompactProvider.mock.calls[0]?.[0] as ContextCompactHandler;
+    const cancel = mocks.cancelProvider.mock.calls[0]?.[0] as CancelHandler;
+
+    await expect(cancel({ operation_id: 'unknown-operation' })).resolves.toBeUndefined();
+    await contextCompact({
+      operation_id: 'completed-operation',
+      conversation_id: 'conversation-1',
+      trigger: 'handoff',
+    });
+    await expect(cancel({ operation_id: 'completed-operation' })).resolves.toBeUndefined();
+  });
+
+  it('keeps app operations registered in the top-level bridge initializer', () => {
     initAllBridges();
 
-    expect(mocks.provider).toHaveBeenCalledOnce();
+    expect(mocks.contextCompactProvider).toHaveBeenCalledOnce();
+    expect(mocks.cancelProvider).toHaveBeenCalledOnce();
   });
 });

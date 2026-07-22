@@ -1,13 +1,5 @@
 import { ipcBridge } from '@/common';
-import { isBackendHttpError } from '@/common/adapter/httpBridge';
-import type {
-  ICompactContextParams,
-  ICompactContextResult,
-  IConversationTurnCompletedEvent,
-  ILocalContextCompactionParams,
-  ILocalContextCompactionResult,
-  TContextCompactionTrigger,
-} from '@/common/adapter/ipcBridge';
+import type { IConversationTurnCompletedEvent, TContextCompactionTrigger } from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
 import type {
   TChatConversation,
@@ -15,6 +7,12 @@ import type {
   TContextGenerationSource,
   TContextHandoffItem,
 } from '@/common/config/storage';
+import type {
+  AppOperationMetadata,
+  AppOperationResult,
+  AppOperationsContextCompactOutput,
+  AppOperationsContextCompactRequest,
+} from '@/common/types/appOperations';
 import { uuid } from '@/common/utils';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { emitter } from '@/renderer/utils/emitter';
@@ -36,6 +34,7 @@ export type CompactConversationContextInput = {
   trigger: TContextCompactionTrigger;
   targetTurnId?: string;
   budgetStatus?: TContextBudgetStatus;
+  operationId?: string;
 };
 
 export type CompactConversationContextResult = {
@@ -45,6 +44,7 @@ export type CompactConversationContextResult = {
   snapshot: NonNullable<ReturnType<typeof parseContextSnapshot>>;
   source: TContextGenerationSource;
   throughTurnId: string;
+  operation?: AppOperationMetadata;
 };
 
 type ConversationUpdateInput = {
@@ -59,8 +59,10 @@ export type ContextCompactionDependencies = {
   readFile: (input: { path: string; workspace: string }) => Promise<string | null>;
   writeFile: (input: { path: string; data: string; workspace: string }) => Promise<boolean>;
   updateConversation: (input: ConversationUpdateInput) => Promise<boolean>;
-  compactRemote: (input: ICompactContextParams) => Promise<ICompactContextResult>;
-  compactLocal: (input: ILocalContextCompactionParams) => Promise<ILocalContextCompactionResult>;
+  compactWithAppOperations: (
+    input: AppOperationsContextCompactRequest
+  ) => Promise<AppOperationResult<AppOperationsContextCompactOutput>>;
+  cancelAppOperation: (operationId: string) => Promise<void>;
   emitRefresh: (conversationId: string) => void;
   now: () => number;
 };
@@ -81,18 +83,21 @@ export class ContextCompactionOperationError extends Error {
   }
 }
 
+export class ContextCompactionCanceledError extends Error {
+  constructor() {
+    super('canceled');
+    this.name = 'ContextCompactionCanceledError';
+  }
+}
+
 const defaultDependencies: ContextCompactionDependencies = {
   getConversation: getConversationOrNull,
   loadMessages: loadContextHandoffMessages,
   readFile: (input) => ipcBridge.fs.readFile.invoke(input),
   writeFile: (input) => ipcBridge.fs.writeFile.invoke(input),
   updateConversation: (input) => ipcBridge.conversation.update.invoke(input),
-  compactRemote: (input) => ipcBridge.conversation.compactContext.invoke(input),
-  compactLocal: async (input) => {
-    const response = await ipcBridge.localContextCompaction.generate.invoke(input);
-    if (response.ok === true) return response.result;
-    throw Object.assign(new Error(response.error_code), { code: response.error_code });
-  },
+  compactWithAppOperations: (input) => ipcBridge.appOperations.contextCompact.invoke(input),
+  cancelAppOperation: (operationId) => ipcBridge.appOperations.cancel.invoke({ operation_id: operationId }),
   emitRefresh: (conversationId) => {
     emitter.emit('aionrs.context-usage.refresh', conversationId);
     emitter.emit('aionrs.workspace.refresh');
@@ -108,26 +113,6 @@ const errorCode = (error: unknown, fallback: string): string => {
     return error.code;
   }
   return fallback;
-};
-
-const isUnsupportedCompactEndpoint = (error: unknown): boolean =>
-  isBackendHttpError(error) && (error.status === 404 || error.status === 501);
-
-/** Backend persists aionrs models as { provider_id, model, use_model: null },
- *  not the TProviderWithModel shape the type declares. Accept both. */
-type PersistedConversationModel = {
-  id?: string;
-  provider_id?: string;
-  model?: string;
-  use_model?: string | null;
-};
-
-const resolveConversationModelRef = (model: AionrsConversation['model']): { providerId: string; modelName: string } => {
-  const persisted = model as PersistedConversationModel;
-  return {
-    providerId: persisted.provider_id || persisted.id || '',
-    modelName: persisted.use_model || persisted.model || '',
-  };
 };
 
 const conversationWithSnapshot = (
@@ -182,44 +167,41 @@ export const compactConversationContext = async (
   });
   await patchContextState(conversation, updating.context_handoff, dependencies);
 
-  const baseRequest: ICompactContextParams = {
+  const operationId = input.operationId ?? uuid();
+  const request: AppOperationsContextCompactRequest = {
+    operation_id: operationId,
     conversation_id: input.conversationId,
     trigger: input.trigger,
     previous_snapshot: contextState.snapshot,
     previous_markdown: currentMarkdown ?? undefined,
     pinned_context: pinnedContext,
     last_compacted_turn_id: contextState.last_compacted_turn_id,
+    target_turn_id: input.targetTurnId,
   };
 
   let snapshot: CompactConversationContextResult['snapshot'] | null = null;
   let source: TContextGenerationSource = 'llm';
   let throughTurnId = input.targetTurnId || contextState.last_compacted_turn_id || '';
   let llmErrorCode: string | null = null;
+  let operation: AppOperationMetadata | undefined;
 
   try {
-    const remote = await dependencies.compactRemote(baseRequest);
-    snapshot = normalizeModelContextSnapshot(remote.snapshot);
-    throughTurnId = remote.through_turn_id || throughTurnId;
-    if (!snapshot) llmErrorCode = 'invalid_model_output';
-  } catch (remoteError) {
-    if (isUnsupportedCompactEndpoint(remoteError)) {
-      try {
-        const modelRef = resolveConversationModelRef(conversation.model);
-        const local = await dependencies.compactLocal({
-          ...baseRequest,
-          provider_id: modelRef.providerId,
-          model: modelRef.modelName,
-          target_turn_id: input.targetTurnId,
-        });
-        snapshot = normalizeModelContextSnapshot(local.snapshot);
-        throughTurnId = local.through_turn_id || throughTurnId;
-        if (!snapshot) llmErrorCode = 'invalid_model_output';
-      } catch (localError) {
-        llmErrorCode = errorCode(localError, 'provider_request_failed');
-      }
+    const result = await dependencies.compactWithAppOperations(request);
+    operation = result.operation;
+    if (result.ok === true) {
+      snapshot = normalizeModelContextSnapshot(result.output.snapshot);
+      throughTurnId = result.output.through_turn_id || throughTurnId;
+      if (!snapshot) llmErrorCode = 'invalid_output';
+    } else if (result.error.code === 'canceled') {
+      throw new ContextCompactionCanceledError();
     } else {
-      llmErrorCode = errorCode(remoteError, 'provider_request_failed');
+      llmErrorCode = result.error.code;
     }
+  } catch (operationError) {
+    if (operationError instanceof ContextCompactionCanceledError || errorCode(operationError, '') === 'canceled') {
+      throw new ContextCompactionCanceledError();
+    }
+    llmErrorCode = errorCode(operationError, 'provider_request_failed');
   }
 
   let markdown: string;
@@ -272,7 +254,7 @@ export const compactConversationContext = async (
   if (!updated) throw new ContextCompactionOperationError('metadata_write_failed');
 
   dependencies.emitRefresh(input.conversationId);
-  return { fileName, filePath, markdown, snapshot, source, throughTurnId };
+  return { fileName, filePath, markdown, snapshot, source, throughTurnId, operation };
 };
 
 export type PinConversationContextInput = {
@@ -519,6 +501,7 @@ export type ContextCompactionHookDependencies = {
   getConversation: (conversationId: string) => Promise<TChatConversation | null>;
   updateConversation: (input: ConversationUpdateInput) => Promise<boolean>;
   runCompaction: (input: CompactConversationContextInput) => Promise<CompactConversationContextResult>;
+  cancelAppOperation: (operationId: string) => Promise<void>;
   now: () => number;
 };
 
@@ -527,6 +510,7 @@ const defaultHookDependencies: ContextCompactionHookDependencies = {
   getConversation: getConversationOrNull,
   updateConversation: (input) => ipcBridge.conversation.update.invoke(input),
   runCompaction: (input) => compactConversationContext(input),
+  cancelAppOperation: (operationId) => ipcBridge.appOperations.cancel.invoke({ operation_id: operationId }),
   now: Date.now,
 };
 
@@ -557,6 +541,8 @@ export const useContextCompaction = ({
   const pendingRequestRef = useRef<HookCompactionRequest | null>(null);
   const pendingTurnRef = useRef<IConversationTurnCompletedEvent | null>(null);
   const processingTurnRef = useRef(false);
+  const inFlightOperationIdRef = useRef<string | null>(null);
+  const disposedRef = useRef(false);
 
   const compact = useCallback(
     (
@@ -570,6 +556,7 @@ export const useContextCompaction = ({
         trigger,
         targetTurnId,
         budgetStatus,
+        operationId: uuid(),
       };
       if (inFlightRef.current) {
         pendingRequestRef.current = request;
@@ -583,13 +570,15 @@ export const useContextCompaction = ({
         let firstError: unknown;
         while (current) {
           pendingRequestRef.current = null;
+          inFlightOperationIdRef.current = current.operationId ?? null;
           try {
             // eslint-disable-next-line no-await-in-loop -- coalesced compactions must commit in request order
             result = await dependencies.runCompaction(current);
           } catch (error) {
             firstError ??= error;
           }
-          current = pendingRequestRef.current;
+          inFlightOperationIdRef.current = null;
+          current = disposedRef.current ? null : pendingRequestRef.current;
         }
         if (firstError) throw firstError;
         return result;
@@ -597,6 +586,7 @@ export const useContextCompaction = ({
 
       const promise = run().finally(() => {
         inFlightRef.current = null;
+        inFlightOperationIdRef.current = null;
         setIsCompacting(false);
       });
       inFlightRef.current = promise;
@@ -604,6 +594,20 @@ export const useContextCompaction = ({
     },
     [conversationId, dependencies, workspace]
   );
+
+  useEffect(() => {
+    disposedRef.current = false;
+    return () => {
+      disposedRef.current = true;
+      pendingRequestRef.current = null;
+      const operationId = inFlightOperationIdRef.current;
+      if (operationId) {
+        void dependencies.cancelAppOperation(operationId).catch((error) => {
+          console.warn('[ContextHandoff] Failed to cancel compaction:', errorCode(error, 'unknown'));
+        });
+      }
+    };
+  }, [dependencies]);
 
   useEffect(() => {
     if (!enabled || !conversationId) return;

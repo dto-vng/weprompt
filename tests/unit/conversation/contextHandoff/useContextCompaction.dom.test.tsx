@@ -1,9 +1,15 @@
-import { BackendHttpError } from '@/common/adapter/httpBridge';
 import type { IConversationTurnCompletedEvent } from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
 import type { TChatConversation, TContextSnapshot } from '@/common/config/storage';
+import type {
+  AppOperationErrorCode,
+  AppOperationMetadata,
+  AppOperationResult,
+  AppOperationsContextCompactOutput,
+} from '@/common/types/appOperations';
 import {
   compactConversationContext,
+  ContextCompactionCanceledError,
   ContextCompactionOperationError,
   handoffConversationContext,
   isMeaningfulContextTurn,
@@ -26,6 +32,27 @@ const snapshot: TContextSnapshot = {
   next_steps: ['Verify the handoff.'],
   do_not_forget: ['Keep transcript export unchanged.'],
 };
+
+const operation: AppOperationMetadata = {
+  task_id: 'context.compact',
+  prompt_version: 'context.compact.v1',
+  provider_id: 'operations-provider',
+  model_id: 'operations-model',
+  duration_ms: 25,
+  queue_wait_ms: 2,
+  attempts: 1,
+  deduplicated: false,
+};
+
+const compactSuccess = (
+  output: AppOperationsContextCompactOutput = { snapshot, through_turn_id: 'turn-4' }
+): AppOperationResult<AppOperationsContextCompactOutput> => ({ ok: true, output, operation });
+
+const compactFailure = (code: AppOperationErrorCode): AppOperationResult<AppOperationsContextCompactOutput> => ({
+  ok: false,
+  error: { code, retryable: code !== 'canceled' },
+  operation,
+});
 
 const conversation: Extract<TChatConversation, { type: 'aionrs' }> = {
   id: 'conversation-1',
@@ -93,12 +120,8 @@ const createDependencies = (): TestDependencies => {
       updates.push(input);
       return true;
     }),
-    compactRemote: vi.fn(async () => ({ snapshot, through_turn_id: 'turn-4' })),
-    compactLocal: vi.fn(async () => ({
-      snapshot,
-      through_turn_id: 'turn-4',
-      model: { provider_id: 'provider-1', model: 'model-1' },
-    })),
+    compactWithAppOperations: vi.fn(async () => compactSuccess()),
+    cancelAppOperation: vi.fn(async () => {}),
     emitRefresh: vi.fn(),
     now: () => 100,
   };
@@ -136,7 +159,7 @@ describe('compactConversationContext', () => {
     vi.useRealTimers();
   });
 
-  it('persists a validated remote snapshot only after Context.md is written', async () => {
+  it('uses app operations provenance even when the conversation model differs', async () => {
     const dependencies = createDependencies();
 
     const result = await compactConversationContext(
@@ -151,6 +174,19 @@ describe('compactConversationContext', () => {
     );
 
     expect(result.source).toBe('llm');
+    expect(result.operation).toEqual(operation);
+    expect(dependencies.compactWithAppOperations).toHaveBeenCalledWith({
+      operation_id: expect.any(String),
+      conversation_id: 'conversation-1',
+      trigger: 'auto',
+      previous_snapshot: undefined,
+      previous_markdown: '# Conversation Context\n\n## Goal\n\n- Keep the edited goal.',
+      pinned_context: conversation.extra.context_handoff?.pinned_context,
+      last_compacted_turn_id: undefined,
+      target_turn_id: 'turn-4',
+    });
+    expect(dependencies.compactWithAppOperations.mock.calls[0]?.[0]).not.toHaveProperty('provider_id');
+    expect(dependencies.compactWithAppOperations.mock.calls[0]?.[0]).not.toHaveProperty('model');
     expect(dependencies.writeFile).toHaveBeenCalledWith({
       path: '/workspace/Context.md',
       data: expect.stringContaining('- Ship LLM-first context management.'),
@@ -173,16 +209,18 @@ describe('compactConversationContext', () => {
 
   it('normalizes bounded model variance instead of using the rules fallback', async () => {
     const dependencies = createDependencies();
-    dependencies.compactRemote = vi.fn(async () => ({
-      snapshot: {
-        ...snapshot,
-        goal: 'g'.repeat(1_001),
-        current_state: Array.from({ length: 13 }, (_, index) => `State ${index}`),
-        decisions: ['d'.repeat(501)],
-        provider_note: 'ignore this extra field',
-      },
-      through_turn_id: 'turn-4',
-    }));
+    dependencies.compactWithAppOperations = vi.fn(async () =>
+      compactSuccess({
+        snapshot: {
+          ...snapshot,
+          goal: 'g'.repeat(1_001),
+          current_state: Array.from({ length: 13 }, (_, index) => `State ${index}`),
+          decisions: ['d'.repeat(501)],
+          provider_note: 'ignore this extra field',
+        },
+        through_turn_id: 'turn-4',
+      })
+    );
 
     const result = await compactConversationContext(
       {
@@ -201,71 +239,18 @@ describe('compactConversationContext', () => {
     expect(result.snapshot).not.toHaveProperty('provider_note');
   });
 
-  it('uses the desktop provider fallback only when the runtime endpoint is unavailable', async () => {
+  it.each<AppOperationErrorCode>([
+    'not_configured',
+    'model_unavailable',
+    'queue_full',
+    'provider_auth_failed',
+    'provider_rate_limited',
+    'provider_request_failed',
+    'provider_timeout',
+    'invalid_output',
+  ])('writes rules context for %s', async (code) => {
     const dependencies = createDependencies();
-    dependencies.compactRemote = vi.fn(async () => {
-      throw new BackendHttpError({ method: 'POST', path: '/context/compact', status: 404, body: {} });
-    });
-
-    await compactConversationContext(
-      {
-        conversationId: 'conversation-1',
-        workspace: '/workspace',
-        trigger: 'manual',
-        targetTurnId: 'turn-4',
-      },
-      dependencies
-    );
-
-    expect(dependencies.compactLocal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversation_id: 'conversation-1',
-        provider_id: 'provider-1',
-        model: 'model-1',
-        target_turn_id: 'turn-4',
-      })
-    );
-  });
-
-  it('resolves the fallback provider from the persisted aionrs model shape', async () => {
-    const dependencies = createDependencies();
-    // Aionrs conversations persist { provider_id, model, use_model: null } —
-    // not the TProviderWithModel shape the type declares.
-    dependencies.getConversation = vi.fn(async () => ({
-      ...conversation,
-      model: { provider_id: 'provider-1', model: 'model-1', use_model: null } as unknown as typeof conversation.model,
-    }));
-    dependencies.compactRemote = vi.fn(async () => {
-      throw new BackendHttpError({ method: 'POST', path: '/context/compact', status: 404, body: {} });
-    });
-
-    await compactConversationContext(
-      {
-        conversationId: 'conversation-1',
-        workspace: '/workspace',
-        trigger: 'manual',
-        targetTurnId: 'turn-4',
-      },
-      dependencies
-    );
-
-    expect(dependencies.compactLocal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversation_id: 'conversation-1',
-        provider_id: 'provider-1',
-        model: 'model-1',
-      })
-    );
-  });
-
-  it('writes a preservation-oriented rules snapshot when both LLM paths fail', async () => {
-    const dependencies = createDependencies();
-    dependencies.compactRemote = vi.fn(async () => {
-      throw new BackendHttpError({ method: 'POST', path: '/context/compact', status: 404, body: {} });
-    });
-    dependencies.compactLocal = vi.fn(async () => {
-      throw Object.assign(new Error('provider failed'), { code: 'provider_request_failed' });
-    });
+    dependencies.compactWithAppOperations = vi.fn(async () => compactFailure(code));
 
     const result = await compactConversationContext(
       {
@@ -283,7 +268,7 @@ describe('compactConversationContext', () => {
       context_handoff: expect.objectContaining({
         source: 'rules',
         status: 'fresh',
-        last_error_code: 'provider_request_failed',
+        last_error_code: code,
         revision: 1,
       }),
     });
@@ -313,12 +298,11 @@ describe('compactConversationContext', () => {
     });
   });
 
-  it('rejects invalid remote snapshots and commits the rules fallback instead', async () => {
+  it('treats an invalid successful broker payload as invalid_output', async () => {
     const dependencies = createDependencies();
-    dependencies.compactRemote = vi.fn(async () => ({
-      snapshot: { goal: 42 },
-      through_turn_id: 'turn-4',
-    }));
+    dependencies.compactWithAppOperations = vi.fn(async () =>
+      compactSuccess({ snapshot: { goal: 42 }, through_turn_id: 'turn-4' })
+    );
 
     const result = await compactConversationContext(
       {
@@ -331,14 +315,134 @@ describe('compactConversationContext', () => {
     );
 
     expect(result.source).toBe('rules');
-    expect(dependencies.compactLocal).not.toHaveBeenCalled();
     expect(dependencies.updates.at(-1)?.updates.extra).toEqual({
       context_handoff: expect.objectContaining({
         source: 'rules',
         status: 'fresh',
-        last_error_code: 'invalid_model_output',
+        last_error_code: 'invalid_output',
       }),
     });
+  });
+
+  it('does not write a rules replacement after cancellation', async () => {
+    const dependencies = createDependencies();
+    dependencies.compactWithAppOperations = vi.fn(async () => compactFailure('canceled'));
+
+    await expect(
+      compactConversationContext(
+        {
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          trigger: 'manual',
+          targetTurnId: 'turn-4',
+        },
+        dependencies
+      )
+    ).rejects.toBeInstanceOf(ContextCompactionCanceledError);
+
+    expect(dependencies.writeFile).not.toHaveBeenCalled();
+    expect(dependencies.updates).toHaveLength(1);
+    expect(dependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({ status: 'updating' }),
+    });
+  });
+
+  it('keeps the same snapshot fields, through turn id, and Context.md fixture output', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-22T00:00:00.000Z'));
+    const dependencies = createDependencies();
+
+    const result = await compactConversationContext(
+      {
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        trigger: 'handoff',
+        targetTurnId: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(result.snapshot).toEqual(snapshot);
+    expect(result.throughTurnId).toBe('turn-4');
+    expect(result.markdown).toMatchInlineSnapshot(`
+      "# Conversation Context
+
+      - Conversation: Context work
+      - Conversation ID: conversation-1
+      - Exported At: 2026-07-22T00:00:00.000Z
+
+      ## Goal
+
+      - Ship LLM-first context management.
+
+      ## Current State
+
+      - Structured compaction is wired.
+
+      ## Important Decisions
+
+      - Pins are immutable.
+
+      ## Files / Artifacts
+
+      - /workspace/Context.md
+
+      ## Assistant Setup
+
+      - Conversation type: aionrs
+      - Model: model-1
+
+      ## Pinned Context
+
+      - Reporting unit: Use VND millions.
+
+      ## User Preferences
+
+      - Keep the UI compact.
+
+      ## Open Questions
+
+
+      ## Next Step
+
+      - Verify the handoff.
+
+      ## Do Not Forget
+
+      - Keep transcript export unchanged."
+    `);
+  });
+
+  it('continues to read snapshots created before app operations metadata existed', async () => {
+    const dependencies = createDependencies();
+    dependencies.getConversation = vi.fn(async () => ({
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          snapshot,
+          last_compacted_turn_id: 'turn-3',
+        },
+      },
+    }));
+
+    await compactConversationContext(
+      {
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        trigger: 'auto',
+        targetTurnId: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(dependencies.compactWithAppOperations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previous_snapshot: snapshot,
+        last_compacted_turn_id: 'turn-3',
+      })
+    );
   });
 
   it('reports metadata failure after the file write without claiming a committed revision', async () => {
@@ -450,6 +554,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => conversation),
       updateConversation: vi.fn(async () => true),
       runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
     };
 
@@ -509,6 +614,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => budgetConversation),
       updateConversation: vi.fn(async () => true),
       runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
     };
 
@@ -547,6 +653,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => interruptedConversation),
       updateConversation,
       runCompaction: vi.fn(),
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 200,
     };
 
@@ -588,6 +695,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => conversation),
       updateConversation: vi.fn(async () => true),
       runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
     };
 
@@ -638,6 +746,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => conversation),
       updateConversation: vi.fn(async () => true),
       runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
     };
     const { result } = renderHook(() =>
@@ -666,6 +775,54 @@ describe('automatic context compaction policy', () => {
     );
   });
 
+  it('cancels the in-flight app operation on unmount without starting a follow-up run', async () => {
+    let resolveCompaction: ((result: CompactConversationContextResult) => void) | undefined;
+    const compactResult: CompactConversationContextResult = {
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      snapshot,
+      source: 'llm',
+      throughTurnId: 'turn-1',
+    };
+    const runCompaction = vi.fn(
+      () =>
+        new Promise<CompactConversationContextResult>((resolve) => {
+          resolveCompaction = resolve;
+        })
+    );
+    const cancelAppOperation = vi.fn(async () => {});
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn(() => vi.fn()),
+      getConversation: vi.fn(async () => conversation),
+      updateConversation: vi.fn(async () => true),
+      runCompaction,
+      cancelAppOperation,
+      now: () => 100,
+    };
+    const { result, unmount } = renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        dependencies,
+      })
+    );
+
+    let compactPromise: Promise<CompactConversationContextResult | null> | undefined;
+    act(() => {
+      compactPromise = result.current.compact('manual');
+    });
+    const operationId = runCompaction.mock.calls[0]?.[0].operationId;
+    expect(operationId).toEqual(expect.any(String));
+
+    unmount();
+    await waitFor(() => expect(cancelAppOperation).toHaveBeenCalledWith(operationId));
+
+    resolveCompaction?.(compactResult);
+    await compactPromise;
+    expect(runCompaction).toHaveBeenCalledOnce();
+  });
+
   it('unsubscribes from completed turns on unmount', () => {
     const unsubscribe = vi.fn();
     const dependencies = {
@@ -673,6 +830,7 @@ describe('automatic context compaction policy', () => {
       getConversation: vi.fn(async () => conversation),
       updateConversation: vi.fn(async () => true),
       runCompaction: vi.fn(),
+      cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
     };
     const { unmount } = renderHook(() =>

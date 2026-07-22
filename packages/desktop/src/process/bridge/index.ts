@@ -13,34 +13,33 @@ import { initNotificationBridge } from './notificationBridge';
 import { initWebuiBridge } from './webuiBridge';
 import { initThemeBridge } from './themeBridge';
 import { ipcBridge } from '@/common';
-import type { TLocalContextCompactionErrorCode } from '@/common/adapter/ipcBridge';
-import { compactContextLocally } from '@process/services/contextCompactionService';
+import { runContextCompact } from '@process/services/appOperations';
 
-const CONTEXT_COMPACTION_ERROR_CODES = new Set<TLocalContextCompactionErrorCode>([
-  'provider_not_found',
-  'provider_timeout',
-  'provider_auth_failed',
-  'provider_rate_limited',
-  'provider_request_failed',
-  'invalid_model_output',
-  'empty_model_output',
-]);
-
-const getContextCompactionErrorCode = (error: unknown): TLocalContextCompactionErrorCode => {
-  if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') {
-    const code = error.code as TLocalContextCompactionErrorCode;
-    if (CONTEXT_COMPACTION_ERROR_CODES.has(code)) return code;
-  }
-  return 'provider_request_failed';
+type AppOperationsBridgeDependencies = {
+  runContextCompact: typeof runContextCompact;
 };
 
-export function initContextCompactionBridge(): void {
-  ipcBridge.localContextCompaction.generate.provider(async (input) => {
+const defaultAppOperationsBridgeDependencies: AppOperationsBridgeDependencies = {
+  runContextCompact,
+};
+
+export function initAppOperationsBridge(
+  dependencies: AppOperationsBridgeDependencies = defaultAppOperationsBridgeDependencies
+): void {
+  const controllers = new Map<string, AbortController>();
+
+  ipcBridge.appOperations.contextCompact.provider(async ({ operation_id, ...input }) => {
+    const controller = new AbortController();
+    controllers.set(operation_id, controller);
     try {
-      return { ok: true, result: await compactContextLocally(input) };
-    } catch (error) {
-      return { ok: false, error_code: getContextCompactionErrorCode(error) };
+      return await dependencies.runContextCompact(input, { signal: controller.signal });
+    } finally {
+      controllers.delete(operation_id);
     }
+  });
+
+  ipcBridge.appOperations.cancel.provider(async ({ operation_id }) => {
+    controllers.get(operation_id)?.abort();
   });
 }
 
@@ -55,7 +54,7 @@ export function initAllBridges(_deps: BridgeDependencies = {}): void {
   initNotificationBridge();
   initWebuiBridge();
   initThemeBridge();
-  initContextCompactionBridge();
+  initAppOperationsBridge();
 }
 
 export {
