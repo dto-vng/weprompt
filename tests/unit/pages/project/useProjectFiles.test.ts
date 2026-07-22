@@ -58,7 +58,23 @@ describe('loadProjectFiles', () => {
     const result = await loadProjectFiles('/w/alpha');
 
     expect(invoke).toHaveBeenCalledExactlyOnceWith({ dir: '/w/alpha', root: '/w/alpha' });
-    expect(result).toBe(fixtureTree);
+    // Normalization rebuilds every node into a new object, so the result is no
+    // longer the same reference as the fixture — compare by value instead.
+    expect(result).toEqual(fixtureTree);
+  });
+
+  it('normalizes a snake_case response into the camelCase IDirOrFile shape', async () => {
+    const snakeCaseFixture = [
+      { name: 'a.ts', full_path: '/w/a.ts', relative_path: 'a.ts', is_dir: false, is_file: true },
+    ];
+    invoke.mockResolvedValue(snakeCaseFixture as unknown as IDirOrFile[]);
+
+    const result = await loadProjectFiles('/w/snake');
+
+    expect(result).toEqual([{ name: 'a.ts', fullPath: '/w/a.ts', relativePath: 'a.ts', isDir: false, isFile: true }]);
+    expect(result[0].isFile).toBe(true);
+    expect(result[0].relativePath).toBe('a.ts');
+    expect(result[0].fullPath).toBe('/w/a.ts');
   });
 
   it('resolves an empty array for a valid, empty workspace folder', async () => {

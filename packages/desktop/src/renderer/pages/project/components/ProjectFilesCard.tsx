@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import WorkspaceProjectFilesFlyout from '@renderer/pages/conversation/Workspace/components/WorkspaceProjectFilesFlyout';
+import '@renderer/pages/conversation/Workspace/workspace.css';
 import { getWorkspaceBasename, updateProject } from '@renderer/pages/conversation/projects/projectStorage';
 import { Alert, Button, Card, Spin } from '@arco-design/web-react';
 import React from 'react';

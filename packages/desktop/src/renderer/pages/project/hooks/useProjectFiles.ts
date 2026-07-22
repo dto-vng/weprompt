@@ -17,6 +17,42 @@ export type UseProjectFilesResult = {
 };
 
 /**
+ * Shape actually returned by `/api/fs/dir`: `ipcBridge.fs.getFilesByDir` has
+ * no response mapper, and the backend serializes this endpoint's DTOs as
+ * snake_case (`full_path`, `relative_path`, `is_dir`, `is_file`), so every
+ * field beyond `name` is accepted in either casing and treated as optional.
+ */
+type RawDirOrFile = {
+  name: string;
+  fullPath?: string;
+  full_path?: string;
+  relativePath?: string;
+  relative_path?: string;
+  isDir?: boolean;
+  is_dir?: boolean;
+  isFile?: boolean;
+  is_file?: boolean;
+  children?: RawDirOrFile[];
+};
+
+/**
+ * Normalizes one raw `/api/fs/dir` node (and its children, recursively) into
+ * the camelCase `IDirOrFile` shape the renderer relies on — `ProjectFilesCard`
+ * / `WorkspaceProjectFilesFlyout` read `isFile`, `relativePath`, and
+ * `fullPath` directly, so an unnormalized snake_case node renders files as
+ * folders and breaks `onOpenFile`. Idempotent: normalizing an already
+ * camelCase node reproduces the same values.
+ */
+export const normalizeDirOrFileNode = (raw: RawDirOrFile): IDirOrFile => ({
+  name: raw.name,
+  fullPath: raw.fullPath ?? raw.full_path ?? '',
+  relativePath: raw.relativePath ?? raw.relative_path ?? '',
+  isDir: raw.isDir ?? raw.is_dir ?? false,
+  isFile: raw.isFile ?? raw.is_file ?? false,
+  children: Array.isArray(raw.children) ? raw.children.map(normalizeDirOrFileNode) : undefined,
+});
+
+/**
  * Fetch `workspace`'s file tree. `getFilesByDir` returns the whole tree
  * recursively in a single call — each directory's `children` is already
  * populated — so there is no lazy per-folder fetch to layer on top.
@@ -25,14 +61,15 @@ export type UseProjectFilesResult = {
  * validate behavior is unit-testable without rendering the hook. Throws on
  * a malformed (non-array) response so the caller treats it the same as a
  * rejected request (missing/unreadable folder) rather than as a valid empty
- * tree.
+ * tree. Every node is run through `normalizeDirOrFileNode` before being
+ * returned (see that function for why).
  */
 export const loadProjectFiles = async (workspace: string): Promise<IDirOrFile[]> => {
   const result = await ipcBridge.fs.getFilesByDir.invoke({ dir: workspace, root: workspace });
   if (!Array.isArray(result)) {
     throw new Error('PROJECT_FILES_INVALID_RESPONSE');
   }
-  return result;
+  return result.map(normalizeDirOrFileNode);
 };
 
 /**
