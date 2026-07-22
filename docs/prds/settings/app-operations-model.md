@@ -1,6 +1,6 @@
 # App Operations Model
 
-Status: Proposed
+Status: Approved
 Date: 2026-07-22
 Target branch: `feat/app-operations-model`
 
@@ -116,7 +116,7 @@ type ResolvedAppOperationsModel = {
     | 'model_disabled'
     | 'auth_required'
     | 'health_check_failed';
-  checked_at?: string;
+  checked_at?: number;
 };
 ```
 
@@ -130,7 +130,7 @@ The API never returns provider credentials. AionCore applies current-user isolat
 
 ### Deterministic Auto Resolution
 
-AionCore owns a versioned, deterministic app-default policy so every app process resolves Auto identically. The policy may designate a bundled/recommended provider model or a backend-owned user default, but it must return at most one provider/model pair and expose that pair through the resolution API. The desktop app must not reproduce the ranking policy.
+AionCore owns a versioned, deterministic app-default policy so every app process resolves Auto identically. Version 1 selects the first eligible provider in backend creation order, then the first eligible model in that provider's stored model order. This is a stable backend-designated default, not per-request routing; the desktop app must not reproduce the ranking policy.
 
 The persisted setting remains `{ mode: 'auto' }`; the resolved pair is derived. If AionCore has no eligible app default, resolution is `setup_required`; it does not fall through to another configured chat model. If provider configuration or the backend policy changes, the next operation may resolve a different pair. A resolution change is visible in Settings and operation metadata.
 
@@ -259,13 +259,13 @@ The primary API is conceptually `runTask(taskId, input, options)`. Type-safe wra
 
 ### Execution Sequence
 
-1. Reject an unknown task or invalid input before provider resolution.
-2. Resolve the current app operations model from AionCore.
-3. Return `not_configured` or `model_unavailable` when resolution is not usable.
-4. Enqueue the operation within the broker's bounded in-memory queue.
-5. Build task messages and create the provider client only after admission.
+1. Reject an unknown task or invalid input before queue admission.
+2. Join an existing deduplicated operation or enter the broker's bounded in-memory queue.
+3. After admission, resolve and capture the current app operations model from AionCore.
+4. Return `not_configured` or `model_unavailable` when resolution is not usable.
+5. Prepare task data, build messages, and create the provider client only after admission.
 6. Execute with the task's timeout and caller cancellation signal.
-7. Retry only transient failures against the same provider/model.
+7. Retry only transient failures against the same captured provider/model.
 8. Parse and validate output using the task definition.
 9. Return the normalized result and emit redacted operational metadata.
 
