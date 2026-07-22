@@ -1,4 +1,14 @@
 {
+  "profile": "Perfil",
+  "groupProfile": "Perfil",
+  "profileTitle": "Suas instruções",
+  "profileDescription": "Diga ao assistente como você quer que ele responda. Essas instruções são adicionadas aos seus novos chats.",
+  "profileEnableLabel": "Aplicar minhas instruções aos novos chats",
+  "profileInstructionsLabel": "Instruções",
+  "profileInstructionsPlaceholder": "ex.: Trabalho no RH da VNG. Prefiro um vietnamita conciso e formal. Pergunte antes de presumir um modelo.",
+  "profilePreviewTitle": "O que é adicionado aos seus chats",
+  "profilePreviewEmpty": "Nada ainda — adicione instruções acima.",
+  "profileScopeNote": "Aplica-se aos seus chats. Assistentes especializados seguem as próprias regras.",
   "title": "Configurações",
   "skillsHub": {
     "title": "Central de Habilidades",
