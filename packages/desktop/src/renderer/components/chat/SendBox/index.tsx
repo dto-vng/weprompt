@@ -186,6 +186,10 @@ const SendBox: React.FC<{
    * `tools` and `rightTools` are not rendered inline on mobile.
    */
   onMobilePlusClick?: () => void;
+  /** When provided, registers the /presentation slash command and the gallery overlay. */
+  onOpenTemplateGallery?: () => void;
+  /** Gallery panel node; non-null means the gallery overlay is open. */
+  templateGalleryNode?: React.ReactNode;
 }> = ({
   onSend,
   onStop,
@@ -214,6 +218,8 @@ const SendBox: React.FC<{
   onSelectedWorkspaceItemsChange,
   bottomHint,
   onMobilePlusClick,
+  onOpenTemplateGallery,
+  templateGalleryNode,
 }) => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
@@ -454,6 +460,16 @@ const SendBox: React.FC<{
         source: 'builtin',
       });
     }
+    if (onOpenTemplateGallery) {
+      commands.push({
+        name: 'presentation',
+        description: t('conversation.presentationTemplates.slashDescription', {
+          defaultValue: 'Choose a presentation template',
+        }),
+        kind: 'builtin',
+        source: 'builtin',
+      });
+    }
     if (conversationContext?.conversation_id) {
       commands.push({
         name: 'copy',
@@ -467,7 +483,14 @@ const SendBox: React.FC<{
       // kept intact for a future per-platform re-enable.
     }
     return commands;
-  }, [conversationContext?.conversation_id, enableBtw, enableContextCommand, onSlashBuiltinCommand, t]);
+  }, [
+    conversationContext?.conversation_id,
+    enableBtw,
+    enableContextCommand,
+    onOpenTemplateGallery,
+    onSlashBuiltinCommand,
+    t,
+  ]);
 
   // Skills loaded into this conversation are also invokable via slash. We reuse
   // the global skills index (shared SWR key `skills-index`) purely to attach a
@@ -510,6 +533,8 @@ const SendBox: React.FC<{
         }
       } else if (name === 'export') {
         void conversationExport.openExportFlow();
+      } else if (name === 'presentation') {
+        onOpenTemplateGallery?.();
       } else {
         onSlashBuiltinCommand?.(name);
       }
@@ -544,7 +569,7 @@ const SendBox: React.FC<{
     () => filterWorkspaceMentionItems(workspaceMentionItems, deferredAtFileQuery),
     [deferredAtFileQuery, workspaceMentionItems]
   );
-  const isOverlayOpen = isCommandMenuOpen || btwCommand.isOpen || isAtFileMenuOpen;
+  const isOverlayOpen = isCommandMenuOpen || btwCommand.isOpen || isAtFileMenuOpen || Boolean(templateGalleryNode);
 
   const getTextareaElement = useCallback((): HTMLTextAreaElement | null => {
     const textarea = containerRef.current?.querySelector('textarea');
@@ -1407,6 +1432,9 @@ const SendBox: React.FC<{
               onSelectItem={insertSelectedAtFile}
             />
           </div>
+        )}
+        {templateGalleryNode != null && (
+          <div className='absolute left-12px right-12px bottom-[calc(100%+8px)] z-70'>{templateGalleryNode}</div>
         )}
         {isCommandMenuOpen && (
           <div className='absolute left-12px right-12px bottom-[calc(100%+8px)] z-70'>
