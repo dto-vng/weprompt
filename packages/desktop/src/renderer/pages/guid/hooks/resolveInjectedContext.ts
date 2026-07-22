@@ -27,7 +27,7 @@ export function resolveInjectedContext(projectId?: string, deps: ResolveDeps = {
   const findProject = deps.findProject ?? ((id: string) => findProjectById(id));
 
   const userContext = getUserContext();
-  const globalText = userContext && userContext.enabled !== false ? userContext.instructions ?? '' : '';
+  const globalText = userContext && userContext.enabled !== false ? (userContext.instructions ?? '') : '';
 
   const project = projectId ? findProject(projectId) : null;
   const projectText = project?.instructions ?? '';
