@@ -1524,4 +1524,61 @@ describe('MessageToolGroupSummary narration-first journal', () => {
     expect(screen.queryByText(/I couldn't complete the project step/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/error details are available below/i)).not.toBeInTheDocument();
   });
+
+  it('renders the amber warm close with the text-warning class for a fully failed turn', () => {
+    // A tool_group whose single call errored: normalizeToolGroupStatus maps
+    // status 'Error' to the 'error' NormalizedToolStatus (see
+    // packages/desktop/src/common/chat/normalizeToolCall.ts), which makes
+    // buildTurnWorkRecap report status 'failed' and buildTurnClose render a
+    // close.failed.* line with tone 'attention'.
+    const failedTurn: WorkJournalSourceMessage = {
+      id: 'tg-failed',
+      conversation_id: 'conv-1',
+      type: 'tool_group',
+      position: 'left',
+      created_at: 1,
+      content: [
+        {
+          call_id: 'c1',
+          name: 'ExecCommand',
+          status: 'Error',
+        },
+      ],
+    } as unknown as WorkJournalSourceMessage;
+    render(<MessageToolGroupSummary messages={[failedTurn]} isActive={false} />);
+
+    const close = screen.getByText(/wasn't able to finish|didn't go through/i);
+    expect(close).toBeInTheDocument();
+    expect(close).toHaveClass('text-warning');
+  });
+
+  it('renders the amber warm close with the text-warning class for a partial turn', () => {
+    // One completed call plus one errored call in the same tool_group: failed > 0
+    // and completed > 0 makes buildTurnWorkRecap report status 'partial', so
+    // buildTurnClose renders a close.partial.* line with tone 'attention'.
+    const partialTurn: WorkJournalSourceMessage = {
+      id: 'tg-partial',
+      conversation_id: 'conv-1',
+      type: 'tool_group',
+      position: 'left',
+      created_at: 1,
+      content: [
+        {
+          call_id: 'c1',
+          name: 'ExecCommand',
+          status: 'Success',
+        },
+        {
+          call_id: 'c2',
+          name: 'ExecCommand',
+          status: 'Error',
+        },
+      ],
+    } as unknown as WorkJournalSourceMessage;
+    render(<MessageToolGroupSummary messages={[partialTurn]} isActive={false} />);
+
+    const close = screen.getByText(/got most of this done|Good progress/i);
+    expect(close).toBeInTheDocument();
+    expect(close).toHaveClass('text-warning');
+  });
 });
