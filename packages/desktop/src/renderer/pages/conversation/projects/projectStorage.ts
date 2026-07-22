@@ -42,7 +42,8 @@ const isForgeProject = (value: unknown): value is ForgeProject => {
     typeof value.workspace === 'string' &&
     typeof value.created_at === 'number' &&
     typeof value.updated_at === 'number' &&
-    (value.last_opened_at === undefined || typeof value.last_opened_at === 'number')
+    (value.last_opened_at === undefined || typeof value.last_opened_at === 'number') &&
+    (value.instructions === undefined || typeof value.instructions === 'string')
   );
 };
 
@@ -128,6 +129,7 @@ export const createProject = (input: CreateForgeProjectInput, deps: ProjectMutat
     workspace,
     created_at: timestamp,
     updated_at: timestamp,
+    ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
   };
 
   writeProjects([project, ...projects], storage);
@@ -160,6 +162,7 @@ export const updateProject = (
     ...(input.name !== undefined ? { name: input.name.trim() || getWorkspaceBasename(nextWorkspace) } : {}),
     workspace: nextWorkspace,
     ...(input.last_opened_at !== undefined ? { last_opened_at: input.last_opened_at } : {}),
+    ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
     updated_at: now(),
   };
 
