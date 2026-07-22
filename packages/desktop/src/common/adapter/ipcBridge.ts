@@ -1636,6 +1636,11 @@ export interface ICreateConversationParams {
     context?: string;
     context_file_name?: string;
     context_handoff?: TConversationContextHandoffExtra;
+    /** Global/project instructions injected as the first-turn preset context
+     *  (acp/codex). Composed client-side by resolveInjectedContext. */
+    preset_context?: string;
+    /** Same, for the native aionrs runtime (merged into system_prompt). */
+    preset_rules?: string;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];
