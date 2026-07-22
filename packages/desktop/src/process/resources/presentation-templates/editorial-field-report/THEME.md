@@ -123,8 +123,8 @@ body {
   <div>VOL. I · ISSUE 01</div>
   <div class="masthead-meta">
     <span>FIELD REPORT</span>
-    <span>HCMC · MAY 15, 2026</span>
-    <span>PREPARED FOR K.</span>
+    <span>CITY · MONTH DD, YYYY</span>
+    <span>PREPARED FOR READER</span>
   </div>
 </div>
 ```
@@ -303,7 +303,7 @@ Chart.defaults.borderColor = 'rgba(10,10,8,0.08)';
 4. **Build the HTML in one file.** Single self-contained file, all CSS inline in `<style>`, all JS inline in `<script>` after the body content. Chart.js loaded from CDN. Fonts from Google.
 5. **Verify all sections have:** section meta + H2 with accent word + at least one punchline.
 6. **Save the file into the conversation workspace** with a descriptive snake_case name and present it.
-7. **Brief response in chat:** one sentence about what the report covers. Don't restate the report. Don't re-summarize sections. Mày đã đọc rồi, không cần đọc lại.
+7. **Brief response in chat:** one sentence about what the report covers. Don't restate the report. Don't re-summarize sections — the reader has the report.
 
 ---
 
