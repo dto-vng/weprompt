@@ -399,6 +399,34 @@ describe('runContextCompact', () => {
     expect(result.operation.prompt_version).toBe('context.compact.v1');
   });
 
+  it('prefers the target turn for both output provenance and deduplication', async () => {
+    const runTask = vi.spyOn(appOperationsBroker, 'runTask').mockResolvedValue({
+      ok: true,
+      output: snapshot,
+      operation: {
+        task_id: 'context.compact',
+        prompt_version: 'context.compact.v1',
+        duration_ms: 0,
+        queue_wait_ms: 0,
+        attempts: 1,
+        deduplicated: false,
+      },
+    });
+    const wrapperInput = {
+      conversation_id: 'conversation-1',
+      trigger: 'manual' as const,
+      target_turn_id: 'turn-target',
+      last_compacted_turn_id: 'turn-previous',
+    };
+
+    const result = await runContextCompact(wrapperInput);
+
+    expect(runTask).toHaveBeenCalledWith('context.compact', wrapperInput, {
+      dedupeKey: 'conversation-1:turn-target',
+    });
+    expect(result).toMatchObject({ ok: true, output: { through_turn_id: 'turn-target' } });
+  });
+
   it('never substitutes a message id for the last compacted turn id', async () => {
     vi.spyOn(appOperationsBroker, 'runTask').mockResolvedValue({
       ok: true,
