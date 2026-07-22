@@ -13,9 +13,9 @@ import type {
 
 export const TEMPLATE_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
-const FORMATS: PresentationTemplateFormat[] = ['html', 'pptx'];
-const KINDS: PresentationTemplateKind[] = ['deck', 'report'];
-const SOURCES: PresentationTemplateSource[] = ['builtin', 'user'];
+const FORMATS: ReadonlySet<PresentationTemplateFormat> = new Set(['html', 'pptx']);
+const KINDS: ReadonlySet<PresentationTemplateKind> = new Set(['deck', 'report']);
+const SOURCES: ReadonlySet<PresentationTemplateSource> = new Set(['builtin', 'user']);
 
 const fail = (reason: string): never => {
   throw new Error(`invalid manifest: ${reason}`);
@@ -40,11 +40,10 @@ export function validateTemplateManifest(raw: unknown): PresentationTemplateMani
   if (typeof m.description !== 'string') fail('missing description');
   if (m.nameI18n !== undefined && !isLocaleMap(m.nameI18n)) fail('bad nameI18n');
   if (m.descriptionI18n !== undefined && !isLocaleMap(m.descriptionI18n)) fail('bad descriptionI18n');
-  if (typeof m.format !== 'string' || !FORMATS.includes(m.format as PresentationTemplateFormat))
+  if (typeof m.format !== 'string' || !FORMATS.has(m.format as PresentationTemplateFormat))
     fail(`bad format: ${String(m.format)}`);
-  if (typeof m.kind !== 'string' || !KINDS.includes(m.kind as PresentationTemplateKind))
-    fail(`bad kind: ${String(m.kind)}`);
-  if (typeof m.source !== 'string' || !SOURCES.includes(m.source as PresentationTemplateSource))
+  if (typeof m.kind !== 'string' || !KINDS.has(m.kind as PresentationTemplateKind)) fail(`bad kind: ${String(m.kind)}`);
+  if (typeof m.source !== 'string' || !SOURCES.has(m.source as PresentationTemplateSource))
     fail(`bad source: ${String(m.source)}`);
   if (typeof m.themeFile !== 'string' || !isPlainFileName(m.themeFile)) fail('bad themeFile');
   if (m.referenceFile !== null && (typeof m.referenceFile !== 'string' || !isPlainFileName(m.referenceFile)))
