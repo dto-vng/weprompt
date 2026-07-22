@@ -13,6 +13,11 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -44,7 +49,7 @@ import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { Message, Tag } from '@arco-design/web-react';
+import { Message, Tag, Tooltip } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -141,6 +146,7 @@ const AcpSendBox: React.FC<{
   const isLeaderInTeam = teamPermission && conversation_id === teamPermission.leaderConversationId;
   const { checkAndUpdateTitle } = useAutoTitle();
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates();
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
   const conversationContext = useConversationContextSafe();
@@ -417,6 +423,9 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     emitter.emit('acp.selected.file.clear');
 
+    // ACP ignores `injectSkills` here — agents discover skills themselves.
+    const composed = presentationTemplates.composeSend(message, allFiles);
+
     if (
       shouldEnqueueConversationCommand({
         enabled: true,
@@ -424,11 +433,13 @@ Please check your local CLI tool authentication status`,
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: allFiles });
+      enqueue({ input: composed.input, files: composed.files });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: allFiles });
+    await executeCommand({ input: composed.input, files: composed.files });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
@@ -693,11 +704,14 @@ Please check your local CLI tool authentication status`,
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
@@ -729,6 +743,15 @@ Please check your local CLI tool authentication status`,
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
+                  <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
+                    {presentationTemplates.selectedTemplate.manifest.name}
+                  </Tag>
+                </Tooltip>
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -771,6 +794,19 @@ Please check your local CLI tool authentication status`,
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         allowSendWhileLoading
         compactActions={false}
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       ></SendBox>
       {isMobile && (
         <>
