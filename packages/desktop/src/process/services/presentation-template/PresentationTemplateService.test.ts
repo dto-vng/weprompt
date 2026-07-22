@@ -7,7 +7,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
 
@@ -108,6 +108,41 @@ describe('PresentationTemplateService', () => {
     expect(await service.remove('removable')).toBe(true);
     expect(await service.remove('removable')).toBe(false);
     expect((await service.list()).map((s) => s.manifest.id)).toEqual(['alpha']);
+  });
+
+  it('continues syncing other packs when one builtin pack fails (e.g. missing reference file)', async () => {
+    const brokenPack: BuiltinTemplatePack = {
+      manifest: {
+        id: 'broken-pptx',
+        name: 'Broken Pptx',
+        description: 'test pack with a missing reference file',
+        format: 'pptx',
+        kind: 'deck',
+        source: 'builtin',
+        themeFile: 'THEME.md',
+        referenceFile: 'reference.pptx',
+        preview: 'preview.svg',
+        version: 1,
+        createdAt: '2026-07-22T00:00:00Z',
+      },
+      themeMd: '# Broken Pptx — Theme Specification v1\n#123456',
+      previewSvg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      referenceSourcePath: () => path.join(rootDir, 'does-not-exist.pptx'),
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [pack('alpha'), brokenPack] });
+    await expect(service.ensureInitialized()).resolves.toBeUndefined();
+
+    const list = await service.list();
+    expect(list.map((s) => s.manifest.id)).toEqual(['alpha']);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[PresentationTemplates] failed to sync builtin pack',
+      'broken-pptx',
+      expect.anything()
+    );
+
+    warnSpy.mockRestore();
   });
 
   it('skips corrupt packs in list()', async () => {

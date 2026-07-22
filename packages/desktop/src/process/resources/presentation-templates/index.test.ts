@@ -9,7 +9,7 @@ import { validateTemplateManifest } from '@process/services/presentation-templat
 import { BUILTIN_TEMPLATE_PACKS } from './index';
 
 describe('BUILTIN_TEMPLATE_PACKS', () => {
-  it('contains the four Phase-1 html packs with unique ids', () => {
+  it('contains the six builtin packs with unique ids', () => {
     const ids = BUILTIN_TEMPLATE_PACKS.map((p) => p.manifest.id);
     expect(ids).toEqual(
       expect.arrayContaining([

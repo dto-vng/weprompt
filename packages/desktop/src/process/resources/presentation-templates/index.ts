@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
 import editorialThemeMd from './editorial-field-report/THEME.md?raw';
@@ -38,9 +39,14 @@ const CREATED_AT = '2026-07-22T00:00:00Z';
 const resolveBundledReference = (fileName: string): string => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { app } = require('electron') as typeof import('electron');
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'presentation-templates', fileName)
-    : path.join(app.getAppPath(), 'resources', 'presentation-templates', fileName);
+  if (app.isPackaged) return path.join(process.resourcesPath, 'presentation-templates', fileName);
+  const candidates = [
+    path.join(app.getAppPath(), 'resources', 'presentation-templates', fileName),
+    path.join(app.getAppPath(), 'packages', 'desktop', 'resources', 'presentation-templates', fileName),
+    path.join(process.cwd(), 'packages', 'desktop', 'resources', 'presentation-templates', fileName),
+    path.join(process.cwd(), 'resources', 'presentation-templates', fileName),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
 };
 
 export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [

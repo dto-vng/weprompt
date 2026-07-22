@@ -48,16 +48,20 @@ export class PresentationTemplateService {
   private async syncBuiltins(): Promise<void> {
     await mkdir(this.rootDir, { recursive: true });
     for (const pack of this.builtinPacks) {
-      const dir = path.join(this.rootDir, pack.manifest.id);
-      const installed = await this.readManifest(dir);
-      if (installed && installed.version >= pack.manifest.version) continue;
-      await mkdir(dir, { recursive: true });
-      await writeFile(path.join(dir, pack.manifest.themeFile), pack.themeMd, 'utf-8');
-      await writeFile(path.join(dir, pack.manifest.preview), pack.previewSvg, 'utf-8');
-      if (pack.manifest.referenceFile && pack.referenceSourcePath) {
-        await copyFile(pack.referenceSourcePath(), path.join(dir, pack.manifest.referenceFile));
+      try {
+        const dir = path.join(this.rootDir, pack.manifest.id);
+        const installed = await this.readManifest(dir);
+        if (installed && installed.version >= pack.manifest.version) continue;
+        await mkdir(dir, { recursive: true });
+        await writeFile(path.join(dir, pack.manifest.themeFile), pack.themeMd, 'utf-8');
+        await writeFile(path.join(dir, pack.manifest.preview), pack.previewSvg, 'utf-8');
+        if (pack.manifest.referenceFile && pack.referenceSourcePath) {
+          await copyFile(pack.referenceSourcePath(), path.join(dir, pack.manifest.referenceFile));
+        }
+        await writeFile(path.join(dir, MANIFEST_FILE), JSON.stringify(pack.manifest, null, 2), 'utf-8');
+      } catch (error) {
+        console.warn('[PresentationTemplates] failed to sync builtin pack', pack.manifest.id, error);
       }
-      await writeFile(path.join(dir, MANIFEST_FILE), JSON.stringify(pack.manifest, null, 2), 'utf-8');
     }
   }
 
