@@ -132,8 +132,8 @@
     },
     "attempt": "(attempt {{n}})",
     "generic": {
-      "running": "I'm working through the next step.",
-      "done": "Completed the next step.",
+      "running": "Working on the next step.",
+      "done": "Finished the next step.",
       "failedTitle": "I couldn't complete this step"
     },
     "status": {
