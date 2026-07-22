@@ -17,6 +17,7 @@ import ProjectChatList from './components/ProjectChatList';
 import ProjectFilesCard from './components/ProjectFilesCard';
 import ProjectHeader from './components/ProjectHeader';
 import ProjectInstructionsCard from './components/ProjectInstructionsCard';
+import ProjectNewChatComposer from './components/ProjectNewChatComposer';
 import { useProjectChats } from './hooks/useProjectChats';
 import { useProjectHome } from './hooks/useProjectHome';
 
@@ -27,11 +28,10 @@ import { useProjectHome } from './hooks/useProjectHome';
  * state, or the two-column hub layout — a full-width header on top, a main
  * column (composer + chats) and a right rail (instructions + files) that
  * collapses to a single stacked column on narrow viewports. The header slot
- * renders `ProjectHeader` (C2), the chats slot renders `ProjectChatList`
+ * renders `ProjectHeader` (C2), the composer slot renders
+ * `ProjectNewChatComposer` (C6), the chats slot renders `ProjectChatList`
  * (C3), the instructions slot renders `ProjectInstructionsCard` (C4), and
- * the files slot renders `ProjectFilesCard` (C5); the composer slot is still
- * an empty placeholder — a later task (C6) replaces it with its real
- * component.
+ * the files slot renders `ProjectFilesCard` (C5).
  *
  * `useProjectHome` resolves synchronously from localStorage, so there is no
  * async page-level loading gap — a page-level loading skeleton would be dead
@@ -70,7 +70,9 @@ const ProjectHomePage: React.FC = () => {
       </div>
       <div className={classNames(styles.hub, isMobile && styles.hubMobile)}>
         <div className={styles.main}>
-          <div data-testid='project-composer-slot' />
+          <div data-testid='project-composer-slot'>
+            <ProjectNewChatComposer project={project} />
+          </div>
           <div data-testid='project-chats-slot'>
             <ProjectChatList chats={chats} />
           </div>

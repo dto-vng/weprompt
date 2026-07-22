@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROJECT_STORAGE_KEY } from '@renderer/pages/conversation/projects/projectStorage';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  // i18n.language is required alongside t: ProjectNewChatComposer resolves
+  // localeKey from it (mirrors GuidPage), so the stub must include it too.
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
 }));
 
 vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
