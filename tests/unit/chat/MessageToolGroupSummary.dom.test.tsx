@@ -1503,4 +1503,25 @@ describe('MessageToolGroupSummary narration-first journal', () => {
     render(<MessageToolGroupSummary messages={[singleActionWithSubject]} isActive={false} />);
     expect(screen.getByText(/done|finished|came together/i)).toBeInTheDocument();
   });
+
+  it('does not show the red failure banner for a recovered step', () => {
+    const recovered: WorkJournalSourceMessage = {
+      id: 'tg-1',
+      conversation_id: 'conv-1',
+      type: 'tool_group',
+      position: 'left',
+      created_at: 1,
+      content: [
+        {
+          call_id: 'c1',
+          name: 'ExecCommand',
+          status: 'Success',
+          startTime: 1,
+        },
+      ],
+    } as unknown as WorkJournalSourceMessage;
+    render(<MessageToolGroupSummary messages={[recovered]} isActive={false} />);
+    expect(screen.queryByText(/I couldn't complete the project step/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/error details are available below/i)).not.toBeInTheDocument();
+  });
 });
