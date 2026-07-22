@@ -16,6 +16,7 @@ import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Mes
 import { iconColors } from '@/renderer/styles/colors';
 import { downloadFileFromPath } from '@/renderer/utils/file/download';
 import { buildTurnClose } from './toolActivity/buildTurnClose';
+import { collapseAdjacentSteps } from './toolActivity/collapseSteps';
 import { buildTurnWorkRecap } from './toolActivity/buildTurnWorkRecap';
 import { useToolActionText } from './toolActivity/useToolActionText';
 import './MessageToolGroupSummary.css';
@@ -493,6 +494,20 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
     [isActive, rows]
   );
   const turnClose = useMemo(() => (isActive ? null : buildTurnClose(recap, recap.safeSubject)), [isActive, recap]);
+  // Resolve each step's display label, then collapse consecutive identical rows so
+  // a run of the same fallback label ("Finished the next step.") reads as one line.
+  const visibleSteps = useMemo(() => {
+    const labeled: Array<{ key: string; label: string; status: Exclude<NormalizedToolStatus, 'error'> }> = [];
+    for (const row of rows) {
+      if (row.status === 'error') continue;
+      labeled.push({
+        key: row.key,
+        label: row.kind === 'tool' ? action.label(row.step) : row.label,
+        status: row.status,
+      });
+    }
+    return collapseAdjacentSteps(labeled);
+  }, [action, rows]);
   const [showDetails, setShowDetails] = useState(false);
 
   if (rows.length === 0 && tools.length === 0) return null;
@@ -505,16 +520,9 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
         aria-live={isActive ? 'polite' : undefined}
         aria-atomic={isActive ? false : undefined}
       >
-        {rows.map((row) => {
-          if (row.status === 'error') return null;
-          return (
-            <StepRow
-              key={row.key}
-              label={row.kind === 'tool' ? action.label(row.step) : row.label}
-              status={row.status}
-            />
-          );
-        })}
+        {visibleSteps.map((step) => (
+          <StepRow key={step.key} label={step.label} status={step.status} />
+        ))}
         {turnClose && (
           <div
             className={'text-13px m-t-4px ' + (turnClose.tone === 'attention' ? 'text-warning' : 'text-t-primary')}

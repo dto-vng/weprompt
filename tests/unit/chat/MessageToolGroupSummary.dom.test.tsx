@@ -435,7 +435,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     expect(screen.getByText('Status Marker')).toBeVisible();
   });
 
-  it('keeps repetitive search commands with distinct call ids as separate journal rows', () => {
+  it('collapses repetitive same-label search commands into a single journal row', () => {
     render(
       <MessageToolGroupSummary
         messages={[
@@ -445,8 +445,9 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'common.technical_details' }));
-    expect(screen.getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(2);
+    // Both searches resolve to the same display label, so the narration collapses
+    // the run into one row instead of repeating the identical line.
+    expect(screen.getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(1);
   });
 
   it('shows a safe thinking subject but not raw thinking content', () => {
@@ -1087,7 +1088,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         },
       }) as unknown as IMessageAcpToolCall;
 
-    it('counts repeated completed generic steps with distinct call ids', () => {
+    it('collapses repeated identical generic steps into a single journal row', () => {
       render(
         <MessageToolGroupSummary
           messages={[
@@ -1098,9 +1099,9 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // The old count-only headline/activity/outcome summary is retired in favor of
-      // a full narration row per distinct action, so all 3 render individually.
-      expect(screen.getAllByText('messages.toolActivity.categories.generic.done')).toHaveLength(3);
+      // Consecutive steps with the same label collapse to one row, so the journal
+      // no longer shows a wall of identical "next step" lines.
+      expect(screen.getAllByText('messages.toolActivity.categories.generic.done')).toHaveLength(1);
       expect(screen.getByText(/^messages\.toolActivity\.close\.completed\.v\d$/)).toBeInTheDocument();
     });
 
