@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#fcfcfa"/>
+  <text x="28" y="46" font-family="monospace" font-size="8" letter-spacing="2" fill="#6e6e76">Q3 REVIEW</text>
+  <text x="28" y="92" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="800" fill="#16161a">Simple <tspan fill="#2563eb" font-style="italic">clarity</tspan></text>
+  <text x="28" y="116" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#6e6e76">One idea per slide. Nothing else.</text>
+  <rect x="28" y="140" width="264" height="1" fill="#16161a"/>
+  <text x="28" y="166" font-family="monospace" font-size="7" letter-spacing="1" fill="#6e6e76">GROWTH</text>
+  <text x="28" y="186" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#16161a">+42%</text>
+  <text x="128" y="166" font-family="monospace" font-size="7" letter-spacing="1" fill="#6e6e76">NPS</text>
+  <text x="128" y="186" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#16161a">61</text>
+  <text x="228" y="166" font-family="monospace" font-size="7" letter-spacing="1" fill="#6e6e76">CHURN</text>
+  <text x="228" y="186" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#2563eb">-1.8%</text>
+  <text x="292" y="30" font-family="monospace" font-size="8" fill="#6e6e76" text-anchor="end">02 / 09</text>
+</svg>
