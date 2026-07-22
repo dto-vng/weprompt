@@ -1,0 +1,55 @@
+/*
+ * Project Home layout: a full-width header slot on top, then a two-column hub
+ * (main column = composer + chats; right rail = instructions + files).
+ * The mobile/desktop switch is driven by LayoutContext's `isMobile` flag in
+ * ProjectHomePage.tsx (applies .hubMobile), not a CSS media query, so it
+ * stays in sync with the rest of the app's mobile breakpoint.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.headerSlot {
+  flex-shrink: 0;
+}
+
+.hub {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 26px 34px 34px;
+  display: grid;
+  grid-template-columns: 1fr 356px;
+  gap: 30px;
+  align-items: start;
+}
+
+/* Mobile stack order (top to bottom): header (above, unaffected) → composer
+   → chats → instructions → files. `.main` already places composer before
+   chats, and `.rail` already places instructions before files, so collapsing
+   the grid to a single flex column here is enough to get the full order. */
+.hubMobile {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px 16px 20px;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
