@@ -492,14 +492,19 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
       ),
     [isActive, rows]
   );
-  const close = useMemo(() => (isActive ? null : buildTurnClose(recap, recap.safeSubject)), [isActive, recap]);
+  const turnClose = useMemo(() => (isActive ? null : buildTurnClose(recap, recap.safeSubject)), [isActive, recap]);
   const [showDetails, setShowDetails] = useState(false);
 
   if (rows.length === 0 && tools.length === 0) return null;
 
   return (
     <div className='tool-group-summary flex flex-col gap-6px'>
-      <div className='flex flex-col gap-4px'>
+      <div
+        className='flex flex-col gap-4px'
+        role={isActive ? 'log' : undefined}
+        aria-live={isActive ? 'polite' : undefined}
+        aria-atomic={isActive ? false : undefined}
+      >
         {rows.map((row) => {
           if (row.status === 'error') return null;
           return (
@@ -510,12 +515,12 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
             />
           );
         })}
-        {close && (
+        {turnClose && (
           <div
-            className={'text-13px m-t-4px ' + (close.tone === 'attention' ? 'text-warning' : 'text-t-primary')}
-            role={recap.status === 'active' ? undefined : 'status'}
+            className={'text-13px m-t-4px ' + (turnClose.tone === 'attention' ? 'text-warning' : 'text-t-primary')}
+            role='status'
           >
-            {t(close.key)}
+            {t(turnClose.key)}
           </div>
         )}
       </div>

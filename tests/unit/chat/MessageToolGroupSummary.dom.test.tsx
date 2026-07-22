@@ -1140,9 +1140,10 @@ describe('MessageToolGroupSummary plain-language activity', () => {
 
       // The count-based "Completed: N of M" outcome sentence is retired — the
       // per-row narration and status now carry this instead.
-      expect(
-        screen.getByText('messages.toolActivity.categories.search.done').closest('[data-status]')
-      ).toHaveAttribute('data-status', 'completed');
+      expect(screen.getByText('messages.toolActivity.categories.search.done').closest('[data-status]')).toHaveAttribute(
+        'data-status',
+        'completed'
+      );
       expect(
         screen.getByText('messages.toolActivity.categories.verify.running').closest('[data-status]')
       ).toHaveAttribute('data-status', 'running');
@@ -1472,18 +1473,31 @@ describe('MessageToolGroupSummary narration-first journal', () => {
 
   it('shows no close while the turn is active', () => {
     const active: WorkJournalSourceMessage = {
-      ...(planMessage() as any),
+      id: 'plan-1',
+      conversation_id: 'conv-1',
+      type: 'plan',
+      position: 'left',
+      created_at: 1,
       content: { entries: [{ content: 'Enable the Google Drive API', status: 'in_progress' }] },
     } as unknown as WorkJournalSourceMessage;
     render(<MessageToolGroupSummary messages={[active]} isActive={true} />);
     expect(screen.queryByText(/done|finished|came together/i)).not.toBeInTheDocument();
   });
 
+  it('shows no Technical details toggle when there are no raw tool calls', () => {
+    render(<MessageToolGroupSummary messages={[planMessage()]} isActive={false} />);
+    expect(screen.queryByText(/technical details/i)).not.toBeInTheDocument();
+  });
+
   it('renders a close for a single completed action that carries a safe subject', () => {
     // A lone action is normally "trivial" and gets no close (see buildTurnClose.test.ts).
     // A safe narration subject makes it notable enough to close — this proves that path.
     const singleActionWithSubject: WorkJournalSourceMessage = {
-      ...(planMessage() as any),
+      id: 'plan-1',
+      conversation_id: 'conv-1',
+      type: 'plan',
+      position: 'left',
+      created_at: 1,
       content: { entries: [{ content: 'Enable the Google Drive API', status: 'completed' }] },
     } as unknown as WorkJournalSourceMessage;
     render(<MessageToolGroupSummary messages={[singleActionWithSubject]} isActive={false} />);
