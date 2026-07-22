@@ -213,6 +213,9 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict()
     .optional(),
+  'presentation-templates.list': voidPayloadSchema,
+  'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
+  'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
   'context.compaction.generate': localContextCompactionSchema,
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.prepare-preview': z.object(officeArtifactRequestShape).strict(),
