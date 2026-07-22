@@ -27,16 +27,18 @@ const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
 
 /**
- * Compact, locale-neutral duration token ("5m" / "3h" / "2d" / "1w") for the
- * `metaActive` i18n slot. No existing relative-time formatter covers this
- * granularity (the timeline helpers in GroupedHistory only bucket into
- * Today/Yesterday/Recent7Days/Earlier), so this is a minimal inline helper.
- * It deliberately never bakes in a word like "ago" — `metaActive`'s
- * translations place the word around `{{time}}` differently per language
- * (e.g. zh-CN: "{{time}}活跃", ja-JP: "{{time}}にアクティブ"), so `time` must
- * stay a bare, language-neutral token.
+ * Compact, locale-neutral duration token ("5m" / "3h" / "2d" / "1w"). No
+ * existing relative-time formatter covers this granularity (the timeline
+ * helpers in GroupedHistory only bucket into Today/Yesterday/Recent7Days/
+ * Earlier), so this is a minimal inline helper. It deliberately never bakes
+ * in a word like "ago" or "active" — callers that wrap it in a phrase (e.g.
+ * the `metaActive` i18n slot here: "{{time}}活跃", "{{time}}にアクティブ")
+ * place the word around `{{time}}` differently per language, so `time` must
+ * stay a bare, language-neutral token. Exported for reuse by `ProjectChatList`
+ * (C3), which shows the same bare token per row instead of introducing a
+ * second formatter or a new "ago"-style i18n key.
  */
-const formatActiveDuration = (timestamp: number, now: number): string => {
+export const formatActiveDuration = (timestamp: number, now: number): string => {
   const diff = Math.max(0, now - timestamp);
   if (diff < HOUR_MS) return `${Math.max(1, Math.floor(diff / MINUTE_MS))}m`;
   if (diff < DAY_MS) return `${Math.floor(diff / HOUR_MS)}h`;
