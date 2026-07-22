@@ -518,12 +518,14 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     handleWheel,
     handlePointerDown,
     showScrollButton,
+    reservedSpaceHeight,
     scrollToBottom,
     scrollElementIntoView,
     hideScrollButton,
   } = useAutoScroll({
     messages: list,
     itemCount: processedList.length,
+    isStreaming: isProcessing,
   });
 
   const setScrollerRef = useCallback(
@@ -757,14 +759,16 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     // User messages keep their own copy row; AI text only shows it at the turn end.
     const showCopyRow = message.position !== 'left' || message.type !== 'text' || aiCopyRowTextIds.has(message.id);
     return (
-      <MessageItem
-        message={message}
-        key={message.id}
-        highlighted={highlighted}
-        rowWidthClass={rowWidthClass}
-        showCopyRow={showCopyRow}
-        isStreaming={streamingTextMessageId === message.id}
-      ></MessageItem>
+      <div id={`message-${message.id}`}>
+        <MessageItem
+          message={message}
+          key={message.id}
+          highlighted={highlighted}
+          rowWidthClass={rowWidthClass}
+          showCopyRow={showCopyRow}
+          isStreaming={streamingTextMessageId === message.id}
+        ></MessageItem>
+      </div>
     );
   };
 
@@ -798,6 +802,13 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
                 <React.Fragment key={getProcessedItemAnchorId(item) || index}>{renderItem(index, item)}</React.Fragment>
               ))}
               <div className='h-20px' />
+              {/* Reserved space so a streaming reply fills in below the anchored user
+                  message without the viewport constantly scrolling (see useAutoScroll). */}
+              <div
+                aria-hidden='true'
+                data-testid='message-list-reserve'
+                style={{ height: `${reservedSpaceHeight}px` }}
+              />
             </div>
           </div>
         </ImagePreviewContext.Provider>
