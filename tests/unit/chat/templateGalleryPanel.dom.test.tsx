@@ -1,0 +1,70 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import TemplateGalleryPanel from '@renderer/components/chat/TemplateGallery/TemplateGalleryPanel';
+import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? key.split('.').pop() ?? key,
+  }),
+}));
+
+const template: PresentationTemplateSummary = {
+  manifest: {
+    id: 'simple-light',
+    name: 'Simple Light',
+    description: 'Minimal light deck',
+    format: 'html',
+    kind: 'deck',
+    source: 'builtin',
+    themeFile: 'THEME.md',
+    referenceFile: null,
+    preview: 'preview.svg',
+    version: 1,
+    createdAt: 'now',
+  },
+  themePath: '/abs/simple-light/THEME.md',
+  referencePath: null,
+  previewDataUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
+};
+
+describe('TemplateGalleryPanel', () => {
+  it('renders template cards and fires onSelect when a card is clicked', () => {
+    const onSelect = vi.fn();
+    render(
+      <TemplateGalleryPanel
+        templates={[template]}
+        onSelect={onSelect}
+        onImport={vi.fn()}
+        onRemove={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Simple Light')).toBeDefined();
+    expect(screen.getByText('HTML')).toBeDefined();
+    fireEvent.click(screen.getByAltText('Simple Light'));
+    expect(onSelect).toHaveBeenCalledWith(template);
+  });
+
+  it('fires onImport from the import tile and shows empty state without templates', () => {
+    const onImport = vi.fn();
+    render(
+      <TemplateGalleryPanel
+        templates={[]}
+        onSelect={vi.fn()}
+        onImport={onImport}
+        onRemove={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'importCard' }));
+    expect(onImport).toHaveBeenCalled();
+  });
+});
