@@ -17,6 +17,11 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -52,7 +57,7 @@ import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage, collectSelectedFiles } from '@/renderer/utils/file/messageFiles';
 import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
-import { Message, Tag } from '@arco-design/web-react';
+import { Message, Tag, Tooltip } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -171,6 +176,7 @@ const AionrsSendBox: React.FC<{
   const runtimeView = useConversationRuntimeView(conversation_id);
 
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates();
 
   const handleContentChange = useCallback(
     (val: string) => {
@@ -269,7 +275,11 @@ const AionrsSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
+    async ({
+      input,
+      files,
+      injectSkills,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files'> & { injectSkills?: string[] }) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
@@ -296,6 +306,7 @@ const AionrsSendBox: React.FC<{
           conversation_id,
           files,
           pinned_context: getConversationPinnedContext(latestConversation),
+          inject_skills: injectSkills && injectSkills.length > 0 ? injectSkills : undefined,
         });
         setActiveMsgId(res.msg_id);
         runtimeView.markSendAccepted(res.turn_id, res.runtime, res.msg_id);
@@ -390,6 +401,8 @@ const AionrsSendBox: React.FC<{
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
 
+    const composed = presentationTemplates.composeSend(message, filesToSend);
+
     if (
       shouldEnqueueConversationCommand({
         enabled: true,
@@ -397,11 +410,15 @@ const AionrsSendBox: React.FC<{
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: filesToSend });
+      // Queued sends drop injectSkills — the directive still names the skill,
+      // so the agent can pick it up when the queued command is executed.
+      enqueue({ input: composed.input, files: composed.files });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: filesToSend });
+    await executeCommand({ input: composed.input, files: composed.files, injectSkills: composed.injectSkills });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
@@ -692,11 +709,14 @@ const AionrsSendBox: React.FC<{
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
@@ -723,6 +743,15 @@ const AionrsSendBox: React.FC<{
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
+                  <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
+                    {presentationTemplates.selectedTemplate.manifest.name}
+                  </Tag>
+                </Tooltip>
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -768,6 +797,19 @@ const AionrsSendBox: React.FC<{
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         enableContextCommand
         allowSendWhileLoading
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       />
       {isMobile && (
         <>
