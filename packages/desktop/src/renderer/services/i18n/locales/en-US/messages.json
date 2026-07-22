@@ -50,6 +50,18 @@
   "unknownMessageType": "Unknown message type: {{type}}",
   "permissionRequest": "Permission Request",
   "agentRequestingPermission": "The agent is requesting permission.",
+  "permission": {
+    "intent": {
+      "run": "I'd like to run a command",
+      "edit": "I'd like to edit a file",
+      "read": "I'd like to read a file",
+      "fetch": "I'd like to fetch something from the web",
+      "tool": "I'd like to use a tool",
+      "destructive": "I'd like to delete or remove files",
+      "generic": "I'd like to do something that needs your approval"
+    },
+    "destructiveWarning": "This can permanently delete or overwrite files — it can't be undone."
+  },
   "command": "Command:",
   "chooseAction": "Choose an action:",
   "option": "Option",
