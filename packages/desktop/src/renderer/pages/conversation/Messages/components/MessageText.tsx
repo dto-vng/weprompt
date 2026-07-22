@@ -48,13 +48,9 @@ export const formatMessageTime = (timestamp: number): string => {
 import MessageCronBadge from './MessageCronBadge';
 import { resolveAgentLogo, useAgentLogos } from '@/renderer/utils/model/agentLogo';
 import TeammateMessageAvatar from './TeammateMessageAvatar';
+import { nextRevealLength } from './progressiveText';
 
 const CODE_STYLE = { marginTop: 4, marginBlock: 4 };
-const STREAM_REVEAL_INTERVAL_MS = 16;
-const STREAM_REVEAL_MIN_DURATION_MS = 80;
-const STREAM_REVEAL_MAX_DURATION_MS = 280;
-const STREAM_REVEAL_MS_PER_CHARACTER = 4;
-
 const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
@@ -63,12 +59,16 @@ const prefersReducedMotion = (): boolean =>
 const useProgressiveText = (text: string, isStreaming: boolean) => {
   const [displayedText, setDisplayedText] = useState(() => (isStreaming && !prefersReducedMotion() ? '' : text));
   const displayedTextRef = React.useRef(displayedText);
+  const targetTextRef = React.useRef(text);
+  const rafRef = React.useRef<number | null>(null);
   const wasStreamingRef = React.useRef(isStreaming);
 
   useEffect(() => {
+    targetTextRef.current = text;
     const wasStreaming = wasStreamingRef.current;
     wasStreamingRef.current = isStreaming;
     const currentText = displayedTextRef.current;
+
     const canReveal =
       !prefersReducedMotion() &&
       (isStreaming || wasStreaming) &&
@@ -76,6 +76,10 @@ const useProgressiveText = (text: string, isStreaming: boolean) => {
       currentText.length < text.length;
 
     if (!canReveal) {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       if (currentText !== text) {
         displayedTextRef.current = text;
         setDisplayedText(text);
@@ -83,27 +87,33 @@ const useProgressiveText = (text: string, isStreaming: boolean) => {
       return;
     }
 
-    const additionalCharacterCount = text.length - currentText.length;
-    const duration = Math.min(
-      STREAM_REVEAL_MAX_DURATION_MS,
-      Math.max(STREAM_REVEAL_MIN_DURATION_MS, additionalCharacterCount * STREAM_REVEAL_MS_PER_CHARACTER)
-    );
-    const stepCount = Math.ceil(duration / STREAM_REVEAL_INTERVAL_MS);
-    const charactersPerStep = Math.max(1, Math.ceil(additionalCharacterCount / stepCount));
-    let revealLength = currentText.length;
+    // One persistent rAF loop eases the shown text toward the latest target. New
+    // chunks only raise the target (above); the loop is never torn down mid-reveal,
+    // so text flows continuously instead of restarting a typewriter each chunk.
+    if (rafRef.current !== null) return;
 
-    const interval = window.setInterval(() => {
-      revealLength = Math.min(text.length, revealLength + charactersPerStep);
-      const nextText = text.slice(0, revealLength);
+    const tick = () => {
+      const target = targetTextRef.current;
+      const revealedLength = displayedTextRef.current.length;
+      const nextLength = nextRevealLength(revealedLength, target.length);
+      if (nextLength <= revealedLength) {
+        rafRef.current = null;
+        return;
+      }
+      const nextText = target.slice(0, nextLength);
       displayedTextRef.current = nextText;
       setDisplayedText(nextText);
-      if (revealLength === text.length) {
-        window.clearInterval(interval);
-      }
-    }, STREAM_REVEAL_INTERVAL_MS);
-
-    return () => window.clearInterval(interval);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
   }, [isStreaming, text]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    []
+  );
 
   return { displayedText, isRevealing: displayedText !== text };
 };
