@@ -262,9 +262,11 @@ export function useAutoScroll({ messages, itemCount, isStreaming }: UseAutoScrol
         const anchorEl = scrollerEl.ownerDocument.getElementById(`message-${lastMessage.id}`);
         if (anchorEl) {
           markProgrammaticScroll();
-          anchorEl.scrollIntoView({ block: 'start', behavior: 'auto' });
+          // Smoothly ease the user's message up to the top rather than snapping,
+          // so the start of a turn feels like a soft transition.
+          anchorEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
         } else {
-          scrollToBottom('auto');
+          scrollToBottom('smooth');
         }
         recomputeReservedSpace();
       });
