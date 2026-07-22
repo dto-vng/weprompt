@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
 import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
 import editorialThemeMd from './editorial-field-report/THEME.md?raw';
 import editorialPreviewSvg from './editorial-field-report/preview.svg?raw';
@@ -13,6 +14,10 @@ import simpleDarkThemeMd from './simple-dark/THEME.md?raw';
 import simpleDarkPreviewSvg from './simple-dark/preview.svg?raw';
 import marketTrendsThemeMd from './market-trends-report/THEME.md?raw';
 import marketTrendsPreviewSvg from './market-trends-report/preview.svg?raw';
+import businessReviewThemeMd from './business-review/THEME.md?raw';
+import businessReviewPreviewSvg from './business-review/preview.svg?raw';
+import projectKickoffThemeMd from './project-kickoff/THEME.md?raw';
+import projectKickoffPreviewSvg from './project-kickoff/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -23,6 +28,20 @@ export type BuiltinTemplatePack = {
 };
 
 const CREATED_AT = '2026-07-22T00:00:00Z';
+
+/**
+ * Bundled binary resources: packaged builds read from process.resourcesPath
+ * (electron-builder extraResources); dev reads from the repo's
+ * packages/desktop/resources directory. Lazy `require('electron')` keeps this
+ * module importable from Vitest (node) where electron is unavailable.
+ */
+const resolveBundledReference = (fileName: string): string => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { app } = require('electron') as typeof import('electron');
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'presentation-templates', fileName)
+    : path.join(app.getAppPath(), 'resources', 'presentation-templates', fileName);
+};
 
 export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   {
@@ -92,5 +111,41 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: marketTrendsThemeMd,
     previewSvg: marketTrendsPreviewSvg,
+  },
+  {
+    manifest: {
+      id: 'business-review',
+      name: 'Business Review',
+      description: 'Navy-and-amber quarterly business review deck (PPTX, cloned from a retained reference)',
+      format: 'pptx',
+      kind: 'deck',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.pptx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: CREATED_AT,
+    },
+    themeMd: businessReviewThemeMd,
+    previewSvg: businessReviewPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('business-review.pptx'),
+  },
+  {
+    manifest: {
+      id: 'project-kickoff',
+      name: 'Project Kickoff',
+      description: 'Clean teal project kickoff deck (PPTX, cloned from a retained reference)',
+      format: 'pptx',
+      kind: 'deck',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.pptx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: CREATED_AT,
+    },
+    themeMd: projectKickoffThemeMd,
+    previewSvg: projectKickoffPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('project-kickoff.pptx'),
   },
 ];

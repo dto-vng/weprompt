@@ -12,7 +12,14 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
   it('contains the four Phase-1 html packs with unique ids', () => {
     const ids = BUILTIN_TEMPLATE_PACKS.map((p) => p.manifest.id);
     expect(ids).toEqual(
-      expect.arrayContaining(['editorial-field-report', 'simple-light', 'simple-dark', 'market-trends-report'])
+      expect.arrayContaining([
+        'editorial-field-report',
+        'simple-light',
+        'simple-dark',
+        'market-trends-report',
+        'business-review',
+        'project-kickoff',
+      ])
     );
     expect(new Set(ids).size).toBe(ids.length);
   });
