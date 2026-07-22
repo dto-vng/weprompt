@@ -78,7 +78,9 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
 
 1. `officecli validate <file>` — zero errors.
 2. `officecli view <file> issues` — zero issues; fix and re-run until clean.
-3. Placeholder scan of `officecli view <file> text` — no lorem/TODO/xxx and no surviving reference sample content.
+3. Placeholder scan — BOTH checks must print nothing:
+   - `officecli view <file> text | grep -iE 'lorem|TODO|xxx'`
+   - `officecli view <file> text | grep -iE 'atlas|osei|m\. tran|ibarra|novak|l\. devi|warehouse|operator shifts|steering review|roastery'` — these tokens exist only in the reference's sample content; any hit is a leftover you must replace or delete. Dividers and the closing slide are the most commonly forgotten — check them slide by slide.
 4. Visual audit: `officecli view <file> screenshot --page N` for every slide; inspect each image for overflow, overlap, low contrast and margin violations; fix and re-render until a full pass finds zero new issues (max 3 cycles).
 
 ## Voice
