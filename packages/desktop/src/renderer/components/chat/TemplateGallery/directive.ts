@@ -55,6 +55,9 @@ export function composePresentationSend(
   return {
     input: `${directive}\n\n${message}`,
     files: attachments,
-    injectSkills: manifest.format === 'pptx' ? ['officecli', 'officecli-pptx'] : [],
+    // Only the generic officecli skill resolves by name in the backend skill
+    // registry; the specialized pptx design rules are pulled in-band via the
+    // directive's mandatory `officecli load_skill pptx` step instead.
+    injectSkills: manifest.format === 'pptx' ? ['officecli'] : [],
   };
 }

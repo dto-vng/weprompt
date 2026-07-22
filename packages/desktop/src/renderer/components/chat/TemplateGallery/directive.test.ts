@@ -46,7 +46,7 @@ describe('composePresentationSend', () => {
     expect(result.input).toContain('officecli view screenshot');
     expect(result.input.endsWith('Q3 business review')).toBe(true);
     expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.pptx']);
-    expect(result.injectSkills).toEqual(['officecli', 'officecli-pptx']);
+    expect(result.injectSkills).toEqual(['officecli']);
   });
 
   it('does not duplicate files already attached', () => {
