@@ -40,10 +40,13 @@ describe('composePresentationSend', () => {
 
   it('pptx: references officecli, attaches theme + reference, requests skill injection', () => {
     const result = composePresentationSend(summary('pptx'), 'Q3 business review', []);
-    expect(result.input).toContain('officecli');
+    expect(result.input).toContain('officecli load_skill pptx');
     expect(result.input).toContain('reference.pptx');
+    expect(result.input).toContain('Never build a deck from scratch');
+    expect(result.input).toContain('officecli view screenshot');
+    expect(result.input.endsWith('Q3 business review')).toBe(true);
     expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.pptx']);
-    expect(result.injectSkills).toEqual(['officecli']);
+    expect(result.injectSkills).toEqual(['officecli', 'officecli-pptx']);
   });
 
   it('does not duplicate files already attached', () => {

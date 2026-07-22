@@ -18,8 +18,14 @@ const htmlDirective = (themeFile: string): string =>
 const pptxDirective = (themeFile: string, referenceFile: string): string =>
   [
     `Create a presentation from the request below.`,
-    `Use the officecli skill to clone the attached ${referenceFile} — preserve its masters, layouts,`,
-    `typography, and slide chrome; replace only the content. The attached ${themeFile} describes the visual system.`,
+    `Before building anything: read the attached ${themeFile} in full and run \`officecli load_skill pptx\`; follow both.`,
+    `Copy the attached ${referenceFile} to the output file, then edit the copy with officecli —`,
+    `preserve its masters, layouts, typography, and slide chrome; duplicate its slides to match content types per the theme spec and replace their content.`,
+    `Never build a deck from scratch and never write raw OOXML.`,
+    `Every content slide needs a non-text visual (chart, shape, or image) and speaker notes.`,
+    `Before declaring done, ALL delivery gates must pass: \`officecli validate\`; \`officecli view issues\` clean;`,
+    `no leftover placeholder text; and a per-slide visual audit — render every slide with \`officecli view screenshot --page N\`,`,
+    `inspect each image for text overflow, overlap, contrast, and margin problems, fix, and re-render until a full pass finds zero new issues (max 3 cycles).`,
     `Save the result into the conversation workspace.`,
     `Do not invent facts to fill template slots.`,
   ].join(' ');
@@ -49,6 +55,6 @@ export function composePresentationSend(
   return {
     input: `${directive}\n\n${message}`,
     files: attachments,
-    injectSkills: manifest.format === 'pptx' ? ['officecli'] : [],
+    injectSkills: manifest.format === 'pptx' ? ['officecli', 'officecli-pptx'] : [],
   };
 }
