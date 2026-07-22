@@ -8,16 +8,18 @@
  * How much empty space to reserve below the latest user message so the streamed
  * reply can fill it without the viewport moving.
  *
- * We keep at least one viewport of (real content + reserved space) below the
- * anchor: when the reply is short the spacer fills the gap so the user message
- * can sit at the top of the viewport; as the reply grows past a viewport the
- * spacer shrinks to zero. Never negative.
+ * We keep `targetBelowHeight` of (real content + reserved space) below the
+ * anchor — a fraction of the viewport chosen by the caller (the anchor sits a
+ * little below the top, so the space it needs below is less than a full
+ * viewport). When the reply is short the spacer fills the gap so the anchor can
+ * hold its position; as the reply grows past the target the spacer shrinks to
+ * zero. Never negative.
  *
- * @param viewportHeight        the scroller's clientHeight
+ * @param targetBelowHeight  how much space to keep below the anchor (px)
  * @param contentHeightBelowAnchor  real content height from the anchor's top to
  *   the end of the messages (EXCLUDING the reserved spacer)
  */
-export const computeReservedSpace = (viewportHeight: number, contentHeightBelowAnchor: number): number => {
+export const computeReservedSpace = (targetBelowHeight: number, contentHeightBelowAnchor: number): number => {
   const belowAnchor = Math.max(0, contentHeightBelowAnchor);
-  return Math.max(0, viewportHeight - belowAnchor);
+  return Math.max(0, targetBelowHeight - belowAnchor);
 };

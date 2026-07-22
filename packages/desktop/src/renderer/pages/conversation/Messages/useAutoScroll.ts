@@ -26,6 +26,9 @@ const PROGRAMMATIC_SCROLL_GUARD_MS = 150;
 const AT_BOTTOM_THRESHOLD_PX = 100;
 const FOLLOW_BOTTOM_THRESHOLD_PX = 4;
 const RESERVE_EPSILON_PX = 2;
+// On a new turn, scroll the user's message to this fraction from the top of the
+// viewport (not all the way up) so the tail of the previous turn stays visible.
+const ANCHOR_TOP_GAP_FRACTION = 0.25;
 
 interface UseAutoScrollOptions {
   messages: TMessage[];
@@ -123,7 +126,7 @@ export function useAutoScroll({ messages, itemCount, isStreaming }: UseAutoScrol
 
     const anchorTop = anchorEl.getBoundingClientRect().top - contentEl.getBoundingClientRect().top;
     const contentBelowAnchor = contentEl.scrollHeight - reservedRef.current - anchorTop;
-    const next = computeReservedSpace(scrollerEl.clientHeight, contentBelowAnchor);
+    const next = computeReservedSpace(scrollerEl.clientHeight * (1 - ANCHOR_TOP_GAP_FRACTION), contentBelowAnchor);
     if (Math.abs(next - reservedRef.current) > RESERVE_EPSILON_PX) {
       reservedRef.current = next;
       setReservedSpaceHeight(next);
@@ -254,17 +257,21 @@ export function useAutoScroll({ messages, itemCount, isStreaming }: UseAutoScrol
 
     userScrolledRef.current = false;
     anchorIdRef.current = lastMessage.id;
-    reservedRef.current = scrollerEl.clientHeight;
-    setReservedSpaceHeight(scrollerEl.clientHeight);
+    const targetBelow = scrollerEl.clientHeight * (1 - ANCHOR_TOP_GAP_FRACTION);
+    reservedRef.current = targetBelow;
+    setReservedSpaceHeight(targetBelow);
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const anchorEl = scrollerEl.ownerDocument.getElementById(`message-${lastMessage.id}`);
         if (anchorEl) {
           markProgrammaticScroll();
-          // Smoothly ease the user's message up to the top rather than snapping,
-          // so the start of a turn feels like a soft transition.
-          anchorEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          // Ease the user's message up to ~a quarter from the top (not all the way),
+          // so the previous turn stays partly visible and the reply fills the space below.
+          const anchorOffsetTop =
+            anchorEl.getBoundingClientRect().top - scrollerEl.getBoundingClientRect().top + scrollerEl.scrollTop;
+          const targetTop = Math.max(0, anchorOffsetTop - scrollerEl.clientHeight * ANCHOR_TOP_GAP_FRACTION);
+          scrollerEl.scrollTo({ top: targetTop, behavior: 'smooth' });
         } else {
           scrollToBottom('smooth');
         }
