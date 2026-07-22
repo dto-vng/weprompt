@@ -3,9 +3,15 @@ import { createProject, findProjectById, updateProject } from './projectStorage'
 
 class MemStorage {
   private m = new Map<string, string>();
-  getItem = (k: string) => this.m.get(k) ?? null;
-  setItem = (k: string, v: string) => void this.m.set(k, v);
-  removeItem = (k: string) => void this.m.delete(k);
+  getItem(key: string): string | null {
+    return this.m.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.m.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.m.delete(key);
+  }
 }
 
 describe('project instructions', () => {
