@@ -14,12 +14,36 @@ vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
   useConversationHistoryContext: () => ({ conversations: [] }),
 }));
 
-// ProjectFilesCard (C5) fetches the workspace tree on mount via ipcBridge —
-// mock it so this page-level test stays hermetic (no real IPC/network call).
+// ProjectNewChatComposer now has full parity with GuidPage's composer (model
+// + skills/MCP pickers), so it reads its focus-ring colors from ThemeContext
+// via useInputFocusRing — mock it so this page-level test doesn't need a
+// real ThemeProvider ancestor.
+vi.mock('@/renderer/hooks/chat/useInputFocusRing', () => ({
+  useInputFocusRing: () => ({
+    activeBorderColor: '#000',
+    inactiveBorderColor: '#ccc',
+    activeShadow: 'none',
+  }),
+}));
+
+// ProjectNewChatComposer also loads the MCP catalog on mount (mirrors
+// GuidPage) — mock it alongside ipcBridge below so this page-level test
+// stays hermetic (no real IPC/network call).
+vi.mock('@/renderer/hooks/mcp/catalog', () => ({
+  ensureBackendMcpCatalog: vi.fn().mockResolvedValue({ allServers: [] }),
+}));
+
+// ProjectFilesCard (C5) fetches the workspace tree on mount via ipcBridge,
+// and ProjectNewChatComposer now fetches the skill catalog + (when an
+// assistant is selected) its detail — mock all three so this page-level
+// test stays hermetic (no real IPC/network call).
 vi.mock('@/common', () => ({
   ipcBridge: {
     fs: {
       getFilesByDir: {
+        invoke: vi.fn().mockResolvedValue([]),
+      },
+      listAvailableSkills: {
         invoke: vi.fn().mockResolvedValue([]),
       },
     },
@@ -31,6 +55,11 @@ vi.mock('@/common', () => ({
     dialog: {
       showOpen: {
         invoke: vi.fn(),
+      },
+    },
+    assistants: {
+      get: {
+        invoke: vi.fn().mockResolvedValue(null),
       },
     },
   },
