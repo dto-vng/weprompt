@@ -41,32 +41,40 @@ export function usePresentationTemplates() {
   const clearSelection = useCallback(() => setSelectedTemplate(null), []);
 
   const importFromDialog = useCallback(async () => {
-    const paths = await ipcBridge.dialog.showOpen.invoke({
-      properties: ['openFile'],
-      filters: [{ name: 'Theme spec', extensions: ['md'] }],
-    });
-    const filePath = paths?.[0];
-    if (!filePath) return;
-    const result = await ipcBridge.presentationTemplates.importSpec.invoke({ file_path: filePath });
-    if (result.ok) {
-      Message.success(t('conversation.presentationTemplates.importSuccess'));
-      await mutate();
-    } else if ('error' in result) {
-      // `else if` (rather than plain `else`) so the discriminated union narrows
-      // correctly under this project's tsconfig, which does not set
-      // strictNullChecks — negating a boolean-literal discriminant alone does
-      // not narrow the other branch without it.
-      Message.error(t('conversation.presentationTemplates.importError', { error: result.error }));
+    try {
+      const paths = await ipcBridge.dialog.showOpen.invoke({
+        properties: ['openFile'],
+        filters: [{ name: 'Theme spec', extensions: ['md'] }],
+      });
+      const filePath = paths?.[0];
+      if (!filePath) return;
+      const result = await ipcBridge.presentationTemplates.importSpec.invoke({ file_path: filePath });
+      if (result.ok) {
+        Message.success(t('conversation.presentationTemplates.importSuccess'));
+        await mutate();
+      } else if ('error' in result) {
+        // `else if` (rather than plain `else`) so the discriminated union narrows
+        // correctly under this project's tsconfig, which does not set
+        // strictNullChecks — negating a boolean-literal discriminant alone does
+        // not narrow the other branch without it.
+        Message.error(t('conversation.presentationTemplates.importError', { error: result.error }));
+      }
+    } catch (error) {
+      Message.error(t('conversation.presentationTemplates.importError', { error: String(error) }));
     }
   }, [mutate, t]);
 
   const removeTemplate = useCallback(
     async (id: string) => {
-      await ipcBridge.presentationTemplates.remove.invoke({ id });
-      setSelectedTemplate((current) => (current?.manifest.id === id ? null : current));
-      await mutate();
+      try {
+        await ipcBridge.presentationTemplates.remove.invoke({ id });
+        setSelectedTemplate((current) => (current?.manifest.id === id ? null : current));
+        await mutate();
+      } catch (error) {
+        Message.error(t('conversation.presentationTemplates.removeError', { error: String(error) }));
+      }
     },
-    [mutate]
+    [mutate, t]
   );
 
   const composeSend = useCallback(

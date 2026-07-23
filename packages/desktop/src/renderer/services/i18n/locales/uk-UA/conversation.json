@@ -586,6 +586,7 @@
     "chipTooltip": "Це повідомлення використає шаблон",
     "importSuccess": "Шаблон імпортовано",
     "importError": "Помилка імпорту: {{error}}",
+    "removeError": "Помилка видалення: {{error}}",
     "deleteTooltip": "Видалити шаблон",
     "deleteConfirm": "Видалити цей шаблон?"
   },

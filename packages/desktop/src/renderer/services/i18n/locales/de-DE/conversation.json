@@ -587,6 +587,7 @@
     "chipTooltip": "Diese Nachricht verwendet die Vorlage",
     "importSuccess": "Vorlage importiert",
     "importError": "Import fehlgeschlagen: {{error}}",
+    "removeError": "Löschen fehlgeschlagen: {{error}}",
     "deleteTooltip": "Vorlage löschen",
     "deleteConfirm": "Diese Vorlage löschen?"
   },

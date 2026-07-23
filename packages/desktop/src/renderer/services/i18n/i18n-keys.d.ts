@@ -650,6 +650,7 @@ export type I18nKey =
   | 'conversation.presentationTemplates.importCard'
   | 'conversation.presentationTemplates.importError'
   | 'conversation.presentationTemplates.importSuccess'
+  | 'conversation.presentationTemplates.removeError'
   | 'conversation.presentationTemplates.slashDescription'
   | 'conversation.presentationTemplates.title'
   | 'conversation.projectHeader.eyebrow'

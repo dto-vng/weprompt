@@ -586,6 +586,7 @@
     "chipTooltip": "این پیام از قالب استفاده می‌کند",
     "importSuccess": "قالب وارد شد",
     "importError": "خطا در وارد کردن: {{error}}",
+    "removeError": "خطا در حذف: {{error}}",
     "deleteTooltip": "حذف قالب",
     "deleteConfirm": "این قالب حذف شود؟"
   },

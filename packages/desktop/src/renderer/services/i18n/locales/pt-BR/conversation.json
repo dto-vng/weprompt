@@ -592,6 +592,7 @@
     "chipTooltip": "Esta mensagem usará o modelo",
     "importSuccess": "Modelo importado",
     "importError": "Falha na importação: {{error}}",
+    "removeError": "Falha ao excluir: {{error}}",
     "deleteTooltip": "Excluir modelo",
     "deleteConfirm": "Excluir este modelo?"
   },

@@ -647,6 +647,7 @@
     "chipTooltip": "This message will use the template",
     "importSuccess": "Template imported",
     "importError": "Import failed: {{error}}",
+    "removeError": "Delete failed: {{error}}",
     "deleteTooltip": "Delete template",
     "deleteConfirm": "Delete this template?"
   },

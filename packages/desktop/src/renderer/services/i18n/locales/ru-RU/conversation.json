@@ -586,6 +586,7 @@
     "chipTooltip": "Это сообщение использует шаблон",
     "importSuccess": "Шаблон импортирован",
     "importError": "Ошибка импорта: {{error}}",
+    "removeError": "Ошибка удаления: {{error}}",
     "deleteTooltip": "Удалить шаблон",
     "deleteConfirm": "Удалить этот шаблон?"
   },

@@ -587,6 +587,7 @@
     "chipTooltip": "Este mensaje usará la plantilla",
     "importSuccess": "Plantilla importada",
     "importError": "Error al importar: {{error}}",
+    "removeError": "Error al eliminar: {{error}}",
     "deleteTooltip": "Eliminar plantilla",
     "deleteConfirm": "¿Eliminar esta plantilla?"
   },

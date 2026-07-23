@@ -588,6 +588,7 @@
     "chipTooltip": "Bu mesaj şablonu kullanacak",
     "importSuccess": "Şablon içe aktarıldı",
     "importError": "İçe aktarma başarısız: {{error}}",
+    "removeError": "Silme başarısız: {{error}}",
     "deleteTooltip": "Şablonu sil",
     "deleteConfirm": "Bu şablon silinsin mi?"
   },

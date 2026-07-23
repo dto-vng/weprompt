@@ -580,6 +580,7 @@
     "chipTooltip": "이 메시지는 템플릿을 사용합니다",
     "importSuccess": "템플릿을 가져왔습니다",
     "importError": "가져오기 실패: {{error}}",
+    "removeError": "삭제 실패: {{error}}",
     "deleteTooltip": "템플릿 삭제",
     "deleteConfirm": "이 템플릿을 삭제하시겠습니까?"
   },

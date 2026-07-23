@@ -580,6 +580,7 @@
     "chipTooltip": "此消息将使用该模板",
     "importSuccess": "模板已导入",
     "importError": "导入失败：{{error}}",
+    "removeError": "删除失败：{{error}}",
     "deleteTooltip": "删除模板",
     "deleteConfirm": "确定删除该模板？"
   },

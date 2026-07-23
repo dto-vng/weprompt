@@ -586,6 +586,7 @@
     "chipTooltip": "このメッセージはテンプレートを使用します",
     "importSuccess": "テンプレートをインポートしました",
     "importError": "インポートに失敗しました: {{error}}",
+    "removeError": "削除に失敗しました: {{error}}",
     "deleteTooltip": "テンプレートを削除",
     "deleteConfirm": "このテンプレートを削除しますか？"
   },
