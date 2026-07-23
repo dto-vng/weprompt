@@ -312,6 +312,23 @@ describe('ProjectNewChatComposer', () => {
     expect(screen.getByTestId('guid-tools-mcp-control')).toBeInTheDocument();
   });
 
+  it('wraps GuidInputCard so its baked-in per-chat folder pill can be hidden via CSS, since this surface is fixed to the project workspace', () => {
+    render(<ProjectNewChatComposer project={project} />);
+
+    // GuidInputCard is stubbed above (see the vi.mock near the top of this
+    // file) since its own workspace-footnote rendering is covered by
+    // tests/unit/renderer/GuidInputCard.dom.test.tsx. This asserts the piece
+    // that IS this composer's responsibility: GuidInputCard renders inside a
+    // wrapper carrying `.composerNoFolderPill`
+    // (ProjectNewChatComposer.module.css), whose `:has()` rule hides
+    // GuidInputCard's workspace-footnote sibling that precedes the
+    // `[data-testid="guid-input"]` textarea — without editing any
+    // Guid-owned file.
+    const wrap = screen.getByTestId('project-composer-input-wrap');
+    expect(wrap).toContainElement(screen.getByTestId('guid-input-card'));
+    expect(wrap.className).toMatch(/composerNoFolderPill/);
+  });
+
   it('creates the conversation in place via useGuidSend, scoped to the project, instead of handing off to /guid', () => {
     render(<ProjectNewChatComposer project={project} />);
 

@@ -27,6 +27,8 @@ import { useGuidModelSelection } from '@renderer/pages/guid/hooks/useGuidModelSe
 import { useGuidSend } from '@renderer/pages/guid/hooks/useGuidSend';
 import { resolveGuidAssistantDefaults } from '@renderer/pages/guid/utils/assistantDefaults';
 
+import styles from './ProjectNewChatComposer.module.css';
+
 export type ProjectNewChatComposerProps = {
   project: ForgeProject;
 };
@@ -65,11 +67,19 @@ const PROVIDER_BASED_AGENTS = new Set(['aionrs']);
  * - Speech-to-text input.
  * - The assistant example-prompt starter grid.
  *
- * Left in, inherited unavoidably from reusing `GuidInputCard` unmodified:
- * its baked-in workspace footnote (folder pill with change/clear controls).
- * Wired identically to GuidPage's own `workspaceDir`/`onSelectWorkspace`/
- * `onClearWorkspace` — forking `GuidInputCard` just to hide it was out of
- * scope here.
+ * Hidden on this surface, without forking `GuidInputCard`: its baked-in
+ * workspace footnote (folder pill with change/clear controls). A project's
+ * folder is fixed to `project.workspace`, so per-chat folder controls would
+ * be misleading here. `GuidInputCard` always renders that footnote and
+ * takes no prop to suppress it, and `GuidWorkspaceFootnote` is upstream
+ * Guid-page code this project must not fork/edit (see AGENTS.md), so
+ * `ProjectNewChatComposer.module.css`'s `.composerNoFolderPill` hides it
+ * structurally instead (see that file for how). `workspaceDir`/
+ * `onSelectWorkspace`/`onClearWorkspace` stay wired identically to
+ * GuidPage's own composer — only the footnote's visibility changes;
+ * `useGuidInput`'s `dir` (seeded from `project.workspace`) still flows to
+ * `useGuidSend` unchanged, so created chats stay scoped to the project's
+ * folder.
  */
 const ProjectNewChatComposer: React.FC<ProjectNewChatComposerProps> = ({ project }) => {
   const { t, i18n } = useTranslation();
@@ -458,27 +468,37 @@ const ProjectNewChatComposer: React.FC<ProjectNewChatComposerProps> = ({ project
         onSelectAssistant={handleSelectAssistant}
       />
 
-      <GuidInputCard
-        input={guidInput.input}
-        onInputChange={handleInputChange}
-        onKeyDown={handleInputKeyDown}
-        onPaste={guidInput.onPaste}
-        onFocus={guidInput.handleTextareaFocus}
-        onBlur={guidInput.handleTextareaBlur}
-        placeholder={t('conversation.projectHome.composerPlaceholder')}
-        isInputActive={guidInput.isInputFocused}
-        isFileDragging={guidInput.isFileDragging}
-        activeBorderColor={activeBorderColor}
-        inactiveBorderColor={inactiveBorderColor}
-        activeShadow={activeShadow}
-        dragHandlers={guidInput.dragHandlers}
-        files={guidInput.files}
-        onRemoveFile={guidInput.handleRemoveFile}
-        actionRow={actionRowNode}
-        workspaceDir={guidInput.dir}
-        onSelectWorkspace={(dir) => guidInput.setDir(dir)}
-        onClearWorkspace={() => guidInput.setDir('')}
-      />
+      {/*
+        Wrapper exists solely to hide GuidInputCard's baked-in workspace
+        footnote (folder pill) via `.composerNoFolderPill` — see
+        ProjectNewChatComposer.module.css. The project's folder is fixed to
+        `project.workspace`, so this per-chat control must not be shown;
+        `workspaceDir`/`onSelectWorkspace`/`onClearWorkspace` below are left
+        wired for internal consistency, but no longer affect what's visible.
+      */}
+      <div className={styles.composerNoFolderPill} data-testid='project-composer-input-wrap'>
+        <GuidInputCard
+          input={guidInput.input}
+          onInputChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
+          onPaste={guidInput.onPaste}
+          onFocus={guidInput.handleTextareaFocus}
+          onBlur={guidInput.handleTextareaBlur}
+          placeholder={t('conversation.projectHome.composerPlaceholder')}
+          isInputActive={guidInput.isInputFocused}
+          isFileDragging={guidInput.isFileDragging}
+          activeBorderColor={activeBorderColor}
+          inactiveBorderColor={inactiveBorderColor}
+          activeShadow={activeShadow}
+          dragHandlers={guidInput.dragHandlers}
+          files={guidInput.files}
+          onRemoveFile={guidInput.handleRemoveFile}
+          actionRow={actionRowNode}
+          workspaceDir={guidInput.dir}
+          onSelectWorkspace={(dir) => guidInput.setDir(dir)}
+          onClearWorkspace={() => guidInput.setDir('')}
+        />
+      </div>
     </Card>
   );
 };
