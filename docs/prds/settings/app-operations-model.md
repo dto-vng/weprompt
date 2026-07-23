@@ -100,9 +100,7 @@ The app operations selection is business data and must be persisted by AionCore,
 Proposed backend contract:
 
 ```ts
-type AppOperationsModelSetting =
-  | { mode: 'auto' }
-  | { mode: 'fixed'; provider_id: string; model_id: string };
+type AppOperationsModelSetting = { mode: 'auto' } | { mode: 'fixed'; provider_id: string; model_id: string };
 
 type ResolvedAppOperationsModel = {
   setting: AppOperationsModelSetting;
@@ -330,6 +328,17 @@ The existing context compaction flow becomes the first broker task.
 - Provenance records the actual app operations provider/model and prompt version.
 - The feature call site no longer lists providers or constructs a client.
 
+### Automatic Trigger Policy
+
+- Automatic compaction runs after eight meaningful completed turns since the last successful compaction. A successful model result or deterministic rules fallback resets the counter.
+- A context-budget escalation from a lower state to `watch`, `compress`, or `too_large` triggers compaction immediately, regardless of the turn counter.
+- A new conversation without an existing Context snapshot follows the same eight-turn threshold unless its budget escalates first; it does not invoke the operations model after every turn.
+- Manual and handoff compaction bypass the automatic turn threshold.
+- Completed turns that arrive while compaction is already running are coalesced to the latest pending request for that conversation.
+- Cancellation or a failed persistence attempt does not reset the successful-compaction counter.
+
+This policy keeps compaction off the synchronous response path and prevents one additional model request per chat turn while preserving immediate action when context pressure increases.
+
 ### Compatibility Strategy
 
 During rollout, the bridge response retains the current compaction result shape required by the renderer. New operation metadata is additive. Older Context snapshots and generated `Context.md` files require no migration.
@@ -412,6 +421,9 @@ An older AionCore build that does not expose the app operations endpoints is tre
 - Conversation model and App Operations Model can differ, and compaction uses the latter.
 - Existing snapshot-to-`Context.md` output remains byte-compatible for the same snapshot fixture.
 - Continuation handoff can consume both pre-feature and post-feature snapshots.
+- Automatic compaction does not run before the eighth meaningful completed turn and runs on the eighth.
+- A budget escalation to `watch` or worse triggers automatic compaction before the turn threshold.
+- Manual and handoff compaction remain available below the automatic threshold.
 
 ## Acceptance Criteria
 
@@ -421,6 +433,7 @@ An older AionCore build that does not expose the app operations endpoints is tre
 - A registered task can run through one central main-process broker with validated input and output.
 - The broker enforces bounded concurrency, timeout, retry, cancellation, deduplication, normalized errors, and content-free operational metadata.
 - Context compaction uses the App Operations Model when available and preserves its deterministic fallback otherwise.
+- Automatic context compaction avoids per-turn model calls by using the approved eight-turn and budget-escalation policy.
 - Existing conversations, snapshots, and `Context.md` handoffs continue to work without migration.
 - Memory and Butler remain explicitly outside this implementation slice.
 
