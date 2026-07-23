@@ -326,6 +326,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     let diffsSourceMessageIds: string[] = [];
     let pendingWorkSummary: PendingWorkSummary | undefined;
     const pendingWorkErrorIdByCallKey = new Map<string, string>();
+    const pendingWorkErrorIds = new Set<string>();
     const supersededWorkErrorIds = new Set<string>();
 
     const pushFileDiffChanges = (changes: FileChangeInfo, sourceMessageId: string, created_at: number) => {
@@ -362,9 +363,21 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       resetFileDiffChanges();
     };
     const pushWorkErrors = (message: ToolMessage) => {
-      normalizeToolMessages([message]).forEach((call, index) => {
+      const calls = normalizeToolMessages([message]);
+      // Later non-error tool activity means the agent recovered from earlier
+      // failures in this turn — retire their standalone error cards. The failed
+      // steps stay inspectable inside the expanded work summary; only an error
+      // the turn actually ends on keeps its card.
+      if (calls.some((call) => call.status !== 'error')) {
+        for (const id of pendingWorkErrorIds) supersededWorkErrorIds.add(id);
+        pendingWorkErrorIds.clear();
+      }
+      calls.forEach((call, index) => {
         const previousErrorId = call.key ? pendingWorkErrorIdByCallKey.get(call.key) : undefined;
-        if (previousErrorId) supersededWorkErrorIds.add(previousErrorId);
+        if (previousErrorId) {
+          supersededWorkErrorIds.add(previousErrorId);
+          pendingWorkErrorIds.delete(previousErrorId);
+        }
 
         if (call.status !== 'error') {
           if (call.key) pendingWorkErrorIdByCallKey.delete(call.key);
@@ -381,6 +394,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
           sourceMessageIds: [message.id],
           created_at: message.created_at ?? 0,
         });
+        pendingWorkErrorIds.add(id);
         if (call.key) pendingWorkErrorIdByCallKey.set(call.key, id);
       });
     };
@@ -401,6 +415,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (isHistoryGapMarker(message)) {
         flushPendingWorkSummary();
         pendingWorkErrorIdByCallKey.clear();
+        pendingWorkErrorIds.clear();
         resetFileDiffChanges();
         continue;
       }
@@ -451,6 +466,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (message.position === 'right') {
         flushPendingWorkSummary();
         pendingWorkErrorIdByCallKey.clear();
+        pendingWorkErrorIds.clear();
       }
       resetFileDiffChanges();
       result.push(message);

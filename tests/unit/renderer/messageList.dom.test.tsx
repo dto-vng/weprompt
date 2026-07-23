@@ -768,7 +768,7 @@ describe('MessageList', () => {
     expect(screen.getByText('permission').compareDocumentPosition(summaries[0])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('keeps a terminal tool error at its source position before permission and later work', () => {
+  it('retires an error card when later tool work succeeds, keeping the step in the work summary', () => {
     const messages = [
       {
         id: 'tool-error-1',
@@ -791,19 +791,78 @@ describe('MessageList', () => {
       wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
     });
 
-    const error = screen.getByTestId('tool-activity-error');
-    const permission = screen.getByText('permission');
-    const summary = screen.getByTestId('work-summary');
-    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(1);
-    expect(error).toHaveAttribute('data-tool-key', 'call-error-1');
-    expect(error.compareDocumentPosition(permission)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(permission.compareDocumentPosition(summary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    // The agent recovered (a different call succeeded afterwards), so the
+    // standalone error card is suppressed; the failed step stays inspectable
+    // inside the work summary.
+    expect(screen.queryByTestId('tool-activity-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('work-summary')).toBeInTheDocument();
     expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ id: 'tool-error-1' }),
         expect.objectContaining({ id: 'tool-success-1' }),
       ])
     );
+  });
+
+  it('keeps a terminal tool error visible when the turn ends on it', () => {
+    const messages = [
+      {
+        id: 'tool-success-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-success-1', name: 'Write', status: 'completed', output: 'Saved' },
+        created_at: 1,
+      },
+      { id: 'permission-1', type: 'permission', position: 'left', content: {}, created_at: 2 },
+      {
+        id: 'tool-error-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-error-1', name: 'Read', status: 'error', error: 'Access denied' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const error = screen.getByTestId('tool-activity-error');
+    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(1);
+    expect(error).toHaveAttribute('data-tool-key', 'call-error-1');
+    expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'tool-success-1' }),
+        expect.objectContaining({ id: 'tool-error-1' }),
+      ])
+    );
+  });
+
+  it('shows only the last error of a failing streak with no recovery', () => {
+    const messages = [
+      {
+        id: 'tool-error-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-error-1', name: 'Read', status: 'error', error: 'Shape 18 not found' },
+        created_at: 1,
+      },
+      {
+        id: 'tool-error-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-error-2', name: 'Read', status: 'error', error: 'Unsupported selector' },
+        created_at: 2,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    // Both errors are pending (no recovery), so both stay visible — a retry
+    // of the SAME call key is the only same-streak supersession.
+    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(2);
   });
 
   it('keeps visible tools in one work summary across a hidden diagnostic', () => {
