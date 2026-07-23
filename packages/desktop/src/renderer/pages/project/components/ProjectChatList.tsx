@@ -28,9 +28,10 @@ const VISIBLE_ROW_COUNT = 5;
 /**
  * Project Home chats region (C3): a "Chats" heading with a count badge and,
  * once there are more than `VISIBLE_ROW_COUNT` chats, a "Show all" toggle;
- * below it, a card of rows — icon avatar, title, an optional one-line
- * snippet from `desc`, and a relative time. Clicking a row opens that
- * conversation; hovering a row swaps the time for pin/rename/delete actions.
+ * below it, a flat list of rows — icon, title, an optional one-line
+ * snippet from `desc`, and a relative time — divided by thin row dividers,
+ * with no surrounding card frame. Clicking a row opens that conversation;
+ * hovering a row swaps the time for pin/rename/delete actions.
  *
  * The sidebar's `ConversationRow` was evaluated first per the design brief,
  * but its `ConversationRowProps` needs 17 fields sourced from four
@@ -190,7 +191,7 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
           }
         />
       ) : (
-        <div className={styles.card}>
+        <div>
           {visibleChats.map((conversation) => {
             const snippet = conversation.desc?.trim();
             const pinned = isConversationPinned(conversation);
@@ -204,11 +205,7 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
                 )}
                 onClick={() => navigate(`/conversation/${conversation.id}`)}
               >
-                <span
-                  className={classNames('flex size-32px shrink-0 items-center justify-center rd-9px', styles.avatar)}
-                >
-                  <MessageOne theme='outline' size='16' className='text-primary' />
-                </span>
+                <MessageOne theme='outline' size='20' className='shrink-0 text-t-secondary' />
                 <div className='min-w-0 flex-1'>
                   <div className='truncate text-14px font-700 text-t-primary'>{conversation.name}</div>
                   {snippet && <div className='mt-2px truncate text-13px text-t-secondary'>{snippet}</div>}

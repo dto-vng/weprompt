@@ -1,39 +1,20 @@
 /*
- * Project Home "Chats" card (see ProjectChatList.tsx). Layout, typography,
- * and hover-state colors for the row/buttons are plain Uno utility classes
- * on the component; this module only holds the handful of rules that don't
- * map cleanly onto a utility class:
- *   - `.row`'s divider needs `:last-child` (no divider under the final row)
- *     combined with a `:hover` background — a chained pseudo-class pattern
- *     that's clearer as a CSS rule than stacking Uno variants.
- *   - `.avatar`'s tint needs `color-mix()`, which the project already
- *     expresses in plain CSS/inline `style` rather than as a Uno utility
- *     (see styles/themes/base.css and components/chat/CommandQueuePanel.tsx
- *     for the same pattern).
+ * Project Home "Chats" list (see ProjectChatList.tsx) — a flat list of rows
+ * with no surrounding card frame. Layout, typography, and hover-state colors
+ * for the row/buttons are plain Uno utility classes on the component; this
+ * module only holds the one rule that doesn't map cleanly onto a utility
+ * class: `.row`'s divider needs `:last-child` (no divider under the final
+ * row) combined with a `:hover` background — a chained pseudo-class pattern
+ * that's clearer as a CSS rule than stacking Uno variants.
  *
  * Token choices (mapped to the nearest existing semantic token, not the
  * hi-fi mockup's literal hex):
- *   - .card background: --bg-base (light: #faf6ee) — closely matches the
- *     mockup's off-white card (#FBF8F1) while staying visually distinct
- *     from Project Home's own page background (--bg-chat-surface, set in
- *     ProjectHomePage.module.css), so the card reads as a surface sitting
- *     on the page instead of blending into it.
- *   - .card border / .row divider: --bg-3 (light: #e5dcc9) — closely
- *     matches the mockup's warm hairline border (#E7DECB) and row divider
- *     (#EEE4D2); reusing one token for both keeps the palette simple.
+ *   - .row divider: --bg-3 (light: #e5dcc9) — closely matches the mockup's
+ *     row divider (#EEE4D2).
  *   - .row:hover background: --color-fill-2 (Arco's own hover fill, light:
  *     #f0e9db) — closest existing match to the mockup's row hover
  *     (#F3EADB).
- *   - .avatar background: a 12% mix of --primary (Forge orange) into
- *     transparent — no semantic token covers this specific a subtle wash.
  */
-
-.card {
-  background-color: var(--bg-base);
-  border: 1px solid var(--bg-3);
-  border-radius: 14px;
-  overflow: hidden;
-}
 
 .row {
   border-bottom: 1px solid var(--bg-3);
@@ -45,8 +26,4 @@
 
 .row:hover {
   background-color: var(--color-fill-2);
-}
-
-.avatar {
-  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
 }
