@@ -488,9 +488,10 @@ const BUDGET_STATUS_RANK: Record<TContextBudgetStatus, number> = {
   too_large: 3,
 };
 
+const AUTO_COMPACTION_TURN_THRESHOLD = 8;
+
 export const shouldAutoCompactContext = (input: AutoCompactPolicyInput): boolean => {
-  if (!input.hasContext) return true;
-  if (input.turnsSinceCompaction >= 1) return true;
+  if (input.turnsSinceCompaction >= AUTO_COMPACTION_TURN_THRESHOLD) return true;
   return (
     BUDGET_STATUS_RANK[input.nextBudgetStatus] > BUDGET_STATUS_RANK[input.previousBudgetStatus] &&
     BUDGET_STATUS_RANK[input.nextBudgetStatus] >= BUDGET_STATUS_RANK.watch

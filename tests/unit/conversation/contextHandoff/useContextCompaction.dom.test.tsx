@@ -493,31 +493,37 @@ describe('automatic context compaction policy', () => {
     ).toBe(true);
   });
 
-  it('compacts context after every completed turn', () => {
+  it('waits below the automatic turn threshold with or without existing context', () => {
     expect(
       shouldAutoCompactContext({
         hasContext: false,
-        turnsSinceCompaction: 1,
+        turnsSinceCompaction: 7,
         previousBudgetStatus: 'healthy',
         nextBudgetStatus: 'healthy',
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldAutoCompactContext({
         hasContext: true,
-        turnsSinceCompaction: 1,
+        turnsSinceCompaction: 7,
         previousBudgetStatus: 'healthy',
         nextBudgetStatus: 'healthy',
       })
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('compacts on the eighth meaningful completed turn', () => {
     expect(
       shouldAutoCompactContext({
-        hasContext: true,
-        turnsSinceCompaction: 3,
+        hasContext: false,
+        turnsSinceCompaction: 8,
         previousBudgetStatus: 'healthy',
         nextBudgetStatus: 'healthy',
       })
     ).toBe(true);
+  });
+
+  it('compacts below the turn threshold when the context budget escalates', () => {
     expect(
       shouldAutoCompactContext({
         hasContext: true,
@@ -526,6 +532,9 @@ describe('automatic context compaction policy', () => {
         nextBudgetStatus: 'watch',
       })
     ).toBe(true);
+  });
+
+  it('waits below the turn threshold when the context budget remains unchanged', () => {
     expect(
       shouldAutoCompactContext({
         hasContext: true,
@@ -533,11 +542,75 @@ describe('automatic context compaction policy', () => {
         previousBudgetStatus: 'watch',
         nextBudgetStatus: 'watch',
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it('starts invisible compaction after the first completed turn when last-message details are omitted', async () => {
+  it('persists the seventh completed turn without starting compaction', async () => {
     let listener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 6,
+        },
+      },
+    };
+    const updateConversation = vi.fn(async () => true);
+    const runCompaction = vi.fn();
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        listener = next;
+        return vi.fn();
+      }),
+      getConversation: vi.fn(async () => thresholdConversation),
+      updateConversation,
+      runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
+      now: () => 100,
+    };
+
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+
+    act(() => listener?.(completedTurn()));
+
+    await waitFor(() =>
+      expect(updateConversation).toHaveBeenCalledWith({
+        id: 'conversation-1',
+        updates: {
+          extra: {
+            context_handoff: expect.objectContaining({
+              status: 'stale',
+              turns_since_compaction: 7,
+            }),
+          },
+        },
+        merge_extra: true,
+      })
+    );
+    expect(runCompaction).not.toHaveBeenCalled();
+  });
+
+  it('starts invisible compaction after the eighth completed turn when last-message details are omitted', async () => {
+    let listener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 7,
+        },
+      },
+    };
     const runCompaction = vi.fn(async () => ({
       fileName: 'Context.md',
       filePath: '/workspace/Context.md',
@@ -551,7 +624,7 @@ describe('automatic context compaction policy', () => {
         listener = next;
         return vi.fn();
       }),
-      getConversation: vi.fn(async () => conversation),
+      getConversation: vi.fn(async () => thresholdConversation),
       updateConversation: vi.fn(async () => true),
       runCompaction,
       cancelAppOperation: vi.fn(async () => {}),
