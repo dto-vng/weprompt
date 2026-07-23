@@ -11,6 +11,10 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* Near-white surface (light: #fffdf9) instead of the app's cream working
+     surface, so Project Home reads as a clean, bright canvas. Theme-aware
+     token — resolves to the appropriate dark surface in dark mode. */
+  background-color: var(--bg-chat-surface);
 }
 
 .headerSlot {
