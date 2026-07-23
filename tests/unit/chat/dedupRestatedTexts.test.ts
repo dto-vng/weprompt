@@ -31,6 +31,19 @@ const toolGroup = (): TMessage =>
     content: [],
   }) as unknown as TMessage;
 
+// Mirrors the hidden `HISTORY_GAP_MARKER_CODE` tip that hooks.ts inserts at a
+// pagination boundary (matched by the exported isHistoryGapMarker).
+const historyGap = (): TMessage =>
+  ({
+    id: `gap-${++seq}`,
+    type: 'tips',
+    position: 'center',
+    conversation_id: 'c1',
+    created_at: seq,
+    hidden: true,
+    content: { content: '', type: 'info', code: '__aionui_renderer_history_gap__' },
+  }) as unknown as TMessage;
+
 const contentOf = (m: TMessage): string => (m as { content: { content: string } }).content.content;
 
 /**
@@ -86,6 +99,14 @@ describe('dedupRestatedTextMessages', () => {
       const user = text('again please', { position: 'right' });
       const turn2 = text('Same answer.');
       const result = dedupRestatedTextMessages([turn1, user, turn2]);
+      expect(result).toHaveLength(3);
+    });
+
+    it('does not dedup across a history-gap marker (pagination boundary)', () => {
+      const older = text('Same answer.');
+      const gap = historyGap();
+      const newer = text('Same answer.');
+      const result = dedupRestatedTextMessages([older, gap, newer]);
       expect(result).toHaveLength(3);
     });
 

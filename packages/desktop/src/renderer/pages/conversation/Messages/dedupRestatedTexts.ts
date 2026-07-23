@@ -22,9 +22,16 @@
  * Hidden messages are never dropped (the render loop already skips them) and
  * never chosen over a visible message. Exact content equality only — distinct
  * segments (continuations) are never collapsed.
+ *
+ * Complements the compose-time `dedupeAssistantRepliesByTurn` in `hooks.ts`,
+ * which normalizes whitespace only (not `<think>`) and excludes hidden
+ * messages — so it cannot collapse a tagged-vs-clean pair, nor graft reasoning
+ * from a hidden twin. This render-time pass covers exactly those two gaps and
+ * composes after it; keep their turn-boundary handling in sync.
  */
 import type { IMessageText, TMessage } from '@/common/chat/chatLib';
 import { hasThinkTags, splitThinkContent, stripThinkTags } from '@/renderer/utils/chat/thinkTagFilter';
+import { isHistoryGapMarker } from './hooks';
 
 type VisibleText = {
   index: number;
@@ -84,7 +91,9 @@ export const dedupRestatedTextMessages = (list: TMessage[]): TMessage[] => {
 
   for (let index = 0; index < list.length; index++) {
     const message = list[index];
-    if (message.position === 'right') {
+    // A user message or a history gap (pagination boundary) ends the turn window,
+    // so restatements are never matched across it.
+    if (message.position === 'right' || isHistoryGapMarker(message)) {
       flushTurn();
       continue;
     }
