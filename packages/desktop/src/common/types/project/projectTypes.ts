@@ -8,6 +8,7 @@ export type ForgeProject = {
   id: string;
   name: string;
   workspace: string;
+  instructions?: string;
   created_at: number;
   updated_at: number;
   last_opened_at?: number;
@@ -16,12 +17,14 @@ export type ForgeProject = {
 export type CreateForgeProjectInput = {
   name: string;
   workspace: string;
+  instructions?: string;
 };
 
 export type UpdateForgeProjectInput = {
   id: string;
   name?: string;
   workspace?: string;
+  instructions?: string;
   last_opened_at?: number;
 };
 
