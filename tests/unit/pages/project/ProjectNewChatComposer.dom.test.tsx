@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigateMock = vi.fn();
 const setSelectedAssistantIdMock = vi.fn();
+const sendMessageHandlerMock = vi.fn();
+const capturedGuidSendDeps: Array<Record<string, unknown>> = [];
 
 vi.mock('react-i18next', () => ({
   // i18n.language is required alongside t: the component resolves localeKey
@@ -25,13 +27,62 @@ vi.mock('react-router-dom', async () => {
 });
 
 // Avoids the real hook's SWR-backed assistant fetch + configService read —
-// this test only needs a fixed selection to assert the handoff payload.
+// this test only needs a fixed selection to assert the deps handed to
+// useGuidSend.
 vi.mock('@renderer/pages/guid/hooks/useGuidAssistantSelection', () => ({
   useGuidAssistantSelection: () => ({
     selectedAssistantId: 'asst-1',
     assistants: [],
+    selectedAssistant: undefined,
     setSelectedAssistantId: setSelectedAssistantIdMock,
+    selectedAssistantBackend: 'aionrs',
+    selectedMode: 'default',
+    selectedAcpModel: null,
+    selectedThoughtLevelValue: '',
+    currentAcpCachedModelInfo: null,
   }),
+}));
+
+// Avoids the real hook's SWR-backed provider list + Google Auth status
+// checks — this test only needs a fixed model to assert the deps handed to
+// useGuidSend.
+vi.mock('@renderer/pages/guid/hooks/useGuidModelSelection', () => ({
+  useGuidModelSelection: () => ({
+    modelList: [],
+    isGoogleAuth: false,
+    formatGeminiModelLabel: () => '',
+    current_model: { id: 'provider-1', name: 'Provider', models: ['model-a'], use_model: 'model-a', enabled: true },
+    setCurrentModel: vi.fn(),
+    resetCurrentModel: vi.fn(),
+  }),
+}));
+
+// useGuidInput itself runs for real (plain input/dir/projectId state plus a
+// locationState-seeding effect) so this test can exercise real typing and
+// confirm the project's workspace/id actually reach useGuidSend. Its drag +
+// paste sub-hooks are stubbed exactly like useGuidInput's own dom test does,
+// since this suite has no file-upload UI to exercise.
+vi.mock('@/renderer/hooks/file/useDragUpload', () => ({
+  useDragUpload: () => ({ isFileDragging: false, dragHandlers: {} }),
+}));
+
+vi.mock('@/renderer/hooks/file/usePasteService', () => ({
+  usePasteService: () => ({ onPaste: vi.fn(), onFocus: vi.fn() }),
+}));
+
+// Stubs the real create+navigate implementation (already covered by
+// useGuidSend.dom.test.ts) so this suite only has to assert the composer
+// wires the submit button / Cmd+Enter shortcut to `sendMessageHandler` and
+// forwards project-scoped deps — it must NOT assert a `/guid` handoff.
+vi.mock('@renderer/pages/guid/hooks/useGuidSend', () => ({
+  useGuidSend: (deps: Record<string, unknown>) => {
+    capturedGuidSendDeps.push(deps);
+    return {
+      handleSend: vi.fn(),
+      sendMessageHandler: sendMessageHandlerMock,
+      isButtonDisabled: !(deps.input as string).trim(),
+    };
+  },
 }));
 
 // Trivial stub — real AssistantSelectionArea has its own dedicated test
@@ -76,13 +127,15 @@ describe('ProjectNewChatComposer', () => {
   beforeEach(() => {
     navigateMock.mockReset();
     setSelectedAssistantIdMock.mockReset();
+    sendMessageHandlerMock.mockReset();
+    capturedGuidSendDeps.length = 0;
   });
 
   it('disables submit when the input is empty', () => {
     render(<ProjectNewChatComposer project={project} />);
 
     expect(screen.getByTestId('project-composer-submit')).toBeDisabled();
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(sendMessageHandlerMock).not.toHaveBeenCalled();
   });
 
   it('stays disabled for whitespace-only input', () => {
@@ -93,7 +146,7 @@ describe('ProjectNewChatComposer', () => {
     expect(screen.getByTestId('project-composer-submit')).toBeDisabled();
   });
 
-  it('hands off to the Guid create flow with the scoped state on submit, then clears the draft', () => {
+  it('creates the conversation in place via useGuidSend, scoped to the project, instead of handing off to /guid', () => {
     render(<ProjectNewChatComposer project={project} />);
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Summarize the README' } });
@@ -101,15 +154,16 @@ describe('ProjectNewChatComposer', () => {
 
     fireEvent.click(screen.getByTestId('project-composer-submit'));
 
-    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid', {
-      state: {
-        workspace: '/w/alpha',
-        projectId: 'p1',
-        prefillPrompt: 'Summarize the README',
-        selectedAssistantId: 'asst-1',
-      },
+    expect(sendMessageHandlerMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).not.toHaveBeenCalled();
+
+    const latestDeps = capturedGuidSendDeps.at(-1);
+    expect(latestDeps).toMatchObject({
+      input: 'Summarize the README',
+      dir: '/w/alpha',
+      projectId: 'p1',
+      selectedAssistantId: 'asst-1',
     });
-    expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
   it('passes the current selection down to the assistant picker and forwards its selection changes', () => {
@@ -130,13 +184,14 @@ describe('ProjectNewChatComposer', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft the release notes' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
 
-    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid', {
-      state: {
-        workspace: '/w/alpha',
-        projectId: 'p1',
-        prefillPrompt: 'Draft the release notes',
-        selectedAssistantId: 'asst-1',
-      },
-    });
+    expect(sendMessageHandlerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not submit on Cmd/Ctrl+Enter when the input is empty', () => {
+    render(<ProjectNewChatComposer project={project} />);
+
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
+
+    expect(sendMessageHandlerMock).not.toHaveBeenCalled();
   });
 });
