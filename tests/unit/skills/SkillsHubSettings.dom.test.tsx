@@ -376,12 +376,12 @@ describe('SkillsHubSettings', () => {
     expect(screen.queryByTestId('my-skill-card-sample-single')).not.toBeInTheDocument();
   });
 
-  it('renders the auto-injected skills hint without an Arco popup trigger', async () => {
+  it('opens the auto-injected skills hint tooltip on hover without crashing', async () => {
     mocks.listAvailableSkills.mockResolvedValue([
       {
-        name: 'officecli',
-        description: 'Create, analyze, proofread, and modify Office documents.',
-        location: '/tmp/builtin-skills/auto-inject/officecli/SKILL.md',
+        name: 'cron',
+        description: 'Auto injected cron skill.',
+        location: '/tmp/builtin-skills/auto-inject/cron/SKILL.md',
         is_auto_inject: true,
         is_custom: false,
         source: 'builtin',
@@ -390,17 +390,15 @@ describe('SkillsHubSettings', () => {
 
     render(<SkillsHubSettings withWrapper={false} />);
 
-    fireEvent.click(await screen.findByTestId('settings-tab-official'));
+    await waitFor(() => expect(screen.getByTestId('settings-tab-official')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('settings-tab-official'));
+    await waitFor(() => expect(screen.getByTestId('auto-skills-section')).toBeInTheDocument());
 
-    const autoSection = screen.getByTestId('auto-skills-section');
-    const nativeHint = Array.from(autoSection.querySelectorAll('[title]')).some(
-      (el) =>
-        el.getAttribute('title') ===
-        'Loaded automatically into every conversation — no need to enable them; the agent decides when to use them.'
-    );
+    const hintTrigger = screen.getByTestId('auto-skills-section').querySelector('.cursor-help');
+    expect(hintTrigger).not.toBeNull();
+    fireEvent.mouseEnter(hintTrigger!);
 
-    expect(nativeHint).toBe(true);
-    expect(autoSection.querySelector('.arco-trigger')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Loaded automatically into every conversation/)).toBeInTheDocument());
   });
 
   it('does not expose the local skills directory path on the skills page', async () => {

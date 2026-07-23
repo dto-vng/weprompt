@@ -1,5 +1,5 @@
 import type { IMessageAcpToolCall, IMessageToolCall, IMessageToolGroup } from './chatLib';
-import { getAcpImagePath } from './acpToolCallOutput';
+import { getAcpImagePath, sanitizeAcpToolUpdate, sanitizeInlineImagePayload } from './acpToolCallOutput';
 
 export type NormalizedToolStatus = 'pending' | 'running' | 'completed' | 'error' | 'canceled';
 
@@ -7,6 +7,7 @@ export interface NormalizedToolCall {
   key: string;
   name: string;
   status: NormalizedToolStatus;
+  kind?: string;
   description?: string;
   input?: string;
   output?: string;
@@ -17,13 +18,25 @@ export interface NormalizedToolCall {
 }
 
 const formatValue = (value: unknown): string => {
-  if (typeof value === 'string') return value;
+  const sanitizedValue = sanitizeInlineImagePayload(value).value;
+  if (typeof sanitizedValue === 'string') return sanitizedValue;
   try {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(sanitizedValue, null, 2);
   } catch {
-    return String(value);
+    return String(sanitizedValue);
   }
 };
+
+const DIAGNOSTIC_TELEMETRY_PATTERNS = [
+  /^\s*Token watermark override\b/i,
+  /\blocal_estimate=\d/i,
+  /^\s*Microcompact:\s*/i,
+];
+
+export const isDiagnosticTelemetryText = (value?: string): boolean =>
+  typeof value === 'string' && DIAGNOSTIC_TELEMETRY_PATTERNS.some((pattern) => pattern.test(value));
+
+const isDiagnosticToolCall = (item: NormalizedToolCall): boolean => isDiagnosticTelemetryText(item.name);
 
 // ===== tool_group → NormalizedToolCall[] =====
 
@@ -48,39 +61,45 @@ const getResultDisplayText = (
   result_display: IMessageToolGroup['content'][0]['result_display']
 ): string | undefined => {
   if (!result_display) return undefined;
-  if (typeof result_display === 'string') return result_display;
-  if ('file_diff' in result_display) return result_display.file_diff;
-  if ('img_url' in result_display) return result_display.relative_path || result_display.img_url;
+  if (typeof result_display === 'string') return formatValue(result_display);
+  if ('file_diff' in result_display) return formatValue(result_display.file_diff);
+  if ('img_url' in result_display) return formatValue(result_display.relative_path || result_display.img_url);
   return undefined;
 };
 
 export function normalizeToolGroup(message: IMessageToolGroup): NormalizedToolCall[] {
   if (!Array.isArray(message.content)) return [];
-  return message.content.map(({ name, call_id, description, confirmationDetails, status, result_display }) => {
-    let desc = typeof description === 'string' ? description.slice(0, 100) : '';
-    const type = confirmationDetails?.type;
-    if (type === 'edit') desc = confirmationDetails.file_name;
-    if (type === 'exec') desc = confirmationDetails.command;
-    if (type === 'info') desc = confirmationDetails.urls?.join(';') || confirmationDetails.title;
-    if (type === 'mcp') desc = confirmationDetails.server_name + ':' + confirmationDetails.tool_name;
+  return message.content
+    .filter(
+      ({ name, confirmationDetails }) =>
+        !isDiagnosticTelemetryText(name) &&
+        !(confirmationDetails?.type === 'info' && isDiagnosticTelemetryText(confirmationDetails.title))
+    )
+    .map(({ name, call_id, description, confirmationDetails, status, result_display }) => {
+      let desc = typeof description === 'string' ? description.slice(0, 100) : '';
+      const type = confirmationDetails?.type;
+      if (type === 'edit') desc = confirmationDetails.file_name;
+      if (type === 'exec') desc = confirmationDetails.command;
+      if (type === 'info') desc = confirmationDetails.urls?.join(';') || confirmationDetails.title;
+      if (type === 'mcp') desc = confirmationDetails.server_name + ':' + confirmationDetails.tool_name;
 
-    let input: string | undefined;
-    if (confirmationDetails) {
-      const { title: _title, type: _type, ...rest } = confirmationDetails;
-      if (Object.keys(rest).length) input = formatValue(rest);
-    } else if (description) {
-      input = description;
-    }
+      let input: string | undefined;
+      if (confirmationDetails) {
+        const { title: _title, type: _type, ...rest } = confirmationDetails;
+        if (Object.keys(rest).length) input = formatValue(rest);
+      } else if (description) {
+        input = formatValue(description);
+      }
 
-    return {
-      key: call_id,
-      name,
-      status: normalizeToolGroupStatus(status),
-      description: desc,
-      input,
-      output: getResultDisplayText(result_display),
-    };
-  });
+      return {
+        key: call_id,
+        name: formatValue(name),
+        status: normalizeToolGroupStatus(status),
+        description: formatValue(desc),
+        input,
+        output: getResultDisplayText(result_display),
+      };
+    });
 }
 
 // ===== acp_tool_call → NormalizedToolCall =====
@@ -149,6 +168,8 @@ export function normalizeAcpToolCall(message: IMessageAcpToolCall): NormalizedTo
   const content = message.content as AcpToolCallContentCompat | undefined;
   const update = content?.update;
   if (!update) return undefined;
+  if (isDiagnosticTelemetryText(update.title)) return undefined;
+  const sanitizedUpdate = sanitizeAcpToolUpdate(update);
 
   const rawInput = update.rawInput ?? update.raw_input;
   const input = rawInput ? formatValue(rawInput) : undefined;
@@ -158,33 +179,44 @@ export function normalizeAcpToolCall(message: IMessageAcpToolCall): NormalizedTo
     output = update.content
       .map((item) => {
         if (typeof item !== 'object' || item === null) return '';
-        if (item.type === 'content' && item.content?.text) return item.content.text;
-        if (item.type === 'diff' && 'path' in item) return `[diff] ${item.path}`;
+        if (item.type === 'content' && item.content?.text) return formatValue(item.content.text);
+        if (item.type === 'diff' && 'path' in item) return formatValue(`[diff] ${item.path}`);
         return '';
       })
       .filter(Boolean)
       .join('\n');
+  }
+  if (!output) {
+    const rawOutput = sanitizedUpdate.rawOutput ?? sanitizedUpdate.raw_output;
+    if (rawOutput) {
+      const rawOutputKeys = Object.keys(rawOutput);
+      output =
+        rawOutputKeys.length === 1 && rawOutputKeys[0] === 'result'
+          ? formatValue(rawOutput.result)
+          : formatValue(rawOutput);
+    }
   }
 
   const keyParam = buildParamSummary(update.kind, rawInput);
 
   return {
     key: update.tool_call_id,
-    name: update.title,
+    name: formatValue(update.title),
     status: normalizeAcpStatus(update.status),
-    description: keyParam || (rawInput?.command as string) || update.kind,
+    kind: update.kind,
+    description: formatValue(keyParam || (rawInput?.command as string) || update.kind),
     input,
     output,
     truncated: content?._compact?.truncated === true,
     messageId: message.id,
     conversationId: message.conversation_id,
-    imagePath: getAcpImagePath(update),
+    imagePath: getAcpImagePath(sanitizedUpdate),
   };
 }
 
 // ===== tool_call → NormalizedToolCall =====
 
-function normalizeToolCallStatus(status?: string): NormalizedToolStatus {
+function normalizeToolCallStatus(status?: string, hasOutput = false, hasError = false): NormalizedToolStatus {
   switch (status) {
     case 'completed':
       return 'completed';
@@ -193,27 +225,51 @@ function normalizeToolCallStatus(status?: string): NormalizedToolStatus {
     case 'running':
       return 'running';
     default:
+      if (hasError) return 'error';
+      if (hasOutput) return 'completed';
       return 'pending';
   }
 }
 
+// Built-in image generation returns "Generated image saved to: <abs path>" (or a
+// Markdown image). Recover the saved path so the chat can render the image inline,
+// independent of how the model phrases its reply. Paths may contain spaces (e.g.
+// ".../Application Support/...") and be percent-encoded, so decode after matching.
+const SAVED_IMAGE_PATH_RE = /saved to:\s*(.+\.(?:png|jpe?g|webp|gif))\s*$/im;
+const MARKDOWN_IMAGE_PATH_RE = /!\[[^\]]*\]\(([^)]+\.(?:png|jpe?g|webp|gif))\)/i;
+
+function extractImagePathFromOutput(output?: string): string | undefined {
+  if (!output) return undefined;
+  const match = output.match(MARKDOWN_IMAGE_PATH_RE) ?? output.match(SAVED_IMAGE_PATH_RE);
+  if (!match) return undefined;
+  const raw = match[1].trim();
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 export function normalizeToolCall(message: IMessageToolCall): NormalizedToolCall | undefined {
-  const { call_id, name, status, input, output, args, description } = message.content;
+  const { call_id, name, status, input, output, error, args, description } = message.content;
   if (!call_id) return undefined;
+  if (isDiagnosticTelemetryText(name)) return undefined;
 
   const displayInput = input
     ? formatValue(input)
     : args && Object.keys(args).length > 0
       ? formatValue(args)
       : undefined;
+  const displayOutput = output ?? error;
 
   return {
     key: call_id,
-    name,
-    status: normalizeToolCallStatus(status),
-    description: description || undefined,
+    name: formatValue(name),
+    status: normalizeToolCallStatus(status, output !== undefined, output === undefined && error !== undefined),
+    description: description ? formatValue(description) : undefined,
     input: displayInput,
-    output,
+    output: displayOutput !== undefined ? formatValue(displayOutput) : undefined,
+    imagePath: extractImagePathFromOutput(output),
   };
 }
 
@@ -229,7 +285,11 @@ export function normalizeToolMessages(messages: ToolMessage[]): NormalizedToolCa
       if (m.type === 'tool_call') return normalizeToolCall(m);
       return undefined;
     })
-    .filter((item): item is NormalizedToolCall => item !== undefined);
+    .filter((item): item is NormalizedToolCall => item !== undefined && !isDiagnosticToolCall(item));
+}
+
+export function isDiagnosticToolMessage(message: ToolMessage): boolean {
+  return normalizeToolMessages([message]).length === 0;
 }
 
 export function hasRunningToolMessages(messages: ToolMessage[]): boolean {

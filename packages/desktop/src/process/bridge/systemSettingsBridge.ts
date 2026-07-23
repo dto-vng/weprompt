@@ -13,6 +13,8 @@
  */
 
 import { ipcBridge } from '@/common';
+import { DESKTOP_PET_ENABLED } from '@/common/config/constants';
+import { getPlatformServices } from '@/common/platform';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { changeLanguage } from '@process/services/i18n';
 import type { PetSize } from '@process/pet/petTypes';
@@ -65,6 +67,10 @@ export function initSystemSettingsBridge(): void {
 
   ipcBridge.systemSettings.setPetEnabled.provider(async ({ enabled }) => {
     const { createPetWindow, destroyPetWindow, isPetSupported } = await import('@process/pet/petManager');
+    if (enabled && !DESKTOP_PET_ENABLED) {
+      console.warn('[SystemSettings] Desktop pet feature is disabled (DESKTOP_PET_ENABLED)');
+      return;
+    }
     if (enabled && !isPetSupported()) {
       console.warn('[SystemSettings] Desktop pet is not supported in headless mode');
       return;

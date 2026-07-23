@@ -44,5 +44,10 @@
     "label": "Thinking Level",
     "switchSuccess": "Thinking level switched",
     "switchFailed": "Failed to switch thinking level"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

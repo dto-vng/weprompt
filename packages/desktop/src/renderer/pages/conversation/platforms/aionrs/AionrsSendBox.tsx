@@ -5,8 +5,10 @@
  */
 
 import { ipcBridge } from '@/common';
+import { parseContextCommand, type ContextCommandInvalidCode } from '@/common/chat/slash/contextCommands';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
+import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndicator';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -15,6 +17,11 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -26,12 +33,15 @@ import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/cha
 import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useSendBoxFiles';
 import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
+import { getKnownModelContextLimit } from '@/renderer/utils/model/modelContextLimits';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
   type ConversationCommandQueueItem,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import { getConversationPinnedContext } from '@/renderer/pages/conversation/contextHandoff/pinnedContext';
 import { useConversationRuntimeView } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { getConversationRuntimeWorkspaceErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
@@ -45,8 +55,9 @@ import { iconColors } from '@/renderer/styles/colors';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage, collectSelectedFiles } from '@/renderer/utils/file/messageFiles';
+import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
-import { Message, Tag } from '@arco-design/web-react';
+import { Message, Tag, Tooltip } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +71,12 @@ const configErrorMessageKey = (error: unknown) => {
   if (errorKind === 'confirmation_timeout') return 'agent.config.timeout';
   if (errorKind === 'config_update_in_progress') return 'agent.config.busy';
   return 'agent.config.failed';
+};
+
+const contextCommandErrorMessageKey = (code: ContextCommandInvalidCode): string => {
+  if (code === 'missing_pin_text') return 'conversation.contextHandoff.command.missingPinText';
+  if (code === 'unexpected_arguments') return 'conversation.contextHandoff.command.unexpectedArguments';
+  return 'conversation.contextHandoff.command.unsupportedSubcommand';
 };
 
 const toModeLabel = (value: string): string =>
@@ -117,11 +134,12 @@ const useSendBoxDraft = (conversation_id: string) => {
 const AionrsSendBox: React.FC<{
   conversation_id: string;
   modelSelection: AionrsModelSelection;
+  modelSelector?: React.ReactNode;
   session_mode?: string;
   agent_name?: string;
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
-}> = ({ conversation_id, modelSelection, session_mode, agent_name, teamSendMessage, teamRuntime }) => {
+}> = ({ conversation_id, modelSelection, modelSelector, session_mode, agent_name, teamSendMessage, teamRuntime }) => {
   const [workspacePath, setWorkspacePath] = useState('');
   const [dynamicModes, setDynamicModes] = useState<AgentModeOption[]>([]);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
@@ -140,21 +158,27 @@ const AionrsSendBox: React.FC<{
   const { t } = useTranslation();
   const { checkAndUpdateTitle } = useAutoTitle();
   const { current_model } = modelSelection;
+  const contextLimit = getKnownModelContextLimit(current_model?.use_model);
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
 
-  const { thought, running, setActiveMsgId, setWaitingResponse, resetState } = useAionrsMessage(conversation_id, {
-    onConfigChanged: (capabilities) => {
-      const modes = (capabilities as { modes?: string[] })?.modes;
-      if (modes && modes.length > 0) {
-        setDynamicModes(modeOptionsFromCapabilities(modes));
-      }
-    },
-  });
+  const { thought, running, setActiveMsgId, setWaitingResponse, resetState, tokenUsage } = useAionrsMessage(
+    conversation_id,
+    {
+      onConfigChanged: (capabilities) => {
+        const modes = (capabilities as { modes?: string[] })?.modes;
+        if (modes && modes.length > 0) {
+          setDynamicModes(modeOptionsFromCapabilities(modes));
+        }
+      },
+    }
+  );
+  const localUsage = useLocalTokenUsage();
   const runtimeView = useConversationRuntimeView(conversation_id);
   const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates();
 
   const handleContentChange = useCallback(
     (val: string) => {
@@ -255,7 +279,11 @@ const AionrsSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
+    async ({
+      input,
+      files,
+      injectSkills,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files'> & { injectSkills?: string[] }) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
@@ -276,10 +304,13 @@ const AionrsSendBox: React.FC<{
 
         markSendStarted();
         setWaitingResponse(true);
+        const latestConversation = await getConversationOrNull(conversation_id);
         const res = await ipcBridge.conversation.sendMessage.invoke({
           input: displayMessage,
           conversation_id,
           files,
+          pinned_context: getConversationPinnedContext(latestConversation),
+          inject_skills: injectSkills && injectSkills.length > 0 ? injectSkills : undefined,
         });
         setActiveMsgId(res.msg_id);
         markSendAccepted(res.turn_id, res.runtime, res.msg_id);
@@ -363,8 +394,8 @@ const AionrsSendBox: React.FC<{
       sessionStorage.removeItem(storageKey);
 
       try {
-        const { input, files: initialFiles } = JSON.parse(storedMessage);
-        await executeCommand({ input, files: initialFiles || [] });
+        const { input, files: initialFiles, injectSkills } = JSON.parse(storedMessage);
+        await executeCommand({ input, files: initialFiles || [], injectSkills });
       } catch (error) {
         console.error('[AionrsSendBox] Failed to send initial message:', error);
         sessionStorage.removeItem(processedKey);
@@ -375,9 +406,24 @@ const AionrsSendBox: React.FC<{
   }, [conversation_id, current_model?.use_model, executeCommand]);
 
   const onSendHandler = async (message: string) => {
+    const contextCommand = parseContextCommand(message);
+    if (contextCommand.kind === 'invalid') {
+      Message.error(t(contextCommandErrorMessageKey(contextCommand.code)));
+      return;
+    }
+    if (contextCommand.kind === 'valid') {
+      emitter.emit('aionrs.context-command', {
+        conversationId: conversation_id,
+        command: contextCommand.command,
+      });
+      return;
+    }
+
     const filesToSend = collectSelectedFiles(uploadFile, atPath);
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
+
+    const composed = presentationTemplates.composeSend(message, filesToSend);
 
     if (
       shouldEnqueueConversationCommand({
@@ -386,11 +432,15 @@ const AionrsSendBox: React.FC<{
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: filesToSend });
+      // Queued sends drop injectSkills — the directive still names the skill,
+      // so the agent can pick it up when the queued command is executed.
+      enqueue({ input: composed.input, files: composed.files });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: filesToSend });
+    await executeCommand({ input: composed.input, files: composed.files, injectSkills: composed.injectSkills });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
@@ -473,7 +523,7 @@ const AionrsSendBox: React.FC<{
     const modelOptions: MobileActionSheetOption[] = modelSelection.providers.flatMap((provider) =>
       modelSelection.getAvailableModels(provider).map((modelName) => ({
         key: `${provider.id}::${modelName}`,
-        label: modelName,
+        label: formatCompactModelName(modelName),
         description: provider.name,
         active:
           modelSelection.current_model?.id === provider.id && modelSelection.current_model?.use_model === modelName,
@@ -482,7 +532,9 @@ const AionrsSendBox: React.FC<{
 
     const currentModeLabel =
       modeOptions.find((opt) => opt.active)?.label ?? t('agentMode.default', { defaultValue: 'Default' });
-    const currentModelLabel = modelSelection.current_model?.use_model || t('conversation.welcome.selectModel');
+    const currentModelLabel = modelSelection.current_model?.use_model
+      ? formatCompactModelName(modelSelection.current_model.use_model)
+      : t('conversation.welcome.selectModel');
 
     const entries: MobileActionSheetEntry[] = [
       {
@@ -646,6 +698,8 @@ const AionrsSendBox: React.FC<{
     [effectiveHandleStop, prioritize]
   );
   const sendBoxWidthClass = getChatSurfaceWidthClass(Boolean(teamPermission));
+  const thoughtDisplayRunning = teamRuntime?.loading ?? (runtimeView.hydrated ? runtimeView.isProcessing : running);
+  const thoughtDisplayThought = thoughtDisplayRunning ? thought : undefined;
 
   return (
     <div className={`${sendBoxWidthClass} flex flex-col mt-auto mb-16px`}>
@@ -664,8 +718,8 @@ const AionrsSendBox: React.FC<{
         onClear={clear}
       />
       <ThoughtDisplay
-        thought={thought}
-        running={teamRuntime?.loading ?? running}
+        thought={thoughtDisplayThought}
+        running={thoughtDisplayRunning}
         statusText={teamRuntime?.statusText}
         externalElapsedSource={Boolean(teamRuntime)}
         startedAtMs={teamRuntime?.startedAtMs ?? null}
@@ -700,14 +754,18 @@ const AionrsSendBox: React.FC<{
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
+            {modelSelector}
             <AgentModeSelector
               backend='aionrs'
               conversation_id={conversation_id}
@@ -715,18 +773,32 @@ const AionrsSendBox: React.FC<{
               initialMode={session_mode}
               dynamicModes={dynamicModes}
               compactLeadingIcon={<Shield theme='outline' size='14' fill={iconColors.secondary} />}
-              modeLabelFormatter={(mode) => t(`agentMode.${mode.value}`, { defaultValue: mode.label })}
-              compactLabelPrefix={t('agentMode.permission')}
-              hideCompactLabelPrefixOnMobile
+              modeLabelFormatter={(mode) =>
+                mode.value === 'auto_edit'
+                  ? t('agentMode.auto')
+                  : mode.value === 'yolo'
+                    ? t('agentMode.full-access')
+                    : t(`agentMode.${mode.value}`, { defaultValue: mode.label })
+              }
               onModeChanged={propagateMode}
               beforeRuntimeSync={prepareRuntimeConfig}
               beforeRuntimeSet={teamPermission?.warmupSession}
               loadConfigOptions={teamPermission?.loadConfigOptions}
             />
+            <ContextUsageIndicator tokenUsage={tokenUsage} localUsage={localUsage} context_limit={contextLimit} />
           </div>
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
+                  <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
+                    {presentationTemplates.selectedTemplate.manifest.name}
+                  </Tag>
+                </Tooltip>
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -770,7 +842,21 @@ const AionrsSendBox: React.FC<{
         onSend={onSendHandler}
         slash_commands={slash_commands}
         onSlashBuiltinCommand={onSlashBuiltinCommand}
+        enableContextCommand
         allowSendWhileLoading
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       />
       {isMobile && (
         <>

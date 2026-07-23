@@ -27,6 +27,11 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'gpt-5.1-chat': 128_000,
   'gpt-5': 400_000,
   'gpt-5-chat': 128_000,
+  'gpt-5-mini': 400_000,
+  'gpt-5-nano': 400_000,
+  'gpt-4.1': 1_047_576,
+  'gpt-4.1-mini': 1_047_576,
+  'gpt-4.1-nano': 1_047_576,
   'gpt-4o': 128_000,
   'gpt-4o-mini': 128_000,
   'gpt-4-turbo': 128_000,
@@ -39,18 +44,56 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'o1-mini': 128_000,
   o3: 200_000,
   'o3-mini': 200_000,
+  'o4-mini': 200_000,
 
   // Claude 系列
+  'claude-fable-5': 1_000_000,
+  'claude-opus-4-8': 1_000_000,
+  'claude-opus-4-7': 1_000_000,
+  'claude-opus-4-6': 1_000_000,
+  'claude-sonnet-5': 1_000_000,
+  'claude-sonnet-4-6': 1_000_000,
+  'claude-opus-4-5': 200_000,
+  'claude-haiku-4-5': 200_000,
+  'claude-sonnet-4-5': 200_000,
+  'claude-3-7-sonnet': 200_000,
   'claude-opus-4.5': 200_000,
   'claude-haiku-4.5': 200_000,
-  'claude-sonnet-4.5': 1_000_000,
+  'claude-sonnet-4.5': 200_000,
   'claude-opus-4.1': 200_000,
   'claude-opus-4': 200_000,
-  'claude-sonnet-4': 1_000_000,
+  'claude-sonnet-4': 200_000,
   'claude-3.7-sonnet': 200_000,
   'claude-3.5-haiku': 200_000,
   'claude-3-opus': 200_000,
   'claude-3-haiku': 200_000,
+
+  // MiniMax 系列
+  'minimax-m3': 1_000_000,
+  'minimax-m2.7': 204_800,
+  'minimax-m2.5': 204_800,
+  'minimax-m2.1': 204_800,
+  'minimax-m2': 204_800,
+
+  // DeepSeek 系列
+  'deepseek-chat': 128_000,
+  'deepseek-reasoner': 128_000,
+
+  // xAI 系列
+  'grok-4.5': 500_000,
+  'grok-4.3': 1_000_000,
+  'grok-build-0.1': 256_000,
+
+  // Mistral 系列
+  'mistral-large-3': 256_000,
+  'mistral-medium-3.5': 256_000,
+  'mistral-small-4': 256_000,
+  codestral: 128_000,
+  'devstral-2': 256_000,
+
+  // Qwen 系列
+  'qwen3-235b-a22b-instruct-2507': 262_144,
+  'qwen2.5-turbo': 1_000_000,
 };
 
 /**
@@ -59,22 +102,27 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
 export const DEFAULT_CONTEXT_LIMIT = 1_048_576;
 
 /**
- * 根据模型名称获取 context limit
+ * 根据模型名称获取已知的 context limit，未命中时返回 undefined
  * 支持模糊匹配，例如 "gemini-2.5-pro-latest" 会匹配 "gemini-2.5-pro"
+ *
+ * Returns the mapped context window for a known model, or `undefined` when the
+ * model is not recognized. Callers that need a graceful "--" (e.g. the context
+ * budget indicator) use this so an unknown model stays truly unknown instead of
+ * silently inheriting the default window.
  */
-export function getModelContextLimit(modelName: string | undefined | null): number {
-  if (!modelName) return DEFAULT_CONTEXT_LIMIT;
+export function getKnownModelContextLimit(modelName: string | undefined | null): number | undefined {
+  if (!modelName) return undefined;
 
   const lowerModelName = modelName.toLowerCase();
 
-  // 精确匹配
+  // 精确匹配 / exact match
   if (MODEL_CONTEXT_LIMITS[lowerModelName]) {
     return MODEL_CONTEXT_LIMITS[lowerModelName];
   }
 
-  // 模糊匹配：查找最长匹配的模型名
+  // 模糊匹配：查找最长匹配的模型名 / fuzzy match: longest matching key wins
   let bestMatch = '';
-  let bestLimit = DEFAULT_CONTEXT_LIMIT;
+  let bestLimit: number | undefined;
 
   for (const [key, limit] of Object.entries(MODEL_CONTEXT_LIMITS)) {
     if (lowerModelName.includes(key) && key.length > bestMatch.length) {
@@ -84,4 +132,12 @@ export function getModelContextLimit(modelName: string | undefined | null): numb
   }
 
   return bestLimit;
+}
+
+/**
+ * 根据模型名称获取 context limit，未知模型回退到默认值
+ * 支持模糊匹配，例如 "gemini-2.5-pro-latest" 会匹配 "gemini-2.5-pro"
+ */
+export function getModelContextLimit(modelName: string | undefined | null): number {
+  return getKnownModelContextLimit(modelName) ?? DEFAULT_CONTEXT_LIMIT;
 }

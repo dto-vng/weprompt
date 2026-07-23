@@ -12,12 +12,19 @@
     "clearWorkspace": "移除项目",
     "openFolder": "打开文件夹",
     "none": "无",
-    "quickActionsTitle": "AionUi 能做什么？",
+    "quickActionsTitle": "WePrompt 能做什么？",
     "quickActionFeedback": "反馈问题",
     "quickActionStar": "喜欢我们？点个星吧",
-    "skillsMarket": "AionUi Skills Market",
+    "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "按需搜索并调用社区 Skills，一次配置，所有Agent通用。",
-    "skillsMarketDetails": "详情 >>"
+    "skillsMarketDetails": "详情 >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "最近",
@@ -68,13 +75,34 @@
     "recent7Days": "最近7天",
     "earlier": "更早",
     "projectsSection": "项目",
-    "conversationsSection": "对话",
+    "conversationsSection": "聊天",
     "removeProjectTitle": "移除项目",
     "removeProject": "移除项目",
-    "removeProjectConfirm": "确定要移除项目「{{name}}」吗？项目下的 {{count}} 个对话也会被一起移除。",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此项目中新建对话",
     "deleting": "删除中...",
-    "reorderPinned": "拖动以调整置顶会话顺序"
+    "reorderPinned": "拖动以调整置顶会话顺序",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "检索会话",
@@ -304,7 +332,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "读取团队辅助进程响应失败",
-        "body": "AionUi 无法读取本地团队辅助进程的响应。请先重试一次，如果持续出现，再重启应用。"
+        "body": "WePrompt 无法读取本地团队辅助进程的响应。请先重试一次，如果持续出现，再重启应用。"
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "本地团队辅助进程拒绝了这次请求",
@@ -312,11 +340,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "团队辅助进程返回了异常响应",
-        "body": "AionUi 收到了本地团队辅助进程的异常响应。请先重试一次，如果持续出现再反馈问题。"
+        "body": "WePrompt 收到了本地团队辅助进程的异常响应。请先重试一次，如果持续出现再反馈问题。"
       },
       "MCP_TCP_READ_FAILED": {
         "title": "读取本地团队辅助进程失败",
-        "body": "AionUi 无法读取本地团队辅助进程的 TCP 响应。请先重试一次，如仍失败可重启应用。"
+        "body": "WePrompt 无法读取本地团队辅助进程的 TCP 响应。请先重试一次，如仍失败可重启应用。"
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "团队服务尚未就绪",
@@ -417,6 +445,9 @@
       "vscode": "VS Code",
       "terminal": "终端",
       "explorer": "文件资源管理器"
+    },
+    "projectMenu": {
+      "trigger": "项目"
     }
   },
   "minimap": {
@@ -508,7 +539,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "上下文已使用"
+    "contextUsed": "上下文已使用",
+    "contextWindow": "上下文窗口",
+    "percentUsed": "已使用 {{percent}}%",
+    "tokenCount": "{{used}} / {{limit}} 个令牌",
+    "localTokenUsage": "本地令牌用量",
+    "today": "今天",
+    "weekToDate": "本周至今",
+    "monthToDate": "本月至今",
+    "triggerLabel": "显示上下文用量"
   },
   "skill_generator": {
     "title": "生成 Skill/规则",
@@ -576,5 +615,98 @@
       }
     }
   },
-  "notFound": "会话不存在或已被删除"
+  "notFound": "会话不存在或已被删除",
+  "projectHeader": {
+    "label": "项目 {{name}}",
+    "eyebrow": "项目",
+    "tabs": {
+      "label": "项目视图",
+      "chat": "聊天",
+      "files": "文件",
+      "context": "上下文",
+      "artifacts": "成果"
+    }
+  },
+  "emptyModelReply": "模型在没有生成可见回复的情况下结束了本轮对话。请重新发送请求；如果需要较大的输出，请分多次索取结果。",
+  "presentationTemplates": {
+    "title": "模板",
+    "buttonTooltip": "演示模板",
+    "slashDescription": "选择演示模板",
+    "importCard": "导入主题 (.md)",
+    "empty": "暂无可用模板",
+    "chipTooltip": "此消息将使用该模板",
+    "importSuccess": "模板已导入",
+    "importError": "导入失败：{{error}}",
+    "removeError": "删除失败：{{error}}",
+    "deleteTooltip": "删除模板",
+    "deleteConfirm": "确定删除该模板？"
+  },
+  "status": {
+    "waitingApproval": "等待你的批准"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "管理、压缩、置顶或交接会话上下文",
+      "missingPinText": "请在 /context pin 后输入要置顶的内容",
+      "unexpectedArguments": "此上下文命令包含多余参数",
+      "unsupportedSubcommand": "未知的上下文命令。请使用 open、compact、pin 或 handoff。",
+      "fallbackComplete": "已使用本地回退更新上下文",
+      "compactSuccess": "上下文已更新",
+      "pinSuccess": "上下文已置顶并更新",
+      "failed": "上下文命令失败"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "正在使用 AI 更新...",
+      "updatedByAi": "由 AI 更新",
+      "rulesFallback": "使用规则回退更新",
+      "stale": "等待更新",
+      "failed": "更新失败",
+      "edited": "已编辑的上下文",
+      "error": {
+        "invalidModelOutput": "AI 返回了异常结果，未能更新上下文。",
+        "providerRequestFailed": "模型请求失败。请检查服务商连接后重试。",
+        "providerNotFound": "未找到模型服务商，请检查该会话的模型设置。",
+        "interrupted": "上下文更新在完成前被中断。",
+        "unknown": "上下文更新意外失败，请重试。"
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "暂无打开的工件",
+    "emptyHint": "生成的文件和文档会在这里打开。"
+  }
 }

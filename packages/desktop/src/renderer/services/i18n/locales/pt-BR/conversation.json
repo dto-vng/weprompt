@@ -12,12 +12,19 @@
     "clearWorkspace": "Remover projeto",
     "openFolder": "Abrir Pasta",
     "none": "Nenhum",
-    "quickActionsTitle": "O que o AionUi pode fazer?",
+    "quickActionsTitle": "O que o WePrompt pode fazer?",
     "quickActionFeedback": "Reportar Problema",
     "quickActionStar": "Gostou? Nos dê uma estrela!",
-    "skillsMarket": "Mercado de Habilidades AionUi",
+    "skillsMarket": "Mercado de Habilidades WePrompt",
     "skillsMarketDesc": "Pesquise e ative as Habilidades da comunidade sob demanda. Configure uma vez, disponível para todos os agentes.",
-    "skillsMarketDetails": "Ver Mais >>"
+    "skillsMarketDetails": "Ver Mais >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "Recentes",
@@ -68,13 +75,34 @@
     "recent7Days": "Últimos 7 Dias",
     "earlier": "Mais Antigos",
     "projectsSection": "Projetos",
-    "conversationsSection": "Conversas",
+    "conversationsSection": "Chats",
     "removeProjectTitle": "Remover projeto",
     "removeProject": "Remover projeto",
-    "removeProjectConfirm": "Remover o projeto \"{{name}}\"? Suas {{count}} conversa(s) também serão removidas.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Novo chat neste projeto",
     "deleting": "Excluindo...",
-    "reorderPinned": "Arraste para reordenar a conversa fixada"
+    "reorderPinned": "Arraste para reordenar a conversa fixada",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "Pesquisar mensagens",
@@ -301,8 +329,8 @@
       },
       "WORKSPACE_PATH_CONTAINS_WHITESPACE_RUNTIME_UNSUPPORTED": {
         "title": "Este caminho de projeto não é mais compatível com execução",
-        "body": "Esta conversa ou tarefa existente usa um caminho de projeto cujos nomes de diretório contêm espaços ou outros caracteres de espaço em branco. O AionUi não oferece mais suporte ao envio de mensagens em caminhos desse tipo. Crie uma nova conversa ou tarefa com um caminho de projeto sem espaços em branco.",
-        "bodyWithPath": "O caminho de projeto existente \"{{workspacePath}}\" contém espaços ou outros caracteres de espaço em branco. O AionUi não oferece mais suporte ao envio de mensagens em conversas ou tarefas que usam esse caminho. Crie uma nova conversa ou tarefa com um caminho de projeto sem espaços em branco."
+        "body": "Esta conversa ou tarefa existente usa um caminho de projeto cujos nomes de diretório contêm espaços ou outros caracteres de espaço em branco. O WePrompt não oferece mais suporte ao envio de mensagens em caminhos desse tipo. Crie uma nova conversa ou tarefa com um caminho de projeto sem espaços em branco.",
+        "bodyWithPath": "O caminho de projeto existente \"{{workspacePath}}\" contém espaços ou outros caracteres de espaço em branco. O WePrompt não oferece mais suporte ao envio de mensagens em conversas ou tarefas que usam esse caminho. Crie uma nova conversa ou tarefa com um caminho de projeto sem espaços em branco."
       },
       "UNKNOWN_UPSTREAM_ERROR": {
         "title": "O agente ou provedor upstream falhou",
@@ -310,7 +338,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "Failed to read the team helper response",
-        "body": "AionUi could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
+        "body": "WePrompt could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "The local team helper rejected the request",
@@ -318,11 +346,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "The team helper returned an unexpected response",
-        "body": "AionUi received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
+        "body": "WePrompt received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "Failed to read from the local team helper",
-        "body": "AionUi could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
+        "body": "WePrompt could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "Team service is not ready yet",
@@ -423,6 +451,9 @@
       "vscode": "VS Code",
       "terminal": "Terminal",
       "explorer": "Explorador de Arquivos"
+    },
+    "projectMenu": {
+      "trigger": "Projeto"
     }
   },
   "minimap": {
@@ -514,7 +545,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "contexto usado"
+    "contextUsed": "contexto usado",
+    "contextWindow": "Janela de contexto",
+    "percentUsed": "{{percent}}% usado",
+    "tokenCount": "{{used}} de {{limit}} tokens",
+    "localTokenUsage": "Uso local de tokens",
+    "today": "Hoje",
+    "weekToDate": "Semana até hoje",
+    "monthToDate": "Mês até hoje",
+    "triggerLabel": "Mostrar uso do contexto"
   },
   "skill_generator": {
     "title": "Gerar Habilidade/Regra",
@@ -582,5 +621,98 @@
       }
     }
   },
-  "notFound": "Conversa não encontrada ou foi deletada"
+  "notFound": "Conversa não encontrada ou foi deletada",
+  "projectHeader": {
+    "label": "Projeto {{name}}",
+    "eyebrow": "PROJETO",
+    "tabs": {
+      "label": "Visualizações do projeto",
+      "chat": "Chat",
+      "files": "Arquivos",
+      "context": "Contexto",
+      "artifacts": "Artefatos"
+    }
+  },
+  "emptyModelReply": "O modelo encerrou o turno sem produzir uma resposta visível. Envie a solicitação novamente; para saídas grandes, peça o resultado em partes menores.",
+  "presentationTemplates": {
+    "title": "Modelos",
+    "buttonTooltip": "Modelos de apresentação",
+    "slashDescription": "Escolher um modelo de apresentação",
+    "importCard": "Importar tema (.md)",
+    "empty": "Nenhum modelo disponível",
+    "chipTooltip": "Esta mensagem usará o modelo",
+    "importSuccess": "Modelo importado",
+    "importError": "Falha na importação: {{error}}",
+    "removeError": "Falha ao excluir: {{error}}",
+    "deleteTooltip": "Excluir modelo",
+    "deleteConfirm": "Excluir este modelo?"
+  },
+  "status": {
+    "waitingApproval": "Aguardando sua aprovação"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "Gerenciar, compactar, fixar ou transferir o contexto da conversa",
+      "missingPinText": "Adicione texto depois de /context pin",
+      "unexpectedArguments": "Este comando de contexto contém argumentos inesperados",
+      "unsupportedSubcommand": "Comando de contexto desconhecido. Use open, compact, pin ou handoff.",
+      "fallbackComplete": "Contexto atualizado com a alternativa local",
+      "compactSuccess": "Contexto atualizado",
+      "pinSuccess": "Contexto fixado e atualizado",
+      "failed": "Falha no comando de contexto"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Atualizando com IA...",
+      "updatedByAi": "Atualizado por IA",
+      "rulesFallback": "Atualizado com alternativa baseada em regras",
+      "stale": "Atualização pendente",
+      "failed": "Falha na atualização",
+      "edited": "Contexto editado",
+      "error": {
+        "invalidModelOutput": "A IA retornou um resultado inesperado, então o contexto não foi atualizado.",
+        "providerRequestFailed": "A solicitação ao modelo falhou. Verifique a conexão do provedor e tente novamente.",
+        "providerNotFound": "O provedor do modelo não foi encontrado. Verifique as configurações de modelo desta conversa.",
+        "interrupted": "A atualização do contexto foi interrompida antes de terminar.",
+        "unknown": "A atualização do contexto falhou inesperadamente. Tente novamente."
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "Nenhum artefato aberto",
+    "emptyHint": "Arquivos e documentos gerados abrem aqui."
+  }
 }

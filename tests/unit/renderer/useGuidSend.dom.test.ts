@@ -50,6 +50,8 @@ const createDeps = (): GuidSendDeps => ({
   setFiles: vi.fn(),
   dir: '',
   setDir: vi.fn(),
+  projectId: undefined,
+  setProjectId: vi.fn(),
   setLoading: vi.fn(),
   loading: false,
   selectedAssistantId: 'assistant-1',
@@ -85,7 +87,7 @@ describe('useGuidSend', () => {
 
   it('passes selected mode into assistant conversation overrides when creating a preset ACP conversation', async () => {
     const deps = createDeps();
-    (deps as any).selectedThoughtLevelValue = 'high';
+    deps.selectedThoughtLevelValue = 'high';
 
     const { result } = renderHook(() => useGuidSend(deps));
 
@@ -244,6 +246,164 @@ describe('useGuidSend', () => {
     expect('model' in payload).toBe(false);
     expect(payload.extra.preset_assistant_id).toBeUndefined();
     expect(payload.extra.backend).toBeUndefined();
+  });
+
+  it('auto-attaches enabled commodity builtin servers when no explicit selection is made', async () => {
+    const deps = createDeps();
+    deps.selectedMcpServerIds = undefined;
+    deps.assistantDefaultMcpIds = [];
+    deps.availableMcpServers = [
+      { id: 'builtin-memory', name: 'aionui-memory', enabled: true, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.extra.selected_session_mcp_servers).toEqual([expect.objectContaining({ id: 'builtin-memory' })]);
+  });
+
+  it('force-attaches an enabled image-gen builtin server on the explicit MCP selection path', async () => {
+    const deps = createDeps();
+    deps.selectedMcpServerIds = ['mcp-user'];
+    deps.availableMcpServers = [
+      { id: 'mcp-user', name: 'User MCP', enabled: true, builtin: false } as IMcpServer,
+      { id: 'builtin-image-gen', name: 'aionui-image-generation', enabled: true, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual(['mcp-user', 'builtin-image-gen']);
+  });
+
+  it('force-attaches an enabled IDP builtin server on the explicit MCP selection path', async () => {
+    const deps = createDeps();
+    deps.selectedMcpServerIds = ['mcp-user'];
+    deps.availableMcpServers = [
+      { id: 'mcp-user', name: 'User MCP', enabled: true, builtin: false } as IMcpServer,
+      { id: 'builtin-idp', name: 'greennode-idp', enabled: true, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual(['mcp-user', 'builtin-idp']);
+  });
+
+  it('force-attaches an enabled IDP builtin server into the session MCP server list for Aion CLI conversations on the explicit selection path', async () => {
+    const deps = createDeps();
+    deps.selectedAssistantId = 'bare:aionrs';
+    deps.selectedAssistantBackend = 'aionrs';
+    deps.current_model = { provider_id: 'openai', model: 'gpt-5', use_model: 'gpt-5' } as never;
+    deps.selectedMcpServerIds = ['mcp-user'];
+    deps.availableMcpServers = [
+      { id: 'mcp-user', name: 'User MCP', enabled: true, builtin: false } as IMcpServer,
+      { id: 'builtin-idp', name: 'greennode-idp', enabled: true, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual(['mcp-user', 'builtin-idp']);
+    expect(payload.extra.selected_session_mcp_servers).toEqual([
+      expect.objectContaining({ id: 'mcp-user' }),
+      expect.objectContaining({ id: 'builtin-idp' }),
+    ]);
+  });
+
+  it('does not force-attach a disabled IDP builtin server on the explicit MCP selection path', async () => {
+    const deps = createDeps();
+    deps.selectedMcpServerIds = ['mcp-user'];
+    deps.availableMcpServers = [
+      { id: 'mcp-user', name: 'User MCP', enabled: true, builtin: false } as IMcpServer,
+      { id: 'builtin-idp', name: 'greennode-idp', enabled: false, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual(['mcp-user']);
+    expect(payload.extra.selected_session_mcp_servers).toEqual([]);
+  });
+
+  it('force-attaches both enabled image-gen and IDP builtin servers together on the explicit selection path', async () => {
+    const deps = createDeps();
+    deps.selectedMcpServerIds = ['mcp-user'];
+    deps.availableMcpServers = [
+      { id: 'mcp-user', name: 'User MCP', enabled: true, builtin: false } as IMcpServer,
+      { id: 'builtin-image-gen', name: 'aionui-image-generation', enabled: true, builtin: true } as IMcpServer,
+      { id: 'builtin-idp', name: 'greennode-idp', enabled: true, builtin: true } as IMcpServer,
+    ];
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual([
+      'mcp-user',
+      'builtin-image-gen',
+      'builtin-idp',
+    ]);
+  });
+
+  it('passes Project id and workspace into ACP conversation creation', async () => {
+    const deps = createDeps();
+    deps.projectId = 'project-1';
+    deps.dir = '/Users/me/Finance Close';
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.extra.project_id).toBe('project-1');
+    expect(payload.extra.workspace).toBe('/Users/me/Finance Close');
+    expect(payload.extra.custom_workspace).toBe(true);
+  });
+
+  it('passes Project id and workspace into Aion CLI conversation creation', async () => {
+    const deps = createDeps();
+    deps.selectedAssistantId = 'bare:aionrs';
+    deps.selectedAssistantBackend = 'aionrs';
+    deps.current_model = { provider_id: 'openai', model: 'gpt-5', use_model: 'gpt-5' } as never;
+    deps.projectId = 'project-1';
+    deps.dir = '/Users/me/Finance Close';
+
+    const { result } = renderHook(() => useGuidSend(deps));
+
+    await act(async () => {
+      await result.current.handleSend();
+    });
+
+    const payload = createConversationInvokeMock.mock.calls[0][0];
+    expect(payload.extra.project_id).toBe('project-1');
+    expect(payload.extra.workspace).toBe('/Users/me/Finance Close');
+    expect(payload.extra.custom_workspace).toBe(true);
   });
 
   it('does not create a conversation without assistant identity', async () => {

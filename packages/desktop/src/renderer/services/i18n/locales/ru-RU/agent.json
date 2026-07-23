@@ -44,5 +44,10 @@
     "label": "Уровень рассуждений",
     "switchSuccess": "Уровень рассуждений переключен",
     "switchFailed": "Не удалось переключить уровень рассуждений"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

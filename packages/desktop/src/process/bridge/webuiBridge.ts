@@ -87,7 +87,8 @@ export function initWebuiBridge(): void {
     await maybeSeedInitialPassword();
     const handle = await startDesktopWebUI({
       port: params?.port,
-      allowRemote: params?.allowRemote,
+      // Forge desktop-only (D1)
+      allowRemote: false,
     });
     ipcBridge.webui.statusChanged.emit({
       running: true,

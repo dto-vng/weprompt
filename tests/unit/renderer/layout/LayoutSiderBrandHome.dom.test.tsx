@@ -10,7 +10,7 @@ import React from 'react';
 
 // Mirror the project convention: t() echoes the key so labels/tooltips are assertable.
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (k: string) => (k === 'login.brand' ? 'WePrompt' : k), i18n: { language: 'en' } }),
 }));
 
 // react-router-dom: control location, capture navigate.
@@ -61,6 +61,7 @@ import Layout from '@renderer/components/layout/Layout';
 const renderLayout = () => render(<Layout sider={<div>sider</div>} />);
 
 const BACK_KEY = 'common.back';
+const BRAND_KEY = 'login.brand';
 
 describe('Layout sider brand Home button', () => {
   beforeEach(() => {
@@ -143,7 +144,7 @@ describe('Layout sider brand Home button', () => {
 
     // No actionable role/label in chat routes.
     expect(screen.queryByLabelText(BACK_KEY)).toBeNull();
-    const wordmark = screen.getByText('AionUi');
+    const wordmark = screen.getByText('WePrompt');
     fireEvent.click(wordmark);
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -152,7 +153,7 @@ describe('Layout sider brand Home button', () => {
     currentPathname = '/conversation/xyz';
     renderLayout();
 
-    fireEvent.click(screen.getByText('AionUi'));
+    fireEvent.click(screen.getByText('WePrompt'));
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -161,8 +162,8 @@ describe('Layout sider brand Home button', () => {
     sessionStorage.setItem('aion:last-non-settings-path', '/conversation/abc');
     const { container } = renderLayout();
 
-    // The icon is the SVG-wrapping div (bg-black), separate from the wordmark.
-    const icon = container.querySelector('.bg-black') as HTMLElement;
+    // The icon is the brand-mark-wrapping div, separate from the wordmark.
+    const icon = container.querySelector('[data-testid="sider-brand-logo"]') as HTMLElement;
     expect(icon).toBeTruthy();
     for (let i = 0; i < 4; i++) fireEvent.click(icon);
     expect(openDevTools).toHaveBeenCalled();

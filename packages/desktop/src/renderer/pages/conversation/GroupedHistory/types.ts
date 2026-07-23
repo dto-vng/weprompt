@@ -11,6 +11,8 @@ export type WorkspaceGroup = {
   workspace: string;
   display_name: string;
   conversations: TChatConversation[];
+  project_id?: string;
+  source?: 'project' | 'legacy-workspace';
 };
 
 export type TimelineItem = {
@@ -44,7 +46,7 @@ export type ExportTask =
 export type ConversationRowProps = {
   conversation: TChatConversation;
   isGenerating: boolean;
-  hasCompletionUnread: boolean;
+  recentCompletionAt?: number;
   collapsed: boolean;
   tooltipEnabled: boolean;
   batchMode: boolean;
@@ -73,6 +75,7 @@ export type WorkspaceGroupedHistoryProps = {
   tooltipEnabled?: boolean;
   batchMode?: boolean;
   onBatchModeChange?: (value: boolean) => void;
+  onNewChat?: () => void;
   afterPinnedContent?: ReactNode;
 };
 

@@ -9,7 +9,8 @@
   "defaultPrompts": {
     "understand": "Verschaffe dir einen Überblick über dieses Projekt und erkläre mir in einfachen Worten, was es macht und wo ich anfangen sollte",
     "cleanup": "Finde doppelte und unnötige Dateien in diesem Ordner und liste sie zur Bestätigung auf",
-    "create": "Erstelle mir eine schöne persönliche Homepage und öffne sie, sobald sie fertig ist"
+    "create": "Erstelle mir eine schöne persönliche Homepage und öffne sie, sobald sie fertig ist",
+    "reviewFolder": "Review the files in a folder"
   },
   "selectAssistantHint": "Wähle einen Assistenten, um eine Aufgabe zu starten",
   "agentSwitcherLabel": "Agent",
@@ -31,5 +32,17 @@
     "statusTesting": "Latenz wird gemessen...",
     "statusUnreachable": "Nicht erreichbar",
     "statusAvailable": "Verfügbar"
+  },
+  "toolbar": {
+    "label": "Startseitenaktionen",
+    "history": "Verlauf",
+    "saved": "Gespeichert",
+    "community": "Community"
+  },
+  "defaultProjectPrompts": {
+    "reviewFiles": "Review the files in this project",
+    "summarizeFolder": "Summarize what this project contains",
+    "createPlan": "Create a plan for this project",
+    "findNextSteps": "Find the next useful steps for this project"
   }
 }

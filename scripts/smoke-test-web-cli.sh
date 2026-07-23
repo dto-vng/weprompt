@@ -132,40 +132,55 @@ else
   exit 1
 fi
 
-# 7. Auth-setup smoke: verify stdout announces a generated admin password on
-#    first launch, then POST it to /login and check for success + session cookie.
+# 7. Auth smoke: obtain a usable admin password via the `resetpass` subcommand
+#    (the seed password is deliberately NOT logged — security #5), then POST it
+#    to /login and check for success + session cookie.
 #    Skip when the bundled backend was unavailable — there's no /login to call.
 echo ""
-echo "7. Testing first-launch admin password seeding + login..."
+echo "7. Testing admin password reset + login..."
 if grep -q 'Backend binary not found' /tmp/aionui-web.log; then
   echo "⚠️  frontend-only mode detected (no bundled backend) — skipping login probe"
   kill "$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
 else
-  # Wait up to 20s for the "Generated initial admin password" line — the backend
-  # needs to finish migrations before /api/auth/status replies.
+  # The first-launch seed password is never printed to stdout, so capture a
+  # usable credential by running `resetpass` against the SAME data-dir the
+  # server uses. resetpass spins up its own backend on an ephemeral port,
+  # POSTs /api/webui/reset-password, and prints:
+  #   [aionui-web] username: <username>
+  #   [aionui-web] new password: <pw>
+  # Retry a few times: on a fresh DB the backend needs to finish migrations
+  # before reset-password succeeds.
   PASSWORD=""
+  USERNAME=""
   for i in $(seq 1 20); do
-    PASSWORD=$(grep -oE 'Generated initial admin password: [^ ]+' /tmp/aionui-web.log | head -1 | sed 's/^Generated initial admin password: //')
-    if [ -n "$PASSWORD" ]; then
-      break
+    if ./aionui-web resetpass --data-dir "$DATA_DIR" > /tmp/aionui-web-resetpass.log 2>&1; then
+      PASSWORD=$(grep -oE '^\[aionui-web\] new password: .+' /tmp/aionui-web-resetpass.log | head -1 | sed 's/^\[aionui-web\] new password: //')
+      USERNAME=$(grep -oE '^\[aionui-web\] username: .+' /tmp/aionui-web-resetpass.log | head -1 | sed 's/^\[aionui-web\] username: //')
+      if [ -n "$PASSWORD" ]; then
+        break
+      fi
     fi
     sleep 1
   done
+  # Default to "admin" if resetpass did not echo an explicit username.
+  USERNAME="${USERNAME:-admin}"
 
   if [ -z "$PASSWORD" ]; then
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
-    echo "❌ Never saw 'Generated initial admin password: ...' in stdout."
+    echo "❌ resetpass never produced a '[aionui-web] new password: ...' line."
+    echo "---resetpass log---"
+    cat /tmp/aionui-web-resetpass.log 2>/dev/null || echo "(no resetpass log)"
     echo "---server log---"
     cat /tmp/aionui-web.log
     exit 1
   fi
-  echo "✓ Captured initial admin password from stdout"
+  echo "✓ Obtained an admin password via resetpass (username: $USERNAME)"
 
   # POST /login — static server proxies to backend. Expect 200, success:true,
   # and at least one Set-Cookie header containing a session cookie.
-  LOGIN_BODY=$(printf '{"username":"admin","password":"%s","remember":false}' "$PASSWORD")
+  LOGIN_BODY=$(printf '{"username":"%s","password":"%s","remember":false}' "$USERNAME" "$PASSWORD")
   LOGIN_RESP_HEADERS=$(mktemp)
   LOGIN_RESP_BODY=$(mktemp)
   HTTP_CODE=$(curl -sS -o "$LOGIN_RESP_BODY" -D "$LOGIN_RESP_HEADERS" -w '%{http_code}' \
@@ -199,12 +214,13 @@ else
     cat "$LOGIN_RESP_HEADERS"
     exit 1
   fi
-  echo "✓ Login with printed password succeeded (HTTP 200 + Set-Cookie present)"
+  echo "✓ Login with resetpass password succeeded (HTTP 200 + Set-Cookie present)"
 fi
 
 # Cleanup
 cd -
 rm -rf "$TEMP_DIR"
+rm -f /tmp/aionui-web-resetpass.log
 
 echo ""
 echo "========================================"

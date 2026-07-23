@@ -74,7 +74,7 @@ const ScheduledTasksPage: React.FC = () => {
   const filteredJobs = useMemo(() => {
     if (!normalizedSearchQuery) return jobs;
     return jobs.filter((job) => {
-      const agentMeta = getJobAgentMeta(job, presetAssistants, logos);
+      const agentMeta = getJobAgentMeta(job, presetAssistants, logos, t);
       const executionModeLabel =
         job.target.execution_mode === 'new_conversation'
           ? t('cron.page.form.newConversation')
@@ -204,7 +204,7 @@ const ScheduledTasksPage: React.FC = () => {
               )}
             >
               {filteredJobs.map((job) => {
-                const agentMeta = getJobAgentMeta(job, presetAssistants, logos);
+                const agentMeta = getJobAgentMeta(job, presetAssistants, logos, t);
                 const isManualOnly = job.schedule.kind === 'cron' && !job.schedule.expr;
                 const executionModeLabel =
                   job.target.execution_mode === 'new_conversation'

@@ -13,11 +13,12 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
 import { initMainAdapterWithWindow } from './common/adapter/main';
+import { DESKTOP_PET_ENABLED } from './common/config/constants';
 import { ipcBridge } from './common';
 import { initializeProcess } from './process';
 import { startBackendOrExit } from './process/startup/backendStartup';
@@ -34,6 +35,8 @@ import './process/bridge/feedbackBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
+import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
+import { disposeOfficeArtifactService } from '@process/services/office-artifact';
 import { setupApplicationMenu } from './process/utils/appMenu';
 import { startWebHost } from '@aionui/web-host';
 import { initializeZoomFactor, setupZoomForWindow } from './process/utils/zoom';
@@ -58,9 +61,10 @@ import {
 } from './process/utils/mainWindowLifecycle';
 import {
   loadUserWebUIConfig,
-  resolveRemoteAccess,
+  resolveElectronRemoteAccessRequestSources,
   resolveWebUIPort,
   restoreDesktopWebUIFromPreferences,
+  warnUnsupportedDesktopRemoteAccess,
 } from './process/utils/webuiConfig';
 import {
   createOrUpdateTray,
@@ -178,7 +182,6 @@ const getSwitchValue = (flag: string): string | undefined => {
 const hasCommand = (cmd: string) => process.argv.includes(cmd);
 
 const isWebUIMode = hasSwitch('webui');
-const isRemoteMode = hasSwitch('remote');
 const isResetPasswordMode = hasCommand('--resetpass');
 const isVersionMode = hasCommand('--version') || hasCommand('-v');
 
@@ -409,6 +412,172 @@ function applyDebugBackendStartupFailure(failure: BackendStartupFailureInfo): vo
   (globalThis as typeof globalThis & { __backendStartupFailed?: boolean }).__backendStartupFailed = true;
 }
 
+// ============ Renderer navigation allowlist ============
+// The renderer is loaded either from a local file (`loadFile` → file:// in
+// production and when the dev server is unreachable) or from the Vite dev
+// server URL (`ELECTRON_RENDERER_URL`, e.g. http://localhost:5173) in dev.
+// Pet windows load the same way (file:// or the dev server). Top-level
+// BrowserWindow contents must never navigate away from that app content;
+// this allowlist encodes what is legitimately part of the app shell.
+//
+// NOTE: this list intentionally governs only top-level `window`-type contents.
+// The <webview> guest contents (HTML preview, external OAuth/settings pages)
+// are meant to browse arbitrary URLs and are handled separately — see
+// installWebContentsSecurity() below, which does NOT block guest navigation.
+const isAllowedTopLevelNavigation = (targetUrl: string): boolean => {
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return false;
+  }
+  // Local built renderer (production) and pet windows loaded via loadFile.
+  if (parsed.protocol === 'file:') {
+    return true;
+  }
+  // Dev server (Vite) and the local backend. Port is dynamic in both cases
+  // (Vite may auto-increment; backend port is assigned at runtime), so allow
+  // any port on the loopback hosts rather than hardcoding one.
+  if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+    return true;
+  }
+  return false;
+};
+
+// ============ web-contents-created security guard (Task 1.5 / #2b) ============
+// Defense-in-depth in the main process: even if the renderer is compromised it
+// cannot escalate by attaching a privileged <webview>, navigating the app shell
+// to attacker content, or spawning a new Electron window. Installed once from
+// the app-ready path (see handleAppReady) so it covers every WebContents the
+// app ever creates (main window, pet windows, and their <webview> guests).
+const installWebContentsSecurity = (): void => {
+  app.on('web-contents-created', (_event, contents) => {
+    // Harden any <webview> the renderer attaches: strip its preload and force
+    // an unprivileged, isolated, sandboxed guest. The app's own <webview>
+    // usage (HTML preview, external pages) never sets a preload, so this is a
+    // no-op for legitimate use and closes the injected-<webview> escalation.
+    // NOTE: this only hardens the guest's *privileges*; it intentionally does
+    // NOT vet the guest's `src` / navigation destination. Restricting where a
+    // guest may go is delegated to the app's own webview usage and is fenced
+    // separately (the `will-navigate` guard below applies to `window` contents,
+    // not guests — guests are meant to browse arbitrary content). Do not assume
+    // this is where guest destinations are restricted.
+    contents.on('will-attach-webview', (_attachEvent, webPreferences, _params) => {
+      // No preload allowlist exists today; strip unconditionally.
+      delete webPreferences.preload;
+      webPreferences.nodeIntegration = false;
+      webPreferences.contextIsolation = true;
+      webPreferences.sandbox = true;
+    });
+
+    // Block top-level navigation away from the app shell. Only applies to
+    // `window`-type contents (main + pet windows); <webview> guests are meant
+    // to browse arbitrary content, so their navigation is left untouched.
+    contents.on('will-navigate', (navEvent, targetUrl) => {
+      if (contents.getType() !== 'window') {
+        return;
+      }
+      if (!isAllowedTopLevelNavigation(targetUrl)) {
+        console.warn(`[AionUi][security] Blocked top-level navigation to: ${targetUrl}`);
+        navEvent.preventDefault();
+      }
+    });
+
+    // Never let content open a new Electron window. External http(s) links are
+    // handed to the OS browser (preserving legitimate external-link behavior);
+    // everything else is denied. Note the renderer normally routes external
+    // links through the backend (ipcBridge.shell.openExternal); this handler is
+    // the safety net for any raw window.open / target=_blank that reaches here.
+    // Non-http(s) schemes — including conventionally-safe `mailto:` / `tel:` —
+    // are deliberately denied for now (the app has no such links today). If
+    // mail/tel links are ever added to the UI, allowlist those schemes here so
+    // they too are passed to shell.openExternal.
+    contents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        void shell.openExternal(url).catch((error) => {
+          console.error('[AionUi][security] shell.openExternal failed:', error);
+        });
+      } else {
+        console.warn(`[AionUi][security] Denied window.open for non-http(s) URL: ${url}`);
+      }
+      return { action: 'deny' };
+    });
+  });
+};
+
+// ============ Content-Security-Policy (Task 1.6b / #2) ============
+// Applied as **Content-Security-Policy-Report-Only** — it REPORTS violations to
+// the DevTools console but does NOT block anything, so it cannot white-screen
+// the renderer. This is deliberate: the CSP below is grounded in code evidence
+// (see comments per directive) but CANNOT be runtime-verified in this
+// environment. A human must promote it to the enforcing `Content-Security-Policy`
+// header only after launching the app, exercising the main flows + HTML preview
+// + charts/markdown (mermaid, katex, syntax highlighting, web-tree-sitter WASM),
+// reading the reported violations, and confirming the policy is complete.
+//
+// ⚠️ SHARED-SESSION CAVEAT — READ BEFORE PROMOTING TO ENFORCING ⚠️
+// This header is installed on `session.defaultSession`, which is SHARED with
+// partition-less <webview> guests — specifically `URLViewer` (arbitrary remote
+// URL preview) and `OfficeWatchViewer` (local office server), both of which
+// render <WebviewHost> WITHOUT a `partition` and therefore inherit
+// defaultSession. In Report-Only this is harmless (nothing is blocked). But
+// this app-shell CSP is authored for the app's OWN content ('self'); imposing
+// it on arbitrary external / office guest pages will very likely BREAK them
+// (their inline scripts and remote connect-src targets are not covered by
+// 'self'). Therefore, BEFORE renaming the header to the enforcing
+// `Content-Security-Policy`, the maintainer MUST do ONE of:
+//   (a) scope the header to the app-shell/main-frame document only — e.g. gate
+//       the onHeadersReceived callback so it only adds CSP to the app's own
+//       document requests, not to guest (webview) page loads; OR
+//   (b) move every external/remote webview onto a DEDICATED `partition` (a
+//       separate session that this defaultSession policy does not touch), so
+//       the app-shell CSP never applies to guest pages.
+// (Extension-settings webviews already use `persist:ext-settings-*` partitions
+// and are unaffected; only the two partition-less viewers above are at risk.)
+//
+// Directive rationale (desktop Electron renderer, loaded from file:// or the
+// Vite dev server):
+//   default-src 'self'                     — baseline; app shell is same-origin.
+//   script-src 'self' 'wasm-unsafe-eval'   — web-tree-sitter loads WASM; mermaid
+//     'unsafe-eval'                            historically evaluates code. Dev
+//                                              server also needs eval for HMR.
+//   style-src 'self' 'unsafe-inline'       — Arco Design + UnoCSS inject inline
+//                                              <style>/style attributes at runtime.
+//   img-src 'self' data: blob:            — icons/data-URIs; blob: from
+//                                              URL.createObjectURL previews.
+//   font-src 'self' data:                  — bundled fonts / data-URI fonts.
+//   connect-src 'self' http://127.0.0.1:*  — httpBridge fetches the local backend
+//     http://localhost:* ws://127.0.0.1:*    at http://127.0.0.1:<dynamic port>
+//     ws://localhost:*                       and the ws://.../ws realtime channel;
+//                                              dev/HMR uses localhost. Ports are
+//                                              runtime-assigned → wildcard port.
+//   worker-src 'self' blob:                — workers spawned from blob URLs.
+//   object-src 'none'; frame-src 'self'    — lock down plugins/embedding.
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "frame-src 'self'",
+].join('; ');
+
+const installContentSecurityPolicy = (): void => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        // Report-Only for now — see block comment above. Promote to
+        // 'Content-Security-Policy' after human runtime verification.
+        'Content-Security-Policy-Report-Only': [CSP_DIRECTIVES],
+      },
+    });
+  });
+};
+
 const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): void => {
   console.log('[AionUi] Creating main window...');
   const { x: windowX, y: windowY, width: windowWidth, height: windowHeight } = resolveInitialBounds();
@@ -457,6 +626,14 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       webviewTag: true, // 启用 webview 标签用于 HTML 预览 / Enable webview tag for HTML preview
+      // Explicit security posture (was relying on Electron 37 defaults).
+      // contextIsolation + nodeIntegration:false are already the effective defaults
+      // → adding them is zero behavior change. sandbox:true is verified safe here:
+      // the preload (src/preload/main.ts) only uses contextBridge/ipcRenderer/webUtils
+      // plus the bundled @sentry/electron/preload, none of which require Node built-ins.
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
   console.log(`[AionUi] Main window created (id=${mainWindow.id})`);
@@ -605,6 +782,13 @@ const handleAppReady = async (): Promise<void> => {
   const t0 = performance.now();
   const mark = (label: string) => console.log(`[AionUi:ready] ${label} +${Math.round(performance.now() - t0)}ms`);
   mark('start');
+
+  // Install main-process security guards before any WebContents is created or
+  // any content is loaded, so they cover the very first renderer load.
+  installWebContentsSecurity();
+  installContentSecurityPolicy();
+  installOfficePreviewSession();
+  mark('installSecurityGuards');
 
   if (!app.isPackaged) {
     try {
@@ -763,7 +947,12 @@ const handleAppReady = async (): Promise<void> => {
       // Config file loaded from user directory
     }
     const resolvedPort = resolveWebUIPort(userConfigInfo.config, getSwitchValue);
-    const allowRemote = resolveRemoteAccess(userConfigInfo.config, isRemoteMode);
+    const remoteAccessRequests = resolveElectronRemoteAccessRequestSources(
+      userConfigInfo.config,
+      hasSwitch('remote'),
+      getSwitchValue('remote')
+    );
+    warnUnsupportedDesktopRemoteAccess(remoteAccessRequests);
     try {
       // Inside Electron (`AionUi --webui` or packaged `aionui-web` mode that
       // launches via the Electron shell), reuse the desktop app's data-dir so
@@ -786,7 +975,8 @@ const handleAppReady = async (): Promise<void> => {
         },
         staticDir: path.join(__dirname, '../renderer'),
         port: resolvedPort,
-        allowRemote,
+        // Forge desktop-only (D1) — ignore any resolved remote flag
+        allowRemote: false,
         dataDir: getDataPath(),
         logDir: sysDirWebUI.logDir,
         // Expose the same AIONUI_{CACHE,WORK,LOG}_DIR env the desktop IPC path
@@ -850,24 +1040,27 @@ const handleAppReady = async (): Promise<void> => {
     appReadyDone = true;
     mark('createWindow');
 
-    // Initialize desktop pet (delayed to not block main window)
-    setTimeout(() => {
-      void (async () => {
-        try {
-          const petEnabled = await ProcessConfig.get('pet.enabled');
-          if (petEnabled === true) {
-            // Read pet sub-settings before creating the pet so flags are honored
-            // on the first createPetWindow() call (which is sync).
-            const confirmEnabled = (await ProcessConfig.get('pet.confirmEnabled')) ?? true;
-            const { createPetWindow, setPetConfirmEnabled } = await import('./process/pet/petManager');
-            setPetConfirmEnabled(confirmEnabled);
-            createPetWindow();
+    // Initialize desktop pet (delayed to not block main window).
+    // Skipped entirely when the feature flag is off, regardless of stored pet.enabled.
+    if (DESKTOP_PET_ENABLED) {
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const petEnabled = await ProcessConfig.get('pet.enabled');
+            if (petEnabled === true) {
+              // Read pet sub-settings before creating the pet so flags are honored
+              // on the first createPetWindow() call (which is sync).
+              const confirmEnabled = (await ProcessConfig.get('pet.confirmEnabled')) ?? true;
+              const { createPetWindow, setPetConfirmEnabled } = await import('./process/pet/petManager');
+              setPetConfirmEnabled(confirmEnabled);
+              createPetWindow();
+            }
+          } catch (error) {
+            console.error('[Pet] Failed to initialize:', error);
           }
-        } catch (error) {
-          console.error('[Pet] Failed to initialize:', error);
-        }
-      })();
-    }, 3000);
+        })();
+      }, 3000);
+    }
 
     // 读取语言设置并初始化主进程 i18n，然后刷新托盘菜单
     // Read language setting and initialize main process i18n, then refresh tray menu
@@ -1001,6 +1194,7 @@ installQuitCleanup({
     disposeCronResumeListener?.();
     disposeCronResumeListener = null;
   },
+  disposeOfficeArtifacts: disposeOfficeArtifactService,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
   stopBackend: () => backendManager.stop(),

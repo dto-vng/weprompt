@@ -1,4 +1,6 @@
 name: '🔨 Manual Build'
+# Touched once on the WePrompt fork so GitHub registers this workflow_dispatch
+# workflow (workflows pushed before Actions was active are not back-indexed).
 
 permissions:
   contents: write

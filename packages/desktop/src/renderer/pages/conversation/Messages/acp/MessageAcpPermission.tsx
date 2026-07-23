@@ -6,7 +6,7 @@
 
 import type { IMessageAcpPermission } from '@/common/chat/chatLib';
 import { conversation } from '@/common/adapter/ipcBridge';
-import { Button, Card, Radio, Typography } from '@arco-design/web-react';
+import { Button, Card, Typography } from '@arco-design/web-react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -46,12 +46,11 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
     };
   };
   const { title, icon } = getToolInfo();
-  const [selected, setSelected] = useState<string | null>(null);
   const [isResponding, setIsResponding] = useState(false);
   const [hasResponded, setHasResponded] = useState(false);
 
-  const handleConfirm = async () => {
-    if (hasResponded || !selected) return;
+  const handleConfirm = async (selected: string) => {
+    if (hasResponded || isResponding) return;
 
     setIsResponding(true);
     try {
@@ -89,43 +88,32 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
           <span className='text-2xl'>{icon}</span>
           <Text className='block'>{title}</Text>
         </div>
-        {(tool_call.raw_input?.command || tool_call.title) && (
-          <div>
-            <Text className='text-xs text-t-secondary mb-1'>{t('messages.command')}</Text>
-            <code className='text-xs bg-1 p-2 rounded block text-t-primary break-all'>
-              {tool_call.raw_input?.command || tool_call.title}
-            </code>
-          </div>
-        )}
         {!hasResponded && (
           <>
             <div className='mt-10px'>{t('messages.chooseAction')}</div>
-            <Radio.Group direction='vertical' size='mini' value={selected} onChange={setSelected}>
-              {options && options.length > 0 ? (
-                options.map((option, index) => {
+            {options && options.length > 0 ? (
+              <div className='flex flex-wrap gap-8px'>
+                {options.map((option, index) => {
                   const optionName = option?.name || `${t('messages.option')} ${index + 1}`;
                   const option_id = option?.option_id || `option_${index}`;
+                  const isDeny = /deny|reject|cancel|no/i.test(option_id);
                   return (
-                    <div key={option_id} data-testid={`message-acp-permission-option-${option_id}`}>
-                      <Radio value={option_id}>{optionName}</Radio>
-                    </div>
+                    <Button
+                      key={option_id}
+                      type={isDeny ? 'secondary' : 'primary'}
+                      size='small'
+                      disabled={isResponding}
+                      onClick={() => void handleConfirm(option_id)}
+                      data-testid={`message-acp-permission-option-${option_id}`}
+                    >
+                      {optionName}
+                    </Button>
                   );
-                })
-              ) : (
-                <Text type='secondary'>{t('messages.noOptionsAvailable')}</Text>
-              )}
-            </Radio.Group>
-            <div className='flex justify-start pl-20px'>
-              <Button
-                type='primary'
-                size='mini'
-                disabled={!selected || isResponding}
-                onClick={handleConfirm}
-                data-testid='message-acp-permission-confirm'
-              >
-                {isResponding ? t('messages.processing') : t('messages.confirm')}
-              </Button>
-            </div>
+                })}
+              </div>
+            ) : (
+              <Text type='secondary'>{t('messages.noOptionsAvailable')}</Text>
+            )}
           </>
         )}
 

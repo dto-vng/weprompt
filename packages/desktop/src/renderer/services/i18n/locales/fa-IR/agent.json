@@ -44,5 +44,10 @@
     "label": "سطح تفکر",
     "switchSuccess": "سطح تفکر تغییر کرد",
     "switchFailed": "تغییر سطح تفکر ناموفق بود"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

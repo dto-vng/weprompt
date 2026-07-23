@@ -11,6 +11,7 @@ import { Button } from '@arco-design/web-react';
 import { AionSearchInput } from '@/renderer/components/base';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { resolveAssistantAvatar } from '@/renderer/utils/model/assistantAvatar';
+import { resolveAssistantDisplayName } from '@/renderer/utils/model/assistantDisplay';
 import { selectableAssistants } from '@/renderer/utils/model/assistantSelection';
 import { useTranslation } from 'react-i18next';
 
@@ -168,17 +169,17 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
     const query = showOverflowSearch ? search.trim().toLowerCase() : '';
     if (!query) return overflowAssistants;
     return overflowAssistants.filter((assistant) => {
-      const label = assistant.name_i18n?.[localeKey] || assistant.name;
+      const label = resolveAssistantDisplayName(assistant, localeKey, t, assistant.name);
       return label.toLowerCase().includes(query);
     });
-  }, [localeKey, overflowAssistants, search, showOverflowSearch]);
+  }, [localeKey, overflowAssistants, search, showOverflowSearch, t]);
 
   if (enabledAssistants.length === 0) return null;
 
   const renderAssistantPill = (assistant: Assistant, testId: string, fullWidth = false) => {
     const avatar = resolveAssistantAvatar(assistant.avatar);
     const isSelected = selectedId === assistant.id;
-    const label = assistant.name_i18n?.[localeKey] || assistant.name;
+    const label = resolveAssistantDisplayName(assistant, localeKey, t, assistant.name);
 
     return (
       <Button

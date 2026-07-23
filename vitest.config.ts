@@ -3,6 +3,7 @@ import path from 'path';
 
 const aliases = {
   '@/': path.resolve(__dirname, './packages/desktop/src') + '/',
+  '@aionui/web-host': path.resolve(__dirname, './packages/web-host/src/index.ts'),
   '@process/': path.resolve(__dirname, './packages/desktop/src/process') + '/',
   '@renderer/': path.resolve(__dirname, './packages/desktop/src/renderer') + '/',
   '@worker/': path.resolve(__dirname, './packages/desktop/src/process/worker') + '/',
@@ -28,6 +29,8 @@ export default defineConfig({
           environment: 'node',
           include: [
             'packages/web-host/src/**/*.test.ts',
+            'packages/web-cli/src/**/*.test.ts',
+            'packages/desktop/src/**/*.test.ts',
             'tests/unit/**/*.test.ts',
             'tests/unit/**/test_*.ts',
             'tests/integration/**/*.test.ts',

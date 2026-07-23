@@ -12,12 +12,19 @@
     "clearWorkspace": "حذف پروژه",
     "openFolder": "باز کردن پوشه",
     "none": "هیچ",
-    "quickActionsTitle": "AionUi چه کارهایی می‌تواند انجام دهد؟",
+    "quickActionsTitle": "WePrompt چه کارهایی می‌تواند انجام دهد؟",
     "quickActionFeedback": "گزارش مشکل",
     "quickActionStar": "خوشتان آمد؟ به ما ستاره بدهید!",
-    "skillsMarket": "بازار مهارت‌های AionUi",
+    "skillsMarket": "بازار مهارت‌های WePrompt",
     "skillsMarketDesc": "مهارت‌های جامعه را جستجو و فعال کنید. یک‌بار پیکربندی کنید، برای همه ایجنت‌ها در دسترس باشد.",
-    "skillsMarketDetails": "مشاهده بیشتر >>"
+    "skillsMarketDetails": "مشاهده بیشتر >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "اخیر",
@@ -68,13 +75,34 @@
     "recent7Days": "۷ روز اخیر",
     "earlier": "قدیمی‌تر",
     "projectsSection": "پروژه‌ها",
-    "conversationsSection": "مکالمات",
+    "conversationsSection": "چت‌ها",
     "removeProjectTitle": "حذف پروژه",
     "removeProject": "حذف پروژه",
-    "removeProjectConfirm": "پروژه «{{name}}» حذف شود؟ {{count}} مکالمه مرتبط نیز حذف خواهند شد.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "چت جدید در این پروژه",
     "deleting": "در حال حذف...",
-    "reorderPinned": "برای تغییر ترتیب گفتگوی سنجاق‌شده بکشید"
+    "reorderPinned": "برای تغییر ترتیب گفتگوی سنجاق‌شده بکشید",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "جستجوی پیام‌ها",
@@ -304,7 +332,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "خواندن پاسخ دستیار تیم ناموفق بود",
-        "body": "AionUi نتوانست پاسخ دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید؛ اگر تکرار شد، برنامه را ری‌استارت کنید."
+        "body": "WePrompt نتوانست پاسخ دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید؛ اگر تکرار شد، برنامه را ری‌استارت کنید."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "دستیار تیم محلی درخواست را رد کرد",
@@ -312,11 +340,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "دستیار تیم پاسخ غیرمنتظره‌ای برگرداند",
-        "body": "AionUi پاسخ غیرمنتظره‌ای از دستیار تیم محلی دریافت کرد. یک‌بار دوباره تلاش کنید و اگر مشکل ادامه داشت گزارش دهید."
+        "body": "WePrompt پاسخ غیرمنتظره‌ای از دستیار تیم محلی دریافت کرد. یک‌بار دوباره تلاش کنید و اگر مشکل ادامه داشت گزارش دهید."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "خواندن از دستیار تیم محلی ناموفق بود",
-        "body": "AionUi نتوانست پاسخ TCP دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید و اگر ادامه داشت برنامه را ری‌استارت کنید."
+        "body": "WePrompt نتوانست پاسخ TCP دستیار تیم محلی را بخواند. یک‌بار دوباره تلاش کنید و اگر ادامه داشت برنامه را ری‌استارت کنید."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "سرویس تیم هنوز آماده نیست",
@@ -417,6 +445,9 @@
       "vscode": "VS Code",
       "terminal": "ترمینال",
       "explorer": "فایل اکسپلورر"
+    },
+    "projectMenu": {
+      "trigger": "پروژه"
     }
   },
   "minimap": {
@@ -508,7 +539,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "زمینه استفاده‌شده"
+    "contextUsed": "زمینه استفاده‌شده",
+    "contextWindow": "پنجره زمینه",
+    "percentUsed": "{{percent}}٪ استفاده‌شده",
+    "tokenCount": "{{used}} از {{limit}} توکن",
+    "localTokenUsage": "استفاده محلی از توکن‌ها",
+    "today": "امروز",
+    "weekToDate": "از ابتدای هفته",
+    "monthToDate": "از ابتدای ماه",
+    "triggerLabel": "نمایش استفاده از زمینه"
   },
   "skill_generator": {
     "title": "ساخت مهارت/قانون",
@@ -576,5 +615,98 @@
       }
     }
   },
-  "notFound": "مکالمه یافت نشد یا حذف شده است"
+  "notFound": "مکالمه یافت نشد یا حذف شده است",
+  "projectHeader": {
+    "label": "پروژه {{name}}",
+    "eyebrow": "پروژه",
+    "tabs": {
+      "label": "نماهای پروژه",
+      "chat": "گفتگو",
+      "files": "فایل‌ها",
+      "context": "زمینه",
+      "artifacts": "خروجی‌ها"
+    }
+  },
+  "emptyModelReply": "مدل نوبت را بدون تولید پاسخ قابل مشاهده به پایان رساند. درخواست را دوباره ارسال کنید؛ برای خروجی‌های بزرگ، نتیجه را در بخش‌های کوچک‌تر درخواست کنید.",
+  "presentationTemplates": {
+    "title": "قالب‌ها",
+    "buttonTooltip": "قالب‌های ارائه",
+    "slashDescription": "انتخاب قالب ارائه",
+    "importCard": "وارد کردن تم (.md)",
+    "empty": "قالبی موجود نیست",
+    "chipTooltip": "این پیام از قالب استفاده می‌کند",
+    "importSuccess": "قالب وارد شد",
+    "importError": "خطا در وارد کردن: {{error}}",
+    "removeError": "خطا در حذف: {{error}}",
+    "deleteTooltip": "حذف قالب",
+    "deleteConfirm": "این قالب حذف شود؟"
+  },
+  "status": {
+    "waitingApproval": "در انتظار تأیید شما"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "مدیریت، فشرده‌سازی، سنجاق‌کردن یا انتقال زمینهٔ گفتگو",
+      "missingPinText": "پس از /context pin متن موردنظر را وارد کنید",
+      "unexpectedArguments": "این فرمان زمینه آرگومان‌های اضافی دارد",
+      "unsupportedSubcommand": "فرمان زمینه ناشناخته است. از open، compact، pin یا handoff استفاده کنید.",
+      "fallbackComplete": "زمینه با روش جایگزین محلی به‌روزرسانی شد",
+      "compactSuccess": "زمینه به‌روزرسانی شد",
+      "pinSuccess": "زمینه سنجاق و به‌روزرسانی شد",
+      "failed": "فرمان زمینه ناموفق بود"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "در حال به‌روزرسانی با هوش مصنوعی...",
+      "updatedByAi": "به‌روزرسانی‌شده با هوش مصنوعی",
+      "rulesFallback": "به‌روزرسانی‌شده با قواعد جایگزین",
+      "stale": "در انتظار به‌روزرسانی",
+      "failed": "به‌روزرسانی ناموفق بود",
+      "edited": "زمینهٔ ویرایش‌شده",
+      "error": {
+        "invalidModelOutput": "هوش مصنوعی نتیجه‌ای غیرمنتظره برگرداند، بنابراین زمینه به‌روزرسانی نشد.",
+        "providerRequestFailed": "درخواست مدل ناموفق بود. اتصال ارائه‌دهنده را بررسی کرده و دوباره تلاش کنید.",
+        "providerNotFound": "ارائه‌دهنده مدل پیدا نشد. تنظیمات مدل این گفتگو را بررسی کنید.",
+        "interrupted": "به‌روزرسانی زمینه پیش از اتمام قطع شد.",
+        "unknown": "به‌روزرسانی زمینه به‌طور غیرمنتظره ناموفق بود. دوباره تلاش کنید."
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "آرتیفکتی باز نیست",
+    "emptyHint": "فایل‌ها و اسناد تولیدشده اینجا باز می‌شوند."
+  }
 }

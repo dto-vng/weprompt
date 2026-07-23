@@ -13,7 +13,7 @@ import { iconColors } from '@/renderer/styles/colors';
 import { Alert, Message, Tooltip } from '@arco-design/web-react';
 import { Copy } from '@icon-park/react';
 import classNames from 'classnames';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
@@ -51,6 +51,63 @@ import TeammateMessageAvatar from './TeammateMessageAvatar';
 import { useTeammateColor } from '@/renderer/pages/team/identity/TeamIdentityContext';
 
 const CODE_STYLE = { marginTop: 4, marginBlock: 4 };
+const STREAM_REVEAL_INTERVAL_MS = 16;
+const STREAM_REVEAL_MIN_DURATION_MS = 80;
+const STREAM_REVEAL_MAX_DURATION_MS = 280;
+const STREAM_REVEAL_MS_PER_CHARACTER = 4;
+
+const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const useProgressiveText = (text: string, isStreaming: boolean) => {
+  const [displayedText, setDisplayedText] = useState(() => (isStreaming && !prefersReducedMotion() ? '' : text));
+  const displayedTextRef = React.useRef(displayedText);
+  const wasStreamingRef = React.useRef(isStreaming);
+
+  useEffect(() => {
+    const wasStreaming = wasStreamingRef.current;
+    wasStreamingRef.current = isStreaming;
+    const currentText = displayedTextRef.current;
+    const canReveal =
+      !prefersReducedMotion() &&
+      (isStreaming || wasStreaming) &&
+      text.startsWith(currentText) &&
+      currentText.length < text.length;
+
+    if (!canReveal) {
+      if (currentText !== text) {
+        displayedTextRef.current = text;
+        setDisplayedText(text);
+      }
+      return;
+    }
+
+    const additionalCharacterCount = text.length - currentText.length;
+    const duration = Math.min(
+      STREAM_REVEAL_MAX_DURATION_MS,
+      Math.max(STREAM_REVEAL_MIN_DURATION_MS, additionalCharacterCount * STREAM_REVEAL_MS_PER_CHARACTER)
+    );
+    const stepCount = Math.ceil(duration / STREAM_REVEAL_INTERVAL_MS);
+    const charactersPerStep = Math.max(1, Math.ceil(additionalCharacterCount / stepCount));
+    let revealLength = currentText.length;
+
+    const interval = window.setInterval(() => {
+      revealLength = Math.min(text.length, revealLength + charactersPerStep);
+      const nextText = text.slice(0, revealLength);
+      displayedTextRef.current = nextText;
+      setDisplayedText(nextText);
+      if (revealLength === text.length) {
+        window.clearInterval(interval);
+      }
+    }, STREAM_REVEAL_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, [isStreaming, text]);
+
+  return { displayedText, isRevealing: displayedText !== text };
+};
 
 type ParsedFileMarker = {
   text: string;
@@ -144,7 +201,11 @@ const useFormatContent = (content: string) => {
   }, [content]);
 };
 
-const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = ({ message, showCopyRow = true }) => {
+const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isStreaming?: boolean }> = ({
+  message,
+  showCopyRow = true,
+  isStreaming = false,
+}) => {
   const logos = useAgentLogos();
   // Filter think tags from content before rendering
   // 在渲染前过滤 think 标签
@@ -172,6 +233,8 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
     [contentToRender, isUserMessage]
   );
   const { data, json } = useFormatContent(text);
+  const shouldRevealStream = isStreaming && !isUserMessage && !json;
+  const { displayedText, isRevealing } = useProgressiveText(text, shouldRevealStream);
   const shouldRenderPlainText = isUserMessage;
   const conversationContext = useConversationContextSafe();
   const layout = useLayoutContext();
@@ -223,7 +286,14 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
 
   return (
     <>
-      <div className={classNames('min-w-0 flex flex-col group', isUserMessage ? 'items-end' : 'items-start')}>
+      <div
+        className={classNames(
+          'flex flex-col group',
+          // User column sizes to content up to 85% (no min-w-0, which would let the
+          // flex item collapse to min-content and wrap short text prematurely).
+          isUserMessage ? 'items-end max-w-[85%] ml-auto' : 'min-w-0 items-start'
+        )}
+      >
         {cronMeta && <MessageCronBadge meta={cronMeta} />}
         {isTeammateMessage && senderName && (
           <div className='flex items-center gap-6px mb-4px'>
@@ -257,12 +327,14 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
         )}
         <div
           className={classNames('min-w-0 [&>p:first-child]:mt-0px [&>p:last-child]:mb-0px', {
-            'bg-aou-2 p-6px md:p-8px': isUserMessage || cronMeta,
+            // User messages get a subtle warm bubble; cron/teammate keep their box.
+            'bg-message-user p-8px md:px-12px md:py-8px': isUserMessage && !cronMeta,
+            'bg-aou-2 p-6px md:p-8px': cronMeta,
             'bg-3 p-6px md:p-8px': isTeammateMessage,
             'w-full': !(isUserMessage || cronMeta || isTeammateMessage),
           })}
           style={{
-            ...(isUserMessage || cronMeta
+            ...(cronMeta
               ? { borderRadius: '8px 0 8px 8px', color: 'var(--text-primary)' }
               : isTeammateMessage
                 ? {
@@ -270,6 +342,9 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
                     ...(teammateColor ? { borderLeft: `3px solid ${teammateColor}` } : {}),
                   }
                 : undefined),
+            ...(isUserMessage && !cronMeta
+              ? { borderRadius: '12px 2px 12px 12px', color: 'var(--text-primary)' }
+              : undefined),
           }}
         >
           {/* JSON 内容使用折叠组件 Use CollapsibleContent for JSON content */}
@@ -289,7 +364,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean }> = 
           ) : (
             <div data-testid='message-text-content'>
               <MarkdownView codeStyle={CODE_STYLE} onLocalFileLink={handleLocalFileLink}>
-                {data}
+                {shouldRevealStream || isRevealing ? displayedText : data}
               </MarkdownView>
             </div>
           )}

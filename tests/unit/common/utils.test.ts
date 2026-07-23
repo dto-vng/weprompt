@@ -158,8 +158,9 @@ describe('utils', () => {
       expect(resolveLocaleKey('de-DE')).toBe('de-DE');
       expect(resolveLocaleKey('es')).toBe('es-ES');
       expect(resolveLocaleKey('es-ES')).toBe('es-ES');
-      expect(resolveLocaleKey('fr')).toBe('fr-FR');
-      expect(resolveLocaleKey('fr-FR')).toBe('fr-FR');
+      // fr-FR is not shipped in this fork; French inputs fall back to the default.
+      expect(resolveLocaleKey('fr')).toBe('en-US');
+      expect(resolveLocaleKey('fr-FR')).toBe('en-US');
       expect(resolveLocaleKey('fa')).toBe('fa-IR');
       expect(resolveLocaleKey('fa-IR')).toBe('fa-IR');
     });
@@ -179,7 +180,6 @@ describe('utils', () => {
       expect(resolveLocaleKey('UK')).toBe('uk-UA');
       expect(resolveLocaleKey('PT')).toBe('pt-BR');
       expect(resolveLocaleKey('ES')).toBe('es-ES');
-      expect(resolveLocaleKey('FR')).toBe('fr-FR');
       expect(resolveLocaleKey('FA')).toBe('fa-IR');
     });
 

@@ -431,6 +431,9 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          # Built-in provider/tool keys (injected at build time via vite define)
+          FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
+          FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
           # CI flag & GitHub token / CI 标识与 GitHub Token
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -524,6 +527,9 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          # Built-in provider/tool keys (injected at build time via vite define)
+          FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
+          FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -555,6 +561,9 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          # Built-in provider/tool keys (injected at build time via vite define)
+          FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
+          FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

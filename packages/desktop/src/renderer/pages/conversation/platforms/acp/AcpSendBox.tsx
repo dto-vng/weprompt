@@ -4,6 +4,7 @@ import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { isSideQuestionSupported } from '@/common/chat/sideQuestion';
 import { parseError, uuid } from '@/common/utils';
 import AgentModeSelector from '@/renderer/components/agent/AgentModeSelector';
+import ContextUsageIndicator from '@/renderer/components/agent/ContextUsageIndicator';
 import CommandQueuePanel from '@/renderer/components/chat/CommandQueuePanel';
 import MobileActionSheet, {
   type MobileActionSheetEntry,
@@ -12,6 +13,11 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -23,6 +29,7 @@ import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useS
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useAddOrUpdateMessage } from '@/renderer/pages/conversation/Messages/hooks';
 import {
@@ -38,10 +45,11 @@ import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionCon
 import type { TeamSendBoxRuntime } from '@/renderer/pages/team/components/teamSendRuntime';
 import { allSupportedExts } from '@/renderer/services/FileService';
 import { iconColors } from '@/renderer/styles/colors';
+import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { Message, Tag } from '@arco-design/web-react';
+import { Message, Tag, Tooltip } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -107,6 +115,7 @@ const AcpSendBox: React.FC<{
   agent_name?: string;
   workspacePath?: string;
   messageState: UseAcpMessageReturn;
+  modelSelector?: React.ReactNode;
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
 }> = ({
@@ -116,10 +125,21 @@ const AcpSendBox: React.FC<{
   agent_name,
   workspacePath,
   messageState,
+  modelSelector,
   teamSendMessage,
   teamRuntime,
 }) => {
-  const { aiProcessing, setAiProcessing, resetState, hasThinkingMessage, slashCommands } = messageState;
+  const {
+    aiProcessing,
+    setAiProcessing,
+    resetState,
+    tokenUsage,
+    context_limit,
+    hasThinkingMessage,
+    slashCommands,
+    fetchSlashCommands,
+  } = messageState;
+  const localUsage = useLocalTokenUsage();
   const { t } = useTranslation();
   const teamPermission = useTeamPermission();
   // In team mode, all agents show the permission mode selector (members don't propagate)
@@ -127,6 +147,7 @@ const AcpSendBox: React.FC<{
   const isLeaderInTeam = teamPermission && conversation_id === teamPermission.leaderConversationId;
   const { checkAndUpdateTitle } = useAutoTitle();
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates();
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
   const conversationContext = useConversationContextSafe();
@@ -411,6 +432,9 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     emitter.emit('acp.selected.file.clear');
 
+    // ACP ignores `injectSkills` here — agents discover skills themselves.
+    const composed = presentationTemplates.composeSend(message, allFiles);
+
     if (
       shouldEnqueueConversationCommand({
         enabled: true,
@@ -418,11 +442,13 @@ Please check your local CLI tool authentication status`,
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: allFiles });
+      enqueue({ input: composed.input, files: composed.files });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: allFiles });
+    await executeCommand({ input: composed.input, files: composed.files });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
@@ -470,14 +496,16 @@ Please check your local CLI tool authentication status`,
     const modelOptions: MobileActionSheetOption[] = canSwitchModel
       ? (model_info?.available_models ?? []).map((model) => ({
           key: model.id,
-          label: model.label || model.id,
+          label: formatCompactModelName(model.label || model.id),
           description: model.description,
           active: model_info?.current_model_id === model.id,
         }))
       : [];
 
     const currentModelLabel =
-      model_info?.current_model_label || model_info?.current_model_id || t('conversation.welcome.useCliModel');
+      model_info?.current_model_label || model_info?.current_model_id
+        ? formatCompactModelName(model_info?.current_model_label || model_info?.current_model_id || '')
+        : t('conversation.welcome.useCliModel');
     const currentModeLabel =
       modeOptions.find((opt) => opt.active)?.label ?? t('agentMode.default', { defaultValue: 'Default' });
 
@@ -704,14 +732,18 @@ Please check your local CLI tool authentication status`,
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
+            {modelSelector}
             {showModeSelector && (
               <AgentModeSelector
                 backend={backend}
@@ -719,19 +751,37 @@ Please check your local CLI tool authentication status`,
                 compact
                 initialMode={session_mode}
                 compactLeadingIcon={<Shield theme='outline' size='14' fill={iconColors.secondary} />}
-                modeLabelFormatter={(mode) => t(`agentMode.${mode.value}`, { defaultValue: mode.label })}
-                compactLabelPrefix={t('agentMode.permission')}
-                hideCompactLabelPrefixOnMobile
+                modeLabelFormatter={(mode) =>
+                  mode.value === 'auto_edit'
+                    ? t('agentMode.auto')
+                    : mode.value === 'yolo'
+                      ? t('agentMode.full-access')
+                      : t(`agentMode.${mode.value}`, { defaultValue: mode.label })
+                }
                 onModeChanged={isLeaderInTeam ? teamPermission?.propagateMode : undefined}
                 beforeRuntimeSync={prepareRuntimeConfig}
                 beforeRuntimeSet={teamPermission?.warmupSession}
                 loadConfigOptions={teamPermission?.loadConfigOptions}
               />
             )}
+            <ContextUsageIndicator
+              tokenUsage={tokenUsage}
+              context_limit={context_limit > 0 ? context_limit : undefined}
+              localUsage={localUsage}
+            />
           </div>
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
+                  <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
+                    {presentationTemplates.selectedTemplate.manifest.name}
+                  </Tag>
+                </Tooltip>
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -774,6 +824,19 @@ Please check your local CLI tool authentication status`,
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         allowSendWhileLoading
         compactActions={false}
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       ></SendBox>
       {isMobile && (
         <>

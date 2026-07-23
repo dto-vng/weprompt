@@ -1,7 +1,7 @@
 import { ipcBridge } from '@/common';
 import type { Assistant } from '@/common/types/agent/assistantTypes';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
-import { Button, Checkbox, Message, Modal } from '@arco-design/web-react';
+import { Button, Checkbox, Message, Modal, Tooltip } from '@arco-design/web-react';
 import { Delete, Help, Lightning, Puzzle } from '@icon-park/react';
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -695,9 +695,12 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
         {icon}
         <span className='text-14px font-bold text-t-primary'>{title}</span>
         {hint ? (
-          <span className='inline-flex shrink-0' title={typeof hint === 'string' ? hint : undefined}>
-            <Help theme='outline' size={14} className='text-t-tertiary hover:text-t-secondary cursor-help shrink-0' />
-          </span>
+          <Tooltip content={hint}>
+            {/* Arco Tooltip needs a ref-forwarding child; icon-park icons don't forward refs. */}
+            <span className='inline-flex items-center cursor-help shrink-0'>
+              <Help theme='outline' size={14} className='text-t-tertiary hover:text-t-secondary' />
+            </span>
+          </Tooltip>
         ) : null}
         <span className={`text-12px px-10px py-2px rd-[100px] font-medium ${countClass}`}>{count}</span>
       </div>
@@ -894,7 +897,7 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
       <div data-testid='official-skills-section'>
         <p className='m-0 mb-12px text-12px leading-relaxed text-t-tertiary'>
           {t('settings.skillsHub.officialHint', {
-            defaultValue: 'Built-in skills maintained by AionUi — read-only and updated with each release.',
+            defaultValue: 'Built-in skills maintained by WePrompt — read-only and updated with each release.',
           })}
         </p>
         {officialSkills.length > 0 ? (

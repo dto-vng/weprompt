@@ -6,21 +6,30 @@
 
 import React, { type PropsWithChildren } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IMessageAcpToolCall, IMessageText, IMessageToolGroup, TMessage } from '@/common/chat/chatLib';
-import type { MessageFileChangesProps } from '@/renderer/pages/conversation/Messages/MessageFileChanges';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { IMessageAcpToolCall, IMessageText, TMessage } from '@/common/chat/chatLib';
+import type { MessagePaginationState } from '@/renderer/pages/conversation/Messages/hooks';
 import {
   MessageListLoadingProvider,
   MessageListProvider,
   MessagePaginationProvider,
-  useUpdateMessageList,
 } from '@/renderer/pages/conversation/Messages/hooks';
 import MessageList from '@/renderer/pages/conversation/Messages/MessageList';
+import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Messages/types';
+import { CHAT_MESSAGE_JUMP_EVENT } from '@/renderer/utils/chat/chatMinimapEvents';
 
-const { parseDiffMock, useTeamPermissionMock } = vi.hoisted(() => ({
-  parseDiffMock: vi.fn(),
+const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissionMock } = vi.hoisted(() => ({
+  scrollElementIntoViewMock: vi.fn(),
+  useConversationArtifactsMock: vi.fn(),
   useTeamPermissionMock: vi.fn(),
 }));
+const workSummaryMessagesMock = vi.hoisted(() => vi.fn());
+const loadConversationMessagePageMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/renderer/utils/chat/messagePagination', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/renderer/utils/chat/messagePagination')>();
+  return { ...actual, loadConversationMessagePage: loadConversationMessagePageMock };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -59,7 +68,7 @@ vi.mock('@/renderer/hooks/file/useAutoPreviewOfficeFiles', () => ({
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/artifacts', () => ({
-  useConversationArtifacts: () => [],
+  useConversationArtifacts: useConversationArtifactsMock,
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/useAutoScroll', () => ({
@@ -71,7 +80,7 @@ vi.mock('@/renderer/pages/conversation/Messages/useAutoScroll', () => ({
     handlePointerDown: () => {},
     showScrollButton: false,
     scrollToBottom: () => {},
-    scrollElementIntoView: () => {},
+    scrollElementIntoView: scrollElementIntoViewMock,
     hideScrollButton: () => {},
   }),
 }));
@@ -93,11 +102,7 @@ vi.mock('@/renderer/pages/conversation/Messages/components/MessageToolCall', () 
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/components/MessageToolGroup', () => ({
-  default: ({ message }: { message: IMessageToolGroup }) => (
-    <div data-testid='tool-group' data-message-id={message.id}>
-      tool_group
-    </div>
-  ),
+  default: () => <div>tool_group</div>,
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/components/MessageAgentStatus', () => ({
@@ -113,15 +118,7 @@ vi.mock('@/renderer/pages/conversation/Messages/acp/MessageAcpPermission', () =>
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/acp/MessageAcpToolCall', () => ({
-  default: ({ message }: { message: IMessageAcpToolCall }) => (
-    <div
-      data-testid='acp-tool-call'
-      data-message-id={message.id}
-      data-diff-count={message.content.update.content?.filter((item) => item.type === 'diff').length ?? 0}
-    >
-      acp_tool_call
-    </div>
-  ),
+  default: () => <div>acp_tool_call</div>,
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/components/MessagePlan', () => ({
@@ -141,19 +138,28 @@ vi.mock('@/renderer/pages/conversation/Messages/components/MessageSkillSuggest',
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/components/MessageToolGroupSummary', () => ({
-  default: ({ messages }: { messages: Array<IMessageToolGroup | IMessageAcpToolCall> }) => (
-    <div data-testid='tool-summary'>{messages.map((message) => message.id).join(',')}</div>
+  default: ({ messages, isActive }: { messages: WorkJournalSourceMessage[]; isActive: boolean }) => {
+    workSummaryMessagesMock(messages);
+    return (
+      <div data-testid='work-summary' data-active={String(isActive)}>
+        {messages.map((message) => message.type).join(',')}
+      </div>
+    );
+  },
+}));
+
+vi.mock('@/renderer/pages/conversation/Messages/components/toolActivity/ToolActivityError', () => ({
+  default: ({ step }: { step: { key: string } }) => (
+    <div data-testid='tool-activity-error' data-tool-key={step.key}>
+      tool error
+    </div>
   ),
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/MessageFileChanges', () => ({
   __esModule: true,
-  default: ({ diffsChanges }: MessageFileChangesProps) => (
-    <div data-testid='file-changes' data-file-count={diffsChanges?.length ?? 0}>
-      file_changes
-    </div>
-  ),
-  parseDiff: parseDiffMock,
+  default: () => <div>file_changes</div>,
+  parseDiff: vi.fn(),
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/components/SelectionReplyButton', () => ({
@@ -178,94 +184,33 @@ function createTextMessage(): IMessageText {
   };
 }
 
-type AcpToolCallOptions = {
-  id?: string;
-  status?: IMessageAcpToolCall['content']['update']['status'];
-  content?: IMessageAcpToolCall['content']['update']['content'];
-  truncated?: boolean;
-};
-
-function createAcpToolCall({
-  id = 'acp-edit-1',
-  status = 'completed',
-  content,
-  truncated = false,
-}: AcpToolCallOptions = {}): IMessageAcpToolCall {
-  return {
-    id,
-    msg_id: id,
-    conversation_id: 'conversation-1',
-    type: 'acp_tool_call',
-    position: 'left',
-    content: {
-      session_id: 'session-1',
-      ...(truncated
-        ? {
-            _compact: {
-              truncated: true,
-              original_size: 90000,
-              preview_chars: 4096,
-            },
-          }
-        : {}),
-      update: {
-        sessionUpdate: 'tool_call_update',
-        tool_call_id: id,
-        status,
-        title: 'Edit file',
-        kind: 'edit',
-        content,
-      },
-    },
-    created_at: 2,
-  } as IMessageAcpToolCall;
-}
-
-function createToolGroup(content: IMessageToolGroup['content'], id = 'tool-group-1'): IMessageToolGroup {
-  return {
-    id,
-    msg_id: id,
-    conversation_id: 'conversation-1',
-    type: 'tool_group',
-    position: 'left',
-    content,
-    created_at: 2,
-  };
-}
-
 function Wrapper({
   children,
   messages = [createTextMessage()],
   loading = false,
-}: PropsWithChildren<{ messages?: TMessage[]; loading?: boolean }>): JSX.Element {
+  pagination = { hasMoreBefore: false, hasMoreAfter: false, isLoadingBefore: false, isLoadingAnchor: false },
+}: PropsWithChildren<{ messages?: TMessage[]; loading?: boolean; pagination?: MessagePaginationState }>): JSX.Element {
   return (
     <MessageListLoadingProvider value={loading}>
-      <MessagePaginationProvider
-        value={{ hasMoreBefore: false, hasMoreAfter: false, isLoadingBefore: false, isLoadingAnchor: false }}
-      >
+      <MessagePaginationProvider value={pagination}>
         <MessageListProvider value={messages}>{children}</MessageListProvider>
       </MessagePaginationProvider>
     </MessageListLoadingProvider>
   );
 }
 
-function ReplaceMessagesButton({ messages }: { messages: TMessage[] }): JSX.Element {
-  const updateMessages = useUpdateMessageList();
-  return <button onClick={() => updateMessages(messages)}>replace messages</button>;
-}
-
 describe('MessageList', () => {
   beforeEach(() => {
     mockIsProcessing = false;
-    parseDiffMock.mockReset();
-    parseDiffMock.mockReturnValue({
-      file_name: 'file.ts',
-      fullPath: '/workspace/file.ts',
-      insertions: 1,
-      deletions: 1,
-      diff: 'diff',
-    });
+    scrollElementIntoViewMock.mockReset();
+    useConversationArtifactsMock.mockReturnValue([]);
     useTeamPermissionMock.mockReturnValue(null);
+    workSummaryMessagesMock.mockReset();
+    loadConversationMessagePageMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('renders message rows with external margin spacing in the plain scroll list', () => {
@@ -359,12 +304,702 @@ describe('MessageList', () => {
     expect(screen.getByTestId('msgtext-text-b').getAttribute('data-copy-row')).toBe('false');
   });
 
+  it('does not create a tool summary row for token watermark telemetry', () => {
+    const messages = [
+      {
+        id: 'token-watermark-1',
+        conversation_id: 'conversation-1',
+        type: 'acp_tool_call',
+        content: {
+          sessionId: 'session-1',
+          update: {
+            sessionUpdate: 'tool_call_update',
+            tool_call_id: 'token-watermark-1',
+            status: 'completed',
+            title: 'Token watermark override: provider=0, local_estimate=12520, using=12520',
+            kind: 'info',
+          },
+        },
+        created_at: 1,
+      } satisfies IMessageAcpToolCall,
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.queryByTestId('work-summary')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Token watermark override/)).not.toBeInTheDocument();
+  });
+
+  it('groups plan, thinking, and tool messages into one renderer-only work summary', () => {
+    const messages = [
+      {
+        id: 'plan-1',
+        type: 'plan',
+        position: 'left',
+        content: { session_id: 's1', entries: [{ content: 'Review the activity flow', status: 'completed' }] },
+        created_at: 1,
+      },
+      {
+        id: 'thinking-1',
+        type: 'thinking',
+        position: 'left',
+        content: { content: 'private detail', subject: 'Reviewing the activity flow', status: 'done' },
+        created_at: 2,
+      },
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 3,
+      },
+      {
+        id: 'tool-2',
+        type: 'acp_tool_call',
+        position: 'left',
+        content: {
+          sessionId: 'session-1',
+          update: {
+            sessionUpdate: 'tool_call_update',
+            tool_call_id: 'call-2',
+            status: 'completed',
+            title: 'Search',
+            kind: 'search',
+          },
+        },
+        created_at: 4,
+      },
+      { id: 'answer-1', type: 'text', position: 'left', content: { content: 'Finished' }, created_at: 5 },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveTextContent(/^plan,thinking,tool_call,acp_tool_call$/);
+    expect(screen.queryByText(/^plan$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^thinking$/)).not.toBeInTheDocument();
+    expect(screen.getByText('Finished')).toBeInTheDocument();
+  });
+
+  it('groups one turn of work across visible assistant narration at the latest work position', () => {
+    const messages = [
+      { id: 'user-1', type: 'text', position: 'right', content: { content: 'Please investigate' }, created_at: 1 },
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 2,
+      },
+      { id: 'narration-1', type: 'text', position: 'left', content: { content: 'I found the cause.' }, created_at: 3 },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'completed' },
+        created_at: 4,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaries = screen.getAllByTestId('work-summary');
+    expect(summaries).toHaveLength(1);
+    expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'tool-1' }), expect.objectContaining({ id: 'tool-2' })])
+    );
+    expect(screen.getByText('I found the cause.').compareDocumentPosition(summaries[0])).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+
+  it('starts a new work summary when a second visible user message starts another turn', () => {
+    const messages = [
+      { id: 'user-1', type: 'text', position: 'right', content: { content: 'First request' }, created_at: 1 },
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 2,
+      },
+      { id: 'narration-1', type: 'text', position: 'left', content: { content: 'First update' }, created_at: 3 },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'completed' },
+        created_at: 4,
+      },
+      { id: 'user-2', type: 'text', position: 'right', content: { content: 'Second request' }, created_at: 5 },
+      {
+        id: 'tool-3',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-3', name: 'Search', status: 'completed' },
+        created_at: 6,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaries = screen.getAllByTestId('work-summary');
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toHaveTextContent('tool_call,tool_call');
+    expect(summaries[1]).toHaveTextContent('tool_call');
+  });
+
+  it('keeps file summaries and artifacts independent from a turn work summary', () => {
+    useConversationArtifactsMock.mockReturnValue([
+      { id: 'artifact-1', kind: 'skill_suggest', status: 'pending', created_at: 6 },
+    ]);
+    const messages = [
+      { id: 'user-1', type: 'text', position: 'right', content: { content: 'Please update it' }, created_at: 1 },
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 2,
+      },
+      {
+        id: 'file-1',
+        type: 'tool_group',
+        position: 'left',
+        content: [
+          {
+            name: 'WriteFile',
+            result_display: { file_diff: '@@ -1 +1 @@', file_name: 'notes.txt' },
+          },
+        ],
+        created_at: 3,
+      },
+      { id: 'narration-1', type: 'text', position: 'left', content: { content: 'Saved the change.' }, created_at: 4 },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Verify', status: 'completed' },
+        created_at: 5,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getAllByTestId('work-summary')).toHaveLength(1);
+    expect(screen.getByTestId('work-summary')).toHaveTextContent('tool_call,tool_call');
+    expect(screen.getByText('file_changes')).toBeInTheDocument();
+    expect(screen.getByTestId('conversation-artifact-skill_suggest')).toBeInTheDocument();
+  });
+
+  it('marks the turn work summary active while processing', () => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      { id: 'answer-1', type: 'text', position: 'left', content: { content: 'First result' }, created_at: 2 },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'in_progress' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaries = screen.getAllByTestId('work-summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toHaveAttribute('data-active', 'true');
+  });
+
+  it('settles a trailing work summary when processing stops', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'false');
+  });
+
+  it('keeps the latest work summary active after nonterminal assistant narration', () => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      {
+        id: 'narration-1',
+        type: 'text',
+        position: 'left',
+        status: 'pending',
+        content: { content: 'I found the relevant files.' },
+        created_at: 2,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'true');
+  });
+
+  it('settles the latest work summary after a terminal assistant answer', () => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      {
+        id: 'answer-1',
+        type: 'text',
+        position: 'left',
+        status: 'finish',
+        content: { content: 'Finished' },
+        created_at: 2,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'false');
+  });
+
+  it.each([
+    ['a permission prompt', { id: 'permission-1', type: 'permission', position: 'left', content: {}, created_at: 2 }],
+    [
+      'an error tip',
+      { id: 'tips-1', type: 'tips', position: 'left', content: { content: 'Try again' }, created_at: 2 },
+    ],
+  ])('keeps the latest work summary active when followed by %s in the same turn', (_label, trailingMessage) => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      trailingMessage,
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'true');
+  });
+
+  it('keeps the latest work summary active when followed by a file summary in the same turn', () => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      {
+        id: 'file-change-1',
+        type: 'tool_group',
+        position: 'left',
+        content: [
+          {
+            call_id: 'write-1',
+            name: 'WriteFile',
+            status: 'Success',
+            result_display: { file_diff: 'diff --git a/file.txt b/file.txt', file_name: 'file.txt' },
+          },
+        ],
+        created_at: 2,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByText('file_changes')).toBeInTheDocument();
+  });
+
+  it('does not carry an active work summary across the next user message', () => {
+    mockIsProcessing = true;
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'in_progress' },
+        created_at: 1,
+      },
+      { id: 'user-1', type: 'text', position: 'right', content: { content: 'One more thing' }, created_at: 2 },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getByTestId('work-summary')).toHaveAttribute('data-active', 'false');
+  });
+
+  it('jumps a later work-summary source to the summary anchor', () => {
+    const messages = [
+      {
+        id: 'plan-1',
+        type: 'plan',
+        position: 'left',
+        content: { session_id: 's1', entries: [{ content: 'Review the activity flow', status: 'completed' }] },
+        created_at: 1,
+      },
+      {
+        id: 'thinking-1',
+        type: 'thinking',
+        position: 'left',
+        content: { content: 'private detail', subject: 'Reviewing the activity flow', status: 'done' },
+        created_at: 2,
+      },
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaryAnchor = document.getElementById('message-plan-1');
+    for (const messageId of ['plan-1', 'thinking-1', 'tool-1']) {
+      window.dispatchEvent(
+        new CustomEvent(CHAT_MESSAGE_JUMP_EVENT, {
+          detail: { conversation_id: 'conversation-1', messageId },
+        })
+      );
+    }
+
+    expect(scrollElementIntoViewMock).toHaveBeenCalledTimes(3);
+    expect(scrollElementIntoViewMock).toHaveBeenNthCalledWith(1, summaryAnchor, {
+      block: 'start',
+      behavior: 'smooth',
+    });
+    expect(scrollElementIntoViewMock).toHaveBeenNthCalledWith(2, summaryAnchor, {
+      block: 'start',
+      behavior: 'smooth',
+    });
+    expect(scrollElementIntoViewMock).toHaveBeenNthCalledWith(3, summaryAnchor, {
+      block: 'start',
+      behavior: 'smooth',
+    });
+  });
+
+  it('keeps a permission visible between work messages in the same turn', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 1,
+      },
+      { id: 'permission-1', type: 'permission', position: 'left', content: {}, created_at: 2 },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'completed' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaries = screen.getAllByTestId('work-summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toHaveTextContent('tool_call,tool_call');
+    expect(screen.getByText('permission').compareDocumentPosition(summaries[0])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps a terminal tool error at its source position before permission and later work', () => {
+    const messages = [
+      {
+        id: 'tool-error-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-error-1', name: 'Read', status: 'error', error: 'Access denied' },
+        created_at: 1,
+      },
+      { id: 'permission-1', type: 'permission', position: 'left', content: {}, created_at: 2 },
+      {
+        id: 'tool-success-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-success-1', name: 'Write', status: 'completed', output: 'Saved' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const error = screen.getByTestId('tool-activity-error');
+    const permission = screen.getByText('permission');
+    const summary = screen.getByTestId('work-summary');
+    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(1);
+    expect(error).toHaveAttribute('data-tool-key', 'call-error-1');
+    expect(error.compareDocumentPosition(permission)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(permission.compareDocumentPosition(summary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'tool-error-1' }),
+        expect.objectContaining({ id: 'tool-success-1' }),
+      ])
+    );
+  });
+
+  it('keeps visible tools in one work summary across a hidden diagnostic', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 1,
+      },
+      {
+        id: 'diagnostic-1',
+        type: 'tool_call',
+        position: 'left',
+        hidden: true,
+        content: {
+          call_id: 'diagnostic-1',
+          name: 'Token watermark override: provider=0, local_estimate=12520, using=12520',
+          status: 'completed',
+        },
+        created_at: 2,
+      },
+      {
+        id: 'tool-2',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'completed' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    expect(screen.getAllByTestId('work-summary')).toHaveLength(1);
+    expect(screen.getByTestId('work-summary')).toHaveTextContent('tool_call,tool_call');
+  });
+
+  it('splits work summaries at a hidden renderer history gap', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        conversation_id: 'conversation-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Read', status: 'completed' },
+        created_at: 1,
+      },
+      {
+        id: 'renderer-history-gap:conversation-1',
+        conversation_id: 'conversation-1',
+        type: 'tips',
+        position: 'center',
+        hidden: true,
+        content: { content: '', type: 'info', code: '__aionui_renderer_history_gap__' },
+        created_at: 2,
+      },
+      {
+        id: 'tool-2',
+        conversation_id: 'conversation-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-2', name: 'Write', status: 'completed' },
+        created_at: 3,
+      },
+    ] as unknown as TMessage[];
+
+    render(<MessageList />, {
+      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
+    });
+
+    const summaries = screen.getAllByTestId('work-summary');
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toHaveTextContent('tool_call');
+    expect(summaries[1]).toHaveTextContent('tool_call');
+    expect(screen.queryByText('tips')).not.toBeInTheDocument();
+  });
+
   it('renders the empty slot when there are no messages', () => {
     render(<MessageList emptySlot={<div>empty state</div>} />, {
       wrapper: ({ children }) => <Wrapper messages={[]}>{children}</Wrapper>,
     });
 
     expect(screen.getByText('empty state')).toBeInTheDocument();
+  });
+
+  describe('earlier-history loading for short pages', () => {
+    // Reproduces the reopened-conversation bug: the newest 50-message page can be
+    // a single long tool-only turn that collapses into one short work-summary
+    // card, so the scroller never overflows and scroll events (the only
+    // load-more trigger) can never fire — the older history became unreachable.
+    const toolOnlyPageMessages = [
+      {
+        id: 'tool-1',
+        conversation_id: 'conversation-1',
+        type: 'tool_call',
+        position: 'left',
+        content: { call_id: 'call-1', name: 'Write', status: 'completed' },
+        created_at: 10,
+      },
+    ] as unknown as TMessage[];
+
+    const paginationWithHistory: MessagePaginationState = {
+      oldestCursor: 'cursor-1',
+      newestCursor: 'cursor-2',
+      hasMoreBefore: true,
+      hasMoreAfter: false,
+      isLoadingBefore: false,
+      isLoadingAnchor: false,
+    };
+
+    const olderHistoryPage = {
+      items: [
+        {
+          id: 'older-user-1',
+          conversation_id: 'conversation-1',
+          type: 'text',
+          position: 'right',
+          content: { content: 'older user question' },
+          created_at: 1,
+        },
+      ],
+      oldest_cursor: 'cursor-0',
+      newest_cursor: 'cursor-1',
+      has_more_before: false,
+      has_more_after: false,
+    };
+
+    const stubScrollerOverflow = (scrollHeight: number, clientHeight: number) => {
+      const scrollHeightSpy = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(scrollHeight);
+      const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(clientHeight);
+      return () => {
+        scrollHeightSpy.mockRestore();
+        clientHeightSpy.mockRestore();
+      };
+    };
+
+    it('auto-loads earlier pages until the viewport can scroll when the newest page is too short', async () => {
+      loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+      render(<MessageList />, {
+        wrapper: ({ children }) => (
+          <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+            {children}
+          </Wrapper>
+        ),
+      });
+
+      expect(await screen.findByTestId('msgtext-older-user-1')).toHaveTextContent('older user question');
+      expect(loadConversationMessagePageMock).toHaveBeenCalledWith(
+        'conversation-1',
+        expect.objectContaining({ before: 'cursor-1' })
+      );
+    });
+
+    it('does not auto-load earlier pages when the content already overflows the scroller', () => {
+      const restoreOverflow = stubScrollerOverflow(2000, 500);
+      try {
+        loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+        render(<MessageList />, {
+          wrapper: ({ children }) => (
+            <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+              {children}
+            </Wrapper>
+          ),
+        });
+
+        expect(loadConversationMessagePageMock).not.toHaveBeenCalled();
+      } finally {
+        restoreOverflow();
+      }
+    });
+
+    it('loads earlier pages when the user wheels up near the top of an overflowing list', async () => {
+      const restoreOverflow = stubScrollerOverflow(2000, 500);
+      try {
+        loadConversationMessagePageMock.mockResolvedValue(olderHistoryPage);
+
+        render(<MessageList />, {
+          wrapper: ({ children }) => (
+            <Wrapper messages={toolOnlyPageMessages} pagination={paginationWithHistory}>
+              {children}
+            </Wrapper>
+          ),
+        });
+
+        fireEvent.wheel(screen.getByTestId('message-list-scroller'), { deltaY: -40 });
+
+        expect(await screen.findByTestId('msgtext-older-user-1')).toHaveTextContent('older user question');
+      } finally {
+        restoreOverflow();
+      }
+    });
   });
 
   it('renders a skeleton while the initial message batch is loading', () => {
@@ -378,228 +1013,5 @@ describe('MessageList', () => {
 
     expect(screen.getByTestId('message-list-skeleton')).toBeInTheDocument();
     expect(screen.queryByText('empty state')).not.toBeInTheDocument();
-  });
-
-  it('renders complete ACP diffs through the specialized file-change message', () => {
-    const message = createAcpToolCall({
-      content: [
-        { type: 'content', content: { type: 'text', text: 'updated both files' } },
-        { type: 'diff', path: '/workspace/a.ts', old_text: 'old a', new_text: 'new a' },
-        { type: 'diff', path: '/workspace/b.ts', old_text: 'old b', new_text: 'new b' },
-      ],
-    });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('acp-tool-call')).toHaveAttribute('data-diff-count', '2');
-    expect(screen.queryByTestId('tool-summary')).not.toBeInTheDocument();
-  });
-
-  it('renders a newly created file when only new text is present', () => {
-    const message = createAcpToolCall({
-      content: [{ type: 'diff', path: '/workspace/new-file.ts', new_text: 'export const created = true;' }],
-    });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('acp-tool-call')).toHaveAttribute('data-diff-count', '1');
-    expect(screen.queryByTestId('tool-summary')).not.toBeInTheDocument();
-  });
-
-  it('keeps ACP calls without diffs in View Steps', () => {
-    const message = createAcpToolCall({
-      id: 'acp-read-1',
-      content: [{ type: 'content', content: { type: 'text', text: 'file contents' } }],
-    });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent('acp-read-1');
-    expect(screen.queryByTestId('acp-tool-call')).not.toBeInTheDocument();
-  });
-
-  it('keeps malformed ACP diffs in View Steps instead of showing misleading stats', () => {
-    const message = createAcpToolCall({
-      content: [
-        { type: 'diff', path: '/workspace/valid.ts', old_text: 'old', new_text: 'new' },
-        null,
-        { type: 'diff', new_text: 'missing path' },
-      ] as unknown as IMessageAcpToolCall['content']['update']['content'],
-    });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent(message.id);
-    expect(screen.queryByTestId('acp-tool-call')).not.toBeInTheDocument();
-  });
-
-  it('keeps an ACP message without an update in View Steps', () => {
-    const message = {
-      ...createAcpToolCall({ id: 'acp-missing-update' }),
-      content: { session_id: 'session-1' },
-    } as unknown as IMessageAcpToolCall;
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent(message.id);
-    expect(screen.queryByTestId('acp-tool-call')).not.toBeInTheDocument();
-  });
-
-  it('keeps truncated ACP diffs in View Steps instead of calculating stats from the preview', () => {
-    const message = createAcpToolCall({
-      truncated: true,
-      content: [{ type: 'diff', path: '/workspace/file.ts', old_text: 'partial old', new_text: 'partial new' }],
-    });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent(message.id);
-    expect(screen.queryByTestId('acp-tool-call')).not.toBeInTheDocument();
-  });
-
-  it('switches a running tool from View Steps when its completed update adds a diff', () => {
-    const runningMessage = createAcpToolCall({ status: 'in_progress' });
-    const completedMessage = createAcpToolCall({
-      content: [{ type: 'diff', path: '/workspace/file.ts', old_text: 'old', new_text: 'new' }],
-    });
-    render(
-      <Wrapper messages={[runningMessage]}>
-        <MessageList />
-        <ReplaceMessagesButton messages={[completedMessage]} />
-      </Wrapper>
-    );
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent(runningMessage.id);
-
-    fireEvent.click(screen.getByText('replace messages'));
-
-    expect(screen.getByTestId('acp-tool-call')).toHaveAttribute('data-message-id', completedMessage.id);
-    expect(screen.queryByTestId('tool-summary')).not.toBeInTheDocument();
-  });
-
-  it('preserves surrounding tool summaries when an ACP edit contains multiple diffs', () => {
-    const readMessage = createAcpToolCall({ id: 'acp-read-1' });
-    const editMessage = createAcpToolCall({
-      id: 'acp-edit-1',
-      content: [
-        { type: 'diff', path: '/workspace/a.ts', old_text: 'old a', new_text: 'new a' },
-        { type: 'diff', path: '/workspace/b.ts', old_text: 'old b', new_text: 'new b' },
-      ],
-    });
-    const executeMessage = createAcpToolCall({ id: 'acp-execute-1' });
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[readMessage, editMessage, executeMessage]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('acp-tool-call')).toHaveAttribute('data-diff-count', '2');
-    expect(screen.getAllByTestId('tool-summary')).toHaveLength(2);
-    expect(screen.getAllByTestId('tool-summary').map((item) => item.textContent)).toEqual([
-      'acp-read-1',
-      'acp-execute-1',
-    ]);
-  });
-
-  it('preserves the legacy single WriteFile summary path', () => {
-    const message = createToolGroup([
-      {
-        call_id: 'write-1',
-        description: 'Write file',
-        name: 'WriteFile',
-        render_output_as_markdown: false,
-        result_display: {
-          file_diff: 'diff --git a/file.ts b/file.ts\n-old\n+new',
-          file_name: '/workspace/file.ts',
-        },
-        status: 'Success',
-      },
-    ]);
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('file-changes')).toHaveAttribute('data-file-count', '1');
-    expect(parseDiffMock).toHaveBeenCalledWith('diff --git a/file.ts b/file.ts\n-old\n+new', '/workspace/file.ts');
-    expect(screen.queryByTestId('tool-summary')).not.toBeInTheDocument();
-  });
-
-  it('aggregates legacy groups containing only structured WriteFile results', () => {
-    const message = createToolGroup([
-      {
-        call_id: 'write-1',
-        description: 'Write file',
-        name: 'WriteFile',
-        render_output_as_markdown: false,
-        result_display: {
-          file_diff: 'diff --git a/file.ts b/file.ts\n-old\n+new',
-          file_name: '/workspace/file.ts',
-        },
-        status: 'Success',
-      },
-      {
-        call_id: 'write-2',
-        description: 'Write second file',
-        name: 'WriteFile',
-        render_output_as_markdown: false,
-        result_display: {
-          file_diff: 'diff --git a/second.ts b/second.ts\n-old\n+new',
-          file_name: '/workspace/second.ts',
-        },
-        status: 'Success',
-      },
-    ]);
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('file-changes')).toHaveAttribute('data-file-count', '2');
-    expect(parseDiffMock).toHaveBeenCalledTimes(2);
-    expect(screen.queryByTestId('tool-summary')).not.toBeInTheDocument();
-  });
-
-  it('keeps mixed legacy tool groups in View Steps without dropping non-file tools', () => {
-    const message = createToolGroup([
-      {
-        call_id: 'write-1',
-        description: 'Write file',
-        name: 'WriteFile',
-        render_output_as_markdown: false,
-        result_display: {
-          file_diff: 'diff --git a/file.ts b/file.ts\n-old\n+new',
-          file_name: '/workspace/file.ts',
-        },
-        status: 'Success',
-      },
-      {
-        call_id: 'read-1',
-        description: 'Read file',
-        name: 'ReadFile',
-        render_output_as_markdown: false,
-        result_display: 'done',
-        status: 'Success',
-      },
-    ]);
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={[message]}>{children}</Wrapper>,
-    });
-
-    expect(screen.getByTestId('tool-summary')).toHaveTextContent(message.id);
-    expect(screen.queryByTestId('file-changes')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('tool-group')).not.toBeInTheDocument();
   });
 });

@@ -44,5 +44,10 @@
     "label": "Düşünme düzeyi",
     "switchSuccess": "Düşünme düzeyi değiştirildi",
     "switchFailed": "Düşünme düzeyi değiştirilemedi"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

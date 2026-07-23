@@ -120,6 +120,11 @@ IMPORTANT: When user provides multiple images, ALWAYS pass ALL images to the ima
         };
       }
 
+      // Return the saved path as plain text ("Generated image saved to: <path>").
+      // The chat renders the image once, app-side, from this tool output (a
+      // bounded preview with click-to-enlarge and full-resolution download) — so
+      // we deliberately avoid a Markdown image that the model may echo (and even
+      // duplicate) as an extra oversized copy.
       return {
         content: [{ type: 'text' as const, text: result.text }],
       };

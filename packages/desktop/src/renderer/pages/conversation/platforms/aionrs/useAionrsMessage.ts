@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import { isErrorTipMessage, transformMessage } from '@/common/chat/chatLib';
+import { extractDiagnosticTokenEstimate, isErrorTipMessage, transformMessage } from '@/common/chat/chatLib';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import type { TChatConversation, TokenUsageData } from '@/common/config/storage';
 import { uuid } from '@/common/utils';
@@ -14,12 +14,26 @@ import { useMergeLiveMessage } from '@/renderer/pages/conversation/Messages/hook
 import { logStreamTerminalObserved } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { isConversationProcessing } from '@/renderer/pages/conversation/utils/conversationRuntime';
+import { emitter } from '@/renderer/utils/emitter';
+import { recordLocalTokenUsage } from '@/renderer/pages/conversation/utils/localTokenUsage';
+import { isThinkOnlyContent } from '@/renderer/utils/chat/thinkTagFilter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { processLocalCronResponse } from './localCronCommands';
 
 type TokenUsage = {
   input_tokens?: number;
   output_tokens?: number;
+};
+
+const isValidTokenCount = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+const getTipContent = (message: IResponseMessage): unknown => {
+  if (message.type !== 'tips') return null;
+  if (typeof message.data === 'string') return message.data;
+  if (typeof message.data !== 'object' || message.data === null || Array.isArray(message.data)) return null;
+  return (message.data as { content?: unknown }).content;
 };
 
 export const useAionrsMessage = (
@@ -32,6 +46,8 @@ export const useAionrsMessage = (
   const onError = options?.onError;
   const onConfigChanged = options?.onConfigChanged;
   const onConfigChangedRef = useRef(onConfigChanged);
+  const { t } = useTranslation();
+  const tRef = useRef(t);
   const mergeLiveMessage = useMergeLiveMessage();
   const [streamRunning, setStreamRunning] = useState(false);
   const [hasActiveTools, setHasActiveTools] = useState(false);
@@ -42,10 +58,18 @@ export const useAionrsMessage = (
     subject: '',
   });
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
+  const tokenUsageRef = useRef<TokenUsageData | null>(null);
+  const pendingDiagnosticTokenEstimateRef = useRef<number | null>(null);
   // Current active message ID to filter out events from old requests (prevents aborted request events from interfering with new ones)
   const activeMsgIdRef = useRef<string | null>(null);
   const messageBufferRef = useRef(new Map<string, string>());
   const processedCronMsgIdsRef = useRef(new Set<string>());
+  // Some models (e.g. MiniMax M2.5) can end a turn right after their <think>
+  // block, so the visible reply strips to nothing. Track tool activity since
+  // the last finish and which msg_ids were already flagged, so we can surface
+  // that failure once instead of silently showing an empty message.
+  const turnHadToolActivityRef = useRef(false);
+  const emptyReplyNoticeMsgIdsRef = useRef(new Set<string>());
 
   // Use refs to avoid useEffect re-subscription when these states change
   const hasActiveToolsRef = useRef(hasActiveTools);
@@ -59,6 +83,9 @@ export const useAionrsMessage = (
   useEffect(() => {
     onConfigChangedRef.current = onConfigChanged;
   }, [onConfigChanged]);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   useEffect(() => {
     hasActiveToolsRef.current = hasActiveTools;
   }, [hasActiveTools]);
@@ -123,6 +150,30 @@ export const useAionrsMessage = (
     activeMsgIdRef.current = msgId;
   }, []);
 
+  const persistTokenUsage = useCallback(
+    (newTokenUsage: TokenUsageData) => {
+      const nextTokenUsage: TokenUsageData = {
+        total_tokens: Math.max(tokenUsageRef.current?.total_tokens ?? 0, newTokenUsage.total_tokens),
+      };
+      tokenUsageRef.current = nextTokenUsage;
+      setTokenUsage(nextTokenUsage);
+      void ipcBridge.conversation.update
+        .invoke({
+          id: conversation_id,
+          updates: {
+            extra: { last_token_usage: nextTokenUsage } as TChatConversation['extra'],
+          },
+          merge_extra: true,
+        })
+        .then((ok) => {
+          if (ok) {
+            emitter.emit('aionrs.context-usage.refresh', conversation_id);
+          }
+        });
+    },
+    [conversation_id]
+  );
+
   const processCompletedAssistantMessage = useCallback(
     async (msgId: string) => {
       if (!msgId || processedCronMsgIdsRef.current.has(msgId)) {
@@ -183,6 +234,12 @@ export const useAionrsMessage = (
         return;
       }
 
+      const tokenEstimate = extractDiagnosticTokenEstimate(getTipContent(message));
+      if (tokenEstimate !== null) {
+        pendingDiagnosticTokenEstimateRef.current = tokenEstimate;
+        persistTokenUsage({ total_tokens: tokenEstimate });
+      }
+
       if (isErrorTipMessage(message)) {
         setStreamRunning(false);
         streamRunningRef.current = false;
@@ -192,6 +249,7 @@ export const useAionrsMessage = (
         hasActiveToolsRef.current = false;
         setThought({ subject: '', description: '' });
         hasContentInTurnRef.current = false;
+        pendingDiagnosticTokenEstimateRef.current = null;
         const transformedMessage = transformMessage(message);
         if (transformedMessage) {
           mergeLiveMessage(transformedMessage);
@@ -244,22 +302,69 @@ export const useAionrsMessage = (
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
             // aionrs stream_end carries usage in data field
             const usageData = message.data as TokenUsage | undefined;
-            if (usageData && typeof usageData === 'object' && 'input_tokens' in usageData) {
+            const hasValidInputTokens = isValidTokenCount(usageData?.input_tokens);
+            const hasValidOutputTokens = isValidTokenCount(usageData?.output_tokens);
+            const inputTokens = hasValidInputTokens ? usageData.input_tokens : 0;
+            const outputTokens = hasValidOutputTokens ? usageData.output_tokens : 0;
+            const diagnosticTokenEstimate = pendingDiagnosticTokenEstimateRef.current;
+            pendingDiagnosticTokenEstimateRef.current = null;
+            if (hasValidInputTokens) {
               const newTokenUsage: TokenUsageData = {
-                total_tokens: (usageData.input_tokens || 0) + (usageData.output_tokens || 0),
+                total_tokens: inputTokens + outputTokens,
               };
-              setTokenUsage(newTokenUsage);
-              void ipcBridge.conversation.update.invoke({
-                id: conversation_id,
-                updates: {
-                  extra: { last_token_usage: newTokenUsage } as TChatConversation['extra'],
-                },
-                merge_extra: true,
+              persistTokenUsage(newTokenUsage);
+            }
+            if (hasValidInputTokens || hasValidOutputTokens) {
+              recordLocalTokenUsage({
+                id: `${conversation_id}:${message.turn_id ?? message.msg_id}`,
+                inputTokens,
+                outputTokens,
+                occurredAt: Date.now(),
+              });
+            } else if (diagnosticTokenEstimate !== null) {
+              recordLocalTokenUsage({
+                id: `${conversation_id}:${message.turn_id ?? message.msg_id}:estimate:${diagnosticTokenEstimate}`,
+                inputTokens: diagnosticTokenEstimate,
+                outputTokens: 0,
+                occurredAt: Date.now(),
               });
             }
             setStreamRunning(false);
+            streamRunningRef.current = false;
             setWaitingResponse(false);
+            waitingResponseRef.current = false;
+            setHasActiveTools(false);
+            hasActiveToolsRef.current = false;
             setThought({ subject: '', description: '' });
+            hasContentInTurnRef.current = false;
+            // Surface reasoning-only turns instead of ending on an empty
+            // message. Guarded to the active request so a manual stop
+            // (resetState nulls activeMsgIdRef) never triggers it.
+            if (
+              message.msg_id &&
+              activeMsgIdRef.current === message.msg_id &&
+              !turnHadToolActivityRef.current &&
+              !emptyReplyNoticeMsgIdsRef.current.has(message.msg_id) &&
+              isThinkOnlyContent(messageBufferRef.current.get(message.msg_id) ?? '')
+            ) {
+              emptyReplyNoticeMsgIdsRef.current.add(message.msg_id);
+              mergeLiveMessage(
+                {
+                  id: uuid(),
+                  msg_id: `empty-reply-${message.msg_id}`,
+                  type: 'tips',
+                  position: 'center',
+                  conversation_id,
+                  created_at: Date.now(),
+                  content: {
+                    content: tRef.current('conversation.emptyModelReply'),
+                    type: 'error',
+                  },
+                },
+                true
+              );
+            }
+            turnHadToolActivityRef.current = false;
             if (message.msg_id) {
               void processCompletedAssistantMessage(message.msg_id);
             }
@@ -269,6 +374,7 @@ export const useAionrsMessage = (
           {
             // Mark that current turn has content output
             hasContentInTurnRef.current = true;
+            turnHadToolActivityRef.current = true;
 
             // Auto-recover streamRunning if tool_group arrives after finish
             if (!streamRunningRef.current) {
@@ -338,6 +444,7 @@ export const useAionrsMessage = (
             setWaitingResponse(false);
             waitingResponseRef.current = false;
             setThought({ subject: '', description: '' });
+            pendingDiagnosticTokenEstimateRef.current = null;
             onError?.(message as IResponseMessage);
           } else {
             // Mark that current turn has content output (exclude error type)
@@ -360,14 +467,17 @@ export const useAionrsMessage = (
       }
     });
     // Note: hasActiveTools and streamRunning are accessed via refs to avoid re-subscription
-  }, [conversation_id, mergeLiveMessage, onError, processCompletedAssistantMessage]);
+  }, [conversation_id, mergeLiveMessage, onError, persistTokenUsage, processCompletedAssistantMessage]);
 
   useEffect(() => {
     let cancelled = false;
 
     setThought({ subject: '', description: '' });
     setTokenUsage(null);
+    tokenUsageRef.current = null;
+    pendingDiagnosticTokenEstimateRef.current = null;
     hasContentInTurnRef.current = false;
+    turnHadToolActivityRef.current = false;
     setHasHydratedRunningState(false);
 
     // Check actual conversation status from backend before resetting all running states
@@ -400,6 +510,7 @@ export const useAionrsMessage = (
         const { last_token_usage } = res.extra;
         if (last_token_usage.total_tokens > 0) {
           setTokenUsage(last_token_usage);
+          tokenUsageRef.current = last_token_usage;
         }
       }
       setHasHydratedRunningState(true);
@@ -419,6 +530,8 @@ export const useAionrsMessage = (
     hasActiveToolsRef.current = false;
     setThought({ subject: '', description: '' });
     hasContentInTurnRef.current = false;
+    turnHadToolActivityRef.current = false;
+    pendingDiagnosticTokenEstimateRef.current = null;
     // Clear active message ID to prevent filtering events from new messages after stop
     activeMsgIdRef.current = null;
   }, []);

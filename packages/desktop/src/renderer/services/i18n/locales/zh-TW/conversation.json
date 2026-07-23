@@ -12,12 +12,19 @@
     "clearWorkspace": "移除專案",
     "openFolder": "Open Folder",
     "none": "None",
-    "quickActionsTitle": "AionUi 能做什麼？",
+    "quickActionsTitle": "WePrompt 能做什麼？",
     "quickActionFeedback": "反饋問題",
     "quickActionStar": "喜歡我們？點個星吧",
-    "skillsMarket": "AionUi Skills Market",
+    "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "按需搜尋並啟用社區 Skills，一次設定，所有Agent通用。",
-    "skillsMarketDetails": "詳情 >>"
+    "skillsMarketDetails": "詳情 >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "最近",
@@ -68,13 +75,34 @@
     "deleteSuccess": "刪除成功",
     "deleteFailed": "刪除失敗",
     "projectsSection": "專案",
-    "conversationsSection": "對話",
+    "conversationsSection": "聊天",
     "removeProjectTitle": "移除專案",
     "removeProject": "移除專案",
-    "removeProjectConfirm": "確定要移除專案「{{name}}」嗎？專案下的 {{count}} 個對話也會被一起移除。",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此專案中新建對話",
     "deleting": "刪除中...",
-    "reorderPinned": "拖動以調整置頂會話順序"
+    "reorderPinned": "拖動以調整置頂會話順序",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "搜尋訊息",
@@ -304,7 +332,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "讀取團隊輔助程序回應失敗",
-        "body": "AionUi 無法讀取本地團隊輔助程序的回應。請先重試一次，若持續發生再重新啟動應用。"
+        "body": "WePrompt 無法讀取本地團隊輔助程序的回應。請先重試一次，若持續發生再重新啟動應用。"
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "本地團隊輔助程序拒絕了這次請求",
@@ -312,11 +340,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "團隊輔助程序回傳了異常回應",
-        "body": "AionUi 收到了本地團隊輔助程序的異常回應。請先重試一次，若持續發生再回報問題。"
+        "body": "WePrompt 收到了本地團隊輔助程序的異常回應。請先重試一次，若持續發生再回報問題。"
       },
       "MCP_TCP_READ_FAILED": {
         "title": "讀取本地團隊輔助程序失敗",
-        "body": "AionUi 無法讀取本地團隊輔助程序的 TCP 回應。請先重試一次，如仍失敗可重新啟動應用。"
+        "body": "WePrompt 無法讀取本地團隊輔助程序的 TCP 回應。請先重試一次，如仍失敗可重新啟動應用。"
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "團隊服務尚未就緒",
@@ -417,6 +445,9 @@
       "vscode": "VS Code",
       "terminal": "終端機",
       "explorer": "檔案總管"
+    },
+    "projectMenu": {
+      "trigger": "專案"
     }
   },
   "minimap": {
@@ -508,7 +539,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "上下文已使用"
+    "contextUsed": "上下文已使用",
+    "contextWindow": "上下文視窗",
+    "percentUsed": "已使用 {{percent}}%",
+    "tokenCount": "{{used}} / {{limit}} 個詞元",
+    "localTokenUsage": "本機詞元用量",
+    "today": "今天",
+    "weekToDate": "本週至今",
+    "monthToDate": "本月至今",
+    "triggerLabel": "顯示上下文用量"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -576,5 +615,98 @@
       }
     }
   },
-  "notFound": "會話不存在或已被刪除"
+  "notFound": "會話不存在或已被刪除",
+  "projectHeader": {
+    "label": "專案 {{name}}",
+    "eyebrow": "專案",
+    "tabs": {
+      "label": "專案檢視",
+      "chat": "聊天",
+      "files": "檔案",
+      "context": "上下文",
+      "artifacts": "成果"
+    }
+  },
+  "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
+  "presentationTemplates": {
+    "title": "範本",
+    "buttonTooltip": "簡報範本",
+    "slashDescription": "選擇簡報範本",
+    "importCard": "匯入主題 (.md)",
+    "empty": "沒有可用的範本",
+    "chipTooltip": "此訊息將使用該範本",
+    "importSuccess": "範本已匯入",
+    "importError": "匯入失敗：{{error}}",
+    "removeError": "刪除失敗：{{error}}",
+    "deleteTooltip": "刪除範本",
+    "deleteConfirm": "確定刪除該範本？"
+  },
+  "status": {
+    "waitingApproval": "等待你的核准"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "管理、壓縮、釘選或交接對話上下文",
+      "missingPinText": "請在 /context pin 後輸入要釘選的內容",
+      "unexpectedArguments": "此上下文命令包含多餘參數",
+      "unsupportedSubcommand": "未知的上下文命令。請使用 open、compact、pin 或 handoff。",
+      "fallbackComplete": "已使用本機備援更新上下文",
+      "compactSuccess": "上下文已更新",
+      "pinSuccess": "上下文已釘選並更新",
+      "failed": "上下文命令失敗"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "正在使用 AI 更新...",
+      "updatedByAi": "由 AI 更新",
+      "rulesFallback": "使用規則備援更新",
+      "stale": "等待更新",
+      "failed": "更新失敗",
+      "edited": "已編輯的上下文",
+      "error": {
+        "invalidModelOutput": "AI 回傳了非預期的結果，未能更新上下文。",
+        "providerRequestFailed": "模型請求失敗。請檢查服務商連線後重試。",
+        "providerNotFound": "找不到模型服務商，請檢查此對話的模型設定。",
+        "interrupted": "上下文更新在完成前被中斷。",
+        "unknown": "上下文更新意外失敗，請重試。"
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "尚無開啟的工件",
+    "emptyHint": "產生的檔案和文件會在這裡開啟。"
+  }
 }

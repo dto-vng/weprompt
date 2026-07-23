@@ -60,6 +60,7 @@ vi.mock('@/renderer/utils/model/agentLogo', () => ({
     selected_value?: string | null;
     fallbackLabel: string;
   }) => selectedLabel || selected_value || fallbackLabel,
+  formatCompactModelName: (value: string) => value.replace('minimax/minimax-m2.5', 'MiniMax M2.5'),
 }));
 
 vi.mock('@icon-park/react', () => ({
@@ -233,6 +234,21 @@ describe('AionrsModelSelector runtime options', () => {
     expect(screen.queryAllByTestId('submenu-title')).toHaveLength(0);
     // Still grouped by provider even without a submenu wrapper.
     expect(screen.getByRole('group', { name: 'OpenAI' })).toBeInTheDocument();
+  });
+
+  it('uses a compact model name in the header pill', () => {
+    render(
+      <AionrsModelSelector
+        selection={makeSelection({
+          current_model: {
+            ...provider,
+            use_model: 'minimax/minimax-m2.5',
+          } as TProviderWithModel,
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('aionrs-model-selector')).toHaveTextContent('MiniMax M2.5');
   });
 
   it('sets thought level through the optional runtime callback', async () => {

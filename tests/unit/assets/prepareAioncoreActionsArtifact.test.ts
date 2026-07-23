@@ -163,6 +163,10 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     const fakeBin = createFakeToolchain(tmp);
     const previousPath = process.env.PATH;
     process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+    // Bypass the pinned-digest gate (covered by verifyAioncoreArtifactDigest tests)
+    // so this test reaches the managed-resources contract check it targets.
+    const previousSkipVerify = process.env.AIONUI_SKIP_AIONCORE_VERIFY;
+    process.env.AIONUI_SKIP_AIONCORE_VERIFY = '1';
 
     try {
       expect(() =>
@@ -176,6 +180,8 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
+      if (previousSkipVerify === undefined) delete process.env.AIONUI_SKIP_AIONCORE_VERIFY;
+      else process.env.AIONUI_SKIP_AIONCORE_VERIFY = previousSkipVerify;
       rmSync(tmp, { recursive: true, force: true });
     }
   });

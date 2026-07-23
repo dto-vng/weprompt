@@ -82,6 +82,9 @@ type GuidActionRowProps = {
   thoughtLevelOption?: AgentRuntimeDerivedOption | null;
   onThoughtLevelSelect?: (value: string) => void;
 
+  // Extra tool buttons rendered next to the attach entry (e.g. template gallery)
+  extraTools?: React.ReactNode;
+
   // Agent mode
   modeBackend?: string;
   selectedMode: string;
@@ -117,6 +120,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
   setSelectedAcpModel,
   thoughtLevelOption,
   onThoughtLevelSelect,
+  extraTools,
   modeBackend,
   selectedMode,
   dynamicModes = [],
@@ -585,6 +589,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
             />
           )}
         </div>
+        {extraTools}
       </div>
       {isMobile && (
         <MobileActionSheet

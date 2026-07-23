@@ -16,13 +16,43 @@
  */
 
 const { execSync, execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { verifyBundledAioncoreResources } = require('./verify-bundled-aioncore-resources');
 
+const aioncoreChecksums = require('./aioncore-checksums');
+const aioncoreTrust = require('./aioncore-trust');
+
 const GITHUB_OWNER = 'iOfficeAI';
 const GITHUB_REPO = 'AionCore';
+
+// Default Forge mirror that publishes cosign-signed, self-built AionCore
+// artifacts (see aioncore-trust.js). Overridable via env for other mirrors.
+const FORGE_SOURCE_OWNER_REPO = 'minhtq1234/Forge-Aion';
+
+/**
+ * AionCore source selector.
+ *  - 'upstream' (default): pinned-SHA-256 verification of the iOfficeAI release
+ *    (unchanged behavior — nothing changes unless the operator opts in).
+ *  - 'forge': download a cosign-signed artifact from the Forge mirror and verify
+ *    the signature against the pinned Forge CI identity + issuer before extract.
+ */
+const SOURCE_ENV = 'AIONUI_AIONCORE_SOURCE';
+const FORGE_SOURCE_REPO_ENV = 'AIONUI_FORGE_SOURCE_REPO';
+const FORGE_SOURCE_TAG_ENV = 'AIONUI_FORGE_SOURCE_TAG';
+
+/**
+ * Break-glass env override for LOCAL DEVELOPMENT ONLY.
+ *
+ * When set to '1', the pinned-digest integrity check is skipped and a LOUD
+ * warning is printed. This exists so a developer can test against a locally
+ * built / unreleased AionCore archive that has no committed digest. It must
+ * NEVER be set in CI or production — doing so re-opens the remote-code-execution
+ * path this verification closes (Forge finding #1).
+ */
+const SKIP_VERIFY_ENV = 'AIONUI_SKIP_AIONCORE_VERIFY';
 
 const ACTIONS_ARTIFACT_TARGETS = {
   'darwin-arm64': {
@@ -86,8 +116,208 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
 }
 
+/**
+ * Reject any download URL that is not https before it is handed to a downloader.
+ * Defense-in-depth alongside the client-side https-only redirect flags.
+ * @param {string} url
+ * @throws {Error} when the URL is not https.
+ */
+function assertHttpsUrl(url) {
+  if (!/^https:\/\//i.test(String(url))) {
+    throw new Error(`Refusing to download AionCore over a non-HTTPS URL: ${url}`);
+  }
+}
+
 function getBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+}
+
+// ---------------------------------------------------------------------------
+// Integrity verification (Forge finding #1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the pinned-digest verification is skipped via the break-glass env.
+ * @returns {boolean}
+ */
+function isVerificationSkipped() {
+  return (process.env[SKIP_VERIFY_ENV] || '').trim() === '1';
+}
+
+/**
+ * Compute the SHA-256 digest of a file as lowercase hex.
+ * @param {string} filePath
+ * @returns {string}
+ */
+function computeSha256(filePath) {
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+/**
+ * Build an Error tagged as an integrity failure. Callers use isIntegrityError()
+ * to distinguish it from a recoverable download failure (a network glitch may
+ * fall back to another source; a failed integrity check must NEVER fall back).
+ * @param {string} message
+ * @returns {Error}
+ */
+function makeIntegrityError(message) {
+  const error = new Error(message);
+  error.isAioncoreIntegrityError = true;
+  return error;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean} true when the error is a tagged integrity failure.
+ */
+function isIntegrityError(error) {
+  return Boolean(error && error.isAioncoreIntegrityError === true);
+}
+
+/**
+ * Verify a downloaded release archive against the digest pinned in our repo,
+ * BEFORE it is extracted or executed.
+ *
+ * Trust model: the pin committed in `aioncore-checksums.js` is the trust anchor.
+ * We do NOT trust the release-served checksums file (it is unsigned). Fail-closed:
+ * a mismatch OR a missing pin throws, so the archive is never extracted/executed.
+ *
+ * @param {object} params
+ * @param {string} params.archivePath - Path to the downloaded archive on disk.
+ * @param {string} params.assetName - Release asset file name (pin lookup key).
+ * @param {string} params.version - AionCore release tag (pin lookup key).
+ * @throws {Error} on missing pin or digest mismatch.
+ */
+function verifyArchiveDigest({ archivePath, assetName, version }) {
+  if (isVerificationSkipped()) {
+    console.warn(
+      `  ⚠️  ${SKIP_VERIFY_ENV}=1 — SKIPPING AionCore integrity verification for ${assetName}. ` +
+        `This is for LOCAL DEVELOPMENT ONLY and must NEVER be used in CI or production.`
+    );
+    return;
+  }
+
+  // Resolve the pin through the module object (not a captured reference) so the
+  // lookup is easy to stub in unit tests and always reflects the committed map.
+  const expected = aioncoreChecksums.getPinnedDigest(version, assetName);
+  if (!expected) {
+    throw makeIntegrityError(
+      `No pinned SHA-256 digest for AionCore asset "${assetName}" at version "${version}". ` +
+        `Refusing to extract or execute an unverified artifact (fail-closed). ` +
+        `Add the digest to packages/shared-scripts/src/aioncore-checksums.js ` +
+        `(see the regeneration instructions in that file), or set ${SKIP_VERIFY_ENV}=1 for local dev only.`
+    );
+  }
+
+  const actual = computeSha256(archivePath);
+  if (actual.toLowerCase() !== expected.toLowerCase()) {
+    throw makeIntegrityError(
+      `AionCore artifact integrity check FAILED for "${assetName}" (version "${version}").\n` +
+        `  expected SHA-256: ${expected}\n` +
+        `  actual   SHA-256: ${actual}\n` +
+        `The downloaded archive does not match the pinned digest. It will NOT be extracted or executed. ` +
+        `This may indicate a corrupted download, a tampered release, or a man-in-the-middle attack.`
+    );
+  }
+
+  console.log(`  Verified AionCore artifact SHA-256 against pinned digest: ${assetName}`);
+}
+
+/**
+ * Resolve the configured AionCore source.
+ * @returns {'upstream' | 'forge'}
+ */
+function getAioncoreSource() {
+  const raw = (process.env[SOURCE_ENV] || '').trim().toLowerCase();
+  return raw === 'forge' ? 'forge' : 'upstream';
+}
+
+/**
+ * Low-level cosign invocation, isolated so tests can inject a fake runner
+ * (the real one shells out to the `cosign` binary; we never hit the network in
+ * unit tests). Returns nothing on success; throws on non-zero exit or a missing
+ * `cosign` binary. Errors are surfaced to verifyCosignSignature which converts
+ * them into a tagged, fail-closed integrity error.
+ *
+ * @param {string[]} args - cosign CLI arguments.
+ */
+function runCosignVerify(args) {
+  execFileSync('cosign', args, { stdio: 'pipe', timeout: 120000 });
+}
+
+// Indirection object so verifyCosignSignature calls cosign through a property
+// that unit tests can override, mirroring how verifyArchiveDigest resolves its
+// pin through the aioncoreChecksums module object.
+const cosign = { run: runCosignVerify };
+
+/**
+ * Verify a downloaded archive's cosign keyless signature against the pinned
+ * Forge CI signer identity + OIDC issuer, BEFORE the archive is extracted or
+ * executed.
+ *
+ * Trust model (Forge path): the trust anchor is the SIGNATURE — not a pinned
+ * SHA-256 — because a self-built binary's digest changes on every build. cosign
+ * returns 0 only when the signature bundle was produced by exactly the pinned
+ * workflow identity issued by exactly the pinned OIDC issuer. Fail-closed: a
+ * non-zero cosign exit OR a missing `cosign` binary throws a tagged integrity
+ * error, so the archive is never extracted/executed.
+ *
+ * @param {object} params
+ * @param {string} params.archivePath - Path to the downloaded archive on disk.
+ * @param {string} params.bundlePath - Path to the `.cosign.bundle` on disk.
+ * @param {string} params.identity - Pinned certificate identity (workflow ref).
+ * @param {string} params.issuer - Pinned certificate OIDC issuer.
+ * @throws {Error} tagged integrity error on failure or missing cosign.
+ */
+function verifyCosignSignature({ archivePath, bundlePath, identity, issuer }) {
+  if (!identity || !issuer) {
+    throw makeIntegrityError(
+      `No pinned Forge signer identity/issuer for this AionCore version. ` +
+        `Refusing to extract or execute an unverified artifact (fail-closed). ` +
+        `Add the trust anchor to packages/shared-scripts/src/aioncore-trust.js ` +
+        `(see the regeneration instructions in that file).`
+    );
+  }
+
+  const args = [
+    'verify-blob',
+    '--bundle',
+    bundlePath,
+    '--certificate-identity',
+    identity,
+    '--certificate-oidc-issuer',
+    issuer,
+    archivePath,
+  ];
+
+  try {
+    cosign.run(args);
+  } catch (error) {
+    // ENOENT → `cosign` binary is not installed. Any other error → non-zero exit
+    // (verification failed: wrong identity/issuer, tampered artifact/bundle, etc).
+    const missingBinary = error && (error.code === 'ENOENT' || /ENOENT/.test(String(error.message || '')));
+    if (missingBinary) {
+      throw makeIntegrityError(
+        `AionCore Forge-signed source requires the "cosign" binary, which was not found on PATH. ` +
+          `Refusing to extract or execute an unverified artifact (fail-closed). ` +
+          `Install Sigstore cosign (https://docs.sigstore.dev/cosign/installation) or use the ` +
+          `default upstream source (${SOURCE_ENV}=upstream).`
+      );
+    }
+    const detail = String((error && (error.stderr || error.message)) || error).trim();
+    throw makeIntegrityError(
+      `AionCore cosign signature verification FAILED.\n` +
+        `  identity: ${identity}\n` +
+        `  issuer:   ${issuer}\n` +
+        `  cosign:   ${detail}\n` +
+        `The signature does not match the pinned Forge CI identity/issuer. The archive will NOT be ` +
+        `extracted or executed. This may indicate a tampered artifact, a wrong signer, or a spoofed mirror.`
+    );
+  }
+
+  console.log(`  Verified AionCore cosign signature against pinned Forge identity: ${identity}`);
 }
 
 function getActionsTarget(platform, arch) {
@@ -212,7 +442,13 @@ function getDownloadUrl(assetName, tag) {
 
 function downloadFile(url, outputPath) {
   console.log(`  Downloading aioncore from ${url}`);
+  // SECURITY (Forge #1): enforce HTTPS on the initial request AND across any
+  // redirect. A downgrade to http on a redirect would expose the download to
+  // MITM tampering before the digest check runs.
+  assertHttpsUrl(url);
   if (process.platform === 'win32') {
+    // Invoke-WebRequest follows redirects; the scheme is validated up front and
+    // curl/wget below (used on non-Windows) refuse http redirects at the client.
     const ps = `$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '${url}' -OutFile '${outputPath.replace(/'/g, "''")}'`;
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
       timeout: 120000,
@@ -220,9 +456,28 @@ function downloadFile(url, outputPath) {
     return;
   }
   try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', '-o', outputPath, url], { timeout: 120000 });
+    // --proto '=https' / --proto-redir '=https' → curl aborts if the URL or any
+    // redirect target is not https.
+    execFileSync(
+      'curl',
+      [
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        '-o',
+        outputPath,
+        url,
+      ],
+      { timeout: 120000 }
+    );
   } catch {
-    execFileSync('wget', ['-q', '-O', outputPath, url], { timeout: 120000 });
+    // --https-only → wget refuses to follow a redirect to a non-https URL.
+    execFileSync('wget', ['--https-only', '-q', '-O', outputPath, url], { timeout: 120000 });
   }
 }
 
@@ -314,15 +569,38 @@ function downloadFileWithAuth(url, outputPath) {
     headers.push('-H', `Authorization: Bearer ${token}`);
   }
 
+  // SECURITY (Forge #1): enforce HTTPS on the request and every redirect so an
+  // authenticated download cannot be downgraded to plaintext http.
+  assertHttpsUrl(url);
+
   try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', ...headers, '-o', outputPath, url], {
-      timeout: 120000,
-    });
+    execFileSync(
+      'curl',
+      [
+        '--proto',
+        '=https',
+        '--proto-redir',
+        '=https',
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        ...headers,
+        '-o',
+        outputPath,
+        url,
+      ],
+      {
+        timeout: 120000,
+      }
+    );
     return;
   } catch {
     // curl may be unavailable in some local environments; try gh before failing.
   }
 
+  // `gh api` only ever talks to the GitHub API over https; the URL is validated
+  // above for defense-in-depth.
   execFileSync('gh', ['api', url, '--output', outputPath], {
     timeout: 120000,
     env: {
@@ -415,6 +693,10 @@ function downloadAndExtract(platform, arch, tag) {
   ensureDirectory(tempDir);
 
   downloadFile(url, archivePath);
+  // SECURITY (Forge #1): verify the archive against the digest pinned in our
+  // repo BEFORE extracting or executing anything. Fail-closed on mismatch or
+  // missing pin — this is the RCE mitigation for the release-download path.
+  verifyArchiveDigest({ archivePath, assetName, version: tag });
   extractArchive(archivePath, extractDir, platform);
 
   const binaryName = getBinaryName(platform);
@@ -424,6 +706,85 @@ function downloadAndExtract(platform, arch, tag) {
   }
 
   return { binaryPath, tempDir, url };
+}
+
+// ---------------------------------------------------------------------------
+// Forge-signed source resolver (AIONUI_AIONCORE_SOURCE=forge)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the Forge mirror owner/repo and release tag for a version.
+ * Defaults to the Forge PoC mirror; both are overridable by env.
+ *
+ * @param {string} tag - Upstream AionCore release tag (e.g. 'v0.1.43').
+ * @returns {{ ownerRepo: string; forgeTag: string }}
+ */
+function resolveForgeSource(tag) {
+  const ownerRepo = (process.env[FORGE_SOURCE_REPO_ENV] || '').trim() || FORGE_SOURCE_OWNER_REPO;
+  const forgeTag = (process.env[FORGE_SOURCE_TAG_ENV] || '').trim() || `${tag}-forge-poc`;
+  return { ownerRepo, forgeTag };
+}
+
+function getForgeDownloadUrl(ownerRepo, forgeTag, fileName) {
+  return `https://github.com/${ownerRepo}/releases/download/${forgeTag}/${fileName}`;
+}
+
+/**
+ * Download the Forge-mirror archive AND its cosign bundle, verify the cosign
+ * signature against the pinned Forge identity/issuer, then extract. The archive
+ * is NEVER extracted until the signature verifies (fail-closed).
+ *
+ * Note: no pinned-SHA-256 check on this path — the trust anchor is the signature
+ * (a self-built binary's digest changes per build).
+ *
+ * @param {string} platform
+ * @param {string} arch
+ * @param {string} tag - Upstream AionCore release tag (drives asset naming + pin).
+ * @returns {{ binaryPath: string; tempDir: string; url: string; forgeTag: string; ownerRepo: string }}
+ */
+function downloadAndExtractForge(platform, arch, tag) {
+  const assetName = getAssetName(platform, arch, tag);
+  if (!assetName) {
+    throw new Error(`Unsupported aioncore target: ${platform}-${arch}`);
+  }
+
+  const { ownerRepo, forgeTag } = resolveForgeSource(tag);
+  const bundleName = `${assetName}.cosign.bundle`;
+  const url = getForgeDownloadUrl(ownerRepo, forgeTag, assetName);
+  const bundleUrl = getForgeDownloadUrl(ownerRepo, forgeTag, bundleName);
+
+  const tempDir = path.join(os.tmpdir(), 'aioncore-prepare-forge', forgeTag, `${platform}-${arch}`);
+  const archivePath = path.join(tempDir, assetName);
+  const bundlePath = path.join(tempDir, bundleName);
+  const extractDir = path.join(tempDir, 'extracted');
+
+  removeDirectorySafe(tempDir);
+  ensureDirectory(tempDir);
+
+  console.log(`  Downloading Forge-signed aioncore from ${ownerRepo} @ ${forgeTag}`);
+  // Reuse the HTTPS-enforced downloader for both the archive and its bundle.
+  downloadFile(url, archivePath);
+  downloadFile(bundleUrl, bundlePath);
+
+  // SECURITY (Forge #1): verify the cosign signature against the pinned Forge CI
+  // identity/issuer BEFORE extracting or executing anything. Fail-closed.
+  const trust = aioncoreTrust.getForgeTrustAnchor(tag);
+  verifyCosignSignature({
+    archivePath,
+    bundlePath,
+    identity: trust?.identity,
+    issuer: trust?.issuer,
+  });
+
+  extractArchive(archivePath, extractDir, platform);
+
+  const binaryName = getBinaryName(platform);
+  const binaryPath = findBinaryInDir(extractDir, binaryName);
+  if (!binaryPath) {
+    throw new Error(`Binary ${binaryName} not found in downloaded Forge archive`);
+  }
+
+  return { binaryPath, tempDir, url, forgeTag, ownerRepo };
 }
 
 // ---------------------------------------------------------------------------
@@ -520,17 +881,33 @@ function prepareAioncore(options) {
     console.log(`  Downloaded from GitHub Actions artifact`);
   }
 
-  // 2. Download from GitHub releases.
+  // 2. Download from GitHub releases (upstream pinned-digest OR Forge-signed).
+  const aioncoreSource = getAioncoreSource();
   if (!sourcePath && tag) {
     try {
-      const result = downloadAndExtract(platform, arch, tag);
-      sourcePath = result.binaryPath;
-      tempDir = result.tempDir;
-      sourceType = 'download';
-      sourceDetail = { url: result.url };
-      console.log(`  Downloaded from GitHub releases`);
+      if (aioncoreSource === 'forge') {
+        const result = downloadAndExtractForge(platform, arch, tag);
+        sourcePath = result.binaryPath;
+        tempDir = result.tempDir;
+        sourceType = 'forge-signed';
+        sourceDetail = { url: result.url, ownerRepo: result.ownerRepo, forgeTag: result.forgeTag };
+        console.log(`  Downloaded and cosign-verified from Forge mirror`);
+      } else {
+        const result = downloadAndExtract(platform, arch, tag);
+        sourcePath = result.binaryPath;
+        tempDir = result.tempDir;
+        sourceType = 'download';
+        sourceDetail = { url: result.url };
+        console.log(`  Downloaded from GitHub releases`);
+      }
     } catch (error) {
-      console.warn(`  Download failed: ${error.message}`);
+      // SECURITY (Forge #1): a failed integrity check must be fatal — never fall
+      // back to another source (which could serve the very artifact we rejected).
+      // Only genuine download/network failures are recoverable here.
+      if (isIntegrityError(error)) {
+        throw error;
+      }
+      console.warn(`  Download failed: ${error?.message ?? error}`);
     }
   }
 
@@ -584,8 +961,19 @@ function prepareAioncore(options) {
 }
 
 module.exports = {
+  assertHttpsUrl,
+  computeSha256,
+  cosign,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
+  getAioncoreSource,
+  getForgeDownloadUrl,
+  isIntegrityError,
+  isVerificationSkipped,
+  makeIntegrityError,
   prepareAioncore,
+  resolveForgeSource,
+  verifyArchiveDigest,
+  verifyCosignSignature,
   verifyPreparedAioncoreBundle,
 };

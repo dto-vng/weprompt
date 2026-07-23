@@ -60,6 +60,18 @@ export const WEBUI_DEFAULT_PORT = (() => {
 
 export const TEAM_MODE_ENABLED = true;
 
+// ===== Feature flags =====
+
+/** Desktop Pet feature flag: when false, the pet is hidden from all UI entry points (settings tab, route, tray menu, startup). Backend code stays dormant. */
+export const DESKTOP_PET_ENABLED = false;
+
+/**
+ * Builtin (official) skills hidden from the app UI.
+ * These ship inside the aioncore backend and cannot be deleted via its API,
+ * so they are filtered out of every skills listing at the bridge layer.
+ */
+export const HIDDEN_BUILTIN_SKILLS: readonly string[] = ['xiaohongshu-recruiter', 'x-recruiter', 'weixin-file-send'];
+
 // ===== AI Provider 相关常量 =====
 
 // Stable ID for the Google Auth virtual provider.

@@ -12,12 +12,19 @@
     "clearWorkspace": "Удалить проект",
     "openFolder": "Открыть папку",
     "none": "Нет",
-    "quickActionsTitle": "Что умеет AionUi?",
+    "quickActionsTitle": "Что умеет WePrompt?",
     "quickActionFeedback": "Сообщить о проблеме",
     "quickActionStar": "Нравится? Поставьте нам звезду!",
-    "skillsMarket": "Маркет навыков AionUi",
+    "skillsMarket": "Маркет навыков WePrompt",
     "skillsMarketDesc": "Находите и активируйте навыки сообщества по запросу. Настройте один раз — доступно для всех агентов.",
-    "skillsMarketDetails": "Подробнее >>"
+    "skillsMarketDetails": "Подробнее >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "Недавние",
@@ -68,13 +75,34 @@
     "recent7Days": "Последние 7 дней",
     "earlier": "Ранее",
     "projectsSection": "Проекты",
-    "conversationsSection": "Беседы",
+    "conversationsSection": "Чаты",
     "removeProjectTitle": "Удалить проект",
     "removeProject": "Удалить проект",
-    "removeProjectConfirm": "Удалить проект «{{name}}»? Беседы в проекте тоже будут удалены: {{count}}.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Новая беседа в этом проекте",
     "deleting": "Удаление...",
-    "reorderPinned": "Перетащите, чтобы изменить порядок закреплённых бесед"
+    "reorderPinned": "Перетащите, чтобы изменить порядок закреплённых бесед",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "Поиск сообщений",
@@ -304,7 +332,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "Не удалось прочитать ответ командного помощника",
-        "body": "AionUi не смог прочитать ответ локального командного помощника. Повторите попытку один раз; если ошибка повторится, перезапустите приложение."
+        "body": "WePrompt could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "Локальный командный помощник отклонил запрос",
@@ -312,11 +340,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "Командный помощник вернул неожиданный ответ",
-        "body": "AionUi получил неожиданный ответ от локального командного помощника. Повторите попытку один раз; если проблема сохранится, отправьте отчёт."
+        "body": "WePrompt received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "Не удалось прочитать данные локального командного помощника",
-        "body": "AionUi не смог прочитать TCP-ответ локального командного помощника. Повторите попытку один раз; если ошибка повторится, перезапустите приложение."
+        "body": "WePrompt could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "Командный сервис ещё не готов",
@@ -417,6 +445,9 @@
       "vscode": "VS Code",
       "terminal": "Терминал",
       "explorer": "Проводник"
+    },
+    "projectMenu": {
+      "trigger": "Проект"
     }
   },
   "minimap": {
@@ -508,7 +539,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "контекст использован"
+    "contextUsed": "контекст использован",
+    "contextWindow": "Контекстное окно",
+    "percentUsed": "Использовано {{percent}}%",
+    "tokenCount": "{{used}} из {{limit}} токенов",
+    "localTokenUsage": "Локальное использование токенов",
+    "today": "Сегодня",
+    "weekToDate": "С начала недели",
+    "monthToDate": "С начала месяца",
+    "triggerLabel": "Показать использование контекста"
   },
   "skill_generator": {
     "title": "Создать навык/правило",
@@ -576,5 +615,98 @@
       }
     }
   },
-  "notFound": "Беседа не найдена или была удалена"
+  "notFound": "Беседа не найдена или была удалена",
+  "projectHeader": {
+    "label": "Проект {{name}}",
+    "eyebrow": "ПРОЕКТ",
+    "tabs": {
+      "label": "Представления проекта",
+      "chat": "Чат",
+      "files": "Файлы",
+      "context": "Контекст",
+      "artifacts": "Артефакты"
+    }
+  },
+  "emptyModelReply": "Модель завершила ход, не сформировав видимый ответ. Отправьте запрос ещё раз; для больших результатов запрашивайте их по частям.",
+  "presentationTemplates": {
+    "title": "Шаблоны",
+    "buttonTooltip": "Шаблоны презентаций",
+    "slashDescription": "Выбрать шаблон презентации",
+    "importCard": "Импорт темы (.md)",
+    "empty": "Нет доступных шаблонов",
+    "chipTooltip": "Это сообщение использует шаблон",
+    "importSuccess": "Шаблон импортирован",
+    "importError": "Ошибка импорта: {{error}}",
+    "removeError": "Ошибка удаления: {{error}}",
+    "deleteTooltip": "Удалить шаблон",
+    "deleteConfirm": "Удалить этот шаблон?"
+  },
+  "status": {
+    "waitingApproval": "Ожидает вашего подтверждения"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "Управление, сжатие, закрепление и передача контекста беседы",
+      "missingPinText": "Добавьте текст после /context pin",
+      "unexpectedArguments": "В команде контекста есть лишние аргументы",
+      "unsupportedSubcommand": "Неизвестная команда контекста. Используйте open, compact, pin или handoff.",
+      "fallbackComplete": "Контекст обновлён с помощью локального резервного режима",
+      "compactSuccess": "Контекст обновлён",
+      "pinSuccess": "Контекст закреплён и обновлён",
+      "failed": "Не удалось выполнить команду контекста"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Обновление с помощью ИИ...",
+      "updatedByAi": "Обновлено ИИ",
+      "rulesFallback": "Обновлено с помощью резервных правил",
+      "stale": "Ожидает обновления",
+      "failed": "Ошибка обновления",
+      "edited": "Отредактированный контекст",
+      "error": {
+        "invalidModelOutput": "ИИ вернул неожиданный результат, поэтому контекст не обновлён.",
+        "providerRequestFailed": "Запрос к модели не выполнен. Проверьте подключение провайдера и повторите попытку.",
+        "providerNotFound": "Провайдер модели не найден. Проверьте настройки модели этого разговора.",
+        "interrupted": "Обновление контекста было прервано до завершения.",
+        "unknown": "Обновление контекста неожиданно завершилось ошибкой. Повторите попытку."
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "Нет открытых артефактов",
+    "emptyHint": "Созданные файлы и документы открываются здесь."
+  }
 }

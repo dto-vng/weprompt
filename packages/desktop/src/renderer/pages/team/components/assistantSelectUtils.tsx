@@ -1,7 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Robot } from '@icon-park/react';
 import { resolveAssistantAvatar } from '@renderer/utils/model/assistantAvatar';
-import { resolveAssistantName } from '@renderer/utils/model/assistantDisplay';
+import {
+  getForgeAssistantBrandKey,
+  resolveAssistantName,
+  type ForgeAssistantBrandKey,
+} from '@renderer/utils/model/assistantDisplay';
 import { assistantRuntimeKey, type Assistant } from '@/common/types/agent/assistantTypes';
 
 /** Team leader selector entry derived from the unified assistant catalog. */
@@ -16,6 +21,12 @@ export type TeamAssistantOption = {
   team_selectable?: boolean;
   /** Why this assistant cannot currently be used in team mode. */
   team_block_reason?: string;
+  /**
+   * Forge brand i18n key when this is one of the rebranded built-in agents.
+   * Display-only: `name` keeps the real catalog name so persisted team records
+   * stay stable; the selector label renders the brand name from this key.
+   */
+  brandKey?: ForgeAssistantBrandKey | null;
 };
 
 export function assistantToOption(assistant: Assistant, localeKey = 'en-US'): TeamAssistantOption {
@@ -26,6 +37,7 @@ export function assistantToOption(assistant: Assistant, localeKey = 'en-US'): Te
     icon: assistant.avatar,
     team_selectable: assistant.team_selectable,
     team_block_reason: assistant.team_block_reason,
+    brandKey: getForgeAssistantBrandKey(assistant),
   };
 }
 
@@ -56,7 +68,9 @@ export const AssistantOptionLabel: React.FC<AssistantOptionLabelProps> = ({
   size = 'compact',
   muted = false,
 }) => {
+  const { t } = useTranslation();
   const avatar = resolveAssistantAvatar(assistant.icon);
+  const label = assistant.brandKey ? t(assistant.brandKey) : assistant.name;
   const isLarge = size === 'large';
   const iconSize = isLarge ? 18 : 16;
   const avatarToneClass = muted ? 'bg-fill-1 text-t-tertiary opacity-75' : 'bg-fill-2 text-t-primary';
@@ -66,11 +80,7 @@ export const AssistantOptionLabel: React.FC<AssistantOptionLabelProps> = ({
   const nameClass = muted ? 'text-t-tertiary' : 'text-t-primary';
   const avatarNode =
     avatar.kind === 'image' ? (
-      <img
-        src={avatar.value}
-        alt={assistant.name}
-        style={{ width: iconSize, height: iconSize, objectFit: 'contain' }}
-      />
+      <img src={avatar.value} alt={label} style={{ width: iconSize, height: iconSize, objectFit: 'contain' }} />
     ) : avatar.kind === 'emoji' ? (
       <span style={{ fontSize: isLarge ? 18 : 14, lineHeight: `${iconSize}px` }}>{avatar.value}</span>
     ) : (
@@ -88,7 +98,7 @@ export const AssistantOptionLabel: React.FC<AssistantOptionLabelProps> = ({
           isLarge ? `min-w-0 truncate text-14px font-500 leading-21px ${nameClass}` : `min-w-0 truncate ${nameClass}`
         }
       >
-        {assistant.name}
+        {label}
       </span>
     </div>
   );

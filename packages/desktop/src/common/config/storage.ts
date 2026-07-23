@@ -72,6 +72,18 @@ export interface IConfigStorageRefer {
    * still-on-disk legacy field.
    */
   'migration.assistantsMigrated_v1'?: boolean;
+  /** One-shot flag: built-in GreenNode provider seeded (see seedBuiltinProviders.ts). */
+  'migration.greennodeProviderSeeded_v1'?: boolean;
+  /** One-shot flag: GreenNode mirrored into local OpenCode config (see seedBuiltinProviders.ts). */
+  'migration.opencodeGreenNodeSeeded_v1'?: boolean;
+  /** One-shot flag: OpenCode agent install requested via Agent Hub (see seedBuiltinProviders.ts). */
+  'migration.opencodeAgentInstalled_v1'?: boolean;
+  /** One-shot flag: Moonshot (Kimi) mirrored into local OpenCode config (see seedBuiltinProviders.ts). */
+  'migration.opencodeMoonshotSeeded_v1'?: boolean;
+  /** One-shot flag: image-analysis (vision) MCP tool registered in local OpenCode config (see seedBuiltinProviders.ts). */
+  'migration.opencodeVisionMcpSeeded_v1'?: boolean;
+  /** One-shot flag: built-in Tavily web search seeded with the shared key (see seedBuiltinProviders.ts). */
+  'migration.tavilyWebSearchSeeded_v1'?: boolean;
   // Desktop Pet: whether the desktop pet feature is enabled
   'pet.enabled'?: boolean;
   // Desktop Pet: size in pixels (200, 280, or 360)
@@ -167,11 +179,72 @@ export interface TokenUsageData {
   total_tokens: number;
 }
 
+export type TContextHandoffItemSource = 'manual' | 'context_md';
+
+export type TContextHandoffItem = {
+  id: string;
+  title: string;
+  content: string;
+  source: TContextHandoffItemSource;
+  created_at: number;
+  updated_at: number;
+};
+
+export type TContextBudgetStatus = 'healthy' | 'watch' | 'compress' | 'too_large';
+
+export type TContextBudgetBucketKey = 'messages' | 'files' | 'skills' | 'memory' | 'tools';
+
+export type TContextBudgetBucket = {
+  estimatedTokens: number;
+};
+
+export type TContextHandoffBudgetSnapshot = {
+  status: TContextBudgetStatus;
+  ratio: number | null;
+  totalEstimatedTokens: number;
+  contextLimit?: number;
+  buckets: Record<TContextBudgetBucketKey, TContextBudgetBucket>;
+};
+
+export type TContextSnapshot = {
+  goal: string;
+  current_state: string[];
+  decisions: string[];
+  artifacts: string[];
+  user_preferences: string[];
+  open_questions: string[];
+  next_steps: string[];
+  do_not_forget: string[];
+};
+
+export type TContextGenerationSource = 'llm' | 'rules' | 'user';
+
+export type TContextGenerationStatus = 'fresh' | 'updating' | 'stale' | 'failed';
+
+export type TContextHandoffExtra = {
+  pinned_context?: TContextHandoffItem[];
+  context_file_path?: string;
+  context_file_name?: string;
+  last_budget_status?: TContextBudgetStatus;
+  last_exported_at?: number;
+  snapshot?: TContextSnapshot;
+  revision?: number;
+  source?: TContextGenerationSource;
+  status?: TContextGenerationStatus;
+  last_compacted_turn_id?: string;
+  turns_since_compaction?: number;
+  updated_at?: number;
+  last_error_code?: string;
+};
+
+export type TConversationContextHandoffExtra = TContextHandoffExtra;
+
 export type TChatConversation =
   | Omit<
       IChatConversation<
         'acp',
         {
+          project_id?: string;
           workspace?: string;
           backend: string;
           cli_path?: string;
@@ -206,6 +279,8 @@ export type TChatConversation =
           last_token_usage?: TokenUsageData;
           /** Context window capacity from usage_update */
           last_context_limit?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
           session_mode?: string;
           /** Persisted model ID for resume support / 持久化的模型 ID，用于恢复 */
@@ -226,6 +301,7 @@ export type TChatConversation =
       IChatConversation<
         'codex',
         {
+          project_id?: string;
           workspace?: string;
           cli_path?: string;
           custom_workspace?: boolean;
@@ -240,6 +316,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
           session_mode?: string;
           /** User-selected Codex model from Guid page / 用户在引导页选择的 Codex 模型 */
@@ -256,6 +334,7 @@ export type TChatConversation =
       IChatConversation<
         'openclaw-gateway',
         {
+          project_id?: string;
           workspace?: string;
           backend?: string;
           agent_name?: string;
@@ -290,6 +369,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -309,12 +390,15 @@ export type TChatConversation =
       IChatConversation<
         'gemini',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           agent_name?: string;
           preset_assistant_id?: string;
           pinned?: boolean;
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           cron_job_id?: string;
@@ -328,6 +412,7 @@ export type TChatConversation =
       IChatConversation<
         'nanobot',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           /** Skills snapshot for this conversation — authoritative list, written
@@ -339,6 +424,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** 置顶时间戳（毫秒）/ Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -351,6 +438,7 @@ export type TChatConversation =
       IChatConversation<
         'remote',
         {
+          project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
           /** Remote agent config ID (FK to remote_agents table) */
@@ -366,6 +454,8 @@ export type TChatConversation =
           pinned?: boolean;
           /** Pin timestamp in milliseconds */
           pinned_at?: number;
+          /** Context handoff artifact and pinned context metadata. */
+          context_handoff?: TConversationContextHandoffExtra;
           /** Legacy marker for pre-provider-probe health-check conversations */
           is_health_check?: boolean;
           /** Cron job ID that spawned this conversation */
@@ -377,6 +467,7 @@ export type TChatConversation =
   | IChatConversation<
       'aionrs',
       {
+        project_id?: string;
         workspace: string;
         custom_workspace?: boolean;
         proxy?: string;
@@ -399,6 +490,12 @@ export type TChatConversation =
         pinned?: boolean;
         /** Pin timestamp in milliseconds */
         pinned_at?: number;
+        /** Context handoff artifact and pinned context metadata. */
+        context_handoff?: TConversationContextHandoffExtra;
+        /** Edited Context.md content used to seed a continuation conversation. */
+        context?: string;
+        /** File name for the Context.md artifact used to seed this conversation. */
+        context_file_name?: string;
         /** Max tokens per response */
         maxTokens?: number;
         /** Max agentic turns */
@@ -582,6 +679,14 @@ export interface IConversationMcpStatus {
 export const BUILTIN_IMAGE_GEN_ID = 'builtin-image-gen';
 export const BUILTIN_IMAGE_GEN_NAME = 'aionui-image-generation';
 export const BUILTIN_IMAGE_GEN_LEGACY_NAMES = ['AionUi Image Generation', BUILTIN_IMAGE_GEN_ID] as const;
+
+/** Stable ID for the built-in GreenNode IDP MCP server */
+export const BUILTIN_IDP_ID = 'builtin-idp';
+export const BUILTIN_IDP_NAME = 'greennode-idp';
+
+/** Stable ID for the built-in image-analysis (vision) MCP server */
+export const BUILTIN_VISION_ID = 'builtin-vision';
+export const BUILTIN_VISION_NAME = 'aionui-image-analysis';
 
 export interface IMcpTool {
   name: string;

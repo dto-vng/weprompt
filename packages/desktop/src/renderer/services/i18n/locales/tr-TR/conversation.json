@@ -12,12 +12,19 @@
     "clearWorkspace": "Projeyi kaldır",
     "openFolder": "Klasör Aç",
     "none": "Hiçbiri",
-    "quickActionsTitle": "AionUi neler yapabilir?",
+    "quickActionsTitle": "WePrompt neler yapabilir?",
     "quickActionFeedback": "Sorun Bildir",
     "quickActionStar": "Bizi beğendiniz mi? Yıldız verin!",
-    "skillsMarket": "AionUi Skills Market",
+    "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "Topluluk Skills'lerini ihtiyaç duyduğunuzda arayın ve etkinleştirin. Bir kez yapılandırın, tüm Agent'larda kullanılabilir.",
-    "skillsMarketDetails": "Ayrıntılar >>"
+    "skillsMarketDetails": "Ayrıntılar >>",
+    "projectTitle": "What's next in {{name}}?",
+    "projectPill": "Project · {{name}}",
+    "projectModeEyebrow": "You are in a Project workspace",
+    "projectModeBody": "Unlike a regular chat, this space is connected to one local folder. New chats stay grouped here and can use the project files as working context.",
+    "projectModeBadgeFolder": "Folder-backed",
+    "projectModeBadgeChats": "Project chats",
+    "projectModeBadgeFiles": "File-aware work"
   },
   "history": {
     "recents": "Son",
@@ -68,13 +75,34 @@
     "deleteSuccess": "Başarıyla silindi",
     "deleteFailed": "Silme başarısız oldu",
     "projectsSection": "Projeler",
-    "conversationsSection": "Konuşmalar",
+    "conversationsSection": "Sohbetler",
     "removeProjectTitle": "Projeyi kaldır",
     "removeProject": "Projeyi kaldır",
-    "removeProjectConfirm": "\"{{name}}\" projesi kaldırılsın mı? Projedeki {{count}} konuşma da kaldırılacak.",
+    "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
     "deleting": "Siliniyor...",
-    "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin"
+    "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin",
+    "newProject": "New project",
+    "createProjectTitle": "Create project",
+    "projectNameLabel": "Project name",
+    "projectNamePlaceholder": "Name this project",
+    "projectFolderLabel": "Folder",
+    "projectFolderPlaceholder": "Choose a folder to start your project",
+    "chooseProjectFolder": "Choose folder",
+    "changeProjectFolder": "Change folder",
+    "createProject": "Create project",
+    "projectFolderRequired": "Choose a folder before creating a project.",
+    "projectDuplicateFolder": "This folder is already used by \"{{name}}\".",
+    "openExistingProject": "Open existing project",
+    "createProjectSuccess": "Project created",
+    "createProjectFailed": "Project could not be created",
+    "renameProject": "Rename project",
+    "revealProjectFolder": "Reveal folder",
+    "relinkProjectFolder": "Relink folder",
+    "convertWorkspaceToProject": "Save as project",
+    "removeProjectSuccess": "Project removed. Chats and files were kept.",
+    "removeProjectFailed": "Project could not be removed",
+    "projectActions": "Project actions"
   },
   "historySearch": {
     "tooltip": "Mesajları ara",
@@ -287,7 +315,7 @@
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
         "title": "Failed to read the team helper response",
-        "body": "AionUi could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
+        "body": "WePrompt could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
       },
       "MCP_TOOL_REMOTE_ERROR": {
         "title": "The local team helper rejected the request",
@@ -295,11 +323,11 @@
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
         "title": "The team helper returned an unexpected response",
-        "body": "AionUi received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
+        "body": "WePrompt received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
       },
       "MCP_TCP_READ_FAILED": {
         "title": "Failed to read from the local team helper",
-        "body": "AionUi could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
+        "body": "WePrompt could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
         "title": "Team service is not ready yet",
@@ -402,6 +430,9 @@
       "vscode": "VS Code",
       "terminal": "Terminal",
       "explorer": "Dosya Gezgini"
+    },
+    "projectMenu": {
+      "trigger": "Proje"
     }
   },
   "minimap": {
@@ -493,7 +524,15 @@
     }
   },
   "contextUsage": {
-    "contextUsed": "bağlam kullanıldı"
+    "contextUsed": "bağlam kullanıldı",
+    "contextWindow": "Bağlam penceresi",
+    "percentUsed": "%{{percent}} kullanıldı",
+    "tokenCount": "{{used}} / {{limit}} belirteç",
+    "localTokenUsage": "Yerel belirteç kullanımı",
+    "today": "Bugün",
+    "weekToDate": "Bu hafta",
+    "monthToDate": "Bu ay",
+    "triggerLabel": "Bağlam kullanımını göster"
   },
   "skill_generator": {
     "title": "Yetenek/Kural Oluştur",
@@ -578,5 +617,98 @@
       }
     }
   },
-  "notFound": "Konuşma bulunamadı veya silinmiş"
+  "notFound": "Konuşma bulunamadı veya silinmiş",
+  "projectHeader": {
+    "label": "Proje {{name}}",
+    "eyebrow": "PROJE",
+    "tabs": {
+      "label": "Proje görünümleri",
+      "chat": "Sohbet",
+      "files": "Dosyalar",
+      "context": "Bağlam",
+      "artifacts": "Çıktılar"
+    }
+  },
+  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
+  "presentationTemplates": {
+    "title": "Şablonlar",
+    "buttonTooltip": "Sunum şablonları",
+    "slashDescription": "Sunum şablonu seçin",
+    "importCard": "Tema içe aktar (.md)",
+    "empty": "Kullanılabilir şablon yok",
+    "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "importSuccess": "Şablon içe aktarıldı",
+    "importError": "İçe aktarma başarısız: {{error}}",
+    "removeError": "Silme başarısız: {{error}}",
+    "deleteTooltip": "Şablonu sil",
+    "deleteConfirm": "Bu şablon silinsin mi?"
+  },
+  "status": {
+    "waitingApproval": "Onayınızı bekliyor"
+  },
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "Konuşma bağlamını yönet, sıkıştır, sabitle veya devret",
+      "missingPinText": "/context pin sonrasına metin ekleyin",
+      "unexpectedArguments": "Bu bağlam komutunda beklenmeyen bağımsız değişkenler var",
+      "unsupportedSubcommand": "Bilinmeyen bağlam komutu. open, compact, pin veya handoff kullanın.",
+      "fallbackComplete": "Bağlam yerel yedek yöntemle güncellendi",
+      "compactSuccess": "Bağlam güncellendi",
+      "pinSuccess": "Bağlam sabitlendi ve güncellendi",
+      "failed": "Bağlam komutu başarısız oldu"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Yapay zekâ ile güncelleniyor...",
+      "updatedByAi": "Yapay zekâ tarafından güncellendi",
+      "rulesFallback": "Kural tabanlı yedek yöntemle güncellendi",
+      "stale": "Güncelleme bekleniyor",
+      "failed": "Güncelleme başarısız",
+      "edited": "Düzenlenmiş bağlam",
+      "error": {
+        "invalidModelOutput": "Yapay zekâ beklenmeyen bir sonuç döndürdü; bağlam güncellenmedi.",
+        "providerRequestFailed": "Model isteği başarısız oldu. Sağlayıcı bağlantısını kontrol edip tekrar deneyin.",
+        "providerNotFound": "Model sağlayıcısı bulunamadı. Bu konuşmanın model ayarlarını kontrol edin.",
+        "interrupted": "Bağlam güncellemesi tamamlanmadan kesildi.",
+        "unknown": "Bağlam güncellemesi beklenmedik şekilde başarısız oldu. Tekrar deneyin."
+      }
+    }
+  },
+  "artifact": {
+    "emptyTitle": "Açık artefakt yok",
+    "emptyHint": "Oluşturulan dosyalar ve belgeler burada açılır."
+  }
 }

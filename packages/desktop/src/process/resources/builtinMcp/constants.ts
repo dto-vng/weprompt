@@ -29,3 +29,33 @@ export function isBuiltinImageGenTransport(transport?: {
 
   return (transport.args || []).some((arg) => typeof arg === 'string' && arg.includes('builtin-mcp-image-gen.js'));
 }
+
+export const BUILTIN_IDP_ID = 'builtin-idp';
+export const BUILTIN_IDP_NAME = 'greennode-idp';
+export const BUILTIN_IDP_SCRIPT = 'builtin-mcp-idp';
+
+export function isBuiltinIdpTransport(
+  transport: { type?: string; command?: string; args?: string[] } | undefined
+): boolean {
+  return (
+    transport?.type === 'stdio' &&
+    transport?.command === 'node' &&
+    Array.isArray(transport?.args) &&
+    transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_IDP_SCRIPT}.js`))
+  );
+}
+
+export const BUILTIN_VISION_ID = 'builtin-vision';
+export const BUILTIN_VISION_NAME = 'aionui-image-analysis';
+export const BUILTIN_VISION_SCRIPT = 'builtin-mcp-vision';
+
+export function isBuiltinVisionTransport(
+  transport: { type?: string; command?: string; args?: string[] } | undefined
+): boolean {
+  return (
+    transport?.type === 'stdio' &&
+    transport?.command === 'node' &&
+    Array.isArray(transport?.args) &&
+    transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_VISION_SCRIPT}.js`))
+  );
+}

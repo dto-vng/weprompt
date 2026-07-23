@@ -37,6 +37,12 @@ export type ConfigKeyMap = {
   // `migrateProviders` / `migrateAssistantsToBackend` (ELECTRON-1KT).
   'migration.providersMigrated_v1': boolean | undefined;
   'migration.assistantsMigrated_v1': boolean | undefined;
+  // One-shot flags for the built-in GreenNode provider/OpenCode seed. See
+  // `seedBuiltinProviders.ts`.
+  'migration.greennodeProviderSeeded_v1': boolean | undefined;
+  'migration.opencodeGreenNodeSeeded_v1': boolean | undefined;
+  'migration.opencodeAgentInstalled_v1': boolean | undefined;
+  'migration.tavilyWebSearchSeeded_v1': boolean | undefined;
 };
 
 export type ConfigKey = keyof ConfigKeyMap;

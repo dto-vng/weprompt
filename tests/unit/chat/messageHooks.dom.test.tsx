@@ -7,7 +7,7 @@
 import React, { useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IMessageAcpToolCall, TMessage } from '@/common/chat/chatLib';
+import type { IMessageAcpToolCall, IMessageText, TMessage } from '@/common/chat/chatLib';
 import {
   MessageListProvider,
   useAddOrUpdateMessage,
@@ -56,6 +56,7 @@ const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ mess
 
   const acpMessage = messages.find((item): item is IMessageAcpToolCall => item.type === 'acp_tool_call');
   const rawOutput = acpMessage?.content.update.rawOutput;
+  const leftTexts = messages.filter((item): item is IMessageText => item.type === 'text' && item.position === 'left');
 
   return (
     <div>
@@ -63,6 +64,8 @@ const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ mess
       <div data-testid='last-message-type'>{messages.at(-1)?.type ?? ''}</div>
       <div data-testid='has-result'>{String(Boolean(rawOutput?.result))}</div>
       <div data-testid='image-path'>{rawOutput?.image?.path ?? ''}</div>
+      <div data-testid='left-text-count'>{leftTexts.length}</div>
+      <div data-testid='left-text-contents'>{leftTexts.map((item) => item.content.content).join('')}</div>
     </div>
   );
 };
@@ -146,6 +149,62 @@ describe('conversation message hooks ACP sanitization', () => {
     expect(screen.getByTestId('image-path')).toHaveTextContent(
       '/Users/test/.codex/generated_images/session/ig_appended_image.png'
     );
+  });
+
+  it('collapses streamed reply segments when a replace snapshot arrives after tool calls', () => {
+    const segment = (id: string, content: string): IMessageText => ({
+      id,
+      msg_id: 'reply-1',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'left',
+      content: { content },
+    });
+    const toolCall: TMessage = {
+      id: 'tool-1',
+      msg_id: 'tool-1',
+      conversation_id: 'conv-1',
+      type: 'tool_call',
+      position: 'left',
+      content: { call_id: 'tool-1', name: 'Write', status: 'finish' },
+    } as TMessage;
+    const snapshot: IMessageText = {
+      id: 'snapshot-1',
+      msg_id: 'reply-1',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'left',
+      content: { content: 'Hello world', replace: true },
+    };
+
+    renderMessageListProbe(snapshot, {
+      initial: [segment('seg-1', 'Hello '), toolCall, segment('seg-2', 'world')],
+    });
+
+    flushNextMessageUpdate();
+
+    const textContents = screen.getByTestId('left-text-contents').textContent;
+    expect(textContents).toBe('Hello world');
+    expect(screen.getByTestId('left-text-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('message-count')).toHaveTextContent('2');
+  });
+
+  it('appends a replace snapshot as a new message when no segment exists', () => {
+    const snapshot: IMessageText = {
+      id: 'snapshot-2',
+      msg_id: 'reply-2',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'left',
+      content: { content: 'Standalone reply', replace: true },
+    };
+
+    renderMessageListProbe(snapshot, { initial: [existingTextMessage] });
+
+    flushNextMessageUpdate();
+
+    expect(screen.getByTestId('message-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('left-text-contents')).toHaveTextContent('helloStandalone reply');
   });
 
   it('keeps non-ACP messages unchanged when inserted with add=true', () => {

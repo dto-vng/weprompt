@@ -8,6 +8,7 @@ import type { AssistantListItem } from '../types';
 import { type AssistantEnabledFilter, filterByEnabled } from '../assistantUtils';
 import AssistantAvatar from '../AssistantAvatar';
 import RuntimeBadge from './RuntimeBadge';
+import { resolveAssistantDisplayName } from '@/renderer/utils/model/assistantDisplay';
 import { Button, Dropdown, Menu, Switch } from '@arco-design/web-react';
 import { AllApplication, Down, MoreOne } from '@icon-park/react';
 import React, { useMemo, useState } from 'react';
@@ -72,7 +73,7 @@ const OfficialAssistantsGrid: React.FC<OfficialAssistantsGridProps> = ({
           />
           <span className='truncate'>
             {t('settings.officialAssistantsHintShort', {
-              defaultValue: 'Maintained by AionUi · enable to use, duplicate to customize',
+              defaultValue: 'Maintained by WePrompt · enable to use, duplicate to customize',
             })}
           </span>
         </span>
@@ -144,7 +145,7 @@ const OfficialAssistantsGrid: React.FC<OfficialAssistantsGridProps> = ({
                 </span>
               </div>
               <div className={`mt-12px truncate text-14px font-600 text-t-primary ${enabled ? '' : 'opacity-70'}`}>
-                {assistant.name_i18n?.[localeKey] || assistant.name}
+                {resolveAssistantDisplayName(assistant, localeKey, t, assistant.name)}
               </div>
               <div
                 className={`mt-6px line-clamp-2 text-12px leading-[1.5] text-t-secondary ${enabled ? '' : 'opacity-55'}`}

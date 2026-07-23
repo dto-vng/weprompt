@@ -153,6 +153,7 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
     onSessionClick,
     batchMode: isBatchMode,
     onBatchModeChange: setIsBatchMode,
+    onNewChat: handleNewChat,
   };
 
   return (
@@ -167,11 +168,9 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
           <div className='size-full flex flex-col gap-2px'>
             <SiderToolbar
               isMobile={isMobile}
-              isBatchMode={isBatchMode}
               collapsed={collapsed}
               siderTooltipProps={siderTooltipProps}
               onNewChat={handleNewChat}
-              onToggleBatchMode={() => setIsBatchMode((prev) => !prev)}
             />
             {/* Search entry — desktop moves this into the titlebar toolbar;
                 mobile keeps it here in the sidebar. */}

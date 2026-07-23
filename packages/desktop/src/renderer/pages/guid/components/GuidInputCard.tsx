@@ -41,6 +41,10 @@ type GuidInputCardProps = {
   actionRow: React.ReactNode;
   slashCommandMenu?: React.ReactNode;
 
+  // Presentation templates
+  templateChip?: React.ReactNode;
+  templateGallery?: React.ReactNode;
+
   // Workspace
   workspaceDir: string;
   onSelectWorkspace: (dir: string) => void;
@@ -66,6 +70,8 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   onRemoveFile,
   actionRow,
   slashCommandMenu,
+  templateChip,
+  templateGallery,
   workspaceDir,
   onSelectWorkspace,
   onClearWorkspace,
@@ -95,7 +101,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
 
   return (
     <div
-      className={`${styles.guidInputCardWrap} guid-input-card-shell relative rd-24px flex flex-col ${slashCommandMenu ? 'overflow-visible' : 'overflow-hidden'} transition-all duration-200 ${isFileDragging ? 'b b-solid border-dashed guid-input-card-shell--dragging' : ''}`}
+      className={`${styles.guidInputCardWrap} guid-input-card-shell relative rd-24px flex flex-col ${slashCommandMenu || templateGallery ? 'overflow-visible' : 'overflow-hidden'} transition-all duration-200 ${isFileDragging ? 'b b-solid border-dashed guid-input-card-shell--dragging' : ''}`}
       style={{
         zIndex: 1,
         transition: 'box-shadow 0.25s ease',
@@ -123,6 +129,11 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
           boxShadow: isInputActive && !isFileDragging ? activeShadow : 'none',
         }}
       >
+        <GuidWorkspaceFootnote
+          workspaceDir={workspaceDir}
+          onSelectWorkspace={onSelectWorkspace}
+          onClearWorkspace={onClearWorkspace}
+        />
         <Input.TextArea
           ref={inputRef}
           autoSize={textareaAutoSize}
@@ -139,6 +150,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
           data-testid='guid-input'
         />
         <div style={{ height: 12, flexShrink: 0 }} aria-hidden='true' />
+        {templateChip}
         {files.length > 0 && (
           <div className='flex flex-wrap items-center gap-8px mt-12px mb-12px'>
             {files.map((path) => (
@@ -151,12 +163,10 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
         {slashCommandMenu && (
           <div className='absolute left-0 right-0 top-[calc(100%+4px)] z-70'>{slashCommandMenu}</div>
         )}
+        {templateGallery && (
+          <div className='absolute left-0 right-0 bottom-[calc(100%+8px)] z-70'>{templateGallery}</div>
+        )}
       </div>
-      <GuidWorkspaceFootnote
-        workspaceDir={workspaceDir}
-        onSelectWorkspace={onSelectWorkspace}
-        onClearWorkspace={onClearWorkspace}
-      />
     </div>
   );
 };

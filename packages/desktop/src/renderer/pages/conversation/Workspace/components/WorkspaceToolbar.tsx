@@ -6,8 +6,10 @@
 
 import { iconColors } from '@/renderer/styles/colors';
 import { isElectronDesktop } from '@/renderer/utils/platform';
-import { Dropdown, Menu, Tooltip } from '@arco-design/web-react';
-import { Down, Plus, Refresh } from '@icon-park/react';
+import WorkspaceOpenButton from '@/renderer/pages/conversation/components/ChatLayout/WorkspaceOpenButton';
+import { Dropdown, Input, Menu, Tooltip } from '@arco-design/web-react';
+import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
+import { Down, Plus, Refresh, Search } from '@icon-park/react';
 import React from 'react';
 import UploadProgressBar from '@/renderer/components/media/UploadProgressBar';
 import { AionSearchInput } from '@/renderer/components/base';
@@ -23,7 +25,7 @@ type WorkspaceToolbarProps = {
   searchText: string;
   setSearchText: (v: string) => void;
   onSearch: (v: string) => void;
-  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  searchInputRef: React.RefObject<RefInputType | null>;
   // Tree state
   loading: boolean;
   refreshWorkspace: () => void;
@@ -31,6 +33,8 @@ type WorkspaceToolbarProps = {
   handleSelectHostFiles: () => void;
   handleUploadDeviceFiles: () => void;
   setShowHostFileSelector: (v: boolean) => void;
+  workspacePath: string;
+  isTemporaryWorkspace: boolean;
 };
 
 /** Toolbar area: workspace name, search toggle, refresh button, upload menu, settings. */
@@ -49,6 +53,8 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
   handleSelectHostFiles,
   handleUploadDeviceFiles,
   setShowHostFileSelector,
+  workspacePath,
+  isTemporaryWorkspace,
 }) => {
   const workspaceUploadMenu = (
     <Menu
@@ -72,11 +78,10 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
 
   return (
     <div className='px-12px'>
-      {/* Search Input */}
-      {(showSearch || searchText) && (
-        <div className='py-8px workspace-toolbar-search'>
-          <AionSearchInput
-            className='w-full workspace-search-input'
+      <div data-testid='workspace-toolbar-top-row' className='flex items-center gap-8px py-8px'>
+        {(showSearch || searchText) && (
+          <Input
+            className='workspace-search-input flex-1 min-w-0'
             ref={searchInputRef}
             placeholder={t('conversation.workspace.searchPlaceholder')}
             value={searchText}
@@ -85,11 +90,9 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
               onSearch(value);
             }}
           />
-        </div>
-      )}
-
-      {/* Border divider below search */}
-      {!isWorkspaceCollapsed && (showSearch || searchText) && <div className='border-b border-b-base' />}
+        )}
+        <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />
+      </div>
 
       {/* Directory name with collapse and action icons */}
       <div className='workspace-toolbar-row flex items-center justify-between gap-8px'>

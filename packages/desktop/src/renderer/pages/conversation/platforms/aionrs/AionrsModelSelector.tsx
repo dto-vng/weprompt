@@ -17,7 +17,7 @@ import {
 } from '@/renderer/components/agent/runtimeSelectorOptions';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
-import { getModelDisplayLabel } from '@/renderer/utils/model/agentLogo';
+import { formatCompactModelName, getModelDisplayLabel } from '@/renderer/utils/model/agentLogo';
 import { iconColors } from '@/renderer/styles/colors';
 import { Button, Dropdown, Menu, Tooltip } from '@arco-design/web-react';
 import { Brain, Down } from '@icon-park/react';
@@ -71,12 +71,13 @@ const AionrsModelSelector: React.FC<{
 
   const { providers, getAvailableModels, handleSelectModel } = selection;
 
-  const label = getModelDisplayLabel({
+  const rawLabel = getModelDisplayLabel({
     selected_value: current_model?.use_model,
     selectedLabel: current_model?.use_model || '',
     defaultModelLabel,
     fallbackLabel: t('conversation.welcome.selectModel'),
   });
+  const label = current_model?.use_model ? formatCompactModelName(rawLabel) : rawLabel;
   const combinedLabel = composeRuntimeSelectorLabel({ modelLabel: label, thoughtLevel });
   const handleThoughtLevelSelect = (value: string) => {
     if (!thoughtLevel || value === thoughtLevel.currentValue || !onSetThoughtLevel) return;

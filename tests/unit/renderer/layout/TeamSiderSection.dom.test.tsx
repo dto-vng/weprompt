@@ -89,6 +89,8 @@ vi.mock('@arco-design/web-react', async () => {
   Modal.confirm = vi.fn();
 
   return {
+    Button: ({ children, ...props }: { children?: React.ReactNode }) =>
+      ReactModule.createElement('button', { type: 'button', ...props }, children),
     Input: () => null,
     Message: { success: vi.fn(), error: vi.fn() },
     Modal,

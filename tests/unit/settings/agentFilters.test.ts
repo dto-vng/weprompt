@@ -5,11 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  filterAgentsByAvailability,
-  getAgentAvailabilityFilterStats,
-  type AgentAvailabilityFilter,
-} from '@/renderer/pages/settings/AgentSettings/agentFilters';
+import { getAvailableAgents } from '@/renderer/pages/settings/AgentSettings/agentFilters';
 import type { ManagedAgent } from '@/renderer/utils/model/agentTypes';
 
 const agent = (id: string, status: ManagedAgent['status']): ManagedAgent =>
@@ -23,22 +19,14 @@ const agent = (id: string, status: ManagedAgent['status']): ManagedAgent =>
     status,
   }) as ManagedAgent;
 
-describe('agent availability filters', () => {
+describe('getAvailableAgents', () => {
   const agents = [agent('a', 'offline'), agent('b', 'online'), agent('c', 'missing'), agent('d', 'online')];
 
-  it('counts all, available, and unavailable agents', () => {
-    expect(getAgentAvailabilityFilterStats(agents)).toEqual({
-      all: 4,
-      available: 2,
-      unavailable: 2,
-    });
+  it('keeps only online agents without changing relative order', () => {
+    expect(getAvailableAgents(agents).map((item) => item.id)).toEqual(['b', 'd']);
   });
 
-  it.each<[AgentAvailabilityFilter, string[]]>([
-    ['all', ['a', 'b', 'c', 'd']],
-    ['available', ['b', 'd']],
-    ['unavailable', ['a', 'c']],
-  ])('filters %s agents without changing relative order', (filter, expectedIds) => {
-    expect(filterAgentsByAvailability(agents, filter).map((item) => item.id)).toEqual(expectedIds);
+  it('returns an empty list when no agent is online', () => {
+    expect(getAvailableAgents([agent('a', 'offline'), agent('c', 'missing')])).toEqual([]);
   });
 });

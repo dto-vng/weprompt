@@ -30,6 +30,19 @@
   "defaultPrompts": {
     "understand": "Familiarízate con este proyecto y explícame con palabras sencillas qué hace y por dónde empezar",
     "cleanup": "Encuentra archivos duplicados e inútiles en esta carpeta y lístalos para que los confirme",
-    "create": "Créame una página personal bonita y ábrela cuando esté lista"
+    "create": "Créame una página personal bonita y ábrela cuando esté lista",
+    "reviewFolder": "Review the files in a folder"
+  },
+  "toolbar": {
+    "label": "Acciones de inicio",
+    "history": "Historial",
+    "saved": "Guardado",
+    "community": "Comunidad"
+  },
+  "defaultProjectPrompts": {
+    "reviewFiles": "Review the files in this project",
+    "summarizeFolder": "Summarize what this project contains",
+    "createPlan": "Create a plan for this project",
+    "findNextSteps": "Find the next useful steps for this project"
   }
 }

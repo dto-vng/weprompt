@@ -44,5 +44,10 @@
     "label": "思考強度",
     "switchSuccess": "思考強度切換成功",
     "switchFailed": "思考強度切換失敗"
+  },
+  "brand": {
+    "forgeChat": "WePrompt Chat",
+    "forgeCode": "WePrompt Code",
+    "forgeAssistant": "WePrompt Assistant"
   }
 }

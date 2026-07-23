@@ -7,28 +7,19 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@arco-design/web-react';
-import { ListCheckbox, Plus } from '@icon-park/react';
+import { Plus } from '@icon-park/react';
 import classNames from 'classnames';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
 import styles from '../Sider.module.css';
 
 interface SiderToolbarProps {
   isMobile: boolean;
-  isBatchMode: boolean;
   collapsed: boolean;
   siderTooltipProps: SiderTooltipProps;
   onNewChat: () => void;
-  onToggleBatchMode: () => void;
 }
 
-const SiderToolbar: React.FC<SiderToolbarProps> = ({
-  isMobile,
-  isBatchMode,
-  collapsed,
-  siderTooltipProps,
-  onNewChat,
-  onToggleBatchMode,
-}) => {
+const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderTooltipProps, onNewChat }) => {
   const { t } = useTranslation();
 
   if (collapsed) {
@@ -66,7 +57,7 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({
           )}
           onClick={onNewChat}
         >
-          <span className='size-22px rd-6px bg-aou-2 border border-solid border-[var(--color-border-2)] group-hover:bg-fill-3 group-hover:border-transparent flex items-center justify-center shrink-0 transition-colors'>
+          <span className='size-22px rd-6px bg-[rgba(var(--primary-6),0.12)] border border-solid border-[rgba(var(--primary-6),0.24)] text-primary group-hover:bg-[rgba(var(--primary-6),0.2)] group-hover:border-[rgba(var(--primary-6),0.32)] flex items-center justify-center shrink-0 transition-colors'>
             <Plus
               theme='outline'
               size='14'
@@ -78,25 +69,6 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({
           <span className='collapsed-hidden text-t-primary text-14px font-[500] leading-24px'>
             {t('conversation.welcome.newConversation')}
           </span>
-        </div>
-      </Tooltip>
-      <Tooltip
-        {...siderTooltipProps}
-        content={isBatchMode ? t('conversation.history.batchModeExit') : t('conversation.history.batchManage')}
-        position='right'
-      >
-        <div
-          className={classNames(
-            'size-26px rd-6px flex items-center justify-center cursor-pointer shrink-0 transition-colors border border-solid border-transparent text-t-secondary hover:text-t-primary',
-            isMobile && 'sider-action-icon-btn-mobile',
-            {
-              'hover:bg-fill-3': !isBatchMode,
-              'bg-[rgba(var(--primary-6),0.12)] border-[rgba(var(--primary-6),0.24)] !text-primary': isBatchMode,
-            }
-          )}
-          onClick={onToggleBatchMode}
-        >
-          <ListCheckbox theme='outline' size='14' className='block leading-none shrink-0' style={{ lineHeight: 0 }} />
         </div>
       </Tooltip>
     </div>

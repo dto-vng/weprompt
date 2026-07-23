@@ -96,7 +96,7 @@ const SidebarIcon: React.FC<{ size?: number; strokeWidth?: number }> = ({ size =
 
 const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
   const { t } = useTranslation();
-  const appTitle = useMemo(() => 'AionUi', []);
+  const appTitle = useMemo(() => t('login.brand'), [t]);
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(true);
   const [mobileCenterTitle, setMobileCenterTitle] = useState(appTitle);
   const [mobileCenterOffset, setMobileCenterOffset] = useState(0);
@@ -129,10 +129,11 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
 
   const isDesktopRuntime = isElectronDesktop();
   const isMacRuntime = isDesktopRuntime && isMacOS();
+  const usesProjectMenu = location.pathname.startsWith('/conversation/');
   // Windows/Linux 显示自定义窗口按钮；macOS 在标题栏给工作区一个切换入口
   const showWindowControls = isDesktopRuntime && !isMacRuntime;
   // WebUI 和 macOS 桌面都需要在标题栏放工作区开关
-  const showWorkspaceButton = workspaceAvailable && (!isDesktopRuntime || isMacRuntime);
+  const showWorkspaceButton = workspaceAvailable && !usesProjectMenu && (!isDesktopRuntime || isMacRuntime);
 
   const workspaceTooltip = workspaceCollapsed
     ? t('common.expandMore', { defaultValue: 'Expand workspace' })
@@ -140,6 +141,7 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
   const backToChatTooltip = t('common.back', { defaultValue: 'Back to Chat' });
   const feedbackTooltip = t('conversation.welcome.quickActionFeedback', { defaultValue: 'Report Issue' });
   const isSettingsRoute = location.pathname.startsWith('/settings');
+  const shouldShowFeedbackButton = !location.pathname.startsWith('/conversation/');
   const iconSize = 18;
   // Desktop uses slimmer strokes to match macOS-native chrome aesthetics;
   // mobile keeps the default weight so icons stay legible at larger sizes.
@@ -406,16 +408,23 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
           })()}
       </div>
       <div ref={toolbarRef} className='app-titlebar__toolbar'>
+        {workspaceAvailable && (
+          <div id='app-titlebar-project-slot' className='app-titlebar__actions-slot app-titlebar__project-slot' />
+        )}
         {layout?.isMobile && <div id='app-titlebar-actions-slot' className='app-titlebar__actions-slot' />}
-        <button
-          type='button'
-          className={classNames('app-titlebar__button', layout?.isMobile && 'app-titlebar__button--mobile')}
-          onClick={() => void openFeedback({ autoScreenshot: true, module: resolveFeedbackModule(location.pathname) })}
-          aria-label={feedbackTooltip}
-          title={feedbackTooltip}
-        >
-          <FeedbackIcon size={iconSize} strokeWidth={desktopIconStroke} />
-        </button>
+        {shouldShowFeedbackButton && (
+          <button
+            type='button'
+            className={classNames('app-titlebar__button', layout?.isMobile && 'app-titlebar__button--mobile')}
+            onClick={() =>
+              void openFeedback({ autoScreenshot: true, module: resolveFeedbackModule(location.pathname) })
+            }
+            aria-label={feedbackTooltip}
+            title={feedbackTooltip}
+          >
+            <FeedbackIcon size={iconSize} strokeWidth={desktopIconStroke} />
+          </button>
+        )}
         {showWorkspaceButton && (
           <button
             type='button'

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Tag, Spin } from '@arco-design/web-react';
-import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { useThemeContext } from '@/renderer/hooks/context/ThemeContext';
+import { Spin } from '@arco-design/web-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import './SendBox/sendbox.css';
 
 export interface ThoughtData {
   subject: string;
@@ -26,10 +26,6 @@ type ThoughtDisplayProps = {
   externalElapsedSource?: boolean;
 };
 
-// Background gradient constants
-const GRADIENT_DARK = 'linear-gradient(135deg, #464767 0%, #323232 100%)';
-const GRADIENT_LIGHT = 'linear-gradient(90deg, #F0F3FF 0%, #F2F2F2 100%)';
-
 const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   thought,
   style = 'default',
@@ -39,7 +35,6 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   startedAtMs,
   externalElapsedSource,
 }) => {
-  const { theme } = useThemeContext();
   const { t } = useTranslation();
 
   // Format elapsed time with localized units
@@ -57,6 +52,7 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const startTimeRef = useRef<number>(Date.now());
+  const hasActivity = running || Boolean(thought?.subject);
 
   // External mode with a valid absolute start timestamp → derive elapsed from it (state A).
   const hasValidStartedAt =
@@ -94,7 +90,7 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
     }
 
     // Branch C: non-external mode (non-team). Preserve the original local timer behavior.
-    if (!running && !thought?.subject) {
+    if (!hasActivity) {
       setElapsedTime(0);
       return;
     }
@@ -108,64 +104,43 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [externalElapsedSource, startedAtMs, running, thought?.subject]);
+  }, [externalElapsedSource, startedAtMs, hasActivity]);
 
-  // Calculate final style based on theme and style prop
-  const containerStyle = useMemo(() => {
-    const background = theme === 'dark' ? GRADIENT_DARK : GRADIENT_LIGHT;
+  const className = [
+    'thought-display',
+    running ? 'thought-display--running' : '',
+    style === 'compact' ? 'thought-display--compact' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
-    if (style === 'compact') {
-      return {
-        background,
-        marginBottom: '8px',
-        maxHeight: '100px',
-        overflow: 'scroll' as const,
-      };
-    }
-
-    return {
-      background,
-    };
-  }, [theme, style]);
-
-  // Hide when not running and no thought data
-  if (!thought?.subject && !running && !statusText) {
+  if (!hasActivity && !statusText) {
     return null;
   }
 
-  // Loading-only mode: running without thought data (used by ACP when thinking is inline)
-  if (!thought?.subject && (running || statusText)) {
-    return (
-      <div
-        className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary flex items-center gap-8px'
-        style={containerStyle}
-      >
-        {running && <Spin size={14} />}
-        <span className='text-t-secondary'>
-          {statusText ?? t('conversation.chat.processing')}
-          {showElapsed && <span className='ml-8px opacity-60'>({formatElapsedTime(elapsedTime)})</span>}
-        </span>
-      </div>
-    );
-  }
-
-  // Full thought display mode: used by non-ACP platforms that still pass thought data
-  const showDescription = thought?.description && thought.description !== thought.subject;
+  const isFallbackActivity = !thought?.subject && !statusText;
+  const rawActivityLabel = thought?.subject || statusText || t('conversation.thinking.label');
+  const activityLabel = isFallbackActivity ? rawActivityLabel.replace(/(?:\.\.\.|…)\s*$/, '') : rawActivityLabel;
+  const showDescription = Boolean(thought?.description && thought.description !== thought.subject);
+  // Bare thinking state hides the initial 0s to avoid flicker; a status text or
+  // external timestamp means the caller wants the timer visible immediately.
+  const showElapsedTime = showElapsed && (elapsedTime > 0 || Boolean(statusText) || externalElapsedSource === true);
+  const activityKey = `${activityLabel}:${thought?.description ?? ''}`;
 
   return (
-    <div
-      className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary'
-      style={containerStyle}
-    >
-      <div className='flex items-center gap-8px'>
+    <div data-testid='thought-display' className={className} role='status' aria-live='polite'>
+      <div className='thought-display__content' key={activityKey}>
         {running && <Spin size={14} />}
-        <Tag color='arcoblue' size='small'>
-          {thought?.subject}
-        </Tag>
-        {showDescription && <span className='flex-1 truncate'>{thought?.description}</span>}
-        {showElapsed && (
-          <span className='text-t-tertiary text-12px whitespace-nowrap'>({formatElapsedTime(elapsedTime)})</span>
+        <span className='thought-display__label'>{activityLabel}</span>
+        {running && isFallbackActivity && (
+          <span data-testid='thought-display-dots' className='thought-display__dots' aria-hidden='true'>
+            <span />
+            <span />
+            <span />
+          </span>
         )}
+        {showDescription && <span className='thought-display__description'>{thought?.description}</span>}
+        {showElapsedTime && <span className='thought-display__elapsed'>{formatElapsedTime(elapsedTime)}</span>}
       </div>
     </div>
   );

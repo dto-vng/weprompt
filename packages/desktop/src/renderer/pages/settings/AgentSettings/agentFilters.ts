@@ -19,3 +19,6 @@ export const filterAgentsByAvailability = (agents: ManagedAgent[], filter: Agent
   }
   return agents;
 };
+
+/** Agents whose CLI is actually detected on this device. */
+export const getAvailableAgents = (agents: ManagedAgent[]): ManagedAgent[] => agents.filter(isAgentAvailable);

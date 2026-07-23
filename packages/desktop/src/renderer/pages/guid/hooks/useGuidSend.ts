@@ -5,6 +5,12 @@
  */
 
 import { ipcBridge } from '@/common';
+import {
+  isIdpBuiltinServer,
+  isImageGenBuiltinServer,
+  isVisionBuiltinServer,
+  mergeCommodityMcpServerIds,
+} from '@/common/config/builtinCapabilities';
 import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
 import { toSessionMcpServer } from '@/renderer/hooks/mcp/catalog';
 import { emitter } from '@/renderer/utils/emitter';
@@ -25,6 +31,8 @@ export type GuidSendDeps = {
   setFiles: React.Dispatch<React.SetStateAction<string[]>>;
   dir: string;
   setDir: React.Dispatch<React.SetStateAction<string>>;
+  projectId?: string;
+  setProjectId: React.Dispatch<React.SetStateAction<string | undefined>>;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   loading: boolean;
 
@@ -52,6 +60,13 @@ export type GuidSendDeps = {
   setMentionSelectorOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMentionActiveIndex: React.Dispatch<React.SetStateAction<number>>;
 
+  // Presentation template (optional — landing-page gallery wiring)
+  composePresentationSend?: (
+    message: string,
+    files: string[]
+  ) => { input: string; files: string[]; injectSkills: string[] };
+  onPresentationTemplateConsumed?: () => void;
+
   // Navigation
   navigate: NavigateFunction;
   t: TFunction;
@@ -75,6 +90,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     setFiles,
     dir,
     setDir,
+    projectId,
+    setProjectId,
     setLoading,
     loading,
     selectedAssistantId,
@@ -91,6 +108,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     availableMcpServers,
     selectedMcpServerIds,
     assistantDefaultMcpIds,
+    composePresentationSend,
+    onPresentationTemplateConsumed,
     setMentionOpen,
     setMentionQuery,
     setMentionSelectorOpen,
@@ -109,6 +128,14 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const isCustomWorkspace = !!dir;
     const finalWorkspace = dir || '';
 
+    // Fold a selected presentation template into the first message: directive
+    // text wraps the user's prompt, and the template's THEME.md (+ reference
+    // deck) rides along as attached files. The conversation title keeps the
+    // raw user input.
+    const composed = composePresentationSend
+      ? composePresentationSend(input, files)
+      : { input, files, injectSkills: [] as string[] };
+
     const assistantConversationId = selectedAssistantId;
     const assistantBackend = selectedAssistantBackend;
     const enabled_skills_to_send = guidEnabledSkills ?? assistantDefaultSkillIds;
@@ -124,20 +151,45 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const selectedSessionMcpServers = availableMcpServers
       .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin === true)
       .map((server) => toSessionMcpServer(server));
-    const defaultSelectedMcpServerIds = assistantDefaultMcpIds;
+    const defaultSelectedMcpServerIds = mergeCommodityMcpServerIds(assistantDefaultMcpIds ?? [], availableMcpServers);
     const defaultSelectedUserMcpServerIds = availableMcpServers
       .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id) && server.builtin !== true)
       .map((server) => server.id);
-    const assistantOverrideMcpIds =
+    // Image generation, the IDP (GreenNode) server, and the vision (image-analysis)
+    // server are globally-enabled capabilities (toggled in Settings > Tools), not
+    // per-chat picks — and their built-in servers are hidden from the MCP picker.
+    // Always attach the enabled hidden servers so the agent can invoke them without
+    // the user selecting them per conversation.
+    const imageGenServer = availableMcpServers.find(
+      (server) => server.enabled === true && isImageGenBuiltinServer(server)
+    );
+    const idpServer = availableMcpServers.find((server) => server.enabled === true && isIdpBuiltinServer(server));
+    const visionServer = availableMcpServers.find((server) => server.enabled === true && isVisionBuiltinServer(server));
+    const hiddenAutoAttachServers = [imageGenServer, idpServer, visionServer].filter(
+      (server): server is IMcpServer => !!server
+    );
+
+    const assistantOverrideMcpIdsBase =
       selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : defaultSelectedMcpServerIds;
+    const missingAutoAttachMcpIds = hiddenAutoAttachServers
+      .filter((server) => !assistantOverrideMcpIdsBase.includes(server.id))
+      .map((server) => server.id);
+    const assistantOverrideMcpIds = [...assistantOverrideMcpIdsBase, ...missingAutoAttachMcpIds];
     const selectedUserMcpServerIdsToSend =
       selectedMcpServerIds !== undefined ? selectedUserMcpServerIds : defaultSelectedUserMcpServerIds;
-    const selectedSessionMcpServersToSend =
+    const selectedSessionMcpServersBase =
       selectedMcpServerIds !== undefined
         ? selectedAllSessionMcpServers
         : availableMcpServers
             .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id))
             .map((server) => toSessionMcpServer(server));
+    const missingAutoAttachSessionServers = hiddenAutoAttachServers.filter(
+      (server) => !selectedSessionMcpServersBase.some((existing) => existing.id === server.id)
+    );
+    const selectedSessionMcpServersToSend = [
+      ...selectedSessionMcpServersBase,
+      ...missingAutoAttachSessionServers.map((server) => toSessionMcpServer(server)),
+    ];
 
     const assistantOverrideModel =
       selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined;
@@ -165,7 +217,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
             conversation_overrides: assistantOverrides,
           },
           extra: {
-            default_files: files,
+            project_id: projectId,
+            default_files: composed.files,
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
             selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
@@ -192,8 +245,9 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         emitter.emit('chat.history.refresh');
 
         const initialMessage = {
-          input,
-          files: files.length > 0 ? files : undefined,
+          input: composed.input,
+          files: composed.files.length > 0 ? composed.files : undefined,
+          injectSkills: composed.injectSkills.length > 0 ? composed.injectSkills : undefined,
         };
         sessionStorage.setItem(`aionrs_initial_message_${conversation.id}`, JSON.stringify(initialMessage));
 
@@ -214,9 +268,10 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           conversation_overrides: assistantOverrides,
         },
         extra: {
+          project_id: projectId,
           workspace: finalWorkspace,
           custom_workspace: isCustomWorkspace,
-          default_files: files,
+          default_files: composed.files,
           selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
           selected_session_mcp_servers:
             selectedMcpServerIds !== undefined ? selectedSessionMcpServers : selectedSessionMcpServersToSend,
@@ -241,8 +296,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       emitter.emit('chat.history.refresh');
 
       const initialMessage = {
-        input,
-        files: files.length > 0 ? files : undefined,
+        input: composed.input,
+        files: composed.files.length > 0 ? composed.files : undefined,
       };
       sessionStorage.setItem(`acp_initial_message_${conversation.id}`, JSON.stringify(initialMessage));
 
@@ -255,6 +310,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     input,
     files,
     dir,
+    projectId,
     selectedAssistantId,
     selectedAssistantBackend,
     selectedMode,
@@ -269,6 +325,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     availableMcpServers,
     selectedMcpServerIds,
     assistantDefaultMcpIds,
+    composePresentationSend,
     navigate,
     t,
     localeKey,
@@ -287,6 +344,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         setMentionActiveIndex(0);
         setFiles([]);
         setDir('');
+        setProjectId(undefined);
+        onPresentationTemplateConsumed?.();
       })
       .catch((error) => {
         console.error('Failed to send message:', error);
@@ -307,6 +366,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     setMentionActiveIndex,
     setFiles,
     setDir,
+    setProjectId,
+    onPresentationTemplateConsumed,
     t,
   ]);
 

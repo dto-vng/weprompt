@@ -26,8 +26,9 @@ import LocalFileLink from './LocalFileLink';
 import ShadowView from './ShadowView';
 import { resolveLocalFileLinkPath, resolveLocalFileLinkReference } from './markdownUtils';
 import type { LocalFileLinkReference } from './markdownUtils';
+import remarkLocalFilePaths from './remarkLocalFilePaths';
 
-const REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBreaks];
+const REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBreaks, remarkLocalFilePaths];
 
 const isLocalFilePath = (src: string): boolean => {
   if (src.startsWith('http://') || src.startsWith('https://')) return false;
