@@ -8,6 +8,11 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigateMock = vi.fn();
+const updateMock = vi.fn();
+const removeMock = vi.fn();
+const getMock = vi.fn();
+const emitMock = vi.fn();
+const modalConfirmMock = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -18,6 +23,41 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     useNavigate: () => navigateMock,
+  };
+});
+
+vi.mock('@/common', () => ({
+  ipcBridge: {
+    conversation: {
+      update: { invoke: (...args: unknown[]) => updateMock(...args) },
+      remove: { invoke: (...args: unknown[]) => removeMock(...args) },
+      get: { invoke: (...args: unknown[]) => getMock(...args) },
+    },
+  },
+}));
+
+vi.mock('@/renderer/utils/emitter', () => ({
+  emitter: { emit: (...args: unknown[]) => emitMock(...args) },
+}));
+
+// Modal.confirm and Message are Arco's imperative, portal-based APIs — real
+// invocations render outside the testing-library tree, so (matching this
+// suite's own precedent for Arco's imperative APIs, e.g.
+// tests/unit/pages/project/ProjectHeader.dom.test.tsx mocking Dropdown/Menu)
+// Modal.confirm is stubbed to synchronously run its `onOk`, letting these
+// tests assert on the resulting ipcBridge call without needing a real popup.
+vi.mock('@arco-design/web-react', async () => {
+  const actual = await vi.importActual<typeof import('@arco-design/web-react')>('@arco-design/web-react');
+  return {
+    ...actual,
+    Modal: {
+      ...actual.Modal,
+      confirm: (options: { onOk?: () => void | Promise<void> }) => {
+        modalConfirmMock(options);
+        return options.onOk?.();
+      },
+    },
+    Message: { success: vi.fn(), error: vi.fn() },
   };
 });
 
@@ -36,7 +76,14 @@ const makeChat = (id: string, name: string, desc?: string, modified_at = Date.no
   }) as unknown as TChatConversation;
 
 describe('ProjectChatList', () => {
-  beforeEach(() => navigateMock.mockReset());
+  beforeEach(() => {
+    navigateMock.mockReset();
+    updateMock.mockReset().mockResolvedValue(true);
+    removeMock.mockReset().mockResolvedValue(true);
+    getMock.mockReset().mockResolvedValue(null);
+    emitMock.mockReset();
+    modalConfirmMock.mockReset();
+  });
 
   it('renders a row per chat with its title and snippet', () => {
     render(
@@ -51,9 +98,10 @@ describe('ProjectChatList', () => {
   it('omits the snippet line when a chat has no desc', () => {
     render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
 
-    expect(screen.getByText('Chat one')).toBeInTheDocument();
-    // No stray empty snippet node — description content is entirely absent.
-    expect(document.querySelector('.arco-list-item-meta-description')).not.toBeInTheDocument();
+    const title = screen.getByText('Chat one');
+    expect(title).toBeInTheDocument();
+    // No stray empty snippet node — the title's wrapper has no sibling description element.
+    expect(title.parentElement?.children.length).toBe(1);
   });
 
   it('navigates to the conversation when a row is clicked', () => {
@@ -107,6 +155,65 @@ describe('ProjectChatList', () => {
 
     expect(screen.getByText('conversation.projectHome.emptyChatsTitle')).toBeInTheDocument();
     expect(screen.getByText('conversation.projectHome.emptyChatsBody')).toBeInTheDocument();
-    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/project-chat-row-/)).not.toBeInTheDocument();
+  });
+
+  it('toggles pin via the conversation update API and refreshes history on success', async () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-pin-c1'));
+
+    await vi.waitFor(() => {
+      expect(emitMock).toHaveBeenCalledWith('chat.history.refresh');
+    });
+    expect(updateMock).toHaveBeenCalledExactlyOnceWith({
+      id: 'c1',
+      updates: { extra: { pinned: true, pinned_at: expect.any(Number) } },
+      merge_extra: true,
+    });
+  });
+
+  it('does not navigate the row when the pin action is clicked', () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-pin-c1'));
+
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('confirms rename via a Modal and calls the conversation update API', async () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-rename-c1'));
+
+    expect(modalConfirmMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'conversation.projectHome.rename' })
+    );
+    await vi.waitFor(() => {
+      expect(emitMock).toHaveBeenCalledWith('chat.history.refresh');
+    });
+    expect(updateMock).toHaveBeenCalledExactlyOnceWith({ id: 'c1', updates: { name: 'Chat one' } });
+  });
+
+  it('requires confirmation before deleting, then calls the conversation remove API', async () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-delete-c1'));
+
+    expect(modalConfirmMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'conversation.history.deleteTitle' })
+    );
+    await vi.waitFor(() => {
+      expect(emitMock).toHaveBeenCalledWith('chat.history.refresh');
+    });
+    expect(removeMock).toHaveBeenCalledExactlyOnceWith({ id: 'c1' });
+  });
+
+  it('does not navigate the row when the delete action is clicked', () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-delete-c1'));
+
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });
