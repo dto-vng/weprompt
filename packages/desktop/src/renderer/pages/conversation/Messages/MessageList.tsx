@@ -47,6 +47,7 @@ import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
 import MessageThinking from './components/MessageThinking';
 import type { WorkJournalSourceMessage, WriteFileResult } from './types';
+import { dedupRestatedTextMessages } from './dedupRestatedTexts';
 import { useAutoScroll } from './useAutoScroll';
 import { useAutoPreviewOfficeFiles } from '@/renderer/hooks/file/useAutoPreviewOfficeFiles';
 import SelectionReplyButton from './components/SelectionReplyButton';
@@ -346,8 +347,12 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       pendingWorkSummary = undefined;
     };
 
-    for (let i = 0, len = list.length; i < len; i++) {
-      const message = list[i];
+    // Collapse restated replies (same answer persisted twice around a tool call)
+    // before grouping, so the turn shows a single copy with its reasoning.
+    const dedupedList = dedupRestatedTextMessages(list);
+
+    for (let i = 0, len = dedupedList.length; i < len; i++) {
+      const message = dedupedList[i];
       if (isHistoryGapMarker(message)) {
         flushPendingWorkSummary();
         resetFileDiffChanges();
