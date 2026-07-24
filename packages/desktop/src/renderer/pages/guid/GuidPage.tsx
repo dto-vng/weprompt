@@ -30,7 +30,7 @@ import { resolveGuidAssistantDefaults } from './utils/assistantDefaults';
 import SpeechInputButton from '@/renderer/components/chat/SpeechInputButton';
 import {
   TemplateGalleryButton,
-  TemplateGalleryPanel,
+  TemplateGalleryExpanded,
   usePresentationTemplates,
 } from '@/renderer/components/chat/TemplateGallery';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
@@ -756,25 +756,22 @@ const GuidPage: React.FC = () => {
                 </div>
               ) : null
             }
-            templateGallery={
-              presentationTemplates.galleryOpen ? (
-                <TemplateGalleryPanel
-                  templates={presentationTemplates.templates}
-                  selectedId={presentationTemplates.selectedTemplate?.manifest.id ?? null}
-                  loading={presentationTemplates.templatesLoading}
-                  onSelect={presentationTemplates.selectTemplate}
-                  onImport={presentationTemplates.importFromDialog}
-                  onRemove={presentationTemplates.removeTemplate}
-                  onClose={presentationTemplates.closeGallery}
-                />
-              ) : null
-            }
             workspaceDir={guidInput.dir}
             onSelectWorkspace={(dir) => guidInput.setDir(dir)}
             onClearWorkspace={() => guidInput.setDir('')}
           />
 
-          {selectedAssistantPrompts.length > 0 ? (
+          {presentationTemplates.galleryOpen ? (
+            <TemplateGalleryExpanded
+              templates={presentationTemplates.templates}
+              loading={presentationTemplates.templatesLoading}
+              selectedId={presentationTemplates.selectedTemplate?.manifest.id ?? null}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : selectedAssistantPrompts.length > 0 ? (
             <section className='mt-18px w-full animate-fade-in' aria-label={t('guid.promptExamplesHint')}>
               <div className={`${styles.assistantPromptHint} mb-10px text-left`}>
                 {t('guid.promptExamplesHint', { defaultValue: 'Try these example prompts:' })}
