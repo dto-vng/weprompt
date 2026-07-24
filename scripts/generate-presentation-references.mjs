@@ -9,8 +9,9 @@
 import { buildDeck } from './presentation-references/lib.mjs';
 import businessReview from './presentation-references/business-review.mjs';
 import projectKickoff from './presentation-references/project-kickoff.mjs';
+import monthlySteerco from './presentation-references/monthly-steerco.mjs';
 
-const DECKS = [businessReview, projectKickoff];
+const DECKS = [businessReview, projectKickoff, monthlySteerco];
 
 const requested = process.argv.slice(2);
 const unknown = requested.filter((name) => !DECKS.some((deck) => deck.name === name));
