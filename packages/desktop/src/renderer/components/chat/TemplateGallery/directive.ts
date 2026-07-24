@@ -18,16 +18,20 @@ const htmlDirective = (themeFile: string): string =>
 const pptxDirective = (themeFile: string, referenceFile: string): string =>
   [
     `Create a presentation from the request below.`,
+    `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
+    `Before concluding anything about availability, run \`officecli --version\` in the shell;`,
+    `only if that command itself fails should you stop and tell the user — never conclude officecli is unavailable without running it.`,
     `Before building anything: read the attached ${themeFile} in full and run \`officecli load_skill pptx\`; follow both.`,
     `Copy the attached ${referenceFile} to the output file, then edit the copy with officecli —`,
     `preserve its masters, layouts, typography, and slide chrome; duplicate its slides to match content types per the theme spec and replace their content.`,
     `Never build a deck from scratch and never write raw OOXML.`,
-    `If the officecli tool is not available in this environment, stop and tell the user this template requires an officecli-capable agent — do not attempt to build the deck another way.`,
     `Every content slide needs a non-text visual (chart, shape, or image) and speaker notes.`,
     `Before declaring done, ALL delivery gates must pass: \`officecli validate\`; \`officecli view issues\` clean;`,
     `no leftover placeholder text; and a per-slide visual audit — render every slide with \`officecli view screenshot --page N\`,`,
     `inspect each image for text overflow, overlap, contrast, and margin problems, fix, and re-render until a full pass finds zero new issues (max 3 cycles).`,
     `Save the result into the conversation workspace.`,
+    `For any follow-up change request later in this conversation, follow the "Follow-up edits" section of ${themeFile}:`,
+    `edit the existing deck in place, re-run the gates, and show the re-rendered changed slide(s) in your reply as a markdown image.`,
     `Do not invent facts to fill template slots.`,
   ].join(' ');
 

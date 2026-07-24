@@ -43,7 +43,10 @@ describe('composePresentationSend', () => {
     expect(result.input).toContain('officecli load_skill pptx');
     expect(result.input).toContain('reference.pptx');
     expect(result.input).toContain('Never build a deck from scratch');
-    expect(result.input).toContain('officecli-capable agent');
+    expect(result.input).toContain('officecli --version');
+    expect(result.input).toContain('will never appear in your tool list');
+    expect(result.input).not.toContain('officecli-capable agent');
+    expect(result.input).toContain('Follow-up edits');
     expect(result.input).toContain('officecli view screenshot');
     expect(result.input.endsWith('Q3 business review')).toBe(true);
     expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.pptx']);
