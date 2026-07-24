@@ -22,6 +22,8 @@ import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
 import { stripThinkTags, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
+import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
+import TemplateMessageCard from './TemplateMessageCard';
 
 /**
  * Format a timestamp for message display.
@@ -232,17 +234,26 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     () => parseFileMarker(contentToRender, isUserMessage),
     [contentToRender, isUserMessage]
   );
-  const { data, json } = useFormatContent(text);
+  // Templated presentation sends: fold the machine directive, show the
+  // template card + the user's own words. parseTemplatedSend is null unless
+  // BOTH detection signals match — unclassified content is never hidden.
+  const templatedSend = useMemo(
+    () => (isUserMessage ? parseTemplatedSend(text, files) : null),
+    [isUserMessage, text, files]
+  );
+  const visibleText = templatedSend ? templatedSend.userText : text;
+  const visibleFiles = templatedSend ? templatedSend.userFiles : files;
+  const { data, json } = useFormatContent(visibleText);
   const shouldRevealStream = isStreaming && !isUserMessage && !json;
-  const { displayedText, isRevealing } = useProgressiveText(text, shouldRevealStream);
+  const { displayedText, isRevealing } = useProgressiveText(visibleText, shouldRevealStream);
   const shouldRenderPlainText = isUserMessage;
   const conversationContext = useConversationContextSafe();
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
   const handleLocalFileLink = useLocalFilePreview(conversationContext?.workspace);
   const resolvedFiles = useMemo(
-    () => files.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
-    [conversationContext?.workspace, files]
+    () => visibleFiles.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
+    [conversationContext?.workspace, visibleFiles]
   );
 
   // 过滤空内容，避免渲染空DOM
@@ -251,8 +262,8 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
   }
 
   const handleCopy = () => {
-    const baseText = shouldRenderPlainText ? text : json ? JSON.stringify(data, null, 2) : text;
-    const fileList = files.length ? `Files:\n${files.map((path) => `- ${path}`).join('\n')}\n\n` : '';
+    const baseText = shouldRenderPlainText ? visibleText : json ? JSON.stringify(data, null, 2) : visibleText;
+    const fileList = visibleFiles.length ? `Files:\n${visibleFiles.map((path) => `- ${path}`).join('\n')}\n\n` : '';
     const textToCopy = fileList + baseText;
     copyText(textToCopy)
       .then(() => {
@@ -310,7 +321,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             </span>
           </div>
         )}
-        {files.length > 0 && (
+        {visibleFiles.length > 0 && (
           <div className={classNames('mt-6px min-w-0 max-w-full', { 'self-end': isUserMessage })}>
             {resolvedFiles.length === 1 ? (
               <div className='flex items-center'>
@@ -325,6 +336,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             )}
           </div>
         )}
+        {templatedSend && <TemplateMessageCard templateId={templatedSend.templateId} />}
         <div
           className={classNames('min-w-0 [&>p:first-child]:mt-0px [&>p:last-child]:mb-0px', {
             // User messages get a subtle warm bubble; cron/teammate keep their box.
@@ -350,7 +362,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
           {/* JSON 内容使用折叠组件 Use CollapsibleContent for JSON content */}
           {shouldRenderPlainText ? (
             <div className='whitespace-pre-wrap break-words' data-testid='message-text-content'>
-              {text}
+              {visibleText}
             </div>
           ) : json ? (
             <CollapsibleContent maxHeight={200} defaultCollapsed={true}>
