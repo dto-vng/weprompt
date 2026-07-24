@@ -631,6 +631,9 @@
   "emptyModelReply": "El modelo terminó el turno sin producir una respuesta visible. Envía la solicitud de nuevo; para salidas grandes, pide el resultado en partes más pequeñas.",
   "presentationTemplates": {
     "title": "Plantillas",
+    "columnPptx": "Presentaciones · PPTX",
+    "columnHtml": "Informes · HTML",
+    "selected": "Seleccionado",
     "buttonTooltip": "Plantillas de presentación",
     "slashDescription": "Elegir una plantilla de presentación",
     "importCard": "Importar tema (.md)",

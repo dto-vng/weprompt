@@ -36,7 +36,7 @@ const template: PresentationTemplateSummary = {
 };
 
 describe('TemplateGalleryPanel', () => {
-  it('renders template cards and fires onSelect when a card is clicked', () => {
+  it('renders the template inside its format column and fires onSelect when the card is clicked', () => {
     const onSelect = vi.fn();
     render(
       <TemplateGalleryPanel
@@ -48,12 +48,14 @@ describe('TemplateGalleryPanel', () => {
       />
     );
     expect(screen.getByText('Simple Light')).toBeDefined();
-    expect(screen.getByText('HTML')).toBeDefined();
+    expect(screen.getByTestId('template-column-html')).toContainElement(
+      screen.getByTestId('template-card-simple-light')
+    );
     fireEvent.click(screen.getByAltText('Simple Light'));
     expect(onSelect).toHaveBeenCalledWith(template);
   });
 
-  it('fires onImport from the import tile and shows empty state without templates', () => {
+  it('fires onImport from the header button and shows empty columns without templates', () => {
     const onImport = vi.fn();
     render(
       <TemplateGalleryPanel

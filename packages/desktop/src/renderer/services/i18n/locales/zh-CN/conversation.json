@@ -630,6 +630,9 @@
   "emptyModelReply": "模型在没有生成可见回复的情况下结束了本轮对话。请重新发送请求；如果需要较大的输出，请分多次索取结果。",
   "presentationTemplates": {
     "title": "模板",
+    "columnPptx": "演示文稿 · PPTX",
+    "columnHtml": "报告 · HTML",
+    "selected": "已选择",
     "buttonTooltip": "演示模板",
     "slashDescription": "选择演示模板",
     "importCard": "导入主题 (.md)",

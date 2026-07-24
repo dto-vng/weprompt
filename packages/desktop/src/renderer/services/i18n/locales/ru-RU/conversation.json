@@ -630,6 +630,9 @@
   "emptyModelReply": "Модель завершила ход, не сформировав видимый ответ. Отправьте запрос ещё раз; для больших результатов запрашивайте их по частям.",
   "presentationTemplates": {
     "title": "Шаблоны",
+    "columnPptx": "Презентации · PPTX",
+    "columnHtml": "Отчёты · HTML",
+    "selected": "Выбрано",
     "buttonTooltip": "Шаблоны презентаций",
     "slashDescription": "Выбрать шаблон презентации",
     "importCard": "Импорт темы (.md)",

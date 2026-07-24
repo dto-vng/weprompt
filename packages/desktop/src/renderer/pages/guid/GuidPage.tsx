@@ -760,6 +760,7 @@ const GuidPage: React.FC = () => {
               presentationTemplates.galleryOpen ? (
                 <TemplateGalleryPanel
                   templates={presentationTemplates.templates}
+                  selectedId={presentationTemplates.selectedTemplate?.manifest.id ?? null}
                   loading={presentationTemplates.templatesLoading}
                   onSelect={presentationTemplates.selectTemplate}
                   onImport={presentationTemplates.importFromDialog}

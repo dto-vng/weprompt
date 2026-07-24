@@ -630,6 +630,9 @@
   "emptyModelReply": "Модель завершила хід, не сформувавши видимої відповіді. Надішліть запит ще раз; для великих результатів запитуйте їх частинами.",
   "presentationTemplates": {
     "title": "Шаблони",
+    "columnPptx": "Презентації · PPTX",
+    "columnHtml": "Звіти · HTML",
+    "selected": "Вибрано",
     "buttonTooltip": "Шаблони презентацій",
     "slashDescription": "Вибрати шаблон презентації",
     "importCard": "Імпорт теми (.md)",

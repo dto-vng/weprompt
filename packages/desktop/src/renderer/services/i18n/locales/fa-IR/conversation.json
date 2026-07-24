@@ -630,6 +630,9 @@
   "emptyModelReply": "مدل نوبت را بدون تولید پاسخ قابل مشاهده به پایان رساند. درخواست را دوباره ارسال کنید؛ برای خروجی‌های بزرگ، نتیجه را در بخش‌های کوچک‌تر درخواست کنید.",
   "presentationTemplates": {
     "title": "قالب‌ها",
+    "columnPptx": "ارائه‌ها · PPTX",
+    "columnHtml": "گزارش‌ها · HTML",
+    "selected": "انتخاب‌شده",
     "buttonTooltip": "قالب‌های ارائه",
     "slashDescription": "انتخاب قالب ارائه",
     "importCard": "وارد کردن تم (.md)",

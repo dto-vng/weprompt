@@ -630,6 +630,9 @@
   "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
   "presentationTemplates": {
     "title": "템플릿",
+    "columnPptx": "프레젠테이션 · PPTX",
+    "columnHtml": "보고서 · HTML",
+    "selected": "선택됨",
     "buttonTooltip": "프레젠테이션 템플릿",
     "slashDescription": "프레젠테이션 템플릿 선택",
     "importCard": "테마 가져오기 (.md)",

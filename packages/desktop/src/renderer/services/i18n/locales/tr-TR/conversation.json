@@ -632,6 +632,9 @@
   "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
   "presentationTemplates": {
     "title": "Şablonlar",
+    "columnPptx": "Sunumlar · PPTX",
+    "columnHtml": "Raporlar · HTML",
+    "selected": "Seçildi",
     "buttonTooltip": "Sunum şablonları",
     "slashDescription": "Sunum şablonu seçin",
     "importCard": "Tema içe aktar (.md)",

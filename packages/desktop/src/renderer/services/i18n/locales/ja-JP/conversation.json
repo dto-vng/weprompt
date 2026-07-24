@@ -630,6 +630,9 @@
   "emptyModelReply": "モデルは表示可能な返答を生成せずにターンを終了しました。もう一度送信してください。大きな出力が必要な場合は、結果を分割して依頼してください。",
   "presentationTemplates": {
     "title": "テンプレート",
+    "columnPptx": "プレゼンテーション · PPTX",
+    "columnHtml": "レポート · HTML",
+    "selected": "選択済み",
     "buttonTooltip": "プレゼンテーションテンプレート",
     "slashDescription": "プレゼンテーションテンプレートを選択",
     "importCard": "テーマをインポート (.md)",

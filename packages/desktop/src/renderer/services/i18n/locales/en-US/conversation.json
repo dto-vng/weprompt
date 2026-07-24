@@ -691,6 +691,9 @@
   "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
   "presentationTemplates": {
     "title": "Templates",
+    "columnPptx": "Presentations · PPTX",
+    "columnHtml": "Reports · HTML",
+    "selected": "Selected",
     "buttonTooltip": "Presentation templates",
     "slashDescription": "Choose a presentation template",
     "importCard": "Import theme (.md)",

@@ -631,6 +631,9 @@
   "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
   "presentationTemplates": {
     "title": "Vorlagen",
+    "columnPptx": "Präsentationen · PPTX",
+    "columnHtml": "Berichte · HTML",
+    "selected": "Ausgewählt",
     "buttonTooltip": "Präsentationsvorlagen",
     "slashDescription": "Präsentationsvorlage auswählen",
     "importCard": "Thema importieren (.md)",
