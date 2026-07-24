@@ -1,4 +1,14 @@
 {
+  "profile": "Profile",
+  "groupProfile": "Profile",
+  "profileTitle": "Your instructions",
+  "profileDescription": "Tell the assistant how you'd like it to respond. These instructions are added to your new chats.",
+  "profileEnableLabel": "Apply my instructions to new chats",
+  "profileInstructionsLabel": "Instructions",
+  "profileInstructionsPlaceholder": "e.g. I work in HR at VNG. Prefer concise, formal Vietnamese. Ask before assuming a template.",
+  "profilePreviewTitle": "What gets added to your chats",
+  "profilePreviewEmpty": "Nothing yet — add instructions above.",
+  "profileScopeNote": "Applies to your chats. Specialized assistants follow their own rules.",
   "title": "Settings",
   "skillsHub": {
     "title": "Skills Hub",

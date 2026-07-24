@@ -1,4 +1,14 @@
 {
+  "profile": "个人资料",
+  "groupProfile": "个人资料",
+  "profileTitle": "你的指令",
+  "profileDescription": "告诉助手你希望它如何回应。这些指令会添加到你的新对话中。",
+  "profileEnableLabel": "将我的指令应用到新对话",
+  "profileInstructionsLabel": "指令",
+  "profileInstructionsPlaceholder": "例如：我在 VNG 的人力资源部门工作。偏好简洁、正式的越南语。在假定使用某个模板前先询问。",
+  "profilePreviewTitle": "将添加到对话中的内容",
+  "profilePreviewEmpty": "暂无内容——请在上方添加指令。",
+  "profileScopeNote": "适用于你的对话。专用助手遵循各自的规则。",
   "title": "设置",
   "skillsHub": {
     "title": "技能中心",
