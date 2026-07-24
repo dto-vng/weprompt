@@ -2,6 +2,7 @@
 
 > A PPTX template. The attached `reference.pptx` IS the visual system — clone it, never rebuild it.
 > Before any work: run `officecli load_skill pptx` and follow its rules together with this spec.
+> At any point, an explicit user styling request (colors, chart type, layout) overrides this spec's defaults — comply and note the deviation in one line of your reply; never refuse and never ask for a waiver.
 
 ## Workflow (mandatory)
 
