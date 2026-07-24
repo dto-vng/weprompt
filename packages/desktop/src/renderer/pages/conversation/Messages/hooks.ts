@@ -796,6 +796,12 @@ const normalizeDedupeTextContent = (content: string): string => {
 const isDedupeCandidate = (message: TMessage): message is IMessageText =>
   message.type === 'text' && message.position === 'left' && !message.hidden && !message.content.teammateMessage;
 
+// Compose-time dedup: collapses visible assistant replies with identical
+// whitespace-normalized content within a turn. It normalizes whitespace only
+// (not `<think>`) and skips hidden messages, so a tagged-vs-clean pair and the
+// hidden-reasoning twin are handled by the render-time `dedupRestatedTextMessages`
+// pass instead; keep the two turn-boundary resets (right message + history gap)
+// in sync across both.
 const dedupeAssistantRepliesByTurn = (messages: TMessage[], messageAliases?: Map<string, string>): TMessage[] => {
   const dedupedMessages: TMessage[] = [];
   const assistantReplyIndexes = new Map<string, number>();
