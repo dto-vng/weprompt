@@ -17,7 +17,6 @@ const ST = {
   muted: '5B6B82',
   peach: 'FDE4D8',
   white: 'FFFFFF',
-  cardLine: 'C9D2DD',
 };
 
 const stKicker = (str, x = 1.5, y = 1.0) =>
@@ -238,7 +237,7 @@ const stDecisionCard = (i, number, title, gap, proposal) => [
     width: `${stCards.width}cm`,
     height: '12.8cm',
     fill: ST.white,
-    line: ST.cardLine,
+    line: ST.muted,
   },
   text({
     x: `${stCards.xs[i] + 0.8}cm`,
