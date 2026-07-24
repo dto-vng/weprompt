@@ -16,7 +16,15 @@ const CJK_RE = /[぀-ヿ㐀-䶿一-鿿豈-﫿]/;
 const CJK_SPLIT_RE = /([぀-ヿ㐀-䶿一-鿿豈-﫿]+)/u;
 
 export const tokenize = (text: string): string[] => {
-  const runs = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  // Normalize FIRST: NFD input represents diacritics as separate combining
+  // marks (outside \p{L}), which would otherwise shatter a word at every
+  // mark (e.g. NFD 'Việt' -> ['vie', 't']). NFC composes them back onto the
+  // base letter so words survive intact regardless of the input's form.
+  const runs =
+    text
+      .normalize('NFC')
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) ?? [];
   const tokens: string[] = [];
   for (const run of runs) {
     for (const segment of run.split(CJK_SPLIT_RE)) {
@@ -53,8 +61,9 @@ export const buildBm25Index = (chunks: KnowledgeChunk[]): Bm25Index => {
 
 export type Bm25Result = { chunkId: string; score: number };
 
+/** Callers must tokenize the query with this module's `tokenize`; duplicate query tokens are deduped and carry no extra weight. */
 export const searchBm25 = (index: Bm25Index, queryTokens: string[], topK: number): Bm25Result[] => {
-  if (index.totalDocs === 0 || queryTokens.length === 0) return [];
+  if (index.totalDocs === 0 || queryTokens.length === 0 || topK <= 0) return [];
   const scores = new Map<string, number>();
   for (const term of new Set(queryTokens)) {
     const posting = index.postings[term];
