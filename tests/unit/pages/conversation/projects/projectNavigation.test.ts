@@ -5,7 +5,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildProjectHomePath, resolveProjectClickTarget } from '@renderer/pages/conversation/projects/projectNavigation';
+import {
+  buildProjectHomePath,
+  resolveProjectClickTarget,
+} from '@renderer/pages/conversation/projects/projectNavigation';
 
 describe('projectNavigation', () => {
   it('builds the home path for an id', () => {
@@ -17,7 +20,10 @@ describe('projectNavigation', () => {
   });
 
   it('routes a saved project to its home', () => {
-    expect(resolveProjectClickTarget({ project_id: 'p1', workspace: '/w/a' })).toEqual({ kind: 'home', path: '/project/p1' });
+    expect(resolveProjectClickTarget({ project_id: 'p1', workspace: '/w/a' })).toEqual({
+      kind: 'home',
+      path: '/project/p1',
+    });
   });
 
   it('routes a legacy workspace (no project_id) to a scoped chat', () => {
