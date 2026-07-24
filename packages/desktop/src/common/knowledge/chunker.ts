@@ -52,7 +52,7 @@ export const chunkMarkdown = (markdown: string, options: ChunkerOptions = {}): R
     buffer = '';
   };
   const startNewBuffer = (withOverlapFrom?: string) => {
-    buffer = withOverlapFrom ? `${withOverlapFrom.slice(-overlapChars)}\n` : '';
+    buffer = withOverlapFrom && overlapChars > 0 ? `${withOverlapFrom.slice(-overlapChars)}\n` : '';
     bufferPath = currentPath();
   };
 
@@ -67,7 +67,8 @@ export const chunkMarkdown = (markdown: string, options: ChunkerOptions = {}): R
     // Hard-split blocks that alone exceed the cap.
     const pieces: string[] = [];
     if (block.text.length > maxChars) {
-      for (let i = 0; i < block.text.length; i += maxChars - overlapChars) {
+      const stride = Math.max(1, maxChars - overlapChars);
+      for (let i = 0; i < block.text.length; i += stride) {
         pieces.push(block.text.slice(i, i + maxChars));
       }
     } else {

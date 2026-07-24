@@ -7,6 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import { chunkMarkdown } from '@/common/knowledge/chunker';
 
+const distinctFilledParagraph = (letter: string) => `${letter}word `.repeat(583).trim();
+
 describe('chunkMarkdown', () => {
   it('returns a single chunk for a short document', () => {
     const chunks = chunkMarkdown('Just a short note.');
@@ -55,5 +57,16 @@ describe('chunkMarkdown', () => {
     const chunks = chunkMarkdown('x'.repeat(10000), { maxChars: 3200, overlapChars: 400 });
     expect(chunks.length).toBeGreaterThanOrEqual(3);
     for (const c of chunks) expect(c.text.length).toBeLessThanOrEqual(3200);
+  });
+
+  it('supports overlapChars: 0 (no overlap)', () => {
+    // Two ~3500-char paragraphs (each individually over the 3200 cap, so each
+    // gets hard-split) with distinct fillers, so a duplicated-prefix bug can't
+    // hide behind an accidental repeat matching itself.
+    const md = [distinctFilledParagraph('a'), distinctFilledParagraph('b')].join('\n\n'); // ~7k chars, multi-paragraph
+    const chunks = chunkMarkdown(md, { maxChars: 3200, overlapChars: 0 });
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    for (const c of chunks) expect(c.text.length).toBeLessThanOrEqual(3200);
+    expect(chunks[1].text.startsWith(chunks[0].text.slice(-50))).toBe(false);
   });
 });
