@@ -444,8 +444,18 @@ const monthlySteerco = {
       background: ST.white,
       shapes: [
         ...stTitle('Agenda'),
-        ...stAgendaRow(1, 4.8, 'Aurora Program & Platform Update', 'Where the rollout stands and what changed since last month.'),
-        ...stAgendaRow(2, 8.9, 'Budget & Vendor Decisions', 'Two approvals needed to keep the second-half plan on schedule.'),
+        ...stAgendaRow(
+          1,
+          4.8,
+          'Aurora Program & Platform Update',
+          'Where the rollout stands and what changed since last month.'
+        ),
+        ...stAgendaRow(
+          2,
+          8.9,
+          'Budget & Vendor Decisions',
+          'Two approvals needed to keep the second-half plan on schedule.'
+        ),
         ...stAgendaRow(3, 13.0, 'Risks and Asks', 'Open risks with owners, and what we need from this committee.'),
       ],
       notes: 'Agenda. Three sections maximum; each number matches a divider slide later in the deck.',
@@ -486,9 +496,30 @@ const monthlySteerco = {
       background: ST.white,
       shapes: [
         ...stTitle('Program status — [period]'),
-        ...stProgramRow(1, 4.4, 'Aurora Rollout', 'On track', ST.green, 'Rollout live at 68% of sites; wave four starts next week with no open blockers.'),
-        ...stProgramRow(2, 8.6, 'Data Platform', 'On track', ST.green, 'Ingestion layer shipped; reporting migration holds to the July cutover date.'),
-        ...stProgramRow(3, 12.8, 'Service Desk AI', 'At risk', ST.red, 'Pilot accuracy is below target; the vendor fix lands mid-July — watch item.'),
+        ...stProgramRow(
+          1,
+          4.4,
+          'Aurora Rollout',
+          'On track',
+          ST.green,
+          'Rollout live at 68% of sites; wave four starts next week with no open blockers.'
+        ),
+        ...stProgramRow(
+          2,
+          8.6,
+          'Data Platform',
+          'On track',
+          ST.green,
+          'Ingestion layer shipped; reporting migration holds to the July cutover date.'
+        ),
+        ...stProgramRow(
+          3,
+          12.8,
+          'Service Desk AI',
+          'At risk',
+          ST.red,
+          'Pilot accuracy is below target; the vendor fix lands mid-July — watch item.'
+        ),
         {
           geometry: 'roundRect',
           name: 'DeliverablesPanel',
@@ -559,9 +590,27 @@ const monthlySteerco = {
       background: ST.white,
       shapes: [
         ...stTitle('Decisions requested'),
-        ...stDecisionCard(0, '01', 'Vendor renewal', 'Current contract lapses 31 Jul with no fallback coverage for support.', 'Renew for twelve months at the renegotiated rate agreed in June.'),
-        ...stDecisionCard(1, '02', 'Scale budget', 'Waves five and six of the rollout are unfunded beyond August.', 'Release the contingency line to fund the remaining rollout waves.'),
-        ...stDecisionCard(2, '03', 'Hiring plan', 'Two platform engineering roles have been open since April.', 'Approve backfill through contract-to-hire staffing this quarter.'),
+        ...stDecisionCard(
+          0,
+          '01',
+          'Vendor renewal',
+          'Current contract lapses 31 Jul with no fallback coverage for support.',
+          'Renew for twelve months at the renegotiated rate agreed in June.'
+        ),
+        ...stDecisionCard(
+          1,
+          '02',
+          'Scale budget',
+          'Waves five and six of the rollout are unfunded beyond August.',
+          'Release the contingency line to fund the remaining rollout waves.'
+        ),
+        ...stDecisionCard(
+          2,
+          '03',
+          'Hiring plan',
+          'Two platform engineering roles have been open since April.',
+          'Approve backfill through contract-to-hire staffing this quarter.'
+        ),
       ],
       notes: 'Decision cards. One decision per card: the gap states the problem, the proposal is the single ask.',
     },
