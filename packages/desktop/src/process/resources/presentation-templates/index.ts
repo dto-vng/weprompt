@@ -19,6 +19,10 @@ import businessReviewThemeMd from './business-review/THEME.md?raw';
 import businessReviewPreviewSvg from './business-review/preview.svg?raw';
 import projectKickoffThemeMd from './project-kickoff/THEME.md?raw';
 import projectKickoffPreviewSvg from './project-kickoff/preview.svg?raw';
+import monthlySteercoThemeMd from './monthly-steerco/THEME.md?raw';
+import monthlySteercoPreviewSvg from './monthly-steerco/preview.svg?raw';
+import connectedOpsThemeMd from './connected-ops/THEME.md?raw';
+import connectedOpsPreviewSvg from './connected-ops/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -153,5 +157,41 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: projectKickoffThemeMd,
     previewSvg: projectKickoffPreviewSvg,
     referenceSourcePath: () => resolveBundledReference('project-kickoff.pptx'),
+  },
+  {
+    manifest: {
+      id: 'monthly-steerco',
+      name: 'Monthly SteerCo',
+      description: 'Serif-and-gold executive steering committee deck (PPTX, cloned from a retained reference)',
+      format: 'pptx',
+      kind: 'deck',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.pptx',
+      preview: 'preview.svg',
+      version: 3,
+      createdAt: CREATED_AT,
+    },
+    themeMd: monthlySteercoThemeMd,
+    previewSvg: monthlySteercoPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('monthly-steerco.pptx'),
+  },
+  {
+    manifest: {
+      id: 'connected-ops',
+      name: 'Connected Ops',
+      description: 'Green-and-hex industrial operations review deck (PPTX, cloned from a retained reference)',
+      format: 'pptx',
+      kind: 'deck',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.pptx',
+      preview: 'preview.svg',
+      version: 3,
+      createdAt: CREATED_AT,
+    },
+    themeMd: connectedOpsThemeMd,
+    previewSvg: connectedOpsPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('connected-ops.pptx'),
   },
 ];

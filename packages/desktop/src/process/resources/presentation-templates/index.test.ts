@@ -9,7 +9,7 @@ import { validateTemplateManifest } from '@process/services/presentation-templat
 import { BUILTIN_TEMPLATE_PACKS } from './index';
 
 describe('BUILTIN_TEMPLATE_PACKS', () => {
-  it('contains the six builtin packs with unique ids', () => {
+  it('contains the eight builtin packs with unique ids', () => {
     const ids = BUILTIN_TEMPLATE_PACKS.map((p) => p.manifest.id);
     expect(ids).toEqual(
       expect.arrayContaining([
@@ -19,6 +19,8 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
         'market-trends-report',
         'business-review',
         'project-kickoff',
+        'monthly-steerco',
+        'connected-ops',
       ])
     );
     expect(new Set(ids).size).toBe(ids.length);
@@ -40,7 +42,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
 
   it('pptx packs carry the follow-up edit contract at version 3', () => {
     const pptxPacks = BUILTIN_TEMPLATE_PACKS.filter((p) => p.manifest.format === 'pptx');
-    expect(pptxPacks.length).toBe(2);
+    expect(pptxPacks.length).toBe(4);
     for (const pack of pptxPacks) {
       expect(pack.themeMd).toContain('## Follow-up edits');
       expect(pack.themeMd).toContain('source documents');

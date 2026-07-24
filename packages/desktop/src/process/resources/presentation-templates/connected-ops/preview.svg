@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#ffffff"/>
+  <polygon points="268,18 292,32 292,60 268,74 244,60 244,32" fill="none" stroke="#e3e8ec" stroke-width="2"/>
+  <polygon points="296,64 314,74 314,96 296,106 278,96 278,74" fill="#f7f9fa" stroke="#e3e8ec" stroke-width="2"/>
+  <text x="24" y="52" font-family="monospace" font-size="8" letter-spacing="2" fill="#5b6b82">NORTHWIND OPERATIONS</text>
+  <text x="24" y="86" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2933">Connected Operations</text>
+  <text x="24" y="112" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#00a650">The future is running</text>
+  <rect x="24" y="132" width="120" height="34" rx="8" fill="#eef2f5"/>
+  <rect x="24" y="132" width="4" height="34" fill="#00a650"/>
+  <text x="38" y="154" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1f2933">68 <tspan font-size="9" fill="#5b6b82">connected sites</tspan></text>
+</svg>
