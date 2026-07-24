@@ -1,4 +1,3 @@
-// packages/desktop/src/common/knowledge/types.ts
 /**
  * @license
  * Copyright 2025 AionUi (aionui.com)

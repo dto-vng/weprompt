@@ -1,4 +1,3 @@
-// packages/desktop/src/common/knowledge/store.ts
 /**
  * @license
  * Copyright 2025 AionUi (aionui.com)
@@ -10,6 +9,7 @@
 // the same directory. Node-side only (main process + the knowledge MCP
 // subprocess) — never import from renderer runtime code.
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { Bm25Index, KnowledgeChunk, KnowledgeManifest } from './types';
@@ -71,7 +71,7 @@ export type KnowledgeVectors = { dim: number; rows: Map<string, Float32Array> };
 
 export const readVectors = async (storeDir: string): Promise<KnowledgeVectors | null> => {
   const paths = storePaths(storeDir);
-  const meta = await readJson<{ dim: number; rowChunkIds: string[] }>(paths.vectorsMetaFile);
+  const meta = await readJson<{ dim: number; rowChunkIds: string[]; checksum: string }>(paths.vectorsMetaFile);
   if (!meta || meta.dim <= 0) return null;
   let raw: Buffer;
   try {
@@ -81,6 +81,7 @@ export const readVectors = async (storeDir: string): Promise<KnowledgeVectors | 
   }
   const expected = meta.rowChunkIds.length * meta.dim * 4;
   if (raw.byteLength !== expected) return null; // corrupt — caller treats as no vectors
+  if (!meta.checksum || createHash('sha256').update(raw).digest('hex') !== meta.checksum) return null; // torn pair — bin/meta from different writes
   const rows = new Map<string, Float32Array>();
   meta.rowChunkIds.forEach((chunkId, i) => {
     const offset = raw.byteOffset + i * meta.dim * 4;
@@ -96,9 +97,13 @@ export const writeVectors = async (
 ): Promise<void> => {
   const paths = storePaths(storeDir);
   const buf = Buffer.alloc(rows.length * dim * 4);
-  rows.forEach(([, vec], i) => {
+  rows.forEach(([id, vec], i) => {
+    if (vec.length !== dim) {
+      throw new Error(`Vector for ${id} has length ${vec.length}, expected ${dim}`);
+    }
     Buffer.from(vec.buffer, vec.byteOffset, dim * 4).copy(buf, i * dim * 4);
   });
+  const checksum = createHash('sha256').update(buf).digest('hex');
   await writeFileAtomic(paths.vectorsFile, buf);
-  await writeFileAtomic(paths.vectorsMetaFile, JSON.stringify({ dim, rowChunkIds: rows.map(([id]) => id) }));
+  await writeFileAtomic(paths.vectorsMetaFile, JSON.stringify({ dim, rowChunkIds: rows.map(([id]) => id), checksum }));
 };
