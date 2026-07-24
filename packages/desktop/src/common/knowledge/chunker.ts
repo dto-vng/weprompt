@@ -15,7 +15,9 @@ const HEADING_RE = /^(#{1,6})\s+(.+)$/;
 
 export const chunkMarkdown = (markdown: string, options: ChunkerOptions = {}): RawChunk[] => {
   const maxChars = options.maxChars ?? 3200;
-  const overlapChars = options.overlapChars ?? 400;
+  // Clamp so overlapChars can never reach maxChars — otherwise the hard-split
+  // stride below would hit zero (or negative) and blow up the chunk count.
+  const overlapChars = Math.min(options.overlapChars ?? 400, Math.max(0, maxChars - 1));
 
   // Blocks = heading lines or blank-line-separated paragraphs, in order.
   type Block = { text: string; heading?: { level: number; title: string } };
@@ -74,12 +76,24 @@ export const chunkMarkdown = (markdown: string, options: ChunkerOptions = {}): R
     } else {
       pieces.push(block.text);
     }
-    for (const piece of pieces) {
+    for (let pieceIndex = 0; pieceIndex < pieces.length; pieceIndex++) {
+      const piece = pieces[pieceIndex];
       if (buffer && buffer.length + piece.length + 1 > maxChars) {
         const prevText = buffer;
         flushChunk();
-        startNewBuffer(prevText);
+        // A non-first piece of a hard-split block already begins with the
+        // previous piece's tail (baked in via the hard-split stride above),
+        // so re-prepending the overlap here would duplicate it verbatim.
+        // Only a flush before piece 0 — a real block boundary — needs it.
+        if (pieceIndex > 0) {
+          startNewBuffer();
+        } else {
+          startNewBuffer(prevText);
+        }
       }
+      // Covers the first block overall and the zero-overlap flush case,
+      // where buffer starts empty and bufferPath must still reflect the
+      // current heading stack.
       if (!buffer) bufferPath = currentPath();
       buffer = buffer ? `${buffer}\n${piece}` : piece;
       // A chunk that absorbs a heading is labeled by that (deepest) heading —

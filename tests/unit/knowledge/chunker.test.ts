@@ -54,9 +54,18 @@ describe('chunkMarkdown', () => {
   });
 
   it('hard-splits a single oversized block', () => {
-    const chunks = chunkMarkdown('x'.repeat(10000), { maxChars: 3200, overlapChars: 400 });
+    // Positionally-distinct filler (not uniform 'x') so a duplicated span
+    // is actually detectable instead of blending into repeated characters.
+    const content = Array.from({ length: 2000 }, (_, i) => `w${String(i).padStart(5, '0')}`).join(' ');
+    const chunks = chunkMarkdown(content, { maxChars: 3200, overlapChars: 400 });
     expect(chunks.length).toBeGreaterThanOrEqual(3);
-    for (const c of chunks) expect(c.text.length).toBeLessThanOrEqual(3200);
+    for (const c of chunks) {
+      expect(c.text.length).toBeLessThanOrEqual(3200);
+      // No chunk should contain a verbatim repeat of its own opening — that
+      // would signal the overlap prefix got duplicated (the hard-split
+      // double-overlap regression this guards against).
+      expect(c.text.indexOf(c.text.slice(0, 60), 60)).toBe(-1);
+    }
   });
 
   it('supports overlapChars: 0 (no overlap)', () => {
