@@ -11,6 +11,7 @@
 3. Plan the full slide-title sequence first. Map each content section to a reference slide via the layout catalog below; duplicate a reference slide when a pattern is needed twice; delete reference slides you do not use.
 4. Replace ALL sample content — every project name, person, date and sentence in the reference is placeholder material. Keep positions, sizes, fonts, colors and the slide chrome exactly as they are.
 5. Update speaker notes on every slide (the reference carries notes explaining each slide's role — replace them with a real presenter script).
+6. If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first (`officecli view <file> text` reads Office files) and build slide content and chart data from it — never invent numbers when sources are attached.
 
 ## Visual system
 

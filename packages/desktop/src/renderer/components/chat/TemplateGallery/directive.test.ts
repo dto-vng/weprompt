@@ -32,6 +32,7 @@ describe('composePresentationSend', () => {
     const result = composePresentationSend(summary('html'), 'Deck about the solar system', ['/user/file.png']);
     expect(result.input).toContain('THEME.md');
     expect(result.input).toContain('ONE self-contained HTML file');
+    expect(result.input).toContain('source documents');
     expect(result.input).toContain('Do not invent facts');
     expect(result.input.endsWith('Deck about the solar system')).toBe(true);
     expect(result.files).toEqual(['/user/file.png', '/abs/t1/THEME.md']);
@@ -47,6 +48,7 @@ describe('composePresentationSend', () => {
     expect(result.input).toContain('will never appear in your tool list');
     expect(result.input).not.toContain('officecli-capable agent');
     expect(result.input).toContain('Follow-up edits');
+    expect(result.input).toContain('source documents');
     expect(result.input).toContain('officecli view screenshot');
     expect(result.input.endsWith('Q3 business review')).toBe(true);
     expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.pptx']);

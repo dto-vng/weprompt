@@ -43,6 +43,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
     expect(pptxPacks.length).toBe(2);
     for (const pack of pptxPacks) {
       expect(pack.themeMd).toContain('## Follow-up edits');
+      expect(pack.themeMd).toContain('source documents');
       expect(pack.manifest.version).toBeGreaterThanOrEqual(3);
     }
   });

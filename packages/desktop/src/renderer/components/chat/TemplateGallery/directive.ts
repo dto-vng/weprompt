@@ -11,6 +11,8 @@ const htmlDirective = (themeFile: string): string =>
     `Create a presentation/report from the request below.`,
     `Read the attached ${themeFile} and follow it exactly: produce ONE self-contained HTML file`,
     `(all CSS/JS inline; only CDN assets the theme spec explicitly allows).`,
+    `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
+    `\`officecli view <file> text\` in your shell reads Office files — and build from that data; never invent numbers when sources are attached.`,
     `Save it into the conversation workspace with a descriptive snake_case file name.`,
     `Do not invent facts to fill template slots.`,
   ].join(' ');
@@ -25,6 +27,8 @@ const pptxDirective = (themeFile: string, referenceFile: string): string =>
     `Copy the attached ${referenceFile} to the output file, then edit the copy with officecli —`,
     `preserve its masters, layouts, typography, and slide chrome; duplicate its slides to match content types per the theme spec and replace their content.`,
     `Never build a deck from scratch and never write raw OOXML.`,
+    `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
+    `\`officecli view <file> text\` reads Office files — and build slide content and chart data from it; never invent numbers when sources are attached.`,
     `Every content slide needs a non-text visual (chart, shape, or image) and speaker notes.`,
     `Before declaring done, ALL delivery gates must pass: \`officecli validate\`; \`officecli view issues\` clean;`,
     `no leftover placeholder text; and a per-slide visual audit — render every slide with \`officecli view screenshot --page N\`,`,
