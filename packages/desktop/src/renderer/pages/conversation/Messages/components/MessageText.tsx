@@ -23,7 +23,7 @@ import MarkdownView from '@renderer/components/Markdown';
 import { stripThinkTags, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
 import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
-import TemplateMessageCard from './TemplateMessageCard';
+import { TemplateMessageCard } from '@/renderer/components/chat/TemplateGallery';
 
 /**
  * Format a timestamp for message display.

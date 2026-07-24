@@ -7,7 +7,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
-import TemplateMessageCard from '@/renderer/pages/conversation/Messages/components/TemplateMessageCard';
+import { TemplateMessageCard } from '@/renderer/components/chat/TemplateGallery';
 
 // Mock the ipcBridge list call the SWR fetcher uses.
 vi.mock('@/common', async (importOriginal) => {
