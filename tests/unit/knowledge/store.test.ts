@@ -52,12 +52,24 @@ describe('knowledge store', () => {
   it('round-trips chunks and bm25 index', async () => {
     const chunks: KnowledgeChunk[] = [
       { chunkId: 'abc123#0', sourceId: 'abc123', chunkIndex: 0, text: 'hello world', hasVector: false },
-      { chunkId: 'abc123#1', sourceId: 'abc123', chunkIndex: 1, text: 'goodbye', headingPath: 'A > B', hasVector: true },
+      {
+        chunkId: 'abc123#1',
+        sourceId: 'abc123',
+        chunkIndex: 1,
+        text: 'goodbye',
+        headingPath: 'A > B',
+        hasVector: true,
+      },
     ];
     await writeChunks(dir, chunks);
     expect(await readChunks(dir)).toEqual(chunks);
 
-    const bm25 = { totalDocs: 2, avgDocLen: 1.5, docLens: { 'abc123#0': 2, 'abc123#1': 1 }, postings: { hello: [['abc123#0', 1]] } };
+    const bm25 = {
+      totalDocs: 2,
+      avgDocLen: 1.5,
+      docLens: { 'abc123#0': 2, 'abc123#1': 1 },
+      postings: { hello: [['abc123#0', 1]] },
+    };
     await writeBm25(dir, bm25 as never);
     expect(await readBm25(dir)).toEqual(bm25);
   });
@@ -72,6 +84,8 @@ describe('knowledge store', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.dim).toBe(4);
     expect([...loaded!.rows.keys()]).toEqual(['abc123#0', 'abc123#1']);
-    expect(Array.from(loaded!.rows.get('abc123#0')!)).toEqual([0.10000000149011612, 0.20000000298023224, 0.30000001192092896, 0.4000000059604645]);
+    expect(Array.from(loaded!.rows.get('abc123#0')!)).toEqual([
+      0.10000000149011612, 0.20000000298023224, 0.30000001192092896, 0.4000000059604645,
+    ]);
   });
 });

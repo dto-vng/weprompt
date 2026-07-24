@@ -89,7 +89,11 @@ export const readVectors = async (storeDir: string): Promise<KnowledgeVectors | 
   return { dim: meta.dim, rows };
 };
 
-export const writeVectors = async (storeDir: string, dim: number, rows: Array<[string, Float32Array]>): Promise<void> => {
+export const writeVectors = async (
+  storeDir: string,
+  dim: number,
+  rows: Array<[string, Float32Array]>
+): Promise<void> => {
   const paths = storePaths(storeDir);
   const buf = Buffer.alloc(rows.length * dim * 4);
   rows.forEach(([, vec], i) => {
