@@ -14,6 +14,7 @@ import MobileActionSheet, {
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
 import {
+  TemplateChipCard,
   TemplateGalleryButton,
   TemplateGalleryPanel,
   usePresentationTemplates,
@@ -49,7 +50,7 @@ import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { Message, Tag, Tooltip } from '@arco-design/web-react';
+import { Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -775,11 +776,10 @@ Please check your local CLI tool authentication status`,
           <>
             {presentationTemplates.selectedTemplate && (
               <div className='flex flex-wrap items-center gap-8px mb-8px'>
-                <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
-                  <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
-                    {presentationTemplates.selectedTemplate.manifest.name}
-                  </Tag>
-                </Tooltip>
+                <TemplateChipCard
+                  template={presentationTemplates.selectedTemplate}
+                  onRemove={presentationTemplates.clearSelection}
+                />
               </div>
             )}
             {uploadFile.length > 0 && (

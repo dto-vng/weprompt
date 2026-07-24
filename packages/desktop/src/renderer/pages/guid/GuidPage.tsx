@@ -29,6 +29,7 @@ import { ensureBackendMcpCatalog } from '@/renderer/hooks/mcp/catalog';
 import { resolveGuidAssistantDefaults } from './utils/assistantDefaults';
 import SpeechInputButton from '@/renderer/components/chat/SpeechInputButton';
 import {
+  TemplateChipCard,
   TemplateGalleryButton,
   TemplateGalleryExpanded,
   usePresentationTemplates,
@@ -36,7 +37,7 @@ import {
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { appendSpeechTranscript } from '@/renderer/hooks/system/useSpeechInput';
 import { useLiveTranscriptInsertion } from '@/renderer/hooks/system/useLiveTranscriptInsertion';
-import { Button, ConfigProvider, Tag, Tooltip } from '@arco-design/web-react';
+import { Button, ConfigProvider } from '@arco-design/web-react';
 import { FolderOpen, Layers, Lightning, Paperclip, Star } from '@icon-park/react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -748,11 +749,10 @@ const GuidPage: React.FC = () => {
             templateChip={
               presentationTemplates.selectedTemplate ? (
                 <div className='flex flex-wrap items-center gap-8px mb-8px'>
-                  <Tooltip content={t('conversation.presentationTemplates.chipTooltip')}>
-                    <Tag color='purple' closable onClose={presentationTemplates.clearSelection}>
-                      {presentationTemplates.selectedTemplate.manifest.name}
-                    </Tag>
-                  </Tooltip>
+                  <TemplateChipCard
+                    template={presentationTemplates.selectedTemplate}
+                    onRemove={presentationTemplates.clearSelection}
+                  />
                 </div>
               ) : null
             }
