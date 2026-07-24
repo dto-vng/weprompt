@@ -11,30 +11,68 @@
 export type EmbedConfig = { baseUrl: string; apiKey: string; model: string };
 
 const BATCH_SIZE = 32;
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+// Bounds a single fetch to timeoutMs so a hung /embeddings call can't hang a
+// caller (e.g. an agent's search tool call) forever. Lets the resulting
+// AbortError propagate — callers already treat rejection as degrade/retry.
+const fetchWithTimeout = async (
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const isFiniteVector = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((v) => typeof v === 'number' && Number.isFinite(v));
 
 export const embedTexts = async (
   texts: string[],
   config: EmbedConfig,
-  deps?: { fetchImpl?: typeof fetch }
+  deps?: { fetchImpl?: typeof fetch; timeoutMs?: number }
 ): Promise<number[][]> => {
   const fetchImpl = deps?.fetchImpl ?? fetch;
+  const timeoutMs = deps?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const url = `${config.baseUrl.replace(/\/+$/, '')}/embeddings`;
   const all: number[][] = [];
   for (let start = 0; start < texts.length; start += BATCH_SIZE) {
     const input = texts.slice(start, start + BATCH_SIZE);
-    const resp = await fetchImpl(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-      body: JSON.stringify({ model: config.model, input }),
-    });
+    const resp = await fetchWithTimeout(
+      fetchImpl,
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+        body: JSON.stringify({ model: config.model, input }),
+      },
+      timeoutMs
+    );
     const body = await resp.text();
     if (!resp.ok) throw new Error(`Embedding request failed (HTTP ${resp.status}): ${body.slice(0, 300)}`);
-    const parsed = JSON.parse(body) as { data?: Array<{ index: number; embedding: number[] }> };
+    let parsed: { data?: Array<{ index: number; embedding: number[] }> };
+    try {
+      parsed = JSON.parse(body) as { data?: Array<{ index: number; embedding: number[] }> };
+    } catch {
+      throw new Error(`Embedding response was not valid JSON (HTTP ${resp.status}).`);
+    }
     if (!parsed.data || parsed.data.length !== input.length) {
       throw new Error('Embedding response did not include one vector per input.');
     }
-    const ordered = [...parsed.data].toSorted((a, b) => a.index - b.index);
-    all.push(...ordered.map((d) => d.embedding));
+    const ordered = [...parsed.data]
+      .toSorted((a, b) => a.index - b.index)
+      .map((d) => {
+        if (!isFiniteVector(d.embedding)) throw new Error('Embedding response contained a malformed vector.');
+        return d.embedding;
+      });
+    all.push(...ordered);
   }
   return all;
 };

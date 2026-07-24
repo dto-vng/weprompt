@@ -56,6 +56,54 @@ describe('embedTexts', () => {
     await embedTexts(['a'], { ...CONFIG, baseUrl: 'https://api.example.com/v1/' }, { fetchImpl: fetchImpl as never });
     expect(fetchImpl.mock.calls[0][0]).toBe('https://api.example.com/v1/embeddings');
   });
+
+  it('reorders vectors by response index even when the API returns them out of order', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          data: [
+            { index: 1, embedding: [0, 1] },
+            { index: 0, embedding: [1, 0] },
+          ],
+        }),
+    });
+    const result = await embedTexts(['a', 'b'], CONFIG, { fetchImpl: fetchImpl as never });
+    expect(result).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+  });
+
+  it('throws when the response vector count does not match the input count', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ data: [{ index: 0, embedding: [1, 0] }] }),
+    });
+    await expect(embedTexts(['a', 'b'], CONFIG, { fetchImpl: fetchImpl as never })).rejects.toThrow(
+      /one vector per input/
+    );
+  });
+
+  it('throws when a response vector contains a non-numeric entry', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ data: [{ index: 0, embedding: ['x'] }] }),
+    });
+    await expect(embedTexts(['a'], CONFIG, { fetchImpl: fetchImpl as never })).rejects.toThrow(/malformed/);
+  });
+
+  it('aborts and rejects when a request exceeds timeoutMs', async () => {
+    const fetchImpl = vi.fn().mockImplementation((_url: string, init: { signal: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      });
+    });
+    await expect(embedTexts(['a'], CONFIG, { fetchImpl: fetchImpl as never, timeoutMs: 10 })).rejects.toThrow();
+  });
 });
 
 describe('cosineSim', () => {
@@ -68,5 +116,9 @@ describe('cosineSim', () => {
   it('returns 0 for zero vectors or length mismatch', () => {
     expect(cosineSim([0, 0], [1, 0])).toBe(0);
     expect(cosineSim([1], [1, 0])).toBe(0);
+  });
+
+  it('accepts typed arrays such as Float32Array', () => {
+    expect(cosineSim(new Float32Array([1, 0]), [1, 0])).toBeCloseTo(1);
   });
 });
