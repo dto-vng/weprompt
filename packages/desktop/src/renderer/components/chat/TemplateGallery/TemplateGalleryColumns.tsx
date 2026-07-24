@@ -17,7 +17,9 @@ const COLUMNS = [
 
 const SIZE = {
   compact: { card: 'w-160px h-100px', img: 'w-160px h-100px' },
-  large: { card: 'w-240px h-150px', img: 'w-240px h-150px' },
+  // Sized so two cards fit per row inside a half-width column of the 800px
+  // landing layout (2×160 + 12 gap < ~360px column).
+  large: { card: 'w-160px h-100px', img: 'w-160px h-100px' },
 } as const;
 
 /**
@@ -46,55 +48,57 @@ const TemplateGalleryColumns: React.FC<{
             className='flex flex-col gap-10px min-w-0 flex-1'
           >
             <span className='text-12px font-medium text-t-secondary'>{t(column.labelKey)}</span>
-            {columnTemplates.map((template) => {
-              const id = template.manifest.id;
-              const isSelected = selectedId === id;
-              return (
-                <div key={id} className='flex flex-col'>
-                  <Tooltip content={template.manifest.description}>
-                    <Card
-                      hoverable
-                      bordered
-                      data-testid={`template-card-${id}`}
-                      className={`${dims.card} p-0 rd-8px cursor-pointer overflow-hidden relative ${isSelected ? 'b-2 b-solid border-aou-6' : ''}`}
-                      onClick={() => onSelect(template)}
-                      bodyStyle={{ padding: 0 }}
-                    >
-                      <img
-                        src={template.previewDataUrl}
-                        alt={template.manifest.name}
-                        className={`${dims.img} object-cover`}
-                      />
-                      {isSelected && (
-                        <span
-                          data-testid={`template-selected-${id}`}
-                          className='absolute inset-0 flex items-center justify-center gap-6px bg-[rgba(0,0,0,0.35)] text-white text-13px font-medium'
-                        >
-                          <CheckOne theme='filled' size='16' />
-                          {t('conversation.presentationTemplates.selected')}
-                        </span>
-                      )}
-                    </Card>
-                  </Tooltip>
-                  <div className='flex items-center justify-between mt-4px'>
-                    <span className='text-12px truncate'>{template.manifest.name}</span>
-                    {template.manifest.source === 'user' && (
-                      <Popconfirm
-                        title={t('conversation.presentationTemplates.deleteConfirm')}
-                        onOk={() => onRemove(id)}
+            <div className={size === 'large' ? 'flex flex-wrap gap-12px items-start' : 'flex flex-col gap-10px'}>
+              {columnTemplates.map((template) => {
+                const id = template.manifest.id;
+                const isSelected = selectedId === id;
+                return (
+                  <div key={id} className='flex flex-col'>
+                    <Tooltip content={template.manifest.description}>
+                      <Card
+                        hoverable
+                        bordered
+                        data-testid={`template-card-${id}`}
+                        className={`${dims.card} p-0 rd-8px cursor-pointer overflow-hidden relative ${isSelected ? 'b-2 b-solid border-aou-6' : ''}`}
+                        onClick={() => onSelect(template)}
+                        bodyStyle={{ padding: 0 }}
                       >
-                        <Button
-                          size='mini'
-                          shape='circle'
-                          icon={<Delete size='12' />}
-                          aria-label={t('conversation.presentationTemplates.deleteTooltip')}
+                        <img
+                          src={template.previewDataUrl}
+                          alt={template.manifest.name}
+                          className={`${dims.img} object-cover`}
                         />
-                      </Popconfirm>
-                    )}
+                        {isSelected && (
+                          <span
+                            data-testid={`template-selected-${id}`}
+                            className='absolute inset-0 flex items-center justify-center gap-6px bg-[rgba(0,0,0,0.35)] text-white text-13px font-medium'
+                          >
+                            <CheckOne theme='filled' size='16' />
+                            {t('conversation.presentationTemplates.selected')}
+                          </span>
+                        )}
+                      </Card>
+                    </Tooltip>
+                    <div className='flex items-center justify-between mt-4px'>
+                      <span className='text-12px truncate'>{template.manifest.name}</span>
+                      {template.manifest.source === 'user' && (
+                        <Popconfirm
+                          title={t('conversation.presentationTemplates.deleteConfirm')}
+                          onOk={() => onRemove(id)}
+                        >
+                          <Button
+                            size='mini'
+                            shape='circle'
+                            icon={<Delete size='12' />}
+                            aria-label={t('conversation.presentationTemplates.deleteTooltip')}
+                          />
+                        </Popconfirm>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
             {columnTemplates.length === 0 && (
               <span className='text-12px text-t-secondary'>{t('conversation.presentationTemplates.empty')}</span>
             )}

@@ -28,10 +28,10 @@ const TemplateGalleryExpanded: React.FC<{
   return (
     <section
       data-testid='template-gallery-expanded'
-      className='mt-18px w-full animate-fade-in bg-dialog-fill-0 b b-solid b-1 rd-12px p-16px'
+      className='mt-18px w-full box-border animate-fade-in bg-dialog-fill-0 b b-solid b-1 rd-12px p-12px'
       aria-label={t('conversation.presentationTemplates.title')}
     >
-      <div className='flex items-center justify-between mb-12px'>
+      <div className='flex items-center justify-between mb-8px'>
         <span className='text-14px font-medium'>{t('conversation.presentationTemplates.title')}</span>
         <div className='flex items-center gap-8px'>
           <Button size='mini' onClick={onImport} icon={<Upload size='12' />}>
