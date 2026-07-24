@@ -37,4 +37,13 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
       }
     }
   });
+
+  it('pptx packs carry the follow-up edit contract at version 3', () => {
+    const pptxPacks = BUILTIN_TEMPLATE_PACKS.filter((p) => p.manifest.format === 'pptx');
+    expect(pptxPacks.length).toBe(2);
+    for (const pack of pptxPacks) {
+      expect(pack.themeMd).toContain('## Follow-up edits');
+      expect(pack.manifest.version).toBeGreaterThanOrEqual(3);
+    }
+  });
 });

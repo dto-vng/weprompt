@@ -84,6 +84,16 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
    - `officecli view <file> text | grep -iE 'acme|jordan lee|emea|nrr|j\. lee|a\. kim|r\. shah|prepared by finance|q4 guidance raised|cac payback'` — these tokens exist only in the reference's sample content; any hit is a leftover you must replace or delete. Dividers and the closing slide are the most commonly forgotten — check them slide by slide.
 4. Visual audit: `officecli view <file> screenshot --page N` for every slide; inspect each image for overflow, overlap, low contrast and margin violations; fix and re-render until a full pass finds zero new issues (max 3 cycles).
 
+## Follow-up edits (all later change requests in this conversation)
+
+1. **Locate.** There is ONE live deck in the conversation directory — the `.pptx` you produced earlier. Edit it in place; never create a second deck file.
+2. **Target.** A slide number from the user names the target slide; an attached screenshot identifies it visually. If the target is ambiguous, run `officecli view <file> outline` and ask which slide — do not guess.
+3. **User overrides theme.** An explicit user styling request (colors, chart type, layout) overrides this spec's defaults. Comply, and note the deviation in one line of your reply. Do not refuse and do not ask for a waiver.
+4. **Edit.** Apply the change with officecli only (never raw OOXML). Preserve everything the user did not ask to change.
+5. **Verify.** Re-run `officecli validate <file>` and `officecli view <file> issues`; both must be clean before you reply (fix and re-run, max 3 cycles).
+6. **Show.** Re-render only the changed slide(s) into the conversation directory: `officecli view <file> screenshot --page N -o slide-N.png`, inspect the render for overflow, overlap and contrast, then embed it in your reply as a markdown image with an absolute path: `![Slide N](/absolute/path/to/slide-N.png)`.
+7. **Close the loop.** End with a one-line summary of what changed and invite the next adjustment.
+
 ## Voice
 
 Board-meeting register: numbers first, adjectives last. Every metric carries a period-over-period delta. Titles state findings ("Revenue beat plan by 18%"), not topics, and keep one grammar across the deck.
