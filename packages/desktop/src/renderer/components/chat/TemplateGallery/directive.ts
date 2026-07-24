@@ -6,9 +6,16 @@
 
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
 
+/**
+ * First sentence of each directive. Exported so the chat renderer can detect
+ * templated sends without duplicating strings that would silently drift.
+ */
+export const HTML_DIRECTIVE_PREFIX = 'Create a presentation/report from the request below.';
+export const PPTX_DIRECTIVE_PREFIX = 'Create a presentation from the request below.';
+
 const htmlDirective = (themeFile: string): string =>
   [
-    `Create a presentation/report from the request below.`,
+    HTML_DIRECTIVE_PREFIX,
     `Read the attached ${themeFile} and follow it exactly: produce ONE self-contained HTML file`,
     `(all CSS/JS inline; only CDN assets the theme spec explicitly allows).`,
     `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first and build from that data;`,
@@ -24,7 +31,7 @@ const OFFICE_SOURCE_EXT_RE = /\.(xlsx|xls|docx|doc|pptx|pdf|odt|ods|odp)$/i;
 
 const pptxDirective = (themeFile: string, referenceFile: string): string =>
   [
-    `Create a presentation from the request below.`,
+    PPTX_DIRECTIVE_PREFIX,
     `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
     `Before concluding anything about availability, run \`officecli --version\` in the shell;`,
     `only if that command itself fails should you stop — tell the user, quoting the failing command and its output; never conclude officecli is unavailable without running it.`,
