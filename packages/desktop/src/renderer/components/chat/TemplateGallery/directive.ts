@@ -11,11 +11,16 @@ const htmlDirective = (themeFile: string): string =>
     `Create a presentation/report from the request below.`,
     `Read the attached ${themeFile} and follow it exactly: produce ONE self-contained HTML file`,
     `(all CSS/JS inline; only CDN assets the theme spec explicitly allows).`,
-    `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
-    `\`officecli view <file> text\` in your shell reads Office files — and build from that data; never invent numbers when sources are attached.`,
+    `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first and build from that data;`,
+    `never invent numbers when sources are attached. officecli is a command-line program run through your shell/execute tool`,
+    `(it will not appear in your tool list): \`officecli view <file> text\` reads Office files; use plain shell tools for CSV/text.`,
+    `If officecli is genuinely missing from the shell, extract what you can with other tools and say so — do not stop.`,
     `Save it into the conversation workspace with a descriptive snake_case file name.`,
     `Do not invent facts to fill template slots.`,
   ].join(' ');
+
+/** User attachments that the agent should mine for content via officecli. */
+const OFFICE_SOURCE_EXT_RE = /\.(xlsx|xls|docx|doc|pptx|pdf|odt|ods|odp)$/i;
 
 const pptxDirective = (themeFile: string, referenceFile: string): string =>
   [
@@ -66,7 +71,9 @@ export function composePresentationSend(
     files: attachments,
     // Only the generic officecli skill resolves by name in the backend skill
     // registry; the specialized pptx design rules are pulled in-band via the
-    // directive's mandatory `officecli load_skill pptx` step instead.
-    injectSkills: manifest.format === 'pptx' ? ['officecli'] : [],
+    // directive's mandatory `officecli load_skill pptx` step instead. HTML
+    // sends get the skill too when the user attached Office source documents
+    // the agent must read with officecli.
+    injectSkills: manifest.format === 'pptx' || files.some((f) => OFFICE_SOURCE_EXT_RE.test(f)) ? ['officecli'] : [],
   };
 }

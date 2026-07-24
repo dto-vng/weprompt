@@ -59,4 +59,11 @@ describe('composePresentationSend', () => {
     const result = composePresentationSend(summary('html'), 'x', ['/abs/t1/THEME.md']);
     expect(result.files).toEqual(['/abs/t1/THEME.md']);
   });
+
+  it('html: injects the officecli skill only when office source documents are attached', () => {
+    const withSources = composePresentationSend(summary('html'), 'x', ['/user/q3 revenue.XLSX', '/user/notes.txt']);
+    expect(withSources.injectSkills).toEqual(['officecli']);
+    const withoutSources = composePresentationSend(summary('html'), 'x', ['/user/photo.png', '/user/notes.txt']);
+    expect(withoutSources.injectSkills).toEqual([]);
+  });
 });
