@@ -7,5 +7,5 @@
   <text x="24" y="112" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#00a650">The future is running</text>
   <rect x="24" y="132" width="120" height="34" rx="8" fill="#eef2f5"/>
   <rect x="24" y="132" width="4" height="34" fill="#00a650"/>
-  <text x="38" y="154" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1f2933">68 <tspan font-size="9" fill="#5b6b82">connected sites</tspan></text>
+  <text x="38" y="154" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1f2933">47 <tspan font-size="9" fill="#5b6b82">connected sites</tspan></text>
 </svg>
