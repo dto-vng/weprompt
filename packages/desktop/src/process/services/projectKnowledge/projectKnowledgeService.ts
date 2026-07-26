@@ -118,9 +118,13 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     await writeBm25(storeDir, buildBm25Index(remaining));
     const vectors = await readVectors(storeDir);
     if (vectors) {
-      const rows = [...vectors.rows.entries()].filter(([chunkId]) =>
-        remaining.some((c) => c.chunkId === chunkId && c.hasVector)
-      );
+      // Membership in `remaining` (surviving chunk ids) is the only thing that
+      // determines whether a vector row is kept — NOT the chunk's own
+      // hasVector flag. That flag can lag reality (e.g. writeVectors below
+      // succeeds but a later writeChunks fails inside embedMissingVectors's
+      // best-effort try/catch, leaving chunks.json stale). Trusting it here
+      // would silently delete valid vectors belonging to an untouched source.
+      const rows = [...vectors.rows.entries()].filter(([chunkId]) => remaining.some((c) => c.chunkId === chunkId));
       await writeVectors(storeDir, vectors.dim, rows);
     }
     await fs.rm(storePaths(storeDir).sourceDir(sourceId), { recursive: true, force: true });
@@ -313,6 +317,14 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       await saveManifest(projectId, manifest);
     });
 
+  /**
+   * Retry one failed source. Dual purpose, both parts load-bearing: the guard
+   * flips only `sourceId` back to `indexing` when it's `failed`, but the
+   * trailing `processPending` call is unconditional and re-scans EVERY
+   * `indexing` row in the project — that's also what rescues a row left
+   * stuck in `indexing` after a crash mid-ingest, since there is no other
+   * recovery path for that case.
+   */
   const retrySource = async (projectId: string, sourceId: string): Promise<void> =>
     enqueue(projectId, async () => {
       const manifest = await loadManifest(projectId);

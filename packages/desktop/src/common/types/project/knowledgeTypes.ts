@@ -19,6 +19,13 @@ export type IKnowledgeSourceDto = {
   chunkCount: number;
   vectorCount: number;
   addedAt: number;
+  /**
+   * Human-readable detail, overloaded by design: on a `failed` or
+   * `unsupported` source this is the fatal reason, but a `ready` source can
+   * ALSO carry a non-null, non-fatal note here (e.g. "Truncated to 2000
+   * passages." when a source exceeded the per-source chunk cap). Consumers
+   * must branch on `status`, never infer failure from `error` being present.
+   */
   error: string | null;
 };
 
