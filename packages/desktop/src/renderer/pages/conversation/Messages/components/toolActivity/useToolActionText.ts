@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CoalescedStep } from '@/common/chat/toolActivity/types';
 
-type Form = 'running' | 'done' | 'failedTitle';
+type Form = 'running' | 'done';
 
 // Resolve a localized phrase: exact tool → category → generic, all via i18n
 // defaultValue chaining so the UI never shows a raw tool id.
@@ -35,12 +35,6 @@ export const useToolActionText = () => {
           return `${base} ${t('messages.toolActivity.attempt', { n: step.attempts })}`;
         }
         return base;
-      },
-      failedTitle(step: CoalescedStep): string {
-        return resolveForm(step, 'failedTitle');
-      },
-      suggestion(): string {
-        return t('messages.toolActivity.error.suggestion');
       },
     };
   }, [t]);

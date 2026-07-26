@@ -108,6 +108,28 @@
         "canceled": "Detuve este turno antes de completar el trabajo previsto. Acciones previstas: {{total, number}}. Sin completar: {{unfinished, number}}. Detenidas: {{canceled, number}}."
       }
     },
+    "close": {
+      "completed": {
+        "v1": "Listo, todo ha salido según lo previsto. Dime qué te gustaría hacer a continuación.",
+        "v2": "Esto ya está terminado y funcionando. Dime por dónde quieres seguir a partir de aquí.",
+        "v3": "Hecho: todo ha encajado. Estoy listo para lo siguiente cuando tú lo estés."
+      },
+      "recovered": {
+        "v1": "Hecho: un paso necesitó un segundo intento, pero ya está todo resuelto.",
+        "v2": "Terminado: hizo falta un breve reintento por el camino, pero todo está en su sitio."
+      },
+      "partial": {
+        "v1": "He hecho casi todo. Un par de cosas aún necesitan otra pasada; tienes los detalles justo abajo.",
+        "v2": "Buen avance: la mayor parte está hecha, aunque algo todavía necesita otro intento. Encontrarás los detalles abajo."
+      },
+      "failed": {
+        "v1": "No he podido terminar esto. Tienes los detalles abajo y puedes pedirme que lo intente de nuevo cuando quieras.",
+        "v2": "Esto no ha salido adelante. Echa un vistazo a los detalles de abajo o simplemente dime que lo intente otra vez."
+      },
+      "canceled": {
+        "v1": "Me he detenido aquí. Dime si quieres que lo retome."
+      }
+    },
     "attempt": "(intento {{n}})",
     "generic": {
       "running": "Estoy avanzando con el siguiente paso.",

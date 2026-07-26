@@ -9,27 +9,19 @@ type LocalCronProcessingResult = {
   systemResponses: string[];
 };
 
-const THINK_TAG_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi;
-
-function stripThinkTags(text: string): string {
-  return text.replace(THINK_TAG_RE, '').trim();
-}
-
 /**
- * Strip think tags from the assistant message for display.
- * Cron job creation/update/listing is handled through the injected HTTP helper.
+ * Finalize a completed assistant message for the local-cron path.
+ *
+ * Legacy cron command text ([CRON_CREATE] etc.) is left visible as-is, and the
+ * model's `<think>` reasoning is now surfaced as distinct grey text by
+ * MessageText (via `splitThinkContent`). We therefore no longer strip or replace
+ * the assistant message here: the previous strip ran at turn finish and wiped the
+ * reasoning that had been shown while streaming. Returning no `displayContent`
+ * leaves the accumulated raw content untouched so the renderer can split it.
  */
 export async function processLocalCronResponse(
   _conversationId: string,
-  rawContent: string
+  _rawContent: string
 ): Promise<LocalCronProcessingResult> {
-  if (!rawContent.trim()) {
-    return { systemResponses: [] };
-  }
-
-  const thinkStripped = stripThinkTags(rawContent);
-  return {
-    displayContent: thinkStripped !== rawContent ? thinkStripped : undefined,
-    systemResponses: [],
-  };
+  return { systemResponses: [] };
 }

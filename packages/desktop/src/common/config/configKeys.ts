@@ -20,6 +20,8 @@ export type ConfigKeyMap = {
   'theme.userThemes': Theme[];
   'workspace.pasteConfirm': boolean | undefined;
   'guid.lastAssistantId': string | undefined;
+  // Global per-user instructions injected into every new conversation.
+  'user.context': { enabled: boolean; instructions: string } | undefined;
   'upload.saveToWorkspace': boolean | undefined;
   'system.closeToTray': boolean | undefined;
   'system.notificationEnabled': boolean | undefined;

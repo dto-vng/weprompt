@@ -139,8 +139,10 @@ import {
 import { fromBackendCompareResult, type RawCompareResult } from './fileSnapshotMapper';
 import {
   absoluteToRelativePath,
+  fromBackendDirOrFiles,
   fromBackendWorkspaceFlatFiles,
   fromBackendWorkspaceList,
+  type RawDirOrFile,
   type RawWorkspaceFlatFile,
 } from './workspaceMapper';
 
@@ -592,7 +594,12 @@ export const presentationTemplates = {
 // ---------------------------------------------------------------------------
 
 export const fs = {
-  getFilesByDir: httpPost<Array<IDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+  getFilesByDir: withResponseMap(
+    // `/api/fs/dir` (aioncore DirOrFileResponse) returns snake_case keys, so the
+    // raw wire type is RawDirOrFile; the mapper converts it to IDirOrFile.
+    httpPost<Array<RawDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+    fromBackendDirOrFiles
+  ),
   listWorkspaceFiles: withResponseMap(
     httpPost<Array<RawWorkspaceFlatFile>, { root: string }>('/api/fs/list'),
     fromBackendWorkspaceFlatFiles
@@ -1656,6 +1663,11 @@ export interface ICreateConversationParams {
     context?: string;
     context_file_name?: string;
     context_handoff?: TConversationContextHandoffExtra;
+    /** Global/project instructions injected as the first-turn preset context
+     *  (acp/codex). Composed client-side by resolveInjectedContext. */
+    preset_context?: string;
+    /** Same, for the native aionrs runtime (merged into system_prompt). */
+    preset_rules?: string;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];

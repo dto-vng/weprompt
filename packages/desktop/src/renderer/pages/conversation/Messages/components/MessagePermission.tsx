@@ -9,6 +9,7 @@ import { ipcBridge } from '@/common';
 import { Button, Card, Typography } from '@arco-design/web-react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { summarizePermission } from './permissionIntent';
 
 const { Text } = Typography;
 
@@ -25,13 +26,15 @@ const actionIcons: Record<string, string> = {
 
 const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ message }) => {
   const { t } = useTranslation();
-  const { options = [], description, title, action, call_id, command_type } = message.content || {};
+  const { options = [], description, title, action, call_id } = message.content || {};
 
   const [isResponding, setIsResponding] = useState(false);
   const [hasResponded, setHasResponded] = useState(false);
 
-  const icon = actionIcons[action || ''] || '🔐';
-  const displayTitle = title || description || t('messages.permissionRequest');
+  const summary = summarizePermission({ action, command: description });
+  const icon = summary.destructive ? '⚠️' : actionIcons[action || ''] || '🔐';
+  const displayTitle =
+    summary.intentKey === 'messages.permission.intent.generic' ? title || t(summary.intentKey) : t(summary.intentKey);
   const handleConfirm = async (selected: string) => {
     if (hasResponded || isResponding) return;
 
@@ -60,9 +63,14 @@ const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ messag
           <span className='text-2xl'>{icon}</span>
           <Text className='block'>{displayTitle}</Text>
         </div>
-        {description && description !== displayTitle && (
+        {summary.destructive && (
           <div>
-            <Text className='text-xs text-t-secondary'>{description}</Text>
+            <Text className='text-13px text-warning'>{t('messages.permission.destructiveWarning')}</Text>
+          </div>
+        )}
+        {summary.command && (
+          <div className='rd-6px p-x-10px p-y-8px' style={{ background: 'var(--bg-2)' }}>
+            <Text className='font-mono text-12px text-t-secondary [word-break:break-all]'>{summary.command}</Text>
           </div>
         )}
         {!hasResponded && (
@@ -73,10 +81,14 @@ const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ messag
                 {options.map((option, index) => {
                   const value = String(option.value);
                   const isDeny = /deny|reject|cancel|no/i.test(value);
+                  // For destructive actions, don't let "always allow" look like a
+                  // casual default — mute it so auto-approving deletes is deliberate.
+                  const isAlwaysAllow = /always/i.test(value);
+                  const deEmphasize = isDeny || (summary.destructive && isAlwaysAllow);
                   return (
                     <Button
                       key={value || `option_${index}`}
-                      type={isDeny ? 'secondary' : 'primary'}
+                      type={deEmphasize ? 'secondary' : 'primary'}
                       size='small'
                       disabled={isResponding}
                       onClick={() => void handleConfirm(value)}

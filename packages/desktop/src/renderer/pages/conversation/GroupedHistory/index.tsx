@@ -13,6 +13,7 @@ import { useCronJobsMap } from '@/renderer/pages/cron';
 import { restrictToVerticalAxis } from '@/renderer/utils/ui/dndModifiers';
 import { ProjectCreateModal } from '@/renderer/pages/conversation/projects/ProjectCreateModal';
 import { buildProjectSidebarGroups } from '@/renderer/pages/conversation/projects/projectGrouping';
+import { resolveProjectClickTarget } from '@/renderer/pages/conversation/projects/projectNavigation';
 import { createProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { useProjects } from '@/renderer/pages/conversation/projects/useProjects';
 import { emitter } from '@/renderer/utils/emitter';
@@ -635,7 +636,14 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                   <div key={group.workspace} className='min-w-0'>
                     <WorkspaceCollapse
                       expanded={expandedWorkspaces.includes(group.workspace)}
-                      onToggle={() => handleToggleWorkspace(group.workspace)}
+                      onToggle={() => {
+                        const target = resolveProjectClickTarget(group);
+                        if (target.kind === 'home') {
+                          void navigate(target.path);
+                        } else {
+                          handleToggleWorkspace(group.workspace);
+                        }
+                      }}
                       siderCollapsed={collapsed}
                       stickyHeader
                       stickyTop={28}
