@@ -129,6 +129,36 @@ describe('projectKnowledgeService', () => {
     expect(chunks[0].text).toContain('converted body text');
   });
 
+  it('reuses the existing row when re-adding a file whose ingestion previously failed', async () => {
+    let fail = true;
+    const svc = createProjectKnowledgeService({
+      storeRootDir: root,
+      listProviders: async () => [],
+      embedTextsImpl: embedMock as never,
+      convertToMarkdown: async () => {
+        if (fail) throw new Error('converter crashed');
+        return '# ok\n\nrecovered body';
+      },
+      getServerScriptPath: () => '/x.js',
+      onUpdated: () => {},
+    });
+    const file = await addFile('spec.docx', 'binary');
+    await svc.addSources('proj-3', [file]);
+    await svc.whenIdle('proj-3');
+    let list = await svc.listSources('proj-3');
+    expect(list.sources).toHaveLength(1);
+    expect(list.sources[0].status).toBe('failed');
+    const failedId = list.sources[0].id;
+
+    fail = false;
+    await svc.addSources('proj-3', [file]);
+    await svc.whenIdle('proj-3');
+    list = await svc.listSources('proj-3');
+    expect(list.sources).toHaveLength(1);
+    expect(list.sources[0].id).toBe(failedId);
+    expect(list.sources[0].status).toBe('ready');
+  });
+
   it('listSources returns empty result for an unknown project', async () => {
     expect(await service.listSources('nope')).toEqual({
       sources: [],

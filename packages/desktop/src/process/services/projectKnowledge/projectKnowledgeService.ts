@@ -178,8 +178,19 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         continue;
       }
       const contentHash = `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
-      if (manifest.sources.some((s) => s.contentHash === contentHash && s.status !== 'failed')) {
-        continue; // unchanged re-add — no-op
+      const existingSameHash = manifest.sources.find((s) => s.contentHash === contentHash);
+      if (existingSameHash) {
+        if (existingSameHash.status !== 'failed') continue; // unchanged re-add — no-op
+        // A previous ingestion of this exact content failed. The source id is derived
+        // from the content hash, so pushing a new row would duplicate the id — reuse
+        // the existing row and queue another attempt instead. Re-write the snapshot in
+        // case it was lost, then let processPending pick it up.
+        const retryDir = storePaths(storeDir).sourceDir(existingSameHash.id);
+        await fs.mkdir(retryDir, { recursive: true });
+        await fs.writeFile(path.join(retryDir, `original.${extension}`), buffer);
+        existingSameHash.status = 'indexing';
+        existingSameHash.error = null;
+        continue;
       }
       const sourceId = contentHash.slice(7, 19);
       const previous = manifest.sources.find(
@@ -214,8 +225,11 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       if (dim === 0) return manifest;
       // Captured into a local const (rather than repeatedly re-reading
       // manifest.embedding) so the non-null value survives the awaits below.
+      // Not assigned onto manifest.embedding until writeVectors below actually
+      // succeeds — otherwise a throw from writeVectors (e.g. a provider
+      // returning inconsistent per-row dimensions) would pin a model on the
+      // manifest despite zero vectors ever having been persisted.
       const embedding = manifest.embedding ?? { model, dim };
-      manifest.embedding = embedding;
       const existing = await readVectors(storeDir);
       const rows = existing && existing.dim === embedding.dim ? [...existing.rows.entries()] : [];
       missing.forEach((chunk, i) => {
@@ -223,6 +237,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         chunk.hasVector = true;
       });
       await writeVectors(storeDir, embedding.dim, rows);
+      manifest.embedding = embedding;
       await writeChunks(storeDir, chunks);
       for (const source of manifest.sources) {
         source.vectorCount = chunks.filter((c) => c.sourceId === source.id && c.hasVector).length;
