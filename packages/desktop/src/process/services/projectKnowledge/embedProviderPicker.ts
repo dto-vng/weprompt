@@ -30,7 +30,15 @@ export const pickEmbeddingModel = (providers: IProvider[]): { providerId: string
 export const resolveEmbedConfigForModel = (providers: IProvider[], model: string): EmbedConfig | null => {
   const provider = providers.find((p) => isUsable(p) && (p.models ?? []).includes(model));
   if (!provider) return null;
-  const apiKey = provider.api_key.split(/[,\n]/)[0].trim();
+  // Mirrors ApiKeyManager.parseKeys / RotatingApiClient.parseMultipleKeys: split on
+  // comma/newline, trim each segment, drop blanks, then take the first. Trimming
+  // before selecting (rather than trimming only the first raw segment) keeps this
+  // in lockstep with the rest of the app's multi-key parsing, so the picker never
+  // hands out a key the rotating client itself would have skipped.
+  const apiKey = provider.api_key
+    .split(/[,\n]/)
+    .map((key) => key.trim())
+    .find((key) => key.length > 0);
   if (!apiKey) return null;
   return { baseUrl: provider.base_url, apiKey, model };
 };

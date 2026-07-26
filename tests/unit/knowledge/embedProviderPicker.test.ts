@@ -42,6 +42,14 @@ describe('pickEmbeddingModel', () => {
     ];
     expect(pickEmbeddingModel(providers)).toEqual({ providerId: 'ok', model: 'bge-large-zh' });
   });
+
+  it('skips providers with a whitespace-only base_url', () => {
+    const providers = [
+      provider({ id: 'blank-url', base_url: '   ', models: ['text-embedding-3-small'] }),
+      provider({ id: 'ok', models: ['bge-large-zh'] }),
+    ];
+    expect(pickEmbeddingModel(providers)).toEqual({ providerId: 'ok', model: 'bge-large-zh' });
+  });
 });
 
 describe('resolveEmbedConfigForModel', () => {
@@ -56,5 +64,28 @@ describe('resolveEmbedConfigForModel', () => {
 
   it('returns null when the pinned model is no longer configured', () => {
     expect(resolveEmbedConfigForModel([provider({ models: ['gpt-4o'] })], 'text-embedding-3-small')).toBeNull();
+  });
+
+  it('skips a leading blank segment and takes the first non-blank key', () => {
+    const providers = [provider({ id: 'e', models: ['text-embedding-3-small'], api_key: ',sk-a' })];
+    expect(resolveEmbedConfigForModel(providers, 'text-embedding-3-small')).toEqual({
+      baseUrl: 'https://api.x.com/v1',
+      apiKey: 'sk-a',
+      model: 'text-embedding-3-small',
+    });
+  });
+
+  it('trims stray \\r from CRLF-separated keys and takes the first non-blank one', () => {
+    const providers = [provider({ id: 'e', models: ['text-embedding-3-small'], api_key: '\r\nsk-a\r\nsk-b' })];
+    expect(resolveEmbedConfigForModel(providers, 'text-embedding-3-small')).toEqual({
+      baseUrl: 'https://api.x.com/v1',
+      apiKey: 'sk-a',
+      model: 'text-embedding-3-small',
+    });
+  });
+
+  it('returns null when api_key is only separators', () => {
+    const providers = [provider({ id: 'e', models: ['text-embedding-3-small'], api_key: ',,' })];
+    expect(resolveEmbedConfigForModel(providers, 'text-embedding-3-small')).toBeNull();
   });
 });
