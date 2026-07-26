@@ -12,6 +12,7 @@ import { initWindowControlsBridge } from './windowControlsBridge';
 import { initNotificationBridge } from './notificationBridge';
 import { initWebuiBridge } from './webuiBridge';
 import { initThemeBridge } from './themeBridge';
+import { initProjectKnowledgeBridge } from './projectKnowledgeBridge';
 import { ipcBridge } from '@/common';
 import type { TLocalContextCompactionErrorCode } from '@/common/adapter/ipcBridge';
 import { compactContextLocally } from '@process/services/contextCompactionService';
@@ -56,12 +57,14 @@ export function initAllBridges(_deps: BridgeDependencies = {}): void {
   initWebuiBridge();
   initThemeBridge();
   initContextCompactionBridge();
+  initProjectKnowledgeBridge();
 }
 
 export {
   initApplicationBridge,
   initDialogBridge,
   initNotificationBridge,
+  initProjectKnowledgeBridge,
   initSystemSettingsBridge,
   initThemeBridge,
   initUpdateBridge,
