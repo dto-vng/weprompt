@@ -59,3 +59,7 @@ export function isBuiltinVisionTransport(
     transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_VISION_SCRIPT}.js`))
   );
 }
+
+export const BUILTIN_KNOWLEDGE_ID = 'builtin-project-knowledge';
+export const BUILTIN_KNOWLEDGE_NAME = 'aionui-project-knowledge';
+export const BUILTIN_KNOWLEDGE_SCRIPT = 'builtin-mcp-knowledge';
