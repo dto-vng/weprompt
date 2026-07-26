@@ -8,7 +8,7 @@
 // BM25 + cosine retrieval fused with RRF, and format hits as MCP tool text.
 // Node-side (fs via store.ts) — used by the knowledge MCP subprocess.
 
-import { searchBm25, tokenize } from './bm25';
+import { buildBm25Index, searchBm25, tokenize } from './bm25';
 import { cosineSim } from './embedCore';
 import { fuseRrf } from './rrf';
 import { readBm25, readChunks, readManifest, readVectors, type KnowledgeVectors } from './store';
@@ -31,7 +31,15 @@ export const loadStore = async (storeDir: string): Promise<KnowledgeStoreData> =
     throw new Error(`Knowledge store missing or unsupported at ${storeDir}`);
   }
   const chunkList = await readChunks(storeDir);
-  const bm25 = (await readBm25(storeDir)) ?? { totalDocs: 0, avgDocLen: 0, docLens: {}, postings: {} };
+  let bm25 = (await readBm25(storeDir)) ?? { totalDocs: 0, avgDocLen: 0, docLens: {}, postings: {} };
+  if (bm25.totalDocs !== chunkList.length) {
+    // chunks.json and bm25.json are written independently (see store.ts), so a
+    // load that races a concurrent re-index can pair chunks from one
+    // generation with a bm25 index built for another (or a stale one from
+    // before the newest write lands). Rebuilding from the chunks we just read
+    // guarantees a self-consistent view; cheap at this scale.
+    bm25 = buildBm25Index(chunkList);
+  }
   const vectors = await readVectors(storeDir);
   return {
     manifest,
@@ -54,20 +62,33 @@ export const searchKnowledge = async (
   options: SearchOptions
 ): Promise<KnowledgeHit[]> => {
   const queryTokens = tokenize(query);
-  if (queryTokens.length === 0 && query.trim() === '') return [];
+  // No lexical signal at all (blank, or punctuation/emoji-only) — nothing for
+  // BM25 to match, and not worth firing a real (up to DEFAULT_TIMEOUT_MS) embed
+  // call over. Short-circuit before either retrieval path runs.
+  if (queryTokens.length === 0) return [];
 
   const bm25List = searchBm25(store.bm25, queryTokens, CANDIDATES_PER_LIST);
 
   let semanticList: Array<{ chunkId: string }> = [];
-  if (options.embed && store.vectors && store.vectors.rows.size > 0) {
+  const vectors = store.vectors;
+  if (options.embed && vectors && vectors.rows.size > 0) {
     try {
       const queryVector = await options.embed(query);
-      semanticList = [...store.vectors.rows.entries()]
+      if (queryVector.length !== vectors.dim) {
+        // The embed config has drifted from whatever the store was actually
+        // indexed with. cosineSim degrades silently to 0 for every row in
+        // that case, which would fill the semantic list with meaningless
+        // zero-score "ties" whose RRF rank contributions can still outrank
+        // genuine BM25 hits. Treat it the same as an embed failure so the
+        // query degrades to BM25-only instead.
+        throw new Error('Embedding dimension does not match the knowledge store.');
+      }
+      semanticList = [...vectors.rows.entries()]
         .map(([chunkId, vec]) => ({ chunkId, score: cosineSim(queryVector, vec) }))
         .toSorted((a, b) => b.score - a.score)
         .slice(0, CANDIDATES_PER_LIST);
     } catch {
-      semanticList = []; // degrade cleanly to BM25-only
+      semanticList = []; // degrade cleanly to BM25-only (includes dimension mismatch above)
     }
   }
 

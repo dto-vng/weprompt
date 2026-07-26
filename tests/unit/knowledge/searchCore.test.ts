@@ -78,6 +78,14 @@ describe('searchCore', () => {
     await expect(loadStore(path.join(dir, 'missing'))).rejects.toThrow();
   });
 
+  it('rebuilds the bm25 index from chunks when it is stale relative to chunks.json (torn pair)', async () => {
+    await seedStore(dir, false);
+    await writeBm25(dir, buildBm25Index(CHUNKS.slice(0, 1))); // stale: indexed only 1 of 3 chunks
+    const store = await loadStore(dir);
+    const hits = await searchKnowledge(store, 'wifi password', { maxResults: 2 });
+    expect(hits.some((h) => h.text.includes('wifi password rotation'))).toBe(true);
+  });
+
   it('finds passages by keyword (BM25-only store)', async () => {
     await seedStore(dir, false);
     const store = await loadStore(dir);
@@ -109,6 +117,55 @@ describe('searchCore', () => {
     await seedStore(dir, false);
     const store = await loadStore(dir);
     expect(await searchKnowledge(store, '   ', { maxResults: 3 })).toEqual([]);
+  });
+
+  it('skips punctuation-only queries without calling embed (no lexical signal)', async () => {
+    await seedStore(dir, true);
+    const store = await loadStore(dir);
+    const embed = vi.fn().mockResolvedValue([1, 0]);
+    const hits = await searchKnowledge(store, '???', { maxResults: 3, embed });
+    expect(hits).toEqual([]);
+    expect(embed).not.toHaveBeenCalled();
+  });
+
+  it('degrades to BM25 when the embed vector dimension does not match the stored vectors', async () => {
+    await seedStore(dir, true); // vectors are dim 2
+    const store = await loadStore(dir);
+    const embed = vi.fn().mockResolvedValue([1, 0, 0]); // dim 3 — drifted from the store
+    const hits = await searchKnowledge(store, 'visa letter', { maxResults: 3, embed });
+    expect(hits[0].text).toContain('visa letter process');
+    const bm25Only = await searchKnowledge(store, 'visa letter', { maxResults: 3 });
+    expect(hits.map((h) => h.text)).toEqual(bm25Only.map((h) => h.text));
+  });
+
+  it('drops hits whose chunk no longer exists in the store (defensive)', async () => {
+    await seedStore(dir, false);
+    const store = await loadStore(dir);
+    store.chunks.delete('s1#1');
+    const hits = await searchKnowledge(store, 'expense reports thirty days', { maxResults: 3 });
+    expect(hits.some((h) => h.text.includes('expense reports'))).toBe(false);
+  });
+
+  it('falls back to the sourceId when the manifest is missing a source name', async () => {
+    await seedStore(dir, false);
+    const store = await loadStore(dir);
+    store.sourceNameById.delete('s2');
+    const hits = await searchKnowledge(store, 'wifi password rotation', { maxResults: 1 });
+    expect(hits[0].sourceName).toBe('s2');
+  });
+
+  it('changes the fused ranking vs BM25-only when both signals are non-empty (order-sensitive)', async () => {
+    await seedStore(dir, true);
+    const store = await loadStore(dir);
+    const idOf = (h: KnowledgeHit) => `${h.sourceId}#${h.chunkIndex}`;
+
+    const bm25Only = await searchKnowledge(store, 'visa expense', { maxResults: 3 });
+    const embed = vi.fn().mockResolvedValue([0.7, 0.7]); // parallel to s2#0's vector; no lexical overlap with the query
+    const fused = await searchKnowledge(store, 'visa expense', { maxResults: 3, embed });
+
+    expect(bm25Only.map(idOf)).toEqual(['s1#0', 's1#1']); // s2#0 has zero lexical overlap with 'visa expense'
+    expect(fused.map(idOf)).toContain('s2#0'); // the semantic list pulls it into the fused results
+    expect(fused.map(idOf)).not.toEqual(bm25Only.map(idOf));
   });
 });
 
