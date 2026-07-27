@@ -54,6 +54,7 @@ import type {
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type { DashboardTemplateSummary } from '@/common/types/office/dashboardTemplate';
 import type {
   EnsureConversationRuntimeResponse,
   GetConfigOptionsResponse,
@@ -587,6 +588,20 @@ export const presentationTemplates = {
     { file_path: string }
   >('presentation-templates.import-spec'),
   remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
+};
+
+// ---------------------------------------------------------------------------
+// Dashboards — Electron main-process store (bridge IPC); builtin + published
+// ---------------------------------------------------------------------------
+
+export const dashboards = {
+  list: bridge.buildProvider<DashboardTemplateSummary[], void>('dashboards.list'),
+  read: bridge.buildProvider<string, { id: string }>('dashboards.read'),
+  publish: bridge.buildProvider<
+    { ok: true; dashboard: DashboardTemplateSummary } | { ok: false; error: string },
+    { name: string; html: string }
+  >('dashboards.publish'),
+  remove: bridge.buildProvider<boolean, { id: string }>('dashboards.remove'),
 };
 
 // ---------------------------------------------------------------------------

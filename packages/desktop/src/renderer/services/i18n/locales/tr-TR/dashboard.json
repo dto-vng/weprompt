@@ -2,5 +2,13 @@
   "title": "Pano",
   "subtitle": "Canlı personel, ayrılma ve elde tutma",
   "refresh": "Yenile",
-  "scheduleRun": "Yenilemeyi zamanla"
+  "scheduleRun": "Yenilemeyi zamanla",
+  "publish": "Panoya yayınla",
+  "publishSuccess": "Panoya yayınlandı",
+  "publishError": "Yayınlama başarısız: {{error}}",
+  "empty": "Henüz pano yok",
+  "back": "Galeriye dön",
+  "delete": "Sil",
+  "deleteConfirm": "Bu pano silinsin mi?",
+  "builtinBadge": "Yerleşik"
 }
