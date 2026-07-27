@@ -17,6 +17,7 @@ import type { IKnowledgeSourceDto, IProjectKnowledgeListResult } from '@/common/
 import { chunkMarkdown } from '@/common/knowledge/chunker';
 import { buildBm25Index } from '@/common/knowledge/bm25';
 import { embedTexts as defaultEmbedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
+import { KB_ENV } from '@/common/knowledge/envKeys';
 import {
   createEmptyManifest,
   readChunks,
@@ -358,8 +359,8 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     if (!manifest) return null;
     if (!manifest.sources.some((s) => s.status === 'ready' && s.chunkCount > 0)) return null;
     const env: Record<string, string> = {
-      AIONUI_KB_PROJECT_ID: projectId,
-      AIONUI_KB_STORE_DIR: storeDirOf(projectId),
+      [KB_ENV.projectId]: projectId,
+      [KB_ENV.storeDir]: storeDirOf(projectId),
     };
     if (manifest.embedding) {
       const embedding = manifest.embedding;
@@ -368,9 +369,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         .then((providers) => resolveEmbedConfigForModel(providers, embedding.model))
         .catch((): EmbedConfig | null => null);
       if (config) {
-        env.AIONUI_KB_EMBED_BASE_URL = config.baseUrl;
-        env.AIONUI_KB_EMBED_API_KEY = config.apiKey;
-        env.AIONUI_KB_EMBED_MODEL = config.model;
+        env[KB_ENV.embedBaseUrl] = config.baseUrl;
+        env[KB_ENV.embedApiKey] = config.apiKey;
+        env[KB_ENV.embedModel] = config.model;
       }
     }
     return {

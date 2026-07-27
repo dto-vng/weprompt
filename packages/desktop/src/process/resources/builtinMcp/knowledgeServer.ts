@@ -12,6 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
+import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
 import { BUILTIN_KNOWLEDGE_NAME } from './constants';
 
@@ -22,13 +23,13 @@ export type KnowledgeServerEnv = {
 };
 
 export function parseKnowledgeServerEnv(env: Record<string, string | undefined>): KnowledgeServerEnv | null {
-  const storeDir = env.AIONUI_KB_STORE_DIR;
+  const storeDir = env[KB_ENV.storeDir];
   if (!storeDir) return null;
-  const baseUrl = env.AIONUI_KB_EMBED_BASE_URL;
-  const apiKey = env.AIONUI_KB_EMBED_API_KEY;
-  const model = env.AIONUI_KB_EMBED_MODEL;
+  const baseUrl = env[KB_ENV.embedBaseUrl];
+  const apiKey = env[KB_ENV.embedApiKey];
+  const model = env[KB_ENV.embedModel];
   return {
-    projectId: env.AIONUI_KB_PROJECT_ID ?? '',
+    projectId: env[KB_ENV.projectId] ?? '',
     storeDir,
     embed: baseUrl && apiKey && model ? { baseUrl, apiKey, model } : null,
   };

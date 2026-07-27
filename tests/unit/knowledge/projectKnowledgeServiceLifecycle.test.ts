@@ -15,6 +15,7 @@ import {
   createProjectKnowledgeService,
   type ProjectKnowledgeService,
 } from '@/process/services/projectKnowledge/projectKnowledgeService';
+import { parseKnowledgeServerEnv } from '@/process/resources/builtinMcp/knowledgeServer';
 
 const EMBED_PROVIDER = {
   id: 'embed',
@@ -191,6 +192,33 @@ describe('projectKnowledgeService lifecycle', () => {
       const env = (server!.transport as { env: Record<string, string> }).env;
       expect(env.AIONUI_KB_EMBED_BASE_URL).toBeUndefined();
       expect(env.AIONUI_KB_STORE_DIR).toBe(path.join(root, 'p1'));
+    });
+
+    it('produces env that the knowledge subprocess parser accepts (round trip)', async () => {
+      await seed('a.md', 'searchable content here');
+      const server = await service.getSessionMcpServer('p1');
+      const env = (server!.transport as { env: Record<string, string> }).env;
+      const parsed = parseKnowledgeServerEnv(env);
+      expect(parsed).not.toBeNull();
+      expect(parsed!.storeDir).toBe(path.join(root, 'p1'));
+      expect(parsed!.projectId).toBe('p1');
+      expect(parsed!.embed).toEqual({
+        baseUrl: 'https://api.x.com/v1',
+        apiKey: 'sk-1',
+        model: 'text-embedding-3-small',
+      });
+    });
+
+    it('round trip yields BM25-only (embed null) when the pinned model is no longer resolvable', async () => {
+      await seed('a.md', 'searchable content here');
+      providers = []; // provider got deleted after indexing
+      const server = await service.getSessionMcpServer('p1');
+      const env = (server!.transport as { env: Record<string, string> }).env;
+      const parsed = parseKnowledgeServerEnv(env);
+      expect(parsed).not.toBeNull();
+      expect(parsed!.storeDir).toBe(path.join(root, 'p1'));
+      expect(parsed!.projectId).toBe('p1');
+      expect(parsed!.embed).toBeNull();
     });
   });
 });
