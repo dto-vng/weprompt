@@ -24,6 +24,7 @@ const ScheduledTasksPage = React.lazy(() => import('@renderer/pages/cron/Schedul
 const TaskDetailPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage/TaskDetailPage'));
 const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
 const ProjectHome = React.lazy(() => import('@renderer/pages/project'));
+const DashboardPage = React.lazy(() => import('@renderer/pages/dashboard'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -68,6 +69,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
         <Route element={<ProtectedLayout layout={layout} />}>
           <Route index element={<Navigate to='/guid' replace />} />
           <Route path='/guid' element={withRouteFallback(Guid)} />
+          <Route path='/dashboard' element={withRouteFallback(DashboardPage)} />
           <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
           <Route path='/project/:id' element={withRouteFallback(ProjectHome)} />
           <Route

@@ -1001,6 +1001,10 @@ export type I18nKey =
   | 'cron.status.unread'
   | 'cron.taskCount'
   | 'cron.trigger.runScheduledTask'
+  | 'dashboard.refresh'
+  | 'dashboard.scheduleRun'
+  | 'dashboard.subtitle'
+  | 'dashboard.title'
   | 'fileSelection.pleaseSelectDirectory'
   | 'fileSelection.pleaseSelectFile'
   | 'fileSelection.selectDirectory'
@@ -2894,4 +2898,5 @@ export type I18nModule =
   | 'guid'
   | 'agent'
   | 'team'
-  | 'pet';
+  | 'pet'
+  | 'dashboard';
