@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -117,5 +118,46 @@ describe('knowledge store', () => {
     bytes[0] = bytes[0] ^ 0xff; // flip a byte in place — same byte length, different content
     writeFileSync(vectorsFile, bytes);
     expect(await readVectors(dir)).toBeNull();
+  });
+
+  // sourceId is interpolated straight into a path whose directory is removed
+  // recursively when a source is dropped (removeSourceRows in
+  // projectKnowledgeService), so a traversing id must be rejected before it
+  // reaches the filesystem. Defense in depth: the native IPC schema already
+  // rejects such ids, but main-process callers need not come through it.
+  describe('sourceDir traversal guard', () => {
+    it('resolves an ordinary sourceId inside the store', () => {
+      expect(storePaths(dir).sourceDir('abc123')).toBe(path.join(dir, 'sources', 'abc123'));
+    });
+
+    it('rejects a sourceId that resolves outside the store, without touching anything there', async () => {
+      // Sentinel directory OUTSIDE the store. `dir` and this sentinel are both
+      // direct children of tmpdir(), so '../../<sentinel-basename>' resolves
+      // from `<dir>/sources` straight to it — simulating a traversing sourceId.
+      // Unguarded, removeSourceRows' recursive rm is what deletes the sentinel.
+      const outsideDir = mkdtempSync(path.join(tmpdir(), 'kb-store-outside-'));
+      const markerFile = path.join(outsideDir, 'do-not-delete.txt');
+      writeFileSync(markerFile, 'must survive');
+      const traversingId = path.join('..', '..', path.basename(outsideDir));
+
+      try {
+        // Same call shape as removeSourceRows: the rm runs only if sourceDir
+        // hands back a path at all.
+        await expect(async () =>
+          rm(storePaths(dir).sourceDir(traversingId), { recursive: true, force: true })
+        ).rejects.toThrow(/Invalid source id/);
+        expect(existsSync(markerFile)).toBe(true);
+      } finally {
+        rmSync(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an absolute sourceId', () => {
+      expect(() => storePaths(dir).sourceDir(path.resolve(dir, '..', 'elsewhere'))).toThrow(/Invalid source id/);
+    });
+
+    it('rejects a sourceId that resolves to the sources directory itself', () => {
+      expect(() => storePaths(dir).sourceDir('.')).toThrow(/Invalid source id/);
+    });
   });
 });

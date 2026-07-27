@@ -14,9 +14,26 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { Bm25Index, KnowledgeChunk, KnowledgeManifest } from './types';
 
+// Join a caller-supplied segment onto a directory, refusing anything that does
+// not land strictly inside it. Mirrors storeDirOf in projectKnowledgeService:
+// ids reaching this layer are already constrained by the native IPC schema, but
+// main-process callers need not come through it, and the directory this builds
+// gets removed recursively when a source is dropped.
+const resolveChild = (parentDir: string, segment: string, label: string): string => {
+  const resolvedParent = path.resolve(parentDir);
+  const target = path.resolve(resolvedParent, segment);
+  if (!target.startsWith(resolvedParent + path.sep)) {
+    throw new Error(`Invalid ${label}: ${segment}`);
+  }
+  return target;
+};
+
+// Every path below is a literal segment joined onto storeDir except sourceDir,
+// which is the one helper taking caller-supplied input — so it is the one that
+// needs the guard. storeDir itself is the caller's to validate (storeDirOf).
 export const storePaths = (storeDir: string) => ({
   sourcesDir: path.join(storeDir, 'sources'),
-  sourceDir: (sourceId: string) => path.join(storeDir, 'sources', sourceId),
+  sourceDir: (sourceId: string) => resolveChild(path.join(storeDir, 'sources'), sourceId, 'source id'),
   indexDir: path.join(storeDir, 'index'),
   chunksFile: path.join(storeDir, 'index', 'chunks.json'),
   bm25File: path.join(storeDir, 'index', 'bm25.json'),
