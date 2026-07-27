@@ -129,6 +129,11 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
             )
           );
           removeProject(project.id);
+          // Best-effort cleanup: the project row is already gone, so a failed
+          // knowledge-store delete must never block or reverse the deletion
+          // the user just confirmed. An orphaned store directory is harmless
+          // leftover data, unlike leaving the user unable to finish deleting.
+          void ipcBridge.projectKnowledge.removeStore.invoke({ projectId: project.id }).catch(() => {});
           emitter.emit('chat.history.refresh');
           void navigate('/guid');
         } catch (error) {
