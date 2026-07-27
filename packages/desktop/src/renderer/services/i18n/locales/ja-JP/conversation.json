@@ -68,7 +68,22 @@
     "rename": "名前を変更",
     "relink": "フォルダを再リンク",
     "reveal": "フォルダで表示",
-    "remove": "削除"
+    "remove": "削除",
+    "knowledge": "ナレッジ",
+    "knowledgeAdd": "ファイルを追加",
+    "knowledgeEmpty": "ドキュメントを追加すると、このプロジェクトのナレッジベースを構築できます。追加した内容はこのプロジェクトのすべてのチャットで自動的に検索されます。",
+    "knowledgeSummary": "{{files}} 件のファイル · {{passages}} 件の抜粋",
+    "knowledgeSemanticOn": "セマンティック検索オン",
+    "knowledgeSemanticOff": "セマンティック検索オフ — 埋め込みモデルが未設定です",
+    "knowledgePassages": "{{count}} 件の抜粋",
+    "knowledgeStatusIndexing": "インデックス作成中……",
+    "knowledgeStatusFailed": "失敗",
+    "knowledgeStatusUnsupported": "非対応",
+    "knowledgeRetry": "再試行",
+    "knowledgeRemove": "削除",
+    "knowledgeRemoveConfirm": "このファイルをナレッジベースから削除しますか？",
+    "knowledgeError": "ナレッジベースを利用できません。",
+    "knowledgeSupportedTypes": "対応形式: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "最近",

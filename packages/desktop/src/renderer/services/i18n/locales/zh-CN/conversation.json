@@ -62,7 +62,22 @@
     "rename": "重命名",
     "relink": "重新链接文件夹",
     "reveal": "在文件夹中显示",
-    "remove": "移除"
+    "remove": "移除",
+    "knowledge": "知识库",
+    "knowledgeAdd": "添加文件",
+    "knowledgeEmpty": "添加文件以构建此项目的知识库。助手会在该项目的每个聊天中自动检索这些内容。",
+    "knowledgeSummary": "{{files}} 个文件 · {{passages}} 个片段",
+    "knowledgeSemanticOn": "语义搜索已开启",
+    "knowledgeSemanticOff": "语义搜索已关闭 — 未配置嵌入模型",
+    "knowledgePassages": "{{count}} 个片段",
+    "knowledgeStatusIndexing": "正在索引……",
+    "knowledgeStatusFailed": "失败",
+    "knowledgeStatusUnsupported": "不支持",
+    "knowledgeRetry": "重试",
+    "knowledgeRemove": "移除",
+    "knowledgeRemoveConfirm": "要将此文件从知识库中移除吗？",
+    "knowledgeError": "知识库当前不可用。",
+    "knowledgeSupportedTypes": "支持的格式：.md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "最近",

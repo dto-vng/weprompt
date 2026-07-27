@@ -68,7 +68,22 @@
     "rename": "Umbenennen",
     "relink": "Ordner neu verknüpfen",
     "reveal": "Im Ordner anzeigen",
-    "remove": "Entfernen"
+    "remove": "Entfernen",
+    "knowledge": "Wissen",
+    "knowledgeAdd": "Dateien hinzufügen",
+    "knowledgeEmpty": "Füge Dokumente hinzu, um die Wissensdatenbank dieses Projekts aufzubauen. Der Assistent durchsucht sie automatisch in jedem Chat dieses Projekts.",
+    "knowledgeSummary": "{{files}} Dateien · {{passages}} Passagen",
+    "knowledgeSemanticOn": "Semantische Suche aktiv",
+    "knowledgeSemanticOff": "Semantische Suche inaktiv — kein Embedding-Modell konfiguriert",
+    "knowledgePassages": "{{count}} Passagen",
+    "knowledgeStatusIndexing": "Wird indiziert…",
+    "knowledgeStatusFailed": "Fehlgeschlagen",
+    "knowledgeStatusUnsupported": "Nicht unterstützt",
+    "knowledgeRetry": "Erneut versuchen",
+    "knowledgeRemove": "Entfernen",
+    "knowledgeRemoveConfirm": "Diese Datei aus der Wissensdatenbank entfernen?",
+    "knowledgeError": "Die Wissensdatenbank ist nicht verfügbar.",
+    "knowledgeSupportedTypes": "Unterstützt: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Zuletzt",

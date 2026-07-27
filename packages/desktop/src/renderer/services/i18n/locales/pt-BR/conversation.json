@@ -68,7 +68,22 @@
     "rename": "Renomear",
     "relink": "Reconectar pasta",
     "reveal": "Mostrar na pasta",
-    "remove": "Remover"
+    "remove": "Remover",
+    "knowledge": "Conhecimento",
+    "knowledgeAdd": "Adicionar arquivos",
+    "knowledgeEmpty": "Adicione documentos para criar a base de conhecimento deste projeto. O assistente pesquisa neles automaticamente em cada chat do projeto.",
+    "knowledgeSummary": "{{files}} arquivos · {{passages}} trechos",
+    "knowledgeSemanticOn": "busca semântica ativada",
+    "knowledgeSemanticOff": "busca semântica desativada — nenhum modelo de embedding configurado",
+    "knowledgePassages": "{{count}} trechos",
+    "knowledgeStatusIndexing": "Indexando…",
+    "knowledgeStatusFailed": "Falhou",
+    "knowledgeStatusUnsupported": "Não compatível",
+    "knowledgeRetry": "Tentar novamente",
+    "knowledgeRemove": "Remover",
+    "knowledgeRemoveConfirm": "Remover este arquivo da base de conhecimento?",
+    "knowledgeError": "A base de conhecimento está indisponível.",
+    "knowledgeSupportedTypes": "Compatível com: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Recentes",
