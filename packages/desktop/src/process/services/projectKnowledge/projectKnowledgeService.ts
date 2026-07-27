@@ -73,7 +73,16 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   const embedTexts = deps.embedTextsImpl ?? defaultEmbedTexts;
   const queues = new Map<string, Promise<void>>();
 
-  const storeDirOf = (projectId: string) => path.join(deps.storeRootDir, projectId);
+  const storeDirOf = (projectId: string): string => {
+    const resolvedRoot = path.resolve(deps.storeRootDir);
+    const target = path.resolve(resolvedRoot, projectId);
+    // Guard against a projectId containing traversal segments: every store path
+    // must stay strictly inside the configured root.
+    if (!target.startsWith(resolvedRoot + path.sep)) {
+      throw new Error(`Invalid project id: ${projectId}`);
+    }
+    return target;
+  };
 
   /** Serialize work per project; returns the enqueued job's promise. */
   const enqueue = <T>(projectId: string, job: () => Promise<T>): Promise<T> => {

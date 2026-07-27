@@ -135,6 +135,26 @@ describe('projectKnowledgeService lifecycle', () => {
     expect(existsSync(path.join(root, 'p1'))).toBe(false);
   });
 
+  it('rejects a projectId that resolves outside the store root, without touching anything there', async () => {
+    // Sentinel directory OUTSIDE storeRootDir. `root` and this sentinel are
+    // both direct children of tmpdir(), so '../<sentinel-basename>' resolves
+    // from `root` straight to it — simulating a path-traversal projectId.
+    // If storeDirOf ever stopped guarding against traversal, this sentinel
+    // would be the thing an attacker-controlled removeStore call deletes.
+    const outsideDir = mkdtempSync(path.join(tmpdir(), 'kb-life-outside-'));
+    const markerFile = path.join(outsideDir, 'do-not-delete.txt');
+    await writeFile(markerFile, 'must survive');
+    const traversingId = path.join('..', path.basename(outsideDir));
+
+    try {
+      await expect(service.removeStore(traversingId)).rejects.toThrow();
+      await expect(service.listSources(traversingId)).rejects.toThrow();
+      expect(existsSync(markerFile)).toBe(true);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
   describe('getSessionMcpServer', () => {
     it('returns null with no store or no ready sources', async () => {
       expect(await service.getSessionMcpServer('p1')).toBeNull();

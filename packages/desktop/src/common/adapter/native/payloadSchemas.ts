@@ -156,8 +156,16 @@ const officeInspectRequestSchema = z
   })
   .strict();
 
-const projectKnowledgeProjectIdSchema = z.object({ projectId: identifierSchema }).strict();
-const projectKnowledgeSourceRefSchema = z.object({ projectId: identifierSchema, sourceId: identifierSchema }).strict();
+// Project-knowledge ids are interpolated into filesystem paths by the main
+// process, so restrict them to characters that cannot traverse or escape.
+const safeIdSchema = z
+  .string()
+  .min(1)
+  .max(MAX_IDENTIFIER_LENGTH)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
+const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 
@@ -220,7 +228,7 @@ export const nativeBridgePayloadSchemas = {
   'context.compaction.generate': localContextCompactionSchema,
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
   'project-knowledge.add-sources': z
-    .object({ projectId: identifierSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })
+    .object({ projectId: safeIdSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })
     .strict(),
   'project-knowledge.remove-source': projectKnowledgeSourceRefSchema,
   'project-knowledge.retry-source': projectKnowledgeSourceRefSchema,

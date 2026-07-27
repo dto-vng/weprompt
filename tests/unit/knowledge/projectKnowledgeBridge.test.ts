@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nativeBridgePayloadSchemas } from '@/common/adapter/native/payloadSchemas';
 
 const mocks = vi.hoisted(() => ({
   wordToMarkdown: vi.fn(async () => '# word'),
@@ -85,5 +86,24 @@ describe('buildProjectKnowledgeDeps', () => {
     await deps.listProviders();
 
     expect(mocks.httpRequest).toHaveBeenCalledWith('GET', '/api/providers');
+  });
+});
+
+// projectId/sourceId are interpolated into filesystem paths in the main
+// process (see projectKnowledgeService.ts's storeDirOf), so the native IPC
+// schema must reject anything that could traverse or escape the store root.
+describe('project-knowledge native schema hardening', () => {
+  const removeStoreSchema = nativeBridgePayloadSchemas['project-knowledge.remove-store'];
+
+  it('rejects a projectId containing path-traversal segments', () => {
+    expect(removeStoreSchema.safeParse({ projectId: '../../etc' }).success).toBe(false);
+  });
+
+  it('accepts a real UUID-shaped projectId', () => {
+    expect(removeStoreSchema.safeParse({ projectId: '3fa85f64-5717-4562-b3fc-2c963f66afa6' }).success).toBe(true);
+  });
+
+  it('rejects a projectId containing a path separator', () => {
+    expect(removeStoreSchema.safeParse({ projectId: 'a/b' }).success).toBe(false);
   });
 });
