@@ -68,7 +68,22 @@
     "rename": "Rename",
     "relink": "Relink folder",
     "reveal": "Reveal in folder",
-    "remove": "Remove"
+    "remove": "Remove",
+    "knowledge": "Knowledge",
+    "knowledgeAdd": "Add files",
+    "knowledgeEmpty": "Add documents to build this project's knowledge base. The assistant searches them automatically in every project chat.",
+    "knowledgeSummary": "{{files}} files · {{passages}} passages",
+    "knowledgeSemanticOn": "semantic search on",
+    "knowledgeSemanticOff": "semantic off — no embedding model configured",
+    "knowledgePassages": "{{count}} passages",
+    "knowledgeStatusIndexing": "Indexing…",
+    "knowledgeStatusFailed": "Failed",
+    "knowledgeStatusUnsupported": "Unsupported",
+    "knowledgeRetry": "Retry",
+    "knowledgeRemove": "Remove",
+    "knowledgeRemoveConfirm": "Remove this file from the knowledge base?",
+    "knowledgeError": "The knowledge base is unavailable.",
+    "knowledgeSupportedTypes": "Supported: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Recents",

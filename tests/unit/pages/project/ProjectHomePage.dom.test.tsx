@@ -34,9 +34,10 @@ vi.mock('@/renderer/hooks/mcp/catalog', () => ({
 }));
 
 // ProjectFilesCard (C5) fetches the workspace tree on mount via ipcBridge,
-// and ProjectNewChatComposer now fetches the skill catalog + (when an
-// assistant is selected) its detail — mock all three so this page-level
-// test stays hermetic (no real IPC/network call).
+// ProjectKnowledgeCard's useProjectKnowledge hook fetches sources + subscribes
+// to the `updated` push, and ProjectNewChatComposer now fetches the skill
+// catalog + (when an assistant is selected) its detail — mock all of them so
+// this page-level test stays hermetic (no real IPC/network call).
 vi.mock('@/common', () => ({
   ipcBridge: {
     fs: {
@@ -62,6 +63,23 @@ vi.mock('@/common', () => ({
         invoke: vi.fn().mockResolvedValue(null),
       },
     },
+    projectKnowledge: {
+      listSources: {
+        invoke: vi.fn().mockResolvedValue({ sources: [], summary: { fileCount: 0, passageCount: 0, semantic: 'off' } }),
+      },
+      addSources: {
+        invoke: vi.fn(),
+      },
+      removeSource: {
+        invoke: vi.fn(),
+      },
+      retrySource: {
+        invoke: vi.fn(),
+      },
+      updated: {
+        on: vi.fn().mockReturnValue(() => {}),
+      },
+    },
   },
 }));
 
@@ -83,7 +101,7 @@ const renderAt = (id: string) =>
 describe('ProjectHomePage', () => {
   beforeEach(() => window.localStorage.clear());
 
-  it('renders the hub layout with all five region slots for a known project', () => {
+  it('renders the hub layout with all six region slots for a known project', () => {
     seedProject();
     renderAt('p1');
 
@@ -92,6 +110,7 @@ describe('ProjectHomePage', () => {
     expect(screen.getByTestId('project-composer-slot')).toBeInTheDocument();
     expect(screen.getByTestId('project-chats-slot')).toBeInTheDocument();
     expect(screen.getByTestId('project-instructions-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('project-knowledge-slot')).toBeInTheDocument();
     expect(screen.getByTestId('project-files-slot')).toBeInTheDocument();
     expect(screen.queryByTestId('project-not-found')).not.toBeInTheDocument();
   });
