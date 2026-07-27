@@ -136,7 +136,7 @@ thead th{font-size:8px;text-transform:uppercase;color:var(--faint);font-weight:7
     </div>
     <div class="grid g2">
       <div class="card g"><h3>Monthly Joiners vs Leavers</h3><div class="cb"><canvas id="cFlow"></canvas></div></div>
-      <div class="card p"><h3>Headcount Bridge — YTD 2026 (Waterfall)</h3><p class="note">Opening → separations → net joiners → closing. Reconciles to the live snapshot.</p><div class="cb" id="cWaterfall"></div></div>
+      <div class="card p"><h3 id="hWater">Headcount Bridge (Waterfall)</h3><p class="note">Opening → separations → net joiners → closing. Reconciles to the live snapshot.</p><div class="cb" id="cWaterfall"></div></div>
     </div>
   </section>
 
@@ -162,24 +162,40 @@ thead th{font-size:8px;text-transform:uppercase;color:var(--faint);font-weight:7
 <script>
 window.DASH_DATA = {
   meta: { year: 2026 },
-  /* Demographic slots (KPIs, hcByBu, hcByFamily, pyramid, typeMix, hcTrend) are now computed
-     live from window.FACTS below, so the Year/Month/EE-Type/View-by slicers filter client-side. */
-  /* SLOT:attrKpis */
-  attrKpis: { leavers: 761, voluntary: 593, involuntary: 168, rateAnnPct: 34.5 },
-  /* SLOT:reasonGroups */
-  reasonGroups: [["Personal Patterns",286],["Organizational Patterns",129],["Compensation",125],["Job Performance",101],["Change of Contract",96],["Career Advancement",16],["Leadership",8]],
-  /* SLOT:attrByBu  (bu, leavers, headcount) */
-  attrByBu: [["Zalo",320,1488],["VNGG",205,1193],["PY",104,700],["DB",44,237],["ZPS",36,261],["BO",35,339],["VRC",6,83],["INCT",6,68]],
-  /* SLOT:monthlyFlow  (month, joiners, leavers) */
-  monthlyFlow: [["Jan",640,102],["Feb",364,120],["Mar",548,203],["Apr",462,133],["May",287,121],["Jun",149,82]],
-  /* SLOT:waterfall  (label, delta|null for totals, isTotal) */
-  waterfall: [["Opening\n(Dec'25)",4426,true],["Voluntary",-593,false],["Involuntary",-168,false],["Net Joiners",742,false],["Closing\n(Jun'26)",4407,true]],
-  /* SLOT:cohort  (cohort, size, ret3, ret6, ret12) */
-  cohort: [["2024-Q1",107,100,100,94],["2024-Q2",214,100,100,64],["2024-Q3",218,100,92,52],["2024-Q4",145,81,64,42],["2025-Q1",232,72,46,30],["2025-Q2",276,65,47,20],["2025-Q3",230,64,42,19],["2025-Q4",190,58,30,21]],
-  /* SLOT:bubble  (bu, attritionPct, tenureYrs, headcount) */
-  bubble: [["Zalo",21.5,3.5,1488],["VNGG",17.2,4.2,1193],["PY",14.9,3.7,700],["BO",10.3,4.8,339],["ZPS",13.8,6.9,261],["DB",18.6,4.8,237],["VRC",7.2,3.5,83],["INCT",8.8,2.3,68]],
-  /* SLOT:sankey  (bu, reason, leavers) */
-  sankey: [["Zalo","Personal Patterns",172],["Zalo","Compensation",62],["Zalo","Organizational Patterns",46],["Zalo","Change of Contract",34],["VNGG","Organizational Patterns",58],["VNGG","Personal Patterns",38],["VNGG","Compensation",34],["VNGG","Job Performance",33],["VNGG","Change of Contract",29],["PY","Job Performance",30],["PY","Personal Patterns",29],["PY","Compensation",17],["PY","Change of Contract",14],["DB","Personal Patterns",21],["ZPS","Job Performance",17],["BO","Personal Patterns",12]]
+  /* Demographic slots are computed live from window.FACTS (below), so the
+     Year/Month/EE-Type/View-by slicers filter the Demographic tab client-side. */
+  /* Attrition + Cohort facts are keyed by year and switch with the Year slicer.
+     The SLOT markers (inside the 2026 block) name the per-year sub-slots for SPEC.md. */
+  years: {
+    "2026": {
+      /* SLOT:attrKpis */
+      attrKpis: { leavers: 761, voluntary: 593, involuntary: 168, rateAnnPct: 34.5, partial: true },
+      /* SLOT:reasonGroups */
+      reasonGroups: [["Personal Patterns",286],["Organizational Patterns",129],["Compensation",125],["Job Performance",101],["Change of Contract",96],["Career Advancement",16],["Leadership",8]],
+      /* SLOT:attrByBu  (bu, leavers, headcount) */
+      attrByBu: [["Zalo",320,1488],["VNGG",205,1193],["PY",104,700],["DB",44,237],["ZPS",36,261],["BO",35,339],["VRC",6,83],["INCT",6,68]],
+      /* SLOT:monthlyFlow  (month, joiners, leavers) */
+      monthlyFlow: [["Jan",640,102],["Feb",364,120],["Mar",548,203],["Apr",462,133],["May",287,121],["Jun",149,82]],
+      /* SLOT:waterfall  (label, delta|null for totals, isTotal) */
+      waterfall: [["Opening\n(Dec'25)",4426,true],["Voluntary",-593,false],["Involuntary",-168,false],["Net Joiners",742,false],["Closing\n(Jun'26)",4407,true]],
+      /* SLOT:cohort  (cohort, size, ret3, ret6, ret12) */
+      cohort: [["2024-Q1",107,100,100,94],["2024-Q2",214,100,100,64],["2024-Q3",218,100,92,52],["2024-Q4",145,81,64,42],["2025-Q1",232,72,46,30],["2025-Q2",276,65,47,20],["2025-Q3",230,64,42,19],["2025-Q4",190,58,30,21]],
+      /* SLOT:bubble  (bu, attritionPct, tenureYrs, headcount) */
+      bubble: [["Zalo",21.5,3.5,1488],["VNGG",17.2,4.2,1193],["PY",14.9,3.7,700],["BO",10.3,4.8,339],["ZPS",13.8,6.9,261],["DB",18.6,4.8,237],["VRC",7.2,3.5,83],["INCT",8.8,2.3,68]],
+      /* SLOT:sankey  (bu, reason, leavers) */
+      sankey: [["Zalo","Personal Patterns",172],["Zalo","Compensation",62],["Zalo","Organizational Patterns",46],["Zalo","Change of Contract",34],["VNGG","Organizational Patterns",58],["VNGG","Personal Patterns",38],["VNGG","Compensation",34],["VNGG","Job Performance",33],["VNGG","Change of Contract",29],["PY","Job Performance",30],["PY","Personal Patterns",29],["PY","Compensation",17],["PY","Change of Contract",14],["DB","Personal Patterns",21],["ZPS","Job Performance",17],["BO","Personal Patterns",12]]
+    },
+    "2025": {
+      attrKpis: { leavers: 1855, voluntary: 1472, involuntary: 383, rateAnnPct: 42.8, partial: false },
+      reasonGroups: [["Personal Patterns",816],["Change of Contract",336],["Organizational Patterns",319],["Job Performance",172],["Compensation",162],["Career Advancement",32],["Leadership",18]],
+      attrByBu: [["Zalo",771,1518],["VNGG",360,1185],["PY",272,707],["BO",55,318],["ZPS",107,266],["DB",90,227],["VRC",19,96],["INCT",172,69]],
+      monthlyFlow: [["Jan",961,90],["Feb",1117,132],["Mar",2118,226],["Apr",1459,114],["May",1487,163],["Jun",1865,259],["Jul",1735,171],["Aug",1131,138],["Sep",1433,152],["Oct",1180,94],["Nov",946,84],["Dec",1252,232]],
+      waterfall: [["Opening\n(Feb'25)",4244,true],["Voluntary",-1472,false],["Involuntary",-383,false],["Net Joiners",2037,false],["Closing\n(Dec'25)",4426,true]],
+      cohort: [["2023-Q1",73,100,100,100],["2023-Q2",80,100,100,100],["2023-Q3",99,100,100,100],["2023-Q4",132,100,100,99],["2024-Q1",107,100,100,94],["2024-Q2",214,100,100,64],["2024-Q3",218,100,92,52],["2024-Q4",145,81,64,42]],
+      bubble: [["Zalo",50.8,3.3,1518],["VNGG",30.4,4.1,1185],["PY",38.5,3.6,707],["BO",17.3,4.8,318],["ZPS",40.2,6.6,266],["DB",39.6,5.0,227],["VRC",19.8,3.0,96],["INCT",249.3,1.9,69]],
+      sankey: [["Zalo","Personal Patterns",505],["Zalo","Change of Contract",158],["INCT","Organizational Patterns",132],["VNGG","Personal Patterns",81],["PY","Personal Patterns",80],["VNGG","Organizational Patterns",72],["PY","Change of Contract",69],["VNGG","Change of Contract",62],["VNGG","Compensation",62],["Zalo","Organizational Patterns",62],["VNGG","Job Performance",55],["ZPS","Personal Patterns",55],["PY","Job Performance",47],["PY","Compensation",43],["DB","Personal Patterns",42],["BO","Personal Patterns",34],["ZPS","Job Performance",30],["Zalo","Compensation",26],["PY","Organizational Patterns",22],["VNGG","Career Advancement",20]]
+    }
+  }
 };
 </script>
 
@@ -199,6 +215,9 @@ const fmt = (n) => Number(n).toLocaleString('en-US');
 let CHARTS = [];   // Chart.js instances
 let ECHARTS = [];  // ECharts instances
 let CUR = null;    // demographic slice derived from the current slicer state
+let YD = null;     // attrition + cohort facts for the selected year
+const yearData = () => D.years[document.getElementById('fYear').value] || D.years[Object.keys(D.years).sort().reverse()[0]];
+const latestYear = () => Object.keys(D.years).sort().reverse()[0];
 
 const EE_LABEL = { official:'Official', collaborator:'Collaborator', service_contract:'Service Contract', probation:'Probation', internship:'Internship', fresher:'Fresher' };
 const DIM_TITLE = { bu:'Headcount by Business Unit', fam:'Headcount by Job Family' };
@@ -286,11 +305,13 @@ function renderAll(){
   Chart.defaults.plugins.legend.display = false;
   Chart.defaults.plugins.datalabels.display = false;
   computeCUR();
+  YD = yearData();
   fillText(); demoCharts(); attrCharts(); cohortCharts();
 }
 
 function fillText(){
-  const c=CUR, a=D.attrKpis;
+  const c=CUR, a=YD.attrKpis;
+  const yr = document.getElementById('fYear').value;
   document.getElementById('dTitle').textContent = c.title;
   document.getElementById('dCut').textContent = c.cut;
   document.getElementById('aCut').textContent = c.cut;
@@ -309,7 +330,8 @@ function fillText(){
   const g = c.male+c.female || 1;
   document.getElementById('kGenSub').textContent = Math.round(c.male/g*100)+'% male · '+Math.round(c.female/g*100)+'% female';
   document.getElementById('kLv').textContent = fmt(a.leavers);
-  document.getElementById('kLvSub').textContent = 'YTD '+D.meta.year;
+  document.getElementById('kLvSub').textContent = (a.partial ? 'YTD ' : 'FY ')+yr;
+  document.getElementById('hWater').textContent = 'Headcount Bridge — '+(a.partial ? 'YTD ' : 'FY ')+yr+' (Waterfall)';
   document.getElementById('kVs').textContent = fmt(a.voluntary);
   document.getElementById('kIs').textContent = fmt(a.involuntary);
   document.getElementById('kRate').textContent = a.rateAnnPct+'%';
@@ -347,19 +369,19 @@ function demoCharts(){
 function attrCharts(){
   const ink=css('--ink'), grid=css('--grid'), vng=css('--vng'), zalo=css('--zalo'), green=css('--green'), vs=css('--vs'), is=css('--is');
 
-  CHARTS.push(new Chart('cReason',{type:'bar',data:{labels:D.reasonGroups.map(r=>r[0]),datasets:[{data:D.reasonGroups.map(r=>r[1]),backgroundColor:vng,borderRadius:5,maxBarThickness:22}]},
+  CHARTS.push(new Chart('cReason',{type:'bar',data:{labels:YD.reasonGroups.map(r=>r[0]),datasets:[{data:YD.reasonGroups.map(r=>r[1]),backgroundColor:vng,borderRadius:5,maxBarThickness:22}]},
     options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:30}},scales:{x:{grid:{color:grid},ticks:{color:css('--muted')}},y:{grid:{display:false},ticks:{color:ink,font:{weight:600,size:10}}}},plugins:{datalabels:{color:ink,font:{weight:700,size:10},anchor:'end',align:'end',display:true}}}}));
 
   // Attrition by BU: leavers bar + rate line (dual axis)
-  const rate = D.attrByBu.map(r=>Math.round(r[1]/r[2]*1000)/10);
-  CHARTS.push(new Chart('cAttrBu',{data:{labels:D.attrByBu.map(r=>r[0]),datasets:[
-      {type:'bar',label:'Leavers',data:D.attrByBu.map(r=>r[1]),backgroundColor:zalo,borderRadius:5,maxBarThickness:26,yAxisID:'y'},
+  const rate = YD.attrByBu.map(r=>Math.round(r[1]/r[2]*1000)/10);
+  CHARTS.push(new Chart('cAttrBu',{data:{labels:YD.attrByBu.map(r=>r[0]),datasets:[
+      {type:'bar',label:'Leavers',data:YD.attrByBu.map(r=>r[1]),backgroundColor:zalo,borderRadius:5,maxBarThickness:26,yAxisID:'y'},
       {type:'line',label:'YTD %',data:rate,borderColor:vng,backgroundColor:vng,pointRadius:3,borderWidth:2,yAxisID:'y1'}]},
     options:{maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:ink,font:{weight:600}}},y:{grid:{color:grid},ticks:{color:css('--muted')}},y1:{position:'right',grid:{display:false},ticks:{color:vng,callback:v=>v+'%'}}},plugins:{legend:{display:true,position:'bottom',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},datalabels:{display:false}}}}));
 
-  CHARTS.push(new Chart('cFlow',{data:{labels:D.monthlyFlow.map(r=>r[0]),datasets:[
-      {type:'bar',label:'Joiners',data:D.monthlyFlow.map(r=>r[1]),backgroundColor:green,borderRadius:5,maxBarThickness:24},
-      {type:'bar',label:'Leavers',data:D.monthlyFlow.map(r=>r[2]),backgroundColor:vng,borderRadius:5,maxBarThickness:24}]},
+  CHARTS.push(new Chart('cFlow',{data:{labels:YD.monthlyFlow.map(r=>r[0]),datasets:[
+      {type:'bar',label:'Joiners',data:YD.monthlyFlow.map(r=>r[1]),backgroundColor:green,borderRadius:5,maxBarThickness:24},
+      {type:'bar',label:'Leavers',data:YD.monthlyFlow.map(r=>r[2]),backgroundColor:vng,borderRadius:5,maxBarThickness:24}]},
     options:{maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:ink,font:{weight:600}}},y:{grid:{color:grid},ticks:{color:css('--muted')}}},plugins:{legend:{display:true,position:'bottom',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},datalabels:{display:false}}}}));
 
   waterfallChart();
@@ -370,7 +392,7 @@ function waterfallChart(){
   const e=echarts.init(el,null,{renderer:'canvas'}); ECHARTS.push(e);
   const ink=css('--ink'), muted=css('--muted'), line=css('--line'), vs=css('--vs'), is=css('--is'), green=css('--green'), zalo=css('--zalo');
   // Build floating bars: base (transparent) + visible delta.
-  const rows=D.waterfall; let running=0; const base=[], up=[], down=[], tot=[];
+  const rows=YD.waterfall; let running=0; const base=[], up=[], down=[], tot=[];
   rows.forEach(([lab,val,isTot])=>{
     if(isTot){ base.push(0); up.push(0); down.push(0); tot.push(val); }
     else if(val>=0){ base.push(running); up.push(val); down.push(0); tot.push('-'); running+=val; }
@@ -401,8 +423,8 @@ function cohortCharts(){
 function heatmapChart(){
   const el=document.getElementById('cHeatmap'); if(!el) return;
   const e=echarts.init(el); ECHARTS.push(e);
-  const muted=css('--muted'), cohorts=D.cohort.map(r=>r[0]), cols=['3 mo','6 mo','12 mo'];
-  const data=[]; D.cohort.forEach((r,y)=>{ [r[2],r[3],r[4]].forEach((v,x)=>data.push([x,y,v])); });
+  const muted=css('--muted'), cohorts=YD.cohort.map(r=>r[0]), cols=['3 mo','6 mo','12 mo'];
+  const data=[]; YD.cohort.forEach((r,y)=>{ [r[2],r[3],r[4]].forEach((v,x)=>data.push([x,y,v])); });
   e.setOption({
     grid:{left:8,right:14,top:8,bottom:44,containLabel:true},
     tooltip:{position:'top',formatter:p=>cohorts[p.data[1]]+' · '+cols[p.data[0]]+': '+p.data[2]+'%'},
@@ -416,7 +438,7 @@ function curveChart(){
   const el=document.getElementById('cCurve'); if(!el) return;
   const e=echarts.init(el); ECHARTS.push(e);
   const muted=css('--muted'), pal=['#16A34A','#22c55e','#2F7FF0','#7C6CF0','#F26F21','#e0623a','#f59e0b','#ef4444'];
-  const series=D.cohort.map((r,i)=>({name:r[0],type:'line',smooth:true,symbol:'circle',symbolSize:5,lineStyle:{width:2},itemStyle:{color:pal[i%pal.length]},data:[100,r[2],r[3],r[4]]}));
+  const series=YD.cohort.map((r,i)=>({name:r[0],type:'line',smooth:true,symbol:'circle',symbolSize:5,lineStyle:{width:2},itemStyle:{color:pal[i%pal.length]},data:[100,r[2],r[3],r[4]]}));
   e.setOption({
     grid:{left:8,right:12,top:14,bottom:20,containLabel:true},
     tooltip:{trigger:'axis'},
@@ -430,7 +452,7 @@ function bubbleChart(){
   const el=document.getElementById('cBubble'); if(!el) return;
   const e=echarts.init(el); ECHARTS.push(e);
   const muted=css('--muted'), pal=['#2F7FF0','#F26F21','#16A34A','#7C6CF0','#e0623a','#f59e0b','#0ea5e9','#ef4444'];
-  const data=D.bubble.map((r,i)=>({name:r[0],value:[r[1],r[2],r[3]],itemStyle:{color:pal[i%pal.length],opacity:.78}}));
+  const data=YD.bubble.map((r,i)=>({name:r[0],value:[r[1],r[2],r[3]],itemStyle:{color:pal[i%pal.length],opacity:.78}}));
   e.setOption({
     grid:{left:8,right:16,top:16,bottom:34,containLabel:true},
     tooltip:{formatter:p=>'<b>'+p.data.name+'</b><br>Attrition: '+p.value[0]+'%<br>Tenure: '+p.value[1]+' yrs<br>Headcount: '+p.value[2].toLocaleString()},
@@ -443,9 +465,9 @@ function sankeyChart(){
   const el=document.getElementById('cSankey'); if(!el) return;
   const e=echarts.init(el); ECHARTS.push(e);
   const muted=css('--muted');
-  const nodes={}; D.sankey.forEach(([a,b])=>{nodes[a]=1;nodes['» '+b]=1;});
+  const nodes={}; YD.sankey.forEach(([a,b])=>{nodes[a]=1;nodes['» '+b]=1;});
   const data=Object.keys(nodes).map(n=>({name:n}));
-  const links=D.sankey.map(([a,b,v])=>({source:a,target:'» '+b,value:v}));
+  const links=YD.sankey.map(([a,b,v])=>({source:a,target:'» '+b,value:v}));
   e.setOption({
     tooltip:{trigger:'item',triggerOn:'mousemove'},
     series:[{type:'sankey',left:6,right:120,top:10,bottom:10,data,links,

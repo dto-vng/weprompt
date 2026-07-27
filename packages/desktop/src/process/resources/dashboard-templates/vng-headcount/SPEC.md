@@ -79,7 +79,12 @@ SELECT CAST(snapshot_date AS varchar) snap,
 FROM hr_data_headcount_dev.hrdev.v_hr_headcount WHERE snapshot_date <> DATE '2025-05-30' GROUP BY 1;
 ```
 
-## SQL per DASH_DATA slot (attrition + cohort — year-scoped, YTD)
+## SQL per DASH_DATA slot (attrition + cohort — keyed by year)
+
+These slots live under `DASH_DATA.years["<year>"]` and switch with the **Year** slicer (run each query
+per year; `attrKpis.partial` = true for the still-running year so the KPI reads "YTD" vs "FY"). Month,
+EE Type, and View-by do not apply here.
+
 
 `SLOT:attrKpis`
 ```sql
