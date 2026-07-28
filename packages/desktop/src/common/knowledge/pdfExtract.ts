@@ -23,8 +23,22 @@ type PdfPage = {
 type PdfDocument = { numPages: number; getPage: (pageNumber: number) => Promise<PdfPage> };
 type PdfLoadingTask = { promise: Promise<PdfDocument>; destroy: () => Promise<void> };
 export type PdfjsLike = {
-  getDocument: (params: { data: Uint8Array; useSystemFonts?: boolean; isEvalSupported?: boolean }) => PdfLoadingTask;
+  getDocument: (params: {
+    data: Uint8Array;
+    useSystemFonts?: boolean;
+    isEvalSupported?: boolean;
+    verbosity?: number;
+  }) => PdfLoadingTask;
 };
+
+/**
+ * pdfjs VerbosityLevel.ERRORS. Without this every ingest logs warnings aimed
+ * at renderers, notably a demand for `standardFontDataUrl`. That parameter
+ * only affects glyph rendering: extracted text was byte-identical with and
+ * without it across the sample corpus, so we take the silence, not the asset
+ * path (which would have to resolve inside the packaged asar).
+ */
+const PDFJS_VERBOSITY_ERRORS = 0;
 
 export type PdfExtraction = {
   /** Text of each page that was read, in order. Length <= maxPages. */
@@ -40,8 +54,11 @@ export type PdfExtraction = {
 export type PdfExtractOptions = {
   /** Read at most this many pages. Defaults to every page — callers own the policy. */
   maxPages?: number;
-  /** Called with (pagesRead, pagesToRead) as extraction advances. */
-  onProgress?: (pagesRead: number, pagesToRead: number) => void;
+  /**
+   * Called with (pagesRead, pagesToRead) as extraction advances. Awaited, so a
+   * reporter that persists progress cannot interleave with the next page.
+   */
+  onProgress?: (pagesRead: number, pagesToRead: number) => void | Promise<void>;
   /** Throttle for onProgress; the final page always reports. */
   progressEveryPages?: number;
   /** Injectable for tests; defaults to the lazy pdfjs import. */
@@ -87,7 +104,12 @@ export const extractPdfText = async (data: Uint8Array, options: PdfExtractOption
   try {
     // pdfjs mutates the buffer it is handed, so pass a private copy — the
     // caller's Buffer is also what gets written to the source snapshot.
-    task = pdfjs.getDocument({ data: new Uint8Array(data), useSystemFonts: false, isEvalSupported: false });
+    task = pdfjs.getDocument({
+      data: new Uint8Array(data),
+      useSystemFonts: false,
+      isEvalSupported: false,
+      verbosity: PDFJS_VERBOSITY_ERRORS,
+    });
     doc = await task.promise;
   } catch (error) {
     throw new Error(`The file could not be read as a PDF: ${error instanceof Error ? error.message : String(error)}`, {
@@ -108,7 +130,7 @@ export const extractPdfText = async (data: Uint8Array, options: PdfExtractOption
         page.cleanup();
       }
       if (pageNumber % progressEvery === 0 || pageNumber === pagesToRead) {
-        options.onProgress?.(pageNumber, pagesToRead);
+        await options.onProgress?.(pageNumber, pagesToRead);
       }
     }
 

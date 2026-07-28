@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -92,13 +92,14 @@ describe('projectKnowledgeService', () => {
   });
 
   it('marks unsupported extensions and oversized files without indexing them', async () => {
-    const pdf = await addFile('doc.pdf', 'x');
+    const pptx = await addFile('deck.pptx', 'x');
     const big = await addFile('big.txt', 'x'.repeat(16 * 1024 * 1024));
-    await service.addSources('proj-1', [pdf, big]);
+    await service.addSources('proj-1', [pptx, big]);
     await service.whenIdle('proj-1');
     const { sources } = await service.listSources('proj-1');
     const byName = Object.fromEntries(sources.map((s) => [s.fileName, s]));
-    expect(byName['doc.pdf'].status).toBe('unsupported');
+    expect(byName['deck.pptx'].status).toBe('unsupported');
+    expect(byName['deck.pptx'].error).toMatch(/\.pdf/); // the hint now advertises PDF
     expect(byName['big.txt'].status).toBe('failed');
     expect(byName['big.txt'].error).toMatch(/15 MB/);
   });
@@ -212,6 +213,163 @@ describe('projectKnowledgeService', () => {
     expect(sources[0].status).toBe('ready');
     expect(sources[0].chunkCount).toBe(2000);
     expect(sources[0].error).toMatch(/Truncated/);
+  });
+
+  it('ingests a real text-layer PDF, citing page numbers', async () => {
+    const file = path.join(inbox, 'policy.pdf');
+    await writeFile(file, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
+    await service.addSources('proj-1', [file]);
+    await service.whenIdle('proj-1');
+
+    const { sources } = await service.listSources('proj-1');
+    expect(sources[0]).toMatchObject({ fileName: 'policy.pdf', status: 'ready', error: null, progress: null });
+    expect(sources[0].chunkCount).toBeGreaterThan(0);
+
+    const chunks = await readChunks(path.join(root, 'proj-1'));
+    expect(chunks.some((c) => c.text.includes('ten working days before departure'))).toBe(true);
+    // The page heading is what makes a citation point at a page. This fixture
+    // fits in one chunk, which the chunker labels with the deepest heading it
+    // absorbed, so assert the shape rather than a specific page.
+    expect(chunks.every((c) => /^Page \d+$/.test(c.headingPath ?? ''))).toBe(true);
+    // What lands on disk must be readable markdown, not a serialized blob.
+    const converted = await readFile(path.join(root, 'proj-1', 'sources', sources[0].id, 'converted.md'), 'utf8');
+    expect(converted).toMatch(/^## Page 1\n\nVisa Letter Policy/);
+  });
+
+  it('fails a scanned PDF with an explicit reason instead of indexing nothing', async () => {
+    const file = path.join(inbox, 'scan.pdf');
+    await writeFile(file, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/image-only.pdf')));
+    await service.addSources('proj-1', [file]);
+    await service.whenIdle('proj-1');
+
+    const { sources } = await service.listSources('proj-1');
+    expect(sources[0].status).toBe('failed');
+    expect(sources[0].error).toMatch(/no text layer/i);
+    expect(sources[0].error).toMatch(/OCR/);
+    expect(await readChunks(path.join(root, 'proj-1'))).toEqual([]);
+  });
+
+  it('routes only .pdf through the PDF extractor', async () => {
+    const extractPdfTextImpl = vi.fn(async () => ({
+      pages: ['extracted body text'],
+      pageCount: 1,
+      hasTextLayer: true,
+      truncated: false,
+    }));
+    const svc = createProjectKnowledgeService({
+      storeRootDir: root,
+      listProviders: async () => [],
+      embedTextsImpl: embedMock as never,
+      extractPdfTextImpl: extractPdfTextImpl as never,
+      convertToMarkdown: async () => '# Docx\n\ndocx body',
+      getServerScriptPath: () => '/x.js',
+      onUpdated: () => {},
+    });
+
+    await svc.addSources('proj-r', [await addFile('a.md', 'markdown body'), await addFile('b.docx', 'binary')]);
+    await svc.whenIdle('proj-r');
+    expect(extractPdfTextImpl).not.toHaveBeenCalled();
+
+    const pdf = path.join(inbox, 'c.pdf');
+    await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
+    await svc.addSources('proj-r', [pdf]);
+    await svc.whenIdle('proj-r');
+    expect(extractPdfTextImpl).toHaveBeenCalledTimes(1);
+    expect(extractPdfTextImpl.mock.calls[0][1]).toMatchObject({ maxPages: 50 });
+  });
+
+  it('truncates a PDF past the page cap but keeps it ready and searchable', async () => {
+    const svc = createProjectKnowledgeService({
+      storeRootDir: root,
+      listProviders: async () => [],
+      embedTextsImpl: embedMock as never,
+      extractPdfTextImpl: async () => ({
+        pages: ['visa letter guidance on the first page'],
+        pageCount: 120,
+        hasTextLayer: true,
+        truncated: true,
+      }),
+      convertToMarkdown: async () => '',
+      getServerScriptPath: () => '/x.js',
+      onUpdated: () => {},
+    });
+    const pdf = path.join(inbox, 'long.pdf');
+    await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
+    await svc.addSources('proj-cap', [pdf]);
+    await svc.whenIdle('proj-cap');
+
+    const { sources } = await svc.listSources('proj-cap');
+    expect(sources[0].status).toBe('ready');
+    expect(sources[0].error).toBe('Truncated to 50 pages.');
+    expect(sources[0].chunkCount).toBeGreaterThan(0);
+  });
+
+  it('publishes reading progress while a PDF is being read, and clears it when done', async () => {
+    const snapshots: Array<Record<string, unknown> | undefined> = [];
+    const svc = createProjectKnowledgeService({
+      storeRootDir: root,
+      listProviders: async () => [],
+      embedTextsImpl: embedMock as never,
+      extractPdfTextImpl: async (_data, options) => {
+        await options?.onProgress?.(5, 12);
+        await options?.onProgress?.(12, 12);
+        return { pages: ['page body text'], pageCount: 12, hasTextLayer: true, truncated: false };
+      },
+      convertToMarkdown: async () => '',
+      getServerScriptPath: () => '/x.js',
+      // Manifest writes are atomic (temp + rename), so reading it back the
+      // moment it is announced captures each intermediate state.
+      onUpdated: (projectId) => {
+        try {
+          const raw = readFileSync(path.join(root, projectId, 'manifest.json'), 'utf8');
+          snapshots.push((JSON.parse(raw) as { sources: Array<Record<string, unknown>> }).sources[0]);
+        } catch {
+          snapshots.push(undefined);
+        }
+      },
+    });
+    const pdf = path.join(inbox, 'prog.pdf');
+    await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
+    await svc.addSources('proj-prog', [pdf]);
+    await svc.whenIdle('proj-prog');
+
+    const progresses = snapshots.map((s) => s?.progress).filter(Boolean);
+    expect(progresses).toContainEqual({ stage: 'reading', done: 5, total: 12 });
+    expect(progresses).toContainEqual({ stage: 'reading', done: 12, total: 12 });
+    const { sources } = await svc.listSources('proj-prog');
+    expect(sources[0].status).toBe('ready');
+    expect(sources[0].progress).toBeNull();
+  });
+
+  it('keeps vectors from batches that succeeded when a later batch fails, and Retry finishes the rest', async () => {
+    // > 32 chunks so the embed pass spans several batches. Each hard-split
+    // chunk advances 2800 chars (chunker defaults), so ~126k chars ≈ 45 chunks.
+    const file = await addFile('big.md', 'word '.repeat(25_200));
+    let calls = 0;
+    embedMock.mockImplementation(async (texts: string[]) => {
+      calls += 1;
+      if (calls === 2) throw new Error('rate limited');
+      return texts.map(() => [1, 0, 0]);
+    });
+
+    await service.addSources('proj-1', [file]);
+    await service.whenIdle('proj-1');
+
+    const partial = (await service.listSources('proj-1')).sources[0];
+    expect(partial.status).toBe('ready'); // BM25 search still works
+    expect(partial.chunkCount).toBeGreaterThan(32);
+    expect(partial.vectorCount).toBe(32); // the first batch survived the failure
+    expect(partial.progress).toBeNull();
+    const vectors = await readVectors(path.join(root, 'proj-1'));
+    expect(vectors?.rows.size).toBe(32);
+
+    embedMock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+    await service.retrySource('proj-1', partial.id);
+    await service.whenIdle('proj-1');
+
+    const done = (await service.listSources('proj-1')).sources[0];
+    expect(done.vectorCount).toBe(done.chunkCount);
+    expect((await readVectors(path.join(root, 'proj-1')))?.rows.size).toBe(done.chunkCount);
   });
 
   it('listSources returns empty result for an unknown project', async () => {

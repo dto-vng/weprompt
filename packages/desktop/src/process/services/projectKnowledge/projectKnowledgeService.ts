@@ -16,8 +16,9 @@ import type { ISessionMcpServer, IProvider } from '@/common/config/storage';
 import type { IKnowledgeSourceDto, IProjectKnowledgeListResult } from '@/common/types/project/knowledgeTypes';
 import { chunkMarkdown } from '@/common/knowledge/chunker';
 import { buildBm25Index } from '@/common/knowledge/bm25';
-import { embedTexts as defaultEmbedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
+import { EMBED_BATCH_SIZE, embedTexts as defaultEmbedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
+import { extractPdfText as defaultExtractPdfText, renderPagesAsMarkdown } from '@/common/knowledge/pdfExtract';
 import {
   createEmptyManifest,
   readChunks,
@@ -29,14 +30,35 @@ import {
   writeManifest,
   writeVectors,
 } from '@/common/knowledge/store';
-import type { KnowledgeChunk, KnowledgeManifest, KnowledgeManifestSource } from '@/common/knowledge/types';
+import type {
+  KnowledgeChunk,
+  KnowledgeIngestProgress,
+  KnowledgeManifest,
+  KnowledgeManifestSource,
+} from '@/common/knowledge/types';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
-const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx']);
+const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
 const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);
+const SUPPORTED_EXTENSIONS_HINT = 'Supported: .md, .txt, .docx, .xlsx, .pdf';
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_CHUNKS_PER_SOURCE = 2000;
+/**
+ * Pages read from one PDF. Ingestion is serialized per project, so an
+ * unbounded document would hold the queue and every file behind it. Beyond
+ * the cap the source truncates and stays `ready`, matching the
+ * MAX_CHUNKS_PER_SOURCE convention.
+ */
+const MAX_PDF_PAGES = 50;
+
+/**
+ * A PDF whose text layer is empty is a scan, which needs OCR we do not have.
+ * Fail it explicitly: silently indexing zero passages would leave the user
+ * with a `ready` source that never matches anything.
+ */
+const SCANNED_PDF_ERROR =
+  'This PDF has no text layer, so it looks like a scan. Reading scanned PDFs (OCR) is not supported yet.';
 
 export type ProjectKnowledgeServiceDeps = {
   storeRootDir: string;
@@ -44,6 +66,8 @@ export type ProjectKnowledgeServiceDeps = {
   /** Convert a .docx/.xlsx buffer to markdown (DocumentConverter in prod). */
   convertToMarkdown: (buffer: ArrayBuffer, extension: 'docx' | 'xlsx') => Promise<string>;
   embedTextsImpl?: typeof defaultEmbedTexts;
+  /** Injectable so tests can drive PDF ingestion without a real parser. */
+  extractPdfTextImpl?: typeof defaultExtractPdfText;
   getServerScriptPath: () => string;
   onUpdated: (projectId: string) => void;
 };
@@ -59,6 +83,34 @@ export type ProjectKnowledgeService = {
   whenIdle: (projectId: string) => Promise<void>;
 };
 
+/**
+ * Recompute each source's vector count from the chunk table, and while a
+ * source is still partly unembedded expose that as embedding progress. Only
+ * sources that own chunks take part; the rest are untouched by this pass.
+ */
+const syncEmbedCounts = (manifest: KnowledgeManifest, chunks: KnowledgeChunk[]): void => {
+  for (const source of manifest.sources) {
+    const own = chunks.filter((c) => c.sourceId === source.id);
+    if (own.length === 0) continue;
+    const embedded = own.filter((c) => c.hasVector).length;
+    source.vectorCount = embedded;
+    if (embedded < own.length) source.progress = { stage: 'embedding', done: embedded, total: own.length };
+    else delete source.progress;
+  }
+};
+
+/** Drop every in-flight marker. Returns true when anything was actually cleared. */
+const clearIngestProgress = (manifest: KnowledgeManifest): boolean => {
+  let cleared = false;
+  for (const source of manifest.sources) {
+    if (source.progress) {
+      delete source.progress;
+      cleared = true;
+    }
+  }
+  return cleared;
+};
+
 const toDto = (source: KnowledgeManifestSource): IKnowledgeSourceDto => ({
   id: source.id,
   fileName: source.fileName,
@@ -68,10 +120,12 @@ const toDto = (source: KnowledgeManifestSource): IKnowledgeSourceDto => ({
   vectorCount: source.vectorCount,
   addedAt: source.addedAt,
   error: source.error,
+  progress: source.progress ?? null,
 });
 
 export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps): ProjectKnowledgeService => {
   const embedTexts = deps.embedTextsImpl ?? defaultEmbedTexts;
+  const extractPdfText = deps.extractPdfTextImpl ?? defaultExtractPdfText;
   const queues = new Map<string, Promise<void>>();
 
   const storeDirOf = (projectId: string): string => {
@@ -105,6 +159,22 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   const saveManifest = async (projectId: string, manifest: KnowledgeManifest): Promise<void> => {
     await writeManifest(storeDirOf(projectId), manifest);
     deps.onUpdated(projectId);
+  };
+
+  /**
+   * Publish a source's position within the stage it is in. Writing the
+   * manifest is what makes it visible: `saveManifest` emits `onUpdated`, and
+   * the card refetches on that push. Reporting failures are swallowed by
+   * callers — losing a progress tick must never abort the ingestion itself.
+   */
+  const reportProgress = async (
+    projectId: string,
+    manifest: KnowledgeManifest,
+    source: KnowledgeManifestSource,
+    progress: KnowledgeIngestProgress
+  ): Promise<void> => {
+    source.progress = progress;
+    await saveManifest(projectId, manifest);
   };
 
   const listSources = async (projectId: string): Promise<IProjectKnowledgeListResult> => {
@@ -165,7 +235,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
           ...baseSource,
           id: `unsupported-${addedAt}-${manifest.sources.length}`,
           status: 'unsupported',
-          error: 'Unsupported file type. Supported: .md, .txt, .docx, .xlsx',
+          error: `Unsupported file type. ${SUPPORTED_EXTENSIONS_HINT}`,
         });
         continue;
       }
@@ -244,30 +314,38 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         );
         return manifest;
       }
-      const vectors = await embedTexts(
-        missing.map((c) => c.text),
-        config
-      );
-      const dim = vectors[0]?.length ?? 0;
-      if (dim === 0) return manifest;
-      // Captured into a local const (rather than repeatedly re-reading
-      // manifest.embedding) so the non-null value survives the awaits below.
-      // Not assigned onto manifest.embedding until writeVectors below actually
-      // succeeds — otherwise a throw from writeVectors (e.g. a provider
-      // returning inconsistent per-row dimensions) would pin a model on the
-      // manifest despite zero vectors ever having been persisted.
-      const embedding = manifest.embedding ?? { model, dim };
-      const existing = await readVectors(storeDir);
-      const rows = existing && existing.dim === embedding.dim ? [...existing.rows.entries()] : [];
-      missing.forEach((chunk, i) => {
-        rows.push([chunk.chunkId, Float32Array.from(vectors[i])]);
-        chunk.hasVector = true;
-      });
-      await writeVectors(storeDir, embedding.dim, rows);
-      manifest.embedding = embedding;
-      await writeChunks(storeDir, chunks);
-      for (const source of manifest.sources) {
-        source.vectorCount = chunks.filter((c) => c.sourceId === source.id && c.hasVector).length;
+      // Read the existing rows once; the loop below appends to this array and
+      // rewrites the file after every batch, so a failure part-way through
+      // keeps everything embedded so far and Retry resumes from there.
+      let rows: Array<[string, Float32Array]> | null = null;
+      for (let start = 0; start < missing.length; start += EMBED_BATCH_SIZE) {
+        const batch = missing.slice(start, start + EMBED_BATCH_SIZE);
+        const vectors = await embedTexts(
+          batch.map((c) => c.text),
+          config
+        );
+        const dim = vectors[0]?.length ?? 0;
+        if (dim === 0) break;
+        // Captured into a local const (rather than repeatedly re-reading
+        // manifest.embedding) so the non-null value survives the awaits below.
+        // Not assigned onto manifest.embedding until writeVectors below actually
+        // succeeds — otherwise a throw from writeVectors (e.g. a provider
+        // returning inconsistent per-row dimensions) would pin a model on the
+        // manifest despite zero vectors ever having been persisted.
+        const embedding = manifest.embedding ?? { model, dim };
+        if (rows === null) {
+          const existing = await readVectors(storeDir);
+          rows = existing && existing.dim === embedding.dim ? [...existing.rows.entries()] : [];
+        }
+        batch.forEach((chunk, i) => {
+          rows!.push([chunk.chunkId, Float32Array.from(vectors[i])]);
+          chunk.hasVector = true;
+        });
+        await writeVectors(storeDir, embedding.dim, rows);
+        manifest.embedding = embedding;
+        await writeChunks(storeDir, chunks);
+        syncEmbedCounts(manifest, chunks);
+        await saveManifest(projectId, manifest);
       }
     } catch (error) {
       // Embedding is best-effort: sources stay ready with vectorCount < chunkCount.
@@ -277,6 +355,10 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         `[projectKnowledge] embedding pass failed for project ${projectId}; sources stay searchable BM25-only:`,
         error instanceof Error ? error.message : error
       );
+    } finally {
+      // Whether the pass completed, gave up, or threw, nothing is in flight
+      // any more — a source left showing "Embedding 64/200" would never move.
+      if (clearIngestProgress(manifest)) await saveManifest(projectId, manifest);
     }
     return manifest;
   };
@@ -291,8 +373,25 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         const extension = path.extname(source.fileName).slice(1).toLowerCase();
         const originalPath = path.join(storePaths(storeDir).sourceDir(source.id), `original.${extension}`);
         const buffer = await fs.readFile(originalPath);
+        // Non-fatal notes accumulated while converting; a source can hit more
+        // than one cap (e.g. a long PDF that is also chunk-capped).
+        const notes: string[] = [];
         let markdown: string;
-        if (CONVERTED_EXTENSIONS.has(extension)) {
+        if (extension === 'pdf') {
+          // PDFs get their own branch rather than joining CONVERTED_EXTENSIONS:
+          // convertToMarkdown's (buffer, 'docx' | 'xlsx') shape has nowhere to
+          // carry a page cap or report per-page progress.
+          const extraction = await extractPdfText(buffer, {
+            maxPages: MAX_PDF_PAGES,
+            onProgress: (done, total) =>
+              reportProgress(projectId, manifest, source, { stage: 'reading', done, total }).catch(
+                (): undefined => undefined
+              ),
+          });
+          if (!extraction.hasTextLayer) throw new Error(SCANNED_PDF_ERROR);
+          if (extraction.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
+          markdown = renderPagesAsMarkdown(extraction.pages);
+        } else if (CONVERTED_EXTENSIONS.has(extension)) {
           markdown = await deps.convertToMarkdown(
             buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
             extension as 'docx' | 'xlsx'
@@ -302,10 +401,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         }
         await fs.writeFile(path.join(storePaths(storeDir).sourceDir(source.id), 'converted.md'), markdown, 'utf8');
         let raw = chunkMarkdown(markdown);
-        let truncated = false;
         if (raw.length > MAX_CHUNKS_PER_SOURCE) {
           raw = raw.slice(0, MAX_CHUNKS_PER_SOURCE);
-          truncated = true;
+          notes.push(`Truncated to ${MAX_CHUNKS_PER_SOURCE} passages.`);
         }
         const newChunks: KnowledgeChunk[] = raw.map((c, i) => ({
           chunkId: `${source.id}#${i}`,
@@ -321,11 +419,14 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         await writeBm25(storeDir, buildBm25Index(all));
         source.status = 'ready';
         source.chunkCount = newChunks.length;
-        source.error = truncated ? `Truncated to ${MAX_CHUNKS_PER_SOURCE} passages.` : null;
+        source.error = notes.length > 0 ? notes.join(' ') : null;
       } catch (error) {
         source.status = 'failed';
         source.error = error instanceof Error ? error.message : 'Indexing failed.';
       }
+      // The source has settled either way — drop any half-finished reading tick
+      // so the card stops showing a stale "Reading page 12/50".
+      delete source.progress;
       await saveManifest(projectId, manifest);
     }
     manifest = await embedMissingVectors(projectId, manifest);
