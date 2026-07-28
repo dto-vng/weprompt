@@ -31,6 +31,9 @@ block.
 - `heading 2` — Cambria 13pt bold ink, used for phases and sub-sections
 - `Normal` — Calibri 11pt ink, 8pt after
 
+`heading 3` exists in the style sheet but is unused in this template — a proposal
+never nests a third level under a phase. Do not introduce it.
+
 ## Page geometry
 
 US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
@@ -59,6 +62,8 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
 - **Signature block** — a paragraph carrying a gold bottom border as the signing rule,
   followed by a 9pt muted "Name and title" label. Two of these, with real vertical space
   between them.
+- **Footer** — a centred page-number field on every page except the cover, which
+  carries no page number (first-page footer suppressed via `titlePage`).
 
 ## Hard bans
 
@@ -79,8 +84,9 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
 4. Contact-sheet visual pass: `officecli view <file> screenshot --grid auto`, inspected
    for the cover standing alone, table column proportions, the total row reading as a
    total, signature rules having room to sign between them, and no page ending in a large
-   blank gap. Confirm any fine call with `screenshot --page N`. Fix and re-render until a
-   full pass finds zero new issues (max 3 cycles).
+   blank gap other than the deliberate break before Commercials described above. Confirm
+   any fine call with `screenshot --page N`. Fix and re-render until a full pass finds
+   zero new issues (max 3 cycles).
 
 ## Follow-up edits (all later change requests in this conversation)
 

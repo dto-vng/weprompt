@@ -50,8 +50,11 @@ column widths are chosen by content, never equal by default.
 - **Lead callout** — a bold paragraph with the tint fill, used once per report for the
   recommendation. Not a table.
 - **Table + caption** — a table followed by a 9pt italic muted caption paragraph
-  (`Table N — …`). Keep the caption with its table.
+  (`Table N — …`). Keep the caption with its table. When a table ends in a totals
+  row, bold every cell in that row so it reads as a sum, not another line item.
 - **Closing rule** — the final paragraph carries a navy bottom border.
+- **Footer** — a centred page-number field on every page except the cover, which
+  carries no page number (first-page footer suppressed via `titlePage`).
 
 ## The TOC rule (important)
 

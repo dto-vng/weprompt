@@ -31,6 +31,9 @@ built for someone following it under time pressure. No cover page.
 - `heading 2` — Calibri 13pt bold ink, used for every section
 - `Normal` — Calibri 11pt ink, 8pt after
 
+`heading 3` exists in the style sheet but is unused in this template — a compact SOP
+has one level of section. Do not introduce it.
+
 ## Page geometry
 
 US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
@@ -51,6 +54,8 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
   Follow with a 9pt italic muted caption.
 - **Completion checklist** — a real bullet list (`numId=2`) of things that must be true
   before the procedure is considered done.
+- **Footer** — a centred page-number field on every page (no cover page to suppress
+  it on).
 
 ## Hard bans
 

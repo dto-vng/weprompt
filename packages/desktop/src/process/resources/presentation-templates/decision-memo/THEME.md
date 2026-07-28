@@ -50,6 +50,8 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
 - **Options table** — three columns: option, effect, principal risk. Follow it with a
   10pt italic muted note explaining the rejected options.
 - **Ask** — a numbered list of what the reader must decide or approve.
+- **Footer** — a centred page-number field on every page (no cover page to suppress
+  it on).
 
 ## Hard bans
 
