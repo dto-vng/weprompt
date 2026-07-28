@@ -34,6 +34,7 @@ import { cleanupRegisteredAgentProcesses } from './agent-process-registry.js';
 import {
   buildSpawnArgs,
   buildSpawnEnv,
+  createLocalToken,
   findAvailablePort,
   BackendLifecycleManager,
   BackendStartupError,
@@ -238,6 +239,39 @@ describe('buildSpawnEnv', () => {
     expect(env.AIONUI_WORK_DIR).toBe('/w');
     expect(env.AIONUI_LOG_DIR).toBe('/l');
     expect(env.PATH).toBe(process.env.PATH); // inherits
+  });
+
+  it('passes the local-mode secret and origin allow-list through the environment', () => {
+    // Never through argv: `ps` is world-readable, so a flag would publish the
+    // secret to every local process.
+    const env = buildSpawnEnv(undefined, {
+      localToken: 'deadbeef',
+      allowedOrigins: ['null', 'http://localhost:5173'],
+    });
+    expect(env.AIONUI_LOCAL_TOKEN).toBe('deadbeef');
+    expect(env.AIONUI_LOCAL_ALLOWED_ORIGINS).toBe('null,http://localhost:5173');
+  });
+
+  it('omits the security vars when no secret or origin is supplied', () => {
+    const env = buildSpawnEnv({ cacheDir: '/c', workDir: '/w', logDir: '/l' });
+    expect(env.AIONUI_LOCAL_TOKEN).toBeUndefined();
+    expect(env.AIONUI_LOCAL_ALLOWED_ORIGINS).toBeUndefined();
+  });
+
+  it('omits the origin allow-list when it is empty', () => {
+    const env = buildSpawnEnv(undefined, { localToken: 'abc', allowedOrigins: [] });
+    expect(env.AIONUI_LOCAL_TOKEN).toBe('abc');
+    expect(env.AIONUI_LOCAL_ALLOWED_ORIGINS).toBeUndefined();
+  });
+});
+
+describe('createLocalToken', () => {
+  it('returns 32 bytes of hex', () => {
+    expect(createLocalToken()).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns a different secret each call so a restart invalidates the old one', () => {
+    expect(createLocalToken()).not.toBe(createLocalToken());
   });
 });
 

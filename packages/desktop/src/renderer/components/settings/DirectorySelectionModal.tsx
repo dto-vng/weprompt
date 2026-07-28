@@ -8,7 +8,7 @@ import { Button, Spin } from '@arco-design/web-react';
 import { IconFile, IconFolder, IconUp } from '@arco-design/web-react/icon';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getBaseUrl } from '@/common/adapter/httpBridge';
+import { getBaseUrl, withLocalTokenHeaders } from '@/common/adapter/httpBridge';
 import { stripWindowsVerbatimPrefix } from '@/renderer/utils/file/fileSelection';
 import AionModal from '@/renderer/components/base/AionModal';
 
@@ -56,6 +56,7 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
           {
             method: 'GET',
             credentials: 'include',
+            headers: withLocalTokenHeaders(),
           }
         );
         if (!response.ok) {

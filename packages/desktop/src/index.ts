@@ -17,6 +17,7 @@ import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell 
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
+import { withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
 import { DESKTOP_PET_ENABLED } from './common/config/constants';
 import { ipcBridge } from './common';
@@ -219,6 +220,13 @@ ipcMain.on('get-backend-port', (event) => {
   event.returnValue = backendManager.port;
 });
 
+// The `--local` backend skips JWT verification, so this per-launch secret is the
+// only thing separating the app's own renderer from any other page or process
+// that reaches the loopback port. Handed out over the preload bridge only.
+ipcMain.on('get-backend-local-token', (event) => {
+  event.returnValue = backendManager.localToken;
+});
+
 ipcMain.on('get-initial-language', (event) => {
   event.returnValue = rendererInitialLanguage;
 });
@@ -263,6 +271,7 @@ ipcMain.handle('backend:recover-corrupted-database', async () => {
             onReady: (backendPort) => {
               markBackendReady(backendPort, 'backendManager.recoverCorruptedDatabase.lateReady');
             },
+            allowedOrigins: rendererAllowedOrigins(),
           },
           undefined,
           { recoverCorruptedDatabase: true }
@@ -296,9 +305,9 @@ function registerCronResumeBridge(backendPort: number): void {
   const onResume = () => {
     void fetch(`http://127.0.0.1:${backendPort}/api/cron/internal/system-resume`, {
       method: 'POST',
-      headers: {
+      headers: withLocalTokenHeaders({
         'x-aionui-internal': '1',
-      },
+      }),
     }).catch((error) => {
       console.error('[AionUi] Failed to notify backend about system resume:', error);
     });
@@ -330,12 +339,37 @@ const scheduleBackendMigrations = (): void => {
   })();
 };
 
+/**
+ * Browser origins allowed to call the local backend.
+ *
+ * A packaged renderer is loaded with `loadFile`, so its requests carry
+ * `Origin: null` — that literal is what the backend's allow-list has to match.
+ * In dev the renderer is served by vite and gets a real origin, so add that too.
+ * Anything not listed here cannot read a local-mode response.
+ */
+function rendererAllowedOrigins(): string[] {
+  const origins = ['null'];
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  if (devUrl) {
+    try {
+      origins.push(new URL(devUrl).origin);
+    } catch {
+      console.warn(`[AionUi] ignoring malformed ELECTRON_RENDERER_URL: ${devUrl}`);
+    }
+  }
+  return origins;
+}
+
 function exposeBackendPort(backendPort: number): void {
   // Expose the backend port to main-process callers of httpBridge (e.g. the
   // one-shot assistant migration hook below). Must land BEFORE any
   // ipcBridge.* invoke from the main process — the renderer side reads
   // window.__backendPort via preload, but main has no `window`.
   (globalThis as typeof globalThis & { __backendPort?: number }).__backendPort = backendPort;
+  // Same reason, for the local-mode secret: main-process callers reach the
+  // backend through httpBridge too, and it reads the token from globalThis when
+  // there is no `window`.
+  (globalThis as typeof globalThis & { __backendLocalToken?: string }).__backendLocalToken = backendManager.localToken;
 }
 
 function ensureAdminUserOnce(backendPort: number): Promise<void> {
@@ -874,6 +908,7 @@ const handleAppReady = async (): Promise<void> => {
             onReady: (backendPort) => {
               markBackendReady(backendPort, 'backendManager.lateReady');
             },
+            allowedOrigins: rendererAllowedOrigins(),
           }
         );
       },
