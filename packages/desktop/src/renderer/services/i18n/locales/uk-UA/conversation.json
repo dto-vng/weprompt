@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "семантичний пошук вимкнено — модель ембеддингу не налаштована",
     "knowledgePassages": "{{count}} фрагментів",
     "knowledgeStatusIndexing": "Індексація…",
+    "knowledgeProgressReading": "Читання сторінки {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Векторизація {{done}}/{{total}} фрагментів",
     "knowledgeStatusFailed": "Помилка",
     "knowledgeStatusUnsupported": "Не підтримується",
     "knowledgeRetry": "Повторити",
     "knowledgeRemove": "Видалити",
     "knowledgeRemoveConfirm": "Видалити цей файл із бази знань?",
     "knowledgeError": "База знань недоступна.",
-    "knowledgeSupportedTypes": "Підтримується: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Підтримується: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Недавні",

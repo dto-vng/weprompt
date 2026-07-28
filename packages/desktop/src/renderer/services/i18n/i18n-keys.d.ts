@@ -672,6 +672,8 @@ export type I18nKey =
   | 'conversation.projectHome.knowledgeEmpty'
   | 'conversation.projectHome.knowledgeError'
   | 'conversation.projectHome.knowledgePassages'
+  | 'conversation.projectHome.knowledgeProgressEmbedding'
+  | 'conversation.projectHome.knowledgeProgressReading'
   | 'conversation.projectHome.knowledgeRemove'
   | 'conversation.projectHome.knowledgeRemoveConfirm'
   | 'conversation.projectHome.knowledgeRetry'

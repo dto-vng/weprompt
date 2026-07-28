@@ -17,7 +17,7 @@ export type ProjectKnowledgeCardProps = {
   project: ForgeProject;
 };
 
-const SUPPORTED_EXTENSIONS = ['md', 'txt', 'docx', 'xlsx'];
+const SUPPORTED_EXTENSIONS = ['md', 'txt', 'docx', 'xlsx', 'pdf'];
 
 /**
  * Project Home knowledge card: lists the project's knowledge sources
@@ -48,10 +48,22 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
     }
   };
 
+  // A long PDF or a large embed pass can occupy the project's ingestion queue
+  // for a while, so show where it has got to rather than an unmoving tag.
+  const indexingLabel = (source: IKnowledgeSourceDto): string => {
+    const progress = source.progress;
+    if (!progress) return t('conversation.projectHome.knowledgeStatusIndexing');
+    const key =
+      progress.stage === 'reading'
+        ? 'conversation.projectHome.knowledgeProgressReading'
+        : 'conversation.projectHome.knowledgeProgressEmbedding';
+    return t(key, { done: progress.done, total: progress.total });
+  };
+
   const renderStatus = (source: IKnowledgeSourceDto): React.ReactNode => {
     switch (source.status) {
       case 'indexing':
-        return <Tag size='small'>{t('conversation.projectHome.knowledgeStatusIndexing')}</Tag>;
+        return <Tag size='small'>{indexingLabel(source)}</Tag>;
       case 'ready': {
         const readyTag = (
           <Tag size='small' color='green'>

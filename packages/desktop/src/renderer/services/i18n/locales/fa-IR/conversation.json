@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "جستجوی معنایی غیرفعال — مدل امبدینگ پیکربندی نشده است",
     "knowledgePassages": "{{count}} گزیده",
     "knowledgeStatusIndexing": "در حال نمایه‌سازی…",
+    "knowledgeProgressReading": "در حال خواندن صفحهٔ {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "در حال جاسازی {{done}}/{{total}} گزیده",
     "knowledgeStatusFailed": "ناموفق",
     "knowledgeStatusUnsupported": "پشتیبانی نمی‌شود",
     "knowledgeRetry": "تلاش مجدد",
     "knowledgeRemove": "حذف",
     "knowledgeRemoveConfirm": "این فایل از پایگاه دانش حذف شود؟",
     "knowledgeError": "پایگاه دانش در دسترس نیست.",
-    "knowledgeSupportedTypes": "فرمت‌های پشتیبانی‌شده: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "فرمت‌های پشتیبانی‌شده: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "اخیر",

@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "busca semântica desativada — nenhum modelo de embedding configurado",
     "knowledgePassages": "{{count}} trechos",
     "knowledgeStatusIndexing": "Indexando…",
+    "knowledgeProgressReading": "Lendo página {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Incorporando {{done}}/{{total}} trechos",
     "knowledgeStatusFailed": "Falhou",
     "knowledgeStatusUnsupported": "Não compatível",
     "knowledgeRetry": "Tentar novamente",
     "knowledgeRemove": "Remover",
     "knowledgeRemoveConfirm": "Remover este arquivo da base de conhecimento?",
     "knowledgeError": "A base de conhecimento está indisponível.",
-    "knowledgeSupportedTypes": "Compatível com: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Compatível com: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Recentes",

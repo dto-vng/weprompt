@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
     "knowledgePassages": "{{count}} фрагментов",
     "knowledgeStatusIndexing": "Индексация…",
+    "knowledgeProgressReading": "Чтение страницы {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Векторизация {{done}}/{{total}} фрагментов",
     "knowledgeStatusFailed": "Ошибка",
     "knowledgeStatusUnsupported": "Не поддерживается",
     "knowledgeRetry": "Повторить",
     "knowledgeRemove": "Удалить",
     "knowledgeRemoveConfirm": "Удалить этот файл из базы знаний?",
     "knowledgeError": "База знаний недоступна.",
-    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Недавние",

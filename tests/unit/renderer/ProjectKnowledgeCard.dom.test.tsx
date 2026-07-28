@@ -31,6 +31,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
       if (options && typeof options.count === 'number') return `${key}:${options.count}`;
+      if (options && typeof options.done === 'number') return `${key}:${options.done}/${String(options.total)}`;
       return key;
     },
   }),
@@ -75,6 +76,7 @@ const readySource: IKnowledgeSourceDto = {
   vectorCount: 5,
   addedAt: 1,
   error: null,
+  progress: null,
 };
 
 const indexingSource: IKnowledgeSourceDto = {
@@ -86,6 +88,7 @@ const indexingSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 2,
   error: null,
+  progress: null,
 };
 
 const failedSource: IKnowledgeSourceDto = {
@@ -97,6 +100,7 @@ const failedSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 3,
   error: 'Could not parse file.',
+  progress: null,
 };
 
 const unsupportedSource: IKnowledgeSourceDto = {
@@ -108,6 +112,7 @@ const unsupportedSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 4,
   error: 'Unsupported file type.',
+  progress: null,
 };
 
 describe('ProjectKnowledgeCard', () => {
@@ -185,6 +190,41 @@ describe('ProjectKnowledgeCard', () => {
     expect(summaryLine).toHaveTextContent('conversation.projectHome.knowledgeSemanticOff');
   });
 
+  it('replaces the bare indexing tag with the page being read', () => {
+    hookState = {
+      sources: [{ ...indexingSource, fileName: 'contract.pdf', progress: { stage: 'reading', done: 12, total: 50 } }],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressReading:12/50')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
+  });
+
+  it('shows embedding progress during the embed pass', () => {
+    hookState = {
+      sources: [{ ...indexingSource, progress: { stage: 'embedding', done: 64, total: 200 } }],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressEmbedding:64/200')).toBeInTheDocument();
+  });
+
+  it('falls back to the plain indexing tag when no progress has been reported yet', () => {
+    hookState = { sources: [indexingSource], summary: null, loading: false, error: false };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeStatusIndexing')).toBeInTheDocument();
+  });
+
   it('renders an unsupported source with its status tag', () => {
     hookState = { sources: [unsupportedSource], summary: null, loading: false, error: false };
 
@@ -204,7 +244,7 @@ describe('ProjectKnowledgeCard', () => {
     await waitFor(() => expect(addSourcesMock).toHaveBeenCalledWith(['/tmp/a.md', '/tmp/b.txt']));
     expect(showOpenMock).toHaveBeenCalledWith({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'conversation.projectHome.knowledge', extensions: ['md', 'txt', 'docx', 'xlsx'] }],
+      filters: [{ name: 'conversation.projectHome.knowledge', extensions: ['md', 'txt', 'docx', 'xlsx', 'pdf'] }],
     });
   });
 

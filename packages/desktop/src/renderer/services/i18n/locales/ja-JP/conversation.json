@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "セマンティック検索オフ — 埋め込みモデルが未設定です",
     "knowledgePassages": "{{count}} 件の抜粋",
     "knowledgeStatusIndexing": "インデックス作成中……",
+    "knowledgeProgressReading": "{{done}}/{{total}} ページを読み込み中",
+    "knowledgeProgressEmbedding": "{{done}}/{{total}} 件の抜粋を埋め込み中",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "非対応",
     "knowledgeRetry": "再試行",
     "knowledgeRemove": "削除",
     "knowledgeRemoveConfirm": "このファイルをナレッジベースから削除しますか？",
     "knowledgeError": "ナレッジベースを利用できません。",
-    "knowledgeSupportedTypes": "対応形式: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "対応形式: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "最近",
