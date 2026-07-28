@@ -25,6 +25,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
         'connected-ops',
         'business-report',
         'decision-memo',
+        'operations-guide',
       ])
     );
     expect(new Set(ids).size).toBe(ids.length);

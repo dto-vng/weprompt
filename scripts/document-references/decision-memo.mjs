@@ -76,7 +76,7 @@ export default {
     { type: 'para', text: 'Why now', style: 'Heading2' },
     {
       type: 'para',
-      text: 'Mid-market list pricing has not moved in seven quarters while input costs rose 11% over the same period. Gross margin in the tier has compressed from 31% to 26%, and the trend has not flattened. Two of the four principal competitors repriced upward this quarter, which narrows the risk that a increase makes us an outlier.',
+      text: 'Mid-market list pricing has not moved in seven quarters while input costs rose 11% over the same period. Gross margin in the tier has compressed from 31% to 26%, and the trend has not flattened. Two of the four principal competitors repriced upward this quarter, which narrows the risk that an increase makes us an outlier.',
     },
     {
       type: 'para',

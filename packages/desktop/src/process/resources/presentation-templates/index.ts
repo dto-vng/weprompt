@@ -27,6 +27,8 @@ import businessReportThemeMd from './business-report/THEME.md?raw';
 import businessReportPreviewSvg from './business-report/preview.svg?raw';
 import decisionMemoThemeMd from './decision-memo/THEME.md?raw';
 import decisionMemoPreviewSvg from './decision-memo/preview.svg?raw';
+import operationsGuideThemeMd from './operations-guide/THEME.md?raw';
+import operationsGuidePreviewSvg from './operations-guide/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -234,5 +236,23 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: decisionMemoThemeMd,
     previewSvg: decisionMemoPreviewSvg,
     referenceSourcePath: () => resolveBundledReference('decision-memo.docx'),
+  },
+  {
+    manifest: {
+      id: 'operations-guide',
+      name: 'Operations Guide',
+      description: 'Compact SOP — numbered steps, note boxes, checklists, teal accent',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: operationsGuideThemeMd,
+    previewSvg: operationsGuidePreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('operations-guide.docx'),
   },
 ];

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#E8F3F2"/>
+  <rect x="96" y="14" width="128" height="172" fill="#FFFFFF" stroke="#C7DEDC"/>
+  <text x="110" y="30" font-family="Helvetica, Arial, sans-serif" font-size="4" font-weight="700" fill="#0E7C7B" letter-spacing="0.6">STANDARD OPERATING PROCEDURE</text>
+  <text x="110" y="45" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#0A4F4E">Production</text>
+  <text x="110" y="57" font-family="Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#0A4F4E">Release</text>
+  <rect x="110" y="63" width="100" height="1.2" fill="#0E7C7B"/>
+  <g font-family="Helvetica, Arial, sans-serif" font-size="4.5" font-weight="700" fill="#0E7C7B">
+    <text x="110" y="80">1</text><text x="110" y="90">2</text><text x="110" y="100">3</text><text x="110" y="110">4</text>
+  </g>
+  <g fill="#CBD6D5">
+    <rect x="118" y="77" width="92" height="2.2"/>
+    <rect x="118" y="87" width="80" height="2.2"/>
+    <rect x="118" y="97" width="92" height="2.2"/>
+    <rect x="118" y="107" width="68" height="2.2"/>
+  </g>
+  <rect x="110" y="118" width="100" height="15" fill="#FDF3E3"/>
+  <rect x="110" y="118" width="2" height="15" fill="#D89A34"/>
+  <g fill="#B0873A">
+    <rect x="116" y="123" width="88" height="2"/>
+    <rect x="116" y="128" width="60" height="2"/>
+  </g>
+  <rect x="110" y="142" width="100" height="8" fill="#0A4F4E"/>
+  <g fill="#DCE9E8">
+    <rect x="110" y="150" width="100" height="7"/>
+    <rect x="110" y="157" width="100" height="7"/>
+    <rect x="110" y="164" width="100" height="7"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="1">
+    <line x1="150" y1="142" x2="150" y2="171"/>
+    <line x1="172" y1="142" x2="172" y2="171"/>
+  </g>
+</svg>
