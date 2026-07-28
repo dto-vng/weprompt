@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { buildInjectedContext } from '@/common/chat/buildInjectedContext';
+import { buildInjectedContext, GLOBAL_CONTEXT_LABEL } from '@/common/chat/buildInjectedContext';
 import { useConfig } from '@/renderer/hooks/config/useConfig';
 import { Input, Switch, Typography } from '@arco-design/web-react';
 import React from 'react';
@@ -17,7 +17,9 @@ const ProfileSettings: React.FC = () => {
   const enabled = ctx?.enabled ?? true;
   const instructions = ctx?.instructions ?? '';
 
-  const preview = buildInjectedContext([{ label: 'Your instructions', text: enabled ? instructions : '' }]);
+  // Uses the same constant as the real injection, so this preview cannot drift
+  // from what actually reaches the model.
+  const preview = buildInjectedContext([{ label: GLOBAL_CONTEXT_LABEL, text: enabled ? instructions : '' }]);
 
   return (
     <SettingsPageWrapper>

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { GLOBAL_CONTEXT_LABEL } from '@/common/chat/buildInjectedContext';
 import { resolveInjectedContext } from './resolveInjectedContext';
+
+describe('GLOBAL_CONTEXT_LABEL', () => {
+  // The Profile field invites first-person text about the user ("I work in HR at
+  // VNG…"), so a label addressed TO the model makes it adopt that text as its own
+  // identity. Observed live: a profile reading "I am a Head of AI Product at VNG"
+  // produced an assistant that introduced itself as the Head of AI Product.
+  it('names the user as the subject rather than addressing the assistant', () => {
+    expect(GLOBAL_CONTEXT_LABEL).toMatch(/user/i);
+    expect(GLOBAL_CONTEXT_LABEL).not.toMatch(/^your\b/i);
+  });
+});
 
 describe('resolveInjectedContext', () => {
   it('is empty when global disabled and no project text', () => {
@@ -15,7 +27,7 @@ describe('resolveInjectedContext', () => {
       getUserContext: () => ({ enabled: true, instructions: 'Be concise.' }),
       findProject: () => null,
     });
-    expect(out).toBe('[Your instructions]\nBe concise.');
+    expect(out).toBe(`[${GLOBAL_CONTEXT_LABEL}]\nBe concise.`);
   });
 
   it('layers global then project, using the project name in the label', () => {
@@ -30,6 +42,6 @@ describe('resolveInjectedContext', () => {
         updated_at: 0,
       }),
     });
-    expect(out).toBe('[Your instructions]\nBe concise.\n\n[Project: HR]\nUse formal Vietnamese.');
+    expect(out).toBe(`[${GLOBAL_CONTEXT_LABEL}]\nBe concise.\n\n[Project: HR]\nUse formal Vietnamese.`);
   });
 });

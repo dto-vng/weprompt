@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { buildInjectedContext } from '@/common/chat/buildInjectedContext';
+import { buildInjectedContext, GLOBAL_CONTEXT_LABEL } from '@/common/chat/buildInjectedContext';
 import type { ConfigKeyMap } from '@/common/config/configKeys';
 import { configService } from '@/common/config/configService';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
@@ -33,7 +33,7 @@ export function resolveInjectedContext(projectId?: string, deps: ResolveDeps = {
   const projectText = project?.instructions ?? '';
 
   return buildInjectedContext([
-    { label: 'Your instructions', text: globalText },
+    { label: GLOBAL_CONTEXT_LABEL, text: globalText },
     { label: project ? `Project: ${project.name}` : 'Project', text: projectText },
   ]);
 }
