@@ -62,6 +62,16 @@ describe('TemplateGalleryColumns', () => {
     expect(docxCol.querySelectorAll('[data-testid^=template-card-]')).toHaveLength(0);
   });
 
+  it('sizes columns per mode: large wraps two-up, compact stacks one-per-row', () => {
+    const { rerender } = render(
+      <TemplateGalleryColumns templates={templates} size='large' onSelect={() => {}} onRemove={() => {}} />
+    );
+    expect(screen.getByTestId('template-column-docx').className).toContain('min-w-340px');
+
+    rerender(<TemplateGalleryColumns templates={templates} size='compact' onSelect={() => {}} onRemove={() => {}} />);
+    expect(screen.getByTestId('template-column-docx').className).toContain('min-w-172px');
+  });
+
   it('marks the selected card and fires onSelect on click', () => {
     const onSelect = vi.fn();
     render(
