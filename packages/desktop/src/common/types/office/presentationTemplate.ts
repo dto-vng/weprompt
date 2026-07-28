@@ -20,7 +20,7 @@ export type PresentationTemplateManifest = {
   source: PresentationTemplateSource;
   /** File name (no path separators) of the theme spec inside the pack dir. */
   themeFile: string;
-  /** File name of the retained reference deck; required when format === 'pptx'. */
+  /** File name of the retained reference file (deck or document); required for pptx and docx formats. */
   referenceFile: string | null;
   /** File name of the gallery thumbnail (SVG or PNG). */
   preview: string;
@@ -34,7 +34,7 @@ export type PresentationTemplateSummary = {
   manifest: PresentationTemplateManifest;
   /** Absolute path of the theme spec on disk. */
   themePath: string;
-  /** Absolute path of the reference deck, when the template has one. */
+  /** Absolute path of the reference file (deck or document), when the template has one. */
   referencePath: string | null;
   /** data: URL for the thumbnail (image/svg+xml or image/png). */
   previewDataUrl: string;

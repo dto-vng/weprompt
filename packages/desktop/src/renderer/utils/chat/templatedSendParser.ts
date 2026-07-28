@@ -17,7 +17,7 @@ export type TemplatedSend = {
   templateId: string;
   /** What the user actually typed (everything after the directive paragraph). */
   userText: string;
-  /** Attachments that belong to the template pack (THEME.md, reference.pptx). */
+  /** Attachments that belong to the template pack (THEME.md, reference.pptx/.docx). */
   templateFiles: string[];
   /** The user's own attachments — still shown as file chips. */
   userFiles: string[];
