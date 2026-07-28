@@ -229,6 +229,31 @@ describe('ProjectKnowledgeCard', () => {
     expect(retrySourceMock).toHaveBeenCalledWith('s-failed');
   });
 
+  it('offers retry on a ready source whose chunks are not all embedded', () => {
+    // Indexed while no embedding model was configured: searchable via BM25 but
+    // vectorless. Without this affordance the only way to embed it later is to
+    // remove and re-add the file.
+    hookState = {
+      sources: [{ ...readySource, id: 's-partial', vectorCount: 0 }],
+      summary: { fileCount: 1, passageCount: 5, semantic: 'off' },
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
+
+    expect(retrySourceMock).toHaveBeenCalledWith('s-partial');
+  });
+
+  it('does not offer retry on a fully embedded ready source', () => {
+    hookState = { sources: [readySource], summary: null, loading: false, error: false };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).not.toBeInTheDocument();
+  });
+
   it('reveals the remove confirmation when the remove control is clicked', async () => {
     hookState = { sources: [readySource], summary: null, loading: false, error: false };
 

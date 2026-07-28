@@ -60,7 +60,21 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
         );
         // A ready source can still carry a non-fatal note (e.g. truncation) —
         // surface it via tooltip rather than treating it as a failure.
-        return source.error ? <Tooltip content={source.error}>{readyTag}</Tooltip> : readyTag;
+        const taggedReady = source.error ? <Tooltip content={source.error}>{readyTag}</Tooltip> : readyTag;
+        // A source indexed while no embedding model was configured is searchable
+        // (BM25) but has no vectors. Offer Retry so the user can embed it after
+        // configuring a model — otherwise remove-and-re-add is the only route.
+        if (source.vectorCount < source.chunkCount) {
+          return (
+            <span className='flex flex-shrink-0 items-center gap-4px'>
+              {taggedReady}
+              <Button type='text' size='mini' onClick={() => void retrySource(source.id)}>
+                {t('conversation.projectHome.knowledgeRetry')}
+              </Button>
+            </span>
+          );
+        }
+        return taggedReady;
       }
       case 'failed':
         return (
