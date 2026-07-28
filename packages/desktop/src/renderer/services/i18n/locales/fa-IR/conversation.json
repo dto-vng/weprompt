@@ -68,7 +68,22 @@
     "rename": "تغییر نام",
     "relink": "اتصال مجدد پوشه",
     "reveal": "نمایش در پوشه",
-    "remove": "حذف"
+    "remove": "حذف",
+    "knowledge": "دانش",
+    "knowledgeAdd": "افزودن فایل",
+    "knowledgeEmpty": "برای ساخت پایگاه دانش این پروژه، سند اضافه کنید. دستیار این محتوا را در هر چت این پروژه به‌طور خودکار جستجو می‌کند.",
+    "knowledgeSummary": "{{files}} فایل · {{passages}} گزیده",
+    "knowledgeSemanticOn": "جستجوی معنایی فعال",
+    "knowledgeSemanticOff": "جستجوی معنایی غیرفعال — مدل امبدینگ پیکربندی نشده است",
+    "knowledgePassages": "{{count}} گزیده",
+    "knowledgeStatusIndexing": "در حال نمایه‌سازی…",
+    "knowledgeStatusFailed": "ناموفق",
+    "knowledgeStatusUnsupported": "پشتیبانی نمی‌شود",
+    "knowledgeRetry": "تلاش مجدد",
+    "knowledgeRemove": "حذف",
+    "knowledgeRemoveConfirm": "این فایل از پایگاه دانش حذف شود؟",
+    "knowledgeError": "پایگاه دانش در دسترس نیست.",
+    "knowledgeSupportedTypes": "فرمت‌های پشتیبانی‌شده: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "اخیر",

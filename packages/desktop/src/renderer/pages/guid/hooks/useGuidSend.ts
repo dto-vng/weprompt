@@ -11,7 +11,7 @@ import {
   isVisionBuiltinServer,
   mergeCommodityMcpServerIds,
 } from '@/common/config/builtinCapabilities';
-import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
+import type { IMcpServer, ISessionMcpServer, TProviderWithModel } from '@/common/config/storage';
 import { toSessionMcpServer } from '@/renderer/hooks/mcp/catalog';
 import { emitter } from '@/renderer/utils/emitter';
 import { updateWorkspaceTime } from '@/renderer/utils/workspace/workspaceHistory';
@@ -192,6 +192,20 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     // assistant's rules take precedence (out of scope — see design spec).
     const injectedContext = resolveInjectedContext(projectId);
 
+    // Project knowledge base: attach the per-project search server as a pure
+    // session MCP (full stdio transport, never a repo-registered row) so the
+    // agent can retrieve from the project's curated documents. Only attaches
+    // for project chats whose knowledge index has at least one ready source —
+    // getSessionMcpServer returns null otherwise. A failure here must never
+    // block sending, so it degrades to "no knowledge tool".
+    const kbSessionServer = projectId
+      ? await ipcBridge.projectKnowledge.getSessionMcpServer.invoke({ projectId }).catch((): null => null)
+      : null;
+    const withKbServer = (servers: ISessionMcpServer[]): ISessionMcpServer[] =>
+      kbSessionServer && !servers.some((server) => server.name === kbSessionServer.name)
+        ? [...servers, kbSessionServer]
+        : servers;
+
     if (assistantBackend === 'aionrs') {
       if (!current_model) {
         Message.warning(t('conversation.noModelConfigured'));
@@ -213,7 +227,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
             selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
-            selected_session_mcp_servers: selectedSessionMcpServersToSend,
+            selected_session_mcp_servers: withKbServer(selectedSessionMcpServersToSend),
           },
         });
 
@@ -264,8 +278,9 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           custom_workspace: isCustomWorkspace,
           default_files: files,
           selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
-          selected_session_mcp_servers:
-            selectedMcpServerIds !== undefined ? selectedSessionMcpServers : selectedSessionMcpServersToSend,
+          selected_session_mcp_servers: withKbServer(
+            selectedMcpServerIds !== undefined ? selectedSessionMcpServers : selectedSessionMcpServersToSend
+          ),
         },
       });
       if (!conversation || !conversation.id) {

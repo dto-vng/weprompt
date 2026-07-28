@@ -58,6 +58,7 @@ import type {
   SetConfigOptionRequest,
   SetConfigOptionResponse,
 } from '../types/platform/acpTypes';
+import type { IProjectKnowledgeListResult } from '../types/project/knowledgeTypes';
 import type {
   CreateProviderRequest,
   FetchModelsAnonymousRequest,
@@ -974,6 +975,24 @@ export const localContextCompaction = {
   generate: bridge.buildProvider<ILocalContextCompactionBridgeResult, ILocalContextCompactionParams>(
     'context.compaction.generate'
   ),
+};
+
+// ---------------------------------------------------------------------------
+// Project Knowledge — stays IPC (main process owns per-project KB stores)
+// ---------------------------------------------------------------------------
+
+export const projectKnowledge = {
+  listSources: bridge.buildProvider<IProjectKnowledgeListResult, { projectId: string }>(
+    'project-knowledge.list-sources'
+  ),
+  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[] }>('project-knowledge.add-sources'),
+  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.remove-source'),
+  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.retry-source'),
+  removeStore: bridge.buildProvider<void, { projectId: string }>('project-knowledge.remove-store'),
+  getSessionMcpServer: bridge.buildProvider<ISessionMcpServer | null, { projectId: string }>(
+    'project-knowledge.get-session-mcp-server'
+  ),
+  updated: bridge.buildEmitter<{ projectId: string }>('project-knowledge.updated'),
 };
 
 // ---------------------------------------------------------------------------

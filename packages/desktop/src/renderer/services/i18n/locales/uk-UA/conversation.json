@@ -68,7 +68,22 @@
     "rename": "Перейменувати",
     "relink": "Повторно прив'язати папку",
     "reveal": "Показати в папці",
-    "remove": "Видалити"
+    "remove": "Видалити",
+    "knowledge": "Знання",
+    "knowledgeAdd": "Додати файли",
+    "knowledgeEmpty": "Додайте документи, щоб створити базу знань цього проєкту. Асистент автоматично шукає в них у кожному чаті цього проєкту.",
+    "knowledgeSummary": "{{files}} файлів · {{passages}} фрагментів",
+    "knowledgeSemanticOn": "семантичний пошук увімкнено",
+    "knowledgeSemanticOff": "семантичний пошук вимкнено — модель ембеддингу не налаштована",
+    "knowledgePassages": "{{count}} фрагментів",
+    "knowledgeStatusIndexing": "Індексація…",
+    "knowledgeStatusFailed": "Помилка",
+    "knowledgeStatusUnsupported": "Не підтримується",
+    "knowledgeRetry": "Повторити",
+    "knowledgeRemove": "Видалити",
+    "knowledgeRemoveConfirm": "Видалити цей файл із бази знань?",
+    "knowledgeError": "База знань недоступна.",
+    "knowledgeSupportedTypes": "Підтримується: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Недавні",

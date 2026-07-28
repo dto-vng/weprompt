@@ -1,0 +1,41 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// DTOs for the per-project knowledge base, shared between the main-process
+// projectKnowledgeService and the renderer. Node-free: only a type-only
+// import from common/knowledge/types, so this file is safe from renderer
+// type positions.
+
+import type { KnowledgeSourceStatus } from '@/common/knowledge/types';
+
+export type IKnowledgeSourceDto = {
+  id: string;
+  fileName: string;
+  byteSize: number;
+  status: KnowledgeSourceStatus;
+  chunkCount: number;
+  vectorCount: number;
+  addedAt: number;
+  /**
+   * Human-readable detail, overloaded by design: on a `failed` or
+   * `unsupported` source this is the fatal reason, but a `ready` source can
+   * ALSO carry a non-null, non-fatal note here (e.g. "Truncated to 2000
+   * passages." when a source exceeded the per-source chunk cap). Consumers
+   * must branch on `status`, never infer failure from `error` being present.
+   */
+  error: string | null;
+};
+
+export type IProjectKnowledgeSummary = {
+  fileCount: number;
+  passageCount: number;
+  semantic: 'on' | 'off';
+};
+
+export type IProjectKnowledgeListResult = {
+  sources: IKnowledgeSourceDto[];
+  summary: IProjectKnowledgeSummary;
+};

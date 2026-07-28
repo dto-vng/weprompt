@@ -68,7 +68,22 @@
     "rename": "Переименовать",
     "relink": "Перепривязать папку",
     "reveal": "Показать в папке",
-    "remove": "Удалить"
+    "remove": "Удалить",
+    "knowledge": "Знания",
+    "knowledgeAdd": "Добавить файлы",
+    "knowledgeEmpty": "Добавьте документы, чтобы создать базу знаний этого проекта. Ассистент автоматически ищет по ним в любом чате этого проекта.",
+    "knowledgeSummary": "{{files}} файлов · {{passages}} фрагментов",
+    "knowledgeSemanticOn": "семантический поиск включён",
+    "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
+    "knowledgePassages": "{{count}} фрагментов",
+    "knowledgeStatusIndexing": "Индексация…",
+    "knowledgeStatusFailed": "Ошибка",
+    "knowledgeStatusUnsupported": "Не поддерживается",
+    "knowledgeRetry": "Повторить",
+    "knowledgeRemove": "Удалить",
+    "knowledgeRemoveConfirm": "Удалить этот файл из базы знаний?",
+    "knowledgeError": "База знаний недоступна.",
+    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Недавние",

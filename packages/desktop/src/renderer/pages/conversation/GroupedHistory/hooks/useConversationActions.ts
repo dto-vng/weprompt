@@ -276,6 +276,16 @@ export const useConversationActions = ({
       const detachedAll = detachResults.every(Boolean);
       const removedProject = removeProjectTarget.projectId ? removeProject(removeProjectTarget.projectId) : true;
 
+      if (removeProjectTarget.projectId && removedProject) {
+        // Best-effort cleanup: the project row is already gone, so a failed
+        // knowledge-store delete must never block or reverse the deletion
+        // the user just confirmed. An orphaned store directory is harmless
+        // leftover data, unlike leaving the user unable to finish deleting.
+        void ipcBridge.projectKnowledge.removeStore
+          .invoke({ projectId: removeProjectTarget.projectId })
+          .catch(() => {});
+      }
+
       emitter.emit('chat.history.refresh');
       if (detachedAll && removedProject) {
         Message.success(t('conversation.history.removeProjectSuccess'));

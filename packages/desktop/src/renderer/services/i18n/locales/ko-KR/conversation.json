@@ -62,7 +62,22 @@
     "rename": "이름 변경",
     "relink": "폴더 다시 연결",
     "reveal": "폴더에서 보기",
-    "remove": "제거"
+    "remove": "제거",
+    "knowledge": "지식",
+    "knowledgeAdd": "파일 추가",
+    "knowledgeEmpty": "문서를 추가하면 이 프로젝트의 지식 베이스를 구축할 수 있습니다. 어시스턴트가 이 프로젝트의 모든 채팅에서 자동으로 검색합니다.",
+    "knowledgeSummary": "파일 {{files}}개 · 구절 {{passages}}개",
+    "knowledgeSemanticOn": "시맨틱 검색 켜짐",
+    "knowledgeSemanticOff": "시맨틱 검색 꺼짐 — 임베딩 모델 미설정",
+    "knowledgePassages": "구절 {{count}}개",
+    "knowledgeStatusIndexing": "색인 중…",
+    "knowledgeStatusFailed": "실패",
+    "knowledgeStatusUnsupported": "지원되지 않음",
+    "knowledgeRetry": "다시 시도",
+    "knowledgeRemove": "제거",
+    "knowledgeRemoveConfirm": "이 파일을 지식 베이스에서 제거하시겠습니까?",
+    "knowledgeError": "지식 베이스를 사용할 수 없습니다.",
+    "knowledgeSupportedTypes": "지원 형식: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "최근",

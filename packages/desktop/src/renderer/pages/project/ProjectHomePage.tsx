@@ -17,6 +17,7 @@ import ProjectChatList from './components/ProjectChatList';
 import ProjectFilesCard from './components/ProjectFilesCard';
 import ProjectHeader from './components/ProjectHeader';
 import ProjectInstructionsCard from './components/ProjectInstructionsCard';
+import ProjectKnowledgeCard from './components/ProjectKnowledgeCard';
 import ProjectNewChatComposer from './components/ProjectNewChatComposer';
 import { useProjectChats } from './hooks/useProjectChats';
 import { useProjectHome } from './hooks/useProjectHome';
@@ -26,12 +27,14 @@ import { useProjectHome } from './hooks/useProjectHome';
  *
  * Resolves the project by route id and renders either a whole-page not-found
  * state, or the two-column hub layout — a full-width header on top, a main
- * column (composer + chats) and a right rail (instructions + files) that
- * collapses to a single stacked column on narrow viewports. The header slot
- * renders `ProjectHeader` (C2), the composer slot renders
+ * column (composer + chats) and a right rail (instructions + knowledge +
+ * files) that collapses to a single stacked column on narrow viewports. The
+ * header slot renders `ProjectHeader` (C2), the composer slot renders
  * `ProjectNewChatComposer` (C6), the chats slot renders `ProjectChatList`
- * (C3), the instructions slot renders `ProjectInstructionsCard` (C4), and
- * the files slot renders `ProjectFilesCard` (C5).
+ * (C3), the instructions slot renders `ProjectInstructionsCard` (C4), the
+ * knowledge slot renders `ProjectKnowledgeCard` (the project's retrieval
+ * knowledge base — add/list/retry/remove sources), and the files slot
+ * renders `ProjectFilesCard` (C5).
  *
  * `useProjectHome` resolves synchronously from localStorage, so there is no
  * async page-level loading gap — a page-level loading skeleton would be dead
@@ -80,6 +83,9 @@ const ProjectHomePage: React.FC = () => {
         <div className={styles.rail}>
           <div data-testid='project-instructions-slot'>
             <ProjectInstructionsCard project={project} />
+          </div>
+          <div data-testid='project-knowledge-slot'>
+            <ProjectKnowledgeCard project={project} />
           </div>
           <div data-testid='project-files-slot'>
             <ProjectFilesCard project={project} />

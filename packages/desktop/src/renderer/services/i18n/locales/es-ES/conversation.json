@@ -68,7 +68,22 @@
     "rename": "Renombrar",
     "relink": "Volver a vincular carpeta",
     "reveal": "Mostrar en carpeta",
-    "remove": "Quitar"
+    "remove": "Quitar",
+    "knowledge": "Conocimiento",
+    "knowledgeAdd": "Añadir archivos",
+    "knowledgeEmpty": "Añade documentos para crear la base de conocimientos de este proyecto. El asistente los busca automáticamente en todos los chats del proyecto.",
+    "knowledgeSummary": "{{files}} archivos · {{passages}} pasajes",
+    "knowledgeSemanticOn": "búsqueda semántica activada",
+    "knowledgeSemanticOff": "búsqueda semántica desactivada — no hay modelo de embedding configurado",
+    "knowledgePassages": "{{count}} pasajes",
+    "knowledgeStatusIndexing": "Indexando…",
+    "knowledgeStatusFailed": "Falló",
+    "knowledgeStatusUnsupported": "No compatible",
+    "knowledgeRetry": "Reintentar",
+    "knowledgeRemove": "Quitar",
+    "knowledgeRemoveConfirm": "¿Quitar este archivo de la base de conocimientos?",
+    "knowledgeError": "La base de conocimientos no está disponible.",
+    "knowledgeSupportedTypes": "Compatible con: .md, .txt, .docx, .xlsx"
   },
   "history": {
     "recents": "Recientes",

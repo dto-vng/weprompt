@@ -22,6 +22,7 @@ const MAX_CONTEXT_MARKDOWN_LENGTH = 24 * 1024;
 const MAX_CONTEXT_PINS = 20;
 const MAX_CONTEXT_PIN_LENGTH = 2_000;
 const MAX_CONTEXT_SNAPSHOT_ITEMS = 256;
+const MAX_PROJECT_KB_FILE_PATHS = 100;
 
 const voidPayloadSchema = z.undefined();
 const pathSchema = z.string().min(1).max(MAX_PATH_LENGTH);
@@ -155,6 +156,17 @@ const officeInspectRequestSchema = z
   })
   .strict();
 
+// Project-knowledge ids are interpolated into filesystem paths by the main
+// process, so restrict them to characters that cannot traverse or escape.
+const safeIdSchema = z
+  .string()
+  .min(1)
+  .max(MAX_IDENTIFIER_LENGTH)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
+const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
+
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 
 export const nativeBridgePayloadSchemas = {
@@ -214,6 +226,14 @@ export const nativeBridgePayloadSchemas = {
     .strict()
     .optional(),
   'context.compaction.generate': localContextCompactionSchema,
+  'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
+  'project-knowledge.add-sources': z
+    .object({ projectId: safeIdSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })
+    .strict(),
+  'project-knowledge.remove-source': projectKnowledgeSourceRefSchema,
+  'project-knowledge.retry-source': projectKnowledgeSourceRefSchema,
+  'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
+  'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.prepare-preview': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.start-preview': z.object({ leaseId: identifierSchema, url: urlSchema.optional() }).strict(),
