@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#EDF1F8"/>
+  <rect x="96" y="14" width="128" height="172" fill="#FFFFFF" stroke="#D3DCEC"/>
+  <text x="112" y="34" font-family="Georgia, serif" font-size="5" fill="#6B7280" letter-spacing="0.6">CONFIDENTIAL</text>
+  <text x="112" y="56" font-family="Georgia, serif" font-size="12" font-weight="700" fill="#1F3864">Annual</text>
+  <text x="112" y="70" font-family="Georgia, serif" font-size="12" font-weight="700" fill="#1F3864">Performance</text>
+  <rect x="112" y="78" width="34" height="2" fill="#1F3864"/>
+  <text x="112" y="94" font-family="Georgia, serif" font-size="6" font-style="italic" fill="#6B7280">Results and outlook</text>
+  <g fill="#C9D3E6">
+    <rect x="112" y="108" width="96" height="2.5"/>
+    <rect x="112" y="115" width="96" height="2.5"/>
+    <rect x="112" y="122" width="72" height="2.5"/>
+  </g>
+  <rect x="112" y="134" width="96" height="9" fill="#1F3864"/>
+  <g fill="#E3E9F4">
+    <rect x="112" y="143" width="96" height="8"/>
+    <rect x="112" y="151" width="96" height="8"/>
+    <rect x="112" y="159" width="96" height="8"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="1">
+    <line x1="144" y1="134" x2="144" y2="167"/>
+    <line x1="176" y1="134" x2="176" y2="167"/>
+  </g>
+  <text x="112" y="180" font-family="Georgia, serif" font-size="5" fill="#6B7280">Table 1 — Performance by segment</text>
+</svg>

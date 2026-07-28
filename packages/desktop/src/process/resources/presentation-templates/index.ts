@@ -23,6 +23,8 @@ import monthlySteercoThemeMd from './monthly-steerco/THEME.md?raw';
 import monthlySteercoPreviewSvg from './monthly-steerco/preview.svg?raw';
 import connectedOpsThemeMd from './connected-ops/THEME.md?raw';
 import connectedOpsPreviewSvg from './connected-ops/preview.svg?raw';
+import businessReportThemeMd from './business-report/THEME.md?raw';
+import businessReportPreviewSvg from './business-report/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -33,6 +35,7 @@ export type BuiltinTemplatePack = {
 };
 
 const CREATED_AT = '2026-07-22T00:00:00Z';
+const DOCX_CREATED_AT = '2026-07-28T00:00:00Z';
 
 /**
  * Bundled binary resources: packaged builds read from process.resourcesPath
@@ -193,5 +196,23 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: connectedOpsThemeMd,
     previewSvg: connectedOpsPreviewSvg,
     referenceSourcePath: () => resolveBundledReference('connected-ops.pptx'),
+  },
+  {
+    manifest: {
+      id: 'business-report',
+      name: 'Business Report',
+      description: 'Long-form formal report — cover, contents, data tables, navy serif headings',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: businessReportThemeMd,
+    previewSvg: businessReportPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('business-report.docx'),
   },
 ];
