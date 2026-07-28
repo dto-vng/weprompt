@@ -228,9 +228,22 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       const providers = await deps.listProviders();
       let model = manifest.embedding?.model ?? null;
       if (!model) model = pickEmbeddingModel(providers)?.model ?? null;
-      if (!model) return manifest; // no embedding provider anywhere — BM25-only
+      if (!model) {
+        // Expected whenever the user has no embedding-capable model configured.
+        // Logged because it is otherwise indistinguishable from a failed embed:
+        // both leave the source ready with vectorCount 0.
+        console.info(
+          `[projectKnowledge] no embedding-capable model among ${providers.length} provider(s); indexing ${missing.length} chunk(s) BM25-only`
+        );
+        return manifest;
+      }
       const config = resolveEmbedConfigForModel(providers, model);
-      if (!config) return manifest;
+      if (!config) {
+        console.info(
+          `[projectKnowledge] embedding model "${model}" is no longer resolvable to a configured provider; staying BM25-only`
+        );
+        return manifest;
+      }
       const vectors = await embedTexts(
         missing.map((c) => c.text),
         config
@@ -256,8 +269,14 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       for (const source of manifest.sources) {
         source.vectorCount = chunks.filter((c) => c.sourceId === source.id && c.hasVector).length;
       }
-    } catch {
+    } catch (error) {
       // Embedding is best-effort: sources stay ready with vectorCount < chunkCount.
+      // Log it — a silent failure here is indistinguishable from "no embedding
+      // model configured", which made a real ingest problem hard to diagnose.
+      console.warn(
+        `[projectKnowledge] embedding pass failed for project ${projectId}; sources stay searchable BM25-only:`,
+        error instanceof Error ? error.message : error
+      );
     }
     return manifest;
   };
