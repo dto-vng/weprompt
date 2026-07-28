@@ -675,6 +675,7 @@ export type I18nKey =
   | 'conversation.notFound'
   | 'conversation.presentationTemplates.buttonTooltip'
   | 'conversation.presentationTemplates.chipTooltip'
+  | 'conversation.presentationTemplates.columnDocx'
   | 'conversation.presentationTemplates.columnHtml'
   | 'conversation.presentationTemplates.columnPptx'
   | 'conversation.presentationTemplates.deleteConfirm'
