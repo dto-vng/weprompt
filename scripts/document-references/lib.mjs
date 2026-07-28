@@ -120,6 +120,12 @@ const emitBlock = (file, block, pIndex, state) => {
     case 'table': {
       const rowCount = block.rows.length + 1;
       const colCount = block.header.length;
+      const widthSum = block.colWidths.reduce((sum, width) => sum + width, 0);
+      if (widthSum !== USABLE_TWIPS) {
+        throw new Error(
+          `table "${block.header.join('/')}" in ${file}: colWidths sum to ${widthSum} twips, expected ${USABLE_TWIPS}`
+        );
+      }
       run([
         'add',
         file,
@@ -152,6 +158,20 @@ const emitBlock = (file, block, pIndex, state) => {
           }
         }
       }
+      // Optional per-column alignment, shaped like `boldRows`: one entry per column,
+      // 1-based against `header`/`rows`. A falsy entry (undefined, '') leaves that
+      // column at Word's default (left). Applied to every row including the header so
+      // a right-aligned numeric column reads as one continuous column, not a header
+      // that disagrees with its own data.
+      if (block.colAlign) {
+        block.colAlign.forEach((align, i) => {
+          if (!align) return;
+          const col = i + 1;
+          for (let rowNum = 1; rowNum <= rowCount; rowNum += 1) {
+            run(['set', file, `${tbl}/tr[${rowNum}]/tc[${col}]`, '--prop', `align=${align}`]);
+          }
+        });
+      }
       // Tables do not occupy /body/p indices.
       return 0;
     }
@@ -160,8 +180,17 @@ const emitBlock = (file, block, pIndex, state) => {
   }
 };
 
-/** Builds one reference document end to end and validates it. */
-export const buildDocument = ({ file, page, styles, blocks }) => {
+/**
+ * Builds one reference document end to end and validates it.
+ *
+ * `footer`, when present, adds a centred page-number footer (`{ PAGE }` field) to
+ * every page. `footer.suppressFirstPage` additionally adds an empty first-page
+ * footer and enables `titlePage` on the section, so a cover page carries no page
+ * number — verified via `add / --type footer --prop type=first --prop text=` plus
+ * `set / --prop titlePage=true`, which together write a distinct `w:titlePg`
+ * first-page `footerReference` alongside the default one.
+ */
+export const buildDocument = ({ file, page, styles, blocks, footer }) => {
   rmSync(file, { force: true });
   run(['create', file]);
   run(['open', file]);
@@ -172,6 +201,13 @@ export const buildDocument = ({ file, page, styles, blocks }) => {
     const state = { tableIndex: 0 };
     let pIndex = 1;
     for (const block of blocks) pIndex += emitBlock(file, block, pIndex, state);
+    if (footer) {
+      run(['add', file, '/', '--type', 'footer', ...propArgs({ type: 'default', align: 'center', field: 'page' })]);
+      if (footer.suppressFirstPage) {
+        run(['add', file, '/', '--type', 'footer', ...propArgs({ type: 'first', text: '' })]);
+        run(['set', file, '/', '--prop', 'titlePage=true']);
+      }
+    }
   } finally {
     run(['close', file]);
   }
