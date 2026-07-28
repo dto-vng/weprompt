@@ -13,9 +13,12 @@ import type {
 
 export const TEMPLATE_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
-const FORMATS: ReadonlySet<PresentationTemplateFormat> = new Set(['html', 'pptx']);
-const KINDS: ReadonlySet<PresentationTemplateKind> = new Set(['deck', 'report']);
+const FORMATS: ReadonlySet<PresentationTemplateFormat> = new Set(['html', 'pptx', 'docx']);
+const KINDS: ReadonlySet<PresentationTemplateKind> = new Set(['deck', 'report', 'document']);
 const SOURCES: ReadonlySet<PresentationTemplateSource> = new Set(['builtin', 'user']);
+
+/** Formats whose packs clone a retained reference file rather than building from a spec. */
+const REFERENCE_REQUIRED: ReadonlySet<PresentationTemplateFormat> = new Set(['pptx', 'docx']);
 
 const fail = (reason: string): never => {
   throw new Error(`invalid manifest: ${reason}`);
@@ -48,7 +51,8 @@ export function validateTemplateManifest(raw: unknown): PresentationTemplateMani
   if (typeof m.themeFile !== 'string' || !isPlainFileName(m.themeFile)) fail('bad themeFile');
   if (m.referenceFile !== null && (typeof m.referenceFile !== 'string' || !isPlainFileName(m.referenceFile)))
     fail('bad referenceFile');
-  if (m.format === 'pptx' && m.referenceFile === null) fail('pptx template requires referenceFile');
+  if (REFERENCE_REQUIRED.has(m.format as PresentationTemplateFormat) && m.referenceFile === null)
+    fail(`${m.format} template requires referenceFile`);
   if (typeof m.preview !== 'string' || !isPlainFileName(m.preview)) fail('bad preview');
   if (typeof m.version !== 'number' || !Number.isInteger(m.version) || m.version < 1) fail('bad version');
   if (typeof m.createdAt !== 'string' || m.createdAt.length === 0) fail('bad createdAt');

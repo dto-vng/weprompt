@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type PresentationTemplateFormat = 'html' | 'pptx';
-export type PresentationTemplateKind = 'deck' | 'report';
+export type PresentationTemplateFormat = 'html' | 'pptx' | 'docx';
+export type PresentationTemplateKind = 'deck' | 'report' | 'document';
 export type PresentationTemplateSource = 'builtin' | 'user';
 
 /** Contents of a template pack's template.json. */
