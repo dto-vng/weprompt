@@ -36,7 +36,7 @@ export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
   themeMd: string;
   previewSvg: string;
-  /** PPTX packs resolve their bundled reference deck lazily (needs electron `app`). */
+  /** PPTX and docx packs resolve their bundled reference file lazily (needs electron `app`). */
   referenceSourcePath?: () => string;
 };
 
@@ -214,7 +214,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
       themeFile: 'THEME.md',
       referenceFile: 'reference.docx',
       preview: 'preview.svg',
-      version: 1,
+      version: 2,
       createdAt: DOCX_CREATED_AT,
     },
     themeMd: businessReportThemeMd,
@@ -232,7 +232,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
       themeFile: 'THEME.md',
       referenceFile: 'reference.docx',
       preview: 'preview.svg',
-      version: 1,
+      version: 2,
       createdAt: DOCX_CREATED_AT,
     },
     themeMd: decisionMemoThemeMd,
@@ -250,7 +250,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
       themeFile: 'THEME.md',
       referenceFile: 'reference.docx',
       preview: 'preview.svg',
-      version: 1,
+      version: 2,
       createdAt: DOCX_CREATED_AT,
     },
     themeMd: operationsGuideThemeMd,
@@ -268,7 +268,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
       themeFile: 'THEME.md',
       referenceFile: 'reference.docx',
       preview: 'preview.svg',
-      version: 1,
+      version: 2,
       createdAt: DOCX_CREATED_AT,
     },
     themeMd: proposalSowThemeMd,
