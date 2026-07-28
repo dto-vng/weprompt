@@ -214,7 +214,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
       themeFile: 'THEME.md',
       referenceFile: 'reference.docx',
       preview: 'preview.svg',
-      version: 2,
+      version: 3,
       createdAt: DOCX_CREATED_AT,
     },
     themeMd: businessReportThemeMd,

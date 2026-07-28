@@ -47,9 +47,9 @@ export default {
     // --- Contents (static dot-leader; see THEME.md) -------------------------
     { type: 'para', text: 'Contents', style: 'Heading1', spaceBefore: '0pt' },
     { type: 'tocline', label: '1. Executive Summary', page: 3 },
-    { type: 'tocline', label: '2. Operating Performance', page: 4 },
-    { type: 'tocline', label: '3. Market Position', page: 5 },
-    { type: 'tocline', label: '4. Outlook and Priorities', page: 6 },
+    { type: 'tocline', label: '2. Operating Performance', page: 3 },
+    { type: 'tocline', label: '3. Market Position', page: 3 },
+    { type: 'tocline', label: '4. Outlook and Priorities', page: 4 },
     { type: 'pagebreak' },
 
     // --- Executive summary --------------------------------------------------
