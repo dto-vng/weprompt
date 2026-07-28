@@ -50,7 +50,7 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
 
   // A long PDF or a large embed pass can occupy the project's ingestion queue
   // for a while, so show where it has got to rather than an unmoving tag.
-  const indexingLabel = (source: IKnowledgeSourceDto): string => {
+  const progressLabel = (source: IKnowledgeSourceDto): string => {
     const progress = source.progress;
     if (!progress) return t('conversation.projectHome.knowledgeStatusIndexing');
     const key =
@@ -63,8 +63,16 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
   const renderStatus = (source: IKnowledgeSourceDto): React.ReactNode => {
     switch (source.status) {
       case 'indexing':
-        return <Tag size='small'>{indexingLabel(source)}</Tag>;
+        return <Tag size='small'>{progressLabel(source)}</Tag>;
       case 'ready': {
+        // The embed pass runs on sources that are ALREADY ready — BM25 makes
+        // them searchable before any vector exists. So embedding progress can
+        // only ever appear here, never under `indexing`. Showing it also
+        // suppresses the Retry button below, which would otherwise invite the
+        // user to restart an embed that is still running.
+        if (source.progress) {
+          return <Tag size='small'>{progressLabel(source)}</Tag>;
+        }
         const readyTag = (
           <Tag size='small' color='green'>
             {t('conversation.projectHome.knowledgePassages', { count: source.chunkCount })}

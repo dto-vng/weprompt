@@ -204,9 +204,15 @@ describe('ProjectKnowledgeCard', () => {
     expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
   });
 
-  it('shows embedding progress during the embed pass', () => {
+  // BM25 marks a source ready before embedding starts, so the embed pass always
+  // runs against an already-`ready` row — this is the only place its progress
+  // can surface. Asserting it on an `indexing` row would test a state the
+  // service never produces.
+  it('shows embedding progress on a ready source, in place of Retry', () => {
     hookState = {
-      sources: [{ ...indexingSource, progress: { stage: 'embedding', done: 64, total: 200 } }],
+      sources: [
+        { ...readySource, chunkCount: 200, vectorCount: 64, progress: { stage: 'embedding', done: 64, total: 200 } },
+      ],
       summary: null,
       loading: false,
       error: false,
@@ -215,6 +221,23 @@ describe('ProjectKnowledgeCard', () => {
     render(<ProjectKnowledgeCard project={project} />);
 
     expect(screen.getByText('conversation.projectHome.knowledgeProgressEmbedding:64/200')).toBeInTheDocument();
+    // vectorCount < chunkCount would normally offer Retry; not while it is running.
+    expect(screen.queryByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).not.toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgePassages:200')).not.toBeInTheDocument();
+  });
+
+  it('restores the passage count and Retry once embedding stops', () => {
+    hookState = {
+      sources: [{ ...readySource, chunkCount: 200, vectorCount: 64, progress: null }],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgePassages:200')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).toBeInTheDocument();
   });
 
   it('falls back to the plain indexing tag when no progress has been reported yet', () => {
