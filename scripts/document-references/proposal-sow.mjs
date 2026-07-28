@@ -94,10 +94,12 @@ export default {
     },
 
     // --- Commercials ---------------------------------------------------------
-    // Forced break: without it, the heading is orphaned at the foot of the Scope/
-    // Timeline page while the whole pricing table is pushed to the next page,
-    // leaving a large blank gap. Keeping heading and table on the same page reads
-    // better than either the orphan or the gap.
+    // Forced break: without it, this heading orphans at the foot of the Scope/Timeline
+    // page while the whole pricing table is pushed to the next page. `keepNext: true`
+    // on this heading was tried and verified to land on the paragraph (officecli get
+    // showed keepNext=true on it) but did not change the rendered page break — this
+    // renderer does not honor keepNext against a following table. See THEME.md's
+    // Structure catalog entry for the Commercials table for the re-evaluation note.
     { type: 'pagebreak' },
     { type: 'para', text: 'Commercials', style: 'Heading1', spaceBefore: '0pt' },
     {
@@ -110,6 +112,9 @@ export default {
         ['Phase 3 — Handover', 'Fixed', '52,000'],
         ['Total', '', '284,000'],
       ],
+      // Row 5 is the Total row (tr[1] is the header) — bold so it reads as a total,
+      // not just another line item.
+      boldRows: [5],
     },
     {
       type: 'para',

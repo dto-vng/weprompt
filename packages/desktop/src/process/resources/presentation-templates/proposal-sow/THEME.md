@@ -47,7 +47,14 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
   describing what the phase produces. Deliverables are named, not implied.
 - **Timeline table** — phase, duration, key deliverable. Duration stays narrow.
 - **Commercials table** — item, basis, amount. Amounts right-aligned in a narrow column;
-  the final row is the total. Follow with a caption naming what is excluded.
+  the final row is the total, bolded across every cell in that row so it reads as a sum
+  rather than another line item. Follow with a caption naming what is excluded. This
+  section starts on a forced page break so the "Commercials" heading and its table stay
+  together — `keepNext` on the heading was tried first and does not survive rendering
+  against a following table, so the break is deliberate, not accidental. A downstream
+  author replacing the sample content should re-evaluate whether the break is still
+  needed once real content changes how much fits on the preceding page, rather than
+  keeping it by default.
 - **Assumptions** — a bullet list of what must be true for the price to hold.
 - **Signature block** — a paragraph carrying a gold bottom border as the signing rule,
   followed by a 9pt muted "Name and title" label. Two of these, with real vertical space

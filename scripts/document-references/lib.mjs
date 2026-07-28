@@ -141,6 +141,17 @@ const emitBlock = (file, block, pIndex, state) => {
       block.rows.forEach((row, i) => {
         run(['set', file, `${tbl}/tr[${i + 2}]`, ...propArgs(cells(row))]);
       });
+      // Optional emphasis hook, shaped like `rule`/`tabs` on the `para` block: bold
+      // every cell in the given 1-based row numbers (tr[1] is the header row, same
+      // numbering as the table itself). Generic — callers decide which row means
+      // "total", "header", or anything else.
+      if (block.boldRows) {
+        for (const rowNum of block.boldRows) {
+          for (let col = 1; col <= colCount; col += 1) {
+            run(['set', file, `${tbl}/tr[${rowNum}]/tc[${col}]`, '--prop', 'bold=true']);
+          }
+        }
+      }
       // Tables do not occupy /body/p indices.
       return 0;
     }
