@@ -25,6 +25,8 @@ import connectedOpsThemeMd from './connected-ops/THEME.md?raw';
 import connectedOpsPreviewSvg from './connected-ops/preview.svg?raw';
 import businessReportThemeMd from './business-report/THEME.md?raw';
 import businessReportPreviewSvg from './business-report/preview.svg?raw';
+import decisionMemoThemeMd from './decision-memo/THEME.md?raw';
+import decisionMemoPreviewSvg from './decision-memo/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -214,5 +216,23 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: businessReportThemeMd,
     previewSvg: businessReportPreviewSvg,
     referenceSourcePath: () => resolveBundledReference('business-report.docx'),
+  },
+  {
+    manifest: {
+      id: 'decision-memo',
+      name: 'Decision Memo',
+      description: 'Short decision memo — TO/FROM/RE block, recommendation up front, no cover',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: decisionMemoThemeMd,
+    previewSvg: decisionMemoPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('decision-memo.docx'),
   },
 ];

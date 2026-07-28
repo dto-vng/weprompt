@@ -24,6 +24,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
         'monthly-steerco',
         'connected-ops',
         'business-report',
+        'decision-memo',
       ])
     );
     expect(new Set(ids).size).toBe(ids.length);

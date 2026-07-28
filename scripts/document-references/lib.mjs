@@ -52,7 +52,10 @@ const defineNumbering = (file) => {
 
 const defineStyles = (file, styles) => {
   for (const style of styles) {
-    run(['add', file, '/styles', '--type', 'style', ...propArgs({ type: 'paragraph', basedOn: 'Normal', ...style })]);
+    // Every style defaults to basing itself on Normal unless it overrides `basedOn`,
+    // except Normal itself — Normal must not carry a self-referential w:basedOn.
+    const basedOn = style.id === 'Normal' ? {} : { basedOn: 'Normal' };
+    run(['add', file, '/styles', '--type', 'style', ...propArgs({ type: 'paragraph', ...basedOn, ...style })]);
   }
 };
 
@@ -63,9 +66,13 @@ const defineStyles = (file, styles) => {
 const emitBlock = (file, block, pIndex, state) => {
   switch (block.type) {
     case 'para': {
-      const { type: _type, rule, ...props } = block;
+      const { type: _type, rule, tabs, ...props } = block;
       run(['add', file, '/body', '--type', 'paragraph', ...propArgs(props)]);
       if (rule) run(['set', file, `/body/p[${pIndex}]`, '--prop', `pbdr.bottom=${rule}`]);
+      // Explicit tab stops (e.g. an addressing block's LABEL:\tvalue columns) — without
+      // one, `\t` falls back to Word's default stops, which land inconsistently once a
+      // label is wide enough to cross the next default increment.
+      if (tabs) for (const tab of tabs) run(['add', file, `/body/p[${pIndex}]`, '--type', 'tab', ...propArgs(tab)]);
       return 1;
     }
     case 'pagebreak': {

@@ -9,8 +9,9 @@
  */
 import { buildDocument } from './document-references/lib.mjs';
 import businessReport from './document-references/business-report.mjs';
+import decisionMemo from './document-references/decision-memo.mjs';
 
-const DOCUMENTS = [businessReport];
+const DOCUMENTS = [businessReport, decisionMemo];
 
 const requested = process.argv.slice(2);
 const unknown = requested.filter((name) => !DOCUMENTS.some((doc) => doc.name === name));
