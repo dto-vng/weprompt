@@ -19,6 +19,8 @@ export default {
   file: path.join(OUT_DIR, 'operations-guide.docx'),
   page: {},
   styles: styleSheet({ display: 'Calibri', body: 'Calibri', ink: OG.ink, accent: OG.deep, titleSize: '24pt' }),
+  // No cover page — the page number shows from page one.
+  footer: { suppressFirstPage: false },
   blocks: [
     // --- Compact title block (no cover page) --------------------------------
     { type: 'para', text: 'STANDARD OPERATING PROCEDURE', size: '9pt', bold: true, color: OG.teal, spaceAfter: '2pt' },

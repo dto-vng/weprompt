@@ -17,6 +17,8 @@ export default {
   file: path.join(OUT_DIR, 'proposal-sow.docx'),
   page: {},
   styles: styleSheet({ display: 'Cambria', body: 'Calibri', ink: PS.ink, accent: PS.gold, titleSize: '30pt' }),
+  // Has a cover page (see below) — suppress the page number there.
+  footer: { suppressFirstPage: true },
   blocks: [
     // --- Cover ---------------------------------------------------------------
     {
@@ -115,6 +117,9 @@ export default {
       // Row 5 is the Total row (tr[1] is the header) — bold so it reads as a total,
       // not just another line item.
       boldRows: [5],
+      // Amount is the only numeric column; right-align it so figures line up on the
+      // ones digit rather than ragging left. Item/Basis stay at Word's default left.
+      colAlign: [undefined, undefined, 'right'],
     },
     {
       type: 'para',

@@ -17,6 +17,8 @@ export default {
   file: path.join(OUT_DIR, 'business-report.docx'),
   page: {},
   styles: styleSheet({ display: 'Cambria', body: 'Calibri', ink: BR.ink, accent: BR.navy }),
+  // Has a cover page (see below) — suppress the page number there.
+  footer: { suppressFirstPage: true },
   blocks: [
     // --- Cover -------------------------------------------------------------
     {
@@ -94,6 +96,9 @@ export default {
         ['Small business', '96.2', '+4%', '22%'],
         ['Total', '696.7', '+12%', '31%'],
       ],
+      // Row 5 is the Total row (tr[1] is the header) — bold so it reads as a total,
+      // not just another line item. Same convention as proposal-sow's Commercials table.
+      boldRows: [5],
     },
     {
       type: 'para',

@@ -17,6 +17,8 @@ export default {
   file: path.join(OUT_DIR, 'decision-memo.docx'),
   page: {},
   styles: styleSheet({ display: 'Calibri', body: 'Calibri', ink: DM.ink, accent: DM.ink, titleSize: '22pt' }),
+  // No cover page — the page number shows from page one.
+  footer: { suppressFirstPage: false },
   blocks: [
     // --- Masthead -----------------------------------------------------------
     { type: 'para', text: 'MEMORANDUM', size: '10pt', bold: true, color: DM.accent, spaceAfter: '2pt', rule: DM.rule },
