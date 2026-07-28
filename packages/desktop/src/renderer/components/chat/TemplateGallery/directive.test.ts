@@ -8,24 +8,27 @@ import { describe, expect, it } from 'vitest';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
 import { composePresentationSend } from './directive';
 
-const summary = (format: 'html' | 'pptx'): PresentationTemplateSummary => ({
-  manifest: {
-    id: 't1',
-    name: 'Theme One',
-    description: 'd',
-    format,
-    kind: 'deck',
-    source: 'builtin',
-    themeFile: 'THEME.md',
-    referenceFile: format === 'pptx' ? 'reference.pptx' : null,
-    preview: 'preview.svg',
-    version: 1,
-    createdAt: 'now',
-  },
-  themePath: '/abs/t1/THEME.md',
-  referencePath: format === 'pptx' ? '/abs/t1/reference.pptx' : null,
-  previewDataUrl: 'data:image/svg+xml;base64,x',
-});
+const summary = (format: 'html' | 'pptx' | 'docx'): PresentationTemplateSummary => {
+  const referenceFile = format === 'pptx' ? 'reference.pptx' : format === 'docx' ? 'reference.docx' : null;
+  return {
+    manifest: {
+      id: 't1',
+      name: 'Theme One',
+      description: 'd',
+      format,
+      kind: format === 'docx' ? 'document' : 'deck',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile,
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: 'now',
+    },
+    themePath: '/abs/t1/THEME.md',
+    referencePath: referenceFile ? `/abs/t1/${referenceFile}` : null,
+    previewDataUrl: 'data:image/svg+xml;base64,x',
+  };
+};
 
 describe('composePresentationSend', () => {
   it('html: prepends the html directive and attaches the theme file', () => {
@@ -65,5 +68,29 @@ describe('composePresentationSend', () => {
     expect(withSources.injectSkills).toEqual(['officecli']);
     const withoutSources = composePresentationSend(summary('html'), 'x', ['/user/photo.png', '/user/notes.txt']);
     expect(withoutSources.injectSkills).toEqual([]);
+  });
+
+  it('docx: clones the reference, loads the docx skill, attaches both pack files', () => {
+    const result = composePresentationSend(summary('docx'), 'Q3 board report', []);
+    expect(result.input).toContain('officecli load_skill docx');
+    expect(result.input).toContain('reference.docx');
+    expect(result.input).toContain('Never build a document from scratch');
+    expect(result.input).toContain('officecli --version');
+    expect(result.input).toContain('officecli validate');
+    expect(result.input).toContain('officecli view issues');
+    expect(result.input).toContain('screenshot --grid auto');
+    expect(result.input).toContain('Follow-up edits');
+    expect(result.input).toContain('source documents');
+    expect(result.input).toContain('Do not invent facts');
+    expect(result.input.endsWith('Q3 board report')).toBe(true);
+    expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.docx']);
+    expect(result.injectSkills).toEqual(['officecli']);
+  });
+
+  it('docx: falls back to the html directive when the pack has no resolved reference', () => {
+    const broken = summary('docx');
+    const result = composePresentationSend({ ...broken, referencePath: null }, 'x', []);
+    expect(result.input).toContain('ONE self-contained HTML file');
+    expect(result.input).not.toContain('reference.docx');
   });
 });

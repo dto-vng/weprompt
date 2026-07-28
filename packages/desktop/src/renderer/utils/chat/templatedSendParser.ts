@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { HTML_DIRECTIVE_PREFIX, PPTX_DIRECTIVE_PREFIX } from '@/renderer/components/chat/TemplateGallery/directive';
+import {
+  DOCX_DIRECTIVE_PREFIX,
+  HTML_DIRECTIVE_PREFIX,
+  PPTX_DIRECTIVE_PREFIX,
+} from '@/renderer/components/chat/TemplateGallery/directive';
 
 const THEME_PATH_RE = /[/\\]presentation-templates[/\\]([^/\\]+)[/\\]THEME\.md$/i;
 const TEMPLATE_FILE_RE = /[/\\]presentation-templates[/\\]([^/\\]+)[/\\][^/\\]+$/i;
@@ -26,7 +30,8 @@ export type TemplatedSend = {
  * never hide content we cannot classify.
  */
 export function parseTemplatedSend(text: string, files: string[]): TemplatedSend | null {
-  if (!text.startsWith(PPTX_DIRECTIVE_PREFIX) && !text.startsWith(HTML_DIRECTIVE_PREFIX)) return null;
+  const PREFIXES = [PPTX_DIRECTIVE_PREFIX, HTML_DIRECTIVE_PREFIX, DOCX_DIRECTIVE_PREFIX];
+  if (!PREFIXES.some((prefix) => text.startsWith(prefix))) return null;
   const themeFile = files.find((f) => THEME_PATH_RE.test(f));
   if (!themeFile) return null;
   const templateId = themeFile.match(THEME_PATH_RE)![1];

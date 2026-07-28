@@ -12,6 +12,10 @@ const REF = '/Users/u/Library/Application Support/Forge/presentation-templates/b
 const PPTX_TEXT =
   'Create a presentation from the request below. officecli is a command-line program…\n\nQ3 review\n\nwith two paragraphs';
 const HTML_TEXT = 'Create a presentation/report from the request below. Read the attached THEME.md…\n\nsolar deck';
+const DOCX_THEME = '/Users/u/Library/Application Support/Forge/presentation-templates/business-report/THEME.md';
+const DOCX_REF = '/Users/u/Library/Application Support/Forge/presentation-templates/business-report/reference.docx';
+const DOCX_TEXT =
+  'Create a Word document from the request below. officecli is a command-line program…\n\nBoard report for Q3';
 
 describe('parseTemplatedSend', () => {
   it('parses a pptx templated send: id, user text, file split', () => {
@@ -40,5 +44,14 @@ describe('parseTemplatedSend', () => {
 
   it('returns null when there is no blank-line separator', () => {
     expect(parseTemplatedSend('Create a presentation from the request below. no split', [THEME])).toBeNull();
+  });
+
+  it('parses a docx templated send and classifies reference.docx as a template file', () => {
+    const r = parseTemplatedSend(DOCX_TEXT, [DOCX_THEME, DOCX_REF, '/user/figures.xlsx']);
+    expect(r).not.toBeNull();
+    expect(r!.templateId).toBe('business-report');
+    expect(r!.userText).toBe('Board report for Q3');
+    expect(r!.templateFiles).toEqual([DOCX_THEME, DOCX_REF]);
+    expect(r!.userFiles).toEqual(['/user/figures.xlsx']);
   });
 });
