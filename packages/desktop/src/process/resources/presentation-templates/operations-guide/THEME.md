@@ -22,7 +22,7 @@ built for someone following it under time pressure. No cover page.
 - Teal `#0E7C7B` — the kicker line and the rule under the title block
 - Ink `#1F2933` — body text, Heading 2/3
 - Muted `#7B8794` — metadata line, captions
-- Tint `#E8F3F2` — informational callout fill
+- Tint `#E8F3F2` — reserved for an informational callout; unused by default
 - Warn `#FDF3E3` — warning box fill
 
 ### Typography (real Word styles only)

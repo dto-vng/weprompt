@@ -26,6 +26,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
         'business-report',
         'decision-memo',
         'operations-guide',
+        'proposal-sow',
       ])
     );
     expect(new Set(ids).size).toBe(ids.length);
@@ -57,7 +58,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
 
   it('docx packs clone a reference and carry the follow-up edit contract', () => {
     const docxPacks = BUILTIN_TEMPLATE_PACKS.filter((p) => p.manifest.format === 'docx');
-    expect(docxPacks.length).toBeGreaterThanOrEqual(1);
+    expect(docxPacks.length).toBe(4);
     for (const pack of docxPacks) {
       expect(pack.manifest.kind).toBe('document');
       expect(pack.manifest.referenceFile).toBe('reference.docx');

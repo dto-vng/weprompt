@@ -29,6 +29,8 @@ import decisionMemoThemeMd from './decision-memo/THEME.md?raw';
 import decisionMemoPreviewSvg from './decision-memo/preview.svg?raw';
 import operationsGuideThemeMd from './operations-guide/THEME.md?raw';
 import operationsGuidePreviewSvg from './operations-guide/preview.svg?raw';
+import proposalSowThemeMd from './proposal-sow/THEME.md?raw';
+import proposalSowPreviewSvg from './proposal-sow/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
@@ -254,5 +256,23 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: operationsGuideThemeMd,
     previewSvg: operationsGuidePreviewSvg,
     referenceSourcePath: () => resolveBundledReference('operations-guide.docx'),
+  },
+  {
+    manifest: {
+      id: 'proposal-sow',
+      name: 'Proposal / SOW',
+      description: 'Client proposal — scope, timeline, pricing table, signature block',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 1,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: proposalSowThemeMd,
+    previewSvg: proposalSowPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('proposal-sow.docx'),
   },
 ];
