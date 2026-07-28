@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgeStoreData } from '@/common/knowledge/searchCore';
 import { createEmptyManifest } from '@/common/knowledge/store';
 import {
+  buildToolDescription,
   createSearchHandler,
   parseKnowledgeServerEnv,
   type KnowledgeServerEnv,
@@ -155,5 +156,30 @@ describe('createSearchHandler', () => {
     expect(embedTextsImpl).toHaveBeenCalledTimes(1);
     expect(embedTextsImpl).toHaveBeenCalledWith(['hello'], configWithEmbed.embed);
     expect(vector).toEqual([0.1, 0.2, 0.3]);
+  });
+});
+
+describe('buildToolDescription', () => {
+  it('steers away from file tools and states the docs are not on disk', () => {
+    const d = buildToolDescription([]);
+    expect(d).toMatch(/USE THIS FIRST/);
+    expect(d).toMatch(/do NOT live in the working directory/);
+    expect(d).toMatch(/glob, grep/);
+  });
+
+  it('names the attached documents so the tool is discoverable by topic', () => {
+    const d = buildToolDescription(['PROBLEM_STATEMENT.md', 'policy.docx']);
+    expect(d).toContain('Documents currently attached to this project:');
+    expect(d).toContain('- PROBLEM_STATEMENT.md');
+    expect(d).toContain('- policy.docx');
+  });
+
+  it('caps the listing and reports the remainder', () => {
+    const many = Array.from({ length: 25 }, (_, i) => `doc-${i}.md`);
+    const d = buildToolDescription(many);
+    expect(d).toContain('- doc-0.md');
+    expect(d).toContain('- doc-19.md');
+    expect(d).not.toContain('- doc-20.md');
+    expect(d).toContain('…and 5 more');
   });
 });

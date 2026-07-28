@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
+import { readManifest } from '@/common/knowledge/store';
 import { BUILTIN_KNOWLEDGE_NAME } from './constants';
 
 export type KnowledgeServerEnv = {
@@ -35,13 +36,34 @@ export function parseKnowledgeServerEnv(env: Record<string, string | undefined>)
   };
 }
 
-const TOOL_DESCRIPTION = `Search this project's curated knowledge base — documents the user deliberately added to the project — for passages relevant to a question. Call this whenever the request may depend on project-specific facts, files, specs, policies, or prior decisions you don't already know. Returns the most relevant passages with their source filenames so you can cite them.
+const TOOL_DESCRIPTION_BASE = `Search the documents the user attached to this project.
+
+USE THIS FIRST — before any file search — when the user asks about specs, reports, policies, requirements, decisions, or any other project document.
+
+These documents do NOT live in the working directory. They cannot be found with file listing, glob, grep, or read tools; this tool is the only way to reach them. "I couldn't find any files about X in the working directory" is the wrong answer when this tool has not been tried.
 
 Input:
 - query: natural-language question or keywords.
 - max_results: optional, defaults to 6 (max 20).
 
-Output: the most relevant passages, each cited with its source filename.`;
+Output: the most relevant passages, each cited with its source filename so you can attribute your answer.`;
+
+/**
+ * Naming the attached documents in the tool description is what makes the tool
+ * discoverable: without it a model asked about "the AF reconciliation bot" has
+ * no way to know that topic lives in an attached document rather than on disk,
+ * and reaches for file tools instead (observed in real use).
+ */
+export function buildToolDescription(fileNames: string[]): string {
+  if (fileNames.length === 0) return TOOL_DESCRIPTION_BASE;
+  const shown = fileNames.slice(0, 20);
+  const more = fileNames.length - shown.length;
+  const list = shown.map((n) => `- ${n}`).join('\n');
+  return `${TOOL_DESCRIPTION_BASE}
+
+Documents currently attached to this project:
+${list}${more > 0 ? `\n- …and ${more} more` : ''}`;
+}
 
 export type KnowledgeToolResult = {
   content: Array<{ type: 'text'; text: string }>;
@@ -108,13 +130,29 @@ export function createSearchHandler(
   };
 }
 
+/**
+ * Names of the ready sources, read once at startup so the tool description can
+ * list them. Best-effort: a missing/unreadable manifest just yields a generic
+ * description rather than preventing the server from starting.
+ */
+async function readAttachedFileNames(config: KnowledgeServerEnv | null): Promise<string[]> {
+  if (!config) return [];
+  try {
+    const manifest = await readManifest(config.storeDir);
+    return (manifest?.sources ?? []).filter((s) => s.status === 'ready').map((s) => s.fileName);
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   const config = parseKnowledgeServerEnv(process.env);
   const server = new McpServer({ name: BUILTIN_KNOWLEDGE_NAME, version: '1.0.0' });
+  const description = buildToolDescription(await readAttachedFileNames(config));
 
   server.tool(
     'search_project_knowledge',
-    TOOL_DESCRIPTION,
+    description,
     {
       query: z.string().describe('Natural-language question or keywords to search for.'),
       max_results: z
