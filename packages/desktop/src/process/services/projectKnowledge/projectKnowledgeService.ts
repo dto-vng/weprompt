@@ -18,7 +18,11 @@ import { chunkMarkdown } from '@/common/knowledge/chunker';
 import { buildBm25Index } from '@/common/knowledge/bm25';
 import { EMBED_BATCH_SIZE, embedTexts as defaultEmbedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
-import { extractPdfText as defaultExtractPdfText, renderPagesAsMarkdown } from '@/common/knowledge/pdfExtract';
+import {
+  extractPdfText as defaultExtractPdfText,
+  pageSpanLabel,
+  renderPagesAsMarkdown,
+} from '@/common/knowledge/pdfExtract';
 import {
   createEmptyManifest,
   readChunks,
@@ -401,6 +405,13 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         }
         await fs.writeFile(path.join(storePaths(storeDir).sourceDir(source.id), 'converted.md'), markdown, 'utf8');
         let raw = chunkMarkdown(markdown);
+        if (extension === 'pdf') {
+          // Relabel from the page markers in each chunk. The chunker labels a
+          // chunk with the deepest heading it absorbed — the LAST page marker —
+          // so a chunk covering pages 1-3 cited "Page 3". Falls back to the
+          // chunker's path for chunks that carry no marker of their own.
+          raw = raw.map((chunk) => ({ ...chunk, headingPath: pageSpanLabel(chunk.text) ?? chunk.headingPath }));
+        }
         if (raw.length > MAX_CHUNKS_PER_SOURCE) {
           raw = raw.slice(0, MAX_CHUNKS_PER_SOURCE);
           notes.push(`Truncated to ${MAX_CHUNKS_PER_SOURCE} passages.`);

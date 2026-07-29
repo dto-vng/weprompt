@@ -146,6 +146,34 @@ export const extractPdfText = async (data: Uint8Array, options: PdfExtractOption
   }
 };
 
+/** The page-marker heading. Written by renderPagesAsMarkdown, read by pageSpanLabel. */
+const pageHeading = (pageNumber: number): string => `## Page ${pageNumber}`;
+const PAGE_HEADING_PATTERN = String.raw`^## Page (\d+)$`;
+
+/**
+ * Derive a chunk's citation label from the page markers inside it.
+ *
+ * The chunker labels a chunk with the DEEPEST heading it absorbed, which for
+ * page markers means the last one — so a chunk covering pages 1-3 came out
+ * labelled `Page 3`, pointing past most of the text being cited. Reading the
+ * markers back gives the true span instead.
+ *
+ * Returns undefined when the chunk holds no marker at all (a page whose body
+ * outgrew one chunk leaves continuations with no heading); callers should keep
+ * the chunker's inherited path in that case, which is the correct page.
+ */
+export const pageSpanLabel = (chunkText: string): string | undefined => {
+  // Built per call: a shared /g regex carries lastIndex between calls.
+  const matches = [...chunkText.matchAll(new RegExp(PAGE_HEADING_PATTERN, 'gm'))];
+  if (matches.length === 0) return undefined;
+  const pageNumbers = matches.map((match) => Number(match[1]));
+  const first = Math.min(...pageNumbers);
+  const last = Math.max(...pageNumbers);
+  // En dash: this is a range, and the label is display-only — heading paths are
+  // never tokenized for BM25 (only chunk text is).
+  return first === last ? `Page ${first}` : `Pages ${first}–${last}`;
+};
+
 /**
  * Render extracted pages as markdown. One `## Page N` heading per page, so the
  * chunker captures a page number as each chunk's heading path and citations
@@ -156,5 +184,5 @@ export const renderPagesAsMarkdown = (pages: string[]): string =>
   pages
     .map((text, index) => ({ text: text.trim(), pageNumber: index + 1 }))
     .filter((page) => page.text.length > 0)
-    .map((page) => `## Page ${page.pageNumber}\n\n${page.text}`)
+    .map((page) => `${pageHeading(page.pageNumber)}\n\n${page.text}`)
     .join('\n\n');

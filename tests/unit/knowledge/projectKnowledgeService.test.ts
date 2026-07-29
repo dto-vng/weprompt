@@ -227,10 +227,11 @@ describe('projectKnowledgeService', () => {
 
     const chunks = await readChunks(path.join(root, 'proj-1'));
     expect(chunks.some((c) => c.text.includes('ten working days before departure'))).toBe(true);
-    // The page heading is what makes a citation point at a page. This fixture
-    // fits in one chunk, which the chunker labels with the deepest heading it
-    // absorbed, so assert the shape rather than a specific page.
-    expect(chunks.every((c) => /^Page \d+$/.test(c.headingPath ?? ''))).toBe(true);
+    // The page heading is what makes a citation point at a page. Both fixture
+    // pages fit in one chunk, so the label must name the whole span — the
+    // chunker on its own would have said "Page 2", where the chunk ends.
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].headingPath).toBe('Pages 1–2');
     // What lands on disk must be readable markdown, not a serialized blob.
     const converted = await readFile(path.join(root, 'proj-1', 'sources', sources[0].id, 'converted.md'), 'utf8');
     expect(converted).toMatch(/^## Page 1\n\nVisa Letter Policy/);
