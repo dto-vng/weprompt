@@ -116,7 +116,7 @@ let completionByConversationIdState = new Map<string, TConversationCompletionRec
 let recentStoppedAtByConversationIdState = new Map<string, number>();
 let recentFailureAtByConversationIdState = new Map<string, number>();
 let runtimeByConversationIdState = new Map<string, TConversationRuntimeSummary>();
-let completedConversationIdsState = new Set<string>();
+let completedTurnIdByConversationIdState = new Map<string, string | undefined>();
 let conversation_idsState = new Set<string>();
 let latestRefreshRequestId = 0;
 let latestRuntimeRefreshRequestId = 0;
@@ -328,7 +328,14 @@ function clearTerminalMarksState(conversation_id: string): boolean {
   return changed;
 }
 
-const markTerminalState = (conversation_id: string, mark: TConversationTerminalMark) => {
+const markTerminalState = (conversation_id: string, mark: TConversationTerminalMark, turn_id?: string) => {
+  if (mark === 'completed' && completionByConversationIdState.has(conversation_id)) {
+    const completedTurnId = completedTurnIdByConversationIdState.get(conversation_id);
+    if (!turn_id || !completedTurnId || turn_id === completedTurnId) {
+      return;
+    }
+  }
+
   const now = Date.now();
   clearTerminalMarksState(conversation_id);
   if (mark === 'failed') {
@@ -356,26 +363,26 @@ const markCompletionSeenState = (conversation_id: string): void => {
   emitStoreChange();
 };
 
-const markRecentCompletion = (conversation_id: string) => {
-  markTerminalState(conversation_id, 'completed');
+const markRecentCompletion = (conversation_id: string, turn_id?: string) => {
+  markTerminalState(conversation_id, 'completed', turn_id);
 };
 
 const markRecentFailure = (conversation_id: string) => {
   markTerminalState(conversation_id, 'failed');
 };
 
-const markCompleted = (conversation_id: string) => {
-  completedConversationIdsState = new Set(completedConversationIdsState).add(conversation_id);
+const markCompleted = (conversation_id: string, turn_id?: string) => {
+  completedTurnIdByConversationIdState = new Map(completedTurnIdByConversationIdState).set(conversation_id, turn_id);
 };
 
 const clearCompleted = (conversation_id: string) => {
-  if (!completedConversationIdsState.has(conversation_id)) {
+  if (!completedTurnIdByConversationIdState.has(conversation_id)) {
     return;
   }
 
-  const next = new Set(completedConversationIdsState);
+  const next = new Map(completedTurnIdByConversationIdState);
   next.delete(conversation_id);
-  completedConversationIdsState = next;
+  completedTurnIdByConversationIdState = next;
 };
 
 const logLateStreamIgnored = (conversation_id: string, type: string) => {
@@ -436,18 +443,18 @@ const initializeConversationListSyncStore = () => {
     if (isTerminalStreamMessage(message)) {
       const wasGenerating = generatingConversationIdsState.has(conversation_id);
       if (message.type === 'finish' && wasGenerating) {
-        markRecentCompletion(conversation_id);
+        markRecentCompletion(conversation_id, message.turn_id);
       } else if (message.type !== 'finish') {
         markRecentFailure(conversation_id);
       }
-      markCompleted(conversation_id);
+      markCompleted(conversation_id, message.turn_id);
       clearGenerating(conversation_id);
       return;
     }
 
     const decision = getSidebarStreamGuardDecision({
       type: message.type,
-      completed: completedConversationIdsState.has(conversation_id),
+      completed: completedTurnIdByConversationIdState.has(conversation_id),
     });
     if (decision.clearCompleted) {
       clearCompleted(conversation_id);
@@ -468,9 +475,9 @@ const initializeConversationListSyncStore = () => {
     applyConversationRuntime(event.session_id, event.runtime);
     const terminalMark = resolveConversationTerminalMark(event.state);
     if (terminalMark) {
-      markTerminalState(event.session_id, terminalMark);
+      markTerminalState(event.session_id, terminalMark, event.turn_id);
     }
-    markCompleted(event.session_id);
+    markCompleted(event.session_id, event.turn_id);
     clearGenerating(event.session_id);
     refreshConversations();
   });

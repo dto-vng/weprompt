@@ -320,12 +320,25 @@ describe('useConversationListSync sidebar runtime state', () => {
     expect(result.current.getRecentStoppedAt(conversation.id)).toBeUndefined();
   });
 
-  it('replaces a seen completion when a second successful terminal event arrives', async () => {
+  it('preserves a seen completion when the same turn reports success twice', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(5_000);
     const { result } = await renderConversationListSync();
 
     act(() => {
-      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+      harness.responseStreamHandler?.({
+        type: 'start',
+        data: {},
+        msg_id: 'message-start',
+        turn_id: 'turn-1',
+        conversation_id: conversation.id,
+      });
+      harness.responseStreamHandler?.({
+        type: 'finish',
+        data: {},
+        msg_id: 'message-finish',
+        turn_id: 'turn-1',
+        conversation_id: conversation.id,
+      });
       result.current.markCompletionSeen(conversation.id);
     });
     expect(result.current.getCompletion(conversation.id)).toEqual({
@@ -336,6 +349,38 @@ describe('useConversationListSync sidebar runtime state', () => {
     now.mockReturnValue(6_000);
     act(() => {
       harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 5_000,
+      seenAt: 5_000,
+    });
+  });
+
+  it('records a new completion as unseen after a distinct turn starts', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(5_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+      result.current.markCompletionSeen(conversation.id);
+    });
+
+    now.mockReturnValue(6_000);
+    act(() => {
+      harness.responseStreamHandler?.({
+        type: 'start',
+        data: {},
+        msg_id: 'message-retry',
+        turn_id: 'turn-2',
+        conversation_id: conversation.id,
+      });
+      harness.responseStreamHandler?.({
+        type: 'finish',
+        data: {},
+        msg_id: 'message-finish',
+        turn_id: 'turn-2',
+        conversation_id: conversation.id,
+      });
     });
     expect(result.current.getCompletion(conversation.id)).toEqual({
       completedAt: 6_000,
