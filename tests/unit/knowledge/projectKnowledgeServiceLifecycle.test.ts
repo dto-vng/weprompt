@@ -45,6 +45,7 @@ describe('projectKnowledgeService lifecycle', () => {
       listProviders: async () => providers,
       embedTextsImpl: embedMock as never,
       convertToMarkdown: async () => '# converted',
+      trashItem: async () => {},
       getServerScriptPath: () => '/out/main/builtin-mcp-knowledge.js',
       onUpdated: () => {},
     });
@@ -67,7 +68,7 @@ describe('projectKnowledgeService lifecycle', () => {
   it('removeSource drops chunks, vectors, snapshot dir, and manifest row', async () => {
     const keepId = await seed('keep.md', 'keep this content');
     const dropId = await seed('drop.md', 'drop this content');
-    await service.removeSource('p1', dropId);
+    await service.removeSource('p1', dropId, workspace);
     await service.whenIdle('p1');
     const { sources } = await service.listSources('p1');
     expect(sources.map((s) => s.id)).toEqual([keepId]);
@@ -79,7 +80,7 @@ describe('projectKnowledgeService lifecycle', () => {
   it('removeSource on an unknown id is a safe no-op', async () => {
     const keepId = await seed('keep.md', 'keep this content safe');
     const chunksBefore = await readChunks(path.join(root, 'p1'));
-    await expect(service.removeSource('p1', 'does-not-exist')).resolves.toBeUndefined();
+    await expect(service.removeSource('p1', 'does-not-exist', workspace)).resolves.toBeUndefined();
     await service.whenIdle('p1');
     const { sources } = await service.listSources('p1');
     expect(sources.map((s) => s.id)).toEqual([keepId]);

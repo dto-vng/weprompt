@@ -47,6 +47,7 @@ describe('projectKnowledgeService', () => {
       convertToMarkdown: async () => {
         throw new Error('not used for md/txt');
       },
+      trashItem: async () => {},
       getServerScriptPath: () => '/out/main/builtin-mcp-knowledge.js',
       onUpdated: (projectId) => updates.push(projectId),
     });
@@ -187,7 +188,7 @@ describe('projectKnowledgeService', () => {
     const desynced = chunksBefore.map((c) => (c.sourceId === keepSource.id ? { ...c, hasVector: false } : c));
     await writeChunks(storeDir, desynced);
 
-    await service.removeSource('proj-1', dropSource.id);
+    await service.removeSource('proj-1', dropSource.id, workspace);
 
     const vectorsAfter = await readVectors(storeDir);
     const keepChunkIds = desynced.filter((c) => c.sourceId === keepSource.id).map((c) => c.chunkId);

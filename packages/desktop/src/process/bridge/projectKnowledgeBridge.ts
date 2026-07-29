@@ -41,8 +41,11 @@ export function initProjectKnowledgeBridge(): void {
   ipcBridge.projectKnowledge.addSources.provider(({ projectId, filePaths, workspace }) =>
     getService().addSources(projectId, filePaths, workspace ?? '')
   );
-  ipcBridge.projectKnowledge.removeSource.provider(({ projectId, sourceId }) =>
-    getService().removeSource(projectId, sourceId)
+  ipcBridge.projectKnowledge.removeSource.provider(({ projectId, sourceId, workspace }) =>
+    getService().removeSource(projectId, sourceId, workspace ?? '')
+  );
+  ipcBridge.projectKnowledge.getSourceText.provider(({ projectId, sourceId }) =>
+    getService().getSourceText(projectId, sourceId)
   );
   ipcBridge.projectKnowledge.retrySource.provider(({ projectId, sourceId, workspace }) =>
     getService().retrySource(projectId, sourceId, workspace ?? '')

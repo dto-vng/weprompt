@@ -235,7 +235,10 @@ export const nativeBridgePayloadSchemas = {
       workspace: pathSchema.optional(),
     })
     .strict(),
-  'project-knowledge.remove-source': projectKnowledgeSourceRefSchema,
+  'project-knowledge.remove-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .strict(),
+  'project-knowledge.get-source-text': projectKnowledgeSourceRefSchema,
   'project-knowledge.retry-source': z
     .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
     .strict(),

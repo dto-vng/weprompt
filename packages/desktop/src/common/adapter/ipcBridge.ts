@@ -977,7 +977,12 @@ export const projectKnowledge = {
   addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace?: string }>(
     'project-knowledge.add-sources'
   ),
-  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.remove-source'),
+  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+    'project-knowledge.remove-source'
+  ),
+  getSourceText: bridge.buildProvider<{ text: string; truncated: boolean }, { projectId: string; sourceId: string }>(
+    'project-knowledge.get-source-text'
+  ),
   retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
     'project-knowledge.retry-source'
   ),

@@ -62,6 +62,13 @@ const MAX_CHUNKS_PER_SOURCE = 2000;
 const MAX_PDF_PAGES = 50;
 
 /**
+ * Cap on the indexed text handed to the preview drawer. Large enough for any
+ * ordinary document, small enough that a pathological source cannot lock up
+ * the renderer's markdown pass.
+ */
+const MAX_PREVIEW_CHARS = 200_000;
+
+/**
  * A PDF whose text layer is empty is a scan, which needs OCR we do not have.
  * Fail it explicitly: silently indexing zero passages would leave the user
  * with a `ready` source that never matches anything.
@@ -78,6 +85,12 @@ export type ProjectKnowledgeServiceDeps = {
   /** Injectable so tests can drive PDF ingestion without a real parser. */
   extractPdfTextImpl?: typeof defaultExtractPdfText;
   scanFolderImpl?: typeof defaultScanKnowledgeFolder;
+  /**
+   * Move a user file to the OS Trash (Electron's `shell.trashItem` in prod).
+   * Deleting knowledge deletes a file the user owns, so it must be reversible
+   * — `fs.rm` is never acceptable for anything inside the workspace.
+   */
+  trashItem?: (filePath: string) => Promise<void>;
   getServerScriptPath: () => string;
   onUpdated: (projectId: string) => void;
 };
@@ -85,10 +98,13 @@ export type ProjectKnowledgeServiceDeps = {
 export type ProjectKnowledgeService = {
   listSources: (projectId: string) => Promise<IProjectKnowledgeListResult>;
   addSources: (projectId: string, filePaths: string[], workspace: string) => Promise<void>;
-  removeSource: (projectId: string, sourceId: string) => Promise<void>;
+  /** Move the file to the Trash, then drop its index rows. */
+  removeSource: (projectId: string, sourceId: string, workspace: string) => Promise<void>;
   retrySource: (projectId: string, sourceId: string, workspace: string) => Promise<void>;
   /** Diff `Knowledge Base/` against the manifest and ingest what changed. */
   syncFolder: (projectId: string, workspace: string) => Promise<void>;
+  /** The indexed text of one source, for the in-app preview. */
+  getSourceText: (projectId: string, sourceId: string) => Promise<{ text: string; truncated: boolean }>;
   removeStore: (projectId: string) => Promise<void>;
   getSessionMcpServer: (projectId: string) => Promise<ISessionMcpServer | null>;
   /** Resolves when all queued work for the project has finished (tests). */
@@ -670,13 +686,43 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     await registered;
   };
 
-  const removeSource = async (projectId: string, sourceId: string): Promise<void> =>
+  const removeSource = async (projectId: string, sourceId: string, workspace: string): Promise<void> =>
     enqueue(projectId, async () => {
+      if (!workspace) throw new Error('workspace is required');
       const manifest = await loadManifest(projectId);
-      if (!manifest.sources.some((s) => s.id === sourceId)) return;
+      const source = manifest.sources.find((s) => s.id === sourceId);
+      if (!source) return;
+      const filePath = path.join(knowledgeDirOf(workspace), path.basename(source.fileName));
+      const exists = await fs.access(filePath).then(
+        (): boolean => true,
+        (): boolean => false
+      );
+      // Trash BEFORE dropping the rows. If trashing fails the row must
+      // survive: a file still sitting in the folder with no index row would be
+      // re-indexed by the very next sync, quietly undoing the user's delete.
+      if (exists) {
+        if (!deps.trashItem) throw new Error('trashItem dependency is not configured');
+        await deps.trashItem(filePath);
+      }
       await removeSourceRows(projectId, manifest, sourceId);
       await saveManifest(projectId, manifest);
     });
+
+  /**
+   * The text the index actually holds for a source — `converted.md`, which is
+   * exactly what was chunked. Deliberately NOT the original file: showing the
+   * extraction is what makes the preview useful for debugging retrieval, and
+   * it keeps working while the folder is missing.
+   */
+  const getSourceText = async (projectId: string, sourceId: string): Promise<{ text: string; truncated: boolean }> => {
+    const manifest = await loadManifest(projectId);
+    if (!manifest.sources.some((s) => s.id === sourceId)) throw new Error('Source not found.');
+    const converted = path.join(storePaths(storeDirOf(projectId)).sourceDir(sourceId), 'converted.md');
+    const text = await fs.readFile(converted, 'utf8');
+    return text.length > MAX_PREVIEW_CHARS
+      ? { text: text.slice(0, MAX_PREVIEW_CHARS), truncated: true }
+      : { text, truncated: false };
+  };
 
   /**
    * Retry one failed source. Dual purpose, both parts load-bearing: the guard
@@ -735,5 +781,15 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
 
   const whenIdle = (projectId: string): Promise<void> => queues.get(projectId) ?? Promise.resolve();
 
-  return { listSources, addSources, removeSource, retrySource, syncFolder, removeStore, getSessionMcpServer, whenIdle };
+  return {
+    listSources,
+    addSources,
+    removeSource,
+    retrySource,
+    syncFolder,
+    getSourceText,
+    removeStore,
+    getSessionMcpServer,
+    whenIdle,
+  };
 };

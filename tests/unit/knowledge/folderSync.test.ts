@@ -48,6 +48,7 @@ describe('projectKnowledgeService.syncFolder', () => {
       listProviders: async () => [EMBED_PROVIDER],
       embedTextsImpl: embedMock as never,
       convertToMarkdown: async () => '# converted docx body',
+      trashItem: async () => {},
       getServerScriptPath: () => '/x.js',
       onUpdated: () => {},
       ...overrides,
@@ -337,6 +338,100 @@ describe('projectKnowledgeService.syncFolder', () => {
     await service.whenIdle('p1');
     const { sources } = await service.listSources('p1');
     expect(sources[0]).toMatchObject({ fileName: 'inplace.md', status: 'ready' });
+  });
+
+  // ------------------------------------------------------------------
+  // Delete = move the user's file to the Trash, never fs.rm
+  // ------------------------------------------------------------------
+
+  it('trashes the file and drops the index rows', async () => {
+    const trashItem = vi.fn(async (): Promise<void> => undefined);
+    const svc = makeService({ trashItem });
+    await writeKb('doomed.md', 'content that is going to the trash');
+    await svc.syncFolder('pd', workspace);
+    await svc.whenIdle('pd');
+    const source = (await svc.listSources('pd')).sources[0];
+
+    await svc.removeSource('pd', source.id, workspace);
+    await svc.whenIdle('pd');
+
+    expect(trashItem).toHaveBeenCalledWith(path.join(kb, 'doomed.md'));
+    expect((await svc.listSources('pd')).sources).toHaveLength(0);
+    expect(await readChunks(path.join(root, 'pd'))).toEqual([]);
+  });
+
+  it('keeps the index rows when trashing fails, so the file is never orphaned from its index', async () => {
+    const trashItem = vi.fn(async (): Promise<void> => {
+      throw new Error('trash unavailable');
+    });
+    const svc = makeService({ trashItem });
+    await writeKb('stubborn.md', 'this file refuses to be trashed');
+    await svc.syncFolder('pd', workspace);
+    await svc.whenIdle('pd');
+    const source = (await svc.listSources('pd')).sources[0];
+
+    await expect(svc.removeSource('pd', source.id, workspace)).rejects.toThrow(/trash/i);
+    await svc.whenIdle('pd');
+    expect((await svc.listSources('pd')).sources.map((s) => s.id)).toEqual([source.id]);
+  });
+
+  it('still removes the rows when the file is already gone from the folder', async () => {
+    const trashItem = vi.fn(async (): Promise<void> => undefined);
+    const svc = makeService({ trashItem });
+    await writeKb('vanished.md', 'this file disappears behind our back');
+    await svc.syncFolder('pd', workspace);
+    await svc.whenIdle('pd');
+    const source = (await svc.listSources('pd')).sources[0];
+    rmSync(path.join(kb, 'vanished.md'));
+
+    await svc.removeSource('pd', source.id, workspace);
+    await svc.whenIdle('pd');
+
+    expect(trashItem).not.toHaveBeenCalled();
+    expect((await svc.listSources('pd')).sources).toHaveLength(0);
+  });
+
+  it('deletes the user file only through trashItem, never by unlinking it directly', async () => {
+    // trashItem is a no-op here, so the file is only gone if the service
+    // deleted it itself — which it must never do for a file the user owns.
+    const trashItem = vi.fn(async (): Promise<void> => undefined);
+    const svc = makeService({ trashItem });
+    await writeKb('watched.md', 'this file must outlive a no-op trash');
+    await svc.syncFolder('pw', workspace);
+    await svc.whenIdle('pw');
+    const source = (await svc.listSources('pw')).sources[0];
+
+    await svc.removeSource('pw', source.id, workspace);
+    await svc.whenIdle('pw');
+
+    expect(trashItem).toHaveBeenCalledTimes(1);
+    expect(existsSync(path.join(kb, 'watched.md'))).toBe(true);
+    expect((await svc.listSources('pw')).sources).toHaveLength(0);
+  });
+
+  // ------------------------------------------------------------------
+  // getSourceText — the in-app preview of what the index actually holds
+  // ------------------------------------------------------------------
+
+  it('returns the indexed text for a source', async () => {
+    await writeKb('preview.md', '# Heading\n\nthe body the index actually holds');
+    await synced();
+    const source = (await service.listSources('p1')).sources[0];
+    const result = await service.getSourceText('p1', source.id);
+    expect(result).toEqual({ text: '# Heading\n\nthe body the index actually holds', truncated: false });
+  });
+
+  it('caps a very long preview and flags it as truncated', async () => {
+    await writeKb('long.md', 'x'.repeat(250_000));
+    await synced();
+    const source = (await service.listSources('p1')).sources[0];
+    const result = await service.getSourceText('p1', source.id);
+    expect(result.truncated).toBe(true);
+    expect(result.text).toHaveLength(200_000);
+  });
+
+  it('rejects a preview for an unknown source', async () => {
+    await expect(service.getSourceText('p1', 'no-such-source')).rejects.toThrow();
   });
 
   // ------------------------------------------------------------------
