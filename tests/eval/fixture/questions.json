@@ -1,0 +1,204 @@
+{
+  "$comment": "Golden questions for the knowledge-base retrieval harness. See ../README.md for the schema and for how to add a case. Text here is stored NFC; a question with queryForm 'NFD' is decomposed by the harness at query time.",
+  "questions": [
+    {
+      "id": "vn-visa-letter-notice",
+      "kind": "keyword-vn",
+      "question": "Thư mời công tác cần yêu cầu trước bao nhiêu ngày làm việc?",
+      "expectedSources": ["chinh-sach-cong-tac-2026.md"],
+      "answerHint": "chậm nhất 15 ngày làm việc trước ngày khởi hành",
+      "notes": "Plain Vietnamese keyword hit. Competes with quy-trinh-tuyen-dung.md, which uses 'thư mời' for a job offer letter."
+    },
+    {
+      "id": "vn-per-diem-danang",
+      "kind": "keyword-vn",
+      "question": "Định mức lưu trú tại Đà Nẵng là bao nhiêu một đêm?",
+      "expectedSources": ["chinh-sach-cong-tac-2026.md"],
+      "answerHint": "1.800.000 đồng một đêm",
+      "notes": "Numeric answer in a Vietnamese policy table-free prose section."
+    },
+    {
+      "id": "vn-visa-documents",
+      "kind": "keyword-vn",
+      "question": "Hồ sơ xin thị thực gồm những giấy tờ gì?",
+      "expectedSources": ["chinh-sach-cong-tac-2026.md"],
+      "answerHint": "hộ chiếu còn hiệu lực tối thiểu 6 tháng",
+      "notes": "'hồ sơ' is heavily used by quy-trinh-tuyen-dung.md in an unrelated sense — a genuine lexical competitor."
+    },
+    {
+      "id": "nfd-admin-password",
+      "kind": "nfd-corpus",
+      "question": "Mật khẩu tài khoản quản trị phải đổi bao lâu một lần?",
+      "expectedSources": ["quy-dinh-bao-mat-thong-tin.md"],
+      "answerHint": "đổi mỗi 90 ngày",
+      "notes": "NFC query against a corpus file stored NFD on disk. Fails outright if tokenize() stops normalising."
+    },
+    {
+      "id": "nfd-device-encryption",
+      "kind": "nfd-corpus",
+      "question": "Máy tính xách tay có bắt buộc mã hoá toàn đĩa không?",
+      "expectedSources": ["quy-dinh-bao-mat-thong-tin.md"],
+      "answerHint": "bật mã hoá toàn đĩa",
+      "notes": "NFD corpus. onboarding-runbook.md discusses full-disk encryption in English — cross-language competitor."
+    },
+    {
+      "id": "nfd-removable-media",
+      "kind": "nfd-corpus",
+      "question": "Có được sao chép dữ liệu mức Mật ra ổ cứng rời không?",
+      "expectedSources": ["quy-dinh-bao-mat-thong-tin.md"],
+      "answerHint": "Không sao chép dữ liệu mức Mật ra thiết bị lưu trữ rời",
+      "notes": "NFD corpus, second chunk region — exercises NFD text past a chunk boundary."
+    },
+    {
+      "id": "nfd-query-nfc-corpus",
+      "kind": "nfd-query",
+      "question": "Phụ cấp ăn uống trong nước là bao nhiêu một ngày?",
+      "queryForm": "NFD",
+      "expectedSources": ["chinh-sach-cong-tac-2026.md"],
+      "answerHint": "400.000 đồng một ngày",
+      "notes": "The reverse direction: a decomposed query against an NFC corpus. Both directions must survive."
+    },
+    {
+      "id": "distractor-vpn-approval",
+      "kind": "distractor",
+      "question": "Ai phê duyệt quyền truy cập VPN doanh nghiệp?",
+      "expectedSources": ["quy-dinh-bao-mat-thong-tin.md"],
+      "answerHint": "phê duyệt bằng văn bản của Trưởng phòng An ninh thông tin",
+      "notes": "Two other files discuss corporate VPN at length and deliberately decline to state the approver: mang-wifi-khach.md and it-service-catalogue.md."
+    },
+    {
+      "id": "id-invoice-disputed",
+      "kind": "identifier",
+      "question": "INV-2026-0421",
+      "expectedSources": ["hoa-don-chi-phi-q2.md"],
+      "answerHint": "INV-2026-0421",
+      "notes": "Bare identifier lookup. BM25 should win at rank 1; the numeric segment is the discriminative token."
+    },
+    {
+      "id": "id-cost-centre",
+      "kind": "identifier",
+      "question": "QUOKKA-7",
+      "expectedSources": ["hoa-don-chi-phi-q2.md"],
+      "answerHint": "QUOKKA-7 covers all travel-related invoices",
+      "notes": "A code with no natural-language meaning — nothing for an embedding to generalise from."
+    },
+    {
+      "id": "id-po-vendor",
+      "kind": "identifier",
+      "question": "PO-88240",
+      "expectedSources": ["hoa-don-chi-phi-q2.md"],
+      "answerHint": "PO-88240 | Nam Long Catering",
+      "notes": "Identifier that only appears inside a markdown table row."
+    },
+    {
+      "id": "en-invoice-dispute-reason",
+      "kind": "keyword-en",
+      "question": "Why was the Hanoi Print Works invoice disputed?",
+      "expectedSources": ["hoa-don-chi-phi-q2.md"],
+      "answerHint": "billed for 500 brochures but only 320 were delivered",
+      "notes": "English keyword hit where the answer is prose below the table, not the table row."
+    },
+    {
+      "id": "semantic-delay",
+      "kind": "semantic-only",
+      "question": "What did the team decide to delay?",
+      "expectedSources": ["meeting-summary-2026-06-12.md"],
+      "answerHint": "stays on the legacy scheduler until the external audit closes",
+      "notes": "The discriminative words ('delay', 'decide') appear nowhere in the corpus — there is no stemmer, so 'decide' does not match 'decision'. Only semantic retrieval can bridge this. incident-postmortem-2026-05.md is a strong lexical competitor and deliberately does not state the condition."
+    },
+    {
+      "id": "cross-lang-trip-approval",
+      "kind": "cross-language",
+      "question": "How many working days in advance must an overseas business trip be approved?",
+      "expectedSources": ["chinh-sach-cong-tac-2026.md"],
+      "answerHint": "trước ít nhất 10 ngày làm việc",
+      "notes": "English question, Vietnamese answer. BM25 cannot bridge languages at all; this is the case that justifies a multilingual embedding model."
+    },
+    {
+      "id": "cross-lang-vpn-signoff",
+      "kind": "cross-language",
+      "question": "Who signs off on corporate VPN access for staff?",
+      "expectedSources": ["quy-dinh-bao-mat-thong-tin.md"],
+      "answerHint": "phê duyệt bằng văn bản của Trưởng phòng An ninh thông tin",
+      "notes": "Same fact as distractor-vpn-approval, asked in English against an NFD Vietnamese source, with two English-language competitors that discuss corporate VPN. Cross-language and distractor pressure at once."
+    },
+    {
+      "id": "boundary-buddy-duration",
+      "kind": "chunk-boundary",
+      "question": "How long does the buddy programme run for a new joiner?",
+      "expectedSources": ["onboarding-runbook.md"],
+      "answerHint": "six weeks",
+      "notes": "At chunk 3200 / overlap 400 the split falls between the paragraph naming the buddy programme and the paragraph giving its duration. Only the overlap puts the query's keywords and the answer in one chunk: at overlap 0 the answer chunk contains 'six weeks' but not 'buddy programme'. Sweep --overlap=0 to watch answerRecall drop."
+    },
+    {
+      "id": "en-onboarding-training",
+      "kind": "keyword-en",
+      "question": "What must a new joiner finish before the laptop is issued?",
+      "expectedSources": ["onboarding-runbook.md"],
+      "answerHint": "information-security course before the laptop is issued",
+      "notes": "Competes with it-service-catalogue.md (laptop requests) and quy-dinh-bao-mat-thong-tin.md (laptop encryption)."
+    },
+    {
+      "id": "en-meeting-owner",
+      "kind": "keyword-en",
+      "question": "Who owns the reporting pipeline migration?",
+      "expectedSources": ["meeting-summary-2026-06-12.md"],
+      "answerHint": "Hà owns the migration of the reporting pipeline",
+      "notes": "incident-postmortem-2026-05.md and roadmap-q3-2026.md both discuss the reporting pipeline migration without naming the owner."
+    },
+    {
+      "id": "en-postmortem-root-cause",
+      "kind": "keyword-en",
+      "question": "Why did the reconciliation job not start after the host maintenance?",
+      "expectedSources": ["incident-postmortem-2026-05.md"],
+      "answerHint": "rewrites them to disk only on a clean shutdown",
+      "notes": "The answer paragraph shares little wording with the question; the question's words appear in the timeline section of the same file."
+    },
+    {
+      "id": "en-service-account-turnaround",
+      "kind": "keyword-en",
+      "question": "What is the turnaround for a service account request?",
+      "expectedSources": ["it-service-catalogue.md"],
+      "answerHint": "Turnaround: five working days. Approval: the owning team's manager",
+      "notes": "The catalogue repeats 'Turnaround' and 'working days' in every entry, so the discriminative token is 'service account' alone."
+    },
+    {
+      "id": "vn-recruitment-offer-validity",
+      "kind": "keyword-vn",
+      "question": "Ứng viên có bao nhiêu ngày để phản hồi thư mời làm việc?",
+      "expectedSources": ["quy-trinh-tuyen-dung.md"],
+      "answerHint": "7 ngày làm việc để phản hồi thư mời",
+      "notes": "Mirror image of vn-visa-letter-notice: 'thư mời' means something different here, and chinh-sach-cong-tac-2026.md uses the same phrase with a 15-day figure. Retrieving the wrong file yields a confidently wrong answer."
+    },
+    {
+      "id": "vn-guest-ssid",
+      "kind": "keyword-vn",
+      "question": "SSID dành cho khách là gì?",
+      "expectedSources": ["mang-wifi-khach.md"],
+      "answerHint": "VNG-Guest",
+      "notes": "Short Vietnamese query with one Latin-script discriminative token."
+    },
+    {
+      "id": "en-roadmap-mobile",
+      "kind": "keyword-en",
+      "question": "What ships in Q3 for the mobile client?",
+      "expectedSources": ["roadmap-q3-2026.md"],
+      "answerHint": "Offline drafts ship in Q3",
+      "notes": "meeting-summary-2026-06-12.md also mentions the mobile client, without roadmap content."
+    },
+    {
+      "id": "unanswerable-no-overlap",
+      "kind": "unanswerable",
+      "question": "forklift operator licence renewal",
+      "expectedSources": [],
+      "notes": "Keyword-style query whose every token is absent from the corpus, so BM25 must return zero hits. Gated: see the bm25ZeroHit invariant in the runner. Hybrid will still return its top-k, which is the point — the semantic half never abstains."
+    },
+    {
+      "id": "unanswerable-lexical-overlap",
+      "kind": "unanswerable",
+      "question": "Chính sách nghỉ phép thai sản là gì?",
+      "expectedSources": [],
+      "notes": "A plausible back-office question the corpus genuinely cannot answer, sharing common words ('chính sách') with two policy files. Reported, not gated — it is the over-retrieval canary for any future relevance floor."
+    }
+  ]
+}

@@ -49,6 +49,7 @@
     "test:coverage": "vitest run --coverage",
     "test:contract": "vitest run tests/contract --passWithNoTests",
     "test:integration": "vitest run tests/integration",
+    "eval:kb": "bunx tsx tests/eval/runEval.ts",
     "test:packaged:i18n": "vitest run tests/integration/i18n-packaged.test.ts",
     "bench": "vitest bench",
     "bench:db": "bun test ./tests/bench/database.bench.bun.ts",
