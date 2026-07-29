@@ -16,14 +16,7 @@ export type TConversationCompletionRecord = {
   seenAt?: number;
 };
 
-export type TConversationStatusMark =
-  | 'idle'
-  | 'running'
-  | 'needs_you'
-  | 'done'
-  | 'done_idle'
-  | 'stopped'
-  | 'failed';
+export type TConversationStatusMark = 'idle' | 'running' | 'needs_you' | 'done' | 'done_idle' | 'stopped' | 'failed';
 
 export type TConversationTerminalMark = 'failed' | 'completed' | 'stopped';
 

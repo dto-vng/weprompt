@@ -155,17 +155,13 @@ describe('resolveConversationStatusMark', () => {
 
   it('shows stopped only inside its transient window', () => {
     expect(resolveConversationStatusMark(input({ recentStoppedAt: NOW }))).toBe('stopped');
-    expect(
-      resolveConversationStatusMark(input({ recentStoppedAt: NOW - STOPPED_MARK_DURATION_MS }))
-    ).toBe('idle');
+    expect(resolveConversationStatusMark(input({ recentStoppedAt: NOW - STOPPED_MARK_DURATION_MS }))).toBe('idle');
   });
 
   it('prefers stopped over completion defensively', () => {
-    expect(
-      resolveConversationStatusMark(
-        input({ recentStoppedAt: NOW, completion: { completedAt: NOW } })
-      )
-    ).toBe('stopped');
+    expect(resolveConversationStatusMark(input({ recentStoppedAt: NOW, completion: { completedAt: NOW } }))).toBe(
+      'stopped'
+    );
   });
 
   it('treats a missing runtime as idle', () => {

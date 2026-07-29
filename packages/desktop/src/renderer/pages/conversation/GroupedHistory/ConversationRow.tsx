@@ -91,7 +91,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   const stoppedExpiresAt = recentStoppedAt !== undefined ? recentStoppedAt + STOPPED_MARK_DURATION_MS : 0;
   const nextTransitionAt = [completionTransitionAt, stoppedExpiresAt]
     .filter((value) => value > Date.now())
-    .sort((left, right) => left - right)[0];
+    .toSorted((left, right) => left - right)[0];
   const [, setStatusTick] = React.useState(0);
 
   React.useEffect(() => {
