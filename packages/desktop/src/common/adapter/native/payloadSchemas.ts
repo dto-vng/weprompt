@@ -165,6 +165,7 @@ const safeIdSchema = z
 
 const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
 const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
+const projectKnowledgeFolderSchema = z.object({ projectId: safeIdSchema, workspace: pathSchema }).strict();
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 
@@ -228,10 +229,17 @@ export const nativeBridgePayloadSchemas = {
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
   'project-knowledge.add-sources': z
-    .object({ projectId: safeIdSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })
+    .object({
+      projectId: safeIdSchema,
+      filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS),
+      workspace: pathSchema.optional(),
+    })
     .strict(),
   'project-knowledge.remove-source': projectKnowledgeSourceRefSchema,
-  'project-knowledge.retry-source': projectKnowledgeSourceRefSchema,
+  'project-knowledge.retry-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .strict(),
+  'project-knowledge.sync-folder': projectKnowledgeFolderSchema,
   'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
   'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),

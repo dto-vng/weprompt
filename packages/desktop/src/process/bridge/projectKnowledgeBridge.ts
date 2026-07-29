@@ -38,14 +38,17 @@ const getService = (): ProjectKnowledgeService => {
 
 export function initProjectKnowledgeBridge(): void {
   ipcBridge.projectKnowledge.listSources.provider(({ projectId }) => getService().listSources(projectId));
-  ipcBridge.projectKnowledge.addSources.provider(({ projectId, filePaths }) =>
-    getService().addSources(projectId, filePaths)
+  ipcBridge.projectKnowledge.addSources.provider(({ projectId, filePaths, workspace }) =>
+    getService().addSources(projectId, filePaths, workspace ?? '')
   );
   ipcBridge.projectKnowledge.removeSource.provider(({ projectId, sourceId }) =>
     getService().removeSource(projectId, sourceId)
   );
-  ipcBridge.projectKnowledge.retrySource.provider(({ projectId, sourceId }) =>
-    getService().retrySource(projectId, sourceId)
+  ipcBridge.projectKnowledge.retrySource.provider(({ projectId, sourceId, workspace }) =>
+    getService().retrySource(projectId, sourceId, workspace ?? '')
+  );
+  ipcBridge.projectKnowledge.syncFolder.provider(({ projectId, workspace }) =>
+    getService().syncFolder(projectId, workspace)
   );
   ipcBridge.projectKnowledge.removeStore.provider(({ projectId }) => getService().removeStore(projectId));
   ipcBridge.projectKnowledge.getSessionMcpServer.provider(({ projectId }) =>

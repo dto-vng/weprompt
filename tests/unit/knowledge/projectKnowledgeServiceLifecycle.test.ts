@@ -29,6 +29,7 @@ const EMBED_PROVIDER = {
 describe('projectKnowledgeService lifecycle', () => {
   let root: string;
   let inbox: string;
+  let workspace: string;
   let embedMock: ReturnType<typeof vi.fn>;
   let providers: IProvider[];
   let service: ProjectKnowledgeService;
@@ -36,6 +37,7 @@ describe('projectKnowledgeService lifecycle', () => {
   beforeEach(() => {
     root = mkdtempSync(path.join(tmpdir(), 'kb-life-root-'));
     inbox = mkdtempSync(path.join(tmpdir(), 'kb-life-in-'));
+    workspace = mkdtempSync(path.join(tmpdir(), 'kb-life-ws-'));
     embedMock = vi.fn(async (texts: string[]) => texts.map(() => [0.5, 0.5]));
     providers = [EMBED_PROVIDER];
     service = createProjectKnowledgeService({
@@ -50,12 +52,13 @@ describe('projectKnowledgeService lifecycle', () => {
   afterEach(() => {
     rmSync(root, { recursive: true, force: true });
     rmSync(inbox, { recursive: true, force: true });
+    rmSync(workspace, { recursive: true, force: true });
   });
 
   const seed = async (name: string, content: string): Promise<string> => {
     const p = path.join(inbox, name);
     await writeFile(p, content, 'utf8');
-    await service.addSources('p1', [p]);
+    await service.addSources('p1', [p], workspace);
     await service.whenIdle('p1');
     const { sources } = await service.listSources('p1');
     return sources.find((s) => s.fileName === name)!.id;
@@ -88,7 +91,7 @@ describe('projectKnowledgeService lifecycle', () => {
     embedMock.mockRejectedValueOnce(new Error('down'));
     const id = await seed('a.md', 'alpha beta gamma');
     expect((await service.listSources('p1')).sources[0].vectorCount).toBe(0);
-    await service.retrySource('p1', id);
+    await service.retrySource('p1', id, workspace);
     await service.whenIdle('p1');
     expect((await service.listSources('p1')).sources[0].vectorCount).toBeGreaterThan(0);
   });
@@ -108,12 +111,12 @@ describe('projectKnowledgeService lifecycle', () => {
     });
     const p = path.join(inbox, 'spec.docx');
     await writeFile(p, 'binary');
-    await svc.addSources('p2', [p]);
+    await svc.addSources('p2', [p], workspace);
     await svc.whenIdle('p2');
     let list = await svc.listSources('p2');
     expect(list.sources[0].status).toBe('failed');
     fail = false;
-    await svc.retrySource('p2', list.sources[0].id);
+    await svc.retrySource('p2', list.sources[0].id, workspace);
     await svc.whenIdle('p2');
     list = await svc.listSources('p2');
     expect(list.sources[0].status).toBe('ready');
@@ -122,7 +125,7 @@ describe('projectKnowledgeService lifecycle', () => {
   it('retrySource on an unknown id is a safe no-op', async () => {
     const keepId = await seed('stay.md', 'this file must remain untouched');
     const before = await service.listSources('p1');
-    await expect(service.retrySource('p1', 'does-not-exist')).resolves.toBeUndefined();
+    await expect(service.retrySource('p1', 'does-not-exist', workspace)).resolves.toBeUndefined();
     await service.whenIdle('p1');
     const after = await service.listSources('p1');
     expect(after).toEqual(before);
@@ -161,7 +164,7 @@ describe('projectKnowledgeService lifecycle', () => {
       expect(await service.getSessionMcpServer('p1')).toBeNull();
       const p = path.join(inbox, 'bad.pdf');
       await writeFile(p, 'x');
-      await service.addSources('p1', [p]);
+      await service.addSources('p1', [p], workspace);
       await service.whenIdle('p1');
       expect(await service.getSessionMcpServer('p1')).toBeNull();
     });

@@ -971,9 +971,17 @@ export const projectKnowledge = {
   listSources: bridge.buildProvider<IProjectKnowledgeListResult, { projectId: string }>(
     'project-knowledge.list-sources'
   ),
-  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[] }>('project-knowledge.add-sources'),
+  // `workspace` is the project workspace path; the `Knowledge Base/` folder
+  // inside it is the source of truth for knowledge files. Optional only until
+  // every renderer caller passes it (typed required again in the card work).
+  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace?: string }>(
+    'project-knowledge.add-sources'
+  ),
   removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.remove-source'),
-  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.retry-source'),
+  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+    'project-knowledge.retry-source'
+  ),
+  syncFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.sync-folder'),
   removeStore: bridge.buildProvider<void, { projectId: string }>('project-knowledge.remove-store'),
   getSessionMcpServer: bridge.buildProvider<ISessionMcpServer | null, { projectId: string }>(
     'project-knowledge.get-session-mcp-server'

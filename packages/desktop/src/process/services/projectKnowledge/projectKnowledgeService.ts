@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Main-process owner of per-project knowledge stores: registration + ingestion
-// pipeline (snapshot → convert → chunk → BM25 → embed), listing, removal,
-// retry, and the per-conversation session-MCP descriptor. All work for one
+// Main-process owner of per-project knowledge stores. The visible
+// `Knowledge Base/` folder inside the project workspace is the source of
+// truth: syncFolder diffs it against the manifest by fileName + content hash
+// and drives the ingestion pipeline (convert → chunk → BM25 → embed), which
+// reads source bytes from the folder and keeps `converted.md` in the private
+// store as conversion cache + text-recovery fallback. All work for one
 // project is serialized on a promise-chain queue.
 
 import { createHash } from 'node:crypto';
@@ -40,7 +43,9 @@ import type {
   KnowledgeManifest,
   KnowledgeManifestSource,
 } from '@/common/knowledge/types';
+import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
+import { scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
@@ -72,15 +77,18 @@ export type ProjectKnowledgeServiceDeps = {
   embedTextsImpl?: typeof defaultEmbedTexts;
   /** Injectable so tests can drive PDF ingestion without a real parser. */
   extractPdfTextImpl?: typeof defaultExtractPdfText;
+  scanFolderImpl?: typeof defaultScanKnowledgeFolder;
   getServerScriptPath: () => string;
   onUpdated: (projectId: string) => void;
 };
 
 export type ProjectKnowledgeService = {
   listSources: (projectId: string) => Promise<IProjectKnowledgeListResult>;
-  addSources: (projectId: string, filePaths: string[]) => Promise<void>;
+  addSources: (projectId: string, filePaths: string[], workspace: string) => Promise<void>;
   removeSource: (projectId: string, sourceId: string) => Promise<void>;
-  retrySource: (projectId: string, sourceId: string) => Promise<void>;
+  retrySource: (projectId: string, sourceId: string, workspace: string) => Promise<void>;
+  /** Diff `Knowledge Base/` against the manifest and ingest what changed. */
+  syncFolder: (projectId: string, workspace: string) => Promise<void>;
   removeStore: (projectId: string) => Promise<void>;
   getSessionMcpServer: (projectId: string) => Promise<ISessionMcpServer | null>;
   /** Resolves when all queued work for the project has finished (tests). */
@@ -130,6 +138,7 @@ const toDto = (source: KnowledgeManifestSource): IKnowledgeSourceDto => ({
 export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps): ProjectKnowledgeService => {
   const embedTexts = deps.embedTextsImpl ?? defaultEmbedTexts;
   const extractPdfText = deps.extractPdfTextImpl ?? defaultExtractPdfText;
+  const scanFolder = deps.scanFolderImpl ?? defaultScanKnowledgeFolder;
   const queues = new Map<string, Promise<void>>();
 
   const storeDirOf = (projectId: string): string => {
@@ -142,6 +151,17 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     }
     return target;
   };
+
+  const knowledgeDirOf = (workspace: string): string => path.join(workspace, KNOWLEDGE_FOLDER_NAME);
+
+  /**
+   * Ids key chunk ownership (`chunkId = ${id}#${i}`), so they only need to be
+   * unique and filesystem-safe. Hashing name + content keeps two same-content
+   * files under different names from colliding; pre-folder rows keep their
+   * original hash-derived ids untouched (sync identity is fileName, not id).
+   */
+  const deriveSourceId = (fileName: string, contentHash: string): string =>
+    createHash('sha256').update(`${fileName}\n${contentHash}`).digest('hex').slice(0, 12);
 
   /** Serialize work per project; returns the enqueued job's promise. */
   const enqueue = <T>(projectId: string, job: () => Promise<T>): Promise<T> => {
@@ -191,6 +211,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         passageCount: sources.reduce((sum, s) => sum + s.chunkCount, 0),
         semantic: manifest.embedding && sources.some((s) => s.vectorCount > 0) ? 'on' : 'off',
       },
+      folderMissing: manifest.folderMissing === true,
     };
   };
 
@@ -215,82 +236,124 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     manifest.sources = manifest.sources.filter((s) => s.id !== sourceId);
   };
 
-  /** Register new sources (visible immediately as indexing/unsupported/failed). */
-  const registerSources = async (projectId: string, filePaths: string[]): Promise<void> => {
-    const storeDir = storeDirOf(projectId);
+  /**
+   * Diff the visible `Knowledge Base/` folder against the manifest and
+   * register the outcome: new/changed files become `indexing` rows for
+   * processPending to ingest; files gone from a READABLE folder lose their
+   * index rows.
+   *
+   * THE GUARD: a missing or unreadable folder performs ZERO deletions. A
+   * transient unmount, a Downloads cleanup, or a renamed workspace must
+   * surface as `folderMissing` — never as "all files were deleted". Every
+   * row-removal below is only reachable after a successful folder read.
+   *
+   * `retryNames` marks files the user explicitly re-picked via Add files: a
+   * failed row whose content is unchanged is retried only then, so automatic
+   * syncs never hammer a persistently failing source (e.g. re-reading a
+   * scanned 50-page PDF on every Project Home mount).
+   */
+  const registerFromFolder = async (
+    projectId: string,
+    workspace: string,
+    retryNames?: Set<string>,
+    unreadableNames?: string[]
+  ): Promise<void> => {
     const manifest = await loadManifest(projectId);
-    for (const filePath of filePaths) {
-      const fileName = path.basename(filePath);
-      const extension = path.extname(fileName).slice(1).toLowerCase();
-      const addedAt = Date.now();
-      const baseSource: KnowledgeManifestSource = {
-        id: '',
-        fileName,
-        contentHash: '',
-        byteSize: 0,
+    const scan = await scanFolder(knowledgeDirOf(workspace));
+    if (!scan.ok) {
+      const missing = manifest.sources.length > 0; // a project with no sources has nothing to lose
+      if ((manifest.folderMissing === true) !== missing) {
+        if (missing) manifest.folderMissing = true;
+        else delete manifest.folderMissing;
+        await saveManifest(projectId, manifest);
+      }
+      return;
+    }
+    let dirty = false;
+    if (manifest.folderMissing) {
+      delete manifest.folderMissing;
+      dirty = true;
+    }
+    const seen = new Set<string>();
+    for (const entry of scan.entries) {
+      seen.add(entry.fileName);
+      const existing = manifest.sources.find((s) => s.fileName === entry.fileName);
+      if (existing && existing.contentHash === entry.contentHash) {
+        if (existing.status === 'failed' && entry.kind === 'supported' && retryNames?.has(entry.fileName)) {
+          existing.status = 'indexing';
+          existing.error = null;
+          dirty = true;
+        }
+        continue;
+      }
+      if (existing) {
+        await removeSourceRows(projectId, manifest, existing.id);
+        dirty = true;
+      }
+      const base: KnowledgeManifestSource = {
+        id: deriveSourceId(entry.fileName, entry.contentHash),
+        fileName: entry.fileName,
+        contentHash: entry.contentHash,
+        byteSize: entry.byteSize,
         status: 'indexing',
         chunkCount: 0,
         vectorCount: 0,
-        addedAt,
+        addedAt: Date.now(),
         error: null,
       };
-      if (!SUPPORTED_EXTENSIONS.has(extension)) {
-        manifest.sources.push({
-          ...baseSource,
-          id: `unsupported-${addedAt}-${manifest.sources.length}`,
-          status: 'unsupported',
-          error: `Unsupported file type. ${SUPPORTED_EXTENSIONS_HINT}`,
-        });
-        continue;
-      }
-      let buffer: Buffer;
-      try {
-        buffer = await fs.readFile(filePath);
-      } catch {
-        manifest.sources.push({
-          ...baseSource,
-          id: `failed-${addedAt}-${manifest.sources.length}`,
-          status: 'failed',
-          error: 'Could not read the file.',
-        });
-        continue;
-      }
-      if (buffer.byteLength > MAX_FILE_BYTES) {
-        manifest.sources.push({
-          ...baseSource,
-          id: `failed-${addedAt}-${manifest.sources.length}`,
-          byteSize: buffer.byteLength,
-          status: 'failed',
-          error: 'File exceeds the 15 MB limit.',
-        });
-        continue;
-      }
-      const contentHash = `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
-      const existingSameHash = manifest.sources.find((s) => s.contentHash === contentHash);
-      if (existingSameHash) {
-        if (existingSameHash.status !== 'failed') continue; // unchanged re-add — no-op
-        // A previous ingestion of this exact content failed. The source id is derived
-        // from the content hash, so pushing a new row would duplicate the id — reuse
-        // the existing row and queue another attempt instead. Re-write the snapshot in
-        // case it was lost, then let processPending pick it up.
-        const retryDir = storePaths(storeDir).sourceDir(existingSameHash.id);
-        await fs.mkdir(retryDir, { recursive: true });
-        await fs.writeFile(path.join(retryDir, `original.${extension}`), buffer);
-        existingSameHash.status = 'indexing';
-        existingSameHash.error = null;
-        continue;
-      }
-      const sourceId = contentHash.slice(7, 19);
-      const previous = manifest.sources.find(
-        (s) => s.fileName === fileName && s.contentHash && s.contentHash !== contentHash
+      manifest.sources.push(
+        entry.kind === 'oversize' ? { ...base, status: 'failed', error: 'File exceeds the 15 MB limit.' } : base
       );
-      if (previous) await removeSourceRows(projectId, manifest, previous.id);
-      const sourceDir = storePaths(storeDir).sourceDir(sourceId);
-      await fs.mkdir(sourceDir, { recursive: true });
-      await fs.writeFile(path.join(sourceDir, `original.${extension}`), buffer);
-      manifest.sources.push({ ...baseSource, id: sourceId, contentHash, byteSize: buffer.byteLength });
+      dirty = true;
     }
-    await saveManifest(projectId, manifest);
+    for (const name of scan.unsupported) {
+      seen.add(name);
+      if (manifest.sources.some((s) => s.fileName === name)) continue;
+      manifest.sources.push({
+        id: deriveSourceId(name, 'unsupported'),
+        fileName: name,
+        contentHash: '',
+        byteSize: 0,
+        status: 'unsupported',
+        chunkCount: 0,
+        vectorCount: 0,
+        addedAt: Date.now(),
+        error: `Unsupported file type. ${SUPPORTED_EXTENSIONS_HINT}`,
+      });
+      dirty = true;
+    }
+    // Picks whose copy into the folder failed. Skipped when the folder still
+    // holds a good copy under that name — a failed pick must not invalidate it.
+    for (const name of unreadableNames ?? []) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const existing = manifest.sources.find((s) => s.fileName === name);
+      if (existing) {
+        existing.status = 'failed';
+        existing.error = 'Could not read the file.';
+        dirty = true;
+        continue;
+      }
+      manifest.sources.push({
+        id: deriveSourceId(name, 'unreadable'),
+        fileName: name,
+        contentHash: '',
+        byteSize: 0,
+        status: 'failed',
+        chunkCount: 0,
+        vectorCount: 0,
+        addedAt: Date.now(),
+        error: 'Could not read the file.',
+      });
+      dirty = true;
+    }
+    // Deletions — reachable ONLY because the folder read above succeeded.
+    for (const source of [...manifest.sources]) {
+      if (seen.has(source.fileName)) continue;
+      await removeSourceRows(projectId, manifest, source.id);
+      dirty = true;
+    }
+    if (dirty) await saveManifest(projectId, manifest);
   };
 
   const embedMissingVectors = async (projectId: string, manifest: KnowledgeManifest): Promise<KnowledgeManifest> => {
@@ -368,15 +431,45 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   };
 
   /** Index all sources currently in `indexing` state, then run the embed pass. */
-  const processPending = async (projectId: string): Promise<void> => {
+  const processPending = async (projectId: string, workspace: string): Promise<void> => {
     const storeDir = storeDirOf(projectId);
+    const knowledgeDir = knowledgeDirOf(workspace);
     let manifest = await loadManifest(projectId);
     const pending = manifest.sources.filter((s) => s.status === 'indexing');
     for (const source of pending) {
+      let buffer: Buffer;
       try {
+        buffer = await fs.readFile(path.join(knowledgeDir, path.basename(source.fileName)));
+      } catch {
+        const folderReadable = await fs.stat(knowledgeDir).then(
+          (stat): boolean => stat.isDirectory(),
+          (): boolean => false
+        );
+        if (!folderReadable) {
+          // Folder-level failure — same rule as the sync guard: treat it as
+          // transient, leave every remaining row `indexing` (the next
+          // successful sync resumes them), and surface folderMissing instead
+          // of failing sources one by one.
+          manifest.folderMissing = true;
+          await saveManifest(projectId, manifest);
+          return;
+        }
+        source.status = 'failed';
+        source.error = 'Could not read the file.';
+        delete source.progress;
+        await saveManifest(projectId, manifest);
+        continue;
+      }
+      try {
+        // The file may have changed between the registering scan and this
+        // read; index what actually exists and record its hash so the next
+        // sync no-ops instead of re-ingesting.
+        const contentHash = `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
+        if (contentHash !== source.contentHash) {
+          source.contentHash = contentHash;
+          source.byteSize = buffer.byteLength;
+        }
         const extension = path.extname(source.fileName).slice(1).toLowerCase();
-        const originalPath = path.join(storePaths(storeDir).sourceDir(source.id), `original.${extension}`);
-        const buffer = await fs.readFile(originalPath);
         // Non-fatal notes accumulated while converting; a source can hit more
         // than one cap (e.g. a long PDF that is also chunk-capped).
         const notes: string[] = [];
@@ -403,7 +496,11 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         } else {
           markdown = buffer.toString('utf8');
         }
-        await fs.writeFile(path.join(storePaths(storeDir).sourceDir(source.id), 'converted.md'), markdown, 'utf8');
+        // converted.md is the conversion cache AND the text-recovery fallback
+        // if the folder is ever lost; it is the only per-source store file now.
+        const sourceDir = storePaths(storeDir).sourceDir(source.id);
+        await fs.mkdir(sourceDir, { recursive: true });
+        await fs.writeFile(path.join(sourceDir, 'converted.md'), markdown, 'utf8');
         let raw = chunkMarkdown(markdown);
         if (extension === 'pdf') {
           // Relabel from the page markers in each chunk. The chunker labels a
@@ -441,12 +538,46 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       await saveManifest(projectId, manifest);
     }
     manifest = await embedMissingVectors(projectId, manifest);
-    await saveManifest(projectId, manifest);
+    // The embed pass persists its own progress; the trailing write only needs
+    // to settle sources ingested above. Skipping it keeps a no-op sync from
+    // rewriting the manifest and re-notifying the card on every mount.
+    if (pending.length > 0) await saveManifest(projectId, manifest);
   };
 
-  const addSources = async (projectId: string, filePaths: string[]): Promise<void> => {
-    const registered = enqueue(projectId, () => registerSources(projectId, filePaths));
-    void enqueue(projectId, () => processPending(projectId));
+  /**
+   * Copy explicitly picked files INTO `Knowledge Base/` (creating it if
+   * needed) and index from there — one consistent source of truth. Awaits
+   * registration (rows become visible) but not ingestion.
+   */
+  const addSources = async (projectId: string, filePaths: string[], workspace: string): Promise<void> => {
+    if (!workspace) throw new Error('workspace is required');
+    const registered = enqueue(projectId, async () => {
+      const knowledgeDir = knowledgeDirOf(workspace);
+      await fs.mkdir(knowledgeDir, { recursive: true });
+      const retryNames = new Set<string>();
+      const unreadable: string[] = [];
+      for (const filePath of filePaths) {
+        const fileName = path.basename(filePath);
+        retryNames.add(fileName);
+        const destination = path.join(knowledgeDir, fileName);
+        // A file picked from inside the folder itself needs no copy.
+        if (path.resolve(filePath) === path.resolve(destination)) continue;
+        try {
+          await fs.copyFile(filePath, destination);
+        } catch {
+          unreadable.push(fileName);
+        }
+      }
+      await registerFromFolder(projectId, workspace, retryNames, unreadable);
+    });
+    void enqueue(projectId, () => processPending(projectId, workspace));
+    await registered;
+  };
+
+  const syncFolder = async (projectId: string, workspace: string): Promise<void> => {
+    if (!workspace) throw new Error('workspace is required');
+    const registered = enqueue(projectId, () => registerFromFolder(projectId, workspace));
+    void enqueue(projectId, () => processPending(projectId, workspace));
     await registered;
   };
 
@@ -466,8 +597,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
    * stuck in `indexing` after a crash mid-ingest, since there is no other
    * recovery path for that case.
    */
-  const retrySource = async (projectId: string, sourceId: string): Promise<void> =>
+  const retrySource = async (projectId: string, sourceId: string, workspace: string): Promise<void> =>
     enqueue(projectId, async () => {
+      if (!workspace) throw new Error('workspace is required');
       const manifest = await loadManifest(projectId);
       const source = manifest.sources.find((s) => s.id === sourceId);
       if (!source) return;
@@ -476,7 +608,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         source.error = null;
         await saveManifest(projectId, manifest);
       }
-      await processPending(projectId);
+      await processPending(projectId, workspace);
     });
 
   const removeStore = async (projectId: string): Promise<void> =>
@@ -514,5 +646,5 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
 
   const whenIdle = (projectId: string): Promise<void> => queues.get(projectId) ?? Promise.resolve();
 
-  return { listSources, addSources, removeSource, retrySource, removeStore, getSessionMcpServer, whenIdle };
+  return { listSources, addSources, removeSource, retrySource, syncFolder, removeStore, getSessionMcpServer, whenIdle };
 };
