@@ -160,11 +160,21 @@ describe('createSearchHandler', () => {
 });
 
 describe('buildToolDescription', () => {
-  it('steers away from file tools and states the docs are not on disk', () => {
+  it('steers the model to search before reaching for file tools', () => {
     const d = buildToolDescription([]);
     expect(d).toMatch(/USE THIS FIRST/);
-    expect(d).toMatch(/do NOT live in the working directory/);
-    expect(d).toMatch(/glob, grep/);
+    expect(d).toMatch(/before file listing, glob, or grep/);
+  });
+
+  // The documents now live in the workspace, so the old "they are not on
+  // disk" claim would actively mislead: whole-document questions are answered
+  // by reading the file, which the model only does if told the path.
+  it('tells the model whole documents are readable at Knowledge Base/<fileName>', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain('Knowledge Base/');
+    expect(d).toMatch(/file tools/);
+    expect(d).not.toMatch(/do NOT live in the working directory/);
+    expect(d).not.toMatch(/cannot be found with file listing/);
   });
 
   it('names the attached documents so the tool is discoverable by topic', () => {

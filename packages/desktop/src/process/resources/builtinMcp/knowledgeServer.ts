@@ -11,6 +11,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
@@ -38,9 +39,9 @@ export function parseKnowledgeServerEnv(env: Record<string, string | undefined>)
 
 const TOOL_DESCRIPTION_BASE = `Search the documents the user attached to this project.
 
-USE THIS FIRST — before any file search — when the user asks about specs, reports, policies, requirements, decisions, or any other project document.
+USE THIS FIRST — before file listing, glob, or grep — when the user asks about specs, reports, policies, requirements, decisions, or any other project document. It searches every attached document at once and returns the passages that actually match, which plain file search cannot do.
 
-These documents do NOT live in the working directory. They cannot be found with file listing, glob, grep, or read tools; this tool is the only way to reach them. "I couldn't find any files about X in the working directory" is the wrong answer when this tool has not been tried.
+For whole-document work (summarise this contract, list every invoice number, walk through the policy), search first to find the right document, then read the file itself: every attached document is an ordinary file at "${KNOWLEDGE_FOLDER_NAME}/<fileName>" inside the working directory, readable with your normal file tools.
 
 Input:
 - query: natural-language question or keywords.
