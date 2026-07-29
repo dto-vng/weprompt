@@ -582,7 +582,12 @@
     }
   },
   "status": {
-    "waitingApproval": "승인을 기다리는 중"
+    "waitingApproval": "승인을 기다리는 중",
+    "running": "작업 중",
+    "done": "완료",
+    "doneIdle": "완료 — 유휴",
+    "stopped": "중지됨",
+    "failed": "실패"
   },
   "runtimePreparing": {
     "sendboxHint": "실행 환경을 준비하는 중입니다. 첫 시작은 조금 더 오래 걸릴 수 있습니다."

@@ -594,7 +594,12 @@
     }
   },
   "status": {
-    "waitingApproval": "Aguardando sua aprovação"
+    "waitingApproval": "Aguardando sua aprovação",
+    "running": "Trabalhando",
+    "done": "Concluído",
+    "doneIdle": "Concluído — inativo",
+    "stopped": "Interrompido",
+    "failed": "Falhou"
   },
   "runtimePreparing": {
     "sendboxHint": "Preparando o ambiente de execução. A primeira inicialização pode demorar um pouco mais."

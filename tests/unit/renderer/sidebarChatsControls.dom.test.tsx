@@ -14,6 +14,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const onBatchModeChangeMock = vi.fn();
 const onNewChatMock = vi.fn();
 const capturedDisplayTimes = vi.hoisted(() => [] as Array<string | undefined>);
+const completion = { completedAt: 100, seenAt: 120 };
+const recentStoppedAt = 140;
 
 const conversation = {
   id: 'conv-1',
@@ -84,12 +86,24 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/ConversationRow', () => ({
   default: ({
     conversation: rowConversation,
     displayTime,
+    completion: rowCompletion,
+    recentStoppedAt: rowRecentStoppedAt,
   }: {
     conversation: TChatConversation;
     displayTime?: string;
+    completion?: { completedAt: number; seenAt?: number };
+    recentStoppedAt?: number;
   }) => {
     capturedDisplayTimes.push(displayTime);
-    return <div>{rowConversation.name}</div>;
+    return (
+      <div
+        data-testid={`conversation-row-${rowConversation.id}`}
+        data-completion={JSON.stringify(rowCompletion)}
+        data-stopped-at={rowRecentStoppedAt}
+      >
+        {rowConversation.name}
+      </div>
+    );
   },
 }));
 
@@ -107,7 +121,9 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversations', (
   useConversations: () => ({
     conversations: [conversation],
     isConversationGenerating: () => false,
-    getRecentCompletionAt: () => undefined,
+    getCompletion: () => completion,
+    getRecentFailureAt: () => undefined,
+    getRecentStoppedAt: () => recentStoppedAt,
     expandedWorkspaces: [],
     pinnedConversations: [],
     timelineSections: [
@@ -245,5 +261,10 @@ describe('sidebar Chats controls', () => {
     expect(screen.getByText('Quarterly planning')).toBeInTheDocument();
     expect(screen.getByText('Remote access notes')).toBeInTheDocument();
     expect(capturedDisplayTimes).not.toContainEqual(expect.any(String));
+    expect(screen.getByTestId('conversation-row-conv-1')).toHaveAttribute(
+      'data-completion',
+      JSON.stringify(completion)
+    );
+    expect(screen.getByTestId('conversation-row-conv-1')).toHaveAttribute('data-stopped-at', String(recentStoppedAt));
   });
 });

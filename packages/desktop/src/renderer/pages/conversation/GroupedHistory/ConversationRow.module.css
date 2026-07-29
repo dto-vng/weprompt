@@ -1,0 +1,27 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+.statusPulse {
+  animation: conversation-status-pulse 1.5s ease-in-out 3;
+}
+
+@keyframes conversation-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusPulse {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -590,7 +590,12 @@
     }
   },
   "status": {
-    "waitingApproval": "Onayınızı bekliyor"
+    "waitingApproval": "Onayınızı bekliyor",
+    "running": "Çalışıyor",
+    "done": "Tamamlandı",
+    "doneIdle": "Tamamlandı — boşta",
+    "stopped": "Durduruldu",
+    "failed": "Başarısız"
   },
   "runtimePreparing": {
     "sendboxHint": "Çalışma ortamı hazırlanıyor. İlk başlatma biraz daha uzun sürebilir."

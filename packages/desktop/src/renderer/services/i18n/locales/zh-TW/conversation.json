@@ -582,7 +582,12 @@
     }
   },
   "status": {
-    "waitingApproval": "等待你的核准"
+    "waitingApproval": "等待你的核准",
+    "running": "處理中",
+    "done": "已完成",
+    "doneIdle": "已完成 — 閒置",
+    "stopped": "已停止",
+    "failed": "失敗"
   },
   "runtimePreparing": {
     "sendboxHint": "正在準備執行環境。首次啟動可能會稍慢一些。"

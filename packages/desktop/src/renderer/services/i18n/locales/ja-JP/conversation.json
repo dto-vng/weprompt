@@ -588,7 +588,12 @@
     }
   },
   "status": {
-    "waitingApproval": "承認待ちです"
+    "waitingApproval": "承認待ちです",
+    "running": "実行中",
+    "done": "完了",
+    "doneIdle": "完了 — アイドル",
+    "stopped": "停止",
+    "failed": "失敗"
   },
   "runtimePreparing": {
     "sendboxHint": "実行環境を準備しています。初回起動は少し時間がかかる場合があります。"

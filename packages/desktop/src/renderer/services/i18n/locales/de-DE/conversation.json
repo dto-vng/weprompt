@@ -589,7 +589,12 @@
     }
   },
   "status": {
-    "waitingApproval": "Wartet auf deine Freigabe"
+    "waitingApproval": "Wartet auf deine Freigabe",
+    "running": "In Bearbeitung",
+    "done": "Abgeschlossen",
+    "doneIdle": "Abgeschlossen — inaktiv",
+    "stopped": "Gestoppt",
+    "failed": "Fehlgeschlagen"
   },
   "runtimePreparing": {
     "sendboxHint": "Laufzeit-Umgebung wird vorbereitet. Der erste Start kann etwas länger dauern."
