@@ -596,6 +596,15 @@
     "stopped": "Gestoppt",
     "failed": "Fehlgeschlagen"
   },
+  "statusTooltip": {
+    "waitingApproval": "Wartet auf deine Freigabe, um fortzufahren.",
+    "running": "Dieser Chat wird bearbeitet.",
+    "doneUnseen": "Abgeschlossen, aber noch nicht von dir angesehen.",
+    "doneSeen": "Kürzlich abgeschlossen und bereits angesehen.",
+    "doneIdle": "Vor mindestens einer Minute abgeschlossen und bereits angesehen.",
+    "stopped": "Vor dem Abschluss gestoppt.",
+    "failed": "Aufgrund eines Fehlers konnte der Vorgang nicht abgeschlossen werden."
+  },
   "runtimePreparing": {
     "sendboxHint": "Laufzeit-Umgebung wird vorbereitet. Der erste Start kann etwas länger dauern."
   },

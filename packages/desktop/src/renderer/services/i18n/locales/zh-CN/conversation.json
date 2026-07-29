@@ -589,6 +589,15 @@
     "stopped": "已停止",
     "failed": "失败"
   },
+  "statusTooltip": {
+    "waitingApproval": "正在等待你的批准以继续。",
+    "running": "正在处理此聊天。",
+    "doneUnseen": "已完成，但你还未查看。",
+    "doneSeen": "最近已完成并已查看。",
+    "doneIdle": "至少一分钟前已完成并已查看。",
+    "stopped": "在完成前已停止。",
+    "failed": "由于发生错误，未能完成。"
+  },
   "runtimePreparing": {
     "sendboxHint": "正在准备运行环境。首次启动可能会稍慢一些。"
   },

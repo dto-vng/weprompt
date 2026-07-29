@@ -18,6 +18,15 @@ export type TConversationCompletionRecord = {
 
 export type TConversationStatusMark = 'idle' | 'running' | 'needs_you' | 'done' | 'done_idle' | 'stopped' | 'failed';
 
+export type TConversationStatusTooltipKey =
+  | 'conversation.statusTooltip.waitingApproval'
+  | 'conversation.statusTooltip.running'
+  | 'conversation.statusTooltip.doneUnseen'
+  | 'conversation.statusTooltip.doneSeen'
+  | 'conversation.statusTooltip.doneIdle'
+  | 'conversation.statusTooltip.stopped'
+  | 'conversation.statusTooltip.failed';
+
 export type TConversationTerminalMark = 'failed' | 'completed' | 'stopped';
 
 export type TConversationStatusInput = {
@@ -85,4 +94,25 @@ export const resolveConversationStatusMark = ({
     return 'done_idle';
   }
   return 'idle';
+};
+
+export const resolveConversationStatusTooltipKey = (
+  statusMark: TConversationStatusMark,
+  completion?: TConversationCompletionRecord
+): TConversationStatusTooltipKey | null => {
+  if (statusMark === 'idle') {
+    return null;
+  }
+  if (statusMark === 'done') {
+    return completion?.seenAt === undefined
+      ? 'conversation.statusTooltip.doneUnseen'
+      : 'conversation.statusTooltip.doneSeen';
+  }
+  if (statusMark === 'done_idle') {
+    return 'conversation.statusTooltip.doneIdle';
+  }
+  if (statusMark === 'needs_you') {
+    return 'conversation.statusTooltip.waitingApproval';
+  }
+  return `conversation.statusTooltip.${statusMark}`;
 };

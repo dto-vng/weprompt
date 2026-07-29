@@ -109,6 +109,8 @@ describe('ConversationRow status', () => {
     render(<ConversationRow {...buildProps()} />);
 
     expect(screen.queryByAltText('Agent')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('conversation-status-idle-conversation-1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('keeps an unseen completion green after sixty seconds', () => {
@@ -135,7 +137,7 @@ describe('ConversationRow status', () => {
 
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByTestId('conversation-status-done_idle-conversation-1')).toHaveAccessibleName(
-      `${conversation.name} conversation.status.doneIdle`
+      `${conversation.name} conversation.statusTooltip.doneIdle`
     );
   });
 
@@ -181,14 +183,14 @@ describe('ConversationRow status', () => {
     expect(screen.getByTestId('conversation-status-done_idle-conversation-1')).toBeInTheDocument();
   });
 
-  it('schedules no expiry timer for an unseen completion', () => {
+  it('keeps an unseen completion green after status-tooltip timers run', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-14T00:00:00Z'));
 
     render(<ConversationRow {...buildProps({ completion: { completedAt: Date.now() } })} />);
 
+    act(() => vi.advanceTimersByTime(60_000));
     expect(screen.getByTestId('conversation-status-done-conversation-1')).toBeInTheDocument();
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('shows stopped for sixty seconds and then returns to neutral idle', () => {
@@ -206,7 +208,7 @@ describe('ConversationRow status', () => {
     render(<ConversationRow {...buildProps({ conversation: waitingApprovalConversation, isGenerating: true })} />);
 
     expect(screen.getByTestId('conversation-status-needs_you-conversation-1')).toHaveAccessibleName(
-      `${conversation.name} conversation.status.waitingApproval`
+      `${conversation.name} conversation.statusTooltip.waitingApproval`
     );
     expect(screen.getByText(conversation.name)).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-status-running-conversation-1')).not.toBeInTheDocument();
@@ -230,7 +232,7 @@ describe('ConversationRow status', () => {
     );
 
     expect(screen.getByTestId('conversation-status-needs_you-conversation-1')).toHaveAccessibleName(
-      `${conversation.name} conversation.status.waitingApproval`
+      `${conversation.name} conversation.statusTooltip.waitingApproval`
     );
     expect(screen.queryByTestId('conversation-status-running-conversation-1')).not.toBeInTheDocument();
   });
@@ -253,7 +255,8 @@ describe('ConversationRow status', () => {
       return content;
     });
     expect(tooltipContent).toHaveTextContent(conversation.name);
-    expect(tooltipContent).toHaveTextContent('conversation.status.waitingApproval');
+    expect(tooltipContent).toHaveTextContent('conversation.statusTooltip.waitingApproval');
+    expect(document.querySelectorAll('[role="tooltip"]')).toHaveLength(1);
   });
 
   it('shows approval when pending confirmations are reported without the waiting state', () => {
@@ -275,7 +278,7 @@ describe('ConversationRow status', () => {
     render(<ConversationRow {...buildProps({ recentFailureAt: Date.now() })} />);
 
     expect(screen.getByTestId('conversation-status-failed-conversation-1')).toHaveAccessibleName(
-      `${conversation.name} conversation.status.failed`
+      `${conversation.name} conversation.statusTooltip.failed`
     );
     expect(screen.getByText(conversation.name)).toBeInTheDocument();
   });
@@ -286,6 +289,58 @@ describe('ConversationRow status', () => {
     expect(screen.getByTestId('conversation-status-failed-conversation-1')).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-status-running-conversation-1')).not.toBeInTheDocument();
   });
+
+  it.each([
+    [
+      'an unseen green completion',
+      { completion: { completedAt: Date.now() } },
+      'done',
+      'conversation.statusTooltip.doneUnseen',
+    ],
+    [
+      'a recently viewed green completion',
+      { completion: { completedAt: Date.now(), seenAt: Date.now() } },
+      'done',
+      'conversation.statusTooltip.doneSeen',
+    ],
+    [
+      'a viewed grey completion',
+      { completion: { completedAt: 1, seenAt: 2 } },
+      'done_idle',
+      'conversation.statusTooltip.doneIdle',
+    ],
+  ] satisfies Array<[string, Partial<ConversationRowProps>, string, string]>)(
+    'explains %s from the status icon',
+    async (_caseName, statusProps, status, tooltipKey) => {
+      render(<ConversationRow {...buildProps(statusProps)} />);
+
+      expect(screen.getByTestId(`conversation-status-${status}-conversation-1`)).toHaveAccessibleName(
+        `${conversation.name} ${tooltipKey}`
+      );
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(tooltipKey);
+    }
+  );
+
+  it.each([
+    [
+      'needs_you',
+      { conversation: waitingApprovalConversation, isGenerating: true },
+      'conversation.statusTooltip.waitingApproval',
+    ],
+    ['running', { isGenerating: true }, 'conversation.statusTooltip.running'],
+    ['stopped', { recentStoppedAt: Date.now() }, 'conversation.statusTooltip.stopped'],
+    ['failed', { recentFailureAt: Date.now() }, 'conversation.statusTooltip.failed'],
+  ] satisfies Array<[string, Partial<ConversationRowProps>, string]>)(
+    'shows the explanatory tooltip for %s',
+    async (status, statusProps, tooltipKey) => {
+      render(<ConversationRow {...buildProps(statusProps)} />);
+
+      expect(screen.getByTestId(`conversation-status-${status}-conversation-1`)).toHaveAccessibleName(
+        `${conversation.name} ${tooltipKey}`
+      );
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(tooltipKey);
+    }
+  );
 
   it.each([
     ['needs_you', { conversation: waitingApprovalConversation }],

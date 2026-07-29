@@ -595,6 +595,15 @@
     "stopped": "停止",
     "failed": "失敗"
   },
+  "statusTooltip": {
+    "waitingApproval": "続行するための承認を待っています。",
+    "running": "このチャットを処理しています。",
+    "doneUnseen": "完了しましたが、まだ確認していません。",
+    "doneSeen": "最近完了し、確認済みです。",
+    "doneIdle": "1分以上前に完了し、確認済みです。",
+    "stopped": "完了する前に停止しました。",
+    "failed": "エラーのため完了できませんでした。"
+  },
   "runtimePreparing": {
     "sendboxHint": "実行環境を準備しています。初回起動は少し時間がかかる場合があります。"
   },

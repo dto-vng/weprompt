@@ -10,6 +10,7 @@ import {
   COMPLETION_MARK_DURATION_MS,
   STOPPED_MARK_DURATION_MS,
   isConversationAwaitingApproval,
+  resolveConversationStatusTooltipKey,
   resolveConversationStatusMark,
   resolveConversationTerminalMark,
 } from './conversationStatus';
@@ -166,5 +167,30 @@ describe('resolveConversationStatusMark', () => {
 
   it('treats a missing runtime as idle', () => {
     expect(resolveConversationStatusMark(input({ runtime: undefined }))).toBe('idle');
+  });
+});
+
+describe('resolveConversationStatusTooltipKey', () => {
+  it.each([
+    ['needs_you', 'conversation.statusTooltip.waitingApproval'],
+    ['running', 'conversation.statusTooltip.running'],
+    ['stopped', 'conversation.statusTooltip.stopped'],
+    ['failed', 'conversation.statusTooltip.failed'],
+    ['done_idle', 'conversation.statusTooltip.doneIdle'],
+  ] as const)('maps %s to %s', (status, expected) => {
+    expect(resolveConversationStatusTooltipKey(status)).toBe(expected);
+  });
+
+  it('distinguishes unseen and recently viewed green completions', () => {
+    expect(resolveConversationStatusTooltipKey('done', { completedAt: NOW })).toBe(
+      'conversation.statusTooltip.doneUnseen'
+    );
+    expect(resolveConversationStatusTooltipKey('done', { completedAt: NOW, seenAt: NOW })).toBe(
+      'conversation.statusTooltip.doneSeen'
+    );
+  });
+
+  it('returns null for neutral idle', () => {
+    expect(resolveConversationStatusTooltipKey('idle')).toBeNull();
   });
 });

@@ -36,18 +36,9 @@ import {
   COMPLETION_MARK_DURATION_MS,
   STOPPED_MARK_DURATION_MS,
   resolveConversationStatusMark,
-  type TConversationStatusMark,
+  resolveConversationStatusTooltipKey,
 } from './utils/conversationStatus';
 import { isConversationPinned } from './utils/groupingHelpers';
-
-const STATUS_LABEL_KEY = {
-  needs_you: 'conversation.status.waitingApproval',
-  running: 'conversation.status.running',
-  done: 'conversation.status.done',
-  done_idle: 'conversation.status.doneIdle',
-  stopped: 'conversation.status.stopped',
-  failed: 'conversation.status.failed',
-} as const satisfies Record<Exclude<TConversationStatusMark, 'idle'>, string>;
 
 const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   const {
@@ -82,7 +73,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   const { info: assistantInfo } = usePresetAssistantInfo(conversation);
   const isPinned = isConversationPinned(conversation);
   const cronStatus = getJobStatus(conversation.id);
-  const siderTooltipProps = getSiderTooltipProps(tooltipEnabled);
+  const rowTooltipProps = getSiderTooltipProps(tooltipEnabled);
   const inlineNameTooltipEnabled = !collapsed && !isMobile && !!conversation.name;
   const pinnedHoverFade = isPinned ? 'group-hover:opacity-0 transition-opacity' : '';
   const conversationName = conversation.name || t('conversation.welcome.newConversation');
@@ -119,11 +110,13 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   });
   const cronOverridesStatus = cronStatus !== 'none' && (statusMark === 'done_idle' || statusMark === 'idle');
   const displayedStatusMark = batchMode || cronOverridesStatus ? 'idle' : statusMark;
-  const statusLabel = displayedStatusMark === 'idle' ? null : t(STATUS_LABEL_KEY[displayedStatusMark]);
-  const rowTooltipContent = statusLabel ? (
+  const statusTooltipKey = resolveConversationStatusTooltipKey(displayedStatusMark, completion);
+  const statusDescription = statusTooltipKey ? t(statusTooltipKey) : null;
+  const statusIconTooltipProps = getSiderTooltipProps(!tooltipEnabled && statusDescription !== null);
+  const rowTooltipContent = statusDescription ? (
     <div className='flex flex-col gap-2px'>
       <span className='font-500'>{conversationName}</span>
-      <span className='text-12px opacity-80'>{statusLabel}</span>
+      <span className='text-12px opacity-80'>{statusDescription}</span>
     </div>
   ) : (
     conversationName
@@ -186,7 +179,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
     }
 
     const commonProps = {
-      'aria-label': `${conversationName} ${statusLabel ?? ''}`.trim(),
+      'aria-label': `${conversationName} ${statusDescription ?? ''}`.trim(),
       'data-testid': `conversation-status-${displayedStatusMark}-${conversation.id}`,
       className: classNames(
         'conversation-status-mark flex-center',
@@ -247,6 +240,18 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
     );
   };
 
+  const renderConversationStatusWithTooltip = () => {
+    const statusNode = renderConversationStatus();
+    if (!statusDescription || tooltipEnabled) {
+      return statusNode;
+    }
+    return (
+      <Tooltip {...statusIconTooltipProps} content={statusDescription} position='top'>
+        {statusNode}
+      </Tooltip>
+    );
+  };
+
   const handleRowClick = () => {
     cleanupSiderTooltips();
     if (batchMode) {
@@ -267,7 +272,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   };
 
   return (
-    <Tooltip key={conversation.id} {...siderTooltipProps} content={rowTooltipContent} position='right'>
+    <Tooltip key={conversation.id} {...rowTooltipProps} content={rowTooltipContent} position='right'>
       <div
         id={'c-' + conversation.id}
         className={classNames(
@@ -296,7 +301,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
           </span>
         )}
         <span className='size-22px flex items-center justify-center shrink-0 relative'>
-          {renderConversationStatus()}
+          {renderConversationStatusWithTooltip()}
           {/* Pinned indicator: only visible when row is hovered, overlays leading icon */}
           {!batchMode &&
             isPinned &&
