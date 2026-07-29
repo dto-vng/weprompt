@@ -29,7 +29,13 @@
   "projectHeader": {
     "label": "项目 {{name}}",
     "eyebrow": "项目",
-    "tabs": { "label": "项目视图", "chat": "聊天", "files": "文件", "context": "上下文", "artifacts": "成果" }
+    "tabs": {
+      "label": "项目视图",
+      "chat": "聊天",
+      "files": "文件",
+      "context": "上下文",
+      "artifacts": "成果"
+    }
   },
   "projectHome": {
     "newChat": "新聊天",
@@ -66,20 +72,26 @@
     "knowledge": "知识库",
     "knowledgeAdd": "添加文件",
     "knowledgeEmpty": "添加文件以构建此项目的知识库。助手会在该项目的每个聊天中自动检索这些内容。",
-    "knowledgeSummary": "{{files}} 个文件 · {{passages}} 个片段",
-    "knowledgeSemanticOn": "语义搜索已开启",
     "knowledgeSemanticOff": "语义搜索已关闭 — 未配置嵌入模型",
-    "knowledgePassages": "{{count}} 个片段",
     "knowledgeStatusIndexing": "正在索引……",
     "knowledgeProgressReading": "正在读取第 {{done}}/{{total}} 页",
-    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}} 个片段",
+    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "失败",
     "knowledgeStatusUnsupported": "不支持",
     "knowledgeRetry": "重试",
-    "knowledgeRemove": "移除",
-    "knowledgeRemoveConfirm": "要将此文件从知识库中移除吗？",
     "knowledgeError": "知识库当前不可用。",
-    "knowledgeSupportedTypes": "支持的格式：.md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "支持的格式：.md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "刷新",
+    "knowledgeOpenOriginal": "打开原文件",
+    "knowledgeDeleteFile": "删除文件",
+    "knowledgeDeleteConfirm": "将“{{fileName}}”移到废纸篓？同时会从知识库中移除。",
+    "knowledgeFolderHint": "文件存放在项目文件夹内的“Knowledge Base”文件夹中。放进去的内容会自动被索引。",
+    "knowledgeFolderMissingTitle": "未找到 Knowledge Base 文件夹",
+    "knowledgeFolderMissingBody": "它可能已被移动、重命名或删除。已索引的知识仍然保留——恢复该文件夹或重新关联项目，然后刷新。",
+    "knowledgePreviewNote": "这是助手检索所用的索引文本，不是原始排版。",
+    "knowledgePreviewTruncated": "预览已截断。查看完整文档请打开原文件。",
+    "knowledgePreviewError": "无法加载该文件的索引文本。",
+    "knowledgeStatusNote": "提示"
   },
   "history": {
     "recents": "最近",
