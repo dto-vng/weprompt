@@ -243,6 +243,8 @@ export const nativeBridgePayloadSchemas = {
     .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
     .strict(),
   'project-knowledge.sync-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.watch-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.unwatch-folder': projectKnowledgeProjectIdSchema,
   'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
   'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),

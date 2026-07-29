@@ -43,6 +43,8 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'project-knowledge.remove-source',
   'project-knowledge.retry-source',
   'project-knowledge.sync-folder',
+  'project-knowledge.watch-folder',
+  'project-knowledge.unwatch-folder',
   'project-knowledge.get-source-text',
   'project-knowledge.remove-store',
   'project-knowledge.get-session-mcp-server',

@@ -987,6 +987,10 @@ export const projectKnowledge = {
     'project-knowledge.retry-source'
   ),
   syncFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.sync-folder'),
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — the renderer registers folder watches.
+  watchFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.watch-folder'),
+  unwatchFolder: bridge.buildProvider<void, { projectId: string }>('project-knowledge.unwatch-folder'),
   removeStore: bridge.buildProvider<void, { projectId: string }>('project-knowledge.remove-store'),
   getSessionMcpServer: bridge.buildProvider<ISessionMcpServer | null, { projectId: string }>(
     'project-knowledge.get-session-mcp-server'
