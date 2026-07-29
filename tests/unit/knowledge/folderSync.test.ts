@@ -10,14 +10,15 @@
 // state, NEVER a deletion signal. If you change the guard, the first tests
 // here must fail.
 
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
-import { readChunks, writeManifest } from '@/common/knowledge/store';
-import type { KnowledgeManifest } from '@/common/knowledge/types';
+import { readChunks, writeChunks, writeManifest } from '@/common/knowledge/store';
+import type { KnowledgeManifest, KnowledgeManifestSource } from '@/common/knowledge/types';
 import type { IProvider } from '@/common/config/storage';
 import {
   createProjectKnowledgeService,
@@ -336,6 +337,113 @@ describe('projectKnowledgeService.syncFolder', () => {
     await service.whenIdle('p1');
     const { sources } = await service.listSources('p1');
     expect(sources[0]).toMatchObject({ fileName: 'inplace.md', status: 'ready' });
+  });
+
+  // ------------------------------------------------------------------
+  // Migration: legacy store snapshots move into the folder exactly once
+  // ------------------------------------------------------------------
+
+  /** Seed a pre-folder store: manifest row + original snapshot + converted.md + one chunk. */
+  const seedLegacyStore = async (projectId: string, fileName: string, content: string): Promise<string> => {
+    const storeDir = path.join(root, projectId);
+    const contentHash = `sha256:${createHash('sha256').update(content).digest('hex')}`;
+    const id = contentHash.slice(7, 19);
+    const sourceDir = path.join(storeDir, 'sources', id);
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(path.join(sourceDir, `original${path.extname(fileName)}`), content, 'utf8');
+    await writeFile(path.join(sourceDir, 'converted.md'), content, 'utf8');
+    const existing = await readChunks(storeDir);
+    await writeChunks(storeDir, [
+      ...existing,
+      { chunkId: `${id}#0`, sourceId: id, chunkIndex: 0, text: content, hasVector: true },
+    ]);
+    const row: KnowledgeManifestSource = {
+      id,
+      fileName,
+      contentHash,
+      byteSize: Buffer.byteLength(content),
+      status: 'ready',
+      chunkCount: 1,
+      vectorCount: 1,
+      addedAt: 1,
+      error: null,
+    };
+    const manifest: KnowledgeManifest = { schemaVersion: 1, projectId, embedding: null, sources: [row] };
+    await writeManifest(storeDir, manifest);
+    return id;
+  };
+
+  it('exports a legacy snapshot into the folder, verifies it, then drops the snapshot', async () => {
+    const id = await seedLegacyStore('pm', 'legacy.md', 'legacy alpha body');
+    await service.syncFolder('pm', workspace);
+    await service.whenIdle('pm');
+
+    expect(await readFile(path.join(kb, 'legacy.md'), 'utf8')).toBe('legacy alpha body');
+    const sourceFiles = await readdir(path.join(root, 'pm', 'sources', id));
+    expect(sourceFiles).toEqual(['converted.md']);
+    const { sources } = await service.listSources('pm');
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatchObject({ id, fileName: 'legacy.md', status: 'ready', addedAt: 1 });
+    const chunks = await readChunks(path.join(root, 'pm'));
+    expect(chunks).toHaveLength(1); // straight export — no re-ingest churn
+  });
+
+  it('drops the snapshot without writing when the folder already has the same content', async () => {
+    const id = await seedLegacyStore('pm', 'legacy.md', 'identical body');
+    await writeKb('legacy.md', 'identical body');
+    await service.syncFolder('pm', workspace);
+    await service.whenIdle('pm');
+
+    expect(await readdir(path.join(root, 'pm', 'sources', id))).toEqual(['converted.md']);
+    expect((await service.listSources('pm')).sources[0]).toMatchObject({ id, status: 'ready' });
+  });
+
+  it('exports under a suffixed name when the folder has different content for that name, and indexes both', async () => {
+    await seedLegacyStore('pm', 'policy.md', 'the legacy store version');
+    await writeKb('policy.md', 'the newer folder version');
+    await service.syncFolder('pm', workspace);
+    await service.whenIdle('pm');
+
+    expect(await readFile(path.join(kb, 'policy.md'), 'utf8')).toBe('the newer folder version');
+    expect(await readFile(path.join(kb, 'policy (from knowledge base).md'), 'utf8')).toBe('the legacy store version');
+    const { sources } = await service.listSources('pm');
+    expect(sources.map((s) => s.fileName).toSorted()).toEqual(['policy (from knowledge base).md', 'policy.md']);
+    expect(sources.every((s) => s.status === 'ready')).toBe(true);
+    const chunkTexts = (await readChunks(path.join(root, 'pm'))).map((c) => c.text).join('\n');
+    expect(chunkTexts).toContain('the newer folder version');
+    expect(chunkTexts).toContain('the legacy store version');
+  });
+
+  it('does not migrate (and keeps the snapshot) when the workspace itself is gone', async () => {
+    const id = await seedLegacyStore('pm', 'legacy.md', 'body');
+    rmSync(workspace, { recursive: true, force: true });
+    await service.syncFolder('pm', workspace);
+    await service.whenIdle('pm');
+
+    const result = await service.listSources('pm');
+    expect(result.folderMissing).toBe(true);
+    expect(result.sources).toHaveLength(1);
+    expect((await readdir(path.join(root, 'pm', 'sources', id))).toSorted()).toEqual(['converted.md', 'original.md']);
+  });
+
+  it('keeps the row and the snapshot when the export fails, and settles on a later sync', async () => {
+    const id = await seedLegacyStore('pm', 'legacy.md', 'precious body');
+    await chmod(kb, 0o555); // folder readable but not writable — export must fail
+    try {
+      await service.syncFolder('pm', workspace);
+      await service.whenIdle('pm');
+      const during = await service.listSources('pm');
+      expect(during.sources.map((s) => s.id)).toEqual([id]); // row protected from the diff
+      expect((await readdir(path.join(root, 'pm', 'sources', id))).toSorted()).toEqual(['converted.md', 'original.md']);
+    } finally {
+      await chmod(kb, 0o755);
+    }
+
+    await service.syncFolder('pm', workspace);
+    await service.whenIdle('pm');
+    expect(await readFile(path.join(kb, 'legacy.md'), 'utf8')).toBe('precious body');
+    expect(await readdir(path.join(root, 'pm', 'sources', id))).toEqual(['converted.md']);
+    expect((await service.listSources('pm')).sources.map((s) => s.id)).toEqual([id]);
   });
 
   it('re-adding a previously failed file retries it, reusing the row', async () => {

@@ -237,6 +237,90 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   };
 
   /**
+   * One-time, per project: export legacy private-store snapshots
+   * (`sources/<id>/original.<ext>`, written before the folder existed) into
+   * the visible folder, then delete the snapshot — but only after re-reading
+   * the exported file and confirming its hash. A failed export keeps the
+   * snapshot so the next sync can retry; nothing is ever deleted on a guess.
+   *
+   * Straight exports keep the manifest hash, so the diff that follows sees no
+   * change and there is no re-index churn. Returns the names it exported so
+   * the diff can protect rows whose export failed.
+   */
+  const migrateStoreSnapshots = async (
+    projectId: string,
+    manifest: KnowledgeManifest,
+    workspace: string
+  ): Promise<Set<string>> => {
+    const storeDir = storeDirOf(projectId);
+    const pendingExports: Array<{ source: KnowledgeManifestSource; snapshotPath: string; extension: string }> = [];
+    for (const source of manifest.sources) {
+      if (!source.contentHash.startsWith('sha256:')) continue;
+      const extension = path.extname(source.fileName).slice(1).toLowerCase();
+      const snapshotPath = path.join(storePaths(storeDir).sourceDir(source.id), `original.${extension}`);
+      const exists = await fs.access(snapshotPath).then(
+        (): boolean => true,
+        (): boolean => false
+      );
+      if (exists) pendingExports.push({ source, snapshotPath, extension });
+    }
+    const unexported = new Set<string>();
+    if (pendingExports.length === 0) return unexported;
+    const workspaceExists = await fs.stat(workspace).then(
+      (stat): boolean => stat.isDirectory(),
+      (): boolean => false
+    );
+    // No workspace means no place to migrate to; the scan below reports
+    // folderMissing and the snapshots stay exactly where they are.
+    if (!workspaceExists) return new Set(pendingExports.map((p) => p.source.fileName));
+    const knowledgeDir = knowledgeDirOf(workspace);
+    try {
+      await fs.mkdir(knowledgeDir, { recursive: true });
+    } catch {
+      return new Set(pendingExports.map((p) => p.source.fileName));
+    }
+    for (const { source, snapshotPath, extension } of pendingExports) {
+      try {
+        const buffer = await fs.readFile(snapshotPath);
+        const hash = `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
+        const targetPath = path.join(knowledgeDir, path.basename(source.fileName));
+        const existingHash = await fs.readFile(targetPath).then(
+          (existing): string | null => `sha256:${createHash('sha256').update(existing).digest('hex')}`,
+          (): string | null => null
+        );
+        if (existingHash === hash) {
+          await fs.rm(snapshotPath, { force: true });
+          continue;
+        }
+        // Name taken by different content: export alongside under a suffixed
+        // name rather than overwrite. Both end up indexed — losing either
+        // silently would be worse than a duplicate the user can delete.
+        const exportPath =
+          existingHash === null
+            ? targetPath
+            : path.join(
+                knowledgeDir,
+                `${path.basename(source.fileName, path.extname(source.fileName))} (from knowledge base).${extension}`
+              );
+        await fs.writeFile(exportPath, buffer);
+        const verify = await fs.readFile(exportPath);
+        if (`sha256:${createHash('sha256').update(verify).digest('hex')}` !== hash) {
+          unexported.add(source.fileName);
+          continue; // keep the snapshot — the export is not trustworthy
+        }
+        await fs.rm(snapshotPath, { force: true });
+      } catch (error) {
+        unexported.add(source.fileName);
+        console.warn(
+          `[projectKnowledge] snapshot export failed for ${source.fileName}:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+    return unexported;
+  };
+
+  /**
    * Diff the visible `Knowledge Base/` folder against the manifest and
    * register the outcome: new/changed files become `indexing` rows for
    * processPending to ingest; files gone from a READABLE folder lose their
@@ -259,6 +343,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     unreadableNames?: string[]
   ): Promise<void> => {
     const manifest = await loadManifest(projectId);
+    // Legacy stores first: their snapshots become folder files, so the scan
+    // below sees them and the diff treats them as already-indexed.
+    const unexported = await migrateStoreSnapshots(projectId, manifest, workspace);
     const scan = await scanFolder(knowledgeDirOf(workspace));
     if (!scan.ok) {
       const missing = manifest.sources.length > 0; // a project with no sources has nothing to lose
@@ -348,8 +435,10 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       dirty = true;
     }
     // Deletions — reachable ONLY because the folder read above succeeded.
+    // A source whose snapshot could not be exported yet is not "missing from
+    // the folder", it is mid-migration: keep it and retry on the next sync.
     for (const source of [...manifest.sources]) {
-      if (seen.has(source.fileName)) continue;
+      if (seen.has(source.fileName) || unexported.has(source.fileName)) continue;
       await removeSourceRows(projectId, manifest, source.id);
       dirty = true;
     }
