@@ -90,6 +90,7 @@ import { bootstrapRendererConfig } from '@renderer/services/bootstrapRenderer';
 // Components and utilities
 import Layout from './components/layout/Layout';
 import Router from './components/layout/Router';
+import { useKnowledgeFolderWatchers } from './pages/conversation/projects/useKnowledgeFolderWatchers';
 import Sider from './components/layout/Sider';
 import { useAuth } from './hooks/context/AuthContext';
 import { ConversationHistoryProvider } from './hooks/context/ConversationHistoryContext';
@@ -274,6 +275,10 @@ const Config: React.FC<PropsWithChildren> = ({ children }) => {
 const Main = () => {
   const { ready } = useAuth();
   const [configReady, setConfigReady] = useState(false);
+
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — this is what gets knowledge folders watched.
+  useKnowledgeFolderWatchers();
 
   useEffect(() => {
     if (!ready) return;

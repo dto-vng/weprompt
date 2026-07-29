@@ -12,6 +12,7 @@ import { useGuidSend, type GuidSendDeps } from '@/renderer/pages/guid/hooks/useG
 const createConversationInvokeMock = vi.fn();
 const swrMutateMock = vi.fn();
 const kbGetSessionMcpServerMock = vi.fn();
+const kbSyncFolderMock = vi.fn();
 
 vi.mock('@/common', () => ({
   ipcBridge: {
@@ -24,8 +25,15 @@ vi.mock('@/common', () => ({
       getSessionMcpServer: {
         invoke: (...args: unknown[]) => kbGetSessionMcpServerMock(...args),
       },
+      syncFolder: {
+        invoke: (...args: unknown[]) => kbSyncFolderMock(...args),
+      },
     },
   },
+}));
+
+vi.mock('@/renderer/pages/conversation/projects/projectStorage', () => ({
+  findProjectById: (id: string) => (id === 'p1' ? { id: 'p1', workspace: '/ws/p1' } : null),
 }));
 
 vi.mock('@/renderer/utils/emitter', () => ({
@@ -90,6 +98,7 @@ describe('useGuidSend', () => {
     swrMutateMock.mockReset();
     swrMutateMock.mockResolvedValue(undefined);
     kbGetSessionMcpServerMock.mockReset();
+    kbSyncFolderMock.mockReset().mockResolvedValue(undefined);
     kbGetSessionMcpServerMock.mockResolvedValue(null);
   });
 
@@ -453,6 +462,45 @@ describe('useGuidSend', () => {
         await result.current.handleSend();
       });
       expect(kbGetSessionMcpServerMock).not.toHaveBeenCalled();
+      expect(kbSyncFolderMock).not.toHaveBeenCalled();
+    });
+
+    // Creating a chat is a sync point: files dropped into the folder since the
+    // last sync get indexed for the NEXT chat. It must not be awaited — this
+    // chat still uses whatever was ready at creation.
+    it('kicks off a folder sync for a project chat without blocking creation', async () => {
+      kbGetSessionMcpServerMock.mockResolvedValue(null);
+      let releaseSync: (() => void) | null = null;
+      kbSyncFolderMock.mockReturnValue(
+        new Promise<void>((resolve) => {
+          releaseSync = resolve;
+        })
+      );
+      const deps = createDeps();
+      deps.projectId = 'p1';
+      const { result } = renderHook(() => useGuidSend(deps));
+
+      await act(async () => {
+        await result.current.handleSend();
+      });
+
+      expect(kbSyncFolderMock).toHaveBeenCalledWith({ projectId: 'p1', workspace: '/ws/p1' });
+      expect(createConversationInvokeMock).toHaveBeenCalled(); // creation did not wait on the sync
+      releaseSync?.();
+    });
+
+    it('still creates the conversation when the folder sync rejects', async () => {
+      kbGetSessionMcpServerMock.mockResolvedValue(null);
+      kbSyncFolderMock.mockRejectedValue(new Error('sync exploded'));
+      const deps = createDeps();
+      deps.projectId = 'p1';
+      const { result } = renderHook(() => useGuidSend(deps));
+
+      await act(async () => {
+        await result.current.handleSend();
+      });
+
+      expect(createConversationInvokeMock).toHaveBeenCalled();
     });
 
     it('appends the KB session server for a project chat (acp path)', async () => {
