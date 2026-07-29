@@ -278,35 +278,182 @@ describe('useConversationListSync sidebar runtime state', () => {
     latestRefresh.resolve({ items: [{ ...conversation, runtime: waitingRuntime }] });
   });
 
-  it('restarts the completion timestamp and clears it when the conversation is deleted', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+  it('records completion as unseen and marks it seen without changing completedAt', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(3_000);
     const { result } = await renderConversationListSync();
 
     act(() => {
       harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
     });
-    expect(result.current.getRecentCompletionAt(conversation.id)).toBe(1_000);
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 3_000,
+    });
 
-    now.mockReturnValue(2_000);
+    now.mockReturnValue(9_000);
+    act(() => {
+      result.current.markCompletionSeen(conversation.id);
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 3_000,
+      seenAt: 9_000,
+    });
+  });
+
+  it('records stopped and clears it when a retry starts', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(4_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'stopped'));
+    });
+    expect(result.current.getRecentStoppedAt(conversation.id)).toBe(4_000);
+    expect(result.current.getCompletion(conversation.id)).toBeUndefined();
+
+    act(() => {
+      harness.responseStreamHandler?.({
+        type: 'start',
+        data: {},
+        msg_id: 'message-retry',
+        conversation_id: conversation.id,
+      });
+    });
+    expect(result.current.getRecentStoppedAt(conversation.id)).toBeUndefined();
+  });
+
+  it('replaces a seen completion when a second successful terminal event arrives', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(5_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+      result.current.markCompletionSeen(conversation.id);
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 5_000,
+      seenAt: 5_000,
+    });
+
+    now.mockReturnValue(6_000);
     act(() => {
       harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
     });
-    expect(result.current.getRecentCompletionAt(conversation.id)).toBe(2_000);
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 6_000,
+    });
+  });
+
+  it('does not change completion visibility without an unseen completion', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(7_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      result.current.markCompletionSeen(conversation.id);
+    });
+    expect(result.current.getCompletion(conversation.id)).toBeUndefined();
+
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+      result.current.markCompletionSeen(conversation.id);
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 7_000,
+      seenAt: 7_000,
+    });
+
+    now.mockReturnValue(8_000);
+    act(() => {
+      result.current.markCompletionSeen(conversation.id);
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({
+      completedAt: 7_000,
+      seenAt: 7_000,
+    });
+  });
+
+  it('clears the other terminal records when terminal outcomes change', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+    });
+    expect(result.current.getCompletion(conversation.id)).toEqual({ completedAt: 10_000 });
+
+    now.mockReturnValue(11_000);
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'error'));
+    });
+    expect(result.current.getCompletion(conversation.id)).toBeUndefined();
+    expect(result.current.getRecentFailureAt(conversation.id)).toBe(11_000);
+
+    now.mockReturnValue(12_000);
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'stopped'));
+    });
+    expect(result.current.getRecentFailureAt(conversation.id)).toBeUndefined();
+    expect(result.current.getRecentStoppedAt(conversation.id)).toBe(12_000);
+
+    now.mockReturnValue(13_000);
+    act(() => {
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+    });
+    expect(result.current.getRecentStoppedAt(conversation.id)).toBeUndefined();
+    expect(result.current.getCompletion(conversation.id)).toEqual({ completedAt: 13_000 });
+  });
+
+  it('clears terminal records, runtime, generating state, and completed guard on deletion', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(14_000);
+    const { result } = await renderConversationListSync();
+
+    act(() => {
+      harness.responseStreamHandler?.({
+        type: 'start',
+        data: {},
+        msg_id: 'message-start',
+        conversation_id: conversation.id,
+      });
+      harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+    });
+    expect(result.current.isConversationGenerating(conversation.id)).toBe(false);
+    expect(result.current.getCompletion(conversation.id)).toEqual({ completedAt: 14_000 });
 
     act(() => {
       harness.listChangedHandler?.({ action: 'deleted', conversation_id: conversation.id });
     });
-    expect(result.current.getRecentCompletionAt(conversation.id)).toBeUndefined();
+    expect(result.current.getCompletion(conversation.id)).toBeUndefined();
+    expect(result.current.getRecentStoppedAt(conversation.id)).toBeUndefined();
+    expect(result.current.getRecentFailureAt(conversation.id)).toBeUndefined();
+    expect(result.current.isConversationGenerating(conversation.id)).toBe(false);
+
+    act(() => {
+      harness.responseStreamHandler?.({
+        type: 'content',
+        data: {},
+        msg_id: 'message-after-delete',
+        conversation_id: conversation.id,
+      });
+    });
+    expect(result.current.isConversationGenerating(conversation.id)).toBe(true);
   });
 
-  it('records recent completion for the active conversation', async () => {
-    vi.spyOn(Date, 'now').mockReturnValue(3_000);
+  it('does not restore runtime for a conversation after it is deleted', async () => {
+    harness.getUserConversations.mockReset();
+    harness.getUserConversations
+      .mockResolvedValueOnce({ items: [conversation] })
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [conversation] });
     const { result } = await renderConversationListSync();
 
     act(() => {
       harness.turnCompletedHandler?.(buildTurnCompletedEvent(idleRuntime, 'ai_waiting_input'));
+      harness.listChangedHandler?.({ action: 'deleted', conversation_id: conversation.id });
     });
+    await waitFor(() => expect(result.current.conversations).toHaveLength(0));
 
-    expect(result.current.getRecentCompletionAt(conversation.id)).toBe(3_000);
+    act(() => {
+      harness.listChangedHandler?.({ action: 'created', conversation_id: conversation.id });
+    });
+    await waitFor(() => expect(result.current.conversations[0]?.runtime).toBeUndefined());
   });
 });
