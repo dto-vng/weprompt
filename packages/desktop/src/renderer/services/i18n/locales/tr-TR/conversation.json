@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "anlamsal arama kapalı — gömme modeli yapılandırılmamış",
     "knowledgePassages": "{{count}} parça",
     "knowledgeStatusIndexing": "Dizinleniyor…",
+    "knowledgeProgressReading": "Sayfa {{done}}/{{total}} okunuyor",
+    "knowledgeProgressEmbedding": "{{done}}/{{total}} parça gömülüyor",
     "knowledgeStatusFailed": "Başarısız",
     "knowledgeStatusUnsupported": "Desteklenmiyor",
     "knowledgeRetry": "Yeniden dene",
     "knowledgeRemove": "Kaldır",
     "knowledgeRemoveConfirm": "Bu dosya bilgi bankasından kaldırılsın mı?",
     "knowledgeError": "Bilgi bankası kullanılamıyor.",
-    "knowledgeSupportedTypes": "Desteklenen: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Desteklenen: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Son",

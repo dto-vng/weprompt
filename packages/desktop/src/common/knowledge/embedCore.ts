@@ -10,7 +10,13 @@
 
 export type EmbedConfig = { baseUrl: string; apiKey: string; model: string };
 
-const BATCH_SIZE = 32;
+/**
+ * Inputs per /embeddings request. Exported so callers that need incremental
+ * durability can slice their work the same way and persist between calls —
+ * this function itself keeps nothing when a batch throws.
+ */
+export const EMBED_BATCH_SIZE = 32;
+const BATCH_SIZE = EMBED_BATCH_SIZE;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 // Bounds a single fetch to timeoutMs so a hung /embeddings call can't hang a

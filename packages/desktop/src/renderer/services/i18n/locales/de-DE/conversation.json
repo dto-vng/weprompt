@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "Semantische Suche inaktiv — kein Embedding-Modell konfiguriert",
     "knowledgePassages": "{{count}} Passagen",
     "knowledgeStatusIndexing": "Wird indiziert…",
+    "knowledgeProgressReading": "Seite {{done}}/{{total}} wird gelesen",
+    "knowledgeProgressEmbedding": "{{done}}/{{total}} Passagen werden eingebettet",
     "knowledgeStatusFailed": "Fehlgeschlagen",
     "knowledgeStatusUnsupported": "Nicht unterstützt",
     "knowledgeRetry": "Erneut versuchen",
     "knowledgeRemove": "Entfernen",
     "knowledgeRemoveConfirm": "Diese Datei aus der Wissensdatenbank entfernen?",
     "knowledgeError": "Die Wissensdatenbank ist nicht verfügbar.",
-    "knowledgeSupportedTypes": "Unterstützt: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Unterstützt: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Zuletzt",

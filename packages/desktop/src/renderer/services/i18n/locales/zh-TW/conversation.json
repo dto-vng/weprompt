@@ -71,13 +71,15 @@
     "knowledgeSemanticOff": "語意搜尋已關閉 — 未設定嵌入模型",
     "knowledgePassages": "{{count}} 個片段",
     "knowledgeStatusIndexing": "建立索引中……",
+    "knowledgeProgressReading": "正在讀取第 {{done}}/{{total}} 頁",
+    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}} 個片段",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "不支援",
     "knowledgeRetry": "重試",
     "knowledgeRemove": "移除",
     "knowledgeRemoveConfirm": "要將此檔案從知識庫中移除嗎？",
     "knowledgeError": "知識庫目前無法使用。",
-    "knowledgeSupportedTypes": "支援格式：.md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "支援格式：.md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "最近",

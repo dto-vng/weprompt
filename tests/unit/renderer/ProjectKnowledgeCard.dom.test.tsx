@@ -31,6 +31,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
       if (options && typeof options.count === 'number') return `${key}:${options.count}`;
+      if (options && typeof options.done === 'number') return `${key}:${options.done}/${String(options.total)}`;
       return key;
     },
   }),
@@ -75,6 +76,7 @@ const readySource: IKnowledgeSourceDto = {
   vectorCount: 5,
   addedAt: 1,
   error: null,
+  progress: null,
 };
 
 const indexingSource: IKnowledgeSourceDto = {
@@ -86,6 +88,7 @@ const indexingSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 2,
   error: null,
+  progress: null,
 };
 
 const failedSource: IKnowledgeSourceDto = {
@@ -97,6 +100,7 @@ const failedSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 3,
   error: 'Could not parse file.',
+  progress: null,
 };
 
 const unsupportedSource: IKnowledgeSourceDto = {
@@ -108,6 +112,7 @@ const unsupportedSource: IKnowledgeSourceDto = {
   vectorCount: 0,
   addedAt: 4,
   error: 'Unsupported file type.',
+  progress: null,
 };
 
 describe('ProjectKnowledgeCard', () => {
@@ -185,6 +190,64 @@ describe('ProjectKnowledgeCard', () => {
     expect(summaryLine).toHaveTextContent('conversation.projectHome.knowledgeSemanticOff');
   });
 
+  it('replaces the bare indexing tag with the page being read', () => {
+    hookState = {
+      sources: [{ ...indexingSource, fileName: 'contract.pdf', progress: { stage: 'reading', done: 12, total: 50 } }],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressReading:12/50')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
+  });
+
+  // BM25 marks a source ready before embedding starts, so the embed pass always
+  // runs against an already-`ready` row — this is the only place its progress
+  // can surface. Asserting it on an `indexing` row would test a state the
+  // service never produces.
+  it('shows embedding progress on a ready source, in place of Retry', () => {
+    hookState = {
+      sources: [
+        { ...readySource, chunkCount: 200, vectorCount: 64, progress: { stage: 'embedding', done: 64, total: 200 } },
+      ],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressEmbedding:64/200')).toBeInTheDocument();
+    // vectorCount < chunkCount would normally offer Retry; not while it is running.
+    expect(screen.queryByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).not.toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgePassages:200')).not.toBeInTheDocument();
+  });
+
+  it('restores the passage count and Retry once embedding stops', () => {
+    hookState = {
+      sources: [{ ...readySource, chunkCount: 200, vectorCount: 64, progress: null }],
+      summary: null,
+      loading: false,
+      error: false,
+    };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgePassages:200')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).toBeInTheDocument();
+  });
+
+  it('falls back to the plain indexing tag when no progress has been reported yet', () => {
+    hookState = { sources: [indexingSource], summary: null, loading: false, error: false };
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeStatusIndexing')).toBeInTheDocument();
+  });
+
   it('renders an unsupported source with its status tag', () => {
     hookState = { sources: [unsupportedSource], summary: null, loading: false, error: false };
 
@@ -204,7 +267,7 @@ describe('ProjectKnowledgeCard', () => {
     await waitFor(() => expect(addSourcesMock).toHaveBeenCalledWith(['/tmp/a.md', '/tmp/b.txt']));
     expect(showOpenMock).toHaveBeenCalledWith({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'conversation.projectHome.knowledge', extensions: ['md', 'txt', 'docx', 'xlsx'] }],
+      filters: [{ name: 'conversation.projectHome.knowledge', extensions: ['md', 'txt', 'docx', 'xlsx', 'pdf'] }],
     });
   });
 

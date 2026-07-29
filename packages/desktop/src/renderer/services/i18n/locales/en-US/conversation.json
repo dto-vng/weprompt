@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "semantic off — no embedding model configured",
     "knowledgePassages": "{{count}} passages",
     "knowledgeStatusIndexing": "Indexing…",
+    "knowledgeProgressReading": "Reading page {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Embedding {{done}}/{{total}} passages",
     "knowledgeStatusFailed": "Failed",
     "knowledgeStatusUnsupported": "Unsupported",
     "knowledgeRetry": "Retry",
     "knowledgeRemove": "Remove",
     "knowledgeRemoveConfirm": "Remove this file from the knowledge base?",
     "knowledgeError": "The knowledge base is unavailable.",
-    "knowledgeSupportedTypes": "Supported: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Supported: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Recents",

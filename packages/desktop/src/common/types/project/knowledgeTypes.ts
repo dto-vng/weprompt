@@ -9,7 +9,7 @@
 // import from common/knowledge/types, so this file is safe from renderer
 // type positions.
 
-import type { KnowledgeSourceStatus } from '@/common/knowledge/types';
+import type { KnowledgeIngestProgress, KnowledgeSourceStatus } from '@/common/knowledge/types';
 
 export type IKnowledgeSourceDto = {
   id: string;
@@ -27,6 +27,13 @@ export type IKnowledgeSourceDto = {
    * must branch on `status`, never infer failure from `error` being present.
    */
   error: string | null;
+  /**
+   * Position within the current ingestion stage while `status` is `indexing`
+   * (e.g. `{ stage: 'reading', done: 12, total: 50 }`), so the card can show
+   * "Reading page 12/50" instead of a bare spinner. Null whenever nothing is
+   * in flight — including for sources that settle too fast to report.
+   */
+  progress: KnowledgeIngestProgress | null;
 };
 
 export type IProjectKnowledgeSummary = {

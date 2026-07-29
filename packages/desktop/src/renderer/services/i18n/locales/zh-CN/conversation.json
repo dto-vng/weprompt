@@ -71,13 +71,15 @@
     "knowledgeSemanticOff": "语义搜索已关闭 — 未配置嵌入模型",
     "knowledgePassages": "{{count}} 个片段",
     "knowledgeStatusIndexing": "正在索引……",
+    "knowledgeProgressReading": "正在读取第 {{done}}/{{total}} 页",
+    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}} 个片段",
     "knowledgeStatusFailed": "失败",
     "knowledgeStatusUnsupported": "不支持",
     "knowledgeRetry": "重试",
     "knowledgeRemove": "移除",
     "knowledgeRemoveConfirm": "要将此文件从知识库中移除吗？",
     "knowledgeError": "知识库当前不可用。",
-    "knowledgeSupportedTypes": "支持的格式：.md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "支持的格式：.md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "最近",

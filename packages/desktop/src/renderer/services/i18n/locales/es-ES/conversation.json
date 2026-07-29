@@ -77,13 +77,15 @@
     "knowledgeSemanticOff": "búsqueda semántica desactivada — no hay modelo de embedding configurado",
     "knowledgePassages": "{{count}} pasajes",
     "knowledgeStatusIndexing": "Indexando…",
+    "knowledgeProgressReading": "Leyendo la página {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Incrustando {{done}}/{{total}} pasajes",
     "knowledgeStatusFailed": "Falló",
     "knowledgeStatusUnsupported": "No compatible",
     "knowledgeRetry": "Reintentar",
     "knowledgeRemove": "Quitar",
     "knowledgeRemoveConfirm": "¿Quitar este archivo de la base de conocimientos?",
     "knowledgeError": "La base de conocimientos no está disponible.",
-    "knowledgeSupportedTypes": "Compatible con: .md, .txt, .docx, .xlsx"
+    "knowledgeSupportedTypes": "Compatible con: .md, .txt, .docx, .xlsx, .pdf"
   },
   "history": {
     "recents": "Recientes",

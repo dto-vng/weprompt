@@ -17,7 +17,7 @@ export type ProjectKnowledgeCardProps = {
   project: ForgeProject;
 };
 
-const SUPPORTED_EXTENSIONS = ['md', 'txt', 'docx', 'xlsx'];
+const SUPPORTED_EXTENSIONS = ['md', 'txt', 'docx', 'xlsx', 'pdf'];
 
 /**
  * Project Home knowledge card: lists the project's knowledge sources
@@ -48,11 +48,31 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
     }
   };
 
+  // A long PDF or a large embed pass can occupy the project's ingestion queue
+  // for a while, so show where it has got to rather than an unmoving tag.
+  const progressLabel = (source: IKnowledgeSourceDto): string => {
+    const progress = source.progress;
+    if (!progress) return t('conversation.projectHome.knowledgeStatusIndexing');
+    const key =
+      progress.stage === 'reading'
+        ? 'conversation.projectHome.knowledgeProgressReading'
+        : 'conversation.projectHome.knowledgeProgressEmbedding';
+    return t(key, { done: progress.done, total: progress.total });
+  };
+
   const renderStatus = (source: IKnowledgeSourceDto): React.ReactNode => {
     switch (source.status) {
       case 'indexing':
-        return <Tag size='small'>{t('conversation.projectHome.knowledgeStatusIndexing')}</Tag>;
+        return <Tag size='small'>{progressLabel(source)}</Tag>;
       case 'ready': {
+        // The embed pass runs on sources that are ALREADY ready — BM25 makes
+        // them searchable before any vector exists. So embedding progress can
+        // only ever appear here, never under `indexing`. Showing it also
+        // suppresses the Retry button below, which would otherwise invite the
+        // user to restart an embed that is still running.
+        if (source.progress) {
+          return <Tag size='small'>{progressLabel(source)}</Tag>;
+        }
         const readyTag = (
           <Tag size='small' color='green'>
             {t('conversation.projectHome.knowledgePassages', { count: source.chunkCount })}
