@@ -453,8 +453,11 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     // Deletions — reachable ONLY because the folder read above succeeded.
     // A source whose snapshot could not be exported yet is not "missing from
     // the folder", it is mid-migration: keep it and retry on the next sync.
-    for (const source of [...manifest.sources]) {
-      if (seen.has(source.fileName) || unexported.has(source.fileName)) continue;
+    // Collected up front because removeSourceRows rewrites manifest.sources.
+    const vanished = manifest.sources.filter(
+      (source) => !seen.has(source.fileName) && !unexported.has(source.fileName)
+    );
+    for (const source of vanished) {
       await removeSourceRows(projectId, manifest, source.id);
       dirty = true;
     }

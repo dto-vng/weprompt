@@ -65,7 +65,11 @@ vi.mock('@/common', () => ({
     },
     projectKnowledge: {
       listSources: {
-        invoke: vi.fn().mockResolvedValue({ sources: [], summary: { fileCount: 0, passageCount: 0, semantic: 'off' } }),
+        invoke: vi.fn().mockResolvedValue({
+          sources: [],
+          summary: { fileCount: 0, passageCount: 0, semantic: 'off' },
+          folderMissing: false,
+        }),
       },
       addSources: {
         invoke: vi.fn(),
@@ -75,6 +79,12 @@ vi.mock('@/common', () => ({
       },
       retrySource: {
         invoke: vi.fn(),
+      },
+      syncFolder: {
+        invoke: vi.fn().mockResolvedValue(undefined),
+      },
+      getSourceText: {
+        invoke: vi.fn().mockResolvedValue({ text: '', truncated: false }),
       },
       updated: {
         on: vi.fn().mockReturnValue(() => {}),

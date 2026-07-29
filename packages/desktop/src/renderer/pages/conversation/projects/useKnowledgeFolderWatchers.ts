@@ -37,7 +37,8 @@ export const useKnowledgeFolderWatchers = (): void => {
         .catch((error: unknown) => console.error('Failed to watch knowledge folder:', error));
     }
 
-    for (const projectId of [...watched.keys()]) {
+    // Map iteration tolerates deleting the entry currently being visited.
+    for (const projectId of watched.keys()) {
       if (seen.has(projectId)) continue;
       watched.delete(projectId);
       void ipcBridge.projectKnowledge.unwatchFolder
