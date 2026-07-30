@@ -45,4 +45,11 @@ export type IProjectKnowledgeSummary = {
 export type IProjectKnowledgeListResult = {
   sources: IKnowledgeSourceDto[];
   summary: IProjectKnowledgeSummary;
+  /**
+   * True when the last sync found the project's `Knowledge Base/` folder
+   * missing or unreadable while indexed sources exist. The index is preserved
+   * while this is set; the card shows a warning + relink affordance instead of
+   * treating the knowledge as deleted.
+   */
+  folderMissing: boolean;
 };

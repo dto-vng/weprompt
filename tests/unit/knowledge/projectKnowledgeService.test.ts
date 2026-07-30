@@ -29,6 +29,7 @@ const EMBED_PROVIDER = {
 describe('projectKnowledgeService', () => {
   let root: string;
   let inbox: string;
+  let workspace: string;
   let service: ProjectKnowledgeService;
   let embedMock: ReturnType<typeof vi.fn>;
   let updates: string[];
@@ -36,6 +37,7 @@ describe('projectKnowledgeService', () => {
   beforeEach(() => {
     root = mkdtempSync(path.join(tmpdir(), 'kb-svc-root-'));
     inbox = mkdtempSync(path.join(tmpdir(), 'kb-svc-in-'));
+    workspace = mkdtempSync(path.join(tmpdir(), 'kb-svc-ws-'));
     embedMock = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
     updates = [];
     service = createProjectKnowledgeService({
@@ -45,6 +47,7 @@ describe('projectKnowledgeService', () => {
       convertToMarkdown: async () => {
         throw new Error('not used for md/txt');
       },
+      trashItem: async () => {},
       getServerScriptPath: () => '/out/main/builtin-mcp-knowledge.js',
       onUpdated: (projectId) => updates.push(projectId),
     });
@@ -52,6 +55,7 @@ describe('projectKnowledgeService', () => {
   afterEach(() => {
     rmSync(root, { recursive: true, force: true });
     rmSync(inbox, { recursive: true, force: true });
+    rmSync(workspace, { recursive: true, force: true });
   });
 
   const addFile = async (name: string, content: string): Promise<string> => {
@@ -62,7 +66,7 @@ describe('projectKnowledgeService', () => {
 
   it('ingests a markdown file end-to-end (register → ready → embedded)', async () => {
     const file = await addFile('notes.md', '# Visa\n\nThe visa letter process requires HR sign-off.');
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     const registered = await service.listSources('proj-1');
     expect(registered.sources).toHaveLength(1);
     await service.whenIdle('proj-1');
@@ -83,7 +87,7 @@ describe('projectKnowledgeService', () => {
   it('stays ready with BM25 only when embedding fails', async () => {
     embedMock.mockRejectedValue(new Error('rate limited'));
     const file = await addFile('a.md', 'expense policy: thirty day deadline');
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
     const { sources, summary } = await service.listSources('proj-1');
     expect(sources[0].status).toBe('ready');
@@ -94,7 +98,7 @@ describe('projectKnowledgeService', () => {
   it('marks unsupported extensions and oversized files without indexing them', async () => {
     const pptx = await addFile('deck.pptx', 'x');
     const big = await addFile('big.txt', 'x'.repeat(16 * 1024 * 1024));
-    await service.addSources('proj-1', [pptx, big]);
+    await service.addSources('proj-1', [pptx, big], workspace);
     await service.whenIdle('proj-1');
     const { sources } = await service.listSources('proj-1');
     const byName = Object.fromEntries(sources.map((s) => [s.fileName, s]));
@@ -106,9 +110,9 @@ describe('projectKnowledgeService', () => {
 
   it('dedupes an unchanged re-add by content hash', async () => {
     const file = await addFile('same.md', 'identical content');
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
     expect((await service.listSources('proj-1')).sources).toHaveLength(1);
   });
@@ -123,7 +127,7 @@ describe('projectKnowledgeService', () => {
       onUpdated: () => {},
     });
     const file = await addFile('spec.docx', 'binary-ish');
-    await svc.addSources('proj-2', [file]);
+    await svc.addSources('proj-2', [file], workspace);
     await svc.whenIdle('proj-2');
     const { sources } = await svc.listSources('proj-2');
     expect(sources[0].status).toBe('ready');
@@ -145,7 +149,7 @@ describe('projectKnowledgeService', () => {
       onUpdated: () => {},
     });
     const file = await addFile('spec.docx', 'binary');
-    await svc.addSources('proj-3', [file]);
+    await svc.addSources('proj-3', [file], workspace);
     await svc.whenIdle('proj-3');
     let list = await svc.listSources('proj-3');
     expect(list.sources).toHaveLength(1);
@@ -153,7 +157,7 @@ describe('projectKnowledgeService', () => {
     const failedId = list.sources[0].id;
 
     fail = false;
-    await svc.addSources('proj-3', [file]);
+    await svc.addSources('proj-3', [file], workspace);
     await svc.whenIdle('proj-3');
     list = await svc.listSources('proj-3');
     expect(list.sources).toHaveLength(1);
@@ -164,7 +168,7 @@ describe('projectKnowledgeService', () => {
   it("does not prune a surviving source's vectors when an unrelated source is removed, even if hasVector lags reality", async () => {
     const keepFile = await addFile('keep.md', 'keep this content around for retrieval please');
     const dropFile = await addFile('drop.md', 'drop this content, it is going away soon');
-    await service.addSources('proj-1', [keepFile, dropFile]);
+    await service.addSources('proj-1', [keepFile, dropFile], workspace);
     await service.whenIdle('proj-1');
 
     const { sources } = await service.listSources('proj-1');
@@ -184,7 +188,7 @@ describe('projectKnowledgeService', () => {
     const desynced = chunksBefore.map((c) => (c.sourceId === keepSource.id ? { ...c, hasVector: false } : c));
     await writeChunks(storeDir, desynced);
 
-    await service.removeSource('proj-1', dropSource.id);
+    await service.removeSource('proj-1', dropSource.id, workspace);
 
     const vectorsAfter = await readVectors(storeDir);
     const keepChunkIds = desynced.filter((c) => c.sourceId === keepSource.id).map((c) => c.chunkId);
@@ -206,7 +210,7 @@ describe('projectKnowledgeService', () => {
     expect(rawChunks.length).toBeGreaterThan(2000); // sanity: the cap must bind, not the input running dry
 
     const file = await addFile('huge.md', hugeText);
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
 
     const { sources } = await service.listSources('proj-1');
@@ -218,7 +222,7 @@ describe('projectKnowledgeService', () => {
   it('ingests a real text-layer PDF, citing page numbers', async () => {
     const file = path.join(inbox, 'policy.pdf');
     await writeFile(file, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
 
     const { sources } = await service.listSources('proj-1');
@@ -240,7 +244,7 @@ describe('projectKnowledgeService', () => {
   it('fails a scanned PDF with an explicit reason instead of indexing nothing', async () => {
     const file = path.join(inbox, 'scan.pdf');
     await writeFile(file, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/image-only.pdf')));
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
 
     const { sources } = await service.listSources('proj-1');
@@ -267,13 +271,17 @@ describe('projectKnowledgeService', () => {
       onUpdated: () => {},
     });
 
-    await svc.addSources('proj-r', [await addFile('a.md', 'markdown body'), await addFile('b.docx', 'binary')]);
+    await svc.addSources(
+      'proj-r',
+      [await addFile('a.md', 'markdown body'), await addFile('b.docx', 'binary')],
+      workspace
+    );
     await svc.whenIdle('proj-r');
     expect(extractPdfTextImpl).not.toHaveBeenCalled();
 
     const pdf = path.join(inbox, 'c.pdf');
     await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
-    await svc.addSources('proj-r', [pdf]);
+    await svc.addSources('proj-r', [pdf], workspace);
     await svc.whenIdle('proj-r');
     expect(extractPdfTextImpl).toHaveBeenCalledTimes(1);
     expect(extractPdfTextImpl.mock.calls[0][1]).toMatchObject({ maxPages: 50 });
@@ -296,7 +304,7 @@ describe('projectKnowledgeService', () => {
     });
     const pdf = path.join(inbox, 'long.pdf');
     await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
-    await svc.addSources('proj-cap', [pdf]);
+    await svc.addSources('proj-cap', [pdf], workspace);
     await svc.whenIdle('proj-cap');
 
     const { sources } = await svc.listSources('proj-cap');
@@ -331,7 +339,7 @@ describe('projectKnowledgeService', () => {
     });
     const pdf = path.join(inbox, 'prog.pdf');
     await writeFile(pdf, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/text-layer.pdf')));
-    await svc.addSources('proj-prog', [pdf]);
+    await svc.addSources('proj-prog', [pdf], workspace);
     await svc.whenIdle('proj-prog');
 
     const progresses = snapshots.map((s) => s?.progress).filter(Boolean);
@@ -353,7 +361,7 @@ describe('projectKnowledgeService', () => {
       return texts.map(() => [1, 0, 0]);
     });
 
-    await service.addSources('proj-1', [file]);
+    await service.addSources('proj-1', [file], workspace);
     await service.whenIdle('proj-1');
 
     const partial = (await service.listSources('proj-1')).sources[0];
@@ -365,7 +373,7 @@ describe('projectKnowledgeService', () => {
     expect(vectors?.rows.size).toBe(32);
 
     embedMock.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
-    await service.retrySource('proj-1', partial.id);
+    await service.retrySource('proj-1', partial.id, workspace);
     await service.whenIdle('proj-1');
 
     const done = (await service.listSources('proj-1')).sources[0];
@@ -377,6 +385,7 @@ describe('projectKnowledgeService', () => {
     expect(await service.listSources('nope')).toEqual({
       sources: [],
       summary: { fileCount: 0, passageCount: 0, semantic: 'off' },
+      folderMissing: false,
     });
   });
 });

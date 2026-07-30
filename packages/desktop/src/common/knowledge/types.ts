@@ -62,6 +62,12 @@ export type KnowledgeManifest = {
   /** Pinned at first successful embed; null = BM25-only. */
   embedding: { model: string; dim: number } | null;
   sources: KnowledgeManifestSource[];
+  /**
+   * Set when the last folder sync could not read `Knowledge Base/` while
+   * sources exist. An error state, NOT a deletion signal: the index is
+   * preserved untouched until the folder becomes readable again.
+   */
+  folderMissing?: boolean;
 };
 
 export type Bm25Index = {

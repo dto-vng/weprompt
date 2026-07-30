@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NATIVE_BRIDGE_PROVIDER_KEYS } from '@/common/adapter/native/constants';
 import { nativeBridgePayloadSchemas } from '@/common/adapter/native/payloadSchemas';
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   excelToMarkdown: vi.fn(async () => '# excel'),
   httpRequest: vi.fn(async () => []),
   updatedEmit: vi.fn(),
+  trashItem: vi.fn(async () => {}),
+}));
+
+vi.mock('electron', () => ({
+  shell: { trashItem: mocks.trashItem },
 }));
 
 vi.mock('@/common', () => ({
@@ -86,6 +92,57 @@ describe('buildProjectKnowledgeDeps', () => {
     await deps.listProviders();
 
     expect(mocks.httpRequest).toHaveBeenCalledWith('GET', '/api/providers');
+  });
+
+  // Knowledge files belong to the user. Deleting one must be reversible, so
+  // the dep has to reach Electron's Trash API — never fs.rm.
+  it('routes trashItem to the OS Trash via electron shell', async () => {
+    const deps = buildProjectKnowledgeDeps();
+
+    await deps.trashItem!('/ws/alpha/Knowledge Base/doomed.md');
+
+    expect(mocks.trashItem).toHaveBeenCalledWith('/ws/alpha/Knowledge Base/doomed.md');
+  });
+});
+
+// Every project-knowledge channel must appear in BOTH the provider-key list
+// and the payload schemas: a channel missing from either is dead at runtime
+// with "operation is not allowed", and no unit test of the handler catches it.
+describe('project-knowledge native bridge registration', () => {
+  const channels = [
+    'project-knowledge.list-sources',
+    'project-knowledge.add-sources',
+    'project-knowledge.remove-source',
+    'project-knowledge.retry-source',
+    'project-knowledge.sync-folder',
+    'project-knowledge.watch-folder',
+    'project-knowledge.unwatch-folder',
+    'project-knowledge.get-source-text',
+    'project-knowledge.remove-store',
+    'project-knowledge.get-session-mcp-server',
+  ] as const;
+
+  it.each(channels)('%s is an allowed native provider key', (channel) => {
+    expect(NATIVE_BRIDGE_PROVIDER_KEYS).toContain(channel);
+  });
+
+  it.each(channels)('%s has a payload schema', (channel) => {
+    expect(nativeBridgePayloadSchemas[channel]).toBeDefined();
+  });
+
+  it('accepts a workspace path on the folder channels', () => {
+    const payload = { projectId: 'p1', workspace: '/Users/me/Projects/alpha' };
+    expect(nativeBridgePayloadSchemas['project-knowledge.sync-folder'].safeParse(payload).success).toBe(true);
+    expect(nativeBridgePayloadSchemas['project-knowledge.watch-folder'].safeParse(payload).success).toBe(true);
+  });
+
+  it('rejects unknown keys on a folder payload', () => {
+    const result = nativeBridgePayloadSchemas['project-knowledge.sync-folder'].safeParse({
+      projectId: 'p1',
+      workspace: '/ws',
+      extra: 'nope',
+    });
+    expect(result.success).toBe(false);
   });
 });
 

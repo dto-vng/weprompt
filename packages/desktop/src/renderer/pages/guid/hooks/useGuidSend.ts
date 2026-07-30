@@ -21,6 +21,7 @@ import { type TFunction } from 'i18next';
 import type { NavigateFunction } from 'react-router-dom';
 import { mutate as swrMutate } from 'swr';
 import { getConversationCreateErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
+import { findProjectById } from '@/renderer/pages/conversation/projects/projectStorage';
 import type { AcpModelInfo } from '../types';
 import { resolveInjectedContext } from './resolveInjectedContext';
 
@@ -191,6 +192,20 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     // no rules of its own (general/default + project chats); a specialized
     // assistant's rules take precedence (out of scope — see design spec).
     const injectedContext = resolveInjectedContext(projectId);
+
+    // Pick up anything dropped into the project's Knowledge Base folder since
+    // the last sync. Deliberately NOT awaited: ingestion can take
+    // seconds-to-minutes and blocking send on it is unacceptable. This chat
+    // therefore uses whatever is already `ready` (the same frozen-at-creation
+    // boundary as the MCP descriptor below); the sync benefits the next one.
+    if (projectId) {
+      const projectWorkspace = findProjectById(projectId)?.workspace;
+      if (projectWorkspace) {
+        void ipcBridge.projectKnowledge.syncFolder
+          .invoke({ projectId, workspace: projectWorkspace })
+          .catch((syncError: unknown) => console.error('Failed to sync knowledge folder on chat creation:', syncError));
+      }
+    }
 
     // Project knowledge base: attach the per-project search server as a pure
     // session MCP (full stdio transport, never a repo-registered row) so the
