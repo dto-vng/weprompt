@@ -241,6 +241,77 @@ In rough order of value: fill in the hybrid baseline against a real provider; gr
 top-6 is a small fraction of it and `recall@6` stops saturating; add questions in the 40–60 range so
 one question is worth less than 0.02; then revisit fusion knobs.
 
+## Recorded findings (2026-07-30, BM25-only, after the OCR-derived case)
+
+The corpus grew to 11 documents / 19 passages and 25 scored questions, and **every aggregate fell**:
+
+| metric         | 23 questions | 25 questions | why                          |
+| -------------- | ------------ | ------------ | ---------------------------- |
+| recall@1       | 0.826 (19)   | 0.800 (20)   | numerator +1, denominator +2 |
+| recall@3, @6   | 0.870 (20)   | 0.840 (21)   | same                         |
+| MRR            | 0.848        | 0.820        | same                         |
+| answerRecall@1 | 0.783 (18)   | 0.760 (19)   | same                         |
+| answerMRR      | 0.826        | 0.800        | same                         |
+
+**None of that is a retrieval change.** Both runs were diffed per question: not one pre-existing case
+changed its `sourceRank` or its `answerRank`, and no question stopped retrieving its expected source.
+Eleven of them changed only in the tail of the top-6, where the new document displaced a
+lower-scoring passage. The drop is arithmetic — two questions were added, one of which BM25 cannot
+reach — which is exactly why the fixture and the baseline moved in separate commits. Read the two
+sets of numbers as different instruments, not as a regression.
+
+### 6. The BM25 ceiling fell to 0.840, and cross-language is now three quarters of it
+
+Finding 1 above put the lexical ceiling at 0.870, with 3 of 23 questions unreachable. It is now
+**0.840, with 4 of 25 unreachable**, and the newcomer is `ocr-cross-lang-response-time`:
+
+- `semantic-delay` — no discriminative word shared with the answer
+- `cross-lang-trip-approval` — English question, Vietnamese answer
+- `cross-lang-vpn-signoff` — same, with distractor pressure
+- `ocr-cross-lang-response-time` — same, against an OCR-derived Vietnamese source
+
+So the entire fall in the ceiling is one question, and it is a cross-language one. Three of the four
+lexically unreachable questions are now cross-language, which sharpens finding 1 rather than
+changing it: on a bilingual corpus the semantic half's value is concentrated in cross-language
+retrieval, and **scanned Vietnamese documents can only ever arrive as that case** — a scan has no text
+layer, so its transcription is the only text retrieval will ever see. BM25 scored it at exactly zero
+and returned `onboarding-runbook` and `it-service-catalogue` instead, on the strength of the single
+token "request".
+
+### 7. A transcribed table retrieves exactly as well as an authored one
+
+`ocr-id-transcribed-table-row` lands at rank 1 with the answer in the top passage — identical to its
+authored twin `id-po-vendor`. It also beats the same document's other passage, so the row survived
+transcription **and** chunking as a row, hint spanning the pipe. On this evidence markdown that a
+multimodal model rebuilt from ruled lines is not measurably worse to retrieve from than markdown a
+human typed.
+
+Note what this does **not** establish. The real-corpus observation motivating it was that text-layer
+extraction of a scanned annual report shredded tables to one word per line, which would scatter a
+code and its description across passages. Confirming that OCR beats text-layer extraction needs both
+variants of the _same_ document in the fixture, and only the OCR variant is here. This is the weak
+form of the claim — transcribed tables retrieve fine — not the comparison.
+
+### 8. The over-retrieval canary got noisier
+
+`unanswerable-lexical-overlap` ("Chính sách nghỉ phép thai sản") now returns the OCR document at rank
+1, on the generic back-office vocabulary any Vietnamese contract shares with a leave policy. Nothing
+is gated on it and the question has no expected source, so this is not a regression — but it is the
+signal that case exists to give: a growing Vietnamese corpus makes a relevance floor more attractive,
+not less. The hard invariant still holds — `unanswerable-no-overlap` returns nothing.
+
+### Still not measured
+
+- **The hybrid half.** `baseline.json` is still `hybrid: null`, so the one question finding 6 raises —
+  does the multilingual embedding model bridge an English query to an OCR'd Vietnamese answer? — is
+  the question this instrument still cannot answer. The only locally configured provider exposes no
+  embedding model, so route 2 cannot resolve one even with the dev app up. Fill it with
+  `KB_EVAL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL` pointed at a working embedding model, then
+  `bun run eval:kb -- --update-baseline`.
+- **Text-layer vs OCR on the same tables** (see finding 7).
+- Resolution barely improved: one question is worth 0.040 where it was worth 0.043. The 40–60 range in
+  "what would make this instrument sharper" is still the target.
+
 ## Baseline and CI
 
 `baseline.json` is the committed reference so a regression is a diff, not a memory test. It records
