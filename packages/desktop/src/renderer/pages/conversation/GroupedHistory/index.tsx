@@ -36,6 +36,15 @@ import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { useExport } from './hooks/useExport';
 import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types';
 
+/**
+ * Compact 20px icon button for a project row's hover actions — the same
+ * footprint and opaque `sider-action-btn` backing that `ConversationRow` uses,
+ * so both kinds of sidebar row present their actions identically. `!flex`
+ * beats `.arco-btn`'s own `display` so the icon actually centres.
+ */
+const PROJECT_ROW_ACTION_CLASS =
+  '!flex items-center justify-center !w-20px !h-20px !min-w-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
+
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   onSessionClick,
   collapsed = false,
@@ -662,47 +671,64 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                         </span>
                       }
                       trailing={
-                        <span className='flex items-center gap-6px'>
-                          <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
-                            <Button
-                              aria-label={t('conversation.history.newConversationInProject')}
-                              className={classNames(
-                                '!w-20px !h-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3 sider-action-btn',
-                                isMobile ? 'flex' : 'hidden group-hover:flex'
-                              )}
-                              size='mini'
-                              type='text'
-                              icon={
-                                <Plus theme='outline' size='14' fill='currentColor' className='block leading-none' />
-                              }
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigateToProjectChat(group.workspace, group.project_id);
-                              }}
-                            />
-                          </Tooltip>
-                          <Dropdown
-                            droplist={projectMenu}
-                            trigger='click'
-                            position='br'
-                            getPopupContainer={() => document.body}
-                            unmountOnExit={false}
+                        <>
+                          {/* Visibility lives on the wrapper, not the Button: `.arco-btn`
+                              carries its own `display`, which ties with the `hidden` /
+                              `group-hover:flex` utilities and leaves the actions stranded
+                              on screen. A plain span has no such competing rule. */}
+                          <span
+                            className={classNames(
+                              'items-center justify-center',
+                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                            )}
                           >
-                            <Button
-                              aria-label={t('conversation.history.projectActions')}
-                              className={classNames(
-                                '!w-20px !h-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3 sider-action-btn',
-                                isMobile ? 'flex' : 'hidden group-hover:flex'
-                              )}
-                              size='mini'
-                              type='text'
-                              icon={
-                                <MoreOne theme='outline' size='14' fill='currentColor' className='block leading-none' />
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </Dropdown>
-                        </span>
+                            <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
+                              <Button
+                                aria-label={t('conversation.history.newConversationInProject')}
+                                className={PROJECT_ROW_ACTION_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <Plus theme='outline' size='14' fill='currentColor' className='block leading-none' />
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigateToProjectChat(group.workspace, group.project_id);
+                                }}
+                              />
+                            </Tooltip>
+                          </span>
+                          <span
+                            className={classNames(
+                              'items-center justify-center',
+                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                            )}
+                          >
+                            <Dropdown
+                              droplist={projectMenu}
+                              trigger='click'
+                              position='br'
+                              getPopupContainer={() => document.body}
+                              unmountOnExit={false}
+                            >
+                              <Button
+                                aria-label={t('conversation.history.projectActions')}
+                                className={PROJECT_ROW_ACTION_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <MoreOne
+                                    theme='outline'
+                                    size='14'
+                                    fill='currentColor'
+                                    className='block leading-none'
+                                  />
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </Dropdown>
+                          </span>
+                        </>
                       }
                     >
                       <div className={classNames('flex flex-col min-w-0', { 'mt-1px': !collapsed })}>

@@ -73,6 +73,9 @@
     "knowledgeAdd": "Adicionar arquivos",
     "knowledgeEmpty": "Adicione documentos para criar a base de conhecimento deste projeto. O assistente pesquisa neles automaticamente em cada chat do projeto.",
     "knowledgeSemanticOff": "busca semântica desativada — nenhum modelo de embedding configurado",
+    "knowledgeSemanticOffAction": "Adicionar modelo de embedding",
+    "knowledgeEmbedAll": "Incorporar tudo",
+    "knowledgePassagesTooltip": "Este arquivo é dividido em trechos pesquisáveis, e o assistente usa os mais relevantes ao responder.",
     "knowledgeStatusIndexing": "Indexando…",
     "knowledgeProgressReading": "Lendo página {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Incorporando {{done}}/{{total}}…",
@@ -90,8 +93,7 @@
     "knowledgeFolderMissingBody": "Ela pode ter sido movida, renomeada ou excluída. Seu conhecimento indexado está preservado — restaure a pasta ou revincule o projeto e atualize.",
     "knowledgePreviewNote": "Este é o texto indexado que o assistente pesquisa, não o layout original.",
     "knowledgePreviewTruncated": "Prévia encurtada. Abra o arquivo original para ver o documento completo.",
-    "knowledgePreviewError": "Não foi possível carregar o texto indexado deste arquivo.",
-    "knowledgeStatusNote": "Observação"
+    "knowledgePreviewError": "Não foi possível carregar o texto indexado deste arquivo."
   },
   "history": {
     "recents": "Recentes",

@@ -73,6 +73,9 @@
     "knowledgeAdd": "Dosya Ekle",
     "knowledgeEmpty": "Bu projenin bilgi bankasını oluşturmak için belge ekleyin. Asistan bunları bu projedeki her sohbette otomatik olarak arar.",
     "knowledgeSemanticOff": "anlamsal arama kapalı — gömme modeli yapılandırılmamış",
+    "knowledgeSemanticOffAction": "Gömme modeli ekle",
+    "knowledgeEmbedAll": "Tümünü göm",
+    "knowledgePassagesTooltip": "Bu dosya aranabilir bölümlere ayrılır ve asistan yanıt verirken en ilgili olanları kullanır.",
     "knowledgeStatusIndexing": "Dizinleniyor…",
     "knowledgeProgressReading": "Sayfa {{done}}/{{total}} okunuyor",
     "knowledgeProgressEmbedding": "Gömülüyor {{done}}/{{total}}…",
@@ -90,8 +93,7 @@
     "knowledgeFolderMissingBody": "Taşınmış, yeniden adlandırılmış veya silinmiş olabilir. Dizinlenmiş bilgileriniz korunuyor — klasörü geri getirin ya da projeyi yeniden bağlayın, sonra yenileyin.",
     "knowledgePreviewNote": "Bu, asistanın aradığı dizinlenmiş metindir; özgün sayfa düzeni değildir.",
     "knowledgePreviewTruncated": "Ön izleme kısaltıldı. Belgenin tamamı için özgün dosyayı açın.",
-    "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi.",
-    "knowledgeStatusNote": "Not"
+    "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi."
   },
   "history": {
     "recents": "Son",
