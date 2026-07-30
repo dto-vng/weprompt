@@ -51,7 +51,8 @@ const VALID_PAYLOADS = {
     properties: ['openDirectory', 'createDirectory'],
     filters: [{ name: 'Documents', extensions: ['pdf', 'docx'] }],
   },
-  'context.compaction.generate': {
+  'app-operations.context-compact': {
+    operation_id: 'operation-1',
     conversation_id: 'conversation-1',
     trigger: 'manual',
     previous_snapshot: {
@@ -74,8 +75,6 @@ const VALID_PAYLOADS = {
         updated_at: 1,
       },
     ],
-    provider_id: 'provider-1',
-    model: 'model-1',
     target_turn_id: 'turn-1',
   },
   'project-knowledge.list-sources': { projectId: 'project-1' },
@@ -87,6 +86,7 @@ const VALID_PAYLOADS = {
   'project-knowledge.retry-source': { projectId: 'project-1', sourceId: 'a1b2c3d4e5f6' },
   'project-knowledge.remove-store': { projectId: 'project-1' },
   'project-knowledge.get-session-mcp-server': { projectId: 'project-1' },
+  'app-operations.cancel': { operation_id: 'operation-1' },
   'office-artifact.get-state': {
     conversationId: 'conversation-1',
     workspace: '/tmp/work',
@@ -324,15 +324,26 @@ const INVALID_PAYLOADS = [
     { filters: Array.from({ length: 33 }, () => ({ name: 'Documents', extensions: ['pdf'] })) },
   ],
   ['show-open', 'unknown nested filter field', { filters: [{ name: 'Documents', extensions: ['pdf'], extra: true }] }],
-  ['context.compaction.generate', 'omitted conversation identifier', { provider_id: 'provider-1', model: 'model-1' }],
+  ['app-operations.context-compact', 'omitted operation identifier', { conversation_id: 'conversation-1' }],
+  ['app-operations.context-compact', 'omitted conversation identifier', { operation_id: 'operation-1' }],
   [
-    'context.compaction.generate',
-    'too many pinned context items',
+    'app-operations.context-compact',
+    'renderer-supplied model selection',
     {
+      operation_id: 'operation-1',
       conversation_id: 'conversation-1',
       trigger: 'manual',
       provider_id: 'provider-1',
       model: 'model-1',
+    },
+  ],
+  [
+    'app-operations.context-compact',
+    'too many pinned context items',
+    {
+      operation_id: 'operation-1',
+      conversation_id: 'conversation-1',
+      trigger: 'manual',
       pinned_context: Array.from({ length: 21 }, (_, index) => ({
         id: `pin-${index}`,
         title: 'Pin',
@@ -355,6 +366,7 @@ const INVALID_PAYLOADS = [
   ['project-knowledge.retry-source', 'non-string source identifier', { projectId: 'project-1', sourceId: 1 }],
   ['project-knowledge.remove-store', 'empty project identifier', { projectId: '' }],
   ['project-knowledge.get-session-mcp-server', 'omitted required project identifier', {}],
+  ['app-operations.cancel', 'omitted operation identifier', {}],
   ['office-artifact.get-state', 'omitted workspace', { filePath: '/tmp/work/report.docx' }],
   ['office-artifact.prepare-preview', 'omitted file path', { workspace: '/tmp/work' }],
   ['office-artifact.start-preview', 'omitted lease identifier', {}],

@@ -94,16 +94,15 @@ const contextPinSchema = z
     updated_at: z.number().finite().int().nonnegative(),
   })
   .strict();
-const localContextCompactionSchema = z
+const appOperationsContextCompactSchema = z
   .object({
+    operation_id: identifierSchema,
     conversation_id: identifierSchema,
     trigger: z.enum(['auto', 'manual', 'handoff']),
     previous_snapshot: contextSnapshotSchema.optional(),
     previous_markdown: z.string().max(MAX_CONTEXT_MARKDOWN_LENGTH).optional(),
     pinned_context: z.array(contextPinSchema).max(MAX_CONTEXT_PINS).optional(),
     last_compacted_turn_id: identifierSchema.optional(),
-    provider_id: identifierSchema,
-    model: shortTextSchema,
     target_turn_id: identifierSchema.optional(),
   })
   .strict();
@@ -225,7 +224,8 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict()
     .optional(),
-  'context.compaction.generate': localContextCompactionSchema,
+  'app-operations.context-compact': appOperationsContextCompactSchema,
+  'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
   'project-knowledge.add-sources': z
     .object({ projectId: safeIdSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })

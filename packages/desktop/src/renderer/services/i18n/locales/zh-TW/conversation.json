@@ -632,7 +632,21 @@
     }
   },
   "status": {
-    "waitingApproval": "等待你的核准"
+    "waitingApproval": "等待你的核准",
+    "running": "處理中",
+    "done": "已完成",
+    "doneIdle": "已完成 — 閒置",
+    "stopped": "已停止",
+    "failed": "失敗"
+  },
+  "statusTooltip": {
+    "waitingApproval": "正在等待你的核准以繼續。",
+    "running": "正在處理此聊天。",
+    "doneUnseen": "已完成，但你尚未查看。",
+    "doneSeen": "最近已完成並已查看。",
+    "doneIdle": "至少一分鐘前已完成並已查看。",
+    "stopped": "在完成前已停止。",
+    "failed": "因發生錯誤而無法完成。"
   },
   "runtimePreparing": {
     "sendboxHint": "正在準備執行環境。首次啟動可能會稍慢一些。"

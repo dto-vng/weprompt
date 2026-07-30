@@ -640,7 +640,21 @@
     }
   },
   "status": {
-    "waitingApproval": "Onayınızı bekliyor"
+    "waitingApproval": "Onayınızı bekliyor",
+    "running": "Çalışıyor",
+    "done": "Tamamlandı",
+    "doneIdle": "Tamamlandı — boşta",
+    "stopped": "Durduruldu",
+    "failed": "Başarısız"
+  },
+  "statusTooltip": {
+    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
+    "running": "Bu sohbet üzerinde çalışılıyor.",
+    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
+    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
+    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
+    "stopped": "Tamamlanmadan önce durduruldu.",
+    "failed": "Bir hata nedeniyle tamamlanamadı."
   },
   "runtimePreparing": {
     "sendboxHint": "Çalışma ortamı hazırlanıyor. İlk başlatma biraz daha uzun sürebilir."

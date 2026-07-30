@@ -105,6 +105,13 @@ import type {
 } from '../update/updateTypes';
 import type { AgentMetadata } from '@/renderer/utils/model/agentTypes';
 import type { Theme } from '@/common/theme/types';
+import type {
+  AppOperationResult,
+  AppOperationsContextCompactOutput,
+  AppOperationsContextCompactRequest,
+  AppOperationsModelResponse,
+  AppOperationsModelSetting,
+} from '@/common/types/appOperations';
 import type { ProtocolDetectionRequest, ProtocolDetectionResponse } from '../utils/protocolDetector';
 import {
   buildCreateConversationBody,
@@ -942,39 +949,18 @@ export const acpConversation = {
   ),
 };
 
-export interface ILocalContextCompactionParams extends ICompactContextParams {
-  provider_id: string;
-  model: string;
-  target_turn_id?: string;
-}
+export const appOperations = {
+  contextCompact: bridge.buildProvider<
+    AppOperationResult<AppOperationsContextCompactOutput>,
+    AppOperationsContextCompactRequest
+  >('app-operations.context-compact'),
+  cancel: bridge.buildProvider<void, { operation_id: string }>('app-operations.cancel'),
+};
 
-export interface ILocalContextCompactionResult {
-  snapshot: unknown;
-  through_turn_id: string;
-  model: {
-    provider_id: string;
-    model: string;
-  };
-}
-
-export type TLocalContextCompactionErrorCode =
-  | 'provider_not_found'
-  | 'provider_timeout'
-  | 'provider_auth_failed'
-  | 'provider_rate_limited'
-  | 'provider_request_failed'
-  | 'invalid_model_output'
-  | 'empty_model_output';
-
-export type ILocalContextCompactionBridgeResult =
-  | { ok: true; result: ILocalContextCompactionResult }
-  | { ok: false; error_code: TLocalContextCompactionErrorCode };
-
-/** Desktop fallback when the installed backend does not yet expose the compact endpoint. */
-export const localContextCompaction = {
-  generate: bridge.buildProvider<ILocalContextCompactionBridgeResult, ILocalContextCompactionParams>(
-    'context.compaction.generate'
-  ),
+export const appOperationsModel = {
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
+  check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };
 
 // ---------------------------------------------------------------------------

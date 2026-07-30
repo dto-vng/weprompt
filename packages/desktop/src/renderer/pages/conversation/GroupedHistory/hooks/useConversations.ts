@@ -57,10 +57,19 @@ export const useConversations = () => {
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>(() => readExpandedWorkspaces());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => readCollapsedSections());
   const { id } = useParams();
-  const { conversations, isConversationGenerating, getRecentCompletionAt, refreshConversationRuntime, groupedHistory } =
-    useConversationHistoryContext();
+  const {
+    conversations,
+    isConversationGenerating,
+    getCompletion,
+    getRecentFailureAt,
+    getRecentStoppedAt,
+    markCompletionSeen,
+    refreshConversationRuntime,
+    groupedHistory,
+  } = useConversationHistoryContext();
 
   const { pinnedConversations, timelineSections } = groupedHistory;
+  const activeCompletion = id ? getCompletion(id) : undefined;
 
   // Track whether auto-expand has already been performed to avoid
   // re-expanding workspaces after a user manually collapses them (#1156)
@@ -84,6 +93,11 @@ export const useConversations = () => {
       refreshConversationRuntime(id);
     }
   }, [id, refreshConversationRuntime]);
+
+  useEffect(() => {
+    if (!id || !activeCompletion || activeCompletion.seenAt !== undefined) return;
+    markCompletionSeen(id);
+  }, [activeCompletion, id, markCompletionSeen]);
 
   // Reveal + scroll the active conversation into view.
   // Depends on the grouped data because on a cold start (opening the app
@@ -205,7 +219,9 @@ export const useConversations = () => {
   return {
     conversations,
     isConversationGenerating,
-    getRecentCompletionAt,
+    getCompletion,
+    getRecentFailureAt,
+    getRecentStoppedAt,
     expandedWorkspaces,
     pinnedConversations,
     timelineSections,

@@ -34,6 +34,7 @@ import './process/bridge/feedbackBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
+import { appOperationsBroker } from '@process/services/appOperations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
 import { disposeOfficeArtifactService } from '@process/services/office-artifact';
 import { setupApplicationMenu } from './process/utils/appMenu';
@@ -1186,6 +1187,7 @@ installQuitCleanup({
     disposeCronResumeListener?.();
     disposeCronResumeListener = null;
   },
+  cancelAppOperations: () => appOperationsBroker.cancelAll(),
   disposeOfficeArtifacts: disposeOfficeArtifactService,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).

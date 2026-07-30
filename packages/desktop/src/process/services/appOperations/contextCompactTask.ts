@@ -1,14 +1,11 @@
-import { ClientFactory } from '@/common/api';
 import { httpRequest } from '@/common/adapter/httpBridge';
-import type {
-  ILocalContextCompactionParams,
-  ILocalContextCompactionResult,
-  MessageCursorPage,
-} from '@/common/adapter/ipcBridge';
+import type { MessageCursorPage } from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
-import type { IProvider, TProviderWithModel } from '@/common/config/storage';
+import type { TContextSnapshot } from '@/common/config/storage';
+import type { AppOperationsContextCompactRequest } from '@/common/types/appOperations';
+import { z } from 'zod';
+import type { AppOperationTaskDefinition } from './types';
 
-const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_MESSAGES = 100;
 const MAX_MESSAGE_CHARS = 4_000;
 const MAX_TRANSCRIPT_CHARS = 60_000;
@@ -16,57 +13,48 @@ const MAX_PREVIOUS_MARKDOWN_CHARS = 24_000;
 const MAX_PIN_CHARS = 2_000;
 const MAX_PINS = 20;
 
-type ContextCompletionResponse = {
-  choices: Array<{
-    message: {
-      content?: string | null;
-    };
-  }>;
+export type ContextCompactInput = Omit<AppOperationsContextCompactRequest, 'operation_id'>;
+
+const contextPinSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    content: z.string(),
+    source: z.enum(['manual', 'context_md']),
+    created_at: z.number(),
+    updated_at: z.number(),
+  })
+  .strict();
+
+export const contextSnapshotSchema = z
+  .object({
+    goal: z.string(),
+    current_state: z.array(z.string()),
+    decisions: z.array(z.string()),
+    artifacts: z.array(z.string()),
+    user_preferences: z.array(z.string()),
+    open_questions: z.array(z.string()),
+    next_steps: z.array(z.string()),
+    do_not_forget: z.array(z.string()),
+  })
+  .strip();
+
+const contextCompactInputSchema = z
+  .object({
+    conversation_id: z.string().min(1),
+    trigger: z.enum(['auto', 'manual', 'handoff']),
+    previous_snapshot: contextSnapshotSchema.optional(),
+    previous_markdown: z.string().optional(),
+    pinned_context: z.array(contextPinSchema).optional(),
+    last_compacted_turn_id: z.string().optional(),
+    target_turn_id: z.string().optional(),
+  })
+  .strict();
+
+type ContextCompactPrepared = {
+  input: ContextCompactInput;
+  messages: TMessage[];
 };
-
-export type ContextCompletionClient = {
-  createChatCompletion: (
-    params: {
-      model: string;
-      messages: Array<{ role: 'system' | 'user'; content: string }>;
-      max_tokens: number;
-      temperature: number;
-      response_format: { type: 'json_object' };
-    },
-    options?: { signal?: AbortSignal; timeout?: number }
-  ) => Promise<ContextCompletionResponse>;
-};
-
-type ContextClientOptions = {
-  timeout: number;
-  rotatingOptions: {
-    maxRetries: number;
-    retryDelay: number;
-  };
-};
-
-export type ContextCompactionServiceDependencies = {
-  listProviders: () => Promise<IProvider[]>;
-  loadMessages: (conversationId: string) => Promise<TMessage[]>;
-  createClient: (provider: TProviderWithModel, options: ContextClientOptions) => Promise<ContextCompletionClient>;
-};
-
-export class ContextCompactionServiceError extends Error {
-  readonly code:
-    | 'provider_not_found'
-    | 'provider_timeout'
-    | 'provider_auth_failed'
-    | 'provider_rate_limited'
-    | 'provider_request_failed'
-    | 'invalid_model_output'
-    | 'empty_model_output';
-
-  constructor(code: ContextCompactionServiceError['code']) {
-    super(code);
-    this.name = 'ContextCompactionServiceError';
-    this.code = code;
-  }
-}
 
 const truncate = (value: string, limit: number): string =>
   value.length <= limit ? value : `${value.slice(0, Math.max(0, limit - 1))}…`;
@@ -76,20 +64,6 @@ const readMessageText = (message: TMessage): string => {
   if (!message.content || typeof message.content !== 'object') return '';
   if ('content' in message.content && typeof message.content.content === 'string') return message.content.content;
   return '';
-};
-
-const normalizeProviderError = (error: unknown, didTimeout: boolean): ContextCompactionServiceError => {
-  if (didTimeout || (error instanceof Error && error.name === 'AbortError')) {
-    return new ContextCompactionServiceError('provider_timeout');
-  }
-
-  const status =
-    error && typeof error === 'object' && 'status' in error && typeof error.status === 'number'
-      ? error.status
-      : undefined;
-  if (status === 401 || status === 403) return new ContextCompactionServiceError('provider_auth_failed');
-  if (status === 429) return new ContextCompactionServiceError('provider_rate_limited');
-  return new ContextCompactionServiceError('provider_request_failed');
 };
 
 const buildTranscript = (messages: TMessage[]): Array<{ role: string; content: string }> => {
@@ -111,7 +85,7 @@ const buildTranscript = (messages: TMessage[]): Array<{ role: string; content: s
   return rows.toReversed();
 };
 
-const buildContextData = (input: ILocalContextCompactionParams, messages: TMessage[]): string => {
+const buildContextData = (input: ContextCompactInput, messages: TMessage[]): string => {
   const data = {
     trigger: input.trigger,
     previous_snapshot: input.previous_snapshot,
@@ -165,7 +139,7 @@ export const buildSystemPrompt = (): string =>
 
 const parseJsonObject = (value: string): unknown => {
   const trimmed = value.trim();
-  if (!trimmed) throw new ContextCompactionServiceError('empty_model_output');
+  if (!trimmed) throw new Error('empty_model_output');
 
   const withoutFence = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
   let depth = 0;
@@ -205,88 +179,33 @@ const parseJsonObject = (value: string): unknown => {
     }
   }
 
-  if (parsed === undefined) throw new ContextCompactionServiceError('invalid_model_output');
+  if (parsed === undefined) throw new Error('invalid_model_output');
   return parsed;
 };
 
-const defaultDependencies: ContextCompactionServiceDependencies = {
-  listProviders: () => httpRequest<IProvider[]>('GET', '/api/providers'),
-  loadMessages: async (conversationId) => {
+export const contextCompactTask: AppOperationTaskDefinition<
+  ContextCompactInput,
+  ContextCompactPrepared,
+  TContextSnapshot
+> = {
+  id: 'context.compact',
+  promptVersion: 'context.compact.v1',
+  inputSchema: contextCompactInputSchema as z.ZodType<ContextCompactInput>,
+  prepare: async (input) => {
     const page = await httpRequest<MessageCursorPage<TMessage>>(
       'GET',
-      `/api/conversations/${encodeURIComponent(conversationId)}/messages?limit=${MAX_MESSAGES}&content_mode=compact`
+      `/api/conversations/${encodeURIComponent(input.conversation_id)}/messages?limit=${MAX_MESSAGES}&content_mode=compact`
     );
-    return page.items;
+    return { input, messages: page.items };
   },
-  createClient: async (provider, options) => {
-    const client = await ClientFactory.createRotatingClient(provider, options);
-    return client as ContextCompletionClient;
-  },
-};
-
-export const compactContextLocally = async (
-  input: ILocalContextCompactionParams,
-  dependencies: ContextCompactionServiceDependencies = defaultDependencies
-): Promise<ILocalContextCompactionResult> => {
-  const providers = await dependencies.listProviders();
-  // The persisted provider id can go stale when the provider is re-created;
-  // fall back to any provider that still serves the requested model.
-  const provider =
-    providers.find((candidate) => candidate.id === input.provider_id) ??
-    providers.find((candidate) => candidate.models.includes(input.model));
-  if (!provider) throw new ContextCompactionServiceError('provider_not_found');
-
-  const selectedProvider: TProviderWithModel = {
-    ...provider,
-    use_model: input.model,
-  };
-  const [messages, client] = await Promise.all([
-    dependencies.loadMessages(input.conversation_id),
-    dependencies.createClient(selectedProvider, {
-      timeout: REQUEST_TIMEOUT_MS,
-      rotatingOptions: { maxRetries: 2, retryDelay: 500 },
-    }),
-  ]);
-
-  const controller = new AbortController();
-  let didTimeout = false;
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  try {
-    let completion: ContextCompletionResponse;
-    try {
-      const providerRequest = client.createChatCompletion(
-        {
-          model: input.model,
-          messages: [
-            { role: 'system', content: buildSystemPrompt() },
-            { role: 'user', content: buildContextData(input, messages) },
-          ],
-          max_tokens: 4_000,
-          temperature: 0.1,
-          response_format: { type: 'json_object' },
-        },
-        { signal: controller.signal, timeout: REQUEST_TIMEOUT_MS }
-      );
-      const deadline = new Promise<never>((_resolve, reject) => {
-        timeoutId = setTimeout(() => {
-          didTimeout = true;
-          controller.abort();
-          reject(new ContextCompactionServiceError('provider_timeout'));
-        }, REQUEST_TIMEOUT_MS);
-      });
-      completion = await Promise.race([providerRequest, deadline]);
-    } catch (error) {
-      if (error instanceof ContextCompactionServiceError) throw error;
-      throw normalizeProviderError(error, didTimeout || controller.signal.aborted);
-    }
-    const snapshot = parseJsonObject(completion.choices[0]?.message.content ?? '');
-
-    return {
-      snapshot,
-      through_turn_id: input.target_turn_id || input.last_compacted_turn_id || '',
-      model: { provider_id: provider.id, model: input.model },
-    };
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
+  buildMessages: ({ input, messages }) => [
+    { role: 'system', content: buildSystemPrompt() },
+    { role: 'user', content: buildContextData(input, messages) },
+  ],
+  parseOutput: (raw) => contextSnapshotSchema.parse(parseJsonObject(raw)) as TContextSnapshot,
+  responseMode: 'json',
+  temperature: 0.1,
+  maxOutputTokens: 4_000,
+  timeoutMs: 45_000,
+  maxTransientRetries: 2,
 };

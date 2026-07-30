@@ -639,7 +639,21 @@
     }
   },
   "status": {
-    "waitingApproval": "Esperando tu aprobación"
+    "waitingApproval": "Esperando tu aprobación",
+    "running": "Trabajando",
+    "done": "Finalizado",
+    "doneIdle": "Finalizado — inactivo",
+    "stopped": "Detenido",
+    "failed": "Fallido"
+  },
+  "statusTooltip": {
+    "waitingApproval": "Esperando tu aprobación para continuar.",
+    "running": "Trabajando en este chat.",
+    "doneUnseen": "Finalizado, pero todavía no lo has visto.",
+    "doneSeen": "Finalizado recientemente y ya visto.",
+    "doneIdle": "Finalizado hace al menos un minuto y ya visto.",
+    "stopped": "Detenido antes de finalizar.",
+    "failed": "No se pudo finalizar debido a un error."
   },
   "runtimePreparing": {
     "sendboxHint": "Preparando el entorno de ejecución. El primer inicio puede tardar un poco más."
