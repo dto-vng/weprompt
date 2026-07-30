@@ -144,18 +144,18 @@ Use a visually bounded section or card consistent with the current Settings surf
 
 ## Required UI States
 
-| State | Selection | Resolved model | Health treatment | Primary action |
-| --- | --- | --- | --- | --- |
-| Initial loading | Skeleton or disabled control | Skeleton | Neutral loading | None |
-| Auto ready | Auto | Provider + model | Ready | Health check |
-| Auto checking | Auto | Retain provider + model | Checking with progress | Disabled Health check |
-| Auto with no candidate | Auto | Em dash | Setup required + no eligible model explanation | Add Model |
-| Fixed ready | Fixed + selected pair | Same pair | Ready | Health check |
-| Fixed unavailable | Fixed + preserved disabled pair | Stored pair or IDs | Unavailable + exact reason | Use the existing provider controls below |
-| Saving selection | New choice visible | Retain last confirmed value until response | Inline saving feedback | Controls temporarily disabled |
-| Save failed | Restore last confirmed setting | Last confirmed value | Existing health retained | Retry by choosing again; localized toast |
-| Fixed health check failed | Fixed setting unchanged | Current pair retained | Unavailable + health-check reason | Health check |
-| Backend update required | Last known or empty state | Em dash if unknown | Compact warning alert | None in this section |
+| State                     | Selection                       | Resolved model                             | Health treatment                               | Primary action                           |
+| ------------------------- | ------------------------------- | ------------------------------------------ | ---------------------------------------------- | ---------------------------------------- |
+| Initial loading           | Skeleton or disabled control    | Skeleton                                   | Neutral loading                                | None                                     |
+| Auto ready                | Auto                            | Provider + model                           | Ready                                          | Health check                             |
+| Auto checking             | Auto                            | Retain provider + model                    | Checking with progress                         | Disabled Health check                    |
+| Auto with no candidate    | Auto                            | Em dash                                    | Setup required + no eligible model explanation | Add Model                                |
+| Fixed ready               | Fixed + selected pair           | Same pair                                  | Ready                                          | Health check                             |
+| Fixed unavailable         | Fixed + preserved disabled pair | Stored pair or IDs                         | Unavailable + exact reason                     | Use the existing provider controls below |
+| Saving selection          | New choice visible              | Retain last confirmed value until response | Inline saving feedback                         | Controls temporarily disabled            |
+| Save failed               | Restore last confirmed setting  | Last confirmed value                       | Existing health retained                       | Retry by choosing again; localized toast |
+| Fixed health check failed | Fixed setting unchanged         | Current pair retained                      | Unavailable + health-check reason              | Health check                             |
+| Backend update required   | Last known or empty state       | Em dash if unknown                         | Compact warning alert                          | None in this section                     |
 
 ## Health and Reason Copy
 
@@ -168,15 +168,15 @@ Health labels:
 
 Reason messages:
 
-| Backend reason | English copy |
-| --- | --- |
-| No eligible model | No eligible model is configured. |
-| Provider missing | The selected provider no longer exists. |
-| Provider disabled | The selected provider is disabled. |
-| Model missing | The selected model no longer exists. |
-| Model disabled | The selected model is disabled. |
+| Backend reason          | English copy                                   |
+| ----------------------- | ---------------------------------------------- |
+| No eligible model       | No eligible model is configured.               |
+| Provider missing        | The selected provider no longer exists.        |
+| Provider disabled       | The selected provider is disabled.             |
+| Model missing           | The selected model no longer exists.           |
+| Model disabled          | The selected model is disabled.                |
 | Authentication required | The selected provider requires authentication. |
-| Health check failed | The latest health check failed. |
+| Health check failed     | The latest health check failed.                |
 
 Compatibility message for an older backend:
 
