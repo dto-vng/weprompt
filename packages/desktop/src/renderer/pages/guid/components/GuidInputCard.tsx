@@ -9,11 +9,13 @@ import UploadProgressBar from '@/renderer/components/media/UploadProgressBar';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useCompositionInput } from '@/renderer/hooks/chat/useCompositionInput';
 import { Input } from '@arco-design/web-react';
-import React from 'react';
+import type { RefTextAreaType } from '@arco-design/web-react/es/Input';
+import React, { useEffect, useRef } from 'react';
 import styles from '../index.module.css';
 import GuidWorkspaceFootnote from './GuidWorkspaceFootnote';
 
 type GuidInputCardProps = {
+  focusRequestKey?: string;
   // Input state
   input: string;
   onInputChange: (value: string) => void;
@@ -39,6 +41,9 @@ type GuidInputCardProps = {
   actionRow: React.ReactNode;
   slashCommandMenu?: React.ReactNode;
 
+  // Presentation templates
+  templateChip?: React.ReactNode;
+
   // Workspace
   workspaceDir: string;
   onSelectWorkspace: (dir: string) => void;
@@ -46,6 +51,7 @@ type GuidInputCardProps = {
 };
 
 const GuidInputCard: React.FC<GuidInputCardProps> = ({
+  focusRequestKey,
   input,
   onInputChange,
   onKeyDown,
@@ -63,6 +69,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   onRemoveFile,
   actionRow,
   slashCommandMenu,
+  templateChip,
   workspaceDir,
   onSelectWorkspace,
   onClearWorkspace,
@@ -70,7 +77,14 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
   const { compositionHandlers, isComposing } = useCompositionInput();
+  const inputRef = useRef<RefTextAreaType | null>(null);
   const textareaAutoSize = isMobile ? { minRows: 2, maxRows: 8 } : { minRows: 2, maxRows: 20 };
+
+  useEffect(() => {
+    if (!focusRequestKey || isMobile) return;
+    inputRef.current?.focus();
+    inputRef.current?.dom.setSelectionRange(input.length, input.length);
+  }, [focusRequestKey, input, isMobile]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (isComposing.current) return;
@@ -119,6 +133,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
           onClearWorkspace={onClearWorkspace}
         />
         <Input.TextArea
+          ref={inputRef}
           autoSize={textareaAutoSize}
           placeholder={placeholder}
           spellCheck={false}
@@ -133,6 +148,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
           data-testid='guid-input'
         />
         <div style={{ height: 12, flexShrink: 0 }} aria-hidden='true' />
+        {templateChip}
         {files.length > 0 && (
           <div className='flex flex-wrap items-center gap-8px mt-12px mb-12px'>
             {files.map((path) => (

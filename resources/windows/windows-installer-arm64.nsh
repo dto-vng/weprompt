@@ -21,13 +21,21 @@
   !insertmacro AIONUI_LOG_EXTRACT_RESULT "zip"
 !macroend
 
-Function .onVerifyInstDir
+; Architecture guard. Inserted from AIONUI_INSTALLER_PREINIT (preInit) so it runs before any
+; registry mutation, replacing the old .onVerifyInstDir placement which fired after customInit
+; had already healed/cleared/repaired an existing install's registry. (Sentry ELECTRON-3BX)
+!macro AIONUI_ASSERT_TARGET_ARCH
+  Var /GLOBAL AionUiActualArch
   ${IfNot} ${IsNativeARM64}
-    MessageBox MB_OK|MB_ICONSTOP \
-      "Installation package architecture mismatch$\n$\n\
-      This AionUi installer is designed for ARM64 architecture.$\n$\n\
-      Your system does not support ARM64. Please download the appropriate version for your architecture.$\n$\n\
-      Download: https://github.com/iOfficeAI/AionUi/releases"
-    !insertmacro AIONUI_FAIL ${AIONUI_E_ARCH_MISMATCH} "target=arm64 actual=non-arm64"
+    !insertmacro AIONUI_DETECT_NATIVE_ARCH $AionUiActualArch
+    !insertmacro AIONUI_FAIL_UX \
+      "${AIONUI_E_ARCH_MISMATCH}" \
+      "target=arm64 actual=$AionUiActualArch" \
+      "${AIONUI_MSG_ARCH_MISMATCH_ZH}" \
+      "${AIONUI_MSG_ARCH_MISMATCH_EN}" \
+      "${AIONUI_MSG_ARCH_MISMATCH_ACTION_ZH}" \
+      "${AIONUI_MSG_ARCH_MISMATCH_ACTION_EN}" \
+      "target=arm64 actual=$AionUiActualArch" \
+      "target=arm64 actual=$AionUiActualArch"
   ${EndIf}
-FunctionEnd
+!macroend

@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "안녕하세요, 오늘의 계획은 무엇인가요?",
-    "placeholder": "메시지 전송, 파일 업로드, 폴더 열기 또는 예약 작업 만들기...",
+    "placeholder": "메시지 전송, 파일 업로드, 폴더 열기, 예약 작업 만들기 또는 / 로 명령 호출...",
     "linkFolder": "폴더 열기",
     "newConversation": "새 채팅",
     "selectModel": "모델 선택",
@@ -78,6 +78,7 @@
     "knowledgePassagesTooltip": "이 파일은 검색 가능한 구절로 나뉘며, 어시스턴트가 답변할 때 가장 관련 있는 부분을 가져옵니다.",
     "knowledgeStatusIndexing": "색인 중…",
     "knowledgeProgressReading": "{{total}}페이지 중 {{done}}페이지 읽는 중",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} 페이지 텍스트 변환 중",
     "knowledgeProgressEmbedding": "임베딩 중 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "실패",
     "knowledgeStatusUnsupported": "지원되지 않음",
@@ -93,7 +94,10 @@
     "knowledgeFolderMissingBody": "이동, 이름 변경 또는 삭제되었을 수 있습니다. 색인된 지식은 그대로 유지됩니다. 폴더를 복원하거나 프로젝트를 다시 연결한 후 새로 고치세요.",
     "knowledgePreviewNote": "어시스턴트가 검색하는 색인 텍스트이며 원본 서식이 아닙니다.",
     "knowledgePreviewTruncated": "미리보기가 잘렸습니다. 전체 문서는 원본 파일을 열어 확인하세요.",
-    "knowledgePreviewError": "이 파일의 색인 텍스트를 불러올 수 없습니다."
+    "knowledgePreviewError": "이 파일의 색인 텍스트를 불러올 수 없습니다.",
+    "knowledgeOcrTag": "텍스트 변환됨(OCR)",
+    "knowledgeOcrDetail": "{{model}}이(가) 스캔본에서 변환했습니다. 건너뛴 페이지: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "없음"
   },
   "history": {
     "recents": "최근",
@@ -110,6 +114,7 @@
     "saveName": "저장",
     "cancelEdit": "취소",
     "rename": "이름 변경",
+    "createCronTask": "예약 작업 만들기",
     "renameTitle": "채팅 이름 변경",
     "renamePlaceholder": "새 이름을 입력하세요",
     "renameSuccess": "이름이 변경되었습니다",
@@ -149,6 +154,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "이 프로젝트에서 새 대화",
     "deleting": "삭제 중...",
+    "reorderPinned": "드래그하여 고정된 대화 순서 변경",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -189,7 +195,6 @@
   "noAgentsAvailable": "사용 가능한 에이전트가 없습니다",
   "noModelConfigured": "모델이 설정되지 않았습니다. 설정 페이지에서 설정하세요.",
   "createFailed": "대화 생성에 실패했습니다",
-  "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "선택한 작업공간 경로를 사용할 수 없습니다. 작업공간 경로 \"{{workspacePath}}\" 가 실제로 존재하고 접근 가능한지 확인하세요."
@@ -576,8 +581,8 @@
     "error": "보조 질문에 답하지 못했습니다."
   },
   "commandQueue": {
-    "title": "대기 중인 명령",
-    "clear": "대기열 비우기",
+    "title": "임시함",
+    "clear": "임시함 비우기",
     "edit": "편집",
     "editing": "편집 중",
     "editPlaceholder": "실행되기 전에 이 대기 명령을 수정하세요.",
@@ -592,7 +597,19 @@
     "queueFull": "대기열이 가득 찼습니다. 일부 명령을 제거한 뒤 다시 추가하세요.",
     "inputTooLong": "대기열에 넣을 명령이 너무 깁니다. 줄인 뒤 다시 보내세요.",
     "tooManyFiles": "이 대기 명령에는 파일이 너무 많이 첨부되었습니다.",
-    "queueTooLarge": "대기열 데이터가 너무 커서 안전하게 저장할 수 없습니다. 일부 명령을 먼저 제거하세요."
+    "queueTooLarge": "대기열 데이터가 너무 커서 안전하게 저장할 수 없습니다. 일부 명령을 먼저 제거하세요.",
+    "sendNow": "지금 보내기",
+    "modeToggle": "전송 모드 전환",
+    "help": "사용 안내",
+    "helpIntro": "AI가 응답하는 동안 보낸 메시지가 여기에 임시로 보관됩니다.",
+    "helpAuto": ": 각 응답이 끝날 때마다 자동으로 하나씩 전송됩니다.",
+    "helpManual": ": 자동 전송하지 않고 보관하며, 각각 \"지금 보내기\"로 전송합니다.",
+    "clearConfirmTitle": "보내기 임시함을 비울까요?",
+    "clearConfirmContent": "대기 중인 모든 메시지가 삭제되며 되돌릴 수 없습니다.",
+    "mode": {
+      "auto": "자동 전송",
+      "manual": "수동 전송"
+    }
   },
   "contextUsage": {
     "contextUsed": "사용된 컨텍스트",
@@ -643,35 +660,22 @@
       "loaded": "로드됨",
       "failed": "실패",
       "unsupported": "지원되지 않음"
-    }
-  },
-  "status": {
-    "waitingApproval": "승인을 기다리는 중",
-    "running": "작업 중",
-    "done": "완료",
-    "doneIdle": "완료 — 유휴",
-    "stopped": "중지됨",
-    "failed": "실패"
-  },
-  "statusTooltip": {
-    "waitingApproval": "계속하려면 승인을 기다리고 있습니다.",
-    "running": "이 채팅을 처리하고 있습니다.",
-    "doneUnseen": "완료되었지만 아직 확인하지 않았습니다.",
-    "doneSeen": "최근에 완료되었으며 확인했습니다.",
-    "doneIdle": "최소 1분 전에 완료되었으며 확인했습니다.",
-    "stopped": "완료되기 전에 중지되었습니다.",
-    "failed": "오류로 인해 완료하지 못했습니다."
+    },
+    "selected": "선택된 MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "실행 환경을 준비하는 중입니다. 첫 시작은 조금 더 오래 걸릴 수 있습니다."
   },
   "sendbox": {
-    "hint": "/ 로 명령, @ 로 파일 참조"
+    "hint": "/ 로 명령, @ 로 파일 참조, ↑/↓ 로 메시지 기록 전환"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "이번 요청에서는 표시할 수 있는 응답이 없었습니다."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "이 요청은 표시할 응답을 생성하지 않았습니다. 이 에이전트는 먼저 로그인이 필요할 수 있습니다: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "이번 요청은 표시 가능한 응답이 나오기 전에 모델의 출력 토큰 한도에 도달했습니다."
@@ -685,6 +689,32 @@
     }
   },
   "notFound": "대화를 찾을 수 없거나 삭제되었습니다",
+  "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
+  "presentationTemplates": {
+    "title": "템플릿",
+    "columnPptx": "프레젠테이션 · PPTX",
+    "columnHtml": "보고서 · HTML",
+    "columnDocx": "문서 · DOCX",
+    "selected": "선택됨",
+    "buttonTooltip": "템플릿",
+    "slashDescription": "템플릿 선택",
+    "importCard": "테마 가져오기 (.md)",
+    "empty": "사용 가능한 템플릿이 없습니다",
+    "chipTooltip": "이 메시지는 템플릿을 사용합니다",
+    "importSuccess": "템플릿을 가져왔습니다",
+    "importError": "가져오기 실패: {{error}}",
+    "removeError": "삭제 실패: {{error}}",
+    "deleteTooltip": "템플릿 삭제",
+    "deleteConfirm": "이 템플릿을 삭제하시겠습니까?"
+  },
+  "status": {
+    "waitingApproval": "승인을 기다리는 중",
+    "running": "작업 중",
+    "done": "완료",
+    "doneIdle": "완료 — 유휴",
+    "stopped": "중지됨",
+    "failed": "실패"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -749,5 +779,14 @@
   "artifact": {
     "emptyTitle": "열린 아티팩트 없음",
     "emptyHint": "생성된 파일과 문서가 여기에 열립니다."
+  },
+  "statusTooltip": {
+    "waitingApproval": "계속하려면 승인을 기다리고 있습니다.",
+    "running": "이 채팅을 처리하고 있습니다.",
+    "doneUnseen": "완료되었지만 아직 확인하지 않았습니다.",
+    "doneSeen": "최근에 완료되었으며 확인했습니다.",
+    "doneIdle": "최소 1분 전에 완료되었으며 확인했습니다.",
+    "stopped": "완료되기 전에 중지되었습니다.",
+    "failed": "오류로 인해 완료하지 못했습니다."
   }
 }

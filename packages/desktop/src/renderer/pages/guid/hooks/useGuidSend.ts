@@ -62,6 +62,13 @@ export type GuidSendDeps = {
   setMentionSelectorOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMentionActiveIndex: React.Dispatch<React.SetStateAction<number>>;
 
+  // Presentation template (optional — landing-page gallery wiring)
+  composePresentationSend?: (
+    message: string,
+    files: string[]
+  ) => { input: string; files: string[]; injectSkills: string[] };
+  onPresentationTemplateConsumed?: () => void;
+
   // Navigation
   navigate: NavigateFunction;
   t: TFunction;
@@ -103,6 +110,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     availableMcpServers,
     selectedMcpServerIds,
     assistantDefaultMcpIds,
+    composePresentationSend,
+    onPresentationTemplateConsumed,
     setMentionOpen,
     setMentionQuery,
     setMentionSelectorOpen,
@@ -120,6 +129,14 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
 
     const isCustomWorkspace = !!dir;
     const finalWorkspace = dir || '';
+
+    // Fold a selected presentation template into the first message: directive
+    // text wraps the user's prompt, and the template's THEME.md (+ reference
+    // deck) rides along as attached files. The conversation title keeps the
+    // raw user input.
+    const composed = composePresentationSend
+      ? composePresentationSend(input, files)
+      : { input, files, injectSkills: [] as string[] };
 
     const assistantConversationId = selectedAssistantId;
     const assistantBackend = selectedAssistantBackend;
@@ -238,7 +255,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           extra: {
             project_id: projectId,
             ...(injectedContext ? { preset_rules: injectedContext } : {}),
-            default_files: files,
+            default_files: composed.files,
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
             selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
@@ -265,8 +282,9 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         emitter.emit('chat.history.refresh');
 
         const initialMessage = {
-          input,
-          files: files.length > 0 ? files : undefined,
+          input: composed.input,
+          files: composed.files.length > 0 ? composed.files : undefined,
+          injectSkills: composed.injectSkills.length > 0 ? composed.injectSkills : undefined,
         };
         sessionStorage.setItem(`aionrs_initial_message_${conversation.id}`, JSON.stringify(initialMessage));
 
@@ -291,7 +309,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           ...(injectedContext ? { preset_context: injectedContext } : {}),
           workspace: finalWorkspace,
           custom_workspace: isCustomWorkspace,
-          default_files: files,
+          default_files: composed.files,
           selected_mcp_server_ids: selectedUserMcpServerIdsToSend,
           selected_session_mcp_servers: withKbServer(
             selectedMcpServerIds !== undefined ? selectedSessionMcpServers : selectedSessionMcpServersToSend
@@ -317,8 +335,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       emitter.emit('chat.history.refresh');
 
       const initialMessage = {
-        input,
-        files: files.length > 0 ? files : undefined,
+        input: composed.input,
+        files: composed.files.length > 0 ? composed.files : undefined,
       };
       sessionStorage.setItem(`acp_initial_message_${conversation.id}`, JSON.stringify(initialMessage));
 
@@ -346,6 +364,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     availableMcpServers,
     selectedMcpServerIds,
     assistantDefaultMcpIds,
+    composePresentationSend,
     navigate,
     t,
     localeKey,
@@ -365,6 +384,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         setFiles([]);
         setDir('');
         setProjectId(undefined);
+        onPresentationTemplateConsumed?.();
       })
       .catch((error) => {
         console.error('Failed to send message:', error);
@@ -386,6 +406,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     setFiles,
     setDir,
     setProjectId,
+    onPresentationTemplateConsumed,
     t,
   ]);
 

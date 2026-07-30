@@ -20,7 +20,7 @@
   "website": "Сайт",
   "version": "Версия",
   "contact": "Контакты",
-  "github": "Github",
+  "github": "GitHub",
   "loading": "Пожалуйста, подождите...",
   "copy": "Копировать",
   "reply": "Ответить",
@@ -92,20 +92,28 @@
       "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
     },
     "dataMigration": {
-      "title": "Local data migration failed",
+      "title": "Не удалось перенести локальные данные",
       "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "sendDiagnostics": "Отправить диагностику",
+      "diagnosticsSent": "Диагностика отправлена",
+      "diagnosticsReportSuccess": "Диагностический отчёт отправлен",
+      "diagnosticsReportFailed": "Не удалось отправить диагностический отчёт"
     },
     "localDataRepair": {
-      "title": "Local data repair failed",
+      "title": "Не удалось восстановить локальные данные",
       "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "sendDiagnostics": "Отправить диагностику",
+      "diagnosticsSent": "Диагностика отправлена",
+      "diagnosticsReportSuccess": "Диагностический отчёт отправлен",
+      "diagnosticsReportFailed": "Не удалось отправить диагностический отчёт"
+    },
+    "startupDirectory": {
+      "title": "Папка запуска недоступна",
+      "description": "AionUi открылся, но AionCore не смог запуститься: настроенная рабочая папка или папка логов отсутствует, недоступна либо заблокирована правами. Убедитесь, что эти папки существуют и доступны для записи, затем перезапустите AionUi.",
+      "sendDiagnostics": "Отправить диагностику",
+      "diagnosticsSent": "Диагностика отправлена",
+      "diagnosticsReportSuccess": "Диагностический отчёт отправлен",
+      "diagnosticsReportFailed": "Не удалось отправить диагностический отчёт"
     },
     "recoverableDatabaseCorruption": {
       "title": "Локальные данные повреждены",
@@ -117,6 +125,15 @@
       "diagnosticsReportSuccess": "Диагностический отчет отправлен",
       "diagnosticsReportFailed": "Не удалось отправить диагностический отчет",
       "rebuildFailed": "Не удалось сохранить старую БД и создать новую"
+    },
+    "transientConcurrentStartup": {
+      "title": "AionUi запускается",
+      "description": "При открытии этого окна другой процесс запуска AionUi всё ещё использовал локальные данные. Это временно, и ваши данные в безопасности — переустановка не требуется. Подождите немного и повторите попытку или перезапустите AionUi.",
+      "sendDiagnostics": "Отправить диагностику",
+      "diagnosticsSent": "Диагностика отправлена",
+      "diagnosticsReportSuccess": "Диагностический отчёт отправлен",
+      "diagnosticsReportFailed": "Не удалось отправить диагностический отчёт",
+      "diagnosticsHint": "Если это повторяется, вы можете отправить отчёт диагностики."
     }
   },
   "fileAttach.addFiles": "Добавить файлы",
@@ -139,5 +156,7 @@
   "unit": {
     "minute_short": "мин",
     "second_short": "с"
-  }
+  },
+  "selectedCount": "Выбрано {{count}}",
+  "selectedSkills": "Выбранные навыки"
 }

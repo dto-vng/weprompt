@@ -202,14 +202,42 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
 
   // A long PDF or a large embed pass can occupy the project's ingestion queue
   // for a while, so show where it has got to rather than an unmoving tag.
+  const PROGRESS_KEY_BY_STAGE = {
+    reading: 'conversation.projectHome.knowledgeProgressReading',
+    transcribing: 'conversation.projectHome.knowledgeProgressTranscribing',
+    embedding: 'conversation.projectHome.knowledgeProgressEmbedding',
+  } as const;
+
   const progressLabel = (source: IKnowledgeSourceDto): string => {
     const progress = source.progress;
     if (!progress) return t('conversation.projectHome.knowledgeStatusIndexing');
-    const key =
-      progress.stage === 'reading'
-        ? 'conversation.projectHome.knowledgeProgressReading'
-        : 'conversation.projectHome.knowledgeProgressEmbedding';
-    return t(key, { done: progress.done, total: progress.total });
+    return t(PROGRESS_KEY_BY_STAGE[progress.stage], { done: progress.done, total: progress.total });
+  };
+
+  /**
+   * Marker for a source whose text was transcribed from a scan by a model
+   * rather than read from the file. Shown for its own sake: transcription can be
+   * wrong in ways reading cannot, so a user who doubts an answer needs to be
+   * able to see where the text came from — and which pages produced nothing.
+   */
+  const renderOcrTag = (source: IKnowledgeSourceDto): React.ReactNode => {
+    if (!source.ocr) return null;
+    const { model, skippedPages } = source.ocr;
+    return (
+      <Tooltip
+        content={t('conversation.projectHome.knowledgeOcrDetail', {
+          model,
+          pages:
+            skippedPages.length > 0
+              ? skippedPages.join(', ')
+              : t('conversation.projectHome.knowledgeOcrNoSkippedPages'),
+        })}
+      >
+        <Tag size='small' data-testid={`knowledge-ocr-${source.id}`}>
+          {t('conversation.projectHome.knowledgeOcrTag')}
+        </Tag>
+      </Tooltip>
+    );
   };
 
   const renderStatus = (source: IKnowledgeSourceDto): React.ReactNode => {
@@ -296,11 +324,14 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
       data-testid={`knowledge-source-${source.id}`}
       className='group flex items-center gap-8px rounded-4px px-4px py-2px hover:bg-fill-secondary'
     >
+      {/* The Arco tooltip replaces the native `title`: two tooltips on one
+          element fight, and this one carries more than the file name. */}
       <Tooltip content={renderRowTooltip(source)} position='top'>
         <span className='min-w-0 flex-1 truncate text-13px text-t-primary' onClick={() => void handlePreview(source)}>
           {source.fileName}
         </span>
       </Tooltip>
+      {renderOcrTag(source)}
       {renderStatus(source)}
       {/* Icon actions stay hidden until hover so a settled list reads as
           content, not as a control panel; focus-within keeps them reachable

@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hi、今日の予定は何ですか？",
-    "placeholder": "メッセージの送信、ファイルの追加、フォルダーの追加、またはスケジュールタスクの作成...",
+    "placeholder": "メッセージの送信、ファイルの追加、フォルダーの追加、スケジュールタスクの作成、または / でコマンド呼び出し...",
     "linkFolder": "フォルダを追加",
     "newConversation": "新しいチャット",
     "selectModel": "モデルを選択",
@@ -78,6 +78,7 @@
     "knowledgePassagesTooltip": "このファイルは検索可能な断片に分割され、アシスタントは回答時に最も関連する部分を参照します。",
     "knowledgeStatusIndexing": "インデックス作成中……",
     "knowledgeProgressReading": "{{done}}/{{total}} ページを読み込み中",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} ページを文字起こし中",
     "knowledgeProgressEmbedding": "ベクトル化中 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "非対応",
@@ -93,7 +94,10 @@
     "knowledgeFolderMissingBody": "移動、名前変更、または削除された可能性があります。索引済みのナレッジは保持されています。フォルダーを復元するかプロジェクトを再リンクしてから更新してください。",
     "knowledgePreviewNote": "これはアシスタントが検索する索引テキストで、元のレイアウトではありません。",
     "knowledgePreviewTruncated": "プレビューは省略されています。全文は元のファイルで確認してください。",
-    "knowledgePreviewError": "このファイルの索引テキストを読み込めませんでした。"
+    "knowledgePreviewError": "このファイルの索引テキストを読み込めませんでした。",
+    "knowledgeOcrTag": "文字起こし済み（OCR）",
+    "knowledgeOcrDetail": "{{model}} がスキャンから文字起こししました。スキップしたページ: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "なし"
   },
   "history": {
     "recents": "最近",
@@ -110,6 +114,7 @@
     "saveName": "保存",
     "cancelEdit": "キャンセル",
     "rename": "名前を変更",
+    "createCronTask": "スケジュールタスクを作成",
     "renameTitle": "チャット名を変更",
     "renamePlaceholder": "新しい名前を入力してください",
     "renameSuccess": "名前を変更しました",
@@ -149,6 +154,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "このプロジェクト内で新しい会話",
     "deleting": "削除中...",
+    "reorderPinned": "ドラッグしてピン留め会話の順序を変更",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -189,7 +195,6 @@
   "noAgentsAvailable": "利用可能なエージェントはありません",
   "noModelConfigured": "モデルが設定されていません。設定ページで設定してください。",
   "createFailed": "会話の作成に失敗しました",
-  "emptyModelReply": "モデルは表示可能な返答を生成せずにターンを終了しました。もう一度送信してください。大きな出力が必要な場合は、結果を分割して依頼してください。",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "選択したワークスペースパスは利用できません。ワークスペースパス「{{workspacePath}}」が実在し、アクセス可能であることを確認してください。"
@@ -576,8 +581,8 @@
     "error": "補足質問への回答に失敗しました。"
   },
   "commandQueue": {
-    "title": "キュー中の指示",
-    "clear": "キューをクリア",
+    "title": "ドラフトボックス",
+    "clear": "ドラフトボックスをクリア",
     "edit": "編集",
     "editing": "編集中",
     "editPlaceholder": "実行される前に、この待機中の指示を修正できます。",
@@ -592,7 +597,19 @@
     "queueFull": "キューがいっぱいです。追加する前にいくつか削除してください。",
     "inputTooLong": "キューに追加する指示が長すぎます。短くしてから送信してください。",
     "tooManyFiles": "このキュー中の指示にはファイルが多すぎます。",
-    "queueTooLarge": "キューのデータが大きすぎて安全に保持できません。いくつか削除してください。"
+    "queueTooLarge": "キューのデータが大きすぎて安全に保持できません。いくつか削除してください。",
+    "sendNow": "今すぐ送信",
+    "modeToggle": "送信モードを切り替え",
+    "help": "使い方",
+    "helpIntro": "AI の返信中に送信したメッセージはここに一時保存されます。",
+    "helpAuto": "：各返信が終わるたびに自動で順番に送信します。",
+    "helpManual": "：自動送信せず保管し、各メッセージを「今すぐ送信」で送ります。",
+    "clearConfirmTitle": "送信ドラフトボックスをクリアしますか？",
+    "clearConfirmContent": "保留中のメッセージはすべて削除され、元に戻せません。",
+    "mode": {
+      "auto": "自動送信",
+      "manual": "手動送信"
+    }
   },
   "contextUsage": {
     "contextUsed": "コンテキスト使用量",
@@ -643,35 +660,22 @@
       "loaded": "読み込み済み",
       "failed": "失敗",
       "unsupported": "非対応"
-    }
-  },
-  "status": {
-    "waitingApproval": "承認待ちです",
-    "running": "実行中",
-    "done": "完了",
-    "doneIdle": "完了 — アイドル",
-    "stopped": "停止",
-    "failed": "失敗"
-  },
-  "statusTooltip": {
-    "waitingApproval": "続行するための承認を待っています。",
-    "running": "このチャットを処理しています。",
-    "doneUnseen": "完了しましたが、まだ確認していません。",
-    "doneSeen": "最近完了し、確認済みです。",
-    "doneIdle": "1分以上前に完了し、確認済みです。",
-    "stopped": "完了する前に停止しました。",
-    "failed": "エラーのため完了できませんでした。"
+    },
+    "selected": "選択済み MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "実行環境を準備しています。初回起動は少し時間がかかる場合があります。"
   },
   "sendbox": {
-    "hint": "/ でコマンド、@ でファイルを参照"
+    "hint": "/ でコマンド、@ でファイルを参照、↑/↓ でメッセージ履歴"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "このリクエストでは、表示できる返信はありませんでした。"
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "このリクエストは可視的な応答を生成しませんでした。この Agent はまずサインインが必要かもしれません：{{hint}}。"
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "このリクエストは、表示できる返信が生成される前にモデルの出力トークン上限に達しました。"
@@ -685,6 +689,32 @@
     }
   },
   "notFound": "会話が存在しないか、削除されました",
+  "emptyModelReply": "モデルは表示可能な返答を生成せずにターンを終了しました。もう一度送信してください。大きな出力が必要な場合は、結果を分割して依頼してください。",
+  "presentationTemplates": {
+    "title": "テンプレート",
+    "columnPptx": "プレゼンテーション · PPTX",
+    "columnHtml": "レポート · HTML",
+    "columnDocx": "ドキュメント · DOCX",
+    "selected": "選択済み",
+    "buttonTooltip": "テンプレート",
+    "slashDescription": "テンプレートを選択",
+    "importCard": "テーマをインポート (.md)",
+    "empty": "利用可能なテンプレートがありません",
+    "chipTooltip": "このメッセージはテンプレートを使用します",
+    "importSuccess": "テンプレートをインポートしました",
+    "importError": "インポートに失敗しました: {{error}}",
+    "removeError": "削除に失敗しました: {{error}}",
+    "deleteTooltip": "テンプレートを削除",
+    "deleteConfirm": "このテンプレートを削除しますか？"
+  },
+  "status": {
+    "waitingApproval": "承認待ちです",
+    "running": "実行中",
+    "done": "完了",
+    "doneIdle": "完了 — アイドル",
+    "stopped": "停止",
+    "failed": "失敗"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -749,5 +779,14 @@
   "artifact": {
     "emptyTitle": "開いているアーティファクトはありません",
     "emptyHint": "生成されたファイルやドキュメントはここで開きます。"
+  },
+  "statusTooltip": {
+    "waitingApproval": "続行するための承認を待っています。",
+    "running": "このチャットを処理しています。",
+    "doneUnseen": "完了しましたが、まだ確認していません。",
+    "doneSeen": "最近完了し、確認済みです。",
+    "doneIdle": "1分以上前に完了し、確認済みです。",
+    "stopped": "完了する前に停止しました。",
+    "failed": "エラーのため完了できませんでした。"
   }
 }

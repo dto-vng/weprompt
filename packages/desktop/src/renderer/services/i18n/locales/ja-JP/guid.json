@@ -1,15 +1,9 @@
 {
-  "toolbar": {
-    "label": "ホーム操作",
-    "history": "履歴",
-    "saved": "保存済み",
-    "community": "コミュニティ"
-  },
   "promptExamplesHint": "これらの指示を試す",
   "defaultPrompts": {
-    "capabilities": "私のために何ができますか？",
-    "skills": "どのようなスキルがありますか？",
-    "tools": "どのようなツールがありますか？",
+    "understand": "このプロジェクトを調べて、何をするものか、どこから手を付ければいいかを分かりやすく教えて",
+    "cleanup": "このフォルダ内の重複ファイルや不要なファイルを見つけて、確認できるようにリストにして",
+    "create": "おしゃれな個人ホームページを作って、完成したらそのまま開いて見せて",
     "reviewFolder": "Review the files in a folder"
   },
   "selectAssistantHint": "アシスタントを選択してタスクを開始",
@@ -20,6 +14,12 @@
     "specifyWorkspace": "プロジェクトフォルダを選択",
     "searchPlaceholder": "プロジェクトを検索…",
     "noProject": "プロジェクトなし"
+  },
+  "toolbar": {
+    "label": "ホーム操作",
+    "history": "履歴",
+    "saved": "保存済み",
+    "community": "コミュニティ"
   },
   "defaultProjectPrompts": {
     "reviewFiles": "Review the files in this project",

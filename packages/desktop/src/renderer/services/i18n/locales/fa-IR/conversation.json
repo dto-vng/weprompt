@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "سلام، برنامه‌تان برای امروز چیست؟",
-    "placeholder": "پیام بفرستید، فایل آپلود کنید، پوشه باز کنید یا کار زمان‌بندی‌شده ایجاد کنید...",
+    "placeholder": "پیام بفرستید، فایل آپلود کنید، پوشه باز کنید، کار زمان‌بندی‌شده ایجاد کنید یا برای دستورات / را تایپ کنید...",
     "linkFolder": "باز کردن پوشه",
     "newConversation": "چت جدید",
     "selectModel": "انتخاب مدل",
@@ -78,6 +78,7 @@
     "knowledgePassagesTooltip": "این فایل به بخش‌های قابل جست‌وجو تقسیم می‌شود و دستیار هنگام پاسخ مرتبط‌ترین بخش‌ها را به کار می‌گیرد.",
     "knowledgeStatusIndexing": "در حال نمایه‌سازی…",
     "knowledgeProgressReading": "در حال خواندن صفحهٔ {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "در حال بازنویسی صفحهٔ {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "در حال جاسازی {{done}}/{{total}}…",
     "knowledgeStatusFailed": "ناموفق",
     "knowledgeStatusUnsupported": "پشتیبانی نمی‌شود",
@@ -93,7 +94,10 @@
     "knowledgeFolderMissingBody": "ممکن است جابه‌جا، تغییرنام یا حذف شده باشد. دانش نمایه‌شدهٔ شما حفظ می‌شود — پوشه را بازگردانید یا پروژه را دوباره پیوند دهید، سپس به‌روزرسانی کنید.",
     "knowledgePreviewNote": "این متنِ نمایه‌شده است که دستیار در آن جست‌وجو می‌کند، نه چیدمان اصلی.",
     "knowledgePreviewTruncated": "پیش‌نمایش کوتاه شده است. برای دیدن کل سند فایل اصلی را باز کنید.",
-    "knowledgePreviewError": "متن نمایه‌شدهٔ این فایل بارگیری نشد."
+    "knowledgePreviewError": "متن نمایه‌شدهٔ این فایل بارگیری نشد.",
+    "knowledgeOcrTag": "بازنویسی‌شده (OCR)",
+    "knowledgeOcrDetail": "توسط {{model}} از یک نسخهٔ اسکن‌شده بازنویسی شد. صفحات نادیده‌گرفته‌شده: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "هیچ"
   },
   "history": {
     "recents": "اخیر",
@@ -106,6 +110,7 @@
     "saveName": "ذخیره",
     "cancelEdit": "لغو",
     "rename": "تغییر نام",
+    "createCronTask": "ایجاد کار زمان‌بندی‌شده",
     "renameTitle": "تغییر نام چت",
     "renamePlaceholder": "لطفاً نام جدیدی وارد کنید",
     "renameSuccess": "نام با موفقیت تغییر کرد",
@@ -149,6 +154,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "چت جدید در این پروژه",
     "deleting": "در حال حذف...",
+    "reorderPinned": "برای تغییر ترتیب گفتگوی سنجاق‌شده بکشید",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -189,7 +195,6 @@
   "noAgentsAvailable": "ایجنتی در دسترس نیست",
   "noModelConfigured": "مدلی پیکربندی نشده است. لطفاً در تنظیمات پیکربندی کنید.",
   "createFailed": "ایجاد مکالمه ناموفق بود",
-  "emptyModelReply": "مدل نوبت را بدون تولید پاسخ قابل مشاهده به پایان رساند. درخواست را دوباره ارسال کنید؛ برای خروجی‌های بزرگ، نتیجه را در بخش‌های کوچک‌تر درخواست کنید.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "مسیر فضای کاری انتخاب‌شده در دسترس نیست. مطمئن شوید مسیر فضای کاری «{{workspacePath}}» وجود دارد و قابل دسترسی است."
@@ -576,8 +581,8 @@
     "error": "پاسخ به سؤال جانبی ناموفق بود."
   },
   "commandQueue": {
-    "title": "دستورات صف‌شده",
-    "clear": "پاک کردن صف",
+    "title": "پیش‌نویس‌ها",
+    "clear": "پاک کردن پیش‌نویس‌ها",
     "edit": "ویرایش",
     "editing": "در حال ویرایش",
     "editPlaceholder": "دستور صف‌شده را قبل از اجرا به‌روزرسانی کنید.",
@@ -592,7 +597,19 @@
     "queueFull": "صف پر است. قبل از افزودن بیشتر، یک دستور حذف کنید.",
     "inputTooLong": "این دستور صف‌شده بسیار طولانی است. قبل از ارسال کوتاه‌تر کنید.",
     "tooManyFiles": "فایل‌های زیادی به این دستور صف‌شده پیوست شده‌اند.",
-    "queueTooLarge": "داده صف برای ذخیره‌سازی امن بسیار بزرگ است. ابتدا برخی دستورات صف‌شده را حذف کنید."
+    "queueTooLarge": "داده صف برای ذخیره‌سازی امن بسیار بزرگ است. ابتدا برخی دستورات صف‌شده را حذف کنید.",
+    "sendNow": "ارسال فوری",
+    "modeToggle": "تغییر حالت ارسال",
+    "help": "راهنما",
+    "helpIntro": "پیام‌هایی که هنگام پاسخ هوش مصنوعی می‌فرستید اینجا منتظر می‌مانند.",
+    "helpAuto": "：پس از پایان هر پاسخ، به‌طور خودکار یکی‌یکی ارسال می‌شوند.",
+    "helpManual": "：بدون ارسال اینجا نگه داشته می‌شوند؛ هرکدام را با «ارسال فوری» بفرستید.",
+    "clearConfirmTitle": "صندوق پیش‌نویس ارسال پاک شود؟",
+    "clearConfirmContent": "همه پیام‌های در انتظار حذف می‌شوند. این کار قابل بازگردانی نیست.",
+    "mode": {
+      "auto": "ارسال خودکار",
+      "manual": "ارسال دستی"
+    }
   },
   "contextUsage": {
     "contextUsed": "زمینه استفاده‌شده",
@@ -643,35 +660,22 @@
       "loaded": "لود شده",
       "failed": "ناموفق",
       "unsupported": "پشتیبانی نمی‌شود"
-    }
-  },
-  "status": {
-    "waitingApproval": "در انتظار تأیید شما",
-    "running": "در حال کار",
-    "done": "پایان یافت",
-    "doneIdle": "پایان یافته — غیرفعال",
-    "stopped": "متوقف شد",
-    "failed": "ناموفق"
-  },
-  "statusTooltip": {
-    "waitingApproval": "برای ادامه، منتظر تأیید شماست.",
-    "running": "در حال کار روی این گفت‌وگو.",
-    "doneUnseen": "تمام شده است، اما هنوز آن را ندیده‌اید.",
-    "doneSeen": "به‌تازگی تمام شده و مشاهده شده است.",
-    "doneIdle": "حداقل یک دقیقه پیش تمام شده و مشاهده شده است.",
-    "stopped": "پیش از پایان متوقف شد.",
-    "failed": "به‌دلیل خطا کامل نشد."
+    },
+    "selected": "MCP انتخاب‌شده"
   },
   "runtimePreparing": {
     "sendboxHint": "در حال آماده‌سازی محیط اجرا. اولین راه‌اندازی ممکن است کمی بیشتر طول بکشد."
   },
   "sendbox": {
-    "hint": "برای دستورات / بزنید، برای ارجاع فایل‌ها @ بزنید"
+    "hint": "برای دستورات /، برای ارجاع فایل‌ها @ و برای تاریخچه پیام‌ها ↑/↓ را بزنید"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "این درخواست پاسخ قابل مشاهده‌ای تولید نکرد."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "این درخواست هیچ پاسخ قابل‌مشاهده‌ای تولید نکرد. ممکن است لازم باشد ابتدا وارد این Agent شوید: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "این درخواست قبل از تولید پاسخ قابل مشاهده، به حد توکن خروجی مدل رسید."
@@ -685,6 +689,32 @@
     }
   },
   "notFound": "مکالمه یافت نشد یا حذف شده است",
+  "emptyModelReply": "مدل نوبت را بدون تولید پاسخ قابل مشاهده به پایان رساند. درخواست را دوباره ارسال کنید؛ برای خروجی‌های بزرگ، نتیجه را در بخش‌های کوچک‌تر درخواست کنید.",
+  "presentationTemplates": {
+    "title": "قالب‌ها",
+    "columnPptx": "ارائه‌ها · PPTX",
+    "columnHtml": "گزارش‌ها · HTML",
+    "columnDocx": "اسناد · DOCX",
+    "selected": "انتخاب‌شده",
+    "buttonTooltip": "قالب‌ها",
+    "slashDescription": "یک قالب انتخاب کنید",
+    "importCard": "وارد کردن تم (.md)",
+    "empty": "قالبی موجود نیست",
+    "chipTooltip": "این پیام از قالب استفاده می‌کند",
+    "importSuccess": "قالب وارد شد",
+    "importError": "خطا در وارد کردن: {{error}}",
+    "removeError": "خطا در حذف: {{error}}",
+    "deleteTooltip": "حذف قالب",
+    "deleteConfirm": "این قالب حذف شود؟"
+  },
+  "status": {
+    "waitingApproval": "در انتظار تأیید شما",
+    "running": "در حال کار",
+    "done": "پایان یافت",
+    "doneIdle": "پایان یافته — غیرفعال",
+    "stopped": "متوقف شد",
+    "failed": "ناموفق"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -749,5 +779,14 @@
   "artifact": {
     "emptyTitle": "آرتیفکتی باز نیست",
     "emptyHint": "فایل‌ها و اسناد تولیدشده اینجا باز می‌شوند."
+  },
+  "statusTooltip": {
+    "waitingApproval": "برای ادامه، منتظر تأیید شماست.",
+    "running": "در حال کار روی این گفت‌وگو.",
+    "doneUnseen": "تمام شده است، اما هنوز آن را ندیده‌اید.",
+    "doneSeen": "به‌تازگی تمام شده و مشاهده شده است.",
+    "doneIdle": "حداقل یک دقیقه پیش تمام شده و مشاهده شده است.",
+    "stopped": "پیش از پایان متوقف شد.",
+    "failed": "به‌دلیل خطا کامل نشد."
   }
 }

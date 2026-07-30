@@ -108,6 +108,14 @@
       "diagnosticsReportSuccess": "Diagnostics report sent",
       "diagnosticsReportFailed": "Failed to send diagnostics report"
     },
+    "startupDirectory": {
+      "title": "Startup directory is unavailable",
+      "description": "AionUi opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart AionUi.",
+      "sendDiagnostics": "Send diagnostics",
+      "diagnosticsSent": "Diagnostics sent",
+      "diagnosticsReportSuccess": "Diagnostics report sent",
+      "diagnosticsReportFailed": "Failed to send diagnostics report"
+    },
     "recoverableDatabaseCorruption": {
       "title": "ローカルデータが破損しています",
       "description": "ローカルデータベースの破損を検出したため、WePrompt は起動を続行できません。確認後、古いデータベースをバックアップし、新しいローカルデータベースを作成して起動を続行します。過去のローカルデータは当面表示されず、古いデータベースはバックアップとして保持されます。",
@@ -118,6 +126,15 @@
       "diagnosticsReportSuccess": "診断レポートを送信しました",
       "diagnosticsReportFailed": "診断レポートの送信に失敗しました",
       "rebuildFailed": "古いDBのバックアップと新しいDBの再作成に失敗しました"
+    },
+    "transientConcurrentStartup": {
+      "title": "AionUi を起動しています",
+      "description": "このウィンドウを開いたとき、別の AionUi の起動処理がまだローカルデータを使用していました。これは一時的なもので、データは安全です。再インストールの必要はありません。少し待ってから再試行するか、AionUi を再起動してください。",
+      "sendDiagnostics": "Send diagnostics",
+      "diagnosticsSent": "Diagnostics sent",
+      "diagnosticsReportSuccess": "Diagnostics report sent",
+      "diagnosticsReportFailed": "Failed to send diagnostics report",
+      "diagnosticsHint": "この現象が繰り返し発生する場合は、診断レポートを送信できます。"
     }
   },
   "fileAttach.addFiles": "ファイルを追加",
@@ -139,5 +156,7 @@
   "unit": {
     "minute_short": "分",
     "second_short": "秒"
-  }
+  },
+  "selectedCount": "選択済み {{count}}",
+  "selectedSkills": "選択済みスキル"
 }

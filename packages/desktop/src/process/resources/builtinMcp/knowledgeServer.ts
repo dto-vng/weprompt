@@ -11,7 +11,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
+import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
@@ -41,7 +41,9 @@ const TOOL_DESCRIPTION_BASE = `Search the documents the user attached to this pr
 
 USE THIS FIRST — before file listing, glob, or grep — when the user asks about specs, reports, policies, requirements, decisions, or any other project document. It searches every attached document at once and returns the passages that actually match, which plain file search cannot do.
 
-For whole-document work (summarise this contract, list every invoice number, walk through the policy), search first to find the right document, then read the file itself: every attached document is an ordinary file at "${KNOWLEDGE_FOLDER_NAME}/<fileName>" inside the working directory, readable with your normal file tools.
+For whole-document work (summarise this contract, list every invoice number, walk through the policy), search first to find the right document, then read it with your normal file tools inside the working directory:
+- .md and .txt documents: read "${KNOWLEDGE_FOLDER_NAME}/<fileName>" directly.
+- PDF and Office documents: the original is binary, so read the extracted text at "${KNOWLEDGE_FOLDER_NAME}/${EXTRACTED_TEXT_DIR_NAME}/<fileName>.md" (e.g. "${KNOWLEDGE_FOLDER_NAME}/${EXTRACTED_TEXT_DIR_NAME}/report.pdf.md").
 
 Input:
 - query: natural-language question or keywords.

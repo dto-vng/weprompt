@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Olá, qual é o seu plano para hoje?",
-    "placeholder": "Envie uma mensagem, faça upload de arquivos, abra uma pasta, ou crie uma tarefa agendada...",
+    "placeholder": "Envie uma mensagem, faça upload de arquivos, abra uma pasta, crie uma tarefa agendada ou digite / para comandos...",
     "linkFolder": "Abrir Pasta",
     "newConversation": "Novo Chat",
     "selectModel": "Selecionar Modelo",
@@ -78,6 +78,7 @@
     "knowledgePassagesTooltip": "Este arquivo é dividido em trechos pesquisáveis, e o assistente usa os mais relevantes ao responder.",
     "knowledgeStatusIndexing": "Indexando…",
     "knowledgeProgressReading": "Lendo página {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcrevendo a página {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Incorporando {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Falhou",
     "knowledgeStatusUnsupported": "Não compatível",
@@ -93,7 +94,10 @@
     "knowledgeFolderMissingBody": "Ela pode ter sido movida, renomeada ou excluída. Seu conhecimento indexado está preservado — restaure a pasta ou revincule o projeto e atualize.",
     "knowledgePreviewNote": "Este é o texto indexado que o assistente pesquisa, não o layout original.",
     "knowledgePreviewTruncated": "Prévia encurtada. Abra o arquivo original para ver o documento completo.",
-    "knowledgePreviewError": "Não foi possível carregar o texto indexado deste arquivo."
+    "knowledgePreviewError": "Não foi possível carregar o texto indexado deste arquivo.",
+    "knowledgeOcrTag": "Transcrito (OCR)",
+    "knowledgeOcrDetail": "Transcrito de uma digitalização por {{model}}. Páginas ignoradas: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "nenhuma"
   },
   "history": {
     "recents": "Recentes",
@@ -106,6 +110,7 @@
     "saveName": "Salvar",
     "cancelEdit": "Cancelar",
     "rename": "Renomear",
+    "createCronTask": "Criar tarefa agendada",
     "renameTitle": "Renomear Chat",
     "renamePlaceholder": "Por favor, digite um novo nome",
     "renameSuccess": "Renomeado com sucesso",
@@ -149,6 +154,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Novo chat neste projeto",
     "deleting": "Excluindo...",
+    "reorderPinned": "Arraste para reordenar a conversa fixada",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -189,7 +195,6 @@
   "noAgentsAvailable": "Nenhum agente disponível",
   "noModelConfigured": "Nenhum modelo configurado. Por favor, configure nas configurações.",
   "createFailed": "Falha ao criar a conversa",
-  "emptyModelReply": "O modelo encerrou o turno sem produzir uma resposta visível. Envie a solicitação novamente; para saídas grandes, peça o resultado em partes menores.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "O caminho do projeto selecionado não está disponível. Verifique se o caminho do projeto \"{{workspacePath}}\" existe e está acessível.",
@@ -582,8 +587,8 @@
     "error": "Falha ao responder à pergunta paralela."
   },
   "commandQueue": {
-    "title": "Comandos na Fila",
-    "clear": "Limpar Fila",
+    "title": "Rascunhos",
+    "clear": "Limpar rascunhos",
     "edit": "Editar",
     "editing": "Editando",
     "editPlaceholder": "Atualize o comando agendado antes que ele seja executado.",
@@ -598,7 +603,19 @@
     "queueFull": "A fila está cheia. Remova um comando antes de adicionar mais.",
     "inputTooLong": "Este comando na fila é muito longo. Encurte-o antes de enviar.",
     "tooManyFiles": "Muitos arquivos anexados a este comando na fila.",
-    "queueTooLarge": "Os dados na fila são muito grandes para serem persistidos com segurança. Remova alguns comandos na fila primeiro."
+    "queueTooLarge": "Os dados na fila são muito grandes para serem persistidos com segurança. Remova alguns comandos na fila primeiro.",
+    "sendNow": "Enviar agora",
+    "modeToggle": "Alternar modo de envio",
+    "help": "Ajuda",
+    "helpIntro": "As mensagens enviadas enquanto a IA responde ficam aqui.",
+    "helpAuto": ": enviadas automaticamente uma a uma após cada resposta terminar.",
+    "helpManual": ": mantidas aqui sem enviar; envie cada uma com Enviar agora.",
+    "clearConfirmTitle": "Limpar a caixa de rascunhos de envio?",
+    "clearConfirmContent": "Todas as mensagens pendentes serão removidas. Isso não pode ser desfeito.",
+    "mode": {
+      "auto": "Envio automático",
+      "manual": "Envio manual"
+    }
   },
   "contextUsage": {
     "contextUsed": "contexto usado",
@@ -649,35 +666,22 @@
       "loaded": "Carregado",
       "failed": "Falhou",
       "unsupported": "Não compatível"
-    }
-  },
-  "status": {
-    "waitingApproval": "Aguardando sua aprovação",
-    "running": "Trabalhando",
-    "done": "Concluído",
-    "doneIdle": "Concluído — inativo",
-    "stopped": "Interrompido",
-    "failed": "Falhou"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Aguardando sua aprovação para continuar.",
-    "running": "Trabalhando neste chat.",
-    "doneUnseen": "Concluído, mas você ainda não visualizou.",
-    "doneSeen": "Concluído recentemente e já visualizado.",
-    "doneIdle": "Concluído há pelo menos um minuto e já visualizado.",
-    "stopped": "Interrompido antes da conclusão.",
-    "failed": "Não foi possível concluir devido a um erro."
+    },
+    "selected": "MCP selecionado"
   },
   "runtimePreparing": {
     "sendboxHint": "Preparando o ambiente de execução. A primeira inicialização pode demorar um pouco mais."
   },
   "sendbox": {
-    "hint": "Digite / para comandos, @ para referenciar arquivos"
+    "hint": "Digite / para comandos, @ para referenciar arquivos, ↑/↓ para o histórico de mensagens"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Esta solicitação não gerou nenhuma resposta visível."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Esta solicitação não produziu nenhuma resposta visível. O agente pode precisar que você faça login primeiro: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "Esta solicitação atingiu o limite de tokens de saída do modelo antes de produzir qualquer resposta visível."
@@ -691,6 +695,32 @@
     }
   },
   "notFound": "Conversa não encontrada ou foi deletada",
+  "emptyModelReply": "O modelo encerrou o turno sem produzir uma resposta visível. Envie a solicitação novamente; para saídas grandes, peça o resultado em partes menores.",
+  "presentationTemplates": {
+    "title": "Modelos",
+    "columnPptx": "Apresentações · PPTX",
+    "columnHtml": "Relatórios · HTML",
+    "columnDocx": "Documentos · DOCX",
+    "selected": "Selecionado",
+    "buttonTooltip": "Modelos",
+    "slashDescription": "Escolher um modelo",
+    "importCard": "Importar tema (.md)",
+    "empty": "Nenhum modelo disponível",
+    "chipTooltip": "Esta mensagem usará o modelo",
+    "importSuccess": "Modelo importado",
+    "importError": "Falha na importação: {{error}}",
+    "removeError": "Falha ao excluir: {{error}}",
+    "deleteTooltip": "Excluir modelo",
+    "deleteConfirm": "Excluir este modelo?"
+  },
+  "status": {
+    "waitingApproval": "Aguardando sua aprovação",
+    "running": "Trabalhando",
+    "done": "Concluído",
+    "doneIdle": "Concluído — inativo",
+    "stopped": "Interrompido",
+    "failed": "Falhou"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -755,5 +785,14 @@
   "artifact": {
     "emptyTitle": "Nenhum artefato aberto",
     "emptyHint": "Arquivos e documentos gerados abrem aqui."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Aguardando sua aprovação para continuar.",
+    "running": "Trabalhando neste chat.",
+    "doneUnseen": "Concluído, mas você ainda não visualizou.",
+    "doneSeen": "Concluído recentemente e já visualizado.",
+    "doneIdle": "Concluído há pelo menos um minuto e já visualizado.",
+    "stopped": "Interrompido antes da conclusão.",
+    "failed": "Não foi possível concluir devido a um erro."
   }
 }

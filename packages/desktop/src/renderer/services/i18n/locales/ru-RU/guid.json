@@ -1,15 +1,9 @@
 {
-  "toolbar": {
-    "label": "Действия на главной",
-    "history": "История",
-    "saved": "Сохранённое",
-    "community": "Сообщество"
-  },
   "promptExamplesHint": "Попробуйте эти инструкции",
   "defaultPrompts": {
-    "capabilities": "Что ты можешь сделать для меня?",
-    "skills": "Какие у тебя есть навыки?",
-    "tools": "Какие у тебя есть инструменты?",
+    "understand": "Изучи этот проект и объясни простыми словами, что он делает и с чего начать",
+    "cleanup": "Найди в этой папке дубликаты и ненужные файлы и покажи список для моего подтверждения",
+    "create": "Сделай мне красивую персональную домашнюю страницу и открой её, когда закончишь",
     "reviewFolder": "Review the files in a folder"
   },
   "selectAssistantHint": "Выберите ассистента, чтобы начать задачу",
@@ -20,6 +14,12 @@
     "specifyWorkspace": "Выбрать папку проекта",
     "searchPlaceholder": "Поиск проектов…",
     "noProject": "Без проекта"
+  },
+  "toolbar": {
+    "label": "Действия на главной",
+    "history": "История",
+    "saved": "Сохранённое",
+    "community": "Сообщество"
   },
   "defaultProjectPrompts": {
     "reviewFiles": "Review the files in this project",

@@ -22,6 +22,8 @@ import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
 import { splitThinkContent, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
+import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
+import { TemplateMessageCard } from '@/renderer/components/chat/TemplateGallery';
 
 /**
  * Format a timestamp for message display.
@@ -48,6 +50,7 @@ export const formatMessageTime = (timestamp: number): string => {
 import MessageCronBadge from './MessageCronBadge';
 import { resolveAgentLogo, useAgentLogos } from '@/renderer/utils/model/agentLogo';
 import TeammateMessageAvatar from './TeammateMessageAvatar';
+import { useTeammateColor } from '@/renderer/pages/team/identity/TeamIdentityContext';
 import { nextRevealLength } from './progressiveText';
 
 const CODE_STYLE = { marginTop: 4, marginBlock: 4 };
@@ -118,24 +121,72 @@ const useProgressiveText = (text: string, isStreaming: boolean) => {
   return { displayedText, isRevealing: displayedText !== text };
 };
 
-const parseFileMarker = (content: string) => {
-  const markerIndex = content.indexOf(AIONUI_FILES_MARKER);
-  if (markerIndex === -1) {
-    return { text: content, files: [] as string[] };
+type ParsedFileMarker = {
+  text: string;
+  files: string[];
+};
+
+const URL_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
+const MARKDOWN_ATTACHMENT_LINE_PATTERN = /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s?|```|~~~|\|)/;
+
+const parseFileMarker = (content: string, canParseFileMarker: boolean): ParsedFileMarker => {
+  if (!canParseFileMarker) {
+    return { text: content, files: [] };
   }
-  const text = content.slice(0, markerIndex).trimEnd();
-  const afterMarker = content.slice(markerIndex + AIONUI_FILES_MARKER.length).trim();
-  const files = afterMarker
-    ? afterMarker
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : [];
-  return { text, files };
+
+  const lines = content.split(/\r?\n/);
+  let markerLineIndex = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].trim() === AIONUI_FILES_MARKER) {
+      markerLineIndex = index;
+      break;
+    }
+  }
+
+  if (markerLineIndex === -1) {
+    return { text: content, files: [] };
+  }
+
+  const files = lines
+    .slice(markerLineIndex + 1)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!files.length || files.some((file_path) => !isLocalMessageFilePath(file_path))) {
+    return { text: content, files: [] };
+  }
+
+  return {
+    text: lines.slice(0, markerLineIndex).join('\n').trimEnd(),
+    files,
+  };
 };
 
 const isAbsoluteMessageFilePath = (file_path: string): boolean =>
-  file_path.startsWith('/') || /^[A-Za-z]:/.test(file_path);
+  file_path.startsWith('/') || file_path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(file_path);
+
+const isWorkspaceRelativeMessageFilePath = (file_path: string): boolean => {
+  const normalizedFilePath = file_path.replace(/\\/g, '/');
+  return (
+    normalizedFilePath.startsWith('./') ||
+    normalizedFilePath.startsWith('../') ||
+    normalizedFilePath.includes('/') ||
+    /(?:^|\/)[^/]+\.[^./\s][^/]*$/.test(normalizedFilePath)
+  );
+};
+
+const isLocalMessageFilePath = (file_path: string): boolean => {
+  const trimmedFilePath = file_path.trim();
+  if (
+    !trimmedFilePath ||
+    URL_SCHEME_PATTERN.test(trimmedFilePath) ||
+    MARKDOWN_ATTACHMENT_LINE_PATTERN.test(trimmedFilePath)
+  ) {
+    return false;
+  }
+
+  return isAbsoluteMessageFilePath(trimmedFilePath) || isWorkspaceRelativeMessageFilePath(trimmedFilePath);
+};
 
 export const resolveMessageFilePath = (file_path: string, workspace?: string): string => {
   if (!file_path || isAbsoluteMessageFilePath(file_path) || !workspace) {
@@ -181,22 +232,34 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     return { reasoning: split, contentToRender: hasSkillSuggest(answer) ? stripSkillSuggest(answer) : answer };
   }, [message.content.content]);
 
-  const { text, files } = parseFileMarker(contentToRender);
-  const { data, json } = useFormatContent(text);
   const { t } = useTranslation();
   const [showCopyAlert, setShowCopyAlert] = useState(false);
   const isUserMessage = message.position === 'right';
-  const shouldRevealStream = isStreaming && !isUserMessage && !json;
-  const { displayedText, isRevealing } = useProgressiveText(text, shouldRevealStream);
   const isTeammateMessage = message.position === 'left' && message.content.teammateMessage === true;
+  const { text, files } = useMemo(
+    () => parseFileMarker(contentToRender, isUserMessage),
+    [contentToRender, isUserMessage]
+  );
+  // Templated presentation sends: fold the machine directive, show the
+  // template card + the user's own words. parseTemplatedSend is null unless
+  // BOTH detection signals match — unclassified content is never hidden.
+  const templatedSend = useMemo(
+    () => (isUserMessage ? parseTemplatedSend(text, files) : null),
+    [isUserMessage, text, files]
+  );
+  const visibleText = templatedSend ? templatedSend.userText : text;
+  const visibleFiles = templatedSend ? templatedSend.userFiles : files;
+  const { data, json } = useFormatContent(visibleText);
+  const shouldRevealStream = isStreaming && !isUserMessage && !json;
+  const { displayedText, isRevealing } = useProgressiveText(visibleText, shouldRevealStream);
   const shouldRenderPlainText = isUserMessage;
   const conversationContext = useConversationContextSafe();
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
   const handleLocalFileLink = useLocalFilePreview(conversationContext?.workspace);
   const resolvedFiles = useMemo(
-    () => files.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
-    [conversationContext?.workspace, files]
+    () => visibleFiles.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
+    [conversationContext?.workspace, visibleFiles]
   );
 
   // 过滤空内容，避免渲染空DOM
@@ -205,8 +268,8 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
   }
 
   const handleCopy = () => {
-    const baseText = shouldRenderPlainText ? text : json ? JSON.stringify(data, null, 2) : text;
-    const fileList = files.length ? `Files:\n${files.map((path) => `- ${path}`).join('\n')}\n\n` : '';
+    const baseText = shouldRenderPlainText ? visibleText : json ? JSON.stringify(data, null, 2) : visibleText;
+    const fileList = visibleFiles.length ? `Files:\n${visibleFiles.map((path) => `- ${path}`).join('\n')}\n\n` : '';
     const textToCopy = fileList + baseText;
     copyText(textToCopy)
       .then(() => {
@@ -235,6 +298,8 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
   const senderAgentType = message.content.senderAgentType;
   const senderConversationId = message.content.senderConversationId;
   const fallbackBackendLogo = senderAgentType ? resolveAgentLogo(logos, { backend: senderAgentType }) : null;
+  // 团队 teammate 消息：按发送者会话取身份色，做气泡左色条 + 彩色发送者名；非团队场景为 undefined。
+  const teammateColor = useTeammateColor(isTeammateMessage ? senderConversationId : undefined);
 
   return (
     <>
@@ -254,11 +319,16 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
               senderConversationId={senderConversationId}
               backendLogo={fallbackBackendLogo}
             />
-            <span className='text-12px text-t-secondary'>{senderName}</span>
+            <span
+              className='text-12px'
+              style={teammateColor ? { color: teammateColor } : { color: 'var(--text-secondary)' }}
+            >
+              {senderName}
+            </span>
           </div>
         )}
-        {files.length > 0 && (
-          <div className={classNames('mt-6px', { 'self-end': isUserMessage })}>
+        {visibleFiles.length > 0 && (
+          <div className={classNames('mt-6px min-w-0 max-w-full', { 'self-end': isUserMessage })}>
             {resolvedFiles.length === 1 ? (
               <div className='flex items-center'>
                 <FilePreview path={resolvedFiles[0]} onRemove={() => undefined} readonly />
@@ -272,6 +342,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             )}
           </div>
         )}
+        {templatedSend && <TemplateMessageCard templateId={templatedSend.templateId} />}
         {/* The model's reasoning, kept and shown in grey above the answer (never erased). */}
         {!isUserMessage && !json && reasoning.trim() && (
           <div className='w-full mb-8px' data-testid='message-reasoning'>
@@ -299,7 +370,10 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             ...(cronMeta
               ? { borderRadius: '8px 0 8px 8px', color: 'var(--text-primary)' }
               : isTeammateMessage
-                ? { borderRadius: '0 8px 8px 8px' }
+                ? {
+                    borderRadius: '0 8px 8px 8px',
+                    ...(teammateColor ? { borderLeft: `3px solid ${teammateColor}` } : {}),
+                  }
                 : undefined),
             ...(isUserMessage && !cronMeta
               ? { borderRadius: '12px 2px 12px 12px', color: 'var(--text-primary)' }
@@ -309,7 +383,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
           {/* JSON 内容使用折叠组件 Use CollapsibleContent for JSON content */}
           {shouldRenderPlainText ? (
             <div className='whitespace-pre-wrap break-words' data-testid='message-text-content'>
-              {text}
+              {visibleText}
             </div>
           ) : json ? (
             <CollapsibleContent maxHeight={200} defaultCollapsed={true}>

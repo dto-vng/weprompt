@@ -103,6 +103,7 @@ const readySource: IKnowledgeSourceDto = {
   addedAt: 1,
   error: null,
   progress: null,
+  ocr: null,
 };
 
 const indexingSource: IKnowledgeSourceDto = {
@@ -115,6 +116,7 @@ const indexingSource: IKnowledgeSourceDto = {
   addedAt: 2,
   error: null,
   progress: null,
+  ocr: null,
 };
 
 const failedSource: IKnowledgeSourceDto = {
@@ -127,6 +129,7 @@ const failedSource: IKnowledgeSourceDto = {
   addedAt: 3,
   error: 'Could not parse file.',
   progress: null,
+  ocr: null,
 };
 
 const unsupportedSource: IKnowledgeSourceDto = {
@@ -139,6 +142,7 @@ const unsupportedSource: IKnowledgeSourceDto = {
   addedAt: 4,
   error: 'Unsupported file type.',
   progress: null,
+  ocr: null,
 };
 
 /** A file BM25 made searchable but that no embedding model ever reached. */
@@ -253,6 +257,47 @@ describe('ProjectKnowledgeCard', () => {
 
     expect(screen.getByText('conversation.projectHome.knowledgeProgressReading:12/50')).toBeInTheDocument();
     expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
+  });
+
+  // Transcribing a scan is the slowest thing ingestion does — one model call per
+  // page, minutes for a capped document — so this label is the one that most
+  // needs to move. A motionless tag for that long reads as a hang.
+  it('shows the page being transcribed while a scan is being read by the model', () => {
+    setState({
+      sources: [{ ...indexingSource, fileName: 'scan.pdf', progress: { stage: 'transcribing', done: 7, total: 20 } }],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressTranscribing:7/20')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
+  });
+
+  it('marks a transcribed source, so a doubted answer can be traced to the scan', () => {
+    setState({
+      sources: [
+        {
+          ...readySource,
+          fileName: 'contract.pdf',
+          ocr: { model: 'google/gemma-4-31b-it', skippedPages: [3, 4] },
+        },
+      ],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    // Present on a HEALTHY ready row, where the card otherwise stays silent:
+    // transcription can be wrong in ways reading a file cannot, so this is not
+    // a "needs attention" tag but a permanent provenance marker.
+    expect(screen.getByTestId('knowledge-ocr-s-ready')).toHaveTextContent('conversation.projectHome.knowledgeOcrTag');
+  });
+
+  it('leaves an ordinary source unmarked', () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-ocr-s-ready')).not.toBeInTheDocument();
   });
 
   // BM25 marks a source ready before embedding starts, so the embed pass always

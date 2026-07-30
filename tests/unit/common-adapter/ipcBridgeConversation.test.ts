@@ -58,7 +58,7 @@ const httpBridgeMocks = vi.hoisted(() => {
 
 vi.mock('@/common/adapter/httpBridge', () => httpBridgeMocks);
 
-vi.mock('@office-ai/platform', () => ({
+vi.mock('@/common/platform/bridge', () => ({
   bridge: {
     buildProvider: vi.fn(() => ({
       provider: vi.fn(),

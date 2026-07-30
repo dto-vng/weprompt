@@ -9,6 +9,8 @@
  */
 
 import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
 import { connect, createServer, type Socket } from 'node:net';
 import { cleanupRegisteredAgentProcesses } from './agent-process-registry.js';
 import type { AppMetadata, BackendBinaryResolver } from './types.js';
@@ -163,6 +165,11 @@ export type BackendStartOptions = {
   onHealthTimeout?: (error: BackendStartupError) => Promise<void> | void;
   onPendingExit?: (error: BackendStartupError) => Promise<void> | void;
   onReady?: (port: number) => Promise<void> | void;
+  /**
+   * Browser origins allowed to call the local API. The caller knows these; a
+   * packaged renderer loads over `file://` and so sends `Origin: null`.
+   */
+  allowedOrigins?: string[];
 };
 
 export class BackendStartupError extends Error {
@@ -198,7 +205,7 @@ export function buildSpawnArgs(config: SpawnConfig): string[] {
     config.appVersion,
   ];
   if (config.isPackaged) args.push('--managed-resources-mode', 'bundled');
-  if (!config.isPackaged) args.push('--dump-prompts');
+  if (!config.isPackaged && process.env.AIONUI_DUMP_PROMPTS === '1') args.push('--dump-prompts');
   if (config.logDir) args.push('--log-dir', config.logDir);
   if (config.workDir) args.push('--work-dir', config.workDir);
   if (config.local) args.push('--local');
@@ -212,13 +219,43 @@ export function buildSpawnArgs(config: SpawnConfig): string[] {
  * backend's `/api/system/info` matches what Electron main persists in
  * ProcessEnv('aionui.dir').
  */
-export function buildSpawnEnv(dirs: BackendDirConfig): NodeJS.ProcessEnv {
+export function buildSpawnEnv(dirs?: BackendDirConfig, security?: BackendSecurityConfig): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    AIONUI_CACHE_DIR: dirs.cacheDir,
-    AIONUI_WORK_DIR: dirs.workDir,
-    AIONUI_LOG_DIR: dirs.logDir,
+    ...(dirs
+      ? {
+          AIONUI_CACHE_DIR: dirs.cacheDir,
+          AIONUI_WORK_DIR: dirs.workDir,
+          AIONUI_LOG_DIR: dirs.logDir,
+        }
+      : {}),
+    ...(security?.localToken ? { AIONUI_LOCAL_TOKEN: security.localToken } : {}),
+    ...(security?.allowedOrigins?.length ? { AIONUI_LOCAL_ALLOWED_ORIGINS: security.allowedOrigins.join(',') } : {}),
   };
+}
+
+/**
+ * Secret and origin allow-list handed to a `--local` backend.
+ *
+ * In local mode the backend skips JWT verification, so without these it answers
+ * any process — or any page a browser renders — that reaches its loopback port.
+ * Passed through the environment rather than argv: process arguments are
+ * world-readable via `ps`.
+ */
+export type BackendSecurityConfig = {
+  localToken?: string;
+  allowedOrigins?: string[];
+};
+
+/**
+ * Mint the per-launch secret the renderer must present on every backend call.
+ *
+ * Regenerated on every spawn and never persisted — a leaked token dies with the
+ * process. Hex keeps it safe to carry in a query string, which `/ws` upgrades
+ * and iframe navigations need because they cannot set a header.
+ */
+export function createLocalToken(): string {
+  return randomBytes(32).toString('hex');
 }
 
 const FETCH_FORBIDDEN_PORTS = new Set([
@@ -231,6 +268,20 @@ const FETCH_FORBIDDEN_PORTS = new Set([
 const FETCH_COMPATIBLE_PORT_MAX_ATTEMPTS = 50;
 const AIONCORE_LISTENING_PREFIX = 'AIONCORE_LISTENING ';
 const BACKEND_PORT_REPORT_TIMEOUT_MS = 30_000;
+
+// Benign boundary code emitted by an aioncore instance that yielded the
+// data-dir instance guard to a peer that already owns it (Sentry 135525166).
+// This is a transient, self-recoverable condition — the owning peer is expected
+// to finish (or a crash-orphan is expected to self-exit and release the guard),
+// so the launcher retries with bounded backoff rather than surfacing a fatal
+// startup failure.
+const PEER_ALREADY_RUNNING_BOUNDARY_CODE = 'BOOTSTRAP_PEER_ALREADY_RUNNING';
+const PEER_RETRY_MAX_ATTEMPTS = 5;
+const PEER_RETRY_BACKOFF_MS = [250, 500, 1000, 1500];
+
+function delayMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function isFetchForbiddenPort(port: number): boolean {
   return FETCH_FORBIDDEN_PORTS.has(port);
@@ -364,6 +415,11 @@ function getResolveDiagnostics(error: unknown): Partial<BackendStartupErrorDetai
   return diagnostics as Partial<BackendStartupErrorDetails>;
 }
 
+function ensureBackendStartupDirectory(dir: string | undefined): void {
+  if (!dir || dir.trim() === '') return;
+  mkdirSync(dir, { recursive: true });
+}
+
 function waitForChildProcessEnd(childProcess: ChildProcess): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
@@ -464,6 +520,7 @@ async function probeHealthCheckTcpConnect(port: number, timeoutMs = 1_000): Prom
 export class BackendLifecycleManager {
   private childProcess: ChildProcess | null = null;
   private _port = 0;
+  private _localToken = '';
   private _status: BackendStatus = 'stopped';
   private _lastDbPath = '';
   private _lastLogDir?: string;
@@ -483,11 +540,62 @@ export class BackendLifecycleManager {
     return this._port;
   }
 
+  /**
+   * Per-launch secret every caller must present to the `--local` backend.
+   *
+   * Empty until the first `start()`. Hand it only to the app's own renderer —
+   * anything else holding it can drive the whole local API.
+   */
+  get localToken(): string {
+    return this._localToken;
+  }
+
   get status(): BackendStatus {
     return this._status;
   }
 
+  private isPeerAlreadyRunningError(error: unknown): boolean {
+    return (
+      error instanceof BackendStartupError && error.details.backendBoundaryCode === PEER_ALREADY_RUNNING_BOUNDARY_CODE
+    );
+  }
+
   async start(
+    dbPath: string,
+    logDir?: string,
+    dirs?: BackendDirConfig,
+    options?: BackendStartOptions,
+    preferredPort?: number,
+    launchFlags: BackendLaunchFlags = {}
+  ): Promise<number> {
+    // Bounded retry loop for the transient "a peer aioncore already owns this
+    // data directory" case (Sentry 135525166). The owning peer either finishes
+    // startup and keeps running, or a crash-orphan self-exits and releases the
+    // data-dir instance guard. Non-peer errors are thrown immediately with no
+    // retry. Runtime crash restarts (handleCrash / maxRestarts) are a separate,
+    // orthogonal mechanism for an already-running backend.
+    let lastPeerError: unknown;
+    for (let attempt = 0; attempt < PEER_RETRY_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.attemptStart(dbPath, logDir, dirs, options, preferredPort, launchFlags);
+      } catch (error) {
+        if (!this.isPeerAlreadyRunningError(error) || attempt >= PEER_RETRY_MAX_ATTEMPTS - 1) {
+          throw error;
+        }
+        lastPeerError = error;
+        const backoff = PEER_RETRY_BACKOFF_MS[Math.min(attempt, PEER_RETRY_BACKOFF_MS.length - 1)];
+        console.warn(
+          `[aioncore] a peer already owns the data directory; retrying startup in ${backoff}ms (attempt ${attempt + 1}/${PEER_RETRY_MAX_ATTEMPTS})`
+        );
+        await delayMs(backoff);
+      }
+    }
+    // Unreachable in practice: the loop either returns on success or throws on
+    // the final attempt. Kept as an explicit safety net for the peer path.
+    throw lastPeerError ?? new Error('aioncore startup failed after peer retries');
+  }
+
+  private async attemptStart(
     dbPath: string,
     logDir?: string,
     dirs?: BackendDirConfig,
@@ -563,6 +671,11 @@ export class BackendLifecycleManager {
       );
     };
 
+    // Local mode skips JWT verification, so the backend is only as private as
+    // this secret. Mint a fresh one per spawn so a restart invalidates whatever
+    // the previous renderer held.
+    this._localToken = createLocalToken();
+
     const args = buildSpawnArgs({
       port: this._port,
       dbPath,
@@ -577,9 +690,23 @@ export class BackendLifecycleManager {
     console.log(`[aioncore] starting: ${binaryPath} ${args.join(' ')}`);
 
     try {
+      ensureBackendStartupDirectory(dbPath);
+      ensureBackendStartupDirectory(logDir);
+      ensureBackendStartupDirectory(dirs?.cacheDir);
+      ensureBackendStartupDirectory(dirs?.workDir);
+      ensureBackendStartupDirectory(dirs?.logDir);
+    } catch (error) {
+      this._status = 'error';
+      throw makeStartupError('spawn', 'aioncore startup directory preparation failed', error);
+    }
+
+    try {
       this.childProcess = spawn(binaryPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: dirs ? buildSpawnEnv(dirs) : process.env,
+        env: buildSpawnEnv(dirs, {
+          localToken: this._localToken,
+          allowedOrigins: options?.allowedOrigins,
+        }),
         cwd: dirs?.workDir ?? dbPath,
         detached: process.platform !== 'win32',
       });

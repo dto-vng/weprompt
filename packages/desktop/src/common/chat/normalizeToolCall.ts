@@ -178,6 +178,7 @@ export function normalizeAcpToolCall(message: IMessageAcpToolCall): NormalizedTo
   if (Array.isArray(update.content) && update.content.length) {
     output = update.content
       .map((item) => {
+        if (typeof item !== 'object' || item === null) return '';
         if (item.type === 'content' && item.content?.text) return formatValue(item.content.text);
         if (item.type === 'diff' && 'path' in item) return formatValue(`[diff] ${item.path}`);
         return '';

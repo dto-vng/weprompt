@@ -8,7 +8,8 @@ const Guid = React.lazy(() => import('@renderer/pages/guid'));
 const AgentSettings = React.lazy(() => import('@renderer/pages/settings/AgentSettings'));
 const AgentRepairPage = React.lazy(() => import('@renderer/pages/settings/AgentSettings/AgentRepairPage'));
 const AssistantSettings = React.lazy(() => import('@renderer/pages/settings/AssistantSettings'));
-const SkillsSettings = React.lazy(() => import('@renderer/pages/settings/SkillsHubSettings'));
+const SkillsSettings = React.lazy(() => import('@renderer/pages/settings/SkillsSettings/SkillsHubSettings'));
+const SkillDetailPage = React.lazy(() => import('@renderer/pages/settings/SkillsSettings/SkillDetailPage'));
 const ToolsSettings = React.lazy(() => import('@renderer/pages/settings/ToolsSettings'));
 const AppearanceSettings = React.lazy(() => import('@renderer/pages/settings/AppearanceSettings'));
 const ModeSettings = React.lazy(() => import('@renderer/pages/settings/ModeSettings'));
@@ -23,6 +24,7 @@ const ScheduledTasksPage = React.lazy(() => import('@renderer/pages/cron/Schedul
 const TaskDetailPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage/TaskDetailPage'));
 const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
 const ProjectHome = React.lazy(() => import('@renderer/pages/project'));
+const DashboardPage = React.lazy(() => import('@renderer/pages/dashboard'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -67,6 +69,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
         <Route element={<ProtectedLayout layout={layout} />}>
           <Route index element={<Navigate to='/guid' replace />} />
           <Route path='/guid' element={withRouteFallback(Guid)} />
+          <Route path='/dashboard' element={withRouteFallback(DashboardPage)} />
           <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
           <Route path='/project/:id' element={withRouteFallback(ProjectHome)} />
           <Route
@@ -84,6 +87,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           {/* Skills and Tools are top-level settings entries. */}
           <Route path='/settings/skills' element={withRouteFallback(SkillsSettings)} />
           <Route path='/settings/skills/import-history' element={withRouteFallback(SkillsSettings)} />
+          <Route path='/settings/skills/detail/:skillName' element={withRouteFallback(SkillDetailPage)} />
           <Route path='/settings/tools' element={withRouteFallback(ToolsSettings)} />
           {/* Legacy routes — the previous combined "Capabilities" page is now two pages. */}
           <Route path='/settings/capabilities' element={<CapabilitiesRedirect />} />

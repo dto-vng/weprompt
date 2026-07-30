@@ -57,7 +57,7 @@ const httpBridgeMocks = vi.hoisted(() => {
 
 vi.mock('@/common/adapter/httpBridge', () => httpBridgeMocks);
 
-vi.mock('@office-ai/platform', () => ({
+vi.mock('@/common/platform/bridge', () => ({
   bridge: {
     buildProvider: vi.fn(() => ({
       provider: vi.fn(),
@@ -85,5 +85,42 @@ describe('ipcBridge team adapter', () => {
       path: '/api/teams/team-1/run-state',
       body: undefined,
     });
+  });
+
+  it('team.create posts canonical agents payload', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    await team.create.invoke({
+      user_id: 'user-1',
+      name: 'Alpha',
+      workspace: '/tmp/ws',
+      workspace_mode: 'shared',
+      agents: [
+        {
+          role: 'leader',
+          assistant_name: 'Lead',
+          assistant_id: 'assistant-lead',
+          model: 'claude-sonnet-4',
+        },
+      ],
+    });
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/teams',
+      body: {
+        name: 'Alpha',
+        workspace: '/tmp/ws',
+        agents: [
+          {
+            name: 'Lead',
+            role: 'lead',
+            model: 'claude-sonnet-4',
+            assistant_id: 'assistant-lead',
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(httpBridgeMocks.calls.at(-1)?.body)).not.toContain('assistants');
   });
 });

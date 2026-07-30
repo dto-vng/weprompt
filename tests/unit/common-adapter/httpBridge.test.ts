@@ -25,6 +25,9 @@ import {
   wsMappedEmitter,
   stubEmitter,
   httpRequest,
+  getLocalToken,
+  withLocalTokenHeaders,
+  withLocalTokenQuery,
 } from '@/common/adapter/httpBridge';
 
 type FakeSocketEventMap = {
@@ -116,6 +119,70 @@ describe('httpBridge', () => {
       const result = getBaseUrl();
 
       expect(result).toBe('');
+    });
+  });
+
+  describe('local-mode secret', () => {
+    afterEach(() => {
+      delete (globalThis as { __backendLocalToken?: string }).__backendLocalToken;
+    });
+
+    it('reads the secret from globalThis for main-process callers', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'main-secret';
+
+      expect(getLocalToken()).toBe('main-secret');
+    });
+
+    it('prefers window over globalThis, so the renderer uses what preload exposed', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'main-secret';
+      vi.stubGlobal('window', { __backendLocalToken: 'renderer-secret' });
+
+      expect(getLocalToken()).toBe('renderer-secret');
+    });
+
+    it('returns an empty string when no secret is exposed', () => {
+      expect(getLocalToken()).toBe('');
+    });
+
+    it('adds the secret header while keeping the caller headers', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+        'X-AionUI-Local-Token': 'abc123',
+      });
+    });
+
+    it('leaves headers untouched in WebUI mode, where real auth applies instead', () => {
+      expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('appends the secret to a URL with no query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws?local_token=abc123');
+    });
+
+    it('appends the secret to a URL that already has a query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x?a=1')).toBe(
+        'http://127.0.0.1:1234/api/x?a=1&local_token=abc123'
+      );
+    });
+
+    it('percent-encodes the secret so it cannot break out of the query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'a&b=c';
+
+      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x')).toBe(
+        'http://127.0.0.1:1234/api/x?local_token=a%26b%3Dc'
+      );
+    });
+
+    it('leaves the URL untouched when no secret is exposed', () => {
+      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws');
     });
   });
 

@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hi, what's your plan for today?",
-    "placeholder": "Send a message, upload files, open a folder, or create a scheduled task...",
+    "placeholder": "Send a message, upload files, open a folder, create a scheduled task, or type / for commands...",
     "linkFolder": "Open Folder",
     "newConversation": "New Chat",
     "selectModel": "Select Model",
@@ -78,6 +78,7 @@
     "knowledgePassagesTooltip": "This file is split into searchable passages, and the assistant pulls in the most relevant ones when it answers.",
     "knowledgeStatusIndexing": "Indexing…",
     "knowledgeProgressReading": "Reading page {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcribing page {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Embedding {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Failed",
     "knowledgeStatusUnsupported": "Unsupported",
@@ -93,7 +94,10 @@
     "knowledgeFolderMissingBody": "It may have been moved, renamed, or deleted. Your indexed knowledge is preserved — restore the folder or relink the project, then refresh.",
     "knowledgePreviewNote": "This is the indexed text the assistant searches, not the original layout.",
     "knowledgePreviewTruncated": "Preview shortened. Open the original for the whole document.",
-    "knowledgePreviewError": "Could not load the indexed text for this file."
+    "knowledgePreviewError": "Could not load the indexed text for this file.",
+    "knowledgeOcrTag": "Transcribed (OCR)",
+    "knowledgeOcrDetail": "Transcribed from a scan by {{model}}. Pages skipped: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "none"
   },
   "history": {
     "recents": "Recents",
@@ -106,6 +110,7 @@
     "saveName": "Save",
     "cancelEdit": "Cancel",
     "rename": "Rename",
+    "createCronTask": "Create scheduled task",
     "renameTitle": "Rename Chat",
     "renamePlaceholder": "Please enter a new name",
     "renameSuccess": "Renamed successfully",
@@ -149,6 +154,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "New chat in this project",
     "deleting": "Deleting...",
+    "reorderPinned": "Drag to reorder pinned conversation",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -182,67 +188,6 @@
     "loadingMore": "Loading more...",
     "untitled": "Untitled conversation"
   },
-  "contextHandoff": {
-    "activeFileDescription": "Active handoff",
-    "addPinned": "Add pinned context",
-    "budget": {
-      "healthy": "Context {{percent}}",
-      "watch": "Context watch {{percent}}",
-      "compress": "Compress soon {{percent}}",
-      "too_large": "Context large {{percent}}"
-    },
-    "budgetLabel": "Budget",
-    "command": {
-      "description": "Manage, compact, pin, or hand off conversation context",
-      "missingPinText": "Add text after /context pin",
-      "unexpectedArguments": "This context command has unexpected arguments",
-      "unsupportedSubcommand": "Unknown context command. Use open, compact, pin, or handoff.",
-      "fallbackComplete": "Context updated with the local fallback",
-      "compactSuccess": "Context updated",
-      "pinSuccess": "Context pinned and updated",
-      "failed": "Context command failed"
-    },
-    "contextMissing": "Context.md could not be read",
-    "continue": "Continue",
-    "continuationName": "{{name}} continuation",
-    "continueTooltip": "Start a new chat with the edited Context.md",
-    "editPinned": "Edit pinned context",
-    "emptyFileDescription": "Not created",
-    "emptyPinned": "No pinned context yet",
-    "export": "Context.md",
-    "exportFailed": "Failed to export Context.md",
-    "exportFirst": "Export Context.md before starting a continuation",
-    "exportSuccess": "Context.md exported",
-    "exportTooltip": "Export this conversation as Context.md",
-    "improve": "Improve",
-    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
-    "improveTooltip": "Ask the agent to improve Context.md",
-    "newContext": "New Context",
-    "newContextTooltip": "Replace the active Context.md with a fresh export",
-    "open": "Open",
-    "openTooltip": "Open Context.md in Preview",
-    "pinContentPlaceholder": "Context to keep active in this conversation",
-    "pinnedCount": "Pinned {{count}}",
-    "pinTitlePlaceholder": "Title",
-    "pinnedTitle": "Pinned context",
-    "replaceSuccess": "Context.md replaced",
-    "sectionTitle": "Context",
-    "status": {
-      "updating": "Updating with AI...",
-      "updatedByAi": "Updated by AI",
-      "rulesFallback": "Updated with rules fallback",
-      "stale": "Update pending",
-      "failed": "Update failed",
-      "edited": "Edited context",
-      "error": {
-        "invalidModelOutput": "The AI returned an unexpected result, so the context wasn't updated.",
-        "providerRequestFailed": "The model request failed. Check the provider connection and try again.",
-        "providerNotFound": "The model provider wasn't found. Check this conversation's model settings.",
-        "interrupted": "The context update was interrupted before it finished.",
-        "unknown": "The context update failed unexpectedly. Try again."
-      }
-    }
-  },
   "dropdown": {
     "cliAgents": "CLI Agents",
     "presetAssistants": "Preset Assistants"
@@ -250,7 +195,6 @@
   "noAgentsAvailable": "No agents available",
   "noModelConfigured": "No model configured. Please configure in settings.",
   "createFailed": "Failed to create conversation",
-  "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "The selected workspace path is unavailable. Make sure the workspace path \"{{workspacePath}}\" exists and is accessible."
@@ -637,8 +581,8 @@
     "error": "Failed to answer the side question."
   },
   "commandQueue": {
-    "title": "Queued Commands",
-    "clear": "Clear Queue",
+    "title": "Draft box",
+    "clear": "Clear draft box",
     "edit": "Edit",
     "editing": "Editing",
     "editPlaceholder": "Update the queued command before it runs.",
@@ -653,7 +597,19 @@
     "queueFull": "Queue is full. Remove a command before adding more.",
     "inputTooLong": "This queued command is too long. Shorten it before sending.",
     "tooManyFiles": "Too many files are attached to this queued command.",
-    "queueTooLarge": "Queue data is too large to persist safely. Remove some queued commands first."
+    "queueTooLarge": "Queue data is too large to persist safely. Remove some queued commands first.",
+    "sendNow": "Send now",
+    "modeToggle": "Toggle send mode",
+    "help": "Help",
+    "helpIntro": "Messages you send while the AI is replying wait here.",
+    "helpAuto": ": sent automatically one by one after each reply finishes.",
+    "helpManual": ": kept here without sending; send each with Send now.",
+    "clearConfirmTitle": "Clear the send draft box?",
+    "clearConfirmContent": "All pending messages will be removed. This cannot be undone.",
+    "mode": {
+      "auto": "Auto send",
+      "manual": "Manual send"
+    }
   },
   "contextUsage": {
     "contextUsed": "context used",
@@ -704,35 +660,22 @@
       "loaded": "Loaded",
       "failed": "Failed",
       "unsupported": "Unsupported"
-    }
-  },
-  "status": {
-    "waitingApproval": "Awaiting approval",
-    "running": "Working",
-    "done": "Finished",
-    "doneIdle": "Finished — idle",
-    "stopped": "Stopped",
-    "failed": "Failed"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Waiting for your approval to continue.",
-    "running": "Working on this chat.",
-    "doneUnseen": "Finished, but you haven't viewed it yet.",
-    "doneSeen": "Finished recently and already viewed.",
-    "doneIdle": "Finished at least a minute ago and already viewed.",
-    "stopped": "Stopped before finishing.",
-    "failed": "Couldn't finish because of an error."
+    },
+    "selected": "Selected MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Preparing the runtime environment. First startup can take a little longer."
   },
   "sendbox": {
-    "hint": "Type / for commands, @ to reference files"
+    "hint": "Type / for commands, @ to reference files, ↑/↓ for message history"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "This request produced no visible reply."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "This request produced no visible reply. The agent may need you to sign in first — {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "This request hit the model's output token limit before any visible reply was produced."
@@ -746,8 +689,104 @@
     }
   },
   "notFound": "Conversation not found or has been deleted",
+  "contextHandoff": {
+    "activeFileDescription": "Active handoff",
+    "addPinned": "Add pinned context",
+    "budget": {
+      "healthy": "Context {{percent}}",
+      "watch": "Context watch {{percent}}",
+      "compress": "Compress soon {{percent}}",
+      "too_large": "Context large {{percent}}"
+    },
+    "budgetLabel": "Budget",
+    "command": {
+      "description": "Manage, compact, pin, or hand off conversation context",
+      "missingPinText": "Add text after /context pin",
+      "unexpectedArguments": "This context command has unexpected arguments",
+      "unsupportedSubcommand": "Unknown context command. Use open, compact, pin, or handoff.",
+      "fallbackComplete": "Context updated with the local fallback",
+      "compactSuccess": "Context updated",
+      "pinSuccess": "Context pinned and updated",
+      "failed": "Context command failed"
+    },
+    "contextMissing": "Context.md could not be read",
+    "continue": "Continue",
+    "continuationName": "{{name}} continuation",
+    "continueTooltip": "Start a new chat with the edited Context.md",
+    "editPinned": "Edit pinned context",
+    "emptyFileDescription": "Not created",
+    "emptyPinned": "No pinned context yet",
+    "export": "Context.md",
+    "exportFailed": "Failed to export Context.md",
+    "exportFirst": "Export Context.md before starting a continuation",
+    "exportSuccess": "Context.md exported",
+    "exportTooltip": "Export this conversation as Context.md",
+    "improve": "Improve",
+    "improvePrompt": "Improve the open Context.md handoff. Rewrite only the synthesis sections: Goal, Current State, Important Decisions, User Preferences, Open Questions, Next Step, and Do Not Forget. Preserve Files / Artifacts, Assistant Setup, and Pinned Context unless the user explicitly asks to change them.",
+    "improveTooltip": "Ask the agent to improve Context.md",
+    "newContext": "New Context",
+    "newContextTooltip": "Replace the active Context.md with a fresh export",
+    "open": "Open",
+    "openTooltip": "Open Context.md in Preview",
+    "pinContentPlaceholder": "Context to keep active in this conversation",
+    "pinnedCount": "Pinned {{count}}",
+    "pinTitlePlaceholder": "Title",
+    "pinnedTitle": "Pinned context",
+    "replaceSuccess": "Context.md replaced",
+    "sectionTitle": "Context",
+    "status": {
+      "updating": "Updating with AI...",
+      "updatedByAi": "Updated by AI",
+      "rulesFallback": "Updated with rules fallback",
+      "stale": "Update pending",
+      "failed": "Update failed",
+      "edited": "Edited context",
+      "error": {
+        "invalidModelOutput": "The AI returned an unexpected result, so the context wasn't updated.",
+        "providerRequestFailed": "The model request failed. Check the provider connection and try again.",
+        "providerNotFound": "The model provider wasn't found. Check this conversation's model settings.",
+        "interrupted": "The context update was interrupted before it finished.",
+        "unknown": "The context update failed unexpectedly. Try again."
+      }
+    }
+  },
+  "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
+  "presentationTemplates": {
+    "title": "Templates",
+    "columnPptx": "Presentations · PPTX",
+    "columnHtml": "Reports · HTML",
+    "columnDocx": "Documents · DOCX",
+    "selected": "Selected",
+    "buttonTooltip": "Templates",
+    "slashDescription": "Choose a template",
+    "importCard": "Import theme (.md)",
+    "empty": "No templates available",
+    "chipTooltip": "This message will use the template",
+    "importSuccess": "Template imported",
+    "importError": "Import failed: {{error}}",
+    "removeError": "Delete failed: {{error}}",
+    "deleteTooltip": "Delete template",
+    "deleteConfirm": "Delete this template?"
+  },
+  "status": {
+    "waitingApproval": "Awaiting approval",
+    "running": "Working",
+    "done": "Finished",
+    "doneIdle": "Finished — idle",
+    "stopped": "Stopped",
+    "failed": "Failed"
+  },
   "artifact": {
     "emptyTitle": "No artifact open",
     "emptyHint": "Generated files and documents open here."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Waiting for your approval to continue.",
+    "running": "Working on this chat.",
+    "doneUnseen": "Finished, but you haven't viewed it yet.",
+    "doneSeen": "Finished recently and already viewed.",
+    "doneIdle": "Finished at least a minute ago and already viewed.",
+    "stopped": "Stopped before finishing.",
+    "failed": "Couldn't finish because of an error."
   }
 }

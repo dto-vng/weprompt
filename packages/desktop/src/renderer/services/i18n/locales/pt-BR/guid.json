@@ -1,15 +1,9 @@
 {
-  "toolbar": {
-    "label": "Ações da página inicial",
-    "history": "Histórico",
-    "saved": "Salvos",
-    "community": "Comunidade"
-  },
   "promptExamplesHint": "Experimente estas instruções",
   "defaultPrompts": {
-    "capabilities": "O que você pode fazer por mim?",
-    "skills": "Quais habilidades você tem?",
-    "tools": "Quais ferramentas você tem?",
+    "understand": "Conheça este projeto e explique em palavras simples o que ele faz e por onde começar",
+    "cleanup": "Encontre arquivos duplicados e inúteis nesta pasta e liste-os para minha confirmação",
+    "create": "Crie uma página pessoal bonita para mim e abra-a quando estiver pronta",
     "reviewFolder": "Review the files in a folder"
   },
   "selectAssistantHint": "Selecione um assistente para iniciar uma tarefa",
@@ -20,6 +14,12 @@
     "specifyWorkspace": "Selecionar pasta do projeto",
     "searchPlaceholder": "Procurar projetos…",
     "noProject": "Nenhum Projeto"
+  },
+  "toolbar": {
+    "label": "Ações da página inicial",
+    "history": "Histórico",
+    "saved": "Salvos",
+    "community": "Comunidade"
   },
   "defaultProjectPrompts": {
     "reviewFiles": "Review the files in this project",
