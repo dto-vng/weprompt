@@ -43,13 +43,20 @@ import type {
   KnowledgeManifest,
   KnowledgeManifestSource,
 } from '@/common/knowledge/types';
-import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
+import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
 import { scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
 const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);
+/**
+ * Formats whose on-disk original is binary, so the agent cannot read them with
+ * file tools. Their extracted text is materialized alongside (see
+ * EXTRACTED_TEXT_DIR_NAME); .md/.txt are excluded because the original already
+ * IS the readable form.
+ */
+const EXTRACTED_TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'xlsx']);
 const SUPPORTED_EXTENSIONS_HINT = 'Supported: .md, .txt, .docx, .xlsx, .pdf';
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_CHUNKS_PER_SOURCE = 2000;
@@ -171,6 +178,71 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   const knowledgeDirOf = (workspace: string): string => path.join(workspace, KNOWLEDGE_FOLDER_NAME);
 
   /**
+   * Where a binary source's extracted text is materialized so the agent's file
+   * tools can reach it. `null` for formats whose original is already readable
+   * (.md/.txt) — copying those would only duplicate a file the agent can open
+   * directly. The original extension stays in the name so `a.pdf` and `a.docx`
+   * cannot collide on a single `a.md`.
+   */
+  const extractedTextPathOf = (workspace: string, fileName: string): string | null => {
+    const extension = path.extname(fileName).slice(1).toLowerCase();
+    if (!EXTRACTED_TEXT_EXTENSIONS.has(extension)) return null;
+    return path.join(knowledgeDirOf(workspace), EXTRACTED_TEXT_DIR_NAME, `${path.basename(fileName)}.md`);
+  };
+
+  /**
+   * Best-effort: the extracted text is a convenience for the agent, never the
+   * index itself. A failure here (missing folder, a file where the directory
+   * should be, permissions) must not fail an otherwise good ingestion.
+   */
+  const writeExtractedText = async (workspace: string, fileName: string, markdown: string): Promise<void> => {
+    const target = extractedTextPathOf(workspace, fileName);
+    if (!target) return;
+    try {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, markdown, 'utf8');
+    } catch (error) {
+      console.warn(
+        `[projectKnowledge] could not materialize extracted text for ${fileName}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  };
+
+  const removeExtractedText = async (workspace: string, fileName: string): Promise<void> => {
+    const target = extractedTextPathOf(workspace, fileName);
+    if (!target) return;
+    await fs.rm(target, { force: true }).catch((): undefined => undefined);
+  };
+
+  /**
+   * Restore a `.text/` entry that is missing while its source is still `ready`
+   * — the folder was restored after going missing, the user deleted `.text/`,
+   * or the source predates this feature. Sourced from the store's
+   * `converted.md`, which is the same text ingestion chunked, so this costs a
+   * file copy rather than a re-extraction.
+   */
+  const repairExtractedText = async (
+    projectId: string,
+    workspace: string,
+    source: KnowledgeManifestSource
+  ): Promise<void> => {
+    const target = extractedTextPathOf(workspace, source.fileName);
+    if (!target) return;
+    if (
+      await fs.access(target).then(
+        (): boolean => true,
+        (): boolean => false
+      )
+    )
+      return;
+    const converted = path.join(storePaths(storeDirOf(projectId)).sourceDir(source.id), 'converted.md');
+    const markdown = await fs.readFile(converted, 'utf8').catch((): null => null);
+    if (markdown === null) return; // nothing to restore from; next re-ingest rebuilds it
+    await writeExtractedText(workspace, source.fileName, markdown);
+  };
+
+  /**
    * Ids key chunk ownership (`chunkId = ${id}#${i}`), so they only need to be
    * unique and filesystem-safe. Hashing name + content keeps two same-content
    * files under different names from colliding; pre-folder rows keep their
@@ -231,9 +303,21 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     };
   };
 
-  /** Drop a source's chunks/vectors/files; caller persists the manifest. */
-  const removeSourceRows = async (projectId: string, manifest: KnowledgeManifest, sourceId: string): Promise<void> => {
+  /**
+   * Drop a source's chunks/vectors/files; caller persists the manifest.
+   * `workspace` is optional only because a few call sites legitimately have no
+   * folder in hand; when given, the source's materialized extracted text is
+   * reaped too, so `.text/` never outlives the index rows it mirrors.
+   */
+  const removeSourceRows = async (
+    projectId: string,
+    manifest: KnowledgeManifest,
+    sourceId: string,
+    workspace?: string
+  ): Promise<void> => {
     const storeDir = storeDirOf(projectId);
+    const removed = manifest.sources.find((s) => s.id === sourceId);
+    if (workspace && removed) await removeExtractedText(workspace, removed.fileName);
     const remaining = (await readChunks(storeDir)).filter((c) => c.sourceId !== sourceId);
     await writeChunks(storeDir, remaining);
     await writeBm25(storeDir, buildBm25Index(remaining));
@@ -386,11 +470,16 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
           existing.status = 'indexing';
           existing.error = null;
           dirty = true;
+        } else if (existing.status === 'ready') {
+          // Unchanged content is otherwise a no-op, so a `.text/` entry lost
+          // with the folder (or predating this feature) would never come back.
+          // Repair it from converted.md without re-ingesting the source.
+          await repairExtractedText(projectId, workspace, existing);
         }
         continue;
       }
       if (existing) {
-        await removeSourceRows(projectId, manifest, existing.id);
+        await removeSourceRows(projectId, manifest, existing.id, workspace);
         dirty = true;
       }
       const base: KnowledgeManifestSource = {
@@ -458,7 +547,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       (source) => !seen.has(source.fileName) && !unexported.has(source.fileName)
     );
     for (const source of vanished) {
-      await removeSourceRows(projectId, manifest, source.id);
+      await removeSourceRows(projectId, manifest, source.id, workspace);
       dirty = true;
     }
     if (dirty) await saveManifest(projectId, manifest);
@@ -636,6 +725,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         source.status = 'ready';
         source.chunkCount = newChunks.length;
         source.error = notes.length > 0 ? notes.join(' ') : null;
+        // Only now that the source is genuinely ready: a failed extraction must
+        // not leave readable-looking text behind for the agent to quote.
+        await writeExtractedText(workspace, source.fileName, markdown);
       } catch (error) {
         source.status = 'failed';
         source.error = error instanceof Error ? error.message : 'Indexing failed.';
@@ -707,7 +799,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         if (!deps.trashItem) throw new Error('trashItem dependency is not configured');
         await deps.trashItem(filePath);
       }
-      await removeSourceRows(projectId, manifest, sourceId);
+      await removeSourceRows(projectId, manifest, sourceId, workspace);
       await saveManifest(projectId, manifest);
     });
 
