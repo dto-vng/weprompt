@@ -11,7 +11,27 @@ import type { IProvider } from '@/common/config/storage';
 import { hasSpecificModelCapability } from '@/common/utils/modelCapabilities';
 import type { EmbedConfig } from '@/common/knowledge/embedCore';
 
-const isUsable = (provider: IProvider): boolean => Boolean(provider.base_url?.trim() && provider.api_key?.trim());
+export const isUsableProvider = (provider: IProvider): boolean =>
+  Boolean(provider.base_url?.trim() && provider.api_key?.trim());
+
+const isUsable = isUsableProvider;
+
+/**
+ * The first usable key from a provider's key field.
+ *
+ * Mirrors ApiKeyManager.parseKeys / RotatingApiClient.parseMultipleKeys: split on
+ * comma/newline, trim each segment, drop blanks, then take the first. Trimming
+ * before selecting (rather than trimming only the first raw segment) keeps this
+ * in lockstep with the rest of the app's multi-key parsing, so a picker never
+ * hands out a key the rotating client itself would have skipped.
+ *
+ * Shared with the OCR picker so this subtle rule has exactly one implementation.
+ */
+export const firstApiKey = (provider: IProvider): string | undefined =>
+  provider.api_key
+    ?.split(/[,\n]/)
+    .map((key) => key.trim())
+    .find((key) => key.length > 0);
 
 /** First embedding-capable model across usable providers, or null. */
 export const pickEmbeddingModel = (providers: IProvider[]): { providerId: string; model: string } | null => {
@@ -30,15 +50,7 @@ export const pickEmbeddingModel = (providers: IProvider[]): { providerId: string
 export const resolveEmbedConfigForModel = (providers: IProvider[], model: string): EmbedConfig | null => {
   const provider = providers.find((p) => isUsable(p) && (p.models ?? []).includes(model));
   if (!provider) return null;
-  // Mirrors ApiKeyManager.parseKeys / RotatingApiClient.parseMultipleKeys: split on
-  // comma/newline, trim each segment, drop blanks, then take the first. Trimming
-  // before selecting (rather than trimming only the first raw segment) keeps this
-  // in lockstep with the rest of the app's multi-key parsing, so the picker never
-  // hands out a key the rotating client itself would have skipped.
-  const apiKey = provider.api_key
-    .split(/[,\n]/)
-    .map((key) => key.trim())
-    .find((key) => key.length > 0);
+  const apiKey = firstApiKey(provider);
   if (!apiKey) return null;
   return { baseUrl: provider.base_url, apiKey, model };
 };

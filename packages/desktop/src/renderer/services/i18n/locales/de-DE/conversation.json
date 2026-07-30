@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "Semantische Suche inaktiv — kein Embedding-Modell konfiguriert",
     "knowledgeStatusIndexing": "Wird indiziert…",
     "knowledgeProgressReading": "Seite {{done}}/{{total}} wird gelesen",
+    "knowledgeProgressTranscribing": "Seite {{done}}/{{total}} wird transkribiert",
     "knowledgeProgressEmbedding": "Einbettung {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Fehlgeschlagen",
     "knowledgeStatusUnsupported": "Nicht unterstützt",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "Dies ist der indexierte Text, den der Assistent durchsucht – nicht das ursprüngliche Layout.",
     "knowledgePreviewTruncated": "Vorschau gekürzt. Öffnen Sie die Originaldatei für das vollständige Dokument.",
     "knowledgePreviewError": "Der indexierte Text dieser Datei konnte nicht geladen werden.",
-    "knowledgeStatusNote": "Hinweis"
+    "knowledgeStatusNote": "Hinweis",
+    "knowledgeOcrTag": "Transkribiert (OCR)",
+    "knowledgeOcrDetail": "Von {{model}} aus einem Scan transkribiert. Übersprungene Seiten: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "keine"
   },
   "history": {
     "recents": "Zuletzt",

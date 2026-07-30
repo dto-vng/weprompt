@@ -11,11 +11,14 @@
 export type KnowledgeSourceStatus = 'indexing' | 'ready' | 'failed' | 'unsupported';
 
 /**
- * The two ingestion phases slow enough to be worth reporting. Markdown
- * conversion and BM25 indexing are single opaque steps that finish in
- * milliseconds, so they have no progress to show and no stage of their own.
+ * The ingestion phases slow enough to be worth reporting. Markdown conversion
+ * and BM25 indexing are single opaque steps that finish in milliseconds, so
+ * they have no progress to show and no stage of their own.
+ *
+ * `transcribing` is by far the slowest: one multimodal model call per page of a
+ * scanned PDF, so a capped document takes minutes.
  */
-export type KnowledgeIngestStage = 'reading' | 'embedding';
+export type KnowledgeIngestStage = 'reading' | 'transcribing' | 'embedding';
 
 /** Live position within a stage, e.g. page 12 of 50. */
 export type KnowledgeIngestProgress = {
@@ -54,6 +57,21 @@ export type KnowledgeManifestSource = {
   error: string | null;
   /** Set while work is in flight; cleared once the source settles. */
   progress?: KnowledgeIngestProgress;
+  /**
+   * Present only when this source's text came from transcribing a scan rather
+   * than from reading it. Provenance, and deliberately per-source rather than
+   * pinned globally like `embedding`: transcription quality varies by document,
+   * and re-transcribing one source with a different model must stay possible.
+   */
+  ocr?: KnowledgeOcrProvenance;
+};
+
+/** How a scanned source was transcribed, and what it cost in coverage. */
+export type KnowledgeOcrProvenance = {
+  /** The model that produced the text. Named so a bad transcription is traceable. */
+  model: string;
+  /** 1-based pages that produced no text and are therefore absent from the index. */
+  skippedPages: number[];
 };
 
 export type KnowledgeManifest = {

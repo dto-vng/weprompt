@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "busca semântica desativada — nenhum modelo de embedding configurado",
     "knowledgeStatusIndexing": "Indexando…",
     "knowledgeProgressReading": "Lendo página {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcrevendo a página {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Incorporando {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Falhou",
     "knowledgeStatusUnsupported": "Não compatível",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "Este é o texto indexado que o assistente pesquisa, não o layout original.",
     "knowledgePreviewTruncated": "Prévia encurtada. Abra o arquivo original para ver o documento completo.",
     "knowledgePreviewError": "Não foi possível carregar o texto indexado deste arquivo.",
-    "knowledgeStatusNote": "Observação"
+    "knowledgeStatusNote": "Observação",
+    "knowledgeOcrTag": "Transcrito (OCR)",
+    "knowledgeOcrDetail": "Transcrito de uma digitalização por {{model}}. Páginas ignoradas: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "nenhuma"
   },
   "history": {
     "recents": "Recentes",

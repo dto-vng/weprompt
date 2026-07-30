@@ -241,7 +241,10 @@ describe('projectKnowledgeService', () => {
     expect(converted).toMatch(/^## Page 1\n\nVisa Letter Policy/);
   });
 
-  it('fails a scanned PDF with an explicit reason instead of indexing nothing', async () => {
+  it('fails a scanned PDF actionably when no model can transcribe it', async () => {
+    // The default provider in this suite offers only an embedding model, so
+    // transcription cannot even be attempted. The message has to name that,
+    // not just report failure — see the OCR suite for the transcribing paths.
     const file = path.join(inbox, 'scan.pdf');
     await writeFile(file, readFileSync(path.resolve(__dirname, '../../fixtures/knowledge/image-only.pdf')));
     await service.addSources('proj-1', [file], workspace);
@@ -249,8 +252,8 @@ describe('projectKnowledgeService', () => {
 
     const { sources } = await service.listSources('proj-1');
     expect(sources[0].status).toBe('failed');
-    expect(sources[0].error).toMatch(/no text layer/i);
-    expect(sources[0].error).toMatch(/OCR/);
+    expect(sources[0].error).toMatch(/scan/i);
+    expect(sources[0].error).toMatch(/read images/i);
     expect(await readChunks(path.join(root, 'proj-1'))).toEqual([]);
   });
 

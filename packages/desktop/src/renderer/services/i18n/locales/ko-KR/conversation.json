@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "시맨틱 검색 꺼짐 — 임베딩 모델 미설정",
     "knowledgeStatusIndexing": "색인 중…",
     "knowledgeProgressReading": "{{total}}페이지 중 {{done}}페이지 읽는 중",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} 페이지 텍스트 변환 중",
     "knowledgeProgressEmbedding": "임베딩 중 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "실패",
     "knowledgeStatusUnsupported": "지원되지 않음",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "어시스턴트가 검색하는 색인 텍스트이며 원본 서식이 아닙니다.",
     "knowledgePreviewTruncated": "미리보기가 잘렸습니다. 전체 문서는 원본 파일을 열어 확인하세요.",
     "knowledgePreviewError": "이 파일의 색인 텍스트를 불러올 수 없습니다.",
-    "knowledgeStatusNote": "참고"
+    "knowledgeStatusNote": "참고",
+    "knowledgeOcrTag": "텍스트 변환됨(OCR)",
+    "knowledgeOcrDetail": "{{model}}이(가) 스캔본에서 변환했습니다. 건너뛴 페이지: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "없음"
   },
   "history": {
     "recents": "최근",
