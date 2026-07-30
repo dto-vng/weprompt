@@ -67,7 +67,7 @@ undefined, and folding them in would reward over-retrieval. They get their own s
 
 ### Read `recall@6` with care
 
-The fixture is 10 documents / 17 passages, so top-6 is roughly a third of the corpus. `recall@1`,
+The fixture is 11 documents / 19 passages, so top-6 is still roughly a third of the corpus. `recall@1`,
 `MRR` and `answerMRR` carry the signal; `recall@6` saturates cheaply. Grow the corpus before reading
 much into it.
 
@@ -82,7 +82,7 @@ same commit. Each needs a one-line change to become an optional parameter with i
 the default; that belongs in a tuning change, not here.
 
 At this corpus size neither would show anything anyway: 30 candidates already exceeds the whole
-17-passage corpus, so there is no truncation to observe. Grow the corpus first.
+19-passage corpus, so there is no truncation to observe. Grow the corpus first.
 
 ## The fixture
 
@@ -90,6 +90,25 @@ At this corpus size neither would show anything anyway: 30 candidates already ex
 invoice register, a meeting summary, a nested-heading runbook, an incident postmortem, a service
 catalogue. **All synthetic.** Never commit real VNG documents here; author in the same register
 instead.
+
+`fixture/corpus-ocr/` — documents whose text is a **model transcription of a scanned PDF**, the
+output of the OCR path in `common/knowledge/pdfOcr.ts`. Both roots load into one flat corpus; file
+names must be unique across them, because the source id comes from the name.
+
+Two roots rather than an eleventh file in `corpus/`, for two reasons. `corpus/` is at the project's
+ten-children ceiling. And the two are different kinds of text that must not be edited into the same
+register: `corpus/` says "author in the same register as a real memo", while a transcription has to
+keep the shape the model actually produces, or an OCR-derived case measures authored markdown wearing
+a scan's file name. Concretely, `renderPagesAsMarkdown` wraps every page in a `## Page N` marker, so a
+transcribed document has page markers where an authored one has sections — and when the model emits
+the document title as `#`, as it does here, that `#` pops the page marker off the heading stack and
+the passage's `headingPath` loses the page number entirely.
+
+`scan-phu-luc-hop-dong-ve-sinh.md` is a three-page Vietnamese service-contract appendix: letterhead,
+signature block, two markdown tables the model rebuilt from ruled lines. Synthetic, same rule as
+above — real scans stay out of the repo, and so do the PDFs themselves. A scan is megabytes and its
+transcription is kilobytes; the transcription is the part retrieval ever sees, so it is the part
+worth committing.
 
 `quy-dinh-bao-mat-thong-tin.md` is stored **NFD** (decomposed diacritics) on disk. This is not
 decoration: an NFD tokenisation bug found during the knowledge-base build shattered Vietnamese words
@@ -99,7 +118,7 @@ catches that class. Without the tokenizer's NFC step that one file yields 1117 f
 document is still stored NFD and that its tokens still collapse without normalisation, so replacing
 it with ASCII content fails loudly rather than quietly removing the coverage.
 
-`fixture/questions.json` — 25 golden questions. Beyond plain keyword hits, the hard cases are:
+`fixture/questions.json` — 27 golden questions. Beyond plain keyword hits, the hard cases are:
 
 | Kind                       | What it probes                                                                                                                                          |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,10 +130,23 @@ it with ASCII content fails loudly rather than quietly removing the coverage.
 | `nfd-corpus` / `nfd-query` | Both normalisation directions.                                                                                                                          |
 | `unanswerable`             | The corpus genuinely cannot answer. A harness that never tests this rewards over-retrieval.                                                             |
 
+`kind` says what a case probes; it does not say where the text came from. Provenance is a property of
+the document, so the two OCR-derived cases sit in existing kinds on purpose, each paired with an
+authored counterpart it can be read against:
+
+| Case                           | kind             | Reads against                                               |
+| ------------------------------ | ---------------- | ----------------------------------------------------------- |
+| `ocr-cross-lang-response-time` | `cross-language` | `cross-lang-vpn-signoff` — same bridge, without distractors |
+| `ocr-id-transcribed-table-row` | `identifier`     | `id-po-vendor` — same in-table lookup, authored table       |
+
+The pairing is the point. An OCR case measured on its own tells you a number; measured against its
+authored twin it tells you whether transcription costs anything.
+
 ## Adding a case
 
 1. Add or extend a document in `fixture/corpus/` — synthetic, in the same register. Keep the
-   directory at 10 files or fewer.
+   directory at 10 files or fewer. A transcription of a scan goes in `fixture/corpus-ocr/` instead,
+   keeping the shape `renderPagesAsMarkdown` produces; do not tidy it into authored prose.
 2. Add an entry to `fixture/questions.json`:
    ```jsonc
    {

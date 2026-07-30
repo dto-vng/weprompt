@@ -38,10 +38,19 @@ export type GoldenQuestion = {
   notes: string;
 };
 
+/**
+ * Where a corpus document's text came from. 'ocr' documents are model
+ * transcriptions of scans, which read differently from hand-authored markdown
+ * — page markers instead of real section headings, and no text layer to fall
+ * back on — so the distinction has to survive into the report.
+ */
+export type DocumentProvenance = 'authored' | 'ocr';
+
 export type EvalDocument = {
   fileName: string;
   /** Exactly the bytes on disk, decoded as UTF-8 — normalisation form included. */
   text: string;
+  provenance: DocumentProvenance;
 };
 
 export type EvalFixture = {
@@ -110,7 +119,8 @@ export type EmbeddingInfo = {
 
 export type EvalRun = {
   knobs: EvalKnobs;
-  corpus: { documentCount: number; chunkCount: number };
+  /** `ocrDocumentCount` is a subset of `documentCount`, not an addition to it. */
+  corpus: { documentCount: number; ocrDocumentCount: number; chunkCount: number };
   /** null when no embedding model was available — BM25-only run. */
   embedding: EmbeddingInfo | null;
   /** Why the hybrid half was skipped, when it was. */

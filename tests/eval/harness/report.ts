@@ -115,7 +115,8 @@ const unanswerableSection = (run: EvalRun): string[] => {
 
 export const renderReport = (run: EvalRun, comparison: ComparisonResult, nfdFileNames: string[]): string => {
   const lines: string[] = ['', 'Knowledge-base retrieval evaluation', ''];
-  lines.push(`  corpus     ${run.corpus.documentCount} documents, ${run.corpus.chunkCount} passages`);
+  const ocrNote = run.corpus.ocrDocumentCount > 0 ? ` (${run.corpus.ocrDocumentCount} OCR-derived)` : '';
+  lines.push(`  corpus     ${run.corpus.documentCount} documents${ocrNote}, ${run.corpus.chunkCount} passages`);
   if (nfdFileNames.length > 0) lines.push(`             stored NFD on disk: ${nfdFileNames.join(', ')}`);
   lines.push(`  knobs      chunk=${run.knobs.chunkChars}  overlap=${run.knobs.overlapChars}  topK=${run.knobs.topK}`);
 
