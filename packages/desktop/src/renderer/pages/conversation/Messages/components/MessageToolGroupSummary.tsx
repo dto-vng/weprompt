@@ -18,6 +18,7 @@ import { buildTurnClose } from './toolActivity/buildTurnClose';
 import { collapseAdjacentSteps } from './toolActivity/collapseSteps';
 import { buildTurnWorkRecap } from './toolActivity/buildTurnWorkRecap';
 import { useToolActionText } from './toolActivity/useToolActionText';
+import ToolOutputCitations, { toolUsesKnowledgeSearch } from './ToolOutputCitations';
 import './MessageToolGroupSummary.css';
 
 const statusToBadge = (status: NormalizedToolStatus): BadgeProps['status'] => {
@@ -389,7 +390,13 @@ const ToolItemDetail: React.FC<{ item: NormalizedToolCall }> = ({ item }) => {
           {displayItem.output && (
             <div className='tool-detail-section'>
               <div className='tool-detail-label'>{t('tools.labels.result')}</div>
-              <pre className='tool-detail-content'>{displayItem.output}</pre>
+              <pre className='tool-detail-content'>
+                {toolUsesKnowledgeSearch(displayItem.name) ? (
+                  <ToolOutputCitations output={displayItem.output} />
+                ) : (
+                  displayItem.output
+                )}
+              </pre>
             </div>
           )}
         </div>
