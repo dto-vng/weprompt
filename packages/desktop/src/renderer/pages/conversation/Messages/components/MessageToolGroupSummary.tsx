@@ -2,7 +2,6 @@ import type { BadgeProps } from '@arco-design/web-react';
 import { Badge, Button, Message, Tooltip } from '@arco-design/web-react';
 import { IconDown, IconRight } from '@arco-design/web-react/icon';
 import { Attention, CheckOne, Download, LoadingOne, Right } from '@icon-park/react';
-import { theme } from '@office-ai/platform';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
@@ -429,16 +428,14 @@ const StepRow: React.FC<{ label: string; status: Exclude<NormalizedToolStatus, '
           </span>
         );
       case 'completed':
-        return (
-          <CheckOne theme='filled' size='14' fill={theme.Color.FunctionalColor.success} data-status-icon='completed' />
-        );
+        return <CheckOne theme='filled' size='14' fill={iconColors.success} data-status-icon='completed' />;
       case 'canceled':
         return (
           <Attention
             theme='filled'
             size='14'
             strokeLinejoin='bevel'
-            fill={theme.Color.FunctionalColor.warn}
+            fill={iconColors.warning}
             data-status-icon='canceled'
           />
         );

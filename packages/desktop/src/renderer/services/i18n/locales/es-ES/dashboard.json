@@ -1,0 +1,14 @@
+{
+  "title": "Panel",
+  "subtitle": "Plantilla, rotación y retención en vivo",
+  "refresh": "Actualizar",
+  "scheduleRun": "Programar actualización",
+  "publish": "Publicar en el panel",
+  "publishSuccess": "Publicado en el panel",
+  "publishError": "Error al publicar: {{error}}",
+  "empty": "Aún no hay paneles",
+  "back": "Volver a la galería",
+  "delete": "Eliminar",
+  "deleteConfirm": "¿Eliminar este panel?",
+  "builtinBadge": "Integrado"
+}

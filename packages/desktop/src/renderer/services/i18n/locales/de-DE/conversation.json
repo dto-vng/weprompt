@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hallo, was hast du heute vor?",
-    "placeholder": "Nachricht senden, Dateien hochladen, Ordner öffnen oder geplante Aufgabe erstellen...",
+    "placeholder": "Nachricht senden, Dateien hochladen, Ordner öffnen, eine geplante Aufgabe erstellen oder / für Befehle eingeben...",
     "linkFolder": "Ordner öffnen",
     "newConversation": "Neuer Chat",
     "selectModel": "Modell auswählen",
@@ -104,6 +104,7 @@
     "saveName": "Speichern",
     "cancelEdit": "Abbrechen",
     "rename": "Umbenennen",
+    "createCronTask": "Geplante Aufgabe erstellen",
     "renameTitle": "Chat umbenennen",
     "renamePlaceholder": "Bitte neuen Namen eingeben",
     "renameSuccess": "Erfolgreich umbenannt",
@@ -147,6 +148,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Neuer Chat in diesem Projekt",
     "deleting": "Wird gelöscht...",
+    "reorderPinned": "Ziehen, um angeheftete Unterhaltung neu anzuordnen",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -187,7 +189,6 @@
   "noAgentsAvailable": "Keine Agenten verfügbar",
   "noModelConfigured": "Kein Modell konfiguriert. Bitte in den Einstellungen konfigurieren.",
   "createFailed": "Gespräch konnte nicht erstellt werden",
-  "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Der ausgewählte Arbeitsbereichspfad ist nicht verfügbar. Stelle sicher, dass der Arbeitsbereichspfad \"{{workspacePath}}\" vorhanden und zugänglich ist."
@@ -575,8 +576,8 @@
     "error": "Nebenfrage konnte nicht beantwortet werden."
   },
   "commandQueue": {
-    "title": "Wartende Befehle",
-    "clear": "Warteschlange leeren",
+    "title": "Entwurfsbox",
+    "clear": "Entwurfsbox leeren",
     "edit": "Bearbeiten",
     "editing": "Bearbeitung",
     "editPlaceholder": "Wartenden Befehl vor der Ausführung aktualisieren.",
@@ -591,7 +592,19 @@
     "queueFull": "Warteschlange ist voll. Entferne einen Befehl, bevor du weitere hinzufügst.",
     "inputTooLong": "Dieser wartende Befehl ist zu lang. Kürze ihn vor dem Senden.",
     "tooManyFiles": "Zu viele Dateien sind an diesen wartenden Befehl angehängt.",
-    "queueTooLarge": "Warteschlangendaten sind zu groß zum sicheren Speichern. Entferne zuerst einige Befehle."
+    "queueTooLarge": "Warteschlangendaten sind zu groß zum sicheren Speichern. Entferne zuerst einige Befehle.",
+    "sendNow": "Jetzt senden",
+    "modeToggle": "Sendemodus umschalten",
+    "help": "Hilfe",
+    "helpIntro": "Nachrichten, die du während der KI-Antwort sendest, warten hier.",
+    "helpAuto": ": werden nach jeder Antwort automatisch nacheinander gesendet.",
+    "helpManual": ": werden hier aufbewahrt, ohne zu senden; sende jede mit „Jetzt senden“.",
+    "clearConfirmTitle": "Sende-Entwurfsbox leeren?",
+    "clearConfirmContent": "Alle ausstehenden Nachrichten werden entfernt. Dies kann nicht rückgängig gemacht werden.",
+    "mode": {
+      "auto": "Auto senden",
+      "manual": "Manuell senden"
+    }
   },
   "contextUsage": {
     "contextUsed": "Kontext verwendet",
@@ -642,35 +655,22 @@
       "loaded": "Geladen",
       "failed": "Fehlgeschlagen",
       "unsupported": "Nicht unterstützt"
-    }
-  },
-  "status": {
-    "waitingApproval": "Wartet auf deine Freigabe",
-    "running": "In Bearbeitung",
-    "done": "Abgeschlossen",
-    "doneIdle": "Abgeschlossen — inaktiv",
-    "stopped": "Gestoppt",
-    "failed": "Fehlgeschlagen"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Wartet auf deine Freigabe, um fortzufahren.",
-    "running": "Dieser Chat wird bearbeitet.",
-    "doneUnseen": "Abgeschlossen, aber noch nicht von dir angesehen.",
-    "doneSeen": "Kürzlich abgeschlossen und bereits angesehen.",
-    "doneIdle": "Vor mindestens einer Minute abgeschlossen und bereits angesehen.",
-    "stopped": "Vor dem Abschluss gestoppt.",
-    "failed": "Aufgrund eines Fehlers konnte der Vorgang nicht abgeschlossen werden."
+    },
+    "selected": "Ausgewählte MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Laufzeit-Umgebung wird vorbereitet. Der erste Start kann etwas länger dauern."
   },
   "sendbox": {
-    "hint": "Tippe / für Befehle, @ um Dateien zu referenzieren"
+    "hint": "Tippe / für Befehle, @ um Dateien zu referenzieren, ↑/↓ für den Nachrichtenverlauf"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Diese Anfrage hat keine sichtbare Antwort erzeugt."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Diese Anfrage hat keine sichtbare Antwort erzeugt. Der Agent muss möglicherweise zuerst angemeldet werden – {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "Diese Anfrage hat das Ausgabe-Token-Limit des Modells erreicht, bevor eine sichtbare Antwort erzeugt wurde."
@@ -684,6 +684,32 @@
     }
   },
   "notFound": "Unterhaltung nicht gefunden oder wurde gelöscht",
+  "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
+  "presentationTemplates": {
+    "title": "Vorlagen",
+    "columnPptx": "Präsentationen · PPTX",
+    "columnHtml": "Berichte · HTML",
+    "columnDocx": "Dokumente · DOCX",
+    "selected": "Ausgewählt",
+    "buttonTooltip": "Vorlagen",
+    "slashDescription": "Eine Vorlage auswählen",
+    "importCard": "Thema importieren (.md)",
+    "empty": "Keine Vorlagen verfügbar",
+    "chipTooltip": "Diese Nachricht verwendet die Vorlage",
+    "importSuccess": "Vorlage importiert",
+    "importError": "Import fehlgeschlagen: {{error}}",
+    "removeError": "Löschen fehlgeschlagen: {{error}}",
+    "deleteTooltip": "Vorlage löschen",
+    "deleteConfirm": "Diese Vorlage löschen?"
+  },
+  "status": {
+    "waitingApproval": "Wartet auf deine Freigabe",
+    "running": "In Bearbeitung",
+    "done": "Abgeschlossen",
+    "doneIdle": "Abgeschlossen — inaktiv",
+    "stopped": "Gestoppt",
+    "failed": "Fehlgeschlagen"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -748,5 +774,14 @@
   "artifact": {
     "emptyTitle": "Kein Artefakt geöffnet",
     "emptyHint": "Generierte Dateien und Dokumente werden hier geöffnet."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Wartet auf deine Freigabe, um fortzufahren.",
+    "running": "Dieser Chat wird bearbeitet.",
+    "doneUnseen": "Abgeschlossen, aber noch nicht von dir angesehen.",
+    "doneSeen": "Kürzlich abgeschlossen und bereits angesehen.",
+    "doneIdle": "Vor mindestens einer Minute abgeschlossen und bereits angesehen.",
+    "stopped": "Vor dem Abschluss gestoppt.",
+    "failed": "Aufgrund eines Fehlers konnte der Vorgang nicht abgeschlossen werden."
   }
 }

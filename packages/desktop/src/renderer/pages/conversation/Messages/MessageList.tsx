@@ -65,6 +65,17 @@ type IMessageVO =
 type IArtifactVO = { type: 'artifact'; id: string; artifact: IConversationArtifact; created_at: number };
 type IProcessedItem = IMessageVO | IArtifactVO;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isWriteFileResult = (value: unknown): value is WriteFileResult =>
+  isRecord(value) &&
+  'file_diff' in value &&
+  typeof value.file_diff === 'string' &&
+  value.file_diff.length > 0 &&
+  'file_name' in value &&
+  typeof value.file_name === 'string';
+
 type ConversationLocationState = {
   targetMessageId?: string;
   fromConversationSearch?: boolean;
@@ -302,7 +313,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     let diffsSourceMessageIds: string[] = [];
     let pendingWorkSummary: PendingWorkSummary | undefined;
 
-    const pushFileDffChanges = (changes: FileChangeInfo, sourceMessageId: string, created_at: number) => {
+    const pushFileDiffChanges = (changes: FileChangeInfo, sourceMessageId: string, created_at: number) => {
       if (!diffsChanges.length) {
         diffsSourceMessageIds = [];
         result.push({
@@ -363,24 +374,18 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (message.type === 'available_commands') continue;
       if (message.type === 'tool_group') {
         if (isDiagnosticToolMessage(message)) continue;
-        if (message.content.length === 1) {
-          const writeFileResults = message.content
-            .filter(
-              (item) =>
-                item.name === 'WriteFile' &&
-                item.result_display &&
-                typeof item.result_display === 'object' &&
-                'file_diff' in item.result_display
-            )
-            .map((item) => item.result_display as WriteFileResult);
-          if (writeFileResults.length && writeFileResults[0].file_diff) {
-            pushFileDffChanges(
-              parseDiff(writeFileResults[0].file_diff, writeFileResults[0].file_name),
+        const writeFileResults = message.content.flatMap((item) =>
+          item.name === 'WriteFile' && isWriteFileResult(item.result_display) ? [item.result_display] : []
+        );
+        if (writeFileResults.length > 0 && writeFileResults.length === message.content.length) {
+          writeFileResults.forEach((writeFileResult) => {
+            pushFileDiffChanges(
+              parseDiff(writeFileResult.file_diff, writeFileResult.file_name),
               message.id,
               message.created_at ?? 0
             );
-            continue;
-          }
+          });
+          continue;
         }
         if (message.position === 'left') {
           pushWorkMessage(message);

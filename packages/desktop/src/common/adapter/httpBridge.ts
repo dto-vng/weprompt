@@ -2,7 +2,7 @@
  * HTTP/WS bridge factory — drop-in replacement for bridge.buildProvider / bridge.buildEmitter
  * that routes calls to aioncore via REST API and WebSocket.
  *
- * Exported helpers produce objects with the same shape as @office-ai/platform bridge,
+ * Exported helpers produce objects with the same shape as the local IPC bridge,
  * so existing renderer code works without changes.
  */
 
@@ -13,7 +13,62 @@
 declare global {
   interface Window {
     __backendPort?: number;
+    __backendLocalToken?: string;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Local-mode shared secret
+// ---------------------------------------------------------------------------
+
+/**
+ * Header carrying the local-mode secret. Must match AionCore's
+ * `LOCAL_TOKEN_HEADER` (crates/aionui-auth/src/middleware.rs).
+ */
+export const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
+
+/** Query parameter carrying the same secret, for callers that cannot set headers. */
+export const LOCAL_TOKEN_QUERY = 'local_token';
+
+/**
+ * Resolve the local-mode secret for the current context.
+ *
+ * Mirrors {@link getBackendPort}: the preload bridge writes
+ * `window.__backendLocalToken` for the renderer, and `src/index.ts` writes
+ * `globalThis.__backendLocalToken` for main-process callers. Empty in WebUI
+ * browser mode, where the backend runs with real authentication instead.
+ */
+export function getLocalToken(): string {
+  if (typeof window !== 'undefined' && (window as Window).__backendLocalToken) {
+    return (window as Window).__backendLocalToken as string;
+  }
+  const g = globalThis as typeof globalThis & { __backendLocalToken?: string };
+  return g.__backendLocalToken ?? '';
+}
+
+/**
+ * Add the local-mode secret to a header bag.
+ *
+ * Every `fetch`/`XMLHttpRequest` aimed at the backend must go through this —
+ * without the header the backend answers 401.
+ */
+export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
+  const token = getLocalToken();
+  if (!token) return headers;
+  return { ...headers, [LOCAL_TOKEN_HEADER]: token };
+}
+
+/**
+ * Add the local-mode secret to a URL's query string.
+ *
+ * For request kinds that cannot carry a header: `WebSocket`, `EventSource`, and
+ * URLs handed to `<img src>` or an iframe.
+ */
+export function withLocalTokenQuery(url: string): string {
+  const token = getLocalToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${LOCAL_TOKEN_QUERY}=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -63,7 +118,8 @@ function getWsUrl(): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/ws`;
   }
-  return `ws://127.0.0.1:${getBackendPort()}/ws`;
+  // A browser `WebSocket` cannot set headers, so the secret rides in the query.
+  return withLocalTokenQuery(`ws://127.0.0.1:${getBackendPort()}/ws`);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +233,7 @@ export async function httpRequest<T>(
   options?: HttpRequestOptions
 ): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = withLocalTokenHeaders();
 
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';

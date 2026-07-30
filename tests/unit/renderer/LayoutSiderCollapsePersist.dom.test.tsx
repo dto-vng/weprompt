@@ -10,6 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as layoutContext from '@renderer/hooks/context/LayoutContext';
 
+// Layout closes the preview panel on route changes; stub the context so the
+// test can render <Layout> without mounting the full PreviewProvider.
+vi.mock('@renderer/pages/conversation/Preview', () => ({
+  usePreviewContext: () => ({ closePreview: vi.fn() }),
+}));
+
 // Spy on the persistence helper while keeping the rest of LayoutContext real.
 vi.mock('@renderer/hooks/context/LayoutContext', async (importActual) => {
   const actual = await importActual<typeof import('@renderer/hooks/context/LayoutContext')>();

@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Message } from '@arco-design/web-react';
+import { BackendHttpError } from '@/common/adapter/httpBridge';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
 
@@ -54,6 +56,9 @@ const {
   translateMock,
   useTeamPermissionMock,
   setSendBoxHandlerMock,
+  markSendFailedMock,
+  markSendStartedMock,
+  markSendAcceptedMock,
   contextUsageIndicatorProps,
   sendBoxProps,
 } = vi.hoisted(() => ({
@@ -90,6 +95,9 @@ const {
   translateMock: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
   useTeamPermissionMock: vi.fn(),
   setSendBoxHandlerMock: vi.fn(),
+  markSendFailedMock: vi.fn(),
+  markSendStartedMock: vi.fn(),
+  markSendAcceptedMock: vi.fn(),
   contextUsageIndicatorProps: {
     current: null as {
       tokenUsage: { total_tokens: number } | null;
@@ -334,7 +342,12 @@ describe('AionrsSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     aionrsMessageState.current = createAionrsMessageState();
-    runtimeViewState.current = createRuntimeViewState();
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      markSendStarted: markSendStartedMock,
+      markSendAccepted: markSendAcceptedMock,
+      markSendFailed: markSendFailedMock,
+    };
     thoughtDisplayProps.current = null;
     contextUsageIndicatorProps.current = null;
     sendBoxProps.current = null;
@@ -392,12 +405,57 @@ describe('AionrsSendBox', () => {
     });
   });
 
+  it('does not start standalone runtime while preparing a team conversation', async () => {
+    const warmupSession = vi.fn().mockResolvedValue(undefined);
+    useTeamPermissionMock.mockReturnValue({
+      isTeamMode: true,
+      isLeaderAgent: true,
+      leaderConversationId: 'conv-1',
+      allConversationIds: ['conv-1'],
+      propagateMode: vi.fn(),
+      warmupSession,
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => {
+      expect(warmupSession).toHaveBeenCalled();
+    });
+    expect(ensureConversationRuntimeMock).not.toHaveBeenCalled();
+  });
+
   it('uses runtime ensure instead of legacy warmup for standalone runtime preparation', async () => {
     render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
 
     await waitFor(() => {
       expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1');
     });
+  });
+
+  it('suppresses visible error and preserves runtime gate for active-turn busy conflicts', async () => {
+    sendMessageInvokeMock.mockRejectedValue(
+      new BackendHttpError({
+        method: 'POST',
+        path: '/api/conversations/conv-1/messages',
+        status: 409,
+        body: { success: false, code: 'CONFLICT', error: 'conversation conv-1 is already running' },
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await waitFor(() => expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1'));
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => {
+      expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1);
+    });
+    expect(markSendFailedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'busy_conflict', busyKind: 'active_turn' })
+    );
+    expect(Message.error).not.toHaveBeenCalled();
   });
 
   it('renders model and permission controls in the composer action row', () => {
