@@ -11,12 +11,38 @@
 // "unknown", not "no files" (the missing-folder deletion guard depends on it).
 
 import { createHash } from 'node:crypto';
-import type { Dirent } from 'node:fs';
+import { createReadStream, type Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 
 export const SUPPORTED_KNOWLEDGE_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
+
+/**
+ * Default ceiling. These formats are read and chunked IN FULL, so the file size
+ * is a direct proxy for the work and the index growth they cause.
+ */
 export const MAX_KNOWLEDGE_FILE_BYTES = 15 * 1024 * 1024;
+
+/**
+ * PDFs get a much higher ceiling, because for them file size is a poor proxy
+ * for cost: `MAX_PDF_PAGES` already bounds the work at 50 pages however long
+ * the document is, and a scan runs 180-200 KB per page, so the default cap
+ * rejected documents whose first 50 pages would have indexed fine. The
+ * motivating case is a real 262-page, 51 MB scanned statement — the very
+ * document that prompted PDF support — which the 15 MB cap refused outright.
+ *
+ * What this cap still protects is peak memory rather than throughput: the bytes
+ * are held once by the caller and copied once more by pdfjs (which mutates the
+ * buffer it is given), plus one decoded page raster of ~24 MB, so a file at this
+ * ceiling costs roughly 225 MB transient in the main process. Hashing does NOT
+ * add to that any more — it streams (see below).
+ */
+export const MAX_PDF_FILE_BYTES = 100 * 1024 * 1024;
+
+/** The ceiling that applies to one file, by extension. */
+export const maxBytesForFile = (fileName: string): number =>
+  path.extname(fileName).slice(1).toLowerCase() === 'pdf' ? MAX_PDF_FILE_BYTES : MAX_KNOWLEDGE_FILE_BYTES;
 
 export type KnowledgeScanEntry = {
   fileName: string;
@@ -24,6 +50,12 @@ export type KnowledgeScanEntry = {
   /** `sha256:<hex>`, or `oversize:<byteSize>` for files beyond the cap (never read). */
   contentHash: string;
   kind: 'supported' | 'oversize';
+  /**
+   * Set only on `oversize`: the ceiling this file actually exceeded, so the
+   * message shown to the user names the real number rather than a literal that
+   * drifts once the caps differ by format.
+   */
+  limitBytes?: number;
 };
 
 export type KnowledgeFolderScan =
@@ -32,6 +64,21 @@ export type KnowledgeFolderScan =
 
 /** Dotfiles (.DS_Store & friends) and `~$…` Office lock files. */
 const isIgnoredName = (name: string): boolean => name.startsWith('.') || name.startsWith('~$');
+
+/**
+ * Hash a file without holding it in memory.
+ *
+ * Streamed rather than `readFile`d because this runs on EVERY sync — Project
+ * Home mount, the card's Refresh, each watcher event, and every project-chat
+ * creation — purely to diff against the manifest. Buffering a 100 MB PDF on
+ * each of those would be a real memory spike for a hash we throw away, and the
+ * PDF ceiling is what made that worth fixing.
+ */
+const hashFile = async (filePath: string): Promise<string> => {
+  const hash = createHash('sha256');
+  await pipeline(createReadStream(filePath), hash);
+  return `sha256:${hash.digest('hex')}`;
+};
 
 export const scanKnowledgeFolder = async (folderPath: string): Promise<KnowledgeFolderScan> => {
   let dirents: Dirent[];
@@ -83,22 +130,18 @@ export const scanKnowledgeFolder = async (folderPath: string): Promise<Knowledge
     } catch {
       continue; // vanished mid-scan — the next sync sees the settled state
     }
-    if (byteSize > MAX_KNOWLEDGE_FILE_BYTES) {
-      entries.push({ fileName: name, byteSize, contentHash: `oversize:${byteSize}`, kind: 'oversize' });
+    const limitBytes = maxBytesForFile(name);
+    if (byteSize > limitBytes) {
+      entries.push({ fileName: name, byteSize, contentHash: `oversize:${byteSize}`, kind: 'oversize', limitBytes });
       continue;
     }
-    let buffer: Buffer;
+    let contentHash: string;
     try {
-      buffer = await fs.readFile(fullPath);
+      contentHash = await hashFile(fullPath);
     } catch {
       continue;
     }
-    entries.push({
-      fileName: name,
-      byteSize: buffer.byteLength,
-      contentHash: `sha256:${createHash('sha256').update(buffer).digest('hex')}`,
-      kind: 'supported',
-    });
+    entries.push({ fileName: name, byteSize, contentHash, kind: 'supported' });
   }
   return { ok: true, entries, unsupported };
 };

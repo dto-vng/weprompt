@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
     "knowledgeStatusIndexing": "Индексация…",
     "knowledgeProgressReading": "Чтение страницы {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Распознавание страницы {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Векторизация {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Ошибка",
     "knowledgeStatusUnsupported": "Не поддерживается",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "Это проиндексированный текст, по которому ищет ассистент, а не исходное оформление.",
     "knowledgePreviewTruncated": "Предпросмотр сокращён. Откройте исходный файл, чтобы увидеть весь документ.",
     "knowledgePreviewError": "Не удалось загрузить проиндексированный текст этого файла.",
-    "knowledgeStatusNote": "Примечание"
+    "knowledgeStatusNote": "Примечание",
+    "knowledgeOcrTag": "Распознано (OCR)",
+    "knowledgeOcrDetail": "Распознано из сканированного документа моделью {{model}}. Пропущенные страницы: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "нет"
   },
   "history": {
     "recents": "Недавние",

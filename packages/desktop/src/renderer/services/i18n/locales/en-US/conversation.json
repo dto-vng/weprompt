@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "semantic off — no embedding model configured",
     "knowledgeStatusIndexing": "Indexing…",
     "knowledgeProgressReading": "Reading page {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcribing page {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Embedding {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Failed",
     "knowledgeStatusUnsupported": "Unsupported",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "This is the indexed text the assistant searches, not the original layout.",
     "knowledgePreviewTruncated": "Preview shortened. Open the original for the whole document.",
     "knowledgePreviewError": "Could not load the indexed text for this file.",
-    "knowledgeStatusNote": "Note"
+    "knowledgeStatusNote": "Note",
+    "knowledgeOcrTag": "Transcribed (OCR)",
+    "knowledgeOcrDetail": "Transcribed from a scan by {{model}}. Pages skipped: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "none"
   },
   "history": {
     "recents": "Recents",

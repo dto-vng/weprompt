@@ -75,6 +75,7 @@
     "knowledgeSemanticOff": "семантичний пошук вимкнено — модель ембеддингу не налаштована",
     "knowledgeStatusIndexing": "Індексація…",
     "knowledgeProgressReading": "Читання сторінки {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Розпізнавання сторінки {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Векторизація {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Помилка",
     "knowledgeStatusUnsupported": "Не підтримується",
@@ -91,7 +92,10 @@
     "knowledgePreviewNote": "Це проіндексований текст, за яким шукає асистент, а не початкове оформлення.",
     "knowledgePreviewTruncated": "Попередній перегляд скорочено. Відкрийте початковий файл, щоб побачити весь документ.",
     "knowledgePreviewError": "Не вдалося завантажити проіндексований текст цього файлу.",
-    "knowledgeStatusNote": "Примітка"
+    "knowledgeStatusNote": "Примітка",
+    "knowledgeOcrTag": "Розпізнано (OCR)",
+    "knowledgeOcrDetail": "Розпізнано зі сканованого документа моделлю {{model}}. Пропущені сторінки: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "немає"
   },
   "history": {
     "recents": "Недавні",

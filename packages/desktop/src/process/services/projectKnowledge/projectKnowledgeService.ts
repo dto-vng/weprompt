@@ -26,6 +26,7 @@ import {
   pageSpanLabel,
   renderPagesAsMarkdown,
 } from '@/common/knowledge/pdfExtract';
+import { ocrPdfPages as defaultOcrPdfPages } from '@/common/knowledge/pdfOcr';
 import {
   createEmptyManifest,
   readChunks,
@@ -45,7 +46,8 @@ import type {
 } from '@/common/knowledge/types';
 import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
-import { scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
+import { MAX_KNOWLEDGE_FILE_BYTES, scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
+import { resolveOcrModel as defaultResolveOcrModel, type OcrModelResolution } from './ocrProviderPicker';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
@@ -58,7 +60,6 @@ const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);
  */
 const EXTRACTED_TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'xlsx']);
 const SUPPORTED_EXTENSIONS_HINT = 'Supported: .md, .txt, .docx, .xlsx, .pdf';
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_CHUNKS_PER_SOURCE = 2000;
 /**
  * Pages read from one PDF. Ingestion is serialized per project, so an
@@ -76,12 +77,28 @@ const MAX_PDF_PAGES = 50;
 const MAX_PREVIEW_CHARS = 200_000;
 
 /**
- * A PDF whose text layer is empty is a scan, which needs OCR we do not have.
- * Fail it explicitly: silently indexing zero passages would leave the user
- * with a `ready` source that never matches anything.
+ * A PDF with no text layer is a scan, and the only way to read it is to
+ * transcribe its pages with a multimodal model. Both messages below explain
+ * what stopped us rather than just reporting failure: a `ready` source with
+ * zero passages, or a bare "failed", leaves the user with nothing to act on.
  */
-const SCANNED_PDF_ERROR =
-  'This PDF has no text layer, so it looks like a scan. Reading scanned PDFs (OCR) is not supported yet.';
+const scannedPdfNoModelError = (reason: string): string =>
+  `This PDF is a scan, so its pages have to be transcribed by a model that can read images — but ${reason}. Add one in provider settings, then retry.`;
+
+const SCANNED_PDF_NO_PAGES_ERROR =
+  'This PDF is a scan, but none of its pages is a single full-page image, so there was nothing to transcribe. Pages built from several images (exported slides or designed documents) are not supported yet.';
+
+const scannedPdfAllPagesFailedError = (detail: string): string =>
+  `This PDF is a scan, but transcribing its pages failed: ${detail}`;
+
+/**
+ * Names the ceiling the file actually exceeded. Derived from the scan rather
+ * than written as a literal, because the caps now differ by format — a message
+ * quoting 15 MB at someone whose PDF was measured against 100 MB is worse than
+ * no message.
+ */
+const oversizeError = (limitBytes?: number): string =>
+  `File exceeds the ${Math.round((limitBytes ?? MAX_KNOWLEDGE_FILE_BYTES) / (1024 * 1024))} MB limit.`;
 
 export type ProjectKnowledgeServiceDeps = {
   storeRootDir: string;
@@ -91,6 +108,9 @@ export type ProjectKnowledgeServiceDeps = {
   embedTextsImpl?: typeof defaultEmbedTexts;
   /** Injectable so tests can drive PDF ingestion without a real parser. */
   extractPdfTextImpl?: typeof defaultExtractPdfText;
+  /** Injectable so tests can drive scanned-PDF ingestion without a real model. */
+  ocrPdfPagesImpl?: typeof defaultOcrPdfPages;
+  resolveOcrModelImpl?: typeof defaultResolveOcrModel;
   scanFolderImpl?: typeof defaultScanKnowledgeFolder;
   /**
    * Move a user file to the OS Trash (Electron's `shell.trashItem` in prod).
@@ -156,11 +176,14 @@ const toDto = (source: KnowledgeManifestSource): IKnowledgeSourceDto => ({
   addedAt: source.addedAt,
   error: source.error,
   progress: source.progress ?? null,
+  ocr: source.ocr ?? null,
 });
 
 export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps): ProjectKnowledgeService => {
   const embedTexts = deps.embedTextsImpl ?? defaultEmbedTexts;
   const extractPdfText = deps.extractPdfTextImpl ?? defaultExtractPdfText;
+  const ocrPdfPages = deps.ocrPdfPagesImpl ?? defaultOcrPdfPages;
+  const resolveOcrModel = deps.resolveOcrModelImpl ?? defaultResolveOcrModel;
   const scanFolder = deps.scanFolderImpl ?? defaultScanKnowledgeFolder;
   const queues = new Map<string, Promise<void>>();
 
@@ -494,7 +517,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         error: null,
       };
       manifest.sources.push(
-        entry.kind === 'oversize' ? { ...base, status: 'failed', error: 'File exceeds the 15 MB limit.' } : base
+        entry.kind === 'oversize' ? { ...base, status: 'failed', error: oversizeError(entry.limitBytes) } : base
       );
       dirty = true;
     }
@@ -633,6 +656,17 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     const knowledgeDir = knowledgeDirOf(workspace);
     let manifest = await loadManifest(projectId);
     const pending = manifest.sources.filter((s) => s.status === 'indexing');
+    /**
+     * Resolved lazily and at most once per run, then reused for every scan in
+     * this batch. Not persisted: probing per page would waste calls, but pinning
+     * the choice on the manifest would outlive the entitlement behind it — the
+     * catalogue on this provider advertises far more than a key may call.
+     */
+    let ocrModel: OcrModelResolution | null = null;
+    const getOcrModel = async (): Promise<OcrModelResolution> => {
+      ocrModel ??= await resolveOcrModel(await deps.listProviders());
+      return ocrModel;
+    };
     for (const source of pending) {
       let buffer: Buffer;
       try {
@@ -671,6 +705,10 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         // than one cap (e.g. a long PDF that is also chunk-capped).
         const notes: string[] = [];
         let markdown: string;
+        // Provenance from a previous pass must not outlive it: a retry that now
+        // finds a text layer, or a source re-ingested after being replaced,
+        // would otherwise keep claiming it was transcribed.
+        delete source.ocr;
         if (extension === 'pdf') {
           // PDFs get their own branch rather than joining CONVERTED_EXTENSIONS:
           // convertToMarkdown's (buffer, 'docx' | 'xlsx') shape has nowhere to
@@ -682,9 +720,43 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
                 (): undefined => undefined
               ),
           });
-          if (!extraction.hasTextLayer) throw new Error(SCANNED_PDF_ERROR);
-          if (extraction.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
-          markdown = renderPagesAsMarkdown(extraction.pages);
+          if (extraction.hasTextLayer) {
+            if (extraction.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
+            markdown = renderPagesAsMarkdown(extraction.pages);
+          } else {
+            // A scan. Transcribing it is the expensive path by a wide margin —
+            // one model call per page, on the user's own quota — so it runs only
+            // after the free local read has come up empty.
+            const resolved = await getOcrModel();
+            if (resolved.status === 'unavailable') throw new Error(scannedPdfNoModelError(resolved.reason));
+            const transcription = await ocrPdfPages(buffer, resolved.config, {
+              maxPages: MAX_PDF_PAGES,
+              onProgress: (done, total) =>
+                reportProgress(projectId, manifest, source, { stage: 'transcribing', done, total }).catch(
+                  (): undefined => undefined
+                ),
+            });
+            if (transcription.transcribedCount === 0) {
+              // Nothing was transcribed, and WHY decides what the user should
+              // do: an unreachable model is worth retrying, a deck exported to
+              // PDF is not.
+              throw new Error(
+                transcription.lastError
+                  ? scannedPdfAllPagesFailedError(transcription.lastError)
+                  : SCANNED_PDF_NO_PAGES_ERROR
+              );
+            }
+            if (transcription.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
+            if (transcription.skippedPages.length > 0) {
+              // Partial success stays a success, and says so: a 20-page contract
+              // with 2 unreadable pages is far more useful indexed than refused.
+              notes.push(
+                `Transcribed from a scan; skipped ${transcription.skippedPages.length} page(s): ${transcription.skippedPages.join(', ')}.`
+              );
+            }
+            source.ocr = { model: resolved.config.model, skippedPages: transcription.skippedPages };
+            markdown = renderPagesAsMarkdown(transcription.pages);
+          }
         } else if (CONVERTED_EXTENSIONS.has(extension)) {
           markdown = await deps.convertToMarkdown(
             buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
