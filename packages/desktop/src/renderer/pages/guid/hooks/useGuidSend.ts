@@ -22,6 +22,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import { mutate as swrMutate } from 'swr';
 import { getConversationCreateErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
 import type { AcpModelInfo } from '../types';
+import { resolveInjectedContext } from './resolveInjectedContext';
 
 export type GuidSendDeps = {
   // Input state
@@ -202,6 +203,12 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       mcp_ids: assistantOverrideMcpIds,
     };
 
+    // Global ("Chat") + project instructions, appended into the first-turn
+    // preset context. Used by the backend only when the chat's assistant has
+    // no rules of its own (general/default + project chats); a specialized
+    // assistant's rules take precedence (out of scope — see design spec).
+    const injectedContext = resolveInjectedContext(projectId);
+
     if (assistantBackend === 'aionrs') {
       if (!current_model) {
         Message.warning(t('conversation.noModelConfigured'));
@@ -218,6 +225,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
           },
           extra: {
             project_id: projectId,
+            ...(injectedContext ? { preset_rules: injectedContext } : {}),
             default_files: composed.files,
             workspace: finalWorkspace,
             custom_workspace: isCustomWorkspace,
@@ -269,6 +277,7 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
         },
         extra: {
           project_id: projectId,
+          ...(injectedContext ? { preset_context: injectedContext } : {}),
           workspace: finalWorkspace,
           custom_workspace: isCustomWorkspace,
           default_files: composed.files,

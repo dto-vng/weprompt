@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   stripThinkTags,
+  splitThinkContent,
   hasThinkTags,
   filterMessageContent,
   isThinkOnlyContent,
@@ -70,6 +71,58 @@ describe('thinkTagFilter', () => {
     it('handles multiline think tags', () => {
       const input = 'Start\n<think>\nMultiline\nthought\n</think>\nEnd';
       expect(stripThinkTags(input)).toBe('Start\n\nEnd');
+    });
+  });
+
+  describe('splitThinkContent', () => {
+    it('splits a complete <think> block into reasoning and answer', () => {
+      expect(splitThinkContent('Before<think>internal thought</think>After')).toEqual({
+        reasoning: 'internal thought',
+        answer: 'BeforeAfter',
+      });
+    });
+
+    it('splits MiniMax-style reasoning (orphaned closing tag) from the answer', () => {
+      expect(splitThinkContent('reasoning without opening tag\n</think>\nThe answer')).toEqual({
+        reasoning: 'reasoning without opening tag',
+        answer: '\nThe answer',
+      });
+    });
+
+    it('treats an unterminated opening tag as reasoning-in-progress with no answer yet', () => {
+      expect(splitThinkContent('Text<think>incomplete')).toEqual({
+        reasoning: 'incomplete',
+        answer: 'Text',
+      });
+    });
+
+    it('joins multiple think blocks into one reasoning string', () => {
+      expect(splitThinkContent('<think>first</think>Content<think>second</think>End')).toEqual({
+        reasoning: 'first\n\nsecond',
+        answer: 'ContentEnd',
+      });
+    });
+
+    it('trims and collapses whitespace in multiline reasoning', () => {
+      expect(splitThinkContent('Start\n<think>\nMultiline\nthought\n</think>\nEnd')).toEqual({
+        reasoning: 'Multiline\nthought',
+        answer: 'Start\n\nEnd',
+      });
+    });
+
+    it('returns reasoning only when there is no visible reply', () => {
+      expect(splitThinkContent('<think>only</think>')).toEqual({ reasoning: 'only', answer: '' });
+    });
+
+    it('returns the content untouched as the answer when there are no think tags', () => {
+      expect(splitThinkContent('Normal text without tags')).toEqual({
+        reasoning: '',
+        answer: 'Normal text without tags',
+      });
+    });
+
+    it('handles empty string', () => {
+      expect(splitThinkContent('')).toEqual({ reasoning: '', answer: '' });
     });
   });
 

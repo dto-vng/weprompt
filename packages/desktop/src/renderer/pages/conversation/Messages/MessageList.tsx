@@ -6,9 +6,7 @@
 
 import type { IConversationArtifact } from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
-import { coalesceToolCalls } from '@/common/chat/toolActivity/coalesceToolCalls';
-import type { CoalescedStep } from '@/common/chat/toolActivity/types';
-import { isDiagnosticToolMessage, normalizeToolMessages, type ToolMessage } from '@/common/chat/normalizeToolCall';
+import { isDiagnosticToolMessage } from '@/common/chat/normalizeToolCall';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useConversationRuntimeView } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getChatSurfaceWidthClass } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
@@ -44,12 +42,12 @@ import MessageTips from './components/MessageTips';
 import MessageToolCall from './components/MessageToolCall';
 import MessageToolGroup from './components/MessageToolGroup';
 import MessageToolGroupSummary from './components/MessageToolGroupSummary';
-import ToolActivityError from './components/toolActivity/ToolActivityError';
 import MessageCronTrigger from './components/MessageCronTrigger';
 import MessageSkillSuggest from './components/MessageSkillSuggest';
 import MessageText from './components/MessageText';
 import MessageThinking from './components/MessageThinking';
 import type { WorkJournalSourceMessage, WriteFileResult } from './types';
+import { dedupRestatedTextMessages } from './dedupRestatedTexts';
 import { useAutoScroll } from './useAutoScroll';
 import { useAutoPreviewOfficeFiles } from '@/renderer/hooks/file/useAutoPreviewOfficeFiles';
 import SelectionReplyButton from './components/SelectionReplyButton';
@@ -57,13 +55,6 @@ import SelectionReplyButton from './components/SelectionReplyButton';
 type IMessageVO =
   | TMessage
   | { type: 'file_summary'; id: string; diffs: FileChangeInfo[]; sourceMessageIds: string[]; created_at: number }
-  | {
-      type: 'work_error';
-      id: string;
-      step: CoalescedStep;
-      sourceMessageIds: string[];
-      created_at: number;
-    }
   | {
       type: 'work_summary';
       id: string;
@@ -97,9 +88,6 @@ const getProcessedItemSourceMessageIds = (item: IProcessedItem): string[] => {
   if ('type' in item && item.type === 'work_summary') {
     return item.sourceMessageIds;
   }
-  if ('type' in item && item.type === 'work_error') {
-    return item.sourceMessageIds;
-  }
   if ('type' in item && item.type === 'file_summary') {
     return item.sourceMessageIds;
   }
@@ -114,13 +102,12 @@ const matchesTargetMessage = (item: IProcessedItem, targetMessageId?: string): b
 };
 
 const getProcessedItemAnchorId = (item: IProcessedItem): string => {
-  if ('type' in item && item.type === 'work_error') return item.id;
   const sourceIds = getProcessedItemSourceMessageIds(item);
   return sourceIds[0] || ('id' in item ? item.id : uuid());
 };
 
 const getProcessedItemCreatedAt = (item: IProcessedItem): number => {
-  if ('type' in item && ['file_summary', 'work_summary', 'work_error', 'artifact'].includes(item.type)) {
+  if ('type' in item && ['file_summary', 'work_summary', 'artifact'].includes(item.type)) {
     return item.created_at;
   }
   return item.created_at ?? 0;
@@ -325,9 +312,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     let diffsChanges: FileChangeInfo[] = [];
     let diffsSourceMessageIds: string[] = [];
     let pendingWorkSummary: PendingWorkSummary | undefined;
-    const pendingWorkErrorIdByCallKey = new Map<string, string>();
-    const pendingWorkErrorIds = new Set<string>();
-    const supersededWorkErrorIds = new Set<string>();
 
     const pushFileDiffChanges = (changes: FileChangeInfo, sourceMessageId: string, created_at: number) => {
       if (!diffsChanges.length) {
@@ -362,42 +346,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       pendingWorkSummary.latestCreatedAt = message.created_at ?? 0;
       resetFileDiffChanges();
     };
-    const pushWorkErrors = (message: ToolMessage) => {
-      const calls = normalizeToolMessages([message]);
-      // Later non-error tool activity means the agent recovered from earlier
-      // failures in this turn — retire their standalone error cards. The failed
-      // steps stay inspectable inside the expanded work summary; only an error
-      // the turn actually ends on keeps its card.
-      if (calls.some((call) => call.status !== 'error')) {
-        for (const id of pendingWorkErrorIds) supersededWorkErrorIds.add(id);
-        pendingWorkErrorIds.clear();
-      }
-      calls.forEach((call, index) => {
-        const previousErrorId = call.key ? pendingWorkErrorIdByCallKey.get(call.key) : undefined;
-        if (previousErrorId) {
-          supersededWorkErrorIds.add(previousErrorId);
-          pendingWorkErrorIds.delete(previousErrorId);
-        }
-
-        if (call.status !== 'error') {
-          if (call.key) pendingWorkErrorIdByCallKey.delete(call.key);
-          return;
-        }
-
-        const step = coalesceToolCalls([call])[0];
-        if (!step) return;
-        const id = `work-error-${message.id}-${call.key || index}`;
-        result.push({
-          type: 'work_error',
-          id,
-          step,
-          sourceMessageIds: [message.id],
-          created_at: message.created_at ?? 0,
-        });
-        pendingWorkErrorIds.add(id);
-        if (call.key) pendingWorkErrorIdByCallKey.set(call.key, id);
-      });
-    };
     const flushPendingWorkSummary = () => {
       if (!pendingWorkSummary) return;
       result.splice(pendingWorkSummary.latestResultIndex, 0, {
@@ -410,12 +358,14 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       pendingWorkSummary = undefined;
     };
 
-    for (let i = 0, len = list.length; i < len; i++) {
-      const message = list[i];
+    // Collapse restated replies (same answer persisted twice around a tool call)
+    // before grouping, so the turn shows a single copy with its reasoning.
+    const dedupedList = dedupRestatedTextMessages(list);
+
+    for (let i = 0, len = dedupedList.length; i < len; i++) {
+      const message = dedupedList[i];
       if (isHistoryGapMarker(message)) {
         flushPendingWorkSummary();
-        pendingWorkErrorIdByCallKey.clear();
-        pendingWorkErrorIds.clear();
         resetFileDiffChanges();
         continue;
       }
@@ -438,7 +388,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
           continue;
         }
         if (message.position === 'left') {
-          pushWorkErrors(message);
           pushWorkMessage(message);
           continue;
         }
@@ -446,7 +395,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (message.type === 'acp_tool_call') {
         if (isDiagnosticToolMessage(message)) continue;
         if (message.position === 'left') {
-          pushWorkErrors(message);
           pushWorkMessage(message);
           continue;
         }
@@ -454,7 +402,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       if (message.type === 'tool_call') {
         if (isDiagnosticToolMessage(message)) continue;
         if (message.position === 'left') {
-          pushWorkErrors(message);
           pushWorkMessage(message);
           continue;
         }
@@ -465,8 +412,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       }
       if (message.position === 'right') {
         flushPendingWorkSummary();
-        pendingWorkErrorIdByCallKey.clear();
-        pendingWorkErrorIds.clear();
       }
       resetFileDiffChanges();
       result.push(message);
@@ -485,10 +430,9 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
         created_at: artifact.created_at,
       }));
 
-    return [
-      ...result.filter((item) => item.type !== 'work_error' || !supersededWorkErrorIds.has(item.id)),
-      ...visibleArtifacts,
-    ].toSorted((a, b) => getProcessedItemCreatedAt(a) - getProcessedItemCreatedAt(b));
+    return [...result, ...visibleArtifacts].toSorted(
+      (a, b) => getProcessedItemCreatedAt(a) - getProcessedItemCreatedAt(b)
+    );
   }, [artifacts, list]);
 
   const activeWorkSummaryId = useMemo(() => {
@@ -510,7 +454,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
         );
         return followsHistoryGap ? item.id : undefined;
       }
-      if (item.type === 'file_summary' || item.type === 'work_error') continue;
+      if (item.type === 'file_summary') continue;
       if (item.position === 'right') return undefined;
       if (item.type === 'text' && item.position === 'left' && item.status === 'finish') return undefined;
     }
@@ -537,10 +481,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     for (const item of processedList) {
       if (
         'type' in item &&
-        (item.type === 'file_summary' ||
-          item.type === 'work_summary' ||
-          item.type === 'work_error' ||
-          item.type === 'artifact')
+        (item.type === 'file_summary' || item.type === 'work_summary' || item.type === 'artifact')
       ) {
         continue;
       }
@@ -567,7 +508,7 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
 
     for (let index = processedList.length - 1; index >= 0; index -= 1) {
       const item = processedList[index];
-      if ('type' in item && ['file_summary', 'work_summary', 'work_error', 'artifact'].includes(item.type)) {
+      if ('type' in item && ['file_summary', 'work_summary', 'artifact'].includes(item.type)) {
         continue;
       }
       const message = item as TMessage;
@@ -587,12 +528,14 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     handleWheel,
     handlePointerDown,
     showScrollButton,
+    reservedSpaceHeight,
     scrollToBottom,
     scrollElementIntoView,
     hideScrollButton,
   } = useAutoScroll({
     messages: list,
     itemCount: processedList.length,
+    isStreaming: isProcessing,
   });
 
   const setScrollerRef = useCallback(
@@ -807,18 +750,6 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
         </div>
       );
     }
-    if ('type' in item && item.type === 'work_error') {
-      return (
-        <div
-          key={item.id}
-          id={`message-${getProcessedItemAnchorId(item)}`}
-          className={`${rowWidthClass} min-w-0 message-item px-8px m-t-10px work_error`}
-          style={highlighted ? highlightStyle : undefined}
-        >
-          <ToolActivityError step={item.step} />
-        </div>
-      );
-    }
     if ('type' in item && ['file_summary', 'work_summary'].includes(item.type)) {
       return (
         <div
@@ -838,14 +769,16 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
     // User messages keep their own copy row; AI text only shows it at the turn end.
     const showCopyRow = message.position !== 'left' || message.type !== 'text' || aiCopyRowTextIds.has(message.id);
     return (
-      <MessageItem
-        message={message}
-        key={message.id}
-        highlighted={highlighted}
-        rowWidthClass={rowWidthClass}
-        showCopyRow={showCopyRow}
-        isStreaming={streamingTextMessageId === message.id}
-      ></MessageItem>
+      <div id={`message-${message.id}`}>
+        <MessageItem
+          message={message}
+          key={message.id}
+          highlighted={highlighted}
+          rowWidthClass={rowWidthClass}
+          showCopyRow={showCopyRow}
+          isStreaming={streamingTextMessageId === message.id}
+        ></MessageItem>
+      </div>
     );
   };
 
@@ -879,6 +812,13 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
                 <React.Fragment key={getProcessedItemAnchorId(item) || index}>{renderItem(index, item)}</React.Fragment>
               ))}
               <div className='h-20px' />
+              {/* Reserved space so a streaming reply fills in below the anchored user
+                  message without the viewport constantly scrolling (see useAutoScroll). */}
+              <div
+                aria-hidden='true'
+                data-testid='message-list-reserve'
+                style={{ height: `${reservedSpaceHeight}px` }}
+              />
             </div>
           </div>
         </ImagePreviewContext.Provider>

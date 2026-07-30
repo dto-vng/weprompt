@@ -1,4 +1,14 @@
 {
+  "profile": "個人資料",
+  "groupProfile": "個人資料",
+  "profileTitle": "你的指示",
+  "profileDescription": "告訴助手你希望它如何回應。這些指示會加入你的新對話。",
+  "profileEnableLabel": "將我的指示套用到新對話",
+  "profileInstructionsLabel": "指示",
+  "profileInstructionsPlaceholder": "例如：我在 VNG 的人力資源部門工作。偏好簡潔、正式的越南語。在假定使用某個範本前先詢問。",
+  "profilePreviewTitle": "將加入對話的內容",
+  "profilePreviewEmpty": "尚無內容——請在上方新增指示。",
+  "profileScopeNote": "適用於你的對話。專用助手遵循各自的規則。",
   "title": "Settings",
   "skillsHub": {
     "title": "技能中心",

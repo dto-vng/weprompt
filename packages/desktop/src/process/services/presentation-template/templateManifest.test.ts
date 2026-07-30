@@ -32,6 +32,30 @@ describe('validateTemplateManifest', () => {
     expect(validateTemplateManifest(pptx).referenceFile).toBe('reference.pptx');
   });
 
+  it('accepts a valid docx manifest with a reference file', () => {
+    const docx = {
+      ...valid,
+      id: 'business-report',
+      format: 'docx',
+      kind: 'document',
+      referenceFile: 'reference.docx',
+    };
+    const parsed = validateTemplateManifest(docx);
+    expect(parsed.format).toBe('docx');
+    expect(parsed.kind).toBe('document');
+    expect(parsed.referenceFile).toBe('reference.docx');
+  });
+
+  it('rejects a docx manifest without referenceFile', () => {
+    expect(() => validateTemplateManifest({ ...valid, format: 'docx', referenceFile: null })).toThrow(
+      /docx template requires referenceFile/
+    );
+  });
+
+  it('still allows html manifests to omit referenceFile', () => {
+    expect(validateTemplateManifest({ ...valid, referenceFile: null }).referenceFile).toBeNull();
+  });
+
   it('rejects a non-object', () => {
     expect(() => validateTemplateManifest('nope')).toThrow(/invalid manifest/);
   });

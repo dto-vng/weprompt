@@ -42,6 +42,7 @@ const isForgeProject = (value: unknown): value is ForgeProject => {
     typeof value.workspace === 'string' &&
     typeof value.created_at === 'number' &&
     typeof value.updated_at === 'number' &&
+    (value.instructions === undefined || typeof value.instructions === 'string') &&
     (value.last_opened_at === undefined || typeof value.last_opened_at === 'number')
   );
 };
@@ -98,6 +99,9 @@ export const findProjectByWorkspace = (
   return projects.find((project) => normalizeWorkspacePath(project.workspace) === normalized) ?? null;
 };
 
+export const findProjectById = (id: string, projects: ForgeProject[] = readProjects()): ForgeProject | null =>
+  projects.find((project) => project.id === id) ?? null;
+
 const defaultCreateId = (): string => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -126,6 +130,7 @@ export const createProject = (input: CreateForgeProjectInput, deps: ProjectMutat
     id: createId(),
     name,
     workspace,
+    ...(input.instructions?.trim() ? { instructions: input.instructions.trim() } : {}),
     created_at: timestamp,
     updated_at: timestamp,
   };
@@ -159,6 +164,7 @@ export const updateProject = (
     ...target,
     ...(input.name !== undefined ? { name: input.name.trim() || getWorkspaceBasename(nextWorkspace) } : {}),
     workspace: nextWorkspace,
+    ...(input.instructions !== undefined ? { instructions: input.instructions.trim() || undefined } : {}),
     ...(input.last_opened_at !== undefined ? { last_opened_at: input.last_opened_at } : {}),
     updated_at: now(),
   };

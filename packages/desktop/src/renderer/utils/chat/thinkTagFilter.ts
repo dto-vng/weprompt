@@ -44,6 +44,57 @@ export function stripThinkTags(content: string): string {
 }
 
 /**
+ * Split content into the model's reasoning and its visible answer, instead of
+ * discarding the reasoning like {@link stripThinkTags}. Handles complete
+ * `<think>…</think>` / `<thinking>…</thinking>` blocks, MiniMax-style orphaned
+ * closing tags (opening omitted), and the streaming partials in between:
+ *   - opening tag, no close yet  → everything after it is reasoning-in-progress
+ *   - no tags yet                → treated as answer (a reasoning model that omits
+ *     the opening tag is indistinguishable from a normal reply until `</think>`)
+ *
+ * @returns `{ reasoning, answer }` — either may be empty.
+ */
+export function splitThinkContent(content: string): { reasoning: string; answer: string } {
+  if (!content || typeof content !== 'string' || !hasThinkTags(content)) {
+    return { reasoning: '', answer: content ?? '' };
+  }
+
+  const reasoningParts: string[] = [];
+  let answer = content;
+
+  // Complete blocks anywhere in the text.
+  answer = answer.replace(/<\s*think(?:ing)?\s*>([\s\S]*?)<\s*\/\s*think(?:ing)?\s*>/gi, (_match, inner: string) => {
+    reasoningParts.push(inner);
+    return '';
+  });
+
+  // Orphaned closing tag (opening omitted): everything before it is reasoning.
+  const beforeClose = answer.match(/^([\s\S]*?)<\s*\/\s*think(?:ing)?\s*>/i);
+  if (beforeClose) {
+    reasoningParts.push(beforeClose[1]);
+    answer = answer.slice(beforeClose[0].length);
+  }
+
+  // Orphaned opening tag, still streaming (no close yet): the rest is reasoning.
+  const afterOpen = answer.match(/<\s*think(?:ing)?\s*>([\s\S]*)$/i);
+  if (afterOpen && afterOpen.index !== undefined) {
+    reasoningParts.push(afterOpen[1]);
+    answer = answer.slice(0, afterOpen.index);
+  }
+
+  // Strip any remaining stray tags.
+  answer = answer.replace(/<\s*\/?\s*think(?:ing)?\s*>/gi, '');
+
+  return {
+    reasoning: reasoningParts
+      .join('\n\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+    answer: answer.replace(/\n{3,}/g, '\n\n'),
+  };
+}
+
+/**
  * Detect content that disappears entirely once think tags are stripped —
  * the model produced only internal reasoning and no visible reply.
  * Whitespace-only and tag-free content both return false, so callers can

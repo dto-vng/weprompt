@@ -8,8 +8,10 @@ import { describe, expect, it } from 'vitest';
 import { validateTemplateManifest } from '@process/services/presentation-template/templateManifest';
 import { BUILTIN_TEMPLATE_PACKS } from './index';
 
+const REFERENCE_FORMATS = new Set(['pptx', 'docx']);
+
 describe('BUILTIN_TEMPLATE_PACKS', () => {
-  it('contains the eight builtin packs with unique ids', () => {
+  it('contains every builtin pack with unique ids', () => {
     const ids = BUILTIN_TEMPLATE_PACKS.map((p) => p.manifest.id);
     expect(ids).toEqual(
       expect.arrayContaining([
@@ -21,6 +23,10 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
         'project-kickoff',
         'monthly-steerco',
         'connected-ops',
+        'business-report',
+        'decision-memo',
+        'operations-guide',
+        'proposal-sow',
       ])
     );
     expect(new Set(ids).size).toBe(ids.length);
@@ -32,7 +38,7 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
       expect(pack.manifest.source).toBe('builtin');
       expect(pack.themeMd).toContain('Theme Specification');
       expect(pack.previewSvg.trim().startsWith('<svg')).toBe(true);
-      if (pack.manifest.format === 'pptx') {
+      if (REFERENCE_FORMATS.has(pack.manifest.format)) {
         expect(pack.referenceSourcePath).toBeDefined();
       } else {
         expect(pack.referenceSourcePath).toBeUndefined();
@@ -47,6 +53,18 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
       expect(pack.themeMd).toContain('## Follow-up edits');
       expect(pack.themeMd).toContain('source documents');
       expect(pack.manifest.version).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('docx packs clone a reference and carry the follow-up edit contract', () => {
+    const docxPacks = BUILTIN_TEMPLATE_PACKS.filter((p) => p.manifest.format === 'docx');
+    expect(docxPacks.length).toBe(4);
+    for (const pack of docxPacks) {
+      expect(pack.manifest.kind).toBe('document');
+      expect(pack.manifest.referenceFile).toBe('reference.docx');
+      expect(pack.themeMd).toContain('## Follow-up edits');
+      expect(pack.themeMd).toContain('source documents');
+      expect(pack.referenceSourcePath).toBeDefined();
     }
   });
 });

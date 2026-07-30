@@ -307,6 +307,48 @@ export const mergeAcpToolCallContent = (
 export const isTextContentReplacement = (content: IMessageText['content'] | undefined): boolean =>
   content?.replace === true;
 
+const THINK_TAG_RE = /<\s*\/?\s*think(?:ing)?\s*>/i;
+
+/**
+ * Extract the think-tagged reasoning prefix from streamed content so it can be
+ * carried over a replace snapshot that lost it. Returns '' when there is none.
+ * Handles complete blocks, MiniMax-style orphaned closing tags, and a still-open
+ * block (closed so downstream splitting keeps the answer out of the reasoning).
+ */
+const extractThinkPrefix = (content: string): string => {
+  const blocks = content.match(/<\s*think(?:ing)?\s*>[\s\S]*?<\s*\/\s*think(?:ing)?\s*>/gi);
+  if (blocks?.length) return blocks.join('\n');
+
+  const orphanClose = content.match(/^[\s\S]*?<\s*\/\s*think(?:ing)?\s*>/i);
+  if (orphanClose) return orphanClose[0];
+
+  const openOnly = content.match(/<\s*think(?:ing)?\s*>[\s\S]*$/i);
+  if (openOnly) return `${openOnly[0]}</think>`;
+
+  return '';
+};
+
+/**
+ * Resolve what a replace-marked snapshot should show. At turn finish the
+ * backend replays each message's persisted form as a `replace: true` snapshot;
+ * observed live, that snapshot can be think-stripped — or entirely empty —
+ * while the streamed content the user is reading still holds the reasoning.
+ * A finalize snapshot must never destroy content the user can already see.
+ */
+const resolveReplacedTextContent = (existingText: string, incomingText: string): string => {
+  // An empty snapshot over visible content is data loss, not a better version.
+  if (!incomingText.trim() && existingText.trim()) return existingText;
+
+  // Carry streamed reasoning over a snapshot that stripped it, so the grey
+  // reasoning block survives turn finish.
+  if (THINK_TAG_RE.test(existingText) && !THINK_TAG_RE.test(incomingText)) {
+    const reasoning = extractThinkPrefix(existingText);
+    if (reasoning) return `${reasoning}\n${incomingText}`;
+  }
+
+  return incomingText;
+};
+
 export const mergeTextMessageContent = (
   existing: IMessageText['content'],
   incoming: IMessageText['content']
@@ -317,7 +359,9 @@ export const mergeTextMessageContent = (
   return {
     ...existingRest,
     ...incomingRest,
-    content: incomingReplace ? incoming.content : existing.content + incoming.content,
+    content: incomingReplace
+      ? resolveReplacedTextContent(existing.content, incoming.content)
+      : existing.content + incoming.content,
     ...(incomingReplace ? { replace: true } : {}),
   };
 };

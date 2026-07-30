@@ -1,4 +1,14 @@
 {
+  "profile": "Profil",
+  "groupProfile": "Profil",
+  "profileTitle": "Talimatlarınız",
+  "profileDescription": "Asistana nasıl yanıt vermesini istediğinizi söyleyin. Bu talimatlar yeni sohbetlerinize eklenir.",
+  "profileEnableLabel": "Talimatlarımı yeni sohbetlere uygula",
+  "profileInstructionsLabel": "Talimatlar",
+  "profileInstructionsPlaceholder": "örn. VNG'de İnsan Kaynakları'nda çalışıyorum. Kısa ve resmi bir Vietnamca tercih ederim. Bir şablon varsaymadan önce sor.",
+  "profilePreviewTitle": "Sohbetlerinize eklenenler",
+  "profilePreviewEmpty": "Henüz bir şey yok — yukarıdan talimat ekleyin.",
+  "profileScopeNote": "Sohbetlerinize uygulanır. Özel asistanlar kendi kurallarına uyar.",
   "title": "Ayarlar",
   "skillsHub": {
     "title": "Beceri Merkezi",

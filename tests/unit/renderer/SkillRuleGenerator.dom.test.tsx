@@ -8,6 +8,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SkillRuleGenerator from '@/renderer/pages/conversation/components/SkillRuleGenerator';
+import { ipcBridge } from '@/common';
 import { loadLatestConversationMessages } from '@/renderer/utils/chat/messagePagination';
 
 const mocks = vi.hoisted(() => ({
@@ -46,15 +47,23 @@ vi.mock('@arco-design/web-react', () => {
     ) : null;
   const Radio = ({ children }: any) => <label>{children}</label>;
   Radio.Group = ({ children }: any) => <div>{children}</div>;
+  const List = ({ dataSource, render }: any) => (
+    <div>{(dataSource ?? []).map((item: any, index: number) => render(item, index))}</div>
+  );
+  List.Item = ({ children, onClick }: any) => (
+    <div role='listitem' onClick={onClick}>
+      {children}
+    </div>
+  );
 
   return {
     Button,
     Dropdown,
-    Empty: () => <div />,
+    Empty: ({ description }: any) => <div>{description}</div>,
     Input: ({ onChange, placeholder, value }: any) => (
       <input placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
     ),
-    List: () => <div />,
+    List,
     Menu,
     Message: {
       error: vi.fn(),
@@ -162,5 +171,50 @@ describe('SkillRuleGenerator', () => {
         contentMode: 'compact',
       });
     });
+  });
+
+  it('lists rule files from every level of the workspace, not just the first entry', async () => {
+    // getFilesByDir returns a FLAT array of the workspace's direct children
+    // (directories first), already camelCase after the ipcBridge mapper.
+    vi.mocked(ipcBridge.fs.getFilesByDir.invoke).mockResolvedValue([
+      {
+        name: 'src',
+        fullPath: '/ws/src',
+        relativePath: 'src',
+        isDir: true,
+        isFile: false,
+        children: [
+          {
+            name: 'helper.py',
+            fullPath: '/ws/src/helper.py',
+            relativePath: 'src/helper.py',
+            isDir: false,
+            isFile: true,
+          },
+        ],
+      },
+      { name: 'README.md', fullPath: '/ws/README.md', relativePath: 'README.md', isDir: false, isFile: true },
+    ] as any);
+
+    render(<SkillRuleGenerator conversation_id='conversation-1' workspace='/ws' />);
+    fireEvent.click(screen.getByText('Load Rule/Skill'));
+
+    // Nested file (inside the first entry) AND the top-level file must both show.
+    expect((await screen.findAllByText('helper.py')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('README.md')).length).toBeGreaterThan(0);
+  });
+
+  it('lists top-level rule files when the workspace has no subdirectories', async () => {
+    vi.mocked(ipcBridge.fs.getFilesByDir.invoke).mockResolvedValue([
+      { name: 'README.md', fullPath: '/ws/README.md', relativePath: 'README.md', isDir: false, isFile: true },
+      { name: 'notes.txt', fullPath: '/ws/notes.txt', relativePath: 'notes.txt', isDir: false, isFile: true },
+    ] as any);
+
+    render(<SkillRuleGenerator conversation_id='conversation-1' workspace='/ws' />);
+    fireEvent.click(screen.getByText('Load Rule/Skill'));
+
+    expect((await screen.findAllByText('README.md')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('notes.txt')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('No relevant files found in workspace')).toBeNull();
   });
 });

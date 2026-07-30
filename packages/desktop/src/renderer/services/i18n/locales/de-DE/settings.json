@@ -1,4 +1,14 @@
 {
+  "profile": "Profil",
+  "groupProfile": "Profil",
+  "profileTitle": "Deine Anweisungen",
+  "profileDescription": "Sag dem Assistenten, wie er antworten soll. Diese Anweisungen werden zu deinen neuen Chats hinzugefügt.",
+  "profileEnableLabel": "Meine Anweisungen auf neue Chats anwenden",
+  "profileInstructionsLabel": "Anweisungen",
+  "profileInstructionsPlaceholder": "z. B. Ich arbeite in der Personalabteilung bei VNG. Bevorzuge knappes, förmliches Vietnamesisch. Frag nach, bevor du eine Vorlage annimmst.",
+  "profilePreviewTitle": "Was zu deinen Chats hinzugefügt wird",
+  "profilePreviewEmpty": "Noch nichts – füge oben Anweisungen hinzu.",
+  "profileScopeNote": "Gilt für deine Chats. Spezialisierte Assistenten folgen ihren eigenen Regeln.",
   "title": "Einstellungen",
   "skillsHub": {
     "title": "Skills-Hub",

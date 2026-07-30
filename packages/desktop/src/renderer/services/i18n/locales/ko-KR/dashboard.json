@@ -1,0 +1,14 @@
+{
+  "title": "대시보드",
+  "subtitle": "실시간 인원, 이직 및 유지",
+  "refresh": "새로고침",
+  "scheduleRun": "새로고침 예약",
+  "publish": "대시보드에 게시",
+  "publishSuccess": "대시보드에 게시됨",
+  "publishError": "게시 실패: {{error}}",
+  "empty": "대시보드가 없습니다",
+  "back": "갤러리로 돌아가기",
+  "delete": "삭제",
+  "deleteConfirm": "이 대시보드를 삭제하시겠습니까?",
+  "builtinBadge": "기본 제공"
+}

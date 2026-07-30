@@ -12,6 +12,7 @@ import type { PresentationTemplateSummary } from '@/common/types/office/presenta
  */
 export const HTML_DIRECTIVE_PREFIX = 'Create a presentation/report from the request below.';
 export const PPTX_DIRECTIVE_PREFIX = 'Create a presentation from the request below.';
+export const DOCX_DIRECTIVE_PREFIX = 'Create a Word document from the request below.';
 
 const htmlDirective = (themeFile: string): string =>
   [
@@ -51,6 +52,29 @@ const pptxDirective = (themeFile: string, referenceFile: string): string =>
     `Do not invent facts to fill template slots.`,
   ].join(' ');
 
+const docxDirective = (themeFile: string, referenceFile: string): string =>
+  [
+    DOCX_DIRECTIVE_PREFIX,
+    `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
+    `Before concluding anything about availability, run \`officecli --version\` in the shell;`,
+    `only if that command itself fails should you stop — tell the user, quoting the failing command and its output; never conclude officecli is unavailable without running it.`,
+    `Before building anything: read the attached ${themeFile} in full and run \`officecli load_skill docx\`; follow both.`,
+    `Copy the attached ${referenceFile} to the output file, then edit the copy with officecli —`,
+    `preserve its Word styles, numbering definitions, page setup, and header/footer parts; replace the sample content wholesale.`,
+    `Never build a document from scratch and never write raw OOXML.`,
+    `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
+    `\`officecli view <file> text\` reads Office files — and build sections and tables from it; never invent numbers when sources are attached.`,
+    `Before declaring done, ALL delivery gates must pass: \`officecli validate\` returning "no errors found";`,
+    `\`officecli view issues\` clean; no leftover placeholder text;`,
+    `and a whole-document visual audit — render a contact sheet with \`officecli view <file> screenshot --grid auto\`,`,
+    `inspect it for pagination faults, blank pages, table overflow, heading rhythm, and margin problems,`,
+    `confirm any fine call on the suspect page with \`screenshot --page N\`, fix, and re-render until a full pass finds zero new issues (max 3 cycles).`,
+    `Save the result into the conversation workspace with a descriptive snake_case file name.`,
+    `For any follow-up change request later in this conversation, follow the "Follow-up edits" section of ${themeFile}:`,
+    `edit the existing document in place, re-run the validate and issues gates, and show the re-rendered changed page(s) in your reply as a markdown image.`,
+    `Do not invent facts to fill template slots.`,
+  ].join(' ');
+
 /**
  * Composes the outgoing message for a template send: directive + user text,
  * template files appended to the attachment list (deduped). The same output
@@ -63,24 +87,32 @@ export function composePresentationSend(
   files: string[]
 ): { input: string; files: string[]; injectSkills: string[] } {
   const { manifest } = template;
-  const directive =
-    manifest.format === 'pptx' && template.referencePath && manifest.referenceFile
-      ? pptxDirective(manifest.themeFile, manifest.referenceFile)
-      : htmlDirective(manifest.themeFile);
+  const hasReference = Boolean(template.referencePath && manifest.referenceFile);
+  let directive: string;
+  if (manifest.format === 'pptx' && hasReference) {
+    directive = pptxDirective(manifest.themeFile, manifest.referenceFile!);
+  } else if (manifest.format === 'docx' && hasReference) {
+    directive = docxDirective(manifest.themeFile, manifest.referenceFile!);
+  } else {
+    // No retained reference resolved (corrupt pack): never tell the agent to copy
+    // a file that is not attached — fall back to the spec-only directive.
+    directive = htmlDirective(manifest.themeFile);
+  }
 
   const attachments = [...files];
   for (const extra of [template.themePath, template.referencePath]) {
     if (extra && !attachments.includes(extra)) attachments.push(extra);
   }
 
+  const clonesReference = manifest.format === 'pptx' || manifest.format === 'docx';
   return {
     input: `${directive}\n\n${message}`,
     files: attachments,
     // Only the generic officecli skill resolves by name in the backend skill
-    // registry; the specialized pptx design rules are pulled in-band via the
-    // directive's mandatory `officecli load_skill pptx` step instead. HTML
-    // sends get the skill too when the user attached Office source documents
-    // the agent must read with officecli.
-    injectSkills: manifest.format === 'pptx' || files.some((f) => OFFICE_SOURCE_EXT_RE.test(f)) ? ['officecli'] : [],
+    // registry; the specialized pptx/docx design rules are pulled in-band via
+    // the directive's mandatory `officecli load_skill` step instead. HTML sends
+    // get the skill too when the user attached Office source documents the
+    // agent must read with officecli.
+    injectSkills: clonesReference || files.some((f) => OFFICE_SOURCE_EXT_RE.test(f)) ? ['officecli'] : [],
   };
 }

@@ -13,19 +13,23 @@ import type { PresentationTemplateSummary } from '@/common/types/office/presenta
 const COLUMNS = [
   { format: 'pptx', labelKey: 'conversation.presentationTemplates.columnPptx' },
   { format: 'html', labelKey: 'conversation.presentationTemplates.columnHtml' },
+  { format: 'docx', labelKey: 'conversation.presentationTemplates.columnDocx' },
 ] as const;
 
+// `col` is the column's minimum width and differs per mode because the two modes
+// lay cards out differently: `large` wraps cards two-up (2x160 + 12 gap = 332), while
+// `compact` stacks them one-per-row, where a 340px column would only pad the popover.
 const SIZE = {
-  compact: { card: 'w-160px h-100px', img: 'w-160px h-100px' },
-  // Sized so two cards fit per row inside a half-width column of the 800px
-  // landing layout (2×160 + 12 gap < ~360px column).
-  large: { card: 'w-160px h-100px', img: 'w-160px h-100px' },
+  compact: { card: 'w-160px h-100px', img: 'w-160px h-100px', col: 'min-w-172px' },
+  large: { card: 'w-160px h-100px', img: 'w-160px h-100px', col: 'min-w-340px' },
 } as const;
 
 /**
- * Format-grouped template columns (PPTX | HTML) shared by the compact popover
- * and the expanded landing-page gallery. Templates are NEVER mixed across
- * columns — grouping is strictly manifest.format.
+ * Format-grouped template columns (PPTX | HTML | DOCX) shared by the compact
+ * popover and the expanded landing-page gallery. Columns wrap rather than being
+ * forced onto one row, so a narrow container drops the last group to a second
+ * row. Templates are NEVER mixed across columns — grouping is strictly
+ * manifest.format.
  */
 const TemplateGalleryColumns: React.FC<{
   templates: PresentationTemplateSummary[];
@@ -38,14 +42,14 @@ const TemplateGalleryColumns: React.FC<{
   const dims = SIZE[size];
 
   return (
-    <div className='flex gap-16px items-start'>
+    <div className='flex flex-wrap gap-16px items-start'>
       {COLUMNS.map((column) => {
         const columnTemplates = templates.filter((template) => template.manifest.format === column.format);
         return (
           <div
             key={column.format}
             data-testid={`template-column-${column.format}`}
-            className='flex flex-col gap-10px min-w-0 flex-1'
+            className={`flex flex-col gap-10px min-w-0 flex-1 ${dims.col}`}
           >
             <span className='text-12px font-medium text-t-secondary'>{t(column.labelKey)}</span>
             <div className={size === 'large' ? 'flex flex-wrap gap-12px items-start' : 'flex flex-col gap-10px'}>

@@ -54,6 +54,7 @@ import type {
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type { DashboardTemplateSummary } from '@/common/types/office/dashboardTemplate';
 import type {
   EnsureConversationRuntimeResponse,
   GetConfigOptionsResponse,
@@ -139,8 +140,10 @@ import {
 import { fromBackendCompareResult, type RawCompareResult } from './fileSnapshotMapper';
 import {
   absoluteToRelativePath,
+  fromBackendDirOrFiles,
   fromBackendWorkspaceFlatFiles,
   fromBackendWorkspaceList,
+  type RawDirOrFile,
   type RawWorkspaceFlatFile,
 } from './workspaceMapper';
 
@@ -588,11 +591,30 @@ export const presentationTemplates = {
 };
 
 // ---------------------------------------------------------------------------
+// Dashboards — Electron main-process store (bridge IPC); builtin + published
+// ---------------------------------------------------------------------------
+
+export const dashboards = {
+  list: bridge.buildProvider<DashboardTemplateSummary[], void>('dashboards.list'),
+  read: bridge.buildProvider<string, { id: string }>('dashboards.read'),
+  publish: bridge.buildProvider<
+    { ok: true; dashboard: DashboardTemplateSummary } | { ok: false; error: string },
+    { name: string; html: string }
+  >('dashboards.publish'),
+  remove: bridge.buildProvider<boolean, { id: string }>('dashboards.remove'),
+};
+
+// ---------------------------------------------------------------------------
 // File System — routed to /api/fs/* and /api/skills/*
 // ---------------------------------------------------------------------------
 
 export const fs = {
-  getFilesByDir: httpPost<Array<IDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+  getFilesByDir: withResponseMap(
+    // `/api/fs/dir` (aioncore DirOrFileResponse) returns snake_case keys, so the
+    // raw wire type is RawDirOrFile; the mapper converts it to IDirOrFile.
+    httpPost<Array<RawDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+    fromBackendDirOrFiles
+  ),
   listWorkspaceFiles: withResponseMap(
     httpPost<Array<RawWorkspaceFlatFile>, { root: string }>('/api/fs/list'),
     fromBackendWorkspaceFlatFiles
@@ -1656,6 +1678,11 @@ export interface ICreateConversationParams {
     context?: string;
     context_file_name?: string;
     context_handoff?: TConversationContextHandoffExtra;
+    /** Global/project instructions injected as the first-turn preset context
+     *  (acp/codex). Composed client-side by resolveInjectedContext. */
+    preset_context?: string;
+    /** Same, for the native aionrs runtime (merged into system_prompt). */
+    preset_rules?: string;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];

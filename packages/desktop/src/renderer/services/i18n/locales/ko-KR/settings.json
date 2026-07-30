@@ -1,4 +1,14 @@
 {
+  "profile": "프로필",
+  "groupProfile": "프로필",
+  "profileTitle": "내 지침",
+  "profileDescription": "어시스턴트가 어떻게 응답하길 원하는지 알려주세요. 이 지침은 새 채팅에 추가됩니다.",
+  "profileEnableLabel": "내 지침을 새 채팅에 적용",
+  "profileInstructionsLabel": "지침",
+  "profileInstructionsPlaceholder": "예: 저는 VNG 인사팀에서 일합니다. 간결하고 격식 있는 베트남어를 선호합니다. 템플릿을 단정하기 전에 먼저 물어봐 주세요.",
+  "profilePreviewTitle": "채팅에 추가되는 내용",
+  "profilePreviewEmpty": "아직 없습니다. 위에서 지침을 추가하세요.",
+  "profileScopeNote": "내 채팅에 적용됩니다. 전문 어시스턴트는 자체 규칙을 따릅니다.",
   "title": "설정",
   "skillsHub": {
     "title": "스킬 허브",

@@ -64,7 +64,9 @@ const LoadRuleModal: React.FC<{
         return acc;
       };
 
-      const flatList = result && result.length > 0 && result[0].children ? flattenFiles(result[0].children) : [];
+      // `/api/fs/dir` returns a flat array of the directory's direct children
+      // (not a single wrapping root node), so flatten the whole result.
+      const flatList = result && result.length > 0 ? flattenFiles(result) : [];
       // Sort by name
       flatList.sort((a, b) => a.name.localeCompare(b.name));
       setFiles(flatList);

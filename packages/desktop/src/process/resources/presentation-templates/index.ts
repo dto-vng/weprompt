@@ -23,16 +23,25 @@ import monthlySteercoThemeMd from './monthly-steerco/THEME.md?raw';
 import monthlySteercoPreviewSvg from './monthly-steerco/preview.svg?raw';
 import connectedOpsThemeMd from './connected-ops/THEME.md?raw';
 import connectedOpsPreviewSvg from './connected-ops/preview.svg?raw';
+import businessReportThemeMd from './business-report/THEME.md?raw';
+import businessReportPreviewSvg from './business-report/preview.svg?raw';
+import decisionMemoThemeMd from './decision-memo/THEME.md?raw';
+import decisionMemoPreviewSvg from './decision-memo/preview.svg?raw';
+import operationsGuideThemeMd from './operations-guide/THEME.md?raw';
+import operationsGuidePreviewSvg from './operations-guide/preview.svg?raw';
+import proposalSowThemeMd from './proposal-sow/THEME.md?raw';
+import proposalSowPreviewSvg from './proposal-sow/preview.svg?raw';
 
 export type BuiltinTemplatePack = {
   manifest: PresentationTemplateManifest;
   themeMd: string;
   previewSvg: string;
-  /** PPTX packs resolve their bundled reference deck lazily (needs electron `app`). */
+  /** PPTX and docx packs resolve their bundled reference file lazily (needs electron `app`). */
   referenceSourcePath?: () => string;
 };
 
 const CREATED_AT = '2026-07-22T00:00:00Z';
+const DOCX_CREATED_AT = '2026-07-28T00:00:00Z';
 
 /**
  * Bundled binary resources: packaged builds read from process.resourcesPath
@@ -193,5 +202,77 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     themeMd: connectedOpsThemeMd,
     previewSvg: connectedOpsPreviewSvg,
     referenceSourcePath: () => resolveBundledReference('connected-ops.pptx'),
+  },
+  {
+    manifest: {
+      id: 'business-report',
+      name: 'Business Report',
+      description: 'Long-form formal report — cover, contents, data tables, navy serif headings',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 3,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: businessReportThemeMd,
+    previewSvg: businessReportPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('business-report.docx'),
+  },
+  {
+    manifest: {
+      id: 'decision-memo',
+      name: 'Decision Memo',
+      description: 'Short decision memo — TO/FROM/RE block, recommendation up front, no cover',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 2,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: decisionMemoThemeMd,
+    previewSvg: decisionMemoPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('decision-memo.docx'),
+  },
+  {
+    manifest: {
+      id: 'operations-guide',
+      name: 'Operations Guide',
+      description: 'Compact SOP — numbered steps, note boxes, checklists, teal accent',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 2,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: operationsGuideThemeMd,
+    previewSvg: operationsGuidePreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('operations-guide.docx'),
+  },
+  {
+    manifest: {
+      id: 'proposal-sow',
+      name: 'Proposal / SOW',
+      description: 'Client proposal — scope, timeline, pricing table, signature block',
+      format: 'docx',
+      kind: 'document',
+      source: 'builtin',
+      themeFile: 'THEME.md',
+      referenceFile: 'reference.docx',
+      preview: 'preview.svg',
+      version: 2,
+      createdAt: DOCX_CREATED_AT,
+    },
+    themeMd: proposalSowThemeMd,
+    previewSvg: proposalSowPreviewSvg,
+    referenceSourcePath: () => resolveBundledReference('proposal-sow.docx'),
   },
 ];
