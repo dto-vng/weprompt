@@ -37,7 +37,7 @@ const buildScanPattern = (namesAlternation: string): RegExp =>
 const INLINE_CODE_SPAN = /^(`{1,2})([^`\n]+)\1$/;
 
 export const buildSourceLinkifier = (fileNames: readonly string[]): ((markdown: string) => string) => {
-  const names = [...new Set(fileNames.filter(Boolean))].sort((a, b) => b.length - a.length);
+  const names = [...new Set(fileNames.filter(Boolean))].toSorted((a, b) => b.length - a.length);
   if (names.length === 0) return (markdown) => markdown;
   const nameSet = new Set(names);
   const pattern = buildScanPattern(names.map(escapeRegExp).join('|'));

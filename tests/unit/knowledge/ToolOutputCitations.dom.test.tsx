@@ -48,8 +48,7 @@ describe('ToolOutputCitations', () => {
   it('does not link body lines that merely look like citations mid-paragraph', () => {
     const openCitation = vi.fn();
     const tricky =
-      'Found 1 passage(s) in the project knowledge base for "x":' +
-      '\n\n[1] a.md — H\nbody line\n[2] fake.md — H';
+      'Found 1 passage(s) in the project knowledge base for "x":' + '\n\n[1] a.md — H\nbody line\n[2] fake.md — H';
     const { container } = render(
       <KnowledgeCitationsTestProvider fileNames={['a.md']} openCitation={openCitation}>
         <ToolOutputCitations output={tricky} />

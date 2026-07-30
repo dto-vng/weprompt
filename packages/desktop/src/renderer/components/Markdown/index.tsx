@@ -171,7 +171,9 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
               remarkPlugins={REMARK_PLUGINS}
               rehypePlugins={rehypePlugins}
               components={components}
-              urlTransform={(url) => (isKbCitationHref(url) || resolveLocalFileLinkPath(url) ? url : defaultUrlTransform(url))}
+              urlTransform={(url) =>
+                isKbCitationHref(url) || resolveLocalFileLinkPath(url) ? url : defaultUrlTransform(url)
+              }
             >
               {normalizedChildren}
             </ReactMarkdown>

@@ -27,8 +27,7 @@ export type KnowledgeCitationsValue = {
 export const KnowledgeCitationsRawContext = createContext<KnowledgeCitationsValue | null>(null);
 
 /** Null outside a project conversation — callers then skip all citation work. */
-export const useKnowledgeCitationsSafe = (): KnowledgeCitationsValue | null =>
-  useContext(KnowledgeCitationsRawContext);
+export const useKnowledgeCitationsSafe = (): KnowledgeCitationsValue | null => useContext(KnowledgeCitationsRawContext);
 
 type PreviewState = {
   fileName: string | null;
