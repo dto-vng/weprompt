@@ -9,6 +9,7 @@
 // Node-side (fs via store.ts) — used by the knowledge MCP subprocess.
 
 import { buildBm25Index, searchBm25, tokenize } from './bm25';
+import { buildCitationHeader } from './citationFormat';
 import { cosineSim } from './embedCore';
 import { fuseRrf } from './rrf';
 import { readBm25, readChunks, readManifest, readVectors, type KnowledgeVectors } from './store';
@@ -121,9 +122,7 @@ export const formatHitsAsText = (
   let used = parts[0].length;
   let rendered = 0;
   for (const [i, hit] of hits.entries()) {
-    const header = hit.headingPath
-      ? `[${i + 1}] ${hit.sourceName} — ${hit.headingPath}`
-      : `[${i + 1}] ${hit.sourceName}`;
+    const header = buildCitationHeader(i + 1, hit.sourceName, hit.headingPath);
     const block = `\n\n${header}\n${hit.text}`;
     if (used + block.length > cap && rendered > 0) break;
     parts.push(block);
