@@ -48,6 +48,12 @@ export const OCR_MODEL_PATTERNS: RegExp[] = [
 export type OcrCandidate = { providerId: string; config: OcrConfig };
 
 /**
+ * Ceiling on one probe. Short on purpose: this asks a trivial question, and a
+ * candidate slow enough to exceed this is not one to hand 50 page images to.
+ */
+const PROBE_TIMEOUT_MS = 20_000;
+
+/**
  * Every plausible (provider, model) pair, best first.
  *
  * A model the capability system explicitly EXCLUDES from vision (embedding,
@@ -97,7 +103,16 @@ export type OcrProbeResult = { status: 'ok' } | { status: 'rejected'; detail: st
  * This exists because the catalogue lies: without it, a 50-page scan would be
  * started against a model that 404s, and every page would fail identically.
  */
-export const probeOcrModel = async (config: OcrConfig, fetchImpl: typeof fetch = fetch): Promise<OcrProbeResult> => {
+export const probeOcrModel = async (
+  config: OcrConfig,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = PROBE_TIMEOUT_MS
+): Promise<OcrProbeResult> => {
+  // A candidate that never answers is a rejected candidate. Without the bound,
+  // one unresponsive model would stall resolution — and with it the whole
+  // per-project ingestion queue — before any page was even encoded.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -107,11 +122,14 @@ export const probeOcrModel = async (config: OcrConfig, fetchImpl: typeof fetch =
         max_tokens: 4,
         messages: [{ role: 'user', content: 'ping' }],
       }),
+      signal: controller.signal,
     });
     if (response.ok) return { status: 'ok' };
     return { status: 'rejected', detail: `HTTP ${response.status}` };
   } catch (error) {
     return { status: 'rejected', detail: error instanceof Error ? error.message : String(error) };
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 

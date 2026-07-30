@@ -56,6 +56,36 @@ const OCR_JPEG_QUALITY = 80;
  */
 const OCR_MAX_TOKENS = 4096;
 
+/**
+ * Per-page ceiling on the model call. Measured pages came back in 5-18 s, so
+ * this is wide headroom rather than a tight budget — its job is to stop a hung
+ * request from wedging ingestion. Without it a single unanswered call would
+ * hold the project's serialized queue forever: every other file waits behind
+ * it, the source stays `indexing`, and there is no user-facing escape.
+ * A timeout aborts one PAGE, which the caller records as a skip and moves on.
+ */
+const OCR_REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * Bound one fetch, letting the AbortError propagate — the same shape as
+ * embedCore's helper, which is the pattern this codebase settled on. (Note
+ * `visionCore` predates it and has no timeout; do not copy that part of it.)
+ */
+const fetchWithTimeout = async (
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 /** Minimal structural view of the `sharp` surface used here. */
 type SharpImage = {
   rotate: (angle: number) => SharpImage;
@@ -75,6 +105,8 @@ export type PdfOcrDeps = {
   fetchImpl?: typeof fetch;
   loadSharp?: () => Promise<SharpLike>;
   extractPageImagesImpl?: typeof defaultExtractPageImages;
+  /** Per-page request ceiling; tests use a tiny value. */
+  timeoutMs?: number;
 };
 
 /**
@@ -126,24 +158,29 @@ const stripEnclosingCodeFence = (text: string): string => {
 export const transcribePageImage = async (jpeg: Uint8Array, config: OcrConfig, deps?: PdfOcrDeps): Promise<string> => {
   const fetchImpl = deps?.fetchImpl ?? fetch;
   const dataUrl = `data:image/jpeg;base64,${Buffer.from(jpeg).toString('base64')}`;
-  const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0,
-      max_tokens: OCR_MAX_TOKENS,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: OCR_PROMPT },
-            { type: 'image_url', image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-    }),
-  });
+  const response = await fetchWithTimeout(
+    fetchImpl,
+    `${config.baseUrl}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0,
+        max_tokens: OCR_MAX_TOKENS,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: OCR_PROMPT },
+              { type: 'image_url', image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+      }),
+    },
+    deps?.timeoutMs ?? OCR_REQUEST_TIMEOUT_MS
+  );
   const body = await response.text();
   if (!response.ok) {
     throw new Error(`the transcription model returned HTTP ${response.status}: ${body.slice(0, 300)}`);

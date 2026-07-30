@@ -105,6 +105,20 @@ describe('probeOcrModel', () => {
     expect(await probeOcrModel(config, fetchImpl as never)).toEqual({ status: 'rejected', detail: 'HTTP 404' });
   });
 
+  it('rejects a candidate that never answers, rather than stalling resolution', async () => {
+    // Resolution runs before any page is encoded, on the per-project ingestion
+    // queue — so an unresponsive candidate would block the whole project.
+    const fetchImpl = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('The operation was aborted.')));
+        })
+    );
+    const result = await probeOcrModel(config, fetchImpl as never, 20);
+    expect(result.status).toBe('rejected');
+    if (result.status === 'rejected') expect(result.detail).toMatch(/abort/i);
+  });
+
   it('reports a transport failure rather than throwing', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error('ECONNREFUSED');

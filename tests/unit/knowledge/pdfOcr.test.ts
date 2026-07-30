@@ -127,6 +127,24 @@ describe('transcribePageImage', () => {
     );
   });
 
+  it('aborts a request that never answers, instead of wedging ingestion', async () => {
+    // Ingestion is serialized per project, so one unanswered call would hold the
+    // queue forever: every other file waits behind it and the source stays
+    // `indexing` with no user-facing escape. The bound turns that into one
+    // skipped page.
+    const fetchImpl = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('The operation was aborted.')));
+        })
+    );
+    await expect(
+      transcribePageImage(new Uint8Array([1]), CONFIG, { fetchImpl: fetchImpl as never, timeoutMs: 20 })
+    ).rejects.toThrow(/abort/i);
+    // The signal must actually be handed to fetch, or the ceiling is decorative.
+    expect((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].signal).toBeDefined();
+  });
+
   it('throws when the response body is not JSON', async () => {
     const fetchImpl = vi.fn(async () => new Response('<html>gateway</html>', { status: 200 }));
     await expect(transcribePageImage(new Uint8Array([1]), CONFIG, { fetchImpl: fetchImpl as never })).rejects.toThrow(
@@ -210,6 +228,30 @@ describe('ocrPdfPages', () => {
     expect(result.pages).toEqual(['']);
     expect(result.skippedPages).toEqual([1]);
     expect(result.transcribedCount).toBe(0);
+  });
+
+  it('records a timed-out page as a skip and carries on to the next', async () => {
+    let call = 0;
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {
+      call += 1;
+      if (call === 1) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('The operation was aborted.')));
+        });
+      }
+      return Promise.resolve(completion('second page text'));
+    });
+    const result = await ocrPdfPages(new Uint8Array([1]), CONFIG, {
+      deps: {
+        fetchImpl: fetchImpl as never,
+        loadSharp: stubSharp,
+        timeoutMs: 20,
+        extractPageImagesImpl: fakePages([{ ok: true }, { ok: true }]),
+      },
+    });
+    expect(result.skippedPages).toEqual([1]);
+    expect(result.transcribedCount).toBe(1);
+    expect(result.lastError).toMatch(/abort/i);
   });
 
   it('keeps going after one page fails and records the reason', async () => {
