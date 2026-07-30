@@ -73,6 +73,9 @@
     "knowledgeAdd": "Добавить файлы",
     "knowledgeEmpty": "Добавьте документы, чтобы создать базу знаний этого проекта. Ассистент автоматически ищет по ним в любом чате этого проекта.",
     "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
+    "knowledgeSemanticOffAction": "Добавить модель эмбеддинга",
+    "knowledgeEmbedAll": "Векторизовать все",
+    "knowledgePassagesTooltip": "Этот файл разбит на фрагменты для поиска, и ассистент использует наиболее подходящие из них при ответе.",
     "knowledgeStatusIndexing": "Индексация…",
     "knowledgeProgressReading": "Чтение страницы {{done}}/{{total}}",
     "knowledgeProgressTranscribing": "Распознавание страницы {{done}}/{{total}}",
@@ -92,7 +95,6 @@
     "knowledgePreviewNote": "Это проиндексированный текст, по которому ищет ассистент, а не исходное оформление.",
     "knowledgePreviewTruncated": "Предпросмотр сокращён. Откройте исходный файл, чтобы увидеть весь документ.",
     "knowledgePreviewError": "Не удалось загрузить проиндексированный текст этого файла.",
-    "knowledgeStatusNote": "Примечание",
     "knowledgeOcrTag": "Распознано (OCR)",
     "knowledgeOcrDetail": "Распознано из сканированного документа моделью {{model}}. Пропущенные страницы: {{pages}}",
     "knowledgeOcrNoSkippedPages": "нет"

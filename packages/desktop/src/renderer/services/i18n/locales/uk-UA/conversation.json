@@ -73,6 +73,9 @@
     "knowledgeAdd": "Додати файли",
     "knowledgeEmpty": "Додайте документи, щоб створити базу знань цього проєкту. Асистент автоматично шукає в них у кожному чаті цього проєкту.",
     "knowledgeSemanticOff": "семантичний пошук вимкнено — модель ембеддингу не налаштована",
+    "knowledgeSemanticOffAction": "Додати модель ембеддингу",
+    "knowledgeEmbedAll": "Векторизувати все",
+    "knowledgePassagesTooltip": "Цей файл розбито на фрагменти для пошуку, і асистент використовує найдоречніші з них у відповіді.",
     "knowledgeStatusIndexing": "Індексація…",
     "knowledgeProgressReading": "Читання сторінки {{done}}/{{total}}",
     "knowledgeProgressTranscribing": "Розпізнавання сторінки {{done}}/{{total}}",
@@ -92,7 +95,6 @@
     "knowledgePreviewNote": "Це проіндексований текст, за яким шукає асистент, а не початкове оформлення.",
     "knowledgePreviewTruncated": "Попередній перегляд скорочено. Відкрийте початковий файл, щоб побачити весь документ.",
     "knowledgePreviewError": "Не вдалося завантажити проіндексований текст цього файлу.",
-    "knowledgeStatusNote": "Примітка",
     "knowledgeOcrTag": "Розпізнано (OCR)",
     "knowledgeOcrDetail": "Розпізнано зі сканованого документа моделлю {{model}}. Пропущені сторінки: {{pages}}",
     "knowledgeOcrNoSkippedPages": "немає"

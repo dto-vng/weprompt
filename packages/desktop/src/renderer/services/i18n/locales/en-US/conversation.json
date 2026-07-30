@@ -73,6 +73,9 @@
     "knowledgeAdd": "Add files",
     "knowledgeEmpty": "Add documents to build this project's knowledge base. The assistant searches them automatically in every project chat.",
     "knowledgeSemanticOff": "semantic off — no embedding model configured",
+    "knowledgeSemanticOffAction": "Add an embedding model",
+    "knowledgeEmbedAll": "Embed all",
+    "knowledgePassagesTooltip": "This file is split into searchable passages, and the assistant pulls in the most relevant ones when it answers.",
     "knowledgeStatusIndexing": "Indexing…",
     "knowledgeProgressReading": "Reading page {{done}}/{{total}}",
     "knowledgeProgressTranscribing": "Transcribing page {{done}}/{{total}}",
@@ -92,7 +95,6 @@
     "knowledgePreviewNote": "This is the indexed text the assistant searches, not the original layout.",
     "knowledgePreviewTruncated": "Preview shortened. Open the original for the whole document.",
     "knowledgePreviewError": "Could not load the indexed text for this file.",
-    "knowledgeStatusNote": "Note",
     "knowledgeOcrTag": "Transcribed (OCR)",
     "knowledgeOcrDetail": "Transcribed from a scan by {{model}}. Pages skipped: {{pages}}",
     "knowledgeOcrNoSkippedPages": "none"

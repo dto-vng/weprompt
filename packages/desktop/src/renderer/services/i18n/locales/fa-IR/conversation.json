@@ -73,6 +73,9 @@
     "knowledgeAdd": "افزودن فایل",
     "knowledgeEmpty": "برای ساخت پایگاه دانش این پروژه، سند اضافه کنید. دستیار این محتوا را در هر چت این پروژه به‌طور خودکار جستجو می‌کند.",
     "knowledgeSemanticOff": "جستجوی معنایی غیرفعال — مدل امبدینگ پیکربندی نشده است",
+    "knowledgeSemanticOffAction": "افزودن مدل امبدینگ",
+    "knowledgeEmbedAll": "جاسازی همه",
+    "knowledgePassagesTooltip": "این فایل به بخش‌های قابل جست‌وجو تقسیم می‌شود و دستیار هنگام پاسخ مرتبط‌ترین بخش‌ها را به کار می‌گیرد.",
     "knowledgeStatusIndexing": "در حال نمایه‌سازی…",
     "knowledgeProgressReading": "در حال خواندن صفحهٔ {{done}}/{{total}}",
     "knowledgeProgressTranscribing": "در حال بازنویسی صفحهٔ {{done}}/{{total}}",
@@ -92,7 +95,6 @@
     "knowledgePreviewNote": "این متنِ نمایه‌شده است که دستیار در آن جست‌وجو می‌کند، نه چیدمان اصلی.",
     "knowledgePreviewTruncated": "پیش‌نمایش کوتاه شده است. برای دیدن کل سند فایل اصلی را باز کنید.",
     "knowledgePreviewError": "متن نمایه‌شدهٔ این فایل بارگیری نشد.",
-    "knowledgeStatusNote": "یادداشت",
     "knowledgeOcrTag": "بازنویسی‌شده (OCR)",
     "knowledgeOcrDetail": "توسط {{model}} از یک نسخهٔ اسکن‌شده بازنویسی شد. صفحات نادیده‌گرفته‌شده: {{pages}}",
     "knowledgeOcrNoSkippedPages": "هیچ"
