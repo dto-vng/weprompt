@@ -148,7 +148,11 @@ export const runEvaluation = async (options: RunEvaluationOptions): Promise<Eval
 
     return {
       knobs,
-      corpus: { documentCount: fixture.documents.length, chunkCount: built.chunkCount },
+      corpus: {
+        documentCount: fixture.documents.length,
+        ocrDocumentCount: fixture.documents.filter((doc) => doc.provenance === 'ocr').length,
+        chunkCount: built.chunkCount,
+      },
       embedding,
       hybridSkippedReason: embedding ? null : (hybridSkippedReason ?? 'no embedding model available'),
       modes,
