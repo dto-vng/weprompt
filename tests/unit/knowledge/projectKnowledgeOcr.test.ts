@@ -362,6 +362,67 @@ describe('projectKnowledgeService — scanned PDFs', () => {
     expect(after.ocr).toBeNull();
   });
 
+  it('ingests a PDF past the default size cap instead of refusing it', async () => {
+    // The finding that motivated the higher PDF ceiling: a real 262-page, 51 MB
+    // scanned statement was rejected outright by the 15 MB default and never
+    // reached OCR at all, even though MAX_PDF_PAGES caps the work at 50 pages
+    // however long the document is.
+    const ocrPdfPagesImpl = vi.fn(async () => ({
+      pages: ['transcribed first page of a very long statement'],
+      skippedPages: [],
+      transcribedCount: 1,
+      pageCount: 262,
+      truncated: true,
+    }));
+    const service = makeService({
+      // Injected so the test does not parse 16 MB of real PDF; the size gate it
+      // exercises lives in the folder scan, upstream of this.
+      extractPdfTextImpl: (async () => ({
+        pages: [''],
+        pageCount: 262,
+        hasTextLayer: false,
+        truncated: true,
+      })) as never,
+      ocrPdfPagesImpl: ocrPdfPagesImpl as never,
+    });
+    const big = path.join(inbox, 'long-scan.pdf');
+    await writeFile(big, Buffer.alloc(15 * 1024 * 1024 + 1, 7));
+    await service.addSources('p1', [big], workspace);
+    await service.whenIdle('p1');
+
+    const { sources } = await service.listSources('p1');
+    expect(sources[0].status).toBe('ready');
+    expect(sources[0].error).toMatch(/Truncated to 50 pages\./);
+    expect(sources[0].ocr).toMatchObject({ model: 'google/gemma-4-31b-it' });
+    expect(ocrPdfPagesImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the PDF ceiling, not the default one, when a PDF is genuinely too big', async () => {
+    // A message quoting 15 MB at someone whose PDF was measured against 100 MB
+    // would be worse than no message, so the limit travels with the scan entry.
+    const service = makeService({
+      scanFolderImpl: (async () => ({
+        ok: true as const,
+        entries: [
+          {
+            fileName: 'enormous.pdf',
+            byteSize: 200 * 1024 * 1024,
+            contentHash: 'oversize:209715200',
+            kind: 'oversize' as const,
+            limitBytes: 100 * 1024 * 1024,
+          },
+        ],
+        unsupported: [],
+      })) as never,
+    });
+    await service.syncFolder('p1', workspace);
+    await service.whenIdle('p1');
+
+    const { sources } = await service.listSources('p1');
+    expect(sources[0].status).toBe('failed');
+    expect(sources[0].error).toBe('File exceeds the 100 MB limit.');
+  });
+
   it('leaves a dot-folder inside the knowledge folder unindexed', async () => {
     // Guarding the self-indexing loop from the other side: anything the app
     // writes beside the user's files (a `.text/` cache, `.DS_Store`) must never

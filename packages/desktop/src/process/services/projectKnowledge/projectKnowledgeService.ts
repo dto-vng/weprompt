@@ -46,14 +46,13 @@ import type {
 } from '@/common/knowledge/types';
 import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
-import { scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
+import { MAX_KNOWLEDGE_FILE_BYTES, scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
 import { resolveOcrModel as defaultResolveOcrModel, type OcrModelResolution } from './ocrProviderPicker';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
 const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);
 const SUPPORTED_EXTENSIONS_HINT = 'Supported: .md, .txt, .docx, .xlsx, .pdf';
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_CHUNKS_PER_SOURCE = 2000;
 /**
  * Pages read from one PDF. Ingestion is serialized per project, so an
@@ -84,6 +83,15 @@ const SCANNED_PDF_NO_PAGES_ERROR =
 
 const scannedPdfAllPagesFailedError = (detail: string): string =>
   `This PDF is a scan, but transcribing its pages failed: ${detail}`;
+
+/**
+ * Names the ceiling the file actually exceeded. Derived from the scan rather
+ * than written as a literal, because the caps now differ by format — a message
+ * quoting 15 MB at someone whose PDF was measured against 100 MB is worse than
+ * no message.
+ */
+const oversizeError = (limitBytes?: number): string =>
+  `File exceeds the ${Math.round((limitBytes ?? MAX_KNOWLEDGE_FILE_BYTES) / (1024 * 1024))} MB limit.`;
 
 export type ProjectKnowledgeServiceDeps = {
   storeRootDir: string;
@@ -420,7 +428,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         error: null,
       };
       manifest.sources.push(
-        entry.kind === 'oversize' ? { ...base, status: 'failed', error: 'File exceeds the 15 MB limit.' } : base
+        entry.kind === 'oversize' ? { ...base, status: 'failed', error: oversizeError(entry.limitBytes) } : base
       );
       dirty = true;
     }
