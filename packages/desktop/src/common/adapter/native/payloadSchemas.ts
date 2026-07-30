@@ -225,6 +225,13 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict()
     .optional(),
+  'presentation-templates.list': voidPayloadSchema,
+  'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
+  'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
+  'dashboards.list': voidPayloadSchema,
+  'dashboards.read': z.object({ id: identifierSchema }).strict(),
+  'dashboards.publish': z.object({ name: z.string().min(1).max(200), html: z.string().min(1).max(8_000_000) }).strict(),
+  'dashboards.remove': z.object({ id: identifierSchema }).strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,

@@ -42,7 +42,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('@office-ai/platform', () => ({
+vi.mock('@/common/platform/bridge', () => ({
   bridge: {
     adapter: (config: { on: (emitter: typeof mocks.bridgeEmitter) => void }) => {
       config.on(mocks.bridgeEmitter);

@@ -108,6 +108,14 @@
       "diagnosticsReportSuccess": "Diagnostics report sent",
       "diagnosticsReportFailed": "Failed to send diagnostics report"
     },
+    "startupDirectory": {
+      "title": "Startup directory is unavailable",
+      "description": "AionUi opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart AionUi.",
+      "sendDiagnostics": "Send diagnostics",
+      "diagnosticsSent": "Diagnostics sent",
+      "diagnosticsReportSuccess": "Diagnostics report sent",
+      "diagnosticsReportFailed": "Failed to send diagnostics report"
+    },
     "recoverableDatabaseCorruption": {
       "title": "Yerel veriler bozulmuş",
       "description": "WePrompt yerel veritabanının bozulduğunu algıladı ve başlatmaya devam edemiyor. Onaydan sonra eski veritabanı yedeklenecek ve başlatmaya devam etmek için yeni bir yerel veritabanı oluşturulacak. Geçmiş yerel veriler şimdilik gösterilmeyecek, eski veritabanı yedek olarak saklanacak.",
@@ -118,6 +126,15 @@
       "diagnosticsReportSuccess": "Tanılama raporu gönderildi",
       "diagnosticsReportFailed": "Tanılama raporu gönderilemedi",
       "rebuildFailed": "Eski DB yedeklenip yeni DB oluşturulamadı"
+    },
+    "transientConcurrentStartup": {
+      "title": "AionUi başlatılıyor",
+      "description": "Bu pencere açıldığında başka bir AionUi başlatma işlemi yerel verileri hâlâ kullanıyordu. Bu geçicidir ve verileriniz güvende — yeniden yükleme gerekmez. Lütfen biraz bekleyip tekrar deneyin veya AionUi'yi yeniden başlatın.",
+      "sendDiagnostics": "Send diagnostics",
+      "diagnosticsSent": "Diagnostics sent",
+      "diagnosticsReportSuccess": "Diagnostics report sent",
+      "diagnosticsReportFailed": "Failed to send diagnostics report",
+      "diagnosticsHint": "Bu durum tekrar ederse bir tanılama raporu gönderebilirsiniz."
     }
   },
   "fileAttach.addFiles": "Dosya ekle",
@@ -139,5 +156,7 @@
   "unit": {
     "minute_short": "dk",
     "second_short": "sn"
-  }
+  },
+  "selectedCount": "{{count}} seçili",
+  "selectedSkills": "Seçili beceriler"
 }

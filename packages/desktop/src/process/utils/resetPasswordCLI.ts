@@ -7,6 +7,8 @@
  * 打包应用的密码重置命令行工具
  */
 
+import { withLocalTokenHeaders } from '@/common/adapter/httpBridge';
+
 // Color output
 const colors = {
   reset: '\x1b[0m',
@@ -49,7 +51,7 @@ export async function resetPasswordCLI(username: string): Promise<void> {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/webui/reset-password`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withLocalTokenHeaders({ 'Content-Type': 'application/json' }),
     });
     if (!res.ok) {
       const body = await res.text();

@@ -1,17 +1,29 @@
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import type { ConversationCommandQueueRuntimeGate } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import type { ITeamSlotWork, TeamSlotBlockedReason } from '@/common/types/team/teamTypes';
 import type { TeamRunViewState } from '../hooks/useTeamRunView';
 
 export type TeamSendBoxRuntime = {
   runtimeGate: ConversationCommandQueueRuntimeGate;
   loading: boolean;
+  queuedCount: number;
+  statusText?: string;
+  startedAtMs: number | null;
   onStop?: () => Promise<void>;
 };
 
 type BuildTeamSendRuntimeOptions = {
   slot_id: string;
   runView: TeamRunViewState;
+  statusText?: string;
   onStop?: () => Promise<void>;
+  /**
+   * True when the team session was idle-reclaimed (see
+   * `TeamRunViewState.sessionStopped`). Stopped is recoverable-and-sendable: the
+   * next send triggers lazy recovery, so the gate stays open and no spinner is
+   * shown, regardless of any stale `session_stopped` slot work.
+   */
+  sessionStopped?: boolean;
 };
 
 type PauseSlotWorkParams = {
@@ -30,16 +42,53 @@ type BuildTeamStopHandlerOptions = {
   onRunStateStale?: () => Promise<boolean>;
 };
 
-const isSlotWorkProcessing = (runView: TeamRunViewState, slot_id: string): boolean => {
-  const work = runView.slotWorkBySlot[slot_id];
-  if (work?.paused) return false;
+// `session_stopped` is intentionally NOT fatal: an idle-reclaimed session is
+// recoverable and must stay sendable so the lazy-recovery send path can fire.
+// A stale `session_stopped` slot still shows the stopped status text (see
+// `buildTeamWorkStatusText`) but no longer blocks sending.
+const FATAL_BLOCK_REASONS = new Set<TeamSlotBlockedReason>(['runtime_failed', 'removing']);
 
-  const hasSlotWork =
-    Boolean(work?.active_turn_id) || (work?.pending_wake_count ?? 0) > 0 || (work?.starting_child_count ?? 0) > 0;
-  if (hasSlotWork) return true;
+type TeamWorkStatusTextFormatters = {
+  processing: () => string;
+  processingWithQueued: (count: number) => string;
+  runtimeStarting: () => string;
+  runtimeFailed: () => string;
+  removing: () => string;
+  sessionStopped: () => string;
+};
 
-  const childStatus = runView.childTurnsBySlot[slot_id]?.status;
-  return childStatus === 'accepted' || childStatus === 'running' || childStatus === 'cancelling';
+export const getTeamWorkQueuedCount = (work?: ITeamSlotWork): number =>
+  (work?.queued_foreground_count ?? 0) + (work?.queued_background_count ?? 0);
+
+const hasActiveTeamWork = (work?: ITeamSlotWork): boolean => work?.state === 'starting' || work?.state === 'running';
+
+export const buildTeamWorkStatusText = (
+  work: ITeamSlotWork | undefined,
+  format: TeamWorkStatusTextFormatters
+): string | undefined => {
+  switch (work?.blocked_reason) {
+    case 'runtime_starting':
+      return format.runtimeStarting();
+    case 'runtime_failed':
+      return format.runtimeFailed();
+    case 'removing':
+      return format.removing();
+    case 'session_stopped':
+      return format.sessionStopped();
+    default:
+      break;
+  }
+
+  const queuedCount = getTeamWorkQueuedCount(work);
+  if (hasActiveTeamWork(work)) {
+    return queuedCount > 0 ? format.processingWithQueued(queuedCount) : undefined;
+  }
+
+  if (queuedCount > 0) {
+    return format.processing();
+  }
+
+  return undefined;
 };
 
 export const isStaleTeamRunPauseError = (error: unknown): boolean => {
@@ -47,7 +96,7 @@ export const isStaleTeamRunPauseError = (error: unknown): boolean => {
     isBackendHttpError(error) &&
     error.status === 400 &&
     error.code === 'BAD_REQUEST' &&
-    error.backendMessage.includes('no active team run to pause')
+    (error.backendMessage.includes('no active team run to pause') || error.backendMessage.includes('is not active'))
   );
 };
 
@@ -65,11 +114,12 @@ export const buildTeamStopHandler = ({
 
     const work = runView.slotWorkBySlot[slot_id];
     const hasSlotWork =
-      Boolean(runView.childTurnsBySlot[slot_id]) ||
       Boolean(work?.active_turn_id) ||
-      (work?.starting_child_count ?? 0) > 0 ||
-      (work?.pending_wake_count ?? 0) > 0 ||
-      (work?.suppressed_wake_count ?? 0) > 0;
+      (work?.queued_foreground_count ?? 0) > 0 ||
+      (work?.queued_background_count ?? 0) > 0 ||
+      work?.state === 'starting' ||
+      work?.state === 'running' ||
+      work?.state === 'paused';
     if (!hasSlotWork) return;
 
     try {
@@ -91,14 +141,29 @@ export const buildTeamStopHandler = ({
   };
 };
 
-export const buildTeamSendRuntime = ({ slot_id, runView, onStop }: BuildTeamSendRuntimeOptions): TeamSendBoxRuntime => {
-  const processing = isSlotWorkProcessing(runView, slot_id);
+export const buildTeamSendRuntime = ({
+  slot_id,
+  runView,
+  statusText,
+  onStop,
+  sessionStopped,
+}: BuildTeamSendRuntimeOptions): TeamSendBoxRuntime => {
+  const work = runView.slotWorkBySlot[slot_id];
+  const queuedCount = getTeamWorkQueuedCount(work);
+  const fatalBlock = work?.blocked_reason ? FATAL_BLOCK_REASONS.has(work.blocked_reason) : false;
+  // Stopped session: force the recoverable-stopped shape — keep the gate open
+  // and suppress the spinner, overriding any residual fatal block or active work.
+  const effectiveFatalBlock = sessionStopped ? false : fatalBlock;
+  const loading = sessionStopped ? false : hasActiveTeamWork(work) || (!fatalBlock && queuedCount > 0);
   return {
-    loading: processing,
+    loading,
+    queuedCount,
+    statusText,
+    startedAtMs: work?.active_turn_started_at_ms ?? null,
     runtimeGate: {
       hydrated: true,
-      canSendMessage: !processing,
-      isProcessing: processing,
+      canSendMessage: !effectiveFatalBlock,
+      isProcessing: false,
     },
     onStop,
   };

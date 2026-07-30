@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hi，今天有什麼安排？",
-    "placeholder": "發送訊息、上傳檔案、開啟資料夾或建立定時任務...",
+    "placeholder": "發送訊息、上傳檔案、開啟資料夾、建立定時任務，或輸入 / 喚起命令...",
     "linkFolder": "開啟資料夾",
     "newConversation": "新會話",
     "selectModel": "選擇模型",
@@ -108,6 +108,7 @@
     "saveName": "儲存",
     "cancelEdit": "取消",
     "rename": "重新命名",
+    "createCronTask": "建立排程任務",
     "renameTitle": "重新命名對話",
     "renamePlaceholder": "請輸入新名稱",
     "renameSuccess": "重新命名成功",
@@ -147,6 +148,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此專案中新建對話",
     "deleting": "刪除中...",
+    "reorderPinned": "拖動以調整置頂會話順序",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -187,7 +189,6 @@
   "noAgentsAvailable": "沒有可用的 Agent",
   "noModelConfigured": "未設定模型，請前往設定頁面設定。",
   "createFailed": "建立對話失敗",
-  "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "所選工作區路徑不可用。請確認工作區路徑「{{workspacePath}}」確實存在且可存取。"
@@ -574,8 +575,8 @@
     "error": "順便提問失敗。"
   },
   "commandQueue": {
-    "title": "佇列中的指令",
-    "clear": "清空佇列",
+    "title": "草稿箱",
+    "clear": "清空草稿箱",
     "edit": "編輯",
     "editing": "編輯中",
     "editPlaceholder": "可以在執行前先調整這筆排隊指令。",
@@ -590,7 +591,19 @@
     "queueFull": "佇列已滿，請先移除部分指令再繼續新增。",
     "inputTooLong": "排隊指令內容過長，請縮短後再發送。",
     "tooManyFiles": "這條排隊指令附加的檔案過多。",
-    "queueTooLarge": "佇列資料過大，無法安全快取，請先移除部分排隊指令。"
+    "queueTooLarge": "佇列資料過大，無法安全快取，請先移除部分排隊指令。",
+    "sendNow": "立即發送",
+    "modeToggle": "切換發送模式",
+    "help": "使用說明",
+    "helpIntro": "AI 回覆期間你發送的訊息會先存到這裡。",
+    "helpAuto": "：AI 每輪回覆結束後自動依序發送。",
+    "helpManual": "：只暫存不自動發送，逐筆點「立即發送」。",
+    "clearConfirmTitle": "確定清空發送草稿箱？",
+    "clearConfirmContent": "所有待發送的訊息都會被移除，且無法復原。",
+    "mode": {
+      "auto": "自動發送",
+      "manual": "手動發送"
+    }
   },
   "contextUsage": {
     "contextUsed": "上下文已使用",
@@ -641,35 +654,22 @@
       "loaded": "已載入",
       "failed": "失敗",
       "unsupported": "不支援"
-    }
-  },
-  "status": {
-    "waitingApproval": "等待你的核准",
-    "running": "處理中",
-    "done": "已完成",
-    "doneIdle": "已完成 — 閒置",
-    "stopped": "已停止",
-    "failed": "失敗"
-  },
-  "statusTooltip": {
-    "waitingApproval": "正在等待你的核准以繼續。",
-    "running": "正在處理此聊天。",
-    "doneUnseen": "已完成，但你尚未查看。",
-    "doneSeen": "最近已完成並已查看。",
-    "doneIdle": "至少一分鐘前已完成並已查看。",
-    "stopped": "在完成前已停止。",
-    "failed": "因發生錯誤而無法完成。"
+    },
+    "selected": "已選 MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "正在準備執行環境。首次啟動可能會稍慢一些。"
   },
   "sendbox": {
-    "hint": "輸入 / 喚起命令，@ 引用檔案"
+    "hint": "輸入 / 喚起命令，@ 引用檔案，↑/↓ 切換歷史訊息"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "這次請求沒有產生任何可見回覆。"
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "這次請求沒有產生任何可見回覆。此 Agent 可能需要先登入：{{hint}}。"
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "這次請求在產生任何可見回覆前已達到模型輸出 token 上限。"
@@ -683,6 +683,32 @@
     }
   },
   "notFound": "會話不存在或已被刪除",
+  "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
+  "presentationTemplates": {
+    "title": "範本",
+    "columnPptx": "簡報 · PPTX",
+    "columnHtml": "報告 · HTML",
+    "columnDocx": "文件 · DOCX",
+    "selected": "已選擇",
+    "buttonTooltip": "範本",
+    "slashDescription": "選擇範本",
+    "importCard": "匯入主題 (.md)",
+    "empty": "沒有可用的範本",
+    "chipTooltip": "此訊息將使用該範本",
+    "importSuccess": "範本已匯入",
+    "importError": "匯入失敗：{{error}}",
+    "removeError": "刪除失敗：{{error}}",
+    "deleteTooltip": "刪除範本",
+    "deleteConfirm": "確定刪除該範本？"
+  },
+  "status": {
+    "waitingApproval": "等待你的核准",
+    "running": "處理中",
+    "done": "已完成",
+    "doneIdle": "已完成 — 閒置",
+    "stopped": "已停止",
+    "failed": "失敗"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -747,5 +773,14 @@
   "artifact": {
     "emptyTitle": "尚無開啟的工件",
     "emptyHint": "產生的檔案和文件會在這裡開啟。"
+  },
+  "statusTooltip": {
+    "waitingApproval": "正在等待你的核准以繼續。",
+    "running": "正在處理此聊天。",
+    "doneUnseen": "已完成，但你尚未查看。",
+    "doneSeen": "最近已完成並已查看。",
+    "doneIdle": "至少一分鐘前已完成並已查看。",
+    "stopped": "在完成前已停止。",
+    "failed": "因發生錯誤而無法完成。"
   }
 }

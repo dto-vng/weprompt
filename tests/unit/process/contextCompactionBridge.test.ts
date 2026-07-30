@@ -32,8 +32,16 @@ const mocks = vi.hoisted(() => ({
   initUpdateBridge: vi.fn(),
   initWebuiBridge: vi.fn(),
   initWindowControlsBridge: vi.fn(),
+  initPresentationTemplateBridge: vi.fn(),
+  initDashboardBridge: vi.fn(),
 }));
 
+vi.mock('@process/services/presentation-template/bridge', () => ({
+  initPresentationTemplateBridge: mocks.initPresentationTemplateBridge,
+}));
+vi.mock('@process/services/dashboard-store/bridge', () => ({
+  initDashboardBridge: mocks.initDashboardBridge,
+}));
 vi.mock('@process/bridge/applicationBridge', () => ({ initApplicationBridge: mocks.initApplicationBridge }));
 vi.mock('@process/bridge/dialogBridge', () => ({ initDialogBridge: mocks.initDialogBridge }));
 vi.mock('@process/bridge/notificationBridge', () => ({ initNotificationBridge: mocks.initNotificationBridge }));

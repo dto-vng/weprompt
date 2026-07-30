@@ -131,6 +131,27 @@
 
 .actionConfigGroup :global(.sendbox-model-btn .arco-btn-content > span:first-child) {
   gap: 4px !important;
+  min-width: 0 !important;
+}
+
+/* Model button must be allowed to shrink so a long label truncates instead of
+ * pushing the send button / mode switch out of the row on narrow viewports. */
+.actionConfigGroup :global(.sendbox-model-btn) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.actionConfigGroup :global(.sendbox-model-btn .arco-btn-content) {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.actionConfigGroup :global(.sendbox-model-btn .guid-model-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 220px;
 }
 
 .actionSubmit {
@@ -418,6 +439,10 @@
     gap: 0;
   }
 
+  .actionConfigGroup :global(.sendbox-model-btn .guid-model-label) {
+    max-width: 90px;
+  }
+
   .actionConfigGroupWithDivider > :first-child::after {
     right: -6px;
     height: 16px;
@@ -472,6 +497,23 @@
     opacity 0.5s cubic-bezier(0.2, 0.8, 0.3, 1),
     background-color 0.25s ease-out;
   animation: agentSelectPop 0.4s ease-out forwards;
+}
+
+/* 更多 Agent 面板：细微且快速的下滑淡入 */
+@keyframes assistantOverflowPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.assistantOverflowPanel {
+  transform-origin: top center;
+  animation: assistantOverflowPanelIn 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 :global([data-theme='dark']) .assistantSelectorInactive {

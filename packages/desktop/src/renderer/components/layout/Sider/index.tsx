@@ -7,7 +7,13 @@ import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { blurActiveElement } from '@renderer/utils/ui/focus';
 import { useThemeContext } from '@renderer/hooks/context/ThemeContext';
-import { SiderToolbar, SiderSearchEntry, SiderScheduledEntry, SiderAssistantEntry } from './SiderNav';
+import {
+  SiderToolbar,
+  SiderSearchEntry,
+  SiderScheduledEntry,
+  SiderAssistantEntry,
+  SiderDashboardEntry,
+} from './SiderNav';
 import SiderFooter from './SiderFooter';
 import TeamSiderSection from './TeamSiderSection';
 import siderStyles from './Sider.module.css';
@@ -76,8 +82,24 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
   const handleConversationSelect = () => {
     cleanupSiderTooltips();
     blurActiveElement();
+    // Do NOT call closePreview() here. conversation/index.tsx calls
+    // closePreviewIfWorkspaceChanged() once the conversation data loads, which
+    // keeps the preview open when switching between conversations of the same
+    // project and closes it only when the workspace actually changes.
+    setIsBatchMode(false);
+  };
+
+  const handleDashboardClick = () => {
+    cleanupSiderTooltips();
+    blurActiveElement();
     closePreview();
     setIsBatchMode(false);
+    Promise.resolve(navigate('/dashboard')).catch((error) => {
+      console.error('Navigation failed:', error);
+    });
+    if (onSessionClick) {
+      onSessionClick();
+    }
   };
 
   const handleScheduledClick = () => {
@@ -180,6 +202,14 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
                 onSessionClick={onSessionClick}
               />
             )}
+            {/* Dashboard nav entry - fixed at top of nav */}
+            <SiderDashboardEntry
+              isMobile={isMobile}
+              isActive={pathname === '/dashboard'}
+              collapsed={collapsed}
+              siderTooltipProps={siderTooltipProps}
+              onClick={handleDashboardClick}
+            />
             {/* Assistant nav entry - fixed above Scheduled */}
             <SiderAssistantEntry
               isMobile={isMobile}

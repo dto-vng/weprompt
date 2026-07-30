@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Merhaba, bugünkü planın nedir?",
-    "placeholder": "Mesaj gönder, dosya yükle veya klasör aç...",
+    "placeholder": "Mesaj gönder, dosya yükle, klasör aç veya komutlar için / yaz...",
     "linkFolder": "Klasör Aç",
     "newConversation": "Yeni Sohbet",
     "selectModel": "Model Seç",
@@ -108,6 +108,7 @@
     "saveName": "Kaydet",
     "cancelEdit": "İptal",
     "rename": "Yeniden Adlandır",
+    "createCronTask": "Zamanlanmış Görev Oluştur",
     "renameTitle": "Sohbeti Yeniden Adlandır",
     "renamePlaceholder": "Lütfen yeni bir isim girin",
     "renameSuccess": "Başarıyla yeniden adlandırıldı",
@@ -147,6 +148,7 @@
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
     "deleting": "Siliniyor...",
+    "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -558,8 +560,8 @@
     "error": "Yan soru yanıtlanamadı."
   },
   "commandQueue": {
-    "title": "Sıradaki Komutlar",
-    "clear": "Kuyruğu Temizle",
+    "title": "Taslak kutusu",
+    "clear": "Taslak kutusunu temizle",
     "edit": "Düzenle",
     "editing": "Düzenleniyor",
     "editPlaceholder": "Bu bekleyen komutu çalıştırılmadan önce güncelleyin.",
@@ -574,7 +576,19 @@
     "queueFull": "Kuyruk dolu. Yeni komut eklemeden önce bazılarını kaldırın.",
     "inputTooLong": "Sıraya alınan komut çok uzun. Göndermeden önce kısaltın.",
     "tooManyFiles": "Bu kuyruk komutuna çok fazla dosya eklendi.",
-    "queueTooLarge": "Kuyruk verisi güvenli şekilde saklanamayacak kadar büyük. Önce bazı komutları kaldırın."
+    "queueTooLarge": "Kuyruk verisi güvenli şekilde saklanamayacak kadar büyük. Önce bazı komutları kaldırın.",
+    "sendNow": "Şimdi gönder",
+    "modeToggle": "Gönderim modunu değiştir",
+    "help": "Yardım",
+    "helpIntro": "Yapay zeka yanıt verirken gönderdiğin mesajlar burada bekler.",
+    "helpAuto": ": her yanıt bittikten sonra otomatik olarak tek tek gönderilir.",
+    "helpManual": ": gönderilmeden burada tutulur; her birini \"Şimdi gönder\" ile yolla.",
+    "clearConfirmTitle": "Gönderim taslak kutusu temizlensin mi?",
+    "clearConfirmContent": "Bekleyen tüm mesajlar kaldırılır. Bu işlem geri alınamaz.",
+    "mode": {
+      "auto": "Otomatik gönder",
+      "manual": "Elle gönder"
+    }
   },
   "contextUsage": {
     "contextUsed": "bağlam kullanıldı",
@@ -616,7 +630,6 @@
   "noAgentsAvailable": "No agents available",
   "noModelConfigured": "No model configured. Please configure in settings.",
   "createFailed": "Failed to create conversation",
-  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Seçilen çalışma alanı yolu kullanılamıyor. Çalışma alanı yolu \"{{workspacePath}}\" gerçekten var ve erişilebilir olduğundan emin olun."
@@ -643,35 +656,22 @@
       "loaded": "Yüklendi",
       "failed": "Başarısız",
       "unsupported": "Desteklenmiyor"
-    }
-  },
-  "status": {
-    "waitingApproval": "Onayınızı bekliyor",
-    "running": "Çalışıyor",
-    "done": "Tamamlandı",
-    "doneIdle": "Tamamlandı — boşta",
-    "stopped": "Durduruldu",
-    "failed": "Başarısız"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
-    "running": "Bu sohbet üzerinde çalışılıyor.",
-    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
-    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
-    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
-    "stopped": "Tamamlanmadan önce durduruldu.",
-    "failed": "Bir hata nedeniyle tamamlanamadı."
+    },
+    "selected": "Seçili MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Çalışma ortamı hazırlanıyor. İlk başlatma biraz daha uzun sürebilir."
   },
   "sendbox": {
-    "hint": "Komutlar için /, dosya için @ yazın"
+    "hint": "Komutlar için /, dosya için @ yazın, ↑/↓ ile mesaj geçmişi"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Bu istek görünür bir yanıt üretmedi."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Bu istek görünür bir yanıt üretmedi. Aracı önce oturum açmanızı gerektirebilir: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "Bu istek, görünür bir yanıt üretilmeden önce modelin çıktı token sınırına ulaştı."
@@ -685,6 +685,32 @@
     }
   },
   "notFound": "Konuşma bulunamadı veya silinmiş",
+  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
+  "presentationTemplates": {
+    "title": "Şablonlar",
+    "columnPptx": "Sunumlar · PPTX",
+    "columnHtml": "Raporlar · HTML",
+    "columnDocx": "Belgeler · DOCX",
+    "selected": "Seçildi",
+    "buttonTooltip": "Şablonlar",
+    "slashDescription": "Bir şablon seçin",
+    "importCard": "Tema içe aktar (.md)",
+    "empty": "Kullanılabilir şablon yok",
+    "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "importSuccess": "Şablon içe aktarıldı",
+    "importError": "İçe aktarma başarısız: {{error}}",
+    "removeError": "Silme başarısız: {{error}}",
+    "deleteTooltip": "Şablonu sil",
+    "deleteConfirm": "Bu şablon silinsin mi?"
+  },
+  "status": {
+    "waitingApproval": "Onayınızı bekliyor",
+    "running": "Çalışıyor",
+    "done": "Tamamlandı",
+    "doneIdle": "Tamamlandı — boşta",
+    "stopped": "Durduruldu",
+    "failed": "Başarısız"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -749,5 +775,14 @@
   "artifact": {
     "emptyTitle": "Açık artefakt yok",
     "emptyHint": "Oluşturulan dosyalar ve belgeler burada açılır."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
+    "running": "Bu sohbet üzerinde çalışılıyor.",
+    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
+    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
+    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
+    "stopped": "Tamamlanmadan önce durduruldu.",
+    "failed": "Bir hata nedeniyle tamamlanamadı."
   }
 }
