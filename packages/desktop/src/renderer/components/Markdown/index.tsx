@@ -15,6 +15,7 @@ import remarkMath from 'remark-math';
 // Import KaTeX CSS to make it available in the document
 import 'katex/dist/katex.min.css';
 
+import { isKbCitationHref, parseKbCitationHref } from '@/common/knowledge/citationFormat';
 import { openExternalUrl } from '@/renderer/utils/platform';
 import classNames from 'classnames';
 import React, { useCallback, useMemo } from 'react';
@@ -43,12 +44,23 @@ type MarkdownViewProps = {
   className?: string;
   onRef?: (el?: HTMLDivElement | null) => void;
   onLocalFileLink?: (path: string, reference?: LocalFileLinkReference) => void | Promise<void>;
+  /** Invoked for weprompt-kb:// citation links; the scheme never reaches openExternalUrl. */
+  onKbCitationClick?: (fileName: string, anchor?: string) => void;
   /** Enable raw HTML rendering in markdown content. Use with caution — only for trusted sources. */
   allowHtml?: boolean;
 };
 
 const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
-  ({ hiddenCodeCopyButton, codeStyle, className, onRef, onLocalFileLink, allowHtml, children: childrenProp }) => {
+  ({
+    hiddenCodeCopyButton,
+    codeStyle,
+    className,
+    onRef,
+    onLocalFileLink,
+    onKbCitationClick,
+    allowHtml,
+    children: childrenProp,
+  }) => {
     const { t } = useTranslation();
 
     const normalizedChildren = useMemo(() => {
@@ -64,13 +76,21 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
       (e: React.MouseEvent<HTMLAnchorElement>) => {
         e.preventDefault();
         e.stopPropagation();
-        const href = (e.currentTarget as HTMLAnchorElement).href;
+        const anchorEl = e.currentTarget as HTMLAnchorElement;
+        const href = anchorEl.getAttribute('href') || anchorEl.href;
         if (!href) return;
+        // Citation links are app-internal: handle (or drop) them before any
+        // external-URL path — the scheme must never leak to the OS browser.
+        if (isKbCitationHref(href)) {
+          const citation = parseKbCitationHref(href);
+          if (citation) onKbCitationClick?.(citation.fileName, citation.anchor);
+          return;
+        }
         openExternalUrl(href).catch((error: unknown) => {
           console.error(t('messages.openLinkFailed'), error);
         });
       },
-      [t]
+      [t, onKbCitationClick]
     );
 
     // Memoize components so React preserves component identity across re-renders.
@@ -151,7 +171,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
               remarkPlugins={REMARK_PLUGINS}
               rehypePlugins={rehypePlugins}
               components={components}
-              urlTransform={(url) => (resolveLocalFileLinkPath(url) ? url : defaultUrlTransform(url))}
+              urlTransform={(url) => (isKbCitationHref(url) || resolveLocalFileLinkPath(url) ? url : defaultUrlTransform(url))}
             >
               {normalizedChildren}
             </ReactMarkdown>
