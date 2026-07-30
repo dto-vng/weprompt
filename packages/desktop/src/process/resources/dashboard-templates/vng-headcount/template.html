@@ -1,2915 +1,488 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" data-theme="light">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VNG People Analytics</title>
-    <!--
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VNG People Analytics</title>
+<!--
   VNG Headcount dashboard template (light mode default).
   Charting: Chart.js (Demographic + Attrition tabs) + ECharts (Cohort & Flows tab) — hybrid by design.
   Data contract: everything the agent injects lives in window.DASH_DATA below, one key per SPEC.md slot.
   Seeded here with a real snapshot of hr_data_headcount_dev.hrdev.v_hr_headcount (2026-06-30) so the file
   renders standalone. On refresh, the agent re-runs the SPEC.md SQL and replaces the DASH_DATA block only.
 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      /* ===== Theme tokens — edit these to restyle. Light is default; [data-theme=dark] overrides. ===== */
-      :root {
-        --vng: #f26f21;
-        --zalo: #2f7ff0;
-        --green: #16a34a;
-        --purple: #7c6cf0;
-        --vs: #f26f21; /* Voluntary separation */
-        --is: #2f7ff0; /* Involuntary separation */
-        --bg: #eef2f7;
-        --panel: #f5f8fc;
-        --card: #ffffff;
-        --ink: #0f172a;
-        --muted: #5b6b80;
-        --faint: #8a99ab;
-        --line: #e4e9f1;
-        --band: #eef3f9;
-        --grid: rgba(100, 116, 139, 0.14);
-        --up: #16a34a;
-        --down: #e0623a;
-        --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 8px 24px rgba(16, 24, 40, 0.06);
-        --r: 14px;
-        --hh: 56px;
-        --bgimg:
-          radial-gradient(1200px 520px at 100% -10%, rgba(47, 127, 240, 0.1), transparent 60%),
-          radial-gradient(1000px 520px at -5% 110%, rgba(242, 111, 33, 0.09), transparent 55%);
-      }
-      [data-theme='dark'] {
-        --bg: #0b0e14;
-        --panel: #131a24;
-        --card: #161d28;
-        --ink: #e8eef6;
-        --muted: #9aa7b8;
-        --faint: #6b7789;
-        --line: #252f3d;
-        --band: #1a2431;
-        --grid: rgba(148, 163, 184, 0.14);
-        --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.38);
-      }
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-      }
-      body {
-        font-family:
-          'Inter',
-          system-ui,
-          -apple-system,
-          'Segoe UI',
-          Roboto,
-          sans-serif;
-        background: var(--bgimg), var(--bg);
-        color: var(--ink);
-        font-size: 12px;
-        -webkit-font-smoothing: antialiased;
-      }
-      .num {
-        font-variant-numeric: tabular-nums;
-        font-feature-settings: 'tnum' 1;
-      }
-      header {
-        height: var(--hh);
-        background: color-mix(in srgb, var(--card) 88%, transparent);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--line);
-        padding: 0 20px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        position: sticky;
-        top: 0;
-        z-index: 30;
-      }
-      .brand {
-        font-weight: 800;
-        font-size: 15px;
-        letter-spacing: -0.2px;
-        display: flex;
-        align-items: center;
-        gap: 9px;
-      }
-      .brand .dots {
-        display: flex;
-        gap: 3px;
-      }
-      .brand .dots i {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-      }
-      .brand small {
-        display: block;
-        font-size: 8px;
-        color: var(--faint);
-        font-weight: 700;
-        letter-spacing: 2px;
-        margin-top: 3px;
-      }
-      .tabs {
-        display: flex;
-        gap: 4px;
-        margin-left: 10px;
-        background: var(--band);
-        padding: 3px;
-        border-radius: 10px;
-      }
-      .tab {
-        padding: 7px 15px;
-        border: none;
-        background: transparent;
-        font-weight: 600;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 12.5px;
-        border-radius: 8px;
-        transition: 0.15s;
-      }
-      .tab.active {
-        color: var(--ink);
-        background: var(--card);
-        box-shadow: var(--shadow);
-      }
-      .filters {
-        margin-left: auto;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-      .f {
-        display: flex;
-        flex-direction: column;
-        font-size: 8px;
-        font-weight: 700;
-        color: var(--faint);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .f select {
-        margin-top: 3px;
-        padding: 6px 9px;
-        border: 1px solid var(--line);
-        border-radius: 9px;
-        font-size: 11.5px;
-        background: var(--card);
-        color: var(--ink);
-        font-weight: 600;
-        box-shadow: var(--shadow);
-        outline: none;
-      }
-      .themeBtn {
-        margin-left: 4px;
-        border: 1px solid var(--line);
-        background: var(--card);
-        color: var(--muted);
-        border-radius: 9px;
-        padding: 7px 10px;
-        cursor: pointer;
-        font-weight: 700;
-        font-size: 11px;
-        box-shadow: var(--shadow);
-      }
-      .wrap {
-        padding: 14px 18px 26px;
-        max-width: 1520px;
-        margin: 0 auto;
-      }
-      .toprow {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        margin: 2px 0 12px;
-      }
-      .ptitle {
-        font-size: 18px;
-        font-weight: 800;
-        margin: 0;
-        letter-spacing: -0.3px;
-      }
-      .ptitle span {
-        color: var(--vng);
-      }
-      .cut {
-        color: var(--faint);
-        font-size: 10.5px;
-        font-weight: 600;
-      }
-      .hidden {
-        display: none !important;
-      }
-      .kpis {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin-bottom: 12px;
-      }
-      .kbox {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: var(--r);
-        padding: 13px 15px;
-        position: relative;
-        box-shadow: var(--shadow);
-        overflow: hidden;
-      }
-      .kbox::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: var(--zalo);
-      }
-      .kbox.a::before {
-        background: var(--vng);
-      }
-      .kbox.b::before {
-        background: var(--green);
-      }
-      .kbox.c::before {
-        background: var(--purple);
-      }
-      .kbox .lab {
-        font-size: 9px;
-        font-weight: 700;
-        color: var(--faint);
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-      }
-      .kbox .big {
-        font-size: 28px;
-        font-weight: 800;
-        line-height: 1.05;
-        letter-spacing: -0.5px;
-        font-variant-numeric: tabular-nums;
-      }
-      .kbox .sub {
-        font-size: 10px;
-        color: var(--muted);
-        font-weight: 600;
-        margin-top: 3px;
-      }
-      .mom {
-        font-size: 9.5px;
-        font-weight: 700;
-        margin-top: 6px;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: rgba(22, 163, 74, 0.13);
-        color: var(--up);
-        width: fit-content;
-      }
-      .mom.down {
-        background: rgba(224, 98, 58, 0.14);
-        color: var(--down);
-      }
-      .grid {
-        display: grid;
-        gap: 12px;
-      }
-      .g2 {
-        grid-template-columns: 1fr 1fr;
-      }
-      .g3 {
-        grid-template-columns: 1fr 1fr 1fr;
-      }
-      .g23 {
-        grid-template-columns: 1.6fr 1fr;
-      }
-      .g32 {
-        grid-template-columns: 1fr 1.6fr;
-      }
-      .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: var(--r);
-        padding: 12px 14px;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        box-shadow: var(--shadow);
-      }
-      .card h3 {
-        margin: 0 0 4px;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.7px;
-        color: var(--muted);
-        display: flex;
-        align-items: center;
-        gap: 7px;
-      }
-      .card h3::before {
-        content: '';
-        width: 7px;
-        height: 7px;
-        border-radius: 2px;
-        background: var(--vng);
-      }
-      .card.z h3::before {
-        background: var(--zalo);
-      }
-      .card.g h3::before {
-        background: var(--green);
-      }
-      .card.p h3::before {
-        background: var(--purple);
-      }
-      .card .note {
-        font-size: 9.5px;
-        color: var(--faint);
-        font-weight: 500;
-        margin: 0 0 8px;
-      }
-      .cb {
-        position: relative;
-        flex: 1;
-        min-height: 210px;
-      }
-      .cb.tall {
-        min-height: 320px;
-      }
-      .cb.xtall {
-        min-height: 380px;
-      }
-      canvas {
-        max-width: 100%;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 10px;
-        table-layout: fixed;
-      }
-      th,
-      td {
-        padding: 4px 7px;
-        text-align: right;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        border-bottom: 1px solid var(--line);
-      }
-      th:first-child,
-      td:first-child {
-        text-align: left;
-      }
-      thead th {
-        font-size: 8px;
-        text-transform: uppercase;
-        color: var(--faint);
-        font-weight: 700;
-        letter-spacing: 0.4px;
-      }
-      .bar-td {
-        position: relative;
-      }
-      .bar-fill {
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        height: 15px;
-        background: rgba(47, 127, 240, 0.16);
-        border-radius: 5px;
-        z-index: 0;
-      }
-      .bar-td span {
-        position: relative;
-        z-index: 1;
-        padding-left: 7px;
-        font-weight: 600;
-      }
-      .foot {
-        margin-top: 14px;
-        font-size: 9.5px;
-        color: var(--faint);
-        text-align: center;
-        font-weight: 500;
-      }
-      .foot code {
-        background: var(--band);
-        padding: 1px 6px;
-        border-radius: 5px;
-        color: var(--muted);
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <div class="brand">
-        <span class="dots"
-          ><i style="background: #f26f21"></i><i style="background: #2f7ff0"></i
-          ><i style="background: #16a34a"></i></span
-        ><span>VNG People Analytics<small>HEADCOUNT · ATTRITION · RETENTION</small></span>
-      </div>
-      <div class="tabs">
-        <button class="tab active" data-tab="demo" onclick="switchTab('demo')">Demographic</button>
-        <button class="tab" data-tab="attr" onclick="switchTab('attr')">Attrition</button>
-        <button class="tab" data-tab="cohort" onclick="switchTab('cohort')">Cohort &amp; Flows</button>
-      </div>
-      <div class="filters">
-        <label class="f">Year<select id="fYear" onchange="onFilter()"></select></label>
-        <label class="f">Month<select id="fMonth" onchange="onFilter()"></select></label>
-        <label class="f"
-          >EE Type<select id="fEE" onchange="onFilter()">
-            <option value="ALL">(All)</option>
-            <option value="official">Official</option>
-            <option value="collaborator">Collaborator</option>
-            <option value="service_contract">Service Contract</option>
-            <option value="probation">Probation</option>
-            <option value="internship">Internship</option>
-            <option value="fresher">Fresher</option>
-          </select></label
-        >
-        <label class="f"
-          >View by<select id="fView" onchange="onFilter()">
-            <option value="bu">BU</option>
-            <option value="fam">Job Family</option>
-          </select></label
-        >
-        <button class="themeBtn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark">◑</button>
-      </div>
-    </header>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+/* ===== Theme tokens — edit these to restyle. Light is default; [data-theme=dark] overrides. ===== */
+:root{
+  --vng:#F26F21;--zalo:#2F7FF0;--green:#16A34A;--purple:#7C6CF0;
+  --vs:#F26F21;      /* Voluntary separation */
+  --is:#2F7FF0;      /* Involuntary separation */
+  --bg:#eef2f7;--panel:#f5f8fc;--card:#ffffff;
+  --ink:#0f172a;--muted:#5b6b80;--faint:#8a99ab;--line:#e4e9f1;--band:#eef3f9;
+  --grid:rgba(100,116,139,.14);--up:#16a34a;--down:#e0623a;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.06);--r:14px;--hh:56px;
+  --bgimg:radial-gradient(1200px 520px at 100% -10%,rgba(47,127,240,.10),transparent 60%),radial-gradient(1000px 520px at -5% 110%,rgba(242,111,33,.09),transparent 55%);
+}
+[data-theme="dark"]{
+  --bg:#0b0e14;--panel:#131a24;--card:#161d28;--ink:#e8eef6;--muted:#9aa7b8;--faint:#6b7789;
+  --line:#252f3d;--band:#1a2431;--grid:rgba(148,163,184,.14);--shadow:0 1px 2px rgba(0,0,0,.5),0 10px 28px rgba(0,0,0,.38);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bgimg),var(--bg);color:var(--ink);font-size:12px;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+header{height:var(--hh);background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30}
+.brand{font-weight:800;font-size:15px;letter-spacing:-.2px;display:flex;align-items:center;gap:9px}
+.brand .dots{display:flex;gap:3px}.brand .dots i{width:8px;height:8px;border-radius:50%}
+.brand small{display:block;font-size:8px;color:var(--faint);font-weight:700;letter-spacing:2px;margin-top:3px}
+.tabs{display:flex;gap:4px;margin-left:10px;background:var(--band);padding:3px;border-radius:10px}
+.tab{padding:7px 15px;border:none;background:transparent;font-weight:600;color:var(--muted);cursor:pointer;font-size:12.5px;border-radius:8px;transition:.15s}
+.tab.active{color:var(--ink);background:var(--card);box-shadow:var(--shadow)}
+.filters{margin-left:auto;display:flex;gap:8px;align-items:center}
+.f{display:flex;flex-direction:column;font-size:8px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.5px}
+.f select{margin-top:3px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;font-size:11.5px;background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--shadow);outline:none}
+.themeBtn{margin-left:4px;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700;font-size:11px;box-shadow:var(--shadow)}
+.wrap{padding:14px 18px 26px;max-width:1520px;margin:0 auto}
+.toprow{display:flex;align-items:baseline;justify-content:space-between;margin:2px 0 12px}
+.ptitle{font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px}.ptitle span{color:var(--vng)}
+.cut{color:var(--faint);font-size:10.5px;font-weight:600}
+.hidden{display:none!important}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.kbox{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;position:relative;box-shadow:var(--shadow);overflow:hidden}
+.kbox::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--zalo)}
+.kbox.a::before{background:var(--vng)}.kbox.b::before{background:var(--green)}.kbox.c::before{background:var(--purple)}
+.kbox .lab{font-size:9px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+.kbox .big{font-size:28px;font-weight:800;line-height:1.05;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kbox .sub{font-size:10px;color:var(--muted);font-weight:600;margin-top:3px}
+.mom{font-size:9.5px;font-weight:700;margin-top:6px;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(22,163,74,.13);color:var(--up);width:fit-content}
+.mom.down{background:rgba(224,98,58,.14);color:var(--down)}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g23{grid-template-columns:1.6fr 1fr}.g32{grid-template-columns:1fr 1.6fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;min-height:0;box-shadow:var(--shadow)}
+.card h3{margin:0 0 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.card h3::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--vng)}
+.card.z h3::before{background:var(--zalo)}.card.g h3::before{background:var(--green)}.card.p h3::before{background:var(--purple)}
+.card .note{font-size:9.5px;color:var(--faint);font-weight:500;margin:0 0 8px}
+.cb{position:relative;flex:1;min-height:210px}
+.cb.tall{min-height:320px}.cb.xtall{min-height:380px}
+canvas{max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed}
+th,td{padding:4px 7px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:8px;text-transform:uppercase;color:var(--faint);font-weight:700;letter-spacing:.4px}
+.bar-td{position:relative}
+.bar-fill{position:absolute;left:0;top:50%;transform:translateY(-50%);height:15px;background:rgba(47,127,240,.16);border-radius:5px;z-index:0}
+.bar-td span{position:relative;z-index:1;padding-left:7px;font-weight:600}
+.foot{margin-top:14px;font-size:9.5px;color:var(--faint);text-align:center;font-weight:500}
+.foot code{background:var(--band);padding:1px 6px;border-radius:5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dots"><i style="background:#F26F21"></i><i style="background:#2F7FF0"></i><i style="background:#16A34A"></i></span><span>VNG People Analytics<small>HEADCOUNT · ATTRITION · RETENTION</small></span></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="demo" onclick="switchTab('demo')">Demographic</button>
+    <button class="tab" data-tab="attr" onclick="switchTab('attr')">Attrition</button>
+    <button class="tab" data-tab="cohort" onclick="switchTab('cohort')">Cohort &amp; Flows</button>
+  </div>
+  <div class="filters">
+    <label class="f">Year<select id="fYear" onchange="onFilter()"></select></label>
+    <label class="f">Month<select id="fMonth" onchange="onFilter()"></select></label>
+    <label class="f">EE Type<select id="fEE" onchange="onFilter()"><option value="ALL">(All)</option><option value="official">Official</option><option value="collaborator">Collaborator</option><option value="service_contract">Service Contract</option><option value="probation">Probation</option><option value="internship">Internship</option><option value="fresher">Fresher</option></select></label>
+    <label class="f">View by<select id="fView" onchange="onFilter()"><option value="bu">BU</option><option value="fam">Job Family</option></select></label>
+    <button class="themeBtn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark">◑</button>
+  </div>
+</header>
 
-    <div class="wrap">
-      <!-- ============ DEMOGRAPHIC ============ -->
-      <section id="tab-demo">
-        <div class="toprow">
-          <h1 class="ptitle">VNG EMPLOYEE HEADCOUNT <span id="dTitle"></span></h1>
-          <div class="cut" id="dCut"></div>
-        </div>
-        <div class="kpis">
-          <div class="kbox">
-            <div class="lab">Gross Headcount</div>
-            <div class="big num" id="kHc"></div>
-            <div class="mom" id="kHcMom"></div>
-          </div>
-          <div class="kbox a">
-            <div class="lab">Vietnam / Oversea</div>
-            <div class="big num" id="kMkt"></div>
-            <div class="sub" id="kMktSub"></div>
-          </div>
-          <div class="kbox b">
-            <div class="lab">Official Staff</div>
-            <div class="big num" id="kOff"></div>
-            <div class="sub" id="kOffSub"></div>
-          </div>
-          <div class="kbox c">
-            <div class="lab">Gender (M / F)</div>
-            <div class="big num" id="kGen"></div>
-            <div class="sub" id="kGenSub"></div>
-          </div>
-        </div>
-        <div class="grid g23" style="margin-bottom: 12px">
-          <div class="card z">
-            <h3 id="hBu">Headcount by Business Unit</h3>
-            <div class="cb tall"><canvas id="cBu"></canvas></div>
-          </div>
-          <div class="card">
-            <h3 id="hFam">Headcount by Job Family</h3>
-            <div class="cb tall"><canvas id="cFam"></canvas></div>
-          </div>
-        </div>
-        <div class="grid g3">
-          <div class="card p">
-            <h3>Age &amp; Gender Pyramid</h3>
-            <div class="cb"><canvas id="cPyr"></canvas></div>
-          </div>
-          <div class="card g">
-            <h3>Employee Type Mix</h3>
-            <div class="cb"><canvas id="cType"></canvas></div>
-          </div>
-          <div class="card">
-            <h3>Headcount Trend (rolling)</h3>
-            <div class="cb"><canvas id="cTrend"></canvas></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ============ ATTRITION ============ -->
-      <section id="tab-attr" class="hidden">
-        <div class="toprow">
-          <h1 class="ptitle">ATTRITION &amp; <span>HEADCOUNT BRIDGE</span></h1>
-          <div class="cut" id="aCut"></div>
-        </div>
-        <div class="kpis">
-          <div class="kbox a">
-            <div class="lab">Leavers YTD</div>
-            <div class="big num" id="kLv"></div>
-            <div class="sub" id="kLvSub"></div>
-          </div>
-          <div class="kbox">
-            <div class="lab">Voluntary (VS)</div>
-            <div class="big num" id="kVs"></div>
-            <div class="sub">incl. VSP</div>
-          </div>
-          <div class="kbox c">
-            <div class="lab">Involuntary (IS)</div>
-            <div class="big num" id="kIs"></div>
-            <div class="sub">incl. ISP</div>
-          </div>
-          <div class="kbox b">
-            <div class="lab">Annualized Attrition</div>
-            <div class="big num" id="kRate"></div>
-            <div class="sub">leavers ÷ avg headcount</div>
-          </div>
-        </div>
-        <div class="grid g2" style="margin-bottom: 12px">
-          <div class="card a">
-            <h3>Attrition by Leaving Reason</h3>
-            <div class="cb"><canvas id="cReason"></canvas></div>
-          </div>
-          <div class="card z">
-            <h3>Attrition by Business Unit &amp; Rate</h3>
-            <div class="cb"><canvas id="cAttrBu"></canvas></div>
-          </div>
-        </div>
-        <div class="grid g2">
-          <div class="card g">
-            <h3>Monthly Joiners vs Leavers</h3>
-            <div class="cb"><canvas id="cFlow"></canvas></div>
-          </div>
-          <div class="card p">
-            <h3 id="hWater">Headcount Bridge (Waterfall)</h3>
-            <p class="note">Opening → separations → net joiners → closing. Reconciles to the live snapshot.</p>
-            <div class="cb" id="cWaterfall"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ============ COHORT & FLOWS ============ -->
-      <section id="tab-cohort" class="hidden">
-        <div class="toprow">
-          <h1 class="ptitle">COHORT RETENTION &amp; <span>MOVEMENT</span></h1>
-          <div class="cut" id="cCut"></div>
-        </div>
-        <div class="grid g23" style="margin-bottom: 12px">
-          <div class="card p">
-            <h3>New-Hire Cohort Retention</h3>
-            <p class="note">
-              % of each join-quarter cohort still active at 3 / 6 / 12 months. Darker = higher retention.
-            </p>
-            <div class="cb tall" id="cHeatmap"></div>
-          </div>
-          <div class="card">
-            <h3>Retention Curves by Cohort</h3>
-            <div class="cb tall" id="cCurve"></div>
-          </div>
-        </div>
-        <div class="grid g2">
-          <div class="card z">
-            <h3>BU Risk — Attrition × Tenure × Size (Bubble)</h3>
-            <p class="note">x = YTD attrition %, y = avg tenure (yrs), bubble size = headcount.</p>
-            <div class="cb tall" id="cBubble"></div>
-          </div>
-          <div class="card a">
-            <h3>Leaver Flows — BU → Reason (Sankey)</h3>
-            <div class="cb tall" id="cSankey"></div>
-          </div>
-        </div>
-        <div class="foot">
-          Data source: <code>hr_data_headcount_dev.hrdev.v_hr_headcount</code> · snapshot <span id="footSnap"></span> ·
-          regenerate via SPEC.md SQL
-        </div>
-      </section>
+<div class="wrap">
+  <!-- ============ DEMOGRAPHIC ============ -->
+  <section id="tab-demo">
+    <div class="toprow"><h1 class="ptitle">VNG EMPLOYEE HEADCOUNT <span id="dTitle"></span></h1><div class="cut" id="dCut"></div></div>
+    <div class="kpis">
+      <div class="kbox"><div class="lab">Gross Headcount</div><div class="big num" id="kHc"></div><div class="mom" id="kHcMom"></div></div>
+      <div class="kbox a"><div class="lab">Vietnam / Oversea</div><div class="big num" id="kMkt"></div><div class="sub" id="kMktSub"></div></div>
+      <div class="kbox b"><div class="lab">Official Staff</div><div class="big num" id="kOff"></div><div class="sub" id="kOffSub"></div></div>
+      <div class="kbox c"><div class="lab">Gender (M / F)</div><div class="big num" id="kGen"></div><div class="sub" id="kGenSub"></div></div>
     </div>
+    <div class="grid g23" style="margin-bottom:12px">
+      <div class="card z"><h3 id="hBu">Headcount by Business Unit</h3><div class="cb tall"><canvas id="cBu"></canvas></div></div>
+      <div class="card"><h3 id="hFam">Headcount by Job Family</h3><div class="cb tall"><canvas id="cFam"></canvas></div></div>
+    </div>
+    <div class="grid g3">
+      <div class="card p"><h3>Age &amp; Gender Pyramid</h3><div class="cb"><canvas id="cPyr"></canvas></div></div>
+      <div class="card g"><h3>Employee Type Mix</h3><div class="cb"><canvas id="cType"></canvas></div></div>
+      <div class="card"><h3>Headcount Trend (rolling)</h3><div class="cb"><canvas id="cTrend"></canvas></div></div>
+    </div>
+  </section>
 
-    <!-- =========================================================================
+  <!-- ============ ATTRITION ============ -->
+  <section id="tab-attr" class="hidden">
+    <div class="toprow"><h1 class="ptitle">ATTRITION &amp; <span>HEADCOUNT BRIDGE</span></h1><div class="cut" id="aCut"></div></div>
+    <div class="kpis">
+      <div class="kbox a"><div class="lab">Leavers YTD</div><div class="big num" id="kLv"></div><div class="sub" id="kLvSub"></div></div>
+      <div class="kbox"><div class="lab">Voluntary (VS)</div><div class="big num" id="kVs"></div><div class="sub">incl. VSP</div></div>
+      <div class="kbox c"><div class="lab">Involuntary (IS)</div><div class="big num" id="kIs"></div><div class="sub">incl. ISP</div></div>
+      <div class="kbox b"><div class="lab">Annualized Attrition</div><div class="big num" id="kRate"></div><div class="sub">leavers ÷ avg headcount</div></div>
+    </div>
+    <div class="grid g2" style="margin-bottom:12px">
+      <div class="card a"><h3>Attrition by Leaving Reason</h3><div class="cb"><canvas id="cReason"></canvas></div></div>
+      <div class="card z"><h3>Attrition by Business Unit &amp; Rate</h3><div class="cb"><canvas id="cAttrBu"></canvas></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card g"><h3>Monthly Joiners vs Leavers</h3><div class="cb"><canvas id="cFlow"></canvas></div></div>
+      <div class="card p"><h3 id="hWater">Headcount Bridge (Waterfall)</h3><p class="note">Opening → separations → net joiners → closing. Reconciles to the live snapshot.</p><div class="cb" id="cWaterfall"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ COHORT & FLOWS ============ -->
+  <section id="tab-cohort" class="hidden">
+    <div class="toprow"><h1 class="ptitle">COHORT RETENTION &amp; <span>MOVEMENT</span></h1><div class="cut" id="cCut"></div></div>
+    <div class="grid g23" style="margin-bottom:12px">
+      <div class="card p"><h3>New-Hire Cohort Retention</h3><p class="note">% of each join-quarter cohort still active at 3 / 6 / 12 months. Darker = higher retention.</p><div class="cb tall" id="cHeatmap"></div></div>
+      <div class="card"><h3>Retention Curves by Cohort</h3><div class="cb tall" id="cCurve"></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card z"><h3>BU Risk — Attrition × Tenure × Size (Bubble)</h3><p class="note">x = YTD attrition %, y = avg tenure (yrs), bubble size = headcount.</p><div class="cb tall" id="cBubble"></div></div>
+      <div class="card a"><h3>Leaver Flows — BU → Reason (Sankey)</h3><div class="cb tall" id="cSankey"></div></div>
+    </div>
+    <div class="foot">Data source: <code>hr_data_headcount_dev.hrdev.v_hr_headcount</code> · snapshot <span id="footSnap"></span> · regenerate via SPEC.md SQL</div>
+  </section>
+</div>
+
+<!-- =========================================================================
      DATA CONTRACT — the ONLY block the agent rewrites on refresh.
      Each key maps 1:1 to a query in SPEC.md. Seeded with real 2026-06-30 data.
      ========================================================================= -->
-    <script>
-      window.DASH_DATA = {
-        meta: { year: 2026 },
-        /* Demographic slots are computed live from window.FACTS (below), so the
+<script>
+window.DASH_DATA = {
+  meta: { year: 2026 },
+  /* Demographic slots are computed live from window.FACTS (below), so the
      Year/Month/EE-Type/View-by slicers filter the Demographic tab client-side. */
-        /* Attrition + Cohort facts are keyed by year and switch with the Year slicer.
+  /* Attrition + Cohort facts are keyed by year and switch with the Year slicer.
      The SLOT markers (inside the 2026 block) name the per-year sub-slots for SPEC.md. */
-        years: {
-          2026: {
-            /* SLOT:attrKpis */
-            attrKpis: { leavers: 761, voluntary: 593, involuntary: 168, rateAnnPct: 34.5, partial: true },
-            /* SLOT:reasonGroups */
-            reasonGroups: [
-              ['Personal Patterns', 286],
-              ['Organizational Patterns', 129],
-              ['Compensation', 125],
-              ['Job Performance', 101],
-              ['Change of Contract', 96],
-              ['Career Advancement', 16],
-              ['Leadership', 8],
-            ],
-            /* SLOT:attrByBu  (bu, leavers, headcount) */
-            attrByBu: [
-              ['Zalo', 320, 1488],
-              ['VNGG', 205, 1193],
-              ['PY', 104, 700],
-              ['DB', 44, 237],
-              ['ZPS', 36, 261],
-              ['BO', 35, 339],
-              ['VRC', 6, 83],
-              ['INCT', 6, 68],
-            ],
-            /* SLOT:monthlyFlow  (month, joiners, leavers) */
-            monthlyFlow: [
-              ['Jan', 640, 102],
-              ['Feb', 364, 120],
-              ['Mar', 548, 203],
-              ['Apr', 462, 133],
-              ['May', 287, 121],
-              ['Jun', 149, 82],
-            ],
-            /* SLOT:waterfall  (label, delta|null for totals, isTotal) */
-            waterfall: [
-              ["Opening\n(Dec'25)", 4426, true],
-              ['Voluntary', -593, false],
-              ['Involuntary', -168, false],
-              ['Net Joiners', 742, false],
-              ["Closing\n(Jun'26)", 4407, true],
-            ],
-            /* SLOT:cohort  (cohort, size, ret3, ret6, ret12) */
-            cohort: [
-              ['2024-Q1', 107, 100, 100, 94],
-              ['2024-Q2', 214, 100, 100, 64],
-              ['2024-Q3', 218, 100, 92, 52],
-              ['2024-Q4', 145, 81, 64, 42],
-              ['2025-Q1', 232, 72, 46, 30],
-              ['2025-Q2', 276, 65, 47, 20],
-              ['2025-Q3', 230, 64, 42, 19],
-              ['2025-Q4', 190, 58, 30, 21],
-            ],
-            /* SLOT:bubble  (bu, attritionPct, tenureYrs, headcount) */
-            bubble: [
-              ['Zalo', 21.5, 3.5, 1488],
-              ['VNGG', 17.2, 4.2, 1193],
-              ['PY', 14.9, 3.7, 700],
-              ['BO', 10.3, 4.8, 339],
-              ['ZPS', 13.8, 6.9, 261],
-              ['DB', 18.6, 4.8, 237],
-              ['VRC', 7.2, 3.5, 83],
-              ['INCT', 8.8, 2.3, 68],
-            ],
-            /* SLOT:sankey  (bu, reason, leavers) */
-            sankey: [
-              ['Zalo', 'Personal Patterns', 172],
-              ['Zalo', 'Compensation', 62],
-              ['Zalo', 'Organizational Patterns', 46],
-              ['Zalo', 'Change of Contract', 34],
-              ['VNGG', 'Organizational Patterns', 58],
-              ['VNGG', 'Personal Patterns', 38],
-              ['VNGG', 'Compensation', 34],
-              ['VNGG', 'Job Performance', 33],
-              ['VNGG', 'Change of Contract', 29],
-              ['PY', 'Job Performance', 30],
-              ['PY', 'Personal Patterns', 29],
-              ['PY', 'Compensation', 17],
-              ['PY', 'Change of Contract', 14],
-              ['DB', 'Personal Patterns', 21],
-              ['ZPS', 'Job Performance', 17],
-              ['BO', 'Personal Patterns', 12],
-            ],
-          },
-          2025: {
-            attrKpis: { leavers: 1855, voluntary: 1472, involuntary: 383, rateAnnPct: 42.8, partial: false },
-            reasonGroups: [
-              ['Personal Patterns', 816],
-              ['Change of Contract', 336],
-              ['Organizational Patterns', 319],
-              ['Job Performance', 172],
-              ['Compensation', 162],
-              ['Career Advancement', 32],
-              ['Leadership', 18],
-            ],
-            attrByBu: [
-              ['Zalo', 771, 1518],
-              ['VNGG', 360, 1185],
-              ['PY', 272, 707],
-              ['BO', 55, 318],
-              ['ZPS', 107, 266],
-              ['DB', 90, 227],
-              ['VRC', 19, 96],
-              ['INCT', 172, 69],
-            ],
-            monthlyFlow: [
-              ['Jan', 961, 90],
-              ['Feb', 1117, 132],
-              ['Mar', 2118, 226],
-              ['Apr', 1459, 114],
-              ['May', 1487, 163],
-              ['Jun', 1865, 259],
-              ['Jul', 1735, 171],
-              ['Aug', 1131, 138],
-              ['Sep', 1433, 152],
-              ['Oct', 1180, 94],
-              ['Nov', 946, 84],
-              ['Dec', 1252, 232],
-            ],
-            waterfall: [
-              ["Opening\n(Feb'25)", 4244, true],
-              ['Voluntary', -1472, false],
-              ['Involuntary', -383, false],
-              ['Net Joiners', 2037, false],
-              ["Closing\n(Dec'25)", 4426, true],
-            ],
-            cohort: [
-              ['2023-Q1', 73, 100, 100, 100],
-              ['2023-Q2', 80, 100, 100, 100],
-              ['2023-Q3', 99, 100, 100, 100],
-              ['2023-Q4', 132, 100, 100, 99],
-              ['2024-Q1', 107, 100, 100, 94],
-              ['2024-Q2', 214, 100, 100, 64],
-              ['2024-Q3', 218, 100, 92, 52],
-              ['2024-Q4', 145, 81, 64, 42],
-            ],
-            bubble: [
-              ['Zalo', 50.8, 3.3, 1518],
-              ['VNGG', 30.4, 4.1, 1185],
-              ['PY', 38.5, 3.6, 707],
-              ['BO', 17.3, 4.8, 318],
-              ['ZPS', 40.2, 6.6, 266],
-              ['DB', 39.6, 5.0, 227],
-              ['VRC', 19.8, 3.0, 96],
-              ['INCT', 249.3, 1.9, 69],
-            ],
-            sankey: [
-              ['Zalo', 'Personal Patterns', 505],
-              ['Zalo', 'Change of Contract', 158],
-              ['INCT', 'Organizational Patterns', 132],
-              ['VNGG', 'Personal Patterns', 81],
-              ['PY', 'Personal Patterns', 80],
-              ['VNGG', 'Organizational Patterns', 72],
-              ['PY', 'Change of Contract', 69],
-              ['VNGG', 'Change of Contract', 62],
-              ['VNGG', 'Compensation', 62],
-              ['Zalo', 'Organizational Patterns', 62],
-              ['VNGG', 'Job Performance', 55],
-              ['ZPS', 'Personal Patterns', 55],
-              ['PY', 'Job Performance', 47],
-              ['PY', 'Compensation', 43],
-              ['DB', 'Personal Patterns', 42],
-              ['BO', 'Personal Patterns', 34],
-              ['ZPS', 'Job Performance', 30],
-              ['Zalo', 'Compensation', 26],
-              ['PY', 'Organizational Patterns', 22],
-              ['VNGG', 'Career Advancement', 20],
-            ],
-          },
-        },
-      };
-    </script>
+  years: {
+    "2026": {
+      /* SLOT:attrKpis */
+      attrKpis: { leavers: 761, voluntary: 593, involuntary: 168, rateAnnPct: 34.5, partial: true },
+      /* SLOT:reasonGroups */
+      reasonGroups: [["Personal Patterns",286],["Organizational Patterns",129],["Compensation",125],["Job Performance",101],["Change of Contract",96],["Career Advancement",16],["Leadership",8]],
+      /* SLOT:attrByBu  (bu, leavers, headcount) */
+      attrByBu: [["Zalo",320,1488],["VNGG",205,1193],["PY",104,700],["DB",44,237],["ZPS",36,261],["BO",35,339],["VRC",6,83],["INCT",6,68]],
+      /* SLOT:monthlyFlow  (month, joiners, leavers) */
+      monthlyFlow: [["Jan",640,102],["Feb",364,120],["Mar",548,203],["Apr",462,133],["May",287,121],["Jun",149,82]],
+      /* SLOT:waterfall  (label, delta|null for totals, isTotal) */
+      waterfall: [["Opening\n(Dec'25)",4426,true],["Voluntary",-593,false],["Involuntary",-168,false],["Net Joiners",742,false],["Closing\n(Jun'26)",4407,true]],
+      /* SLOT:cohort  (cohort, size, ret3, ret6, ret12) */
+      cohort: [["2024-Q1",107,100,100,94],["2024-Q2",214,100,100,64],["2024-Q3",218,100,92,52],["2024-Q4",145,81,64,42],["2025-Q1",232,72,46,30],["2025-Q2",276,65,47,20],["2025-Q3",230,64,42,19],["2025-Q4",190,58,30,21]],
+      /* SLOT:bubble  (bu, attritionPct, tenureYrs, headcount) */
+      bubble: [["Zalo",21.5,3.5,1488],["VNGG",17.2,4.2,1193],["PY",14.9,3.7,700],["BO",10.3,4.8,339],["ZPS",13.8,6.9,261],["DB",18.6,4.8,237],["VRC",7.2,3.5,83],["INCT",8.8,2.3,68]],
+      /* SLOT:sankey  (bu, reason, leavers) */
+      sankey: [["Zalo","Personal Patterns",172],["Zalo","Compensation",62],["Zalo","Organizational Patterns",46],["Zalo","Change of Contract",34],["VNGG","Organizational Patterns",58],["VNGG","Personal Patterns",38],["VNGG","Compensation",34],["VNGG","Job Performance",33],["VNGG","Change of Contract",29],["PY","Job Performance",30],["PY","Personal Patterns",29],["PY","Compensation",17],["PY","Change of Contract",14],["DB","Personal Patterns",21],["ZPS","Job Performance",17],["BO","Personal Patterns",12]]
+    },
+    "2025": {
+      attrKpis: { leavers: 1855, voluntary: 1472, involuntary: 383, rateAnnPct: 42.8, partial: false },
+      reasonGroups: [["Personal Patterns",816],["Change of Contract",336],["Organizational Patterns",319],["Job Performance",172],["Compensation",162],["Career Advancement",32],["Leadership",18]],
+      attrByBu: [["Zalo",771,1518],["VNGG",360,1185],["PY",272,707],["BO",55,318],["ZPS",107,266],["DB",90,227],["VRC",19,96],["INCT",172,69]],
+      monthlyFlow: [["Jan",961,90],["Feb",1117,132],["Mar",2118,226],["Apr",1459,114],["May",1487,163],["Jun",1865,259],["Jul",1735,171],["Aug",1131,138],["Sep",1433,152],["Oct",1180,94],["Nov",946,84],["Dec",1252,232]],
+      waterfall: [["Opening\n(Feb'25)",4244,true],["Voluntary",-1472,false],["Involuntary",-383,false],["Net Joiners",2037,false],["Closing\n(Dec'25)",4426,true]],
+      cohort: [["2023-Q1",73,100,100,100],["2023-Q2",80,100,100,100],["2023-Q3",99,100,100,100],["2023-Q4",132,100,100,99],["2024-Q1",107,100,100,94],["2024-Q2",214,100,100,64],["2024-Q3",218,100,92,52],["2024-Q4",145,81,64,42]],
+      bubble: [["Zalo",50.8,3.3,1518],["VNGG",30.4,4.1,1185],["PY",38.5,3.6,707],["BO",17.3,4.8,318],["ZPS",40.2,6.6,266],["DB",39.6,5.0,227],["VRC",19.8,3.0,96],["INCT",249.3,1.9,69]],
+      sankey: [["Zalo","Personal Patterns",505],["Zalo","Change of Contract",158],["INCT","Organizational Patterns",132],["VNGG","Personal Patterns",81],["PY","Personal Patterns",80],["VNGG","Organizational Patterns",72],["PY","Change of Contract",69],["VNGG","Change of Contract",62],["VNGG","Compensation",62],["Zalo","Organizational Patterns",62],["VNGG","Job Performance",55],["ZPS","Personal Patterns",55],["PY","Job Performance",47],["PY","Compensation",43],["DB","Personal Patterns",42],["BO","Personal Patterns",34],["ZPS","Job Performance",30],["Zalo","Compensation",26],["PY","Organizational Patterns",22],["VNGG","Career Advancement",20]]
+    }
+  }
+};
+</script>
 
-    <!-- =========================================================================
+<!-- =========================================================================
      FACTS — cross-tab headcount by snapshot × employee-type × dimension.
      Powers the client-side slicers (Year/Month/EE Type/View by) on the
      Demographic tab. Agent regenerates this block from the SPEC.md FACTS SQL.
      ========================================================================= -->
-    <script>
-      window.FACTS = {
-        snaps: [
-          '2025-02-04',
-          '2025-03-04',
-          '2025-04-01',
-          '2025-07-01',
-          '2025-08-01',
-          '2025-09-03',
-          '2025-10-02',
-          '2025-11-03',
-          '2025-12-02',
-          '2025-12-30',
-          '2026-02-02',
-          '2026-02-27',
-          '2026-04-01',
-          '2026-05-04',
-          '2026-05-27',
-          '2026-06-30',
-        ],
-        market: {
-          '2025-02-04': [4064, 180],
-          '2025-03-04': [4016, 185],
-          '2025-04-01': [4035, 184],
-          '2025-07-01': [4104, 195],
-          '2025-08-01': [4148, 195],
-          '2025-09-03': [4043, 194],
-          '2025-10-02': [4076, 195],
-          '2025-11-03': [4090, 194],
-          '2025-12-02': [4131, 195],
-          '2025-12-30': [4231, 195],
-          '2026-02-02': [4259, 183],
-          '2026-02-27': [4160, 180],
-          '2026-04-01': [4222, 172],
-          '2026-05-04': [4244, 163],
-          '2026-05-27': [4228, 138],
-          '2026-06-30': [4275, 132],
-        },
-        data: {
-          '2025-02-04': {
-            collaborator: {
-              bu: { '(Other)': 5, BO: 27, DB: 13, INCT: 7, PY: 27, VNGG: 73, ZPS: 5, Zalo: 200 },
-              fam: { 'Business Support': 112, Data: 8, Marketing: 64, Product: 117, Sales: 20, Tech: 36 },
-              pyr: {
-                '25-29': [61, 90],
-                '30-34': [16, 20],
-                '35-39': [11, 5],
-                '40-44': [6, 1],
-                '45+': [8, 2],
-                '<25': [49, 88],
-              },
-            },
-            internship: {
-              bu: { BO: 8, DB: 15, PY: 16, VNGG: 10, Zalo: 13 },
-              fam: { 'Business Support': 7, Data: 8, Marketing: 11, Product: 13, Sales: 3, Tech: 20 },
-              pyr: { '<25': [37, 25] },
-            },
-            official: {
-              bu: { '(Other)': 46, BO: 236, DB: 315, INCT: 107, PY: 565, SMT: 9, VNGG: 872, ZPS: 293, Zalo: 884 },
-              fam: {
-                'Business Support': 465,
-                Data: 160,
-                Executive: 9,
-                Marketing: 437,
-                Product: 779,
-                Sales: 168,
-                Tech: 1309,
-              },
-              pyr: {
-                '25-29': [856, 441],
-                '30-34': [555, 338],
-                '35-39': [326, 191],
-                '40-44': [190, 90],
-                '45+': [81, 28],
-                '<25': [146, 85],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 1, BO: 3, DB: 1, INCT: 32, PY: 8, VNGG: 16, Zalo: 10 },
-              fam: { 'Business Support': 16, Data: 5, Marketing: 11, Product: 7, Sales: 4, Tech: 28 },
-              pyr: {
-                '25-29': [17, 13],
-                '30-34': [12, 7],
-                '35-39': [7, 2],
-                '40-44': [2, 0],
-                '45+': [0, 1],
-                '<25': [7, 3],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 2, INCT: 2, PY: 24, VNGG: 57, Zalo: 339 },
-              fam: { 'Business Support': 63, Data: 3, Executive: 1, Marketing: 15, Product: 341, Sales: 1, Tech: 3 },
-              pyr: {
-                '25-29': [31, 79],
-                '30-34': [14, 26],
-                '35-39': [8, 13],
-                '40-44': [1, 5],
-                '45+': [3, 1],
-                '<25': [43, 203],
-              },
-            },
-          },
-          '2025-03-04': {
-            collaborator: {
-              bu: { '(Other)': 6, BO: 26, DB: 12, INCT: 5, PY: 18, VNGG: 70, ZPS: 5, Zalo: 201 },
-              fam: { 'Business Support': 101, Data: 7, Marketing: 63, Product: 121, Sales: 21, Tech: 30 },
-              pyr: {
-                '25-29': [53, 84],
-                '30-34': [14, 19],
-                '35-39': [10, 5],
-                '40-44': [6, 1],
-                '45+': [9, 2],
-                '<25': [50, 90],
-              },
-            },
-            internship: {
-              bu: { BO: 7, DB: 15, INCT: 3, PY: 13, VNGG: 14, Zalo: 8 },
-              fam: { 'Business Support': 8, Data: 8, Marketing: 11, Product: 9, Sales: 3, Tech: 21 },
-              pyr: { '<25': [36, 24] },
-            },
-            official: {
-              bu: { '(Other)': 52, BO: 231, DB: 285, INCT: 141, PY: 552, SMT: 1, VNGG: 873, ZPS: 291, Zalo: 876 },
-              fam: {
-                'Business Support': 463,
-                Data: 163,
-                Executive: 9,
-                Marketing: 436,
-                Product: 772,
-                Sales: 160,
-                Tech: 1299,
-              },
-              pyr: {
-                '25-29': [850, 437],
-                '30-34': [550, 336],
-                '35-39': [321, 189],
-                '40-44': [188, 88],
-                '45+': [79, 27],
-                '<25': [151, 86],
-              },
-            },
-            probation: {
-              bu: { BO: 5, DB: 2, INCT: 28, PY: 16, VNGG: 28, Zalo: 13 },
-              fam: { 'Business Support': 21, Data: 6, Marketing: 12, Product: 14, Sales: 9, Tech: 30 },
-              pyr: {
-                '25-29': [25, 19],
-                '30-34': [13, 7],
-                '35-39': [8, 2],
-                '40-44': [3, 1],
-                '45+': [0, 1],
-                '<25': [8, 5],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 3, INCT: 2, PY: 24, VNGG: 58, Zalo: 314 },
-              fam: { 'Business Support': 61, Data: 3, Executive: 1, Marketing: 14, Product: 320, Sales: 1, Tech: 4 },
-              pyr: {
-                '25-29': [31, 76],
-                '30-34': [14, 26],
-                '35-39': [7, 13],
-                '40-44': [1, 5],
-                '45+': [4, 1],
-                '<25': [41, 185],
-              },
-            },
-          },
-          '2025-04-01': {
-            collaborator: {
-              bu: { '(Other)': 5, BO: 27, DB: 12, INCT: 5, PY: 20, VNGG: 77, ZPS: 5, Zalo: 200 },
-              fam: { 'Business Support': 108, Data: 5, Marketing: 65, Product: 121, Sales: 20, Tech: 32 },
-              pyr: {
-                '25-29': [52, 85],
-                '30-34': [14, 19],
-                '35-39': [10, 4],
-                '40-44': [7, 1],
-                '45+': [9, 2],
-                '<25': [54, 94],
-              },
-            },
-            fresher: { bu: { Zalo: 2 }, fam: { Tech: 2 }, pyr: { '<25': [2, 0] } },
-            internship: {
-              bu: { '(Other)': 1, BO: 6, DB: 14, INCT: 3, PY: 12, VNGG: 23, Zalo: 5 },
-              fam: { 'Business Support': 9, Data: 11, Marketing: 9, Product: 6, Sales: 3, Tech: 26 },
-              pyr: { '<25': [41, 23] },
-            },
-            official: {
-              bu: { '(Other)': 44, BO: 232, DB: 279, INCT: 149, PY: 548, VNGG: 884, ZPS: 290, Zalo: 863 },
-              fam: {
-                'Business Support': 473,
-                Data: 157,
-                Executive: 9,
-                Marketing: 437,
-                Product: 767,
-                Sales: 156,
-                Tech: 1290,
-              },
-              pyr: {
-                '25-29': [839, 440],
-                '30-34': [548, 337],
-                '35-39': [318, 187],
-                '40-44': [186, 88],
-                '45+': [78, 27],
-                '<25': [150, 91],
-              },
-            },
-            probation: {
-              bu: { BO: 7, DB: 4, INCT: 25, PY: 20, VNGG: 35, Zalo: 17 },
-              fam: { 'Business Support': 19, Data: 9, Marketing: 19, Product: 17, Sales: 10, Tech: 34 },
-              pyr: {
-                '25-29': [33, 10],
-                '30-34': [14, 14],
-                '35-39': [7, 1],
-                '40-44': [4, 3],
-                '45+': [1, 1],
-                '<25': [16, 4],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 4, INCT: 2, PY: 32, VNGG: 57, Zalo: 307 },
-              fam: { 'Business Support': 69, Data: 3, Executive: 1, Marketing: 13, Product: 312, Sales: 1, Tech: 6 },
-              pyr: {
-                '25-29': [34, 74],
-                '30-34': [14, 26],
-                '35-39': [8, 12],
-                '40-44': [1, 4],
-                '45+': [4, 1],
-                '<25': [40, 187],
-              },
-            },
-          },
-          '2025-07-01': {
-            collaborator: {
-              bu: { '(Other)': 5, BO: 26, DB: 12, INCT: 2, PY: 27, VNGG: 93, ZPS: 8, Zalo: 189 },
-              fam: { 'Business Support': 109, Data: 5, Marketing: 66, Product: 127, Sales: 20, Tech: 35 },
-              pyr: {
-                '25-29': [49, 78],
-                '30-34': [18, 19],
-                '35-39': [10, 4],
-                '40-44': [7, 1],
-                '45+': [8, 2],
-                '<25': [62, 104],
-              },
-            },
-            fresher: {
-              bu: { PY: 16, ZPS: 29, Zalo: 8 },
-              fam: { Data: 5, Product: 17, Tech: 31 },
-              pyr: { '25-29': [1, 1], '<25': [43, 8] },
-            },
-            internship: {
-              bu: { '(Other)': 1, BO: 6, DB: 28, INCT: 2, PY: 14, VNGG: 44, Zalo: 15 },
-              fam: { 'Business Support': 11, Data: 11, Marketing: 18, Product: 22, Sales: 4, Tech: 44 },
-              pyr: { '25-29': [2, 1], '<25': [70, 37] },
-            },
-            official: {
-              bu: { '(Other)': 44, BO: 245, DB: 272, INCT: 178, PY: 586, VNGG: 923, ZPS: 272, Zalo: 881 },
-              fam: {
-                'Business Support': 501,
-                Data: 155,
-                Executive: 9,
-                Marketing: 460,
-                Product: 789,
-                Sales: 171,
-                Tech: 1316,
-              },
-              pyr: {
-                '25-29': [846, 472],
-                '30-34': [545, 342],
-                '35-39': [318, 185],
-                '40-44': [185, 87],
-                '45+': [77, 29],
-                '<25': [198, 117],
-              },
-            },
-            probation: {
-              bu: { INCT: 5, PY: 3, VNGG: 5 },
-              fam: { 'Business Support': 2, Marketing: 3, Product: 3, Sales: 3, Tech: 2 },
-              pyr: { '25-29': [2, 2], '30-34': [1, 0], '35-39': [0, 1], '40-44': [3, 1], '45+': [2, 0], '<25': [0, 1] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 3, INCT: 1, PY: 33, VNGG: 50, Zalo: 270 },
-              fam: { 'Business Support': 67, Data: 2, Executive: 1, Marketing: 13, Product: 272, Sales: 2, Tech: 3 },
-              pyr: {
-                '25-29': [27, 67],
-                '30-34': [10, 21],
-                '35-39': [7, 11],
-                '40-44': [1, 4],
-                '45+': [3, 1],
-                '<25': [43, 165],
-              },
-            },
-          },
-          '2025-08-01': {
-            collaborator: {
-              bu: { BO: 31, DB: 14, INCT: 5, PY: 28, VNGG: 96, ZPS: 8, Zalo: 198 },
-              fam: { 'Business Support': 120, Data: 6, Marketing: 65, Product: 134, Sales: 23, Tech: 32 },
-              pyr: {
-                '25-29': [46, 84],
-                '30-34': [19, 19],
-                '35-39': [10, 5],
-                '40-44': [8, 1],
-                '45+': [7, 2],
-                '<25': [64, 115],
-              },
-            },
-            fresher: {
-              bu: { PY: 15, ZPS: 22, Zalo: 9 },
-              fam: { Data: 5, Product: 11, Tech: 30 },
-              pyr: { '25-29': [0, 1], '<25': [40, 5] },
-            },
-            internship: {
-              bu: { BO: 11, DB: 33, INCT: 2, PY: 12, VNGG: 48, Zalo: 21 },
-              fam: { 'Business Support': 17, Data: 11, Marketing: 21, Product: 26, Sales: 6, Tech: 46 },
-              pyr: { '25-29': [3, 1], '<25': [78, 45] },
-            },
-            official: {
-              bu: { '(Other)': 36, BO: 254, DB: 275, INCT: 169, PY: 602, VNGG: 932, ZPS: 269, Zalo: 887 },
-              fam: {
-                'Business Support': 503,
-                Data: 162,
-                Executive: 10,
-                'Game Development': 3,
-                Marketing: 464,
-                Product: 796,
-                Sales: 171,
-                Tech: 1315,
-              },
-              pyr: {
-                '25-29': [845, 474],
-                '30-34': [540, 347],
-                '35-39': [316, 186],
-                '40-44': [183, 87],
-                '45+': [77, 29],
-                '<25': [214, 126],
-              },
-            },
-            probation: {
-              bu: { INCT: 6, VNGG: 6 },
-              fam: { 'Business Support': 4, Marketing: 4, Product: 1, Sales: 2, Tech: 1 },
-              pyr: { '25-29': [2, 2], '30-34': [2, 0], '35-39': [0, 1], '40-44': [2, 1], '45+': [1, 0], '<25': [0, 1] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 3, INCT: 1, PY: 37, VNGG: 48, Zalo: 262 },
-              fam: { 'Business Support': 68, Data: 1, Executive: 1, Marketing: 12, Product: 267, Sales: 2, Tech: 3 },
-              pyr: {
-                '25-29': [26, 66],
-                '30-34': [9, 22],
-                '35-39': [7, 13],
-                '40-44': [1, 4],
-                '45+': [3, 1],
-                '<25': [43, 159],
-              },
-            },
-          },
-          '2025-09-03': {
-            collaborator: {
-              bu: { BO: 34, DB: 14, INCT: 6, PY: 32, VNGG: 112, ZPS: 8, Zalo: 199 },
-              fam: {
-                'Business Operations': 106,
-                Data: 5,
-                'Game Development': 5,
-                Marketing: 76,
-                Product: 156,
-                Sales: 28,
-                Tech: 29,
-              },
-              pyr: {
-                '25-29': [53, 87],
-                '30-34': [20, 20],
-                '35-39': [10, 6],
-                '40-44': [9, 1],
-                '45+': [8, 1],
-                '<25': [67, 123],
-              },
-            },
-            fresher: { bu: { PY: 15, Zalo: 7 }, fam: { Data: 3, Tech: 19 }, pyr: { '25-29': [0, 1], '<25': [20, 1] } },
-            internship: {
-              bu: { '(Other)': 2, BO: 11, DB: 32, INCT: 1, PY: 14, VNGG: 42, Zalo: 22 },
-              fam: {
-                'Business Operations': 15,
-                Data: 10,
-                'Game Development': 5,
-                Marketing: 24,
-                Product: 17,
-                Sales: 6,
-                Tech: 47,
-              },
-              pyr: { '25-29': [2, 1], '<25': [72, 49] },
-            },
-            official: {
-              bu: { '(Other)': 35, BO: 258, DB: 273, INCT: 49, PY: 604, VNGG: 949, ZPS: 270, Zalo: 898 },
-              fam: {
-                'Business Operations': 466,
-                Data: 149,
-                Executive: 10,
-                'Game Development': 311,
-                Marketing: 465,
-                Product: 717,
-                Sales: 163,
-                Tech: 1055,
-              },
-              pyr: {
-                '25-29': [799, 467],
-                '30-34': [515, 342],
-                '35-39': [299, 183],
-                '40-44': [178, 87],
-                '45+': [75, 28],
-                '<25': [228, 135],
-              },
-            },
-            probation: {
-              bu: { INCT: 4, VNGG: 7 },
-              fam: { 'Business Operations': 4, Marketing: 4, Product: 1, Sales: 2 },
-              pyr: { '25-29': [2, 3], '30-34': [2, 0], '35-39': [0, 1], '40-44': [1, 0], '45+': [1, 0], '<25': [0, 1] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 2, INCT: 1, PY: 28, VNGG: 43, Zalo: 262 },
-              fam: { 'Business Operations': 52, Executive: 1, Marketing: 10, Product: 273, Sales: 1, Tech: 2 },
-              pyr: {
-                '25-29': [25, 61],
-                '30-34': [8, 19],
-                '35-39': [4, 13],
-                '40-44': [1, 4],
-                '45+': [3, 1],
-                '<25': [40, 160],
-              },
-            },
-          },
-          '2025-10-02': {
-            collaborator: {
-              bu: { BO: 34, DB: 11, INCT: 6, PY: 33, VNGG: 113, VRC: 2, ZPS: 5, Zalo: 198 },
-              fam: {
-                'Business Operations': 110,
-                Data: 8,
-                'Game Development': 3,
-                Marketing: 75,
-                Product: 151,
-                Sales: 26,
-                Tech: 29,
-              },
-              pyr: {
-                '25-29': [49, 86],
-                '30-34': [17, 17],
-                '35-39': [9, 4],
-                '40-44': [9, 1],
-                '45+': [8, 1],
-                '<25': [70, 131],
-              },
-            },
-            fresher: {
-              bu: { PY: 15, Zalo: 49 },
-              fam: { Data: 5, Product: 11, Tech: 48 },
-              pyr: { '25-29': [0, 1], '<25': [52, 11] },
-            },
-            internship: {
-              bu: { '(Other)': 2, BO: 11, DB: 22, INCT: 1, PY: 17, VNGG: 41, VRC: 11, Zalo: 25 },
-              fam: {
-                'Business Operations': 19,
-                Data: 11,
-                'Game Development': 5,
-                Marketing: 24,
-                Product: 18,
-                Sales: 7,
-                Tech: 46,
-              },
-              pyr: { '25-29': [4, 1], '<25': [67, 58] },
-            },
-            official: {
-              bu: { '(Other)': 33, BO: 248, DB: 207, INCT: 50, PY: 553, VNGG: 903, VRC: 59, ZPS: 244, Zalo: 836 },
-              fam: {
-                'Business Operations': 442,
-                Data: 132,
-                Executive: 10,
-                'Game Development': 300,
-                Marketing: 430,
-                Product: 665,
-                Sales: 157,
-                Tech: 997,
-              },
-              pyr: {
-                '25-29': [746, 424],
-                '30-34': [493, 328],
-                '35-39': [295, 177],
-                '40-44': [175, 86],
-                '45+': [76, 28],
-                '<25': [189, 116],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 2, BO: 12, DB: 4, INCT: 4, PY: 74, VNGG: 60, VRC: 4, ZPS: 11, Zalo: 51 },
-              fam: {
-                'Business Operations': 30,
-                Data: 15,
-                'Game Development': 14,
-                Marketing: 38,
-                Product: 41,
-                Sales: 10,
-                Tech: 74,
-              },
-              pyr: { '25-29': [43, 42], '30-34': [19, 16], '35-39': [7, 3], '40-44': [3, 1], '<25': [65, 23] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 1, INCT: 1, PY: 27, VNGG: 18, VRC: 2, Zalo: 268 },
-              fam: { 'Business Operations': 48, Data: 2, Executive: 1, Marketing: 8, Product: 257, Sales: 1, Tech: 3 },
-              pyr: {
-                '25-29': [28, 62],
-                '30-34': [5, 15],
-                '35-39': [2, 5],
-                '40-44': [1, 2],
-                '45+': [2, 0],
-                '<25': [40, 158],
-              },
-            },
-          },
-          '2025-11-03': {
-            collaborator: {
-              bu: { BO: 34, DB: 12, INCT: 6, PY: 37, VNGG: 115, VRC: 2, ZPS: 6, Zalo: 199 },
-              fam: {
-                'Business Operations': 113,
-                Data: 8,
-                'Game Development': 4,
-                Marketing: 77,
-                Product: 153,
-                Sales: 24,
-                Tech: 32,
-              },
-              pyr: {
-                '25-29': [53, 88],
-                '30-34': [17, 19],
-                '35-39': [8, 3],
-                '40-44': [9, 1],
-                '45+': [8, 1],
-                '<25': [76, 128],
-              },
-            },
-            fresher: { bu: { ZPS: 9, Zalo: 45 }, fam: { Data: 5, Product: 20, Tech: 29 }, pyr: { '<25': [38, 16] } },
-            internship: {
-              bu: { '(Other)': 2, BO: 11, DB: 17, INCT: 2, PY: 15, VNGG: 53, VRC: 12, ZPS: 1, Zalo: 26 },
-              fam: {
-                'Business Operations': 18,
-                Data: 9,
-                'Game Development': 7,
-                Marketing: 23,
-                Product: 14,
-                Sales: 6,
-                Tech: 62,
-              },
-              pyr: { '25-29': [3, 0], '<25': [80, 56] },
-            },
-            official: {
-              bu: { '(Other)': 34, BO: 254, DB: 202, INCT: 50, PY: 567, VNGG: 910, VRC: 60, ZPS: 249, Zalo: 833 },
-              fam: {
-                'Business Operations': 450,
-                Data: 135,
-                Executive: 10,
-                'Game Development': 306,
-                Marketing: 436,
-                Product: 674,
-                Sales: 155,
-                Tech: 993,
-              },
-              pyr: {
-                '25-29': [739, 429],
-                '30-34': [490, 330],
-                '35-39': [293, 178],
-                '40-44': [173, 86],
-                '45+': [76, 28],
-                '<25': [207, 130],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 3, BO: 12, DB: 6, INCT: 5, PY: 61, VNGG: 60, VRC: 7, ZPS: 2, Zalo: 49 },
-              fam: {
-                'Business Operations': 31,
-                Data: 14,
-                'Game Development': 10,
-                Marketing: 29,
-                Product: 32,
-                Sales: 14,
-                Tech: 75,
-              },
-              pyr: {
-                '25-29': [44, 39],
-                '30-34': [20, 21],
-                '35-39': [5, 4],
-                '40-44': [3, 2],
-                '45+': [1, 0],
-                '<25': [51, 15],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 1, INCT: 1, PY: 23, VNGG: 20, VRC: 2, Zalo: 266 },
-              fam: { 'Business Operations': 43, Data: 5, Executive: 1, Marketing: 8, Product: 254, Sales: 1, Tech: 4 },
-              pyr: {
-                '25-29': [28, 66],
-                '30-34': [7, 15],
-                '35-39': [2, 4],
-                '40-44': [1, 2],
-                '45+': [2, 0],
-                '<25': [37, 152],
-              },
-            },
-          },
-          '2025-12-02': {
-            collaborator: {
-              bu: { BO: 32, DB: 11, INCT: 7, PY: 39, VNGG: 115, VRC: 3, ZPS: 7, Zalo: 215 },
-              fam: {
-                'Business Operations': 117,
-                Data: 8,
-                'Game Development': 4,
-                Marketing: 77,
-                Product: 154,
-                Sales: 35,
-                Tech: 34,
-              },
-              pyr: {
-                '25-29': [56, 91],
-                '30-34': [16, 19],
-                '35-39': [8, 4],
-                '40-44': [10, 1],
-                '45+': [8, 1],
-                '<25': [78, 137],
-              },
-            },
-            fresher: { bu: { ZPS: 9, Zalo: 43 }, fam: { Data: 3, Product: 20, Tech: 29 }, pyr: { '<25': [36, 16] } },
-            internship: {
-              bu: { '(Other)': 3, BO: 8, DB: 15, INCT: 2, PY: 16, VNGG: 62, VRC: 12, ZPS: 1, Zalo: 23 },
-              fam: {
-                'Business Operations': 19,
-                Data: 7,
-                'Game Development': 8,
-                Marketing: 24,
-                Product: 19,
-                Sales: 6,
-                Tech: 59,
-              },
-              pyr: { '25-29': [2, 0], '<25': [80, 60] },
-            },
-            official: {
-              bu: { '(Other)': 34, BO: 257, DB: 194, INCT: 47, PY: 603, VNGG: 935, VRC: 68, ZPS: 248, Zalo: 859 },
-              fam: {
-                'Business Operations': 462,
-                Data: 137,
-                Executive: 10,
-                'Game Development': 309,
-                Marketing: 451,
-                Product: 691,
-                Sales: 154,
-                Tech: 1031,
-              },
-              pyr: {
-                '25-29': [749, 446],
-                '30-34': [491, 336],
-                '35-39': [298, 178],
-                '40-44': [171, 86],
-                '45+': [72, 28],
-                '<25': [248, 142],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 2, BO: 11, DB: 5, INCT: 7, PY: 27, VNGG: 46, VRC: 6, Zalo: 39 },
-              fam: {
-                'Business Operations': 25,
-                Data: 13,
-                'Game Development': 7,
-                Marketing: 29,
-                Product: 21,
-                Sales: 14,
-                Tech: 34,
-              },
-              pyr: {
-                '25-29': [38, 29],
-                '30-34': [14, 17],
-                '35-39': [3, 5],
-                '40-44': [3, 2],
-                '45+': [1, 0],
-                '<25': [16, 15],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 4, DB: 1, INCT: 1, PY: 17, VNGG: 20, VRC: 2, Zalo: 269 },
-              fam: {
-                'Business Operations': 37,
-                Data: 6,
-                Executive: 1,
-                'Game Development': 1,
-                Marketing: 8,
-                Product: 255,
-                Sales: 1,
-                Tech: 6,
-              },
-              pyr: {
-                '25-29': [24, 66],
-                '30-34': [7, 13],
-                '35-39': [2, 4],
-                '40-44': [1, 2],
-                '45+': [2, 0],
-                '<25': [34, 160],
-              },
-            },
-          },
-          '2025-12-30': {
-            collaborator: {
-              bu: { BO: 33, DB: 11, INCT: 8, PY: 41, VNGG: 120, VRC: 3, ZPS: 7, Zalo: 226 },
-              fam: {
-                'Business Operations': 121,
-                Data: 10,
-                'Game Development': 6,
-                Marketing: 82,
-                Product: 154,
-                Sales: 39,
-                Tech: 37,
-              },
-              pyr: {
-                '25-29': [55, 93],
-                '30-34': [17, 19],
-                '35-39': [9, 5],
-                '40-44': [10, 1],
-                '45+': [8, 1],
-                '<25': [83, 148],
-              },
-            },
-            fresher: { bu: { ZPS: 7, Zalo: 43 }, fam: { Data: 4, Product: 18, Tech: 28 }, pyr: { '<25': [35, 15] } },
-            internship: {
-              bu: { '(Other)': 3, BO: 8, DB: 15, INCT: 2, PY: 16, VNGG: 63, VRC: 13, ZPS: 1, Zalo: 20 },
-              fam: {
-                'Business Operations': 18,
-                Data: 7,
-                'Game Development': 9,
-                Marketing: 29,
-                Product: 19,
-                Sales: 1,
-                Tech: 58,
-              },
-              pyr: { '25-29': [2, 0], '<25': [81, 58] },
-            },
-            official: {
-              bu: { '(Other)': 36, BO: 263, DB: 199, INCT: 50, PY: 609, VNGG: 947, VRC: 72, ZPS: 246, Zalo: 896 },
-              fam: {
-                'Business Operations': 472,
-                Data: 143,
-                Executive: 11,
-                'Game Development': 311,
-                Marketing: 454,
-                Product: 696,
-                Sales: 161,
-                Tech: 1070,
-              },
-              pyr: {
-                '25-29': [765, 455],
-                '30-34': [492, 345],
-                '35-39': [294, 178],
-                '40-44': [173, 87],
-                '45+': [74, 27],
-                '<25': [281, 147],
-              },
-            },
-            probation: {
-              bu: { BO: 10, DB: 1, INCT: 8, PY: 23, VNGG: 37, VRC: 6, ZPS: 5, Zalo: 38 },
-              fam: {
-                'Business Operations': 24,
-                Data: 12,
-                'Game Development': 5,
-                Marketing: 24,
-                Product: 28,
-                Sales: 8,
-                Tech: 27,
-              },
-              pyr: { '25-29': [31, 31], '30-34': [8, 14], '35-39': [3, 2], '40-44': [4, 2], '<25': [17, 16] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 4, DB: 1, INCT: 1, PY: 18, VNGG: 18, VRC: 2, Zalo: 295 },
-              fam: {
-                'Business Operations': 38,
-                Data: 6,
-                Executive: 1,
-                'Game Development': 1,
-                Marketing: 8,
-                Product: 280,
-                Sales: 1,
-                Tech: 5,
-              },
-              pyr: {
-                '25-29': [24, 72],
-                '30-34': [5, 13],
-                '35-39': [1, 4],
-                '40-44': [1, 1],
-                '45+': [2, 0],
-                '<25': [39, 178],
-              },
-            },
-          },
-          '2026-02-02': {
-            collaborator: {
-              bu: { BO: 32, DB: 11, INCT: 7, PY: 42, VNGG: 133, VRC: 3, ZPS: 7, Zalo: 231 },
-              fam: {
-                'Business Operations': 124,
-                Data: 10,
-                'Game Development': 6,
-                Marketing: 86,
-                Product: 154,
-                Sales: 37,
-                Tech: 49,
-              },
-              pyr: {
-                '25-29': [80, 122],
-                '30-34': [21, 24],
-                '35-39': [11, 5],
-                '40-44': [8, 2],
-                '45+': [9, 1],
-                '<25': [66, 117],
-              },
-            },
-            fresher: { bu: { Zalo: 12 }, fam: { Data: 2, Product: 10 }, pyr: { '<25': [4, 8] } },
-            internship: {
-              bu: { '(Other)': 3, BO: 7, DB: 14, INCT: 2, PY: 15, VNGG: 64, VRC: 14, ZPS: 1, Zalo: 19 },
-              fam: {
-                'Business Operations': 17,
-                Data: 7,
-                'Game Development': 11,
-                Marketing: 30,
-                Product: 16,
-                Sales: 2,
-                Tech: 56,
-              },
-              pyr: { '25-29': [1, 0], '<25': [84, 54] },
-            },
-            official: {
-              bu: { '(Other)': 35, BO: 270, DB: 195, INCT: 51, PY: 627, VNGG: 957, VRC: 70, ZPS: 245, Zalo: 909 },
-              fam: {
-                'Business Operations': 487,
-                Data: 148,
-                Executive: 10,
-                'Game Development': 314,
-                Marketing: 462,
-                Product: 701,
-                Sales: 164,
-                Tech: 1073,
-              },
-              pyr: {
-                '25-29': [723, 445],
-                '30-34': [585, 402],
-                '35-39': [353, 201],
-                '40-44': [179, 100],
-                '45+': [95, 36],
-                '<25': [157, 83],
-              },
-            },
-            probation: {
-              bu: { BO: 7, DB: 3, INCT: 7, PY: 14, VNGG: 31, VRC: 8, ZPS: 6, Zalo: 27 },
-              fam: {
-                'Business Operations': 19,
-                Data: 7,
-                'Game Development': 4,
-                Marketing: 13,
-                Product: 30,
-                Sales: 7,
-                Tech: 23,
-              },
-              pyr: { '25-29': [20, 21], '30-34': [13, 15], '35-39': [4, 2], '40-44': [3, 1], '<25': [14, 10] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 4, DB: 2, INCT: 1, PY: 22, VNGG: 18, VRC: 2, ZPS: 1, Zalo: 312 },
-              fam: {
-                'Business Operations': 42,
-                Data: 5,
-                Executive: 1,
-                'Game Development': 2,
-                Marketing: 8,
-                Product: 299,
-                Sales: 1,
-                Tech: 5,
-              },
-              pyr: {
-                '25-29': [31, 107],
-                '30-34': [6, 26],
-                '35-39': [2, 6],
-                '40-44': [2, 1],
-                '45+': [2, 0],
-                '<25': [39, 141],
-              },
-            },
-          },
-          '2026-02-27': {
-            collaborator: {
-              bu: { BO: 32, DB: 13, INCT: 7, PY: 34, VNGG: 132, VRC: 1, ZPS: 7, Zalo: 227 },
-              fam: {
-                'Business Operations': 115,
-                Data: 10,
-                'Game Development': 6,
-                Marketing: 87,
-                Product: 151,
-                Sales: 35,
-                Tech: 49,
-              },
-              pyr: {
-                '25-29': [77, 115],
-                '30-34': [21, 24],
-                '35-39': [9, 5],
-                '40-44': [7, 2],
-                '45+': [9, 1],
-                '<25': [69, 114],
-              },
-            },
-            fresher: { bu: { Zalo: 12 }, fam: { Data: 2, Product: 10 }, pyr: { '<25': [4, 8] } },
-            internship: {
-              bu: { '(Other)': 3, BO: 5, DB: 10, INCT: 2, PY: 12, VNGG: 46, VRC: 10, Zalo: 14 },
-              fam: {
-                'Business Operations': 17,
-                Data: 5,
-                'Game Development': 9,
-                Marketing: 24,
-                Product: 17,
-                Sales: 3,
-                Tech: 27,
-              },
-              pyr: { '<25': [53, 49] },
-            },
-            official: {
-              bu: { '(Other)': 35, BO: 275, DB: 188, INCT: 54, PY: 626, VNGG: 968, VRC: 65, ZPS: 249, Zalo: 910 },
-              fam: {
-                'Business Operations': 498,
-                Data: 147,
-                Executive: 10,
-                'Game Development': 315,
-                Marketing: 470,
-                Product: 701,
-                Sales: 163,
-                Tech: 1066,
-              },
-              pyr: {
-                '25-29': [718, 451],
-                '30-34': [583, 408],
-                '35-39': [354, 202],
-                '40-44': [179, 101],
-                '45+': [94, 35],
-                '<25': [157, 88],
-              },
-            },
-            probation: {
-              bu: { BO: 3, DB: 6, INCT: 4, PY: 13, VNGG: 31, VRC: 4, ZPS: 1, Zalo: 26 },
-              fam: {
-                'Business Operations': 18,
-                Data: 3,
-                'Game Development': 2,
-                Marketing: 11,
-                Product: 23,
-                Sales: 6,
-                Tech: 25,
-              },
-              pyr: { '25-29': [17, 15], '30-34': [13, 9], '35-39': [3, 2], '40-44': [1, 0], '<25': [18, 10] },
-            },
-            service_contract: {
-              bu: { BO: 3, DB: 3, INCT: 1, PY: 20, VNGG: 10, VRC: 1, ZPS: 2, Zalo: 275 },
-              fam: {
-                'Business Operations': 40,
-                Data: 5,
-                'Game Development': 2,
-                Marketing: 8,
-                Product: 254,
-                Sales: 1,
-                Tech: 5,
-              },
-              pyr: {
-                '25-29': [26, 92],
-                '30-34': [5, 20],
-                '35-39': [3, 3],
-                '40-44': [1, 1],
-                '45+': [1, 0],
-                '<25': [36, 127],
-              },
-            },
-          },
-          '2026-04-01': {
-            collaborator: {
-              bu: { BO: 34, DB: 15, INCT: 6, PY: 35, VNGG: 133, VRC: 1, ZPS: 7, Zalo: 235 },
-              fam: {
-                'Business Operations': 119,
-                Data: 9,
-                'Game Development': 9,
-                Marketing: 89,
-                Product: 151,
-                Sales: 37,
-                Tech: 52,
-              },
-              pyr: {
-                '25-29': [74, 111],
-                '30-34': [19, 25],
-                '35-39': [9, 5],
-                '40-44': [7, 2],
-                '45+': [9, 1],
-                '<25': [75, 129],
-              },
-            },
-            fresher: { bu: { Zalo: 12 }, fam: { Data: 2, Product: 10 }, pyr: { '<25': [4, 8] } },
-            internship: {
-              bu: { '(Other)': 2, BO: 8, DB: 7, INCT: 2, PY: 11, VNGG: 38, VRC: 9, Zalo: 13 },
-              fam: {
-                'Business Operations': 14,
-                Data: 6,
-                'Game Development': 8,
-                Marketing: 17,
-                Product: 16,
-                Sales: 2,
-                Tech: 27,
-              },
-              pyr: { '<25': [47, 43] },
-            },
-            official: {
-              bu: { '(Other)': 34, BO: 277, DB: 191, INCT: 54, PY: 624, VNGG: 979, VRC: 69, ZPS: 249, Zalo: 923 },
-              fam: {
-                'Business Operations': 504,
-                Data: 149,
-                Executive: 10,
-                'Game Development': 315,
-                Marketing: 470,
-                Product: 712,
-                Sales: 164,
-                Tech: 1076,
-              },
-              pyr: {
-                '25-29': [722, 456],
-                '30-34': [584, 411],
-                '35-39': [353, 200],
-                '40-44': [178, 99],
-                '45+': [93, 35],
-                '<25': [170, 99],
-              },
-            },
-            probation: {
-              bu: { BO: 8, DB: 7, INCT: 6, PY: 18, VNGG: 35, VRC: 2, ZPS: 1, Zalo: 32 },
-              fam: {
-                'Business Operations': 25,
-                Data: 7,
-                'Game Development': 3,
-                Marketing: 17,
-                Product: 23,
-                Sales: 6,
-                Tech: 28,
-              },
-              pyr: { '25-29': [23, 19], '30-34': [15, 10], '35-39': [4, 2], '40-44': [3, 1], '<25': [15, 17] },
-            },
-            service_contract: {
-              bu: { BO: 3, DB: 2, INCT: 1, PY: 21, VNGG: 9, VRC: 1, ZPS: 2, Zalo: 278 },
-              fam: {
-                'Business Operations': 41,
-                Data: 6,
-                'Game Development': 2,
-                Marketing: 9,
-                Product: 254,
-                Sales: 2,
-                Tech: 3,
-              },
-              pyr: {
-                '25-29': [23, 87],
-                '30-34': [5, 22],
-                '35-39': [4, 3],
-                '40-44': [1, 2],
-                '45+': [1, 0],
-                '<25': [36, 133],
-              },
-            },
-          },
-          '2026-05-04': {
-            collaborator: {
-              bu: { BO: 34, DB: 15, INCT: 5, PY: 34, VNGG: 133, VRC: 1, ZPS: 7, Zalo: 244 },
-              fam: {
-                'Business Operations': 130,
-                Data: 8,
-                'Game Development': 9,
-                Marketing: 90,
-                Product: 147,
-                Sales: 38,
-                Tech: 51,
-              },
-              pyr: {
-                '25-29': [75, 110],
-                '30-34': [20, 24],
-                '35-39': [10, 5],
-                '40-44': [6, 2],
-                '45+': [9, 1],
-                '<25': [76, 135],
-              },
-            },
-            fresher: { bu: { Zalo: 2 }, fam: { Data: 2 }, pyr: { '<25': [1, 1] } },
-            internship: {
-              bu: { '(Other)': 2, BO: 8, DB: 23, INCT: 2, PY: 9, VNGG: 32, VRC: 9, Zalo: 9 },
-              fam: {
-                'Business Operations': 16,
-                Data: 12,
-                'Game Development': 7,
-                Marketing: 15,
-                Product: 11,
-                Sales: 2,
-                Tech: 31,
-              },
-              pyr: { '<25': [51, 43] },
-            },
-            official: {
-              bu: { '(Other)': 33, BO: 277, DB: 190, INCT: 54, PY: 604, VNGG: 970, VRC: 70, ZPS: 247, Zalo: 910 },
-              fam: {
-                'Business Operations': 505,
-                Data: 143,
-                Executive: 10,
-                'Game Development': 314,
-                Marketing: 463,
-                Product: 697,
-                Sales: 162,
-                Tech: 1061,
-              },
-              pyr: {
-                '25-29': [710, 455],
-                '30-34': [577, 399],
-                '35-39': [348, 198],
-                '40-44': [175, 98],
-                '45+': [93, 35],
-                '<25': [169, 98],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 3, BO: 14, DB: 4, INCT: 6, PY: 26, VNGG: 43, VRC: 6, ZPS: 1, Zalo: 50 },
-              fam: {
-                'Business Operations': 33,
-                Data: 8,
-                'Game Development': 6,
-                Marketing: 24,
-                Product: 36,
-                Sales: 9,
-                Tech: 37,
-              },
-              pyr: {
-                '25-29': [35, 26],
-                '30-34': [17, 16],
-                '35-39': [4, 4],
-                '40-44': [5, 2],
-                '45+': [1, 0],
-                '<25': [21, 22],
-              },
-            },
-            service_contract: {
-              bu: { BO: 3, DB: 3, INCT: 1, PY: 21, VNGG: 7, VRC: 1, ZPS: 1, Zalo: 293 },
-              fam: {
-                'Business Operations': 40,
-                Data: 6,
-                'Game Development': 2,
-                Marketing: 28,
-                Product: 248,
-                Sales: 2,
-                Tech: 4,
-              },
-              pyr: {
-                '25-29': [23, 86],
-                '30-34': [11, 22],
-                '35-39': [4, 8],
-                '40-44': [2, 4],
-                '45+': [1, 1],
-                '<25': [39, 129],
-              },
-            },
-          },
-          '2026-05-27': {
-            collaborator: {
-              bu: { BO: 34, DB: 15, INCT: 5, PY: 35, VNGG: 128, VRC: 1, ZPS: 7, Zalo: 237 },
-              fam: {
-                'Business Operations': 125,
-                Data: 8,
-                'Game Development': 9,
-                Marketing: 87,
-                Product: 145,
-                Sales: 36,
-                Tech: 52,
-              },
-              pyr: {
-                '25-29': [71, 102],
-                '30-34': [19, 24],
-                '35-39': [10, 5],
-                '40-44': [6, 2],
-                '45+': [9, 1],
-                '<25': [78, 135],
-              },
-            },
-            fresher: { bu: { ZPS: 7, Zalo: 1 }, fam: { Data: 1, Product: 7 }, pyr: { '<25': [2, 6] } },
-            internship: {
-              bu: { '(Other)': 2, BO: 6, DB: 22, INCT: 1, PY: 9, VNGG: 33, VRC: 9, ZPS: 8, Zalo: 17 },
-              fam: {
-                'Business Operations': 16,
-                Data: 12,
-                'Game Development': 13,
-                Marketing: 14,
-                Product: 15,
-                Sales: 2,
-                Tech: 35,
-              },
-              pyr: { '<25': [62, 45] },
-            },
-            official: {
-              bu: { '(Other)': 33, BO: 278, DB: 185, INCT: 58, PY: 600, VNGG: 945, VRC: 69, ZPS: 238, Zalo: 914 },
-              fam: {
-                'Business Operations': 507,
-                Data: 141,
-                Executive: 10,
-                'Game Development': 309,
-                Marketing: 446,
-                Product: 687,
-                Sales: 160,
-                Tech: 1060,
-              },
-              pyr: {
-                '25-29': [701, 442],
-                '30-34': [566, 391],
-                '35-39': [338, 194],
-                '40-44': [174, 99],
-                '45+': [91, 35],
-                '<25': [176, 113],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 3, BO: 19, DB: 8, INCT: 2, PY: 25, VNGG: 46, VRC: 4, Zalo: 51 },
-              fam: {
-                'Business Operations': 36,
-                Data: 10,
-                'Game Development': 4,
-                Marketing: 23,
-                Product: 36,
-                Sales: 7,
-                Tech: 42,
-              },
-              pyr: {
-                '25-29': [38, 27],
-                '30-34': [23, 20],
-                '35-39': [5, 5],
-                '40-44': [4, 1],
-                '45+': [1, 0],
-                '<25': [18, 16],
-              },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 3, DB: 3, INCT: 1, PY: 21, VNGG: 4, VRC: 1, ZPS: 1, Zalo: 276 },
-              fam: {
-                'Business Operations': 40,
-                Data: 7,
-                'Game Development': 2,
-                Marketing: 33,
-                Product: 223,
-                Sales: 2,
-                Tech: 4,
-              },
-              pyr: {
-                '25-29': [22, 75],
-                '30-34': [11, 21],
-                '35-39': [5, 8],
-                '40-44': [2, 4],
-                '45+': [2, 3],
-                '<25': [33, 125],
-              },
-            },
-          },
-          '2026-06-30': {
-            collaborator: {
-              bu: { BO: 34, DB: 13, INCT: 5, PY: 41, VNGG: 126, ZPS: 7, Zalo: 233 },
-              fam: {
-                'Business Operations': 124,
-                Data: 8,
-                'Game Development': 9,
-                Marketing: 85,
-                Product: 146,
-                Sales: 37,
-                Tech: 50,
-              },
-              pyr: {
-                '25-29': [68, 99],
-                '30-34': [19, 22],
-                '35-39': [11, 4],
-                '40-44': [5, 2],
-                '45+': [9, 1],
-                '<25': [80, 139],
-              },
-            },
-            fresher: {
-              bu: { VNGG: 38, ZPS: 7, Zalo: 1 },
-              fam: { 'Business Operations': 38, Data: 1, Product: 7 },
-              pyr: { '25-29': [1, 0], '<25': [28, 17] },
-            },
-            internship: {
-              bu: { '(Other)': 2, BO: 7, DB: 23, INCT: 3, PY: 8, VNGG: 36, VRC: 9, ZPS: 11, Zalo: 19 },
-              fam: {
-                'Business Operations': 15,
-                Data: 17,
-                'Game Development': 19,
-                Marketing: 13,
-                Product: 14,
-                Sales: 2,
-                Tech: 38,
-              },
-              pyr: { '<25': [70, 48] },
-            },
-            official: {
-              bu: { '(Other)': 34, BO: 279, DB: 183, INCT: 57, PY: 606, VNGG: 949, VRC: 73, ZPS: 235, Zalo: 922 },
-              fam: {
-                'Business Operations': 513,
-                Data: 138,
-                Executive: 10,
-                'Game Development': 313,
-                Marketing: 448,
-                Product: 694,
-                Sales: 166,
-                Tech: 1056,
-              },
-              pyr: {
-                '25-29': [701, 443],
-                '30-34': [565, 391],
-                '35-39': [335, 196],
-                '40-44': [174, 100],
-                '45+': [92, 35],
-                '<25': [184, 122],
-              },
-            },
-            probation: {
-              bu: { '(Other)': 1, BO: 17, DB: 14, INCT: 2, PY: 24, VNGG: 40, ZPS: 1, Zalo: 46 },
-              fam: { 'Business Operations': 31, Data: 15, Marketing: 25, Product: 26, Sales: 6, Tech: 42 },
-              pyr: { '25-29': [32, 24], '30-34': [22, 20], '35-39': [5, 3], '40-44': [5, 0], '<25': [21, 13] },
-            },
-            service_contract: {
-              bu: { '(Other)': 1, BO: 2, DB: 4, INCT: 1, PY: 21, VNGG: 4, VRC: 1, Zalo: 267 },
-              fam: {
-                'Business Operations': 43,
-                Data: 8,
-                'Game Development': 1,
-                Marketing: 33,
-                Product: 212,
-                Sales: 2,
-                Tech: 2,
-              },
-              pyr: {
-                '25-29': [20, 72],
-                '30-34': [12, 18],
-                '35-39': [4, 9],
-                '40-44': [2, 4],
-                '45+': [2, 3],
-                '<25': [31, 124],
-              },
-            },
-          },
-        },
-      };
-    </script>
+<script>window.FACTS = {"snaps":["2025-02-04","2025-03-04","2025-04-01","2025-07-01","2025-08-01","2025-09-03","2025-10-02","2025-11-03","2025-12-02","2025-12-30","2026-02-02","2026-02-27","2026-04-01","2026-05-04","2026-05-27","2026-06-30"],"market":{"2025-02-04":[4064,180],"2025-03-04":[4016,185],"2025-04-01":[4035,184],"2025-07-01":[4104,195],"2025-08-01":[4148,195],"2025-09-03":[4043,194],"2025-10-02":[4076,195],"2025-11-03":[4090,194],"2025-12-02":[4131,195],"2025-12-30":[4231,195],"2026-02-02":[4259,183],"2026-02-27":[4160,180],"2026-04-01":[4222,172],"2026-05-04":[4244,163],"2026-05-27":[4228,138],"2026-06-30":[4275,132]},"data":{"2025-02-04":{"collaborator":{"bu":{"(Other)":5,"BO":27,"DB":13,"INCT":7,"PY":27,"VNGG":73,"ZPS":5,"Zalo":200},"fam":{"Business Support":112,"Data":8,"Marketing":64,"Product":117,"Sales":20,"Tech":36},"pyr":{"25-29":[61,90],"30-34":[16,20],"35-39":[11,5],"40-44":[6,1],"45+":[8,2],"<25":[49,88]}},"internship":{"bu":{"BO":8,"DB":15,"PY":16,"VNGG":10,"Zalo":13},"fam":{"Business Support":7,"Data":8,"Marketing":11,"Product":13,"Sales":3,"Tech":20},"pyr":{"<25":[37,25]}},"official":{"bu":{"(Other)":46,"BO":236,"DB":315,"INCT":107,"PY":565,"SMT":9,"VNGG":872,"ZPS":293,"Zalo":884},"fam":{"Business Support":465,"Data":160,"Executive":9,"Marketing":437,"Product":779,"Sales":168,"Tech":1309},"pyr":{"25-29":[856,441],"30-34":[555,338],"35-39":[326,191],"40-44":[190,90],"45+":[81,28],"<25":[146,85]}},"probation":{"bu":{"(Other)":1,"BO":3,"DB":1,"INCT":32,"PY":8,"VNGG":16,"Zalo":10},"fam":{"Business Support":16,"Data":5,"Marketing":11,"Product":7,"Sales":4,"Tech":28},"pyr":{"25-29":[17,13],"30-34":[12,7],"35-39":[7,2],"40-44":[2,0],"45+":[0,1],"<25":[7,3]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":2,"INCT":2,"PY":24,"VNGG":57,"Zalo":339},"fam":{"Business Support":63,"Data":3,"Executive":1,"Marketing":15,"Product":341,"Sales":1,"Tech":3},"pyr":{"25-29":[31,79],"30-34":[14,26],"35-39":[8,13],"40-44":[1,5],"45+":[3,1],"<25":[43,203]}}},"2025-03-04":{"collaborator":{"bu":{"(Other)":6,"BO":26,"DB":12,"INCT":5,"PY":18,"VNGG":70,"ZPS":5,"Zalo":201},"fam":{"Business Support":101,"Data":7,"Marketing":63,"Product":121,"Sales":21,"Tech":30},"pyr":{"25-29":[53,84],"30-34":[14,19],"35-39":[10,5],"40-44":[6,1],"45+":[9,2],"<25":[50,90]}},"internship":{"bu":{"BO":7,"DB":15,"INCT":3,"PY":13,"VNGG":14,"Zalo":8},"fam":{"Business Support":8,"Data":8,"Marketing":11,"Product":9,"Sales":3,"Tech":21},"pyr":{"<25":[36,24]}},"official":{"bu":{"(Other)":52,"BO":231,"DB":285,"INCT":141,"PY":552,"SMT":1,"VNGG":873,"ZPS":291,"Zalo":876},"fam":{"Business Support":463,"Data":163,"Executive":9,"Marketing":436,"Product":772,"Sales":160,"Tech":1299},"pyr":{"25-29":[850,437],"30-34":[550,336],"35-39":[321,189],"40-44":[188,88],"45+":[79,27],"<25":[151,86]}},"probation":{"bu":{"BO":5,"DB":2,"INCT":28,"PY":16,"VNGG":28,"Zalo":13},"fam":{"Business Support":21,"Data":6,"Marketing":12,"Product":14,"Sales":9,"Tech":30},"pyr":{"25-29":[25,19],"30-34":[13,7],"35-39":[8,2],"40-44":[3,1],"45+":[0,1],"<25":[8,5]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":3,"INCT":2,"PY":24,"VNGG":58,"Zalo":314},"fam":{"Business Support":61,"Data":3,"Executive":1,"Marketing":14,"Product":320,"Sales":1,"Tech":4},"pyr":{"25-29":[31,76],"30-34":[14,26],"35-39":[7,13],"40-44":[1,5],"45+":[4,1],"<25":[41,185]}}},"2025-04-01":{"collaborator":{"bu":{"(Other)":5,"BO":27,"DB":12,"INCT":5,"PY":20,"VNGG":77,"ZPS":5,"Zalo":200},"fam":{"Business Support":108,"Data":5,"Marketing":65,"Product":121,"Sales":20,"Tech":32},"pyr":{"25-29":[52,85],"30-34":[14,19],"35-39":[10,4],"40-44":[7,1],"45+":[9,2],"<25":[54,94]}},"fresher":{"bu":{"Zalo":2},"fam":{"Tech":2},"pyr":{"<25":[2,0]}},"internship":{"bu":{"(Other)":1,"BO":6,"DB":14,"INCT":3,"PY":12,"VNGG":23,"Zalo":5},"fam":{"Business Support":9,"Data":11,"Marketing":9,"Product":6,"Sales":3,"Tech":26},"pyr":{"<25":[41,23]}},"official":{"bu":{"(Other)":44,"BO":232,"DB":279,"INCT":149,"PY":548,"VNGG":884,"ZPS":290,"Zalo":863},"fam":{"Business Support":473,"Data":157,"Executive":9,"Marketing":437,"Product":767,"Sales":156,"Tech":1290},"pyr":{"25-29":[839,440],"30-34":[548,337],"35-39":[318,187],"40-44":[186,88],"45+":[78,27],"<25":[150,91]}},"probation":{"bu":{"BO":7,"DB":4,"INCT":25,"PY":20,"VNGG":35,"Zalo":17},"fam":{"Business Support":19,"Data":9,"Marketing":19,"Product":17,"Sales":10,"Tech":34},"pyr":{"25-29":[33,10],"30-34":[14,14],"35-39":[7,1],"40-44":[4,3],"45+":[1,1],"<25":[16,4]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":4,"INCT":2,"PY":32,"VNGG":57,"Zalo":307},"fam":{"Business Support":69,"Data":3,"Executive":1,"Marketing":13,"Product":312,"Sales":1,"Tech":6},"pyr":{"25-29":[34,74],"30-34":[14,26],"35-39":[8,12],"40-44":[1,4],"45+":[4,1],"<25":[40,187]}}},"2025-07-01":{"collaborator":{"bu":{"(Other)":5,"BO":26,"DB":12,"INCT":2,"PY":27,"VNGG":93,"ZPS":8,"Zalo":189},"fam":{"Business Support":109,"Data":5,"Marketing":66,"Product":127,"Sales":20,"Tech":35},"pyr":{"25-29":[49,78],"30-34":[18,19],"35-39":[10,4],"40-44":[7,1],"45+":[8,2],"<25":[62,104]}},"fresher":{"bu":{"PY":16,"ZPS":29,"Zalo":8},"fam":{"Data":5,"Product":17,"Tech":31},"pyr":{"25-29":[1,1],"<25":[43,8]}},"internship":{"bu":{"(Other)":1,"BO":6,"DB":28,"INCT":2,"PY":14,"VNGG":44,"Zalo":15},"fam":{"Business Support":11,"Data":11,"Marketing":18,"Product":22,"Sales":4,"Tech":44},"pyr":{"25-29":[2,1],"<25":[70,37]}},"official":{"bu":{"(Other)":44,"BO":245,"DB":272,"INCT":178,"PY":586,"VNGG":923,"ZPS":272,"Zalo":881},"fam":{"Business Support":501,"Data":155,"Executive":9,"Marketing":460,"Product":789,"Sales":171,"Tech":1316},"pyr":{"25-29":[846,472],"30-34":[545,342],"35-39":[318,185],"40-44":[185,87],"45+":[77,29],"<25":[198,117]}},"probation":{"bu":{"INCT":5,"PY":3,"VNGG":5},"fam":{"Business Support":2,"Marketing":3,"Product":3,"Sales":3,"Tech":2},"pyr":{"25-29":[2,2],"30-34":[1,0],"35-39":[0,1],"40-44":[3,1],"45+":[2,0],"<25":[0,1]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":3,"INCT":1,"PY":33,"VNGG":50,"Zalo":270},"fam":{"Business Support":67,"Data":2,"Executive":1,"Marketing":13,"Product":272,"Sales":2,"Tech":3},"pyr":{"25-29":[27,67],"30-34":[10,21],"35-39":[7,11],"40-44":[1,4],"45+":[3,1],"<25":[43,165]}}},"2025-08-01":{"collaborator":{"bu":{"BO":31,"DB":14,"INCT":5,"PY":28,"VNGG":96,"ZPS":8,"Zalo":198},"fam":{"Business Support":120,"Data":6,"Marketing":65,"Product":134,"Sales":23,"Tech":32},"pyr":{"25-29":[46,84],"30-34":[19,19],"35-39":[10,5],"40-44":[8,1],"45+":[7,2],"<25":[64,115]}},"fresher":{"bu":{"PY":15,"ZPS":22,"Zalo":9},"fam":{"Data":5,"Product":11,"Tech":30},"pyr":{"25-29":[0,1],"<25":[40,5]}},"internship":{"bu":{"BO":11,"DB":33,"INCT":2,"PY":12,"VNGG":48,"Zalo":21},"fam":{"Business Support":17,"Data":11,"Marketing":21,"Product":26,"Sales":6,"Tech":46},"pyr":{"25-29":[3,1],"<25":[78,45]}},"official":{"bu":{"(Other)":36,"BO":254,"DB":275,"INCT":169,"PY":602,"VNGG":932,"ZPS":269,"Zalo":887},"fam":{"Business Support":503,"Data":162,"Executive":10,"Game Development":3,"Marketing":464,"Product":796,"Sales":171,"Tech":1315},"pyr":{"25-29":[845,474],"30-34":[540,347],"35-39":[316,186],"40-44":[183,87],"45+":[77,29],"<25":[214,126]}},"probation":{"bu":{"INCT":6,"VNGG":6},"fam":{"Business Support":4,"Marketing":4,"Product":1,"Sales":2,"Tech":1},"pyr":{"25-29":[2,2],"30-34":[2,0],"35-39":[0,1],"40-44":[2,1],"45+":[1,0],"<25":[0,1]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":3,"INCT":1,"PY":37,"VNGG":48,"Zalo":262},"fam":{"Business Support":68,"Data":1,"Executive":1,"Marketing":12,"Product":267,"Sales":2,"Tech":3},"pyr":{"25-29":[26,66],"30-34":[9,22],"35-39":[7,13],"40-44":[1,4],"45+":[3,1],"<25":[43,159]}}},"2025-09-03":{"collaborator":{"bu":{"BO":34,"DB":14,"INCT":6,"PY":32,"VNGG":112,"ZPS":8,"Zalo":199},"fam":{"Business Operations":106,"Data":5,"Game Development":5,"Marketing":76,"Product":156,"Sales":28,"Tech":29},"pyr":{"25-29":[53,87],"30-34":[20,20],"35-39":[10,6],"40-44":[9,1],"45+":[8,1],"<25":[67,123]}},"fresher":{"bu":{"PY":15,"Zalo":7},"fam":{"Data":3,"Tech":19},"pyr":{"25-29":[0,1],"<25":[20,1]}},"internship":{"bu":{"(Other)":2,"BO":11,"DB":32,"INCT":1,"PY":14,"VNGG":42,"Zalo":22},"fam":{"Business Operations":15,"Data":10,"Game Development":5,"Marketing":24,"Product":17,"Sales":6,"Tech":47},"pyr":{"25-29":[2,1],"<25":[72,49]}},"official":{"bu":{"(Other)":35,"BO":258,"DB":273,"INCT":49,"PY":604,"VNGG":949,"ZPS":270,"Zalo":898},"fam":{"Business Operations":466,"Data":149,"Executive":10,"Game Development":311,"Marketing":465,"Product":717,"Sales":163,"Tech":1055},"pyr":{"25-29":[799,467],"30-34":[515,342],"35-39":[299,183],"40-44":[178,87],"45+":[75,28],"<25":[228,135]}},"probation":{"bu":{"INCT":4,"VNGG":7},"fam":{"Business Operations":4,"Marketing":4,"Product":1,"Sales":2},"pyr":{"25-29":[2,3],"30-34":[2,0],"35-39":[0,1],"40-44":[1,0],"45+":[1,0],"<25":[0,1]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":2,"INCT":1,"PY":28,"VNGG":43,"Zalo":262},"fam":{"Business Operations":52,"Executive":1,"Marketing":10,"Product":273,"Sales":1,"Tech":2},"pyr":{"25-29":[25,61],"30-34":[8,19],"35-39":[4,13],"40-44":[1,4],"45+":[3,1],"<25":[40,160]}}},"2025-10-02":{"collaborator":{"bu":{"BO":34,"DB":11,"INCT":6,"PY":33,"VNGG":113,"VRC":2,"ZPS":5,"Zalo":198},"fam":{"Business Operations":110,"Data":8,"Game Development":3,"Marketing":75,"Product":151,"Sales":26,"Tech":29},"pyr":{"25-29":[49,86],"30-34":[17,17],"35-39":[9,4],"40-44":[9,1],"45+":[8,1],"<25":[70,131]}},"fresher":{"bu":{"PY":15,"Zalo":49},"fam":{"Data":5,"Product":11,"Tech":48},"pyr":{"25-29":[0,1],"<25":[52,11]}},"internship":{"bu":{"(Other)":2,"BO":11,"DB":22,"INCT":1,"PY":17,"VNGG":41,"VRC":11,"Zalo":25},"fam":{"Business Operations":19,"Data":11,"Game Development":5,"Marketing":24,"Product":18,"Sales":7,"Tech":46},"pyr":{"25-29":[4,1],"<25":[67,58]}},"official":{"bu":{"(Other)":33,"BO":248,"DB":207,"INCT":50,"PY":553,"VNGG":903,"VRC":59,"ZPS":244,"Zalo":836},"fam":{"Business Operations":442,"Data":132,"Executive":10,"Game Development":300,"Marketing":430,"Product":665,"Sales":157,"Tech":997},"pyr":{"25-29":[746,424],"30-34":[493,328],"35-39":[295,177],"40-44":[175,86],"45+":[76,28],"<25":[189,116]}},"probation":{"bu":{"(Other)":2,"BO":12,"DB":4,"INCT":4,"PY":74,"VNGG":60,"VRC":4,"ZPS":11,"Zalo":51},"fam":{"Business Operations":30,"Data":15,"Game Development":14,"Marketing":38,"Product":41,"Sales":10,"Tech":74},"pyr":{"25-29":[43,42],"30-34":[19,16],"35-39":[7,3],"40-44":[3,1],"<25":[65,23]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":1,"INCT":1,"PY":27,"VNGG":18,"VRC":2,"Zalo":268},"fam":{"Business Operations":48,"Data":2,"Executive":1,"Marketing":8,"Product":257,"Sales":1,"Tech":3},"pyr":{"25-29":[28,62],"30-34":[5,15],"35-39":[2,5],"40-44":[1,2],"45+":[2,0],"<25":[40,158]}}},"2025-11-03":{"collaborator":{"bu":{"BO":34,"DB":12,"INCT":6,"PY":37,"VNGG":115,"VRC":2,"ZPS":6,"Zalo":199},"fam":{"Business Operations":113,"Data":8,"Game Development":4,"Marketing":77,"Product":153,"Sales":24,"Tech":32},"pyr":{"25-29":[53,88],"30-34":[17,19],"35-39":[8,3],"40-44":[9,1],"45+":[8,1],"<25":[76,128]}},"fresher":{"bu":{"ZPS":9,"Zalo":45},"fam":{"Data":5,"Product":20,"Tech":29},"pyr":{"<25":[38,16]}},"internship":{"bu":{"(Other)":2,"BO":11,"DB":17,"INCT":2,"PY":15,"VNGG":53,"VRC":12,"ZPS":1,"Zalo":26},"fam":{"Business Operations":18,"Data":9,"Game Development":7,"Marketing":23,"Product":14,"Sales":6,"Tech":62},"pyr":{"25-29":[3,0],"<25":[80,56]}},"official":{"bu":{"(Other)":34,"BO":254,"DB":202,"INCT":50,"PY":567,"VNGG":910,"VRC":60,"ZPS":249,"Zalo":833},"fam":{"Business Operations":450,"Data":135,"Executive":10,"Game Development":306,"Marketing":436,"Product":674,"Sales":155,"Tech":993},"pyr":{"25-29":[739,429],"30-34":[490,330],"35-39":[293,178],"40-44":[173,86],"45+":[76,28],"<25":[207,130]}},"probation":{"bu":{"(Other)":3,"BO":12,"DB":6,"INCT":5,"PY":61,"VNGG":60,"VRC":7,"ZPS":2,"Zalo":49},"fam":{"Business Operations":31,"Data":14,"Game Development":10,"Marketing":29,"Product":32,"Sales":14,"Tech":75},"pyr":{"25-29":[44,39],"30-34":[20,21],"35-39":[5,4],"40-44":[3,2],"45+":[1,0],"<25":[51,15]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":1,"INCT":1,"PY":23,"VNGG":20,"VRC":2,"Zalo":266},"fam":{"Business Operations":43,"Data":5,"Executive":1,"Marketing":8,"Product":254,"Sales":1,"Tech":4},"pyr":{"25-29":[28,66],"30-34":[7,15],"35-39":[2,4],"40-44":[1,2],"45+":[2,0],"<25":[37,152]}}},"2025-12-02":{"collaborator":{"bu":{"BO":32,"DB":11,"INCT":7,"PY":39,"VNGG":115,"VRC":3,"ZPS":7,"Zalo":215},"fam":{"Business Operations":117,"Data":8,"Game Development":4,"Marketing":77,"Product":154,"Sales":35,"Tech":34},"pyr":{"25-29":[56,91],"30-34":[16,19],"35-39":[8,4],"40-44":[10,1],"45+":[8,1],"<25":[78,137]}},"fresher":{"bu":{"ZPS":9,"Zalo":43},"fam":{"Data":3,"Product":20,"Tech":29},"pyr":{"<25":[36,16]}},"internship":{"bu":{"(Other)":3,"BO":8,"DB":15,"INCT":2,"PY":16,"VNGG":62,"VRC":12,"ZPS":1,"Zalo":23},"fam":{"Business Operations":19,"Data":7,"Game Development":8,"Marketing":24,"Product":19,"Sales":6,"Tech":59},"pyr":{"25-29":[2,0],"<25":[80,60]}},"official":{"bu":{"(Other)":34,"BO":257,"DB":194,"INCT":47,"PY":603,"VNGG":935,"VRC":68,"ZPS":248,"Zalo":859},"fam":{"Business Operations":462,"Data":137,"Executive":10,"Game Development":309,"Marketing":451,"Product":691,"Sales":154,"Tech":1031},"pyr":{"25-29":[749,446],"30-34":[491,336],"35-39":[298,178],"40-44":[171,86],"45+":[72,28],"<25":[248,142]}},"probation":{"bu":{"(Other)":2,"BO":11,"DB":5,"INCT":7,"PY":27,"VNGG":46,"VRC":6,"Zalo":39},"fam":{"Business Operations":25,"Data":13,"Game Development":7,"Marketing":29,"Product":21,"Sales":14,"Tech":34},"pyr":{"25-29":[38,29],"30-34":[14,17],"35-39":[3,5],"40-44":[3,2],"45+":[1,0],"<25":[16,15]}},"service_contract":{"bu":{"(Other)":1,"BO":4,"DB":1,"INCT":1,"PY":17,"VNGG":20,"VRC":2,"Zalo":269},"fam":{"Business Operations":37,"Data":6,"Executive":1,"Game Development":1,"Marketing":8,"Product":255,"Sales":1,"Tech":6},"pyr":{"25-29":[24,66],"30-34":[7,13],"35-39":[2,4],"40-44":[1,2],"45+":[2,0],"<25":[34,160]}}},"2025-12-30":{"collaborator":{"bu":{"BO":33,"DB":11,"INCT":8,"PY":41,"VNGG":120,"VRC":3,"ZPS":7,"Zalo":226},"fam":{"Business Operations":121,"Data":10,"Game Development":6,"Marketing":82,"Product":154,"Sales":39,"Tech":37},"pyr":{"25-29":[55,93],"30-34":[17,19],"35-39":[9,5],"40-44":[10,1],"45+":[8,1],"<25":[83,148]}},"fresher":{"bu":{"ZPS":7,"Zalo":43},"fam":{"Data":4,"Product":18,"Tech":28},"pyr":{"<25":[35,15]}},"internship":{"bu":{"(Other)":3,"BO":8,"DB":15,"INCT":2,"PY":16,"VNGG":63,"VRC":13,"ZPS":1,"Zalo":20},"fam":{"Business Operations":18,"Data":7,"Game Development":9,"Marketing":29,"Product":19,"Sales":1,"Tech":58},"pyr":{"25-29":[2,0],"<25":[81,58]}},"official":{"bu":{"(Other)":36,"BO":263,"DB":199,"INCT":50,"PY":609,"VNGG":947,"VRC":72,"ZPS":246,"Zalo":896},"fam":{"Business Operations":472,"Data":143,"Executive":11,"Game Development":311,"Marketing":454,"Product":696,"Sales":161,"Tech":1070},"pyr":{"25-29":[765,455],"30-34":[492,345],"35-39":[294,178],"40-44":[173,87],"45+":[74,27],"<25":[281,147]}},"probation":{"bu":{"BO":10,"DB":1,"INCT":8,"PY":23,"VNGG":37,"VRC":6,"ZPS":5,"Zalo":38},"fam":{"Business Operations":24,"Data":12,"Game Development":5,"Marketing":24,"Product":28,"Sales":8,"Tech":27},"pyr":{"25-29":[31,31],"30-34":[8,14],"35-39":[3,2],"40-44":[4,2],"<25":[17,16]}},"service_contract":{"bu":{"(Other)":1,"BO":4,"DB":1,"INCT":1,"PY":18,"VNGG":18,"VRC":2,"Zalo":295},"fam":{"Business Operations":38,"Data":6,"Executive":1,"Game Development":1,"Marketing":8,"Product":280,"Sales":1,"Tech":5},"pyr":{"25-29":[24,72],"30-34":[5,13],"35-39":[1,4],"40-44":[1,1],"45+":[2,0],"<25":[39,178]}}},"2026-02-02":{"collaborator":{"bu":{"BO":32,"DB":11,"INCT":7,"PY":42,"VNGG":133,"VRC":3,"ZPS":7,"Zalo":231},"fam":{"Business Operations":124,"Data":10,"Game Development":6,"Marketing":86,"Product":154,"Sales":37,"Tech":49},"pyr":{"25-29":[80,122],"30-34":[21,24],"35-39":[11,5],"40-44":[8,2],"45+":[9,1],"<25":[66,117]}},"fresher":{"bu":{"Zalo":12},"fam":{"Data":2,"Product":10},"pyr":{"<25":[4,8]}},"internship":{"bu":{"(Other)":3,"BO":7,"DB":14,"INCT":2,"PY":15,"VNGG":64,"VRC":14,"ZPS":1,"Zalo":19},"fam":{"Business Operations":17,"Data":7,"Game Development":11,"Marketing":30,"Product":16,"Sales":2,"Tech":56},"pyr":{"25-29":[1,0],"<25":[84,54]}},"official":{"bu":{"(Other)":35,"BO":270,"DB":195,"INCT":51,"PY":627,"VNGG":957,"VRC":70,"ZPS":245,"Zalo":909},"fam":{"Business Operations":487,"Data":148,"Executive":10,"Game Development":314,"Marketing":462,"Product":701,"Sales":164,"Tech":1073},"pyr":{"25-29":[723,445],"30-34":[585,402],"35-39":[353,201],"40-44":[179,100],"45+":[95,36],"<25":[157,83]}},"probation":{"bu":{"BO":7,"DB":3,"INCT":7,"PY":14,"VNGG":31,"VRC":8,"ZPS":6,"Zalo":27},"fam":{"Business Operations":19,"Data":7,"Game Development":4,"Marketing":13,"Product":30,"Sales":7,"Tech":23},"pyr":{"25-29":[20,21],"30-34":[13,15],"35-39":[4,2],"40-44":[3,1],"<25":[14,10]}},"service_contract":{"bu":{"(Other)":1,"BO":4,"DB":2,"INCT":1,"PY":22,"VNGG":18,"VRC":2,"ZPS":1,"Zalo":312},"fam":{"Business Operations":42,"Data":5,"Executive":1,"Game Development":2,"Marketing":8,"Product":299,"Sales":1,"Tech":5},"pyr":{"25-29":[31,107],"30-34":[6,26],"35-39":[2,6],"40-44":[2,1],"45+":[2,0],"<25":[39,141]}}},"2026-02-27":{"collaborator":{"bu":{"BO":32,"DB":13,"INCT":7,"PY":34,"VNGG":132,"VRC":1,"ZPS":7,"Zalo":227},"fam":{"Business Operations":115,"Data":10,"Game Development":6,"Marketing":87,"Product":151,"Sales":35,"Tech":49},"pyr":{"25-29":[77,115],"30-34":[21,24],"35-39":[9,5],"40-44":[7,2],"45+":[9,1],"<25":[69,114]}},"fresher":{"bu":{"Zalo":12},"fam":{"Data":2,"Product":10},"pyr":{"<25":[4,8]}},"internship":{"bu":{"(Other)":3,"BO":5,"DB":10,"INCT":2,"PY":12,"VNGG":46,"VRC":10,"Zalo":14},"fam":{"Business Operations":17,"Data":5,"Game Development":9,"Marketing":24,"Product":17,"Sales":3,"Tech":27},"pyr":{"<25":[53,49]}},"official":{"bu":{"(Other)":35,"BO":275,"DB":188,"INCT":54,"PY":626,"VNGG":968,"VRC":65,"ZPS":249,"Zalo":910},"fam":{"Business Operations":498,"Data":147,"Executive":10,"Game Development":315,"Marketing":470,"Product":701,"Sales":163,"Tech":1066},"pyr":{"25-29":[718,451],"30-34":[583,408],"35-39":[354,202],"40-44":[179,101],"45+":[94,35],"<25":[157,88]}},"probation":{"bu":{"BO":3,"DB":6,"INCT":4,"PY":13,"VNGG":31,"VRC":4,"ZPS":1,"Zalo":26},"fam":{"Business Operations":18,"Data":3,"Game Development":2,"Marketing":11,"Product":23,"Sales":6,"Tech":25},"pyr":{"25-29":[17,15],"30-34":[13,9],"35-39":[3,2],"40-44":[1,0],"<25":[18,10]}},"service_contract":{"bu":{"BO":3,"DB":3,"INCT":1,"PY":20,"VNGG":10,"VRC":1,"ZPS":2,"Zalo":275},"fam":{"Business Operations":40,"Data":5,"Game Development":2,"Marketing":8,"Product":254,"Sales":1,"Tech":5},"pyr":{"25-29":[26,92],"30-34":[5,20],"35-39":[3,3],"40-44":[1,1],"45+":[1,0],"<25":[36,127]}}},"2026-04-01":{"collaborator":{"bu":{"BO":34,"DB":15,"INCT":6,"PY":35,"VNGG":133,"VRC":1,"ZPS":7,"Zalo":235},"fam":{"Business Operations":119,"Data":9,"Game Development":9,"Marketing":89,"Product":151,"Sales":37,"Tech":52},"pyr":{"25-29":[74,111],"30-34":[19,25],"35-39":[9,5],"40-44":[7,2],"45+":[9,1],"<25":[75,129]}},"fresher":{"bu":{"Zalo":12},"fam":{"Data":2,"Product":10},"pyr":{"<25":[4,8]}},"internship":{"bu":{"(Other)":2,"BO":8,"DB":7,"INCT":2,"PY":11,"VNGG":38,"VRC":9,"Zalo":13},"fam":{"Business Operations":14,"Data":6,"Game Development":8,"Marketing":17,"Product":16,"Sales":2,"Tech":27},"pyr":{"<25":[47,43]}},"official":{"bu":{"(Other)":34,"BO":277,"DB":191,"INCT":54,"PY":624,"VNGG":979,"VRC":69,"ZPS":249,"Zalo":923},"fam":{"Business Operations":504,"Data":149,"Executive":10,"Game Development":315,"Marketing":470,"Product":712,"Sales":164,"Tech":1076},"pyr":{"25-29":[722,456],"30-34":[584,411],"35-39":[353,200],"40-44":[178,99],"45+":[93,35],"<25":[170,99]}},"probation":{"bu":{"BO":8,"DB":7,"INCT":6,"PY":18,"VNGG":35,"VRC":2,"ZPS":1,"Zalo":32},"fam":{"Business Operations":25,"Data":7,"Game Development":3,"Marketing":17,"Product":23,"Sales":6,"Tech":28},"pyr":{"25-29":[23,19],"30-34":[15,10],"35-39":[4,2],"40-44":[3,1],"<25":[15,17]}},"service_contract":{"bu":{"BO":3,"DB":2,"INCT":1,"PY":21,"VNGG":9,"VRC":1,"ZPS":2,"Zalo":278},"fam":{"Business Operations":41,"Data":6,"Game Development":2,"Marketing":9,"Product":254,"Sales":2,"Tech":3},"pyr":{"25-29":[23,87],"30-34":[5,22],"35-39":[4,3],"40-44":[1,2],"45+":[1,0],"<25":[36,133]}}},"2026-05-04":{"collaborator":{"bu":{"BO":34,"DB":15,"INCT":5,"PY":34,"VNGG":133,"VRC":1,"ZPS":7,"Zalo":244},"fam":{"Business Operations":130,"Data":8,"Game Development":9,"Marketing":90,"Product":147,"Sales":38,"Tech":51},"pyr":{"25-29":[75,110],"30-34":[20,24],"35-39":[10,5],"40-44":[6,2],"45+":[9,1],"<25":[76,135]}},"fresher":{"bu":{"Zalo":2},"fam":{"Data":2},"pyr":{"<25":[1,1]}},"internship":{"bu":{"(Other)":2,"BO":8,"DB":23,"INCT":2,"PY":9,"VNGG":32,"VRC":9,"Zalo":9},"fam":{"Business Operations":16,"Data":12,"Game Development":7,"Marketing":15,"Product":11,"Sales":2,"Tech":31},"pyr":{"<25":[51,43]}},"official":{"bu":{"(Other)":33,"BO":277,"DB":190,"INCT":54,"PY":604,"VNGG":970,"VRC":70,"ZPS":247,"Zalo":910},"fam":{"Business Operations":505,"Data":143,"Executive":10,"Game Development":314,"Marketing":463,"Product":697,"Sales":162,"Tech":1061},"pyr":{"25-29":[710,455],"30-34":[577,399],"35-39":[348,198],"40-44":[175,98],"45+":[93,35],"<25":[169,98]}},"probation":{"bu":{"(Other)":3,"BO":14,"DB":4,"INCT":6,"PY":26,"VNGG":43,"VRC":6,"ZPS":1,"Zalo":50},"fam":{"Business Operations":33,"Data":8,"Game Development":6,"Marketing":24,"Product":36,"Sales":9,"Tech":37},"pyr":{"25-29":[35,26],"30-34":[17,16],"35-39":[4,4],"40-44":[5,2],"45+":[1,0],"<25":[21,22]}},"service_contract":{"bu":{"BO":3,"DB":3,"INCT":1,"PY":21,"VNGG":7,"VRC":1,"ZPS":1,"Zalo":293},"fam":{"Business Operations":40,"Data":6,"Game Development":2,"Marketing":28,"Product":248,"Sales":2,"Tech":4},"pyr":{"25-29":[23,86],"30-34":[11,22],"35-39":[4,8],"40-44":[2,4],"45+":[1,1],"<25":[39,129]}}},"2026-05-27":{"collaborator":{"bu":{"BO":34,"DB":15,"INCT":5,"PY":35,"VNGG":128,"VRC":1,"ZPS":7,"Zalo":237},"fam":{"Business Operations":125,"Data":8,"Game Development":9,"Marketing":87,"Product":145,"Sales":36,"Tech":52},"pyr":{"25-29":[71,102],"30-34":[19,24],"35-39":[10,5],"40-44":[6,2],"45+":[9,1],"<25":[78,135]}},"fresher":{"bu":{"ZPS":7,"Zalo":1},"fam":{"Data":1,"Product":7},"pyr":{"<25":[2,6]}},"internship":{"bu":{"(Other)":2,"BO":6,"DB":22,"INCT":1,"PY":9,"VNGG":33,"VRC":9,"ZPS":8,"Zalo":17},"fam":{"Business Operations":16,"Data":12,"Game Development":13,"Marketing":14,"Product":15,"Sales":2,"Tech":35},"pyr":{"<25":[62,45]}},"official":{"bu":{"(Other)":33,"BO":278,"DB":185,"INCT":58,"PY":600,"VNGG":945,"VRC":69,"ZPS":238,"Zalo":914},"fam":{"Business Operations":507,"Data":141,"Executive":10,"Game Development":309,"Marketing":446,"Product":687,"Sales":160,"Tech":1060},"pyr":{"25-29":[701,442],"30-34":[566,391],"35-39":[338,194],"40-44":[174,99],"45+":[91,35],"<25":[176,113]}},"probation":{"bu":{"(Other)":3,"BO":19,"DB":8,"INCT":2,"PY":25,"VNGG":46,"VRC":4,"Zalo":51},"fam":{"Business Operations":36,"Data":10,"Game Development":4,"Marketing":23,"Product":36,"Sales":7,"Tech":42},"pyr":{"25-29":[38,27],"30-34":[23,20],"35-39":[5,5],"40-44":[4,1],"45+":[1,0],"<25":[18,16]}},"service_contract":{"bu":{"(Other)":1,"BO":3,"DB":3,"INCT":1,"PY":21,"VNGG":4,"VRC":1,"ZPS":1,"Zalo":276},"fam":{"Business Operations":40,"Data":7,"Game Development":2,"Marketing":33,"Product":223,"Sales":2,"Tech":4},"pyr":{"25-29":[22,75],"30-34":[11,21],"35-39":[5,8],"40-44":[2,4],"45+":[2,3],"<25":[33,125]}}},"2026-06-30":{"collaborator":{"bu":{"BO":34,"DB":13,"INCT":5,"PY":41,"VNGG":126,"ZPS":7,"Zalo":233},"fam":{"Business Operations":124,"Data":8,"Game Development":9,"Marketing":85,"Product":146,"Sales":37,"Tech":50},"pyr":{"25-29":[68,99],"30-34":[19,22],"35-39":[11,4],"40-44":[5,2],"45+":[9,1],"<25":[80,139]}},"fresher":{"bu":{"VNGG":38,"ZPS":7,"Zalo":1},"fam":{"Business Operations":38,"Data":1,"Product":7},"pyr":{"25-29":[1,0],"<25":[28,17]}},"internship":{"bu":{"(Other)":2,"BO":7,"DB":23,"INCT":3,"PY":8,"VNGG":36,"VRC":9,"ZPS":11,"Zalo":19},"fam":{"Business Operations":15,"Data":17,"Game Development":19,"Marketing":13,"Product":14,"Sales":2,"Tech":38},"pyr":{"<25":[70,48]}},"official":{"bu":{"(Other)":34,"BO":279,"DB":183,"INCT":57,"PY":606,"VNGG":949,"VRC":73,"ZPS":235,"Zalo":922},"fam":{"Business Operations":513,"Data":138,"Executive":10,"Game Development":313,"Marketing":448,"Product":694,"Sales":166,"Tech":1056},"pyr":{"25-29":[701,443],"30-34":[565,391],"35-39":[335,196],"40-44":[174,100],"45+":[92,35],"<25":[184,122]}},"probation":{"bu":{"(Other)":1,"BO":17,"DB":14,"INCT":2,"PY":24,"VNGG":40,"ZPS":1,"Zalo":46},"fam":{"Business Operations":31,"Data":15,"Marketing":25,"Product":26,"Sales":6,"Tech":42},"pyr":{"25-29":[32,24],"30-34":[22,20],"35-39":[5,3],"40-44":[5,0],"<25":[21,13]}},"service_contract":{"bu":{"(Other)":1,"BO":2,"DB":4,"INCT":1,"PY":21,"VNGG":4,"VRC":1,"Zalo":267},"fam":{"Business Operations":43,"Data":8,"Game Development":1,"Marketing":33,"Product":212,"Sales":2,"Tech":2},"pyr":{"25-29":[20,72],"30-34":[12,18],"35-39":[4,9],"40-44":[2,4],"45+":[2,3],"<25":[31,124]}}}}};</script>
 
-    <!-- ============ RENDER LOGIC (theme-aware, no data inside) ============ -->
-    <script>
-      const D = window.DASH_DATA;
-      const F = window.FACTS;
-      const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-      const fmt = (n) => Number(n).toLocaleString('en-US');
-      let CHARTS = []; // Chart.js instances
-      let ECHARTS = []; // ECharts instances
-      let CUR = null; // demographic slice derived from the current slicer state
-      let YD = null; // attrition + cohort facts for the selected year
-      const yearData = () =>
-        D.years[document.getElementById('fYear').value] || D.years[Object.keys(D.years).sort().reverse()[0]];
-      const latestYear = () => Object.keys(D.years).sort().reverse()[0];
+<!-- ============ RENDER LOGIC (theme-aware, no data inside) ============ -->
+<script>
+const D = window.DASH_DATA;
+const F = window.FACTS;
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (n) => Number(n).toLocaleString('en-US');
+let CHARTS = [];   // Chart.js instances
+let ECHARTS = [];  // ECharts instances
+let CUR = null;    // demographic slice derived from the current slicer state
+let YD = null;     // attrition + cohort facts for the selected year
+const yearData = () => D.years[document.getElementById('fYear').value] || D.years[Object.keys(D.years).sort().reverse()[0]];
+const latestYear = () => Object.keys(D.years).sort().reverse()[0];
 
-      const EE_LABEL = {
-        official: 'Official',
-        collaborator: 'Collaborator',
-        service_contract: 'Service Contract',
-        probation: 'Probation',
-        internship: 'Internship',
-        fresher: 'Fresher',
-      };
-      const DIM_TITLE = { bu: 'Headcount by Business Unit', fam: 'Headcount by Job Family' };
-      const BANDS = ['<25', '25-29', '30-34', '35-39', '40-44', '45+'];
-      const monthShort = (s) => {
-        const d = new Date(s);
-        return d.toLocaleString('en', { month: 'short' }) + ' ' + String(d.getUTCDate()).padStart(2, '0');
-      };
-      const trendLabel = (s) => {
-        const d = new Date(s);
-        return d.toLocaleString('en', { month: 'short' }) + "'" + String(d.getUTCFullYear()).slice(2);
-      };
+const EE_LABEL = { official:'Official', collaborator:'Collaborator', service_contract:'Service Contract', probation:'Probation', internship:'Internship', fresher:'Fresher' };
+const DIM_TITLE = { bu:'Headcount by Business Unit', fam:'Headcount by Job Family' };
+const BANDS = ['<25','25-29','30-34','35-39','40-44','45+'];
+const monthShort = (s) => { const d=new Date(s); return d.toLocaleString('en',{month:'short'})+' '+String(d.getUTCDate()).padStart(2,'0'); };
+const trendLabel = (s) => { const d=new Date(s); return d.toLocaleString('en',{month:'short'})+"'"+String(d.getUTCFullYear()).slice(2); };
 
-      function switchTab(t) {
-        document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
-        document.getElementById('tab-demo').classList.toggle('hidden', t !== 'demo');
-        document.getElementById('tab-attr').classList.toggle('hidden', t !== 'attr');
-        document.getElementById('tab-cohort').classList.toggle('hidden', t !== 'cohort');
-        setTimeout(() => ECHARTS.forEach((e) => e && e.resize()), 30);
-      }
-      function toggleTheme() {
-        const r = document.documentElement;
-        r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-        renderAll();
-      }
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+  document.getElementById('tab-demo').classList.toggle('hidden', t!=='demo');
+  document.getElementById('tab-attr').classList.toggle('hidden', t!=='attr');
+  document.getElementById('tab-cohort').classList.toggle('hidden', t!=='cohort');
+  setTimeout(()=>ECHARTS.forEach(e=>e && e.resize()), 30);
+}
+function toggleTheme(){
+  const r = document.documentElement;
+  r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark' ? 'light' : 'dark');
+  renderAll();
+}
 
-      /* ---------- Slicer state → demographic slice ---------- */
-      function sliceAt(snap, ee) {
-        const bySnap = (F && F.data[snap]) || {};
-        if (ee !== 'ALL') return bySnap[ee] || { bu: {}, fam: {}, pyr: {} };
-        const m = { bu: {}, fam: {}, pyr: {} };
-        for (const e in bySnap) {
-          const s = bySnap[e];
-          for (const k in s.bu) m.bu[k] = (m.bu[k] || 0) + s.bu[k];
-          for (const k in s.fam) m.fam[k] = (m.fam[k] || 0) + s.fam[k];
-          for (const b in s.pyr) {
-            const [x, y] = s.pyr[b];
-            const c = m.pyr[b] || [0, 0];
-            m.pyr[b] = [c[0] + x, c[1] + y];
-          }
-        }
-        return m;
-      }
-      const total = (sl) => Object.values(sl.bu).reduce((a, b) => a + b, 0);
+/* ---------- Slicer state → demographic slice ---------- */
+function sliceAt(snap, ee){
+  const bySnap = (F && F.data[snap]) || {};
+  if (ee !== 'ALL') return bySnap[ee] || { bu:{}, fam:{}, pyr:{} };
+  const m = { bu:{}, fam:{}, pyr:{} };
+  for (const e in bySnap){ const s=bySnap[e];
+    for (const k in s.bu) m.bu[k]=(m.bu[k]||0)+s.bu[k];
+    for (const k in s.fam) m.fam[k]=(m.fam[k]||0)+s.fam[k];
+    for (const b in s.pyr){ const [x,y]=s.pyr[b]; const c=m.pyr[b]||[0,0]; m.pyr[b]=[c[0]+x,c[1]+y]; }
+  }
+  return m;
+}
+const total = (sl)=>Object.values(sl.bu).reduce((a,b)=>a+b,0);
 
-      function computeCUR() {
-        const snap = document.getElementById('fMonth').value || F.snaps[F.snaps.length - 1];
-        const ee = document.getElementById('fEE').value || 'ALL';
-        const sl = sliceAt(snap, ee);
-        const i = F.snaps.indexOf(snap),
-          prev = i > 0 ? F.snaps[i - 1] : null;
-        const gross = total(sl),
-          prevGross = prev ? total(sliceAt(prev, ee)) : gross;
-        let male = 0,
-          female = 0;
-        const pyramid = BANDS.map((b) => {
-          const [x, y] = sl.pyr[b] || [0, 0];
-          male += x;
-          female += y;
-          return [b, x, y];
-        });
-        const byDim = {
-          bu: Object.entries(sl.bu).sort((a, b) => b[1] - a[1]),
-          fam: Object.entries(sl.fam).sort((a, b) => b[1] - a[1]),
-        };
-        const snapEes = F.data[snap] || {};
-        const typeMix = Object.keys(snapEes)
-          .map((e) => [EE_LABEL[e] || e, total(snapEes[e])])
-          .filter((r) => r[1] > 0)
-          .sort((a, b) => b[1] - a[1]);
-        const hcTrend = F.snaps.map((s) => [trendLabel(s), total(sliceAt(s, ee))]);
-        const official = snapEes.official ? total(snapEes.official) : 0;
-        const [vn, os] = F.market[snap] || [0, 0];
-        CUR = {
-          snap,
-          ee,
-          view: document.getElementById('fView').value || 'bu',
-          gross,
-          momAbs: gross - prevGross,
-          momPct: prevGross ? Math.round(((gross - prevGross) / prevGross) * 1000) / 10 : 0,
-          vietnam: vn,
-          oversea: os,
-          official,
-          officialPct: gross ? Math.round((official / gross) * 1000) / 10 : 0,
-          male,
-          female,
-          byDim,
-          pyramid,
-          typeMix,
-          hcTrend,
-          title: trendLabel(snap),
-          cut: 'Snapshot ' + snap + (ee === 'ALL' ? ' · all types' : ' · ' + (EE_LABEL[ee] || ee)),
-        };
-      }
+function computeCUR(){
+  const snap = document.getElementById('fMonth').value || F.snaps[F.snaps.length-1];
+  const ee = document.getElementById('fEE').value || 'ALL';
+  const sl = sliceAt(snap, ee);
+  const i = F.snaps.indexOf(snap), prev = i>0 ? F.snaps[i-1] : null;
+  const gross = total(sl), prevGross = prev ? total(sliceAt(prev, ee)) : gross;
+  let male=0, female=0;
+  const pyramid = BANDS.map(b=>{ const [x,y]=sl.pyr[b]||[0,0]; male+=x; female+=y; return [b,x,y]; });
+  const byDim = {
+    bu: Object.entries(sl.bu).sort((a,b)=>b[1]-a[1]),
+    fam: Object.entries(sl.fam).sort((a,b)=>b[1]-a[1]),
+  };
+  const snapEes = F.data[snap] || {};
+  const typeMix = Object.keys(snapEes).map(e=>[EE_LABEL[e]||e, total(snapEes[e])]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1]);
+  const hcTrend = F.snaps.map(s=>[trendLabel(s), total(sliceAt(s, ee))]);
+  const official = snapEes.official ? total(snapEes.official) : 0;
+  const [vn, os] = F.market[snap] || [0,0];
+  CUR = { snap, ee, view: document.getElementById('fView').value || 'bu',
+    gross, momAbs: gross-prevGross, momPct: prevGross ? Math.round((gross-prevGross)/prevGross*1000)/10 : 0,
+    vietnam: vn, oversea: os, official, officialPct: gross ? Math.round(official/gross*1000)/10 : 0,
+    male, female, byDim, pyramid, typeMix, hcTrend,
+    title: trendLabel(snap), cut: 'Snapshot '+snap+(ee==='ALL' ? ' · all types' : ' · '+(EE_LABEL[ee]||ee)) };
+}
 
-      function populateFilters() {
-        const years = [...new Set(F.snaps.map((s) => s.slice(0, 4)))].sort().reverse();
-        const fY = document.getElementById('fYear');
-        fY.innerHTML = years.map((y) => '<option value="' + y + '">' + y + '</option>').join('');
-        fY.value = years[0];
-        LAST_YEAR = years[0];
-        populateMonths(years[0]);
-      }
-      function populateMonths(year) {
-        const fM = document.getElementById('fMonth');
-        const snaps = F.snaps.filter((s) => s.startsWith(year));
-        fM.innerHTML = snaps.map((s) => '<option value="' + s + '">' + monthShort(s) + '</option>').join('');
-        fM.value = snaps[snaps.length - 1];
-      }
-      let LAST_YEAR = null;
-      function onFilter() {
-        const y = document.getElementById('fYear').value;
-        if (y !== LAST_YEAR) {
-          populateMonths(y);
-          LAST_YEAR = y;
-        }
-        renderAll();
-      }
+function populateFilters(){
+  const years = [...new Set(F.snaps.map(s=>s.slice(0,4)))].sort().reverse();
+  const fY = document.getElementById('fYear');
+  fY.innerHTML = years.map(y=>'<option value="'+y+'">'+y+'</option>').join('');
+  fY.value = years[0]; LAST_YEAR = years[0];
+  populateMonths(years[0]);
+}
+function populateMonths(year){
+  const fM = document.getElementById('fMonth');
+  const snaps = F.snaps.filter(s=>s.startsWith(year));
+  fM.innerHTML = snaps.map(s=>'<option value="'+s+'">'+monthShort(s)+'</option>').join('');
+  fM.value = snaps[snaps.length-1];
+}
+let LAST_YEAR = null;
+function onFilter(){
+  const y = document.getElementById('fYear').value;
+  if (y !== LAST_YEAR){ populateMonths(y); LAST_YEAR = y; }
+  renderAll();
+}
 
-      function renderAll() {
-        CHARTS.forEach((c) => c.destroy());
-        CHARTS = [];
-        ECHARTS.forEach((e) => e.dispose());
-        ECHARTS = [];
-        Chart.register(ChartDataLabels);
-        Chart.defaults.font.family = "'Inter',sans-serif";
-        Chart.defaults.color = css('--muted');
-        Chart.defaults.plugins.legend.display = false;
-        Chart.defaults.plugins.datalabels.display = false;
-        computeCUR();
-        YD = yearData();
-        fillText();
-        demoCharts();
-        attrCharts();
-        cohortCharts();
-      }
+function renderAll(){
+  CHARTS.forEach(c=>c.destroy()); CHARTS=[];
+  ECHARTS.forEach(e=>e.dispose()); ECHARTS=[];
+  Chart.register(ChartDataLabels);
+  Chart.defaults.font.family = "'Inter',sans-serif";
+  Chart.defaults.color = css('--muted');
+  Chart.defaults.plugins.legend.display = false;
+  Chart.defaults.plugins.datalabels.display = false;
+  computeCUR();
+  YD = yearData();
+  fillText(); demoCharts(); attrCharts(); cohortCharts();
+}
 
-      function fillText() {
-        const c = CUR,
-          a = YD.attrKpis;
-        const yr = document.getElementById('fYear').value;
-        document.getElementById('dTitle').textContent = c.title;
-        document.getElementById('dCut').textContent = c.cut;
-        document.getElementById('aCut').textContent = c.cut;
-        document.getElementById('cCut').textContent = c.cut;
-        document.getElementById('footSnap').textContent = c.snap;
-        document.getElementById('kHc').textContent = fmt(c.gross);
-        const mom = document.getElementById('kHcMom');
-        mom.textContent = (c.momAbs >= 0 ? '▲ +' : '▼ ') + fmt(Math.abs(c.momAbs)) + ' (' + c.momPct + '%) MoM';
-        mom.classList.toggle('down', c.momAbs < 0);
-        const mkt = c.vietnam + c.oversea || 1;
-        document.getElementById('kMkt').textContent = fmt(c.vietnam) + ' / ' + fmt(c.oversea);
-        document.getElementById('kMktSub').textContent =
-          'Vietnam ' + Math.round((c.vietnam / mkt) * 100) + '% · Oversea ' + Math.round((c.oversea / mkt) * 100) + '%';
-        document.getElementById('kOff').textContent = fmt(c.official);
-        document.getElementById('kOffSub').textContent = c.officialPct + '% of headcount';
-        document.getElementById('kGen').textContent = fmt(c.male) + ' / ' + fmt(c.female);
-        const g = c.male + c.female || 1;
-        document.getElementById('kGenSub').textContent =
-          Math.round((c.male / g) * 100) + '% male · ' + Math.round((c.female / g) * 100) + '% female';
-        document.getElementById('kLv').textContent = fmt(a.leavers);
-        document.getElementById('kLvSub').textContent = (a.partial ? 'YTD ' : 'FY ') + yr;
-        document.getElementById('hWater').textContent =
-          'Headcount Bridge — ' + (a.partial ? 'YTD ' : 'FY ') + yr + ' (Waterfall)';
-        document.getElementById('kVs').textContent = fmt(a.voluntary);
-        document.getElementById('kIs').textContent = fmt(a.involuntary);
-        document.getElementById('kRate').textContent = a.rateAnnPct + '%';
-      }
+function fillText(){
+  const c=CUR, a=YD.attrKpis;
+  const yr = document.getElementById('fYear').value;
+  document.getElementById('dTitle').textContent = c.title;
+  document.getElementById('dCut').textContent = c.cut;
+  document.getElementById('aCut').textContent = c.cut;
+  document.getElementById('cCut').textContent = c.cut;
+  document.getElementById('footSnap').textContent = c.snap;
+  document.getElementById('kHc').textContent = fmt(c.gross);
+  const mom = document.getElementById('kHcMom');
+  mom.textContent = (c.momAbs>=0?'▲ +':'▼ ')+fmt(Math.abs(c.momAbs))+' ('+c.momPct+'%) MoM';
+  mom.classList.toggle('down', c.momAbs<0);
+  const mkt = c.vietnam+c.oversea || 1;
+  document.getElementById('kMkt').textContent = fmt(c.vietnam)+' / '+fmt(c.oversea);
+  document.getElementById('kMktSub').textContent = 'Vietnam '+Math.round(c.vietnam/mkt*100)+'% · Oversea '+Math.round(c.oversea/mkt*100)+'%';
+  document.getElementById('kOff').textContent = fmt(c.official);
+  document.getElementById('kOffSub').textContent = c.officialPct+'% of headcount';
+  document.getElementById('kGen').textContent = fmt(c.male)+' / '+fmt(c.female);
+  const g = c.male+c.female || 1;
+  document.getElementById('kGenSub').textContent = Math.round(c.male/g*100)+'% male · '+Math.round(c.female/g*100)+'% female';
+  document.getElementById('kLv').textContent = fmt(a.leavers);
+  document.getElementById('kLvSub').textContent = (a.partial ? 'YTD ' : 'FY ')+yr;
+  document.getElementById('hWater').textContent = 'Headcount Bridge — '+(a.partial ? 'YTD ' : 'FY ')+yr+' (Waterfall)';
+  document.getElementById('kVs').textContent = fmt(a.voluntary);
+  document.getElementById('kIs').textContent = fmt(a.involuntary);
+  document.getElementById('kRate').textContent = a.rateAnnPct+'%';
+}
 
-      /* ---------- DEMOGRAPHIC (Chart.js) — all series come from CUR (slicer state) ---------- */
-      function demoCharts() {
-        const ink = css('--ink'),
-          grid = css('--grid'),
-          vng = css('--vng'),
-          zalo = css('--zalo'),
-          green = css('--green'),
-          purple = css('--purple');
-        const barLabels = { color: ink, font: { weight: 700, size: 10 }, anchor: 'end', align: 'end', display: true };
-        const primary = CUR.view,
-          secondary = primary === 'bu' ? 'fam' : 'bu';
-        document.getElementById('hBu').textContent = DIM_TITLE[primary];
-        document.getElementById('hFam').textContent = DIM_TITLE[secondary];
-        const pri = CUR.byDim[primary],
-          sec = CUR.byDim[secondary];
+/* ---------- DEMOGRAPHIC (Chart.js) — all series come from CUR (slicer state) ---------- */
+function demoCharts(){
+  const ink=css('--ink'), grid=css('--grid'), vng=css('--vng'), zalo=css('--zalo'), green=css('--green'), purple=css('--purple');
+  const barLabels = { color: ink, font:{weight:700,size:10}, anchor:'end', align:'end', display:true };
+  const primary = CUR.view, secondary = primary==='bu' ? 'fam' : 'bu';
+  document.getElementById('hBu').textContent = DIM_TITLE[primary];
+  document.getElementById('hFam').textContent = DIM_TITLE[secondary];
+  const pri = CUR.byDim[primary], sec = CUR.byDim[secondary];
 
-        CHARTS.push(
-          new Chart('cBu', {
-            type: 'bar',
-            data: {
-              labels: pri.map((r) => r[0]),
-              datasets: [{ data: pri.map((r) => r[1]), backgroundColor: zalo, borderRadius: 5, maxBarThickness: 22 }],
-            },
-            options: {
-              indexAxis: 'y',
-              maintainAspectRatio: false,
-              layout: { padding: { right: 34 } },
-              scales: {
-                x: { grid: { color: grid }, ticks: { color: css('--muted') } },
-                y: { grid: { display: false }, ticks: { color: ink, font: { weight: 600 } } },
-              },
-              plugins: { datalabels: { ...barLabels, formatter: fmt } },
-            },
-          })
-        );
+  CHARTS.push(new Chart('cBu',{type:'bar',data:{labels:pri.map(r=>r[0]),datasets:[{data:pri.map(r=>r[1]),backgroundColor:zalo,borderRadius:5,maxBarThickness:22}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:34}},scales:{x:{grid:{color:grid},ticks:{color:css('--muted')}},y:{grid:{display:false},ticks:{color:ink,font:{weight:600}}}},plugins:{datalabels:{...barLabels,formatter:fmt}}}}));
 
-        CHARTS.push(
-          new Chart('cFam', {
-            type: 'bar',
-            data: {
-              labels: sec.map((r) => r[0]),
-              datasets: [{ data: sec.map((r) => r[1]), backgroundColor: vng, borderRadius: 5, maxBarThickness: 22 }],
-            },
-            options: {
-              indexAxis: 'y',
-              maintainAspectRatio: false,
-              layout: { padding: { right: 34 } },
-              scales: {
-                x: { grid: { color: grid }, ticks: { color: css('--muted') } },
-                y: { grid: { display: false }, ticks: { color: ink, font: { weight: 600 } } },
-              },
-              plugins: { datalabels: { ...barLabels, formatter: fmt } },
-            },
-          })
-        );
+  CHARTS.push(new Chart('cFam',{type:'bar',data:{labels:sec.map(r=>r[0]),datasets:[{data:sec.map(r=>r[1]),backgroundColor:vng,borderRadius:5,maxBarThickness:22}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:34}},scales:{x:{grid:{color:grid},ticks:{color:css('--muted')}},y:{grid:{display:false},ticks:{color:ink,font:{weight:600}}}},plugins:{datalabels:{...barLabels,formatter:fmt}}}}));
 
-        // Age × gender diverging pyramid: male negative, female positive
-        CHARTS.push(
-          new Chart('cPyr', {
-            type: 'bar',
-            data: {
-              labels: CUR.pyramid.map((r) => r[0]),
-              datasets: [
-                {
-                  label: 'Male',
-                  data: CUR.pyramid.map((r) => -r[1]),
-                  backgroundColor: zalo,
-                  borderRadius: 4,
-                  maxBarThickness: 16,
-                },
-                {
-                  label: 'Female',
-                  data: CUR.pyramid.map((r) => r[2]),
-                  backgroundColor: vng,
-                  borderRadius: 4,
-                  maxBarThickness: 16,
-                },
-              ],
-            },
-            options: {
-              indexAxis: 'y',
-              maintainAspectRatio: false,
-              scales: {
-                x: {
-                  stacked: true,
-                  grid: { color: grid },
-                  ticks: { color: css('--muted'), callback: (v) => fmt(Math.abs(v)) },
-                },
-                y: { stacked: true, grid: { display: false }, ticks: { color: ink, font: { weight: 600 } } },
-              },
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'bottom',
-                  labels: { color: css('--muted'), boxWidth: 9, font: { size: 10 } },
-                },
-                tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + fmt(Math.abs(c.parsed.x)) } },
-              },
-            },
-          })
-        );
+  // Age × gender diverging pyramid: male negative, female positive
+  CHARTS.push(new Chart('cPyr',{type:'bar',data:{labels:CUR.pyramid.map(r=>r[0]),datasets:[
+      {label:'Male',data:CUR.pyramid.map(r=>-r[1]),backgroundColor:zalo,borderRadius:4,maxBarThickness:16},
+      {label:'Female',data:CUR.pyramid.map(r=>r[2]),backgroundColor:vng,borderRadius:4,maxBarThickness:16}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{stacked:true,grid:{color:grid},ticks:{color:css('--muted'),callback:v=>fmt(Math.abs(v))}},y:{stacked:true,grid:{display:false},ticks:{color:ink,font:{weight:600}}}},plugins:{legend:{display:true,position:'bottom',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(Math.abs(c.parsed.x))}}}}}));
 
-        CHARTS.push(
-          new Chart('cType', {
-            type: 'doughnut',
-            data: {
-              labels: CUR.typeMix.map((r) => r[0]),
-              datasets: [
-                {
-                  data: CUR.typeMix.map((r) => r[1]),
-                  backgroundColor: [green, zalo, vng, purple, '#e0623a', '#8a99ab'],
-                  borderWidth: 0,
-                },
-              ],
-            },
-            options: {
-              maintainAspectRatio: false,
-              cutout: '62%',
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'right',
-                  labels: { color: css('--muted'), boxWidth: 9, font: { size: 10 } },
-                },
-                datalabels: {
-                  display: true,
-                  color: '#fff',
-                  font: { weight: 700, size: 9 },
-                  formatter: (v) => (v > 150 ? fmt(v) : ''),
-                },
-              },
-            },
-          })
-        );
+  CHARTS.push(new Chart('cType',{type:'doughnut',data:{labels:CUR.typeMix.map(r=>r[0]),datasets:[{data:CUR.typeMix.map(r=>r[1]),backgroundColor:[green,zalo,vng,purple,'#e0623a','#8a99ab'],borderWidth:0}]},
+    options:{maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},datalabels:{display:true,color:'#fff',font:{weight:700,size:9},formatter:(v)=>v>150?fmt(v):''}}}}));
 
-        CHARTS.push(
-          new Chart('cTrend', {
-            type: 'line',
-            data: {
-              labels: CUR.hcTrend.map((r) => r[0]),
-              datasets: [
-                {
-                  data: CUR.hcTrend.map((r) => r[1]),
-                  borderColor: green,
-                  backgroundColor: 'rgba(22,163,74,.10)',
-                  fill: true,
-                  tension: 0.35,
-                  pointRadius: 2,
-                  borderWidth: 2,
-                },
-              ],
-            },
-            options: {
-              maintainAspectRatio: false,
-              scales: {
-                x: { grid: { display: false }, ticks: { color: css('--muted'), font: { size: 9 }, maxRotation: 0 } },
-                y: { grid: { color: grid }, ticks: { color: css('--muted') } },
-              },
-              plugins: { datalabels: { display: false } },
-            },
-          })
-        );
-      }
+  CHARTS.push(new Chart('cTrend',{type:'line',data:{labels:CUR.hcTrend.map(r=>r[0]),datasets:[{data:CUR.hcTrend.map(r=>r[1]),borderColor:green,backgroundColor:'rgba(22,163,74,.10)',fill:true,tension:.35,pointRadius:2,borderWidth:2}]},
+    options:{maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:css('--muted'),font:{size:9},maxRotation:0}},y:{grid:{color:grid},ticks:{color:css('--muted')}}},plugins:{datalabels:{display:false}}}}));
+}
 
-      /* ---------- ATTRITION (Chart.js + ECharts waterfall) ---------- */
-      function attrCharts() {
-        const ink = css('--ink'),
-          grid = css('--grid'),
-          vng = css('--vng'),
-          zalo = css('--zalo'),
-          green = css('--green'),
-          vs = css('--vs'),
-          is = css('--is');
+/* ---------- ATTRITION (Chart.js + ECharts waterfall) ---------- */
+function attrCharts(){
+  const ink=css('--ink'), grid=css('--grid'), vng=css('--vng'), zalo=css('--zalo'), green=css('--green'), vs=css('--vs'), is=css('--is');
 
-        CHARTS.push(
-          new Chart('cReason', {
-            type: 'bar',
-            data: {
-              labels: YD.reasonGroups.map((r) => r[0]),
-              datasets: [
-                { data: YD.reasonGroups.map((r) => r[1]), backgroundColor: vng, borderRadius: 5, maxBarThickness: 22 },
-              ],
-            },
-            options: {
-              indexAxis: 'y',
-              maintainAspectRatio: false,
-              layout: { padding: { right: 30 } },
-              scales: {
-                x: { grid: { color: grid }, ticks: { color: css('--muted') } },
-                y: { grid: { display: false }, ticks: { color: ink, font: { weight: 600, size: 10 } } },
-              },
-              plugins: {
-                datalabels: { color: ink, font: { weight: 700, size: 10 }, anchor: 'end', align: 'end', display: true },
-              },
-            },
-          })
-        );
+  CHARTS.push(new Chart('cReason',{type:'bar',data:{labels:YD.reasonGroups.map(r=>r[0]),datasets:[{data:YD.reasonGroups.map(r=>r[1]),backgroundColor:vng,borderRadius:5,maxBarThickness:22}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,layout:{padding:{right:30}},scales:{x:{grid:{color:grid},ticks:{color:css('--muted')}},y:{grid:{display:false},ticks:{color:ink,font:{weight:600,size:10}}}},plugins:{datalabels:{color:ink,font:{weight:700,size:10},anchor:'end',align:'end',display:true}}}}));
 
-        // Attrition by BU: leavers bar + rate line (dual axis)
-        const rate = YD.attrByBu.map((r) => Math.round((r[1] / r[2]) * 1000) / 10);
-        CHARTS.push(
-          new Chart('cAttrBu', {
-            data: {
-              labels: YD.attrByBu.map((r) => r[0]),
-              datasets: [
-                {
-                  type: 'bar',
-                  label: 'Leavers',
-                  data: YD.attrByBu.map((r) => r[1]),
-                  backgroundColor: zalo,
-                  borderRadius: 5,
-                  maxBarThickness: 26,
-                  yAxisID: 'y',
-                },
-                {
-                  type: 'line',
-                  label: 'YTD %',
-                  data: rate,
-                  borderColor: vng,
-                  backgroundColor: vng,
-                  pointRadius: 3,
-                  borderWidth: 2,
-                  yAxisID: 'y1',
-                },
-              ],
-            },
-            options: {
-              maintainAspectRatio: false,
-              scales: {
-                x: { grid: { display: false }, ticks: { color: ink, font: { weight: 600 } } },
-                y: { grid: { color: grid }, ticks: { color: css('--muted') } },
-                y1: { position: 'right', grid: { display: false }, ticks: { color: vng, callback: (v) => v + '%' } },
-              },
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'bottom',
-                  labels: { color: css('--muted'), boxWidth: 9, font: { size: 10 } },
-                },
-                datalabels: { display: false },
-              },
-            },
-          })
-        );
+  // Attrition by BU: leavers bar + rate line (dual axis)
+  const rate = YD.attrByBu.map(r=>Math.round(r[1]/r[2]*1000)/10);
+  CHARTS.push(new Chart('cAttrBu',{data:{labels:YD.attrByBu.map(r=>r[0]),datasets:[
+      {type:'bar',label:'Leavers',data:YD.attrByBu.map(r=>r[1]),backgroundColor:zalo,borderRadius:5,maxBarThickness:26,yAxisID:'y'},
+      {type:'line',label:'YTD %',data:rate,borderColor:vng,backgroundColor:vng,pointRadius:3,borderWidth:2,yAxisID:'y1'}]},
+    options:{maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:ink,font:{weight:600}}},y:{grid:{color:grid},ticks:{color:css('--muted')}},y1:{position:'right',grid:{display:false},ticks:{color:vng,callback:v=>v+'%'}}},plugins:{legend:{display:true,position:'bottom',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},datalabels:{display:false}}}}));
 
-        CHARTS.push(
-          new Chart('cFlow', {
-            data: {
-              labels: YD.monthlyFlow.map((r) => r[0]),
-              datasets: [
-                {
-                  type: 'bar',
-                  label: 'Joiners',
-                  data: YD.monthlyFlow.map((r) => r[1]),
-                  backgroundColor: green,
-                  borderRadius: 5,
-                  maxBarThickness: 24,
-                },
-                {
-                  type: 'bar',
-                  label: 'Leavers',
-                  data: YD.monthlyFlow.map((r) => r[2]),
-                  backgroundColor: vng,
-                  borderRadius: 5,
-                  maxBarThickness: 24,
-                },
-              ],
-            },
-            options: {
-              maintainAspectRatio: false,
-              scales: {
-                x: { grid: { display: false }, ticks: { color: ink, font: { weight: 600 } } },
-                y: { grid: { color: grid }, ticks: { color: css('--muted') } },
-              },
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'bottom',
-                  labels: { color: css('--muted'), boxWidth: 9, font: { size: 10 } },
-                },
-                datalabels: { display: false },
-              },
-            },
-          })
-        );
+  CHARTS.push(new Chart('cFlow',{data:{labels:YD.monthlyFlow.map(r=>r[0]),datasets:[
+      {type:'bar',label:'Joiners',data:YD.monthlyFlow.map(r=>r[1]),backgroundColor:green,borderRadius:5,maxBarThickness:24},
+      {type:'bar',label:'Leavers',data:YD.monthlyFlow.map(r=>r[2]),backgroundColor:vng,borderRadius:5,maxBarThickness:24}]},
+    options:{maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:ink,font:{weight:600}}},y:{grid:{color:grid},ticks:{color:css('--muted')}}},plugins:{legend:{display:true,position:'bottom',labels:{color:css('--muted'),boxWidth:9,font:{size:10}}},datalabels:{display:false}}}}));
 
-        waterfallChart();
-      }
+  waterfallChart();
+}
 
-      function waterfallChart() {
-        const el = document.getElementById('cWaterfall');
-        if (!el) return;
-        const e = echarts.init(el, null, { renderer: 'canvas' });
-        ECHARTS.push(e);
-        const ink = css('--ink'),
-          muted = css('--muted'),
-          line = css('--line'),
-          vs = css('--vs'),
-          is = css('--is'),
-          green = css('--green'),
-          zalo = css('--zalo');
-        // Build floating bars: base (transparent) + visible delta.
-        const rows = YD.waterfall;
-        let running = 0;
-        const base = [],
-          up = [],
-          down = [],
-          tot = [];
-        rows.forEach(([lab, val, isTot]) => {
-          if (isTot) {
-            base.push(0);
-            up.push(0);
-            down.push(0);
-            tot.push(val);
-          } else if (val >= 0) {
-            base.push(running);
-            up.push(val);
-            down.push(0);
-            tot.push('-');
-            running += val;
-          } else {
-            running += val;
-            base.push(running);
-            up.push(0);
-            down.push(-val);
-            tot.push('-');
-          }
-          if (isTot) running = val;
-        });
-        // Floor the y-axis just below the lowest running total so descending steps aren't clipped.
-        const bottoms = rows.map((r, i) => (r[2] ? null : base[i])).filter((b) => b !== null && b > 0);
-        const axisMin = Math.max(0, Math.floor(Math.min(...bottoms) / 100) * 100 - 100);
-        e.setOption({
-          grid: { left: 8, right: 10, top: 16, bottom: 24, containLabel: true },
-          xAxis: {
-            type: 'category',
-            data: rows.map((r) => r[0]),
-            axisLabel: { color: muted, fontSize: 10, lineHeight: 12 },
-            axisLine: { lineStyle: { color: line } },
-            axisTick: { show: false },
-          },
-          yAxis: {
-            type: 'value',
-            min: axisMin,
-            axisLabel: { color: muted },
-            splitLine: { lineStyle: { color: css('--grid') } },
-          },
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-          series: [
-            { type: 'bar', stack: 'w', itemStyle: { color: 'transparent' }, data: base, silent: true },
-            {
-              type: 'bar',
-              stack: 'w',
-              data: tot.map((v) => (v === '-' ? '-' : v)),
-              itemStyle: { color: zalo, borderRadius: [3, 3, 0, 0] },
-              label: {
-                show: true,
-                position: 'top',
-                color: ink,
-                fontWeight: 700,
-                formatter: (p) => (p.value === '-' ? '' : p.value.toLocaleString()),
-              },
-            },
-            {
-              type: 'bar',
-              stack: 'w',
-              data: up,
-              itemStyle: { color: green, borderRadius: [3, 3, 0, 0] },
-              label: {
-                show: true,
-                position: 'top',
-                color: green,
-                fontWeight: 700,
-                formatter: (p) => (p.value > 0 ? '+' + p.value : ''),
-              },
-            },
-            {
-              type: 'bar',
-              stack: 'w',
-              data: down,
-              itemStyle: { color: vs, borderRadius: [3, 3, 0, 0] },
-              label: {
-                show: true,
-                position: 'top',
-                color: vs,
-                fontWeight: 700,
-                formatter: (p) => (p.value > 0 ? '−' + p.value : ''),
-              },
-            },
-          ],
-        });
-      }
+function waterfallChart(){
+  const el=document.getElementById('cWaterfall'); if(!el) return;
+  const e=echarts.init(el,null,{renderer:'canvas'}); ECHARTS.push(e);
+  const ink=css('--ink'), muted=css('--muted'), line=css('--line'), vs=css('--vs'), is=css('--is'), green=css('--green'), zalo=css('--zalo');
+  // Build floating bars: base (transparent) + visible delta.
+  const rows=YD.waterfall; let running=0; const base=[], up=[], down=[], tot=[];
+  rows.forEach(([lab,val,isTot])=>{
+    if(isTot){ base.push(0); up.push(0); down.push(0); tot.push(val); }
+    else if(val>=0){ base.push(running); up.push(val); down.push(0); tot.push('-'); running+=val; }
+    else { running+=val; base.push(running); up.push(0); down.push(-val); tot.push('-'); }
+    if(isTot) running=val;
+  });
+  // Floor the y-axis just below the lowest running total so descending steps aren't clipped.
+  const bottoms = rows.map((r,i)=> r[2] ? null : base[i]).filter(b=>b!==null && b>0);
+  const axisMin = Math.max(0, Math.floor(Math.min(...bottoms)/100)*100 - 100);
+  e.setOption({
+    grid:{left:8,right:10,top:16,bottom:24,containLabel:true},
+    xAxis:{type:'category',data:rows.map(r=>r[0]),axisLabel:{color:muted,fontSize:10,lineHeight:12},axisLine:{lineStyle:{color:line}},axisTick:{show:false}},
+    yAxis:{type:'value',min:axisMin,axisLabel:{color:muted},splitLine:{lineStyle:{color:css('--grid')}}},
+    tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+    series:[
+      {type:'bar',stack:'w',itemStyle:{color:'transparent'},data:base,silent:true},
+      {type:'bar',stack:'w',data:tot.map(v=>v==='-'?'-':v),itemStyle:{color:zalo,borderRadius:[3,3,0,0]},label:{show:true,position:'top',color:ink,fontWeight:700,formatter:p=>p.value==='-'?'':p.value.toLocaleString()}},
+      {type:'bar',stack:'w',data:up,itemStyle:{color:green,borderRadius:[3,3,0,0]},label:{show:true,position:'top',color:green,fontWeight:700,formatter:p=>p.value>0?'+'+p.value:''}},
+      {type:'bar',stack:'w',data:down,itemStyle:{color:vs,borderRadius:[3,3,0,0]},label:{show:true,position:'top',color:vs,fontWeight:700,formatter:p=>p.value>0?'−'+p.value:''}}
+    ]
+  });
+}
 
-      /* ---------- COHORT & FLOWS (ECharts) ---------- */
-      function cohortCharts() {
-        heatmapChart();
-        curveChart();
-        bubbleChart();
-        sankeyChart();
-      }
-      function heatmapChart() {
-        const el = document.getElementById('cHeatmap');
-        if (!el) return;
-        const e = echarts.init(el);
-        ECHARTS.push(e);
-        const muted = css('--muted'),
-          cohorts = YD.cohort.map((r) => r[0]),
-          cols = ['3 mo', '6 mo', '12 mo'];
-        const data = [];
-        YD.cohort.forEach((r, y) => {
-          [r[2], r[3], r[4]].forEach((v, x) => data.push([x, y, v]));
-        });
-        e.setOption({
-          grid: { left: 8, right: 14, top: 8, bottom: 44, containLabel: true },
-          tooltip: {
-            position: 'top',
-            formatter: (p) => cohorts[p.data[1]] + ' · ' + cols[p.data[0]] + ': ' + p.data[2] + '%',
-          },
-          xAxis: {
-            type: 'category',
-            data: cols,
-            splitArea: { show: true },
-            axisLabel: { color: muted },
-            axisLine: { show: false },
-            axisTick: { show: false },
-          },
-          yAxis: {
-            type: 'category',
-            data: cohorts,
-            axisLabel: { color: muted, fontSize: 10 },
-            axisLine: { show: false },
-            axisTick: { show: false },
-          },
-          visualMap: {
-            min: 0,
-            max: 100,
-            calculable: true,
-            orient: 'horizontal',
-            left: 'center',
-            bottom: 6,
-            itemWidth: 12,
-            itemHeight: 120,
-            textStyle: { color: muted, fontSize: 9 },
-            inRange: { color: ['#fde7dc', '#f7b48a', '#F26F21', '#2F7FF0', '#16418f'] },
-          },
-          series: [
-            {
-              type: 'heatmap',
-              data: data,
-              label: { show: true, formatter: (p) => p.data[2] + '%', color: '#fff', fontWeight: 700, fontSize: 10 },
-              itemStyle: { borderColor: css('--card'), borderWidth: 2, borderRadius: 4 },
-            },
-          ],
-        });
-      }
-      function curveChart() {
-        const el = document.getElementById('cCurve');
-        if (!el) return;
-        const e = echarts.init(el);
-        ECHARTS.push(e);
-        const muted = css('--muted'),
-          pal = ['#16A34A', '#22c55e', '#2F7FF0', '#7C6CF0', '#F26F21', '#e0623a', '#f59e0b', '#ef4444'];
-        const series = YD.cohort.map((r, i) => ({
-          name: r[0],
-          type: 'line',
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 5,
-          lineStyle: { width: 2 },
-          itemStyle: { color: pal[i % pal.length] },
-          data: [100, r[2], r[3], r[4]],
-        }));
-        e.setOption({
-          grid: { left: 8, right: 12, top: 14, bottom: 20, containLabel: true },
-          tooltip: { trigger: 'axis' },
-          legend: { type: 'scroll', bottom: 0, textStyle: { color: muted, fontSize: 9 }, itemWidth: 10, itemHeight: 8 },
-          xAxis: {
-            type: 'category',
-            data: ['Hire', '3 mo', '6 mo', '12 mo'],
-            boundaryGap: false,
-            axisLabel: { color: muted },
-            axisLine: { lineStyle: { color: css('--line') } },
-          },
-          yAxis: {
-            type: 'value',
-            max: 100,
-            axisLabel: { color: muted, formatter: '{value}%' },
-            splitLine: { lineStyle: { color: css('--grid') } },
-          },
-          series,
-        });
-      }
-      function bubbleChart() {
-        const el = document.getElementById('cBubble');
-        if (!el) return;
-        const e = echarts.init(el);
-        ECHARTS.push(e);
-        const muted = css('--muted'),
-          pal = ['#2F7FF0', '#F26F21', '#16A34A', '#7C6CF0', '#e0623a', '#f59e0b', '#0ea5e9', '#ef4444'];
-        const data = YD.bubble.map((r, i) => ({
-          name: r[0],
-          value: [r[1], r[2], r[3]],
-          itemStyle: { color: pal[i % pal.length], opacity: 0.78 },
-        }));
-        e.setOption({
-          grid: { left: 8, right: 16, top: 16, bottom: 34, containLabel: true },
-          tooltip: {
-            formatter: (p) =>
-              '<b>' +
-              p.data.name +
-              '</b><br>Attrition: ' +
-              p.value[0] +
-              '%<br>Tenure: ' +
-              p.value[1] +
-              ' yrs<br>Headcount: ' +
-              p.value[2].toLocaleString(),
-          },
-          xAxis: {
-            name: 'YTD attrition %',
-            nameLocation: 'middle',
-            nameGap: 24,
-            nameTextStyle: { color: muted, fontSize: 10 },
-            axisLabel: { color: muted, formatter: '{value}%' },
-            splitLine: { lineStyle: { color: css('--grid') } },
-          },
-          yAxis: {
-            name: 'Avg tenure (yrs)',
-            nameLocation: 'middle',
-            nameGap: 26,
-            nameTextStyle: { color: muted, fontSize: 10 },
-            axisLabel: { color: muted },
-            splitLine: { lineStyle: { color: css('--grid') } },
-          },
-          series: [
-            {
-              type: 'scatter',
-              data,
-              symbolSize: (v) => Math.max(14, Math.sqrt(v[2]) * 1.4),
-              label: {
-                show: true,
-                formatter: (p) => p.data.name,
-                position: 'inside',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 10,
-              },
-            },
-          ],
-        });
-      }
-      function sankeyChart() {
-        const el = document.getElementById('cSankey');
-        if (!el) return;
-        const e = echarts.init(el);
-        ECHARTS.push(e);
-        const muted = css('--muted');
-        const nodes = {};
-        YD.sankey.forEach(([a, b]) => {
-          nodes[a] = 1;
-          nodes['» ' + b] = 1;
-        });
-        const data = Object.keys(nodes).map((n) => ({ name: n }));
-        const links = YD.sankey.map(([a, b, v]) => ({ source: a, target: '» ' + b, value: v }));
-        e.setOption({
-          tooltip: { trigger: 'item', triggerOn: 'mousemove' },
-          series: [
-            {
-              type: 'sankey',
-              left: 6,
-              right: 120,
-              top: 10,
-              bottom: 10,
-              data,
-              links,
-              nodeGap: 8,
-              nodeWidth: 12,
-              label: { color: css('--ink'), fontSize: 10, fontWeight: 600 },
-              lineStyle: { color: 'gradient', opacity: 0.42, curveness: 0.5 },
-              itemStyle: { borderWidth: 0 },
-              levels: [
-                { depth: 0, itemStyle: { color: '#2F7FF0' } },
-                { depth: 1, itemStyle: { color: '#F26F21' } },
-              ],
-            },
-          ],
-        });
-      }
+/* ---------- COHORT & FLOWS (ECharts) ---------- */
+function cohortCharts(){
+  heatmapChart(); curveChart(); bubbleChart(); sankeyChart();
+}
+function heatmapChart(){
+  const el=document.getElementById('cHeatmap'); if(!el) return;
+  const e=echarts.init(el); ECHARTS.push(e);
+  const muted=css('--muted'), cohorts=YD.cohort.map(r=>r[0]), cols=['3 mo','6 mo','12 mo'];
+  const data=[]; YD.cohort.forEach((r,y)=>{ [r[2],r[3],r[4]].forEach((v,x)=>data.push([x,y,v])); });
+  e.setOption({
+    grid:{left:8,right:14,top:8,bottom:44,containLabel:true},
+    tooltip:{position:'top',formatter:p=>cohorts[p.data[1]]+' · '+cols[p.data[0]]+': '+p.data[2]+'%'},
+    xAxis:{type:'category',data:cols,splitArea:{show:true},axisLabel:{color:muted},axisLine:{show:false},axisTick:{show:false}},
+    yAxis:{type:'category',data:cohorts,axisLabel:{color:muted,fontSize:10},axisLine:{show:false},axisTick:{show:false}},
+    visualMap:{min:0,max:100,calculable:true,orient:'horizontal',left:'center',bottom:6,itemWidth:12,itemHeight:120,textStyle:{color:muted,fontSize:9},inRange:{color:['#fde7dc','#f7b48a','#F26F21','#2F7FF0','#16418f']}},
+    series:[{type:'heatmap',data:data,label:{show:true,formatter:p=>p.data[2]+'%',color:'#fff',fontWeight:700,fontSize:10},itemStyle:{borderColor:css('--card'),borderWidth:2,borderRadius:4}}]
+  });
+}
+function curveChart(){
+  const el=document.getElementById('cCurve'); if(!el) return;
+  const e=echarts.init(el); ECHARTS.push(e);
+  const muted=css('--muted'), pal=['#16A34A','#22c55e','#2F7FF0','#7C6CF0','#F26F21','#e0623a','#f59e0b','#ef4444'];
+  const series=YD.cohort.map((r,i)=>({name:r[0],type:'line',smooth:true,symbol:'circle',symbolSize:5,lineStyle:{width:2},itemStyle:{color:pal[i%pal.length]},data:[100,r[2],r[3],r[4]]}));
+  e.setOption({
+    grid:{left:8,right:12,top:14,bottom:20,containLabel:true},
+    tooltip:{trigger:'axis'},
+    legend:{type:'scroll',bottom:0,textStyle:{color:muted,fontSize:9},itemWidth:10,itemHeight:8},
+    xAxis:{type:'category',data:['Hire','3 mo','6 mo','12 mo'],boundaryGap:false,axisLabel:{color:muted},axisLine:{lineStyle:{color:css('--line')}}},
+    yAxis:{type:'value',max:100,axisLabel:{color:muted,formatter:'{value}%'},splitLine:{lineStyle:{color:css('--grid')}}},
+    series
+  });
+}
+function bubbleChart(){
+  const el=document.getElementById('cBubble'); if(!el) return;
+  const e=echarts.init(el); ECHARTS.push(e);
+  const muted=css('--muted'), pal=['#2F7FF0','#F26F21','#16A34A','#7C6CF0','#e0623a','#f59e0b','#0ea5e9','#ef4444'];
+  const data=YD.bubble.map((r,i)=>({name:r[0],value:[r[1],r[2],r[3]],itemStyle:{color:pal[i%pal.length],opacity:.78}}));
+  e.setOption({
+    grid:{left:8,right:16,top:16,bottom:34,containLabel:true},
+    tooltip:{formatter:p=>'<b>'+p.data.name+'</b><br>Attrition: '+p.value[0]+'%<br>Tenure: '+p.value[1]+' yrs<br>Headcount: '+p.value[2].toLocaleString()},
+    xAxis:{name:'YTD attrition %',nameLocation:'middle',nameGap:24,nameTextStyle:{color:muted,fontSize:10},axisLabel:{color:muted,formatter:'{value}%'},splitLine:{lineStyle:{color:css('--grid')}}},
+    yAxis:{name:'Avg tenure (yrs)',nameLocation:'middle',nameGap:26,nameTextStyle:{color:muted,fontSize:10},axisLabel:{color:muted},splitLine:{lineStyle:{color:css('--grid')}}},
+    series:[{type:'scatter',data,symbolSize:v=>Math.max(14,Math.sqrt(v[2])*1.4),label:{show:true,formatter:p=>p.data.name,position:'inside',color:'#fff',fontWeight:700,fontSize:10}}]
+  });
+}
+function sankeyChart(){
+  const el=document.getElementById('cSankey'); if(!el) return;
+  const e=echarts.init(el); ECHARTS.push(e);
+  const muted=css('--muted');
+  const nodes={}; YD.sankey.forEach(([a,b])=>{nodes[a]=1;nodes['» '+b]=1;});
+  const data=Object.keys(nodes).map(n=>({name:n}));
+  const links=YD.sankey.map(([a,b,v])=>({source:a,target:'» '+b,value:v}));
+  e.setOption({
+    tooltip:{trigger:'item',triggerOn:'mousemove'},
+    series:[{type:'sankey',left:6,right:120,top:10,bottom:10,data,links,
+      nodeGap:8,nodeWidth:12,
+      label:{color:css('--ink'),fontSize:10,fontWeight:600},
+      lineStyle:{color:'gradient',opacity:.42,curveness:.5},
+      itemStyle:{borderWidth:0},
+      levels:[{depth:0,itemStyle:{color:'#2F7FF0'}},{depth:1,itemStyle:{color:'#F26F21'}}]
+    }]
+  });
+}
 
-      window.addEventListener('resize', () => ECHARTS.forEach((e) => e && e.resize()));
-      populateFilters();
-      renderAll();
-    </script>
-  </body>
+window.addEventListener('resize',()=>ECHARTS.forEach(e=>e&&e.resize()));
+populateFilters();
+renderAll();
+</script>
+</body>
 </html>

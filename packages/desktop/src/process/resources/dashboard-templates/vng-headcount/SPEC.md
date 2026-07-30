@@ -17,12 +17,12 @@ redefine a metric" = edit the theme tokens / text / a metric's SQL below, then r
 
 ## Parameters
 
-| Param   | Meaning                                     | Default                     |
-| ------- | ------------------------------------------- | --------------------------- |
-| `:snap` | snapshot date for point-in-time views       | latest `MAX(snapshot_date)` |
-| `:year` | attrition / cohort year                     | current year                |
-| `:ee`   | `type_of_employee` filter, or `ALL`         | `ALL`                       |
-| `:view` | `bu` or `job_family` for the breakdown axis | `bu`                        |
+| Param | Meaning | Default |
+| --- | --- | --- |
+| `:snap` | snapshot date for point-in-time views | latest `MAX(snapshot_date)` |
+| `:year` | attrition / cohort year | current year |
+| `:ee` | `type_of_employee` filter, or `ALL` | `ALL` |
+| `:view` | `bu` or `job_family` for the breakdown axis | `bu` |
 
 Apply `:ee` as `AND (:ee = 'ALL' OR type_of_employee = :ee)` on any point-in-time query.
 
@@ -85,8 +85,8 @@ These slots live under `DASH_DATA.years["<year>"]` and switch with the **Year** 
 per year; `attrKpis.partial` = true for the still-running year so the KPI reads "YTD" vs "FY"). Month,
 EE Type, and View-by do not apply here.
 
-`SLOT:attrKpis`
 
+`SLOT:attrKpis`
 ```sql
 SELECT COUNT(*) leavers,
   SUM(CASE WHEN leaving_type IN ('VS','VSP') THEN 1 ELSE 0 END) voluntary,
@@ -96,7 +96,6 @@ WHERE end_date IS NOT NULL AND year(end_date) = :year;
 ```
 
 `SLOT:reasonGroups`
-
 ```sql
 SELECT leaving_reason_group_1 k, COUNT(*) v FROM hr_data_headcount_dev.hrdev.v_hr_headcount
 WHERE end_date IS NOT NULL AND year(end_date) = :year AND leaving_reason_group_1 IS NOT NULL
@@ -104,7 +103,6 @@ GROUP BY leaving_reason_group_1 ORDER BY v DESC;
 ```
 
 `SLOT:attrByBu` (leavers + current headcount denominator)
-
 ```sql
 SELECT l.bu, l.leavers, h.hc FROM
   (SELECT bu, COUNT(*) leavers FROM hr_data_headcount_dev.hrdev.v_hr_headcount
@@ -116,7 +114,6 @@ ORDER BY l.leavers DESC;
 ```
 
 `SLOT:monthlyFlow`
-
 ```sql
 SELECT m month,
   (SELECT COUNT(*) FROM hr_data_headcount_dev.hrdev.v_hr_headcount WHERE year(join_date)=:year AND month(join_date)=m) joiners,
@@ -130,7 +127,6 @@ FROM UNNEST(SEQUENCE(1, month(current_date))) AS t(m) ORDER BY m;
 `Closing` = gross at `:snap`.
 
 `SLOT:cohort`
-
 ```sql
 WITH j AS (
   SELECT DISTINCT id, join_date, end_date FROM hr_data_headcount_dev.hrdev.v_hr_headcount
@@ -145,7 +141,6 @@ FROM j GROUP BY date_trunc('quarter', join_date), quarter(join_date) ORDER BY 1;
 ```
 
 `SLOT:bubble`
-
 ```sql
 SELECT h.bu, ROUND(100.0*l.leavers/h.hc,1) attrition_pct,
   ROUND(t.tenure,1) tenure_yrs, h.hc
@@ -162,7 +157,6 @@ ORDER BY h.hc DESC;
 ```
 
 `SLOT:sankey`
-
 ```sql
 SELECT bu, leaving_reason_group_1 reason, COUNT(*) leavers
 FROM hr_data_headcount_dev.hrdev.v_hr_headcount
