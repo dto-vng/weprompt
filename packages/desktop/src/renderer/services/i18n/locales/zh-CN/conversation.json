@@ -91,6 +91,7 @@
     "knowledgePreviewNote": "这是助手检索所用的索引文本，不是原始排版。",
     "knowledgePreviewTruncated": "预览已截断。查看完整文档请打开原文件。",
     "knowledgePreviewError": "无法加载该文件的索引文本。",
+    "knowledgeCitationMissing": "该文件已不在知识库中。",
     "knowledgeStatusNote": "提示"
   },
   "history": {

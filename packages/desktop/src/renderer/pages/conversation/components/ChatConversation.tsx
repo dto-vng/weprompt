@@ -36,6 +36,7 @@ import { isLegacyReadOnlyConversationType } from '../utils/conversationRuntime';
 import { resolveConversationBackend } from '../utils/conversationAssistantIdentity';
 import LegacyReadOnlyConversation from '../platforms/legacy/LegacyReadOnlyConversation';
 import { useActiveLease } from '../hooks/useActiveLease';
+import { KnowledgeCitationsProvider } from '../knowledge/KnowledgeCitationsContext';
 // import SkillRuleGenerator from './components/SkillRuleGenerator'; // Temporarily hidden
 
 const configErrorMessageKey = (error: unknown) => {
@@ -338,7 +339,11 @@ const ChatConversation: React.FC<{
   }, [t]);
 
   if (conversation && conversation.type === 'aionrs') {
-    return <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />;
+    return (
+      <KnowledgeCitationsProvider conversation={conversation}>
+        <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />
+      </KnowledgeCitationsProvider>
+    );
   }
 
   // 如果有预设助手信息，使用预设助手的 logo 和名称；加载中时不进入 fallback；否则使用 backend 的 logo
@@ -366,22 +371,24 @@ const ChatConversation: React.FC<{
   );
 
   return (
-    <ChatLayout
-      title={conversation?.name}
-      {...chatLayoutProps}
-      headerExtra={headerExtraNode}
-      siderTitle={sliderTitle}
-      sider={<ChatSlider conversation={conversation} />}
-      workspaceEnabled={workspaceEnabled}
-      workspacePresentation='project-menu'
-      workspacePath={conversation?.extra?.workspace}
-      isTemporaryWorkspace={
-        (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
-      }
-      conversation_id={conversation?.id}
-    >
-      {conversationNode}
-    </ChatLayout>
+    <KnowledgeCitationsProvider conversation={conversation}>
+      <ChatLayout
+        title={conversation?.name}
+        {...chatLayoutProps}
+        headerExtra={headerExtraNode}
+        siderTitle={sliderTitle}
+        sider={<ChatSlider conversation={conversation} />}
+        workspaceEnabled={workspaceEnabled}
+        workspacePresentation='project-menu'
+        workspacePath={conversation?.extra?.workspace}
+        isTemporaryWorkspace={
+          (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
+        }
+        conversation_id={conversation?.id}
+      >
+        {conversationNode}
+      </ChatLayout>
+    </KnowledgeCitationsProvider>
   );
 };
 

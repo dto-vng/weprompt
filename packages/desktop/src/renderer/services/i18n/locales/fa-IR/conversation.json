@@ -91,6 +91,7 @@
     "knowledgePreviewNote": "این متنِ نمایه‌شده است که دستیار در آن جست‌وجو می‌کند، نه چیدمان اصلی.",
     "knowledgePreviewTruncated": "پیش‌نمایش کوتاه شده است. برای دیدن کل سند فایل اصلی را باز کنید.",
     "knowledgePreviewError": "متن نمایه‌شدهٔ این فایل بارگیری نشد.",
+    "knowledgeCitationMissing": "این فایل دیگر در پایگاه دانش نیست.",
     "knowledgeStatusNote": "یادداشت"
   },
   "history": {

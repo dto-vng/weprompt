@@ -91,6 +91,7 @@
     "knowledgePreviewNote": "Bu, asistanın aradığı dizinlenmiş metindir; özgün sayfa düzeni değildir.",
     "knowledgePreviewTruncated": "Ön izleme kısaltıldı. Belgenin tamamı için özgün dosyayı açın.",
     "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi.",
+    "knowledgeCitationMissing": "Bu dosya artık bilgi bankasında değil.",
     "knowledgeStatusNote": "Not"
   },
   "history": {

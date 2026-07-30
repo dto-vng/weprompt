@@ -6,8 +6,10 @@
 
 import MarkdownView from '@/renderer/components/Markdown';
 import { Alert, Button, Drawer, Spin } from '@arco-design/web-react';
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { findCitationHeading } from './knowledgePreviewAnchor';
 
 export type KnowledgeSourcePreviewProps = {
   fileName: string | null;
@@ -15,6 +17,8 @@ export type KnowledgeSourcePreviewProps = {
   truncated: boolean;
   loading: boolean;
   failed: boolean;
+  /** Citation headingPath to scroll to once the text loads (no match → top). */
+  anchor?: string;
   onClose: () => void;
   onOpenOriginal: () => void;
 };
@@ -32,10 +36,28 @@ const KnowledgeSourcePreview: React.FC<KnowledgeSourcePreviewProps> = ({
   truncated,
   loading,
   failed,
+  anchor,
   onClose,
   onOpenOriginal,
 }) => {
   const { t } = useTranslation();
+  const markdownBodyRef = useRef<HTMLDivElement | null>(null);
+  const handleMarkdownRef = useCallback((el?: HTMLDivElement | null) => {
+    markdownBodyRef.current = el ?? null;
+  }, []);
+
+  // Scroll the loaded preview to the cited section. One frame lets the
+  // markdown commit inside the drawer before we measure; no match → stay at top.
+  useEffect(() => {
+    if (loading || failed || !anchor || fileName === null) return;
+    const frame = requestAnimationFrame(() => {
+      const container = markdownBodyRef.current;
+      if (!container) return;
+      const heading = findCitationHeading(container, anchor);
+      heading?.scrollIntoView?.({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, failed, fileName, loading, text]);
 
   return (
     <Drawer
@@ -62,7 +84,9 @@ const KnowledgeSourcePreview: React.FC<KnowledgeSourcePreviewProps> = ({
           <Alert type='warning' content={t('conversation.projectHome.knowledgePreviewError')} />
         ) : (
           <>
-            <MarkdownView hiddenCodeCopyButton>{text}</MarkdownView>
+            <MarkdownView hiddenCodeCopyButton onRef={handleMarkdownRef}>
+              {text}
+            </MarkdownView>
             {truncated && (
               <span className='text-12px text-t-tertiary'>
                 {t('conversation.projectHome.knowledgePreviewTruncated')}
