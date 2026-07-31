@@ -11,7 +11,7 @@ import { useKnowledgeCitationsSafe } from '@/renderer/pages/conversation/knowled
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useLocalFilePreview } from '@/renderer/pages/conversation/Preview/hooks/useLocalFilePreview';
 import { iconColors } from '@/renderer/styles/colors';
-import { Alert, Message, Tooltip } from '@arco-design/web-react';
+import { Alert, Button, Message, Tooltip } from '@arco-design/web-react';
 import { Copy, Brain } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -291,15 +291,22 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
       });
   };
 
+  // A real focusable Button, so `focus-visible:opacity-100` can actually fire. The div this
+  // replaces carried `focus-within:` variants that could never match — it had no focusable
+  // descendant and was not focusable itself — plus `pointer-events-none`, which would have
+  // blocked activation even once focused. Both are gone.
+  const copyLabel = t('common.copy', { defaultValue: 'Copy' });
   const copyButton = (
-    <Tooltip content={t('common.copy', { defaultValue: 'Copy' })}>
-      <div
-        className='p-4px rd-4px cursor-pointer hover:bg-3 transition-colors opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+    <Tooltip content={copyLabel}>
+      <Button
+        type='text'
+        size='mini'
+        shape='circle'
+        aria-label={copyLabel}
+        className='!p-4px !h-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity'
         onClick={handleCopy}
-        style={{ lineHeight: 0 }}
-      >
-        <Copy theme='outline' size='16' fill={iconColors.secondary} />
-      </div>
+        icon={<Copy theme='outline' size='16' fill={iconColors.secondary} />}
+      />
     </Tooltip>
   );
 
@@ -360,12 +367,17 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
               <Brain theme='outline' size='13' fill='var(--bg-6)' />
               <span>{t('messages.reasoning')}</span>
             </div>
-            <div
-              className='pl-12px text-13px text-t-secondary whitespace-pre-wrap [word-break:break-word]'
-              style={{ borderLeft: '2px solid var(--color-border-2)', lineHeight: 1.6 }}
-            >
-              {reasoning}
-            </div>
+            {/* Bounded and collapsed by default: an unbounded chain-of-thought pushed the
+                actual answer arbitrarily far down the scroller. MessageThinking, the sibling
+                surface for the same content class, already collapses. */}
+            <CollapsibleContent maxHeight={160} defaultCollapsed={true} useMask>
+              <div
+                className='pl-12px text-13px text-t-secondary whitespace-pre-wrap [word-break:break-word]'
+                style={{ borderLeft: '2px solid var(--color-border-2)', lineHeight: 1.6 }}
+              >
+                {reasoning}
+              </div>
+            </CollapsibleContent>
           </div>
         )}
         <div
