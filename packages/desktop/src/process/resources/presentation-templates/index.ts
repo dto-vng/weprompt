@@ -67,7 +67,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'editorial-field-report',
       name: 'Editorial Field Report',
-      description: 'Print-influenced editorial HTML report — serif type, one red accent, prose over bullets',
+      description: 'Long-read report — serif type, prose over bullets, one red accent.',
       format: 'html',
       kind: 'report',
       source: 'builtin',
@@ -84,7 +84,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'simple-light',
       name: 'Simple Light',
-      description: 'Minimal light slide deck — one idea per slide, single blue accent',
+      description: 'Minimal light deck — one idea per slide, single blue accent.',
       format: 'html',
       kind: 'deck',
       source: 'builtin',
@@ -101,7 +101,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'simple-dark',
       name: 'Simple Dark',
-      description: 'Minimal dark slide deck for technical content — code-friendly, green accent',
+      description: 'Minimal dark deck for technical talks — code-friendly, green accent.',
       format: 'html',
       kind: 'deck',
       source: 'builtin',
@@ -118,7 +118,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'market-trends-report',
       name: 'Market Trends Report',
-      description: 'Data-forward scrolling report built around Chart.js exhibits',
+      description: 'Data-forward scrolling report — charted exhibits with sourced notes.',
       format: 'html',
       kind: 'report',
       source: 'builtin',
@@ -135,7 +135,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'business-review',
       name: 'Business Review',
-      description: 'Navy-and-amber quarterly business review deck (PPTX, cloned from a retained reference)',
+      description: 'Quarterly results deck — KPI summary, segment detail, outlook. Navy and amber.',
       format: 'pptx',
       kind: 'deck',
       source: 'builtin',
@@ -153,7 +153,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'project-kickoff',
       name: 'Project Kickoff',
-      description: 'Clean teal project kickoff deck (PPTX, cloned from a retained reference)',
+      description: 'Kickoff deck — scope, team, timeline, next steps. Clean teal.',
       format: 'pptx',
       kind: 'deck',
       source: 'builtin',
@@ -171,7 +171,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'monthly-steerco',
       name: 'Monthly SteerCo',
-      description: 'Serif-and-gold executive steering committee deck (PPTX, cloned from a retained reference)',
+      description: 'Steering committee update — portfolio status, risks, decisions needed. Serif and gold.',
       format: 'pptx',
       kind: 'deck',
       source: 'builtin',
@@ -189,7 +189,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'connected-ops',
       name: 'Connected Ops',
-      description: 'Green-and-hex industrial operations review deck (PPTX, cloned from a retained reference)',
+      description: 'Operations review — site metrics, uptime, incidents. Industrial green.',
       format: 'pptx',
       kind: 'deck',
       source: 'builtin',
@@ -207,7 +207,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'business-report',
       name: 'Business Report',
-      description: 'Long-form formal report — cover, contents, data tables, navy serif headings',
+      description: 'Long-form formal report — cover, contents, data tables, navy serif headings.',
       format: 'docx',
       kind: 'document',
       source: 'builtin',
@@ -225,7 +225,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'decision-memo',
       name: 'Decision Memo',
-      description: 'Short decision memo — TO/FROM/RE block, recommendation up front, no cover',
+      description: 'Short decision memo — TO/FROM/RE block, recommendation up front, no cover.',
       format: 'docx',
       kind: 'document',
       source: 'builtin',
@@ -243,7 +243,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'operations-guide',
       name: 'Operations Guide',
-      description: 'Compact SOP — numbered steps, note boxes, checklists, teal accent',
+      description: 'Compact SOP — numbered steps, note boxes, checklists, teal accent.',
       format: 'docx',
       kind: 'document',
       source: 'builtin',
@@ -261,7 +261,7 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     manifest: {
       id: 'proposal-sow',
       name: 'Proposal / SOW',
-      description: 'Client proposal — scope, timeline, pricing table, signature block',
+      description: 'Client proposal — scope, timeline, pricing table, signature block.',
       format: 'docx',
       kind: 'document',
       source: 'builtin',

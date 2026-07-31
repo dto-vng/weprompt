@@ -13,6 +13,35 @@ import type { PresentationTemplateSummary } from '@/common/types/office/presenta
 import { composePresentationSend } from './directive';
 
 /**
+ * Display name + description for a template.
+ *
+ * Built-in packs carry English strings in their manifest (the canonical source
+ * lives in process/resources/presentation-templates), so the catalog under
+ * `conversation.presentationTemplates.catalog.<id>` supplies the localized
+ * copy. User-imported templates are the user's own content and cannot be
+ * pre-translated, so they always fall back to the manifest — as does any
+ * built-in whose id is missing from the catalog.
+ *
+ * Lives here rather than in its own module because this directory already sits
+ * at the 10-child limit from the architecture guide.
+ */
+export function useTemplateLabels() {
+  const { t } = useTranslation();
+  return useCallback(
+    (template: PresentationTemplateSummary) => {
+      const { id, name, description, source } = template.manifest;
+      if (source !== 'builtin') return { name, description };
+      const key = `conversation.presentationTemplates.catalog.${id}`;
+      return {
+        name: t(`${key}.name`, { defaultValue: name }),
+        description: t(`${key}.description`, { defaultValue: description }),
+      };
+    },
+    [t]
+  );
+}
+
+/**
  * Owns all state for the presentation template gallery: the fetched template
  * list (via SWR), gallery open/close, the currently selected template, and
  * the import/remove actions. Consumed by the SendBox area to render the

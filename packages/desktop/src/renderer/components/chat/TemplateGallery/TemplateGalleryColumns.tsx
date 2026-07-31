@@ -9,6 +9,7 @@ import { Button, Card, Popconfirm, Tooltip } from '@arco-design/web-react';
 import { CheckOne, Delete } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import { useTemplateLabels } from './usePresentationTemplates';
 
 const COLUMNS = [
   { format: 'pptx', labelKey: 'conversation.presentationTemplates.columnPptx' },
@@ -52,6 +53,7 @@ const TemplateGalleryColumns: React.FC<{
   onRemove: (id: string) => void;
 }> = ({ templates, selectedId, size = 'compact', onSelect, onRemove }) => {
   const { t } = useTranslation();
+  const labelsOf = useTemplateLabels();
   const dims = SIZE[size];
 
   return (
@@ -66,9 +68,10 @@ const TemplateGalleryColumns: React.FC<{
                 const id = template.manifest.id;
                 const isSelected = selectedId === id;
                 const select = () => onSelect(template);
+                const labels = labelsOf(template);
                 return (
                   <div key={id} className='flex flex-col shrink-0 snap-start'>
-                    <Tooltip content={template.manifest.description}>
+                    <Tooltip content={labels.description}>
                       <Card
                         hoverable
                         bordered
@@ -78,7 +81,7 @@ const TemplateGalleryColumns: React.FC<{
                         role='button'
                         tabIndex={0}
                         aria-pressed={isSelected}
-                        aria-label={template.manifest.name}
+                        aria-label={labels.name}
                         className={`${CARD} p-0 rd-8px cursor-pointer overflow-hidden relative b-solid ${isSelected ? 'b-2 border-aou-6' : 'b-1 border-4'}`}
                         onClick={select}
                         onKeyDown={(event) => {
@@ -101,7 +104,7 @@ const TemplateGalleryColumns: React.FC<{
                       </Card>
                     </Tooltip>
                     <div className='flex items-center justify-between gap-4px mt-4px'>
-                      <span className='text-12px truncate'>{template.manifest.name}</span>
+                      <span className='text-12px truncate'>{labels.name}</span>
                       {template.manifest.source === 'user' && (
                         <Popconfirm
                           title={t('conversation.presentationTemplates.deleteConfirm')}

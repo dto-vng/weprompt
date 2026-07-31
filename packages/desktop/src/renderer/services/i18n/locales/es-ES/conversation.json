@@ -693,14 +693,64 @@
   "notFound": "Conversación no encontrada o ha sido eliminada",
   "emptyModelReply": "El modelo terminó el turno sin producir una respuesta visible. Envía la solicitud de nuevo; para salidas grandes, pide el resultado en partes más pequeñas.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Revisión de negocio",
+        "description": "Presentación de resultados trimestrales — resumen de KPI, detalle por segmento, perspectivas. Azul marino y ámbar."
+      },
+      "project-kickoff": {
+        "name": "Arranque de proyecto",
+        "description": "Presentación de arranque — alcance, equipo, calendario, próximos pasos. Verde azulado limpio."
+      },
+      "monthly-steerco": {
+        "name": "Comité de dirección mensual",
+        "description": "Informe para el comité de dirección — estado de la cartera, riesgos, decisiones pendientes. Serif y dorado."
+      },
+      "connected-ops": {
+        "name": "Operaciones conectadas",
+        "description": "Revisión de operaciones — métricas por planta, disponibilidad, incidencias. Verde industrial."
+      },
+      "editorial-field-report": {
+        "name": "Informe de campo editorial",
+        "description": "Informe de lectura larga — tipografía serif, prosa en lugar de viñetas, un acento rojo."
+      },
+      "market-trends-report": {
+        "name": "Informe de tendencias de mercado",
+        "description": "Informe de desplazamiento centrado en datos — gráficos con notas y fuentes."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Presentación clara y minimalista — una idea por diapositiva, un acento azul."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Presentación oscura y minimalista para charlas técnicas — apta para código, acento verde."
+      },
+      "business-report": {
+        "name": "Informe de negocio",
+        "description": "Informe formal extenso — portada, índice, tablas de datos, títulos serif azul marino."
+      },
+      "decision-memo": {
+        "name": "Memorando de decisión",
+        "description": "Memorando breve de decisión — bloque PARA/DE/ASUNTO, recomendación al principio, sin portada."
+      },
+      "operations-guide": {
+        "name": "Guía de operaciones",
+        "description": "Procedimiento compacto — pasos numerados, cuadros de nota, listas de verificación, acento verde azulado."
+      },
+      "proposal-sow": {
+        "name": "Propuesta / SOW",
+        "description": "Propuesta para cliente — alcance, calendario, tabla de precios, bloque de firma."
+      }
+    },
     "title": "Plantillas",
     "columnPptx": "Presentaciones · PPTX",
-    "columnHtml": "Informes · HTML",
+    "columnHtml": "Web · HTML",
     "columnDocx": "Documentos · DOCX",
     "selected": "Seleccionado",
     "buttonTooltip": "Plantillas",
     "slashDescription": "Elegir una plantilla",
-    "importCard": "Importar tema (.md)",
+    "importCard": "Importar plantilla (.md)",
     "empty": "No hay plantillas disponibles",
     "chipTooltip": "Este mensaje usará la plantilla",
     "importSuccess": "Plantilla importada",

@@ -51,7 +51,10 @@ describe('TemplateGalleryPanel', () => {
     expect(screen.getByTestId('template-column-html')).toContainElement(
       screen.getByTestId('template-card-simple-light')
     );
-    fireEvent.click(screen.getByAltText('Simple Light'));
+    // The card is the button and carries the accessible name; its preview image is
+    // decorative (alt=''), so querying by alt text would duplicate that name to
+    // screen readers.
+    fireEvent.click(screen.getByRole('button', { name: 'Simple Light' }));
     expect(onSelect).toHaveBeenCalledWith(template);
   });
 

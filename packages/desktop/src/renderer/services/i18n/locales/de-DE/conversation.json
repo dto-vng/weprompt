@@ -693,14 +693,64 @@
   "notFound": "Unterhaltung nicht gefunden oder wurde gelöscht",
   "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Quartalsreview",
+        "description": "Deck für Quartalsergebnisse — KPI-Überblick, Segmentdetails, Ausblick. Navy und Amber."
+      },
+      "project-kickoff": {
+        "name": "Projekt-Kickoff",
+        "description": "Kickoff-Deck — Umfang, Team, Zeitplan, nächste Schritte. Klares Petrol."
+      },
+      "monthly-steerco": {
+        "name": "Monatliches Steuerungsgremium",
+        "description": "Update für das Steuerungsgremium — Portfoliostatus, Risiken, offene Entscheidungen. Serif und Gold."
+      },
+      "connected-ops": {
+        "name": "Connected Ops",
+        "description": "Betriebsreview — Standortkennzahlen, Verfügbarkeit, Störungen. Industriegrün."
+      },
+      "editorial-field-report": {
+        "name": "Redaktioneller Feldbericht",
+        "description": "Langform-Bericht — Serifenschrift, Fließtext statt Aufzählungen, ein roter Akzent."
+      },
+      "market-trends-report": {
+        "name": "Markttrend-Bericht",
+        "description": "Datengetriebener Scroll-Bericht — Diagramme mit Quellenangaben."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimalistisches helles Deck — eine Idee pro Folie, ein blauer Akzent."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Minimalistisches dunkles Deck für Technikvorträge — code-freundlich, grüner Akzent."
+      },
+      "business-report": {
+        "name": "Geschäftsbericht",
+        "description": "Ausführlicher formeller Bericht — Deckblatt, Inhalt, Datentabellen, Navy-Serifenüberschriften."
+      },
+      "decision-memo": {
+        "name": "Entscheidungsvorlage",
+        "description": "Kurze Entscheidungsvorlage — AN/VON/BETREFF-Block, Empfehlung vorangestellt, kein Deckblatt."
+      },
+      "operations-guide": {
+        "name": "Betriebshandbuch",
+        "description": "Kompakte Arbeitsanweisung — nummerierte Schritte, Hinweisboxen, Checklisten, Petrol-Akzent."
+      },
+      "proposal-sow": {
+        "name": "Angebot / SOW",
+        "description": "Kundenangebot — Leistungsumfang, Zeitplan, Preistabelle, Signaturblock."
+      }
+    },
     "title": "Vorlagen",
     "columnPptx": "Präsentationen · PPTX",
-    "columnHtml": "Berichte · HTML",
+    "columnHtml": "Web · HTML",
     "columnDocx": "Dokumente · DOCX",
     "selected": "Ausgewählt",
     "buttonTooltip": "Vorlagen",
     "slashDescription": "Eine Vorlage auswählen",
-    "importCard": "Thema importieren (.md)",
+    "importCard": "Vorlage importieren (.md)",
     "empty": "Keine Vorlagen verfügbar",
     "chipTooltip": "Diese Nachricht verwendet die Vorlage",
     "importSuccess": "Vorlage importiert",

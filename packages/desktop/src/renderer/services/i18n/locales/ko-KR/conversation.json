@@ -692,14 +692,64 @@
   "notFound": "대화를 찾을 수 없거나 삭제되었습니다",
   "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "비즈니스 리뷰",
+        "description": "분기 실적 덱 — KPI 요약, 세그먼트 상세, 전망. 네이비와 앰버."
+      },
+      "project-kickoff": {
+        "name": "프로젝트 킥오프",
+        "description": "킥오프 덱 — 범위, 팀, 일정, 다음 단계. 깔끔한 청록."
+      },
+      "monthly-steerco": {
+        "name": "월간 운영위원회",
+        "description": "운영위원회 보고 — 포트폴리오 현황, 리스크, 결정 필요 사항. 세리프와 골드."
+      },
+      "connected-ops": {
+        "name": "커넥티드 운영",
+        "description": "운영 리뷰 — 사업장 지표, 가동률, 장애. 인더스트리얼 그린."
+      },
+      "editorial-field-report": {
+        "name": "에디토리얼 현장 보고서",
+        "description": "장문 보고서 — 세리프 서체, 불릿보다 서술문, 빨강 강조 하나."
+      },
+      "market-trends-report": {
+        "name": "시장 동향 보고서",
+        "description": "데이터 중심 스크롤 보고서 — 출처가 있는 차트."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "미니멀 라이트 덱 — 슬라이드당 하나의 메시지, 파랑 강조 하나."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "기술 발표용 미니멀 다크 덱 — 코드에 적합, 초록 강조."
+      },
+      "business-report": {
+        "name": "비즈니스 보고서",
+        "description": "장문 공식 보고서 — 표지, 목차, 데이터 표, 네이비 세리프 제목."
+      },
+      "decision-memo": {
+        "name": "의사결정 메모",
+        "description": "짧은 의사결정 메모 — 수신/발신/제목 블록, 권고를 앞에, 표지 없음."
+      },
+      "operations-guide": {
+        "name": "운영 가이드",
+        "description": "간결한 표준 절차 — 번호 단계, 참고 박스, 체크리스트, 청록 강조."
+      },
+      "proposal-sow": {
+        "name": "제안서 / SOW",
+        "description": "고객 제안서 — 범위, 일정, 가격표, 서명란."
+      }
+    },
     "title": "템플릿",
     "columnPptx": "프레젠테이션 · PPTX",
-    "columnHtml": "보고서 · HTML",
+    "columnHtml": "웹 · HTML",
     "columnDocx": "문서 · DOCX",
     "selected": "선택됨",
     "buttonTooltip": "템플릿",
     "slashDescription": "템플릿 선택",
-    "importCard": "테마 가져오기 (.md)",
+    "importCard": "템플릿 가져오기 (.md)",
     "empty": "사용 가능한 템플릿이 없습니다",
     "chipTooltip": "이 메시지는 템플릿을 사용합니다",
     "importSuccess": "템플릿을 가져왔습니다",

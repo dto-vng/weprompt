@@ -692,14 +692,64 @@
   "notFound": "会话不存在或已被删除",
   "emptyModelReply": "模型在没有生成可见回复的情况下结束了本轮对话。请重新发送请求；如果需要较大的输出，请分多次索取结果。",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "业务回顾",
+        "description": "季度业绩演示 — KPI 概览、分部细分、前景展望。藏青与琥珀色。"
+      },
+      "project-kickoff": {
+        "name": "项目启动",
+        "description": "启动演示 — 范围、团队、时间线、后续步骤。清爽青绿色。"
+      },
+      "monthly-steerco": {
+        "name": "月度指导委员会",
+        "description": "指导委员会汇报 — 项目组合状态、风险、待决事项。衬线体与金色。"
+      },
+      "connected-ops": {
+        "name": "互联运营",
+        "description": "运营回顾 — 站点指标、运行时间、事件。工业绿。"
+      },
+      "editorial-field-report": {
+        "name": "编辑式实地报告",
+        "description": "长篇报告 — 衬线字体、以行文替代要点、单一红色强调。"
+      },
+      "market-trends-report": {
+        "name": "市场趋势报告",
+        "description": "以数据为主的滚动报告 — 附来源说明的图表。"
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "极简浅色演示 — 每页一个观点、单一蓝色强调。"
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "面向技术分享的极简深色演示 — 适合展示代码、绿色强调。"
+      },
+      "business-report": {
+        "name": "业务报告",
+        "description": "长篇正式报告 — 封面、目录、数据表格、藏青衬线标题。"
+      },
+      "decision-memo": {
+        "name": "决策备忘录",
+        "description": "简短决策备忘录 — 收件人/发件人/事由栏、结论前置、无封面。"
+      },
+      "operations-guide": {
+        "name": "运营指南",
+        "description": "精简作业规程 — 编号步骤、提示框、检查清单、青绿强调。"
+      },
+      "proposal-sow": {
+        "name": "提案 / SOW",
+        "description": "客户提案 — 范围、时间线、报价表、签署栏。"
+      }
+    },
     "title": "模板",
     "columnPptx": "演示文稿 · PPTX",
-    "columnHtml": "报告 · HTML",
+    "columnHtml": "网页 · HTML",
     "columnDocx": "文档 · DOCX",
     "selected": "已选择",
     "buttonTooltip": "模板",
     "slashDescription": "选择模板",
-    "importCard": "导入主题 (.md)",
+    "importCard": "导入模板 (.md)",
     "empty": "暂无可用模板",
     "chipTooltip": "此消息将使用该模板",
     "importSuccess": "模板已导入",
