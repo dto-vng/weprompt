@@ -660,7 +660,7 @@
   "mcpAddServer": "添加 MCP",
   "mcpEditServer": "编辑",
   "mcpDeleteServer": "删除",
-  "mcpDeleteConfirm": "确定要删除此 MCP 服务器吗？",
+  "mcpDeleteConfirm": "确定要删除 MCP 服务器“{{name}}”吗？",
   "mcpImportFromJSON": "从 JSON 导入",
   "mcpImportTitle": "导入 MCP 配置",
   "mcpImportPlaceholder": "请将服务文档中的 MCP JSON 配置粘贴到下方输入框。如果配置里使用了 npx、uvx 等命令，请先确认它们已安装并且当前机器可用。",

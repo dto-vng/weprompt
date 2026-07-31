@@ -660,7 +660,7 @@
   "mcpAddServer": "Add MCP",
   "mcpEditServer": "Edit",
   "mcpDeleteServer": "Delete",
-  "mcpDeleteConfirm": "Are you sure you want to delete this MCP server?",
+  "mcpDeleteConfirm": "Are you sure you want to delete the MCP server \"{{name}}\"?",
   "mcpImportFromJSON": "Import from JSON",
   "mcpImportTitle": "Import MCP Configuration",
   "mcpImportPlaceholder": "Paste the MCP JSON configuration from the service documentation below. If the configuration uses commands like npx or uvx, make sure they are installed and available on your machine.",

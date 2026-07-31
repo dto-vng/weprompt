@@ -307,7 +307,12 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
         count: selectedSkillNames.size,
         defaultValue: `Are you sure you want to delete the ${selectedSkillNames.size} selected skill(s)?`,
       }),
-      okButtonProps: { status: 'warning' },
+      // 批量删除比单个删除毁掉的数据更多，不能反而比它温和：橙色留给「有后果但不销毁数据」
+      // 的操作。单个删除在本文件 550 行之下用的就是 'danger'。
+      // Batch delete destroys strictly more than single delete, so it cannot be styled milder:
+      // orange is reserved for consequential-but-non-destructive actions. The single-skill
+      // delete 550 lines below this already uses 'danger'.
+      okButtonProps: { status: 'danger' },
       okText: t('common.delete', { defaultValue: 'Delete' }),
       wrapClassName: 'modal-delete-skill',
       onOk: async () => {

@@ -652,7 +652,7 @@
   "mcpAddServer": "Добавить MCP",
   "mcpEditServer": "Редактировать",
   "mcpDeleteServer": "Удалить",
-  "mcpDeleteConfirm": "Вы уверены, что хотите удалить этот сервер MCP?",
+  "mcpDeleteConfirm": "Вы уверены, что хотите удалить сервер MCP «{{name}}»?",
   "mcpImportFromJSON": "Импорт из JSON",
   "mcpImportTitle": "Импорт конфигурации MCP",
   "mcpImportPlaceholder": "Вставьте ниже JSON-конфигурацию MCP из документации сервиса. Если конфигурация использует команды вроде npx или uvx, сначала убедитесь, что они установлены и доступны на вашем компьютере.",

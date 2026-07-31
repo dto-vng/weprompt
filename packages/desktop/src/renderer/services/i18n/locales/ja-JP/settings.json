@@ -660,7 +660,7 @@
   "mcpAddServer": "MCP を追加",
   "mcpEditServer": "編集",
   "mcpDeleteServer": "削除",
-  "mcpDeleteConfirm": "この MCP サーバーを削除してもよろしいですか？",
+  "mcpDeleteConfirm": "MCP サーバー「{{name}}」を削除してもよろしいですか？",
   "mcpImportFromJSON": "JSONからインポート",
   "mcpImportTitle": "MCP 設定をインポート",
   "mcpImportPlaceholder": "サービスのドキュメントにある MCP JSON 設定を下の入力欄に貼り付けてください。npx や uvx などのコマンドを使う場合は、この端末で利用できることを確認してください。",

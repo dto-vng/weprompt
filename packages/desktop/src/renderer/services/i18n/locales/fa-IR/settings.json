@@ -660,7 +660,7 @@
   "mcpAddServer": "افزودن MCP",
   "mcpEditServer": "ویرایش",
   "mcpDeleteServer": "حذف",
-  "mcpDeleteConfirm": "آیا مطمئن هستید که می‌خواهید این سرور MCP را حذف کنید؟",
+  "mcpDeleteConfirm": "آیا مطمئن هستید که می‌خواهید سرور MCP «{{name}}» را حذف کنید؟",
   "mcpImportFromJSON": "وارد کردن از JSON",
   "mcpImportTitle": "وارد کردن پیکربندی MCP",
   "mcpImportPlaceholder": "پیکربندی JSON MCP را از مستندات سرویس در زیر جای‌گذاری کنید. اگر پیکربندی از دستوراتی مانند npx یا uvx استفاده می‌کند، مطمئن شوید روی سیستم شما نصب و در دسترس هستند.",

@@ -660,7 +660,7 @@
   "mcpAddServer": "MCP Ekle",
   "mcpEditServer": "Düzenle",
   "mcpDeleteServer": "Sil",
-  "mcpDeleteConfirm": "Bu MCP sunucusunu silmek istediğinizden emin misiniz?",
+  "mcpDeleteConfirm": "\"{{name}}\" adlı MCP sunucusunu silmek istediğinizden emin misiniz?",
   "mcpImportFromJSON": "JSON'dan İçe Aktar",
   "mcpImportTitle": "MCP Yapılandırmasını İçe Aktar",
   "mcpImportPlaceholder": "Hizmet belgelerindeki MCP JSON yapılandırmasını aşağıdaki alana yapıştırın. Yapılandırma npx veya uvx gibi komutlar kullanıyorsa, bunların makinenizde kurulu ve erişilebilir olduğundan emin olun.",
