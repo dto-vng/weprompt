@@ -101,6 +101,7 @@
     "knowledgeOcrNoSkippedPages": "keine"
   },
   "history": {
+    "moreActions": "Weitere Aktionen",
     "recents": "Zuletzt",
     "noHistory": "Kein Chatverlauf",
     "deleteTitle": "Löschen",

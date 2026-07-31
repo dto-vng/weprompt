@@ -10,6 +10,7 @@ import { Tooltip } from '@arco-design/web-react';
 import { ViewGridCard } from '@icon-park/react';
 import classNames from 'classnames';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 interface SiderDashboardEntryProps {
   isMobile: boolean;
@@ -33,10 +34,15 @@ const SiderDashboardEntry: React.FC<SiderDashboardEntryProps> = ({
       <Tooltip {...siderTooltipProps} content={t('dashboard.title')} position='right'>
         <div
           className={classNames(
+            ROW_FOCUS_RING,
             'w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px text-t-primary',
             isActive ? 'bg-fill-3' : 'hover:bg-fill-3 active:bg-fill-4'
           )}
           onClick={onClick}
+          role='button'
+          tabIndex={0}
+          aria-label={t('dashboard.title')}
+          onKeyDown={activateOnEnterOrSpace(() => onClick?.())}
         >
           <ViewGridCard
             theme='outline'
@@ -54,11 +60,16 @@ const SiderDashboardEntry: React.FC<SiderDashboardEntryProps> = ({
     <Tooltip {...siderTooltipProps} content={t('dashboard.title')} position='right'>
       <div
         className={classNames(
+          ROW_FOCUS_RING,
           'box-border group h-34px w-full flex items-center justify-start gap-8px pl-10px pr-8px rd-0.5rem cursor-pointer shrink-0 transition-all text-t-primary',
           isMobile && 'sider-action-btn-mobile',
           isActive ? 'bg-fill-3' : 'hover:bg-fill-3 active:bg-fill-4'
         )}
         onClick={onClick}
+        role='button'
+        tabIndex={0}
+        aria-label={t('dashboard.title')}
+        onKeyDown={activateOnEnterOrSpace(() => onClick?.())}
       >
         <span className='size-22px flex items-center justify-center shrink-0 text-t-primary'>
           <ViewGridCard

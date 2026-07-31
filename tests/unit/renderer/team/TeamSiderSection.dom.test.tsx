@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   removeTeam: vi.fn(),
   teams: [] as Array<{ id: string; name: string }>,
+  isLoading: false,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -25,6 +26,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/renderer/pages/team/hooks/useTeamList', () => ({
   useTeamList: () => ({
     teams: mocks.teams,
+    isLoading: mocks.isLoading,
     mutate: mocks.mutate,
     removeTeam: mocks.removeTeam,
   }),
@@ -42,6 +44,7 @@ describe('TeamSiderSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.teams = [];
+    mocks.isLoading = false;
     localStorage.clear();
   });
 
@@ -78,5 +81,63 @@ describe('TeamSiderSection', () => {
     expect(createButton).toHaveClass('!text-t-secondary');
     expect(createButton).toHaveClass('hover:!text-t-primary');
     expect(createButton).not.toHaveClass('text-primary');
+  });
+
+  it('matches the collapsed rail row height used by every sibling entry', () => {
+    // The collapsed rail is one vertical stack, so a team row taller than the nav
+    // entries next to it breaks the pitch. jsdom applies no UnoCSS, so the class is
+    // the only assertable signal; the pixel result is checked by eye.
+    mocks.teams = [{ id: 'team-a', name: 'aaa' }];
+
+    render(
+      <MemoryRouter>
+        <TeamSiderSection collapsed={true} pathname='/' siderTooltipProps={{}} />
+      </MemoryRouter>
+    );
+
+    const row = screen.getByTestId('collapsed-team-item-team-a');
+    expect(row).toHaveClass('h-34px');
+    expect(row).not.toHaveClass('h-40px');
+  });
+
+  it('distinguishes "still loading" from "no teams" when expanded', () => {
+    // An empty array meant both before, so expanding showed a header over a blank gap.
+    localStorage.setItem('team-section-expanded', 'true');
+    mocks.teams = [];
+    mocks.isLoading = true;
+
+    const loading = render(
+      <MemoryRouter>
+        <TeamSiderSection collapsed={false} pathname='/' siderTooltipProps={{}} />
+      </MemoryRouter>
+    );
+
+    const placeholder = screen.getByTestId('team-sider-placeholder');
+    expect(placeholder).toHaveClass('h-34px');
+    expect(screen.queryByText('team.sider.empty')).not.toBeInTheDocument();
+    loading.unmount();
+
+    mocks.isLoading = false;
+    render(
+      <MemoryRouter>
+        <TeamSiderSection collapsed={false} pathname='/' siderTooltipProps={{}} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('team.sider.empty')).toBeInTheDocument();
+  });
+
+  it('shows neither placeholder once teams have loaded', () => {
+    localStorage.setItem('team-section-expanded', 'true');
+    mocks.teams = [{ id: 'team-a', name: 'aaa' }];
+
+    render(
+      <MemoryRouter>
+        <TeamSiderSection collapsed={false} pathname='/' siderTooltipProps={{}} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByTestId('team-sider-placeholder')).not.toBeInTheDocument();
+    expect(screen.queryByText('team.sider.empty')).not.toBeInTheDocument();
   });
 });

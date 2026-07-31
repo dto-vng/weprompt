@@ -40,6 +40,7 @@ import {
   resolveConversationStatusTooltipKey,
 } from './utils/conversationStatus';
 import { isConversationPinned } from './utils/groupingHelpers';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   const {
@@ -280,6 +281,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
       <div
         id={'c-' + conversation.id}
         className={classNames(
+          ROW_FOCUS_RING,
           'chat-history__item h-34px rd-8px flex items-center group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-2px min-w-0 transition-colors',
           collapsed ? 'justify-center px-0' : 'justify-start gap-8px pr-16px',
           // dimIcon means this row sits inside a project/cron parent — visually indent the row content while keeping the bg full-width
@@ -292,6 +294,10 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
         )}
         onClick={handleRowClick}
         onContextMenu={handleRowContextMenu}
+        role='button'
+        tabIndex={0}
+        aria-label={conversationName}
+        onKeyDown={activateOnEnterOrSpace(handleRowClick)}
       >
         {batchMode && (
           <span
@@ -344,7 +350,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
               'absolute right-8px top-1/2 -translate-y-1/2 items-center justify-end !collapsed-hidden',
               {
                 flex: isMobile || menuVisible,
-                'hidden group-hover:flex': !isMobile && !menuVisible,
+                'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
               }
             )}
             onClick={(event) => {
@@ -403,7 +409,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
                     </Menu.Item>
                   )}
                   <Menu.Item key='delete'>
-                    <div className='flex items-center gap-8px text-[rgb(var(--warning-6))]'>
+                    <div className='flex items-center gap-8px text-danger-6'>
                       <DeleteOne theme='outline' size='14' />
                       <span>{t('conversation.history.deleteTitle')}</span>
                     </div>
@@ -423,10 +429,19 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
                   'flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px rd-4px sider-action-btn',
                   {
                     flex: isMobile || menuVisible,
-                    'hidden group-hover:flex': !isMobile && !menuVisible,
+                    'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
                   }
                 )}
                 onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenMenu(conversation);
+                }}
+                role='button'
+                tabIndex={0}
+                aria-label={t('conversation.history.moreActions')}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
                   event.stopPropagation();
                   onOpenMenu(conversation);
                 }}

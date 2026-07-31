@@ -6,7 +6,7 @@
 
 import type { TChatConversation } from '@/common/config/storage';
 import type { ConversationRowProps } from '@/renderer/pages/conversation/GroupedHistory/types';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -446,5 +446,82 @@ describe('ConversationRow status', () => {
     render(<ConversationRow {...buildProps({ conversation: pinnedApprovalConversation })} />);
 
     expect(screen.getByTestId('conversation-status-needs_you-conversation-1')).not.toHaveClass('group-hover:opacity-0');
+  });
+});
+
+describe('ConversationRow keyboard access', () => {
+  // The row is the app's primary way to switch conversations. It stays a div because it
+  // carries absolutely-positioned overlays and group-hover children that Arco's .arco-btn
+  // display rule breaks, so it has to take button semantics by hand.
+  it('is reachable and activated by keyboard, not mouse only', () => {
+    const onConversationClick = vi.fn();
+    render(<ConversationRow {...buildProps({ onConversationClick })} />);
+
+    const row = screen.getByRole('button', { name: 'Review the release notes' });
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onConversationClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onConversationClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores keys that are not Enter or Space', () => {
+    const onConversationClick = vi.fn();
+    render(<ConversationRow {...buildProps({ onConversationClick })} />);
+
+    const row = screen.getByRole('button', { name: 'Review the release notes' });
+    fireEvent.keyDown(row, { key: 'a' });
+    fireEvent.keyDown(row, { key: 'Tab' });
+    fireEvent.keyDown(row, { key: 'ArrowDown' });
+
+    expect(onConversationClick).not.toHaveBeenCalled();
+  });
+
+  it('carries a focus-visible treatment so keyboard position is visible', () => {
+    render(<ConversationRow {...buildProps()} />);
+    const row = screen.getByRole('button', { name: 'Review the release notes' });
+    // jsdom applies no UnoCSS, so the class is the only assertable signal; the ring was
+    // confirmed to actually paint by reading computed styles in the running app.
+    expect(row.className).toContain('focus-visible:[outline:1px_solid_rgb(var(--primary-6))]');
+  });
+});
+
+describe('ConversationRow overflow actions', () => {
+  // The action cluster was display:none until mouse hover with no focus-within
+  // variant, so pin/rename/delete/export were unreachable without a mouse even
+  // once the row itself became focusable.
+  it('reveals the action cluster on focus as well as hover', () => {
+    render(<ConversationRow {...buildProps()} />);
+    const trigger = screen.getByTestId('conversation-row-menu-conversation-1');
+    expect(trigger.className).toContain('group-hover:flex');
+    expect(trigger.className).toContain('group-focus-within:flex');
+  });
+
+  it('opens the menu from the keyboard', () => {
+    const onOpenMenu = vi.fn();
+    render(<ConversationRow {...buildProps({ onOpenMenu })} />);
+    const trigger = screen.getByTestId('conversation-row-menu-conversation-1');
+
+    expect(trigger).toHaveAttribute('role', 'button');
+    expect(trigger).toHaveAttribute('tabindex', '0');
+    expect(trigger).toHaveAttribute('aria-label', 'conversation.history.moreActions');
+
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not also fire the row when the trigger is keyed', () => {
+    // The trigger sits inside the row, so without stopPropagation an Enter on the
+    // menu would both open the menu and navigate away from the conversation.
+    const onOpenMenu = vi.fn();
+    const onConversationClick = vi.fn();
+    render(<ConversationRow {...buildProps({ onOpenMenu, onConversationClick })} />);
+
+    fireEvent.keyDown(screen.getByTestId('conversation-row-menu-conversation-1'), { key: 'Enter' });
+
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+    expect(onConversationClick).not.toHaveBeenCalled();
   });
 });

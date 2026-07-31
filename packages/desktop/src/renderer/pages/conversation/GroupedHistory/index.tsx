@@ -66,6 +66,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
 
   const {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentFailureAt,
@@ -404,7 +405,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             <Button
               className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
               size='mini'
-              status='warning'
+              status='danger'
               onClick={handleBatchDelete}
             >
               {t('conversation.history.batchDelete')}
@@ -676,7 +677,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                           <span
                             className={classNames(
                               'items-center justify-center',
-                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
                             )}
                           >
                             <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
@@ -698,7 +699,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                           <span
                             className={classNames(
                               'items-center justify-center',
-                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
                             )}
                           >
                             <Dropdown
@@ -750,9 +751,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               />
             )}
             {batchSelectionPanel}
+            {/* Only claim there is no history once a load has actually settled —
+                otherwise every cold start flashes "No chat history" before the rows
+                arrive. The reserved block keeps the same footprint so the rail does
+                not jump when they do. */}
             {conversationOnlySections.length === 0 ? (
-              <div className='py-48px flex-center'>
-                <Empty description={t('conversation.history.noHistory')} />
+              <div className='py-48px flex-center' data-testid='conversation-history-empty-slot'>
+                {hasLoadedConversations ? <Empty description={t('conversation.history.noHistory')} /> : null}
               </div>
             ) : null}
             {!collapsedSections.has('conversations') &&

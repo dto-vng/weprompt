@@ -59,6 +59,7 @@ export const useConversations = () => {
   const { id } = useParams();
   const {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentFailureAt,
@@ -218,6 +219,7 @@ export const useConversations = () => {
 
   return {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentFailureAt,

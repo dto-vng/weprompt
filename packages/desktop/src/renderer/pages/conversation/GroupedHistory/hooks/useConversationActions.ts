@@ -98,7 +98,7 @@ export const useConversationActions = ({
         content: t('conversation.history.deleteConfirm'),
         okText: t('conversation.history.confirmDelete'),
         cancelText: t('conversation.history.cancelDelete'),
-        okButtonProps: { status: 'warning' },
+        okButtonProps: { status: 'danger' },
         onOk: async () => {
           try {
             const success = await removeConversation(conversation_id);
@@ -132,7 +132,7 @@ export const useConversationActions = ({
       content: t('conversation.history.batchDeleteConfirm', { count: selectedConversationIds.size }),
       okText: t('conversation.history.confirmDelete'),
       cancelText: t('conversation.history.cancelDelete'),
-      okButtonProps: { status: 'warning' },
+      okButtonProps: { status: 'danger' },
       onOk: async () => {
         const selectedIds = Array.from(selectedConversationIds);
         try {

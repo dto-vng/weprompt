@@ -512,7 +512,7 @@ const ConversationSearchPopover: React.FC<ConversationSearchPopoverProps> = ({
               type='button'
               className='conversation-search-modal__close-btn'
               onClick={handleClose}
-              aria-label='Close'
+              aria-label={t('common.close')}
             >
               <Close size={16} />
             </button>
