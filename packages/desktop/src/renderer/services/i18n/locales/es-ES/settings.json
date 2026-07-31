@@ -1257,5 +1257,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "Modelo para operaciones de la aplicación",
+    "description": "Elige el modelo que WePrompt usa para el trabajo de la aplicación en segundo plano.",
+    "selectionLabel": "Selección",
+    "auto": "Automático",
+    "fixed": "Fijo",
+    "resolvedModelLabel": "Modelo resuelto",
+    "healthLabel": "Estado",
+    "usedByLabel": "Usado por",
+    "contextCompaction": "Compactación de contexto",
+    "saving": "Guardando…",
+    "loadFailed": "No se pudo cargar la configuración de operaciones de la aplicación.",
+    "saveFailed": "No se pudo guardar el modelo para operaciones de la aplicación.",
+    "checkFailed": "La comprobación de estado de las operaciones de la aplicación falló.",
+    "backendUpdateRequired": "Actualiza WePrompt para configurar el modelo para operaciones de la aplicación.",
+    "status": {
+      "ready": "Listo",
+      "checking": "Comprobando",
+      "setupRequired": "Se requiere configuración",
+      "unavailable": "No disponible"
+    },
+    "reason": {
+      "noEligibleModel": "Agrega o habilita un modelo de texto con credenciales válidas.",
+      "providerMissing": "El proveedor guardado ya no existe.",
+      "providerDisabled": "El proveedor guardado está deshabilitado.",
+      "modelMissing": "El modelo guardado ya no existe.",
+      "modelDisabled": "El modelo guardado está deshabilitado.",
+      "authRequired": "El proveedor guardado necesita credenciales válidas.",
+      "healthCheckFailed": "El modelo seleccionado no superó la comprobación de estado."
+    }
+  }
 }

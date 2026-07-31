@@ -1257,5 +1257,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "مدل عملیات برنامه",
+    "description": "مدلی را انتخاب کنید که WePrompt برای کارهای پس‌زمینه برنامه استفاده می‌کند.",
+    "selectionLabel": "انتخاب",
+    "auto": "خودکار",
+    "fixed": "ثابت",
+    "resolvedModelLabel": "مدل تعیین‌شده",
+    "healthLabel": "وضعیت",
+    "usedByLabel": "استفاده‌شده توسط",
+    "contextCompaction": "فشرده‌سازی زمینه",
+    "saving": "در حال ذخیره‌سازی…",
+    "loadFailed": "تنظیمات عملیات برنامه بارگیری نشد.",
+    "saveFailed": "مدل عملیات برنامه ذخیره نشد.",
+    "checkFailed": "بررسی سلامت عملیات برنامه ناموفق بود.",
+    "backendUpdateRequired": "برای پیکربندی مدل عملیات برنامه، WePrompt را به‌روزرسانی کنید.",
+    "status": {
+      "ready": "آماده",
+      "checking": "در حال بررسی",
+      "setupRequired": "نیاز به راه‌اندازی دارد",
+      "unavailable": "در دسترس نیست"
+    },
+    "reason": {
+      "noEligibleModel": "یک مدل متنی با اطلاعات ورود معتبر اضافه یا فعال کنید.",
+      "providerMissing": "ارائه‌دهنده ذخیره‌شده دیگر وجود ندارد.",
+      "providerDisabled": "ارائه‌دهنده ذخیره‌شده غیرفعال است.",
+      "modelMissing": "مدل ذخیره‌شده دیگر وجود ندارد.",
+      "modelDisabled": "مدل ذخیره‌شده غیرفعال است.",
+      "authRequired": "ارائه‌دهنده ذخیره‌شده به اطلاعات ورود معتبر نیاز دارد.",
+      "healthCheckFailed": "مدل انتخاب‌شده بررسی سلامت را با موفقیت پشت سر نگذاشت."
+    }
+  }
 }

@@ -950,7 +950,7 @@ export const appOperations = {
 };
 
 export const appOperationsModel = {
-  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model', { silentStatuses: [404] }),
   update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
   check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };

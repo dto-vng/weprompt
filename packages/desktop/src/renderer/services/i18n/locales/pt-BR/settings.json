@@ -1260,5 +1260,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "Modelo para operações do aplicativo",
+    "description": "Escolha o modelo que o WePrompt usa para tarefas do aplicativo em segundo plano.",
+    "selectionLabel": "Seleção",
+    "auto": "Automático",
+    "fixed": "Fixo",
+    "resolvedModelLabel": "Modelo resolvido",
+    "healthLabel": "Status",
+    "usedByLabel": "Usado por",
+    "contextCompaction": "Compactação de contexto",
+    "saving": "Salvando…",
+    "loadFailed": "Não foi possível carregar as configurações de operações do aplicativo.",
+    "saveFailed": "Não foi possível salvar o modelo para operações do aplicativo.",
+    "checkFailed": "A verificação de integridade das operações do aplicativo falhou.",
+    "backendUpdateRequired": "Atualize o WePrompt para configurar o modelo para operações do aplicativo.",
+    "status": {
+      "ready": "Pronto",
+      "checking": "Verificando",
+      "setupRequired": "Configuração necessária",
+      "unavailable": "Indisponível"
+    },
+    "reason": {
+      "noEligibleModel": "Adicione ou ative um modelo de texto com credenciais válidas.",
+      "providerMissing": "O provedor salvo não existe mais.",
+      "providerDisabled": "O provedor salvo está desativado.",
+      "modelMissing": "O modelo salvo não existe mais.",
+      "modelDisabled": "O modelo salvo está desativado.",
+      "authRequired": "O provedor salvo precisa de credenciais válidas.",
+      "healthCheckFailed": "O modelo selecionado não passou na verificação de integridade."
+    }
+  }
 }

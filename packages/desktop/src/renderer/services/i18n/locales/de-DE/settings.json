@@ -1257,5 +1257,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "Modell für App-Vorgänge",
+    "description": "Wählen Sie das Modell aus, das WePrompt für Hintergrundaufgaben der Anwendung verwendet.",
+    "selectionLabel": "Auswahl",
+    "auto": "Automatisch",
+    "fixed": "Festgelegt",
+    "resolvedModelLabel": "Aufgelöstes Modell",
+    "healthLabel": "Status",
+    "usedByLabel": "Verwendet von",
+    "contextCompaction": "Kontextkomprimierung",
+    "saving": "Wird gespeichert…",
+    "loadFailed": "Die Einstellungen für App-Vorgänge konnten nicht geladen werden.",
+    "saveFailed": "Das Modell für App-Vorgänge konnte nicht gespeichert werden.",
+    "checkFailed": "Die Integritätsprüfung für App-Vorgänge ist fehlgeschlagen.",
+    "backendUpdateRequired": "Aktualisieren Sie WePrompt, um das Modell für App-Vorgänge zu konfigurieren.",
+    "status": {
+      "ready": "Bereit",
+      "checking": "Wird überprüft",
+      "setupRequired": "Einrichtung erforderlich",
+      "unavailable": "Nicht verfügbar"
+    },
+    "reason": {
+      "noEligibleModel": "Fügen Sie ein Textmodell mit gültigen Anmeldedaten hinzu oder aktivieren Sie es.",
+      "providerMissing": "Der gespeicherte Anbieter ist nicht mehr vorhanden.",
+      "providerDisabled": "Der gespeicherte Anbieter ist deaktiviert.",
+      "modelMissing": "Das gespeicherte Modell ist nicht mehr vorhanden.",
+      "modelDisabled": "Das gespeicherte Modell ist deaktiviert.",
+      "authRequired": "Der gespeicherte Anbieter benötigt gültige Anmeldedaten.",
+      "healthCheckFailed": "Das ausgewählte Modell hat die Integritätsprüfung nicht bestanden."
+    }
+  }
 }

@@ -1257,5 +1257,36 @@
     }
   },
   "providerIdConflict": "Provider ID already exists. Please try again.",
-  "autoInjectedSkillsHint": "Loaded automatically into every conversation — no need to enable them; the agent decides when to use them."
+  "autoInjectedSkillsHint": "Loaded automatically into every conversation — no need to enable them; the agent decides when to use them.",
+  "appOperationsModel": {
+    "title": "App operations model",
+    "description": "Choose the model WePrompt uses for background application work.",
+    "selectionLabel": "Selection",
+    "auto": "Auto",
+    "fixed": "Fixed",
+    "resolvedModelLabel": "Resolved model",
+    "healthLabel": "Status",
+    "usedByLabel": "Used by",
+    "contextCompaction": "Context compaction",
+    "saving": "Saving…",
+    "loadFailed": "App operations settings could not be loaded.",
+    "saveFailed": "App operations model could not be saved.",
+    "checkFailed": "The app operations health check failed.",
+    "backendUpdateRequired": "Update WePrompt to configure the app operations model.",
+    "status": {
+      "ready": "Ready",
+      "checking": "Checking",
+      "setupRequired": "Setup required",
+      "unavailable": "Unavailable"
+    },
+    "reason": {
+      "noEligibleModel": "Add or enable a text model with valid credentials.",
+      "providerMissing": "The saved provider no longer exists.",
+      "providerDisabled": "The saved provider is disabled.",
+      "modelMissing": "The saved model no longer exists.",
+      "modelDisabled": "The saved model is disabled.",
+      "authRequired": "The saved provider needs valid credentials.",
+      "healthCheckFailed": "The selected model did not pass its health check."
+    }
+  }
 }

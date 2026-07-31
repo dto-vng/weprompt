@@ -1259,5 +1259,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "Модель для операций приложения",
+    "description": "Выберите модель, которую WePrompt использует для фоновой работы приложения.",
+    "selectionLabel": "Выбор",
+    "auto": "Автоматически",
+    "fixed": "Фиксированная",
+    "resolvedModelLabel": "Определённая модель",
+    "healthLabel": "Статус",
+    "usedByLabel": "Используется для",
+    "contextCompaction": "Сжатие контекста",
+    "saving": "Сохранение…",
+    "loadFailed": "Не удалось загрузить настройки операций приложения.",
+    "saveFailed": "Не удалось сохранить модель для операций приложения.",
+    "checkFailed": "Проверка работоспособности операций приложения не удалась.",
+    "backendUpdateRequired": "Обновите WePrompt, чтобы настроить модель для операций приложения.",
+    "status": {
+      "ready": "Готово",
+      "checking": "Проверка",
+      "setupRequired": "Требуется настройка",
+      "unavailable": "Недоступно"
+    },
+    "reason": {
+      "noEligibleModel": "Добавьте или включите текстовую модель с действительными учётными данными.",
+      "providerMissing": "Сохранённый поставщик больше не существует.",
+      "providerDisabled": "Сохранённый поставщик отключён.",
+      "modelMissing": "Сохранённая модель больше не существует.",
+      "modelDisabled": "Сохранённая модель отключена.",
+      "authRequired": "Сохранённому поставщику нужны действительные учётные данные.",
+      "healthCheckFailed": "Выбранная модель не прошла проверку работоспособности."
+    }
+  }
 }

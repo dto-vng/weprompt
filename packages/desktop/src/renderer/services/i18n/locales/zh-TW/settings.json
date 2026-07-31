@@ -1259,5 +1259,36 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "appOperationsModel": {
+    "title": "應用程式操作模型",
+    "description": "選擇 WePrompt 用於背景應用程式操作的模型。",
+    "selectionLabel": "選擇",
+    "auto": "自動",
+    "fixed": "固定",
+    "resolvedModelLabel": "已解析模型",
+    "healthLabel": "狀態",
+    "usedByLabel": "用於",
+    "contextCompaction": "上下文壓縮",
+    "saving": "正在儲存…",
+    "loadFailed": "無法載入應用程式操作設定。",
+    "saveFailed": "無法儲存應用程式操作模型。",
+    "checkFailed": "應用程式操作健康狀態檢查失敗。",
+    "backendUpdateRequired": "請更新 WePrompt 以設定應用程式操作模型。",
+    "status": {
+      "ready": "就緒",
+      "checking": "正在檢查",
+      "setupRequired": "需要設定",
+      "unavailable": "無法使用"
+    },
+    "reason": {
+      "noEligibleModel": "請新增或啟用具有有效憑證的文字模型。",
+      "providerMissing": "已儲存的提供者已不存在。",
+      "providerDisabled": "已儲存的提供者已被停用。",
+      "modelMissing": "已儲存的模型已不存在。",
+      "modelDisabled": "已儲存的模型已被停用。",
+      "authRequired": "已儲存的提供者需要有效憑證。",
+      "healthCheckFailed": "所選模型未通過健康狀態檢查。"
+    }
+  }
 }
