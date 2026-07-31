@@ -80,6 +80,13 @@ export type QuestionResult = {
   sourceRank: number | null;
   /** 1-based rank of the first expected-source hit containing answerHint. */
   answerRank: number | null;
+  /**
+   * Vector mode only: the rank in the UNTRUNCATED ranking, before the top-k cut.
+   * The whole point of the diagnostic is the questions that miss, and a miss
+   * measured at top-6 says only "not in the top 6" — the same non-answer the
+   * fused run already gave. This is where the passage actually sat.
+   */
+  deepSourceRank?: number | null;
 };
 
 export type ModeMetrics = {
@@ -98,7 +105,13 @@ export type ModeMetrics = {
   answerMrr: number;
 };
 
-export type EvalMode = 'bm25' | 'hybrid';
+/**
+ * 'vector' is a DIAGNOSTIC lens, not a shipping configuration — production is
+ * always hybrid. It exists to answer one question the fused result cannot: when
+ * hybrid misses, was the passage never found, or found and then buried by
+ * fusion? For that reason it is reported but deliberately not baselined.
+ */
+export type EvalMode = 'bm25' | 'hybrid' | 'vector';
 
 export type ModeResult = {
   mode: EvalMode;

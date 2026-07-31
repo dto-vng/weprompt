@@ -80,6 +80,33 @@ file without changing which file wins, so `recall@k` and `MRR` sit still while `
 BM25-only and hybrid are reported **separately**. The semantic half is optional at runtime, and a
 change that helps one can hurt the other.
 
+### The vector-only row is a diagnostic, not a configuration
+
+When an embedding model is available a third row appears, **Vector-only**. Production is always
+hybrid and never runs this; it exists to answer the one question a fused result cannot — when hybrid
+misses, was the passage never found, or found and then discarded by fusion? Those have completely
+different fixes (a different embedding model versus a fusion constant), and the fused ranking cannot
+tell them apart.
+
+It is implemented by handing `searchKnowledge` a store whose BM25 index was built from **no chunks**.
+`searchBm25` returns `[]` the moment `totalDocs === 0`, so the lexical contribution disappears and
+RRF fuses a single list, which is order-preserving. Cosine, the candidate cap and the chunk mapping
+are all still the shipping code — nothing about ranking is reimplemented, and `packages/` is
+untouched. A regression test asserts the vector row actually differs from the hybrid row, because a
+`withoutLexicalHalf` that quietly became a no-op would turn this into a second copy of the hybrid
+ranking with every conclusion drawn from it wrong and nothing else failing.
+
+Two things to know when reading it:
+
+- It ranks the **whole corpus**, then truncates to `topK` for its metrics row so the row stays
+  comparable. The untruncated rank is what the "where the semantic half ranked what Hybrid missed"
+  section reports — a miss measured at top-6 would only repeat what the fused run already said.
+- Its scores are RRF scores, `1/(60+rank)`, not cosine similarities. Read the ordering, not the
+  number.
+- It is deliberately **not** in `baseline.json`. Baselining it would gate a configuration that is
+  never shipped and add a third block to re-record on every embedding-model change; the hybrid block
+  already guards the semantic path.
+
 Unanswerable questions are excluded from every average — the recall of an empty expected set is
 undefined, and folding them in would reward over-retrieval. They get their own section.
 
@@ -366,19 +393,76 @@ Hybrid's `zeroHitIds` is empty where BM25's holds `unanswerable-no-overlap`: a q
 token is absent from the corpus still returns six passages once vectors are in play. Predicted when
 that case was written, now measured. Only the BM25 abstention is gated.
 
-### Why cross-language fails is NOT established
+### Why cross-language fails — open at the time, since answered
 
-Two candidates, not separated by this run:
+Two candidates, not separated by _this_ run:
 
 1. `bge-m3` may not bridge English → Vietnamese in this vector space.
 2. RRF may be burying a correct semantic hit. At `k = 60`, a passage in only one of the two lists
    scores 1/61 and loses to anything appearing in both — and a cross-language query's BM25 list is
    exactly where the right document is absent.
 
-Telling them apart needs a **vector-only ranking**, which this harness does not expose: it reports
-the fused result and nothing else. Until that exists, "embeddings do not help cross-language here" is
-supported; "bge-m3 cannot bridge these languages" is not. Exposing a semantic-only mode is the
-cheapest next measurement, and unlike the fusion knobs it needs no change to shipping code.
+Telling them apart needed a **vector-only ranking**. That mode was added, run, and **the question is
+now settled: it is the fusion, not the model.** See finding 11 below.
+
+## Recorded findings (2026-07-31, vector-only diagnostic)
+
+Same run, same model, with the semantic half isolated:
+
+| metric         | BM25-only | Hybrid | Vector-only |
+| -------------- | --------- | ------ | ----------- |
+| recall@1       | 0.800     | 0.800  | 0.760       |
+| recall@3       | 0.840     | 0.840  | **0.880**   |
+| recall@6       | 0.840     | 0.880  | **0.960**   |
+| MRR            | 0.820     | 0.828  | 0.818       |
+| answerRecall@6 | 0.840     | 0.880  | **0.960**   |
+| answerMRR      | 0.800     | 0.808  | 0.778       |
+
+### 11. The embedding model bridges languages fine. Fusion throws the answer away.
+
+```
+where the semantic half ranked what Hybrid missed
+  [cross-lang-trip-approval]     rank 1 of 19 — FOUND, then lost in fusion
+  [cross-lang-vpn-signoff]       rank 5 of 19 — mid-pack
+  [ocr-cross-lang-response-time] rank 1 of 19 — FOUND, then lost in fusion
+```
+
+Two of the three cross-language questions — including the OCR'd scan — have the correct document at
+**rank 1** on pure semantics, the best result available. Hybrid returns six wrong documents for both.
+`bge-m3` was never the problem, and finding 9's open question is closed: **it is the combination
+rule.**
+
+The mechanism is visible in the report's own scores. RRF at `k = 60` gives a document found by one
+list `1/61 = 0.0164`; a document found by **both** lists gets `1/61 + 1/62 = 0.0325`. Roughly double,
+regardless of how good either hit was — which is exactly the `0.0164` versus `0.0320` in the
+unanswerable section.
+
+So a rank-1 semantic hit loses to any document both retrievers merely noticed. And for a
+cross-language query BM25 _structurally cannot_ find the right document — different language, zero
+shared tokens — so it can never appear in both lists, so it can never win. This is not a tuning
+nicety: **on a bilingual corpus, the current fusion cannot surface the correct document above any
+document the two retrievers happen to agree on.**
+
+### 12. The fused result is worse than one of its own inputs
+
+`recall@6`: vector-only 0.960, hybrid 0.880. Fusion is discarding information rather than combining
+it. Twenty-four of twenty-five questions are answerable from the semantic list alone at k=6.
+
+But pure semantic is not the answer either, and the fixture says why. Vector-only loses `id-po-vendor`
+outright and drops `ocr-id-transcribed-table-row` from rank 1 to 3 — the two identifier-in-a-table
+cases, exactly where BM25 was predicted to dominate because an exact code offers an embedding nothing
+to generalise from. `recall@1` goes 0.800 → 0.760 for the same reason.
+
+Neither half is right alone. The combination rule is what is broken.
+
+### What this does NOT license
+
+A quick retune. Lowering RRF's `k` does not cleanly fix this: RRF is _designed_ to reward cross-list
+agreement, and for a single-list rank-1 hit to beat a document sitting at ranks 3 and 4 of both lists
+you need `1/(k+1) > 1/(k+3) + 1/(k+4)`, which only holds at implausibly small `k`. A real fix is more
+likely weighted fusion, or a rule for when one list is structurally empty — and either is a change to
+`rrf.ts` or `searchCore.ts`, which is **shipping code, not this harness**. It belongs in its own
+change, measured with this instrument rather than alongside it.
 
 ## Baseline and CI
 
