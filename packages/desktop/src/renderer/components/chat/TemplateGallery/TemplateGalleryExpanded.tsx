@@ -32,7 +32,7 @@ const TemplateGalleryExpanded: React.FC<{
       aria-label={t('conversation.presentationTemplates.title')}
     >
       <div className='flex items-center justify-between gap-8px mb-8px'>
-        <span className='text-14px font-medium'>{t('conversation.presentationTemplates.title')}</span>
+        <span className='text-14px font-semibold text-t-primary'>{t('conversation.presentationTemplates.title')}</span>
         <div className='flex items-center gap-4px shrink-0'>
           {/* Text-weight so importing (the rarest action here) doesn't outweigh the
               title, and so it matches the borderless close button beside it. Arco

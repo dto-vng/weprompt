@@ -35,7 +35,7 @@ const TemplateGalleryPanel: React.FC<{
       aria-label={t('conversation.presentationTemplates.title')}
     >
       <div className='flex items-center justify-between gap-8px mb-8px'>
-        <span className='text-13px font-medium'>{t('conversation.presentationTemplates.title')}</span>
+        <span className='text-13px font-semibold text-t-primary'>{t('conversation.presentationTemplates.title')}</span>
         {/* Both actions share one group: with three direct children, justify-between
             stranded the import button in the middle of the header. */}
         <div className='flex items-center gap-4px shrink-0'>
