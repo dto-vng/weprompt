@@ -77,6 +77,36 @@ describe('projectStorage', () => {
     expect(updated?.updated_at).toBe(2000);
   });
 
+  it('allows a metadata-only update when another project already shares the workspace', () => {
+    writeProjects(
+      [
+        { id: 'project-1', name: 'Finance Close', workspace: '/Users/me/Finance Close', created_at: 1, updated_at: 1 },
+        { id: 'project-2', name: 'Duplicate', workspace: '/Users/me/Finance Close', created_at: 1, updated_at: 1 },
+      ],
+      storage
+    );
+
+    const updated = updateProject({ id: 'project-1', last_opened_at: 5000 }, { storage, now: () => 2000 });
+
+    expect(updated?.last_opened_at).toBe(5000);
+    expect(updated?.workspace).toBe('/Users/me/Finance Close');
+  });
+
+  it('still rejects an update that moves a project onto another project workspace', () => {
+    createProject(
+      { name: 'Finance Close', workspace: '/Users/me/Finance Close' },
+      { storage, now: () => 1000, createId: () => 'project-1' }
+    );
+    createProject(
+      { name: 'Payroll', workspace: '/Users/me/Payroll' },
+      { storage, now: () => 1000, createId: () => 'project-2' }
+    );
+
+    expect(() =>
+      updateProject({ id: 'project-2', workspace: '/Users/me/Finance Close/' }, { storage, now: () => 2000 })
+    ).toThrow('PROJECT_WORKSPACE_DUPLICATE');
+  });
+
   it('finds projects by normalized workspace', () => {
     const project = createProject(
       { name: 'Finance Close', workspace: '/Users/me/Finance Close' },
