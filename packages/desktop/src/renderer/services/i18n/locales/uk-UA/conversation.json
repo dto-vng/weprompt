@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "Це проіндексований текст, за яким шукає асистент, а не початкове оформлення.",
     "knowledgePreviewTruncated": "Попередній перегляд скорочено. Відкрийте початковий файл, щоб побачити весь документ.",
     "knowledgePreviewError": "Не вдалося завантажити проіндексований текст цього файлу.",
+    "knowledgeCitationMissing": "Цього файлу більше немає в базі знань.",
     "knowledgeOcrTag": "Розпізнано (OCR)",
     "knowledgeOcrDetail": "Розпізнано зі сканованого документа моделлю {{model}}. Пропущені сторінки: {{pages}}",
     "knowledgeOcrNoSkippedPages": "немає"

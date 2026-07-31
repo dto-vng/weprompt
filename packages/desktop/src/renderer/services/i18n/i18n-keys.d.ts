@@ -715,6 +715,7 @@ export type I18nKey =
   | 'conversation.projectHome.instructionsSaved'
   | 'conversation.projectHome.knowledge'
   | 'conversation.projectHome.knowledgeAdd'
+  | 'conversation.projectHome.knowledgeCitationMissing'
   | 'conversation.projectHome.knowledgeDeleteConfirm'
   | 'conversation.projectHome.knowledgeDeleteFile'
   | 'conversation.projectHome.knowledgeEmbedAll'

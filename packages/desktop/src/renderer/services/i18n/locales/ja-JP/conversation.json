@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "これはアシスタントが検索する索引テキストで、元のレイアウトではありません。",
     "knowledgePreviewTruncated": "プレビューは省略されています。全文は元のファイルで確認してください。",
     "knowledgePreviewError": "このファイルの索引テキストを読み込めませんでした。",
+    "knowledgeCitationMissing": "このファイルはもうナレッジベースにありません。",
     "knowledgeOcrTag": "文字起こし済み（OCR）",
     "knowledgeOcrDetail": "{{model}} がスキャンから文字起こししました。スキップしたページ: {{pages}}",
     "knowledgeOcrNoSkippedPages": "なし"

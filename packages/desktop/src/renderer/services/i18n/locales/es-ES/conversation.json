@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "Este es el texto indexado que busca el asistente, no el diseño original.",
     "knowledgePreviewTruncated": "Vista previa recortada. Abre el archivo original para ver el documento completo.",
     "knowledgePreviewError": "No se pudo cargar el texto indexado de este archivo.",
+    "knowledgeCitationMissing": "Este archivo ya no está en la base de conocimientos.",
     "knowledgeOcrTag": "Transcrito (OCR)",
     "knowledgeOcrDetail": "Transcrito de un escaneo por {{model}}. Páginas omitidas: {{pages}}",
     "knowledgeOcrNoSkippedPages": "ninguna"

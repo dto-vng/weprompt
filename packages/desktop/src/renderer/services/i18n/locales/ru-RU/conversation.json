@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "Это проиндексированный текст, по которому ищет ассистент, а не исходное оформление.",
     "knowledgePreviewTruncated": "Предпросмотр сокращён. Откройте исходный файл, чтобы увидеть весь документ.",
     "knowledgePreviewError": "Не удалось загрузить проиндексированный текст этого файла.",
+    "knowledgeCitationMissing": "Этот файл больше не находится в базе знаний.",
     "knowledgeOcrTag": "Распознано (OCR)",
     "knowledgeOcrDetail": "Распознано из сканированного документа моделью {{model}}. Пропущенные страницы: {{pages}}",
     "knowledgeOcrNoSkippedPages": "нет"

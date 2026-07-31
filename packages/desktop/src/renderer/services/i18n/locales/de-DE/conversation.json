@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "Dies ist der indexierte Text, den der Assistent durchsucht – nicht das ursprüngliche Layout.",
     "knowledgePreviewTruncated": "Vorschau gekürzt. Öffnen Sie die Originaldatei für das vollständige Dokument.",
     "knowledgePreviewError": "Der indexierte Text dieser Datei konnte nicht geladen werden.",
+    "knowledgeCitationMissing": "Diese Datei ist nicht mehr in der Wissensdatenbank.",
     "knowledgeOcrTag": "Transkribiert (OCR)",
     "knowledgeOcrDetail": "Von {{model}} aus einem Scan transkribiert. Übersprungene Seiten: {{pages}}",
     "knowledgeOcrNoSkippedPages": "keine"

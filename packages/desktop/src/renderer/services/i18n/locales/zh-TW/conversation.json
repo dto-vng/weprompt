@@ -95,6 +95,7 @@
     "knowledgePreviewNote": "這是助理檢索所用的索引文字，不是原始版面。",
     "knowledgePreviewTruncated": "預覽已截斷。要看完整文件請開啟原始檔案。",
     "knowledgePreviewError": "無法載入此檔案的索引文字。",
+    "knowledgeCitationMissing": "該檔案已不在知識庫中。",
     "knowledgeOcrTag": "已轉寫（OCR）",
     "knowledgeOcrDetail": "由 {{model}} 從掃描件轉寫。已略過的頁：{{pages}}",
     "knowledgeOcrNoSkippedPages": "無"

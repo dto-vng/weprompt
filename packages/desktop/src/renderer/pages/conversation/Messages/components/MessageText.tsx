@@ -7,6 +7,7 @@
 import type { IMessageText } from '@/common/chat/chatLib';
 import { AIONUI_FILES_MARKER } from '@/common/config/constants';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
+import { useKnowledgeCitationsSafe } from '@/renderer/pages/conversation/knowledge/KnowledgeCitationsContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useLocalFilePreview } from '@/renderer/pages/conversation/Preview/hooks/useLocalFilePreview';
 import { iconColors } from '@/renderer/styles/colors';
@@ -261,6 +262,15 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     () => visibleFiles.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
     [conversationContext?.workspace, visibleFiles]
   );
+  const citations = useKnowledgeCitationsSafe();
+  // Citation linkify runs on the exact string MarkdownView receives (post
+  // progressive-reveal): pure and memoized; partially revealed names simply
+  // don't match until the stream completes them.
+  const markdownSource = shouldRevealStream || isRevealing ? displayedText : data;
+  const linkifiedMarkdown = useMemo(() => {
+    if (!citations || isUserMessage || json || typeof markdownSource !== 'string') return markdownSource;
+    return citations.linkify(markdownSource);
+  }, [citations, isUserMessage, json, markdownSource]);
 
   // 过滤空内容，避免渲染空DOM
   if (!message.content.content || (typeof message.content.content === 'string' && !message.content.content.trim())) {
@@ -396,8 +406,12 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             </CollapsibleContent>
           ) : (
             <div data-testid='message-text-content'>
-              <MarkdownView codeStyle={CODE_STYLE} onLocalFileLink={handleLocalFileLink}>
-                {shouldRevealStream || isRevealing ? displayedText : data}
+              <MarkdownView
+                codeStyle={CODE_STYLE}
+                onLocalFileLink={handleLocalFileLink}
+                onKbCitationClick={citations?.openCitation}
+              >
+                {linkifiedMarkdown}
               </MarkdownView>
             </div>
           )}
