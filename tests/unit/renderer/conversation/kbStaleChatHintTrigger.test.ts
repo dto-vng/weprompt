@@ -7,8 +7,11 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_KNOWLEDGE_NAME } from '@/common/knowledge/constants';
 import {
+  kbChangedHintDismissKey,
   kbStaleHintDismissKey,
+  shouldShowKbChangedHint,
   shouldShowKbStaleHint,
+  type KbChangedChatHintTrigger,
   type KbStaleChatHintTrigger,
 } from '@/renderer/pages/conversation/knowledge/useKbStaleChatHint';
 
@@ -115,5 +118,71 @@ describe('kbStaleHintDismissKey', () => {
   it('namespaces the dismissal per conversation', () => {
     expect(kbStaleHintDismissKey('abc')).toBe('kb.staleHint.dismissed.abc');
     expect(kbStaleHintDismissKey('def')).not.toBe(kbStaleHintDismissKey('abc'));
+  });
+
+  it('is a different key from the changed-hint dismissal, so one does not silence the other', () => {
+    expect(kbChangedHintDismissKey('abc')).toBe('kb.changedHint.dismissed.abc');
+    expect(kbChangedHintDismissKey('abc')).not.toBe(kbStaleHintDismissKey('abc'));
+  });
+});
+
+/**
+ * Case B: verified real on 2026-07-31 — a running session's knowledge subprocess
+ * serves a snapshot frozen at spawn, so files indexed mid-chat are invisible to
+ * it even though the chat has the tool.
+ */
+describe('shouldShowKbChangedHint', () => {
+  const CHANGED: KbChangedChatHintTrigger = {
+    conversationId: 'c1',
+    projectId: 'p1',
+    sessionMcpServers: [OTHER_SERVER, KNOWLEDGE_SERVER],
+    knowledgeChangedSinceMount: true,
+    dismissed: false,
+  };
+
+  it('shows when a chat that HAS the tool sees the knowledge base change under it', () => {
+    expect(shouldShowKbChangedHint(CHANGED)).toBe(true);
+  });
+
+  it('stays hidden until something actually changes', () => {
+    expect(shouldShowKbChangedHint({ ...CHANGED, knowledgeChangedSinceMount: false })).toBe(false);
+  });
+
+  it('stays hidden once dismissed', () => {
+    expect(shouldShowKbChangedHint({ ...CHANGED, dismissed: true })).toBe(false);
+  });
+
+  it('defers to the stale notice for a chat that never had the tool', () => {
+    const lacksTool = { ...CHANGED, sessionMcpServers: [OTHER_SERVER] };
+    expect(shouldShowKbChangedHint(lacksTool)).toBe(false);
+    // ...and that same conversation is exactly the stale case instead.
+    expect(
+      shouldShowKbStaleHint({
+        conversationId: 'c1',
+        projectId: 'p1',
+        sessionMcpServers: [OTHER_SERVER],
+        hasIndexedSource: true,
+        dismissed: false,
+      })
+    ).toBe(true);
+  });
+
+  it('never shows both notices for the same conversation', () => {
+    const withTool = {
+      conversationId: 'c1',
+      projectId: 'p1',
+      sessionMcpServers: [OTHER_SERVER, KNOWLEDGE_SERVER],
+      dismissed: false,
+    };
+    const stale = shouldShowKbStaleHint({ ...withTool, hasIndexedSource: true });
+    const changed = shouldShowKbChangedHint({ ...withTool, knowledgeChangedSinceMount: true });
+    expect(stale && changed).toBe(false);
+  });
+
+  it('fails closed for non-project chats and unreadable snapshots', () => {
+    expect(shouldShowKbChangedHint({ ...CHANGED, projectId: undefined })).toBe(false);
+    expect(shouldShowKbChangedHint({ ...CHANGED, conversationId: undefined })).toBe(false);
+    expect(shouldShowKbChangedHint({ ...CHANGED, sessionMcpServers: undefined })).toBe(false);
+    expect(shouldShowKbChangedHint({ ...CHANGED, sessionMcpServers: 'nope' })).toBe(false);
   });
 });

@@ -6,7 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import { BUILTIN_KNOWLEDGE_NAME } from '@/common/knowledge/constants';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Route of the project-scoped new-chat screen, with the project carried in
@@ -18,6 +18,10 @@ export const PROJECT_CHAT_ROUTE = '/guid';
 
 /** Dismissal is per conversation: silencing one chat must not silence another. */
 export const kbStaleHintDismissKey = (conversationId: string): string => `kb.staleHint.dismissed.${conversationId}`;
+
+/** Separate from the stale key so dismissing one notice never hides the other. */
+export const kbChangedHintDismissKey = (conversationId: string): string =>
+  `kb.changedHint.dismissed.${conversationId}`;
 
 export type KbStaleChatHintTrigger = {
   conversationId?: string;
@@ -56,18 +60,62 @@ export const shouldShowKbStaleHint = (trigger: KbStaleChatHintTrigger): boolean 
   return !includesKnowledgeServer(sessionMcpServers);
 };
 
-export type KbStaleChatHintState = {
-  visible: boolean;
-  /** Hide the notice for this conversation, permanently. */
-  dismiss: () => void;
+export type KbChangedChatHintTrigger = {
+  conversationId?: string;
+  projectId?: string;
+  sessionMcpServers?: unknown;
+  /** A source that was absent when this view mounted has since become ready. */
+  knowledgeChangedSinceMount: boolean;
+  dismissed: boolean;
 };
 
 /**
- * Trigger for the stale-chat notice.
+ * Whether a chat that *does* have the knowledge server is nonetheless blind to
+ * files added since it started.
  *
- * Only conversations that could ever show it — project scoped, and missing the
- * knowledge server from their frozen snapshot — read the source list or
- * subscribe to updates. A chat that can already search costs nothing.
+ * Verified on 2026-07-31: a running session's knowledge subprocess serves a
+ * snapshot frozen at spawn. Asked in one turn, the same session found a file
+ * indexed before it started and returned "No relevant passages found" for an
+ * exact-name query on one indexed after — while a fresh chat found it at once.
+ *
+ * The staleness lasts only until the subprocess respawns, so the trigger is
+ * intentionally in-session: `knowledgeChangedSinceMount` is not persisted, and
+ * forgetting it on reload errs toward silence rather than nagging about a chat
+ * that can search again.
+ */
+export const shouldShowKbChangedHint = (trigger: KbChangedChatHintTrigger): boolean => {
+  const { conversationId, projectId, sessionMcpServers, knowledgeChangedSinceMount, dismissed } = trigger;
+  if (!conversationId || !projectId) return false;
+  if (dismissed) return false;
+  if (!knowledgeChangedSinceMount) return false;
+  if (!Array.isArray(sessionMcpServers)) return false;
+  // A chat without the server can never search at all — that is the stale case.
+  return includesKnowledgeServer(sessionMcpServers);
+};
+
+/**
+ * `stale` — the chat never had the knowledge server (Case A).
+ * `changed` — it has the server, but files were indexed after it started (Case B).
+ */
+export type KbChatHintVariant = 'stale' | 'changed';
+
+export type KbStaleChatHintState = {
+  variant: KbChatHintVariant | null;
+  /** Hide the currently shown notice for this conversation, permanently. */
+  dismiss: () => void;
+};
+
+/** Sources a new chat would be able to search, by id. */
+const readySourceIds = (sources: ReadonlyArray<{ id: string; status: string; chunkCount: number }>): Set<string> =>
+  new Set(sources.filter((source) => source.status === 'ready' && source.chunkCount > 0).map((source) => source.id));
+
+/**
+ * Trigger for both knowledge notices.
+ *
+ * Every project conversation watches the source list, because either notice can
+ * apply: a chat without the server can never search (`stale`), and one with it
+ * still cannot see files indexed after its session spawned (`changed`).
+ * Non-project chats subscribe to nothing.
  */
 export const useKbStaleChatHint = (input: {
   conversationId?: string;
@@ -76,15 +124,24 @@ export const useKbStaleChatHint = (input: {
 }): KbStaleChatHintState => {
   const { conversationId, projectId, sessionMcpServers } = input;
 
-  const lacksKnowledgeServer = Array.isArray(sessionMcpServers) && !includesKnowledgeServer(sessionMcpServers);
-  const shouldWatch = Boolean(conversationId && projectId && lacksKnowledgeServer);
+  const shouldWatch = Boolean(conversationId && projectId);
 
   const [hasIndexedSource, setHasIndexedSource] = useState(false);
+  const [knowledgeChangedSinceMount, setKnowledgeChangedSinceMount] = useState(false);
   // Starts dismissed so the first paint cannot flash a notice we may hide.
-  const [dismissed, setDismissed] = useState(true);
+  const [staleDismissed, setStaleDismissed] = useState(true);
+  const [changedDismissed, setChangedDismissed] = useState(true);
+  /** Sources known when this view mounted; null until the first read lands. */
+  const knownReadyIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    setDismissed(conversationId ? localStorage.getItem(kbStaleHintDismissKey(conversationId)) === '1' : true);
+    if (!conversationId) {
+      setStaleDismissed(true);
+      setChangedDismissed(true);
+      return;
+    }
+    setStaleDismissed(localStorage.getItem(kbStaleHintDismissKey(conversationId)) === '1');
+    setChangedDismissed(localStorage.getItem(kbChangedHintDismissKey(conversationId)) === '1');
   }, [conversationId]);
 
   useEffect(() => {
@@ -93,14 +150,30 @@ export const useKbStaleChatHint = (input: {
       return;
     }
     let disposed = false;
+    // A fresh mount means a fresh baseline: the notice is about what changed
+    // while this view was open, not about history.
+    knownReadyIdsRef.current = null;
+    setKnowledgeChangedSinceMount(false);
     const refetch = async () => {
       try {
         const result = await ipcBridge.projectKnowledge.listSources.invoke({ projectId });
+        if (disposed) return;
         // Mirrors the server-side attach predicate
         // (`projectKnowledgeService.getSessionMcpServer`): a source only makes a
         // new chat better once it is ready AND has passages to search.
-        const ready = result.sources.some((source) => source.status === 'ready' && source.chunkCount > 0);
-        if (!disposed) setHasIndexedSource(ready);
+        const ready = readySourceIds(result.sources);
+        setHasIndexedSource(ready.size > 0);
+        const known = knownReadyIdsRef.current;
+        if (known === null) {
+          knownReadyIdsRef.current = ready;
+          return;
+        }
+        // Only a source that was absent at mount means the running session is
+        // behind; progress ticks on an already-known file are not news.
+        if ([...ready].some((id) => !known.has(id))) {
+          knownReadyIdsRef.current = ready;
+          setKnowledgeChangedSinceMount(true);
+        }
       } catch (error) {
         console.error('Failed to load knowledge sources for the stale-chat hint:', error);
         if (!disposed) setHasIndexedSource(false);
@@ -118,14 +191,36 @@ export const useKbStaleChatHint = (input: {
     };
   }, [shouldWatch, projectId]);
 
+  const stale = shouldShowKbStaleHint({
+    conversationId,
+    projectId,
+    sessionMcpServers,
+    hasIndexedSource,
+    dismissed: staleDismissed,
+  });
+  const changed = shouldShowKbChangedHint({
+    conversationId,
+    projectId,
+    sessionMcpServers,
+    knowledgeChangedSinceMount,
+    dismissed: changedDismissed,
+  });
+  // The two are mutually exclusive by construction (one needs the server
+  // absent, the other present), so the order here is a formality.
+  const variant: KbChatHintVariant | null = stale ? 'stale' : changed ? 'changed' : null;
+
   const dismiss = useCallback(() => {
     if (!conversationId) return;
-    localStorage.setItem(kbStaleHintDismissKey(conversationId), '1');
-    setDismissed(true);
-  }, [conversationId]);
+    if (variant === 'stale') {
+      localStorage.setItem(kbStaleHintDismissKey(conversationId), '1');
+      setStaleDismissed(true);
+      return;
+    }
+    if (variant === 'changed') {
+      localStorage.setItem(kbChangedHintDismissKey(conversationId), '1');
+      setChangedDismissed(true);
+    }
+  }, [conversationId, variant]);
 
-  return {
-    visible: shouldShowKbStaleHint({ conversationId, projectId, sessionMcpServers, hasIndexedSource, dismissed }),
-    dismiss,
-  };
+  return { variant, dismiss };
 };

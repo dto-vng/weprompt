@@ -14,9 +14,10 @@ import { PROJECT_CHAT_ROUTE, useKbStaleChatHint } from './useKbStaleChatHint';
 
 /**
  * Explains, right where the confusion happens, why this chat cannot see the
- * project's knowledge base: its MCP server set was frozen at creation, before
- * any file was indexed. Offers the only actual fix — a new chat, which picks
- * up the current set. Renders nothing unless that is provably the situation.
+ * project's knowledge base — either because its MCP server set was frozen
+ * before any file was indexed (`stale`), or because its session was spawned
+ * before files that have since been added (`changed`). Both have the same fix,
+ * a new chat, and both render nothing unless provably the situation.
  */
 const KbStaleChatHint: React.FC<{
   conversationId?: string;
@@ -27,21 +28,25 @@ const KbStaleChatHint: React.FC<{
   const { t } = useTranslation();
   const navigate = useNavigate();
   const teamPermission = useTeamPermission();
-  const { visible, dismiss } = useKbStaleChatHint({ conversationId, projectId, sessionMcpServers });
+  const { variant, dismiss } = useKbStaleChatHint({ conversationId, projectId, sessionMcpServers });
 
-  if (!visible) return null;
+  if (!variant) return null;
+
+  const bodyKey =
+    variant === 'stale' ? 'conversation.staleKnowledgeHint.body' : 'conversation.staleKnowledgeHint.changedBody';
 
   return (
     <div className={`${getChatSurfaceWidthClass(Boolean(teamPermission))} mb-8px`}>
       <Alert
         type='info'
         data-testid='kb-stale-chat-hint'
+        data-variant={variant}
         closable
         onClose={dismiss}
         className='!rounded-8px'
         content={
           <div className='flex items-center justify-between gap-8px flex-wrap'>
-            <span className='text-13px text-t-secondary'>{t('conversation.staleKnowledgeHint.body')}</span>
+            <span className='text-13px text-t-secondary'>{t(bodyKey)}</span>
             <Button
               type='text'
               size='mini'
