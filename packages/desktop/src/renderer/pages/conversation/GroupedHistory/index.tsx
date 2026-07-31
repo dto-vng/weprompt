@@ -676,7 +676,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                           <span
                             className={classNames(
                               'items-center justify-center',
-                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
                             )}
                           >
                             <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
@@ -698,7 +698,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                           <span
                             className={classNames(
                               'items-center justify-center',
-                              isMobile ? 'flex' : 'hidden group-hover:flex'
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
                             )}
                           >
                             <Dropdown

@@ -613,6 +613,7 @@ export type I18nKey =
   | 'conversation.history.exportSuccess'
   | 'conversation.history.exportTargetFolder'
   | 'conversation.history.exporting'
+  | 'conversation.history.moreActions'
   | 'conversation.history.newConversationInProject'
   | 'conversation.history.newProject'
   | 'conversation.history.noHistory'

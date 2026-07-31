@@ -487,3 +487,41 @@ describe('ConversationRow keyboard access', () => {
     expect(row.className).toContain('focus-visible:[outline:1px_solid_rgb(var(--primary-6))]');
   });
 });
+
+describe('ConversationRow overflow actions', () => {
+  // The action cluster was display:none until mouse hover with no focus-within
+  // variant, so pin/rename/delete/export were unreachable without a mouse even
+  // once the row itself became focusable.
+  it('reveals the action cluster on focus as well as hover', () => {
+    render(<ConversationRow {...buildProps()} />);
+    const trigger = screen.getByTestId('conversation-row-menu-conversation-1');
+    expect(trigger.className).toContain('group-hover:flex');
+    expect(trigger.className).toContain('group-focus-within:flex');
+  });
+
+  it('opens the menu from the keyboard', () => {
+    const onOpenMenu = vi.fn();
+    render(<ConversationRow {...buildProps({ onOpenMenu })} />);
+    const trigger = screen.getByTestId('conversation-row-menu-conversation-1');
+
+    expect(trigger).toHaveAttribute('role', 'button');
+    expect(trigger).toHaveAttribute('tabindex', '0');
+    expect(trigger).toHaveAttribute('aria-label', 'conversation.history.moreActions');
+
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not also fire the row when the trigger is keyed', () => {
+    // The trigger sits inside the row, so without stopPropagation an Enter on the
+    // menu would both open the menu and navigate away from the conversation.
+    const onOpenMenu = vi.fn();
+    const onConversationClick = vi.fn();
+    render(<ConversationRow {...buildProps({ onOpenMenu, onConversationClick })} />);
+
+    fireEvent.keyDown(screen.getByTestId('conversation-row-menu-conversation-1'), { key: 'Enter' });
+
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+    expect(onConversationClick).not.toHaveBeenCalled();
+  });
+});

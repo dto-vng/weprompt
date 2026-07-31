@@ -101,6 +101,7 @@
     "knowledgeOcrNoSkippedPages": "нет"
   },
   "history": {
+    "moreActions": "Другие действия",
     "recents": "Недавние",
     "noHistory": "Нет истории чатов",
     "deleteTitle": "Удалить",

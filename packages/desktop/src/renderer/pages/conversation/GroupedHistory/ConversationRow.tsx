@@ -350,7 +350,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
               'absolute right-8px top-1/2 -translate-y-1/2 items-center justify-end !collapsed-hidden',
               {
                 flex: isMobile || menuVisible,
-                'hidden group-hover:flex': !isMobile && !menuVisible,
+                'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
               }
             )}
             onClick={(event) => {
@@ -429,10 +429,19 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
                   'flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px rd-4px sider-action-btn',
                   {
                     flex: isMobile || menuVisible,
-                    'hidden group-hover:flex': !isMobile && !menuVisible,
+                    'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
                   }
                 )}
                 onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenMenu(conversation);
+                }}
+                role='button'
+                tabIndex={0}
+                aria-label={t('conversation.history.moreActions')}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
                   event.stopPropagation();
                   onOpenMenu(conversation);
                 }}
