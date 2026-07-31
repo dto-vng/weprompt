@@ -146,6 +146,27 @@ describe('ProjectHeader', () => {
     expect(screen.getByText('conversation.projectHome.metaActive')).toBeInTheDocument();
   });
 
+  it('shows the full workspace path on hover, since the subline truncates it', async () => {
+    render(<ProjectHeader project={{ ...project, workspace: '/a/very/long/workspace/path/alpha' }} />);
+
+    fireEvent.mouseEnter(screen.getByText('/a/very/long/workspace/path/alpha'));
+
+    // Arco renders tooltip content into a portal only once hovered, so both the
+    // truncated span and the tooltip copy carry the path by the time it opens.
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('/a/very/long/workspace/path/alpha').length).toBeGreaterThan(1);
+    });
+  });
+
+  it('shows the exact moment behind the active-duration token on hover', async () => {
+    const lastOpened = Date.UTC(2026, 6, 30, 9, 15);
+    render(<ProjectHeader project={{ ...project, last_opened_at: lastOpened }} />);
+
+    fireEvent.mouseEnter(screen.getByText('conversation.projectHome.metaActive'));
+
+    expect(await screen.findByText(new Date(lastOpened).toLocaleString())).toBeInTheDocument();
+  });
+
   it('reveals the project folder from the overflow menu', () => {
     render(<ProjectHeader project={project} />);
 

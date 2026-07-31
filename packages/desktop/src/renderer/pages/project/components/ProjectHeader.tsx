@@ -9,9 +9,9 @@ import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
 import { findProjectByWorkspace, removeProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { emitter } from '@/renderer/utils/emitter';
-import { Button, Dropdown, Input, Menu, Message, Modal } from '@arco-design/web-react';
+import { Button, Dropdown, Input, Menu, Message, Modal, Tooltip } from '@arco-design/web-react';
 import { Delete, FolderOpen, MoreOne } from '@icon-park/react';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,10 +58,19 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
   const navigate = useNavigate();
   const chats = useProjectChats(project);
 
-  const activeTime = useMemo(
-    () => formatActiveDuration(project.last_opened_at ?? project.updated_at, Date.now()),
-    [project.last_opened_at, project.updated_at]
-  );
+  // `Date.now()` used to be read inside a `useMemo` keyed only on the two
+  // timestamps, so the token froze for the page's lifetime: a Project Home left
+  // open all afternoon still read "1m", and disagreed with the exact timestamp
+  // now shown beside it on hover. A minute is the token's own finest
+  // granularity, so re-reading the clock that often is enough to keep it true.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const ticker = window.setInterval(() => setNow(Date.now()), MINUTE_MS);
+    return () => window.clearInterval(ticker);
+  }, []);
+
+  const activeSince = project.last_opened_at ?? project.updated_at;
+  const activeTime = formatActiveDuration(activeSince, now);
 
   const handleRename = useCallback(() => {
     let nextName = project.name;
@@ -210,12 +219,20 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
         <div className='mt-6px flex flex-wrap items-center gap-8px text-13px text-t-secondary'>
           <span className='flex min-w-0 max-w-full items-center gap-4px'>
             <FolderOpen theme='outline' size='13' className='shrink-0' />
-            <span className='truncate'>{project.workspace}</span>
+            {/* Both meta items hide information the user cannot otherwise reach:
+                a path long enough to be truncated, and a duration token with no
+                way to see the moment it counts from. Arco's Tooltip, never a
+                native `title` beside it — two tooltips on one element fight. */}
+            <Tooltip content={project.workspace}>
+              <span className='truncate'>{project.workspace}</span>
+            </Tooltip>
           </span>
           <span className='h-3px w-3px shrink-0 rd-full bg-3' />
           <span className='shrink-0'>{t('conversation.projectHome.metaChats', { count: chats.length })}</span>
           <span className='h-3px w-3px shrink-0 rd-full bg-3' />
-          <span className='shrink-0'>{t('conversation.projectHome.metaActive', { time: activeTime })}</span>
+          <Tooltip content={new Date(activeSince).toLocaleString()}>
+            <span className='shrink-0'>{t('conversation.projectHome.metaActive', { time: activeTime })}</span>
+          </Tooltip>
         </div>
       </div>
       <Dropdown droplist={menu} trigger='click' position='br' getPopupContainer={() => document.body}>
