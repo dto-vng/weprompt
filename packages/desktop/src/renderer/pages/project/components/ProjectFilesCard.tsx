@@ -9,7 +9,7 @@ import type { ForgeProject } from '@/common/types/project/projectTypes';
 import WorkspaceProjectFilesFlyout from '@renderer/pages/conversation/Workspace/components/WorkspaceProjectFilesFlyout';
 import '@renderer/pages/conversation/Workspace/workspace.css';
 import { getWorkspaceBasename, updateProject } from '@renderer/pages/conversation/projects/projectStorage';
-import { Alert, Button, Card, Spin, Tooltip } from '@arco-design/web-react';
+import { Alert, Button, Card, Message, Spin, Tooltip } from '@arco-design/web-react';
 import { FolderOpen } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -94,7 +94,14 @@ const ProjectFilesCard: React.FC<ProjectFilesCardProps> = ({ project }) => {
               files={files}
               expandedKeys={expandedKeys}
               onToggleFolder={toggleFolder}
-              onOpenFile={(node) => void ipcBridge.shell.showItemInFolder.invoke(node.fullPath)}
+              // A row click opens the file, as it does in a chat's Workspace
+              // tab; the card's `extra` action above is the deliberate
+              // reveal-in-Finder path, which this used to duplicate.
+              onOpenFile={(node) =>
+                void ipcBridge.shell.openFile
+                  .invoke(node.fullPath)
+                  .catch(() => Message.error(t('conversation.workspace.contextMenu.openFailed')))
+              }
             />
           </div>
           <span className='border-t border-t-4 pt-8px text-center text-11px text-t-tertiary'>
