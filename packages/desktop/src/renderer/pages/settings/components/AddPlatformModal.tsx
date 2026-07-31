@@ -550,7 +550,14 @@ const AddPlatformModal = ModalHOC<{
               </div>
             }
           >
-            <Input
+            {/* 与同文件里的 Bedrock 凭证保持一致：密钥一律遮蔽，需要时用眼睛图标显示。
+                添加供应商时只会填一个 key（多 key 轮换是在编辑页配的，见 settings.multiApiKeyTip），
+                所以单行的 Input.Password 是安全的替换。
+                Masked like the Bedrock credentials further down this same file. At add time the
+                field holds a single key — multi-key rotation is configured later in platform
+                edit (see settings.multiApiKeyTip) — so a single-line Password is a safe swap. */}
+            <Input.Password
+              visibilityToggle
               onBlur={() => {
                 void modelListState.mutate();
               }}
