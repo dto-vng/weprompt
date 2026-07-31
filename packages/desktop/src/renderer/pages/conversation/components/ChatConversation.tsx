@@ -235,6 +235,10 @@ const AionrsConversationPanel: React.FC<{
         loadedMcpStatuses={
           (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
         }
+        project_id={conversation.extra?.project_id}
+        session_mcp_servers={
+          (conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers
+        }
         agent_name={presetAssistantInfo?.name}
         assistantId={aionrsAssistantId}
       />
@@ -311,6 +315,10 @@ const ChatConversation: React.FC<{
             loadedMcpServers={(conversation.extra as { mcp_servers?: string[] } | undefined)?.mcp_servers}
             loadedMcpStatuses={
               (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
+            }
+            project_id={(conversation.extra as { project_id?: string } | undefined)?.project_id}
+            session_mcp_servers={
+              (conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers
             }
             assistantId={acpAssistantId}
           ></AcpChat>

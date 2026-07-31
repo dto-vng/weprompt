@@ -7,6 +7,7 @@
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import type { ConversationContextValue } from '@/renderer/hooks/context/ConversationContext';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
+import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
 import { CHAT_SURFACE_CONTAINER_CLASS } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
 import FlexFullContainer from '@renderer/components/layout/FlexFullContainer';
 import MessageList from '@renderer/pages/conversation/Messages/MessageList';
@@ -40,6 +41,9 @@ const AionrsChat: React.FC<{
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
   assistantId?: string;
+  project_id?: string;
+  /** Frozen-at-create MCP snapshot; validated by the hint, not trusted here. */
+  session_mcp_servers?: unknown;
 }> = ({
   conversation_id,
   workspace,
@@ -55,6 +59,8 @@ const AionrsChat: React.FC<{
   teamSendMessage,
   teamRuntime,
   assistantId,
+  project_id,
+  session_mcp_servers,
 }) => {
   useMessageLstCache(conversation_id);
   usePendingConfirmationsRecovery(conversation_id);
@@ -82,6 +88,12 @@ const AionrsChat: React.FC<{
           <FlexFullContainer>
             <MessageList className='flex-1' emptySlot={emptySlot} />
           </FlexFullContainer>
+          <KbStaleChatHint
+            conversationId={conversation_id}
+            projectId={project_id}
+            workspace={workspace}
+            sessionMcpServers={session_mcp_servers}
+          />
           <AionrsSendBox
             conversation_id={conversation_id}
             modelSelection={modelSelection}
