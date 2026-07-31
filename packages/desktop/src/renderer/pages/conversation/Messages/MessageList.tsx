@@ -13,7 +13,7 @@ import { getChatSurfaceWidthClass } from '@/renderer/pages/conversation/utils/ch
 import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionContext';
 import { iconColors } from '@/renderer/styles/colors';
 import { CHAT_MESSAGE_JUMP_EVENT, type ChatMessageJumpDetail } from '@/renderer/utils/chat/chatMinimapEvents';
-import { Image } from '@arco-design/web-react';
+import { Button, Image, Tooltip } from '@arco-design/web-react';
 import { Down } from '@icon-park/react';
 import MessageAcpPermission from '@renderer/pages/conversation/Messages/acp/MessageAcpPermission';
 import MessagePermission from './components/MessagePermission';
@@ -825,21 +825,24 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
       </Image.PreviewGroup>
 
       {showScrollButton && (
-        <>
-          {/* Gradient mask */}
-          <div className='absolute bottom-0 left-0 right-0 h-100px pointer-events-none' />
-          {/* Scroll button */}
-          <div className='absolute bottom-20px left-50% transform -translate-x-50% z-100'>
-            <div
-              className='flex items-center justify-center w-40px h-40px rd-full bg-base shadow-lg cursor-pointer hover:bg-1 transition-all hover:scale-110 border-1 border-solid border-3'
+        // The 100px "Gradient mask" div that used to sit here had no background, no gradient
+        // and no mask — it painted nothing and only occupied non-interactive space.
+        <div className='absolute bottom-20px left-50% transform -translate-x-50% z-100'>
+          <Tooltip content={t('messages.scrollToBottom')} mini>
+            <Button
+              shape='circle'
+              aria-label={t('messages.scrollToBottom')}
+              // `!b` supplies the width and `!border-4` the colour: `border-4` is colour-only,
+              // the Uno preflight sets every element to border-width 0, and `.arco-btn`'s own
+              // `border-color: transparent` beats an unprefixed utility (measured live — the
+              // ring stayed transparent without `!`). The old class list paired `border-1` with
+              // `border-3`: two competing colours, no width, so it drew no ring in any theme.
+              className='!flex items-center justify-center !w-40px !h-40px rd-full bg-base shadow-lg hover:bg-1 transition-all hover:scale-110 !b !b-solid !border-4'
               onClick={handleScrollButtonClick}
-              title={t('messages.scrollToBottom')}
-              style={{ lineHeight: 0 }}
-            >
-              <Down theme='filled' size='20' fill={iconColors.secondary} style={{ display: 'block' }} />
-            </div>
-          </div>
-        </>
+              icon={<Down theme='filled' size='20' fill={iconColors.secondary} style={{ display: 'block' }} />}
+            />
+          </Tooltip>
+        </div>
       )}
 
       <SelectionReplyButton messages={list} />

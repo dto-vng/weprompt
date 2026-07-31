@@ -533,6 +533,7 @@
     "noModelSelected": "Mevcut oturum için model seçilmedi, mesaj gönderilemiyor",
     "sendMessageTo": "{{model}} modeline mesaj gönder",
     "processing": "İşleniyor...",
+    "stopGenerating": "Üretimi durdur",
     "quotaExceededTitle": "Model kotasına ulaşıldı",
     "quotaExceededBody": "Mevcut model kotası tükendi. Devam etmek için {{model}} modeline geçilsin mi?",
     "quotaExceededNoFallback": "Model kotasına ulaşıldı. Lütfen başka bir uygun modele geçin.",
@@ -858,5 +859,6 @@
   "staleKnowledgeHint": {
     "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
     "action": "Yeni sohbet başlat"
-  }
+  },
+  "emptyChat": "Başlamak için bir mesaj gönderin."
 }

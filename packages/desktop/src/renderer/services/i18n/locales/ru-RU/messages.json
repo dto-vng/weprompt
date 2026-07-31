@@ -53,6 +53,7 @@
   "noOptionsAvailable": "Нет доступных опций",
   "processing": "Обработка...",
   "responseSentSuccessfully": "Ответ успешно отправлен",
+  "permissionResponseFailed": "Не удалось отправить ваш ответ. Попробуйте ещё раз.",
   "confirmation": {
     "applyChange": "Применить это изменение?",
     "allowExecution": "Разрешить выполнение?",
@@ -227,5 +228,8 @@
         "failedTitle": "Не удалось подготовить итоговый файл"
       }
     }
+  },
+  "plan": {
+    "title": "Список задач"
   }
 }

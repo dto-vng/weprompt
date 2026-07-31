@@ -5,9 +5,10 @@
  */
 
 import type { IMessageThinking } from '@/common/chat/chatLib';
+import { activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import { Spin } from '@arco-design/web-react';
 import { Brain, Right } from '@icon-park/react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './MessageThinking.module.css';
 
@@ -45,6 +46,8 @@ const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) =
   });
   const startTimeRef = useRef<number>(message.created_at ?? Date.now());
   const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyId = useId();
+  const toggleExpanded = () => setExpanded((v) => !v);
 
   // Auto-collapse when status changes to done
   useEffect(() => {
@@ -79,14 +82,25 @@ const MessageThinking: React.FC<{ message: IMessageThinking }> = ({ message }) =
 
   return (
     <div className={styles.container}>
-      <div className={styles.header} onClick={() => setExpanded((v) => !v)}>
+      {/* Stays a div rather than becoming an Arco Button: `.arco-btn` sets its own display and
+          paddings, which fight this CSS-module header. It takes button semantics by hand
+          instead — the case `activateOnEnterOrSpace` exists for. */}
+      <div
+        className={styles.header}
+        role='button'
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-controls={bodyId}
+        onClick={toggleExpanded}
+        onKeyDown={activateOnEnterOrSpace(toggleExpanded)}
+      >
         <span className={styles.headerIcon}>{!isDone ? <Spin size={12} /> : <Brain theme='outline' size='14' />}</span>
         <span className={styles.summary}>{summaryText}</span>
         <span className={`${styles.arrow} ${expanded ? styles.arrowExpanded : ''}`}>
           <Right theme='outline' size='12' />
         </span>
       </div>
-      <div ref={bodyRef} className={`${styles.body} ${!expanded ? styles.collapsed : ''}`}>
+      <div id={bodyId} ref={bodyRef} className={`${styles.body} ${!expanded ? styles.collapsed : ''}`}>
         {text}
       </div>
     </div>

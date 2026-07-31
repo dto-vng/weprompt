@@ -23,7 +23,7 @@ import type { FileOrFolderItem } from '@/renderer/utils/file/fileTypes';
 import { filterWorkspaceMentionItems } from '@/renderer/utils/file/workspaceMentions';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { blurActiveElement, shouldBlockMobileInputFocus } from '@/renderer/utils/ui/focus';
-import { Button, Input, Message, Tag } from '@arco-design/web-react';
+import { Button, Input, Message, Tag, Tooltip } from '@arco-design/web-react';
 import { ArrowUp, CloseSmall, Plus, Quote } from '@icon-park/react';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import { buildSkillSlashCommands, mergeSlashCommands } from '@/common/chat/slash/mergeSlashCommands';
@@ -1310,28 +1310,39 @@ const SendBox: React.FC<{
   const isButtonDisabled = disabled || isUploading || (!input.trim() && domSnippets.length === 0);
 
   // Reusable send button component
+  const sendLabel = t('common.send', { defaultValue: 'Send' });
+  const stopLabel = t('conversation.chat.stopGenerating', { defaultValue: 'Stop generating' });
+
   const sendButton = (
-    <Button
-      shape='circle'
-      type='primary'
-      disabled={isButtonDisabled}
-      className='send-button-custom'
-      icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-      onClick={() => {
-        sendMessageHandler();
-      }}
-      data-testid='sendbox-send-btn'
-    />
+    <Tooltip content={sendLabel} mini>
+      <Button
+        shape='circle'
+        type='primary'
+        disabled={isButtonDisabled}
+        className='send-button-custom'
+        aria-label={sendLabel}
+        icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
+        onClick={() => {
+          sendMessageHandler();
+        }}
+        data-testid='sendbox-send-btn'
+      />
+    </Tooltip>
   );
 
   const stopButton = (
-    <Button
-      shape='circle'
-      type='secondary'
-      className='bg-animate sendbox-stop-button'
-      icon={<div className='mx-auto size-12px bg-6'></div>}
-      onClick={stopHandler}
-    ></Button>
+    <Tooltip content={stopLabel} mini>
+      <Button
+        shape='circle'
+        type='secondary'
+        className='bg-animate sendbox-stop-button'
+        aria-label={stopLabel}
+        // The glyph is a bare square div, so the button has no text to fall back on.
+        icon={<div className='mx-auto size-12px bg-6'></div>}
+        onClick={stopHandler}
+        data-testid='sendbox-stop-btn'
+      ></Button>
+    </Tooltip>
   );
 
   const renderActionButtons = () => {
@@ -1421,7 +1432,11 @@ const SendBox: React.FC<{
     <div className={className}>
       <div
         ref={containerRef}
-        className={`sendbox-panel relative p-16px border-3 b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
+        // No border-colour utility here on purpose: the inline `borderColor` below is set in
+        // every state (from useInputFocusRing, or the drag highlight), so a class-level colour
+        // never paints. `border-3` used to sit here and read as if the edge were themed by
+        // --bg-3 — it was not, in either theme.
+        className={`sendbox-panel relative p-16px b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
         style={{
           transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
           ...(isFileDragging
