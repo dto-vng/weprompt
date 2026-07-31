@@ -212,6 +212,12 @@ value is concentrated almost entirely in **cross-language retrieval**, which BM2
 zero. For a Vietnamese-and-English knowledge base this is not a nice-to-have. Fill in the hybrid
 baseline to put a number on the other side.
 
+> **Superseded by finding 9 (2026-07-31).** The hybrid baseline was filled in, and this paragraph's
+> conclusion did not survive it. Cross-language is where the semantic half adds **nothing** here; its
+> entire contribution is `semantic-delay`, the monolingual case listed above. The reasoning was sound
+> and the prediction was wrong — left in place because a findings log that quietly deletes its wrong
+> calls cannot be trusted about its right ones.
+
 ### 2. Chunk size 3200 is not obviously the best setting — but the fixture cannot call a winner
 
 | chunk             | passages | recall@1  | recall@6  | MRR       | answerMRR |
@@ -320,14 +326,59 @@ not less. The hard invariant still holds — `unanswerable-no-overlap` returns n
 
 ### Still not measured
 
-- **The hybrid half.** `baseline.json` is still `hybrid: null`, so the one question finding 6 raises —
-  does the multilingual embedding model bridge an English query to an OCR'd Vietnamese answer? — is
-  the question this instrument still cannot answer. Route 2 will not get you there — see "Route 2
-  cannot authenticate" — so fill it with `KB_EVAL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL` pointed at a
-  working embedding model, then `bun run eval:kb -- --update-baseline`.
 - **Text-layer vs OCR on the same tables** (see finding 7).
 - Resolution barely improved: one question is worth 0.040 where it was worth 0.043. The 40–60 range in
   "what would make this instrument sharper" is still the target.
+
+## Recorded findings (2026-07-31, hybrid)
+
+The hybrid baseline is filled in, against `baai/bge-m3` (dim 1024) via `KB_EVAL_EMBED_*`. First
+numbers the semantic half has ever produced here.
+
+| metric         | BM25-only | Hybrid    |
+| -------------- | --------- | --------- |
+| recall@1       | 0.800     | 0.800     |
+| recall@3       | 0.840     | 0.840     |
+| recall@6       | 0.840     | **0.880** |
+| MRR            | 0.820     | 0.828     |
+| answerRecall@6 | 0.840     | **0.880** |
+| answerMRR      | 0.800     | 0.808     |
+
+### 9. The semantic half rescues one question, and not the one it was for
+
+`foundIds` goes 21 → 22. The single addition is **`semantic-delay`** — the monolingual English case.
+All three cross-language questions are still missed: `cross-lang-trip-approval`,
+`cross-lang-vpn-signoff`, and `ocr-cross-lang-response-time`.
+
+This is the reverse of finding 1's prediction, which is annotated as superseded above rather than
+deleted. On this corpus, at these knobs, with this model, **cross-language is precisely where the
+semantic half adds nothing**, and its whole contribution is the one case where an English question
+shares no vocabulary with an English answer.
+
+The rescue is also weak. `recall@1` and `recall@3` do not move at all — the top slot is never
+improved — and the gain shows only at `recall@6`. The MRR delta of 0.008 across 25 scored questions
+pins the new hit's reciprocal rank at 0.2, so it enters at **rank 5**, near the bottom of a top-6
+payload.
+
+### 10. Hybrid never abstains, exactly as designed
+
+Hybrid's `zeroHitIds` is empty where BM25's holds `unanswerable-no-overlap`: a question whose every
+token is absent from the corpus still returns six passages once vectors are in play. Predicted when
+that case was written, now measured. Only the BM25 abstention is gated.
+
+### Why cross-language fails is NOT established
+
+Two candidates, not separated by this run:
+
+1. `bge-m3` may not bridge English → Vietnamese in this vector space.
+2. RRF may be burying a correct semantic hit. At `k = 60`, a passage in only one of the two lists
+   scores 1/61 and loses to anything appearing in both — and a cross-language query's BM25 list is
+   exactly where the right document is absent.
+
+Telling them apart needs a **vector-only ranking**, which this harness does not expose: it reports
+the fused result and nothing else. Until that exists, "embeddings do not help cross-language here" is
+supported; "bge-m3 cannot bridge these languages" is not. Exposing a semantic-only mode is the
+cheapest next measurement, and unlike the fusion knobs it needs no change to shipping code.
 
 ## Baseline and CI
 
@@ -337,10 +388,13 @@ correctly returned nothing. It does **not** pin per-question ranks: ranks move f
 reasons, and a fixture that pins them becomes noise nobody trusts.
 
 The hybrid block is pinned to one embedding model and only compared when the current run uses the
-same one — different model, different vector space, incomparable numbers. **The committed baseline
-currently has `hybrid: null`**, recorded on a machine with no embedding provider reachable. The
-semantic half is therefore unguarded. Fill it in with the env vars from route 1 — not by starting the
-app, for the reason given under "Route 2 cannot authenticate":
+same one — different model, different vector space, incomparable numbers. It is now **recorded
+against `baai/bge-m3`**, so the semantic half is guarded for anyone running with that model; a run on
+a different provider notes the mismatch and skips the comparison rather than reporting a false
+regression. CI is unaffected — it runs BM25-only and reports "hybrid not run".
+
+To re-record it after a deliberate change, use the env vars from route 1 — not by starting the app,
+for the reason given under "Route 2 cannot authenticate":
 
 ```bash
 KB_EVAL_EMBED_BASE_URL=… KB_EVAL_EMBED_API_KEY=… KB_EVAL_EMBED_MODEL=… bun run eval:kb -- --update-baseline
