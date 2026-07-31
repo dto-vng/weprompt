@@ -340,6 +340,28 @@ describe('ProjectKnowledgeCard', () => {
     expect(retrySourceMock).toHaveBeenCalledWith('s-partial');
   });
 
+  it('names the keyword-only state beside that retry, and explains it on hover', async () => {
+    setState({ sources: [{ ...readySource, id: 's-partial', vectorCount: 2, chunkCount: 5 }] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    // Retry alone told the user nothing: the row showed no problem to retry from.
+    expect(screen.getByTestId('knowledge-not-embedded-s-partial')).toHaveTextContent(
+      'conversation.projectHome.knowledgeStatusNotEmbedded'
+    );
+    fireEvent.mouseEnter(screen.getByText('conversation.projectHome.knowledgeStatusNotEmbedded'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgeNotEmbeddedDetail:2/5')).toBeInTheDocument();
+  });
+
+  it('keeps the keyword-only tag off a fully embedded row', () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-not-embedded-s-ready')).not.toBeInTheDocument();
+  });
+
   it('retries a failed source', () => {
     setState({ sources: [failedSource] });
 
@@ -385,6 +407,25 @@ describe('ProjectKnowledgeCard', () => {
     fireEvent.click(confirmButton!);
 
     await waitFor(() => expect(removeSourceMock).toHaveBeenCalledWith('s-ready'));
+  });
+
+  it('offers the delete confirmation in danger red, like the trigger beside it', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const trigger = screen.getByTestId('knowledge-delete-s-ready');
+    fireEvent.click(trigger);
+    await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+
+    // Compared against the row trigger — which has carried status='danger' all
+    // along — rather than against a hardcoded Arco class name, so this survives
+    // Arco renaming its internals.
+    const dangerClass = [...trigger.classList].find((name) => name.includes('danger'));
+    expect(dangerClass).toBeDefined();
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+      .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+    expect(confirmButton).toHaveClass(dangerClass!);
   });
 
   it('re-scans the folder when Refresh is used', async () => {
@@ -477,6 +518,47 @@ describe('ProjectKnowledgeCard', () => {
     fireEvent.click(screen.getByText('archive.zip'));
 
     expect(getSourceTextMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the preview from the keyboard on a ready row', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.keyDown(screen.getByText('readme.md'), { key: 'Enter' });
+
+    await waitFor(() => expect(getSourceTextMock).toHaveBeenCalledWith('s-ready'));
+  });
+
+  it('offers no affordance at all on a row with nothing to open', () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const name = screen.getByText('archive.zip');
+
+    // The name used to look and behave identically on every row while only a
+    // ready row led anywhere — a click into nothing.
+    expect(name).not.toHaveAttribute('role', 'button');
+    expect(name).not.toHaveAttribute('tabindex');
+    expect(name.className).not.toContain('cursor-pointer');
+  });
+
+  it('says in the row tooltip why a non-ready row opens nothing', async () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('archive.zip'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePreviewNotReady')).toBeInTheDocument();
+  });
+
+  it('leaves that line off a ready row, which does open', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('readme.md'));
+
+    await screen.findByText('conversation.projectHome.knowledgePassagesTooltip');
+    expect(screen.queryByText('conversation.projectHome.knowledgePreviewNotReady')).not.toBeInTheDocument();
   });
 
   // ---- row tooltip: what happened to the file, plus any note ---------------

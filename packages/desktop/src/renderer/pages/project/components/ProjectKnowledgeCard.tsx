@@ -9,6 +9,7 @@ import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import type { IKnowledgeSourceDto } from '@/common/types/project/knowledgeTypes';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { updateProject } from '@renderer/pages/conversation/projects/projectStorage';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import { Alert, Button, Card, Message, Popconfirm, Spin, Tag, Tooltip } from '@arco-design/web-react';
 import { Delete, FolderOpen, Refresh, ShareTwo, Upload } from '@icon-park/react';
 import classNames from 'classnames';
@@ -286,21 +287,37 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
         // only route.
         if (isMissingVectors(source)) {
           return (
-            <Button
-              type='text'
-              size='mini'
-              className='flex-shrink-0'
-              onClick={(event) => {
-                event.stopPropagation();
-                report(
-                  retrySource(source.id),
-                  'conversation.projectHome.knowledgeRetryFailed',
-                  'Failed to retry knowledge source:'
-                );
-              }}
-            >
-              {t('conversation.projectHome.knowledgeRetry')}
-            </Button>
+            // Same shape as the `failed` branch below — a tag that names the
+            // state next to the button that fixes it. A bare "Retry" beside a
+            // filename showing no problem gave the user nothing to retry from.
+            // The tag stays neutral: this file IS searchable, just by keyword
+            // only, so red is reserved for `failed`.
+            <span className='flex flex-shrink-0 items-center gap-4px'>
+              <Tooltip
+                content={t('conversation.projectHome.knowledgeNotEmbeddedDetail', {
+                  done: source.vectorCount,
+                  total: source.chunkCount,
+                })}
+              >
+                <Tag size='small' data-testid={`knowledge-not-embedded-${source.id}`}>
+                  {t('conversation.projectHome.knowledgeStatusNotEmbedded')}
+                </Tag>
+              </Tooltip>
+              <Button
+                type='text'
+                size='mini'
+                onClick={(event) => {
+                  event.stopPropagation();
+                  report(
+                    retrySource(source.id),
+                    'conversation.projectHome.knowledgeRetryFailed',
+                    'Failed to retry knowledge source:'
+                  );
+                }}
+              >
+                {t('conversation.projectHome.knowledgeRetry')}
+              </Button>
+            </span>
           );
         }
         // Healthy and fully embedded: say nothing. Quiet means good — any
@@ -352,61 +369,88 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
       <span>{source.fileName}</span>
       {source.status === 'ready' && <span>{t('conversation.projectHome.knowledgePassagesTooltip')}</span>}
       {source.status === 'ready' && source.error && <span>{source.error}</span>}
+      {/* A row with nothing to open now says so, instead of leaving the user to
+          discover it by clicking and getting no response. */}
+      {!isPreviewable(source) && <span>{t('conversation.projectHome.knowledgePreviewNotReady')}</span>}
     </span>
   );
 
-  const renderRow = (source: IKnowledgeSourceDto): React.ReactNode => (
-    <div
-      key={source.id}
-      data-testid={`knowledge-source-${source.id}`}
-      className='group flex items-center gap-8px rounded-4px px-4px py-2px hover:bg-fill-secondary'
-    >
-      {/* The Arco tooltip replaces the native `title`: two tooltips on one
-          element fight, and this one carries more than the file name. */}
-      <Tooltip content={renderRowTooltip(source)} position='top'>
-        <span className='min-w-0 flex-1 truncate text-13px text-t-primary' onClick={() => void handlePreview(source)}>
-          {source.fileName}
-        </span>
-      </Tooltip>
-      {renderOcrTag(source)}
-      {renderStatus(source)}
-      {/* Icon actions stay hidden until hover so a settled list reads as
-          content, not as a control panel; focus-within keeps them reachable
-          by keyboard. */}
-      <span className='flex flex-shrink-0 items-center gap-2px opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'>
-        <Tooltip content={t('conversation.projectHome.knowledgeOpenOriginal')}>
-          <Button
-            type='text'
-            size='mini'
-            data-testid={`knowledge-open-${source.id}`}
-            aria-label={t('conversation.projectHome.knowledgeOpenOriginal')}
-            icon={<ShareTwo theme='outline' size='14' />}
-            onClick={() => void ipcBridge.shell.openFile.invoke(filePathOf(source.fileName))}
-          />
+  const renderRow = (source: IKnowledgeSourceDto): React.ReactNode => {
+    // Only a `ready` source has indexed text behind it. The name used to be a
+    // bare mouse-only `<span onClick>` on every row, so opening the drawer was
+    // unreachable by keyboard AND every other row offered a click that did
+    // nothing. The affordance now exists exactly where it leads somewhere.
+    const canPreview = isPreviewable(source);
+    const openPreview = (): void => {
+      void handlePreview(source);
+    };
+    return (
+      <div
+        key={source.id}
+        data-testid={`knowledge-source-${source.id}`}
+        className='group flex items-center gap-8px rounded-4px px-4px py-2px hover:bg-fill-secondary'
+      >
+        {/* The Arco tooltip replaces the native `title`: two tooltips on one
+            element fight, and this one carries more than the file name. */}
+        <Tooltip content={renderRowTooltip(source)} position='top'>
+          <span
+            className={classNames(
+              'min-w-0 flex-1 truncate text-13px text-t-primary',
+              canPreview && `cursor-pointer ${ROW_FOCUS_RING}`
+            )}
+            role={canPreview ? 'button' : undefined}
+            tabIndex={canPreview ? 0 : undefined}
+            aria-label={canPreview ? source.fileName : undefined}
+            onClick={canPreview ? openPreview : undefined}
+            onKeyDown={canPreview ? activateOnEnterOrSpace(openPreview) : undefined}
+          >
+            {source.fileName}
+          </span>
         </Tooltip>
-        <Popconfirm
-          title={t('conversation.projectHome.knowledgeDeleteConfirm', { fileName: source.fileName })}
-          okText={t('conversation.projectHome.knowledgeDeleteFile')}
-          onOk={() =>
-            report(
-              removeSource(source.id),
-              'conversation.projectHome.knowledgeDeleteFailed',
-              'Failed to remove knowledge source:'
-            )
-          }
-        >
-          <Button
-            type='text'
-            size='mini'
-            status='danger'
-            data-testid={`knowledge-delete-${source.id}`}
-            aria-label={t('conversation.projectHome.knowledgeDeleteFile')}
-            icon={<Delete theme='outline' size='14' />}
-          />
-        </Popconfirm>
-      </span>
-    </div>
-  );
+        {renderOcrTag(source)}
+        {renderStatus(source)}
+        {/* Icon actions stay hidden until hover so a settled list reads as
+            content, not as a control panel; focus-within keeps them reachable
+            by keyboard. */}
+        <span className='flex flex-shrink-0 items-center gap-2px opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'>
+          <Tooltip content={t('conversation.projectHome.knowledgeOpenOriginal')}>
+            <Button
+              type='text'
+              size='mini'
+              data-testid={`knowledge-open-${source.id}`}
+              aria-label={t('conversation.projectHome.knowledgeOpenOriginal')}
+              icon={<ShareTwo theme='outline' size='14' />}
+              onClick={() => void ipcBridge.shell.openFile.invoke(filePathOf(source.fileName))}
+            />
+          </Tooltip>
+          <Popconfirm
+            title={t('conversation.projectHome.knowledgeDeleteConfirm', { fileName: source.fileName })}
+            okText={t('conversation.projectHome.knowledgeDeleteFile')}
+            // A single file is small enough for an inline confirm, but it still
+            // moves a file to the Trash, so the OK button is red rather than the
+            // default primary.
+            okButtonProps={{ status: 'danger' }}
+            onOk={() =>
+              report(
+                removeSource(source.id),
+                'conversation.projectHome.knowledgeDeleteFailed',
+                'Failed to remove knowledge source:'
+              )
+            }
+          >
+            <Button
+              type='text'
+              size='mini'
+              status='danger'
+              data-testid={`knowledge-delete-${source.id}`}
+              aria-label={t('conversation.projectHome.knowledgeDeleteFile')}
+              icon={<Delete theme='outline' size='14' />}
+            />
+          </Popconfirm>
+        </span>
+      </div>
+    );
+  };
 
   return (
     <Card
@@ -499,7 +543,7 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
             <div className='flex max-h-280px flex-col gap-4px overflow-y-auto'>{sources.map(renderRow)}</div>
           )}
           {(pendingEmbedSources.length > 0 || (summary?.semantic === 'off' && sources.length > 0)) && (
-            <div className='flex flex-col items-center gap-2px border-t border-t-light pt-8px text-center text-11px text-t-tertiary'>
+            <div className='flex flex-col items-center gap-2px border-t border-t-4 pt-8px text-center text-11px text-t-tertiary'>
               {summary?.semantic === 'off' && sources.length > 0 && (
                 <span data-testid='knowledge-degraded-note'>
                   {t('conversation.projectHome.knowledgeSemanticOff')}{' '}

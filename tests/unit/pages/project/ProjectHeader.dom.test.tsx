@@ -10,6 +10,13 @@ const showItemInFolderMock = vi.fn();
 const removeStoreMock = vi.fn();
 const navigateMock = vi.fn();
 const modalConfirmMock = vi.fn();
+const conversationUpdateMock = vi.fn();
+const showOpenMock = vi.fn();
+const updateProjectMock = vi.fn();
+const removeProjectMock = vi.fn();
+const findProjectByWorkspaceMock = vi.fn();
+const messageSuccessMock = vi.fn();
+const messageErrorMock = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -21,10 +28,10 @@ vi.mock('@/common', () => ({
       showItemInFolder: { invoke: (...args: unknown[]) => showItemInFolderMock(...args) },
     },
     dialog: {
-      showOpen: { invoke: vi.fn() },
+      showOpen: { invoke: (...args: unknown[]) => showOpenMock(...args) },
     },
     conversation: {
-      update: { invoke: vi.fn() },
+      update: { invoke: (...args: unknown[]) => conversationUpdateMock(...args) },
     },
     projectKnowledge: {
       removeStore: { invoke: (...args: unknown[]) => removeStoreMock(...args) },
@@ -43,6 +50,21 @@ vi.mock('react-router-dom', async () => {
 vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
   useConversationHistoryContext: () => ({ conversations: [] }),
 }));
+
+// The header now branches on what projectStorage reports back, and the real
+// module reads and writes jsdom's localStorage — where no project 'p1' exists,
+// so `removeProject` would answer `false` and every removal would look failed.
+// Same importOriginal shape as the sibling ProjectFilesCard/ProjectInstructionsCard suites.
+vi.mock('@renderer/pages/conversation/projects/projectStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/pages/conversation/projects/projectStorage')>();
+  return {
+    ...actual,
+    updateProject: (...args: Parameters<typeof actual.updateProject>) => updateProjectMock(...args),
+    removeProject: (...args: Parameters<typeof actual.removeProject>) => removeProjectMock(...args),
+    findProjectByWorkspace: (...args: Parameters<typeof actual.findProjectByWorkspace>) =>
+      findProjectByWorkspaceMock(...args),
+  };
+});
 
 // Dropdown/Menu are mocked so the droplist is always present in the DOM —
 // mirrors the proven pattern in tests/unit/chat/CommandQueuePanel.dom.test.tsx,
@@ -68,16 +90,28 @@ vi.mock('@arco-design/web-react', async () => {
       {children}
     </button>
   );
+  const ActualModal = actual.Modal;
   return {
     ...actual,
     Dropdown,
     Menu,
-    Modal: {
-      ...actual.Modal,
+    // `{ ...actual.Modal }` would drop the component itself — spreading a
+    // function yields a plain, non-callable object, so the rename `<Modal>` this
+    // header now renders would be an invalid element type. Object.assign keeps
+    // the component callable AND carries the statics, with `confirm` still
+    // stubbed for the Remove flow.
+    Modal: Object.assign((props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />, ActualModal, {
       confirm: (options: { onOk?: () => void | Promise<void> }) => {
         modalConfirmMock(options);
         return options.onOk?.();
       },
+    }),
+    // Arco's imperative Message mounts through the legacy ReactDOM.render React
+    // 18 removed, so left real it throws out of the test as an unhandled error.
+    Message: {
+      ...actual.Message,
+      success: (...args: unknown[]) => messageSuccessMock(...args),
+      error: (...args: unknown[]) => messageErrorMock(...args),
     },
   };
 });
@@ -98,6 +132,15 @@ describe('ProjectHeader', () => {
     removeStoreMock.mockReset().mockResolvedValue(undefined);
     navigateMock.mockReset();
     modalConfirmMock.mockReset();
+    conversationUpdateMock.mockReset().mockResolvedValue(true);
+    showOpenMock.mockReset().mockResolvedValue(undefined);
+    // Both storage mutators answer like the real ones on success: the updated
+    // project, and `true` for a row that existed.
+    updateProjectMock.mockReset().mockReturnValue({ ...project });
+    removeProjectMock.mockReset().mockReturnValue(true);
+    findProjectByWorkspaceMock.mockReset().mockReturnValue(null);
+    messageSuccessMock.mockReset();
+    messageErrorMock.mockReset();
   });
 
   it('renders the project name and the chats/active subline', () => {
@@ -106,6 +149,27 @@ describe('ProjectHeader', () => {
     expect(screen.getByText('Alpha Project')).toBeInTheDocument();
     expect(screen.getByText('conversation.projectHome.metaChats')).toBeInTheDocument();
     expect(screen.getByText('conversation.projectHome.metaActive')).toBeInTheDocument();
+  });
+
+  it('shows the full workspace path on hover, since the subline truncates it', async () => {
+    render(<ProjectHeader project={{ ...project, workspace: '/a/very/long/workspace/path/alpha' }} />);
+
+    fireEvent.mouseEnter(screen.getByText('/a/very/long/workspace/path/alpha'));
+
+    // Arco renders tooltip content into a portal only once hovered, so both the
+    // truncated span and the tooltip copy carry the path by the time it opens.
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('/a/very/long/workspace/path/alpha').length).toBeGreaterThan(1);
+    });
+  });
+
+  it('shows the exact moment behind the active-duration token on hover', async () => {
+    const lastOpened = Date.UTC(2026, 6, 30, 9, 15);
+    render(<ProjectHeader project={{ ...project, last_opened_at: lastOpened }} />);
+
+    fireEvent.mouseEnter(screen.getByText('conversation.projectHome.metaActive'));
+
+    expect(await screen.findByText(new Date(lastOpened).toLocaleString())).toBeInTheDocument();
   });
 
   it('reveals the project folder from the overflow menu', () => {
@@ -125,6 +189,105 @@ describe('ProjectHeader', () => {
 
     await vi.waitFor(() => {
       expect(removeStoreMock).toHaveBeenCalledExactlyOnceWith({ projectId: 'p1' });
+    });
+  });
+
+  it('reports a removal that did not go through, and stays on the page', async () => {
+    // The project row was already gone, so nothing was removed — navigating
+    // away would have claimed a deletion that never happened.
+    removeProjectMock.mockReturnValue(false);
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectFailed');
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(removeStoreMock).not.toHaveBeenCalled();
+  });
+
+  it('confirms a successful removal before leaving the page', async () => {
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageSuccessMock).toHaveBeenCalledWith('conversation.history.removeProjectSuccess');
+    });
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid');
+  });
+
+  const openRenameDialog = (): HTMLElement => {
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    // The menu entry and the dialog's title share this string, so scope to the menu.
+    fireEvent.click(screen.getAllByText('conversation.projectHome.rename')[0]);
+    return screen.getByRole('textbox');
+  };
+
+  it('renames the project from a dialog seeded with the current name', () => {
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    expect(input).toHaveValue('Alpha Project');
+
+    fireEvent.change(input, { target: { value: 'Renamed Project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', name: 'Renamed Project' });
+    expect(messageSuccessMock).toHaveBeenCalledExactlyOnceWith('conversation.history.renameSuccess');
+  });
+
+  it('submits the project rename on Enter', () => {
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: 'Keyboard Project' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });
+
+    expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', name: 'Keyboard Project' });
+  });
+
+  it('disables Save for a whitespace-only project name', () => {
+    // The old Modal.confirm resolved through its empty-name early return, so Arco
+    // closed the dialog and the rename disappeared without a word.
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: '  ' } });
+
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.save' })).toBeDisabled();
+    expect(updateProjectMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a rename that failed to persist, and keeps the dialog open', () => {
+    updateProjectMock.mockReturnValue(null);
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: 'Renamed Project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.history.renameFailed');
+    expect(messageSuccessMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox')).toHaveValue('Renamed Project');
+  });
+
+  it('names the project already using a folder when a relink clashes', async () => {
+    showOpenMock.mockResolvedValue(['/w/beta']);
+    updateProjectMock.mockImplementation(() => {
+      throw new Error('PROJECT_WORKSPACE_DUPLICATE');
+    });
+    findProjectByWorkspaceMock.mockReturnValue({ ...project, id: 'p2', name: 'Beta Project' });
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.relink'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.history.projectDuplicateFolder');
     });
   });
 

@@ -25,6 +25,9 @@ vi.mock('@/common', () => ({
       },
     },
     shell: {
+      openFile: {
+        invoke: vi.fn(),
+      },
       showItemInFolder: {
         invoke: vi.fn(),
       },
@@ -48,6 +51,7 @@ vi.mock('@renderer/pages/conversation/projects/projectStorage', async (importOri
 import ProjectFilesCard from '@renderer/pages/project/components/ProjectFilesCard';
 
 const getFilesByDir = vi.mocked(ipcBridge.fs.getFilesByDir.invoke);
+const openFile = vi.mocked(ipcBridge.shell.openFile.invoke);
 const showItemInFolder = vi.mocked(ipcBridge.shell.showItemInFolder.invoke);
 const showOpen = vi.mocked(ipcBridge.dialog.showOpen.invoke);
 
@@ -72,6 +76,7 @@ const fixtureTree: IDirOrFile[] = [
 describe('ProjectFilesCard', () => {
   beforeEach(() => {
     getFilesByDir.mockReset();
+    openFile.mockReset().mockResolvedValue(undefined);
     showItemInFolder.mockReset();
     showOpen.mockReset();
     updateProjectMock.mockReset();
@@ -123,6 +128,19 @@ describe('ProjectFilesCard', () => {
     await waitFor(() => {
       expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', workspace: '/w/new-alpha' });
     });
+  });
+
+  it('opens the file in its default application when a row is clicked', async () => {
+    getFilesByDir.mockResolvedValue(fixtureTree);
+
+    render(<ProjectFilesCard project={project} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /README\.md/ }));
+
+    // A row click used to jump to Finder, which the card's own reveal action
+    // already does — the same row means "open this file" in a chat's Workspace tab.
+    expect(openFile).toHaveBeenCalledExactlyOnceWith('/w/alpha/README.md');
+    expect(showItemInFolder).not.toHaveBeenCalled();
   });
 
   it('reveals the workspace folder from the card action', async () => {
