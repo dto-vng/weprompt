@@ -104,7 +104,7 @@ const FileChangeItem: React.FC<{
   const statusLabel = STATUS_LABELS[change.operation];
 
   return (
-    <div className='border-b border-b-base last:border-b-0'>
+    <div className='border-b border-b-4 last:border-b-0'>
       <div
         className={`group flex items-center justify-between px-8px py-6px transition-colors ${
           expandable ? 'cursor-pointer hover:bg-fill-2' : ''
@@ -165,7 +165,7 @@ const PanelHeader: React.FC<{
   count: number;
   actions?: React.ReactNode;
 }> = ({ title, count, actions }) => (
-  <div className='flex items-center justify-between px-8px py-4px bg-fill-2 border-b border-b-base select-none flex-shrink-0'>
+  <div className='flex items-center justify-between px-8px py-4px bg-fill-2 border-b border-b-4 select-none flex-shrink-0'>
     <span className='text-12px font-medium text-t-secondary'>
       {title} ({count})
     </span>
@@ -393,7 +393,7 @@ const FileChangeList: React.FC<FileChangeListProps> = ({
   return (
     <div className='flex flex-col size-full'>
       {/* Top toolbar */}
-      <div className='px-8px py-4px border-b border-b-base flex items-center justify-between flex-shrink-0'>
+      <div className='px-8px py-4px border-b border-b-4 flex items-center justify-between flex-shrink-0'>
         <span className='text-12px text-t-secondary'>
           {t('conversation.workspace.changes.summary', { count: totalCount })}
         </span>
@@ -405,7 +405,7 @@ const FileChangeList: React.FC<FileChangeListProps> = ({
       </div>
       <div className='flex-1 overflow-y-auto p-8px flex flex-col gap-10px'>
         {groupedChanges.map((group) => (
-          <div key={group.key} className='border border-base rounded-10px overflow-hidden bg-bg-1'>
+          <div key={group.key} className='border border-4 rounded-10px overflow-hidden bg-bg-1'>
             <PanelHeader title={group.title} count={group.count} actions={group.headerAction} />
             {group.items.length === 0 ? (
               <div className='flex items-center justify-center py-16px text-12px text-t-quaternary'>
