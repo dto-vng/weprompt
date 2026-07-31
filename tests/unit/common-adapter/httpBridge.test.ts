@@ -203,6 +203,26 @@ describe('httpBridge', () => {
   });
 
   describe('error handling', () => {
+    it('passes the request abort signal to fetch', async () => {
+      const controller = new AbortController();
+      const networkError = new Error('request aborted');
+      let capturedSignal: AbortSignal | null | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((_url: string, options?: RequestInit) => {
+          capturedSignal = options?.signal;
+          return Promise.reject(networkError);
+        })
+      );
+      vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/cancelable', undefined, { signal: controller.signal })).rejects.toBe(
+        networkError
+      );
+
+      expect(capturedSignal).toBe(controller.signal);
+    });
+
     it('keeps request logging before a normal network failure', async () => {
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
       const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});

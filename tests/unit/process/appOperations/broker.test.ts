@@ -642,6 +642,81 @@ describe('app operations broker cancellation', () => {
     expectFailureCode(await running, 'canceled');
     expect(dependencies.createClient).not.toHaveBeenCalled();
   });
+
+  it.each(['model resolution', 'provider listing', 'task preparation'] as const)(
+    'promptly cancels never-settling %s, releases the slot, and ignores late completion',
+    async (stage) => {
+      const modelResolution = deferred<AppOperationsModelResponse>();
+      const providers = deferred<IProvider[]>();
+      const preparation = deferred<EchoInput>();
+      const resolveModel =
+        stage === 'model resolution'
+          ? vi
+              .fn<AppOperationsBrokerDependencies['resolveModel']>()
+              .mockImplementationOnce(() => modelResolution.promise)
+              .mockResolvedValue(readyResolution)
+          : vi.fn<AppOperationsBrokerDependencies['resolveModel']>(async () => readyResolution);
+      const listProviders =
+        stage === 'provider listing'
+          ? vi
+              .fn<AppOperationsBrokerDependencies['listProviders']>()
+              .mockImplementationOnce(() => providers.promise)
+              .mockResolvedValue([provider])
+          : vi.fn<AppOperationsBrokerDependencies['listProviders']>(async () => [provider]);
+      const prepare =
+        stage === 'task preparation'
+          ? vi
+              .fn<AppOperationTaskDefinition<EchoInput, EchoInput, string>['prepare']>()
+              .mockImplementationOnce(() => preparation.promise)
+              .mockImplementation(async (input) => input)
+          : vi.fn<AppOperationTaskDefinition<EchoInput, EchoInput, string>['prepare']>(async (input) => input);
+      const enteredStage = {
+        'model resolution': resolveModel,
+        'provider listing': listProviders,
+        'task preparation': prepare,
+      }[stage];
+      const { broker, audits } = createHarness({
+        concurrency: 1,
+        task: echoTask({ prepare }),
+        dependencies: { resolveModel, listProviders },
+      });
+
+      const running = broker.runTask('test.echo', { value: 'running' }, { dedupeKey: 'shared-cancellation' });
+      const joined = broker.runTask('test.echo', { value: 'running' }, { dedupeKey: 'shared-cancellation' });
+      await vi.waitFor(() => expect(enteredStage).toHaveBeenCalledOnce());
+
+      broker.cancelAll();
+      const fresh = broker.runTask('test.echo', { value: 'fresh' }, { dedupeKey: 'shared-cancellation' });
+      let runningResult: AppOperationResult<string> | undefined;
+      let joinedResult: AppOperationResult<string> | undefined;
+      void running.then((result) => {
+        runningResult = result;
+      });
+      void joined.then((result) => {
+        joinedResult = result;
+      });
+
+      await vi.waitFor(
+        () => {
+          expect(runningResult).toBeDefined();
+          expect(joinedResult).toBeDefined();
+        },
+        { timeout: 1_000 }
+      );
+      expectFailureCode(runningResult!, 'canceled');
+      expectFailureCode(joinedResult!, 'canceled');
+      expect(await fresh).toMatchObject({ ok: true, output: 'model output' });
+      expect(audits).toHaveLength(2);
+
+      if (stage === 'model resolution') modelResolution.resolve(readyResolution);
+      if (stage === 'provider listing') providers.resolve([provider]);
+      if (stage === 'task preparation') preparation.resolve({ value: 'late' });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(audits).toHaveLength(2);
+    }
+  );
 });
 
 describe('app operations broker audit privacy', () => {

@@ -150,6 +150,7 @@ export function isBackendHttpError(error: unknown): error is BackendHttpError {
  */
 export type HttpRequestOptions = {
   silentStatuses?: number[];
+  signal?: AbortSignal;
 };
 
 const SENSITIVE_LOG_KEY_PATTERN = /api[_-]?key|authorization|auth[_-]?token|access[_-]?token|refresh[_-]?token|secret/i;
@@ -200,6 +201,7 @@ export async function httpRequest<T>(
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: options?.signal,
     });
   } catch (error) {
     if (deferRequestLog) {

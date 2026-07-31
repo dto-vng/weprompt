@@ -50,6 +50,24 @@ type AttemptFailure = {
   transient: boolean;
 };
 
+const abortError = (): Error => Object.assign(new Error('aborted'), { name: 'AbortError' });
+
+const raceWithAbort = async <Value>(run: () => Promise<Value>, signal: AbortSignal): Promise<Value> => {
+  if (signal.aborted) throw abortError();
+
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(abortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+
+  try {
+    return await Promise.race([run(), aborted]);
+  } finally {
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  }
+};
+
 const retryableByCode = (code: AppOperationErrorCode): boolean =>
   code === 'provider_rate_limited' ||
   code === 'provider_timeout' ||
@@ -278,7 +296,7 @@ export class AppOperationsBroker {
   private async execute(shared: SharedOperation): Promise<AppOperationResult<unknown>> {
     let resolution;
     try {
-      resolution = await this.dependencies.resolveModel();
+      resolution = await raceWithAbort(() => this.dependencies.resolveModel(), shared.controller.signal);
     } catch (error) {
       if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
       const status = readStatus(error);
@@ -297,7 +315,7 @@ export class AppOperationsBroker {
 
     let providers: IProvider[];
     try {
-      providers = await this.dependencies.listProviders();
+      providers = await raceWithAbort(() => this.dependencies.listProviders(), shared.controller.signal);
     } catch {
       if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
       return this.failure(shared, 'provider_request_failed');
@@ -318,7 +336,10 @@ export class AppOperationsBroker {
     let prepared: unknown;
     let messages;
     try {
-      prepared = await shared.task.prepare(shared.input, { signal: shared.controller.signal });
+      prepared = await raceWithAbort(
+        () => shared.task.prepare(shared.input, { signal: shared.controller.signal }),
+        shared.controller.signal
+      );
       if (shared.controller.signal.aborted) return this.failure(shared, 'canceled');
       messages = shared.task.buildMessages(prepared);
     } catch {

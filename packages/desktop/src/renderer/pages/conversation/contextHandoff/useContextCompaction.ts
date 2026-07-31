@@ -1,5 +1,9 @@
 import { ipcBridge } from '@/common';
-import type { IConversationTurnCompletedEvent, TContextCompactionTrigger } from '@/common/adapter/ipcBridge';
+import type {
+  IConversationTurnCompletedEvent,
+  IResponseMessage,
+  TContextCompactionTrigger,
+} from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
 import type {
   TChatConversation,
@@ -459,19 +463,59 @@ export const handoffConversationContext = async (
   return { conversation: created, markdown };
 };
 
-const readCompletedTurnText = (event: IConversationTurnCompletedEvent): string => {
-  const content = event.last_message.content;
+type ContextTurnStreamEvidence = {
+  hasMeaningfulAssistantText: boolean;
+  terminal: 'finish' | 'error' | null;
+};
+
+const readMessageContentText = (content: unknown): string => {
   if (typeof content === 'string') return content.trim();
   if (!content || typeof content !== 'object' || Array.isArray(content)) return '';
   if ('content' in content && typeof content.content === 'string') return content.content.trim();
   return '';
 };
 
-export const isMeaningfulContextTurn = (event: IConversationTurnCompletedEvent): boolean => {
+const readCompletedTurnText = (event: IConversationTurnCompletedEvent): string =>
+  readMessageContentText(event.last_message?.content);
+
+const updateContextTurnStreamEvidence = (
+  current: ContextTurnStreamEvidence | undefined,
+  message: IResponseMessage
+): ContextTurnStreamEvidence => {
+  const next: ContextTurnStreamEvidence = current ?? {
+    hasMeaningfulAssistantText: false,
+    terminal: null,
+  };
+  if (message.type === 'error' || message.status === 'error') {
+    return { ...next, terminal: 'error' };
+  }
+  if (
+    (message.type === 'text' || message.type === 'content') &&
+    message.hidden !== true &&
+    readMessageContentText(message.data).length > 0
+  ) {
+    next.hasMeaningfulAssistantText = true;
+  }
+  if (message.type === 'finish' && next.terminal !== 'error') {
+    next.terminal = 'finish';
+  }
+  return next;
+};
+
+export const isMeaningfulContextTurn = (
+  event: IConversationTurnCompletedEvent,
+  streamEvidence?: {
+    hasMeaningfulAssistantText: boolean;
+    terminal: 'finish' | 'error' | null;
+  }
+): boolean => {
   if (event.status !== 'finished' || event.state !== 'ai_waiting_input') return false;
-  if (event.last_message.type && event.last_message.type !== 'text') return false;
-  if (!event.last_message.type) return true;
-  return readCompletedTurnText(event).length > 0;
+  if (streamEvidence?.terminal === 'error') return false;
+  if (event.last_message) {
+    if (event.last_message.type && event.last_message.type !== 'text') return false;
+    return readCompletedTurnText(event).length > 0;
+  }
+  return streamEvidence?.terminal === 'finish' && streamEvidence.hasMeaningfulAssistantText;
 };
 
 type AutoCompactPolicyInput = {
@@ -521,6 +565,7 @@ type HookCompactionRequest = CompactConversationContextInput & {
 
 export type ContextCompactionHookDependencies = {
   subscribeTurnCompleted: (listener: (event: IConversationTurnCompletedEvent) => void) => () => void;
+  subscribeResponseStream?: (listener: (event: IResponseMessage) => void) => () => void;
   getConversation: (conversationId: string) => Promise<TChatConversation | null>;
   updateConversation: (input: ConversationUpdateInput) => Promise<boolean>;
   runCompaction: (input: CompactConversationContextInput) => Promise<CompactConversationContextResult>;
@@ -530,6 +575,7 @@ export type ContextCompactionHookDependencies = {
 
 const defaultHookDependencies: ContextCompactionHookDependencies = {
   subscribeTurnCompleted: (listener) => ipcBridge.conversation.turnCompleted.on(listener),
+  subscribeResponseStream: (listener) => ipcBridge.conversation.responseStream.on(listener),
   getConversation: getConversationOrNull,
   updateConversation: (input) => ipcBridge.conversation.update.invoke(input),
   runCompaction: (input) => compactConversationContext(input),
@@ -562,7 +608,11 @@ export const useContextCompaction = ({
   const [isCompacting, setIsCompacting] = useState(false);
   const inFlightRef = useRef<Promise<CompactConversationContextResult | null> | null>(null);
   const pendingRequestRef = useRef<HookCompactionRequest | null>(null);
-  const pendingTurnRef = useRef<IConversationTurnCompletedEvent | null>(null);
+  const pendingTurnRef = useRef<{
+    count: number;
+    latestEvent: IConversationTurnCompletedEvent;
+  } | null>(null);
+  const turnStreamEvidenceRef = useRef(new Map<string, ContextTurnStreamEvidence>());
   const processingTurnRef = useRef(false);
   const inFlightOperationIdRef = useRef<string | null>(null);
   const inFlightAbortControllerRef = useRef<AbortController | null>(null);
@@ -674,12 +724,12 @@ export const useContextCompaction = ({
   }, [conversationId, dependencies, enabled]);
 
   const handleCompletedTurn = useCallback(
-    async (event: IConversationTurnCompletedEvent): Promise<void> => {
+    async (batch: { count: number; latestEvent: IConversationTurnCompletedEvent }): Promise<void> => {
       const conversation = await dependencies.getConversation(conversationId);
       if (!isAionrsConversation(conversation)) return;
 
       const contextState = getConversationContextHandoffExtra(conversation);
-      const turnsSinceCompaction = (contextState.turns_since_compaction ?? 0) + 1;
+      const turnsSinceCompaction = (contextState.turns_since_compaction ?? 0) + batch.count;
       const previousBudgetStatus = contextState.last_budget_status ?? 'healthy';
       const nextBudgetStatus = runtimeBudgetStatus(conversation, previousBudgetStatus);
       const hasContext = Boolean(contextState.snapshot || contextState.context_file_path);
@@ -692,7 +742,7 @@ export const useContextCompaction = ({
           nextBudgetStatus,
         })
       ) {
-        await compact('auto', event.turn_id, nextBudgetStatus);
+        await compact('auto', batch.latestEvent.turn_id, nextBudgetStatus);
         return;
       }
 
@@ -720,32 +770,54 @@ export const useContextCompaction = ({
   useEffect(() => {
     if (!enabled || !conversationId) return;
 
-    const processTurn = (event: IConversationTurnCompletedEvent): void => {
-      if (event.session_id !== conversationId || !isMeaningfulContextTurn(event)) return;
-      if (processingTurnRef.current) {
-        pendingTurnRef.current = event;
-        return;
-      }
+    const unsubscribeResponseStream =
+      dependencies.subscribeResponseStream?.((message) => {
+        if (message.conversation_id !== conversationId || !message.turn_id) return;
+        const current = turnStreamEvidenceRef.current.get(message.turn_id);
+        turnStreamEvidenceRef.current.set(message.turn_id, updateContextTurnStreamEvidence(current, message));
+      }) ?? (() => {});
 
+    const drainPendingTurns = (): void => {
       processingTurnRef.current = true;
       void (async () => {
-        let current: IConversationTurnCompletedEvent | null = event;
-        while (current) {
+        while (true) {
+          const current = pendingTurnRef.current;
+          if (!current) {
+            processingTurnRef.current = false;
+            return;
+          }
           pendingTurnRef.current = null;
           try {
-            // eslint-disable-next-line no-await-in-loop -- completed turns must update the shared cursor serially
+            // eslint-disable-next-line no-await-in-loop -- completed-turn batches must update the shared cursor serially
             await handleCompletedTurn(current);
           } catch (error) {
             console.warn('[ContextHandoff] Automatic compaction failed:', errorCode(error, 'unknown'));
           }
-          current = pendingTurnRef.current;
         }
-      })().finally(() => {
-        processingTurnRef.current = false;
-      });
+      })();
     };
 
-    return dependencies.subscribeTurnCompleted(processTurn);
+    const processTurn = (event: IConversationTurnCompletedEvent): void => {
+      if (event.session_id !== conversationId) return;
+      const streamEvidence = turnStreamEvidenceRef.current.get(event.turn_id);
+      turnStreamEvidenceRef.current.delete(event.turn_id);
+      if (!isMeaningfulContextTurn(event, streamEvidence)) return;
+
+      const pending = pendingTurnRef.current;
+      pendingTurnRef.current = {
+        count: (pending?.count ?? 0) + 1,
+        latestEvent: event,
+      };
+      if (!processingTurnRef.current) drainPendingTurns();
+    };
+
+    const unsubscribeTurnCompleted = dependencies.subscribeTurnCompleted(processTurn);
+    return () => {
+      unsubscribeTurnCompleted();
+      unsubscribeResponseStream();
+      pendingTurnRef.current = null;
+      turnStreamEvidenceRef.current.clear();
+    };
   }, [conversationId, dependencies, enabled, handleCompletedTurn]);
 
   return { compact, isCompacting };
