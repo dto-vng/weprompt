@@ -79,4 +79,21 @@ describe('TeamSiderSection', () => {
     expect(createButton).toHaveClass('hover:!text-t-primary');
     expect(createButton).not.toHaveClass('text-primary');
   });
+
+  it('matches the collapsed rail row height used by every sibling entry', () => {
+    // The collapsed rail is one vertical stack, so a team row taller than the nav
+    // entries next to it breaks the pitch. jsdom applies no UnoCSS, so the class is
+    // the only assertable signal; the pixel result is checked by eye.
+    mocks.teams = [{ id: 'team-a', name: 'aaa' }];
+
+    render(
+      <MemoryRouter>
+        <TeamSiderSection collapsed={true} pathname='/' siderTooltipProps={{}} />
+      </MemoryRouter>
+    );
+
+    const row = screen.getByTestId('collapsed-team-item-team-a');
+    expect(row).toHaveClass('h-34px');
+    expect(row).not.toHaveClass('h-40px');
+  });
 });

@@ -404,7 +404,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             <Button
               className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
               size='mini'
-              status='warning'
+              status='danger'
               onClick={handleBatchDelete}
             >
               {t('conversation.history.batchDelete')}

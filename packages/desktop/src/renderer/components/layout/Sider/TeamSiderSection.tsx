@@ -121,7 +121,9 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
                   <div
                     data-testid={`collapsed-team-item-${team.id}`}
                     className={classNames(
-                      'relative w-full h-40px flex items-center justify-center cursor-pointer transition-colors rd-8px',
+                      // 34px matches every other row in the collapsed rail (nav entries,
+                      // new-chat, conversation rows); this was 40px and broke the pitch.
+                      'relative w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px',
                       isActive ? '!bg-active' : 'hover:bg-fill-3 active:bg-fill-4'
                     )}
                     onClick={() => handleTeamClick(team.id)}
@@ -258,7 +260,7 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
                           content: t('team.sider.deleteConfirmContent'),
                           okText: t('team.sider.deleteOk'),
                           cancelText: t('team.sider.deleteCancel'),
-                          okButtonProps: { status: 'warning' },
+                          okButtonProps: { status: 'danger' },
                           onOk: async () => {
                             const teamIdToDelete = team.id;
                             await removeTeam(teamIdToDelete);

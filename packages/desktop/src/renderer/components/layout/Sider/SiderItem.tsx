@@ -112,7 +112,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
                     <Menu.Item key={item.key}>
                       <div
                         className={classNames('flex items-center gap-8px', {
-                          'text-[rgb(var(--warning-6))]': item.danger,
+                          'text-danger-6': item.danger,
                         })}
                       >
                         {item.icon}
