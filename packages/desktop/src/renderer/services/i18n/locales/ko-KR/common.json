@@ -162,5 +162,14 @@
     "second_short": "초"
   },
   "selectedCount": "선택됨 {{count}}",
-  "selectedSkills": "선택된 스킬"
+  "selectedSkills": "선택된 스킬",
+  "chrome": {
+    "minimize": "최소화",
+    "maximize": "최대화",
+    "restore": "이전 크기로 복원",
+    "collapseSidebar": "사이드바 접기",
+    "toggleProjectPanel": "프로젝트 패널 전환",
+    "expandProjectPanel": "프로젝트 패널 펼치기",
+    "collapseProjectPanel": "프로젝트 패널 접기"
+  }
 }

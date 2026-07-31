@@ -162,5 +162,14 @@
     "second_short": "ث"
   },
   "selectedCount": "{{count}} انتخاب‌شده",
-  "selectedSkills": "مهارت‌های انتخاب‌شده"
+  "selectedSkills": "مهارت‌های انتخاب‌شده",
+  "chrome": {
+    "minimize": "کوچک کردن",
+    "maximize": "بزرگ کردن",
+    "restore": "بازگرداندن",
+    "collapseSidebar": "جمع کردن نوار کناری",
+    "toggleProjectPanel": "تغییر وضعیت پنل پروژه",
+    "expandProjectPanel": "باز کردن پنل پروژه",
+    "collapseProjectPanel": "جمع کردن پنل پروژه"
+  }
 }

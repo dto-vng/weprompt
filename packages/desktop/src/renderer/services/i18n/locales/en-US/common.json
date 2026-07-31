@@ -162,5 +162,14 @@
     "second_short": "s"
   },
   "selectedCount": "Selected {{count}}",
-  "selectedSkills": "Selected skills"
+  "selectedSkills": "Selected skills",
+  "chrome": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "collapseSidebar": "Collapse sidebar",
+    "toggleProjectPanel": "Toggle project panel",
+    "expandProjectPanel": "Expand project panel",
+    "collapseProjectPanel": "Collapse project panel"
+  }
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Minus, CloseSmall } from '@icon-park/react';
+import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 
 const WindowMaximizeIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
@@ -21,6 +22,9 @@ const WindowRestoreIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
 const WindowControls: React.FC = () => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [available, setAvailable] = useState(true);
+  // 必须在下面的提前 return 之前调用 / Must be called above the early return below,
+  // or react-hooks/rules-of-hooks fires when the controls are unavailable.
+  const { t } = useTranslation();
 
   // 初始化时同步窗口状态并订阅最大化事件 / Sync current window state and subscribe to maximize events
   useEffect(() => {
@@ -77,14 +81,19 @@ const WindowControls: React.FC = () => {
 
   return (
     <div className='app-window-controls'>
-      <button type='button' className='app-window-controls__button' onClick={handleMinimize} aria-label='Minimize'>
+      <button
+        type='button'
+        className='app-window-controls__button'
+        onClick={handleMinimize}
+        aria-label={t('common.chrome.minimize')}
+      >
         <Minus theme='outline' size='14' fill='currentColor' strokeWidth={4} />
       </button>
       <button
         type='button'
         className='app-window-controls__button'
         onClick={handleToggleMaximize}
-        aria-label={isMaximized ? 'Restore' : 'Maximize'}
+        aria-label={isMaximized ? t('common.chrome.restore') : t('common.chrome.maximize')}
       >
         {isMaximized ? <WindowRestoreIcon size={14} /> : <WindowMaximizeIcon size={14} />}
       </button>
@@ -92,7 +101,7 @@ const WindowControls: React.FC = () => {
         type='button'
         className='app-window-controls__button app-window-controls__button--close'
         onClick={handleClose}
-        aria-label='Close'
+        aria-label={t('common.close')}
       >
         <CloseSmall theme='outline' size='16' fill='currentColor' strokeWidth={3} />
       </button>

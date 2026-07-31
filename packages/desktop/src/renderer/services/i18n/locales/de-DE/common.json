@@ -162,5 +162,14 @@
   },
   "goBack": "Zurück",
   "selectedCount": "{{count}} ausgewählt",
-  "selectedSkills": "Ausgewählte Skills"
+  "selectedSkills": "Ausgewählte Skills",
+  "chrome": {
+    "minimize": "Minimieren",
+    "maximize": "Maximieren",
+    "restore": "Wiederherstellen",
+    "collapseSidebar": "Seitenleiste einklappen",
+    "toggleProjectPanel": "Arbeitsbereich ein- oder ausklappen",
+    "expandProjectPanel": "Arbeitsbereich ausklappen",
+    "collapseProjectPanel": "Arbeitsbereich einklappen"
+  }
 }

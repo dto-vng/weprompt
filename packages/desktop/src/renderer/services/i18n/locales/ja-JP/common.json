@@ -162,5 +162,14 @@
     "second_short": "秒"
   },
   "selectedCount": "選択済み {{count}}",
-  "selectedSkills": "選択済みスキル"
+  "selectedSkills": "選択済みスキル",
+  "chrome": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "元のサイズに戻す",
+    "collapseSidebar": "サイドバーを折りたたむ",
+    "toggleProjectPanel": "プロジェクトパネルの表示を切り替える",
+    "expandProjectPanel": "プロジェクトパネルを展開",
+    "collapseProjectPanel": "プロジェクトパネルを折りたたむ"
+  }
 }
