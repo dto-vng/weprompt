@@ -499,7 +499,7 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
             <div className='flex max-h-280px flex-col gap-4px overflow-y-auto'>{sources.map(renderRow)}</div>
           )}
           {(pendingEmbedSources.length > 0 || (summary?.semantic === 'off' && sources.length > 0)) && (
-            <div className='flex flex-col items-center gap-2px border-t border-t-light pt-8px text-center text-11px text-t-tertiary'>
+            <div className='flex flex-col items-center gap-2px border-t border-t-4 pt-8px text-center text-11px text-t-tertiary'>
               {summary?.semantic === 'off' && sources.length > 0 && (
                 <span data-testid='knowledge-degraded-note'>
                   {t('conversation.projectHome.knowledgeSemanticOff')}{' '}

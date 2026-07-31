@@ -97,7 +97,7 @@ const ProjectFilesCard: React.FC<ProjectFilesCardProps> = ({ project }) => {
               onOpenFile={(node) => void ipcBridge.shell.showItemInFolder.invoke(node.fullPath)}
             />
           </div>
-          <span className='border-t border-t-light pt-8px text-center text-11px text-t-tertiary'>
+          <span className='border-t border-t-4 pt-8px text-center text-11px text-t-tertiary'>
             {t('conversation.projectHome.filesReadonly')}
           </span>
         </div>

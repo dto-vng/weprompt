@@ -166,7 +166,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
   );
 
   return (
-    <div className='px-34px pt-26px pb-20px border-b border-b-light flex items-start gap-14px'>
+    <div className='px-34px pt-26px pb-20px border-b border-b-4 flex items-start gap-14px'>
       <div className='flex-1 min-w-0'>
         <h1 className='m-0 text-22px font-700 leading-tight text-t-primary truncate'>{project.name}</h1>
         <div className='mt-6px flex flex-wrap items-center gap-8px text-13px text-t-secondary'>
