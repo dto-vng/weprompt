@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ipcBridge } from '@/common';
 import type { TConversationRuntimeSummary } from '@/common/config/storage';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import {
-  conversationDeleted,
   getConversationRuntimeViewSnapshot,
   hydrateFailed,
   hydrateStarted,
@@ -20,13 +18,13 @@ import {
   localStopAcknowledged,
   localStopRequested,
   resetLocalGate,
-  streamTerminalObserved,
   subscribeConversationRuntimeView,
-  turnCompleted,
   type ConversationRuntimeView,
-  type ConversationRuntimeViewLogEntry,
   type ConversationRuntimeSendFailure,
 } from './conversationRuntimeViewStore';
+import { ensureConversationRuntimeViewEvents, flushConversationRuntimeViewLogs } from './conversationRuntimeViewEvents';
+
+export { logStreamTerminalObserved } from './conversationRuntimeViewEvents';
 
 type UseConversationRuntimeViewReturn = {
   view: ConversationRuntimeView;
@@ -45,26 +43,6 @@ type UseConversationRuntimeViewReturn = {
 
 const normalizeReason = (reason: string): string => reason.trim().slice(0, 200) || 'unknown';
 
-const logConversationRuntimeView = (entry: ConversationRuntimeViewLogEntry): void => {
-  const rendererLogger = ipcBridge.application?.writeRendererLog;
-  if (!rendererLogger) {
-    return;
-  }
-
-  void rendererLogger
-    .invoke({
-      level: entry.level,
-      tag: 'conversationRuntimeView',
-      message: entry.event,
-      data: entry.data,
-    })
-    .catch(() => {});
-};
-
-const flushRuntimeViewLogs = (logs: ConversationRuntimeViewLogEntry[]): void => {
-  logs.forEach(logConversationRuntimeView);
-};
-
 const getRuntimeOrNull = (runtime: TConversationRuntimeSummary | undefined): TConversationRuntimeSummary | null =>
   runtime ?? null;
 
@@ -73,26 +51,30 @@ export const useConversationRuntimeView = (conversation_id: string): UseConversa
   const view = useSyncExternalStore(subscribeConversationRuntimeView, getSnapshot, getSnapshot);
 
   useEffect(() => {
+    ensureConversationRuntimeViewEvents();
+  }, []);
+
+  useEffect(() => {
     if (!conversation_id) {
       return;
     }
 
     let cancelled = false;
-    flushRuntimeViewLogs(hydrateStarted(conversation_id));
+    flushConversationRuntimeViewLogs(hydrateStarted(conversation_id));
 
     void getConversationOrNull(conversation_id)
       .then((conversation) => {
         if (cancelled) {
           return;
         }
-        flushRuntimeViewLogs(hydrateSucceeded(conversation_id, getRuntimeOrNull(conversation?.runtime)));
+        flushConversationRuntimeViewLogs(hydrateSucceeded(conversation_id, getRuntimeOrNull(conversation?.runtime)));
       })
       .catch((error: unknown) => {
         if (cancelled) {
           return;
         }
         const reason = error instanceof Error ? error.message : String(error);
-        flushRuntimeViewLogs(hydrateFailed(conversation_id, normalizeReason(reason)));
+        flushConversationRuntimeViewLogs(hydrateFailed(conversation_id, normalizeReason(reason)));
       });
 
     return () => {
@@ -100,51 +82,20 @@ export const useConversationRuntimeView = (conversation_id: string): UseConversa
     };
   }, [conversation_id]);
 
-  useEffect(() => {
-    if (!conversation_id) {
-      return;
-    }
-
-    const turnCompletedEmitter = ipcBridge.conversation.turnCompleted;
-    const listChangedEmitter = ipcBridge.conversation.listChanged;
-    if (!turnCompletedEmitter || !listChangedEmitter) {
-      return;
-    }
-
-    const disposeTurnCompleted = turnCompletedEmitter.on((event) => {
-      if (event.session_id !== conversation_id) {
-        return;
-      }
-      flushRuntimeViewLogs(turnCompleted(conversation_id, event.turn_id, event.runtime));
-    });
-
-    const disposeListChanged = listChangedEmitter.on((event) => {
-      if (event.conversation_id !== conversation_id || event.action !== 'deleted') {
-        return;
-      }
-      flushRuntimeViewLogs(conversationDeleted(conversation_id));
-    });
-
-    return () => {
-      disposeTurnCompleted();
-      disposeListChanged();
-    };
-  }, [conversation_id]);
-
   const markSendStarted = useCallback(() => {
-    flushRuntimeViewLogs(localSendStarted(conversation_id));
+    flushConversationRuntimeViewLogs(localSendStarted(conversation_id));
   }, [conversation_id]);
 
   const markSendAccepted = useCallback(
     (turn_id: string, runtime: TConversationRuntimeSummary, msg_id?: string) => {
-      flushRuntimeViewLogs(localSendAccepted(conversation_id, turn_id, runtime, msg_id));
+      flushConversationRuntimeViewLogs(localSendAccepted(conversation_id, turn_id, runtime, msg_id));
     },
     [conversation_id]
   );
 
   const markSendFailed = useCallback(
     (failure: ConversationRuntimeSendFailure) => {
-      flushRuntimeViewLogs(
+      flushConversationRuntimeViewLogs(
         localSendFailed(conversation_id, {
           ...failure,
           reason: normalizeReason(failure.reason),
@@ -156,21 +107,21 @@ export const useConversationRuntimeView = (conversation_id: string): UseConversa
 
   const markStopRequested = useCallback(
     (turn_id: string) => {
-      flushRuntimeViewLogs(localStopRequested(conversation_id, turn_id));
+      flushConversationRuntimeViewLogs(localStopRequested(conversation_id, turn_id));
     },
     [conversation_id]
   );
 
   const markStopAcknowledged = useCallback(
     (turn_id: string, runtime: TConversationRuntimeSummary) => {
-      flushRuntimeViewLogs(localStopAcknowledged(conversation_id, turn_id, runtime));
+      flushConversationRuntimeViewLogs(localStopAcknowledged(conversation_id, turn_id, runtime));
     },
     [conversation_id]
   );
 
   const resetLocalRuntimeGate = useCallback(
     (reason: string) => {
-      flushRuntimeViewLogs(resetLocalGate(conversation_id, normalizeReason(reason)));
+      flushConversationRuntimeViewLogs(resetLocalGate(conversation_id, normalizeReason(reason)));
     },
     [conversation_id]
   );
@@ -189,34 +140,4 @@ export const useConversationRuntimeView = (conversation_id: string): UseConversa
     markStopAcknowledged,
     resetLocalGate: resetLocalRuntimeGate,
   };
-};
-
-export const logStreamTerminalObserved = (
-  conversation_id: string,
-  turn_id: string | undefined,
-  platform: 'acp' | 'aionrs',
-  stream_type: string
-): void => {
-  if (turn_id) {
-    flushRuntimeViewLogs(streamTerminalObserved(conversation_id, turn_id));
-  }
-
-  const rendererLogger = ipcBridge.application?.writeRendererLog;
-  if (!rendererLogger) {
-    return;
-  }
-
-  void rendererLogger
-    .invoke({
-      level: 'info',
-      tag: 'conversationRuntimeView',
-      message: 'stream_terminal_observed',
-      data: {
-        conversation_id,
-        turn_id,
-        platform,
-        stream_type,
-      },
-    })
-    .catch(() => {});
 };
