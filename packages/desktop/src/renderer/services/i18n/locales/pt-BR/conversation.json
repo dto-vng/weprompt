@@ -795,5 +795,9 @@
     "doneIdle": "Concluído há pelo menos um minuto e já visualizado.",
     "stopped": "Interrompido antes da conclusão.",
     "failed": "Não foi possível concluir devido a um erro."
+  },
+  "staleKnowledgeHint": {
+    "body": "Este chat não pode pesquisar a base de conhecimento do projeto — ele começou antes de os arquivos serem adicionados.",
+    "action": "Iniciar um novo chat"
   }
 }

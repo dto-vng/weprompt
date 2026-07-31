@@ -794,6 +794,8 @@ export type I18nKey =
   | 'conversation.skill_generator.type_skill'
   | 'conversation.skills.loaded'
   | 'conversation.skills.slashHint'
+  | 'conversation.staleKnowledgeHint.action'
+  | 'conversation.staleKnowledgeHint.body'
   | 'conversation.status.done'
   | 'conversation.status.doneIdle'
   | 'conversation.status.failed'

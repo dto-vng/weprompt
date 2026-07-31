@@ -791,5 +791,9 @@
     "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
     "stopped": "Tamamlanmadan önce durduruldu.",
     "failed": "Bir hata nedeniyle tamamlanamadı."
+  },
+  "staleKnowledgeHint": {
+    "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
+    "action": "Yeni sohbet başlat"
   }
 }

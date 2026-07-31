@@ -789,5 +789,9 @@
     "doneIdle": "Finished at least a minute ago and already viewed.",
     "stopped": "Stopped before finishing.",
     "failed": "Couldn't finish because of an error."
+  },
+  "staleKnowledgeHint": {
+    "body": "This chat can't search the project's knowledge base — it started before files were added.",
+    "action": "Start a new chat"
   }
 }
