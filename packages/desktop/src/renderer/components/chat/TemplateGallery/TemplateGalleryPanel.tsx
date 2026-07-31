@@ -30,22 +30,30 @@ const TemplateGalleryPanel: React.FC<{
 
   return (
     <div
-      className='bg-dialog-fill-0 b b-solid b-1 rd-12px p-12px shadow-lg'
+      className='bg-dialog-fill-0 b-1 b-solid border-4 rd-12px p-12px shadow-lg'
       role='dialog'
       aria-label={t('conversation.presentationTemplates.title')}
     >
-      <div className='flex items-center justify-between mb-8px'>
+      <div className='flex items-center justify-between gap-8px mb-8px'>
         <span className='text-13px font-medium'>{t('conversation.presentationTemplates.title')}</span>
-        <Button size='mini' onClick={onImport} icon={<Upload size='12' />}>
-          {t('conversation.presentationTemplates.importCard')}
-        </Button>
-        <Button
-          size='mini'
-          shape='circle'
-          icon={<Close size='14' />}
-          onClick={onClose}
-          aria-label={t('common.close', { defaultValue: 'Close' })}
-        />
+        {/* Both actions share one group: with three direct children, justify-between
+            stranded the import button in the middle of the header. */}
+        <div className='flex items-center gap-4px shrink-0'>
+          <Button size='small' type='text' onClick={onImport} className='!text-t-secondary hover:!text-t-primary'>
+            <span className='flex items-center gap-6px'>
+              <Upload size='14' />
+              {t('conversation.presentationTemplates.importCard')}
+            </span>
+          </Button>
+          <Button
+            size='small'
+            type='text'
+            shape='circle'
+            icon={<Close size='14' />}
+            onClick={onClose}
+            aria-label={t('common.close')}
+          />
+        </div>
       </div>
       {loading ? (
         <div className='flex justify-center p-16px'>

@@ -62,14 +62,36 @@ describe('TemplateGalleryColumns', () => {
     expect(docxCol.querySelectorAll('[data-testid^=template-card-]')).toHaveLength(0);
   });
 
-  it('sizes columns per mode: large wraps two-up, compact stacks one-per-row', () => {
-    const { rerender } = render(
-      <TemplateGalleryColumns templates={templates} size='large' onSelect={() => {}} onRemove={() => {}} />
-    );
-    expect(screen.getByTestId('template-column-docx').className).toContain('min-w-340px');
+  it('lays out large mode as full-width horizontally scrolling shelves', () => {
+    render(<TemplateGalleryColumns templates={templates} size='large' onSelect={() => {}} onRemove={() => {}} />);
 
-    rerender(<TemplateGalleryColumns templates={templates} size='compact' onSelect={() => {}} onRemove={() => {}} />);
+    // Every format group is its own full-width shelf, so no group is ever left
+    // sharing a row (which is what made pptx/html wrap two-up while docx sat inline).
+    for (const format of ['pptx', 'html', 'docx']) {
+      const shelf = screen.getByTestId(`template-shelf-${format}`);
+      expect(shelf.className).toContain('overflow-x-auto');
+      expect(shelf.className).not.toContain('flex-wrap');
+      expect(screen.getByTestId(`template-column-${format}`).className).not.toContain('min-w-340px');
+    }
+  });
+
+  it('keeps compact mode as narrow stacked columns', () => {
+    render(<TemplateGalleryColumns templates={templates} size='compact' onSelect={() => {}} onRemove={() => {}} />);
     expect(screen.getByTestId('template-column-docx').className).toContain('min-w-172px');
+    expect(screen.getByTestId('template-shelf-docx').className).toContain('flex-col');
+  });
+
+  it('exposes each card as a keyboard-operable button', () => {
+    const onSelect = vi.fn();
+    render(<TemplateGalleryColumns templates={templates} onSelect={onSelect} onRemove={() => {}} />);
+    const card = screen.getByTestId('template-card-simple-dark');
+    expect(card.getAttribute('role')).toBe('button');
+    expect(card.getAttribute('tabindex')).toBe('0');
+
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(onSelect).toHaveBeenCalledTimes(2);
   });
 
   it('marks the selected card and fires onSelect on click', () => {

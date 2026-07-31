@@ -16,20 +16,33 @@ const COLUMNS = [
   { format: 'docx', labelKey: 'conversation.presentationTemplates.columnDocx' },
 ] as const;
 
-// `col` is the column's minimum width and differs per mode because the two modes
-// lay cards out differently: `large` wraps cards two-up (2x160 + 12 gap = 332), while
-// `compact` stacks them one-per-row, where a 340px column would only pad the popover.
+// The two modes lay groups out differently:
+// - `compact` (popover) keeps three narrow side-by-side columns that stack their cards
+//   vertically; 172px is just wide enough for a 160px card without padding the popover.
+// - `large` (landing gallery) gives every group its own full-width shelf that scrolls
+//   horizontally. Shelves must NOT wrap: when the groups shared one wrapping row,
+//   whichever group happened to land alone on the last row got the full width and
+//   rendered inline while the others wrapped two-up, so a single gallery showed two
+//   different layouts at once.
 const SIZE = {
-  compact: { card: 'w-160px h-100px', img: 'w-160px h-100px', col: 'min-w-172px' },
-  large: { card: 'w-160px h-100px', img: 'w-160px h-100px', col: 'min-w-340px' },
+  compact: {
+    outer: 'flex flex-wrap gap-16px items-start',
+    col: 'flex flex-col gap-10px min-w-0 flex-1 min-w-172px',
+    shelf: 'flex flex-col gap-10px',
+  },
+  large: {
+    outer: 'flex flex-col gap-16px',
+    col: 'flex flex-col gap-10px w-full min-w-0',
+    shelf: 'flex gap-12px items-start overflow-x-auto overscroll-x-contain snap-x pb-4px',
+  },
 } as const;
 
+const CARD = 'w-160px h-100px';
+
 /**
- * Format-grouped template columns (PPTX | HTML | DOCX) shared by the compact
- * popover and the expanded landing-page gallery. Columns wrap rather than being
- * forced onto one row, so a narrow container drops the last group to a second
- * row. Templates are NEVER mixed across columns — grouping is strictly
- * manifest.format.
+ * Format-grouped templates (PPTX | HTML | DOCX) shared by the compact popover and
+ * the expanded landing-page gallery. Templates are NEVER mixed across groups —
+ * grouping is strictly manifest.format. See SIZE for how the two modes differ.
  */
 const TemplateGalleryColumns: React.FC<{
   templates: PresentationTemplateSummary[];
@@ -42,40 +55,44 @@ const TemplateGalleryColumns: React.FC<{
   const dims = SIZE[size];
 
   return (
-    <div className='flex flex-wrap gap-16px items-start'>
+    <div className={dims.outer}>
       {COLUMNS.map((column) => {
         const columnTemplates = templates.filter((template) => template.manifest.format === column.format);
         return (
-          <div
-            key={column.format}
-            data-testid={`template-column-${column.format}`}
-            className={`flex flex-col gap-10px min-w-0 flex-1 ${dims.col}`}
-          >
+          <div key={column.format} data-testid={`template-column-${column.format}`} className={dims.col}>
             <span className='text-12px font-medium text-t-secondary'>{t(column.labelKey)}</span>
-            <div className={size === 'large' ? 'flex flex-wrap gap-12px items-start' : 'flex flex-col gap-10px'}>
+            <div data-testid={`template-shelf-${column.format}`} className={dims.shelf}>
               {columnTemplates.map((template) => {
                 const id = template.manifest.id;
                 const isSelected = selectedId === id;
+                const select = () => onSelect(template);
                 return (
-                  <div key={id} className='flex flex-col'>
+                  <div key={id} className='flex flex-col shrink-0 snap-start'>
                     <Tooltip content={template.manifest.description}>
                       <Card
                         hoverable
                         bordered
                         data-testid={`template-card-${id}`}
-                        className={`${dims.card} p-0 rd-8px cursor-pointer overflow-hidden relative ${isSelected ? 'b-2 b-solid border-aou-6' : ''}`}
-                        onClick={() => onSelect(template)}
+                        // Arco Card renders a plain div, so the card carries its own
+                        // button semantics — it is the only way to pick a template.
+                        role='button'
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        aria-label={template.manifest.name}
+                        className={`${CARD} p-0 rd-8px cursor-pointer overflow-hidden relative b-solid ${isSelected ? 'b-2 border-aou-6' : 'b-1 border-4'}`}
+                        onClick={select}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                          event.preventDefault();
+                          select();
+                        }}
                         bodyStyle={{ padding: 0 }}
                       >
-                        <img
-                          src={template.previewDataUrl}
-                          alt={template.manifest.name}
-                          className={`${dims.img} object-cover`}
-                        />
+                        <img src={template.previewDataUrl} alt='' className={`${CARD} object-cover`} />
                         {isSelected && (
                           <span
                             data-testid={`template-selected-${id}`}
-                            className='absolute inset-0 flex items-center justify-center gap-6px bg-[rgba(0,0,0,0.35)] text-white text-13px font-medium'
+                            className='absolute inset-0 flex items-center justify-center gap-6px bg-[rgba(0,0,0,0.55)] text-white text-13px font-medium'
                           >
                             <CheckOne theme='filled' size='16' />
                             {t('conversation.presentationTemplates.selected')}
@@ -83,7 +100,7 @@ const TemplateGalleryColumns: React.FC<{
                         )}
                       </Card>
                     </Tooltip>
-                    <div className='flex items-center justify-between mt-4px'>
+                    <div className='flex items-center justify-between gap-4px mt-4px'>
                       <span className='text-12px truncate'>{template.manifest.name}</span>
                       {template.manifest.source === 'user' && (
                         <Popconfirm
