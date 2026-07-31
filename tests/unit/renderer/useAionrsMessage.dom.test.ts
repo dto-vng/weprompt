@@ -158,6 +158,47 @@ describe('useAionrsMessage runtime state', () => {
     expect(result.current.running).toBe(true);
   });
 
+  it('keeps the text alias replacement terminal after finish', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'text',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'text',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+    });
+
+    expect(result.current.running).toBe(false);
+    expect(mergeLiveMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg_id: 'reply-text',
+        content: expect.objectContaining({ content: 'Hello world', replace: true }),
+      })
+    );
+  });
+
   it('replaces buffered raw content before finalizing an assistant message', async () => {
     const { result } = renderHook(() => useAionrsMessage('conv-1'));
 
@@ -192,6 +233,50 @@ describe('useAionrsMessage runtime state', () => {
 
     await waitFor(() => {
       expect(processLocalCronResponseMock).toHaveBeenCalledWith('conv-1', 'Hello world');
+    });
+  });
+
+  it('resets buffered raw content when an explicit replacement is empty', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'stale' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: '' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Fresh' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    await waitFor(() => {
+      expect(processLocalCronResponseMock).toHaveBeenCalledWith('conv-1', 'Fresh');
     });
   });
 

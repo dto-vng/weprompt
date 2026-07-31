@@ -2,7 +2,7 @@ import { ipcBridge } from '@/common';
 import { uuid } from '@/common/utils';
 import {
   getConversationRuntimeViewSnapshot,
-  turnCompleted,
+  subscribeConversationRuntimeView,
 } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
 import { useAddEventListener } from '@/renderer/utils/emitter';
 import { Message } from '@arco-design/web-react';
@@ -385,31 +385,29 @@ type BackgroundCommandQueueRunner = {
 };
 
 const backgroundRunners = new Map<string, BackgroundCommandQueueRunner>();
-let backgroundTurnCompletedUnsubscribe: (() => void) | null = null;
+let backgroundRuntimeViewUnsubscribe: (() => void) | null = null;
 
-const ensureBackgroundTurnCompletedListener = (): void => {
-  if (backgroundTurnCompletedUnsubscribe) {
+const ensureBackgroundRuntimeViewListener = (): void => {
+  if (backgroundRuntimeViewUnsubscribe) {
     return;
   }
 
-  backgroundTurnCompletedUnsubscribe = ipcBridge.conversation.turnCompleted.on((event) => {
-    const runner = backgroundRunners.get(event.session_id);
-    if (!runner || runner.active) {
-      return;
+  backgroundRuntimeViewUnsubscribe = subscribeConversationRuntimeView(() => {
+    for (const runner of backgroundRunners.values()) {
+      if (!runner.active) {
+        void drainBackgroundCommandQueue(runner);
+      }
     }
-
-    turnCompleted(event.session_id, event.turn_id, event.runtime);
-    void drainBackgroundCommandQueue(runner);
   });
 };
 
-const releaseBackgroundTurnCompletedListener = (): void => {
+const releaseBackgroundRuntimeViewListener = (): void => {
   if (backgroundRunners.size > 0) {
     return;
   }
 
-  backgroundTurnCompletedUnsubscribe?.();
-  backgroundTurnCompletedUnsubscribe = null;
+  backgroundRuntimeViewUnsubscribe?.();
+  backgroundRuntimeViewUnsubscribe = null;
 };
 
 const registerBackgroundCommandQueueRunner = (
@@ -421,7 +419,7 @@ const registerBackgroundCommandQueueRunner = (
     active: true,
     executing: existing?.executing ?? false,
   });
-  ensureBackgroundTurnCompletedListener();
+  ensureBackgroundRuntimeViewListener();
 };
 
 const detachBackgroundCommandQueueRunner = (conversation_id: string): void => {
@@ -433,7 +431,7 @@ const detachBackgroundCommandQueueRunner = (conversation_id: string): void => {
   const state = readPersistedQueueState(conversation_id);
   if (state.items.length === 0 || state.isPaused || state.mode === 'manual') {
     backgroundRunners.delete(conversation_id);
-    releaseBackgroundTurnCompletedListener();
+    releaseBackgroundRuntimeViewListener();
     return;
   }
 
@@ -450,7 +448,7 @@ const drainBackgroundCommandQueue = async (runner: BackgroundCommandQueueRunner)
   const state = readPersistedQueueState(runner.conversation_id);
   if (state.items.length === 0) {
     backgroundRunners.delete(runner.conversation_id);
-    releaseBackgroundTurnCompletedListener();
+    releaseBackgroundRuntimeViewListener();
     return;
   }
 
@@ -466,7 +464,7 @@ const drainBackgroundCommandQueue = async (runner: BackgroundCommandQueueRunner)
   const [nextCommand, ...remainingCommands] = currentState.items;
   if (!nextCommand) {
     backgroundRunners.delete(runner.conversation_id);
-    releaseBackgroundTurnCompletedListener();
+    releaseBackgroundRuntimeViewListener();
     return;
   }
 
@@ -517,8 +515,8 @@ const drainBackgroundCommandQueue = async (runner: BackgroundCommandQueueRunner)
 
 export const resetConversationCommandQueueBackgroundRunnerForTest = (): void => {
   backgroundRunners.clear();
-  backgroundTurnCompletedUnsubscribe?.();
-  backgroundTurnCompletedUnsubscribe = null;
+  backgroundRuntimeViewUnsubscribe?.();
+  backgroundRuntimeViewUnsubscribe = null;
 };
 
 const getQueueValidationMessage = (

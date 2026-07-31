@@ -143,6 +143,26 @@ describe('conversation runtime view event ownership', () => {
     expect(remaining.result.current.canSendMessage).toBe(true);
   });
 
+  it('applies a valid emitter snapshot after a null runtime for the same turn', () => {
+    const view = renderHook(() => useConversationRuntimeView('conv-1'));
+
+    act(() => {
+      turnCompletedHandlerRef.current?.({ ...completedTurn(), runtime: null });
+      turnCompletedHandlerRef.current?.({ ...completedTurn(), runtime: runningRuntime });
+    });
+
+    expect(view.result.current).toMatchObject({
+      hydrated: true,
+      state: 'running',
+      canSendMessage: false,
+      isProcessing: true,
+      activeTurnId: 'turn-1',
+    });
+    expect(mocks.writeRendererLogMock.mock.calls.map(([entry]) => entry.message)).toEqual(
+      expect.arrayContaining(['turn_completed_missing_runtime', 'turn_completed_applied'])
+    );
+  });
+
   it('retries a missing optional emitter without duplicating an installed listener', () => {
     emittersAvailable.listChanged = false;
 

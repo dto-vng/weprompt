@@ -182,17 +182,23 @@ const collapseReplaceTextSnapshot = (
   message: IMessageText,
   messageAliases: Map<string, string>
 ): TMessage[] | null => {
+  const emptyReplyTipId = `empty-reply-${message.msg_id}`;
+  const canRetractEmptyReplyTip = normalizeDedupeTextContent(message.content.content).length > 0;
+  const snapshotList = canRetractEmptyReplyTip
+    ? list.filter((item) => item.type !== 'tips' || item.msg_id !== emptyReplyTipId)
+    : list;
+  const retractedEmptyReplyTip = snapshotList.length !== list.length;
   const segmentIndexes: number[] = [];
-  for (let i = 0; i < list.length; i++) {
-    const item = list[i];
+  for (let i = 0; i < snapshotList.length; i++) {
+    const item = snapshotList[i];
     if (item.type === 'text' && item.position === 'left' && item.msg_id === message.msg_id) {
       segmentIndexes.push(i);
     }
   }
 
   if (!segmentIndexes.length && !message.hidden && !message.content.teammateMessage) {
-    for (let i = list.length - 1; i >= 0; i -= 1) {
-      const item = list[i];
+    for (let i = snapshotList.length - 1; i >= 0; i -= 1) {
+      const item = snapshotList[i];
       if (isHistoryGapMarker(item) || (item.position === 'right' && !item.hidden)) break;
       if (item.type === 'text' && item.position === 'left' && !item.hidden && !item.content.teammateMessage) {
         segmentIndexes.push(i);
@@ -201,41 +207,45 @@ const collapseReplaceTextSnapshot = (
     segmentIndexes.reverse();
 
     const aggregateContent = segmentIndexes
-      .map((segmentIndex) => (list[segmentIndex] as IMessageText).content.content)
+      .map((segmentIndex) => (snapshotList[segmentIndex] as IMessageText).content.content)
       .join('');
     if (
       !segmentIndexes.length ||
       normalizeDedupeTextContent(aggregateContent) !== normalizeDedupeTextContent(message.content.content)
     ) {
-      return null;
+      return retractedEmptyReplyTip ? snapshotList.concat(message) : null;
     }
   }
 
-  if (!segmentIndexes.length) return null;
+  if (!segmentIndexes.length) return retractedEmptyReplyTip ? snapshotList.concat(message) : null;
 
   const firstIndex = segmentIndexes[0];
-  const first = list[firstIndex] as IMessageText;
+  const first = snapshotList[firstIndex] as IMessageText;
   const isCrossIdAggregate = first.msg_id !== message.msg_id;
+  const aggregateContent = segmentIndexes
+    .map((segmentIndex) => (snapshotList[segmentIndex] as IMessageText).content.content)
+    .join('');
   const collapsed: IMessageText = isCrossIdAggregate
     ? {
         ...message,
         status:
-          message.status === 'finish' || segmentIndexes.some((segmentIndex) => list[segmentIndex].status === 'finish')
+          message.status === 'finish' ||
+          segmentIndexes.some((segmentIndex) => snapshotList[segmentIndex].status === 'finish')
             ? 'finish'
             : (message.status ?? first.status),
       }
     : {
         ...first,
         status: first.status === 'finish' || message.status === 'finish' ? 'finish' : (message.status ?? first.status),
-        content: mergeTextMessageContent(first.content, message.content),
+        content: mergeTextMessageContent({ ...first.content, content: aggregateContent }, message.content),
       };
   const laterSegments = new Set(segmentIndexes.slice(1));
-  const newList = list.filter((_, i) => !laterSegments.has(i));
+  const newList = snapshotList.filter((_, i) => !laterSegments.has(i));
   newList[firstIndex] = collapsed;
 
   if (isCrossIdAggregate && collapsed.msg_id) {
     for (const segmentIndex of segmentIndexes) {
-      const discardedMessageId = list[segmentIndex].msg_id;
+      const discardedMessageId = snapshotList[segmentIndex].msg_id;
       if (discardedMessageId && discardedMessageId !== collapsed.msg_id) {
         messageAliases.set(discardedMessageId, collapsed.msg_id);
       }

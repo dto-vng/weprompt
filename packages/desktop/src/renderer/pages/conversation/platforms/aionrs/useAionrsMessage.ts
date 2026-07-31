@@ -277,7 +277,7 @@ export const useAionrsMessage = (
               ? ((payload as { content: string }).content ?? '')
               : '';
 
-        if (chunk) {
+        if (message.replace === true || chunk) {
           const previous = messageBufferRef.current.get(message.msg_id) ?? '';
           messageBufferRef.current.set(message.msg_id, message.replace === true ? chunk : previous + chunk);
         }
@@ -456,7 +456,8 @@ export const useAionrsMessage = (
             }
             // Auto-recover streamRunning if content arrives after finish, except
             // for a final replacement snapshot that reconciles an already-ended turn.
-            const isFinalReplacementSnapshot = message.type === 'content' && message.replace === true;
+            const isFinalReplacementSnapshot =
+              (message.type === 'content' || message.type === 'text') && message.replace === true;
             if (!streamRunningRef.current && !isFinalReplacementSnapshot) {
               setStreamRunning(true);
               streamRunningRef.current = true;

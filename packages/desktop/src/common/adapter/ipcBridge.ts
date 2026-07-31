@@ -338,17 +338,25 @@ export const conversation = {
           created_at: (rawLast.created_at ?? rawLast.createdAt ?? Date.now()) as number,
         }
       : undefined;
-    const rawRuntime = (r.runtime ?? {}) as Record<string, unknown>;
-    const runtime: IConversationTurnCompletedEvent['runtime'] = {
-      state: (rawRuntime.state ?? 'idle') as IConversationTurnCompletedEvent['runtime']['state'],
-      can_send_message: (rawRuntime.can_send_message ?? rawRuntime.canSendMessage ?? true) as boolean,
-      has_task: (rawRuntime.has_task ?? rawRuntime.hasTask ?? false) as boolean,
-      task_status: (rawRuntime.task_status ??
-        rawRuntime.taskStatus) as IConversationTurnCompletedEvent['runtime']['task_status'],
-      is_processing: (rawRuntime.is_processing ?? rawRuntime.isProcessing ?? false) as boolean,
-      pending_confirmations: (rawRuntime.pending_confirmations ?? rawRuntime.pendingConfirmations ?? 0) as number,
-      turn_id: (rawRuntime.turn_id ?? rawRuntime.turnId ?? null) as string | null,
-    };
+    const rawRuntime = r.runtime;
+    const runtimeRecord =
+      typeof rawRuntime === 'object' && rawRuntime !== null && !Array.isArray(rawRuntime)
+        ? (rawRuntime as Record<string, unknown>)
+        : null;
+    const runtime: IConversationTurnCompletedEvent['runtime'] = runtimeRecord
+      ? {
+          state: (runtimeRecord.state ?? 'idle') as TConversationRuntimeSummary['state'],
+          can_send_message: (runtimeRecord.can_send_message ?? runtimeRecord.canSendMessage ?? true) as boolean,
+          has_task: (runtimeRecord.has_task ?? runtimeRecord.hasTask ?? false) as boolean,
+          task_status: (runtimeRecord.task_status ??
+            runtimeRecord.taskStatus) as TConversationRuntimeSummary['task_status'],
+          is_processing: (runtimeRecord.is_processing ?? runtimeRecord.isProcessing ?? false) as boolean,
+          pending_confirmations: (runtimeRecord.pending_confirmations ??
+            runtimeRecord.pendingConfirmations ??
+            0) as number,
+          turn_id: (runtimeRecord.turn_id ?? runtimeRecord.turnId ?? null) as string | null,
+        }
+      : null;
     const rawModel = (r.model ?? {}) as Record<string, unknown>;
     const model: IConversationTurnCompletedEvent['model'] = {
       platform: (rawModel.platform ?? '') as string,
@@ -357,7 +365,7 @@ export const conversation = {
     };
     return {
       session_id: (r.session_id ?? r.sessionId ?? r.conversation_id ?? '') as string,
-      turn_id: (r.turn_id ?? r.turnId ?? runtime.turn_id ?? '') as string,
+      turn_id: (r.turn_id ?? r.turnId ?? runtime?.turn_id ?? '') as string,
       status: (r.status ?? 'finished') as IConversationTurnCompletedEvent['status'],
       ...(r.state !== undefined ? { state: r.state as NonNullable<IConversationTurnCompletedEvent['state']> } : {}),
       detail: (r.detail ?? '') as string,
@@ -1828,15 +1836,7 @@ export interface IConversationTurnCompletedEvent {
     | 'unknown';
   detail: string;
   can_send_message: boolean;
-  runtime: {
-    state: 'idle' | 'starting' | 'running' | 'cancelling' | 'waiting_confirmation';
-    can_send_message: boolean;
-    has_task: boolean;
-    task_status?: 'pending' | 'running' | 'finished';
-    is_processing: boolean;
-    pending_confirmations: number;
-    turn_id: string | null;
-  };
+  runtime: TConversationRuntimeSummary | null;
   workspace: string;
   model: {
     platform: string;

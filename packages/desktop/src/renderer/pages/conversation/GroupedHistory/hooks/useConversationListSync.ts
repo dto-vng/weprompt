@@ -486,7 +486,9 @@ const initializeConversationListSyncStore = () => {
   });
   ipcBridge.conversation.turnCompleted.on((event) => {
     advanceConversationRuntimeRequest(event.session_id);
-    applyConversationRuntime(event.session_id, event.runtime);
+    if (event.runtime) {
+      applyConversationRuntime(event.session_id, event.runtime);
+    }
     const terminalMark = resolveConversationTerminalMark(event.state);
     if (terminalMark) {
       markTerminalState(event.session_id, terminalMark, event.turn_id);
