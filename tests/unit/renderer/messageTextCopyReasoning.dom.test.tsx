@@ -78,16 +78,25 @@ describe('MessageText copy control', () => {
 });
 
 describe('MessageText inline reasoning', () => {
-  it('renders reasoning bounded and collapsed rather than always-expanded', () => {
+  it('renders reasoning collapsed behind a toggle that can actually expand it', () => {
     const reasoning = Array.from({ length: 40 }, (_, i) => `thought line ${i}`).join('\n');
     render(<MessageText message={buildMessage(`<think>${reasoning}</think>the answer`)} />);
 
     const block = screen.getByTestId('message-reasoning');
-    expect(block).toBeTruthy();
-    // The reasoning text still renders; what changed is that its container is height-bounded.
     expect(block.textContent).toContain('thought line 0');
-    const bounded = block.querySelector('[style*="max-height"]');
-    expect(bounded).toBeTruthy();
+
+    // Clamped by default...
+    const body = block.querySelector('[style*="max-height"]') as HTMLElement;
+    expect(body).toBeTruthy();
+
+    // ...and there must be a control to unclamp it. Clipping reasoning behind a fade with no
+    // way to open it is worse than the always-expanded state this replaced.
+    const toggle = screen.getByRole('button', { expanded: false });
+    expect(toggle.getAttribute('aria-controls')).toBe(body.id);
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { expanded: true })).toBe(toggle);
+    expect(block.querySelector('[style*="max-height"]')).toBeNull();
   });
 
   it('keeps the message-text-content handle for the answer', () => {

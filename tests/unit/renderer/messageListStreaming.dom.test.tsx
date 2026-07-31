@@ -47,6 +47,18 @@ vi.mock('@arco-design/web-react', () => ({
   Image: {
     PreviewGroup: ({ children }: PropsWithChildren) => <>{children}</>,
   },
+  // Used by the scroll-to-bottom control, which this suite renders once the user scrolls up.
+  Button: ({
+    children,
+    icon,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; shape?: string }) => (
+    <button type='button' {...props}>
+      {icon}
+      {children}
+    </button>
+  ),
+  Tooltip: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 vi.mock('@/renderer/hooks/context/ConversationContext', () => ({

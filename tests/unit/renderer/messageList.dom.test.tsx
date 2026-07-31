@@ -1039,10 +1039,11 @@ describe('MessageList', () => {
       fireEvent.click(control);
       expect(autoScrollState.scrollToBottom).toHaveBeenCalled();
 
-      // `b` is what actually paints a border here — `border-4` is colour-only and the Uno
-      // preflight zeroes border-width, so the old `border-1 border-solid border-3` drew nothing.
-      expect(control.className).toContain('border-4');
-      expect(control.className).toMatch(/(^|\s)b(\s|$)/);
+      // `!b` paints the width and `!border-4` the colour. Both need the important prefix:
+      // `border-4` is colour-only, the Uno preflight zeroes border-width, and `.arco-btn`'s own
+      // `border-color: transparent` beats an unprefixed utility (measured in the running app).
+      expect(control.className).toContain('!border-4');
+      expect(control.className).toMatch(/(^|\s)!b(\s|$)/);
       expect(control.className).not.toContain('border-3');
       expect(container.querySelector('.h-100px.pointer-events-none')).toBeNull();
     });

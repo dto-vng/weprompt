@@ -12,9 +12,9 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useLocalFilePreview } from '@/renderer/pages/conversation/Preview/hooks/useLocalFilePreview';
 import { iconColors } from '@/renderer/styles/colors';
 import { Alert, Button, Message, Tooltip } from '@arco-design/web-react';
-import { Copy, Brain } from '@icon-park/react';
+import { Copy, Brain, Right } from '@icon-park/react';
 import classNames from 'classnames';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
@@ -55,6 +55,8 @@ import { useTeammateColor } from '@/renderer/pages/team/identity/TeamIdentityCon
 import { nextRevealLength } from './progressiveText';
 
 const CODE_STYLE = { marginTop: 4, marginBlock: 4 };
+const REASONING_COLLAPSED_HEIGHT = 160;
+const REASONING_MASK = 'linear-gradient(#000 0%, #000 60%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)';
 const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
@@ -235,6 +237,8 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
 
   const { t } = useTranslation();
   const [showCopyAlert, setShowCopyAlert] = useState(false);
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const reasoningBodyId = useId();
   const isUserMessage = message.position === 'right';
   const isTeammateMessage = message.position === 'left' && message.content.teammateMessage === true;
   const { text, files } = useMemo(
@@ -363,21 +367,48 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
         {/* The model's reasoning, kept and shown in grey above the answer (never erased). */}
         {!isUserMessage && !json && reasoning.trim() && (
           <div className='w-full mb-8px' data-testid='message-reasoning'>
-            <div className='flex items-center gap-4px mb-4px text-12px text-t-tertiary'>
+            {/* Collapsed by default and clamped: an unbounded chain-of-thought pushed the actual
+                answer arbitrarily far down the scroller. Mirrors MessageThinking, the sibling
+                surface for the same content class, rather than using CollapsibleContent —
+                measured in the running app, that component leaves this content clipped behind a
+                fade with NO expand control, because its ResizeObserver watches an element whose
+                box is already pinned to maxHeight. */}
+            <Button
+              type='text'
+              size='mini'
+              // `.arco-btn` brings its own display and paddings, which would reflow this row.
+              className='!flex items-center gap-4px !h-auto !p-0 mb-4px !text-12px !text-t-tertiary hover:!text-t-secondary'
+              aria-expanded={reasoningExpanded}
+              aria-controls={reasoningBodyId}
+              onClick={() => setReasoningExpanded((value) => !value)}
+            >
               <Brain theme='outline' size='13' fill='var(--bg-6)' />
               <span>{t('messages.reasoning')}</span>
+              <Right
+                theme='outline'
+                size='12'
+                className='transition-transform'
+                style={reasoningExpanded ? { transform: 'rotate(90deg)' } : undefined}
+              />
+            </Button>
+            <div
+              id={reasoningBodyId}
+              className='pl-12px text-13px text-t-secondary whitespace-pre-wrap [word-break:break-word]'
+              style={{
+                borderLeft: '2px solid var(--color-border-2)',
+                lineHeight: 1.6,
+                ...(reasoningExpanded
+                  ? undefined
+                  : {
+                      maxHeight: REASONING_COLLAPSED_HEIGHT,
+                      overflow: 'hidden',
+                      maskImage: REASONING_MASK,
+                      WebkitMaskImage: REASONING_MASK,
+                    }),
+              }}
+            >
+              {reasoning}
             </div>
-            {/* Bounded and collapsed by default: an unbounded chain-of-thought pushed the
-                actual answer arbitrarily far down the scroller. MessageThinking, the sibling
-                surface for the same content class, already collapses. */}
-            <CollapsibleContent maxHeight={160} defaultCollapsed={true} useMask>
-              <div
-                className='pl-12px text-13px text-t-secondary whitespace-pre-wrap [word-break:break-word]'
-                style={{ borderLeft: '2px solid var(--color-border-2)', lineHeight: 1.6 }}
-              >
-                {reasoning}
-              </div>
-            </CollapsibleContent>
           </div>
         )}
         <div

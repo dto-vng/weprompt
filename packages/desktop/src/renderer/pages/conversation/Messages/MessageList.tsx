@@ -832,10 +832,12 @@ const MessageList: React.FC<{ className?: string; emptySlot?: React.ReactNode }>
             <Button
               shape='circle'
               aria-label={t('messages.scrollToBottom')}
-              // `b` supplies the width: `border-4` is colour-only, and the Uno preflight sets
-              // every element to border-width 0. The old class list paired `border-1` with
-              // `border-3` — two competing colours and no width — so it drew no ring at all.
-              className='!flex items-center justify-center !w-40px !h-40px rd-full bg-base shadow-lg hover:bg-1 transition-all hover:scale-110 b b-solid border-4'
+              // `!b` supplies the width and `!border-4` the colour: `border-4` is colour-only,
+              // the Uno preflight sets every element to border-width 0, and `.arco-btn`'s own
+              // `border-color: transparent` beats an unprefixed utility (measured live — the
+              // ring stayed transparent without `!`). The old class list paired `border-1` with
+              // `border-3`: two competing colours, no width, so it drew no ring in any theme.
+              className='!flex items-center justify-center !w-40px !h-40px rd-full bg-base shadow-lg hover:bg-1 transition-all hover:scale-110 !b !b-solid !border-4'
               onClick={handleScrollButtonClick}
               icon={<Down theme='filled' size='20' fill={iconColors.secondary} style={{ display: 'block' }} />}
             />

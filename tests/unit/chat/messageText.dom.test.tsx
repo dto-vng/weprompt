@@ -128,6 +128,17 @@ vi.mock('@arco-design/web-react', () => ({
   Message: {
     error: vi.fn(),
   },
+  // The copy control is an Arco Button so it can take focus.
+  Button: ({
+    children,
+    icon,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; shape?: string }) => (
+    <button type='button' {...props}>
+      {icon}
+      {children}
+    </button>
+  ),
   Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 }));
 
