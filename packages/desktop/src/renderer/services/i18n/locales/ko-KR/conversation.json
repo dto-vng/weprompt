@@ -548,6 +548,7 @@
     "noModelSelected": "현재 세션에 선택된 모델이 없어 메시지를 보낼 수 없습니다",
     "sendMessageTo": "{{model}}에게 메시지 보내기",
     "processing": "처리 중...",
+    "stopGenerating": "생성 중지",
     "quotaExceededTitle": "모델 할당량 도달",
     "quotaExceededBody": "현재 모델 할당량이 소진되었습니다. {{model}}(으)로 전환하여 계속하시겠습니까?",
     "quotaExceededNoFallback": "모델 할당량에 도달했습니다. 다른 사용 가능한 모델로 전환하세요.",
@@ -856,5 +857,6 @@
   "staleKnowledgeHint": {
     "body": "이 대화는 프로젝트 지식 베이스를 검색할 수 없습니다. 파일이 추가되기 전에 시작되었기 때문입니다.",
     "action": "새 대화 시작"
-  }
+  },
+  "emptyChat": "메시지를 보내 시작하세요."
 }

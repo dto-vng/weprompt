@@ -548,6 +548,7 @@
     "noModelSelected": "No hay modelo seleccionado para la sesión actual, no se puede enviar el mensaje",
     "sendMessageTo": "Enviar mensaje a {{model}}",
     "processing": "Procesando...",
+    "stopGenerating": "Detener generación",
     "quotaExceededTitle": "Cuota del modelo alcanzada",
     "quotaExceededBody": "La cuota del modelo actual se agotó. ¿Cambiar a {{model}} para continuar?",
     "quotaExceededNoFallback": "Cuota del modelo alcanzada. Por favor cambia a otro modelo disponible.",
@@ -857,5 +858,6 @@
   "staleKnowledgeHint": {
     "body": "Este chat no puede buscar en la base de conocimiento del proyecto: se inició antes de que se añadieran archivos.",
     "action": "Iniciar un chat nuevo"
-  }
+  },
+  "emptyChat": "Envía un mensaje para empezar."
 }

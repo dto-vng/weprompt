@@ -548,6 +548,7 @@
     "noModelSelected": "Kein Modell für die aktuelle Sitzung ausgewählt, Nachricht kann nicht gesendet werden",
     "sendMessageTo": "Nachricht an {{model}} senden",
     "processing": "Wird verarbeitet...",
+    "stopGenerating": "Generierung stoppen",
     "quotaExceededTitle": "Modellkontingent erreicht",
     "quotaExceededBody": "Das aktuelle Modellkontingent ist erschöpft. Zu {{model}} wechseln, um fortzufahren?",
     "quotaExceededNoFallback": "Modellkontingent erreicht. Bitte zu einem anderen verfügbaren Modell wechseln.",
@@ -857,5 +858,6 @@
   "staleKnowledgeHint": {
     "body": "Dieser Chat kann die Wissensdatenbank des Projekts nicht durchsuchen – er wurde begonnen, bevor Dateien hinzugefügt wurden.",
     "action": "Neuen Chat starten"
-  }
+  },
+  "emptyChat": "Sende eine Nachricht, um zu beginnen."
 }

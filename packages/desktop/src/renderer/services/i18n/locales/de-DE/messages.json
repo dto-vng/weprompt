@@ -56,6 +56,7 @@
   "noOptionsAvailable": "Keine Optionen verfügbar",
   "processing": "Wird verarbeitet...",
   "responseSentSuccessfully": "Antwort erfolgreich gesendet",
+  "permissionResponseFailed": "Deine Antwort konnte nicht gesendet werden. Bitte versuche es erneut.",
   "confirmation": {
     "applyChange": "Diese Änderung anwenden?",
     "allowExecution": "Ausführung erlauben?",
@@ -227,5 +228,8 @@
         "failedTitle": "Ich konnte die fertige Datei nicht vorbereiten"
       }
     }
+  },
+  "plan": {
+    "title": "Aufgabenliste"
   }
 }

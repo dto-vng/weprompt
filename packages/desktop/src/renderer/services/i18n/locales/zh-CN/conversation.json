@@ -548,6 +548,7 @@
     "noModelSelected": "当前会话未选择模型，无法发送消息",
     "sendMessageTo": "发送消息到 {{model}}",
     "processing": "正在处理中……",
+    "stopGenerating": "停止生成",
     "quotaExceededTitle": "模型额度已用尽",
     "quotaExceededBody": "当前模型额度已用尽，是否切换到 {{model}}？",
     "quotaExceededNoFallback": "当前模型额度已用尽，请切换到其他可用模型。",
@@ -856,5 +857,6 @@
   "staleKnowledgeHint": {
     "body": "此对话无法检索项目知识库 —— 它创建于添加文件之前。",
     "action": "新建对话"
-  }
+  },
+  "emptyChat": "发送消息开始对话。"
 }

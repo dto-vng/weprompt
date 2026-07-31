@@ -548,6 +548,7 @@
     "noModelSelected": "當前會話未選擇模型，無法發送訊息",
     "sendMessageTo": "發送訊息到 {{model}}",
     "processing": "正在處理中……",
+    "stopGenerating": "停止產生",
     "quotaExceededTitle": "模型額度已用盡",
     "quotaExceededBody": "當前模型額度已用盡，是否切換到 {{model}}？",
     "quotaExceededNoFallback": "當前模型額度已用盡，請切換到其他可用模型。",
@@ -856,5 +857,6 @@
   "staleKnowledgeHint": {
     "body": "此對話無法檢索專案知識庫 —— 它建立於新增檔案之前。",
     "action": "新建對話"
-  }
+  },
+  "emptyChat": "傳送訊息開始對話。"
 }
