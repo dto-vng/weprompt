@@ -212,6 +212,19 @@ describe('httpBridge', () => {
       expect(debugSpy).toHaveBeenCalledWith('[httpBridge] GET /api/network-failure', '(no body)');
     });
 
+    it('logs and preserves a deferred request network failure', async () => {
+      const networkError = new Error('app operations backend unavailable');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/app-operations/model', undefined, { silentStatuses: [404] })).rejects.toBe(
+        networkError
+      );
+
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledWith('[httpBridge] GET /api/app-operations/model', '(no body)');
+    });
+
     it('keeps a configured silent status out of logs while preserving its BackendHttpError', async () => {
       vi.stubGlobal(
         'fetch',

@@ -194,11 +194,19 @@ export async function httpRequest<T>(
     requestLog();
   }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (error) {
+    if (deferRequestLog) {
+      requestLog();
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     // Response body can only be consumed once — read as text, then try JSON
