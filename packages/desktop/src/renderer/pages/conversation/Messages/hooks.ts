@@ -161,10 +161,27 @@ const sanitizeMessageForList = (message: TMessage): TMessage =>
     ? ({ ...message, content: sanitizeAcpToolCallContent(message.content) } as TMessage)
     : message;
 
+const normalizeDedupeTextContent = (content: string): string => {
+  const lines = content.replace(/\r\n?/g, '\n').split('\n');
+
+  while (lines.length && lines[0].trim().length === 0) lines.shift();
+  while (lines.length && lines.at(-1)?.trim().length === 0) lines.pop();
+  if (!lines.length) return '';
+
+  // CommonMark allows up to three insignificant leading spaces; four starts an indented code block.
+  lines[0] = lines[0].replace(/^ {1,3}(?=\S)/, '');
+  lines[lines.length - 1] = lines[lines.length - 1].replace(/[ \t]+$/, '');
+  return lines.join('\n');
+};
+
 // A replace-marked text message is a full-turn snapshot of the reply: it must
 // absorb every streamed segment sharing its msg_id, not just the last one —
 // otherwise earlier segments survive and the reply renders twice.
-const collapseReplaceTextSnapshot = (list: TMessage[], message: IMessageText): TMessage[] | null => {
+const collapseReplaceTextSnapshot = (
+  list: TMessage[],
+  message: IMessageText,
+  messageAliases: Map<string, string>
+): TMessage[] | null => {
   const segmentIndexes: number[] = [];
   for (let i = 0; i < list.length; i++) {
     const item = list[i];
@@ -172,24 +189,70 @@ const collapseReplaceTextSnapshot = (list: TMessage[], message: IMessageText): T
       segmentIndexes.push(i);
     }
   }
+
+  if (!segmentIndexes.length && !message.hidden && !message.content.teammateMessage) {
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const item = list[i];
+      if (isHistoryGapMarker(item) || (item.position === 'right' && !item.hidden)) break;
+      if (item.type === 'text' && item.position === 'left' && !item.hidden && !item.content.teammateMessage) {
+        segmentIndexes.push(i);
+      }
+    }
+    segmentIndexes.reverse();
+
+    const aggregateContent = segmentIndexes
+      .map((segmentIndex) => (list[segmentIndex] as IMessageText).content.content)
+      .join('');
+    if (
+      !segmentIndexes.length ||
+      normalizeDedupeTextContent(aggregateContent) !== normalizeDedupeTextContent(message.content.content)
+    ) {
+      return null;
+    }
+  }
+
   if (!segmentIndexes.length) return null;
 
   const firstIndex = segmentIndexes[0];
   const first = list[firstIndex] as IMessageText;
-  const collapsed: IMessageText = {
-    ...first,
-    status: first.status === 'finish' || message.status === 'finish' ? 'finish' : (message.status ?? first.status),
-    content: mergeTextMessageContent(first.content, message.content),
-  };
+  const isCrossIdAggregate = first.msg_id !== message.msg_id;
+  const collapsed: IMessageText = isCrossIdAggregate
+    ? {
+        ...message,
+        status:
+          message.status === 'finish' || segmentIndexes.some((segmentIndex) => list[segmentIndex].status === 'finish')
+            ? 'finish'
+            : (message.status ?? first.status),
+      }
+    : {
+        ...first,
+        status: first.status === 'finish' || message.status === 'finish' ? 'finish' : (message.status ?? first.status),
+        content: mergeTextMessageContent(first.content, message.content),
+      };
   const laterSegments = new Set(segmentIndexes.slice(1));
   const newList = list.filter((_, i) => !laterSegments.has(i));
   newList[firstIndex] = collapsed;
+
+  if (isCrossIdAggregate && collapsed.msg_id) {
+    for (const segmentIndex of segmentIndexes) {
+      const discardedMessageId = list[segmentIndex].msg_id;
+      if (discardedMessageId && discardedMessageId !== collapsed.msg_id) {
+        messageAliases.set(discardedMessageId, collapsed.msg_id);
+      }
+    }
+  }
+
   return newList;
 };
 
 // 使用索引优化的消息合并函数
 // Index-optimized message compose function
-function composeMessageWithIndex(message: TMessage | undefined, list: TMessage[], index: MessageIndex): TMessage[] {
+function composeMessageWithIndex(
+  message: TMessage | undefined,
+  list: TMessage[],
+  index: MessageIndex,
+  messageAliases: Map<string, string>
+): TMessage[] {
   if (!message) return list || [];
 
   if (logDroppedToolCallWithoutCallId(message)) {
@@ -288,7 +351,7 @@ function composeMessageWithIndex(message: TMessage | undefined, list: TMessage[]
   // text 消息: 只与最后一条连续的流式片段合并，保留被工具/思考打断后的消息边界。
   if (message.type === 'text' && message.msg_id) {
     if (message.position === 'left' && isTextContentReplacement(message.content)) {
-      const collapsed = collapseReplaceTextSnapshot(list, message);
+      const collapsed = collapseReplaceTextSnapshot(list, message, messageAliases);
       if (collapsed) {
         const rebuilt = buildMessageIndex(collapsed);
         index.msgIdIndex = rebuilt.msgIdIndex;
@@ -477,7 +540,7 @@ export const useMergeLiveMessage = () => {
         } else {
           // 使用索引优化的消息合并
           // Use index-optimized message compose
-          newList = composeMessageWithIndex(message, newList, index);
+          newList = composeMessageWithIndex(message, newList, index, messageAliases);
         }
 
         while (beforeUpdateMessageListStack.length) {
@@ -778,19 +841,6 @@ export function normalizeDbMessage(msg: TMessage): TMessage {
 const getMessageMergeKey = (message: TMessage): string => {
   if (message.msg_id) return `${message.type}:${message.msg_id}`;
   return `id:${message.id}`;
-};
-
-const normalizeDedupeTextContent = (content: string): string => {
-  const lines = content.replace(/\r\n?/g, '\n').split('\n');
-
-  while (lines.length && lines[0].trim().length === 0) lines.shift();
-  while (lines.length && lines.at(-1)?.trim().length === 0) lines.pop();
-  if (!lines.length) return '';
-
-  // CommonMark allows up to three insignificant leading spaces; four starts an indented code block.
-  lines[0] = lines[0].replace(/^ {1,3}(?=\S)/, '');
-  lines[lines.length - 1] = lines[lines.length - 1].replace(/[ \t]+$/, '');
-  return lines.join('\n');
 };
 
 const isDedupeCandidate = (message: TMessage): message is IMessageText =>
@@ -1196,7 +1246,11 @@ export const useMessageLstCache = (key: string) => {
           },
           messageAliases
         );
-        return reconcileAssistantReplyList(composeMessageWithIndex(message, list, index), key, aliasState);
+        return reconcileAssistantReplyList(
+          composeMessageWithIndex(message, list, index, messageAliases),
+          key,
+          aliasState
+        );
       });
     });
   }, [aliasState, key, update]);

@@ -46,6 +46,15 @@ const existingTextMessage: TMessage = {
   },
 };
 
+const segment = (id: string, msgId: string, content: string): IMessageText => ({
+  id,
+  msg_id: msgId,
+  conversation_id: 'conv-1',
+  type: 'text',
+  position: 'left',
+  content: { content },
+});
+
 const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ message, add = false }) => {
   const addOrUpdateMessage = useAddOrUpdateMessage();
   const messages = useMessageList();
@@ -152,14 +161,14 @@ describe('conversation message hooks ACP sanitization', () => {
   });
 
   it('collapses streamed reply segments when a replace snapshot arrives after tool calls', () => {
-    const segment = (id: string, content: string): IMessageText => ({
-      id,
-      msg_id: 'reply-1',
+    const userMessage: IMessageText = {
+      id: 'user-1',
+      msg_id: 'user-1',
       conversation_id: 'conv-1',
       type: 'text',
-      position: 'left',
-      content: { content },
-    });
+      position: 'right',
+      content: { content: 'Write a greeting' },
+    };
     const toolCall: TMessage = {
       id: 'tool-1',
       msg_id: 'tool-1',
@@ -169,8 +178,8 @@ describe('conversation message hooks ACP sanitization', () => {
       content: { call_id: 'tool-1', name: 'Write', status: 'finish' },
     } as TMessage;
     const snapshot: IMessageText = {
-      id: 'snapshot-1',
-      msg_id: 'reply-1',
+      id: 'persisted-answer',
+      msg_id: 'persisted-reply',
       conversation_id: 'conv-1',
       type: 'text',
       position: 'left',
@@ -178,7 +187,12 @@ describe('conversation message hooks ACP sanitization', () => {
     };
 
     renderMessageListProbe(snapshot, {
-      initial: [segment('seg-1', 'Hello '), toolCall, segment('seg-2', 'world')],
+      initial: [
+        userMessage,
+        segment('seg-1', 'live-reply', 'Hello '),
+        toolCall,
+        segment('seg-2', 'live-reply', 'world'),
+      ],
     });
 
     flushNextMessageUpdate();
@@ -186,7 +200,8 @@ describe('conversation message hooks ACP sanitization', () => {
     const textContents = screen.getByTestId('left-text-contents').textContent;
     expect(textContents).toBe('Hello world');
     expect(screen.getByTestId('left-text-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('message-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('message-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('last-message-type')).toHaveTextContent('tool_call');
   });
 
   it('appends a replace snapshot as a new message when no segment exists', () => {

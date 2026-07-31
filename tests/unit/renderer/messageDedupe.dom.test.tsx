@@ -8,7 +8,7 @@ import React, { type PropsWithChildren } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ipcBridge } from '@/common';
-import type { IMessageText } from '@/common/chat/chatLib';
+import type { IMessageText, TMessage } from '@/common/chat/chatLib';
 import {
   MessageListLoadingProvider,
   MessageListProvider,
@@ -61,6 +61,17 @@ const userMessage = (id: string, msg_id: string, content: string, created_at: nu
   ...textMessage(id, msg_id, content, created_at),
   position: 'right',
 });
+
+const toolCall = (id: string, created_at: number): TMessage =>
+  ({
+    id,
+    msg_id: id,
+    conversation_id: CONVERSATION_ID,
+    type: 'tool_call',
+    position: 'left',
+    created_at,
+    content: { call_id: id, name: 'Write', status: 'finish' },
+  }) as TMessage;
 
 function TestWrapper({ children }: PropsWithChildren): JSX.Element {
   return <MessageListProvider value={[]}>{children}</MessageListProvider>;
@@ -200,6 +211,130 @@ describe('message dedupe', () => {
 
     expect(result.current.messages).toHaveLength(2);
     expect(result.current.messages[1]).toEqual(preferredAnswer);
+  });
+
+  it('collapses an exact cross-id replacement aggregate and aliases every discarded segment', async () => {
+    const { result } = renderHook(() => useMessageHarness(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.addOrUpdateMessage(userMessage('user-1', 'user-msg-1', 'question', 100));
+      result.current.addOrUpdateMessage(textMessage('segment-1', 'live-segment-1', 'Hello ', 101));
+      result.current.addOrUpdateMessage(toolCall('tool-1', 102));
+      result.current.addOrUpdateMessage(textMessage('segment-2', 'live-segment-2', 'world', 103));
+      result.current.addOrUpdateMessage(
+        textMessage('persisted-answer', 'persisted-reply', 'Hello world', 104, { replace: true })
+      );
+    });
+    await flushMessageQueue();
+
+    act(() => {
+      result.current.addOrUpdateMessage(textMessage('segment-1-tail', 'live-segment-1', '!', 105));
+      result.current.addOrUpdateMessage(textMessage('segment-2-tail', 'live-segment-2', '?', 106));
+    });
+    await flushMessageQueue();
+
+    const assistantTexts = result.current.messages.filter(
+      (message): message is IMessageText => message.type === 'text' && message.position === 'left'
+    );
+    expect(assistantTexts.map((message) => message.content.content).join('')).toBe('Hello world!?');
+    expect(assistantTexts.every((message) => message.msg_id === 'persisted-reply')).toBe(true);
+    expect(result.current.messages.some((message) => message.id === 'tool-1')).toBe(true);
+  });
+
+  it('keeps the same assistant text in two distinct user turns during aggregate replacement', async () => {
+    const { result } = renderHook(() => useMessageHarness(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.addOrUpdateMessage(userMessage('user-1', 'user-msg-1', 'first question', 100));
+      result.current.addOrUpdateMessage(textMessage('answer-1', 'answer-msg-1', 'Hello world', 101));
+      result.current.addOrUpdateMessage(userMessage('user-2', 'user-msg-2', 'second question', 200));
+      result.current.addOrUpdateMessage(textMessage('segment-1', 'live-segment-1', 'Hello ', 201));
+      result.current.addOrUpdateMessage(toolCall('tool-1', 202));
+      result.current.addOrUpdateMessage(textMessage('segment-2', 'live-segment-2', 'world', 203));
+      result.current.addOrUpdateMessage(
+        textMessage('persisted-answer', 'persisted-reply', 'Hello world', 204, { replace: true })
+      );
+    });
+    await flushMessageQueue();
+
+    const assistantTexts = result.current.messages.filter(
+      (message): message is IMessageText => message.type === 'text' && message.position === 'left'
+    );
+    expect(assistantTexts.map((message) => message.content.content)).toEqual(['Hello world', 'Hello world']);
+  });
+
+  it('keeps live segments when a cross-id replacement is only a near match', async () => {
+    const { result } = renderHook(() => useMessageHarness(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.addOrUpdateMessage(userMessage('user-1', 'user-msg-1', 'question', 100));
+      result.current.addOrUpdateMessage(textMessage('segment-1', 'live-segment-1', 'Hello ', 101));
+      result.current.addOrUpdateMessage(toolCall('tool-1', 102));
+      result.current.addOrUpdateMessage(textMessage('segment-2', 'live-segment-2', 'world', 103));
+      result.current.addOrUpdateMessage(
+        textMessage('persisted-answer', 'persisted-reply', 'Hello world!', 104, { replace: true })
+      );
+    });
+    await flushMessageQueue();
+
+    const assistantTexts = result.current.messages.filter(
+      (message): message is IMessageText => message.type === 'text' && message.position === 'left'
+    );
+    expect(assistantTexts.map((message) => message.id)).toEqual(['segment-1', 'segment-2', 'persisted-answer']);
+  });
+
+  it('does not aggregate replacement candidates across a history gap', async () => {
+    const { result } = renderHook(() => useMessageHarness(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.addOrUpdateMessage(textMessage('live-segment', 'live-segment-msg', 'world', 100));
+    });
+    await flushMessageQueue();
+
+    act(() => {
+      result.current.replaceWithAnchorWindow(
+        CONVERSATION_ID,
+        [textMessage('older-segment', 'older-segment-msg', 'Hello ', 10)],
+        { hasMoreAfter: true }
+      );
+      result.current.addOrUpdateMessage(
+        textMessage('persisted-answer', 'persisted-reply', 'Hello world', 101, { replace: true })
+      );
+    });
+    await flushMessageQueue();
+
+    const assistantTexts = result.current.messages.filter(
+      (message): message is IMessageText => message.type === 'text' && message.position === 'left'
+    );
+    expect(assistantTexts.map((message) => message.id)).toEqual(['older-segment', 'live-segment', 'persisted-answer']);
+  });
+
+  it('keeps legitimate post-tool text segments separate without a replacement snapshot', async () => {
+    const { result } = renderHook(() => useMessageHarness(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.addOrUpdateMessage(userMessage('user-1', 'user-msg-1', 'question', 100));
+      result.current.addOrUpdateMessage(textMessage('segment-1', 'live-reply', 'Hello ', 101));
+      result.current.addOrUpdateMessage(toolCall('tool-1', 102));
+      result.current.addOrUpdateMessage(textMessage('segment-2', 'live-reply', 'world', 103));
+    });
+    await flushMessageQueue();
+
+    const assistantTexts = result.current.messages.filter(
+      (message): message is IMessageText => message.type === 'text' && message.position === 'left'
+    );
+    expect(assistantTexts.map((message) => message.id)).toEqual(['segment-1', 'segment-2']);
+    expect(result.current.messages.some((message) => message.id === 'tool-1')).toBe(true);
   });
 
   it('routes a continuation from a deduped tie loser to the retained live reply', async () => {
