@@ -7,7 +7,7 @@
 import { Message } from '@arco-design/web-react';
 import { Copy, Down, Up } from '@icon-park/react';
 import katex from 'katex';
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs, vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -34,6 +34,7 @@ type CodeBlockProps = {
 function CodeBlock(props: CodeBlockProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const codeId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>(
     () => (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light'
@@ -115,17 +116,30 @@ function CodeBlock(props: CodeBlockProps) {
       });
   };
 
+  // Native buttons rather than Arco, and inline styles rather than utility classes: this
+  // subtree only ever renders inside MarkdownView's shadow root, where neither Arco's
+  // stylesheet nor UnoCSS output reaches. The documented exception to the "no raw interactive
+  // HTML in new UI" rule. `markdown-code-control` is defined in ShadowView's createInitStyle
+  // and supplies the :focus-visible ring.
+  const controlStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: 0,
+    padding: 0,
+    margin: 0,
+    display: 'flex',
+    alignItems: 'center',
+    color: 'inherit',
+    font: 'inherit',
+    cursor: 'pointer',
+  };
+
   const iconFill = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)';
   const footerTextColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
   const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const bgColor = isDark ? 'rgba(255,255,255,0.04)' : 'var(--bg-2)';
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...props.codeStyle }}
-      className='group'
-    >
+    <div ref={containerRef} style={{ width: '100%', minWidth: 0, maxWidth: '100%', ...props.codeStyle }}>
       <div style={{ backgroundColor: bgColor, borderRadius: '8px', overflow: 'hidden' }}>
         {/* Header */}
         <div
@@ -136,49 +150,47 @@ function CodeBlock(props: CodeBlockProps) {
             padding: '8px 12px',
           }}
         >
+          {/* An unlabelled fence used to render the literal string "text" as its language chip.
+              `language` still falls back to 'text' for SyntaxHighlighter below. */}
           <span style={{ color: footerTextColor, fontSize: '12px', lineHeight: '16px' }}>
-            {language.toLocaleLowerCase()}
+            {match?.[1] ? language.toLocaleLowerCase() : null}
           </span>
-          {/* Buttons: always visible on touch devices, hover-only on pointer devices */}
-          <div
-            className='opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity'
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
+          {/* The `group` / `md:opacity-0 md:group-hover:opacity-100` classes that used to live
+              here were dead: UnoCSS output never crosses the shadow boundary, so these controls
+              have always been permanently visible. Removed rather than left as misleading code. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {canCollapse && (
-              <span title={expanded ? t('common.collapse') : t('common.expand')} style={{ display: 'flex' }}>
+              <button
+                type='button'
+                className='markdown-code-control'
+                aria-label={expanded ? t('common.collapse') : t('common.expand')}
+                aria-expanded={expanded}
+                aria-controls={codeId}
+                style={controlStyle}
+                onClick={toggleExpanded}
+              >
                 {expanded ? (
-                  <Up
-                    theme='outline'
-                    size='14'
-                    style={{ cursor: 'pointer', display: 'block' }}
-                    fill={iconFill}
-                    onClick={toggleExpanded}
-                  />
+                  <Up theme='outline' size='14' style={{ display: 'block' }} fill={iconFill} />
                 ) : (
-                  <Down
-                    theme='outline'
-                    size='14'
-                    style={{ cursor: 'pointer', display: 'block' }}
-                    fill={iconFill}
-                    onClick={toggleExpanded}
-                  />
+                  <Down theme='outline' size='14' style={{ display: 'block' }} fill={iconFill} />
                 )}
-              </span>
+              </button>
             )}
-            <span title={t('common.copy')} style={{ display: 'flex' }}>
-              <Copy
-                theme='outline'
-                size='14'
-                style={{ cursor: 'pointer', display: 'block' }}
-                fill={iconFill}
-                onClick={handleCopy}
-              />
-            </span>
+            <button
+              type='button'
+              className='markdown-code-control'
+              aria-label={t('common.copy')}
+              style={controlStyle}
+              onClick={handleCopy}
+            >
+              <Copy theme='outline' size='14' style={{ display: 'block' }} fill={iconFill} />
+            </button>
           </div>
         </div>
 
         {/* Code content — always full content, clipped by maxHeight when collapsed */}
         <div
+          id={codeId}
           style={{
             maxHeight: canCollapse && !expanded ? `${COLLAPSED_HEIGHT}px` : 'none',
             overflowY: 'hidden',
@@ -222,15 +234,19 @@ function CodeBlock(props: CodeBlockProps) {
 
         {/* Footer */}
         {canCollapse && (
-          <div
+          <button
+            type='button'
+            className='markdown-code-control'
+            aria-expanded={expanded}
+            aria-controls={codeId}
             style={{
-              display: 'flex',
+              ...controlStyle,
+              width: '100%',
               justifyContent: 'center',
-              alignItems: 'center',
               padding: '6px 12px',
-              cursor: 'pointer',
               gap: '4px',
               borderTop: `1px solid ${borderColor}`,
+              borderRadius: 0,
             }}
             onClick={toggleExpanded}
           >
@@ -242,7 +258,7 @@ function CodeBlock(props: CodeBlockProps) {
             ) : (
               <Down theme='outline' size='12' fill={footerTextColor} />
             )}
-          </div>
+          </button>
         )}
       </div>
     </div>
