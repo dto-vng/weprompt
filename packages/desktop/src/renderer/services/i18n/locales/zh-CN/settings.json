@@ -1307,5 +1307,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "显示密钥",
+  "apiKeyHide": "隐藏密钥",
+  "apiKeyMasked": "API 密钥已隐藏",
+  "mcpNoTools": "该服务器未提供任何工具"
 }

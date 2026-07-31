@@ -1308,5 +1308,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "키 표시",
+  "apiKeyHide": "키 숨기기",
+  "apiKeyMasked": "API 키가 숨겨져 있습니다",
+  "mcpNoTools": "이 서버는 도구를 제공하지 않습니다"
 }
