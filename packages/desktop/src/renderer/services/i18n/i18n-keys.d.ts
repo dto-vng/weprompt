@@ -2827,6 +2827,7 @@ export type I18nKey =
   | 'team.sider.deleteConfirmContent'
   | 'team.sider.deleteOk'
   | 'team.sider.deleteSuccess'
+  | 'team.sider.empty'
   | 'team.sider.pin'
   | 'team.sider.rename'
   | 'team.sider.renameCancel'

@@ -1,5 +1,6 @@
 {
   "sider": {
+    "empty": "No teams yet",
     "title": "Teams",
     "createTeam": "New Team",
     "pin": "Pin",

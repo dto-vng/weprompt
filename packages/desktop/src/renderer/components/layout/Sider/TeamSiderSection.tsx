@@ -42,7 +42,7 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { teams, mutate: refreshTeams, removeTeam } = useTeamList();
+  const { teams, isLoading, mutate: refreshTeams, removeTeam } = useTeamList();
   const teamBadgeCounts = useSiderTeamBadges(teams);
   const isTeamRunning = useSiderTeamRunning(teams);
   const { mutate: globalMutate } = useSWRConfig();
@@ -207,6 +207,18 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
               />
             </Tooltip>
           </div>
+          {/* Expanding used to render a header over a blank gap: an empty list looked
+              identical whether the fetch was still in flight or there genuinely are no
+              teams. Both rows are h-34px so the rail keeps its pitch either way. */}
+          {expanded && sortedTeams.length === 0 && (
+            <div className='h-34px flex items-center pl-10px' data-testid='team-sider-placeholder'>
+              {isLoading ? (
+                <Spin size={16} />
+              ) : (
+                <span className='text-13px text-t-secondary'>{t('team.sider.empty')}</span>
+              )}
+            </div>
+          )}
           {expanded &&
             sortedTeams.length > 0 &&
             sortedTeams.map((team) => {
