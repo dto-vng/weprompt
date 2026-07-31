@@ -823,7 +823,6 @@ export type I18nKey =
   | 'conversation.skills.slashHint'
   | 'conversation.staleKnowledgeHint.action'
   | 'conversation.staleKnowledgeHint.body'
-  | 'conversation.staleKnowledgeHint.changedBody'
   | 'conversation.status.done'
   | 'conversation.status.doneIdle'
   | 'conversation.status.failed'

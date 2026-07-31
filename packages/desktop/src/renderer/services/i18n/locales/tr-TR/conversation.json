@@ -845,7 +845,6 @@
   },
   "staleKnowledgeHint": {
     "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
-    "changedBody": "Bilgi tabanı değişti — yeni sohbetler en güncel dosyaları görür.",
     "action": "Yeni sohbet başlat"
   }
 }

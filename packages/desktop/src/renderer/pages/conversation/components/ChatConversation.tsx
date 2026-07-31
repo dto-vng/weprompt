@@ -5,7 +5,13 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { IConversationMcpStatus, IProvider, TChatConversation, TProviderWithModel } from '@/common/config/storage';
+import type {
+  IConversationMcpStatus,
+  IProvider,
+  ISessionMcpServer,
+  TChatConversation,
+  TProviderWithModel,
+} from '@/common/config/storage';
 import { uuid } from '@/common/utils';
 import addChatIcon from '@/renderer/assets/icons/add-chat.svg';
 import { CronJobManager } from '@/renderer/pages/cron';
@@ -236,7 +242,7 @@ const AionrsConversationPanel: React.FC<{
           (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
         }
         project_id={conversation.extra?.project_id}
-        session_mcp_servers={(conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers}
+        session_mcp_servers={conversation.extra?.session_mcp_servers}
         agent_name={presetAssistantInfo?.name}
         assistantId={aionrsAssistantId}
       />
@@ -316,7 +322,7 @@ const ChatConversation: React.FC<{
             }
             project_id={(conversation.extra as { project_id?: string } | undefined)?.project_id}
             session_mcp_servers={
-              (conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers
+              (conversation.extra as { session_mcp_servers?: ISessionMcpServer[] } | undefined)?.session_mcp_servers
             }
             assistantId={acpAssistantId}
           ></AcpChat>

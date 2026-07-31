@@ -4,27 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ISessionMcpServer } from '@/common/config/storage';
+import type { IKnowledgeSourceDto, IProjectKnowledgeListResult } from '@/common/types/project/knowledgeTypes';
 import { BUILTIN_KNOWLEDGE_NAME } from '@/common/knowledge/constants';
 import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
 import { kbStaleHintDismissKey } from '@/renderer/pages/conversation/knowledge/useKbStaleChatHint';
 
 const listSourcesMock = vi.fn();
 const navigateMock = vi.fn();
-let updatedListener: ((payload: { projectId: string }) => void) | null = null;
 
 vi.mock('@/common', () => ({
   ipcBridge: {
     projectKnowledge: {
       listSources: { invoke: (...args: unknown[]) => listSourcesMock(...args) },
-      updated: {
-        on: (listener: (payload: { projectId: string }) => void) => {
-          updatedListener = listener;
-          return () => undefined;
-        },
-      },
+      updated: { on: () => () => undefined },
     },
   },
 }));
@@ -37,7 +33,7 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
 }));
 
-const READY_SOURCE = {
+const READY_SOURCE: IKnowledgeSourceDto = {
   id: 's1',
   fileName: 'policy.pdf',
   byteSize: 10,
@@ -50,22 +46,33 @@ const READY_SOURCE = {
   ocr: null,
 };
 
+const listResult = (sources: IKnowledgeSourceDto[]): IProjectKnowledgeListResult => ({
+  sources,
+  summary: { fileCount: sources.length, passageCount: 0, semantic: 'off' },
+  folderMissing: false,
+});
+
+const KNOWLEDGE_SERVER: ISessionMcpServer = {
+  id: 'project-kb-p1',
+  name: BUILTIN_KNOWLEDGE_NAME,
+  transport: { type: 'stdio' },
+};
+
 const STALE_PROPS = {
   conversationId: 'c1',
   projectId: 'p1',
   workspace: '/tmp/project',
-  sessionMcpServers: [{ id: 'mcp_1', name: 'greennode-idp', transport: { type: 'stdio' } }],
+  sessionMcpServers: [{ id: 'mcp_1', name: 'greennode-idp', transport: { type: 'stdio' } } as ISessionMcpServer],
 };
 
 const BODY_KEY = 'conversation.staleKnowledgeHint.body';
-const CHANGED_KEY = 'conversation.staleKnowledgeHint.changedBody';
 const ACTION_KEY = 'conversation.staleKnowledgeHint.action';
+const CLOSE_KEY = 'common.close';
 
 beforeEach(() => {
   localStorage.clear();
-  listSourcesMock.mockReset().mockResolvedValue({ sources: [READY_SOURCE], summary: null, folderMissing: false });
+  listSourcesMock.mockReset().mockResolvedValue(listResult([READY_SOURCE]));
   navigateMock.mockReset();
-  updatedListener = null;
 });
 
 describe('KbStaleChatHint', () => {
@@ -75,18 +82,21 @@ describe('KbStaleChatHint', () => {
     expect(screen.getByRole('button', { name: ACTION_KEY })).toBeInTheDocument();
   });
 
+  it('announces politely rather than interrupting, and names its close button', async () => {
+    // Arco's role='alert' would announce assertively, cutting off whatever the
+    // screen reader is saying; the explicit aria-live downgrades it. Its
+    // icon-only close button also ships with no accessible name.
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    const notice = await screen.findByTestId('kb-stale-chat-hint');
+    expect(notice).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('button', { name: CLOSE_KEY })).toBeInTheDocument();
+  });
+
   it('renders nothing for a chat that already has the knowledge server', async () => {
-    render(
-      <KbStaleChatHint
-        {...STALE_PROPS}
-        sessionMcpServers={[{ id: 'project-kb-p1', name: BUILTIN_KNOWLEDGE_NAME, transport: { type: 'stdio' } }]}
-      />
-    );
-    // It still watches the source list — Case B can apply to this chat — but
-    // nothing is wrong yet, so nothing renders.
+    render(<KbStaleChatHint {...STALE_PROPS} sessionMcpServers={[KNOWLEDGE_SERVER]} />);
     await waitFor(() => expect(listSourcesMock).toHaveBeenCalled());
     expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
-    expect(screen.queryByText(CHANGED_KEY)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('kb-stale-chat-hint')).not.toBeInTheDocument();
   });
 
   it('renders nothing for a non-project chat', async () => {
@@ -96,7 +106,7 @@ describe('KbStaleChatHint', () => {
   });
 
   it('renders nothing when the project has no indexed sources', async () => {
-    listSourcesMock.mockResolvedValue({ sources: [], summary: null, folderMissing: false });
+    listSourcesMock.mockResolvedValue(listResult([]));
     render(<KbStaleChatHint {...STALE_PROPS} />);
     await waitFor(() => expect(listSourcesMock).toHaveBeenCalled());
     expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
@@ -115,38 +125,10 @@ describe('KbStaleChatHint', () => {
     expect(navigateMock).toHaveBeenCalledWith('/guid', { state: { workspace: '/tmp/project', projectId: 'p1' } });
   });
 
-  it('shows the knowledge-changed copy when a tool-equipped chat falls behind', async () => {
-    listSourcesMock.mockResolvedValue({ sources: [READY_SOURCE], summary: null, folderMissing: false });
-    const withTool = {
-      ...STALE_PROPS,
-      sessionMcpServers: [{ id: 'project-kb-p1', name: BUILTIN_KNOWLEDGE_NAME, transport: { type: 'stdio' } }],
-    };
-    const { rerender } = render(<KbStaleChatHint {...withTool} />);
-    await waitFor(() => expect(listSourcesMock).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText(CHANGED_KEY)).not.toBeInTheDocument();
-
-    // A file indexed after mount: the running session cannot see it.
-    listSourcesMock.mockResolvedValue({
-      sources: [READY_SOURCE, { ...READY_SOURCE, id: 's2', fileName: 'new.md' }],
-      summary: null,
-      folderMissing: false,
-    });
-    await act(async () => {
-      updatedListener?.({ projectId: 'p1' });
-    });
-    rerender(<KbStaleChatHint {...withTool} />);
-
-    expect(await screen.findByText(CHANGED_KEY)).toBeInTheDocument();
-    expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
-    expect(screen.getByTestId('kb-stale-chat-hint')).toHaveAttribute('data-variant', 'changed');
-  });
-
   it('closing it hides the notice and remembers the choice', async () => {
-    const { container } = render(<KbStaleChatHint {...STALE_PROPS} />);
+    render(<KbStaleChatHint {...STALE_PROPS} />);
     expect(await screen.findByText(BODY_KEY)).toBeInTheDocument();
-    const close = container.querySelector('.arco-alert-close-btn');
-    expect(close).not.toBeNull();
-    fireEvent.click(close as Element);
+    fireEvent.click(screen.getByRole('button', { name: CLOSE_KEY }));
     await waitFor(() => expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument());
     expect(localStorage.getItem(kbStaleHintDismissKey('c1'))).toBe('1');
   });
