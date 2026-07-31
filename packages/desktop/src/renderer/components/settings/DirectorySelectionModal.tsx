@@ -185,11 +185,11 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
       }}
     >
       <Spin loading={loading} className='w-full'>
-        <div className='w-full border border-b-base rd-4px overflow-hidden' style={{ height: 'min(400px, 60vh)' }}>
+        <div className='w-full border border-4 rd-4px overflow-hidden' style={{ height: 'min(400px, 60vh)' }}>
           <div className='h-full overflow-y-auto'>
             {directoryData.canGoUp && (
               <div
-                className='flex items-center p-10px border-b border-4 cursor-pointer hover:bg-hover transition'
+                className='flex items-center p-10px border-b border-b-4 cursor-pointer hover:bg-hover transition'
                 onClick={handleGoUp}
               >
                 <IconUp className='mr-10px text-t-secondary' />
@@ -207,7 +207,7 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
             {directoryData.items.map((item, index) => (
               <div
                 key={index}
-                className='flex items-center justify-between p-10px border-b border-4 cursor-pointer hover:bg-hover transition'
+                className='flex items-center justify-between p-10px border-b border-b-4 cursor-pointer hover:bg-hover transition'
                 style={selectedPath === item.path ? { background: 'var(--brand-light)' } : {}}
                 onClick={() => handleItemClick(item)}
                 onDoubleClick={() => handleItemDoubleClick(item)}
