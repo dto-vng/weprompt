@@ -146,6 +146,18 @@ const message = {
   normal: vi.fn(),
 } as never;
 
+// Both pages are imported at module scope, and must stay that way — importing them inside a test
+// instead costs it seconds of module-graph warm-up out of its own `testTimeout`, and a loaded
+// machine turns that into a timeout before the test asserts anything. The knock-on is worse than
+// the failure: Vitest marks a timed-out test failed but never stops it, so the `render()` waiting
+// behind that import still mounts, after cleanup has run and usually midway through the next test.
+// Nothing catches that afterwards — these confirms are Arco `Modal`s portalled to `document.body`,
+// so the leftover is not scoped away by querying a container either, and it resurfaces as a "found
+// multiple elements" failure somewhere else. Vitest hoists the `vi.mock` calls above these
+// imports, so the mocks still apply.
+import McpManagement from '@/renderer/pages/settings/ToolsSettings/McpManagement';
+import ToolsModalContent from '@/renderer/components/settings/SettingsModal/contents/ToolsModalContent';
+
 describe('destructive confirms in settings', () => {
   beforeEach(() => {
     vi.clearAllMocks();

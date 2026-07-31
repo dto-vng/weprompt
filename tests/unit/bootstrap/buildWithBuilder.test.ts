@@ -7,6 +7,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -16,10 +17,101 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { dirname, join, resolve } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(__dirname, '../../..');
+
+/**
+ * `scripts/build-with-builder.js` resolves `out/`, the generated Sentry include and the
+ * app-builder-lib NSIS templates from its own `__dirname`, so the tests below have to drive the
+ * real repo — there is no temp copy to point them at. That made two test runs in one worktree race:
+ * the second found no `out/` to back up (the first had already moved it aside), and the restores
+ * then collided as `ENOTEMPTY: <repo>/out`. Those paths are genuinely process-global, so take a
+ * lock on them rather than pretend otherwise. The whole file holds it for its full duration, which
+ * is the simplest thing that is correct — the alternative is re-acquiring around each mutation for
+ * no real gain, since only these tests contend for the lock in the first place.
+ */
+const LOCK_FILE = resolve(repoRoot, 'node_modules/.cache/aionui-build-with-builder.lock');
+const LOCK_WAIT_MS = 120_000;
+
+/**
+ * The three tests below shell out to the real build script, which patches node_modules templates and
+ * spawns node — measured at 4-10s each on an idle machine, so the 10s default was never an adequate
+ * budget for them (the x64 case fails on an idle machine at 10s, before any load is involved). There
+ * is no warm-up to hoist out of the budget the way a slow import could be: spawning the script *is*
+ * the test, and its runtime is whatever the machine gives it. Hence an explicit, generous budget.
+ */
+const BUILD_SCRIPT_TIMEOUT_MS = 120_000;
+
+/**
+ * `link(2)` is the atomic primitive here, not `mkdir`/`open`: it publishes the lock and its contents
+ * in one step. Creating the lock and then writing the owner pid into it would leave a window where a
+ * waiter reads a lock with no owner, concludes it is abandoned, and steals it from a live holder.
+ */
+function tryTakeLock(): boolean {
+  const staging = `${LOCK_FILE}.${process.pid}`;
+  writeFileSync(staging, String(process.pid), 'utf8');
+  try {
+    linkSync(staging, LOCK_FILE);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    return false;
+  } finally {
+    // The lock keeps the inode alive through its own link, so dropping this name is safe either way.
+    rmSync(staging, { force: true });
+  }
+}
+
+function lockHolderIsGone(): boolean {
+  // A run killed mid-test leaves the lock behind. Without this, one SIGKILL or Ctrl-C would wedge
+  // every later run on this worktree until someone deleted the file by hand.
+  try {
+    const pid = Number.parseInt(readFileSync(LOCK_FILE, 'utf8'), 10);
+    if (!Number.isInteger(pid)) return true;
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    // ENOENT: already released. EPERM: alive but not ours to signal. Anything else: gone.
+    const code = (error as NodeJS.ErrnoException).code;
+    return code !== 'EPERM';
+  }
+}
+
+let holdsLock = false;
+
+// The hook's own budget has to outlast the wait, or vitest kills the waiter before the lock frees.
+beforeAll(async () => {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  mkdirSync(dirname(LOCK_FILE), { recursive: true });
+
+  for (;;) {
+    if (tryTakeLock()) {
+      holdsLock = true;
+      return;
+    }
+    if (lockHolderIsGone()) {
+      rmSync(LOCK_FILE, { force: true });
+      continue;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Timed out after ${LOCK_WAIT_MS}ms waiting for ${LOCK_FILE} — another test run is using ${repoRoot}/out`
+      );
+    }
+    // Polling is inherently sequential here — there is nothing to run in parallel.
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolveWait) => setTimeout(resolveWait, 50));
+  }
+}, LOCK_WAIT_MS + 10_000);
+
+afterAll(() => {
+  // Only the holder releases. A run that gave up waiting must not delete the live owner's lock.
+  if (!holdsLock) return;
+  holdsLock = false;
+  rmSync(LOCK_FILE, { force: true });
+});
 
 function readInstallerErrorDefinitions(): Array<{ defineName: string; code: string }> {
   const source = readFileSync(resolve(repoRoot, 'resources/windows/installer-errors-sentry.nsh'), 'utf8');
@@ -49,7 +141,7 @@ function resolveAppBuilderInstallUtil(): string {
 }
 
 describe('build-with-builder', () => {
-  it('rejects skip-vite when renderer output is only a source html shell', () => {
+  it('rejects skip-vite when renderer output is only a source html shell', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
     const outDir = resolve(repoRoot, 'out');
     const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}`);
     const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-skip-vite-test-'));
@@ -268,16 +360,19 @@ childProcess.execSync = function mockedExecSync(command) {
       args: ['auto', '--mac', '--x64'],
       expectedArch: 'x64',
     },
-  ])('prepares bundled AionCore for $expectedArch with args $args', ({ args, expectedArch }) => {
-    const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
-    const hookPath = join(tempDir, 'hook.cjs');
-    const callsPath = join(tempDir, 'prepare-calls.json');
-    const outDir = resolve(repoRoot, 'out');
-    const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}-${expectedArch}`);
+  ])(
+    'prepares bundled AionCore for $expectedArch with args $args',
+    { timeout: BUILD_SCRIPT_TIMEOUT_MS },
+    ({ args, expectedArch }) => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
+      const hookPath = join(tempDir, 'hook.cjs');
+      const callsPath = join(tempDir, 'prepare-calls.json');
+      const outDir = resolve(repoRoot, 'out');
+      const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}-${expectedArch}`);
 
-    writeFileSync(
-      hookPath,
-      `
+      writeFileSync(
+        hookPath,
+        `
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const Module = require('node:module');
@@ -335,46 +430,47 @@ childProcess.execSync = function mockedExecSync(command) {
   return Buffer.from('');
 };
 `,
-      'utf8'
-    );
-
-    let movedExistingOut = false;
-    try {
-      if (existsSync(outDir)) {
-        renameSync(outDir, backupOutDir);
-        movedExistingOut = true;
-      }
-
-      const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', ...args], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          AIONUI_PREPARE_CALLS_FILE: callsPath,
-          NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
-        },
-      });
-
-      expect(result.status, result.stderr || result.stdout).toBe(0);
-      expect(readFileSync(resolve(repoRoot, 'resources/windows/support/_sentry-dsn.generated.nsh'), 'utf8')).toBe(
-        '!define AIONUI_SENTRY_DSN ""\n'
+        'utf8'
       );
 
-      if (args.includes('--win')) {
-        const installUtil = readFileSync(resolveAppBuilderInstallUtil(), 'utf8');
-        expect(installUtil).toContain('AionUi-bundled-uninstaller override source');
-        expect(installUtil).toContain('$PLUGINSDIR\\AionUi-fixed-uninstaller.exe');
-        expect(installUtil.match(/AionUi-bundled-uninstaller override source/g)).toHaveLength(1);
-      }
+      let movedExistingOut = false;
+      try {
+        if (existsSync(outDir)) {
+          renameSync(outDir, backupOutDir);
+          movedExistingOut = true;
+        }
 
-      const calls = JSON.parse(readFileSync(callsPath, 'utf8')) as Array<{ arch?: string } | null>;
-      expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
-    } finally {
-      rmSync(outDir, { recursive: true, force: true });
-      if (movedExistingOut) {
-        renameSync(backupOutDir, outDir);
+        const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', ...args], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            AIONUI_PREPARE_CALLS_FILE: callsPath,
+            NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+          },
+        });
+
+        expect(result.status, result.stderr || result.stdout).toBe(0);
+        expect(readFileSync(resolve(repoRoot, 'resources/windows/support/_sentry-dsn.generated.nsh'), 'utf8')).toBe(
+          '!define AIONUI_SENTRY_DSN ""\n'
+        );
+
+        if (args.includes('--win')) {
+          const installUtil = readFileSync(resolveAppBuilderInstallUtil(), 'utf8');
+          expect(installUtil).toContain('AionUi-bundled-uninstaller override source');
+          expect(installUtil).toContain('$PLUGINSDIR\\AionUi-fixed-uninstaller.exe');
+          expect(installUtil.match(/AionUi-bundled-uninstaller override source/g)).toHaveLength(1);
+        }
+
+        const calls = JSON.parse(readFileSync(callsPath, 'utf8')) as Array<{ arch?: string } | null>;
+        expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
+      } finally {
+        rmSync(outDir, { recursive: true, force: true });
+        if (movedExistingOut) {
+          renameSync(backupOutDir, outDir);
+        }
+        rmSync(tempDir, { recursive: true, force: true });
       }
-      rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  );
 });
