@@ -12,7 +12,7 @@
  * button on a representative sample of routes.
  */
 import { test, expect, type Page } from '../fixtures';
-import { goToSettings, navigateTo } from '../helpers';
+import { goToSettings, modalCloseButton, navigateTo } from '../helpers';
 
 // Several FeedbackReportModal instances can coexist in the DOM (the global
 // FeedbackProvider's plus per-page ones like About's), and closed modals stay
@@ -26,7 +26,7 @@ const TITLEBAR_FEEDBACK_BUTTON = 'button[aria-label="反馈问题"], button[aria
 // test after it. Close all visible modals before each test.
 test.beforeEach(async ({ page }) => {
   for (let i = 0; i < 3; i++) {
-    const closeBtn = page.locator('.arco-modal-wrapper:visible button[aria-label="Close"]').first();
+    const closeBtn = page.locator(modalCloseButton('.arco-modal-wrapper:visible')).first();
     if (!(await closeBtn.isVisible().catch(() => false))) break;
     await closeBtn.click({ timeout: 2_000 }).catch(() => {});
     await page.waitForTimeout(300);
@@ -51,7 +51,7 @@ async function expectSelectedModule(page: Page, labelPattern: RegExp) {
 async function closeFeedbackModal(page: Page) {
   await page
     .locator('.arco-modal-wrapper', { has: page.locator(VISIBLE_MODAL_BODY) })
-    .locator('button[aria-label="Close"]')
+    .locator(modalCloseButton())
     .first()
     .click();
   await expect(page.locator(VISIBLE_MODAL_BODY)).toHaveCount(0, { timeout: 5_000 });

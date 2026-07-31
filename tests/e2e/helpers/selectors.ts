@@ -6,6 +6,7 @@
  *
  * When the app adds `data-testid` later, update these selectors in one place.
  */
+import { CLOSE_LABELS } from './localizedLabels';
 
 // ── Generic ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,38 @@ export function settingsSiderItemById(id: string): string {
 // ── Settings modal ───────────────────────────────────────────────────────────
 
 export const SETTINGS_MODAL = '.settings-modal';
+
+// ── Modal chrome ─────────────────────────────────────────────────────────────
+
+/** Class on each titlebar window control (WindowControls.tsx). */
+const WINDOW_CONTROL_CLASS = 'app-window-controls__button';
+
+/**
+ * AionModal's header close button, in whatever language the app is running.
+ *
+ * Both header variants label the button `aria-label={t('common.close')}`, so a
+ * selector pinned to the literal `"Close"` stops matching the moment the app
+ * runs in a locale that translates the key (see {@link CLOSE_LABELS}). This
+ * accepts every locale's spelling.
+ *
+ * Still anchor the result to a modal — either via `scope` or by chaining — so a
+ * sweep cannot reach a different modal than the one under test. The window
+ * chrome is excluded structurally as well: WindowControls labels the titlebar
+ * close button from this same `common.close` key, giving it an accessible name
+ * identical to the modal's in every locale, and an unanchored match on it would
+ * quit the app mid-suite rather than close a dialog.
+ *
+ * @param scope Optional CSS ancestor to scope the button to (`'.arco-modal'`,
+ *   `'.arco-modal-wrapper:visible'`, …). Pass it here rather than
+ *   concatenating: the prefix has to be distributed over each label
+ *   alternative, because `'.arco-modal ' + 'button[…A], button[…B]'` would
+ *   scope only the first alternative and leave the rest matching page-wide.
+ *   Omit it when chaining off an existing locator, which scopes the whole list.
+ */
+export function modalCloseButton(scope = ''): string {
+  const prefix = scope ? `${scope} ` : '';
+  return CLOSE_LABELS.map((label) => `${prefix}button[aria-label="${label}"]:not(.${WINDOW_CONTROL_CLASS})`).join(', ');
+}
 
 // ── Arco Design components ───────────────────────────────────────────────────
 

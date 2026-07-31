@@ -4,7 +4,7 @@
  * Flow: sidebar "+" button -> Create Team modal -> fill form -> create -> verify navigation
  */
 import { test, expect } from '../../fixtures';
-import { TEAM_SUPPORTED_BACKENDS, cleanupTeamsByName } from '../../helpers';
+import { TEAM_SUPPORTED_BACKENDS, cleanupTeamsByName, modalCloseButton } from '../../helpers';
 
 /**
  * UI label patterns for each backend. Used to match the assistant option in
@@ -63,7 +63,7 @@ test.describe('Team Create', () => {
     await expect(confirmBtn).toBeVisible();
 
     // Close modal via the standard header close button
-    await page.locator('.arco-modal button[aria-label="Close"]').first().click();
+    await page.locator(modalCloseButton('.arco-modal')).first().click();
     await expect(page.locator('.arco-modal')).toBeHidden({ timeout: 5000 });
   });
 
@@ -165,7 +165,7 @@ async function createTeamWithAgent(
   }
 
   if (!matchingOption) {
-    await page.locator('.arco-modal button[aria-label="Close"]').first().click({ force: true });
+    await page.locator(modalCloseButton('.arco-modal')).first().click({ force: true });
     await expect(page.locator('.arco-modal')).toBeHidden({ timeout: 5000 });
     console.log(`[E2E] Assistant matching ${agentTextPattern} not found — skipping`);
     test.skip();
