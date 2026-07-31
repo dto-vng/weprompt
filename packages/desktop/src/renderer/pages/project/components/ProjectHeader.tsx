@@ -7,9 +7,9 @@
 import { ipcBridge } from '@/common';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
-import { removeProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
+import { findProjectByWorkspace, removeProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { emitter } from '@/renderer/utils/emitter';
-import { Button, Dropdown, Input, Menu, Modal } from '@arco-design/web-react';
+import { Button, Dropdown, Input, Menu, Message, Modal } from '@arco-design/web-react';
 import { Delete, FolderOpen, MoreOne } from '@icon-park/react';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -81,7 +81,19 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
       onOk: () => {
         const trimmedName = nextName.trim();
         if (!trimmedName) return;
-        updateProject({ id: project.id, name: trimmedName });
+        try {
+          // A vanished project row comes back as `null`, and a workspace clash
+          // throws; neither said anything before, so a rename that never
+          // persisted looked exactly like one that did.
+          if (!updateProject({ id: project.id, name: trimmedName })) {
+            Message.error(t('conversation.history.renameFailed'));
+            return;
+          }
+          Message.success(t('conversation.history.renameSuccess'));
+        } catch (renameError) {
+          console.error('Failed to rename project:', renameError);
+          Message.error(t('conversation.history.renameFailed'));
+        }
       },
       alignCenter: true,
       getPopupContainer: () => document.body,
@@ -96,11 +108,22 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
     const selectedFolder = result?.[0];
     if (!selectedFolder) return;
     try {
-      updateProject({ id: project.id, workspace: selectedFolder });
+      if (!updateProject({ id: project.id, workspace: selectedFolder })) {
+        Message.error(t('conversation.history.createProjectFailed'));
+      }
     } catch (error) {
       console.error('Failed to relink project:', error);
+      // The one failure a user can act on: another project already owns that
+      // folder. Naming the owner is the difference between a dead end and
+      // knowing which project to look at.
+      const owner = error instanceof Error && error.message === 'PROJECT_WORKSPACE_DUPLICATE' ? findProjectByWorkspace(selectedFolder) : null;
+      Message.error(
+        owner
+          ? t('conversation.history.projectDuplicateFolder', { name: owner.name })
+          : t('conversation.history.createProjectFailed')
+      );
     }
-  }, [project.id, project.workspace]);
+  }, [project.id, project.workspace, t]);
 
   const handleReveal = useCallback(() => {
     void ipcBridge.shell.showItemInFolder.invoke(project.workspace);
@@ -119,7 +142,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
       okButtonProps: { status: 'danger' },
       onOk: async () => {
         try {
-          await Promise.all(
+          const detachResults = await Promise.all(
             chats.map((conversationItem) =>
               ipcBridge.conversation.update.invoke({
                 id: conversationItem.id,
@@ -128,16 +151,31 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
               })
             )
           );
-          removeProject(project.id);
+          // Both results were discarded before: a chat that failed to detach or
+          // a project row that was already gone still navigated away as if the
+          // removal had gone through. The sidebar's equivalent checks both
+          // (`useConversationActions.ts`), so this now matches it.
+          const detachedAll = detachResults.every(Boolean);
+          const removedProject = removeProject(project.id);
           // Best-effort cleanup: the project row is already gone, so a failed
           // knowledge-store delete must never block or reverse the deletion
           // the user just confirmed. An orphaned store directory is harmless
           // leftover data, unlike leaving the user unable to finish deleting.
-          void ipcBridge.projectKnowledge.removeStore.invoke({ projectId: project.id }).catch(() => {});
+          if (removedProject) {
+            void ipcBridge.projectKnowledge.removeStore.invoke({ projectId: project.id }).catch(() => {});
+          }
           emitter.emit('chat.history.refresh');
+          if (!detachedAll || !removedProject) {
+            Message.error(t('conversation.history.removeProjectFailed'));
+            return;
+          }
+          Message.success(t('conversation.history.removeProjectSuccess'));
+          // Only leave the page once the project really is gone — otherwise the
+          // user lands on the home screen with the project still in the sidebar.
           void navigate('/guid');
         } catch (error) {
           console.error('Failed to remove project:', error);
+          Message.error(t('conversation.history.removeProjectFailed'));
         }
       },
       alignCenter: true,

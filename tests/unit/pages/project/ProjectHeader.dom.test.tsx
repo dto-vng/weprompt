@@ -10,6 +10,13 @@ const showItemInFolderMock = vi.fn();
 const removeStoreMock = vi.fn();
 const navigateMock = vi.fn();
 const modalConfirmMock = vi.fn();
+const conversationUpdateMock = vi.fn();
+const showOpenMock = vi.fn();
+const updateProjectMock = vi.fn();
+const removeProjectMock = vi.fn();
+const findProjectByWorkspaceMock = vi.fn();
+const messageSuccessMock = vi.fn();
+const messageErrorMock = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -21,10 +28,10 @@ vi.mock('@/common', () => ({
       showItemInFolder: { invoke: (...args: unknown[]) => showItemInFolderMock(...args) },
     },
     dialog: {
-      showOpen: { invoke: vi.fn() },
+      showOpen: { invoke: (...args: unknown[]) => showOpenMock(...args) },
     },
     conversation: {
-      update: { invoke: vi.fn() },
+      update: { invoke: (...args: unknown[]) => conversationUpdateMock(...args) },
     },
     projectKnowledge: {
       removeStore: { invoke: (...args: unknown[]) => removeStoreMock(...args) },
@@ -43,6 +50,21 @@ vi.mock('react-router-dom', async () => {
 vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
   useConversationHistoryContext: () => ({ conversations: [] }),
 }));
+
+// The header now branches on what projectStorage reports back, and the real
+// module reads and writes jsdom's localStorage — where no project 'p1' exists,
+// so `removeProject` would answer `false` and every removal would look failed.
+// Same importOriginal shape as the sibling ProjectFilesCard/ProjectInstructionsCard suites.
+vi.mock('@renderer/pages/conversation/projects/projectStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@renderer/pages/conversation/projects/projectStorage')>();
+  return {
+    ...actual,
+    updateProject: (...args: Parameters<typeof actual.updateProject>) => updateProjectMock(...args),
+    removeProject: (...args: Parameters<typeof actual.removeProject>) => removeProjectMock(...args),
+    findProjectByWorkspace: (...args: Parameters<typeof actual.findProjectByWorkspace>) =>
+      findProjectByWorkspaceMock(...args),
+  };
+});
 
 // Dropdown/Menu are mocked so the droplist is always present in the DOM —
 // mirrors the proven pattern in tests/unit/chat/CommandQueuePanel.dom.test.tsx,
@@ -79,6 +101,13 @@ vi.mock('@arco-design/web-react', async () => {
         return options.onOk?.();
       },
     },
+    // Arco's imperative Message mounts through the legacy ReactDOM.render React
+    // 18 removed, so left real it throws out of the test as an unhandled error.
+    Message: {
+      ...actual.Message,
+      success: (...args: unknown[]) => messageSuccessMock(...args),
+      error: (...args: unknown[]) => messageErrorMock(...args),
+    },
   };
 });
 
@@ -98,6 +127,15 @@ describe('ProjectHeader', () => {
     removeStoreMock.mockReset().mockResolvedValue(undefined);
     navigateMock.mockReset();
     modalConfirmMock.mockReset();
+    conversationUpdateMock.mockReset().mockResolvedValue(true);
+    showOpenMock.mockReset().mockResolvedValue(undefined);
+    // Both storage mutators answer like the real ones on success: the updated
+    // project, and `true` for a row that existed.
+    updateProjectMock.mockReset().mockReturnValue({ ...project });
+    removeProjectMock.mockReset().mockReturnValue(true);
+    findProjectByWorkspaceMock.mockReset().mockReturnValue(null);
+    messageSuccessMock.mockReset();
+    messageErrorMock.mockReset();
   });
 
   it('renders the project name and the chats/active subline', () => {
@@ -125,6 +163,61 @@ describe('ProjectHeader', () => {
 
     await vi.waitFor(() => {
       expect(removeStoreMock).toHaveBeenCalledExactlyOnceWith({ projectId: 'p1' });
+    });
+  });
+
+  it('reports a removal that did not go through, and stays on the page', async () => {
+    // The project row was already gone, so nothing was removed — navigating
+    // away would have claimed a deletion that never happened.
+    removeProjectMock.mockReturnValue(false);
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectFailed');
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(removeStoreMock).not.toHaveBeenCalled();
+  });
+
+  it('confirms a successful removal before leaving the page', async () => {
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageSuccessMock).toHaveBeenCalledWith('conversation.history.removeProjectSuccess');
+    });
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid');
+  });
+
+  it('reports a rename that failed to persist', () => {
+    updateProjectMock.mockReturnValue(null);
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.rename'));
+
+    expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.history.renameFailed');
+    expect(messageSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it('names the project already using a folder when a relink clashes', async () => {
+    showOpenMock.mockResolvedValue(['/w/beta']);
+    updateProjectMock.mockImplementation(() => {
+      throw new Error('PROJECT_WORKSPACE_DUPLICATE');
+    });
+    findProjectByWorkspaceMock.mockReturnValue({ ...project, id: 'p2', name: 'Beta Project' });
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.relink'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.history.projectDuplicateFolder');
     });
   });
 
