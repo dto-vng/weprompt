@@ -153,11 +153,17 @@ export const updateProject = (
   }
 
   const nextWorkspace = input.workspace !== undefined ? normalizeWorkspacePath(input.workspace) : target.workspace;
-  const duplicate = projects.find(
-    (project) => project.id !== input.id && normalizeWorkspacePath(project.workspace) === nextWorkspace
-  );
-  if (duplicate) {
-    throw new Error('PROJECT_WORKSPACE_DUPLICATE');
+
+  // Only validate the workspace when the caller is actually changing it. A
+  // metadata-only update (name, instructions, last_opened_at) must not fail
+  // just because storage already holds a duplicate-workspace pair.
+  if (input.workspace !== undefined) {
+    const duplicate = projects.find(
+      (project) => project.id !== input.id && normalizeWorkspacePath(project.workspace) === nextWorkspace
+    );
+    if (duplicate) {
+      throw new Error('PROJECT_WORKSPACE_DUPLICATE');
+    }
   }
 
   const updated: ForgeProject = {
