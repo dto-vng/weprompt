@@ -9,7 +9,7 @@ import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import type { IKnowledgeSourceDto } from '@/common/types/project/knowledgeTypes';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { updateProject } from '@renderer/pages/conversation/projects/projectStorage';
-import { Alert, Button, Card, Popconfirm, Spin, Tag, Tooltip } from '@arco-design/web-react';
+import { Alert, Button, Card, Message, Popconfirm, Spin, Tag, Tooltip } from '@arco-design/web-react';
 import { Delete, FolderOpen, Refresh, ShareTwo, Upload } from '@icon-park/react';
 import classNames from 'classnames';
 import React from 'react';
@@ -103,6 +103,7 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
       await addSources(filePaths);
     } catch (addError) {
       console.error('Failed to add project knowledge sources:', addError);
+      Message.error(t('conversation.projectHome.knowledgeAddFailed'));
     }
   };
 
@@ -113,14 +114,19 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
    * down the list, not a different operation.
    */
   const handleEmbedAll = async (): Promise<void> => {
+    let failed = 0;
     for (const source of pendingEmbedSources) {
       try {
         // eslint-disable-next-line no-await-in-loop -- one queued pass at a time; parallel calls would only stack refetches
         await retrySource(source.id);
       } catch (embedError) {
+        failed += 1;
         console.error('Failed to queue embedding for source:', source.id, embedError);
       }
     }
+    // Reported once rather than per source: a backend that rejects one usually rejects all,
+    // and N toasts for one click would bury the rest of the UI.
+    if (failed > 0) Message.error(t('conversation.projectHome.knowledgeRetryFailed'));
   };
 
   const handleRelink = async (): Promise<void> => {
@@ -135,7 +141,20 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
       await syncNow();
     } catch (relinkError) {
       console.error('Failed to relink project workspace:', relinkError);
+      Message.error(t('conversation.projectHome.knowledgeRelinkFailed'));
     }
+  };
+
+  /**
+   * The row actions and Refresh were `void someAsync()` with no catch at all: a rejected
+   * IPC produced an unhandled rejection and the user saw nothing change and heard nothing.
+   * Each now reports through here, which keeps the call sites one-liners.
+   */
+  const report = (promise: Promise<unknown>, messageKey: string, logLabel: string): void => {
+    promise.catch((error: unknown) => {
+      console.error(logLabel, error);
+      Message.error(t(messageKey));
+    });
   };
 
   const handlePreview = async (source: IKnowledgeSourceDto): Promise<void> => {
@@ -175,13 +194,23 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>): Promise<void> => {
     event.preventDefault();
     setDragging(false);
-    if (folderMissing) return;
+    // Both early returns used to swallow the drop silently. Dropping onto a card whose
+    // folder is gone, or dropping only unsupported files, looked identical to dropping
+    // nothing at all — the cursor came back and no row appeared.
+    if (folderMissing) {
+      Message.warning(t('conversation.projectHome.knowledgeDropFolderMissing'));
+      return;
+    }
     const paths = pathsFromDrop(event.dataTransfer);
-    if (paths.length === 0) return;
+    if (paths.length === 0) {
+      Message.warning(t('conversation.projectHome.knowledgeDropUnsupported'));
+      return;
+    }
     try {
       await addSources(paths);
     } catch (dropError) {
       console.error('Failed to add dropped knowledge sources:', dropError);
+      Message.error(t('conversation.projectHome.knowledgeAddFailed'));
     }
   };
 
@@ -263,7 +292,11 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
               className='flex-shrink-0'
               onClick={(event) => {
                 event.stopPropagation();
-                void retrySource(source.id);
+                report(
+                  retrySource(source.id),
+                  'conversation.projectHome.knowledgeRetryFailed',
+                  'Failed to retry knowledge source:'
+                );
               }}
             >
               {t('conversation.projectHome.knowledgeRetry')}
@@ -287,7 +320,11 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
               size='mini'
               onClick={(event) => {
                 event.stopPropagation();
-                void retrySource(source.id);
+                report(
+                  retrySource(source.id),
+                  'conversation.projectHome.knowledgeRetryFailed',
+                  'Failed to retry knowledge source:'
+                );
               }}
             >
               {t('conversation.projectHome.knowledgeRetry')}
@@ -350,7 +387,13 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
         <Popconfirm
           title={t('conversation.projectHome.knowledgeDeleteConfirm', { fileName: source.fileName })}
           okText={t('conversation.projectHome.knowledgeDeleteFile')}
-          onOk={() => void removeSource(source.id)}
+          onOk={() =>
+            report(
+              removeSource(source.id),
+              'conversation.projectHome.knowledgeDeleteFailed',
+              'Failed to remove knowledge source:'
+            )
+          }
         >
           <Button
             type='text'
@@ -397,7 +440,13 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
               size='mini'
               aria-label={t('conversation.projectHome.knowledgeRefresh')}
               icon={<Refresh theme='outline' size='14' />}
-              onClick={() => void syncNow()}
+              onClick={() =>
+                report(
+                  syncNow(),
+                  'conversation.projectHome.knowledgeRefreshFailed',
+                  'Failed to refresh project knowledge:'
+                )
+              }
             />
           </Tooltip>
           <Tooltip content={t('conversation.projectHome.knowledgeAdd')}>
