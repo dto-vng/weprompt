@@ -195,7 +195,9 @@ describe('useKbStaleChatHint', () => {
     });
 
     it('fires when a source that was still indexing at mount becomes searchable', async () => {
-      listSourcesMock.mockResolvedValue(listResult([source(), source({ id: 's2', status: 'indexing', chunkCount: 0 })]));
+      listSourcesMock.mockResolvedValue(
+        listResult([source(), source({ id: 's2', status: 'indexing', chunkCount: 0 })])
+      );
       const { result } = renderHook(() => useKbStaleChatHint(WITH_TOOL));
       await waitFor(() => expect(listSourcesMock).toHaveBeenCalledTimes(1));
       expect(result.current.variant).toBe(null);

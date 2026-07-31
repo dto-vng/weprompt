@@ -236,9 +236,7 @@ const AionrsConversationPanel: React.FC<{
           (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
         }
         project_id={conversation.extra?.project_id}
-        session_mcp_servers={
-          (conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers
-        }
+        session_mcp_servers={(conversation.extra as { session_mcp_servers?: unknown } | undefined)?.session_mcp_servers}
         agent_name={presetAssistantInfo?.name}
         assistantId={aionrsAssistantId}
       />

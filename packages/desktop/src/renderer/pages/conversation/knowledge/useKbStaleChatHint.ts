@@ -20,8 +20,7 @@ export const PROJECT_CHAT_ROUTE = '/guid';
 export const kbStaleHintDismissKey = (conversationId: string): string => `kb.staleHint.dismissed.${conversationId}`;
 
 /** Separate from the stale key so dismissing one notice never hides the other. */
-export const kbChangedHintDismissKey = (conversationId: string): string =>
-  `kb.changedHint.dismissed.${conversationId}`;
+export const kbChangedHintDismissKey = (conversationId: string): string => `kb.changedHint.dismissed.${conversationId}`;
 
 export type KbStaleChatHintTrigger = {
   conversationId?: string;
