@@ -80,6 +80,33 @@ file without changing which file wins, so `recall@k` and `MRR` sit still while `
 BM25-only and hybrid are reported **separately**. The semantic half is optional at runtime, and a
 change that helps one can hurt the other.
 
+### The vector-only row is a diagnostic, not a configuration
+
+When an embedding model is available a third row appears, **Vector-only**. Production is always
+hybrid and never runs this; it exists to answer the one question a fused result cannot — when hybrid
+misses, was the passage never found, or found and then discarded by fusion? Those have completely
+different fixes (a different embedding model versus a fusion constant), and the fused ranking cannot
+tell them apart.
+
+It is implemented by handing `searchKnowledge` a store whose BM25 index was built from **no chunks**.
+`searchBm25` returns `[]` the moment `totalDocs === 0`, so the lexical contribution disappears and
+RRF fuses a single list, which is order-preserving. Cosine, the candidate cap and the chunk mapping
+are all still the shipping code — nothing about ranking is reimplemented, and `packages/` is
+untouched. A regression test asserts the vector row actually differs from the hybrid row, because a
+`withoutLexicalHalf` that quietly became a no-op would turn this into a second copy of the hybrid
+ranking with every conclusion drawn from it wrong and nothing else failing.
+
+Two things to know when reading it:
+
+- It ranks the **whole corpus**, then truncates to `topK` for its metrics row so the row stays
+  comparable. The untruncated rank is what the "where the semantic half ranked what Hybrid missed"
+  section reports — a miss measured at top-6 would only repeat what the fused run already said.
+- Its scores are RRF scores, `1/(60+rank)`, not cosine similarities. Read the ordering, not the
+  number.
+- It is deliberately **not** in `baseline.json`. Baselining it would gate a configuration that is
+  never shipped and add a third block to re-record on every embedding-model change; the hybrid block
+  already guards the semantic path.
+
 Unanswerable questions are excluded from every average — the recall of an empty expected set is
 undefined, and folding them in would reward over-retrieval. They get their own section.
 
@@ -375,10 +402,19 @@ Two candidates, not separated by this run:
    scores 1/61 and loses to anything appearing in both — and a cross-language query's BM25 list is
    exactly where the right document is absent.
 
-Telling them apart needs a **vector-only ranking**, which this harness does not expose: it reports
-the fused result and nothing else. Until that exists, "embeddings do not help cross-language here" is
-supported; "bge-m3 cannot bridge these languages" is not. Exposing a semantic-only mode is the
-cheapest next measurement, and unlike the fusion knobs it needs no change to shipping code.
+Telling them apart needs a **vector-only ranking**. That mode now exists (see "The vector-only row is
+a diagnostic" above) — but **it has not yet been run against a real embedding model**, so the
+question is still open. The instrument is built; the measurement is not taken.
+
+To take it, run with `KB_EVAL_EMBED_*` set and read the "where the semantic half ranked what Hybrid
+missed" section for the three cross-language questions:
+
+- near the top → the model bridges fine and RRF is discarding it, which is a fusion problem and a
+  one-constant fix;
+- near the bottom of the corpus → the model does not bridge, and no fusion tuning will help.
+
+Until then, "embeddings do not help cross-language here" is supported; "bge-m3 cannot bridge these
+languages" is not.
 
 ## Baseline and CI
 

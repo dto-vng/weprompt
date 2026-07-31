@@ -21,7 +21,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tokenize } from '@/common/knowledge/bm25';
 import { chunkMarkdown } from '@/common/knowledge/chunker';
-import { compareToBaseline, readBaseline, type Baseline } from '../eval/harness/baseline';
+import { compareToBaseline, readBaseline, toBaseline, type Baseline } from '../eval/harness/baseline';
 import { loadFixture, validateFixture } from '../eval/harness/fixture';
 import { runEvaluation } from '../eval/harness/runHarness';
 import type { EvalFixture, EvalRun, ModeResult } from '../eval/harness/types';
@@ -225,10 +225,64 @@ describe('hybrid retrieval wiring', () => {
     expect(run.embedding?.vectorCount).toBe(run.corpus.chunkCount);
   });
 
-  it('produces a hybrid mode alongside the BM25 mode', async () => {
+  it('produces a hybrid mode alongside the BM25 mode, plus the vector-only diagnostic', async () => {
     const run = await runHybrid();
-    expect(run.modes.map((mode) => mode.mode)).toEqual(['bm25', 'hybrid']);
+    expect(run.modes.map((mode) => mode.mode)).toEqual(['bm25', 'hybrid', 'vector']);
     expect(run.hybridSkippedReason).toBeNull();
+  });
+
+  it('caps the vector-only rows at topK even though it ranks the whole corpus', async () => {
+    // The mode ranks to full depth so a miss can report where the passage
+    // actually sat, but its metrics row has to stay comparable with the other
+    // two — a rank-9 hit scored against an untruncated list would flatter it.
+    const run = await runHybrid();
+    const vector = modeOf(run, 'vector');
+    expect(vector.questions.length).toBeGreaterThan(0);
+    for (const question of vector.questions) {
+      expect(question.hits.length).toBeLessThanOrEqual(BASELINE_KNOBS.topK);
+    }
+  });
+
+  it('keeps the deep rank consistent with the truncated one', async () => {
+    // deepSourceRank is the rank before the cut, so whenever the passage did
+    // survive the cut the two must agree. A mismatch would mean the truncation
+    // re-scored something it should not have.
+    const run = await runHybrid();
+    for (const question of modeOf(run, 'vector').questions) {
+      if (question.sourceRank !== null) {
+        expect(question.deepSourceRank).toBe(question.sourceRank);
+      } else if (question.deepSourceRank !== null && question.deepSourceRank !== undefined) {
+        expect(question.deepSourceRank).toBeGreaterThan(BASELINE_KNOBS.topK);
+      }
+    }
+  });
+
+  it('actually drops the lexical half rather than relabelling the hybrid run', async () => {
+    // The mode is implemented by handing searchKnowledge a store whose BM25
+    // index has no documents. If that ever stopped working — or became a no-op —
+    // "vector-only" would silently be a second copy of the hybrid ranking and
+    // every conclusion drawn from it would be wrong, with nothing else failing.
+    const run = await runHybrid();
+    const hybrid = new Map(modeOf(run, 'hybrid').questions.map((q) => [q.id, q]));
+    const differs = modeOf(run, 'vector').questions.filter((question) => {
+      const other = hybrid.get(question.id);
+      if (!other) return false;
+      const a = question.hits.map((h) => `${h.sourceName}#${h.chunkIndex}`).join(',');
+      const b = other.hits.map((h) => `${h.sourceName}#${h.chunkIndex}`).join(',');
+      return a !== b;
+    });
+    expect(differs.length).toBeGreaterThan(0);
+  });
+
+  it('leaves the committed baseline free of the diagnostic mode', async () => {
+    // Vector-only is a lens on a configuration production never runs. Baselining
+    // it would gate something we do not ship and add a third block to re-record
+    // on every embedding-model change.
+    const run = await runHybrid();
+    const baseline = toBaseline(run, '2026-01-01');
+    expect(Object.keys(baseline)).not.toContain('vector');
+    expect(baseline.bm25).toBeTruthy();
+    expect(baseline.hybrid).toBeTruthy();
   });
 
   it('serves a repeat run from the embedding cache instead of re-embedding', async () => {
