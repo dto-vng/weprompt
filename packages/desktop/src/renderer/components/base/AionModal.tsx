@@ -113,8 +113,15 @@ export interface AionModalProps extends Omit<ModalProps, 'title' | 'footer'> {
 
 const HEADER_BASE_CLASS = 'flex items-center justify-between pb-20px';
 const TITLE_BASE_CLASS = 'text-18px font-500 text-t-primary m-0';
+/**
+ * 关闭按钮：图标用 currentColor，故这里必须显式给 text-t-secondary，
+ * 否则会继承弹窗正文色（暗色下 #e6ecf5），关闭图标变成刺眼的亮色。与 STD_CLOSE_BTN_CLASS 一致。
+ * The close icon uses currentColor, so this class must set text-t-secondary itself —
+ * otherwise it inherits modal body text colour (#e6ecf5 in dark) and the X reads far too
+ * bright for a secondary affordance. Matches STD_CLOSE_BTN_CLASS.
+ */
 const CLOSE_BUTTON_CLASS =
-  'w-32px h-32px flex items-center justify-center rd-8px transition-colors duration-200 cursor-pointer border-0 bg-transparent p-0 hover:bg-2 focus:outline-none';
+  'w-32px h-32px flex items-center justify-center rd-8px transition-colors duration-200 cursor-pointer border-0 bg-transparent p-0 text-t-secondary hover:bg-2 focus:outline-none';
 const FOOTER_BASE_CLASS = 'flex-shrink-0 bg-transparent';
 /**
  * 任务型弹窗 footer 的统一分隔线 + 内边距（内容↔按钮区）。
@@ -382,7 +389,7 @@ const AionModal: React.FC<AionModalProps> = ({
             {headerConfig.subtitle ? <p className={STD_SUBTITLE_CLASS}>{headerConfig.subtitle}</p> : null}
           </div>
           {headerConfig.showClose && (
-            <button onClick={onCancel} className={STD_CLOSE_BTN_CLASS} aria-label='Close'>
+            <button onClick={onCancel} className={STD_CLOSE_BTN_CLASS} aria-label={t('common.close')}>
               {headerConfig.closeIcon || <Close size={20} fill='currentColor' />}
             </button>
           )}
@@ -404,8 +411,8 @@ const AionModal: React.FC<AionModalProps> = ({
       <div className={headerClassName} style={headerStyle}>
         {headerConfig.title && <h3 className={TITLE_BASE_CLASS}>{headerConfig.title}</h3>}
         {headerConfig.showClose && (
-          <button onClick={onCancel} className={CLOSE_BUTTON_CLASS} aria-label='Close'>
-            {headerConfig.closeIcon || <Close size={20} fill='#86909c' />}
+          <button onClick={onCancel} className={CLOSE_BUTTON_CLASS} aria-label={t('common.close')}>
+            {headerConfig.closeIcon || <Close size={20} fill='currentColor' />}
           </button>
         )}
       </div>

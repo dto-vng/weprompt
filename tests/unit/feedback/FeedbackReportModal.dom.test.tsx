@@ -149,7 +149,8 @@ describe('FeedbackReportModal — prefill', () => {
     const user = userEvent.setup();
     renderModal(<FeedbackReportModal visible={true} onCancel={onCancel} defaultModule='agent-detection' />);
 
-    const closeBtn = document.querySelector('button[aria-label="Close"]') as HTMLElement | null;
+    // The label is now translated, and the mock `t` above returns the key itself.
+    const closeBtn = document.querySelector('button[aria-label="common.close"]') as HTMLElement | null;
     expect(closeBtn).not.toBeNull();
     await user.click(closeBtn!);
 
