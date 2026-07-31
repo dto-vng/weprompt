@@ -48,7 +48,9 @@ Input:
 - query: natural-language question or keywords.
 - max_results: optional, defaults to 6 (max 20).
 
-Output: the most relevant passages, each cited with its source filename so you can attribute your answer.`;
+Output: the most relevant passages, each headed by "[n] <fileName> — <section>".
+
+CITE BY fileName. When you attribute a claim in your answer, write the fileName exactly as it appears in that header — "annual-report-2026.pdf", never the document's title ("Annual Report 2026"), a translation of it, or a vague reference ("the report"). The app turns an exact fileName into a link the user can click to open the source; anything else stays plain text and the user cannot reach the document.`;
 
 /**
  * Naming the attached documents in the tool description is what makes the tool
