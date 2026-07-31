@@ -522,6 +522,47 @@ describe('ProjectKnowledgeCard', () => {
     expect(getSourceTextMock).not.toHaveBeenCalled();
   });
 
+  it('opens the preview from the keyboard on a ready row', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.keyDown(screen.getByText('readme.md'), { key: 'Enter' });
+
+    await waitFor(() => expect(getSourceTextMock).toHaveBeenCalledWith('s-ready'));
+  });
+
+  it('offers no affordance at all on a row with nothing to open', () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const name = screen.getByText('archive.zip');
+
+    // The name used to look and behave identically on every row while only a
+    // ready row led anywhere — a click into nothing.
+    expect(name).not.toHaveAttribute('role', 'button');
+    expect(name).not.toHaveAttribute('tabindex');
+    expect(name.className).not.toContain('cursor-pointer');
+  });
+
+  it('says in the row tooltip why a non-ready row opens nothing', async () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('archive.zip'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePreviewNotReady')).toBeInTheDocument();
+  });
+
+  it('leaves that line off a ready row, which does open', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('readme.md'));
+
+    await screen.findByText('conversation.projectHome.knowledgePassagesTooltip');
+    expect(screen.queryByText('conversation.projectHome.knowledgePreviewNotReady')).not.toBeInTheDocument();
+  });
+
   // ---- row tooltip: what happened to the file, plus any note ---------------
 
   it('explains on hover what an indexed file was split into', async () => {
