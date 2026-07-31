@@ -7,7 +7,11 @@
 import { ipcBridge } from '@/common';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
-import { findProjectByWorkspace, removeProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
+import {
+  findProjectByWorkspace,
+  removeProject,
+  updateProject,
+} from '@/renderer/pages/conversation/projects/projectStorage';
 import { emitter } from '@/renderer/utils/emitter';
 import { Button, Dropdown, Input, Menu, Message, Modal, Tooltip } from '@arco-design/web-react';
 import { Delete, FolderOpen, MoreOne } from '@icon-park/react';
@@ -127,7 +131,10 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
       // The one failure a user can act on: another project already owns that
       // folder. Naming the owner is the difference between a dead end and
       // knowing which project to look at.
-      const owner = error instanceof Error && error.message === 'PROJECT_WORKSPACE_DUPLICATE' ? findProjectByWorkspace(selectedFolder) : null;
+      const owner =
+        error instanceof Error && error.message === 'PROJECT_WORKSPACE_DUPLICATE'
+          ? findProjectByWorkspace(selectedFolder)
+          : null;
       Message.error(
         owner
           ? t('conversation.history.projectDuplicateFolder', { name: owner.name })

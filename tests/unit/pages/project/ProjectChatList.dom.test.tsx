@@ -59,17 +59,16 @@ vi.mock('@arco-design/web-react', async () => {
     // component callable AND carries the statics, with `confirm` still stubbed
     // for the delete flow (Arco's imperative confirm mounts through the legacy
     // ReactDOM.render React 18 removed).
-    Modal: Object.assign(
-      (props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />,
-      ActualModal,
-      {
-        confirm: (options: { onOk?: () => void | Promise<void> }) => {
-          modalConfirmMock(options);
-          return options.onOk?.();
-        },
-      }
-    ),
-    Message: { success: (...args: unknown[]) => messageSuccessMock(...args), error: (...args: unknown[]) => messageErrorMock(...args) },
+    Modal: Object.assign((props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />, ActualModal, {
+      confirm: (options: { onOk?: () => void | Promise<void> }) => {
+        modalConfirmMock(options);
+        return options.onOk?.();
+      },
+    }),
+    Message: {
+      success: (...args: unknown[]) => messageSuccessMock(...args),
+      error: (...args: unknown[]) => messageErrorMock(...args),
+    },
   };
 });
 

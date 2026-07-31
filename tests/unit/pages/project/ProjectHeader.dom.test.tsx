@@ -100,16 +100,12 @@ vi.mock('@arco-design/web-react', async () => {
     // header now renders would be an invalid element type. Object.assign keeps
     // the component callable AND carries the statics, with `confirm` still
     // stubbed for the Remove flow.
-    Modal: Object.assign(
-      (props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />,
-      ActualModal,
-      {
-        confirm: (options: { onOk?: () => void | Promise<void> }) => {
-          modalConfirmMock(options);
-          return options.onOk?.();
-        },
-      }
-    ),
+    Modal: Object.assign((props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />, ActualModal, {
+      confirm: (options: { onOk?: () => void | Promise<void> }) => {
+        modalConfirmMock(options);
+        return options.onOk?.();
+      },
+    }),
     // Arco's imperative Message mounts through the legacy ReactDOM.render React
     // 18 removed, so left real it throws out of the test as an unhandled error.
     Message: {

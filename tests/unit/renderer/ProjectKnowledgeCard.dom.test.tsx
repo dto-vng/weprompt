@@ -351,9 +351,7 @@ describe('ProjectKnowledgeCard', () => {
     );
     fireEvent.mouseEnter(screen.getByText('conversation.projectHome.knowledgeStatusNotEmbedded'));
 
-    expect(
-      await screen.findByText('conversation.projectHome.knowledgeNotEmbeddedDetail:2/5')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('conversation.projectHome.knowledgeNotEmbeddedDetail:2/5')).toBeInTheDocument();
   });
 
   it('keeps the keyword-only tag off a fully embedded row', () => {
