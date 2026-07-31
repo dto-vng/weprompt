@@ -18,6 +18,17 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+// Imported statically, not with `await import(...)` inside the tests. `vi.mock` is
+// hoisted above imports, so the mocks below still apply — but a dynamic import puts
+// the cost of loading these two components' module graphs (Arco, icon-park, the
+// settings tree) inside the test body, where it counts against `testTimeout: 10000`.
+// Under full-suite load that budget is not enough: the first test timed out, and
+// because a timed-out test's continuation still runs, its `render` landed *after*
+// auto-cleanup and left a second confirm in the DOM, so the next test's `getByText`
+// then failed with "Found multiple elements". Loading them here keeps the module
+// cost in the file's import phase, which is not subject to the per-test timeout.
+import McpManagement from '@/renderer/pages/settings/ToolsSettings/McpManagement';
+import ToolsModalContent from '@/renderer/components/settings/SettingsModal/contents/ToolsModalContent';
 
 const LOCALES = [
   'de-DE',
@@ -141,7 +152,6 @@ describe('destructive confirms in settings', () => {
   });
 
   it('names the server in the Tools page delete confirm', async () => {
-    const { default: McpManagement } = await import('@/renderer/pages/settings/ToolsSettings/McpManagement');
     render(<McpManagement message={message} />);
 
     await waitFor(() => {
@@ -151,8 +161,6 @@ describe('destructive confirms in settings', () => {
 
   it('names the server in the settings-modal Tools tab delete confirm too', async () => {
     // The two confirms are copy-pasted, so fixing only one leaves this surface unnamed.
-    const mod = await import('@/renderer/components/settings/SettingsModal/contents/ToolsModalContent');
-    const ToolsModalContent = mod.default;
     render(<ToolsModalContent message={message} />);
 
     await waitFor(() => {
