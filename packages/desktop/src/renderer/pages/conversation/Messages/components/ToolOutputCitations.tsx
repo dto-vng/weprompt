@@ -6,6 +6,7 @@
 
 import { parseCitationHeader } from '@/common/knowledge/citationFormat';
 import { useKnowledgeCitationsSafe } from '@/renderer/pages/conversation/knowledge/KnowledgeCitationsContext';
+import { activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import React from 'react';
 
 // The knowledge search tool's result renders as plain <pre> text inside the
@@ -52,6 +53,9 @@ const ToolOutputCitations: React.FC<{ output: string }> = ({ output }) => {
                 event.stopPropagation();
                 citations.openCitation(parsed.fileName, parsed.headingPath);
               }}
+              // An anchor with no href gets no implicit keyboard activation, so role+tabIndex
+              // alone left Enter doing nothing here.
+              onKeyDown={activateOnEnterOrSpace(() => citations.openCitation(parsed.fileName, parsed.headingPath))}
             >
               {parsed.fileName}
             </a>

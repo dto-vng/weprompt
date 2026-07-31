@@ -70,6 +70,32 @@ describe('ToolOutputCitations', () => {
     expect(container.querySelectorAll('a').length).toBe(0);
   });
 
+  it('opens a citation from the keyboard, not just the mouse', () => {
+    const openCitation = vi.fn();
+    const { container } = render(
+      <KnowledgeCitationsTestProvider fileNames={['hop-dong-ctv-scan.pdf']} openCitation={openCitation}>
+        <pre>
+          <ToolOutputCitations output={OUTPUT} />
+        </pre>
+      </KnowledgeCitationsTestProvider>
+    );
+    const link = container.querySelector('a.kb-citation-link') as HTMLAnchorElement;
+    // An href-less anchor gets no implicit activation, so role+tabIndex alone left Enter dead.
+    expect(link).toHaveAttribute('tabindex', '0');
+    expect(link).toHaveAttribute('role', 'button');
+
+    fireEvent.keyDown(link, { key: 'Enter' });
+    expect(openCitation).toHaveBeenCalledWith('hop-dong-ctv-scan.pdf', 'Pages 1–3');
+
+    openCitation.mockClear();
+    fireEvent.keyDown(link, { key: ' ' });
+    expect(openCitation).toHaveBeenCalledWith('hop-dong-ctv-scan.pdf', 'Pages 1–3');
+
+    openCitation.mockClear();
+    fireEvent.keyDown(link, { key: 'a' });
+    expect(openCitation).not.toHaveBeenCalled();
+  });
+
   it('renders plain text without a citations context', () => {
     const { container } = render(<ToolOutputCitations output={OUTPUT} />);
     expect(container.querySelectorAll('a').length).toBe(0);
