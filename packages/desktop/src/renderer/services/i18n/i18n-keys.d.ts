@@ -283,6 +283,8 @@ export type I18nKey =
   | 'common.remove'
   | 'common.reply'
   | 'common.retry'
+  | 'common.routeError.description'
+  | 'common.routeError.title'
   | 'common.save'
   | 'common.saveFailed'
   | 'common.saveSuccess'

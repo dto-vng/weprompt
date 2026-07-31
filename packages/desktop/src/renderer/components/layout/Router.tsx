@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import AppLoader from '@renderer/components/layout/AppLoader';
+import RouteErrorBoundary from '@renderer/components/layout/RouteErrorBoundary';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { DESKTOP_PET_ENABLED, TEAM_MODE_ENABLED } from '@/common/config/constants';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
@@ -26,10 +27,22 @@ const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
 const ProjectHome = React.lazy(() => import('@renderer/pages/project'));
 const DashboardPage = React.lazy(() => import('@renderer/pages/dashboard'));
 
+/**
+ * Scopes render failures to the active route. Sits outside `Suspense` so a
+ * failed lazy chunk is caught too, and resets on navigation so leaving a broken
+ * screen is enough to recover.
+ */
+const RouteBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation();
+  return <RouteErrorBoundary resetKey={pathname}>{children}</RouteErrorBoundary>;
+};
+
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
-  <Suspense fallback={<AppLoader />}>
-    <Component />
-  </Suspense>
+  <RouteBoundary>
+    <Suspense fallback={<AppLoader />}>
+      <Component />
+    </Suspense>
+  </RouteBoundary>
 );
 
 /**

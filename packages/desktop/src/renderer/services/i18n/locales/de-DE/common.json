@@ -28,6 +28,10 @@
   "download": "Herunterladen",
   "close": "Schließen",
   "retry": "Erneut versuchen",
+  "routeError": {
+    "title": "Diese Seite konnte nicht angezeigt werden",
+    "description": "Beim Öffnen dieser Seite ist ein Problem aufgetreten. Der Rest der App funktioniert weiterhin – versuche es erneut oder wähle einen anderen Eintrag in der Seitenleiste."
+  },
   "reload": "Neu laden",
   "technical_details": "Technische Details",
   "error_details": "Fehlerdetails",

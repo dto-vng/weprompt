@@ -29,6 +29,10 @@
   "download": "İndir",
   "close": "Kapat",
   "retry": "Tekrar Dene",
+  "routeError": {
+    "title": "Bu sayfa görüntülenemedi",
+    "description": "Bu sayfa açılırken bir sorun oluştu. Uygulamanın geri kalanı çalışmaya devam ediyor; yeniden deneyebilir veya kenar çubuğundan başka bir öğe seçebilirsiniz."
+  },
   "reload": "Yenile",
   "technical_details": "Teknik Detaylar",
   "error_details": "Hata Detayları",

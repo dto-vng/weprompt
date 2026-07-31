@@ -87,6 +87,32 @@ describe('ipcBridge team adapter', () => {
     });
   });
 
+  // The mocked backend answers `{ active_run: null }` — the literal payload
+  // older aioncore builds return, with `slot_work` absent rather than empty.
+  it('getRunState hands consumers an array of slot work even when the backend omits it', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    const snapshot = await team.getRunState.invoke({ team_id: 'team-1' });
+
+    expect(snapshot).toEqual({ session_generation: null, active_run: null, slot_work: [] });
+  });
+
+  it('sendMessage hands consumers an ack whose run carries slot work', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    const ack = await team.sendMessage.invoke({ team_id: 'team-1', input: 'hello' });
+
+    expect(ack.run.slot_work).toEqual([]);
+  });
+
+  it('run events are mapped rather than forwarded raw', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    expect(team.runUpdated.on).toBeDefined();
+    expect(httpBridgeMocks.wsMappedEmitter).toHaveBeenCalledWith('team.runUpdated', expect.any(Function));
+    expect(httpBridgeMocks.wsEmitter).not.toHaveBeenCalledWith('team.runUpdated');
+  });
+
   it('team.create posts canonical agents payload', async () => {
     const { team } = await import('@/common/adapter/ipcBridge');
 

@@ -29,6 +29,10 @@
   "download": "Baixar",
   "close": "Fechar",
   "retry": "Tentar novamente",
+  "routeError": {
+    "title": "Não foi possível exibir esta página",
+    "description": "Ocorreu um problema ao abrir esta página. O restante do aplicativo continua funcionando — tente novamente ou escolha outro item na barra lateral."
+  },
   "reload": "Recarregar",
   "technical_details": "Detalhes Técnicos",
   "error_details": "Detalhes do Erro",

@@ -29,6 +29,10 @@
   "download": "下载",
   "close": "关闭",
   "retry": "重试",
+  "routeError": {
+    "title": "无法显示此页面",
+    "description": "打开此页面时出现问题。应用的其他部分仍可正常使用——你可以重试，或从侧边栏选择其他内容。"
+  },
   "reload": "重新加载",
   "technical_details": "技术详情",
   "error_details": "错误详情",
