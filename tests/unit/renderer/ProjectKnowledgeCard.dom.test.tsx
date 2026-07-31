@@ -387,6 +387,25 @@ describe('ProjectKnowledgeCard', () => {
     await waitFor(() => expect(removeSourceMock).toHaveBeenCalledWith('s-ready'));
   });
 
+  it('offers the delete confirmation in danger red, like the trigger beside it', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const trigger = screen.getByTestId('knowledge-delete-s-ready');
+    fireEvent.click(trigger);
+    await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+
+    // Compared against the row trigger — which has carried status='danger' all
+    // along — rather than against a hardcoded Arco class name, so this survives
+    // Arco renaming its internals.
+    const dangerClass = [...trigger.classList].find((name) => name.includes('danger'));
+    expect(dangerClass).toBeDefined();
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+      .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+    expect(confirmButton).toHaveClass(dangerClass!);
+  });
+
   it('re-scans the folder when Refresh is used', async () => {
     setState({ sources: [readySource] });
 

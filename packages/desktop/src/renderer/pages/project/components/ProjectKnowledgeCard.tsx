@@ -387,6 +387,10 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
         <Popconfirm
           title={t('conversation.projectHome.knowledgeDeleteConfirm', { fileName: source.fileName })}
           okText={t('conversation.projectHome.knowledgeDeleteFile')}
+          // A single file is small enough for an inline confirm, but it still
+          // moves a file to the Trash, so the OK button is red rather than the
+          // default primary.
+          okButtonProps={{ status: 'danger' }}
           onOk={() =>
             report(
               removeSource(source.id),

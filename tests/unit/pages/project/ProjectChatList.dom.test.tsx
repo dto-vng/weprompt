@@ -203,6 +203,11 @@ describe('ProjectChatList', () => {
     expect(modalConfirmMock).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ title: 'conversation.history.deleteTitle' })
     );
+    // Deleting a chat is irreversible, so the confirm reads as danger (red), not
+    // warning (orange). Asserted on the options handed to Modal.confirm because
+    // Arco portals the dialog and the styling contract lives in okButtonProps —
+    // same reasoning as tests/unit/renderer/conversationDeleteDangerStyling.dom.test.tsx.
+    expect(modalConfirmMock.mock.calls[0][0]).toMatchObject({ okButtonProps: { status: 'danger' } });
     await vi.waitFor(() => {
       expect(emitMock).toHaveBeenCalledWith('chat.history.refresh');
     });

@@ -135,7 +135,9 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
         content: t('conversation.history.deleteConfirm'),
         okText: t('conversation.history.confirmDelete'),
         cancelText: t('conversation.history.cancelDelete'),
-        okButtonProps: { status: 'warning' },
+        // Deleting a chat removes user data, so the confirm is red like every
+        // other delete; orange is for consequential-but-not-destructive actions.
+        okButtonProps: { status: 'danger' },
         onOk: async () => {
           try {
             const success = await ipcBridge.conversation.remove.invoke({ id: conversation_id });
