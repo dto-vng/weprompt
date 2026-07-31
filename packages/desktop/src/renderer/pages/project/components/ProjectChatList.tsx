@@ -9,6 +9,7 @@ import type { TChatConversation } from '@/common/config/storage';
 import { isConversationPinned } from '@/renderer/pages/conversation/GroupedHistory/utils/groupingHelpers';
 import { refreshConversationCache } from '@/renderer/pages/conversation/utils/conversationCache';
 import { emitter } from '@/renderer/utils/emitter';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import { Button, Empty, Input, Message, Modal, Tag, Tooltip } from '@arco-design/web-react';
 import { DeleteOne, EditOne, MessageOne, Pushpin } from '@icon-park/react';
 import classNames from 'classnames';
@@ -201,27 +202,47 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
           {visibleChats.map((conversation) => {
             const snippet = conversation.desc?.trim();
             const pinned = isConversationPinned(conversation);
+            const openRow = (): void => {
+              navigate(`/conversation/${conversation.id}`);
+            };
             return (
+              // A clickable div with button semantics rather than a real <button>:
+              // Arco's `.arco-btn` display rule breaks the group-hover children,
+              // which is the reason `rowActivation` exists. Same compromise as
+              // `ConversationRow` and `SiderItem`.
               <div
                 key={conversation.id}
                 data-testid={`project-chat-row-${conversation.id}`}
                 className={classNames(
                   'group flex min-w-0 items-center gap-13px px-15px py-13px cursor-pointer transition-colors',
+                  ROW_FOCUS_RING,
                   styles.row
                 )}
-                onClick={() => navigate(`/conversation/${conversation.id}`)}
+                role='button'
+                tabIndex={0}
+                aria-label={conversation.name}
+                onClick={openRow}
+                onKeyDown={activateOnEnterOrSpace(openRow)}
               >
                 <MessageOne theme='outline' size='20' className='shrink-0 text-t-secondary' />
                 <div className='min-w-0 flex-1'>
                   <div className='truncate text-14px font-700 text-t-primary'>{conversation.name}</div>
                   {snippet && <div className='mt-2px truncate text-13px text-t-secondary'>{snippet}</div>}
                 </div>
-                <span className='shrink-0 text-12px text-t-tertiary group-hover:hidden'>
+                <span className='shrink-0 text-12px text-t-tertiary group-hover:hidden group-focus-within:hidden'>
                   {formatActiveDuration(conversation.modified_at, Date.now())}
                 </span>
+                {/* The reveal works from the keyboard only because the row above
+                    is now focusable: focusing it satisfies `:focus-within`, which
+                    flips this cluster into flow and puts the three buttons in the
+                    tab order. The keydown guard is the twin of the click guard —
+                    without it, Enter on a focused action would fire the action AND
+                    bubble to the row, navigating away from the result. */}
                 <span
-                  className='hidden shrink-0 items-center gap-4px group-hover:flex'
+                  data-testid={`project-chat-actions-${conversation.id}`}
+                  className='hidden shrink-0 items-center gap-4px group-hover:flex group-focus-within:flex'
                   onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
                 >
                   <Tooltip
                     content={t(pinned ? 'conversation.history.unpin' : 'conversation.history.pin')}

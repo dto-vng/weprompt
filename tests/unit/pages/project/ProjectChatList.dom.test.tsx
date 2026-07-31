@@ -112,6 +112,43 @@ describe('ProjectChatList', () => {
     expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/conversation/c1');
   });
 
+  it('opens the conversation from the keyboard', () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    const row = screen.getByTestId('project-chat-row-c1');
+    expect(row).toHaveAttribute('role', 'button');
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(row).toHaveAttribute('aria-label', 'Chat one');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/conversation/c1');
+
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(navigateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reveals the row actions on keyboard focus, not on hover alone', () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    // jsdom evaluates no Uno classes, so the reveal contract is asserted on the
+    // variant being present — the same way ConversationRow's suite does it. The
+    // cluster is `display: none` until the row (which is now focusable) matches
+    // `:focus-within`, which is what puts these buttons in the tab order.
+    const actions = screen.getByTestId('project-chat-actions-c1');
+    expect(actions.className).toContain('group-focus-within:flex');
+    expect(screen.getByTestId('project-chat-row-c1').className).toContain('focus-visible:');
+  });
+
+  it('does not also open the conversation when a row action is keyed', () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.keyDown(screen.getByTestId('project-chat-pin-c1'), { key: 'Enter' });
+
+    // Enter on a focused action must not bubble into the row handler and
+    // navigate away from the action the user just took.
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('shows a count badge matching the number of chats', () => {
     render(<ProjectChatList chats={[makeChat('c1', 'Chat one'), makeChat('c2', 'Chat two')]} />);
 
