@@ -341,7 +341,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
 
   if (!isIncompatibleRuntime && !isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <InstallationIntegrityModalHost
           description={description}
           diagnosticsKind={
@@ -369,7 +369,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
 
   if (isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <Modal
           visible
           closable={false}
@@ -384,7 +384,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
   }
 
   return (
-    <div className='min-h-screen bg-bg-1'>
+    <div className='min-h-screen bg-1'>
       <Modal visible closable={false} maskClosable={false} footer={null} title={title}>
         <div className='text-t-1'>
           <Typography.Paragraph className='mb-0 text-t-secondary'>{description}</Typography.Paragraph>

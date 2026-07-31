@@ -664,7 +664,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
       )}
       {/* Navigation bar (optional) */}
       {showNavBar && (
-        <div className='aion-url-viewer-toolbar flex items-center gap-6px h-40px px-10px bg-bg-2 border-b border-border-1 flex-shrink-0'>
+        <div className='aion-url-viewer-toolbar flex items-center gap-6px h-40px px-10px bg-2 border-b border-[var(--color-border-1)] flex-shrink-0'>
           <button onClick={handleGoBack} disabled={!canGoBack} className='toolbar-btn icon-btn' title='Back'>
             <Left theme='outline' size={16} />
           </button>
@@ -730,7 +730,7 @@ const WebviewHost: React.FC<WebviewHostProps> = ({
         {showViewerControls && viewerControlsReady && (
           <div
             data-testid='office-viewer-controls'
-            className='absolute right-12px bottom-12px z-20 flex h-32px items-center gap-2px rounded-8px border border-border-1 bg-bg-1 p-2px shadow-sm'
+            className='absolute right-12px bottom-12px z-20 flex h-32px items-center gap-2px rounded-8px border border-[var(--color-border-1)] bg-1 p-2px shadow-sm'
           >
             <Tooltip content={t('preview.office.viewer.zoomOut')}>
               <Button

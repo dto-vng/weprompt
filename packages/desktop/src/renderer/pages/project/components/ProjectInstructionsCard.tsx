@@ -104,7 +104,7 @@ const ProjectInstructionsCard: React.FC<ProjectInstructionsCardProps> = ({ proje
           </span>
         </div>
       ) : (
-        <div className='flex flex-col items-center gap-10px rd-10px border border-dashed border-border-2 px-16px py-20px text-center'>
+        <div className='flex flex-col items-center gap-10px rd-10px border border-dashed border-[var(--color-border-2)] px-16px py-20px text-center'>
           <span className='text-13px text-t-secondary'>{t('conversation.projectHome.instructionsEmpty')}</span>
           <Button type='outline' size='small' icon={<Plus theme='outline' size='14' />} onClick={startEdit}>
             {t('conversation.projectHome.addInstructions')}
