@@ -232,7 +232,7 @@ export async function httpRequest<T>(
 
 type ProviderLike<Data, Params> = {
   provider: (handler: (params: Params) => Promise<Data>) => void;
-  invoke: Params extends undefined ? () => Promise<Data> : (params: Params) => Promise<Data>;
+  invoke: [Params] extends [undefined] ? () => Promise<Data> : (params: Params) => Promise<Data>;
 };
 
 export function withResponseMap<Raw, Mapped, Params>(

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Alert, Button, Radio, Spin, Tag } from '@arco-design/web-react';
+import { Alert, Button, Message, Radio, Spin, Tag } from '@arco-design/web-react';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { appOperationsModel } from '@/common/adapter/ipcBridge';
 import type { IProvider } from '@/common/config/storage';
@@ -12,6 +12,7 @@ import type {
   AppOperationsModelReasonCode,
   AppOperationsModelResponse,
   AppOperationsModelSetting,
+  AppOperationsModelHealth,
 } from '@/common/types/appOperations';
 import AionSelect from '@/renderer/components/base/AionSelect';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -58,13 +59,22 @@ const isFixedSetting = (
 
 const modelOptionValue = (providerId: string, modelId: string): string => JSON.stringify([providerId, modelId]);
 
-const statusKey = (health: AppOperationsModelResponse['health']): string =>
-  `settings.appOperationsModel.status.${health}`;
+const STATUS_KEYS: Record<AppOperationsModelHealth, string> = {
+  ready: 'settings.appOperationsModel.status.ready',
+  checking: 'settings.appOperationsModel.status.checking',
+  setup_required: 'settings.appOperationsModel.status.setupRequired',
+  unavailable: 'settings.appOperationsModel.status.unavailable',
+};
 
-const updateAppOperationsModel = (setting: AppOperationsModelSetting): Promise<AppOperationsModelResponse> =>
-  (appOperationsModel.update.invoke as (nextSetting: AppOperationsModelSetting) => Promise<AppOperationsModelResponse>)(
-    setting
-  );
+const REASON_KEYS: Record<AppOperationsModelReasonCode, string> = {
+  no_eligible_model: 'settings.appOperationsModel.reason.noEligibleModel',
+  provider_missing: 'settings.appOperationsModel.reason.providerMissing',
+  provider_disabled: 'settings.appOperationsModel.reason.providerDisabled',
+  model_missing: 'settings.appOperationsModel.reason.modelMissing',
+  model_disabled: 'settings.appOperationsModel.reason.modelDisabled',
+  auth_required: 'settings.appOperationsModel.reason.authRequired',
+  health_check_failed: 'settings.appOperationsModel.reason.healthCheckFailed',
+};
 
 export default function AppOperationsModelCard({
   providers,
@@ -72,11 +82,11 @@ export default function AppOperationsModelCard({
   onAddModel,
 }: AppOperationsModelCardProps): React.ReactElement {
   const { t } = useTranslation();
+  const [message, messageContext] = Message.useMessage();
   const [response, setResponse] = useState<AppOperationsModelResponse | undefined>();
   const [draft, setDraft] = useState<AppOperationsModelSetting | undefined>();
   const [phase, setPhase] = useState<LoadPhase>('loading');
   const [pending, setPending] = useState<PendingAction>('idle');
-  const [actionError, setActionError] = useState<'save' | 'check' | undefined>();
   const requestRef = useRef(0);
   const unmountedRef = useRef(false);
 
@@ -129,7 +139,6 @@ export default function AppOperationsModelCard({
   const load = useCallback(async (): Promise<void> => {
     const requestId = ++requestRef.current;
     setPhase('loading');
-    setActionError(undefined);
     try {
       const nextResponse = await appOperationsModel.get.invoke();
       if (unmountedRef.current || requestId !== requestRef.current) return;
@@ -151,7 +160,8 @@ export default function AppOperationsModelCard({
     };
   }, [load]);
 
-  const canMutate = phase === 'ready' && pending === 'idle' && response !== undefined && !providersLoading;
+  const canMutate = phase === 'ready' && pending === 'idle' && response !== undefined;
+  const canSelectFixed = canMutate && !providersLoading;
   const responseIdentity =
     response?.resolved_model ?? (isFixedSetting(response?.setting) ? response.setting : undefined);
   const identityProvider = responseIdentity
@@ -171,21 +181,20 @@ export default function AppOperationsModelCard({
       const requestId = ++requestRef.current;
       setDraft(nextSetting);
       setPending('saving');
-      setActionError(undefined);
       try {
-        const nextResponse = await updateAppOperationsModel(nextSetting);
+        const nextResponse = await appOperationsModel.update.invoke(nextSetting);
         if (unmountedRef.current || requestId !== requestRef.current) return;
         setResponse(nextResponse);
         setDraft(nextResponse.setting);
       } catch {
         if (unmountedRef.current || requestId !== requestRef.current) return;
         setDraft(response.setting);
-        setActionError('save');
+        message.error(t('settings.appOperationsModel.saveFailed'));
       } finally {
         if (!unmountedRef.current && requestId === requestRef.current) setPending('idle');
       }
     },
-    [canMutate, response]
+    [canMutate, message, response, t]
   );
 
   const handleModeChange = useCallback(
@@ -195,6 +204,7 @@ export default function AppOperationsModelCard({
         void save({ mode: 'auto' });
         return;
       }
+      if (!canSelectFixed) return;
       const resolvedValue = response.resolved_model
         ? modelOptionValue(response.resolved_model.provider_id, response.resolved_model.model_id)
         : undefined;
@@ -206,16 +216,16 @@ export default function AppOperationsModelCard({
       }
       void save({ mode: 'fixed', provider_id: option.providerId, model_id: option.modelId });
     },
-    [canMutate, onAddModel, response, save, selectableOptionMap, selectableOptions]
+    [canMutate, canSelectFixed, onAddModel, response, save, selectableOptionMap, selectableOptions]
   );
 
   const handleFixedSelection = useCallback(
     (value: string): void => {
       const option = selectableOptionMap.get(value);
-      if (!option || !canMutate) return;
+      if (!option || !canSelectFixed) return;
       void save({ mode: 'fixed', provider_id: option.providerId, model_id: option.modelId });
     },
-    [canMutate, save, selectableOptionMap]
+    [canSelectFixed, save, selectableOptionMap]
   );
 
   const handleCheck = useCallback(async (): Promise<void> => {
@@ -223,7 +233,6 @@ export default function AppOperationsModelCard({
     const previousResponse = response;
     const requestId = ++requestRef.current;
     setPending('checking');
-    setActionError(undefined);
     try {
       const nextResponse = await appOperationsModel.check.invoke();
       if (unmountedRef.current || requestId !== requestRef.current) return;
@@ -233,21 +242,23 @@ export default function AppOperationsModelCard({
       if (unmountedRef.current || requestId !== requestRef.current) return;
       setResponse(previousResponse);
       setDraft(previousResponse.setting);
-      setActionError('check');
+      message.error(t('settings.appOperationsModel.checkFailed'));
     } finally {
       if (!unmountedRef.current && requestId === requestRef.current) setPending('idle');
     }
-  }, [canCheck, response]);
+  }, [canCheck, message, response, t]);
 
   const selectedFixedValue = isFixedSetting(draft) ? modelOptionValue(draft.provider_id, draft.model_id) : undefined;
-  const mutationsDisabled = !canMutate;
   const reasonCode: AppOperationsModelReasonCode | undefined = response?.reason_code;
+  const showAddModelAction =
+    response?.setting.mode === 'auto' && response.health === 'setup_required' && reasonCode === 'no_eligible_model';
 
   return (
     <section className='flex flex-col gap-12px rounded-8px border border-border-2 p-16px'>
+      {messageContext}
       <div className='flex flex-col gap-4px'>
         <div className='text-15px font-medium text-text-1'>{t('settings.appOperationsModel.title')}</div>
-        <div className='text-13px text-text-3'>{t('settings.appOperationsModel.contextCompaction')}</div>
+        <div className='text-13px text-text-3'>{t('settings.appOperationsModel.description')}</div>
       </div>
 
       {phase === 'loading' && <Spin className='self-start' />}
@@ -262,32 +273,36 @@ export default function AppOperationsModelCard({
           content={t('settings.appOperationsModel.loadFailed')}
           action={
             <Button size='mini' type='text' onClick={() => void load()}>
-              {t('settings.appOperationsModel.retry')}
+              {t('common.retry')}
             </Button>
           }
         />
       )}
 
-      {actionError && <Alert type='error' content={t(`settings.appOperationsModel.${actionError}Failed`)} />}
-
       {phase !== 'loading' && (
         <>
-          <Radio.Group
-            value={draft?.mode}
-            disabled={mutationsDisabled}
-            onChange={(value) => handleModeChange(value === 'fixed' ? 'fixed' : 'auto')}
-          >
-            <Radio value='auto'>{t('settings.appOperationsModel.auto')}</Radio>
-            <Radio value='fixed'>{t('settings.appOperationsModel.fixed')}</Radio>
-          </Radio.Group>
+          <div className='flex flex-col gap-4px'>
+            <span className='text-13px text-text-2'>{t('settings.appOperationsModel.selectionLabel')}</span>
+            <Radio.Group
+              value={draft?.mode}
+              onChange={(value) => handleModeChange(value === 'fixed' ? 'fixed' : 'auto')}
+            >
+              <Radio value='auto' disabled={!canMutate}>
+                {t('settings.appOperationsModel.auto')}
+              </Radio>
+              <Radio value='fixed' disabled={!canSelectFixed}>
+                {t('settings.appOperationsModel.fixed')}
+              </Radio>
+            </Radio.Group>
+          </div>
 
           {draft?.mode === 'fixed' && (
             <label className='flex flex-col gap-4px text-13px text-text-2'>
-              {t('settings.appOperationsModel.fixedModel')}
+              {t('settings.selectModel')}
               <AionSelect
-                aria-label={t('settings.appOperationsModel.fixedModel')}
+                aria-label={t('settings.selectModel')}
                 value={selectedFixedValue}
-                disabled={mutationsDisabled}
+                disabled={!canSelectFixed}
                 onChange={handleFixedSelection}
               >
                 {providers.map((provider) => {
@@ -304,7 +319,9 @@ export default function AppOperationsModelCard({
                   );
                 })}
                 {options
-                  .filter((option) => option.synthetic)
+                  .filter(
+                    (option) => option.synthetic && !providers.some((provider) => provider.id === option.providerId)
+                  )
                   .map((option) => (
                     <AionSelect.Option key={option.value} value={option.value} disabled>
                       {`${option.providerId} / ${option.modelId}`}
@@ -315,11 +332,30 @@ export default function AppOperationsModelCard({
           )}
 
           <div aria-live='polite' className='flex flex-wrap items-center gap-8px text-13px text-text-2'>
-            {identityProvider && <Tag>{identityProvider}</Tag>}
-            {responseIdentity && <Tag>{responseIdentity.model_id}</Tag>}
-            {visibleHealth && <Tag>{t(statusKey(visibleHealth))}</Tag>}
-            {reasonCode && <span>{t(`settings.appOperationsModel.reason.${reasonCode}`)}</span>}
+            {pending === 'saving' && <span>{t('settings.appOperationsModel.saving')}</span>}
+            {responseIdentity && (
+              <>
+                <span>{t('settings.appOperationsModel.resolvedModelLabel')}</span>
+                {identityProvider && <Tag>{identityProvider}</Tag>}
+                <Tag>{responseIdentity.model_id}</Tag>
+              </>
+            )}
+            {visibleHealth && (
+              <>
+                <span>{t('settings.appOperationsModel.healthLabel')}</span>
+                <Tag>{t(STATUS_KEYS[visibleHealth])}</Tag>
+              </>
+            )}
+            <span>{t('settings.appOperationsModel.usedByLabel')}</span>
+            <Tag>{t('settings.appOperationsModel.contextCompaction')}</Tag>
+            {reasonCode && <span>{t(REASON_KEYS[reasonCode])}</span>}
           </div>
+
+          {showAddModelAction && (
+            <Button type='secondary' onClick={onAddModel}>
+              {t('settings.addModel')}
+            </Button>
+          )}
 
           <Button
             type='secondary'
@@ -327,7 +363,7 @@ export default function AppOperationsModelCard({
             loading={pending === 'checking'}
             onClick={() => void handleCheck()}
           >
-            {t('settings.appOperationsModel.check')}
+            {t('settings.healthCheck')}
           </Button>
         </>
       )}
