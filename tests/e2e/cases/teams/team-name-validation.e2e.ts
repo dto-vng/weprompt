@@ -14,7 +14,11 @@ type ModalHandles = {
 };
 
 async function openCreateModal(page: import('@playwright/test').Page): Promise<ModalHandles> {
-  const createBtn = page.locator('.h-20px.w-20px.rd-4px').first();
+  // The sider create button carries a stable testid; the utility-class chain this used to
+  // match (.h-20px.w-20px.rd-4px) exists on no element — TeamSiderSection renders
+  // `!w-22px !h-22px !rounded-6px` — so openCreateModal timed out before reaching any
+  // assertion, in every locale.
+  const createBtn = page.locator('[data-testid="team-create-btn"]').first();
   await expect(createBtn).toBeVisible({ timeout: 10_000 });
   await createBtn.click();
 
