@@ -19,6 +19,7 @@ import { Layout as ArcoLayout } from '@arco-design/web-react';
 import { ExpandLeft, ExpandRight } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import './chat-layout.css';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
@@ -54,6 +55,7 @@ const ChatLayout: React.FC<{
   /** Optional override for the leading icon shown before the title (e.g. team Peoples icon) */
   headerLeading?: React.ReactNode;
 }> = (props) => {
+  const { t } = useTranslation();
   const { conversation_id, workspacePath, isTemporaryWorkspace } = props;
   const {
     backend,
@@ -199,7 +201,7 @@ const ChatLayout: React.FC<{
           <button
             type='button'
             className='workspace-header__toggle'
-            aria-label='Toggle workspace'
+            aria-label={t('common.chrome.toggleProjectPanel')}
             onClick={() => dispatchWorkspaceToggleEvent()}
           >
             {artifactCollapsed ? <ExpandRight size={16} /> : <ExpandLeft size={16} />}

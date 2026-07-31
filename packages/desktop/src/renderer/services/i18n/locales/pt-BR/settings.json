@@ -660,7 +660,7 @@
   "mcpAddServer": "Adicionar MCP",
   "mcpEditServer": "Editar",
   "mcpDeleteServer": "Excluir",
-  "mcpDeleteConfirm": "Tem certeza de que deseja excluir este servidor MCP?",
+  "mcpDeleteConfirm": "Tem certeza de que deseja excluir o servidor MCP \"{{name}}\"?",
   "mcpImportFromJSON": "Importar do JSON",
   "mcpImportTitle": "Importar Configuração MCP",
   "mcpImportPlaceholder": "Copie a configuração JSON da página de introdução do serviço MCP (preferencialmente a configuração NPX ou UVX) e cole-a na caixa de entrada abaixo.",
@@ -1309,5 +1309,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "Mostrar chaves",
+  "apiKeyHide": "Ocultar chaves",
+  "apiKeyMasked": "Chaves de API ocultas",
+  "mcpNoTools": "Este servidor não expõe nenhuma ferramenta"
 }

@@ -288,7 +288,7 @@ const ModalMcpManagementSection: React.FC<{
         okText={t('common.confirm')}
         cancelText={t('common.cancel')}
       >
-        <p>{t('settings.mcpDeleteConfirm')}</p>
+        <p>{t('settings.mcpDeleteConfirm', { name: serverToDelete })}</p>
       </Modal>
     </div>
   );

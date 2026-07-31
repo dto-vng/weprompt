@@ -2,6 +2,7 @@ import { WORKSPACE_HEADER_HEIGHT } from '@/renderer/pages/conversation/utils/lay
 import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspaceEvents';
 import { ExpandLeft, ExpandRight } from '@icon-park/react';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import WorkspaceOpenButton from './WorkspaceOpenButton';
 
 type WorkspaceHeaderProps = {
@@ -28,47 +29,60 @@ const WorkspacePanelHeader: React.FC<WorkspaceHeaderProps> = ({
   togglePlacement = 'right',
   workspacePath,
   isTemporaryWorkspace = false,
-}) => (
-  <div
-    className='workspace-panel-header flex items-center justify-start px-12px py-4px gap-12px border-b border-[var(--bg-3)]'
-    style={{ height: WORKSPACE_HEADER_HEIGHT, minHeight: WORKSPACE_HEADER_HEIGHT }}
-  >
-    {showToggle && togglePlacement === 'left' && (
-      <button
-        type='button'
-        className='workspace-header__toggle mr-4px'
-        aria-label='Toggle workspace'
-        onClick={onToggle}
-      >
-        {collapsed ? <ExpandRight size={16} /> : <ExpandLeft size={16} />}
-      </button>
-    )}
-    <div className='flex-1 truncate'>{children}</div>
+}) => {
+  const { t } = useTranslation();
 
-    {/* Open workspace button - shown when workspace path is provided */}
-    {workspacePath && !collapsed && (
-      <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />
-    )}
+  return (
+    <div
+      className='workspace-panel-header flex items-center justify-start px-12px py-4px gap-12px border-b border-[var(--bg-3)]'
+      style={{ height: WORKSPACE_HEADER_HEIGHT, minHeight: WORKSPACE_HEADER_HEIGHT }}
+    >
+      {showToggle && togglePlacement === 'left' && (
+        <button
+          type='button'
+          className='workspace-header__toggle mr-4px'
+          aria-label={t('common.chrome.toggleProjectPanel')}
+          onClick={onToggle}
+        >
+          {collapsed ? <ExpandRight size={16} /> : <ExpandLeft size={16} />}
+        </button>
+      )}
+      <div className='flex-1 truncate'>{children}</div>
 
-    {showToggle && togglePlacement === 'right' && (
-      <button type='button' className='workspace-header__toggle' aria-label='Toggle workspace' onClick={onToggle}>
-        {collapsed ? <ExpandRight size={16} /> : <ExpandLeft size={16} />}
-      </button>
-    )}
-  </div>
-);
+      {/* Open workspace button - shown when workspace path is provided */}
+      {workspacePath && !collapsed && (
+        <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />
+      )}
+
+      {showToggle && togglePlacement === 'right' && (
+        <button
+          type='button'
+          className='workspace-header__toggle'
+          aria-label={t('common.chrome.toggleProjectPanel')}
+          onClick={onToggle}
+        >
+          {collapsed ? <ExpandRight size={16} /> : <ExpandLeft size={16} />}
+        </button>
+      )}
+    </div>
+  );
+};
 
 // Small floating button shown when the workspace panel is collapsed on desktop
-export const DesktopWorkspaceToggle: React.FC = () => (
-  <button
-    type='button'
-    className='workspace-toggle-floating workspace-header__toggle absolute top-1/2 right-2 z-10'
-    style={{ transform: 'translateY(-50%)' }}
-    onClick={() => dispatchWorkspaceToggleEvent()}
-    aria-label='Expand workspace'
-  >
-    <ExpandLeft size={16} />
-  </button>
-);
+export const DesktopWorkspaceToggle: React.FC = () => {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      type='button'
+      className='workspace-toggle-floating workspace-header__toggle absolute top-1/2 right-2 z-10'
+      style={{ transform: 'translateY(-50%)' }}
+      onClick={() => dispatchWorkspaceToggleEvent()}
+      aria-label={t('common.chrome.expandProjectPanel')}
+    >
+      <ExpandLeft size={16} />
+    </button>
+  );
+};
 
 export default WorkspacePanelHeader;

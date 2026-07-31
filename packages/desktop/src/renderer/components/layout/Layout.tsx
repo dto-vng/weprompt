@@ -370,8 +370,8 @@ const Layout: React.FC<{
                     type='button'
                     className='app-titlebar__button app-titlebar__button--mobile'
                     onClick={() => setCollapsed(true)}
-                    title='Collapse sidebar'
-                    aria-label='Collapse sidebar'
+                    title={t('common.chrome.collapseSidebar')}
+                    aria-label={t('common.chrome.collapseSidebar')}
                   >
                     <SidebarIcon size={18} strokeWidth={2.5} />
                   </button>

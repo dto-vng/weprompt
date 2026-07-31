@@ -162,5 +162,15 @@
     "second_short": "秒"
   },
   "selectedCount": "已選 {{count}}",
-  "selectedSkills": "已選技能"
+  "selectedSkills": "已選技能",
+  "chrome": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "還原",
+    "collapseSidebar": "收起側邊欄",
+    "expandSidebar": "展開側邊欄",
+    "toggleProjectPanel": "切換專案面板",
+    "expandProjectPanel": "展開專案面板",
+    "collapseProjectPanel": "收起專案面板"
+  }
 }

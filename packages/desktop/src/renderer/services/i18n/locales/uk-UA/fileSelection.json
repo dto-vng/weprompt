@@ -2,5 +2,7 @@
   "selectFile": "Вибрати файл",
   "selectDirectory": "Вибрати директорію",
   "pleaseSelectFile": "Будь ласка, виберіть файл",
-  "pleaseSelectDirectory": "Будь ласка, виберіть директорію"
+  "pleaseSelectDirectory": "Будь ласка, виберіть директорію",
+  "emptyFolder": "Ця папка порожня",
+  "goToParent": "Перейти до батьківської папки"
 }

@@ -8,6 +8,7 @@ import { LinkCloud } from '@icon-park/react';
 import { ipcBridge } from '@/common';
 import useModeModeList from '@renderer/hooks/agent/useModeModeList';
 import { getProviderLogo } from '@/renderer/utils/model/modelPlatforms';
+import MaskedApiKeyTextArea from './MaskedApiKeyTextArea';
 
 /**
  * 供应商 Logo 组件
@@ -233,7 +234,10 @@ const EditModeModal = ModalHOC<{ data?: IProvider; onChange(data: IProvider): vo
               field={'api_key'}
               extra={<div className='text-11px text-t-secondary mt-2'>💡 {t('settings.multiApiKeyEditTip')}</div>}
             >
-              <Input.TextArea rows={4} placeholder={t('settings.apiKeyPlaceholder')} />
+              {/* 遮蔽但保持多行：这里展示的是已保存的 key，且支持一行一个的轮换。
+                  Masked but still multi-line — this shows ALREADY-SAVED keys, and the field
+                  supports one-key-per-line rotation, which Input.Password would break. */}
+              <MaskedApiKeyTextArea rows={4} placeholder={t('settings.apiKeyPlaceholder')} />
             </Form.Item>
 
             {/* AWS Bedrock Authentication Method */}

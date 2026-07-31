@@ -162,5 +162,15 @@
     "second_short": "с"
   },
   "selectedCount": "Выбрано {{count}}",
-  "selectedSkills": "Выбранные навыки"
+  "selectedSkills": "Выбранные навыки",
+  "chrome": {
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
+    "restore": "Восстановить",
+    "collapseSidebar": "Свернуть боковую панель",
+    "expandSidebar": "Развернуть боковую панель",
+    "toggleProjectPanel": "Показать или скрыть панель проекта",
+    "expandProjectPanel": "Развернуть панель проекта",
+    "collapseProjectPanel": "Свернуть панель проекта"
+  }
 }

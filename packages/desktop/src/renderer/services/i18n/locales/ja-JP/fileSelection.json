@@ -2,5 +2,7 @@
   "selectFile": "ファイルを選択",
   "selectDirectory": "ディレクトリを選択",
   "pleaseSelectFile": "ファイルを選択してください",
-  "pleaseSelectDirectory": "ディレクトリを選択してください"
+  "pleaseSelectDirectory": "ディレクトリを選択してください",
+  "emptyFolder": "このフォルダーは空です",
+  "goToParent": "親フォルダーへ移動"
 }

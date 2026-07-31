@@ -660,7 +660,7 @@
   "mcpAddServer": "MCP 추가",
   "mcpEditServer": "편집",
   "mcpDeleteServer": "삭제",
-  "mcpDeleteConfirm": "이 MCP 서버를 삭제하시겠습니까?",
+  "mcpDeleteConfirm": "MCP 서버 \"{{name}}\"을(를) 삭제하시겠습니까?",
   "mcpImportFromJSON": "JSON에서 가져오기",
   "mcpImportTitle": "MCP 구성 가져오기",
   "mcpImportPlaceholder": "서비스 문서의 MCP JSON 구성을 아래 입력 상자에 붙여넣으세요. 구성에 npx, uvx 같은 명령이 포함되어 있다면 현재 컴퓨터에서 사용할 수 있는지 먼저 확인하세요.",
@@ -1308,5 +1308,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "키 표시",
+  "apiKeyHide": "키 숨기기",
+  "apiKeyMasked": "API 키가 숨겨져 있습니다",
+  "mcpNoTools": "이 서버는 도구를 제공하지 않습니다"
 }

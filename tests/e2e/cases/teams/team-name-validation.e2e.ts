@@ -5,6 +5,7 @@
  * correctly without crashing the app or submitting invalid data.
  */
 import { test, expect } from '../../fixtures';
+import { modalCloseButton } from '../../helpers';
 
 type ModalHandles = {
   modal: import('@playwright/test').Locator;
@@ -32,7 +33,7 @@ async function openCreateModal(page: import('@playwright/test').Page): Promise<M
 }
 
 async function closeModal(page: import('@playwright/test').Page): Promise<void> {
-  const closeIcon = page.locator('.arco-modal button[aria-label="Close"]').first();
+  const closeIcon = page.locator(modalCloseButton('.arco-modal')).first();
   const visible = await closeIcon.isVisible().catch(() => false);
   if (visible) {
     await closeIcon.click();

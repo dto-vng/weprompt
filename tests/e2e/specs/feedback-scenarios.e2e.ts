@@ -18,7 +18,7 @@
  *   - MessageAgentStatus error (needs broken agent session)
  */
 import { test, expect, type Page } from '../fixtures';
-import { goToSettings } from '../helpers';
+import { goToSettings, modalCloseButton } from '../helpers';
 
 // Label comes from i18n key settings.oneClickFeedback.
 const FEEDBACK_PILL = 'button:has-text("反馈问题"), button:has-text("Report Issue")';
@@ -31,11 +31,12 @@ const VISIBLE_MODAL_BODY = `${MODAL_BODY}:visible`;
 /** Close the feedback modal (AionModal sets closable=false so Escape is a no-op). */
 async function closeFeedbackModal(page: Page) {
   // The feedback modal is an AionModal (standard variant); its header close
-  // button carries aria-label='Close'. Scope to the modal that owns the
-  // visible feedback scroll body so we never match another (hidden) instance.
+  // button is labelled from i18n, so match every locale's spelling. Scope to
+  // the modal that owns the visible feedback scroll body so we never match
+  // another (hidden) instance.
   await page
     .locator('.arco-modal-wrapper', { has: page.locator(VISIBLE_MODAL_BODY) })
-    .locator('button[aria-label="Close"]')
+    .locator(modalCloseButton())
     .first()
     .click();
   await expect(page.locator(VISIBLE_MODAL_BODY)).toHaveCount(0, { timeout: 5_000 });
@@ -43,7 +44,7 @@ async function closeFeedbackModal(page: Page) {
 
 /** Close any open AionModal (e.g. the Agent editor) so the next test starts clean. */
 async function closeAgentEditor(page: Page) {
-  const closeBtn = page.locator('.arco-modal button[aria-label="Close"]').first();
+  const closeBtn = page.locator(modalCloseButton('.arco-modal')).first();
   if (await closeBtn.isVisible().catch(() => false)) {
     await closeBtn.click({ timeout: 2_000 }).catch(() => {});
   }
@@ -56,7 +57,7 @@ async function closeAgentEditor(page: Page) {
 // test after it. Close all visible modals before each test.
 test.beforeEach(async ({ page }) => {
   for (let i = 0; i < 3; i++) {
-    const closeBtn = page.locator('.arco-modal-wrapper:visible button[aria-label="Close"]').first();
+    const closeBtn = page.locator(modalCloseButton('.arco-modal-wrapper:visible')).first();
     if (!(await closeBtn.isVisible().catch(() => false))) break;
     await closeBtn.click({ timeout: 2_000 }).catch(() => {});
     await page.waitForTimeout(300);

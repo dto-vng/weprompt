@@ -162,5 +162,15 @@
     "second_short": "sn"
   },
   "selectedCount": "{{count}} seçili",
-  "selectedSkills": "Seçili beceriler"
+  "selectedSkills": "Seçili beceriler",
+  "chrome": {
+    "minimize": "Simge durumuna küçült",
+    "maximize": "Ekranı kapla",
+    "restore": "Geri yükle",
+    "collapseSidebar": "Kenar çubuğunu daralt",
+    "expandSidebar": "Kenar çubuğunu genişlet",
+    "toggleProjectPanel": "Proje panelini aç veya kapat",
+    "expandProjectPanel": "Proje panelini genişlet",
+    "collapseProjectPanel": "Proje panelini daralt"
+  }
 }

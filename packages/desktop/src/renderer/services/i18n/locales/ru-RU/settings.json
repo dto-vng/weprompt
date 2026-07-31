@@ -652,7 +652,7 @@
   "mcpAddServer": "Добавить MCP",
   "mcpEditServer": "Редактировать",
   "mcpDeleteServer": "Удалить",
-  "mcpDeleteConfirm": "Вы уверены, что хотите удалить этот сервер MCP?",
+  "mcpDeleteConfirm": "Вы уверены, что хотите удалить сервер MCP «{{name}}»?",
   "mcpImportFromJSON": "Импорт из JSON",
   "mcpImportTitle": "Импорт конфигурации MCP",
   "mcpImportPlaceholder": "Вставьте ниже JSON-конфигурацию MCP из документации сервиса. Если конфигурация использует команды вроде npx или uvx, сначала убедитесь, что они установлены и доступны на вашем компьютере.",
@@ -1306,5 +1306,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "Показать ключи",
+  "apiKeyHide": "Скрыть ключи",
+  "apiKeyMasked": "Ключи API скрыты",
+  "mcpNoTools": "Этот сервер не предоставляет инструментов"
 }

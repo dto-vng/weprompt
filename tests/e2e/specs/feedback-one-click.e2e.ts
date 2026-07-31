@@ -11,7 +11,7 @@
  *   3. The modal displays its title and module select control.
  */
 import { test, expect } from '../fixtures';
-import { goToSettings } from '../helpers';
+import { goToSettings, modalCloseButton } from '../helpers';
 
 declare global {
   interface Window {
@@ -75,14 +75,11 @@ test.describe('One-click feedback infrastructure', () => {
     const autoInfo = page.locator('[data-testid="feedback-report-auto-info"]');
     await expect(autoInfo).toBeVisible();
 
-    // Close via the AionModal header close button (aria-label='Close'). The
-    // modal is configured with closable={false} so Escape alone does not
-    // dismiss it. Scope to the modal that owns the feedback body so we never
-    // match another modal's close button.
-    const closeBtn = page
-      .locator('.arco-modal-wrapper', { has: modalBody })
-      .locator('button[aria-label="Close"]')
-      .first();
+    // Close via the AionModal header close button, whose aria-label is
+    // localized. The modal is configured with closable={false} so Escape alone
+    // does not dismiss it. Scope to the modal that owns the feedback body so we
+    // never match another modal's close button.
+    const closeBtn = page.locator('.arco-modal-wrapper', { has: modalBody }).locator(modalCloseButton()).first();
     await closeBtn.click();
     await expect(modalBody).toBeHidden({ timeout: 5_000 });
   });

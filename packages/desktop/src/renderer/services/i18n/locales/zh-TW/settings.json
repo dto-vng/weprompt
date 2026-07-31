@@ -660,7 +660,7 @@
   "mcpAddServer": "新增 MCP",
   "mcpEditServer": "編輯",
   "mcpDeleteServer": "刪除",
-  "mcpDeleteConfirm": "確定要刪除此 MCP 伺服器嗎？",
+  "mcpDeleteConfirm": "確定要刪除 MCP 伺服器「{{name}}」嗎？",
   "mcpImportFromJSON": "從 JSON 導入",
   "mcpImportTitle": "匯入 MCP 配置",
   "mcpImportPlaceholder": "請將服務文件中的 MCP JSON 配置貼到下方輸入框。如果配置裡使用了 npx、uvx 等命令，請先確認它們已安裝並且目前機器可用。",
@@ -1308,5 +1308,9 @@
   "capabilityMemoryDesc": "Remember facts across chats.",
   "capabilitySaved": "Saved",
   "capabilitySaveError": "Could not save. Check the value and try again.",
-  "capabilityMissingKey": "Add a key first to enable this capability."
+  "capabilityMissingKey": "Add a key first to enable this capability.",
+  "apiKeyReveal": "顯示密鑰",
+  "apiKeyHide": "隱藏密鑰",
+  "apiKeyMasked": "API 密鑰已隱藏",
+  "mcpNoTools": "該伺服器未提供任何工具"
 }
