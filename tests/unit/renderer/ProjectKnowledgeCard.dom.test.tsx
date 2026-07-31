@@ -340,6 +340,30 @@ describe('ProjectKnowledgeCard', () => {
     expect(retrySourceMock).toHaveBeenCalledWith('s-partial');
   });
 
+  it('names the keyword-only state beside that retry, and explains it on hover', async () => {
+    setState({ sources: [{ ...readySource, id: 's-partial', vectorCount: 2, chunkCount: 5 }] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    // Retry alone told the user nothing: the row showed no problem to retry from.
+    expect(screen.getByTestId('knowledge-not-embedded-s-partial')).toHaveTextContent(
+      'conversation.projectHome.knowledgeStatusNotEmbedded'
+    );
+    fireEvent.mouseEnter(screen.getByText('conversation.projectHome.knowledgeStatusNotEmbedded'));
+
+    expect(
+      await screen.findByText('conversation.projectHome.knowledgeNotEmbeddedDetail:2/5')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the keyword-only tag off a fully embedded row', () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-not-embedded-s-ready')).not.toBeInTheDocument();
+  });
+
   it('retries a failed source', () => {
     setState({ sources: [failedSource] });
 

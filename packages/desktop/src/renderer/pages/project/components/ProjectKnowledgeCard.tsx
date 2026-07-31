@@ -286,21 +286,37 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
         // only route.
         if (isMissingVectors(source)) {
           return (
-            <Button
-              type='text'
-              size='mini'
-              className='flex-shrink-0'
-              onClick={(event) => {
-                event.stopPropagation();
-                report(
-                  retrySource(source.id),
-                  'conversation.projectHome.knowledgeRetryFailed',
-                  'Failed to retry knowledge source:'
-                );
-              }}
-            >
-              {t('conversation.projectHome.knowledgeRetry')}
-            </Button>
+            // Same shape as the `failed` branch below — a tag that names the
+            // state next to the button that fixes it. A bare "Retry" beside a
+            // filename showing no problem gave the user nothing to retry from.
+            // The tag stays neutral: this file IS searchable, just by keyword
+            // only, so red is reserved for `failed`.
+            <span className='flex flex-shrink-0 items-center gap-4px'>
+              <Tooltip
+                content={t('conversation.projectHome.knowledgeNotEmbeddedDetail', {
+                  done: source.vectorCount,
+                  total: source.chunkCount,
+                })}
+              >
+                <Tag size='small' data-testid={`knowledge-not-embedded-${source.id}`}>
+                  {t('conversation.projectHome.knowledgeStatusNotEmbedded')}
+                </Tag>
+              </Tooltip>
+              <Button
+                type='text'
+                size='mini'
+                onClick={(event) => {
+                  event.stopPropagation();
+                  report(
+                    retrySource(source.id),
+                    'conversation.projectHome.knowledgeRetryFailed',
+                    'Failed to retry knowledge source:'
+                  );
+                }}
+              >
+                {t('conversation.projectHome.knowledgeRetry')}
+              </Button>
+            </span>
           );
         }
         // Healthy and fully embedded: say nothing. Quiet means good — any
