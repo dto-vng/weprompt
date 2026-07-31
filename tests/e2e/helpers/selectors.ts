@@ -53,6 +53,19 @@ function buttonByAnyLabel(labels: string[], scope = '', exclude = ''): string {
 }
 
 /**
+ * A `<button>` whose visible **text** is any of `labels`, for the controls that
+ * carry no `aria-label` (Arco Buttons render their label as text).
+ *
+ * `:has-text()` is a case-insensitive substring match — the same semantics as the
+ * hand-written English/Chinese pairs this replaces. `scope` is distributed for
+ * the reason given on {@link buttonByAnyLabel}.
+ */
+export function buttonWithText(labels: string[], scope = ''): string {
+  const prefix = scope ? `${scope} ` : '';
+  return labels.map((label) => `${prefix}button:has-text("${label}")`).join(', ');
+}
+
+/**
  * AionModal's header close button, in whatever language the app is running.
  *
  * Both header variants label the button `aria-label={t('common.close')}`, so a
@@ -206,6 +219,20 @@ export function channelSwitchById(id: string): string {
 export function webuiTabByKey(key: 'webui' | 'channels'): string {
   return `[data-webui-tab="${key}"]`;
 }
+
+// ── Agent Settings ──────────────────────────────────────────────────────────
+
+/**
+ * "Add custom Agent" dropdown trigger, and its "Add manually" menu item.
+ *
+ * TalkToButlerButton forwards its `data-testid` to the Arco Button and derives
+ * `${testId}-manual` for the manual Menu.Item, so neither needs a translated
+ * label. Arco strips only `popup`/`triggerProps`/`selectable` from a Menu.Item,
+ * so `data-*` reaches the DOM — two unit tests already select the `-manual` node
+ * that way.
+ */
+export const BTN_ADD_CUSTOM_AGENT = '[data-testid="btn-add-custom-agent"]';
+export const BTN_ADD_CUSTOM_AGENT_MANUAL = '[data-testid="btn-add-custom-agent-manual"]';
 
 // ── Assistant Settings ──────────────────────────────────────────────────────
 
