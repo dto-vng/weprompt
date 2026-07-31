@@ -692,14 +692,64 @@
   "notFound": "會話不存在或已被刪除",
   "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "業務回顧",
+        "description": "季度業績簡報 — KPI 概覽、分部細節、前景展望。藏青與琥珀色。"
+      },
+      "project-kickoff": {
+        "name": "專案啟動",
+        "description": "啟動簡報 — 範圍、團隊、時程、後續步驟。清爽青綠色。"
+      },
+      "monthly-steerco": {
+        "name": "月度指導委員會",
+        "description": "指導委員會報告 — 專案組合狀態、風險、待決事項。襯線體與金色。"
+      },
+      "connected-ops": {
+        "name": "互聯營運",
+        "description": "營運回顧 — 場站指標、運行時間、事件。工業綠。"
+      },
+      "editorial-field-report": {
+        "name": "編輯式實地報告",
+        "description": "長篇報告 — 襯線字體、以行文取代要點、單一紅色強調。"
+      },
+      "market-trends-report": {
+        "name": "市場趨勢報告",
+        "description": "以資料為主的滾動報告 — 附來源說明的圖表。"
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "極簡淺色簡報 — 每頁一個觀點、單一藍色強調。"
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "面向技術分享的極簡深色簡報 — 適合展示程式碼、綠色強調。"
+      },
+      "business-report": {
+        "name": "業務報告",
+        "description": "長篇正式報告 — 封面、目錄、資料表格、藏青襯線標題。"
+      },
+      "decision-memo": {
+        "name": "決策備忘錄",
+        "description": "簡短決策備忘錄 — 收件人/寄件人/主旨欄、結論前置、無封面。"
+      },
+      "operations-guide": {
+        "name": "營運指南",
+        "description": "精簡作業程序 — 編號步驟、提示框、檢查清單、青綠強調。"
+      },
+      "proposal-sow": {
+        "name": "提案 / SOW",
+        "description": "客戶提案 — 範圍、時程、報價表、簽署欄。"
+      }
+    },
     "title": "範本",
     "columnPptx": "簡報 · PPTX",
-    "columnHtml": "報告 · HTML",
+    "columnHtml": "網頁 · HTML",
     "columnDocx": "文件 · DOCX",
     "selected": "已選擇",
     "buttonTooltip": "範本",
     "slashDescription": "選擇範本",
-    "importCard": "匯入主題 (.md)",
+    "importCard": "匯入範本 (.md)",
     "empty": "沒有可用的範本",
     "chipTooltip": "此訊息將使用該範本",
     "importSuccess": "範本已匯入",

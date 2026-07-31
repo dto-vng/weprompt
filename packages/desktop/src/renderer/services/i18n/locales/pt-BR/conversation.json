@@ -698,14 +698,64 @@
   "notFound": "Conversa não encontrada ou foi deletada",
   "emptyModelReply": "O modelo encerrou o turno sem produzir uma resposta visível. Envie a solicitação novamente; para saídas grandes, peça o resultado em partes menores.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Revisão de negócios",
+        "description": "Apresentação de resultados trimestrais — resumo de KPIs, detalhe por segmento, perspectivas. Azul-marinho e âmbar."
+      },
+      "project-kickoff": {
+        "name": "Início de projeto",
+        "description": "Apresentação de abertura — escopo, equipe, cronograma, próximos passos. Verde-azulado limpo."
+      },
+      "monthly-steerco": {
+        "name": "Comitê diretivo mensal",
+        "description": "Relato ao comitê diretivo — status do portfólio, riscos, decisões necessárias. Serifada e dourado."
+      },
+      "connected-ops": {
+        "name": "Operações conectadas",
+        "description": "Revisão de operações — métricas por unidade, disponibilidade, incidentes. Verde industrial."
+      },
+      "editorial-field-report": {
+        "name": "Relatório de campo editorial",
+        "description": "Relatório de leitura longa — tipografia serifada, texto corrido em vez de tópicos, um acento vermelho."
+      },
+      "market-trends-report": {
+        "name": "Relatório de tendências de mercado",
+        "description": "Relatório de rolagem focado em dados — gráficos com fontes citadas."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Apresentação clara e minimalista — uma ideia por slide, um acento azul."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Apresentação escura e minimalista para palestras técnicas — boa para código, acento verde."
+      },
+      "business-report": {
+        "name": "Relatório de negócios",
+        "description": "Relatório formal extenso — capa, sumário, tabelas de dados, títulos serifados azul-marinho."
+      },
+      "decision-memo": {
+        "name": "Memorando de decisão",
+        "description": "Memorando curto de decisão — bloco PARA/DE/ASSUNTO, recomendação no início, sem capa."
+      },
+      "operations-guide": {
+        "name": "Guia de operações",
+        "description": "Procedimento compacto — etapas numeradas, caixas de nota, checklists, acento verde-azulado."
+      },
+      "proposal-sow": {
+        "name": "Proposta / SOW",
+        "description": "Proposta para cliente — escopo, cronograma, tabela de preços, bloco de assinatura."
+      }
+    },
     "title": "Modelos",
     "columnPptx": "Apresentações · PPTX",
-    "columnHtml": "Relatórios · HTML",
+    "columnHtml": "Web · HTML",
     "columnDocx": "Documentos · DOCX",
     "selected": "Selecionado",
     "buttonTooltip": "Modelos",
     "slashDescription": "Escolher um modelo",
-    "importCard": "Importar tema (.md)",
+    "importCard": "Importar modelo (.md)",
     "empty": "Nenhum modelo disponível",
     "chipTooltip": "Esta mensagem usará o modelo",
     "importSuccess": "Modelo importado",

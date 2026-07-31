@@ -692,14 +692,64 @@
   "notFound": "会話が存在しないか、削除されました",
   "emptyModelReply": "モデルは表示可能な返答を生成せずにターンを終了しました。もう一度送信してください。大きな出力が必要な場合は、結果を分割して依頼してください。",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "ビジネスレビュー",
+        "description": "四半期業績のデッキ — KPI サマリー、セグメント詳細、見通し。ネイビーとアンバー。"
+      },
+      "project-kickoff": {
+        "name": "プロジェクトキックオフ",
+        "description": "キックオフ用デッキ — スコープ、体制、スケジュール、次のステップ。クリーンなティール。"
+      },
+      "monthly-steerco": {
+        "name": "月次ステアリングコミッティ",
+        "description": "ステアリングコミッティ報告 — ポートフォリオ状況、リスク、要決定事項。セリフ体とゴールド。"
+      },
+      "connected-ops": {
+        "name": "コネクテッドオペレーション",
+        "description": "運用レビュー — 拠点指標、稼働率、インシデント。インダストリアルグリーン。"
+      },
+      "editorial-field-report": {
+        "name": "エディトリアルフィールドレポート",
+        "description": "長文レポート — セリフ体、箇条書きより文章、赤のアクセント 1 色。"
+      },
+      "market-trends-report": {
+        "name": "市場トレンドレポート",
+        "description": "データ中心のスクロール型レポート — 出典付きのチャート。"
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "ミニマルなライトデッキ — 1 スライド 1 メッセージ、青のアクセント 1 色。"
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "技術発表向けのミニマルなダークデッキ — コード表示に適した緑のアクセント。"
+      },
+      "business-report": {
+        "name": "ビジネスレポート",
+        "description": "長文の正式レポート — 表紙、目次、データ表、ネイビーのセリフ体見出し。"
+      },
+      "decision-memo": {
+        "name": "意思決定メモ",
+        "description": "短い意思決定メモ — 宛先/差出人/件名、推奨事項を冒頭に、表紙なし。"
+      },
+      "operations-guide": {
+        "name": "オペレーションガイド",
+        "description": "コンパクトな手順書 — 番号付き手順、注記ボックス、チェックリスト、ティールのアクセント。"
+      },
+      "proposal-sow": {
+        "name": "提案書 / SOW",
+        "description": "顧客向け提案書 — スコープ、スケジュール、価格表、署名欄。"
+      }
+    },
     "title": "テンプレート",
     "columnPptx": "プレゼンテーション · PPTX",
-    "columnHtml": "レポート · HTML",
+    "columnHtml": "Web · HTML",
     "columnDocx": "ドキュメント · DOCX",
     "selected": "選択済み",
     "buttonTooltip": "テンプレート",
     "slashDescription": "テンプレートを選択",
-    "importCard": "テーマをインポート (.md)",
+    "importCard": "テンプレートをインポート (.md)",
     "empty": "利用可能なテンプレートがありません",
     "chipTooltip": "このメッセージはテンプレートを使用します",
     "importSuccess": "テンプレートをインポートしました",

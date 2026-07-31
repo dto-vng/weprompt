@@ -753,14 +753,64 @@
   },
   "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Business Review",
+        "description": "Quarterly results deck — KPI summary, segment detail, outlook. Navy and amber."
+      },
+      "project-kickoff": {
+        "name": "Project Kickoff",
+        "description": "Kickoff deck — scope, team, timeline, next steps. Clean teal."
+      },
+      "monthly-steerco": {
+        "name": "Monthly SteerCo",
+        "description": "Steering committee update — portfolio status, risks, decisions needed. Serif and gold."
+      },
+      "connected-ops": {
+        "name": "Connected Ops",
+        "description": "Operations review — site metrics, uptime, incidents. Industrial green."
+      },
+      "editorial-field-report": {
+        "name": "Editorial Field Report",
+        "description": "Long-read report — serif type, prose over bullets, one red accent."
+      },
+      "market-trends-report": {
+        "name": "Market Trends Report",
+        "description": "Data-forward scrolling report — charted exhibits with sourced notes."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimal light deck — one idea per slide, single blue accent."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Minimal dark deck for technical talks — code-friendly, green accent."
+      },
+      "business-report": {
+        "name": "Business Report",
+        "description": "Long-form formal report — cover, contents, data tables, navy serif headings."
+      },
+      "decision-memo": {
+        "name": "Decision Memo",
+        "description": "Short decision memo — TO/FROM/RE block, recommendation up front, no cover."
+      },
+      "operations-guide": {
+        "name": "Operations Guide",
+        "description": "Compact SOP — numbered steps, note boxes, checklists, teal accent."
+      },
+      "proposal-sow": {
+        "name": "Proposal / SOW",
+        "description": "Client proposal — scope, timeline, pricing table, signature block."
+      }
+    },
     "title": "Templates",
     "columnPptx": "Presentations · PPTX",
-    "columnHtml": "Reports · HTML",
+    "columnHtml": "Web · HTML",
     "columnDocx": "Documents · DOCX",
     "selected": "Selected",
     "buttonTooltip": "Templates",
     "slashDescription": "Choose a template",
-    "importCard": "Import theme (.md)",
+    "importCard": "Import template (.md)",
     "empty": "No templates available",
     "chipTooltip": "This message will use the template",
     "importSuccess": "Template imported",
