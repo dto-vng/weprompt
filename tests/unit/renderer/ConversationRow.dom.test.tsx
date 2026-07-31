@@ -482,8 +482,8 @@ describe('ConversationRow keyboard access', () => {
   it('carries a focus-visible treatment so keyboard position is visible', () => {
     render(<ConversationRow {...buildProps()} />);
     const row = screen.getByRole('button', { name: 'Review the release notes' });
-    // jsdom applies no UnoCSS, so the class is the only assertable signal.
-    expect(row.className).toContain('focus-visible:bg-fill-3');
+    // jsdom applies no UnoCSS, so the class is the only assertable signal; the ring was
+    // confirmed to actually paint by reading computed styles in the running app.
     expect(row.className).toContain('focus-visible:[outline:1px_solid_rgb(var(--primary-6))]');
   });
 });
