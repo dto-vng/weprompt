@@ -47,6 +47,63 @@ function createManagedAcpToolFixture({
   return platformRoot;
 }
 
+function createSchema2ManagedResourcesFixture(managedResourcesDir: string) {
+  rmSync(managedResourcesDir, { recursive: true, force: true });
+
+  const manifestPath = join(managedResourcesDir, 'manifest.json');
+  const nodeRoot = join(managedResourcesDir, 'node', 'node-v24.11.0-win-x64');
+  const claudeRoot = join(managedResourcesDir, 'cli', 'claude', '2.1.215', 'win32-x64');
+  const codexRoot = join(managedResourcesDir, 'cli', 'codex', '0.144.6', 'win32-x64');
+  const codexPlatformRoot = join(codexRoot, 'vendor', 'x86_64-pc-windows-msvc');
+  const codexRequiredFile = join(codexPlatformRoot, 'codex-path', 'rg.exe');
+  const codexRequiredDirectory = join(codexPlatformRoot, 'codex-resources');
+  const manifest = {
+    schemaVersion: 2,
+    runtimeKey: 'win32-x64',
+    node: {
+      version: '24.11.0',
+      root: 'node/node-v24.11.0-win-x64',
+      executable: 'node.exe',
+    },
+    clis: [
+      {
+        name: 'claude',
+        version: '2.1.215',
+        root: 'cli/claude/2.1.215/win32-x64',
+        platformDirectory: 'win32-x64',
+        executable: 'claude.exe',
+        requiredFiles: [],
+        requiredDirectories: [],
+      },
+      {
+        name: 'codex',
+        version: '0.144.6',
+        root: 'cli/codex/0.144.6/win32-x64',
+        platformDirectory: 'win32-x64',
+        executable: 'vendor/x86_64-pc-windows-msvc/bin/codex.exe',
+        requiredFiles: ['vendor/x86_64-pc-windows-msvc/codex-path/rg.exe'],
+        requiredDirectories: ['vendor/x86_64-pc-windows-msvc/codex-resources'],
+      },
+    ],
+  };
+
+  writeFile(join(nodeRoot, 'node.exe'));
+  writeFile(join(claudeRoot, 'claude.exe'));
+  writeFile(join(codexPlatformRoot, 'bin', 'codex.exe'));
+  writeFile(codexRequiredFile);
+  mkdirSync(codexRequiredDirectory, { recursive: true });
+  writeJson(manifestPath, manifest);
+
+  return {
+    manifest,
+    manifestPath,
+    nodeExecutable: join(nodeRoot, 'node.exe'),
+    claudeExecutable: join(claudeRoot, 'claude.exe'),
+    codexRequiredFile,
+    codexRequiredDirectory,
+  };
+}
+
 describe('verifyBundledAioncoreResources', () => {
   let tmp: string;
   let resourcesDir: string;
@@ -224,4 +281,133 @@ describe('verifyBundledAioncoreResources', () => {
       'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/0.14.0/win32-x64/node_modules/@zed-industries/codex-acp-win32-x64/bin/codex-acp.exe'
     );
   });
+
+  it('passes when a schema-2 manifest declares the bundled node and CLIs', () => {
+    createSchema2ManagedResourcesFixture(managedResourcesDir);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toEqual([]);
+    expect(result.checked).toContain('bundled-aioncore/win32-x64/managed-resources/manifest.json');
+    expect(result.checked).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/cli/codex/0.144.6/win32-x64/vendor/x86_64-pc-windows-msvc/codex-path/rg.exe'
+    );
+  });
+
+  it('reports a missing node executable declared by a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    rmSync(fixture.nodeExecutable);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/node/node-v24.11.0-win-x64/node.exe'
+    );
+  });
+
+  it('reports a missing CLI executable declared by a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    rmSync(fixture.claudeExecutable);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/cli/claude/2.1.215/win32-x64/claude.exe'
+    );
+  });
+
+  it('reports a missing required CLI file declared by a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    rmSync(fixture.codexRequiredFile);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/cli/codex/0.144.6/win32-x64/vendor/x86_64-pc-windows-msvc/codex-path/rg.exe'
+    );
+  });
+
+  it('reports a missing required CLI directory declared by a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    rmSync(fixture.codexRequiredDirectory, { recursive: true });
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/cli/codex/0.144.6/win32-x64/vendor/x86_64-pc-windows-msvc/codex-resources'
+    );
+  });
+
+  it('reports schema-2 runtime and CLI platform mismatches', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    fixture.manifest.runtimeKey = 'linux-x64';
+    fixture.manifest.clis[0].platformDirectory = 'linux-x64';
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<runtimeKey:win32-x64>'
+    );
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude].platformDirectory:win32-x64>'
+    );
+  });
+
+  it('reports a required CLI omitted from a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    fixture.manifest.clis = fixture.manifest.clis.filter((cli) => cli.name !== 'claude');
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain('bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude]>');
+  });
+
+  it.each(['../escape', '/absolute/path', 'C:/absolute/path'])(
+    'rejects unsafe schema-2 paths without checking outside the bundle: %s',
+    (unsafeRoot) => {
+      const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+      fixture.manifest.clis[0].root = unsafeRoot;
+      writeJson(fixture.manifestPath, fixture.manifest);
+
+      const result = verifyBundledAioncoreResources({
+        resourcesDir,
+        electronPlatformName: 'win32',
+        targetArch: 'x64',
+      });
+
+      expect(result.missing).toContain(
+        'bundled-aioncore/win32-x64/managed-resources/manifest.json<invalid-path:clis[claude].root>'
+      );
+    }
+  );
 });

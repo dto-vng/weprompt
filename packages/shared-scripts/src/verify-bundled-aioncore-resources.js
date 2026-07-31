@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const REQUIRED_SCHEMA_2_CLI_NAMES = ['claude', 'codex'];
+
 function backendBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
 }
@@ -138,6 +140,142 @@ function readManifest(manifestPath) {
   }
 }
 
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSafeManifestRelativePath(value) {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.includes('\\') ||
+    value.includes('\0') ||
+    path.posix.isAbsolute(value) ||
+    /^[a-zA-Z]:/.test(value)
+  ) {
+    return false;
+  }
+
+  return value.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..');
+}
+
+function schema2ManifestProblem(runtimeKey, problem) {
+  return `${bundledPath(runtimeKey, 'managed-resources', 'manifest.json')}<${problem}>`;
+}
+
+function readManifestPathParts(runtimeKey, value, field, missing) {
+  if (!isSafeManifestRelativePath(value)) {
+    missing.push(schema2ManifestProblem(runtimeKey, `invalid-path:${field}`));
+    return null;
+  }
+
+  return value.split('/');
+}
+
+function verifySchema2Node(baseDir, runtimeKey, node, checked, missing) {
+  if (!isObject(node)) {
+    missing.push(schema2ManifestProblem(runtimeKey, 'node'));
+    return;
+  }
+
+  const rootParts = readManifestPathParts(runtimeKey, node.root, 'node.root', missing);
+  const executableParts = readManifestPathParts(runtimeKey, node.executable, 'node.executable', missing);
+
+  if (rootParts) {
+    requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts], checked, missing);
+  }
+  if (rootParts && executableParts) {
+    requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...executableParts], checked, missing);
+  }
+}
+
+function verifySchema2Cli(baseDir, runtimeKey, cli, index, checked, missing) {
+  if (!isObject(cli) || typeof cli.name !== 'string' || cli.name.length === 0) {
+    missing.push(schema2ManifestProblem(runtimeKey, `clis[${index}].name`));
+    return null;
+  }
+
+  const label = `clis[${cli.name}]`;
+  if (cli.platformDirectory !== runtimeKey) {
+    missing.push(schema2ManifestProblem(runtimeKey, `${label}.platformDirectory:${runtimeKey}`));
+  }
+
+  const rootParts = readManifestPathParts(runtimeKey, cli.root, `${label}.root`, missing);
+  const executableParts = readManifestPathParts(runtimeKey, cli.executable, `${label}.executable`, missing);
+
+  if (rootParts) {
+    requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts], checked, missing);
+  }
+  if (rootParts && executableParts) {
+    requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...executableParts], checked, missing);
+  }
+
+  verifySchema2CliPaths(baseDir, runtimeKey, cli, label, 'requiredFiles', rootParts, checked, missing);
+  verifySchema2CliPaths(baseDir, runtimeKey, cli, label, 'requiredDirectories', rootParts, checked, missing);
+
+  return cli.name;
+}
+
+function verifySchema2CliPaths(baseDir, runtimeKey, cli, label, field, rootParts, checked, missing) {
+  const values = cli[field];
+  if (values === undefined) return;
+  if (!Array.isArray(values)) {
+    missing.push(schema2ManifestProblem(runtimeKey, `${label}.${field}`));
+    return;
+  }
+
+  for (const [index, value] of values.entries()) {
+    const parts = readManifestPathParts(runtimeKey, value, `${label}.${field}[${index}]`, missing);
+    if (!rootParts || !parts) continue;
+
+    if (field === 'requiredFiles') {
+      requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...parts], checked, missing);
+    } else {
+      requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...parts], checked, missing);
+    }
+  }
+}
+
+function verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing) {
+  const manifestParts = ['managed-resources', 'manifest.json'];
+  const manifestPath = path.join(baseDir, ...manifestParts);
+
+  if (!isFile(manifestPath)) return false;
+
+  const manifest = readManifest(manifestPath);
+  if (!manifest) {
+    checked.push(bundledPath(runtimeKey, ...manifestParts));
+    missing.push(schema2ManifestProblem(runtimeKey, 'invalid-json'));
+    return true;
+  }
+  if (manifest.schemaVersion !== 2) return false;
+
+  checked.push(bundledPath(runtimeKey, ...manifestParts));
+  if (manifest.runtimeKey !== runtimeKey) {
+    missing.push(schema2ManifestProblem(runtimeKey, `runtimeKey:${runtimeKey}`));
+  }
+
+  verifySchema2Node(baseDir, runtimeKey, manifest.node, checked, missing);
+
+  if (!Array.isArray(manifest.clis)) {
+    missing.push(schema2ManifestProblem(runtimeKey, 'clis'));
+    return true;
+  }
+
+  const cliNames = new Set();
+  for (const [index, cli] of manifest.clis.entries()) {
+    const name = verifySchema2Cli(baseDir, runtimeKey, cli, index, checked, missing);
+    if (name) cliNames.add(name);
+  }
+  for (const requiredName of REQUIRED_SCHEMA_2_CLI_NAMES) {
+    if (!cliNames.has(requiredName)) {
+      missing.push(schema2ManifestProblem(runtimeKey, `clis[${requiredName}]`));
+    }
+  }
+
+  return true;
+}
+
 function requireManagedAcpTool(baseDir, runtimeKey, platform, toolId, checked, missing) {
   const toolRoot = path.join(baseDir, 'managed-resources', 'acp', toolId);
   const versions = readDirectories(toolRoot);
@@ -234,9 +372,12 @@ function verifyBundledAioncoreResources({ resourcesDir, electronPlatformName, ta
   requireRelativePath(baseDir, runtimeKey, [backendBinaryName(electronPlatformName)], checked, missing);
   verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetArch, checked, missing);
   requireRelativeDirectory(baseDir, runtimeKey, ['managed-resources'], checked, missing);
-  requireManagedNode(baseDir, runtimeKey, electronPlatformName, checked, missing);
-  requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'codex-acp', checked, missing);
-  requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'claude-agent-acp', checked, missing);
+  const verifiedSchema2 = verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing);
+  if (!verifiedSchema2) {
+    requireManagedNode(baseDir, runtimeKey, electronPlatformName, checked, missing);
+    requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'codex-acp', checked, missing);
+    requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'claude-agent-acp', checked, missing);
+  }
 
   return { runtimeKey, checked, missing };
 }
