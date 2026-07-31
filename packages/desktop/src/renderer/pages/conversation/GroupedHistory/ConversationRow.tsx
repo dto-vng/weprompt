@@ -40,6 +40,7 @@ import {
   resolveConversationStatusTooltipKey,
 } from './utils/conversationStatus';
 import { isConversationPinned } from './utils/groupingHelpers';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 const ConversationRow: React.FC<ConversationRowProps> = (props) => {
   const {
@@ -280,6 +281,7 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
       <div
         id={'c-' + conversation.id}
         className={classNames(
+          ROW_FOCUS_RING,
           'chat-history__item h-34px rd-8px flex items-center group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-2px min-w-0 transition-colors',
           collapsed ? 'justify-center px-0' : 'justify-start gap-8px pr-16px',
           // dimIcon means this row sits inside a project/cron parent — visually indent the row content while keeping the bg full-width
@@ -292,6 +294,10 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
         )}
         onClick={handleRowClick}
         onContextMenu={handleRowContextMenu}
+        role='button'
+        tabIndex={0}
+        aria-label={conversationName}
+        onKeyDown={activateOnEnterOrSpace(handleRowClick)}
       >
         {batchMode && (
           <span

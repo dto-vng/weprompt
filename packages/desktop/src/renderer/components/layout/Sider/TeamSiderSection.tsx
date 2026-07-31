@@ -21,6 +21,7 @@ import { ipcBridge } from '@/common';
 import SiderItem from './SiderItem';
 import type { SiderMenuItem } from './SiderItem';
 import { useSiderTeamRunning } from './useSiderTeamRunning';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 const TEAM_PINNED_KEY = 'team-pinned-ids';
 
@@ -123,10 +124,15 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
                     className={classNames(
                       // 34px matches every other row in the collapsed rail (nav entries,
                       // new-chat, conversation rows); this was 40px and broke the pitch.
+                      ROW_FOCUS_RING,
                       'relative w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px',
                       isActive ? '!bg-active' : 'hover:bg-fill-3 active:bg-fill-4'
                     )}
                     onClick={() => handleTeamClick(team.id)}
+                    role='button'
+                    tabIndex={0}
+                    aria-label={team.name}
+                    onKeyDown={activateOnEnterOrSpace(() => handleTeamClick(team.id))}
                   >
                     {isRunning ? (
                       <span

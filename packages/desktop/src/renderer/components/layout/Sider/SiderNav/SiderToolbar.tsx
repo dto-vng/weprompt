@@ -11,6 +11,7 @@ import { Plus } from '@icon-park/react';
 import classNames from 'classnames';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
 import styles from '../Sider.module.css';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 interface SiderToolbarProps {
   isMobile: boolean;
@@ -28,10 +29,15 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderT
         <Tooltip {...siderTooltipProps} content={t('conversation.welcome.newConversation')} position='right'>
           <div
             className={classNames(
+              ROW_FOCUS_RING,
               'w-full h-34px flex items-center justify-center cursor-pointer transition-colors text-t-primary rd-8px hover:bg-fill-3 active:bg-fill-4',
               styles.newChatTrigger
             )}
             onClick={onNewChat}
+            role='button'
+            tabIndex={0}
+            aria-label={t('conversation.welcome.newConversation')}
+            onKeyDown={activateOnEnterOrSpace(onNewChat)}
           >
             <Plus
               theme='outline'
@@ -51,11 +57,16 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderT
       <Tooltip {...siderTooltipProps} content={t('conversation.welcome.newConversation')} position='right'>
         <div
           className={classNames(
+            ROW_FOCUS_RING,
             styles.newChatTrigger,
             'h-34px flex-1 flex items-center justify-start gap-8px pl-10px pr-8px rd-0.5rem cursor-pointer group transition-all bg-transparent text-t-primary hover:bg-fill-3 active:bg-fill-4',
             isMobile && 'sider-action-btn-mobile'
           )}
           onClick={onNewChat}
+          role='button'
+          tabIndex={0}
+          aria-label={t('conversation.welcome.newConversation')}
+          onKeyDown={activateOnEnterOrSpace(onNewChat)}
         >
           <span className='size-22px rd-6px bg-[rgba(var(--primary-6),0.12)] border border-solid border-[rgba(var(--primary-6),0.24)] text-primary group-hover:bg-[rgba(var(--primary-6),0.2)] group-hover:border-[rgba(var(--primary-6),0.32)] flex items-center justify-center shrink-0 transition-colors'>
             <Plus

@@ -5,6 +5,7 @@
  */
 
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import { Dropdown, Menu, Tooltip } from '@arco-design/web-react';
 import { MoreOne, Pushpin } from '@icon-park/react';
 import classNames from 'classnames';
@@ -57,6 +58,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
       <div
         className={classNames(
           'h-34px rd-8px flex items-center gap-8px pl-10px pr-8px cursor-pointer relative overflow-hidden shrink-0 group min-w-0 transition-colors',
+          ROW_FOCUS_RING,
           {
             'hover:bg-fill-3': !selected,
             '!bg-fill-3': selected,
@@ -64,6 +66,10 @@ const SiderItem: React.FC<SiderItemProps> = ({
         )}
         onClick={onClick}
         onContextMenu={onContextMenu}
+        role='button'
+        tabIndex={0}
+        aria-label={name}
+        onKeyDown={activateOnEnterOrSpace(() => onClick?.())}
       >
         {/* Leading icon — pushpin overlays this slot on hover when row is pinned */}
         <span className='size-22px flex items-center justify-center shrink-0 line-height-0 text-t-primary relative'>
