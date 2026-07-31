@@ -44,11 +44,10 @@ import type {
   KnowledgeManifest,
   KnowledgeManifestSource,
 } from '@/common/knowledge/types';
-import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
+import { BUILTIN_KNOWLEDGE_NAME, EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
 import { MAX_KNOWLEDGE_FILE_BYTES, scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
 import { resolveOcrModel as defaultResolveOcrModel, type OcrModelResolution } from './ocrProviderPicker';
-import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
 const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);

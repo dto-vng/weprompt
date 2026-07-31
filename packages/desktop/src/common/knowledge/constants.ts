@@ -23,3 +23,14 @@ export const KNOWLEDGE_FOLDER_NAME = 'Knowledge Base';
  * a duplicate of every binary document's text.
  */
 export const EXTRACTED_TEXT_DIR_NAME = '.text';
+
+/**
+ * Name of the built-in project-knowledge MCP server. Also the name persisted
+ * in a conversation's frozen `extra.session_mcp_servers` snapshot, which is
+ * what lets the renderer tell whether a chat was created with knowledge
+ * search attached. It lives here rather than beside the other builtin-MCP
+ * names in `process/resources/builtinMcp/constants.ts` because the renderer
+ * may not import from `process/` — and a second copy of the literal is how
+ * the persona-label bug happened.
+ */
+export const BUILTIN_KNOWLEDGE_NAME = 'aionui-project-knowledge';

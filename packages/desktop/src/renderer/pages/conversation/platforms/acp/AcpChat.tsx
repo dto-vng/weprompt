@@ -6,6 +6,7 @@
 
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
+import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
 import { CHAT_SURFACE_CONTAINER_CLASS } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
 import { useTeamPermission } from '@/renderer/pages/team/hooks/TeamPermissionContext';
 import type { TeamSendBoxRuntime } from '@/renderer/pages/team/components/teamSendRuntime';
@@ -41,6 +42,9 @@ const AcpChat: React.FC<{
   teamSendMessage?: (payload: { input: string; files: string[] }) => Promise<void>;
   teamRuntime?: TeamSendBoxRuntime;
   assistantId?: string;
+  project_id?: string;
+  /** Frozen-at-create MCP snapshot; validated by the hint, not trusted here. */
+  session_mcp_servers?: unknown;
 }> = ({
   conversation_id,
   workspace,
@@ -57,6 +61,8 @@ const AcpChat: React.FC<{
   teamSendMessage,
   teamRuntime,
   assistantId,
+  project_id,
+  session_mcp_servers,
 }) => {
   useMessageLstCache(conversation_id);
   usePendingConfirmationsRecovery(conversation_id);
@@ -87,17 +93,25 @@ const AcpChat: React.FC<{
           </FlexFullContainer>
           <AcpE2EStreamInjector conversationId={conversation_id} />
           {!hideSendBox && (
-            <AcpSendBox
-              conversation_id={conversation_id}
-              backend={backend}
-              session_mode={session_mode}
-              agent_name={agent_name}
-              modelSelector={modelSelector}
-              workspacePath={workspace}
-              messageState={messageState}
-              teamSendMessage={teamSendMessage}
-              teamRuntime={teamRuntime}
-            ></AcpSendBox>
+            <>
+              <KbStaleChatHint
+                conversationId={conversation_id}
+                projectId={project_id}
+                workspace={workspace}
+                sessionMcpServers={session_mcp_servers}
+              />
+              <AcpSendBox
+                conversation_id={conversation_id}
+                backend={backend}
+                session_mode={session_mode}
+                agent_name={agent_name}
+                modelSelector={modelSelector}
+                workspacePath={workspace}
+                messageState={messageState}
+                teamSendMessage={teamSendMessage}
+                teamRuntime={teamRuntime}
+              ></AcpSendBox>
+            </>
           )}
         </div>
       </ConversationArtifactProvider>

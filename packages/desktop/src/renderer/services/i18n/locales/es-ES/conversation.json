@@ -840,5 +840,10 @@
     "doneIdle": "Finalizado hace al menos un minuto y ya visto.",
     "stopped": "Detenido antes de finalizar.",
     "failed": "No se pudo finalizar debido a un error."
+  },
+  "staleKnowledgeHint": {
+    "body": "Este chat no puede buscar en la base de conocimiento del proyecto: se inició antes de que se añadieran archivos.",
+    "changedBody": "La base de conocimiento cambió: los chats nuevos verán los archivos más recientes.",
+    "action": "Iniciar un chat nuevo"
   }
 }

@@ -11,12 +11,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
+import { BUILTIN_KNOWLEDGE_NAME, EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
 import { readManifest } from '@/common/knowledge/store';
-import { BUILTIN_KNOWLEDGE_NAME } from './constants';
 
 export type KnowledgeServerEnv = {
   projectId: string;
