@@ -38,6 +38,7 @@ export type CompactConversationContextInput = {
   trigger: TContextCompactionTrigger;
   targetTurnId?: string;
   budgetStatus?: TContextBudgetStatus;
+  turnsSinceCompaction?: number;
   operationId?: string;
   signal?: AbortSignal;
 };
@@ -163,6 +164,10 @@ export const compactConversationContext = async (
   if (!isAionrsConversation(conversation)) throw new ContextCompactionOperationError('unsupported_conversation');
 
   const contextState = getConversationContextHandoffExtra(conversation);
+  const durableTurnsSinceCompaction =
+    input.trigger === 'auto' && input.turnsSinceCompaction !== undefined
+      ? Math.max(contextState.turns_since_compaction ?? 0, input.turnsSinceCompaction)
+      : contextState.turns_since_compaction;
   const pinnedContext = getConversationPinnedContext(conversation);
   const { fileName, filePath } = resolveContextFile(input.workspace);
   const [messages, currentMarkdown] = await Promise.all([
@@ -175,7 +180,7 @@ export const compactConversationContext = async (
   const updating = buildContextSnapshotStatePatch(conversation, {
     source: contextState.source,
     status: 'updating',
-    turnsSinceCompaction: contextState.turns_since_compaction,
+    turnsSinceCompaction: durableTurnsSinceCompaction,
     updatedAt: now,
     lastErrorCode: null,
     didPersistFileUpdate: false,
@@ -243,7 +248,7 @@ export const compactConversationContext = async (
     const failed = buildContextSnapshotStatePatch(conversation, {
       source,
       status: 'failed',
-      turnsSinceCompaction: contextState.turns_since_compaction,
+      turnsSinceCompaction: durableTurnsSinceCompaction,
       updatedAt: dependencies.now(),
       lastErrorCode: 'file_write_failed',
       didPersistFileUpdate: false,
@@ -491,6 +496,7 @@ const updateContextTurnStreamEvidence = (
   }
   if (
     (message.type === 'text' || message.type === 'content') &&
+    (message.position === undefined || message.position === 'left') &&
     message.hidden !== true &&
     readMessageContentText(message.data).length > 0
   ) {
@@ -594,7 +600,8 @@ export type UseContextCompactionResult = {
   compact: (
     trigger?: TContextCompactionTrigger,
     targetTurnId?: string,
-    budgetStatus?: TContextBudgetStatus
+    budgetStatus?: TContextBudgetStatus,
+    turnsSinceCompaction?: number
   ) => Promise<CompactConversationContextResult | null>;
   isCompacting: boolean;
 };
@@ -608,12 +615,7 @@ export const useContextCompaction = ({
   const [isCompacting, setIsCompacting] = useState(false);
   const inFlightRef = useRef<Promise<CompactConversationContextResult | null> | null>(null);
   const pendingRequestRef = useRef<HookCompactionRequest | null>(null);
-  const pendingTurnRef = useRef<{
-    count: number;
-    latestEvent: IConversationTurnCompletedEvent;
-  } | null>(null);
   const turnStreamEvidenceRef = useRef(new Map<string, ContextTurnStreamEvidence>());
-  const processingTurnRef = useRef(false);
   const inFlightOperationIdRef = useRef<string | null>(null);
   const inFlightAbortControllerRef = useRef<AbortController | null>(null);
   const disposedRef = useRef(false);
@@ -622,7 +624,8 @@ export const useContextCompaction = ({
     (
       trigger: TContextCompactionTrigger = 'manual',
       targetTurnId?: string,
-      budgetStatus?: TContextBudgetStatus
+      budgetStatus?: TContextBudgetStatus,
+      turnsSinceCompaction?: number
     ): Promise<CompactConversationContextResult | null> => {
       const request: HookCompactionRequest = {
         conversationId,
@@ -630,6 +633,7 @@ export const useContextCompaction = ({
         trigger,
         targetTurnId,
         budgetStatus,
+        turnsSinceCompaction,
         operationId: uuid(),
         abortController: new AbortController(),
       };
@@ -742,7 +746,26 @@ export const useContextCompaction = ({
           nextBudgetStatus,
         })
       ) {
-        await compact('auto', batch.latestEvent.turn_id, nextBudgetStatus);
+        const stale = buildContextSnapshotStatePatch(
+          conversation,
+          {
+            source: contextState.source,
+            status: 'stale',
+            turnsSinceCompaction,
+            updatedAt: dependencies.now(),
+            lastErrorCode: null,
+            didPersistFileUpdate: false,
+          },
+          { last_budget_status: nextBudgetStatus }
+        );
+        const countPersisted = await dependencies.updateConversation({
+          id: conversation.id,
+          updates: { extra: stale as TChatConversation['extra'] },
+          merge_extra: true,
+        });
+        if (!countPersisted) throw new ContextCompactionOperationError('metadata_write_failed');
+        if (disposedRef.current) return;
+        await compact('auto', batch.latestEvent.turn_id, nextBudgetStatus, turnsSinceCompaction);
         return;
       }
 
@@ -770,6 +793,11 @@ export const useContextCompaction = ({
   useEffect(() => {
     if (!enabled || !conversationId) return;
 
+    let pendingTurn: {
+      count: number;
+      latestEvent: IConversationTurnCompletedEvent;
+    } | null = null;
+    let processingTurn = false;
     const unsubscribeResponseStream =
       dependencies.subscribeResponseStream?.((message) => {
         if (message.conversation_id !== conversationId || !message.turn_id) return;
@@ -778,15 +806,15 @@ export const useContextCompaction = ({
       }) ?? (() => {});
 
     const drainPendingTurns = (): void => {
-      processingTurnRef.current = true;
+      processingTurn = true;
       void (async () => {
         while (true) {
-          const current = pendingTurnRef.current;
+          const current = pendingTurn;
           if (!current) {
-            processingTurnRef.current = false;
+            processingTurn = false;
             return;
           }
-          pendingTurnRef.current = null;
+          pendingTurn = null;
           try {
             // eslint-disable-next-line no-await-in-loop -- completed-turn batches must update the shared cursor serially
             await handleCompletedTurn(current);
@@ -803,19 +831,17 @@ export const useContextCompaction = ({
       turnStreamEvidenceRef.current.delete(event.turn_id);
       if (!isMeaningfulContextTurn(event, streamEvidence)) return;
 
-      const pending = pendingTurnRef.current;
-      pendingTurnRef.current = {
-        count: (pending?.count ?? 0) + 1,
+      pendingTurn = {
+        count: (pendingTurn?.count ?? 0) + 1,
         latestEvent: event,
       };
-      if (!processingTurnRef.current) drainPendingTurns();
+      if (!processingTurn) drainPendingTurns();
     };
 
     const unsubscribeTurnCompleted = dependencies.subscribeTurnCompleted(processTurn);
     return () => {
       unsubscribeTurnCompleted();
       unsubscribeResponseStream();
-      pendingTurnRef.current = null;
       turnStreamEvidenceRef.current.clear();
     };
   }, [conversationId, dependencies, enabled, handleCompletedTurn]);

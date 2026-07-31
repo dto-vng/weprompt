@@ -199,6 +199,7 @@ describe('compactConversationContext', () => {
         trigger: 'auto',
         targetTurnId: 'turn-4',
         budgetStatus: 'healthy',
+        turnsSinceCompaction: 8,
       },
       dependencies
     );
@@ -232,6 +233,12 @@ describe('compactConversationContext', () => {
         turns_since_compaction: 0,
         context_file_path: '/workspace/Context.md',
         context_file_name: 'Context.md',
+      }),
+    });
+    expect(dependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'updating',
+        turns_since_compaction: 8,
       }),
     });
     expect(dependencies.emitRefresh).toHaveBeenCalledWith('conversation-1');
@@ -375,6 +382,100 @@ describe('compactConversationContext', () => {
     expect(dependencies.updates[0]?.updates.extra).toEqual({
       context_handoff: expect.objectContaining({ status: 'updating' }),
     });
+  });
+
+  it('retains an automatic triggering count when compaction is canceled after the updating transition', async () => {
+    const dependencies = createDependencies();
+    dependencies.compactWithAppOperations = vi.fn(async () => compactFailure('canceled'));
+
+    await expect(
+      compactConversationContext(
+        {
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          trigger: 'auto',
+          targetTurnId: 'turn-8',
+          turnsSinceCompaction: 8,
+        },
+        dependencies
+      )
+    ).rejects.toBeInstanceOf(ContextCompactionCanceledError);
+
+    expect(dependencies.updates).toHaveLength(1);
+    expect(dependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'updating',
+        turns_since_compaction: 8,
+      }),
+    });
+  });
+
+  it('retains an automatic triggering count when writing Context.md fails', async () => {
+    const dependencies = createDependencies();
+    dependencies.writeFile = vi.fn(async () => false);
+
+    await expect(
+      compactConversationContext(
+        {
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          trigger: 'auto',
+          targetTurnId: 'turn-8',
+          turnsSinceCompaction: 8,
+        },
+        dependencies
+      )
+    ).rejects.toMatchObject({ code: 'file_write_failed' });
+
+    expect(dependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'updating',
+        turns_since_compaction: 8,
+      }),
+    });
+    expect(dependencies.updates.at(-1)?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'failed',
+        turns_since_compaction: 8,
+      }),
+    });
+  });
+
+  it('retains an automatic triggering count when final metadata persistence fails', async () => {
+    const dependencies = createDependencies();
+    dependencies.updateConversation = vi
+      .fn<(input: TestDependencies['updates'][number]) => Promise<boolean>>()
+      .mockImplementation(async (input) => {
+        dependencies.updates.push(input);
+        return dependencies.updates.length === 1;
+      });
+
+    await expect(
+      compactConversationContext(
+        {
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          trigger: 'auto',
+          targetTurnId: 'turn-8',
+          turnsSinceCompaction: 8,
+        },
+        dependencies
+      )
+    ).rejects.toMatchObject({ code: 'metadata_write_failed' });
+
+    expect(dependencies.updates[0]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'updating',
+        turns_since_compaction: 8,
+      }),
+    });
+    expect(dependencies.updates[1]?.updates.extra).toEqual({
+      context_handoff: expect.objectContaining({
+        status: 'fresh',
+        turns_since_compaction: 0,
+      }),
+    });
+    expect(dependencies.emitRefresh).not.toHaveBeenCalled();
   });
 
   it('keeps the same snapshot fields, through turn id, and Context.md fixture output', async () => {
@@ -630,7 +731,120 @@ describe('automatic context compaction policy', () => {
     expect(runCompaction).not.toHaveBeenCalled();
   });
 
-  it('starts invisible compaction for an enriched sparse success with correlated assistant text', async () => {
+  it.each([undefined, 'left'] as const)(
+    'starts invisible compaction for correlated assistant text with position %s',
+    async (position) => {
+      let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+      let responseListener: ((event: IResponseMessage) => void) | undefined;
+      const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+        ...conversation,
+        extra: {
+          ...conversation.extra,
+          context_handoff: {
+            ...conversation.extra.context_handoff,
+            turns_since_compaction: 7,
+          },
+        },
+      };
+      const runCompaction = vi.fn(async () => ({
+        fileName: 'Context.md',
+        filePath: '/workspace/Context.md',
+        markdown: '# Context',
+        snapshot,
+        source: 'llm' as const,
+        throughTurnId: 'turn-1',
+      }));
+      const dependencies = {
+        subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+          completedListener = next;
+          return vi.fn();
+        }),
+        subscribeResponseStream: vi.fn((next: (event: IResponseMessage) => void) => {
+          responseListener = next;
+          return vi.fn();
+        }),
+        getConversation: vi.fn(async () => thresholdConversation),
+        updateConversation: vi.fn(async () => true),
+        runCompaction,
+        cancelAppOperation: vi.fn(async () => {}),
+        now: () => 100,
+      };
+
+      renderHook(() =>
+        useContextCompaction({
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          enabled: true,
+          dependencies,
+        })
+      );
+
+      act(() => {
+        responseListener?.(responseMessage('turn-1', position ? { position } : {}));
+        responseListener?.(responseMessage('turn-1', { type: 'finish', data: {} }));
+        completedListener?.(sparseCompletedTurn('turn-1', { state: 'ai_waiting_input' }));
+      });
+
+      await waitFor(() =>
+        expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-1' }))
+      );
+    }
+  );
+
+  it.each([
+    {
+      label: 'explicit user position',
+      content: responseMessage('turn-rejected', { position: 'right' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'ai_waiting_input' }),
+    },
+    {
+      label: 'explicit center position',
+      content: responseMessage('turn-rejected', { position: 'center' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'ai_waiting_input' }),
+    },
+    {
+      label: 'explicit pop position',
+      content: responseMessage('turn-rejected', { position: 'pop' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'ai_waiting_input' }),
+    },
+    {
+      label: 'mismatched conversation',
+      content: responseMessage('turn-rejected', { conversation_id: 'conversation-other', position: 'left' }),
+      finish: responseMessage('turn-rejected', {
+        conversation_id: 'conversation-other',
+        type: 'finish',
+        data: {},
+      }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'ai_waiting_input' }),
+    },
+    {
+      label: 'mismatched turn',
+      content: responseMessage('turn-other', { position: 'left' }),
+      finish: responseMessage('turn-other', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'ai_waiting_input' }),
+    },
+    {
+      label: 'enriched error state',
+      content: responseMessage('turn-rejected', { position: 'left' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'error' }),
+    },
+    {
+      label: 'enriched stopped state',
+      content: responseMessage('turn-rejected', { position: 'left' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected', { state: 'stopped' }),
+    },
+    {
+      label: 'sparse legacy completion',
+      content: responseMessage('turn-rejected', { position: 'left' }),
+      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
+      completion: sparseCompletedTurn('turn-rejected'),
+    },
+  ])('does not count $label', async ({ content, finish, completion }) => {
     let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
     let responseListener: ((event: IResponseMessage) => void) | undefined;
     const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
@@ -643,14 +857,9 @@ describe('automatic context compaction policy', () => {
         },
       },
     };
-    const runCompaction = vi.fn(async () => ({
-      fileName: 'Context.md',
-      filePath: '/workspace/Context.md',
-      markdown: '# Context',
-      snapshot,
-      source: 'llm' as const,
-      throughTurnId: 'turn-1',
-    }));
+    const getConversation = vi.fn(async () => thresholdConversation);
+    const updateConversation = vi.fn(async () => true);
+    const runCompaction = vi.fn();
     const dependencies = {
       subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
         completedListener = next;
@@ -660,8 +869,8 @@ describe('automatic context compaction policy', () => {
         responseListener = next;
         return vi.fn();
       }),
-      getConversation: vi.fn(async () => thresholdConversation),
-      updateConversation: vi.fn(async () => true),
+      getConversation,
+      updateConversation,
       runCompaction,
       cancelAppOperation: vi.fn(async () => {}),
       now: () => 100,
@@ -675,16 +884,22 @@ describe('automatic context compaction policy', () => {
         dependencies,
       })
     );
+    await waitFor(() => expect(getConversation).toHaveBeenCalledOnce());
 
     act(() => {
-      responseListener?.(responseMessage('turn-1'));
-      responseListener?.(responseMessage('turn-1', { type: 'finish', data: {} }));
-      completedListener?.(sparseCompletedTurn('turn-1', { state: 'ai_waiting_input' }));
+      responseListener?.(content);
+      responseListener?.(finish);
+      completedListener?.(completion);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
-    await waitFor(() =>
-      expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-1' }))
-    );
+    expect(getConversation).toHaveBeenCalledOnce();
+    expect(updateConversation).not.toHaveBeenCalled();
+    expect(runCompaction).not.toHaveBeenCalled();
   });
 
   it('does not count an exact sparse failed turn after an error message stream event', async () => {
@@ -998,9 +1213,198 @@ describe('automatic context compaction policy', () => {
       )
     );
     await waitFor(() =>
-      expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-3' }))
+      expect(runCompaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'auto',
+          targetTurnId: 'turn-3',
+          turnsSinceCompaction: 8,
+        })
+      )
+    );
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: {
+          extra: {
+            context_handoff: expect.objectContaining({
+              status: 'stale',
+              turns_since_compaction: 8,
+            }),
+          },
+        },
+      })
     );
     expect(getConversation).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ['cancellation before updating', new ContextCompactionCanceledError()],
+    ['Context.md write failure', new ContextCompactionOperationError('file_write_failed')],
+    ['metadata write failure', new ContextCompactionOperationError('metadata_write_failed')],
+  ])('retains a threshold-crossing burst after %s', async (_label, failure) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    let resolveFirstTurn: ((value: TChatConversation | null) => void) | undefined;
+    const firstTurnRead = new Promise<TChatConversation | null>((resolve) => {
+      resolveFirstTurn = resolve;
+    });
+    const fiveTurnConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 5,
+        },
+      },
+    };
+    const sixTurnConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...fiveTurnConversation,
+      extra: {
+        ...fiveTurnConversation.extra,
+        context_handoff: {
+          ...fiveTurnConversation.extra.context_handoff,
+          turns_since_compaction: 6,
+        },
+      },
+    };
+    const getConversation = vi
+      .fn<(conversationId: string) => Promise<TChatConversation | null>>()
+      .mockResolvedValueOnce(fiveTurnConversation)
+      .mockImplementationOnce(() => firstTurnRead)
+      .mockResolvedValue(sixTurnConversation);
+    const updateConversation = vi.fn(async () => true);
+    const runCompaction = vi.fn(async () => Promise.reject(failure));
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        completedListener = next;
+        return vi.fn();
+      }),
+      getConversation,
+      updateConversation,
+      runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
+      now: () => 100,
+    };
+
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+    await waitFor(() => expect(getConversation).toHaveBeenCalledOnce());
+
+    act(() => completedListener?.(completedTurn({ turn_id: 'turn-1' })));
+    await waitFor(() => expect(getConversation).toHaveBeenCalledTimes(2));
+    act(() => {
+      completedListener?.(completedTurn({ turn_id: 'turn-2' }));
+      completedListener?.(completedTurn({ turn_id: 'turn-3' }));
+    });
+    resolveFirstTurn?.(fiveTurnConversation);
+
+    await waitFor(() =>
+      expect(runCompaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'auto',
+          targetTurnId: 'turn-3',
+          turnsSinceCompaction: 8,
+        })
+      )
+    );
+    expect(updateConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: {
+          extra: {
+            context_handoff: expect.objectContaining({
+              status: 'stale',
+              turns_since_compaction: 8,
+            }),
+          },
+        },
+      })
+    );
+  });
+
+  it('persists a pending threshold batch when disposal happens before the updating transition', async () => {
+    let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    let resolveFirstTurn: ((value: TChatConversation | null) => void) | undefined;
+    const firstTurnRead = new Promise<TChatConversation | null>((resolve) => {
+      resolveFirstTurn = resolve;
+    });
+    const fiveTurnConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 5,
+        },
+      },
+    };
+    const sixTurnConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...fiveTurnConversation,
+      extra: {
+        ...fiveTurnConversation.extra,
+        context_handoff: {
+          ...fiveTurnConversation.extra.context_handoff,
+          turns_since_compaction: 6,
+        },
+      },
+    };
+    const getConversation = vi
+      .fn<(conversationId: string) => Promise<TChatConversation | null>>()
+      .mockResolvedValueOnce(fiveTurnConversation)
+      .mockImplementationOnce(() => firstTurnRead)
+      .mockResolvedValue(sixTurnConversation);
+    const updateConversation = vi.fn(async () => true);
+    const runCompaction = vi.fn();
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        completedListener = next;
+        return vi.fn();
+      }),
+      getConversation,
+      updateConversation,
+      runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
+      now: () => 100,
+    };
+    const { unmount } = renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+    await waitFor(() => expect(getConversation).toHaveBeenCalledOnce());
+
+    act(() => completedListener?.(completedTurn({ turn_id: 'turn-1' })));
+    await waitFor(() => expect(getConversation).toHaveBeenCalledTimes(2));
+    act(() => {
+      completedListener?.(completedTurn({ turn_id: 'turn-2' }));
+      completedListener?.(completedTurn({ turn_id: 'turn-3' }));
+    });
+    unmount();
+    resolveFirstTurn?.(fiveTurnConversation);
+
+    await waitFor(() =>
+      expect(updateConversation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updates: {
+            extra: {
+              context_handoff: expect.objectContaining({
+                status: 'stale',
+                turns_since_compaction: 8,
+              }),
+            },
+          },
+        })
+      )
+    );
+    expect(runCompaction).not.toHaveBeenCalled();
   });
 
   it('coalesces requests received during a compaction into one follow-up run', async () => {
