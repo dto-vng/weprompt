@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -15,6 +15,10 @@ function writeFile(filePath: string) {
 function writeJson(filePath: string, value: unknown) {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, JSON.stringify(value), { flush: true });
+}
+
+function linkDirectory(target: string, linkPath: string) {
+  symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
 }
 
 function createManagedAcpToolFixture({
@@ -98,6 +102,7 @@ function createSchema2ManagedResourcesFixture(managedResourcesDir: string) {
     manifest,
     manifestPath,
     nodeExecutable: join(nodeRoot, 'node.exe'),
+    claudeRoot,
     claudeExecutable: join(claudeRoot, 'claude.exe'),
     codexRequiredFile,
     codexRequiredDirectory,
@@ -361,7 +366,6 @@ describe('verifyBundledAioncoreResources', () => {
   it('reports schema-2 runtime and CLI platform mismatches', () => {
     const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
     fixture.manifest.runtimeKey = 'linux-x64';
-    fixture.manifest.clis[0].platformDirectory = 'linux-x64';
     writeJson(fixture.manifestPath, fixture.manifest);
 
     const result = verifyBundledAioncoreResources({
@@ -374,7 +378,7 @@ describe('verifyBundledAioncoreResources', () => {
       'bundled-aioncore/win32-x64/managed-resources/manifest.json<runtimeKey:win32-x64>'
     );
     expect(result.missing).toContain(
-      'bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude].platformDirectory:win32-x64>'
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude].platformDirectory:linux-x64>'
     );
   });
 
@@ -390,6 +394,123 @@ describe('verifyBundledAioncoreResources', () => {
     });
 
     expect(result.missing).toContain('bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude]>');
+  });
+
+  it('reports an empty node version in a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    fixture.manifest.node.version = '';
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain('bundled-aioncore/win32-x64/managed-resources/manifest.json<node.version>');
+  });
+
+  it('reports an empty CLI version in a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    fixture.manifest.clis[0].version = '';
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<clis[claude].version>'
+    );
+  });
+
+  it('reports duplicate CLI names in a schema-2 manifest', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    fixture.manifest.clis[1].name = 'claude';
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<duplicate-clis[claude]>'
+    );
+  });
+
+  it('reports a schema-2 runtime key outside the supported contract', () => {
+    const unsupportedResourcesDir = join(tmp, 'unsupported-resources');
+    const unsupportedRoot = join(unsupportedResourcesDir, 'bundled-aioncore', 'darwin-ia32');
+    const unsupportedManagedResourcesDir = join(unsupportedRoot, 'managed-resources');
+    writeFile(join(unsupportedRoot, 'aioncore'));
+    writeJson(join(unsupportedRoot, 'manifest.json'), { platform: 'darwin', arch: 'ia32' });
+    const fixture = createSchema2ManagedResourcesFixture(unsupportedManagedResourcesDir);
+    fixture.manifest.runtimeKey = 'darwin-ia32';
+    for (const cli of fixture.manifest.clis) cli.platformDirectory = 'darwin-ia32';
+    writeJson(fixture.manifestPath, fixture.manifest);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir: unsupportedResourcesDir,
+      electronPlatformName: 'darwin',
+      targetArch: 'ia32',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/darwin-ia32/managed-resources/manifest.json<unsupported-runtimeKey:darwin-ia32>'
+    );
+  });
+
+  it('rejects a declared CLI root symlink that resolves outside managed resources', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    const outsideClaudeRoot = join(tmp, 'outside-claude');
+    writeFile(join(outsideClaudeRoot, 'claude.exe'));
+    rmSync(fixture.claudeRoot, { recursive: true });
+    linkDirectory(outsideClaudeRoot, fixture.claudeRoot);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/manifest.json<escaped-path:clis[claude].root>'
+    );
+  });
+
+  it('rejects a managed-resources symlink that resolves outside the runtime bundle', () => {
+    const outsideManagedResources = join(tmp, 'outside-managed-resources');
+    createSchema2ManagedResourcesFixture(outsideManagedResources);
+    rmSync(managedResourcesDir, { recursive: true });
+    linkDirectory(outsideManagedResources, managedResourcesDir);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain('bundled-aioncore/win32-x64/managed-resources<escaped-path>');
+  });
+
+  it('allows a declared resource symlink that resolves inside managed resources', () => {
+    const fixture = createSchema2ManagedResourcesFixture(managedResourcesDir);
+    const internalTarget = join(managedResourcesDir, 'shared', 'codex-resources');
+    mkdirSync(internalTarget, { recursive: true });
+    rmSync(fixture.codexRequiredDirectory, { recursive: true });
+    linkDirectory(internalTarget, fixture.codexRequiredDirectory);
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toEqual([]);
   });
 
   it.each(['../escape', '/absolute/path', 'C:/absolute/path'])(

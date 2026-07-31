@@ -2,6 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const REQUIRED_SCHEMA_2_CLI_NAMES = ['claude', 'codex'];
+const SUPPORTED_SCHEMA_2_RUNTIME_KEYS = new Set([
+  'win32-x64',
+  'win32-arm64',
+  'darwin-x64',
+  'darwin-arm64',
+  'linux-x64',
+  'linux-arm64',
+]);
 
 function backendBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
@@ -163,6 +171,56 @@ function schema2ManifestProblem(runtimeKey, problem) {
   return `${bundledPath(runtimeKey, 'managed-resources', 'manifest.json')}<${problem}>`;
 }
 
+function realPath(filePath) {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function isWithinRoot(root, candidate) {
+  const relativePath = path.relative(root, candidate);
+  return (
+    relativePath === '' ||
+    (relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath))
+  );
+}
+
+function inspectManagedResourcesRoot(baseDir, runtimeKey, missing) {
+  const managedResourcesRealPath = realPath(path.join(baseDir, 'managed-resources'));
+  if (!managedResourcesRealPath) return { escaped: false, realPath: null };
+
+  const baseRealPath = realPath(baseDir);
+  if (!baseRealPath || !isWithinRoot(baseRealPath, managedResourcesRealPath)) {
+    missing.push(`${bundledPath(runtimeKey, 'managed-resources')}<escaped-path>`);
+    return { escaped: true, realPath: null };
+  }
+
+  return { escaped: false, realPath: managedResourcesRealPath };
+}
+
+function requireSchema2Resource(baseDir, managedResourcesRealPath, runtimeKey, parts, field, kind, checked, missing) {
+  const bundleParts = ['managed-resources', ...parts];
+  const relativePath = bundledPath(runtimeKey, ...bundleParts);
+  const fullPath = path.join(baseDir, ...bundleParts);
+  checked.push(relativePath);
+
+  const exists = kind === 'file' ? isFile(fullPath) : fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory();
+  if (!exists) {
+    missing.push(relativePath);
+    return false;
+  }
+
+  const resourceRealPath = realPath(fullPath);
+  if (!managedResourcesRealPath || !resourceRealPath || !isWithinRoot(managedResourcesRealPath, resourceRealPath)) {
+    missing.push(schema2ManifestProblem(runtimeKey, `escaped-path:${field}`));
+    return false;
+  }
+
+  return true;
+}
+
 function readManifestPathParts(runtimeKey, value, field, missing) {
   if (!isSafeManifestRelativePath(value)) {
     missing.push(schema2ManifestProblem(runtimeKey, `invalid-path:${field}`));
@@ -172,51 +230,132 @@ function readManifestPathParts(runtimeKey, value, field, missing) {
   return value.split('/');
 }
 
-function verifySchema2Node(baseDir, runtimeKey, node, checked, missing) {
+function verifySchema2Node(baseDir, managedResourcesRealPath, runtimeKey, node, checked, missing) {
   if (!isObject(node)) {
     missing.push(schema2ManifestProblem(runtimeKey, 'node'));
     return;
+  }
+  if (typeof node.version !== 'string' || node.version.length === 0) {
+    missing.push(schema2ManifestProblem(runtimeKey, 'node.version'));
   }
 
   const rootParts = readManifestPathParts(runtimeKey, node.root, 'node.root', missing);
   const executableParts = readManifestPathParts(runtimeKey, node.executable, 'node.executable', missing);
 
-  if (rootParts) {
-    requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts], checked, missing);
-  }
-  if (rootParts && executableParts) {
-    requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...executableParts], checked, missing);
+  const rootIsValid =
+    rootParts &&
+    requireSchema2Resource(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      rootParts,
+      'node.root',
+      'directory',
+      checked,
+      missing
+    );
+  if (rootIsValid && executableParts) {
+    requireSchema2Resource(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      [...rootParts, ...executableParts],
+      'node.executable',
+      'file',
+      checked,
+      missing
+    );
   }
 }
 
-function verifySchema2Cli(baseDir, runtimeKey, cli, index, checked, missing) {
+function verifySchema2Cli(
+  baseDir,
+  managedResourcesRealPath,
+  runtimeKey,
+  manifestRuntimeKey,
+  cli,
+  index,
+  checked,
+  missing
+) {
   if (!isObject(cli) || typeof cli.name !== 'string' || cli.name.length === 0) {
     missing.push(schema2ManifestProblem(runtimeKey, `clis[${index}].name`));
     return null;
   }
 
   const label = `clis[${cli.name}]`;
-  if (cli.platformDirectory !== runtimeKey) {
-    missing.push(schema2ManifestProblem(runtimeKey, `${label}.platformDirectory:${runtimeKey}`));
+  if (typeof cli.version !== 'string' || cli.version.length === 0) {
+    missing.push(schema2ManifestProblem(runtimeKey, `${label}.version`));
+  }
+  if (cli.platformDirectory !== manifestRuntimeKey) {
+    missing.push(schema2ManifestProblem(runtimeKey, `${label}.platformDirectory:${manifestRuntimeKey}`));
   }
 
   const rootParts = readManifestPathParts(runtimeKey, cli.root, `${label}.root`, missing);
   const executableParts = readManifestPathParts(runtimeKey, cli.executable, `${label}.executable`, missing);
 
-  if (rootParts) {
-    requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts], checked, missing);
-  }
-  if (rootParts && executableParts) {
-    requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...executableParts], checked, missing);
+  const rootIsValid =
+    rootParts &&
+    requireSchema2Resource(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      rootParts,
+      `${label}.root`,
+      'directory',
+      checked,
+      missing
+    );
+  if (rootIsValid && executableParts) {
+    requireSchema2Resource(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      [...rootParts, ...executableParts],
+      `${label}.executable`,
+      'file',
+      checked,
+      missing
+    );
   }
 
-  verifySchema2CliPaths(baseDir, runtimeKey, cli, label, 'requiredFiles', rootParts, checked, missing);
-  verifySchema2CliPaths(baseDir, runtimeKey, cli, label, 'requiredDirectories', rootParts, checked, missing);
+  verifySchema2CliPaths(
+    baseDir,
+    managedResourcesRealPath,
+    runtimeKey,
+    cli,
+    label,
+    'requiredFiles',
+    rootIsValid ? rootParts : null,
+    checked,
+    missing
+  );
+  verifySchema2CliPaths(
+    baseDir,
+    managedResourcesRealPath,
+    runtimeKey,
+    cli,
+    label,
+    'requiredDirectories',
+    rootIsValid ? rootParts : null,
+    checked,
+    missing
+  );
 
   return cli.name;
 }
 
-function verifySchema2CliPaths(baseDir, runtimeKey, cli, label, field, rootParts, checked, missing) {
+function verifySchema2CliPaths(
+  baseDir,
+  managedResourcesRealPath,
+  runtimeKey,
+  cli,
+  label,
+  field,
+  rootParts,
+  checked,
+  missing
+) {
   const values = cli[field];
   if (values === undefined) return;
   if (!Array.isArray(values)) {
@@ -228,15 +367,20 @@ function verifySchema2CliPaths(baseDir, runtimeKey, cli, label, field, rootParts
     const parts = readManifestPathParts(runtimeKey, value, `${label}.${field}[${index}]`, missing);
     if (!rootParts || !parts) continue;
 
-    if (field === 'requiredFiles') {
-      requireFile(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...parts], checked, missing);
-    } else {
-      requireDirectory(baseDir, runtimeKey, ['managed-resources', ...rootParts, ...parts], checked, missing);
-    }
+    requireSchema2Resource(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      [...rootParts, ...parts],
+      `${label}.${field}[${index}]`,
+      field === 'requiredFiles' ? 'file' : 'directory',
+      checked,
+      missing
+    );
   }
 }
 
-function verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing) {
+function verifySchema2ManagedResources(baseDir, managedResourcesRealPath, runtimeKey, checked, missing) {
   const manifestParts = ['managed-resources', 'manifest.json'];
   const manifestPath = path.join(baseDir, ...manifestParts);
 
@@ -251,11 +395,14 @@ function verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing) {
   if (manifest.schemaVersion !== 2) return false;
 
   checked.push(bundledPath(runtimeKey, ...manifestParts));
+  if (!SUPPORTED_SCHEMA_2_RUNTIME_KEYS.has(manifest.runtimeKey)) {
+    missing.push(schema2ManifestProblem(runtimeKey, `unsupported-runtimeKey:${manifest.runtimeKey}`));
+  }
   if (manifest.runtimeKey !== runtimeKey) {
     missing.push(schema2ManifestProblem(runtimeKey, `runtimeKey:${runtimeKey}`));
   }
 
-  verifySchema2Node(baseDir, runtimeKey, manifest.node, checked, missing);
+  verifySchema2Node(baseDir, managedResourcesRealPath, runtimeKey, manifest.node, checked, missing);
 
   if (!Array.isArray(manifest.clis)) {
     missing.push(schema2ManifestProblem(runtimeKey, 'clis'));
@@ -264,8 +411,21 @@ function verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing) {
 
   const cliNames = new Set();
   for (const [index, cli] of manifest.clis.entries()) {
-    const name = verifySchema2Cli(baseDir, runtimeKey, cli, index, checked, missing);
-    if (name) cliNames.add(name);
+    const name = verifySchema2Cli(
+      baseDir,
+      managedResourcesRealPath,
+      runtimeKey,
+      manifest.runtimeKey,
+      cli,
+      index,
+      checked,
+      missing
+    );
+    if (!name) continue;
+    if (cliNames.has(name)) {
+      missing.push(schema2ManifestProblem(runtimeKey, `duplicate-clis[${name}]`));
+    }
+    cliNames.add(name);
   }
   for (const requiredName of REQUIRED_SCHEMA_2_CLI_NAMES) {
     if (!cliNames.has(requiredName)) {
@@ -372,11 +532,20 @@ function verifyBundledAioncoreResources({ resourcesDir, electronPlatformName, ta
   requireRelativePath(baseDir, runtimeKey, [backendBinaryName(electronPlatformName)], checked, missing);
   verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetArch, checked, missing);
   requireRelativeDirectory(baseDir, runtimeKey, ['managed-resources'], checked, missing);
-  const verifiedSchema2 = verifySchema2ManagedResources(baseDir, runtimeKey, checked, missing);
-  if (!verifiedSchema2) {
-    requireManagedNode(baseDir, runtimeKey, electronPlatformName, checked, missing);
-    requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'codex-acp', checked, missing);
-    requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'claude-agent-acp', checked, missing);
+  const managedResourcesRoot = inspectManagedResourcesRoot(baseDir, runtimeKey, missing);
+  if (!managedResourcesRoot.escaped) {
+    const verifiedSchema2 = verifySchema2ManagedResources(
+      baseDir,
+      managedResourcesRoot.realPath,
+      runtimeKey,
+      checked,
+      missing
+    );
+    if (!verifiedSchema2) {
+      requireManagedNode(baseDir, runtimeKey, electronPlatformName, checked, missing);
+      requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'codex-acp', checked, missing);
+      requireManagedAcpTool(baseDir, runtimeKey, electronPlatformName, 'claude-agent-acp', checked, missing);
+    }
   }
 
   return { runtimeKey, checked, missing };
