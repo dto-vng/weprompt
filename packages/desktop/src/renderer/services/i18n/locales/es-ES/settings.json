@@ -1310,5 +1310,36 @@
   "apiKeyReveal": "Mostrar claves",
   "apiKeyHide": "Ocultar claves",
   "apiKeyMasked": "Claves de API ocultas",
-  "mcpNoTools": "Este servidor no expone ninguna herramienta"
+  "mcpNoTools": "Este servidor no expone ninguna herramienta",
+  "appOperationsModel": {
+    "title": "Modelo para operaciones de la aplicación",
+    "description": "Se usa para el contexto en segundo plano y la futura asistencia en toda la aplicación, independientemente de los modelos de chat.",
+    "selectionLabel": "Selección",
+    "auto": "Automático",
+    "fixed": "Fijo",
+    "resolvedModelLabel": "Modelo resuelto",
+    "healthLabel": "Estado",
+    "usedByLabel": "Usado por",
+    "contextCompaction": "Compactación de contexto",
+    "saving": "Guardando…",
+    "loadFailed": "No se pudo cargar la configuración de operaciones de la aplicación.",
+    "saveFailed": "No se pudo guardar el modelo para operaciones de la aplicación.",
+    "checkFailed": "La comprobación de estado de las operaciones de la aplicación falló.",
+    "backendUpdateRequired": "Actualiza WePrompt para configurar el modelo para operaciones de la aplicación.",
+    "status": {
+      "ready": "Listo",
+      "checking": "Comprobando",
+      "setupRequired": "Se requiere configuración",
+      "unavailable": "No disponible"
+    },
+    "reason": {
+      "noEligibleModel": "Agrega o habilita un modelo de texto con credenciales válidas.",
+      "providerMissing": "El proveedor guardado ya no existe.",
+      "providerDisabled": "El proveedor guardado está deshabilitado.",
+      "modelMissing": "El modelo guardado ya no existe.",
+      "modelDisabled": "El modelo guardado está deshabilitado.",
+      "authRequired": "El proveedor guardado necesita credenciales válidas.",
+      "healthCheckFailed": "El modelo seleccionado no superó la comprobación de estado."
+    }
+  }
 }

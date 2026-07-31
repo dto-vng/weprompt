@@ -329,7 +329,7 @@ export const conversation = {
   turnCompleted: wsMappedEmitter<IConversationTurnCompletedEvent>('turn.completed', (raw) => {
     const r = raw as Record<string, unknown>;
     const rawLast = (r.last_message ?? r.lastMessage) as Record<string, unknown> | undefined;
-    const last_message: IConversationTurnCompletedEvent['last_message'] = rawLast
+    const lastMessage = rawLast
       ? {
           id: rawLast.id as string | undefined,
           type: rawLast.type as string | undefined,
@@ -337,10 +337,7 @@ export const conversation = {
           status: rawLast.status as string | null | undefined,
           created_at: (rawLast.created_at ?? rawLast.createdAt ?? Date.now()) as number,
         }
-      : {
-          content: null,
-          created_at: Date.now(),
-        };
+      : undefined;
     const rawRuntime = (r.runtime ?? {}) as Record<string, unknown>;
     const runtime: IConversationTurnCompletedEvent['runtime'] = {
       state: (rawRuntime.state ?? 'idle') as IConversationTurnCompletedEvent['runtime']['state'],
@@ -362,14 +359,13 @@ export const conversation = {
       session_id: (r.session_id ?? r.sessionId ?? r.conversation_id ?? '') as string,
       turn_id: (r.turn_id ?? r.turnId ?? runtime.turn_id ?? '') as string,
       status: (r.status ?? 'finished') as IConversationTurnCompletedEvent['status'],
-      state: (r.state ??
-        (r.status === 'finished' ? 'ai_waiting_input' : 'unknown')) as IConversationTurnCompletedEvent['state'],
+      ...(r.state !== undefined ? { state: r.state as NonNullable<IConversationTurnCompletedEvent['state']> } : {}),
       detail: (r.detail ?? '') as string,
       can_send_message: (r.can_send_message ?? r.canSendMessage ?? r.status === 'finished') as boolean,
       runtime,
       workspace: (r.workspace ?? '') as string,
       model,
-      last_message,
+      ...(lastMessage ? { last_message: lastMessage } : {}),
     };
   }),
   listChanged: wsEmitter<IConversationListChangedEvent>('conversation.listChanged'),
@@ -992,7 +988,7 @@ export const appOperations = {
 };
 
 export const appOperationsModel = {
-  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model', { silentStatuses: [404] }),
   update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
   check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };
@@ -1822,7 +1818,7 @@ export interface IConversationTurnCompletedEvent {
   session_id: string;
   turn_id: string;
   status: 'pending' | 'running' | 'finished';
-  state:
+  state?:
     | 'ai_generating'
     | 'ai_waiting_input'
     | 'ai_waiting_confirmation'
@@ -1847,7 +1843,7 @@ export interface IConversationTurnCompletedEvent {
     name: string;
     use_model: string;
   };
-  last_message: {
+  last_message?: {
     id?: string;
     type?: string;
     content: unknown;

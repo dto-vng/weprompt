@@ -3,7 +3,11 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ICreateConversationParams, ISendMessageParams } from '@/common/adapter/ipcBridge';
+import type {
+  IConversationTurnCompletedEvent,
+  ICreateConversationParams,
+  ISendMessageParams,
+} from '@/common/adapter/ipcBridge';
 
 type HttpCall = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -28,6 +32,18 @@ const httpBridgeMocks = vi.hoisted(() => {
       }),
     });
   const emitter = () => ({ on: vi.fn(() => vi.fn()), emit: vi.fn() });
+  const mappedEmitter = <Params>(_eventName: string, transform: (raw: unknown) => Params) => {
+    let listener: ((value: Params) => void) | undefined;
+    return {
+      on: vi.fn((next: (value: Params) => void) => {
+        listener = next;
+        return () => {
+          if (listener === next) listener = undefined;
+        };
+      }),
+      emit: vi.fn((raw: unknown) => listener?.(transform(raw))),
+    };
+  };
 
   return {
     calls,
@@ -51,7 +67,7 @@ const httpBridgeMocks = vi.hoisted(() => {
       })
     ),
     wsEmitter: vi.fn(emitter),
-    wsMappedEmitter: vi.fn(emitter),
+    wsMappedEmitter: vi.fn(mappedEmitter),
     stubEmitter: vi.fn(emitter),
   };
 });
@@ -224,5 +240,56 @@ describe('ipcBridge conversation adapter', () => {
         last_compacted_turn_id: input.last_compacted_turn_id,
       },
     });
+  });
+
+  it('preserves unknown outcome fields on the pinned sparse completion payload', async () => {
+    const { conversation } = await import('@/common/adapter/ipcBridge');
+    let received: IConversationTurnCompletedEvent | undefined;
+    const unsubscribe = conversation.turnCompleted.on((event) => {
+      received = event;
+    });
+
+    (
+      conversation.turnCompleted.emit as unknown as (raw: {
+        user_id: string;
+        conversation_id: string;
+        session_id: string;
+        turn_id: string;
+        status: string;
+        canSendMessage: boolean;
+        runtime: {
+          state: string;
+          can_send_message: boolean;
+          has_task: boolean;
+          is_processing: boolean;
+          pending_confirmations: number;
+          turn_id: null;
+        };
+      }) => void
+    )({
+      user_id: 'user-1',
+      conversation_id: 'conv-1',
+      session_id: 'conv-1',
+      turn_id: 'turn-failed',
+      status: 'finished',
+      canSendMessage: true,
+      runtime: {
+        state: 'idle',
+        can_send_message: true,
+        has_task: false,
+        is_processing: false,
+        pending_confirmations: 0,
+        turn_id: null,
+      },
+    });
+
+    expect(received).toMatchObject({
+      session_id: 'conv-1',
+      turn_id: 'turn-failed',
+      status: 'finished',
+    });
+    expect(received).not.toHaveProperty('state');
+    expect(received).not.toHaveProperty('last_message');
+    unsubscribe();
   });
 });
