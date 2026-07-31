@@ -1327,6 +1327,212 @@ describe('automatic context compaction policy', () => {
     );
   });
 
+  it.each([
+    ['returns false', async () => false],
+    ['rejects', async () => Promise.reject(new Error('metadata unavailable'))],
+  ])('retains a failed threshold batch when count persistence %s', async (_label, failPersistence) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 7,
+        },
+      },
+    };
+    const updateConversation = vi
+      .fn<(input: TestDependencies['updates'][number]) => Promise<boolean>>()
+      .mockImplementationOnce(failPersistence)
+      .mockResolvedValue(true);
+    const runCompaction = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      snapshot,
+      source: 'llm' as const,
+      throughTurnId: 'turn-9',
+    }));
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        completedListener = next;
+        return vi.fn();
+      }),
+      getConversation: vi.fn(async () => thresholdConversation),
+      updateConversation,
+      runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
+      now: () => 100,
+    };
+
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
+    await waitFor(() => expect(dependencies.getConversation).toHaveBeenCalledOnce());
+
+    act(() => completedListener?.(completedTurn({ turn_id: 'turn-8' })));
+    await waitFor(() => expect(updateConversation).toHaveBeenCalledOnce());
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    act(() => completedListener?.(completedTurn({ turn_id: 'turn-9' })));
+
+    await waitFor(() =>
+      expect(updateConversation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          updates: {
+            extra: {
+              context_handoff: expect.objectContaining({
+                status: 'stale',
+                turns_since_compaction: 9,
+              }),
+            },
+          },
+        })
+      )
+    );
+    await waitFor(() =>
+      expect(runCompaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trigger: 'auto',
+          targetTurnId: 'turn-9',
+          turnsSinceCompaction: 9,
+        })
+      )
+    );
+  });
+
+  it.each(['manual', 'handoff'] as const)(
+    'serializes a threshold turn behind an in-flight %s compaction during disposal',
+    async (trigger) => {
+      let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+      let resolveBroker: ((value: AppOperationResult<AppOperationsContextCompactOutput>) => void) | undefined;
+      let resolveThresholdUpdate: (() => void) | undefined;
+      let resolveManualCommit: (() => void) | undefined;
+      let resolveManualCommitStarted: (() => void) | undefined;
+      const manualCommitStarted = new Promise<void>((resolve) => {
+        resolveManualCommitStarted = resolve;
+      });
+      let storedConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+        ...conversation,
+        extra: {
+          ...conversation.extra,
+          context_handoff: {
+            ...conversation.extra.context_handoff,
+            turns_since_compaction: 7,
+          },
+        },
+      };
+      let activeMetadataWrites = 0;
+      let maxConcurrentMetadataWrites = 0;
+
+      const applyUpdate = (input: TestDependencies['updates'][number]): void => {
+        const contextHandoff = input.updates.extra?.context_handoff;
+        if (!contextHandoff) return;
+        storedConversation = {
+          ...storedConversation,
+          extra: {
+            ...storedConversation.extra,
+            context_handoff: contextHandoff,
+          },
+        };
+      };
+      const updateConversation = vi.fn(async (input: TestDependencies['updates'][number]): Promise<boolean> => {
+        const contextHandoff = input.updates.extra?.context_handoff;
+        activeMetadataWrites += 1;
+        maxConcurrentMetadataWrites = Math.max(maxConcurrentMetadataWrites, activeMetadataWrites);
+        const finish = (): boolean => {
+          applyUpdate(input);
+          activeMetadataWrites -= 1;
+          return true;
+        };
+
+        if (contextHandoff?.status === 'stale' && contextHandoff.turns_since_compaction === 8) {
+          return new Promise<boolean>((resolve) => {
+            resolveThresholdUpdate = () => resolve(finish());
+          });
+        }
+        if (contextHandoff?.status === 'fresh' && contextHandoff.turns_since_compaction === 0) {
+          resolveManualCommitStarted?.();
+          return new Promise<boolean>((resolve) => {
+            resolveManualCommit = () => resolve(finish());
+          });
+        }
+        return finish();
+      });
+      const compactionDependencies = createDependencies();
+      compactionDependencies.getConversation = vi.fn(async () => storedConversation);
+      compactionDependencies.updateConversation = updateConversation;
+      compactionDependencies.compactWithAppOperations = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveBroker = resolve;
+          })
+      );
+      const runCompaction = vi.fn((input) => compactConversationContext(input, compactionDependencies));
+      const getConversation = vi.fn(async () => storedConversation);
+      const dependencies = {
+        subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+          completedListener = next;
+          return vi.fn();
+        }),
+        getConversation,
+        updateConversation,
+        runCompaction,
+        cancelAppOperation: vi.fn(async () => {}),
+        now: () => 100,
+      };
+      const { result, unmount } = renderHook(() =>
+        useContextCompaction({
+          conversationId: 'conversation-1',
+          workspace: '/workspace',
+          enabled: true,
+          dependencies,
+        })
+      );
+      await waitFor(() => expect(getConversation).toHaveBeenCalledOnce());
+
+      let compactionPromise: Promise<CompactConversationContextResult | null> | undefined;
+      act(() => {
+        compactionPromise = result.current.compact(trigger);
+      });
+      const compactionOutcome = compactionPromise?.then(
+        (value) => value,
+        (error: unknown) => error
+      );
+      await waitFor(() => expect(compactionDependencies.compactWithAppOperations).toHaveBeenCalledOnce());
+
+      act(() => completedListener?.(completedTurn({ turn_id: 'turn-8' })));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      resolveBroker?.(compactSuccess({ snapshot, through_turn_id: 'turn-before-threshold' }));
+      await manualCommitStarted;
+      unmount();
+
+      resolveThresholdUpdate?.();
+      await Promise.resolve();
+      resolveManualCommit?.();
+
+      expect(await compactionOutcome).toBeInstanceOf(ContextCompactionCanceledError);
+      await waitFor(() => expect(storedConversation.extra.context_handoff?.turns_since_compaction).toBe(1));
+      expect(maxConcurrentMetadataWrites).toBe(1);
+      expect(runCompaction).toHaveBeenCalledOnce();
+    }
+  );
+
   it('persists a pending threshold batch when disposal happens before the updating transition', async () => {
     let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
     let resolveFirstTurn: ((value: TChatConversation | null) => void) | undefined;
