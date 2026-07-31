@@ -168,6 +168,7 @@
     "maximize": "Maximieren",
     "restore": "Wiederherstellen",
     "collapseSidebar": "Seitenleiste einklappen",
+    "expandSidebar": "Seitenleiste ausklappen",
     "toggleProjectPanel": "Arbeitsbereich ein- oder ausklappen",
     "expandProjectPanel": "Arbeitsbereich ausklappen",
     "collapseProjectPanel": "Arbeitsbereich einklappen"

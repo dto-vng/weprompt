@@ -135,9 +135,14 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
   // WebUI 和 macOS 桌面都需要在标题栏放工作区开关
   const showWorkspaceButton = workspaceAvailable && !usesProjectMenu && (!isDesktopRuntime || isMacRuntime);
 
+  // Name the panel, not just the gesture. `common.expandMore` / `common.collapse`
+  // are the generic "show more" / "collapse" strings shared with code blocks and
+  // list toggles — every locale translates them ("Expand More", "展开更多", …), so
+  // the `defaultValue` here never applied and the button announced a bare verb.
+  // `common.chrome.*` carries the affordance in the string itself.
   const workspaceTooltip = workspaceCollapsed
-    ? t('common.expandMore', { defaultValue: 'Expand workspace' })
-    : t('common.collapse', { defaultValue: 'Collapse workspace' });
+    ? t('common.chrome.expandProjectPanel')
+    : t('common.chrome.collapseProjectPanel');
   const backToChatTooltip = t('common.back', { defaultValue: 'Back to Chat' });
   const feedbackTooltip = t('conversation.welcome.quickActionFeedback', { defaultValue: 'Report Issue' });
   const isSettingsRoute = location.pathname.startsWith('/settings');
@@ -149,9 +154,9 @@ const Titlebar: React.FC<TitlebarProps> = ({ workspaceAvailable }) => {
   // 统一在标题栏左侧展示主侧栏开关 / Always expose sidebar toggle on titlebar left side
   const showSiderToggle = Boolean(layout?.setSiderCollapsed) && !(layout?.isMobile && isSettingsRoute);
   const showBackToChatButton = Boolean(layout?.isMobile && isSettingsRoute);
-  const siderTooltip = layout?.siderCollapsed
-    ? t('common.expandMore', { defaultValue: 'Expand sidebar' })
-    : t('common.collapse', { defaultValue: 'Collapse sidebar' });
+  // Same key as Layout's mobile collapse button, so the one affordance keeps one
+  // accessible name whichever of the two is on screen (both render on mobile).
+  const siderTooltip = layout?.siderCollapsed ? t('common.chrome.expandSidebar') : t('common.chrome.collapseSidebar');
   // 前进/后退仅在桌面端显示（移动端空间有限，保留原有的返回到聊天按钮）
   // Show back/forward on desktop only; mobile keeps the existing back-to-chat button.
   const showHistoryNav = Boolean(navigationHistory) && !layout?.isMobile;

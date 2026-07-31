@@ -168,6 +168,7 @@
     "maximize": "최대화",
     "restore": "이전 크기로 복원",
     "collapseSidebar": "사이드바 접기",
+    "expandSidebar": "사이드바 펼치기",
     "toggleProjectPanel": "프로젝트 패널 전환",
     "expandProjectPanel": "프로젝트 패널 펼치기",
     "collapseProjectPanel": "프로젝트 패널 접기"

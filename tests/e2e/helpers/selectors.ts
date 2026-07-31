@@ -6,7 +6,7 @@
  *
  * When the app adds `data-testid` later, update these selectors in one place.
  */
-import { CLOSE_LABELS } from './localizedLabels';
+import { CLOSE_LABELS, COLLAPSE_SIDEBAR_LABELS, EXPAND_SIDEBAR_LABELS } from './localizedLabels';
 
 // ── Generic ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,20 @@ export const SETTINGS_MODAL = '.settings-modal';
 const WINDOW_CONTROL_CLASS = 'app-window-controls__button';
 
 /**
+ * Build a CSS selector list matching a button under any of `labels`.
+ *
+ * `scope` and `exclude` are distributed over every alternative rather than
+ * concatenated once: a CSS selector list binds looser than anything else, so
+ * `'.arco-modal ' + 'button[…A], button[…B]'` would scope only the first
+ * alternative and leave the rest matching page-wide.
+ */
+function buttonByAnyLabel(labels: string[], scope = '', exclude = ''): string {
+  const prefix = scope ? `${scope} ` : '';
+  const suffix = exclude ? `:not(.${exclude})` : '';
+  return labels.map((label) => `${prefix}button[aria-label="${label}"]${suffix}`).join(', ');
+}
+
+/**
  * AionModal's header close button, in whatever language the app is running.
  *
  * Both header variants label the button `aria-label={t('common.close')}`, so a
@@ -50,14 +64,11 @@ const WINDOW_CONTROL_CLASS = 'app-window-controls__button';
  *
  * @param scope Optional CSS ancestor to scope the button to (`'.arco-modal'`,
  *   `'.arco-modal-wrapper:visible'`, …). Pass it here rather than
- *   concatenating: the prefix has to be distributed over each label
- *   alternative, because `'.arco-modal ' + 'button[…A], button[…B]'` would
- *   scope only the first alternative and leave the rest matching page-wide.
- *   Omit it when chaining off an existing locator, which scopes the whole list.
+ *   concatenating — see {@link buttonByAnyLabel} for why. Omit it when chaining
+ *   off an existing locator, which scopes the whole list.
  */
 export function modalCloseButton(scope = ''): string {
-  const prefix = scope ? `${scope} ` : '';
-  return CLOSE_LABELS.map((label) => `${prefix}button[aria-label="${label}"]:not(.${WINDOW_CONTROL_CLASS})`).join(', ');
+  return buttonByAnyLabel(CLOSE_LABELS, scope, WINDOW_CONTROL_CLASS);
 }
 
 // ── Arco Design components ───────────────────────────────────────────────────
@@ -102,6 +113,29 @@ export const MESSAGE_TEXT_CONTENT = '[data-testid="message-text-content"]';
 
 /** New chat trigger button in sidebar (CSS module hash varies). */
 export const NEW_CHAT_TRIGGER = 'div[class*="newChatTrigger"]';
+
+/**
+ * The sidebar toggle while the sidebar is open, in whatever language the app is
+ * running (see {@link COLLAPSE_SIDEBAR_LABELS}).
+ *
+ * The control lives in the titlebar (Titlebar/index.tsx), which renders it at
+ * every viewport width; Layout.tsx adds a second button carrying the same
+ * `common.chrome.collapseSidebar` name below the mobile breakpoint
+ * (`window.innerWidth < 768`). Both collapse the sidebar, so either is a valid
+ * target — but two can be on screen at once, which trips Playwright's strict
+ * mode. Take `.first()` or pass a `scope`.
+ */
+export function collapseSidebarButton(scope = ''): string {
+  return buttonByAnyLabel(COLLAPSE_SIDEBAR_LABELS, scope);
+}
+
+/**
+ * The same toggle once the sidebar is collapsed. Only the titlebar renders this
+ * state, so it is unambiguous at any width.
+ */
+export function expandSidebarButton(scope = ''): string {
+  return buttonByAnyLabel(EXPAND_SIDEBAR_LABELS, scope);
+}
 
 // ── Agent pill bar ───────────────────────────────────────────────────────────
 

@@ -168,6 +168,7 @@
     "maximize": "Развернуть",
     "restore": "Восстановить",
     "collapseSidebar": "Свернуть боковую панель",
+    "expandSidebar": "Развернуть боковую панель",
     "toggleProjectPanel": "Показать или скрыть панель проекта",
     "expandProjectPanel": "Развернуть панель проекта",
     "collapseProjectPanel": "Свернуть панель проекта"

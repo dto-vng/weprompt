@@ -169,6 +169,7 @@
     "maximize": "Розгорнути",
     "restore": "Відновити",
     "collapseSidebar": "Згорнути бічну панель",
+    "expandSidebar": "Розгорнути бічну панель",
     "toggleProjectPanel": "Показати або сховати панель проєкту",
     "expandProjectPanel": "Розгорнути панель проєкту",
     "collapseProjectPanel": "Згорнути панель проєкту"

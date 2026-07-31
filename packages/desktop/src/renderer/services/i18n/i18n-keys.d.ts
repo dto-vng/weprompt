@@ -234,6 +234,7 @@ export type I18nKey =
   | 'common.chrome.collapseProjectPanel'
   | 'common.chrome.collapseSidebar'
   | 'common.chrome.expandProjectPanel'
+  | 'common.chrome.expandSidebar'
   | 'common.chrome.maximize'
   | 'common.chrome.minimize'
   | 'common.chrome.restore'

@@ -168,6 +168,7 @@
     "maximize": "最大化",
     "restore": "元のサイズに戻す",
     "collapseSidebar": "サイドバーを折りたたむ",
+    "expandSidebar": "サイドバーを展開",
     "toggleProjectPanel": "プロジェクトパネルの表示を切り替える",
     "expandProjectPanel": "プロジェクトパネルを展開",
     "collapseProjectPanel": "プロジェクトパネルを折りたたむ"

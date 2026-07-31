@@ -168,6 +168,7 @@
     "maximize": "Maximizar",
     "restore": "Restaurar",
     "collapseSidebar": "Recolher a barra lateral",
+    "expandSidebar": "Expandir a barra lateral",
     "toggleProjectPanel": "Alternar o painel do projeto",
     "expandProjectPanel": "Expandir o painel do projeto",
     "collapseProjectPanel": "Recolher o painel do projeto"

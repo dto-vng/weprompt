@@ -21,6 +21,8 @@ export {
   SETTINGS_SIDER_ITEM_LABEL,
   SETTINGS_MODAL,
   modalCloseButton,
+  collapseSidebarButton,
+  expandSidebarButton,
   ARCO_SWITCH,
   ARCO_SWITCH_CHECKED,
   ARCO_COLLAPSE_ITEM,

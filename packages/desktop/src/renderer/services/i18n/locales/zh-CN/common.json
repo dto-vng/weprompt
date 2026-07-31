@@ -168,6 +168,7 @@
     "maximize": "最大化",
     "restore": "还原",
     "collapseSidebar": "收起侧边栏",
+    "expandSidebar": "展开侧边栏",
     "toggleProjectPanel": "切换项目面板",
     "expandProjectPanel": "展开项目面板",
     "collapseProjectPanel": "收起项目面板"
