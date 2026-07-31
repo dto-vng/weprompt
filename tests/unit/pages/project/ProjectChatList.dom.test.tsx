@@ -134,13 +134,38 @@ describe('ProjectChatList', () => {
     expect(screen.getByText('Chat 6')).toBeInTheDocument();
   });
 
-  it('hides the "Show all" toggle once all chats are already shown', () => {
+  it('collapses the list again from the same control', () => {
+    // The control used to unmount on first use, so expanding was a one-way latch.
     const chats = Array.from({ length: 7 }, (_, index) => makeChat(`c${index}`, `Chat ${index}`));
     render(<ProjectChatList chats={chats} />);
 
     fireEvent.click(screen.getByText('conversation.projectHome.showAll'));
 
+    expect(screen.getByText('conversation.projectHome.showLess')).toBeInTheDocument();
     expect(screen.queryByText('conversation.projectHome.showAll')).not.toBeInTheDocument();
+    expect(screen.getByText('Chat 6')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('conversation.projectHome.showLess'));
+
+    expect(screen.getByText('conversation.projectHome.showAll')).toBeInTheDocument();
+    expect(screen.getByText('Chat 4')).toBeInTheDocument();
+    expect(screen.queryByText('Chat 5')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chat 6')).not.toBeInTheDocument();
+  });
+
+  it('reports its expanded state to assistive technology', () => {
+    const chats = Array.from({ length: 7 }, (_, index) => makeChat(`c${index}`, `Chat ${index}`));
+    render(<ProjectChatList chats={chats} />);
+
+    const toggle = screen.getByRole('button', { name: 'conversation.projectHome.showAll' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.showLess' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it('does not show the "Show all" toggle when there are 5 or fewer chats', () => {

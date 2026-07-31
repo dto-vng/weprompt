@@ -56,7 +56,10 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
   const [showAll, setShowAll] = useState(false);
 
   const visibleChats = useMemo(() => (showAll ? chats : chats.slice(0, VISIBLE_ROW_COUNT)), [chats, showAll]);
-  const hasHiddenChats = !showAll && chats.length > VISIBLE_ROW_COUNT;
+  // Gated on the chat count alone: with `!showAll` in here the control unmounted
+  // the moment it was used, so expanding was a one-way latch out of which only a
+  // page remount escaped.
+  const canToggleChats = chats.length > VISIBLE_ROW_COUNT;
 
   const handleTogglePin = useCallback(
     async (conversation: TChatConversation) => {
@@ -171,14 +174,15 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
         >
           {chats.length}
         </Tag>
-        {hasHiddenChats && (
+        {canToggleChats && (
           <Button
             type='text'
             size='mini'
             className='ml-auto !text-t-secondary hover:!text-t-primary'
-            onClick={() => setShowAll(true)}
+            aria-expanded={showAll}
+            onClick={() => setShowAll((previous) => !previous)}
           >
-            {t('conversation.projectHome.showAll')}
+            {t(showAll ? 'conversation.projectHome.showLess' : 'conversation.projectHome.showAll')}
           </Button>
         )}
       </div>
