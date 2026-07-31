@@ -23,6 +23,7 @@ export {
   modalCloseButton,
   collapseSidebarButton,
   expandSidebarButton,
+  titlebarFeedbackButton,
   ARCO_SWITCH,
   ARCO_SWITCH_CHECKED,
   ARCO_COLLAPSE_ITEM,
@@ -46,6 +47,7 @@ export {
   ASSISTANT_PILL_SELECTED,
   type ChannelId,
 } from './selectors';
+export { labelPattern, FEEDBACK_MODULE_LABELS } from './localizedLabels';
 export { expectBodyContainsAny, expectUrlContains, createErrorCollector } from './assertions';
 export { takeScreenshot } from './screenshots';
 export {

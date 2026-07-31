@@ -6,7 +6,12 @@
  *
  * When the app adds `data-testid` later, update these selectors in one place.
  */
-import { CLOSE_LABELS, COLLAPSE_SIDEBAR_LABELS, EXPAND_SIDEBAR_LABELS } from './localizedLabels';
+import {
+  CLOSE_LABELS,
+  COLLAPSE_SIDEBAR_LABELS,
+  EXPAND_SIDEBAR_LABELS,
+  FEEDBACK_BUTTON_LABELS,
+} from './localizedLabels';
 
 // ── Generic ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +140,19 @@ export function collapseSidebarButton(scope = ''): string {
  */
 export function expandSidebarButton(scope = ''): string {
   return buttonByAnyLabel(EXPAND_SIDEBAR_LABELS, scope);
+}
+
+// ── Titlebar toolbar ─────────────────────────────────────────────────────────
+
+/**
+ * The titlebar's report-issue button, in whatever language the app is running
+ * (see {@link FEEDBACK_BUTTON_LABELS}).
+ *
+ * Titlebar hides it on `/conversation/*`, and page-level report buttons can
+ * carry the same name, so callers generally want `.first()`.
+ */
+export function titlebarFeedbackButton(scope = ''): string {
+  return buttonByAnyLabel(FEEDBACK_BUTTON_LABELS, scope);
 }
 
 // ── Agent pill bar ───────────────────────────────────────────────────────────
