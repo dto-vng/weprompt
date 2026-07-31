@@ -781,7 +781,7 @@ const GuidPage: React.FC = () => {
                   <Button
                     key={`${index}-${prompt}`}
                     type='text'
-                    className='!h-auto !min-h-56px !w-full !rounded-8px !border !border-border-2 !bg-bg-base !px-12px !py-10px !text-left !text-12.5px !text-t-secondary !whitespace-normal !break-words transition-colors hover:!border-aou-6 hover:!text-t-primary'
+                    className='!h-auto !min-h-56px !w-full !rounded-8px !border !border-[var(--color-border-2)] !bg-base !px-12px !py-10px !text-left !text-12.5px !text-t-secondary !whitespace-normal !break-words transition-colors hover:!border-aou-6 hover:!text-t-primary'
                     onClick={() => {
                       guidInput.setInput(prompt);
                       guidInput.handleTextareaFocus();

@@ -133,7 +133,7 @@ const CssThemeSettings: React.FC = () => {
             <Radio
               key={theme.id}
               value={theme.id}
-              className={`!m-0 w-full min-h-48px px-12px py-10px rounded-8px border border-solid transition-colors ${isActive ? 'border-[var(--color-primary)] bg-[var(--color-primary-light-1)]' : 'border-border-2 bg-1 hover:bg-3'}`}
+              className={`!m-0 w-full min-h-48px px-12px py-10px rounded-8px border border-solid transition-colors ${isActive ? 'border-[var(--color-primary)] bg-[var(--color-primary-light-1)]' : 'border-[var(--color-border-2)] bg-1 hover:bg-3'}`}
             >
               <span className='text-14px text-t-primary leading-22px truncate'>{theme.name}</span>
             </Radio>

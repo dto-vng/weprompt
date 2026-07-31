@@ -18,7 +18,7 @@ type QuickActionButtonsProps = {
 };
 
 const toolbarButtonClass =
-  '!h-34px !rounded-7px !border !border-border-2 !bg-bg-base !px-10px !text-13px !text-t-secondary hover:!bg-fill-2 hover:!text-t-primary';
+  '!h-34px !rounded-7px !border !border-[var(--color-border-2)] !bg-base !px-10px !text-13px !text-t-secondary hover:!bg-fill-2 hover:!text-t-primary';
 
 const QuickActionButtons: React.FC<QuickActionButtonsProps> = ({ onOpenLink }) => {
   const { t } = useTranslation();

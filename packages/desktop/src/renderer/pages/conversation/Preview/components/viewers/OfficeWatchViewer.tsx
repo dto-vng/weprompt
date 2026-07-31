@@ -487,7 +487,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
     const desktopFallbackPath = docType !== 'ppt' && isElectronDesktop() ? file_path : undefined;
 
     return (
-      <div className='h-full w-full flex items-center justify-center bg-bg-1'>
+      <div className='h-full w-full flex items-center justify-center bg-1'>
         <Alert
           type='error'
           className='max-w-400px'
@@ -550,7 +550,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   }
 
   return (
-    <div className='relative h-full w-full overflow-hidden bg-bg-1'>
+    <div className='relative h-full w-full overflow-hidden bg-1'>
       {[
         ...(watchView ? [{ active: true, view: watchView }] : []),
         ...(refreshView ? [{ active: false, view: refreshView }] : []),
@@ -563,7 +563,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           {isElectronDesktop() ? (
             <WebviewHost
               url={view.url}
-              className='bg-bg-1'
+              className='bg-1'
               showViewerControls={docType === 'word' || docType === 'excel'}
               partition={docType === 'ppt' ? undefined : OFFICE_PREVIEW_PARTITION}
               injectedScript={guestScript}
@@ -575,7 +575,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           ) : (
             <iframe
               src={view.url}
-              className='w-full h-full border-0 bg-bg-1'
+              className='w-full h-full border-0 bg-1'
               title={IFRAME_TITLE[docType]}
               onLoad={active ? handlePreviewLoaded : () => handleRefreshLoaded(view)}
               onError={active ? handlePreviewLoadFailed : () => handleRefreshLoadFailed(view)}
@@ -587,7 +587,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       {initialLoading && (
         <div
           data-testid='office-preview-loading'
-          className='absolute inset-0 z-10 flex items-center justify-center bg-bg-1'
+          className='absolute inset-0 z-10 flex items-center justify-center bg-1'
         >
           <div className='flex flex-col items-center gap-12px'>
             <Spin size={32} />
@@ -601,7 +601,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       {refreshing && (
         <div
           data-testid='office-preview-refreshing'
-          className='pointer-events-none absolute right-12px top-12px z-10 flex items-center gap-6px rounded-6px bg-bg-2 px-8px py-6px text-12px text-t-secondary shadow-sm'
+          className='pointer-events-none absolute right-12px top-12px z-10 flex items-center gap-6px rounded-6px bg-2 px-8px py-6px text-12px text-t-secondary shadow-sm'
         >
           <Spin size={14} />
           <span>{t(keys.loading)}</span>
