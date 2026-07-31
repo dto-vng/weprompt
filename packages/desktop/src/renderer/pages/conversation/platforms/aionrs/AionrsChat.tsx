@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IConversationMcpStatus } from '@/common/config/storage';
+import type { IConversationMcpStatus, ISessionMcpServer } from '@/common/config/storage';
 import type { ConversationContextValue } from '@/renderer/hooks/context/ConversationContext';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
 import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
@@ -43,7 +43,7 @@ const AionrsChat: React.FC<{
   assistantId?: string;
   project_id?: string;
   /** Frozen-at-create MCP snapshot; validated by the hint, not trusted here. */
-  session_mcp_servers?: unknown;
+  session_mcp_servers?: ISessionMcpServer[];
 }> = ({
   conversation_id,
   workspace,

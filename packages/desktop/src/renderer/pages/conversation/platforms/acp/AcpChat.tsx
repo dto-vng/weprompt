@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IConversationMcpStatus } from '@/common/config/storage';
+import type { IConversationMcpStatus, ISessionMcpServer } from '@/common/config/storage';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
 import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
 import { CHAT_SURFACE_CONTAINER_CLASS } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
@@ -44,7 +44,7 @@ const AcpChat: React.FC<{
   assistantId?: string;
   project_id?: string;
   /** Frozen-at-create MCP snapshot; validated by the hint, not trusted here. */
-  session_mcp_servers?: unknown;
+  session_mcp_servers?: ISessionMcpServer[];
 }> = ({
   conversation_id,
   workspace,

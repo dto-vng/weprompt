@@ -843,7 +843,6 @@
   },
   "staleKnowledgeHint": {
     "body": "Dieser Chat kann die Wissensdatenbank des Projekts nicht durchsuchen – er wurde begonnen, bevor Dateien hinzugefügt wurden.",
-    "changedBody": "Die Wissensdatenbank hat sich geändert – neue Chats sehen die aktuellen Dateien.",
     "action": "Neuen Chat starten"
   }
 }

@@ -843,7 +843,6 @@
   },
   "staleKnowledgeHint": {
     "body": "Este chat no puede buscar en la base de conocimiento del proyecto: se inició antes de que se añadieran archivos.",
-    "changedBody": "La base de conocimiento cambió: los chats nuevos verán los archivos más recientes.",
     "action": "Iniciar un chat nuevo"
   }
 }
