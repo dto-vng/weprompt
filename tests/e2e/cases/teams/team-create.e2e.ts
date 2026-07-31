@@ -4,7 +4,13 @@
  * Flow: sidebar "+" button -> Create Team modal -> fill form -> create -> verify navigation
  */
 import { test, expect } from '../../fixtures';
-import { TEAM_SUPPORTED_BACKENDS, cleanupTeamsByName, modalCloseButton } from '../../helpers';
+import {
+  TEAM_SUPPORTED_BACKENDS,
+  TEAM_CREATE_TITLE_LABELS,
+  cleanupTeamsByName,
+  labelPattern,
+  modalCloseButton,
+} from '../../helpers';
 
 /**
  * UI label patterns for each backend. Used to match the assistant option in
@@ -39,8 +45,12 @@ test.describe('Team Create', () => {
     // Screenshot: modal open
     await page.screenshot({ path: 'tests/e2e/results/team-02-modal.png' });
 
-    // Verify Modal is visible with "Create Team" title
-    const modalTitle = page.locator('.arco-modal h3').filter({ hasText: /Create Team|创建团队/ });
+    // Verify the modal is visible and titled. The title is team.create.title —
+    // "New Team" in ten locales; the old "Create Team" literal matched none of them.
+    const modalTitle = page
+      .locator('.arco-modal.team-create-modal')
+      .locator('h3')
+      .filter({ hasText: labelPattern(TEAM_CREATE_TITLE_LABELS) });
     await expect(modalTitle).toBeVisible({ timeout: 5000 });
 
     // Verify Team name input exists
@@ -73,9 +83,9 @@ test.describe('Team Create', () => {
     await expect(createBtn).toBeVisible({ timeout: 10000 });
     await createBtn.click();
 
-    // Wait for modal to appear
-    const modalTitle = page.locator('.arco-modal h3').filter({ hasText: /Create Team|创建团队/ });
-    await expect(modalTitle).toBeVisible({ timeout: 5000 });
+    // Wait for the modal. Keyed on the modal's own class, not its title text.
+    const createModal = page.locator('.arco-modal.team-create-modal');
+    await expect(createModal).toBeVisible({ timeout: 5000 });
 
     // Fill team name
     const modal = page.locator('.arco-modal');
@@ -136,9 +146,9 @@ async function createTeamWithAgent(
   await expect(createBtn).toBeVisible({ timeout: 10000 });
   await createBtn.click();
 
-  // Wait for modal to appear
-  const modalTitle = page.locator('.arco-modal h3').filter({ hasText: /Create Team|创建团队/ });
-  await expect(modalTitle).toBeVisible({ timeout: 5000 });
+  // Wait for the modal. Keyed on the modal's own class, not its title text.
+  const createModal = page.locator('.arco-modal.team-create-modal');
+  await expect(createModal).toBeVisible({ timeout: 5000 });
 
   // Fill team name
   const modal = page.locator('.arco-modal');

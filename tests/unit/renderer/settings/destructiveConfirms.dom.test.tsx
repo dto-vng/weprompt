@@ -26,7 +26,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // because a timed-out test's continuation still runs, its `render` landed *after*
 // auto-cleanup and left a second confirm in the DOM, so the next test's `getByText`
 // then failed with "Found multiple elements". Loading them here keeps the module
-// cost in the file's import phase, which is not subject to the per-test timeout.
+// cost in the file's import phase, which is not subject to the per-test timeout. Vitest hoists
+// the `vi.mock` calls below above these imports, so the mocks still apply.
 import McpManagement from '@/renderer/pages/settings/ToolsSettings/McpManagement';
 import ToolsModalContent from '@/renderer/components/settings/SettingsModal/contents/ToolsModalContent';
 
@@ -145,18 +146,6 @@ const message = {
   loading: vi.fn(),
   normal: vi.fn(),
 } as never;
-
-// Both pages are imported at module scope, and must stay that way — importing them inside a test
-// instead costs it seconds of module-graph warm-up out of its own `testTimeout`, and a loaded
-// machine turns that into a timeout before the test asserts anything. The knock-on is worse than
-// the failure: Vitest marks a timed-out test failed but never stops it, so the `render()` waiting
-// behind that import still mounts, after cleanup has run and usually midway through the next test.
-// Nothing catches that afterwards — these confirms are Arco `Modal`s portalled to `document.body`,
-// so the leftover is not scoped away by querying a container either, and it resurfaces as a "found
-// multiple elements" failure somewhere else. Vitest hoists the `vi.mock` calls above these
-// imports, so the mocks still apply.
-import McpManagement from '@/renderer/pages/settings/ToolsSettings/McpManagement';
-import ToolsModalContent from '@/renderer/components/settings/SettingsModal/contents/ToolsModalContent';
 
 describe('destructive confirms in settings', () => {
   beforeEach(() => {

@@ -62,6 +62,18 @@ import trTRSettings from '@/renderer/services/i18n/locales/tr-TR/settings.json';
 import ukUASettings from '@/renderer/services/i18n/locales/uk-UA/settings.json';
 import zhCNSettings from '@/renderer/services/i18n/locales/zh-CN/settings.json';
 import zhTWSettings from '@/renderer/services/i18n/locales/zh-TW/settings.json';
+import deDETeam from '@/renderer/services/i18n/locales/de-DE/team.json';
+import enUSTeam from '@/renderer/services/i18n/locales/en-US/team.json';
+import esESTeam from '@/renderer/services/i18n/locales/es-ES/team.json';
+import faIRTeam from '@/renderer/services/i18n/locales/fa-IR/team.json';
+import jaJPTeam from '@/renderer/services/i18n/locales/ja-JP/team.json';
+import koKRTeam from '@/renderer/services/i18n/locales/ko-KR/team.json';
+import ptBRTeam from '@/renderer/services/i18n/locales/pt-BR/team.json';
+import ruRUTeam from '@/renderer/services/i18n/locales/ru-RU/team.json';
+import trTRTeam from '@/renderer/services/i18n/locales/tr-TR/team.json';
+import ukUATeam from '@/renderer/services/i18n/locales/uk-UA/team.json';
+import zhCNTeam from '@/renderer/services/i18n/locales/zh-CN/team.json';
+import zhTWTeam from '@/renderer/services/i18n/locales/zh-TW/team.json';
 
 /**
  * The slices of each bundle these selectors read.
@@ -89,11 +101,20 @@ interface ConversationLabelBundle {
 }
 
 interface SettingsLabelBundle {
+  oneClickFeedback?: string;
+  bugReport?: string;
+  testConnectionBtn?: string;
   bugReportModuleScheduledTask?: string;
   bugReportModuleAssistant?: string;
   bugReportModulePermission?: string;
   bugReportModuleLlmConfig?: string;
   bugReportModuleSystemSettings?: string;
+}
+
+interface TeamLabelBundle {
+  create?: {
+    title?: string;
+  };
 }
 
 /** Each bundle family, in `supportedLanguages` order. */
@@ -142,6 +163,21 @@ const SETTINGS_BUNDLES: readonly SettingsLabelBundle[] = [
   faIRSettings,
 ];
 
+const TEAM_BUNDLES: readonly TeamLabelBundle[] = [
+  zhCNTeam,
+  enUSTeam,
+  jaJPTeam,
+  zhTWTeam,
+  koKRTeam,
+  trTRTeam,
+  ruRUTeam,
+  ukUATeam,
+  ptBRTeam,
+  deDETeam,
+  esESTeam,
+  faIRTeam,
+];
+
 /**
  * Build a collector over one bundle family.
  *
@@ -172,6 +208,7 @@ function labelCollector<T>(namespace: string, bundles: readonly T[]) {
 const commonLabels = labelCollector('common', COMMON_BUNDLES);
 const conversationLabels = labelCollector('conversation', CONVERSATION_BUNDLES);
 const settingsLabels = labelCollector('settings', SETTINGS_BUNDLES);
+const teamLabels = labelCollector('team', TEAM_BUNDLES);
 
 /**
  * Turn a label set into a regex accepting any of its spellings, for the
@@ -184,6 +221,15 @@ const settingsLabels = labelCollector('settings', SETTINGS_BUNDLES);
  */
 export function labelPattern(labels: string[]): RegExp {
   return new RegExp(labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'));
+}
+
+/**
+ * Anchored counterpart to {@link labelPattern}, for `hasText` filters that must
+ * match a whole string — a row whose text *is* the label, rather than one that
+ * merely contains it. Escapes each label for the same reason.
+ */
+export function exactLabelPattern(labels: string[]): RegExp {
+  return new RegExp(`^(${labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`);
 }
 
 /**
@@ -229,3 +275,36 @@ export const FEEDBACK_MODULE_LABELS = {
   llmConfig: settingsLabels('bugReportModuleLlmConfig', (b) => b.bugReportModuleLlmConfig),
   systemSettings: settingsLabels('bugReportModuleSystemSettings', (b) => b.bugReportModuleSystemSettings),
 };
+
+/**
+ * Every locale's `settings.oneClickFeedback` — the visible text of the inline
+ * feedback pill (base/FeedbackButton.tsx, which sets no aria-label).
+ *
+ * A different key from {@link FEEDBACK_BUTTON_LABELS} despite reading the same in
+ * English: the titlebar button says "Feedback oder Vorschläge?" in de-DE where
+ * this one says "Problem melden", so one set cannot serve both.
+ */
+export const FEEDBACK_PILL_LABELS: string[] = settingsLabels('oneClickFeedback', (bundle) => bundle.oneClickFeedback);
+
+/**
+ * Every locale's `settings.bugReport` — the About page's report row
+ * (AboutModalContent.tsx). A third key reading "Report Issue" in English, and
+ * "Fehlerbericht" in de-DE where the pill says "Problem melden".
+ */
+export const BUG_REPORT_LABELS: string[] = settingsLabels('bugReport', (bundle) => bundle.bugReport);
+
+/** Every locale's `settings.testConnectionBtn` — the agent editor's test button. */
+export const TEST_CONNECTION_LABELS: string[] = settingsLabels(
+  'testConnectionBtn',
+  (bundle) => bundle.testConnectionBtn
+);
+
+/**
+ * Every locale's `team.create.title` — the Create-Team modal's `h3`.
+ *
+ * Only three distinct spellings exist (nine locales ship the untranslated "New
+ * Team"), and none of them is "Create Team", the string five specs filtered on
+ * after commit 826eba76c renamed the key — so those selectors matched nothing in
+ * any language, en-US included.
+ */
+export const TEAM_CREATE_TITLE_LABELS: string[] = teamLabels('create.title', (bundle) => bundle.create?.title);

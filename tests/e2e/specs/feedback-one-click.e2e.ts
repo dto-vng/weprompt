@@ -11,7 +11,7 @@
  *   3. The modal displays its title and module select control.
  */
 import { test, expect } from '../fixtures';
-import { goToSettings, modalCloseButton } from '../helpers';
+import { BUG_REPORT_LABELS, exactLabelPattern, goToSettings, modalCloseButton } from '../helpers';
 
 declare global {
   interface Window {
@@ -61,7 +61,7 @@ test.describe('One-click feedback infrastructure', () => {
     // setShowFeedbackModal(true) in AboutModalContent.
     const bugReportRow = page
       .locator('div')
-      .filter({ hasText: /^Report Issue$|^反馈问题$|^問題を報告$|^문제 보고$/ })
+      .filter({ hasText: exactLabelPattern(BUG_REPORT_LABELS) })
       .first();
     await expect(bugReportRow).toBeVisible({ timeout: 10_000 });
     await bugReportRow.click();
