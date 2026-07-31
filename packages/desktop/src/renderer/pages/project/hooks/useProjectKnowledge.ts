@@ -70,26 +70,39 @@ export const useProjectKnowledge = (project: ForgeProject): UseProjectKnowledgeR
     return unsubscribe;
   }, [projectId, workspace, refetch]);
 
+  // The three mutators below refetch in `finally` and let the rejection through, the same
+  // shape as syncNow. Two reasons, both load-bearing: a failed invoke must still refetch or
+  // the list keeps showing state the backend no longer has, and the rejection has to reach
+  // the caller because this hook has no i18n or Arco — the card owns the toast.
   const addSources = useCallback(
     async (filePaths: string[]) => {
-      await ipcBridge.projectKnowledge.addSources.invoke({ projectId, filePaths, workspace });
-      await refetch();
+      try {
+        await ipcBridge.projectKnowledge.addSources.invoke({ projectId, filePaths, workspace });
+      } finally {
+        await refetch();
+      }
     },
     [projectId, workspace, refetch]
   );
 
   const removeSource = useCallback(
     async (sourceId: string) => {
-      await ipcBridge.projectKnowledge.removeSource.invoke({ projectId, sourceId, workspace });
-      await refetch();
+      try {
+        await ipcBridge.projectKnowledge.removeSource.invoke({ projectId, sourceId, workspace });
+      } finally {
+        await refetch();
+      }
     },
     [projectId, workspace, refetch]
   );
 
   const retrySource = useCallback(
     async (sourceId: string) => {
-      await ipcBridge.projectKnowledge.retrySource.invoke({ projectId, sourceId, workspace });
-      await refetch();
+      try {
+        await ipcBridge.projectKnowledge.retrySource.invoke({ projectId, sourceId, workspace });
+      } finally {
+        await refetch();
+      }
     },
     [projectId, workspace, refetch]
   );

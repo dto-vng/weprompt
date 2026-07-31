@@ -21,6 +21,9 @@ const syncNowMock = vi.fn();
 const getSourceTextMock = vi.fn();
 const updateProjectMock = vi.fn();
 const navigateMock = vi.fn();
+// vi.hoisted: vi.mock is lifted above plain const declarations, so the factory below
+// cannot close over ordinary top-level vi.fn()s.
+const arcoMessage = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), success: vi.fn() }));
 
 type HookState = {
   sources: IKnowledgeSourceDto[];
@@ -48,6 +51,18 @@ vi.mock('react-i18next', () => ({
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => navigateMock };
+});
+
+// The card now reports failures through Arco's imperative Message, which mounts via the
+// legacy ReactDOM.render that React 18 removed — left real it throws
+// "CopyReactDOM.render is not a function" out of the test as an unhandled rejection.
+// Only the imperative surface is replaced; every rendered Arco component stays real.
+vi.mock('@arco-design/web-react', async () => {
+  const actual = await vi.importActual<typeof import('@arco-design/web-react')>('@arco-design/web-react');
+  return {
+    ...actual,
+    Message: { ...actual.Message, ...arcoMessage },
+  };
 });
 
 vi.mock('@/common', () => ({
@@ -637,5 +652,91 @@ describe('ProjectKnowledgeCard', () => {
     dropOnCard([{ file: dropFile('notes.md', '/drop/notes.md') }]);
 
     await waitFor(() => expect(addSourcesMock).not.toHaveBeenCalled());
+  });
+
+  describe('failure feedback', () => {
+    // Every one of these paths used to be silent: console.error at best, and for the row
+    // actions not even that — a bare `void asyncCall()` produced an unhandled rejection
+    // while the UI showed nothing at all.
+    beforeEach(() => {
+      arcoMessage.error.mockReset();
+      arcoMessage.warning.mockReset();
+    });
+
+    it('reports a failed add', async () => {
+      showOpenMock.mockResolvedValue(['/w/alpha/Knowledge Base/a.md']);
+      addSourcesMock.mockRejectedValue(new Error('nope'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeAddFailed')
+      );
+    });
+
+    it('reports a failed delete instead of leaving the row silently in place', async () => {
+      setState({ sources: [readySource] });
+      removeSourceMock.mockRejectedValue(new Error('trash failed'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByTestId('knowledge-delete-s-ready'));
+      await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+      // The row trigger shares its accessible name with the confirm's OK button, so pick
+      // the one that is not the trigger — same approach as the neighbouring delete test.
+      const confirmButton = screen
+        .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+        .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+      fireEvent.click(confirmButton!);
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeDeleteFailed')
+      );
+    });
+
+    it('reports a failed retry', async () => {
+      setState({ sources: [failedSource] });
+      retrySourceMock.mockRejectedValue(new Error('queue full'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeRetryFailed')
+      );
+    });
+
+    it('warns when a drop contained nothing supported, rather than swallowing it', () => {
+      render(<ProjectKnowledgeCard project={project} />);
+
+      dropOnCard([{ file: dropFile('archive.zip', '/tmp/archive.zip') }]);
+
+      expect(arcoMessage.warning).toHaveBeenCalledWith('conversation.projectHome.knowledgeDropUnsupported');
+      expect(addSourcesMock).not.toHaveBeenCalled();
+    });
+
+    it('warns when dropping onto a card whose folder is gone', () => {
+      setState({ folderMissing: true });
+      render(<ProjectKnowledgeCard project={project} />);
+
+      dropOnCard([{ file: dropFile('a.md', '/tmp/a.md') }]);
+
+      expect(arcoMessage.warning).toHaveBeenCalledWith('conversation.projectHome.knowledgeDropFolderMissing');
+      expect(addSourcesMock).not.toHaveBeenCalled();
+    });
+
+    it('reports embed-all failure once, not once per source', async () => {
+      setState({ sources: [partialSource, { ...partialSource, id: 's-partial-2', fileName: 'other.pdf' }] });
+      retrySourceMock.mockRejectedValue(new Error('no model'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeEmbedAll' }));
+
+      await waitFor(() => expect(retrySourceMock).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeRetryFailed')
+      );
+      expect(arcoMessage.error).toHaveBeenCalledTimes(1);
+    });
   });
 });
