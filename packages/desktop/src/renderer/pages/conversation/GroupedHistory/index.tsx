@@ -66,6 +66,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
 
   const {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentFailureAt,
@@ -750,9 +751,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               />
             )}
             {batchSelectionPanel}
+            {/* Only claim there is no history once a load has actually settled —
+                otherwise every cold start flashes "No chat history" before the rows
+                arrive. The reserved block keeps the same footprint so the rail does
+                not jump when they do. */}
             {conversationOnlySections.length === 0 ? (
-              <div className='py-48px flex-center'>
-                <Empty description={t('conversation.history.noHistory')} />
+              <div className='py-48px flex-center' data-testid='conversation-history-empty-slot'>
+                {hasLoadedConversations ? <Empty description={t('conversation.history.noHistory')} /> : null}
               </div>
             ) : null}
             {!collapsedSections.has('conversations') &&
