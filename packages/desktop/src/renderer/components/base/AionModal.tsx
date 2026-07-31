@@ -4,6 +4,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * 弹窗外壳选型规则（已定，勿再反复讨论）/ Which modal chrome to use (settled — please stop re-litigating)
+ *
+ * - 表单型 / 多步骤弹窗 → `AionModal`（本文件）。
+ * - 简短确认弹窗 → 原生 Arco `Modal` / `Modal.confirm`。
+ *
+ * - Form and multi-step dialogs → `AionModal` (this file).
+ * - Short confirmation dialogs → raw Arco `Modal` / `Modal.confirm`.
+ *
+ * 两套外壳并存是有意的，不是待清理的技术债。`Modal.confirm` 没有 AionModal 等价物，
+ * 迁移确认弹窗需要新造一个 `AionModal.confirm`（尚不存在），或把命令式调用改写成声明式组件，
+ * 同时还要保住这些弹窗依赖的 z-index 叠放（有一个嵌套弹窗特意坐在 10050/10040）
+ * 和 DOM 测试选择的 `data-testid` / `wrapClassName` —— 而用户什么也看不出变化。
+ * 两者唯一的差异是外观：确认弹窗少了这里统一的 header/footer 内边距、分隔线与 dialog 底色。
+ *
+ * The split is deliberate, not debt awaiting cleanup. `Modal.confirm` has no AionModal
+ * equivalent, so migrating confirms would mean inventing an `AionModal.confirm` helper or
+ * rewriting imperative call sites as declarative components — while preserving the z-index
+ * stacking they rely on (one nested modal deliberately sits at 10050/10040) and the
+ * `data-testid` / `wrapClassName` hooks existing DOM tests select on — for no user-visible
+ * gain. The only cost of the split is cosmetic: confirms miss the header/footer padding,
+ * divider and dialog fill standardised here.
+ *
+ * 确认弹窗要统一的是行为而不是外壳：删除类操作一律 `status: 'danger'`，
+ * 文案带上被删对象的名字。Migration 以后仍然可以做，这条规则没有关上任何门。
+ *
+ * What confirms must standardise is behaviour, not chrome: every destructive confirm uses
+ * `status: 'danger'` and names the thing it is about to delete. Migration stays possible
+ * later; this rule forecloses nothing.
+ *
+ * 注 / Note: `components/base/ModalWrapper.tsx` 是第三套外壳，只被 `pages/TestShowcase.tsx`
+ * 使用，且带有本文件已修掉的同一个硬编码 `fill='#86909c'` 问题。它不属于本规则的任何一档，
+ * 诚实的处理是单独一次改动里删掉它。
+ * `components/base/ModalWrapper.tsx` is a third chrome, consumed only by
+ * `pages/TestShowcase.tsx`, and still carries the hardcoded `fill='#86909c'` this file just
+ * fixed. It fits neither tier above; the honest resolution is deleting it in its own change.
+ */
+
 import type { ModalProps } from '@arco-design/web-react';
 import { Modal, Button } from '@arco-design/web-react';
 import { Close } from '@icon-park/react';
