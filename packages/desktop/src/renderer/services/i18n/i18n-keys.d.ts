@@ -1099,6 +1099,8 @@ export type I18nKey =
   | 'dashboard.scheduleRun'
   | 'dashboard.subtitle'
   | 'dashboard.title'
+  | 'fileSelection.emptyFolder'
+  | 'fileSelection.goToParent'
   | 'fileSelection.pleaseSelectDirectory'
   | 'fileSelection.pleaseSelectFile'
   | 'fileSelection.selectDirectory'

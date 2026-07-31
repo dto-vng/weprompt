@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Button, Spin } from '@arco-design/web-react';
+import { Button, Empty, Spin } from '@arco-design/web-react';
 import { IconFile, IconFolder, IconUp } from '@arco-design/web-react/icon';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getBaseUrl, withLocalTokenHeaders } from '@/common/adapter/httpBridge';
 import { stripWindowsVerbatimPrefix } from '@/renderer/utils/file/fileSelection';
 import AionModal from '@/renderer/components/base/AionModal';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 interface DirectoryItem {
   name: string;
@@ -145,7 +146,17 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
       variant='standard'
       visible={visible}
       header={{
-        title: isFileMode ? '📄 ' + t('fileSelection.selectFile') : '📁 ' + t('fileSelection.selectDirectory'),
+        // 图标用组件渲染，不要把 emoji 拼进翻译外面：拼接会让译者无法移动或去掉字形，
+        // 在 fa-IR 这种 RTL 语言里位置还会跑到错的一侧。
+        // Render the glyph as a component instead of concatenating an emoji outside the
+        // translation: concatenation leaves translators unable to move or drop it, and it lands
+        // on the wrong side in an RTL locale such as fa-IR.
+        title: (
+          <span className='inline-flex items-center gap-8px'>
+            {isFileMode ? <IconFile className='text-primary' /> : <IconFolder className='text-warning' />}
+            <span>{isFileMode ? t('fileSelection.selectFile') : t('fileSelection.selectDirectory')}</span>
+          </span>
+        ),
         showClose: true,
       }}
       onCancel={onCancel}
@@ -189,8 +200,12 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
           <div className='h-full overflow-y-auto'>
             {directoryData.canGoUp && (
               <div
-                className='flex items-center p-10px border-b border-b-4 cursor-pointer hover:bg-hover transition'
+                className={`flex items-center p-10px border-b border-b-4 cursor-pointer hover:bg-hover transition ${ROW_FOCUS_RING}`}
+                role='button'
+                tabIndex={0}
+                aria-label={t('fileSelection.goToParent')}
                 onClick={handleGoUp}
+                onKeyDown={activateOnEnterOrSpace(handleGoUp)}
               >
                 <IconUp className='mr-10px text-t-secondary' />
                 <span>..</span>
@@ -204,36 +219,59 @@ const DirectorySelectionModal: React.FC<DirectorySelectionModalProps> = ({
                 </Button>
               </div>
             )}
-            {directoryData.items.map((item, index) => (
-              <div
-                key={index}
-                className='flex items-center justify-between p-10px border-b border-b-4 cursor-pointer hover:bg-hover transition'
-                style={selectedPath === item.path ? { background: 'var(--brand-light)' } : {}}
-                onClick={() => handleItemClick(item)}
-                onDoubleClick={() => handleItemDoubleClick(item)}
-              >
-                <div className='flex items-center flex-1 min-w-0'>
-                  {item.isDirectory ? (
-                    <IconFolder className='mr-10px text-warning shrink-0' />
-                  ) : (
-                    <IconFile className='mr-10px text-primary shrink-0' />
-                  )}
-                  <span className='overflow-hidden text-ellipsis whitespace-nowrap'>{item.name}</span>
-                </div>
-                {canSelect(item) && (
-                  <Button
-                    type='primary'
-                    size='mini'
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelect(item.path);
-                    }}
-                  >
-                    {t('common.select')}
-                  </Button>
-                )}
+            {!loading && !error && directoryData.items.length === 0 && (
+              // 空目录以前是一片 400px 的空白，什么都不解释。
+              // 注意 go-up 行在空目录时仍然渲染，否则键盘用户进了空目录就出不来了。
+              // An empty directory used to paint a blank 400px box with no explanation. The
+              // go-up row above stays rendered, or a keyboard user who walks into an empty
+              // folder has no way back out.
+              <div className='py-32px'>
+                <Empty description={t('fileSelection.emptyFolder')} />
               </div>
-            ))}
+            )}
+            {directoryData.items.map((item, index) => {
+              // 只有目录行点击/回车才有动作（进入该目录）；文件行点了不会发生任何事，
+              // 所以不给它 role='button' —— 让读屏念出「按钮」再按下去毫无反应更糟。
+              // 文件仍然可以用行内那颗 Select 按钮选中，它本身就能 Tab 到。
+              // Only directory rows do something on click/Enter (navigate into them). A file row
+              // does nothing, so it does not claim role='button' — announcing "button" and then
+              // doing nothing on Enter is worse than not being focusable. Files stay selectable
+              // via the row's own Select button, which is already Tab-reachable.
+              const isNavigable = item.isDirectory;
+              return (
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-10px border-b border-b-4 hover:bg-hover transition ${isNavigable ? `cursor-pointer ${ROW_FOCUS_RING}` : ''}`}
+                  style={selectedPath === item.path ? { background: 'var(--brand-light)' } : {}}
+                  role={isNavigable ? 'button' : undefined}
+                  tabIndex={isNavigable ? 0 : undefined}
+                  onClick={() => handleItemClick(item)}
+                  onDoubleClick={() => handleItemDoubleClick(item)}
+                  onKeyDown={isNavigable ? activateOnEnterOrSpace(() => handleItemClick(item)) : undefined}
+                >
+                  <div className='flex items-center flex-1 min-w-0'>
+                    {item.isDirectory ? (
+                      <IconFolder className='mr-10px text-warning shrink-0' />
+                    ) : (
+                      <IconFile className='mr-10px text-primary shrink-0' />
+                    )}
+                    <span className='overflow-hidden text-ellipsis whitespace-nowrap'>{item.name}</span>
+                  </div>
+                  {canSelect(item) && (
+                    <Button
+                      type='primary'
+                      size='mini'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelect(item.path);
+                      }}
+                    >
+                      {t('common.select')}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </Spin>
