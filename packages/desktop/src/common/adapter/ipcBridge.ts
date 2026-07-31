@@ -143,6 +143,9 @@ import {
   fromBackendTeam,
   fromBackendTeamList,
   fromBackendTeamOptional,
+  fromBackendTeamRunAck,
+  fromBackendTeamRunEvent,
+  fromBackendTeamRunState,
   toBackendAssistant,
 } from './teamMapper';
 import { fromBackendCompareResult, type RawCompareResult } from './fileSnapshotMapper';
@@ -2155,20 +2158,31 @@ export const team = {
     (p) => `/api/teams/${p.team_id}/session-mode`,
     (p) => ({ mode: p.session_mode })
   ),
-  getRunState: httpGet<ITeamRunStateResponse, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
-  sendMessage: httpPost<ITeamRunAck, ISendTeamMessageParams>(
-    (p) => `/api/teams/${p.team_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  // Run payloads are normalized (see `fromBackendTeamRunState`) so `slot_work`
+  // is always an array, even on backends that predate the field.
+  getRunState: withResponseMap(
+    httpGet<unknown, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
+    fromBackendTeamRunState
   ),
-  sendMessageToAgent: httpPost<ITeamRunAck, ISendTeamAgentMessageParams>(
-    (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  sendMessage: withResponseMap(
+    httpPost<unknown, ISendTeamMessageParams>(
+      (p) => `/api/teams/${p.team_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
+  ),
+  sendMessageToAgent: withResponseMap(
+    httpPost<unknown, ISendTeamAgentMessageParams>(
+      (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
   ),
   cancelRun: httpPost<void, ICancelTeamRunParams>(
     (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/cancel`,
@@ -2202,12 +2216,12 @@ export const team = {
   sessionStatusChanged: wsEmitter<ITeamSessionStatusChangedEvent>('team.sessionStatusChanged'),
   taskChanged: wsEmitter<ITeamTaskChangedEvent>('team.taskChanged'),
   sessionChanged: wsEmitter<ITeamSessionChangedEvent>('team.sessionChanged'),
-  runAccepted: wsEmitter<ITeamRunEvent>('team.runAccepted'),
-  runStarted: wsEmitter<ITeamRunEvent>('team.runStarted'),
-  runUpdated: wsEmitter<ITeamRunEvent>('team.runUpdated'),
-  runCompleted: wsEmitter<ITeamRunEvent>('team.runCompleted'),
-  runCancelled: wsEmitter<ITeamRunEvent>('team.runCancelled'),
-  runFailed: wsEmitter<ITeamRunEvent>('team.runFailed'),
+  runAccepted: wsMappedEmitter<ITeamRunEvent>('team.runAccepted', fromBackendTeamRunEvent),
+  runStarted: wsMappedEmitter<ITeamRunEvent>('team.runStarted', fromBackendTeamRunEvent),
+  runUpdated: wsMappedEmitter<ITeamRunEvent>('team.runUpdated', fromBackendTeamRunEvent),
+  runCompleted: wsMappedEmitter<ITeamRunEvent>('team.runCompleted', fromBackendTeamRunEvent),
+  runCancelled: wsMappedEmitter<ITeamRunEvent>('team.runCancelled', fromBackendTeamRunEvent),
+  runFailed: wsMappedEmitter<ITeamRunEvent>('team.runFailed', fromBackendTeamRunEvent),
   childTurnStarted: wsEmitter<ITeamChildTurnEvent>('team.childTurnStarted'),
   childTurnCompleted: wsEmitter<ITeamChildTurnEvent>('team.childTurnCompleted'),
   childTurnCancelled: wsEmitter<ITeamChildTurnEvent>('team.childTurnCancelled'),

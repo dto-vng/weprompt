@@ -110,12 +110,18 @@ export type ITeamRunEvent = {
   starting_batch_count: number;
   running_batch_count: number;
   active_enqueue_lease_count: number;
+  /**
+   * Absent on the wire for backends that predate the field; guaranteed to be an
+   * array here because every ingress point runs `fromBackendTeamRunEvent`.
+   */
   slot_work: ITeamSlotWork[];
 };
 
 export type ITeamRunStateResponse = {
+  /** Absent on older backends; normalized to `null` by `fromBackendTeamRunState`. */
   session_generation: string | null;
   active_run: ITeamRunEvent | null;
+  /** Absent on older backends; normalized to `[]` by `fromBackendTeamRunState`. */
   slot_work: ITeamSlotWork[];
 };
 

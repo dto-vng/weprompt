@@ -29,6 +29,10 @@
   "download": "Download",
   "close": "Close",
   "retry": "Retry",
+  "routeError": {
+    "title": "This page could not be displayed",
+    "description": "Something went wrong while opening this page. The rest of the app is still running — retry, or choose another item in the sidebar."
+  },
   "reload": "Reload",
   "technical_details": "Technical Details",
   "error_details": "Error Details",

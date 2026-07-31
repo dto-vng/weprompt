@@ -66,8 +66,15 @@ const debugTeamChildTurnEvent = (source: string, event: ITeamChildTurnEvent) => 
   });
 };
 
-const indexSlotWork = (slotWork: ITeamSlotWork[]): Record<string, ITeamSlotWork | undefined> => {
+/**
+ * `slot_work` is normalized to an array at the IPC boundary, but this stays
+ * defensive on purpose: every call site below runs inside a `setState` updater,
+ * which React invokes during the render phase. A throw there escapes the
+ * surrounding `try/catch` and unmounts the whole app rather than just this view.
+ */
+const indexSlotWork = (slotWork: ITeamSlotWork[] | undefined): Record<string, ITeamSlotWork | undefined> => {
   const indexed: Record<string, ITeamSlotWork | undefined> = {};
+  if (!Array.isArray(slotWork)) return indexed;
   for (const work of slotWork) {
     indexed[work.slot_id] = work;
   }
@@ -121,12 +128,12 @@ export const useTeamRunView = (team_id: string) => {
         const snapshot = await ipcBridge.team.getRunState.invoke({ team_id });
         setState((prev) => {
           if (seq !== reconcileSeq.current) return prev;
-          const activeRun = snapshot.active_run ?? undefined;
+          const activeRun = snapshot?.active_run ?? undefined;
           if (activeRun) debugTeamRunEvent(`reconcile:${source}`, activeRun);
           return {
             activeRun,
             childTurnsBySlot: {},
-            slotWorkBySlot: indexSlotWork(snapshot.slot_work),
+            slotWorkBySlot: indexSlotWork(snapshot?.slot_work),
             sessionStopped: false,
           };
         });

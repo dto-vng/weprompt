@@ -28,6 +28,10 @@
   "download": "Descargar",
   "close": "Cerrar",
   "retry": "Reintentar",
+  "routeError": {
+    "title": "No se pudo mostrar esta página",
+    "description": "Se produjo un problema al abrir esta página. El resto de la aplicación sigue funcionando: vuelve a intentarlo o elige otro elemento en la barra lateral."
+  },
   "reload": "Recargar",
   "technical_details": "Detalles técnicos",
   "error_details": "Detalles del error",
