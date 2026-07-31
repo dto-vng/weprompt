@@ -183,10 +183,16 @@ export async function httpRequest<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  console.debug(
-    `[httpBridge] ${method} ${path}`,
-    body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
-  );
+  const requestLog = () =>
+    console.debug(
+      `[httpBridge] ${method} ${path}`,
+      body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
+    );
+  const deferRequestLog = options?.silentStatuses !== undefined && options.silentStatuses.length > 0;
+
+  if (!deferRequestLog) {
+    requestLog();
+  }
 
   const response = await fetch(url, {
     method,
@@ -203,14 +209,18 @@ export async function httpRequest<T>(
     } catch {
       errorBody = rawText;
     }
-    if (options?.silentStatuses?.includes(response.status)) {
-      console.debug(`[httpBridge] ${method} ${path} → ${response.status} (silenced)`, errorBody);
-    } else {
+    if (!options?.silentStatuses?.includes(response.status)) {
+      if (deferRequestLog) {
+        requestLog();
+      }
       console.error(`[httpBridge] ${method} ${path} → ${response.status}`, errorBody);
     }
     throw new BackendHttpError({ method, path, status: response.status, body: errorBody });
   }
 
+  if (deferRequestLog) {
+    requestLog();
+  }
   console.debug(`[httpBridge] ${method} ${path} → ${response.status} OK`);
 
   const contentType = response.headers.get('Content-Type');

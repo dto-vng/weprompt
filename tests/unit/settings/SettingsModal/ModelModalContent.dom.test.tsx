@@ -7,11 +7,21 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import type { IProvider } from '@/common/config/storage';
 
-const { addPlatformOpenMock, appOperationsCardProps } = vi.hoisted(() => ({
+const { addPlatformOpenMock, appOperationsCardProps, providersQueryData } = vi.hoisted(() => ({
   addPlatformOpenMock: vi.fn(),
   appOperationsCardProps: {
-    current: undefined as { onAddModel: () => void } | undefined,
+    current: undefined as
+      | {
+          onAddModel: () => void;
+          providers: IProvider[];
+          providersLoading: boolean;
+        }
+      | undefined,
+  },
+  providersQueryData: {
+    current: undefined as IProvider[] | undefined,
   },
 }));
 
@@ -31,7 +41,7 @@ vi.mock('@/common', () => ({
 }));
 
 vi.mock('@/renderer/hooks/agent/useModelProviderList', () => ({
-  useProvidersQuery: () => ({ data: [], mutate: vi.fn() }),
+  useProvidersQuery: () => ({ data: providersQueryData.current, mutate: vi.fn() }),
 }));
 
 vi.mock('@/renderer/components/base/AionScrollArea', () => ({
@@ -69,7 +79,7 @@ vi.mock('@/renderer/pages/settings/components/EditModeModal', () => ({
 }));
 
 vi.mock('@/renderer/components/settings/SettingsModal/AppOperationsModelCard', () => ({
-  default: (props: { onAddModel: () => void }) => {
+  default: (props: NonNullable<typeof appOperationsCardProps.current>) => {
     appOperationsCardProps.current = props;
     return <div data-testid='app-operations-card'>App Operations</div>;
   },
@@ -88,17 +98,28 @@ vi.mock('@arco-design/web-react', async (importOriginal) => {
 
 import ModelModalContent from '@/renderer/components/settings/SettingsModal/contents/ModelModalContent';
 
+const provider: IProvider = {
+  id: 'provider-a',
+  platform: 'openai',
+  name: 'Provider A',
+  base_url: 'https://example.test/v1',
+  api_key: 'secret',
+  models: ['model-a'],
+  enabled: true,
+};
+
 describe('ModelModalContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     appOperationsCardProps.current = undefined;
+    providersQueryData.current = [];
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('shows app operations before the empty provider state and opens provider setup from the card', () => {
+  it('passes loaded-empty providers to the card before the empty provider state and opens provider setup', () => {
     render(<ModelModalContent />);
 
     const card = screen.getByTestId('app-operations-card');
@@ -106,8 +127,30 @@ describe('ModelModalContent', () => {
     expect(card.compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(card).toBeVisible();
     expect(empty).toBeVisible();
+    expect(appOperationsCardProps.current?.providers).toEqual([]);
+    expect(appOperationsCardProps.current?.providersLoading).toBe(false);
 
     appOperationsCardProps.current?.onAddModel();
     expect(addPlatformOpenMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes a loading provider query to the card without treating it as configured providers', () => {
+    providersQueryData.current = undefined;
+    render(<ModelModalContent />);
+
+    expect(appOperationsCardProps.current?.providers).toEqual([]);
+    expect(appOperationsCardProps.current?.providersLoading).toBe(true);
+  });
+
+  it('passes the raw configured providers to the card before the existing provider row', () => {
+    const rawProviders = [provider];
+    providersQueryData.current = rawProviders;
+    render(<ModelModalContent />);
+
+    const card = screen.getByTestId('app-operations-card');
+    const providerRow = screen.getByText('Provider A');
+    expect(appOperationsCardProps.current?.providers).toBe(rawProviders);
+    expect(appOperationsCardProps.current?.providersLoading).toBe(false);
+    expect(card.compareDocumentPosition(providerRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

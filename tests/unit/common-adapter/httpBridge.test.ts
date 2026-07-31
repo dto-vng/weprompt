@@ -203,6 +203,39 @@ describe('httpBridge', () => {
   });
 
   describe('error handling', () => {
+    it('keeps request logging before a normal network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/network-failure')).rejects.toThrow('network unavailable');
+
+      expect(debugSpy).toHaveBeenCalledWith('[httpBridge] GET /api/network-failure', '(no body)');
+    });
+
+    it('keeps a configured silent status out of logs while preserving its BackendHttpError', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: 'backend upgrade required' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+      );
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(
+        httpRequest('GET', '/api/app-operations/model', undefined, { silentStatuses: [404] })
+      ).rejects.toMatchObject({
+        status: 404,
+        body: { error: 'backend upgrade required' },
+      });
+
+      expect(debugSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
     it('non-2xx response throws BackendHttpError with code/status/backendMessage', async () => {
       const fetchSpy = vi.fn().mockResolvedValue(
         new Response(
