@@ -305,7 +305,7 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
                   key={index}
                   className='p-3'
                   style={
-                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-3)' } : undefined
+                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-4)' } : undefined
                   }
                 >
                   <div className='flex items-center justify-between gap-3'>
@@ -347,7 +347,7 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
                   key={index}
                   className='p-3'
                   style={
-                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-3)' } : undefined
+                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-4)' } : undefined
                   }
                 >
                   <div className='flex items-center justify-between gap-3'>

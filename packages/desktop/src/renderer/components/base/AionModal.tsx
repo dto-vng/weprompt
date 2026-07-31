@@ -116,8 +116,13 @@ const TITLE_BASE_CLASS = 'text-18px font-500 text-t-primary m-0';
 const CLOSE_BUTTON_CLASS =
   'w-32px h-32px flex items-center justify-center rd-8px transition-colors duration-200 cursor-pointer border-0 bg-transparent p-0 hover:bg-2 focus:outline-none';
 const FOOTER_BASE_CLASS = 'flex-shrink-0 bg-transparent';
-/** 任务型弹窗 footer 的统一分隔线 + 内边距（内容↔按钮区）。 */
-const FOOTER_DIVIDER_CLASS = 'flex-shrink-0 border-t border-solid border-[var(--bg-3)] px-24px py-16px';
+/**
+ * 任务型弹窗 footer 的统一分隔线 + 内边距（内容↔按钮区）。
+ * 分隔线用 --bg-4：--bg-3 在暗色下等于 --dialog-fill-0（都是 #1e2536），画在弹窗底色上等于不存在。
+ * Divider uses --bg-4: in dark, --bg-3 equals --dialog-fill-0 (both #1e2536), so a --bg-3
+ * hairline drawn on the dialog fill is invisible.
+ */
+const FOOTER_DIVIDER_CLASS = 'flex-shrink-0 border-t border-solid border-[var(--bg-4)] px-24px py-16px';
 
 // ===== standard 变体：统一三段式布局 =====
 /** 标题区：上 20 / 左右 24 / 下 16，底部一条贯穿全宽的分隔线。 */
@@ -389,7 +394,9 @@ const AionModal: React.FC<AionModalProps> = ({
     const headerClassName = classNames(HEADER_BASE_CLASS, headerConfig.className);
 
     const headerStyle: CSSProperties = {
-      borderBottom: '1px solid var(--bg-3)',
+      // 见 FOOTER_DIVIDER_CLASS：暗色下 --bg-3 与弹窗底色同色，故用 --bg-4
+      // See FOOTER_DIVIDER_CLASS: --bg-3 matches the dialog fill in dark, so use --bg-4
+      borderBottom: '1px solid var(--bg-4)',
       ...headerConfig.style,
     };
 
