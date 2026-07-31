@@ -35,11 +35,29 @@ treated as an experiment and skips the comparison rather than failing it.
 Config is resolved in this order:
 
 1. `KB_EVAL_EMBED_BASE_URL`, `KB_EVAL_EMBED_API_KEY`, `KB_EVAL_EMBED_MODEL` — all three, explicit,
-   works headless.
+   works headless. **In practice this is the one that works; prefer it.**
 2. The running dev app's `GET /api/providers`, run through the same `pickEmbeddingModel` →
    `resolveEmbedConfigForModel` the ingestion service uses, so you measure the model a real ingest
-   would have picked. Override the port with `AIONUI_BACKEND_PORT`.
+   would have picked. Override the port with `AIONUI_BACKEND_PORT`. See the caveat below — this route
+   may be closed to you.
 3. Neither — BM25-only, with the reason printed.
+
+All three of the env vars are required together. Setting two of them is not a partial win: the
+resolver treats it as unset and falls through to route 2, which is easy to misread as "my env vars
+were ignored".
+
+#### Route 2 cannot authenticate, and that is not fixable here
+
+Since `fix(security): require a per-launch secret on every local backend call`, the desktop app
+presents an `X-AionUI-Local-Token` header on every local backend call. The secret is minted on each
+spawn and **never persisted** — it lives only in the app process's globals — so a separate headless
+process has nowhere to read it from. If the backend enforces the header, route 2 answers 401 no
+matter what, and adding the header to this harness would not help.
+
+The resolver therefore reports a refusal as a refusal rather than as an outage, because those need
+opposite responses from the reader: an outage means start the app, a refusal means stop trying and
+use the env vars. Whether the pinned AionCore binary enforces the header has not been confirmed
+against a running backend; treat route 2 as "may work, do not rely on it".
 
 Vectors are cached by content hash in `tests/eval/.cache/` (already gitignored) and keyed by model,
 so sweeping a knob does not re-embed the corpus or the queries. Delete the directory to force a
@@ -304,10 +322,9 @@ not less. The hard invariant still holds — `unanswerable-no-overlap` returns n
 
 - **The hybrid half.** `baseline.json` is still `hybrid: null`, so the one question finding 6 raises —
   does the multilingual embedding model bridge an English query to an OCR'd Vietnamese answer? — is
-  the question this instrument still cannot answer. The only locally configured provider exposes no
-  embedding model, so route 2 cannot resolve one even with the dev app up. Fill it with
-  `KB_EVAL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL` pointed at a working embedding model, then
-  `bun run eval:kb -- --update-baseline`.
+  the question this instrument still cannot answer. Route 2 will not get you there — see "Route 2
+  cannot authenticate" — so fill it with `KB_EVAL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL` pointed at a
+  working embedding model, then `bun run eval:kb -- --update-baseline`.
 - **Text-layer vs OCR on the same tables** (see finding 7).
 - Resolution barely improved: one question is worth 0.040 where it was worth 0.043. The 40–60 range in
   "what would make this instrument sharper" is still the target.
@@ -322,8 +339,12 @@ reasons, and a fixture that pins them becomes noise nobody trusts.
 The hybrid block is pinned to one embedding model and only compared when the current run uses the
 same one — different model, different vector space, incomparable numbers. **The committed baseline
 currently has `hybrid: null`**, recorded on a machine with no embedding provider reachable. The
-semantic half is therefore unguarded. Run `bun run eval:kb -- --update-baseline` against a configured
-provider to fill it in.
+semantic half is therefore unguarded. Fill it in with the env vars from route 1 — not by starting the
+app, for the reason given under "Route 2 cannot authenticate":
+
+```bash
+KB_EVAL_EMBED_BASE_URL=… KB_EVAL_EMBED_API_KEY=… KB_EVAL_EMBED_MODEL=… bun run eval:kb -- --update-baseline
+```
 
 The full harness is deliberately **not** in `bun run test`: it wants the network and takes real time.
 The deterministic BM25 half runs in CI via `tests/regression/kbRetrievalBaseline.test.ts`, which
