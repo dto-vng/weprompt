@@ -89,48 +89,47 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
     [t]
   );
 
-  const handleRenameStart = useCallback(
-    (conversation: TChatConversation) => {
-      let nextName = conversation.name;
-      Modal.confirm({
-        title: t('conversation.projectHome.rename'),
-        content: (
-          <Input
-            autoFocus
-            defaultValue={conversation.name}
-            onChange={(value) => {
-              nextName = value;
-            }}
-          />
-        ),
-        okText: t('conversation.projectHome.save'),
-        cancelText: t('conversation.projectHome.cancel'),
-        onOk: async () => {
-          const trimmedName = nextName.trim();
-          if (!trimmedName) return;
-          try {
-            const success = await ipcBridge.conversation.update.invoke({
-              id: conversation.id,
-              updates: { name: trimmedName },
-            });
-            if (success) {
-              await refreshConversationCache(conversation.id);
-              emitter.emit('chat.history.refresh');
-              Message.success(t('conversation.history.renameSuccess'));
-            } else {
-              Message.error(t('conversation.history.renameFailed'));
-            }
-          } catch (error) {
-            console.error('Failed to rename conversation:', error);
-            Message.error(t('conversation.history.renameFailed'));
-          }
-        },
-        alignCenter: true,
-        getPopupContainer: () => document.body,
+  /**
+   * Rename is a controlled `<Modal>` rather than `Modal.confirm`: the confirm's
+   * `<Input>` was uncontrolled over a closure `let`, so no re-render could ever
+   * disable OK on an empty name — and because Arco closes a confirm the moment
+   * `onOk` resolves, the empty-name early return dismissed the dialog and threw
+   * the rename away silently. Mirrors the sidebar's conversation rename.
+   */
+  const [renameTarget, setRenameTarget] = useState<TChatConversation | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+
+  const handleRenameStart = useCallback((conversation: TChatConversation) => {
+    setRenameTarget(conversation);
+    setRenameName(conversation.name);
+  }, []);
+
+  const handleRenameConfirm = useCallback(async () => {
+    // Unreachable while OK is disabled and Enter is guarded, but kept so neither
+    // affordance is the only thing standing between a blank name and storage.
+    if (!renameTarget || !renameName.trim()) return;
+    setRenameLoading(true);
+    try {
+      const success = await ipcBridge.conversation.update.invoke({
+        id: renameTarget.id,
+        updates: { name: renameName.trim() },
       });
-    },
-    [t]
-  );
+      if (success) {
+        await refreshConversationCache(renameTarget.id);
+        emitter.emit('chat.history.refresh');
+        Message.success(t('conversation.history.renameSuccess'));
+        setRenameTarget(null);
+      } else {
+        Message.error(t('conversation.history.renameFailed'));
+      }
+    } catch (error) {
+      console.error('Failed to rename conversation:', error);
+      Message.error(t('conversation.history.renameFailed'));
+    } finally {
+      setRenameLoading(false);
+    }
+  }, [renameName, renameTarget, t]);
 
   const handleDeleteClick = useCallback(
     (conversation_id: string) => {
@@ -286,6 +285,29 @@ const ProjectChatList: React.FC<ProjectChatListProps> = ({ chats }) => {
           })}
         </div>
       )}
+
+      <Modal
+        title={t('conversation.history.renameTitle')}
+        visible={!!renameTarget}
+        onOk={() => void handleRenameConfirm()}
+        onCancel={() => setRenameTarget(null)}
+        okText={t('conversation.projectHome.save')}
+        cancelText={t('conversation.projectHome.cancel')}
+        confirmLoading={renameLoading}
+        okButtonProps={{ disabled: !renameName.trim() }}
+        style={{ borderRadius: '12px' }}
+        alignCenter
+        getPopupContainer={() => document.body}
+      >
+        <Input
+          autoFocus
+          value={renameName}
+          onChange={setRenameName}
+          onPressEnter={() => void handleRenameConfirm()}
+          placeholder={t('conversation.history.renamePlaceholder')}
+          allowClear
+        />
+      </Modal>
     </div>
   );
 };

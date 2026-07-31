@@ -13,6 +13,8 @@ const removeMock = vi.fn();
 const getMock = vi.fn();
 const emitMock = vi.fn();
 const modalConfirmMock = vi.fn();
+const messageSuccessMock = vi.fn();
+const messageErrorMock = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -48,16 +50,26 @@ vi.mock('@/renderer/utils/emitter', () => ({
 // tests assert on the resulting ipcBridge call without needing a real popup.
 vi.mock('@arco-design/web-react', async () => {
   const actual = await vi.importActual<typeof import('@arco-design/web-react')>('@arco-design/web-react');
+  const ActualModal = actual.Modal;
   return {
     ...actual,
-    Modal: {
-      ...actual.Modal,
-      confirm: (options: { onOk?: () => void | Promise<void> }) => {
-        modalConfirmMock(options);
-        return options.onOk?.();
-      },
-    },
-    Message: { success: vi.fn(), error: vi.fn() },
+    // `{ ...actual.Modal }` would drop the component itself — spreading a
+    // function yields a plain, non-callable object, so the rename `<Modal>` this
+    // file now renders would be an invalid element type. Object.assign keeps the
+    // component callable AND carries the statics, with `confirm` still stubbed
+    // for the delete flow (Arco's imperative confirm mounts through the legacy
+    // ReactDOM.render React 18 removed).
+    Modal: Object.assign(
+      (props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />,
+      ActualModal,
+      {
+        confirm: (options: { onOk?: () => void | Promise<void> }) => {
+          modalConfirmMock(options);
+          return options.onOk?.();
+        },
+      }
+    ),
+    Message: { success: (...args: unknown[]) => messageSuccessMock(...args), error: (...args: unknown[]) => messageErrorMock(...args) },
   };
 });
 
@@ -83,6 +95,8 @@ describe('ProjectChatList', () => {
     getMock.mockReset().mockResolvedValue(null);
     emitMock.mockReset();
     modalConfirmMock.mockReset();
+    messageSuccessMock.mockReset();
+    messageErrorMock.mockReset();
   });
 
   it('renders a row per chat with its title and snippet', () => {
@@ -243,18 +257,63 @@ describe('ProjectChatList', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it('confirms rename via a Modal and calls the conversation update API', async () => {
+  it('renames a chat from the rename dialog, seeded with the current name', async () => {
     render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
 
     fireEvent.click(screen.getByTestId('project-chat-rename-c1'));
 
-    expect(modalConfirmMock).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ title: 'conversation.projectHome.rename' })
-    );
+    // A declarative Modal, so nothing reaches Modal.confirm any more. Arco
+    // portals it to document.body, which `screen` queries reach.
+    const input = screen.getByRole('textbox');
+    expect(input).toHaveValue('Chat one');
+
+    fireEvent.change(input, { target: { value: 'Renamed chat' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
     await vi.waitFor(() => {
       expect(emitMock).toHaveBeenCalledWith('chat.history.refresh');
     });
-    expect(updateMock).toHaveBeenCalledExactlyOnceWith({ id: 'c1', updates: { name: 'Chat one' } });
+    expect(updateMock).toHaveBeenCalledExactlyOnceWith({ id: 'c1', updates: { name: 'Renamed chat' } });
+    expect(messageSuccessMock).toHaveBeenCalledWith('conversation.history.renameSuccess');
+    expect(modalConfirmMock).not.toHaveBeenCalled();
+  });
+
+  it('submits the rename on Enter', async () => {
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-rename-c1'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keyboard rename' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', keyCode: 13 });
+
+    await vi.waitFor(() => {
+      expect(updateMock).toHaveBeenCalledExactlyOnceWith({ id: 'c1', updates: { name: 'Keyboard rename' } });
+    });
+  });
+
+  it('disables Save for an empty or whitespace-only name instead of silently discarding it', () => {
+    // The old confirm resolved through its empty-name early return, which made
+    // Arco close the dialog — the rename vanished with no feedback at all.
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-rename-c1'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '   ' } });
+
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.save' })).toBeDisabled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a rename the backend refused, and keeps the dialog open', async () => {
+    updateMock.mockResolvedValue(false);
+    render(<ProjectChatList chats={[makeChat('c1', 'Chat one')]} />);
+
+    fireEvent.click(screen.getByTestId('project-chat-rename-c1'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Renamed chat' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.renameFailed');
+    });
+    expect(screen.getByRole('textbox')).toHaveValue('Renamed chat');
   });
 
   it('requires confirmation before deleting, then calls the conversation remove API', async () => {

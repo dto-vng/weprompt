@@ -72,42 +72,44 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
   const activeSince = project.last_opened_at ?? project.updated_at;
   const activeTime = formatActiveDuration(activeSince, now);
 
+  /**
+   * Rename is a controlled `<Modal>` rather than `Modal.confirm` because the
+   * confirm form could not be fixed: its `<Input>` was uncontrolled and the draft
+   * lived in a closure `let`, so nothing re-rendered and `okButtonProps.disabled`
+   * could never reflect an empty name. Worse, Arco closes a confirm as soon as
+   * `onOk` resolves, and an empty name resolved through the early `return`, so the
+   * dialog dismissed itself and discarded the rename without a word.
+   * Matches the sidebar and team rename dialogs.
+   */
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameName, setRenameName] = useState('');
+
   const handleRename = useCallback(() => {
-    let nextName = project.name;
-    Modal.confirm({
-      title: t('conversation.projectHome.rename'),
-      content: (
-        <Input
-          autoFocus
-          defaultValue={project.name}
-          onChange={(value) => {
-            nextName = value;
-          }}
-        />
-      ),
-      okText: t('conversation.projectHome.save'),
-      cancelText: t('conversation.projectHome.cancel'),
-      onOk: () => {
-        const trimmedName = nextName.trim();
-        if (!trimmedName) return;
-        try {
-          // A vanished project row comes back as `null`, and a workspace clash
-          // throws; neither said anything before, so a rename that never
-          // persisted looked exactly like one that did.
-          if (!updateProject({ id: project.id, name: trimmedName })) {
-            Message.error(t('conversation.history.renameFailed'));
-            return;
-          }
-          Message.success(t('conversation.history.renameSuccess'));
-        } catch (renameError) {
-          console.error('Failed to rename project:', renameError);
-          Message.error(t('conversation.history.renameFailed'));
-        }
-      },
-      alignCenter: true,
-      getPopupContainer: () => document.body,
-    });
-  }, [project.id, project.name, t]);
+    setRenameName(project.name);
+    setRenameVisible(true);
+  }, [project.name]);
+
+  const handleRenameConfirm = useCallback(() => {
+    const trimmedName = renameName.trim();
+    // Unreachable while the OK button is disabled and Enter is guarded, but kept
+    // so neither affordance is the only thing standing between a blank name and
+    // storage.
+    if (!trimmedName) return;
+    try {
+      // A vanished project row comes back as `null`, and a workspace clash
+      // throws; neither said anything before, so a rename that never persisted
+      // looked exactly like one that did.
+      if (!updateProject({ id: project.id, name: trimmedName })) {
+        Message.error(t('conversation.history.renameFailed'));
+        return;
+      }
+      Message.success(t('conversation.history.renameSuccess'));
+      setRenameVisible(false);
+    } catch (renameError) {
+      console.error('Failed to rename project:', renameError);
+      Message.error(t('conversation.history.renameFailed'));
+    }
+  }, [project.id, renameName, t]);
 
   const handleRelink = useCallback(async () => {
     const result = await ipcBridge.dialog.showOpen.invoke({
@@ -213,37 +215,60 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
   );
 
   return (
-    <div className='px-34px pt-26px pb-20px border-b border-b-4 flex items-start gap-14px'>
-      <div className='flex-1 min-w-0'>
-        <h1 className='m-0 text-22px font-700 leading-tight text-t-primary truncate'>{project.name}</h1>
-        <div className='mt-6px flex flex-wrap items-center gap-8px text-13px text-t-secondary'>
-          <span className='flex min-w-0 max-w-full items-center gap-4px'>
-            <FolderOpen theme='outline' size='13' className='shrink-0' />
-            {/* Both meta items hide information the user cannot otherwise reach:
-                a path long enough to be truncated, and a duration token with no
-                way to see the moment it counts from. Arco's Tooltip, never a
-                native `title` beside it — two tooltips on one element fight. */}
-            <Tooltip content={project.workspace}>
-              <span className='truncate'>{project.workspace}</span>
+    <>
+      <div className='px-34px pt-26px pb-20px border-b border-b-4 flex items-start gap-14px'>
+        <div className='flex-1 min-w-0'>
+          <h1 className='m-0 text-22px font-700 leading-tight text-t-primary truncate'>{project.name}</h1>
+          <div className='mt-6px flex flex-wrap items-center gap-8px text-13px text-t-secondary'>
+            <span className='flex min-w-0 max-w-full items-center gap-4px'>
+              <FolderOpen theme='outline' size='13' className='shrink-0' />
+              {/* Both meta items hide information the user cannot otherwise reach:
+                  a path long enough to be truncated, and a duration token with no
+                  way to see the moment it counts from. Arco's Tooltip, never a
+                  native `title` beside it — two tooltips on one element fight. */}
+              <Tooltip content={project.workspace}>
+                <span className='truncate'>{project.workspace}</span>
+              </Tooltip>
+            </span>
+            <span className='h-3px w-3px shrink-0 rd-full bg-3' />
+            <span className='shrink-0'>{t('conversation.projectHome.metaChats', { count: chats.length })}</span>
+            <span className='h-3px w-3px shrink-0 rd-full bg-3' />
+            <Tooltip content={new Date(activeSince).toLocaleString()}>
+              <span className='shrink-0'>{t('conversation.projectHome.metaActive', { time: activeTime })}</span>
             </Tooltip>
-          </span>
-          <span className='h-3px w-3px shrink-0 rd-full bg-3' />
-          <span className='shrink-0'>{t('conversation.projectHome.metaChats', { count: chats.length })}</span>
-          <span className='h-3px w-3px shrink-0 rd-full bg-3' />
-          <Tooltip content={new Date(activeSince).toLocaleString()}>
-            <span className='shrink-0'>{t('conversation.projectHome.metaActive', { time: activeTime })}</span>
-          </Tooltip>
+          </div>
         </div>
+        <Dropdown droplist={menu} trigger='click' position='br' getPopupContainer={() => document.body}>
+          <Button
+            aria-label={t('common.more')}
+            type='secondary'
+            className='!h-36px !w-36px !rounded-9px !p-0'
+            icon={<MoreOne theme='outline' size='18' className='block leading-none' />}
+          />
+        </Dropdown>
       </div>
-      <Dropdown droplist={menu} trigger='click' position='br' getPopupContainer={() => document.body}>
-        <Button
-          aria-label={t('common.more')}
-          type='secondary'
-          className='!h-36px !w-36px !rounded-9px !p-0'
-          icon={<MoreOne theme='outline' size='18' className='block leading-none' />}
+      <Modal
+        title={t('conversation.projectHome.rename')}
+        visible={renameVisible}
+        onOk={handleRenameConfirm}
+        onCancel={() => setRenameVisible(false)}
+        okText={t('conversation.projectHome.save')}
+        cancelText={t('conversation.projectHome.cancel')}
+        okButtonProps={{ disabled: !renameName.trim() }}
+        style={{ borderRadius: '12px' }}
+        alignCenter
+        getPopupContainer={() => document.body}
+      >
+        <Input
+          autoFocus
+          value={renameName}
+          onChange={setRenameName}
+          onPressEnter={handleRenameConfirm}
+          placeholder={t('conversation.history.projectNamePlaceholder')}
+          allowClear
         />
-      </Dropdown>
-    </div>
+      </Modal>
+    </>
   );
 };
 

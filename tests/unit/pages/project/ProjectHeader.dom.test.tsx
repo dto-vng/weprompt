@@ -90,17 +90,26 @@ vi.mock('@arco-design/web-react', async () => {
       {children}
     </button>
   );
+  const ActualModal = actual.Modal;
   return {
     ...actual,
     Dropdown,
     Menu,
-    Modal: {
-      ...actual.Modal,
-      confirm: (options: { onOk?: () => void | Promise<void> }) => {
-        modalConfirmMock(options);
-        return options.onOk?.();
-      },
-    },
+    // `{ ...actual.Modal }` would drop the component itself — spreading a
+    // function yields a plain, non-callable object, so the rename `<Modal>` this
+    // header now renders would be an invalid element type. Object.assign keeps
+    // the component callable AND carries the statics, with `confirm` still
+    // stubbed for the Remove flow.
+    Modal: Object.assign(
+      (props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />,
+      ActualModal,
+      {
+        confirm: (options: { onOk?: () => void | Promise<void> }) => {
+          modalConfirmMock(options);
+          return options.onOk?.();
+        },
+      }
+    ),
     // Arco's imperative Message mounts through the legacy ReactDOM.render React
     // 18 removed, so left real it throws out of the test as an unhandled error.
     Message: {
@@ -215,15 +224,59 @@ describe('ProjectHeader', () => {
     expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid');
   });
 
-  it('reports a rename that failed to persist', () => {
+  const openRenameDialog = (): HTMLElement => {
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    // The menu entry and the dialog's title share this string, so scope to the menu.
+    fireEvent.click(screen.getAllByText('conversation.projectHome.rename')[0]);
+    return screen.getByRole('textbox');
+  };
+
+  it('renames the project from a dialog seeded with the current name', () => {
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    expect(input).toHaveValue('Alpha Project');
+
+    fireEvent.change(input, { target: { value: 'Renamed Project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', name: 'Renamed Project' });
+    expect(messageSuccessMock).toHaveBeenCalledExactlyOnceWith('conversation.history.renameSuccess');
+  });
+
+  it('submits the project rename on Enter', () => {
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: 'Keyboard Project' } });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 13 });
+
+    expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', name: 'Keyboard Project' });
+  });
+
+  it('disables Save for a whitespace-only project name', () => {
+    // The old Modal.confirm resolved through its empty-name early return, so Arco
+    // closed the dialog and the rename disappeared without a word.
+    render(<ProjectHeader project={project} />);
+
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: '  ' } });
+
+    expect(screen.getByRole('button', { name: 'conversation.projectHome.save' })).toBeDisabled();
+    expect(updateProjectMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a rename that failed to persist, and keeps the dialog open', () => {
     updateProjectMock.mockReturnValue(null);
     render(<ProjectHeader project={project} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
-    fireEvent.click(screen.getByText('conversation.projectHome.rename'));
+    const input = openRenameDialog();
+    fireEvent.change(input, { target: { value: 'Renamed Project' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
 
     expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.history.renameFailed');
     expect(messageSuccessMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox')).toHaveValue('Renamed Project');
   });
 
   it('names the project already using a folder when a relink clashes', async () => {
