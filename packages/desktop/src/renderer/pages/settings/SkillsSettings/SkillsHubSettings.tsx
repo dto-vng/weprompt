@@ -544,7 +544,7 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
   const importHistoryContent = (
     <div data-testid='skill-import-history-page' className='flex flex-col h-full w-full'>
       <div className='space-y-16px pb-24px'>
-        <div className='px-[16px] md:px-[32px] py-20px bg-base rd-16px md:rd-24px shadow-sm border border-b-base'>
+        <div className='px-[16px] md:px-[32px] py-20px bg-base rd-16px md:rd-24px shadow-sm border border-4'>
           <div className='flex flex-col sm:flex-row sm:items-start justify-between gap-12px'>
             <div>
               <div className='flex items-center gap-10px'>
@@ -568,7 +568,7 @@ const SkillsHubSettings: React.FC<SkillsHubSettingsProps> = ({ withWrapper = tru
           </div>
         </div>
 
-        <div className='px-[16px] md:px-[32px] py-16px bg-base rd-16px md:rd-24px shadow-sm border border-b-base'>
+        <div className='px-[16px] md:px-[32px] py-16px bg-base rd-16px md:rd-24px shadow-sm border border-4'>
           {importHistoryGroups.length === 0 ? (
             <div className='border border-dashed border-border-1 bg-fill-1 rd-10px px-12px py-14px text-12px text-t-tertiary'>
               {t('settings.skillsHub.importHistoryEmpty', { defaultValue: 'No import records yet.' })}
