@@ -92,8 +92,17 @@ test.describe('Assistant Settings Skills / MCP', () => {
 
     await expect(page.locator('[data-testid="select-assistant-default-skills"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="select-assistant-default-mcp"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="assistant-card-defaults"]')).toContainText(/Default Skills|默认技能/);
-    await expect(page.locator('[data-testid="assistant-card-defaults"]')).toContainText(/Default MCP|默认 MCP/);
+
+    // Both rows still have to render, read-only. Assert their hub links rather
+    // than the row labels: #3528 renamed those labels ("Default Skills" → "Skills",
+    // "默认技能" → "技能"), so the old literals matched nothing in any locale — and
+    // matching the new ones would be no better, because the card's own hint text
+    // ("Open MCP settings", "前往技能中心管理", …) contains the same tokens in every
+    // locale, so the assertion would pass even with the label row deleted.
+    const defaultsCard = page.locator('[data-testid="assistant-card-defaults"]');
+    await expect(defaultsCard).toBeVisible();
+    await expect(defaultsCard.locator('[data-testid="btn-open-skills-settings"]')).toBeVisible();
+    await expect(defaultsCard.locator('[data-testid="btn-open-mcp-settings"]')).toBeVisible();
 
     await closeAssistantEditor(page);
   });

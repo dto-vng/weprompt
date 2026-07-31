@@ -89,7 +89,8 @@ export const CollapsibleContent: React.FC<CollapsibleContentProps> = ({
   const { theme } = useThemeContext(); // 主题上下文（亮色/暗色）Theme context (light/dark)
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed); // 折叠状态 Collapse state
   const [needsCollapse, setNeedsCollapse] = useState(false); // 是否需要折叠功能 Whether collapse feature is needed
-  const contentRef = useRef<HTMLDivElement>(null); // 内容容器引用 Content container ref
+  const contentRef = useRef<HTMLDivElement>(null); // 内容容器引用（可能被 maxHeight 裁剪）Content container ref (clamped by maxHeight)
+  const measureRef = useRef<HTMLDivElement>(null); // 未裁剪的内层包裹，用于观测真实高度 Unclamped inner wrapper, observed for real height
 
   // 检测内容高度 Detect content height using ResizeObserver
   useEffect(() => {
@@ -123,6 +124,16 @@ export const CollapsibleContent: React.FC<CollapsibleContentProps> = ({
         scheduleHeightCheck();
       });
 
+      // Observe the UNCLAMPED inner wrapper, not `element`. `element` carries
+      // `max-height` + `overflow:hidden` while collapsed, so its own box is pinned and a
+      // ResizeObserver on it never fires when the content inside grows — verified in the
+      // browser: content going 420px → 2814px produced 0 callbacks on the clamped box.
+      // `element` is still observed too, since a width change there reflows the content.
+      // (Growth that comes with a React re-render is covered anyway by `children` in the
+      // dep list below; this is for growth that does not re-render — images and fonts
+      // finishing, async-rendered children like Mermaid or KaTeX.)
+      const measured = measureRef.current;
+      if (measured) resizeObserver.observe(measured);
       resizeObserver.observe(element);
 
       // 初始检测 Initial check
@@ -186,7 +197,9 @@ export const CollapsibleContent: React.FC<CollapsibleContentProps> = ({
         className={classNames('transition-all duration-300', contentClassName)}
         style={contentStyle}
       >
-        {children}
+        {/* Unstyled wrapper whose height is NOT clamped, so the ResizeObserver above has
+            something that actually changes size when the content grows. */}
+        <div ref={measureRef}>{children}</div>
       </div>
 
       {/* 渐变遮罩（仅在非 mask 模式、折叠且内容超出时显示）

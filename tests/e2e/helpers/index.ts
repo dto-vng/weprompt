@@ -24,6 +24,9 @@ export {
   collapseSidebarButton,
   expandSidebarButton,
   titlebarFeedbackButton,
+  buttonWithText,
+  BTN_ADD_CUSTOM_AGENT,
+  BTN_ADD_CUSTOM_AGENT_MANUAL,
   ARCO_SWITCH,
   ARCO_SWITCH_CHECKED,
   ARCO_COLLAPSE_ITEM,
@@ -47,7 +50,15 @@ export {
   ASSISTANT_PILL_SELECTED,
   type ChannelId,
 } from './selectors';
-export { labelPattern, FEEDBACK_MODULE_LABELS } from './localizedLabels';
+export {
+  labelPattern,
+  exactLabelPattern,
+  FEEDBACK_MODULE_LABELS,
+  FEEDBACK_PILL_LABELS,
+  BUG_REPORT_LABELS,
+  TEST_CONNECTION_LABELS,
+  TEAM_CREATE_TITLE_LABELS,
+} from './localizedLabels';
 export { expectBodyContainsAny, expectUrlContains, createErrorCollector } from './assertions';
 export { takeScreenshot } from './screenshots';
 export {

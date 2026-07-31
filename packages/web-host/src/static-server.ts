@@ -174,11 +174,19 @@ export async function startStaticServer(opts: StaticServerOptions): Promise<Stat
     throw new Error('internal HTTP server failed to bind to a port');
   }
 
+  // Tracked so stop() can force them closed. net.Server.close() only fires its callback once every
+  // connection is gone, and unlike http.Server it cannot tell an idle keep-alive socket from a busy
+  // one, so without this a served-and-idle connection pins shutdown until the client's own timer
+  // expires. Every caller of stop() is a shutdown path, so cutting them is the intended behaviour.
+  const openClients = new Set<Socket>();
+
   // User-facing listener: inspect the first line of every TCP connection and
   // route to either the backend (for /ws and /api/stt/stream upgrades) or the internal HTTP
   // server (everything else). Both routes use raw TCP splice — no reliance
   // on http.Server's upgrade event.
   const tcp_server = net.createServer((client: Socket) => {
+    openClients.add(client);
+    client.once('close', () => openClients.delete(client));
     let peeked = Buffer.alloc(0);
     let settled = false;
     const cleanup = (): void => {
@@ -234,6 +242,12 @@ export async function startStaticServer(opts: StaticServerOptions): Promise<Stat
         tcp_server.close(() => {
           http_server.close(() => resolve());
         });
+        // Stop accepting first (above), then cut what is already open, so nothing new slips in
+        // between. Destroying a client cascades to its spliced upstream via the teardown handlers,
+        // which in turn releases the internal HTTP server's own connection.
+        for (const client of openClients) client.destroy();
+        openClients.clear();
+        http_server.closeAllConnections();
       }),
   };
 }

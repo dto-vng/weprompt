@@ -315,6 +315,31 @@ describe('ProjectKnowledgeCard', () => {
     expect(screen.queryByTestId('knowledge-ocr-s-ready')).not.toBeInTheDocument();
   });
 
+  // The real-world OCR row carries BOTH: skipped pages become a non-fatal note
+  // in `error` while `status` stays ready. The provenance tag and the note live
+  // on different elements with different tooltips, so neither may swallow the
+  // other — a scan with unreadable pages is exactly when a user needs both.
+  it('shows the transcription tag and the skipped-pages note together', async () => {
+    setState({
+      sources: [
+        {
+          ...readySource,
+          fileName: 'contract.pdf',
+          ocr: { model: 'google/gemma-4-31b-it', skippedPages: [3, 4] },
+          error: 'Transcribed from a scan; skipped 2 page(s): 3, 4.',
+        },
+      ],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    expect(screen.getByTestId('knowledge-ocr-s-ready')).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByText('contract.pdf'));
+
+    expect(await screen.findByText('Transcribed from a scan; skipped 2 page(s): 3, 4.')).toBeInTheDocument();
+    // Still a healthy row: the note must not have promoted it to a failed tag.
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusFailed')).not.toBeInTheDocument();
+  });
+
   // BM25 marks a source ready before embedding starts, so the embed pass always
   // runs against an already-`ready` row — this is the only place its progress
   // can surface.

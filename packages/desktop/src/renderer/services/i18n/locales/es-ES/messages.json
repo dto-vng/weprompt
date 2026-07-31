@@ -16,6 +16,7 @@
   "downloadFailed": "Error en la descarga",
   "imageLoadFailed": "Error al cargar la imagen",
   "scrollToBottom": "Ir al final",
+  "reasoning": "Razonamiento",
   "availableCommands": "{{count}} comandos disponibles",
   "atFile.hint": "Escribe para buscar archivos",
   "atFile.menuLabel": "Menciones de archivos",
@@ -50,6 +51,18 @@
   "unknownMessageType": "Tipo de mensaje desconocido: {{type}}",
   "permissionRequest": "Solicitud de permiso",
   "agentRequestingPermission": "El agente está solicitando permiso.",
+  "permission": {
+    "intent": {
+      "run": "Me gustaría ejecutar un comando",
+      "edit": "Me gustaría editar un archivo",
+      "read": "Me gustaría leer un archivo",
+      "fetch": "Me gustaría obtener algo de la web",
+      "tool": "Me gustaría usar una herramienta",
+      "destructive": "Me gustaría eliminar o borrar archivos",
+      "generic": "Me gustaría hacer algo que necesita tu aprobación"
+    },
+    "destructiveWarning": "Esto puede eliminar o sobrescribir archivos de forma permanente: no se puede deshacer."
+  },
   "command": "Comando:",
   "chooseAction": "Elige una acción:",
   "option": "Opción",

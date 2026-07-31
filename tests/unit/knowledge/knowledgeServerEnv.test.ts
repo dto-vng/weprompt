@@ -192,4 +192,26 @@ describe('buildToolDescription', () => {
     expect(d).not.toContain('- doc-20.md');
     expect(d).toContain('…and 5 more');
   });
+
+  it('points the model at the citation header as the source of the fileName', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain('[n] <fileName> — <section>');
+    expect(d).toMatch(/CITE BY fileName/);
+  });
+
+  // Prose citations only linkify on an exact fileName (see
+  // linkifyKnownSources.ts). Observed in acceptance: the model cited a document
+  // by the title printed inside the passage text, so the answer carried no
+  // clickable source at all. The old passive "each cited with its source
+  // filename" line never told it to do otherwise, so its absence is asserted
+  // too — the rule must replace that line, not sit alongside it.
+  it('forbids citing by document title instead of fileName', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain("never the document's title");
+    expect(d).not.toMatch(/each cited with its source filename/);
+  });
+
+  it('keeps the citation rule when documents are attached', () => {
+    expect(buildToolDescription(['policy.docx'])).toMatch(/CITE BY fileName/);
+  });
 });

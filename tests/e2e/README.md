@@ -38,7 +38,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 bun run test:e2e
 
 # Specific test file
-npx playwright test --config playwright.config.ts tests/e2e/specs/team-workspace-migration.e2e.ts --reporter=list
+npx playwright test --config playwright.config.ts tests/e2e/cases/teams/team-create.e2e.ts --reporter=list
 ```
 
 ### 3. View Results
@@ -97,7 +97,6 @@ tests/e2e/
 │   ├── README.md       # Team E2E spec (rules for team tests)
 │   ├── app-launch.e2e.ts
 │   ├── team-create.e2e.ts
-│   ├── team-workspace-migration.e2e.ts
 │   └── ...             # ~30+ test files
 ├── results/            # Test artifacts (gitignored)
 ├── report/             # HTML report (gitignored)

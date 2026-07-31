@@ -16,6 +16,7 @@
   "downloadFailed": "ダウンロードに失敗しました",
   "imageLoadFailed": "画像の読み込みに失敗しました",
   "scrollToBottom": "下にスクロール",
+  "reasoning": "推論",
   "availableCommands": "{{count}} 個の利用可能なコマンド",
   "atFile.hint": "ファイルを検索するには入力してください",
   "atFile.menuLabel": "ファイル参照",
@@ -50,6 +51,18 @@
   "unknownMessageType": "不明なメッセージタイプ: {{type}}",
   "permissionRequest": "権限リクエスト",
   "agentRequestingPermission": "The agent is requesting permission.",
+  "permission": {
+    "intent": {
+      "run": "コマンドを実行したいです",
+      "edit": "ファイルを編集したいです",
+      "read": "ファイルを読み取りたいです",
+      "fetch": "ウェブから情報を取得したいです",
+      "tool": "ツールを使用したいです",
+      "destructive": "ファイルを削除したいです",
+      "generic": "承認が必要な操作を行いたいです"
+    },
+    "destructiveWarning": "ファイルが完全に削除または上書きされる可能性があります。元に戻すことはできません。"
+  },
   "command": "コマンド:",
   "chooseAction": "操作を選択してください:",
   "option": "オプション",

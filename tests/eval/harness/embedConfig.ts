@@ -73,7 +73,7 @@ const getProviders = async (url: string, port: number): Promise<Response> => {
     return await fetch(url, { signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS) });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`nothing answered on 127.0.0.1:${port} — is the dev app running? (${detail})`);
+    throw new Error(`nothing answered on 127.0.0.1:${port} — is the dev app running? (${detail})`, { cause: error });
   }
 };
 

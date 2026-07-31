@@ -96,11 +96,26 @@ chmod +x "$out/aioncore"
   return binDir;
 }
 
+/**
+ * `prepare-aioncore.js` puts its scratch dirs at `os.tmpdir()/aioncore-prepare/<tag>` and
+ * `os.tmpdir()/aioncore-prepare-actions/<runId>`. Nothing in either path is per-process, and these
+ * tests pin the tag and the run id, so every test run on the machine — including runs in other
+ * worktrees, since `os.tmpdir()` is machine-global — used to share one directory and delete it out
+ * from under the others on cleanup. `os.tmpdir()` reads TMPDIR on each call, so pointing it at the
+ * test's own scratch root makes those paths private and lets the tests run concurrently.
+ */
+function useIsolatedTmpdir(root: string): () => void {
+  const previous = process.env.TMPDIR;
+  process.env.TMPDIR = root;
+  return () => {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+  };
+}
+
 afterEach(() => {
   delete process.env.AIONUI_BACKEND_RUN_ID;
   delete process.env.AIONUI_BACKEND_LOCAL_BINARY;
-  rmSync(join(tmpdir(), 'aioncore-prepare', 'v0.1.46'), { recursive: true, force: true });
-  rmSync(join(tmpdir(), 'aioncore-prepare-actions', '123'), { recursive: true, force: true });
 });
 
 describe('prepare-aioncore GitHub Actions artifact resolver', () => {
@@ -141,6 +156,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     const previousPath = process.env.PATH;
     process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
     process.env.AIONUI_BACKEND_RUN_ID = '123';
+    const restoreTmpdir = useIsolatedTmpdir(tmp);
 
     try {
       expect(() =>
@@ -154,6 +170,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
+      restoreTmpdir();
       rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -167,6 +184,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     // so this test reaches the managed-resources contract check it targets.
     const previousSkipVerify = process.env.AIONUI_SKIP_AIONCORE_VERIFY;
     process.env.AIONUI_SKIP_AIONCORE_VERIFY = '1';
+    const restoreTmpdir = useIsolatedTmpdir(tmp);
 
     try {
       expect(() =>
@@ -182,6 +200,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
       else process.env.PATH = previousPath;
       if (previousSkipVerify === undefined) delete process.env.AIONUI_SKIP_AIONCORE_VERIFY;
       else process.env.AIONUI_SKIP_AIONCORE_VERIFY = previousSkipVerify;
+      restoreTmpdir();
       rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -194,6 +213,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     const previousPath = process.env.PATH;
     process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
     process.env.AIONUI_BACKEND_LOCAL_BINARY = localBinary;
+    const restoreTmpdir = useIsolatedTmpdir(tmp);
 
     try {
       expect(() =>
@@ -207,6 +227,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
+      restoreTmpdir();
       rmSync(tmp, { recursive: true, force: true });
     }
   });

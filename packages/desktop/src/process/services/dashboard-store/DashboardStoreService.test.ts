@@ -57,7 +57,7 @@ describe('DashboardStoreService', () => {
     expect(summary.manifest.source).toBe('user');
     expect(summary.manifest.id).toBe('q3-headcount');
     const list = await svc.list();
-    expect(list.map((d) => d.manifest.id).sort()).toEqual(['q3-headcount', 'vng-headcount']);
+    expect(list.map((d) => d.manifest.id).toSorted()).toEqual(['q3-headcount', 'vng-headcount']);
     expect(await svc.read('q3-headcount')).toContain('hi');
   });
 

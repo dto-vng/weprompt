@@ -31,7 +31,13 @@ export const useProjectHome = (projectId: string | undefined): UseProjectHomeRes
   useEffect(() => {
     if (project && stampedId.current !== project.id) {
       stampedId.current = project.id;
-      updateProject({ id: project.id, last_opened_at: Date.now() });
+      try {
+        updateProject({ id: project.id, last_opened_at: Date.now() });
+      } catch (error) {
+        // The stamp only affects Project ordering, so a failed write must never
+        // escape the effect and take down the page it decorates.
+        console.warn('[useProjectHome] failed to stamp last_opened_at', project.id, error);
+      }
     }
   }, [project]);
 
