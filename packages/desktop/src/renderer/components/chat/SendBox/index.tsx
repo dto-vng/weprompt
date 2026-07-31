@@ -23,7 +23,7 @@ import type { FileOrFolderItem } from '@/renderer/utils/file/fileTypes';
 import { filterWorkspaceMentionItems } from '@/renderer/utils/file/workspaceMentions';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { blurActiveElement, shouldBlockMobileInputFocus } from '@/renderer/utils/ui/focus';
-import { Button, Input, Message, Tag } from '@arco-design/web-react';
+import { Button, Input, Message, Tag, Tooltip } from '@arco-design/web-react';
 import { ArrowUp, CloseSmall, Plus, Quote } from '@icon-park/react';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import { buildSkillSlashCommands, mergeSlashCommands } from '@/common/chat/slash/mergeSlashCommands';
@@ -1310,28 +1310,39 @@ const SendBox: React.FC<{
   const isButtonDisabled = disabled || isUploading || (!input.trim() && domSnippets.length === 0);
 
   // Reusable send button component
+  const sendLabel = t('common.send', { defaultValue: 'Send' });
+  const stopLabel = t('conversation.chat.stopGenerating', { defaultValue: 'Stop generating' });
+
   const sendButton = (
-    <Button
-      shape='circle'
-      type='primary'
-      disabled={isButtonDisabled}
-      className='send-button-custom'
-      icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-      onClick={() => {
-        sendMessageHandler();
-      }}
-      data-testid='sendbox-send-btn'
-    />
+    <Tooltip content={sendLabel} mini>
+      <Button
+        shape='circle'
+        type='primary'
+        disabled={isButtonDisabled}
+        className='send-button-custom'
+        aria-label={sendLabel}
+        icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
+        onClick={() => {
+          sendMessageHandler();
+        }}
+        data-testid='sendbox-send-btn'
+      />
+    </Tooltip>
   );
 
   const stopButton = (
-    <Button
-      shape='circle'
-      type='secondary'
-      className='bg-animate sendbox-stop-button'
-      icon={<div className='mx-auto size-12px bg-6'></div>}
-      onClick={stopHandler}
-    ></Button>
+    <Tooltip content={stopLabel} mini>
+      <Button
+        shape='circle'
+        type='secondary'
+        className='bg-animate sendbox-stop-button'
+        aria-label={stopLabel}
+        // The glyph is a bare square div, so the button has no text to fall back on.
+        icon={<div className='mx-auto size-12px bg-6'></div>}
+        onClick={stopHandler}
+        data-testid='sendbox-stop-btn'
+      ></Button>
+    </Tooltip>
   );
 
   const renderActionButtons = () => {
