@@ -226,6 +226,26 @@ describe('useKbStaleChatHint', () => {
       expect(localStorage.getItem(kbStaleHintDismissKey('c1'))).toBeNull();
     });
 
+    it('does not carry the baseline across a switch to another chat in the same project', async () => {
+      const { result, rerender } = renderHook(
+        (props: { conversationId: string }) =>
+          useKbStaleChatHint({ ...WITH_TOOL, conversationId: props.conversationId }),
+        { initialProps: { conversationId: 'c1' } }
+      );
+      await waitFor(() => expect(listSourcesMock).toHaveBeenCalledTimes(1));
+
+      listSourcesMock.mockResolvedValue(listResult([source(), source({ id: 's2', fileName: 'new.md' })]));
+      await act(async () => {
+        updatedListener?.({ projectId: 'p1' });
+      });
+      await waitFor(() => expect(result.current.variant).toBe('changed'));
+
+      // Opening a different chat in the same project starts from scratch: its
+      // own session was spawned with the new file already indexed.
+      rerender({ conversationId: 'c2' });
+      await waitFor(() => expect(result.current.variant).toBe(null));
+    });
+
     it('is forgotten on remount, because a respawned session can search again', async () => {
       const { result, unmount } = renderHook(() => useKbStaleChatHint(WITH_TOOL));
       await waitFor(() => expect(listSourcesMock).toHaveBeenCalledTimes(1));

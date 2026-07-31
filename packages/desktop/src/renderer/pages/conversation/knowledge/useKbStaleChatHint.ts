@@ -188,7 +188,12 @@ export const useKbStaleChatHint = (input: {
       disposed = true;
       unsubscribe();
     };
-  }, [shouldWatch, projectId]);
+    // conversationId is a dependency even though it is unused in the body: the
+    // baseline above is per conversation, and switching chats within one
+    // project must not inherit the previous chat's. Today the parents remount
+    // on `key={conversation.id}` anyway, so this only guards against that key
+    // going away.
+  }, [shouldWatch, projectId, conversationId]);
 
   const stale = shouldShowKbStaleHint({
     conversationId,
