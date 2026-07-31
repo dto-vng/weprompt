@@ -9,7 +9,8 @@ import type { ForgeProject } from '@/common/types/project/projectTypes';
 import WorkspaceProjectFilesFlyout from '@renderer/pages/conversation/Workspace/components/WorkspaceProjectFilesFlyout';
 import '@renderer/pages/conversation/Workspace/workspace.css';
 import { getWorkspaceBasename, updateProject } from '@renderer/pages/conversation/projects/projectStorage';
-import { Alert, Button, Card, Spin } from '@arco-design/web-react';
+import { Alert, Button, Card, Spin, Tooltip } from '@arco-design/web-react';
+import { FolderOpen } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -53,9 +54,15 @@ const ProjectFilesCard: React.FC<ProjectFilesCardProps> = ({ project }) => {
       data-testid='project-files-card'
       title={t('conversation.projectHome.files')}
       extra={
-        <Button type='text' size='mini' onClick={() => void ipcBridge.shell.showItemInFolder.invoke(project.workspace)}>
-          {t('conversation.projectHome.revealInFolder')}
-        </Button>
+        <Tooltip content={t('conversation.projectHome.revealInFolder')}>
+          <Button
+            type='text'
+            size='mini'
+            aria-label={t('conversation.projectHome.revealInFolder')}
+            icon={<FolderOpen theme='outline' size='14' />}
+            onClick={() => void ipcBridge.shell.showItemInFolder.invoke(project.workspace)}
+          />
+        </Tooltip>
       }
     >
       {loading ? (

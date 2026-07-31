@@ -73,8 +73,12 @@
     "knowledgeAdd": "Dateien hinzufügen",
     "knowledgeEmpty": "Füge Dokumente hinzu, um die Wissensdatenbank dieses Projekts aufzubauen. Der Assistent durchsucht sie automatisch in jedem Chat dieses Projekts.",
     "knowledgeSemanticOff": "Semantische Suche inaktiv — kein Embedding-Modell konfiguriert",
+    "knowledgeSemanticOffAction": "Embedding-Modell hinzufügen",
+    "knowledgeEmbedAll": "Alle einbetten",
+    "knowledgePassagesTooltip": "Diese Datei wird in durchsuchbare Abschnitte geteilt, und der Assistent verwendet beim Antworten die passendsten davon.",
     "knowledgeStatusIndexing": "Wird indiziert…",
     "knowledgeProgressReading": "Seite {{done}}/{{total}} wird gelesen",
+    "knowledgeProgressTranscribing": "Seite {{done}}/{{total}} wird transkribiert",
     "knowledgeProgressEmbedding": "Einbettung {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Fehlgeschlagen",
     "knowledgeStatusUnsupported": "Nicht unterstützt",
@@ -92,7 +96,9 @@
     "knowledgePreviewTruncated": "Vorschau gekürzt. Öffnen Sie die Originaldatei für das vollständige Dokument.",
     "knowledgePreviewError": "Der indexierte Text dieser Datei konnte nicht geladen werden.",
     "knowledgeCitationMissing": "Diese Datei ist nicht mehr in der Wissensdatenbank.",
-    "knowledgeStatusNote": "Hinweis"
+    "knowledgeOcrTag": "Transkribiert (OCR)",
+    "knowledgeOcrDetail": "Von {{model}} aus einem Scan transkribiert. Übersprungene Seiten: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "keine"
   },
   "history": {
     "recents": "Zuletzt",

@@ -73,8 +73,12 @@
     "knowledgeAdd": "新增檔案",
     "knowledgeEmpty": "新增檔案以建立此專案的知識庫。助手會在這個專案的每個聊天中自動檢索這些內容。",
     "knowledgeSemanticOff": "語意搜尋已關閉 — 未設定嵌入模型",
+    "knowledgeSemanticOffAction": "新增嵌入模型",
+    "knowledgeEmbedAll": "全部向量化",
+    "knowledgePassagesTooltip": "此檔案已切分為可檢索的片段，助理回答時會取用其中最相關的部分。",
     "knowledgeStatusIndexing": "建立索引中……",
     "knowledgeProgressReading": "正在讀取第 {{done}}/{{total}} 頁",
+    "knowledgeProgressTranscribing": "正在轉寫第 {{done}}/{{total}} 頁",
     "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "不支援",
@@ -92,7 +96,9 @@
     "knowledgePreviewTruncated": "預覽已截斷。要看完整文件請開啟原始檔案。",
     "knowledgePreviewError": "無法載入此檔案的索引文字。",
     "knowledgeCitationMissing": "該檔案已不在知識庫中。",
-    "knowledgeStatusNote": "提示"
+    "knowledgeOcrTag": "已轉寫（OCR）",
+    "knowledgeOcrDetail": "由 {{model}} 從掃描件轉寫。已略過的頁：{{pages}}",
+    "knowledgeOcrNoSkippedPages": "無"
   },
   "history": {
     "recents": "最近",

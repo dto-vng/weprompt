@@ -73,8 +73,12 @@
     "knowledgeAdd": "Dosya Ekle",
     "knowledgeEmpty": "Bu projenin bilgi bankasını oluşturmak için belge ekleyin. Asistan bunları bu projedeki her sohbette otomatik olarak arar.",
     "knowledgeSemanticOff": "anlamsal arama kapalı — gömme modeli yapılandırılmamış",
+    "knowledgeSemanticOffAction": "Gömme modeli ekle",
+    "knowledgeEmbedAll": "Tümünü göm",
+    "knowledgePassagesTooltip": "Bu dosya aranabilir bölümlere ayrılır ve asistan yanıt verirken en ilgili olanları kullanır.",
     "knowledgeStatusIndexing": "Dizinleniyor…",
     "knowledgeProgressReading": "Sayfa {{done}}/{{total}} okunuyor",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}}. sayfa yazıya dökülüyor",
     "knowledgeProgressEmbedding": "Gömülüyor {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Başarısız",
     "knowledgeStatusUnsupported": "Desteklenmiyor",
@@ -92,7 +96,9 @@
     "knowledgePreviewTruncated": "Ön izleme kısaltıldı. Belgenin tamamı için özgün dosyayı açın.",
     "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi.",
     "knowledgeCitationMissing": "Bu dosya artık bilgi bankasında değil.",
-    "knowledgeStatusNote": "Not"
+    "knowledgeOcrTag": "Yazıya döküldü (OCR)",
+    "knowledgeOcrDetail": "{{model}} tarafından bir taramadan yazıya döküldü. Atlanan sayfalar: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "yok"
   },
   "history": {
     "recents": "Son",

@@ -73,8 +73,12 @@
     "knowledgeAdd": "ファイルを追加",
     "knowledgeEmpty": "ドキュメントを追加すると、このプロジェクトのナレッジベースを構築できます。追加した内容はこのプロジェクトのすべてのチャットで自動的に検索されます。",
     "knowledgeSemanticOff": "セマンティック検索オフ — 埋め込みモデルが未設定です",
+    "knowledgeSemanticOffAction": "埋め込みモデルを追加",
+    "knowledgeEmbedAll": "すべてベクトル化",
+    "knowledgePassagesTooltip": "このファイルは検索可能な断片に分割され、アシスタントは回答時に最も関連する部分を参照します。",
     "knowledgeStatusIndexing": "インデックス作成中……",
     "knowledgeProgressReading": "{{done}}/{{total}} ページを読み込み中",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} ページを文字起こし中",
     "knowledgeProgressEmbedding": "ベクトル化中 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "非対応",
@@ -92,7 +96,9 @@
     "knowledgePreviewTruncated": "プレビューは省略されています。全文は元のファイルで確認してください。",
     "knowledgePreviewError": "このファイルの索引テキストを読み込めませんでした。",
     "knowledgeCitationMissing": "このファイルはもうナレッジベースにありません。",
-    "knowledgeStatusNote": "注意"
+    "knowledgeOcrTag": "文字起こし済み（OCR）",
+    "knowledgeOcrDetail": "{{model}} がスキャンから文字起こししました。スキップしたページ: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "なし"
   },
   "history": {
     "recents": "最近",

@@ -187,6 +187,22 @@
       "notes": "meeting-summary-2026-06-12.md also mentions the mobile client, without roadmap content."
     },
     {
+      "id": "ocr-cross-lang-response-time",
+      "kind": "cross-language",
+      "question": "How quickly must the cleaning contractor arrive for an unscheduled request?",
+      "expectedSources": ["scan-phu-luc-hop-dong-ve-sinh.md"],
+      "answerHint": "trong vòng 4 giờ kể từ khi nhận yêu cầu",
+      "notes": "English question against an OCR-derived Vietnamese source — the case the real corpus is full of, since VNG's scans are Vietnamese and the questions asked of them often are not. Deliberately the UNDISTRACTED cross-language case: no other corpus file discusses cleaning services, so 'cleaning', 'contractor' and 'unscheduled' appear nowhere and BM25 has only 'request' to go on, which points it at it-service-catalogue.md instead. A miss here is therefore a language-bridge failure and nothing else, which is what separates it from cross-lang-vpn-signoff, where distractor pressure is mixed in. Retrieval sees no text layer here, only the model's transcription: if OCR output indexes worse than authored markdown, this is where it shows."
+    },
+    {
+      "id": "ocr-id-transcribed-table-row",
+      "kind": "identifier",
+      "question": "DV-03",
+      "expectedSources": ["scan-phu-luc-hop-dong-ve-sinh.md"],
+      "answerHint": "DV-03 | Phun thuốc diệt muỗi định kỳ",
+      "notes": "The OCR analogue of id-po-vendor: an identifier that only exists inside a table row, so the hint spans the row's pipe and passes only if the table survived transcription AND chunking as a table. This is the measurable half of the claim that OCR beats text-layer extraction on scanned tables — text-layer extraction of a real annual report shredded tables to one word per line, which would put the code and its description in different passages. Note the tokens are weak on purpose and unlike PO-88240: 'dv' recurs in all four rows and inside the parent contract number, and '03' also appears in a date, so this does not reduce to one unique token."
+    },
+    {
       "id": "unanswerable-no-overlap",
       "kind": "unanswerable",
       "question": "forklift operator licence renewal",

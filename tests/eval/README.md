@@ -67,7 +67,7 @@ undefined, and folding them in would reward over-retrieval. They get their own s
 
 ### Read `recall@6` with care
 
-The fixture is 10 documents / 17 passages, so top-6 is roughly a third of the corpus. `recall@1`,
+The fixture is 11 documents / 19 passages, so top-6 is still roughly a third of the corpus. `recall@1`,
 `MRR` and `answerMRR` carry the signal; `recall@6` saturates cheaply. Grow the corpus before reading
 much into it.
 
@@ -82,7 +82,7 @@ same commit. Each needs a one-line change to become an optional parameter with i
 the default; that belongs in a tuning change, not here.
 
 At this corpus size neither would show anything anyway: 30 candidates already exceeds the whole
-17-passage corpus, so there is no truncation to observe. Grow the corpus first.
+19-passage corpus, so there is no truncation to observe. Grow the corpus first.
 
 ## The fixture
 
@@ -90,6 +90,25 @@ At this corpus size neither would show anything anyway: 30 candidates already ex
 invoice register, a meeting summary, a nested-heading runbook, an incident postmortem, a service
 catalogue. **All synthetic.** Never commit real VNG documents here; author in the same register
 instead.
+
+`fixture/corpus-ocr/` — documents whose text is a **model transcription of a scanned PDF**, the
+output of the OCR path in `common/knowledge/pdfOcr.ts`. Both roots load into one flat corpus; file
+names must be unique across them, because the source id comes from the name.
+
+Two roots rather than an eleventh file in `corpus/`, for two reasons. `corpus/` is at the project's
+ten-children ceiling. And the two are different kinds of text that must not be edited into the same
+register: `corpus/` says "author in the same register as a real memo", while a transcription has to
+keep the shape the model actually produces, or an OCR-derived case measures authored markdown wearing
+a scan's file name. Concretely, `renderPagesAsMarkdown` wraps every page in a `## Page N` marker, so a
+transcribed document has page markers where an authored one has sections — and when the model emits
+the document title as `#`, as it does here, that `#` pops the page marker off the heading stack and
+the passage's `headingPath` loses the page number entirely.
+
+`scan-phu-luc-hop-dong-ve-sinh.md` is a three-page Vietnamese service-contract appendix: letterhead,
+signature block, two markdown tables the model rebuilt from ruled lines. Synthetic, same rule as
+above — real scans stay out of the repo, and so do the PDFs themselves. A scan is megabytes and its
+transcription is kilobytes; the transcription is the part retrieval ever sees, so it is the part
+worth committing.
 
 `quy-dinh-bao-mat-thong-tin.md` is stored **NFD** (decomposed diacritics) on disk. This is not
 decoration: an NFD tokenisation bug found during the knowledge-base build shattered Vietnamese words
@@ -99,7 +118,7 @@ catches that class. Without the tokenizer's NFC step that one file yields 1117 f
 document is still stored NFD and that its tokens still collapse without normalisation, so replacing
 it with ASCII content fails loudly rather than quietly removing the coverage.
 
-`fixture/questions.json` — 25 golden questions. Beyond plain keyword hits, the hard cases are:
+`fixture/questions.json` — 27 golden questions. Beyond plain keyword hits, the hard cases are:
 
 | Kind                       | What it probes                                                                                                                                          |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,10 +130,23 @@ it with ASCII content fails loudly rather than quietly removing the coverage.
 | `nfd-corpus` / `nfd-query` | Both normalisation directions.                                                                                                                          |
 | `unanswerable`             | The corpus genuinely cannot answer. A harness that never tests this rewards over-retrieval.                                                             |
 
+`kind` says what a case probes; it does not say where the text came from. Provenance is a property of
+the document, so the two OCR-derived cases sit in existing kinds on purpose, each paired with an
+authored counterpart it can be read against:
+
+| Case                           | kind             | Reads against                                               |
+| ------------------------------ | ---------------- | ----------------------------------------------------------- |
+| `ocr-cross-lang-response-time` | `cross-language` | `cross-lang-vpn-signoff` — same bridge, without distractors |
+| `ocr-id-transcribed-table-row` | `identifier`     | `id-po-vendor` — same in-table lookup, authored table       |
+
+The pairing is the point. An OCR case measured on its own tells you a number; measured against its
+authored twin it tells you whether transcription costs anything.
+
 ## Adding a case
 
 1. Add or extend a document in `fixture/corpus/` — synthetic, in the same register. Keep the
-   directory at 10 files or fewer.
+   directory at 10 files or fewer. A transcription of a scan goes in `fixture/corpus-ocr/` instead,
+   keeping the shape `renderPagesAsMarkdown` produces; do not tidy it into authored prose.
 2. Add an entry to `fixture/questions.json`:
    ```jsonc
    {
@@ -208,6 +240,77 @@ fusion.**
 In rough order of value: fill in the hybrid baseline against a real provider; grow the corpus so
 top-6 is a small fraction of it and `recall@6` stops saturating; add questions in the 40–60 range so
 one question is worth less than 0.02; then revisit fusion knobs.
+
+## Recorded findings (2026-07-30, BM25-only, after the OCR-derived case)
+
+The corpus grew to 11 documents / 19 passages and 25 scored questions, and **every aggregate fell**:
+
+| metric         | 23 questions | 25 questions | why                          |
+| -------------- | ------------ | ------------ | ---------------------------- |
+| recall@1       | 0.826 (19)   | 0.800 (20)   | numerator +1, denominator +2 |
+| recall@3, @6   | 0.870 (20)   | 0.840 (21)   | same                         |
+| MRR            | 0.848        | 0.820        | same                         |
+| answerRecall@1 | 0.783 (18)   | 0.760 (19)   | same                         |
+| answerMRR      | 0.826        | 0.800        | same                         |
+
+**None of that is a retrieval change.** Both runs were diffed per question: not one pre-existing case
+changed its `sourceRank` or its `answerRank`, and no question stopped retrieving its expected source.
+Eleven of them changed only in the tail of the top-6, where the new document displaced a
+lower-scoring passage. The drop is arithmetic — two questions were added, one of which BM25 cannot
+reach — which is exactly why the fixture and the baseline moved in separate commits. Read the two
+sets of numbers as different instruments, not as a regression.
+
+### 6. The BM25 ceiling fell to 0.840, and cross-language is now three quarters of it
+
+Finding 1 above put the lexical ceiling at 0.870, with 3 of 23 questions unreachable. It is now
+**0.840, with 4 of 25 unreachable**, and the newcomer is `ocr-cross-lang-response-time`:
+
+- `semantic-delay` — no discriminative word shared with the answer
+- `cross-lang-trip-approval` — English question, Vietnamese answer
+- `cross-lang-vpn-signoff` — same, with distractor pressure
+- `ocr-cross-lang-response-time` — same, against an OCR-derived Vietnamese source
+
+So the entire fall in the ceiling is one question, and it is a cross-language one. Three of the four
+lexically unreachable questions are now cross-language, which sharpens finding 1 rather than
+changing it: on a bilingual corpus the semantic half's value is concentrated in cross-language
+retrieval, and **scanned Vietnamese documents can only ever arrive as that case** — a scan has no text
+layer, so its transcription is the only text retrieval will ever see. BM25 scored it at exactly zero
+and returned `onboarding-runbook` and `it-service-catalogue` instead, on the strength of the single
+token "request".
+
+### 7. A transcribed table retrieves exactly as well as an authored one
+
+`ocr-id-transcribed-table-row` lands at rank 1 with the answer in the top passage — identical to its
+authored twin `id-po-vendor`. It also beats the same document's other passage, so the row survived
+transcription **and** chunking as a row, hint spanning the pipe. On this evidence markdown that a
+multimodal model rebuilt from ruled lines is not measurably worse to retrieve from than markdown a
+human typed.
+
+Note what this does **not** establish. The real-corpus observation motivating it was that text-layer
+extraction of a scanned annual report shredded tables to one word per line, which would scatter a
+code and its description across passages. Confirming that OCR beats text-layer extraction needs both
+variants of the _same_ document in the fixture, and only the OCR variant is here. This is the weak
+form of the claim — transcribed tables retrieve fine — not the comparison.
+
+### 8. The over-retrieval canary got noisier
+
+`unanswerable-lexical-overlap` ("Chính sách nghỉ phép thai sản") now returns the OCR document at rank
+1, on the generic back-office vocabulary any Vietnamese contract shares with a leave policy. Nothing
+is gated on it and the question has no expected source, so this is not a regression — but it is the
+signal that case exists to give: a growing Vietnamese corpus makes a relevance floor more attractive,
+not less. The hard invariant still holds — `unanswerable-no-overlap` returns nothing.
+
+### Still not measured
+
+- **The hybrid half.** `baseline.json` is still `hybrid: null`, so the one question finding 6 raises —
+  does the multilingual embedding model bridge an English query to an OCR'd Vietnamese answer? — is
+  the question this instrument still cannot answer. The only locally configured provider exposes no
+  embedding model, so route 2 cannot resolve one even with the dev app up. Fill it with
+  `KB_EVAL_EMBED_BASE_URL` / `_API_KEY` / `_MODEL` pointed at a working embedding model, then
+  `bun run eval:kb -- --update-baseline`.
+- **Text-layer vs OCR on the same tables** (see finding 7).
+- Resolution barely improved: one question is worth 0.040 where it was worth 0.043. The 40–60 range in
+  "what would make this instrument sharper" is still the target.
 
 ## Baseline and CI
 

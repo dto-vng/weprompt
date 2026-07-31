@@ -26,6 +26,7 @@ import {
   pageSpanLabel,
   renderPagesAsMarkdown,
 } from '@/common/knowledge/pdfExtract';
+import { ocrPdfPages as defaultOcrPdfPages } from '@/common/knowledge/pdfOcr';
 import {
   createEmptyManifest,
   readChunks,
@@ -43,15 +44,22 @@ import type {
   KnowledgeManifest,
   KnowledgeManifestSource,
 } from '@/common/knowledge/types';
-import { KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
+import { EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { pickEmbeddingModel, resolveEmbedConfigForModel } from './embedProviderPicker';
-import { scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
+import { MAX_KNOWLEDGE_FILE_BYTES, scanKnowledgeFolder as defaultScanKnowledgeFolder } from './folderScan';
+import { resolveOcrModel as defaultResolveOcrModel, type OcrModelResolution } from './ocrProviderPicker';
 import { BUILTIN_KNOWLEDGE_NAME } from '../../resources/builtinMcp/constants';
 
 const SUPPORTED_EXTENSIONS = new Set(['md', 'txt', 'docx', 'xlsx', 'pdf']);
 const CONVERTED_EXTENSIONS = new Set(['docx', 'xlsx']);
+/**
+ * Formats whose on-disk original is binary, so the agent cannot read them with
+ * file tools. Their extracted text is materialized alongside (see
+ * EXTRACTED_TEXT_DIR_NAME); .md/.txt are excluded because the original already
+ * IS the readable form.
+ */
+const EXTRACTED_TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'xlsx']);
 const SUPPORTED_EXTENSIONS_HINT = 'Supported: .md, .txt, .docx, .xlsx, .pdf';
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const MAX_CHUNKS_PER_SOURCE = 2000;
 /**
  * Pages read from one PDF. Ingestion is serialized per project, so an
@@ -69,12 +77,28 @@ const MAX_PDF_PAGES = 50;
 const MAX_PREVIEW_CHARS = 200_000;
 
 /**
- * A PDF whose text layer is empty is a scan, which needs OCR we do not have.
- * Fail it explicitly: silently indexing zero passages would leave the user
- * with a `ready` source that never matches anything.
+ * A PDF with no text layer is a scan, and the only way to read it is to
+ * transcribe its pages with a multimodal model. Both messages below explain
+ * what stopped us rather than just reporting failure: a `ready` source with
+ * zero passages, or a bare "failed", leaves the user with nothing to act on.
  */
-const SCANNED_PDF_ERROR =
-  'This PDF has no text layer, so it looks like a scan. Reading scanned PDFs (OCR) is not supported yet.';
+const scannedPdfNoModelError = (reason: string): string =>
+  `This PDF is a scan, so its pages have to be transcribed by a model that can read images — but ${reason}. Add one in provider settings, then retry.`;
+
+const SCANNED_PDF_NO_PAGES_ERROR =
+  'This PDF is a scan, but none of its pages is a single full-page image, so there was nothing to transcribe. Pages built from several images (exported slides or designed documents) are not supported yet.';
+
+const scannedPdfAllPagesFailedError = (detail: string): string =>
+  `This PDF is a scan, but transcribing its pages failed: ${detail}`;
+
+/**
+ * Names the ceiling the file actually exceeded. Derived from the scan rather
+ * than written as a literal, because the caps now differ by format — a message
+ * quoting 15 MB at someone whose PDF was measured against 100 MB is worse than
+ * no message.
+ */
+const oversizeError = (limitBytes?: number): string =>
+  `File exceeds the ${Math.round((limitBytes ?? MAX_KNOWLEDGE_FILE_BYTES) / (1024 * 1024))} MB limit.`;
 
 export type ProjectKnowledgeServiceDeps = {
   storeRootDir: string;
@@ -84,6 +108,9 @@ export type ProjectKnowledgeServiceDeps = {
   embedTextsImpl?: typeof defaultEmbedTexts;
   /** Injectable so tests can drive PDF ingestion without a real parser. */
   extractPdfTextImpl?: typeof defaultExtractPdfText;
+  /** Injectable so tests can drive scanned-PDF ingestion without a real model. */
+  ocrPdfPagesImpl?: typeof defaultOcrPdfPages;
+  resolveOcrModelImpl?: typeof defaultResolveOcrModel;
   scanFolderImpl?: typeof defaultScanKnowledgeFolder;
   /**
    * Move a user file to the OS Trash (Electron's `shell.trashItem` in prod).
@@ -149,11 +176,14 @@ const toDto = (source: KnowledgeManifestSource): IKnowledgeSourceDto => ({
   addedAt: source.addedAt,
   error: source.error,
   progress: source.progress ?? null,
+  ocr: source.ocr ?? null,
 });
 
 export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps): ProjectKnowledgeService => {
   const embedTexts = deps.embedTextsImpl ?? defaultEmbedTexts;
   const extractPdfText = deps.extractPdfTextImpl ?? defaultExtractPdfText;
+  const ocrPdfPages = deps.ocrPdfPagesImpl ?? defaultOcrPdfPages;
+  const resolveOcrModel = deps.resolveOcrModelImpl ?? defaultResolveOcrModel;
   const scanFolder = deps.scanFolderImpl ?? defaultScanKnowledgeFolder;
   const queues = new Map<string, Promise<void>>();
 
@@ -169,6 +199,71 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
   };
 
   const knowledgeDirOf = (workspace: string): string => path.join(workspace, KNOWLEDGE_FOLDER_NAME);
+
+  /**
+   * Where a binary source's extracted text is materialized so the agent's file
+   * tools can reach it. `null` for formats whose original is already readable
+   * (.md/.txt) — copying those would only duplicate a file the agent can open
+   * directly. The original extension stays in the name so `a.pdf` and `a.docx`
+   * cannot collide on a single `a.md`.
+   */
+  const extractedTextPathOf = (workspace: string, fileName: string): string | null => {
+    const extension = path.extname(fileName).slice(1).toLowerCase();
+    if (!EXTRACTED_TEXT_EXTENSIONS.has(extension)) return null;
+    return path.join(knowledgeDirOf(workspace), EXTRACTED_TEXT_DIR_NAME, `${path.basename(fileName)}.md`);
+  };
+
+  /**
+   * Best-effort: the extracted text is a convenience for the agent, never the
+   * index itself. A failure here (missing folder, a file where the directory
+   * should be, permissions) must not fail an otherwise good ingestion.
+   */
+  const writeExtractedText = async (workspace: string, fileName: string, markdown: string): Promise<void> => {
+    const target = extractedTextPathOf(workspace, fileName);
+    if (!target) return;
+    try {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, markdown, 'utf8');
+    } catch (error) {
+      console.warn(
+        `[projectKnowledge] could not materialize extracted text for ${fileName}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  };
+
+  const removeExtractedText = async (workspace: string, fileName: string): Promise<void> => {
+    const target = extractedTextPathOf(workspace, fileName);
+    if (!target) return;
+    await fs.rm(target, { force: true }).catch((): undefined => undefined);
+  };
+
+  /**
+   * Restore a `.text/` entry that is missing while its source is still `ready`
+   * — the folder was restored after going missing, the user deleted `.text/`,
+   * or the source predates this feature. Sourced from the store's
+   * `converted.md`, which is the same text ingestion chunked, so this costs a
+   * file copy rather than a re-extraction.
+   */
+  const repairExtractedText = async (
+    projectId: string,
+    workspace: string,
+    source: KnowledgeManifestSource
+  ): Promise<void> => {
+    const target = extractedTextPathOf(workspace, source.fileName);
+    if (!target) return;
+    if (
+      await fs.access(target).then(
+        (): boolean => true,
+        (): boolean => false
+      )
+    )
+      return;
+    const converted = path.join(storePaths(storeDirOf(projectId)).sourceDir(source.id), 'converted.md');
+    const markdown = await fs.readFile(converted, 'utf8').catch((): null => null);
+    if (markdown === null) return; // nothing to restore from; next re-ingest rebuilds it
+    await writeExtractedText(workspace, source.fileName, markdown);
+  };
 
   /**
    * Ids key chunk ownership (`chunkId = ${id}#${i}`), so they only need to be
@@ -231,9 +326,21 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     };
   };
 
-  /** Drop a source's chunks/vectors/files; caller persists the manifest. */
-  const removeSourceRows = async (projectId: string, manifest: KnowledgeManifest, sourceId: string): Promise<void> => {
+  /**
+   * Drop a source's chunks/vectors/files; caller persists the manifest.
+   * `workspace` is optional only because a few call sites legitimately have no
+   * folder in hand; when given, the source's materialized extracted text is
+   * reaped too, so `.text/` never outlives the index rows it mirrors.
+   */
+  const removeSourceRows = async (
+    projectId: string,
+    manifest: KnowledgeManifest,
+    sourceId: string,
+    workspace?: string
+  ): Promise<void> => {
     const storeDir = storeDirOf(projectId);
+    const removed = manifest.sources.find((s) => s.id === sourceId);
+    if (workspace && removed) await removeExtractedText(workspace, removed.fileName);
     const remaining = (await readChunks(storeDir)).filter((c) => c.sourceId !== sourceId);
     await writeChunks(storeDir, remaining);
     await writeBm25(storeDir, buildBm25Index(remaining));
@@ -386,11 +493,16 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
           existing.status = 'indexing';
           existing.error = null;
           dirty = true;
+        } else if (existing.status === 'ready') {
+          // Unchanged content is otherwise a no-op, so a `.text/` entry lost
+          // with the folder (or predating this feature) would never come back.
+          // Repair it from converted.md without re-ingesting the source.
+          await repairExtractedText(projectId, workspace, existing);
         }
         continue;
       }
       if (existing) {
-        await removeSourceRows(projectId, manifest, existing.id);
+        await removeSourceRows(projectId, manifest, existing.id, workspace);
         dirty = true;
       }
       const base: KnowledgeManifestSource = {
@@ -405,7 +517,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         error: null,
       };
       manifest.sources.push(
-        entry.kind === 'oversize' ? { ...base, status: 'failed', error: 'File exceeds the 15 MB limit.' } : base
+        entry.kind === 'oversize' ? { ...base, status: 'failed', error: oversizeError(entry.limitBytes) } : base
       );
       dirty = true;
     }
@@ -458,7 +570,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
       (source) => !seen.has(source.fileName) && !unexported.has(source.fileName)
     );
     for (const source of vanished) {
-      await removeSourceRows(projectId, manifest, source.id);
+      await removeSourceRows(projectId, manifest, source.id, workspace);
       dirty = true;
     }
     if (dirty) await saveManifest(projectId, manifest);
@@ -544,6 +656,17 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
     const knowledgeDir = knowledgeDirOf(workspace);
     let manifest = await loadManifest(projectId);
     const pending = manifest.sources.filter((s) => s.status === 'indexing');
+    /**
+     * Resolved lazily and at most once per run, then reused for every scan in
+     * this batch. Not persisted: probing per page would waste calls, but pinning
+     * the choice on the manifest would outlive the entitlement behind it — the
+     * catalogue on this provider advertises far more than a key may call.
+     */
+    let ocrModel: OcrModelResolution | null = null;
+    const getOcrModel = async (): Promise<OcrModelResolution> => {
+      ocrModel ??= await resolveOcrModel(await deps.listProviders());
+      return ocrModel;
+    };
     for (const source of pending) {
       let buffer: Buffer;
       try {
@@ -582,6 +705,10 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         // than one cap (e.g. a long PDF that is also chunk-capped).
         const notes: string[] = [];
         let markdown: string;
+        // Provenance from a previous pass must not outlive it: a retry that now
+        // finds a text layer, or a source re-ingested after being replaced,
+        // would otherwise keep claiming it was transcribed.
+        delete source.ocr;
         if (extension === 'pdf') {
           // PDFs get their own branch rather than joining CONVERTED_EXTENSIONS:
           // convertToMarkdown's (buffer, 'docx' | 'xlsx') shape has nowhere to
@@ -593,9 +720,43 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
                 (): undefined => undefined
               ),
           });
-          if (!extraction.hasTextLayer) throw new Error(SCANNED_PDF_ERROR);
-          if (extraction.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
-          markdown = renderPagesAsMarkdown(extraction.pages);
+          if (extraction.hasTextLayer) {
+            if (extraction.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
+            markdown = renderPagesAsMarkdown(extraction.pages);
+          } else {
+            // A scan. Transcribing it is the expensive path by a wide margin —
+            // one model call per page, on the user's own quota — so it runs only
+            // after the free local read has come up empty.
+            const resolved = await getOcrModel();
+            if (resolved.status === 'unavailable') throw new Error(scannedPdfNoModelError(resolved.reason));
+            const transcription = await ocrPdfPages(buffer, resolved.config, {
+              maxPages: MAX_PDF_PAGES,
+              onProgress: (done, total) =>
+                reportProgress(projectId, manifest, source, { stage: 'transcribing', done, total }).catch(
+                  (): undefined => undefined
+                ),
+            });
+            if (transcription.transcribedCount === 0) {
+              // Nothing was transcribed, and WHY decides what the user should
+              // do: an unreachable model is worth retrying, a deck exported to
+              // PDF is not.
+              throw new Error(
+                transcription.lastError
+                  ? scannedPdfAllPagesFailedError(transcription.lastError)
+                  : SCANNED_PDF_NO_PAGES_ERROR
+              );
+            }
+            if (transcription.truncated) notes.push(`Truncated to ${MAX_PDF_PAGES} pages.`);
+            if (transcription.skippedPages.length > 0) {
+              // Partial success stays a success, and says so: a 20-page contract
+              // with 2 unreadable pages is far more useful indexed than refused.
+              notes.push(
+                `Transcribed from a scan; skipped ${transcription.skippedPages.length} page(s): ${transcription.skippedPages.join(', ')}.`
+              );
+            }
+            source.ocr = { model: resolved.config.model, skippedPages: transcription.skippedPages };
+            markdown = renderPagesAsMarkdown(transcription.pages);
+          }
         } else if (CONVERTED_EXTENSIONS.has(extension)) {
           markdown = await deps.convertToMarkdown(
             buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
@@ -636,6 +797,9 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         source.status = 'ready';
         source.chunkCount = newChunks.length;
         source.error = notes.length > 0 ? notes.join(' ') : null;
+        // Only now that the source is genuinely ready: a failed extraction must
+        // not leave readable-looking text behind for the agent to quote.
+        await writeExtractedText(workspace, source.fileName, markdown);
       } catch (error) {
         source.status = 'failed';
         source.error = error instanceof Error ? error.message : 'Indexing failed.';
@@ -707,7 +871,7 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         if (!deps.trashItem) throw new Error('trashItem dependency is not configured');
         await deps.trashItem(filePath);
       }
-      await removeSourceRows(projectId, manifest, sourceId);
+      await removeSourceRows(projectId, manifest, sourceId, workspace);
       await saveManifest(projectId, manifest);
     });
 

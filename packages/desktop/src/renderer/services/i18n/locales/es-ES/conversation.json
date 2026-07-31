@@ -73,8 +73,12 @@
     "knowledgeAdd": "Añadir archivos",
     "knowledgeEmpty": "Añade documentos para crear la base de conocimientos de este proyecto. El asistente los busca automáticamente en todos los chats del proyecto.",
     "knowledgeSemanticOff": "búsqueda semántica desactivada — no hay modelo de embedding configurado",
+    "knowledgeSemanticOffAction": "Añadir un modelo de embedding",
+    "knowledgeEmbedAll": "Incrustar todo",
+    "knowledgePassagesTooltip": "Este archivo se divide en fragmentos consultables y el asistente usa los más relevantes al responder.",
     "knowledgeStatusIndexing": "Indexando…",
     "knowledgeProgressReading": "Leyendo la página {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcribiendo la página {{done}}/{{total}}",
     "knowledgeProgressEmbedding": "Incrustando {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Falló",
     "knowledgeStatusUnsupported": "No compatible",
@@ -92,7 +96,9 @@
     "knowledgePreviewTruncated": "Vista previa recortada. Abre el archivo original para ver el documento completo.",
     "knowledgePreviewError": "No se pudo cargar el texto indexado de este archivo.",
     "knowledgeCitationMissing": "Este archivo ya no está en la base de conocimientos.",
-    "knowledgeStatusNote": "Nota"
+    "knowledgeOcrTag": "Transcrito (OCR)",
+    "knowledgeOcrDetail": "Transcrito de un escaneo por {{model}}. Páginas omitidas: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "ninguna"
   },
   "history": {
     "recents": "Recientes",
