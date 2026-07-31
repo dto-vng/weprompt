@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ipcBridge } from '@/common';
 import { BUILTIN_KNOWLEDGE_NAME } from '@/common/knowledge/constants';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * Route of the project-scoped new-chat screen, with the project carried in
@@ -52,4 +54,78 @@ export const shouldShowKbStaleHint = (trigger: KbStaleChatHintTrigger): boolean 
   if (!hasIndexedSource) return false;
   if (!Array.isArray(sessionMcpServers)) return false;
   return !includesKnowledgeServer(sessionMcpServers);
+};
+
+export type KbStaleChatHintState = {
+  visible: boolean;
+  /** Hide the notice for this conversation, permanently. */
+  dismiss: () => void;
+};
+
+/**
+ * Trigger for the stale-chat notice.
+ *
+ * Only conversations that could ever show it — project scoped, and missing the
+ * knowledge server from their frozen snapshot — read the source list or
+ * subscribe to updates. A chat that can already search costs nothing.
+ */
+export const useKbStaleChatHint = (input: {
+  conversationId?: string;
+  projectId?: string;
+  sessionMcpServers?: unknown;
+}): KbStaleChatHintState => {
+  const { conversationId, projectId, sessionMcpServers } = input;
+
+  const lacksKnowledgeServer = Array.isArray(sessionMcpServers) && !includesKnowledgeServer(sessionMcpServers);
+  const shouldWatch = Boolean(conversationId && projectId && lacksKnowledgeServer);
+
+  const [hasIndexedSource, setHasIndexedSource] = useState(false);
+  // Starts dismissed so the first paint cannot flash a notice we may hide.
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    setDismissed(conversationId ? localStorage.getItem(kbStaleHintDismissKey(conversationId)) === '1' : true);
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!shouldWatch || !projectId) {
+      setHasIndexedSource(false);
+      return;
+    }
+    let disposed = false;
+    const refetch = async () => {
+      try {
+        const result = await ipcBridge.projectKnowledge.listSources.invoke({ projectId });
+        // Mirrors the server-side attach predicate
+        // (`projectKnowledgeService.getSessionMcpServer`): a source only makes a
+        // new chat better once it is ready AND has passages to search.
+        const ready = result.sources.some((source) => source.status === 'ready' && source.chunkCount > 0);
+        if (!disposed) setHasIndexedSource(ready);
+      } catch (error) {
+        console.error('Failed to load knowledge sources for the stale-chat hint:', error);
+        if (!disposed) setHasIndexedSource(false);
+      }
+    };
+    void refetch();
+    // The event is global across projects, and fires on every manifest write —
+    // including ingestion progress ticks.
+    const unsubscribe = ipcBridge.projectKnowledge.updated.on((payload) => {
+      if (payload.projectId === projectId) void refetch();
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [shouldWatch, projectId]);
+
+  const dismiss = useCallback(() => {
+    if (!conversationId) return;
+    localStorage.setItem(kbStaleHintDismissKey(conversationId), '1');
+    setDismissed(true);
+  }, [conversationId]);
+
+  return {
+    visible: shouldShowKbStaleHint({ conversationId, projectId, sessionMcpServers, hasIndexedSource, dismissed }),
+    dismiss,
+  };
 };
