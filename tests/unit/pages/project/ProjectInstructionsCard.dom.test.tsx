@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const updateProjectMock = vi.fn();
 const messageSuccessMock = vi.fn();
+const messageErrorMock = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -29,6 +30,7 @@ vi.mock('@arco-design/web-react', async (importOriginal) => {
     Message: {
       ...actual.Message,
       success: (...args: unknown[]) => messageSuccessMock(...args),
+      error: (...args: unknown[]) => messageErrorMock(...args),
     },
   };
 });
@@ -45,8 +47,12 @@ const baseProject: ForgeProject = {
 
 describe('ProjectInstructionsCard', () => {
   beforeEach(() => {
-    updateProjectMock.mockReset();
+    // A successful `updateProject` returns the updated project, and the card now
+    // branches on that return value, so the default mock has to answer like the
+    // real one rather than with `undefined`.
+    updateProjectMock.mockReset().mockReturnValue({ ...baseProject });
     messageSuccessMock.mockReset();
+    messageErrorMock.mockReset();
   });
 
   it('renders a preview of existing instructions with an Edit control', () => {
@@ -89,6 +95,37 @@ describe('ProjectInstructionsCard', () => {
     expect(updateProjectMock).toHaveBeenCalledExactlyOnceWith({ id: 'p1', instructions: 'Always answer in USD.' });
     expect(messageSuccessMock).toHaveBeenCalledExactlyOnceWith('conversation.projectHome.instructionsSaved');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('keeps the draft on screen and reports the failure when the project row is gone', () => {
+    updateProjectMock.mockReturnValue(null);
+    render(<ProjectInstructionsCard project={{ ...baseProject, instructions: 'Always answer in VND.' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.edit' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Always answer in USD.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.projectHome.instructionsSaveFailed');
+    expect(messageSuccessMock).not.toHaveBeenCalled();
+    // Still editing, with the typed text intact — a failed save must not throw the draft away.
+    expect(screen.getByRole('textbox')).toHaveValue('Always answer in USD.');
+  });
+
+  it('keeps the draft on screen and reports the failure when the save throws', () => {
+    // The workspace duplicate check runs on every save, so an instructions-only
+    // save can throw for a clash the user never touched.
+    updateProjectMock.mockImplementation(() => {
+      throw new Error('PROJECT_WORKSPACE_DUPLICATE');
+    });
+    render(<ProjectInstructionsCard project={{ ...baseProject, instructions: 'Always answer in VND.' }} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.edit' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Always answer in USD.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.save' }));
+
+    expect(messageErrorMock).toHaveBeenCalledExactlyOnceWith('conversation.projectHome.instructionsSaveFailed');
+    expect(messageSuccessMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox')).toHaveValue('Always answer in USD.');
   });
 
   it('discards the draft and leaves updateProject uncalled on Cancel', () => {
