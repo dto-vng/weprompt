@@ -108,7 +108,7 @@ resolve_version() {
         info "最新版本: ${BOLD}v$VERSION${NC}"
     fi
 
-    DEB_FILENAME="AionUi-${VERSION}-linux-${DEB_ARCH}.deb"
+    DEB_FILENAME="WePrompt-${VERSION}-linux-${DEB_ARCH}.deb"
     DOWNLOAD_URL="https://github.com/iOfficeAI/AionUi/releases/download/v${VERSION}/${DEB_FILENAME}"
 }
 

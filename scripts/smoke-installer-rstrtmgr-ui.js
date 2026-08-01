@@ -79,33 +79,38 @@ function main() {
 
   const compileOnly = process.argv.includes('--compile-only');
   const makensis = findMakensis();
-  const root = mkdtempSync(path.join(tmpdir(), 'aionui-rm-ui-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'weprompt-rm-ui-'));
   const installDir = path.join(root, 'install-dir');
   mkdirSync(installDir, { recursive: true });
   const lockedFile = path.join(installDir, 'locked-by-smoke.txt');
-  writeFileSync(lockedFile, 'AionUi Restart Manager UI smoke lock\n', 'utf8');
+  writeFileSync(lockedFile, 'WePrompt Restart Manager UI smoke lock\n', 'utf8');
 
   let locker = null;
-  const nsiPath = path.join(root, 'aionui-rstrtmgr-ui-smoke.nsi');
-  const exePath = path.join(root, 'aionui-rstrtmgr-ui-smoke.exe');
+  const nsiPath = path.join(root, 'weprompt-rstrtmgr-ui-smoke.nsi');
+  const exePath = path.join(root, 'weprompt-rstrtmgr-ui-smoke.exe');
   const logPath = path.join(
     process.env.TEMP || tmpdir(),
-    `aionui-installer-smoke-${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-')}.log`
+    `weprompt-installer-smoke-${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-')}.log`
   );
   const processControlPath = path.join(repoRoot, 'resources', 'windows', 'installer-process-control.nsh');
   const messagesPath = path.join(repoRoot, 'resources', 'windows', 'installer-messages.nsh');
 
   const nsi = `
 Unicode true
-Name "AionUi Restart Manager UI Smoke"
+Name "WePrompt Restart Manager UI Smoke"
 OutFile "${nsisQuote(exePath)}"
 RequestExecutionLevel user
 SilentInstall normal
-!define AIONUI_FALLBACK_LOG "aionui-installer-smoke-fallback.log"
+!define AIONUI_FALLBACK_LOG "weprompt-installer-smoke-fallback.log"
 !define VERSION "rstrtmgr-ui-smoke"
 !define AIONUI_TARGET_ARCH "x64"
-!define AIONUI_APP_EXECUTABLE_FILENAME "AionUi.exe"
-!define UNINSTALL_FILENAME "Uninstall AionUi.exe"
+!define AIONUI_APP_EXECUTABLE_FILENAME "WePrompt.exe"
+!define AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME "Forge.exe"
+!define AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME "AionUi.exe"
+!define AIONUI_CURRENT_UNINSTALLER_FILENAME "Uninstall WePrompt.exe"
+!define AIONUI_LEGACY_FORGE_UNINSTALLER_FILENAME "Uninstall Forge.exe"
+!define AIONUI_LEGACY_AIONUI_UNINSTALLER_FILENAME "Uninstall AionUi.exe"
+!define UNINSTALL_FILENAME "Uninstall WePrompt.exe"
 !define PROJECT_DIR "${nsisQuote(repoRoot)}"
 !include LogicLib.nsh
 !include "${nsisQuote(messagesPath)}"

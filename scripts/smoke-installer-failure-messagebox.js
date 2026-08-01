@@ -21,8 +21,8 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'uninstaller-copy-or-rebuild-failed',
     defineName: 'AIONUI_E_UNINSTALLER_COPY_OR_REBUILD_FAILED',
     code: 'E1001',
-    message: 'AionUi could not repair the installed uninstaller.',
-    action: 'Close AionUi, restart Windows if needed, then run this installer again.',
+    message: 'WePrompt could not repair the installed uninstaller.',
+    action: 'Close WePrompt, restart Windows if needed, then run this installer again.',
     diagnostics:
       'scenario=uninstaller-copy-or-rebuild-failed phase=uninstaller-repair result=copy-failed-retry-bundled-missing',
   },
@@ -30,7 +30,7 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'old-uninstall-failed',
     defineName: 'AIONUI_E_OLD_UNINSTALL_FAILED',
     code: 'E1002',
-    message: 'The previous AionUi uninstaller returned an error.',
+    message: 'The previous WePrompt-compatible uninstaller returned an error.',
     action:
       'Close any program using the install folder, then run this installer again. If no program is listed, restart Windows and run this installer again.',
     diagnostics: 'scenario=old-uninstall-failed phase=old-uninstaller exitCode=2',
@@ -39,23 +39,23 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'install-dir-remove-or-locked',
     defineName: 'AIONUI_E_INSTALL_DIR_REMOVE_OR_LOCKED',
     code: 'E1003',
-    message: 'AionUi could not remove or replace the previous installation directory.',
-    action: 'Close AionUi and any program using the install folder, then run this installer again.',
+    message: 'WePrompt could not remove or replace the previous installation directory.',
+    action: 'Close WePrompt and any program using the install folder, then run this installer again.',
     diagnostics: 'scenario=install-dir-remove-or-locked phase=atomic-failed failedPath=install-dir',
   },
   {
     id: 'extract-failed',
     defineName: 'AIONUI_E_EXTRACT_FAILED',
     code: 'E1010',
-    message: 'AionUi could not extract the application files correctly.',
+    message: 'WePrompt could not extract the application files correctly.',
     action: 'Download a fresh installer and run it again.',
-    diagnostics: 'scenario=extract-failed phase=extract method=zip missing=AionUi.exe',
+    diagnostics: 'scenario=extract-failed phase=extract method=zip missing=WePrompt.exe',
   },
   {
     id: 'disk-insufficient',
     defineName: 'AIONUI_E_DISK_INSUFFICIENT',
     code: 'E1020',
-    message: 'AionUi cannot continue because the target disk does not have enough free space.',
+    message: 'WePrompt cannot continue because the target disk does not have enough free space.',
     action: 'Free disk space on the target drive, then run this installer again.',
     diagnostics: 'scenario=disk-insufficient phase=preflight requiredMb=1024 availableMb=0',
   },
@@ -63,7 +63,7 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'bundled-aioncore-incomplete',
     defineName: 'AIONUI_E_BUNDLED_AIONCORE_INCOMPLETE',
     code: 'E1030',
-    message: 'AionUi installed, but the bundled AionCore resources are incomplete.',
+    message: 'WePrompt installed some files, but the bundled AionCore resources are incomplete.',
     action: 'Download a fresh installer and run it again.',
     diagnostics: 'scenario=bundled-aioncore-incomplete phase=verify-bundled-aioncore runtime=win32-x64 result=1',
   },
@@ -71,8 +71,8 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'core-app-files-incomplete',
     defineName: 'AIONUI_E_CORE_APP_FILES_INCOMPLETE',
     code: 'E1031',
-    message: 'AionUi installation is incomplete because a required application file is missing.',
-    action: 'Reinstall AionUi or download a newer installer.',
+    message: 'WePrompt installation is incomplete because a required application file is missing.',
+    action: 'Reinstall WePrompt from the approved internal installer.',
     diagnostics: 'scenario=core-app-files-incomplete phase=verify-required-file missing=resources/app.asar',
   },
   {
@@ -80,14 +80,14 @@ const INSTALLER_ERROR_SCENARIOS = [
     defineName: 'AIONUI_E_ARCH_MISMATCH',
     code: 'E1040',
     message: 'Installation package architecture mismatch.',
-    action: 'Download the AionUi installer that matches this Windows architecture, then run it again.',
+    action: 'Use the WePrompt installer that matches this Windows architecture, then run it again.',
     diagnostics: 'scenario=arch-mismatch phase=arch-check target=x64 actual=arm64',
   },
   {
     id: 'active-installer-conflict',
     defineName: 'AIONUI_E_ACTIVE_INSTALLER_CONFLICT',
     code: 'E1050',
-    message: 'Another AionUi installer appears to still be active.',
+    message: 'Another WePrompt installer appears to still be active.',
     action: 'Close the other installer window or wait for it to finish, then run this installer again.',
     diagnostics: 'scenario=active-installer-conflict phase=active-installer-marker state=active',
   },
@@ -95,15 +95,15 @@ const INSTALLER_ERROR_SCENARIOS = [
     id: 'registry-state-invalid',
     defineName: 'AIONUI_E_REGISTRY_STATE_INVALID',
     code: 'E1060',
-    message: 'AionUi found an invalid previous-install registry state.',
-    action: 'Uninstall the old AionUi from Windows Settings, then run this installer again.',
+    message: 'WePrompt found an invalid previous-install registry state.',
+    action: 'Uninstall the old application from Windows Settings, then run this installer again.',
     diagnostics: 'scenario=registry-state-invalid phase=registry-heal installLocation=invalid uninstallString=missing',
   },
   {
     id: 'active-marker-write-failed',
     defineName: 'AIONUI_E_ACTIVE_MARKER_WRITE_FAILED',
     code: 'E1070',
-    message: 'AionUi could not write the active-installer marker.',
+    message: 'WePrompt could not write the active-installer marker.',
     action: 'Restart Windows, then run this installer again.',
     diagnostics: 'scenario=active-marker-write-failed phase=active-installer-marker-write result=failed',
   },
@@ -176,7 +176,6 @@ function copyHarnessProject(projectRoot) {
     path.join(repoRoot, 'resources', 'windows', 'support', 'report-installer-failure.ps1'),
     path.join(supportDir, 'report-installer-failure.ps1')
   );
-  writeFileSync(path.join(supportDir, '_sentry-dsn.generated.nsh'), '!define AIONUI_SENTRY_DSN ""\n', 'utf8');
 }
 
 function getArg(name, fallback) {
@@ -256,9 +255,7 @@ param(
   [string]$ExePath,
   [string]$Code,
   [string]$ScenarioId,
-  [string]$LogPath,
-  [ValidateSet('yes', 'no')]
-  [string]$Answer
+  [string]$LogPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -314,8 +311,8 @@ function Find-FailureWindow([string]$Code, [int]$TimeoutSec = 90) {
     $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $windowCond)
     foreach ($window in $windows) {
       $text = Get-WindowText $window
-      if ($text -like "*AionUi installation failed ($Code)*" -or
-          ($text -like "*($Code)*" -and $text -like '*Send this installer failure report*')) {
+      if ($text -like "*WePrompt installation failed ($Code)*" -or
+          ($text -like "*($Code)*" -and $text -like '*Local diagnostic export*')) {
         return [ordered]@{ window = $window; text = $text; title = $window.Current.Name }
       }
     }
@@ -329,12 +326,12 @@ $proc = Start-Process -FilePath $ExePath -PassThru
 try {
   $failure = Find-FailureWindow $Code
   foreach ($required in @(
-    "AionUi installation failed ($Code)",
+    "WePrompt installation failed ($Code)",
     "scenario=$ScenarioId",
     'Suggested action:',
     'Diagnostics:',
     'Installer log:',
-    'Send this installer failure report'
+    'Local diagnostic export:'
   )) {
     if ($failure.text -notlike "*$required*") {
       throw "Failure dialog for $Code is missing: $required"
@@ -347,25 +344,20 @@ try {
   if ($failure.text -like '*Blocking diagnostics:*') {
     throw "Failure dialog for $Code still uses the old Blocking diagnostics label."
   }
-  if ($Answer -eq 'yes') {
-    $yesZh = [string][char]26159
-    $buttons = @('Yes', $yesZh, "$yesZh(Y)", "$yesZh(&Y)")
-  } else {
-    $noZh = [string][char]21542
-    $buttons = @('No', $noZh, "$noZh(N)", "$noZh(&N)")
-  }
+  $okZh = [string][char]30830 + [string][char]23450
+  $buttons = @('OK', $okZh, "$okZh(O)", "$okZh(&O)")
   if (-not (Try-ClickWindowButton $failure.window $buttons)) {
-    throw "$Answer button not found for $Code failure dialog."
+    throw "OK button not found for $Code failure dialog."
   }
 
   if (-not $proc.WaitForExit(60000)) {
-    throw "Harness did not exit after declining report for $Code."
+    throw "Harness did not exit after acknowledging diagnostics for $Code."
   }
   if ($proc.ExitCode -ne 2) {
     throw "Harness exited with $($proc.ExitCode) for $Code; expected 2."
   }
 
-  [pscustomobject]@{ code = $Code; answer = $Answer; exitCode = $proc.ExitCode; title = $failure.title; logPath = $LogPath } |
+  [pscustomobject]@{ code = $Code; action = 'acknowledged'; exitCode = $proc.ExitCode; title = $failure.title; logPath = $LogPath } |
     ConvertTo-Json -Compress
 } finally {
   if (-not $proc.HasExited) {
@@ -381,7 +373,7 @@ function createHarnessNsi({ exePath, logPath, projectRoot, scenario }) {
   const detail = `${scenario.diagnostics} smoke=messagebox`;
   return `
 Unicode true
-Name "AionUi Failure MessageBox Smoke"
+Name "WePrompt Failure MessageBox Smoke"
 OutFile "${nsisQuote(exePath)}"
 RequestExecutionLevel user
 SilentInstall normal
@@ -397,7 +389,7 @@ SilentInstall normal
 !include "${nsisQuote(path.join(projectRoot, 'resources', 'windows', 'installer-errors-sentry.nsh'))}"
 
 Section
-  StrCpy $INSTDIR "$TEMP\\AionUi-messagebox-smoke"
+  StrCpy $INSTDIR "$TEMP\\WePrompt-messagebox-smoke"
   StrCpy $AionUiSessionId "smokembox-${nsisQuote(scenario.code)}"
   StrCpy $AionUiIsUpdated "1"
   StrCpy $AionUiSessionLogPath "${nsisQuote(logPath)}"
@@ -415,7 +407,7 @@ SectionEnd
 `;
 }
 
-function verifyFailureLog(logPath, scenario, expectedReportReason) {
+function verifyFailureLog(logPath, scenario) {
   const { code, id } = scenario;
   if (!existsSync(logPath)) {
     throw new Error(`installer log was not written for ${code}: ${logPath}`);
@@ -432,35 +424,35 @@ function verifyFailureLog(logPath, scenario, expectedReportReason) {
       event.message.includes(`code=${code}`) &&
       event.message.includes(`scenario=${id}`)
   );
-  const hasReportSkipped = events.some(
+  const hasLocalExport = events.some(
     (event) =>
-      event.event === 'report-skipped' &&
+      event.event === 'diagnostics-exported' &&
       ((typeof event.message === 'string' &&
         event.message.includes(`code=${code}`) &&
-        event.message.includes(`reason=${expectedReportReason}`)) ||
-        (event.code === code && event.reason === expectedReportReason))
+        event.message.includes('localExportPath=')) ||
+        event.code === code)
   );
 
   if (!hasSessionFailure) {
     throw new Error(`session-end failure event missing code or scenario id for ${code} (${id}): ${logPath}`);
   }
-  if (!hasReportSkipped) {
-    throw new Error(`report-skipped event missing after declining report for ${code}: ${logPath}`);
+  if (!hasLocalExport) {
+    throw new Error(`diagnostics-exported event missing for ${code}: ${logPath}`);
   }
 }
 
-function runHarness({ autoDecline, compileOnly, makensis, scenario }) {
+function runHarness({ autoAcknowledge, compileOnly, makensis, scenario }) {
   const { code } = scenario;
-  const root = mkdtempSync(path.join(tmpdir(), `aionui-failure-messagebox-${code}-`));
+  const root = mkdtempSync(path.join(tmpdir(), `weprompt-failure-messagebox-${code}-`));
   const projectRoot = path.join(root, 'project');
-  const nsiPath = path.join(root, 'aionui-failure-messagebox-smoke.nsi');
-  const exePath = path.join(root, 'aionui-failure-messagebox-smoke.exe');
+  const nsiPath = path.join(root, 'weprompt-failure-messagebox-smoke.nsi');
+  const exePath = path.join(root, 'weprompt-failure-messagebox-smoke.exe');
   const logPath = path.join(
     process.env.TEMP || tmpdir(),
-    `aionui-installer-messagebox-smoke-${code}-${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-')}-log.jsonl`
+    `weprompt-installer-messagebox-smoke-${code}-${new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-')}-log.jsonl`
   );
-  const automationPath = path.join(root, 'auto-decline.ps1');
-  const reportStatusPath = path.join(process.env.TEMP || tmpdir(), 'aionui-installer-report.json');
+  const automationPath = path.join(root, 'auto-acknowledge.ps1');
+  const reportStatusPath = path.join(process.env.TEMP || tmpdir(), 'weprompt-installer-report.json');
 
   copyHarnessProject(projectRoot);
   writeAutoDeclineScript(automationPath);
@@ -480,13 +472,9 @@ function runHarness({ autoDecline, compileOnly, makensis, scenario }) {
       return { code, exePath, logPath, mode: 'compile-only' };
     }
 
-    if (autoDecline) {
-      const answer = autoDecline === 'consent' ? 'yes' : 'no';
-      const expectedReportReason = autoDecline === 'consent' ? 'empty-dsn' : 'user-declined';
+    if (autoAcknowledge) {
       rmSync(reportStatusPath, { force: true });
-      console.log(
-        `[failure-messagebox] ${code}: launching harness and auto-${answer === 'yes' ? 'consenting to' : 'declining'} report...`
-      );
+      console.log(`[failure-messagebox] ${code}: launching harness and acknowledging local diagnostics...`);
       const run = spawnSync(
         'powershell.exe',
         [
@@ -499,44 +487,44 @@ function runHarness({ autoDecline, compileOnly, makensis, scenario }) {
           code,
           scenario.id,
           logPath,
-          answer,
         ],
         { encoding: 'utf8' }
       );
       if (run.status !== 0) {
         process.stdout.write(run.stdout || '');
         process.stderr.write(run.stderr || '');
-        throw new Error(`auto-decline harness failed for ${code} with exit ${run.status}`);
+        throw new Error(`auto-acknowledge harness failed for ${code} with exit ${run.status}`);
       }
-      verifyFailureLog(logPath, scenario, expectedReportReason);
-      if (autoDecline === 'consent') {
-        if (!existsSync(reportStatusPath)) {
-          throw new Error(`report status file missing for ${code}: ${reportStatusPath}`);
-        }
-        const status = JSON.parse(readFileSync(reportStatusPath, 'utf8'));
-        if (status.code !== code) {
-          throw new Error(`report status code mismatch for ${code}: ${status.code}`);
-        }
-        if (status.status !== 'skipped' || status.reason !== 'empty-dsn') {
-          throw new Error(`unexpected report status for ${code}: ${JSON.stringify(status)}`);
-        }
-        if (typeof status.copyText !== 'string' || !status.copyText.includes(`AionUi installer failure ${code}`)) {
-          throw new Error(`report copyText missing support payload for ${code}`);
-        }
+      verifyFailureLog(logPath, scenario);
+      if (!existsSync(reportStatusPath)) {
+        throw new Error(`diagnostic status file missing for ${code}: ${reportStatusPath}`);
+      }
+      const status = JSON.parse(readFileSync(reportStatusPath, 'utf8'));
+      if (status.code !== code) {
+        throw new Error(`diagnostic status code mismatch for ${code}: ${status.code}`);
+      }
+      if (status.status !== 'exported') {
+        throw new Error(`unexpected diagnostic status for ${code}: ${JSON.stringify(status)}`);
+      }
+      if (!status.localExportPath || !existsSync(status.localExportPath)) {
+        throw new Error(`local diagnostic export missing for ${code}: ${status.localExportPath}`);
+      }
+      if (typeof status.copyText !== 'string' || !status.copyText.includes(`WePrompt installer failure ${code}`)) {
+        throw new Error(`diagnostic copyText missing support payload for ${code}`);
       }
       console.log(`[failure-messagebox] ${code}: e2e ok: ${logPath}`);
-      return { code, exePath, logPath, mode: 'auto-decline' };
+      return { code, exePath, logPath, mode: 'auto-acknowledge' };
     }
 
-    console.log('[failure-messagebox] launching harness. Click No to close without attempting report upload.');
+    console.log('[failure-messagebox] launching harness. Click OK after reviewing the local diagnostic paths.');
     const run = spawnSync(exePath, [], { stdio: 'inherit' });
     if (run.status !== 2) {
       throw new Error(`harness exited with ${run.status}; expected installer failure exit code 2`);
     }
-    verifyFailureLog(logPath, scenario, 'user-declined');
+    verifyFailureLog(logPath, scenario);
     return { code, exePath, logPath, mode: 'manual' };
   } finally {
-    if (compileOnly || autoDecline || process.argv.includes('--cleanup')) {
+    if (compileOnly || autoAcknowledge || process.argv.includes('--cleanup')) {
       rmSync(root, { recursive: true, force: true });
     }
   }
@@ -566,11 +554,10 @@ function main() {
   }
 
   const allScenarios = process.argv.includes('--all-scenarios') || process.argv.includes('--all-codes');
-  const autoConsent = process.argv.includes('--auto-consent');
-  const autoDecline = process.argv.includes('--auto-decline');
-  if (autoConsent && autoDecline) {
-    throw new Error('Use only one of --auto-consent or --auto-decline.');
-  }
+  const autoConsentAlias = process.argv.includes('--auto-consent');
+  const autoDeclineAlias = process.argv.includes('--auto-decline');
+  const autoAcknowledge =
+    process.argv.includes('--auto-acknowledge') || autoConsentAlias || autoDeclineAlias;
   const compileOnly = process.argv.includes('--compile-only');
   const { scenarios } = getInstallerErrorScenarioMatrix();
   const selectedScenarios = allScenarios ? scenarios : [findInstallerErrorScenario(getArg('--code', 'E1003'))];
@@ -581,7 +568,7 @@ function main() {
   for (const scenario of selectedScenarios) {
     results.push(
       runHarness({
-        autoDecline: autoConsent ? 'consent' : autoDecline ? 'decline' : '',
+        autoAcknowledge,
         compileOnly,
         makensis,
         scenario,
@@ -596,7 +583,7 @@ function main() {
           coveredCodes: results.map((result) => result.code),
           coveredScenarios: selectedScenarios.map((scenario) => scenario.id),
           count: results.length,
-          mode: compileOnly ? 'compile-only' : autoConsent ? 'auto-consent' : autoDecline ? 'auto-decline' : 'manual',
+          mode: compileOnly ? 'compile-only' : autoAcknowledge ? 'auto-acknowledge' : 'manual',
         },
         null,
         2

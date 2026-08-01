@@ -27,6 +27,10 @@ on:
         description: 'Optional AionCore Manual Build workflow run id to bundle instead of the pinned release'
         type: string
         default: ''
+      internal_release:
+        description: 'Build an internal WePrompt package with public update and telemetry configuration disabled'
+        type: boolean
+        default: false
 
 env:
   BUN_INSTALL_REGISTRY: 'https://registry.npmjs.org/'
@@ -77,6 +81,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: code-quality
     if: ${{ always() && (inputs.skip_code_quality || needs.code-quality.result == 'success') }}
+    env:
+      WEPROMPT_INTERNAL_RELEASE: ${{ inputs.internal_release && '1' || '0' }}
 
     outputs:
       commit-short: ${{ steps.commit.outputs.short }}
@@ -198,6 +204,7 @@ jobs:
           echo "=========================================="
 
       - name: Resolve Sentry release name
+        if: ${{ !inputs.internal_release }}
         shell: bash
         run: |
           set -euo pipefail
@@ -215,6 +222,7 @@ jobs:
           echo "Sentry release: $RELEASE_NAME"
 
       - name: Configure Sentry source map upload owner
+        if: ${{ !inputs.internal_release }}
         shell: bash
         run: |
           set -euo pipefail
@@ -228,7 +236,7 @@ jobs:
           fi
 
       - name: Validate Sentry source map upload configuration
-        if: matrix.platform == 'linux-x64'
+        if: ${{ !inputs.internal_release && matrix.platform == 'linux-x64' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -250,6 +258,18 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: Validate internal release network configuration
+        if: ${{ inputs.internal_release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in WEPROMPT_UPDATE_BASE_URL SENTRY_DSN SENTRY_AUTH_TOKEN SENTRY_UPLOAD_SOURCE_MAPS SENTRY_ORG SENTRY_PROJECT SENTRY_RELEASE; do
+            if [ -n "${!name:-}" ]; then
+              echo "::error title=Internal release configuration rejected::$name must be unset"
+              exit 1
+            fi
+          done
 
       # macOS code signing certificate installation
       - name: Setup macOS code signing (macOS only)
@@ -380,23 +400,28 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $Command = $env:WINDOWS_BUILD_COMMAND
-          $BuildFailed = $false
+          $BuildExitCode = 1
+          $global:LASTEXITCODE = 0
 
           try {
             Write-Host "Running Windows build command: $Command"
             iex $Command
-            Write-Host "Windows build completed successfully"
+            $BuildExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
           } catch {
-            $BuildFailed = $true
-            Write-Warning "${{ matrix.platform }} build failed but will not block the workflow"
-            Write-Host "::notice title=Windows build skipped::${{ matrix.platform }} build failed (see logs above) but workflow is allowed to continue."
+            if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+              $BuildExitCode = [int]$LASTEXITCODE
+            }
+            Write-Host "::error title=Windows build failed::${{ matrix.platform }} exited with code $BuildExitCode. $($_.Exception.Message)"
           }
 
-          if ($BuildFailed) {
+          if ($BuildExitCode -ne 0) {
             "result=failure" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else {
             "result=success" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host "Windows build completed successfully"
           }
+
+          exit $BuildExitCode
         env:
           WINDOWS_BUILD_COMMAND: ${{ matrix.command }}
           AIONUI_BACKEND_RUN_ID: ${{ inputs.aioncore_run_id }}
@@ -426,11 +451,6 @@ jobs:
           GYP_MSVS_VERSION: 2022
           WindowsTargetPlatformVersion: 10.0.19041.0
           _WIN32_WINNT: 0x0A00
-          # Sentry DSN (injected at build time via vite define)
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           # Built-in provider/tool keys (injected at build time via vite define)
           FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
           FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
@@ -467,11 +487,14 @@ jobs:
           ${{ matrix.command }} 2>&1 | tee "${RUNNER_TEMP}/build.log"
           BUILD_EXIT_CODE=${PIPESTATUS[0]}
 
-          # Check if DMG was created (most important artifact)
+          VERSION=$(node -p "require('./package.json').version")
+          EXPECTED_DMG="out/WePrompt-${VERSION}-mac-${{ matrix.arch }}.dmg"
+
+          # Check only the current architecture's DMG. A sibling build cannot satisfy this job.
           DMG_EXISTS=false
-          if ls out/*.dmg 1>/dev/null 2>&1; then
+          if [ -s "$EXPECTED_DMG" ]; then
             DMG_EXISTS=true
-            echo "✅ DMG created successfully"
+            echo "✅ DMG created successfully: $EXPECTED_DMG"
           fi
 
           # If build succeeded completely
@@ -523,10 +546,6 @@ jobs:
           npm_config_disturl: https://electronjs.org/headers
           npm_config_runtime: electron
           npm_config_target_arch: ${{ matrix.arch }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           # Built-in provider/tool keys (injected at build time via vite define)
           FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
           FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
@@ -557,10 +576,10 @@ jobs:
           npm_config_disturl: https://electronjs.org/headers
           npm_config_runtime: electron
           npm_config_target_arch: ${{ matrix.arch }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_DSN: ${{ !inputs.internal_release && secrets.SENTRY_DSN || '' }}
+          SENTRY_AUTH_TOKEN: ${{ !inputs.internal_release && secrets.SENTRY_AUTH_TOKEN || '' }}
+          SENTRY_ORG: ${{ !inputs.internal_release && secrets.SENTRY_ORG || '' }}
+          SENTRY_PROJECT: ${{ !inputs.internal_release && secrets.SENTRY_PROJECT || '' }}
           # Built-in provider/tool keys (injected at build time via vite define)
           FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
           FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
@@ -613,6 +632,39 @@ jobs:
             echo "No out directory found!"
           fi
 
+      - name: Verify expected WePrompt artifacts
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          REQUIRED=()
+
+          case "${{ matrix.platform }}" in
+            windows-*)
+              REQUIRED+=("out/WePrompt-${VERSION}-win-${{ matrix.arch }}.exe")
+              ;;
+            macos-*)
+              REQUIRED+=("out/WePrompt-${VERSION}-mac-${{ matrix.arch }}.dmg")
+              REQUIRED+=("out/WePrompt-${VERSION}-mac-${{ matrix.arch }}.zip")
+              ;;
+            linux-*)
+              REQUIRED+=("out/WePrompt-${VERSION}-linux-${{ matrix.arch }}.deb")
+              ;;
+            *)
+              echo "::error title=Unknown build platform::${{ matrix.platform }}"
+              exit 1
+              ;;
+          esac
+
+          for artifact in "${REQUIRED[@]}"; do
+            if [ ! -s "$artifact" ]; then
+              echo "::error title=Missing build artifact::$artifact"
+              exit 1
+            fi
+            echo "Verified $artifact"
+          done
+
       # Verify desktop asar does not contain packages/web-cli/ contamination
       # 验证桌面 asar 没有被 web-cli 代码污染
       - name: Verify desktop asar isolation
@@ -663,13 +715,12 @@ jobs:
         with:
           name: ${{ inputs.append_commit_hash && format('{0}-{1}', matrix.artifact-name, steps.commit.outputs.short) || matrix.artifact-name }}
           path: |
-            out/*.exe
-            out/*.msi
-            out/*.dmg
-            out/*.deb
-            out/AionUi-*-mac-*.zip
+            out/WePrompt-*-win-*.exe
+            out/WePrompt-*-mac-*.dmg
+            out/WePrompt-*-linux-*.deb
+            out/WePrompt-*-mac-*.zip
             out/*.yml
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
   build-summary:
