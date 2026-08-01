@@ -13,7 +13,10 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { resolveMacLogDirectoryNames } from '../packages/desktop/src/common/platform/appIdentity';
+import {
+  buildBenchmarkLogRelativePath,
+  resolveMacLogDirectoryNames,
+} from '../packages/desktop/src/common/platform/appIdentity';
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -86,9 +89,9 @@ function agentPillByBackend(backend: string) {
 // ── Log parsing ─────────────────────────────────────────────────────────────
 
 function getLogFilePath(): string {
-  const today = new Date().toISOString().slice(0, 10);
+  const datedLogPath = buildBenchmarkLogRelativePath();
   const candidates = resolveMacLogDirectoryNames().map((directoryName) =>
-    path.join(os.homedir(), 'Library', 'Logs', directoryName, `${today}.log`)
+    path.join(os.homedir(), 'Library', 'Logs', directoryName, datedLogPath)
   );
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
 }

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 type AppIdentity = {
   dataDirectoryName?: string;
@@ -9,6 +9,7 @@ type AppIdentity = {
 };
 
 type AppIdentityModule = {
+  buildBenchmarkLogRelativePath: (date?: Date) => string;
   applyAppIdentity: (
     app: {
       getPath: (name: 'appData' | 'userData') => string;
@@ -148,5 +149,16 @@ describe('application identity', () => {
     const { resolveMacLogDirectoryNames } = await loadAppIdentity();
 
     expect(resolveMacLogDirectoryNames()).toEqual(['WePrompt-Dev', 'Forge-Dev', 'WePrompt', 'Forge']);
+  });
+
+  it('builds the nested benchmark log path from local calendar components', async () => {
+    const { buildBenchmarkLogRelativePath } = await loadAppIdentity();
+    const localBoundary = new Date(0);
+    vi.spyOn(localBoundary, 'getFullYear').mockReturnValue(2026);
+    vi.spyOn(localBoundary, 'getMonth').mockReturnValue(6);
+    vi.spyOn(localBoundary, 'getDate').mockReturnValue(3);
+    vi.spyOn(localBoundary, 'toISOString').mockReturnValue('2026-07-02T17:01:00.000Z');
+
+    expect(buildBenchmarkLogRelativePath(localBoundary)).toBe('2026/07/03/2026-07-03.log');
   });
 });

@@ -83,6 +83,16 @@ export function resolveMacLogDirectoryNames(): string[] {
 }
 
 /**
+ * Mirrors electron-log's nested daily file path using local calendar components.
+ */
+export function buildBenchmarkLogRelativePath(date = new Date()): string {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}/${month}/${day}/${year}-${month}-${day}.log`;
+}
+
+/**
  * Applies identity before any caller can read Electron's userData path.
  */
 export function applyAppIdentity(

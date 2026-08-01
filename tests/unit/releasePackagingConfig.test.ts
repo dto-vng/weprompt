@@ -85,6 +85,18 @@ describe('release packaging configuration', () => {
     expect(script).toMatch(/--mac\s+dmg\s+zip\s+--\$\{targetArch\}\s+--prepackaged/);
   });
 
+  it('uses the nested local-date log path contract in both startup benchmarks', () => {
+    const benchmarkScripts = ['scripts/benchmark-acp-startup.ts', 'scripts/benchmark-startup.ts'];
+
+    for (const benchmarkScript of benchmarkScripts) {
+      const source = readProjectFile(benchmarkScript);
+      expect(source, `${benchmarkScript} should use the shared nested-date helper`).toContain(
+        'buildBenchmarkLogRelativePath'
+      );
+      expect(source, `${benchmarkScript} should not derive dates in UTC`).not.toContain('toISOString().slice(0, 10)');
+    }
+  });
+
   itWithBash('fails release asset preparation when a mac zip is missing', () => {
     const tempDir = mkdtempSync(resolve(tmpdir(), 'aionui-release-assets-'));
     const artifactsDir = resolve(tempDir, 'build-artifacts');
