@@ -78,9 +78,7 @@ describe('release packaging configuration', () => {
       resolutions: Record<string, string>;
     }>('package.json');
     const lockedVersions = (packageName: string): string[] =>
-      [...lockfile.matchAll(new RegExp(`\\[\"${packageName.replaceAll('-', '\\-')}@([^\"]+)\"`, 'g'))].map(
-        (match) => match[1]
-      );
+      [...lockfile.matchAll(new RegExp(`\\["${packageName}@([^"]+)"`, 'g'))].map((match) => match[1]);
     const expectFixed = (packageName: string, floors: Record<number, string>) => {
       const versions = lockedVersions(packageName);
       expect(versions.length, `${packageName} must remain represented in bun.lock`).toBeGreaterThan(0);
