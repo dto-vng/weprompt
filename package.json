@@ -238,7 +238,6 @@
     "@xmldom/xmldom": "^0.8.13",
     "axios": "^1.16.0",
     "body-parser": "^2.2.1",
-    "builder-util-runtime": "9.5.1",
     "defu": "^6.1.5",
     "fast-uri": "^3.1.3",
     "fast-xml-builder": "^1.1.7",

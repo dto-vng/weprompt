@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -26,6 +27,27 @@ function yamlBlock(content: string, key: string): string {
 }
 
 describe('release packaging configuration', () => {
+  it('keeps electron-builder on its compatible builder runtime', () => {
+    const rootPackage = readProjectJson<{
+      dependencies: Record<string, string>;
+      resolutions: Record<string, string>;
+    }>('package.json');
+    const projectRequire = createRequire(resolve(projectRoot, 'package.json'));
+    const electronBuilderPackagePath = projectRequire.resolve('electron-builder/package.json');
+    const electronBuilderRequire = createRequire(electronBuilderPackagePath);
+    const appBuilderPackagePath = electronBuilderRequire.resolve('app-builder-lib/package.json');
+    const appBuilderRequire = createRequire(appBuilderPackagePath);
+    const appBuilderRuntime = appBuilderRequire('builder-util-runtime') as {
+      deepAssign?: unknown;
+    };
+    const appBuilderRuntimePackage = appBuilderRequire('builder-util-runtime/package.json') as { version: string };
+
+    expect(rootPackage.dependencies['builder-util-runtime']).toBe('9.5.1');
+    expect(rootPackage.resolutions).not.toHaveProperty('builder-util-runtime');
+    expect(appBuilderRuntimePackage.version).toBe('9.7.0');
+    expect(appBuilderRuntime.deepAssign).toBeTypeOf('function');
+  });
+
   it('uses WePrompt as the visible application identity while preserving compatibility identifiers', () => {
     const rootPackage = readProjectJson<{
       author: { email?: string; name: string };
