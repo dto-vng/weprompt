@@ -13,6 +13,7 @@ import { resolveFiles as resolveProviderFiles } from 'electron-updater/out/provi
 import { getChannelFilename, newUrlFromBase } from 'electron-updater/out/util';
 import log from 'electron-log';
 import type { RequestOptions } from 'http';
+import { isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
 
 type GenericProviderConfiguration = ConstructorParameters<typeof GenericProvider>[0];
 type GenericProviderUpdater = ConstructorParameters<typeof GenericProvider>[1];
@@ -30,16 +31,7 @@ const updateUrlError = (url: URL, baseUrl: URL): Error =>
 
 export function assertUpdateUrlWithinBase(url: URL, configuredBaseUrl: string): void {
   const baseUrl = new URL(withTrailingSlash(configuredBaseUrl));
-  const basePath = baseUrl.pathname.endsWith('/') ? baseUrl.pathname : `${baseUrl.pathname}/`;
-  const basePathWithoutSlash = basePath.slice(0, -1) || '/';
-
-  if (
-    url.protocol !== 'https:' ||
-    url.username ||
-    url.password ||
-    url.origin !== baseUrl.origin ||
-    (url.pathname !== basePathWithoutSlash && !url.pathname.startsWith(basePath))
-  ) {
+  if (!isUpdateUrlWithinBase(url, baseUrl.href)) {
     throw updateUrlError(url, baseUrl);
   }
 }

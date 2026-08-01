@@ -28,6 +28,53 @@ export type DesktopReleaseBuildPolicy = {
 
 const trimmed = (value: string | undefined): string => value?.trim() ?? '';
 
+const AMBIGUOUS_UPDATE_PATH_ENCODING = /%(?:25|2e|2f|5c)/i;
+
+const canonicalUpdatePath = (url: URL): string | null => {
+  // A proxy may decode these values differently from WHATWG URL handling.
+  // Reject encoded percent, dot, and path separators instead of allowing a
+  // downstream normalization step to move a request outside the feed root.
+  if (AMBIGUOUS_UPDATE_PATH_ENCODING.test(url.pathname)) return null;
+
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(url.pathname);
+  } catch {
+    return null;
+  }
+
+  if (decodedPath.includes('\\')) return null;
+  if (decodedPath.split('/').some((segment) => segment === '.' || segment === '..')) return null;
+  return decodedPath;
+};
+
+export function isUpdateUrlWithinBase(targetUrl: URL, configuredBaseUrl: string): boolean {
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(configuredBaseUrl);
+  } catch {
+    return false;
+  }
+
+  const targetPath = canonicalUpdatePath(targetUrl);
+  const baseCanonicalPath = canonicalUpdatePath(baseUrl);
+  if (!targetPath || !baseCanonicalPath) return false;
+
+  const basePath = baseCanonicalPath.endsWith('/') ? baseCanonicalPath : `${baseCanonicalPath}/`;
+  const basePathWithoutSlash = basePath.slice(0, -1) || '/';
+
+  return (
+    targetUrl.protocol === 'https:' &&
+    !targetUrl.username &&
+    !targetUrl.password &&
+    baseUrl.protocol === 'https:' &&
+    !baseUrl.username &&
+    !baseUrl.password &&
+    targetUrl.origin === baseUrl.origin &&
+    (targetPath === basePathWithoutSlash || targetPath.startsWith(basePath))
+  );
+}
+
 const isUpstreamAionUiDestination = (url: URL): boolean => {
   const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
   const pathname = url.pathname.toLowerCase();
@@ -59,6 +106,9 @@ export function resolveUpdateBaseUrl(value: string | undefined): string | null {
   }
   if (url.username || url.password || url.search || url.hash) {
     throw new Error('WEPROMPT_UPDATE_BASE_URL must not contain credentials, query parameters, or a fragment');
+  }
+  if (!canonicalUpdatePath(url)) {
+    throw new Error('WEPROMPT_UPDATE_BASE_URL must not contain ambiguous path encoding');
   }
   if (isUpstreamAionUiDestination(url)) {
     throw new Error('WEPROMPT_UPDATE_BASE_URL must not use a public AionUi destination');

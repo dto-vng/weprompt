@@ -16,7 +16,7 @@ import type {
   InstallerLastFailureMarker,
 } from '@/common/update/updateTypes';
 import { UPDATE_BRIDGE_DISABLED_CODE } from '@/common/update/updateTypes';
-import { getConfiguredUpdateBaseUrl } from '@/common/update/updatePolicy';
+import { getConfiguredUpdateBaseUrl, isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
 import { uuid } from '@/common/utils';
 import { app } from 'electron';
 import log from 'electron-log';
@@ -54,14 +54,6 @@ const createUpdatesDisabledResult = () => ({
   msg: UPDATE_BRIDGE_DISABLED_CODE,
 });
 
-const isWithinUpdateBase = (targetUrl: URL, updateBaseUrl: string): boolean => {
-  const baseUrl = new URL(`${updateBaseUrl}/`);
-  if (targetUrl.origin !== baseUrl.origin) return false;
-
-  const basePath = baseUrl.pathname;
-  return targetUrl.pathname === basePath.slice(0, -1) || targetUrl.pathname.startsWith(basePath);
-};
-
 const assertAllowedUrl = async (rawUrl: string, updateBaseUrl: string) => {
   let parsed: URL;
   try {
@@ -73,7 +65,7 @@ const assertAllowedUrl = async (rawUrl: string, updateBaseUrl: string) => {
   if (parsed.protocol !== 'https:') {
     throw new Error((await getI18n()).t('update.errors.httpsOnly'));
   }
-  if (!isWithinUpdateBase(parsed, updateBaseUrl)) {
+  if (!isUpdateUrlWithinBase(parsed, updateBaseUrl)) {
     throw new Error((await getI18n()).t('update.errors.hostNotAllowed', { host: parsed.hostname }));
   }
 };

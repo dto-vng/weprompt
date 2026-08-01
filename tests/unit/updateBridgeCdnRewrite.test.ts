@@ -200,6 +200,9 @@ describe('updateBridge product-owned download containment', () => {
     'https://evil.example.com/fake.dmg',
     'https://updates.weprompt.test/private/fake.dmg',
     'https://static.aionui.com/releases/fake.dmg',
+    'https://updates.weprompt.test/releases/%2e%2e%2fprivate/fake.dmg',
+    'https://updates.weprompt.test/releases/%2e%2e%5cprivate/fake.dmg',
+    'https://updates.weprompt.test/releases/%252e%252e%252fprivate/fake.dmg',
   ])('rejects URLs outside the configured update base: %s', async (url) => {
     vi.resetModules();
     vi.clearAllMocks();

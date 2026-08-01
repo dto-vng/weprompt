@@ -13,6 +13,7 @@ const autoUpdaterMock = vi.hoisted(() => ({
   logger: null as unknown,
   autoDownload: true,
   autoInstallOnAppQuit: false,
+  disableDifferentialDownload: false,
   forceDevUpdateConfig: false,
   allowPrerelease: false,
   allowDowngrade: false,
@@ -84,6 +85,7 @@ describe('AutoUpdaterService', () => {
     autoUpdaterMock.logger = null;
     autoUpdaterMock.autoDownload = true;
     autoUpdaterMock.autoInstallOnAppQuit = false;
+    autoUpdaterMock.disableDifferentialDownload = false;
     autoUpdaterMock.forceDevUpdateConfig = false;
     autoUpdaterMock.allowPrerelease = false;
     autoUpdaterMock.allowDowngrade = false;
@@ -145,6 +147,7 @@ describe('AutoUpdaterService', () => {
       updateProvider: CdnGenericProvider,
     });
     expect((autoUpdaterMock as { httpExecutor?: unknown }).httpExecutor).toBeInstanceOf(ContainedElectronHttpExecutor);
+    expect(autoUpdaterMock.disableDifferentialDownload).toBe(true);
   });
 
   it('enables forced updater checks in unpacked dev builds when requested', async () => {

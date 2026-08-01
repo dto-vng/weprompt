@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { UpdateInfo } from 'electron-updater';
 import type { AppUpdater } from 'electron-updater/out/AppUpdater';
 import type { ProviderRuntimeOptions } from 'electron-updater/out/providers/Provider';
+import { resolveUpdateBaseUrl } from '@/common/update/updatePolicy';
 import {
   assertUpdateUrlWithinBase,
   CdnGenericProvider,
@@ -38,6 +39,13 @@ describe('CDN update feed options', () => {
 
   it('fails closed when no update feed is configured', () => {
     expect(() => buildCdnFeedOptions(null)).toThrow('updates-disabled');
+  });
+
+  it.each([
+    'https://updates.weprompt.test/releases/%2e%2e%2fprivate',
+    'https://updates.weprompt.test/releases/%252e%252e%252fprivate',
+  ])('rejects an update base with ambiguous encoded traversal: %s', (url) => {
+    expect(() => resolveUpdateBaseUrl(url)).toThrow(/ambiguous path encoding/i);
   });
 });
 
@@ -140,6 +148,16 @@ describe('CdnGenericProvider', () => {
         'https://updates.weprompt.test/releases'
       )
     ).toThrow(/outside the configured update base/i);
+  });
+
+  it.each([
+    'https://updates.weprompt.test/releases/%2e%2e%2fprivate/latest.yml',
+    'https://updates.weprompt.test/releases/%2e%2e%5cprivate/latest.yml',
+    'https://updates.weprompt.test/releases/%252e%252e%252fprivate/latest.yml',
+  ])('rejects ambiguous encoded paths before an updater or proxy can normalize them: %s', (url) => {
+    expect(() => assertUpdateUrlWithinBase(new URL(url), 'https://updates.weprompt.test/releases')).toThrow(
+      /outside the configured update base/i
+    );
   });
 
   it('rejects an electron redirect before following it outside the configured base', () => {

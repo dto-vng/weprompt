@@ -131,6 +131,10 @@ class AutoUpdaterService extends EventEmitter {
     // Disable auto-download for manual control
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    // electron-updater's differential downloaders can follow redirects without
+    // passing them through our contained HTTP executor. Full downloads use the
+    // executor's request and redirect guards, so keep differential mode off.
+    autoUpdater.disableDifferentialDownload = true;
     this.configureDevAutoUpdateDebug();
     const cdnFeedOptions = buildCdnFeedOptions();
 
