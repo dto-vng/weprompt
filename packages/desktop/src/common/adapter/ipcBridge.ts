@@ -329,7 +329,7 @@ export const conversation = {
   turnCompleted: wsMappedEmitter<IConversationTurnCompletedEvent>('turn.completed', (raw) => {
     const r = raw as Record<string, unknown>;
     const rawLast = (r.last_message ?? r.lastMessage) as Record<string, unknown> | undefined;
-    const last_message: IConversationTurnCompletedEvent['last_message'] = rawLast
+    const lastMessage = rawLast
       ? {
           id: rawLast.id as string | undefined,
           type: rawLast.type as string | undefined,
@@ -337,21 +337,26 @@ export const conversation = {
           status: rawLast.status as string | null | undefined,
           created_at: (rawLast.created_at ?? rawLast.createdAt ?? Date.now()) as number,
         }
-      : {
-          content: null,
-          created_at: Date.now(),
-        };
-    const rawRuntime = (r.runtime ?? {}) as Record<string, unknown>;
-    const runtime: IConversationTurnCompletedEvent['runtime'] = {
-      state: (rawRuntime.state ?? 'idle') as IConversationTurnCompletedEvent['runtime']['state'],
-      can_send_message: (rawRuntime.can_send_message ?? rawRuntime.canSendMessage ?? true) as boolean,
-      has_task: (rawRuntime.has_task ?? rawRuntime.hasTask ?? false) as boolean,
-      task_status: (rawRuntime.task_status ??
-        rawRuntime.taskStatus) as IConversationTurnCompletedEvent['runtime']['task_status'],
-      is_processing: (rawRuntime.is_processing ?? rawRuntime.isProcessing ?? false) as boolean,
-      pending_confirmations: (rawRuntime.pending_confirmations ?? rawRuntime.pendingConfirmations ?? 0) as number,
-      turn_id: (rawRuntime.turn_id ?? rawRuntime.turnId ?? null) as string | null,
-    };
+      : undefined;
+    const rawRuntime = r.runtime;
+    const runtimeRecord =
+      typeof rawRuntime === 'object' && rawRuntime !== null && !Array.isArray(rawRuntime)
+        ? (rawRuntime as Record<string, unknown>)
+        : null;
+    const runtime: IConversationTurnCompletedEvent['runtime'] = runtimeRecord
+      ? {
+          state: (runtimeRecord.state ?? 'idle') as TConversationRuntimeSummary['state'],
+          can_send_message: (runtimeRecord.can_send_message ?? runtimeRecord.canSendMessage ?? true) as boolean,
+          has_task: (runtimeRecord.has_task ?? runtimeRecord.hasTask ?? false) as boolean,
+          task_status: (runtimeRecord.task_status ??
+            runtimeRecord.taskStatus) as TConversationRuntimeSummary['task_status'],
+          is_processing: (runtimeRecord.is_processing ?? runtimeRecord.isProcessing ?? false) as boolean,
+          pending_confirmations: (runtimeRecord.pending_confirmations ??
+            runtimeRecord.pendingConfirmations ??
+            0) as number,
+          turn_id: (runtimeRecord.turn_id ?? runtimeRecord.turnId ?? null) as string | null,
+        }
+      : null;
     const rawModel = (r.model ?? {}) as Record<string, unknown>;
     const model: IConversationTurnCompletedEvent['model'] = {
       platform: (rawModel.platform ?? '') as string,
@@ -360,16 +365,15 @@ export const conversation = {
     };
     return {
       session_id: (r.session_id ?? r.sessionId ?? r.conversation_id ?? '') as string,
-      turn_id: (r.turn_id ?? r.turnId ?? runtime.turn_id ?? '') as string,
+      turn_id: (r.turn_id ?? r.turnId ?? runtime?.turn_id ?? '') as string,
       status: (r.status ?? 'finished') as IConversationTurnCompletedEvent['status'],
-      state: (r.state ??
-        (r.status === 'finished' ? 'ai_waiting_input' : 'unknown')) as IConversationTurnCompletedEvent['state'],
+      ...(r.state !== undefined ? { state: r.state as NonNullable<IConversationTurnCompletedEvent['state']> } : {}),
       detail: (r.detail ?? '') as string,
       can_send_message: (r.can_send_message ?? r.canSendMessage ?? r.status === 'finished') as boolean,
       runtime,
       workspace: (r.workspace ?? '') as string,
       model,
-      last_message,
+      ...(lastMessage ? { last_message: lastMessage } : {}),
     };
   }),
   listChanged: wsEmitter<IConversationListChangedEvent>('conversation.listChanged'),
@@ -992,7 +996,7 @@ export const appOperations = {
 };
 
 export const appOperationsModel = {
-  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model', { silentStatuses: [404] }),
   update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
   check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };
@@ -1822,7 +1826,7 @@ export interface IConversationTurnCompletedEvent {
   session_id: string;
   turn_id: string;
   status: 'pending' | 'running' | 'finished';
-  state:
+  state?:
     | 'ai_generating'
     | 'ai_waiting_input'
     | 'ai_waiting_confirmation'
@@ -1832,22 +1836,14 @@ export interface IConversationTurnCompletedEvent {
     | 'unknown';
   detail: string;
   can_send_message: boolean;
-  runtime: {
-    state: 'idle' | 'starting' | 'running' | 'cancelling' | 'waiting_confirmation';
-    can_send_message: boolean;
-    has_task: boolean;
-    task_status?: 'pending' | 'running' | 'finished';
-    is_processing: boolean;
-    pending_confirmations: number;
-    turn_id: string | null;
-  };
+  runtime: TConversationRuntimeSummary | null;
   workspace: string;
   model: {
     platform: string;
     name: string;
     use_model: string;
   };
-  last_message: {
+  last_message?: {
     id?: string;
     type?: string;
     content: unknown;

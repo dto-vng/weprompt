@@ -168,7 +168,9 @@ describe('context.compact task', () => {
     expect(mocks.httpRequest).toHaveBeenCalledOnce();
     expect(mocks.httpRequest).toHaveBeenCalledWith(
       'GET',
-      '/api/conversations/conversation-1/messages?limit=100&content_mode=compact'
+      '/api/conversations/conversation-1/messages?limit=100&content_mode=compact',
+      undefined,
+      { signal: expect.any(AbortSignal) }
     );
     expect(dependencies.resolveModel).toHaveBeenCalledBefore(mocks.httpRequest);
     expect(dependencies.listProviders).toHaveBeenCalledBefore(mocks.httpRequest);

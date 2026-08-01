@@ -5,7 +5,7 @@
  */
 
 import type { TConversationRuntimeSummary } from '@/common/config/storage';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createDefaultConversationRuntimeView,
   getConversationRuntimeViewSnapshot,
@@ -21,6 +21,8 @@ import {
   localStopRequested,
   localStopRequestedConversationRuntimeView,
   resetConversationRuntimeViewStoreForTest,
+  streamTerminalObserved,
+  subscribeConversationRuntimeView,
   turnCompleted,
   turnCompletedConversationRuntimeView,
 } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
@@ -346,6 +348,47 @@ describe('conversationRuntimeViewStore', () => {
         runtime_turn_id: 'turn-1',
       },
     });
+  });
+
+  it('applies the same valid turn completion once', () => {
+    resetConversationRuntimeViewStoreForTest();
+    const listener = vi.fn();
+    const unsubscribe = subscribeConversationRuntimeView(listener);
+
+    const firstLogs = turnCompleted(conversation_id, 'turn-1', runtime({}));
+    const callsAfterFirst = listener.mock.calls.length;
+    const duplicateLogs = turnCompleted(conversation_id, 'turn-1', runtime({}));
+
+    expect(firstLogs.map((log) => log.event)).toContain('turn_completed_applied');
+    expect(duplicateLogs).toEqual([]);
+    expect(listener).toHaveBeenCalledTimes(callsAfterFirst);
+    unsubscribe();
+  });
+
+  it('applies turn completed once after the stream terminal was observed', () => {
+    resetConversationRuntimeViewStoreForTest();
+    streamTerminalObserved(conversation_id, 'turn-1');
+
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({}))).not.toEqual([]);
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({}))).toEqual([]);
+  });
+
+  it('allows a valid completion to recover a missing-runtime completion', () => {
+    resetConversationRuntimeViewStoreForTest();
+
+    expect(turnCompleted(conversation_id, 'turn-1', null)[0]?.event).toBe('turn_completed_missing_runtime');
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({})).map((log) => log.event)).toContain(
+      'turn_completed_applied'
+    );
+  });
+
+  it('applies a completion for a different turn after a prior turn completes', () => {
+    resetConversationRuntimeViewStoreForTest();
+    turnCompleted(conversation_id, 'turn-1', runtime({}));
+
+    expect(turnCompleted(conversation_id, 'turn-2', runtime({})).map((log) => log.event)).toContain(
+      'turn_completed_applied'
+    );
   });
 
   it('does not unlock when turn completed has no runtime', () => {

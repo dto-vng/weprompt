@@ -62,6 +62,7 @@ type ConversationRuntimeMetadata = {
   pendingLocalSendSeq: number | null;
   pendingStopTurnId: string | null;
   lastCompletedTurnId: string | null;
+  lastAppliedTurnCompletedId: string | null;
 };
 
 const listeners = new Set<ConversationRuntimeViewListener>();
@@ -73,6 +74,7 @@ const createRuntimeMetadata = (): ConversationRuntimeMetadata => ({
   pendingLocalSendSeq: null,
   pendingStopTurnId: null,
   lastCompletedTurnId: null,
+  lastAppliedTurnCompletedId: null,
 });
 
 const getRuntimeMetadata = (conversation_id: string): ConversationRuntimeMetadata => {
@@ -486,11 +488,19 @@ export const turnCompleted = (
   runtime: TConversationRuntimeSummary | null
 ): ConversationRuntimeViewLogEntry[] => {
   const metadata = getRuntimeMetadata(conversation_id);
+  if (metadata.lastAppliedTurnCompletedId === turn_id) {
+    return [];
+  }
+
   metadata.pendingLocalSendSeq = null;
   if (metadata.pendingStopTurnId === turn_id) {
     metadata.pendingStopTurnId = null;
   }
   metadata.lastCompletedTurnId = turn_id;
+  if (runtime !== null) {
+    metadata.lastAppliedTurnCompletedId = turn_id;
+  }
+
   return setConversationRuntimeSnapshot(
     conversation_id,
     turnCompletedConversationRuntimeView(runtimeViews.get(conversation_id), conversation_id, turn_id, runtime, metadata)

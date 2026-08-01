@@ -206,6 +206,7 @@ export function isBackendHttpError(error: unknown): error is BackendHttpError {
  */
 export type HttpRequestOptions = {
   silentStatuses?: number[];
+  signal?: AbortSignal;
 };
 
 const SENSITIVE_LOG_KEY_PATTERN = /api[_-]?key|authorization|auth[_-]?token|access[_-]?token|refresh[_-]?token|secret/i;
@@ -239,16 +240,31 @@ export async function httpRequest<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  console.debug(
-    `[httpBridge] ${method} ${path}`,
-    body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
-  );
+  const requestLog = () =>
+    console.debug(
+      `[httpBridge] ${method} ${path}`,
+      body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
+    );
+  const deferRequestLog = options?.silentStatuses !== undefined && options.silentStatuses.length > 0;
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  if (!deferRequestLog) {
+    requestLog();
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: options?.signal,
+    });
+  } catch (error) {
+    if (deferRequestLog) {
+      requestLog();
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     // Response body can only be consumed once — read as text, then try JSON
@@ -259,14 +275,18 @@ export async function httpRequest<T>(
     } catch {
       errorBody = rawText;
     }
-    if (options?.silentStatuses?.includes(response.status)) {
-      console.debug(`[httpBridge] ${method} ${path} → ${response.status} (silenced)`, errorBody);
-    } else {
+    if (!options?.silentStatuses?.includes(response.status)) {
+      if (deferRequestLog) {
+        requestLog();
+      }
       console.error(`[httpBridge] ${method} ${path} → ${response.status}`, errorBody);
     }
     throw new BackendHttpError({ method, path, status: response.status, body: errorBody });
   }
 
+  if (deferRequestLog) {
+    requestLog();
+  }
   console.debug(`[httpBridge] ${method} ${path} → ${response.status} OK`);
 
   const contentType = response.headers.get('Content-Type');
@@ -288,7 +308,7 @@ export async function httpRequest<T>(
 
 type ProviderLike<Data, Params> = {
   provider: (handler: (params: Params) => Promise<Data>) => void;
-  invoke: Params extends undefined ? () => Promise<Data> : (params: Params) => Promise<Data>;
+  invoke: [Params] extends [undefined] ? () => Promise<Data> : (params: Params) => Promise<Data>;
 };
 
 export function withResponseMap<Raw, Mapped, Params>(

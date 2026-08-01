@@ -16,7 +16,10 @@ import {
   resetConversationCommandQueueBackgroundRunnerForTest,
   useConversationCommandQueue,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
-import { resetConversationRuntimeViewStoreForTest } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
+import {
+  resetConversationRuntimeViewStoreForTest,
+  turnCompleted,
+} from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
 
 const turnCompletedListeners = vi.hoisted(() => ({
   current: [] as Array<
@@ -119,17 +122,12 @@ const runtimeUnavailableError = () =>
   });
 
 const storageKey = (conversationId: string) => `conversation-command-queue/${conversationId}`;
+let completedTurnSequence = 0;
 
 const emitTurnCompleted = (conversationId: string): void => {
   act(() => {
-    turnCompletedListeners.current.forEach((listener) => {
-      listener({
-        session_id: conversationId,
-        turn_id: 'turn-1',
-        state: 'ai_waiting_input',
-        runtime: runtime(),
-      });
-    });
+    completedTurnSequence += 1;
+    turnCompleted(conversationId, `turn-${completedTurnSequence}`, runtime());
   });
 };
 
@@ -162,6 +160,7 @@ const renderQueue = ({
 describe('useConversationCommandQueue drain', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    completedTurnSequence = 0;
     turnCompletedListeners.current = [];
     resetConversationRuntimeViewStoreForTest();
     resetConversationCommandQueueBackgroundRunnerForTest();
@@ -274,7 +273,7 @@ describe('useConversationCommandQueue drain', () => {
     });
   });
 
-  it('shares the background listener across active queues and releases it after the last runner unmounts', () => {
+  it('observes completed store transitions without installing a competing transport listener', () => {
     const firstExecute = vi.fn().mockResolvedValue(undefined);
     const secondExecute = vi.fn().mockResolvedValue(undefined);
     const firstQueue = renderQueue({
@@ -288,7 +287,7 @@ describe('useConversationCommandQueue drain', () => {
       onExecute: secondExecute,
     });
 
-    expect(turnCompletedListeners.current).toHaveLength(1);
+    expect(turnCompletedListeners.current).toHaveLength(0);
 
     emitTurnCompleted('conv-active-two');
 
@@ -296,7 +295,7 @@ describe('useConversationCommandQueue drain', () => {
     expect(secondExecute).not.toHaveBeenCalled();
 
     firstQueue.unmount();
-    expect(turnCompletedListeners.current).toHaveLength(1);
+    expect(turnCompletedListeners.current).toHaveLength(0);
 
     secondQueue.unmount();
     expect(turnCompletedListeners.current).toHaveLength(0);

@@ -1310,5 +1310,36 @@
   "apiKeyReveal": "Anahtarları göster",
   "apiKeyHide": "Anahtarları gizle",
   "apiKeyMasked": "API anahtarları gizli",
-  "mcpNoTools": "Bu sunucu hiçbir araç sunmuyor"
+  "mcpNoTools": "Bu sunucu hiçbir araç sunmuyor",
+  "appOperationsModel": {
+    "title": "Uygulama işlemleri modeli",
+    "description": "Sohbet modellerinden bağımsız olarak arka plandaki bağlam işlemleri ve gelecekte uygulama genelindeki destek için kullanılır.",
+    "selectionLabel": "Seçim",
+    "auto": "Otomatik",
+    "fixed": "Sabit",
+    "resolvedModelLabel": "Belirlenen model",
+    "healthLabel": "Durum",
+    "usedByLabel": "Kullanan",
+    "contextCompaction": "Bağlam sıkıştırma",
+    "saving": "Kaydediliyor…",
+    "loadFailed": "Uygulama işlemleri ayarları yüklenemedi.",
+    "saveFailed": "Uygulama işlemleri modeli kaydedilemedi.",
+    "checkFailed": "Uygulama işlemleri durum denetimi başarısız oldu.",
+    "backendUpdateRequired": "Uygulama işlemleri modelini yapılandırmak için WePrompt'u güncelleyin.",
+    "status": {
+      "ready": "Hazır",
+      "checking": "Denetleniyor",
+      "setupRequired": "Kurulum gerekli",
+      "unavailable": "Kullanılamıyor"
+    },
+    "reason": {
+      "noEligibleModel": "Geçerli kimlik bilgilerine sahip bir metin modeli ekleyin veya etkinleştirin.",
+      "providerMissing": "Kaydedilen sağlayıcı artık mevcut değil.",
+      "providerDisabled": "Kaydedilen sağlayıcı devre dışı.",
+      "modelMissing": "Kaydedilen model artık mevcut değil.",
+      "modelDisabled": "Kaydedilen model devre dışı.",
+      "authRequired": "Kaydedilen sağlayıcının geçerli kimlik bilgilerine ihtiyacı var.",
+      "healthCheckFailed": "Seçilen model durum denetimini geçemedi."
+    }
+  }
 }

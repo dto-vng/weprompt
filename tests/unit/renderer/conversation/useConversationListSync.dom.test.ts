@@ -129,7 +129,7 @@ const runningRuntime = {
 } satisfies IConversationTurnCompletedEvent['runtime'];
 
 const buildTurnCompletedEvent = (
-  runtime: IConversationTurnCompletedEvent['runtime'],
+  runtime: NonNullable<IConversationTurnCompletedEvent['runtime']>,
   state: IConversationTurnCompletedEvent['state']
 ): IConversationTurnCompletedEvent => ({
   session_id: conversation.id,

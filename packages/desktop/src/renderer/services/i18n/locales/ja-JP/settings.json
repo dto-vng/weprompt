@@ -1312,5 +1312,36 @@
   "apiKeyReveal": "キーを表示",
   "apiKeyHide": "キーを非表示",
   "apiKeyMasked": "API キーは非表示です",
-  "mcpNoTools": "このサーバーはツールを提供していません"
+  "mcpNoTools": "このサーバーはツールを提供していません",
+  "appOperationsModel": {
+    "title": "アプリ操作モデル",
+    "description": "チャットモデルとは独立して、バックグラウンドのコンテキスト処理と将来のアプリ全体の支援に使用されます。",
+    "selectionLabel": "選択",
+    "auto": "自動",
+    "fixed": "固定",
+    "resolvedModelLabel": "解決済みモデル",
+    "healthLabel": "ステータス",
+    "usedByLabel": "使用先",
+    "contextCompaction": "コンテキスト圧縮",
+    "saving": "保存中…",
+    "loadFailed": "アプリ操作の設定を読み込めませんでした。",
+    "saveFailed": "アプリ操作モデルを保存できませんでした。",
+    "checkFailed": "アプリ操作のヘルスチェックに失敗しました。",
+    "backendUpdateRequired": "アプリ操作モデルを設定するには、WePrompt を更新してください。",
+    "status": {
+      "ready": "準備完了",
+      "checking": "確認中",
+      "setupRequired": "セットアップが必要",
+      "unavailable": "利用不可"
+    },
+    "reason": {
+      "noEligibleModel": "有効な認証情報を持つテキストモデルを追加または有効にしてください。",
+      "providerMissing": "保存されたプロバイダーは存在しなくなりました。",
+      "providerDisabled": "保存されたプロバイダーは無効です。",
+      "modelMissing": "保存されたモデルは存在しなくなりました。",
+      "modelDisabled": "保存されたモデルは無効です。",
+      "authRequired": "保存されたプロバイダーには有効な認証情報が必要です。",
+      "healthCheckFailed": "選択したモデルはヘルスチェックに合格しませんでした。"
+    }
+  }
 }
