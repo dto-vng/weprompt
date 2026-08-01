@@ -24,6 +24,7 @@ import {
   recordAutoUpdateQuitAndInstall,
   recordAutoUpdateStatus,
 } from './autoUpdateDiagnostics';
+import { ContainedElectronHttpExecutor } from './cdnGenericProvider';
 import { buildCdnFeedOptions } from './updateFeed';
 
 const FORCE_DEV_AUTO_UPDATE_ENV = 'AIONUI_FORCE_DEV_AUTO_UPDATE';
@@ -140,6 +141,13 @@ class AutoUpdaterService extends EventEmitter {
       autoUpdater.channel = channel;
       log.info(`Update channel set to: ${channel}`);
     }
+    (
+      autoUpdater as unknown as {
+        httpExecutor: ContainedElectronHttpExecutor;
+      }
+    ).httpExecutor = new ContainedElectronHttpExecutor(cdnFeedOptions.url, (authInfo, callback) => {
+      autoUpdater.emit('login', authInfo, callback);
+    });
     autoUpdater.setFeedURL(cdnFeedOptions);
     log.info('Product-owned update feed configured');
     log.debug('[auto-update] Product-owned feed configured', {

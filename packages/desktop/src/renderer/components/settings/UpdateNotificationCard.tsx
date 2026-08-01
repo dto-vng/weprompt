@@ -24,6 +24,7 @@ const renderNotificationLayer = (node: React.ReactElement) => {
 
 const UpdateNotificationCardContent: React.FC = () => {
   const { t } = useTranslation();
+  const updatesEnabled = isUpdateFeatureEnabled();
   const { state, versionLabel, actions } = useUpdateNotificationController();
   const { isFeedbackAvailable, openFeedback } = useFeedback();
   const [releaseLogVisible, setReleaseLogVisible] = React.useState(false);
@@ -203,15 +204,17 @@ const UpdateNotificationCardContent: React.FC = () => {
     if (state.status === 'installer-last-failure') {
       return (
         <>
-          <Button size='small' className={ACTION_BTN_CLASS} onClick={() => void actions.checkForUpdates()}>
-            {t('update.installerLastFailure.retryUpdate')}
-          </Button>
+          {updatesEnabled ? (
+            <Button size='small' className={ACTION_BTN_CLASS} onClick={() => void actions.checkForUpdates()}>
+              {t('update.installerLastFailure.retryUpdate')}
+            </Button>
+          ) : null}
           {state.installerLastFailure?.logPath && (
             <Button size='small' className={ACTION_BTN_CLASS} onClick={actions.viewInstallerLastFailureLog}>
               {t('update.installerLastFailure.viewLog')}
             </Button>
           )}
-          {isFeedbackAvailable ? (
+          {updatesEnabled && isFeedbackAvailable ? (
             <Button
               type='primary'
               size='small'
@@ -340,7 +343,6 @@ const UpdateNotificationCardContent: React.FC = () => {
 };
 
 const UpdateNotificationCard: React.FC = () => {
-  if (!isUpdateFeatureEnabled()) return null;
   return <UpdateNotificationCardContent />;
 };
 

@@ -29,7 +29,7 @@ export type DesktopReleaseBuildPolicy = {
 const trimmed = (value: string | undefined): string => value?.trim() ?? '';
 
 const isUpstreamAionUiDestination = (url: URL): boolean => {
-  const hostname = url.hostname.toLowerCase();
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
   const pathname = url.pathname.toLowerCase();
 
   if (hostname === 'aionui.com' || hostname.endsWith('.aionui.com')) {

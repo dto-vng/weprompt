@@ -16,9 +16,13 @@ describe('desktop release update policy', () => {
   it.each([
     'http://updates.weprompt.test/releases',
     'https://static.aionui.com/releases',
+    'https://static.aionui.com./releases',
     'https://aionui.com/download',
+    'https://aionui.com./download',
     'https://github.com/iOfficeAI/AionUi/releases',
+    'https://github.com./iOfficeAI/AionUi/releases',
     'https://api.github.com/repos/iOfficeAI/AionUi/releases',
+    'https://api.github.com./repos/iOfficeAI/AionUi/releases',
   ])('rejects an unsafe or upstream AionUi feed: %s', (value) => {
     expect(() => resolveUpdateBaseUrl(value)).toThrow();
   });
@@ -34,15 +38,24 @@ describe('desktop release update policy', () => {
       )
     ).toThrow(/WEPROMPT_UPDATE_BASE_URL/);
 
-    expect(() =>
-      resolveDesktopReleaseBuildPolicy(
-        {
-          WEPROMPT_INTERNAL_RELEASE: '1',
-          SENTRY_AUTH_TOKEN: 'ambient-token',
-        },
-        { isDevelopment: false }
-      )
-    ).toThrow(/SENTRY_AUTH_TOKEN/);
+    for (const variable of [
+      'SENTRY_DSN',
+      'SENTRY_AUTH_TOKEN',
+      'SENTRY_UPLOAD_SOURCE_MAPS',
+      'SENTRY_ORG',
+      'SENTRY_PROJECT',
+      'SENTRY_RELEASE',
+    ] as const) {
+      expect(() =>
+        resolveDesktopReleaseBuildPolicy(
+          {
+            WEPROMPT_INTERNAL_RELEASE: '1',
+            [variable]: 'ambient-value',
+          },
+          { isDevelopment: false }
+        )
+      ).toThrow(new RegExp(variable));
+    }
   });
 
   it('does not enable source-map upload from an ambient auth token alone', () => {

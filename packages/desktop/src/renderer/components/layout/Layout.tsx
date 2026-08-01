@@ -406,11 +406,9 @@ const Layout: React.FC<{
               <Outlet />
               {directorySelectionContextHolder}
               <PwaPullToRefresh />
-              {updatesEnabled && (
-                <Suspense fallback={null}>
-                  <UpdateModal />
-                </Suspense>
-              )}
+              <Suspense fallback={null}>
+                <UpdateModal />
+              </Suspense>
             </ArcoLayout.Content>
           </ArcoLayout>
         </div>

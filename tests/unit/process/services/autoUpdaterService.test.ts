@@ -135,7 +135,7 @@ describe('AutoUpdaterService', () => {
 
   it('configures electron-updater to read stable metadata from the product-owned feed', async () => {
     const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
-    const { CdnGenericProvider } = await import('@/process/services/cdnGenericProvider');
+    const { CdnGenericProvider, ContainedElectronHttpExecutor } = await import('@/process/services/cdnGenericProvider');
 
     autoUpdaterService.resetForTest();
 
@@ -144,6 +144,7 @@ describe('AutoUpdaterService', () => {
       url: 'https://updates.weprompt.test/releases',
       updateProvider: CdnGenericProvider,
     });
+    expect((autoUpdaterMock as { httpExecutor?: unknown }).httpExecutor).toBeInstanceOf(ContainedElectronHttpExecutor);
   });
 
   it('enables forced updater checks in unpacked dev builds when requested', async () => {

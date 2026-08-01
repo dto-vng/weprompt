@@ -42,7 +42,9 @@ vi.mock('@/common', () => ({
 vi.mock('@/common/config/constants', () => ({ TEAM_MODE_ENABLED: false }));
 vi.mock('@/renderer/components/layout/PwaPullToRefresh', () => ({ default: () => null }));
 vi.mock('@/renderer/components/layout/Titlebar', () => ({ default: () => null }));
-vi.mock('@/renderer/components/settings/UpdateModal', () => ({ default: () => null }));
+vi.mock('@/renderer/components/settings/UpdateModal', () => ({
+  default: () => <div data-testid='update-diagnostics-host' />,
+}));
 vi.mock('@renderer/hooks/system/useDeepLink', () => ({ useDeepLink: () => {} }));
 vi.mock('@renderer/hooks/system/notification/useNotificationClick', () => ({ useNotificationClick: () => {} }));
 vi.mock('@renderer/hooks/system/notification/useBrowserNotification', () => ({ useBrowserNotification: () => {} }));
@@ -62,6 +64,7 @@ const renderLayout = () => render(<Layout sider={<div>sider</div>} />);
 
 const BACK_KEY = 'common.back';
 const BRAND_KEY = 'login.brand';
+const originalUpdateBaseUrl = process.env.WEPROMPT_UPDATE_BASE_URL;
 
 describe('Layout sider brand Home button', () => {
   beforeEach(() => {
@@ -81,12 +84,23 @@ describe('Layout sider brand Home button', () => {
     navigate.mockClear();
     openDevTools.mockClear();
     platformMocks.isElectronDesktopMock.mockReturnValue(false);
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     sessionStorage.clear();
     currentPathname = '/guid';
   });
 
   afterEach(() => {
+    if (originalUpdateBaseUrl === undefined) delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    else process.env.WEPROMPT_UPDATE_BASE_URL = originalUpdateBaseUrl;
     vi.clearAllMocks();
+  });
+
+  it('mounts the local installer diagnostics host when network updates are disabled', async () => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
+
+    renderLayout();
+
+    expect(await screen.findByTestId('update-diagnostics-host')).toBeInTheDocument();
   });
 
   it('navigates to the recorded last non-settings path when clicked in a settings route', () => {

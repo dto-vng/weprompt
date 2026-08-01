@@ -147,7 +147,7 @@ describe('UpdateNotificationCard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders nothing and makes no update IPC calls when updates are disabled', async () => {
+  it('renders nothing, consumes local installer diagnostics, and makes no network-update IPC calls when disabled', async () => {
     delete process.env.WEPROMPT_UPDATE_BASE_URL;
 
     const { container } = render(<UpdateNotificationCard />);
@@ -160,6 +160,31 @@ describe('UpdateNotificationCard', () => {
     expect(mocks.autoUpdateRestoreDownloadedMock).not.toHaveBeenCalled();
     expect(mocks.autoUpdateCheckMock).not.toHaveBeenCalled();
     expect(mocks.updateCheckMock).not.toHaveBeenCalled();
+    expect(mocks.consumeInstallerLastFailureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows local installer diagnostics without retry or feedback actions when updates are disabled', async () => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    const marker: InstallerLastFailureMarker = {
+      schemaVersion: 1,
+      kind: 'app-cannot-be-closed',
+      phase: 'customCheckAppRunning',
+      silent: true,
+      updated: true,
+      retryCount: 3,
+      instDir: 'D:\\Forge',
+      logPath: 'C:\\Users\\me\\AppData\\Local\\Temp\\weprompt-installer-failure.log',
+      at: '2026-08-01T00:00:00.000Z',
+    };
+    mocks.consumeInstallerLastFailureMock.mockResolvedValue({ success: true, data: marker });
+
+    render(<UpdateNotificationCard />);
+
+    expect(await screen.findByText('update.installerLastFailure.title')).toBeInTheDocument();
+    expect(screen.getByText('update.installerLastFailure.viewLog')).toBeInTheDocument();
+    expect(screen.queryByText('update.installerLastFailure.retryUpdate')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.oneClickFeedback')).not.toBeInTheDocument();
+    expect(mocks.autoUpdateCheckMock).not.toHaveBeenCalled();
   });
 
   it('renders a bottom-right notification card for auto-update availability without a dialog', async () => {
