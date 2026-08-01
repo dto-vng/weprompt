@@ -170,10 +170,7 @@ describe('build-with-builder', () => {
     expect(updateVerify).toContain('$INSTDIR\\${AIONUI_APP_EXECUTABLE_FILENAME}');
     expect(updateVerify).not.toContain('$INSTDIR\\AionUi.exe');
 
-    for (const legacyMacro of [
-      'AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME',
-      'AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME',
-    ]) {
+    for (const legacyMacro of ['AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME', 'AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME']) {
       expect(repair).toContain(legacyMacro);
       expect(processControl).toContain(legacyMacro);
     }
@@ -193,10 +190,7 @@ describe('build-with-builder', () => {
     const errors = readFileSync(resolve(repoRoot, 'resources/windows/installer-errors-sentry.nsh'), 'utf8');
     const messages = readFileSync(resolve(repoRoot, 'resources/windows/installer-messages.nsh'), 'utf8');
     const sharedMessages = readFileSync(resolve(repoRoot, 'resources/messages.yml'), 'utf8');
-    const reporter = readFileSync(
-      resolve(repoRoot, 'resources/windows/support/report-installer-failure.ps1'),
-      'utf8'
-    );
+    const reporter = readFileSync(resolve(repoRoot, 'resources/windows/support/report-installer-failure.ps1'), 'utf8');
 
     expect(errors).toContain('AIONUI_EXPORT_LOCAL_DIAGNOSTICS');
     expect(errors).toContain('MessageBox MB_OK|MB_ICONSTOP');

@@ -503,7 +503,9 @@ function assertInternalReleaseBuildEnvironment() {
     (name) => typeof process.env[name] === 'string' && process.env[name].trim() !== ''
   );
   if (inheritedVariables.length > 0) {
-    throw new Error(`Internal release build rejects ambient network/upload variables: ${inheritedVariables.join(', ')}`);
+    throw new Error(
+      `Internal release build rejects ambient network/upload variables: ${inheritedVariables.join(', ')}`
+    );
   }
 }
 

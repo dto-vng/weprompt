@@ -477,17 +477,7 @@ function runHarness({ autoAcknowledge, compileOnly, makensis, scenario }) {
       console.log(`[failure-messagebox] ${code}: launching harness and acknowledging local diagnostics...`);
       const run = spawnSync(
         'powershell.exe',
-        [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-File',
-          automationPath,
-          exePath,
-          code,
-          scenario.id,
-          logPath,
-        ],
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', automationPath, exePath, code, scenario.id, logPath],
         { encoding: 'utf8' }
       );
       if (run.status !== 0) {
@@ -556,8 +546,7 @@ function main() {
   const allScenarios = process.argv.includes('--all-scenarios') || process.argv.includes('--all-codes');
   const autoConsentAlias = process.argv.includes('--auto-consent');
   const autoDeclineAlias = process.argv.includes('--auto-decline');
-  const autoAcknowledge =
-    process.argv.includes('--auto-acknowledge') || autoConsentAlias || autoDeclineAlias;
+  const autoAcknowledge = process.argv.includes('--auto-acknowledge') || autoConsentAlias || autoDeclineAlias;
   const compileOnly = process.argv.includes('--compile-only');
   const { scenarios } = getInstallerErrorScenarioMatrix();
   const selectedScenarios = allScenarios ? scenarios : [findInstallerErrorScenario(getArg('--code', 'E1003'))];

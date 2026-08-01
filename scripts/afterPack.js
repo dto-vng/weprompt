@@ -29,7 +29,8 @@ function assertBundledRuntimeIsolation(resourcesDir, electronPlatformName, targe
   const isExactTarget = entries.length === 1 && entries[0].isDirectory() && entries[0].name === expectedRuntimeKey;
 
   if (!isExactTarget) {
-    const actualEntries = entries.map((entry) => `${entry.name}${entry.isDirectory() ? '/' : ''}`).join(', ') || '(none)';
+    const actualEntries =
+      entries.map((entry) => `${entry.name}${entry.isDirectory() ? '/' : ''}`).join(', ') || '(none)';
     throw new Error(
       `Packaged app must contain exactly one bundled AionCore runtime (${expectedRuntimeKey}); found: ${actualEntries}`
     );
