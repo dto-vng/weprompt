@@ -12,13 +12,13 @@ import { channelItemById, webuiTabByKey } from './selectors';
 export const ROUTES = {
   guid: '#/guid',
   settings: {
-    gemini: '#/settings/gemini',
+    profile: '#/settings/profile',
     model: '#/settings/model',
     agent: '#/settings/agent',
     assistants: '#/settings/assistants',
     skills: '#/settings/skills',
     tools: '#/settings/tools',
-    display: '#/settings/display',
+    appearance: '#/settings/appearance',
     webui: '#/settings/webui',
     system: '#/settings/system',
     about: '#/settings/about',
@@ -35,6 +35,7 @@ async function ensureRendererReady(page: Page, timeout = 30_000): Promise<void> 
   await page.waitForFunction(
     () =>
       window.location.href !== 'about:blank' &&
+      window.location.hash.startsWith('#/') &&
       typeof (window as unknown as { __backendPort?: number }).__backendPort === 'number',
     { timeout }
   );
@@ -83,7 +84,7 @@ export async function navigateTo(page: Page, hash: string): Promise<void> {
     // Target is non-settings (guid, conversation, etc.)
     if (isOnSettings) {
       // Click the sider back button to leave settings
-      const siderBtn = page.locator('.sider-footer div').first();
+      const siderBtn = page.locator('.sider-footer button').first();
       await siderBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await siderBtn.click();
       // Wait for hash to change away from settings
@@ -105,7 +106,7 @@ export async function navigateTo(page: Page, hash: string): Promise<void> {
     // Target is a settings sub-page
     if (!isOnSettings) {
       // Click sider settings button to enter settings
-      const siderBtn = page.locator('.sider-footer div').first();
+      const siderBtn = page.locator('.sider-footer button').first();
       await siderBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await siderBtn.click();
       await page

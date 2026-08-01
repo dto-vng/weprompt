@@ -10,6 +10,26 @@ export interface WebUIStatus {
   initialPassword?: string;
 }
 
+export type FeedbackDiagnosticAttachment = {
+  contentType: string;
+  data: number[];
+  filename: string;
+};
+
+export type LocalFeedbackDiagnosticExportInput = {
+  attachments: FeedbackDiagnosticAttachment[];
+  description: string;
+  extra?: Record<string, unknown>;
+  module: string;
+  moduleLabel: string;
+  tags?: Record<string, string>;
+};
+
+export type LocalFeedbackDiagnosticExportResult =
+  | { path: string; status: 'saved' }
+  | { status: 'cancelled' }
+  | { status: 'failed' };
+
 export interface ElectronBridgeAPI {
   emit: (name: string, data: unknown) => Promise<unknown> | void;
   on: (callback: (event: { value: string }) => void) => void;
@@ -19,6 +39,10 @@ export interface ElectronBridgeAPI {
   collectFeedbackLogs?: () => Promise<{ filename: string; data: number[] } | null>;
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
+  // Export a local, redacted diagnostic archive selected by the user.
+  exportLocalFeedbackDiagnostics?: (
+    input: LocalFeedbackDiagnosticExportInput
+  ) => Promise<LocalFeedbackDiagnosticExportResult>;
   // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
   logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
   recoverCorruptedDatabase?: () => Promise<void>;

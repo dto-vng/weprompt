@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SettingsTabNavigateProvider } from '@/renderer/components/settings/SettingsModal/settingsViewContext';
@@ -144,5 +145,14 @@ describe('ToolsModalContent image model guide', () => {
       (a) => a.textContent === 'settings.goToModelSettings'
     );
     expect(links).toHaveLength(0);
+  });
+
+  it('labels the retained upstream image-model guide', () => {
+    const source = readFileSync(
+      'packages/desktop/src/renderer/components/settings/SettingsModal/contents/ToolsModalContent.tsx',
+      'utf8'
+    );
+
+    expect(source).toContain("t('settings.upstreamAionUiDocumentation')");
   });
 });

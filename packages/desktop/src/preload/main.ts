@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   collectFeedbackLogs: () => ipcRenderer.invoke('feedback:collect-logs'),
   // Feedback: capture a screenshot of the current window
   captureFeedbackScreenshot: () => ipcRenderer.invoke('feedback:capture-screenshot'),
+  // Feedback: export a local diagnostic package chosen by the user
+  exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   // Feedback: forward diagnostics logs to the main process console
   logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
     ipcRenderer.send('feedback:renderer-log', payload),

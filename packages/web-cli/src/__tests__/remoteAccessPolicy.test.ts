@@ -59,7 +59,7 @@ describe('standalone WebUI remote-access compatibility policy', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
-      '[aionui-web] Remote access requested by --remote, AIONUI_HOST, but Forge WebUI is local-only; binding to 127.0.0.1.'
+      '[aionui-web] Remote access requested by --remote, AIONUI_HOST, but WePrompt WebUI is local-only; binding to 127.0.0.1.'
     );
     expect(warn.mock.calls[0][0]).not.toContain('a-secret-looking-value');
   });

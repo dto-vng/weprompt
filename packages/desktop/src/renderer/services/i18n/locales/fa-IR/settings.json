@@ -678,18 +678,18 @@
   "mcpDisconnected": "آزمایش نشده",
   "mcpError": "آخرین آزمایش ناموفق بود",
   "mcpErrorNodeCommandNotFound": "دستور {{command}} قابل آماده‌سازی نبود. AionCore معمولاً زمان اجرای مدیریت‌شده Node را به‌صورت خودکار فراهم می‌کند. آزمایش اتصال را تکرار کنید، لاگ‌های بک‌اند را بررسی کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
-  "mcpErrorBunCommandNotFound": "دستور {{command}} یافت نشد. Bun را نصب کنید (که شامل bun/bunx می‌شود)، AionUI را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
-  "mcpErrorUvCommandNotFound": "دستور {{command}} یافت نشد. uv را نصب کنید، AionUI را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
-  "mcpErrorPythonCommandNotFound": "دستور {{command}} یافت نشد. Python را نصب کنید، AionUI را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
-  "mcpErrorDenoCommandNotFound": "دستور {{command}} یافت نشد. Deno را نصب کنید، AionUI را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
+  "mcpErrorBunCommandNotFound": "دستور {{command}} یافت نشد. Bun را نصب کنید (که شامل bun/bunx می‌شود)، WePrompt را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
+  "mcpErrorUvCommandNotFound": "دستور {{command}} یافت نشد. uv را نصب کنید، WePrompt را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
+  "mcpErrorPythonCommandNotFound": "دستور {{command}} یافت نشد. Python را نصب کنید، WePrompt را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
+  "mcpErrorDenoCommandNotFound": "دستور {{command}} یافت نشد. Deno را نصب کنید، WePrompt را ری‌استارت کنید، یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
   "mcpErrorCommandNotFound": "دستور {{command}} یافت نشد. آن را نصب کنید یا این سرور MCP را با مسیر مطلق دستور پیکربندی کنید.",
-  "mcpErrorCommandPermissionDenied": "AionUI قادر به اجرای {{command}} نیست زیرا دسترسی رد شده است.",
-  "mcpErrorCommandStartFailed": "AionUI نتوانست {{command}} را راه‌اندازی کند.",
+  "mcpErrorCommandPermissionDenied": "WePrompt قادر به اجرای {{command}} نیست زیرا دسترسی رد شده است.",
+  "mcpErrorCommandStartFailed": "WePrompt نتوانست {{command}} را راه‌اندازی کند.",
   "mcpErrorTimeout": "آزمایش اتصال پس از {{seconds}} ثانیه منقضی شد.",
-  "mcpErrorConnectionFailed": "AionUI نتوانست به سرور MCP متصل شود.",
+  "mcpErrorConnectionFailed": "WePrompt نتوانست به سرور MCP متصل شود.",
   "mcpErrorHttp": "سرور MCP کد HTTP {{status}} برگرداند.",
   "mcpErrorRpc": "سرور MCP هنگام پردازش {{method}} خطای RPC برگرداند.",
-  "mcpErrorProtocol": "AionUI نتوانست دست‌داده MCP را تکمیل کند.",
+  "mcpErrorProtocol": "WePrompt نتوانست دست‌داده MCP را تکمیل کند.",
   "mcpLastCheckedAvailable": "آخرین بررسی در تنظیمات ابزارها: در دسترس",
   "mcpLastCheckedFailed": "آخرین بررسی در تنظیمات ابزارها: ناموفق",
   "mcpCheckedAt": "بررسی شده در: {{time}}",
@@ -802,11 +802,11 @@
   "bugReportScreenshotUploaded": "({{count}} مورد آپلود شد)",
   "bugReportScreenshotDropzoneText": "اسکرین‌شات‌ها را کلیک، بکشید یا جای‌گذاری کنید",
   "bugReportScreenshotFormats": "از PNG، JPG، GIF پشتیبانی می‌شود",
-  "bugReportAutoInfo": "اطلاعات سیستم و لاگ‌های ۳ روز اخیر به‌صورت خودکار پیوست می‌شوند تا سریع‌تر مشکل را پیدا کنیم",
-  "bugReportSubmit": "ارسال",
+  "bugReportAutoInfo": "اطلاعات سیستم، داده‌های تشخیصی پالایش‌شده و لاگ‌های ۳ روز اخیر می‌توانند در یک بسته تشخیصی محلی قرار گیرند.",
+  "bugReportSubmit": "ذخیره بسته تشخیصی",
   "bugReportCancel": "لغو",
-  "bugReportSuccess": "گزارش ارسال شد، ممنون از بازخورد شما",
-  "bugReportError": "ارسال ناموفق بود، لطفاً بعداً دوباره تلاش کنید",
+  "bugReportSuccess": "بسته تشخیصی ذخیره شد",
+  "bugReportError": "بسته تشخیصی ذخیره نشد. دوباره تلاش کنید.",
   "bugReportModuleSkills": "مهارت‌ها و پلاگین‌ها",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP و ابزارها",
@@ -1283,7 +1283,7 @@
       "addMcp": "کمکم کن یک سرور MCP راه‌اندازی کنم.",
       "addSkill": "کمکم کن یک مهارت وارد کنم و آن را به یک دستیار متصل کنم.",
       "diagnose": "در WePrompt به مشکلی برخوردم، لطفاً کمک کن آن را عیب‌یابی کنم.\n\n[ماژول] {{module}}\n[توضیح] {{description}}\n[پیوست‌ها] اسکرین‌شات‌های ورودی را ببین.\n\nلطفاً علت را تشخیص بده و بگو چطور آن را رفع کنم.",
-      "diagnoseChatError": "در حین گفتگو در AionUi با خطایی مواجه شدم، لطفاً کمک کن آن را عیب‌یابی کنم.\n\n[خطا] {{error}}\n\nلطفاً علت را تشخیص بده و بگو چطور آن را رفع کنم."
+      "diagnoseChatError": "در حین گفتگو در WePrompt با خطایی مواجه شدم، لطفاً کمک کن آن را عیب‌یابی کنم.\n\n[خطا] {{error}}\n\nلطفاً علت را تشخیص بده و بگو چطور آن را رفع کنم."
     },
     "solveWithButler": "از باتلر بپرس"
   },
@@ -1346,5 +1346,20 @@
       "authRequired": "ارائه‌دهنده ذخیره‌شده به اطلاعات ورود معتبر نیاز دارد.",
       "healthCheckFailed": "مدل انتخاب‌شده بررسی سلامت را با موفقیت پشت سر نگذاشت."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "مستندات بالادستی AionUi",
+  "channelConflict": {
+    "title": "تداخل کانال {{platform}} شناسایی شد",
+    "summary": "OpenClaw به‌جای WePrompt پیام‌های {{platform}} را مدیریت می‌کند. تغییر دستیار در WePrompt روی این ربات اثری ندارد، اما پیام‌ها از طریق OpenClaw ادامه می‌یابند.",
+    "howToUse": "برای استفاده از کانال‌های WePrompt و تغییر دستیار:",
+    "optionDisable": "گزینه ۱: OpenClaw {{platform}} را غیرفعال کنید (پیشنهادی)",
+    "restart": "سپس OpenClaw و WePrompt را دوباره راه‌اندازی کنید.",
+    "optionDifferentBot": "گزینه ۲: از یک ربات {{platform}} دیگر برای WePrompt استفاده کنید.",
+    "optionKeepOpenClaw": "گزینه ۳: OpenClaw را نگه دارید و {{platform}} را در کانال‌های WePrompt غیرفعال کنید.",
+    "helpDisable": "برای غیرفعال کردن OpenClaw {{platform}} کمک کن",
+    "ignore": "نادیده بگیر (می‌دانم چه می‌کنم)",
+    "banner": "تداخل OpenClaw با {{platform}} شناسایی شد؛ تغییر دستیار کار نمی‌کند.",
+    "learnMore": "بیشتر بدانید"
+  },
+  "bugReportCancelled": "ذخیره بسته تشخیصی لغو شد."
 }

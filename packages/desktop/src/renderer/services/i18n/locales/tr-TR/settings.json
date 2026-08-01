@@ -677,18 +677,18 @@
   "mcpDisconnected": "Test edilmedi",
   "mcpError": "Son test başarısız",
   "mcpErrorNodeCommandNotFound": "{{command}} komutu hazırlanamadı. AionCore genellikle yönetilen Node çalışma zamanını otomatik olarak hazırlar. Bağlantı testini yeniden deneyin; sorun sürerse arka uç günlüklerini kontrol edin veya bu MCP sunucusu için mutlak komut yolu yapılandırın.",
-  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart AionUI, or configure this MCP server to use an absolute command path.",
+  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart WePrompt, or configure this MCP server to use an absolute command path.",
   "mcpErrorCommandNotFound": "Command {{command}} was not found. Install it or configure this MCP server to use an absolute command path.",
-  "mcpErrorCommandPermissionDenied": "AionUI cannot execute {{command}} because permission was denied.",
-  "mcpErrorCommandStartFailed": "AionUI failed to start {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt cannot execute {{command}} because permission was denied.",
+  "mcpErrorCommandStartFailed": "WePrompt failed to start {{command}}.",
   "mcpErrorTimeout": "Connection test timed out after {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI could not reach the MCP server.",
+  "mcpErrorConnectionFailed": "WePrompt could not reach the MCP server.",
   "mcpErrorHttp": "The MCP server returned HTTP {{status}}.",
   "mcpErrorRpc": "The MCP server returned an RPC error while handling {{method}}.",
-  "mcpErrorProtocol": "AionUI could not complete the MCP handshake.",
+  "mcpErrorProtocol": "WePrompt could not complete the MCP handshake.",
   "mcpLastCheckedAvailable": "Araç ayarlarında son kontrol sonucu: Kullanılabilir",
   "mcpLastCheckedFailed": "Araç ayarlarında son kontrol sonucu: Başarısız",
   "mcpCheckedAt": "Kontrol zamanı: {{time}}",
@@ -790,11 +790,11 @@
   "bugReportScreenshotUploaded": "({{count}} yüklendi)",
   "bugReportScreenshotDropzoneText": "Ekran görüntülerini buraya tıklayarak, sürükleyerek veya yapıştırarak ekleyin",
   "bugReportScreenshotFormats": "PNG, JPG, GIF desteklenir",
-  "bugReportAutoInfo": "Gönderim sırasında sistem bilgileri ve son 3 günün günlükleri sorunu daha hızlı tespit etmemize yardımcı olmak için otomatik olarak eklenecektir",
-  "bugReportSubmit": "Gönder",
+  "bugReportAutoInfo": "Sistem bilgileri, hassas bilgileri temizlenmiş tanılar ve son 3 günün günlükleri yerel bir tanı paketine eklenebilir.",
+  "bugReportSubmit": "Tanı paketini kaydet",
   "bugReportCancel": "İptal",
-  "bugReportSuccess": "Rapor gönderildi, geri bildiriminiz için teşekkürler",
-  "bugReportError": "Gönderilemedi, lütfen daha sonra tekrar deneyin",
+  "bugReportSuccess": "Tanı paketi kaydedildi",
+  "bugReportError": "Tanı paketi kaydedilemedi. Lütfen tekrar deneyin.",
   "bugReportModuleSkills": "Skills ve Eklentiler",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP ve Araçlar",
@@ -1283,7 +1283,7 @@
       "addMcp": "Bir MCP sunucusu kurmama yardım et.",
       "addSkill": "Bir beceri içe aktarıp bir asistana eklememe yardım et.",
       "diagnose": "WePrompt kullanırken bir sorunla karşılaştım, teşhis etmeme yardım et.\n\n[Modül] {{module}}\n[Açıklama] {{description}}\n[Ekler] giriş alanındaki ekran görüntülerine bakın.\n\nLütfen nedenini teşhis et ve nasıl düzelteceğimi söyle.",
-      "diagnoseChatError": "AionUi sohbeti sırasında bir hatayla karşılaştım, teşhis etmeme yardım et.\n\n[Hata] {{error}}\n\nLütfen nedenini teşhis et ve nasıl düzelteceğimi söyle."
+      "diagnoseChatError": "WePrompt sohbeti sırasında bir hatayla karşılaştım, teşhis etmeme yardım et.\n\n[Hata] {{error}}\n\nLütfen nedenini teşhis et ve nasıl düzelteceğimi söyle."
     },
     "solveWithButler": "Kâhya'ya sor"
   },
@@ -1346,5 +1346,20 @@
       "authRequired": "Kaydedilen sağlayıcının geçerli kimlik bilgilerine ihtiyacı var.",
       "healthCheckFailed": "Seçilen model durum denetimini geçemedi."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "Üst kaynak AionUi belgeleri",
+  "channelConflict": {
+    "title": "{{platform}} kanal çakışması algılandı",
+    "summary": "WePrompt yerine OpenClaw {{platform}} mesajlarını işliyor. WePrompt içinde asistan değiştirmek bu botu etkilemez, ancak mesajlar OpenClaw üzerinden çalışmaya devam eder.",
+    "howToUse": "WePrompt Kanallarını kullanmak ve asistan değiştirmek için:",
+    "optionDisable": "Seçenek 1: OpenClaw {{platform}} özelliğini devre dışı bırakın (önerilir)",
+    "restart": "Ardından OpenClaw ve WePrompt’u yeniden başlatın.",
+    "optionDifferentBot": "Seçenek 2: WePrompt için farklı bir {{platform}} botu kullanın.",
+    "optionKeepOpenClaw": "Seçenek 3: OpenClaw’ı koruyun ve WePrompt Kanallarında {{platform}} özelliğini kapatın.",
+    "helpDisable": "OpenClaw {{platform}} özelliğini devre dışı bırakmama yardım et",
+    "ignore": "Yoksay (ne yaptığımı biliyorum)",
+    "banner": "OpenClaw ve {{platform}} çakışması algılandı; asistan değiştirme çalışmaz.",
+    "learnMore": "Daha fazla bilgi"
+  },
+  "bugReportCancelled": "Tanı paketi kaydetme işlemi iptal edildi."
 }

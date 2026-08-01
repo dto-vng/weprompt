@@ -10,7 +10,13 @@
 import os from 'os';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures';
-import { findAssistantIdForBackend, goToGuid } from '../helpers';
+import {
+  buttonWithText,
+  FEEDBACK_PILL_LABELS,
+  findAssistantIdForBackend,
+  goToGuid,
+  modalCloseButton,
+} from '../helpers';
 import { httpDelete, httpPost } from '../helpers/httpBridge';
 import { GUID_INPUT } from '../helpers/selectors';
 
@@ -32,7 +38,7 @@ async function ensureRendererReady(page: Page): Promise<void> {
   );
 }
 
-test('error bubble butler chip pre-fills a diagnosis prompt in the home chat', async ({ page }) => {
+test('error bubble feedback opens the modal and Butler pre-fills a diagnosis prompt', async ({ page }) => {
   await goToGuid(page);
   await ensureRendererReady(page);
   const assistantId = await findAssistantIdForBackend(page, 'codex', { requireAvailable: true });
@@ -75,10 +81,18 @@ test('error bubble butler chip pre-fills a diagnosis prompt in the home chat', a
       { id: conversation.id, text: ERROR_TEXT }
     );
 
-    // The error bubble should surface both chips.
+    // The error bubble should surface both live actions.
     const butlerChip = page.locator('button:has-text("找管家排查"), button:has-text("Ask the Butler")').first();
+    const feedbackButton = page.locator(buttonWithText(FEEDBACK_PILL_LABELS)).first();
     await expect(butlerChip).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('button:has-text("反馈问题"), button:has-text("Report Issue")').first()).toBeVisible();
+    await expect(feedbackButton).toBeVisible();
+
+    await feedbackButton.click();
+    const modalBody = page.locator('[data-testid="feedback-report-scroll-body"]:visible');
+    await expect(modalBody).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-testid="feedback-report-auto-info"]:visible')).toBeVisible();
+    await page.locator('.arco-modal-wrapper', { has: modalBody }).locator(modalCloseButton()).first().click();
+    await expect(modalBody).toHaveCount(0, { timeout: 5_000 });
 
     await butlerChip.click();
 

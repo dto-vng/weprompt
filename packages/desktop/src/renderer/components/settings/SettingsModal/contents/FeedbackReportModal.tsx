@@ -161,7 +161,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
         )
       ).filter((item): item is FeedbackAttachment => item !== null);
 
-      await submitFeedbackReport({
+      const result = await submitFeedbackReport({
         attachments,
         collectDbDiagnostics: {
           explicitContext: feedbackDiagnosticsContext?.explicitContext,
@@ -178,9 +178,15 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
         tags: feedbackTags,
       });
 
-      Message.success(t('settings.bugReportSuccess'));
-      resetForm();
-      onCancel();
+      if (result.status === 'saved') {
+        Message.success(t('settings.bugReportSuccess'));
+        resetForm();
+        onCancel();
+      } else if (result.status === 'cancelled') {
+        setError(t('settings.bugReportCancelled'));
+      } else {
+        setError(t('settings.bugReportError'));
+      }
     } catch {
       setError(t('settings.bugReportError'));
     } finally {
@@ -199,7 +205,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
     feedbackDiagnosticsContext,
   ]);
 
-  // "Solve via chat": hand the report to the AionUi Butler for on-the-spot
+  // "Solve via chat": hand the report to the WePrompt Butler for on-the-spot
   // diagnosis instead of submitting to the team. The typed description + module
   // become a structured prompt; screenshots are uploaded to disk so they ride
   // along in the chat input (reusing the same upload path as pasted images).
@@ -224,8 +230,6 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
 
       const moduleLabel = t(selectedModule?.i18nKey ?? 'settings.bugReportModuleOther');
       const prompt = t('settings.talkToButler.prompt.diagnose', {
-        defaultValue:
-          'I ran into a problem with AionUi, please help me diagnose it.\n\n[Module] {{module}}\n[Description] {{description}}\n[Attachments] see the screenshots in the input.\n\nPlease diagnose the cause and tell me how to fix it.',
         module: moduleLabel,
         description: description.trim(),
       });
@@ -343,7 +347,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
               data-testid='btn-feedback-diagnose'
               className='!text-primary-6 hover:!text-primary-5'
             >
-              {t('settings.talkToButler.solveViaChat', { defaultValue: 'Solve via chat' })}
+              {t('settings.talkToButler.solveViaChat')}
             </Button>
             <div className='flex items-center gap-8px'>
               <Button onClick={handleCancel} className='px-20px min-w-80px' style={{ borderRadius: 8 }}>

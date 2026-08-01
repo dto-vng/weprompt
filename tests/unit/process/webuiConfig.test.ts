@@ -153,7 +153,7 @@ describe('desktop WebUI remote-access compatibility policy', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
-      '[WebUI] Remote access requested by --remote, AIONUI_HOST, but Forge WebUI is local-only; binding to 127.0.0.1.'
+      '[WebUI] Remote access requested by --remote, AIONUI_HOST, but WePrompt WebUI is local-only; binding to 127.0.0.1.'
     );
   });
 

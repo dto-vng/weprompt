@@ -115,6 +115,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
             element={DESKTOP_PET_ENABLED ? withRouteFallback(PetSettings) : <Navigate to='/settings' replace />}
           />
           <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
+          <Route path='/settings/about' element={<Navigate to='/settings/system' replace />} />
           <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
           <Route path='/settings' element={<Navigate to='/settings/agent' replace />} />
           <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />

@@ -8,11 +8,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { gunzipSync } from 'node:zlib';
-import { app } from 'electron';
+import { gzipSync, gunzipSync } from 'node:zlib';
+import { app, dialog } from 'electron';
 import { collectFeedbackLogAttachment } from '@/process/feedback/logs';
 
 // Table of handlers registered via ipcMain.handle during module import.
@@ -37,8 +37,11 @@ vi.mock('electron', () => ({
     on: vi.fn(),
   },
   app: {
-    getPath: vi.fn(() => '/tmp/aionui-test-logs-nonexistent'),
+    getPath: vi.fn((name: string) => (name === 'downloads' ? '/tmp' : '/tmp/aionui-test-logs-nonexistent')),
     getVersion: vi.fn(() => '0.0.0'),
+  },
+  dialog: {
+    showSaveDialog: vi.fn(),
   },
   BrowserWindow: {
     fromWebContents: vi.fn(() => currentWindow),
@@ -128,6 +131,232 @@ describe('feedbackBridge — capture-screenshot', () => {
     expect(result).toBeNull();
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe('feedbackBridge — local diagnostic export', () => {
+  it('writes a timestamped gzip package only after the user selects a destination', async () => {
+    const exportDir = mkdtempSync(path.join(tmpdir(), 'weprompt-diagnostics-'));
+    const outputPath = path.join(exportDir, 'diagnostics.json.gz');
+    try {
+      vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
+      const handler = handlers.get('feedback:export-local');
+
+      expect(handler).toBeDefined();
+      const result = (await handler!(
+        {},
+        {
+          attachments: [{ contentType: 'text/plain', data: [108, 111, 103], filename: 'weprompt.log' }],
+          description: 'AionCore could not start',
+          extra: { installation_integrity: { source: 'backend_startup_failure' } },
+          module: 'installation-integrity',
+          moduleLabel: 'WePrompt installation is incomplete',
+          tags: { 'aionui.installation_integrity.report_source': 'backend_startup_failure' },
+        }
+      )) as { status: string; path?: string };
+
+      expect(result).toEqual({ status: 'saved', path: outputPath });
+      expect(dialog.showSaveDialog).toHaveBeenCalledWith({
+        defaultPath: expect.stringMatching(/^.*weprompt-diagnostics-.*\.json\.gz$/),
+      });
+      expect(statSync(outputPath).mode & 0o777).toBe(0o600);
+      const payload = JSON.parse(gunzipSync(readFileSync(outputPath)).toString('utf8')) as Record<string, unknown>;
+      expect(payload).toMatchObject({
+        schema_version: 'weprompt-diagnostics/v1',
+        report: {
+          description: 'AionCore could not start',
+          module: 'installation-integrity',
+          module_label: 'WePrompt installation is incomplete',
+        },
+      });
+    } finally {
+      rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns cancelled without writing an archive when the save dialog is dismissed', async () => {
+    vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: true, filePath: undefined });
+    const handler = handlers.get('feedback:export-local');
+
+    await expect(
+      handler!({}, { attachments: [], description: 'Cancelled', module: 'test', moduleLabel: 'Test' })
+    ).resolves.toEqual({ status: 'cancelled' });
+  });
+
+  it('returns failed when the selected archive cannot be written', async () => {
+    vi.mocked(dialog.showSaveDialog).mockResolvedValue({
+      canceled: false,
+      filePath: '/definitely-not-writable/weprompt-diagnostics.json.gz',
+    });
+    const handler = handlers.get('feedback:export-local');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      handler!({}, { attachments: [], description: 'Write failed', module: 'test', moduleLabel: 'Test' })
+    ).resolves.toEqual({ status: 'failed' });
+    consoleError.mockRestore();
+  });
+
+  it('redacts secrets, prompts, conversation bodies, and raw provider errors before writing', async () => {
+    const exportDir = mkdtempSync(path.join(tmpdir(), 'weprompt-diagnostics-redaction-'));
+    const outputPath = path.join(exportDir, 'diagnostics.json.gz');
+    const blockedValue = ['local', 'test', 'credential'].join('-');
+    try {
+      vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
+      const handler = handlers.get('feedback:export-local')!;
+
+      await handler(
+        {},
+        {
+          attachments: [],
+          description: `Authorization: ${blockedValue}`,
+          extra: {
+            api_key: 'not-exported',
+            provider_error: { message: 'not-exported' },
+            conversation_body: 'not-exported',
+            prompt: 'not-exported',
+            safe_code: 'BACKEND_UNAVAILABLE',
+          },
+          module: 'test',
+          moduleLabel: 'Test',
+        }
+      );
+
+      const content = gunzipSync(readFileSync(outputPath)).toString('utf8');
+      expect(content).not.toContain(blockedValue);
+      expect(content).not.toContain('not-exported');
+      expect(content).toContain('BACKEND_UNAVAILABLE');
+    } finally {
+      rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  it('recursively redacts sensitive subtrees in a gzipped JSON attachment', async () => {
+    const exportDir = mkdtempSync(path.join(tmpdir(), 'weprompt-diagnostics-json-redaction-'));
+    const outputPath = path.join(exportDir, 'diagnostics.json.gz');
+    const blockedValues = ['conversation-value', 'prompt-value', 'provider-error-value'].map((value) =>
+      ['blocked', value].join('-')
+    );
+    try {
+      vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
+      const handler = handlers.get('feedback:export-local')!;
+      const nestedJson = gzipSync(
+        JSON.stringify({
+          conversation: { body: blockedValues[0], nested: { content: blockedValues[0] } },
+          prompt: { text: blockedValues[1] },
+          provider_error: { message: blockedValues[2] },
+          safe: { code: 'BACKEND_UNAVAILABLE' },
+        })
+      );
+
+      await handler(
+        {},
+        {
+          attachments: [
+            {
+              contentType: 'application/gzip',
+              data: Array.from(nestedJson),
+              filename: 'db-diagnostics.json.gz',
+            },
+          ],
+          description: 'Safe description',
+          module: 'test',
+          moduleLabel: 'Test',
+        }
+      );
+
+      const archive = JSON.parse(gunzipSync(readFileSync(outputPath)).toString('utf8')) as {
+        report: { attachments: Array<{ data_base64: string }> };
+      };
+      const sanitizedJson = gunzipSync(Buffer.from(archive.report.attachments[0].data_base64, 'base64')).toString(
+        'utf8'
+      );
+      for (const blockedValue of blockedValues) expect(sanitizedJson).not.toContain(blockedValue);
+      expect(sanitizedJson).toContain('BACKEND_UNAVAILABLE');
+    } finally {
+      rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves benign conversation module metadata', async () => {
+    const exportDir = mkdtempSync(path.join(tmpdir(), 'weprompt-diagnostics-benign-metadata-'));
+    const outputPath = path.join(exportDir, 'diagnostics.json.gz');
+    try {
+      vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
+      const handler = handlers.get('feedback:export-local')!;
+
+      await handler(
+        {},
+        {
+          attachments: [],
+          description: 'Conversation stuck',
+          module: 'conversation-session',
+          moduleLabel: 'Conversation & Sessions',
+        }
+      );
+
+      const archive = JSON.parse(gunzipSync(readFileSync(outputPath)).toString('utf8')) as {
+        report: { description: string; module: string; module_label: string };
+      };
+      expect(archive.report).toMatchObject({
+        description: 'Conversation stuck',
+        module: 'conversation-session',
+        module_label: 'Conversation & Sessions',
+      });
+    } finally {
+      rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  it('replaces sensitive module labels and attachment filenames with stable archive metadata', async () => {
+    const exportDir = mkdtempSync(path.join(tmpdir(), 'weprompt-diagnostics-metadata-redaction-'));
+    const blockedValue = ['blocked', 'metadata', 'credential'].join('-');
+    try {
+      const handler = handlers.get('feedback:export-local')!;
+      const unsafeMetadata = [
+        {
+          module: `Authorization: Bearer ${blockedValue}`,
+          moduleLabel: `Bearer ${blockedValue}`,
+        },
+        {
+          module: 'sk-1234567890abcdef',
+          moduleLabel: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.signaturevalue',
+        },
+      ];
+
+      for (const [index, metadata] of unsafeMetadata.entries()) {
+        const outputPath = path.join(exportDir, `diagnostics-${index}.json.gz`);
+        vi.mocked(dialog.showSaveDialog).mockResolvedValueOnce({ canceled: false, filePath: outputPath });
+
+        await handler(
+          {},
+          {
+            attachments: [
+              {
+                contentType: 'text/plain',
+                data: [108, 111, 103],
+                filename: `token-${blockedValue}.log`,
+              },
+            ],
+            description: 'Safe description',
+            ...metadata,
+          }
+        );
+
+        const archiveText = gunzipSync(readFileSync(outputPath)).toString('utf8');
+        const archive = JSON.parse(archiveText) as {
+          report: { attachments: Array<{ filename: string }>; module: string; module_label: string };
+        };
+        expect(archiveText).not.toContain(blockedValue);
+        expect(archive.report).toMatchObject({
+          attachments: [{ filename: 'diagnostic-attachment' }],
+          module: 'diagnostic-module',
+          module_label: 'Diagnostic report',
+        });
+      }
+    } finally {
+      rmSync(exportDir, { recursive: true, force: true });
+    }
   });
 });
 

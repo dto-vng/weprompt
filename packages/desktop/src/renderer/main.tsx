@@ -102,7 +102,6 @@ import {
   InstallationIntegrityModalHost,
   type InstallationIntegrityDiagnostics,
   getBackendStartupInstallationDescription,
-  getDownloadLatestModalActionProps,
   getRuntimeComponentInstallationDescription,
   showInstallationIntegrityModal,
 } from './components/layout/InstallationIntegrityDialog';
@@ -374,8 +373,8 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
           visible
           closable={false}
           maskClosable={false}
+          footer={null}
           title={t('common.backendStartup.packageArchitectureMismatch.title')}
-          {...getDownloadLatestModalActionProps(t)}
         >
           <InstallationIntegrityContent description={description} />
         </Modal>

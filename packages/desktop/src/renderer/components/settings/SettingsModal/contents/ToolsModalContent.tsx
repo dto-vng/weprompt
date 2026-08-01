@@ -765,7 +765,7 @@ const ToolsModalContent: React.FC = () => {
                             className='text-[rgb(var(--primary-6))] hover:text-[rgb(var(--primary-5))] underline ml-4px'
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {t('settings.configGuide')}
+                            {t('settings.upstreamAionUiDocumentation')}
                           </a>
                         </div>
                       }
@@ -777,6 +777,7 @@ const ToolsModalContent: React.FC = () => {
                         className='ml-8px text-[rgb(var(--primary-6))] hover:text-[rgb(var(--primary-5))] cursor-pointer'
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <span className='sr-only'>{t('settings.upstreamAionUiDocumentation')}</span>
                         <Help theme='outline' size='14' />
                       </a>
                     </Tooltip>

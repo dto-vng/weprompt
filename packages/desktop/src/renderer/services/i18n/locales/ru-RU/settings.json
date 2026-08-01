@@ -669,18 +669,18 @@
   "mcpDisconnected": "Не тестировалось",
   "mcpError": "Последний тест завершился ошибкой",
   "mcpErrorNodeCommandNotFound": "Не удалось подготовить команду {{command}}. Обычно AionCore автоматически подготавливает управляемую среду Node. Повторите тест подключения; если ошибка не исчезнет, проверьте логи бэкенда или укажите для этого MCP-сервера абсолютный путь к команде.",
-  "mcpErrorBunCommandNotFound": "Команда {{command}} не найдена. Установите Bun (включает bun/bunx), перезапустите AionUi или укажите для этого MCP-сервера абсолютный путь к команде.",
-  "mcpErrorUvCommandNotFound": "Команда {{command}} не найдена. Установите uv, перезапустите AionUi или укажите для этого MCP-сервера абсолютный путь к команде.",
-  "mcpErrorPythonCommandNotFound": "Команда {{command}} не найдена. Установите Python, перезапустите AionUi или укажите для этого MCP-сервера абсолютный путь к команде.",
-  "mcpErrorDenoCommandNotFound": "Команда {{command}} не найдена. Установите Deno, перезапустите AionUi или укажите для этого MCP-сервера абсолютный путь к команде.",
+  "mcpErrorBunCommandNotFound": "Команда {{command}} не найдена. Установите Bun (включает bun/bunx), перезапустите WePrompt или укажите для этого MCP-сервера абсолютный путь к команде.",
+  "mcpErrorUvCommandNotFound": "Команда {{command}} не найдена. Установите uv, перезапустите WePrompt или укажите для этого MCP-сервера абсолютный путь к команде.",
+  "mcpErrorPythonCommandNotFound": "Команда {{command}} не найдена. Установите Python, перезапустите WePrompt или укажите для этого MCP-сервера абсолютный путь к команде.",
+  "mcpErrorDenoCommandNotFound": "Команда {{command}} не найдена. Установите Deno, перезапустите WePrompt или укажите для этого MCP-сервера абсолютный путь к команде.",
   "mcpErrorCommandNotFound": "Команда {{command}} не найдена. Установите её или укажите для этого MCP-сервера абсолютный путь к команде.",
-  "mcpErrorCommandPermissionDenied": "AionUi не может выполнить {{command}}: доступ запрещён.",
-  "mcpErrorCommandStartFailed": "AionUi не смог запустить {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt не может выполнить {{command}}: доступ запрещён.",
+  "mcpErrorCommandStartFailed": "WePrompt не смог запустить {{command}}.",
   "mcpErrorTimeout": "Проверка подключения превысила таймаут {{seconds}} с.",
-  "mcpErrorConnectionFailed": "AionUi не смог подключиться к MCP-серверу.",
+  "mcpErrorConnectionFailed": "WePrompt не смог подключиться к MCP-серверу.",
   "mcpErrorHttp": "MCP-сервер вернул HTTP {{status}}.",
   "mcpErrorRpc": "MCP-сервер вернул RPC-ошибку при обработке {{method}}.",
-  "mcpErrorProtocol": "AionUi не смог завершить MCP-handshake.",
+  "mcpErrorProtocol": "WePrompt не смог завершить MCP-handshake.",
   "mcpLastCheckedAvailable": "Последний результат проверки в настройках инструментов: доступно",
   "mcpLastCheckedFailed": "Последний результат проверки в настройках инструментов: ошибка",
   "mcpCheckedAt": "Время проверки: {{time}}",
@@ -782,11 +782,11 @@
   "bugReportScreenshotUploaded": "(Загружено: {{count}})",
   "bugReportScreenshotDropzoneText": "Нажмите, перетащите или вставьте скриншоты сюда",
   "bugReportScreenshotFormats": "Поддерживаются PNG, JPG, GIF",
-  "bugReportAutoInfo": "При отправке автоматически прикрепляются системная информация и логи за последние 3 дня для ускорения диагностики",
-  "bugReportSubmit": "Отправить",
+  "bugReportAutoInfo": "Системная информация, обезличенная диагностика и журналы за последние 3 дня могут быть включены в локальный диагностический пакет.",
+  "bugReportSubmit": "Сохранить диагностический пакет",
   "bugReportCancel": "Отмена",
-  "bugReportSuccess": "Отчёт отправлен, спасибо за обратную связь",
-  "bugReportError": "Не удалось отправить, попробуйте позже",
+  "bugReportSuccess": "Диагностический пакет сохранён",
+  "bugReportError": "Не удалось сохранить диагностический пакет. Повторите попытку.",
   "bugReportModuleSkills": "Skills и плагины",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP и инструменты",
@@ -1283,7 +1283,7 @@
       "addMcp": "Помоги настроить сервер MCP.",
       "addSkill": "Помоги импортировать навык и привязать его к ассистенту.",
       "diagnose": "У меня возникла проблема с WePrompt, помоги её диагностировать.\n\n[Модуль] {{module}}\n[Описание] {{description}}\n[Вложения] см. скриншоты в поле ввода.\n\nПожалуйста, определи причину и подскажи, как исправить.",
-      "diagnoseChatError": "Во время разговора в AionUi возникла ошибка, помоги её диагностировать.\n\n[Ошибка] {{error}}\n\nПожалуйста, определи причину и подскажи, как исправить."
+      "diagnoseChatError": "Во время разговора в WePrompt возникла ошибка, помоги её диагностировать.\n\n[Ошибка] {{error}}\n\nПожалуйста, определи причину и подскажи, как исправить."
     },
     "solveWithButler": "Спросить дворецкого"
   },
@@ -1346,5 +1346,20 @@
       "authRequired": "Сохранённому поставщику нужны действительные учётные данные.",
       "healthCheckFailed": "Выбранная модель не прошла проверку работоспособности."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "Документация исходного AionUi",
+  "channelConflict": {
+    "title": "Обнаружен конфликт канала {{platform}}",
+    "summary": "Сообщения {{platform}} обрабатывает OpenClaw, а не WePrompt. Смена ассистента в WePrompt не повлияет на этого бота, но сообщения продолжат работать через OpenClaw.",
+    "howToUse": "Чтобы использовать каналы WePrompt и переключать ассистентов:",
+    "optionDisable": "Вариант 1: отключить {{platform}} в OpenClaw (рекомендуется)",
+    "restart": "Затем перезапустите OpenClaw и WePrompt.",
+    "optionDifferentBot": "Вариант 2: используйте другого бота {{platform}} для WePrompt.",
+    "optionKeepOpenClaw": "Вариант 3: оставьте OpenClaw и отключите {{platform}} в каналах WePrompt.",
+    "helpDisable": "Помочь отключить {{platform}} в OpenClaw",
+    "ignore": "Игнорировать (я понимаю последствия)",
+    "banner": "Обнаружен конфликт OpenClaw и {{platform}}; переключение ассистента не сработает.",
+    "learnMore": "Подробнее"
+  },
+  "bugReportCancelled": "Сохранение диагностического пакета отменено."
 }

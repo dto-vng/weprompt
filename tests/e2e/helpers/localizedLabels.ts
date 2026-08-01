@@ -37,19 +37,6 @@ import ukUACommon from '@/renderer/services/i18n/locales/uk-UA/common.json';
 import zhCNCommon from '@/renderer/services/i18n/locales/zh-CN/common.json';
 import zhTWCommon from '@/renderer/services/i18n/locales/zh-TW/common.json';
 
-import deDEConversation from '@/renderer/services/i18n/locales/de-DE/conversation.json';
-import enUSConversation from '@/renderer/services/i18n/locales/en-US/conversation.json';
-import esESConversation from '@/renderer/services/i18n/locales/es-ES/conversation.json';
-import faIRConversation from '@/renderer/services/i18n/locales/fa-IR/conversation.json';
-import jaJPConversation from '@/renderer/services/i18n/locales/ja-JP/conversation.json';
-import koKRConversation from '@/renderer/services/i18n/locales/ko-KR/conversation.json';
-import ptBRConversation from '@/renderer/services/i18n/locales/pt-BR/conversation.json';
-import ruRUConversation from '@/renderer/services/i18n/locales/ru-RU/conversation.json';
-import trTRConversation from '@/renderer/services/i18n/locales/tr-TR/conversation.json';
-import ukUAConversation from '@/renderer/services/i18n/locales/uk-UA/conversation.json';
-import zhCNConversation from '@/renderer/services/i18n/locales/zh-CN/conversation.json';
-import zhTWConversation from '@/renderer/services/i18n/locales/zh-TW/conversation.json';
-
 import deDESettings from '@/renderer/services/i18n/locales/de-DE/settings.json';
 import enUSSettings from '@/renderer/services/i18n/locales/en-US/settings.json';
 import esESSettings from '@/renderer/services/i18n/locales/es-ES/settings.json';
@@ -94,21 +81,9 @@ interface CommonLabelBundle {
   };
 }
 
-interface ConversationLabelBundle {
-  welcome?: {
-    quickActionFeedback?: string;
-  };
-}
-
 interface SettingsLabelBundle {
   oneClickFeedback?: string;
-  bugReport?: string;
   testConnectionBtn?: string;
-  bugReportModuleScheduledTask?: string;
-  bugReportModuleAssistant?: string;
-  bugReportModulePermission?: string;
-  bugReportModuleLlmConfig?: string;
-  bugReportModuleSystemSettings?: string;
 }
 
 interface TeamLabelBundle {
@@ -131,21 +106,6 @@ const COMMON_BUNDLES: readonly CommonLabelBundle[] = [
   deDECommon,
   esESCommon,
   faIRCommon,
-];
-
-const CONVERSATION_BUNDLES: readonly ConversationLabelBundle[] = [
-  zhCNConversation,
-  enUSConversation,
-  jaJPConversation,
-  zhTWConversation,
-  koKRConversation,
-  trTRConversation,
-  ruRUConversation,
-  ukUAConversation,
-  ptBRConversation,
-  deDEConversation,
-  esESConversation,
-  faIRConversation,
 ];
 
 const SETTINGS_BUNDLES: readonly SettingsLabelBundle[] = [
@@ -206,7 +166,6 @@ function labelCollector<T>(namespace: string, bundles: readonly T[]) {
 }
 
 const commonLabels = labelCollector('common', COMMON_BUNDLES);
-const conversationLabels = labelCollector('conversation', CONVERSATION_BUNDLES);
 const settingsLabels = labelCollector('settings', SETTINGS_BUNDLES);
 const teamLabels = labelCollector('team', TEAM_BUNDLES);
 
@@ -221,15 +180,6 @@ const teamLabels = labelCollector('team', TEAM_BUNDLES);
  */
 export function labelPattern(labels: string[]): RegExp {
   return new RegExp(labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'));
-}
-
-/**
- * Anchored counterpart to {@link labelPattern}, for `hasText` filters that must
- * match a whole string — a row whose text *is* the label, rather than one that
- * merely contains it. Escapes each label for the same reason.
- */
-export function exactLabelPattern(labels: string[]): RegExp {
-  return new RegExp(`^(${labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`);
 }
 
 /**
@@ -255,43 +205,10 @@ export const EXPAND_SIDEBAR_LABELS: string[] = commonLabels(
 );
 
 /**
- * Every locale's `conversation.welcome.quickActionFeedback` — the accessible
- * name of the titlebar's report-issue button (Titlebar/index.tsx).
- */
-export const FEEDBACK_BUTTON_LABELS: string[] = conversationLabels(
-  'welcome.quickActionFeedback',
-  (bundle) => bundle.welcome?.quickActionFeedback
-);
-
-/**
- * Every locale's option labels for the feedback modal's module select, keyed by
- * the `FeedbackModule` id that `resolveFeedbackModule` returns. Use with
- * {@link labelPattern} — the select renders its label as text, not as a name.
- */
-export const FEEDBACK_MODULE_LABELS = {
-  scheduledTask: settingsLabels('bugReportModuleScheduledTask', (b) => b.bugReportModuleScheduledTask),
-  assistant: settingsLabels('bugReportModuleAssistant', (b) => b.bugReportModuleAssistant),
-  permission: settingsLabels('bugReportModulePermission', (b) => b.bugReportModulePermission),
-  llmConfig: settingsLabels('bugReportModuleLlmConfig', (b) => b.bugReportModuleLlmConfig),
-  systemSettings: settingsLabels('bugReportModuleSystemSettings', (b) => b.bugReportModuleSystemSettings),
-};
-
-/**
  * Every locale's `settings.oneClickFeedback` — the visible text of the inline
  * feedback pill (base/FeedbackButton.tsx, which sets no aria-label).
- *
- * A different key from {@link FEEDBACK_BUTTON_LABELS} despite reading the same in
- * English: the titlebar button says "Feedback oder Vorschläge?" in de-DE where
- * this one says "Problem melden", so one set cannot serve both.
  */
 export const FEEDBACK_PILL_LABELS: string[] = settingsLabels('oneClickFeedback', (bundle) => bundle.oneClickFeedback);
-
-/**
- * Every locale's `settings.bugReport` — the About page's report row
- * (AboutModalContent.tsx). A third key reading "Report Issue" in English, and
- * "Fehlerbericht" in de-DE where the pill says "Problem melden".
- */
-export const BUG_REPORT_LABELS: string[] = settingsLabels('bugReport', (bundle) => bundle.bugReport);
 
 /** Every locale's `settings.testConnectionBtn` — the agent editor's test button. */
 export const TEST_CONNECTION_LABELS: string[] = settingsLabels(

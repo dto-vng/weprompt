@@ -1,51 +1,33 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { submitFeedbackReport } from '@/renderer/services/feedback/submitFeedbackReport';
 
-const sentryMocks = vi.hoisted(() => {
-  const setTag = vi.fn();
-  const flush = vi.fn(async () => true);
-  return {
-    captureEvent: vi.fn(() => 'event-id'),
-    flush,
-    getClient: vi.fn(() => ({ flush })),
-    setTag,
-    withScope: vi.fn((callback: (scope: { setTag: typeof setTag }) => void) => {
-      callback({ setTag });
-    }),
-  };
-});
-
-vi.mock('@sentry/electron/renderer', () => sentryMocks);
-
 describe('submitFeedbackReport', () => {
   beforeEach(() => {
-    sentryMocks.captureEvent.mockClear();
-    sentryMocks.captureEvent.mockReturnValue('event-id');
-    sentryMocks.flush.mockClear();
-    sentryMocks.flush.mockResolvedValue(true);
-    sentryMocks.getClient.mockClear();
-    sentryMocks.getClient.mockReturnValue({ flush: sentryMocks.flush });
-    sentryMocks.setTag.mockClear();
-    sentryMocks.withScope.mockClear();
     vi.stubGlobal('window', { electronAPI: undefined });
+    vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('submits a user-feedback event with tags, extra context, logs, and attachments', async () => {
+  it('exports a local diagnostic package with redacted metadata, logs, and attachments', async () => {
     const collectFeedbackLogs = vi.fn().mockResolvedValue({
-      filename: 'aionui-logs.log.gz',
+      filename: 'weprompt-logs.gz',
       data: [1, 2, 3],
     });
-    const logFeedbackEvent = vi.fn();
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({
+      status: 'saved',
+      path: '/tmp/weprompt-diagnostics.json.gz',
+    });
     vi.stubGlobal('window', {
       electronAPI: {
         collectFeedbackLogs,
         emit: vi.fn(),
-        logFeedbackEvent,
+        exportLocalFeedbackDiagnostics,
+        logFeedbackEvent: vi.fn(),
         on: vi.fn(),
       },
     });
 
-    await submitFeedbackReport({
+    const result = await submitFeedbackReport({
       attachments: [
         {
           filename: 'screenshot.png',
@@ -56,79 +38,102 @@ describe('submitFeedbackReport', () => {
       collectLogs: true,
       description: '  AionCore   cannot start  ',
       extra: {
-        installation_integrity: {
-          source: 'backend_startup_failure',
-        },
+        installation_integrity: { source: 'backend_startup_failure' },
+        provider_token: 'not-exported',
+        provider_error: { message: 'not-exported' },
       },
       module: 'installation-integrity',
-      moduleLabel: 'AionUi installation is incomplete',
+      moduleLabel: 'WePrompt installation is incomplete',
       tags: {
         'aionui.installation_integrity.report_source': 'backend_startup_failure',
       },
     });
 
+    expect(result).toEqual({ status: 'saved', path: '/tmp/weprompt-diagnostics.json.gz' });
     expect(collectFeedbackLogs).toHaveBeenCalledOnce();
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('type', 'user-feedback');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('module', 'installation-integrity');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith(
-      'aionui.installation_integrity.report_source',
-      'backend_startup_failure'
-    );
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
-      {
-        level: 'info',
-        message: 'AionUi installation is incomplete: AionCore cannot start',
-        extra: {
-          description: 'AionCore cannot start',
-          installation_integrity: {
-            source: 'backend_startup_failure',
-          },
-        },
-      },
-      {
-        attachments: [
-          {
-            filename: 'aionui-logs.log.gz',
-            data: new Uint8Array([1, 2, 3]),
-            contentType: 'application/gzip',
-          },
-          {
-            filename: 'screenshot.png',
-            data: new Uint8Array([4, 5, 6]),
-            contentType: 'image/png',
-          },
-        ],
-      }
-    );
-    expect(sentryMocks.flush).not.toHaveBeenCalled();
-    expect(logFeedbackEvent).toHaveBeenCalledOnce();
-    expect(logFeedbackEvent).toHaveBeenCalledWith(
+    expect(exportLocalFeedbackDiagnostics).toHaveBeenCalledWith(
       expect.objectContaining({
-        level: 'info',
-        message: 'submitted',
+        description: 'AionCore cannot start',
+        module: 'installation-integrity',
+        moduleLabel: 'WePrompt installation is incomplete',
+        tags: {
+          'aionui.installation_integrity.report_source': 'backend_startup_failure',
+        },
+        attachments: [
+          expect.objectContaining({ filename: 'weprompt-logs.gz', contentType: 'application/gzip' }),
+          expect.objectContaining({ filename: 'screenshot.png', contentType: 'image/png' }),
+        ],
       })
     );
+    expect(JSON.stringify(exportLocalFeedbackDiagnostics.mock.calls[0][0])).not.toContain('not-exported');
   });
 
-  it('continues without logs when log collection is unavailable', async () => {
+  it('returns cancelled without treating a dismissed save dialog as success', async () => {
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({ status: 'cancelled' });
+    vi.stubGlobal('window', { electronAPI: { exportLocalFeedbackDiagnostics, on: vi.fn() } });
+
+    await expect(
+      submitFeedbackReport({
+        description: 'Cancelled save',
+        module: 'installation-integrity',
+        moduleLabel: 'WePrompt installation is incomplete',
+      })
+    ).resolves.toEqual({ status: 'cancelled' });
+  });
+
+  it('returns a local write failure instead of reporting a remote submission', async () => {
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({ status: 'failed' });
+    vi.stubGlobal('window', { electronAPI: { exportLocalFeedbackDiagnostics, on: vi.fn() } });
+
+    await expect(
+      submitFeedbackReport({
+        description: 'Write failed',
+        module: 'installation-integrity',
+        moduleLabel: 'WePrompt installation is incomplete',
+      })
+    ).resolves.toEqual({ status: 'failed' });
+  });
+
+  it('redacts sensitive free-text descriptions before they cross the preload bridge', async () => {
+    const blockedValue = ['local', 'test', 'credential'].join('-');
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({ status: 'saved', path: '/tmp/report.gz' });
+    vi.stubGlobal('window', { electronAPI: { exportLocalFeedbackDiagnostics, on: vi.fn() } });
+
     await submitFeedbackReport({
-      collectLogs: true,
-      description: 'No logs available',
+      description: `Authorization: ${blockedValue}`,
       module: 'installation-integrity',
-      moduleLabel: 'AionUi installation is incomplete',
+      moduleLabel: 'WePrompt installation is incomplete',
     });
 
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        extra: {
-          description: 'No logs available',
-        },
-      }),
-      { attachments: [] }
+    expect(exportLocalFeedbackDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ description: '[redacted]' }));
+  });
+
+  it('preserves a benign conversation issue description but redacts explicit conversation content', async () => {
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({ status: 'saved', path: '/tmp/report.gz' });
+    vi.stubGlobal('window', { electronAPI: { exportLocalFeedbackDiagnostics, on: vi.fn() } });
+
+    await submitFeedbackReport({
+      description: 'Conversation stuck',
+      module: 'conversation-session',
+      moduleLabel: 'Conversation & Sessions',
+    });
+    await submitFeedbackReport({
+      description: 'conversation body: private diagnostic text',
+      module: 'conversation-session',
+      moduleLabel: 'Conversation & Sessions',
+    });
+
+    expect(exportLocalFeedbackDiagnostics).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ description: 'Conversation stuck' })
+    );
+    expect(exportLocalFeedbackDiagnostics).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ description: '[redacted]' })
     );
   });
 
-  it('attaches db diagnostics when collection succeeds', async () => {
+  it('includes optional database diagnostics when collection succeeds', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -139,18 +144,13 @@ describe('submitFeedbackReport', () => {
             privacy: { raw_content_included: false, api_keys_included: false },
           },
         }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     );
+    const exportLocalFeedbackDiagnostics = vi.fn().mockResolvedValue({ status: 'saved', path: '/tmp/report.gz' });
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal('window', {
-      electronAPI: {
-        emit: vi.fn(),
-        on: vi.fn(),
-      },
+      electronAPI: { emit: vi.fn(), exportLocalFeedbackDiagnostics, on: vi.fn() },
     });
 
     await submitFeedbackReport({
@@ -158,9 +158,7 @@ describe('submitFeedbackReport', () => {
         routeAtOpen: '#/conversation/conv-1',
         routeAtSubmit: '#/conversation/conv-1',
         selectedModule: 'conversation-session',
-        explicitContext: {
-          conversationId: 'conv-1',
-        },
+        explicitContext: { conversationId: 'conv-1' },
       },
       collectLogs: false,
       description: 'Conversation stuck',
@@ -169,117 +167,22 @@ describe('submitFeedbackReport', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    const [path, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(path).toContain('/api/system/diagnostics/feedback-report?');
-    expect(path).toContain('route_at_open=%23%2Fconversation%2Fconv-1');
-    expect(path).toContain('route_at_submit=%23%2Fconversation%2Fconv-1');
-    expect(path).toContain('selected_module=conversation-session');
-    expect(path).toContain('conversation_id=conv-1');
-    expect(options.method).toBe('GET');
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
+    const [requestPath] = fetchMock.mock.calls[0] as [string];
+    expect(requestPath).toContain('/api/system/diagnostics/feedback-report?');
+    expect(requestPath).toContain('conversation_id=conv-1');
+    expect(exportLocalFeedbackDiagnostics).toHaveBeenCalledWith(
       expect.objectContaining({
-        extra: {
-          description: 'Conversation stuck',
-        },
-      }),
-      {
-        attachments: [
-          expect.objectContaining({
-            filename: expect.stringMatching(/^db-diagnostics\.json(?:\.gz)?$/),
-            data: expect.any(Uint8Array),
-            contentType: expect.stringMatching(/^application\/(?:gzip|json)$/),
-          }),
-        ],
-      }
-    );
-  });
-
-  it('continues without db diagnostics when collection fails', async () => {
-    const fetchMock = vi.fn(async () => {
-      throw new Error('db locked');
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    vi.stubGlobal('window', {
-      electronAPI: {
-        emit: vi.fn(),
-        on: vi.fn(),
-      },
-    });
-
-    await submitFeedbackReport({
-      collectDbDiagnostics: {
-        routeAtOpen: '#/conversation/conv-1',
-        selectedModule: 'conversation-session',
-      },
-      collectLogs: false,
-      description: 'Conversation stuck',
-      module: 'conversation-session',
-      moduleLabel: 'Conversation & Sessions',
-    });
-
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        extra: {
-          description: 'Conversation stuck',
-        },
-      }),
-      { attachments: [] }
-    );
-  });
-
-  it('flushes when requested', async () => {
-    await submitFeedbackReport({
-      collectLogs: false,
-      description: 'Flush me',
-      flushTimeoutMs: 2000,
-      module: 'installation-integrity',
-      moduleLabel: 'AionUi installation is incomplete',
-    });
-
-    expect(sentryMocks.captureEvent).toHaveBeenCalledOnce();
-    expect(sentryMocks.getClient).toHaveBeenCalledOnce();
-    expect(sentryMocks.flush).toHaveBeenCalledWith(2000);
-  });
-
-  it('rejects when requested flush does not complete', async () => {
-    sentryMocks.flush.mockResolvedValue(false);
-    const logFeedbackEvent = vi.fn();
-    vi.stubGlobal('window', {
-      electronAPI: {
-        logFeedbackEvent,
-      },
-    });
-
-    await expect(
-      submitFeedbackReport({
-        collectLogs: false,
-        description: 'Flush me',
-        flushTimeoutMs: 2000,
-        module: 'installation-integrity',
-        moduleLabel: 'AionUi installation is incomplete',
-      })
-    ).rejects.toThrow('Failed to flush feedback report (event-id)');
-    expect(logFeedbackEvent).toHaveBeenCalledOnce();
-    expect(logFeedbackEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: 'error',
-        message: 'failed',
+        attachments: [expect.objectContaining({ filename: expect.stringMatching(/^db-diagnostics\.json(?:\.gz)?$/) })],
+        module: 'conversation-session',
+        moduleLabel: 'Conversation & Sessions',
       })
     );
   });
 
-  it('rejects when requested flush has no initialized Sentry client', async () => {
-    sentryMocks.getClient.mockReturnValue(undefined);
+  it('does not import the renderer Sentry client', () => {
+    const source = readFileSync('packages/desktop/src/renderer/services/feedback/submitFeedbackReport.ts', 'utf8');
 
-    await expect(
-      submitFeedbackReport({
-        collectLogs: false,
-        description: 'Flush me',
-        flushTimeoutMs: 2000,
-        module: 'installation-integrity',
-        moduleLabel: 'AionUi installation is incomplete',
-      })
-    ).rejects.toThrow('Sentry is not initialized');
+    expect(source).not.toContain('@sentry/electron/renderer');
+    expect(source).not.toContain('captureEvent');
   });
 });

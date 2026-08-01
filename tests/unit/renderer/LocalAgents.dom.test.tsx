@@ -288,7 +288,7 @@ describe('LocalAgents', () => {
 
     render(<LocalAgents />);
 
-    fireEvent.click(screen.getByText('settings.agentManagement.localAgentsSetupLink'));
+    fireEvent.click(screen.getByText('settings.upstreamAionUiDocumentation'));
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup');
   });

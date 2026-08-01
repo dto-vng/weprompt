@@ -678,18 +678,18 @@
   "mcpDisconnected": "未测试",
   "mcpError": "最近一次测试失败",
   "mcpErrorNodeCommandNotFound": "无法准备命令 {{command}}。AionCore 通常会自动准备托管的 Node 运行环境。请重试连接测试；若仍失败，请检查后端日志，或把这个 MCP server 改成绝对命令路径。",
-  "mcpErrorBunCommandNotFound": "未找到命令 {{command}}。请安装 Bun（包含 bun/bunx），重启 AionUI，或把这个 MCP server 改成绝对命令路径。",
-  "mcpErrorUvCommandNotFound": "未找到命令 {{command}}。请安装 uv，重启 AionUI，或把这个 MCP server 改成绝对命令路径。",
-  "mcpErrorPythonCommandNotFound": "未找到命令 {{command}}。请安装 Python，重启 AionUI，或把这个 MCP server 改成绝对命令路径。",
-  "mcpErrorDenoCommandNotFound": "未找到命令 {{command}}。请安装 Deno，重启 AionUI，或把这个 MCP server 改成绝对命令路径。",
+  "mcpErrorBunCommandNotFound": "未找到命令 {{command}}。请安装 Bun（包含 bun/bunx），重启 WePrompt，或把这个 MCP server 改成绝对命令路径。",
+  "mcpErrorUvCommandNotFound": "未找到命令 {{command}}。请安装 uv，重启 WePrompt，或把这个 MCP server 改成绝对命令路径。",
+  "mcpErrorPythonCommandNotFound": "未找到命令 {{command}}。请安装 Python，重启 WePrompt，或把这个 MCP server 改成绝对命令路径。",
+  "mcpErrorDenoCommandNotFound": "未找到命令 {{command}}。请安装 Deno，重启 WePrompt，或把这个 MCP server 改成绝对命令路径。",
   "mcpErrorCommandNotFound": "未找到命令 {{command}}。请安装该命令，或把这个 MCP server 改成绝对命令路径。",
-  "mcpErrorCommandPermissionDenied": "AionUI 无法执行 {{command}}，因为权限被拒绝。",
-  "mcpErrorCommandStartFailed": "AionUI 启动 {{command}} 失败。",
+  "mcpErrorCommandPermissionDenied": "WePrompt 无法执行 {{command}}，因为权限被拒绝。",
+  "mcpErrorCommandStartFailed": "WePrompt 启动 {{command}} 失败。",
   "mcpErrorTimeout": "连接测试在 {{seconds}} 秒后超时。",
-  "mcpErrorConnectionFailed": "AionUI 无法连接到这个 MCP server。",
+  "mcpErrorConnectionFailed": "WePrompt 无法连接到这个 MCP server。",
   "mcpErrorHttp": "这个 MCP server 返回了 HTTP {{status}}。",
   "mcpErrorRpc": "这个 MCP server 在处理 {{method}} 时返回了 RPC 错误。",
-  "mcpErrorProtocol": "AionUI 无法完成 MCP 握手。",
+  "mcpErrorProtocol": "WePrompt 无法完成 MCP 握手。",
   "mcpLastCheckedAvailable": "工具设置页最近一次检测结果：可用",
   "mcpLastCheckedFailed": "工具设置页最近一次检测结果：失败",
   "mcpCheckedAt": "检测时间：{{time}}",
@@ -802,11 +802,11 @@
   "bugReportScreenshotUploaded": "（已上传 {{count}} 张）",
   "bugReportScreenshotDropzoneText": "点击、拖拽或粘贴截图到此处",
   "bugReportScreenshotFormats": "支持 PNG、JPG、GIF",
-  "bugReportAutoInfo": "提交时将自动附带系统信息和最近 3 天的日志，帮助我们更快定位问题",
-  "bugReportSubmit": "提交",
+  "bugReportAutoInfo": "系统信息、脱敏诊断数据和最近 3 天的日志可包含在本地诊断包中。",
+  "bugReportSubmit": "保存诊断包",
   "bugReportCancel": "取消",
-  "bugReportSuccess": "问题已提交，感谢反馈",
-  "bugReportError": "提交失败，请稍后重试",
+  "bugReportSuccess": "诊断包已保存",
+  "bugReportError": "无法保存诊断包，请重试。",
   "bugReportModuleSkills": "Skills 与插件",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP 与工具",
@@ -1284,7 +1284,7 @@
       "addMcp": "帮我配置一个 MCP 服务器。",
       "addSkill": "帮我导入一个技能，并绑定到助手上。",
       "diagnose": "我在使用 WePrompt 时遇到问题，帮我排查一下。\n\n【模块】{{module}}\n【问题描述】{{description}}\n【附件】见输入框中的截图。\n\n请帮我诊断原因并给出解决办法。",
-      "diagnoseChatError": "我在 AionUi 对话过程中遇到了报错，帮我排查一下。\n\n【报错内容】{{error}}\n\n请帮我诊断原因并给出解决办法。"
+      "diagnoseChatError": "我在 WePrompt 对话过程中遇到了报错，帮我排查一下。\n\n【报错内容】{{error}}\n\n请帮我诊断原因并给出解决办法。"
     },
     "solveWithButler": "找管家排查"
   },
@@ -1347,5 +1347,20 @@
       "authRequired": "保存的提供商需要有效凭据。",
       "healthCheckFailed": "所选模型未通过运行状况检查。"
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "上游 AionUi 文档",
+  "channelConflict": {
+    "title": "检测到 {{platform}} 渠道冲突",
+    "summary": "OpenClaw 正在处理 {{platform}} 消息，而不是 WePrompt。在 WePrompt 中切换助手不会影响此机器人，但消息仍会通过 OpenClaw 正常工作。",
+    "howToUse": "要使用 WePrompt 渠道并切换助手：",
+    "optionDisable": "方案 1：停用 OpenClaw 的 {{platform}}（推荐）",
+    "restart": "然后重启 OpenClaw 和 WePrompt。",
+    "optionDifferentBot": "方案 2：为 WePrompt 使用其他 {{platform}} 机器人。",
+    "optionKeepOpenClaw": "方案 3：保留 OpenClaw，并在 WePrompt 渠道中停用 {{platform}}。",
+    "helpDisable": "帮助我停用 OpenClaw {{platform}}",
+    "ignore": "忽略（我知道自己在做什么）",
+    "banner": "检测到 OpenClaw 与 {{platform}} 冲突，助手切换将无法生效。",
+    "learnMore": "了解详情"
+  },
+  "bugReportCancelled": "已取消保存诊断包。"
 }

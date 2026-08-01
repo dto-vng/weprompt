@@ -1,29 +1,27 @@
 /**
- * Feedback button scenarios — walks each place in the product where the
- * "一键反馈" pill appears, verifies the pill shows up, clicks it, and
- * confirms the feedback modal opens with the correct module preselected.
+ * Feedback regression scenarios for the custom-agent editor.
  *
  * Covered scenarios:
- *   1. About → Bug Report (no module)
- *   3. MCP server connection error → mcp-tools
- *   4. System settings dir-change cancel → system-settings
  *   5. Agent test connection (CLI not found) → alert has NO feedback pill
  *   6. Agent test connection (CLI exists, ACP fails) → alert has NO feedback pill
  *      (the pill was removed from InlineAgentEditor in #3448; the unit test
  *      feedbackMountPoints.test.ts asserts the same at source level)
  *
- * Not covered here (verified via white-box unit tests instead):
+ * Live modal wiring is covered through the conversation-error surface in
+ * feedback-butler-diagnose.e2e.ts. Other mount points are verified with focused
+ * component/source tests because reproducing their native/runtime failures is
+ * not stable E2E setup:
  *   - MessageTips error (needs live model)
  *   - MessageToolGroup error (needs live tool call)
  *   - MessageAgentStatus error (needs broken agent session)
+ *   - MCP server connection error
+ *   - System settings directory-change error
  */
 import { test, expect, type Page } from '../fixtures';
 import {
   BTN_ADD_CUSTOM_AGENT,
   BTN_ADD_CUSTOM_AGENT_MANUAL,
-  BUG_REPORT_LABELS,
   buttonWithText,
-  exactLabelPattern,
   FEEDBACK_PILL_LABELS,
   goToSettings,
   modalCloseButton,
@@ -33,65 +31,24 @@ import {
 // FeedbackButton renders settings.oneClickFeedback as button text (no aria-label),
 // so match the text in whichever language the app is running.
 const FEEDBACK_PILL = buttonWithText(FEEDBACK_PILL_LABELS);
-// The app can hold several FeedbackReportModal instances (FeedbackProvider's
-// plus per-page ones like About's), and Arco keeps closed modals mounted but
-// hidden — so always scope to the *visible* body, not the first in the DOM.
-const MODAL_BODY = '[data-testid="feedback-report-scroll-body"]';
-const VISIBLE_MODAL_BODY = `${MODAL_BODY}:visible`;
 
-/** Close the feedback modal (AionModal sets closable=false so Escape is a no-op). */
-async function closeFeedbackModal(page: Page) {
-  // The feedback modal is an AionModal (standard variant); its header close
-  // button is labelled from i18n, so match every locale's spelling. Scope to
-  // the modal that owns the visible feedback scroll body so we never match
-  // another (hidden) instance.
-  await page
-    .locator('.arco-modal-wrapper', { has: page.locator(VISIBLE_MODAL_BODY) })
-    .locator(modalCloseButton())
-    .first()
-    .click();
-  await expect(page.locator(VISIBLE_MODAL_BODY)).toHaveCount(0, { timeout: 5_000 });
-}
-
-/** Close any open AionModal (e.g. the Agent editor) so the next test starts clean. */
-async function closeAgentEditor(page: Page) {
-  const closeBtn = page.locator(modalCloseButton('.arco-modal')).first();
-  if (await closeBtn.isVisible().catch(() => false)) {
-    await closeBtn.click({ timeout: 2_000 }).catch(() => {});
+/** Close every visible AionModal and require its backdrop to stop intercepting input. */
+async function closeVisibleModals(page: Page) {
+  for (let i = 0; i < 3; i++) {
+    const visibleModal = page.locator('.arco-modal-wrapper:visible').first();
+    if (!(await visibleModal.isVisible().catch(() => false))) break;
+    const closeBtn = visibleModal.locator(modalCloseButton()).first();
+    await expect(closeBtn).toBeVisible({ timeout: 2_000 });
+    await closeBtn.click({ timeout: 2_000 });
+    await expect(visibleModal).toBeHidden({ timeout: 5_000 });
   }
-  // Wait for modal backdrop to disappear.
-  await page.waitForTimeout(300);
 }
 
 // Tests share one Electron instance across spec files; a modal left open by a
-// prior (possibly failed) test intercepts pointer events and poisons every
-// test after it. Close all visible modals before each test.
-test.beforeEach(async ({ page }) => {
-  for (let i = 0; i < 3; i++) {
-    const closeBtn = page.locator(modalCloseButton('.arco-modal-wrapper:visible')).first();
-    if (!(await closeBtn.isVisible().catch(() => false))) break;
-    await closeBtn.click({ timeout: 2_000 }).catch(() => {});
-    await page.waitForTimeout(300);
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Scenario 1: About → Bug Report
-// ─────────────────────────────────────────────────────────────────────────────
-
-test('[1] About → Bug Report entry opens feedback modal', async ({ page }) => {
-  await goToSettings(page, 'about');
-
-  const bugReportRow = page
-    .locator('div')
-    .filter({ hasText: exactLabelPattern(BUG_REPORT_LABELS) })
-    .first();
-  await expect(bugReportRow).toBeVisible({ timeout: 10_000 });
-  await bugReportRow.click();
-
-  await expect(page.locator(VISIBLE_MODAL_BODY).first()).toBeVisible({ timeout: 5_000 });
-  await closeFeedbackModal(page);
-});
+// prior (possibly failed) test intercepts pointer events and poisons every test
+// after it. Clean both sides of each scenario so later spec files start clean.
+test.beforeEach(async ({ page }) => closeVisibleModals(page));
+test.afterEach(async ({ page }) => closeVisibleModals(page));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Scenario 3 (MCP error → mcp-tools) is covered by the component-level test
@@ -118,7 +75,7 @@ test('[1] About → Bug Report entry opens feedback modal', async ({ page }) => 
 async function openCustomAgentEditor(page: Page, command: string) {
   // Defensive: close any AionModal left over from a prior test so the
   // sidebar/page buttons are clickable.
-  await closeAgentEditor(page);
+  await closeVisibleModals(page);
 
   await goToSettings(page, 'agent');
 
@@ -162,7 +119,7 @@ test('[5] Agent fail_cli alert shows without feedback pill', async ({ page }) =>
   await expect(alert.locator(FEEDBACK_PILL)).toHaveCount(0);
 
   // Close the agent editor modal so the next test starts fresh.
-  await closeAgentEditor(page);
+  await closeVisibleModals(page);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,5 +135,5 @@ test('[6] Agent fail_acp warning shows without feedback pill', async ({ page }) 
   await expect(alert).toBeVisible({ timeout: 15_000 });
   await expect(alert.locator(FEEDBACK_PILL)).toHaveCount(0);
 
-  await closeAgentEditor(page);
+  await closeVisibleModals(page);
 });

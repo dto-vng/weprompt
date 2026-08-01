@@ -678,18 +678,18 @@
   "mcpDisconnected": "Not tested",
   "mcpError": "Last test failed",
   "mcpErrorNodeCommandNotFound": "Command {{command}} could not be prepared. AionCore usually provisions its managed Node runtime automatically. Retry the connection test, check backend logs if it still fails, or configure this MCP server to use an absolute command path.",
-  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart AionUI, or configure this MCP server to use an absolute command path.",
+  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart WePrompt, or configure this MCP server to use an absolute command path.",
   "mcpErrorCommandNotFound": "Command {{command}} was not found. Install it or configure this MCP server to use an absolute command path.",
-  "mcpErrorCommandPermissionDenied": "AionUI cannot execute {{command}} because permission was denied.",
-  "mcpErrorCommandStartFailed": "AionUI failed to start {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt cannot execute {{command}} because permission was denied.",
+  "mcpErrorCommandStartFailed": "WePrompt failed to start {{command}}.",
   "mcpErrorTimeout": "Connection test timed out after {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI could not reach the MCP server.",
+  "mcpErrorConnectionFailed": "WePrompt could not reach the MCP server.",
   "mcpErrorHttp": "The MCP server returned HTTP {{status}}.",
   "mcpErrorRpc": "The MCP server returned an RPC error while handling {{method}}.",
-  "mcpErrorProtocol": "AionUI could not complete the MCP handshake.",
+  "mcpErrorProtocol": "WePrompt could not complete the MCP handshake.",
   "mcpLastCheckedAvailable": "Latest check in Tools settings: Available",
   "mcpLastCheckedFailed": "Latest check in Tools settings: Failed",
   "mcpCheckedAt": "Checked at: {{time}}",
@@ -802,11 +802,11 @@
   "bugReportScreenshotUploaded": "({{count}} uploaded)",
   "bugReportScreenshotDropzoneText": "Click, drag, or paste screenshots here",
   "bugReportScreenshotFormats": "Supports PNG, JPG, GIF",
-  "bugReportAutoInfo": "System info and logs from the last 3 days will be automatically attached to help us locate the issue faster",
-  "bugReportSubmit": "Submit",
+  "bugReportAutoInfo": "System information, redacted diagnostics, and logs from the last 3 days can be included in a local diagnostic package.",
+  "bugReportSubmit": "Save diagnostic package",
   "bugReportCancel": "Cancel",
-  "bugReportSuccess": "Report submitted, thank you for your feedback",
-  "bugReportError": "Submission failed, please try again later",
+  "bugReportSuccess": "Diagnostic package saved",
+  "bugReportError": "Could not save the diagnostic package. Please try again.",
   "bugReportModuleSkills": "Skills & Plugins",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP & Tools",
@@ -1283,7 +1283,7 @@
       "addMcp": "Help me set up an MCP server.",
       "addSkill": "Help me import a skill and attach it to an assistant.",
       "diagnose": "I ran into a problem with WePrompt, please help me diagnose it.\n\n[Module] {{module}}\n[Description] {{description}}\n[Attachments] see the screenshots in the input.\n\nPlease diagnose the cause and tell me how to fix it.",
-      "diagnoseChatError": "I ran into an error during a conversation in AionUi, please help me diagnose it.\n\n[Error] {{error}}\n\nPlease diagnose the cause and tell me how to fix it."
+      "diagnoseChatError": "I ran into an error during a conversation in WePrompt, please help me diagnose it.\n\n[Error] {{error}}\n\nPlease diagnose the cause and tell me how to fix it."
     },
     "solveWithButler": "Ask the Butler"
   },
@@ -1346,5 +1346,20 @@
       "authRequired": "The saved provider needs valid credentials.",
       "healthCheckFailed": "The selected model did not pass its health check."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "Upstream AionUi documentation",
+  "channelConflict": {
+    "title": "{{platform}} channel conflict detected",
+    "summary": "OpenClaw is handling {{platform}} messages instead of WePrompt. Switching assistants in WePrompt will not affect this bot, although messages continue through OpenClaw.",
+    "howToUse": "To use WePrompt Channels and switch assistants:",
+    "optionDisable": "Option 1: Disable OpenClaw {{platform}} (recommended)",
+    "restart": "Then restart OpenClaw and WePrompt.",
+    "optionDifferentBot": "Option 2: Use a different {{platform}} bot for WePrompt.",
+    "optionKeepOpenClaw": "Option 3: Keep OpenClaw and disable {{platform}} in WePrompt Channels.",
+    "helpDisable": "Help me disable OpenClaw {{platform}}",
+    "ignore": "Ignore (I know what I am doing)",
+    "banner": "OpenClaw {{platform}} conflict detected — assistant switching will not work.",
+    "learnMore": "Learn more"
+  },
+  "bugReportCancelled": "Saving the diagnostic package was cancelled."
 }

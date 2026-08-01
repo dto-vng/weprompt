@@ -10,10 +10,10 @@ import {
 } from '../helpers';
 
 const EXT_E2E_SETTINGS_ID = 'ext-e2e-full-extension-e2e-settings';
-const EXT_E2E_BEFORE_ABOUT_ID = 'ext-e2e-full-extension-e2e-before-about';
+const EXT_E2E_LEGACY_ANCHOR_ID = 'ext-e2e-full-extension-e2e-before-about';
 const EXT_HELLO_SETTINGS_ID = 'ext-hello-world-hello-settings';
 
-const KNOWN_EXTENSION_TAB_IDS = [EXT_E2E_SETTINGS_ID, EXT_E2E_BEFORE_ABOUT_ID, EXT_HELLO_SETTINGS_ID] as const;
+const KNOWN_EXTENSION_TAB_IDS = [EXT_E2E_SETTINGS_ID, EXT_E2E_LEGACY_ANCHOR_ID, EXT_HELLO_SETTINGS_ID] as const;
 
 async function getSiderItemIds(page: Page): Promise<string[]> {
   const ids = await page.locator(SETTINGS_SIDER_ITEM).evaluateAll((elements) => {
@@ -57,7 +57,7 @@ test.describe('Extension: Settings Tabs Discovery', () => {
 
     const siderItemIds = await waitForExtensionSettingsTabs(page);
 
-    const hasE2eTab = siderItemIds.includes(EXT_E2E_SETTINGS_ID) || siderItemIds.includes(EXT_E2E_BEFORE_ABOUT_ID);
+    const hasE2eTab = siderItemIds.includes(EXT_E2E_SETTINGS_ID) || siderItemIds.includes(EXT_E2E_LEGACY_ANCHOR_ID);
     const hasHelloTab = siderItemIds.includes(EXT_HELLO_SETTINGS_ID);
 
     expect(hasE2eTab && hasHelloTab).toBeTruthy();
@@ -79,18 +79,18 @@ test.describe('Extension: Settings Tabs Position Anchoring', () => {
     expect(e2eIdx).toBeGreaterThan(capabilitiesIdx);
   });
 
-  test('tab with anchor "about/before" appears before About in sidebar', async ({ page }) => {
-    await goToSettings(page, 'about');
+  test('tab with a removed anchor falls back before System in the sidebar', async ({ page }) => {
+    await goToSettings(page, 'system');
     await waitForExtensionSettingsTabs(page);
 
     const siderItemIds = await getSiderItemIds(page);
 
-    const aboutIdx = siderItemIds.indexOf('about');
-    const beforeAboutIdx = siderItemIds.indexOf(EXT_E2E_BEFORE_ABOUT_ID);
+    const systemIdx = siderItemIds.indexOf('system');
+    const legacyAnchorIdx = siderItemIds.indexOf(EXT_E2E_LEGACY_ANCHOR_ID);
 
-    expect(aboutIdx).toBeGreaterThanOrEqual(0);
-    expect(beforeAboutIdx).toBeGreaterThanOrEqual(0);
-    expect(beforeAboutIdx).toBeLessThan(aboutIdx);
+    expect(systemIdx).toBeGreaterThanOrEqual(0);
+    expect(legacyAnchorIdx).toBeGreaterThanOrEqual(0);
+    expect(legacyAnchorIdx).toBeLessThan(systemIdx);
   });
 
   test('tab with anchor "display/after" appears after Display in sidebar', async ({ page }) => {
