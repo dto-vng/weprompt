@@ -259,12 +259,12 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
 
-      - name: Validate internal release network configuration
+      - name: Validate internal release environment
         if: ${{ inputs.internal_release }}
         shell: bash
         run: |
           set -euo pipefail
-          for name in WEPROMPT_UPDATE_BASE_URL SENTRY_DSN SENTRY_AUTH_TOKEN SENTRY_UPLOAD_SOURCE_MAPS SENTRY_ORG SENTRY_PROJECT SENTRY_RELEASE; do
+          for name in WEPROMPT_UPDATE_BASE_URL SENTRY_DSN SENTRY_AUTH_TOKEN SENTRY_UPLOAD_SOURCE_MAPS SENTRY_ORG SENTRY_PROJECT SENTRY_RELEASE BUILD_CERTIFICATE_BASE64 P12_PASSWORD KEYCHAIN_PASSWORD CSC_LINK CSC_KEY_PASSWORD WIN_CSC_LINK WIN_CSC_KEY_PASSWORD CSC_NAME CSC_IDENTITY_AUTO_DISCOVERY APPLE_ID APPLE_ID_PASSWORD TEAM_ID IDENTITY appleId appleIdPassword teamId identity; do
             if [ -n "${!name:-}" ]; then
               echo "::error title=Internal release configuration rejected::$name must be unset"
               exit 1
@@ -273,7 +273,7 @@ jobs:
 
       # macOS code signing certificate installation
       - name: Setup macOS code signing (macOS only)
-        if: startsWith(matrix.platform, 'macos')
+        if: ${{ startsWith(matrix.platform, 'macos') && !inputs.internal_release }}
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -438,14 +438,8 @@ jobs:
           npm_config_cache: ${{ runner.temp }}/.npm
           ELECTRON_CACHE: ${{ runner.temp }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/.cache/electron-builder
-          # Signing & IDs / 签名与应用 ID 配置
+          # Application ID / 应用 ID 配置
           APP_ID: ${{ secrets.APP_ID }}
-          appleId: ${{ secrets.APPLE_ID }}
-          appleIdPassword: ${{ secrets.APPLE_ID_PASSWORD }}
-          teamId: ${{ secrets.TEAM_ID }}
-          identity: ${{ secrets.IDENTITY }}
-          CSC_NAME: ${{ secrets.IDENTITY }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
           # Windows build flags / Windows 构建参数
           MSVS_VERSION: 2022
           GYP_MSVS_VERSION: 2022
@@ -531,12 +525,12 @@ jobs:
           AIONUI_BACKEND_RUN_ID: ${{ inputs.aioncore_run_id }}
           npm_config_arch: ${{ matrix.arch }}
           APP_ID: ${{ secrets.APP_ID }}
-          appleId: ${{ secrets.APPLE_ID }}
-          appleIdPassword: ${{ secrets.APPLE_ID_PASSWORD }}
-          teamId: ${{ secrets.TEAM_ID }}
-          identity: ${{ secrets.IDENTITY }}
-          CSC_NAME: ${{ secrets.IDENTITY }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          appleId: ${{ !inputs.internal_release && secrets.APPLE_ID || '' }}
+          appleIdPassword: ${{ !inputs.internal_release && secrets.APPLE_ID_PASSWORD || '' }}
+          teamId: ${{ !inputs.internal_release && secrets.TEAM_ID || '' }}
+          identity: ${{ !inputs.internal_release && secrets.IDENTITY || '' }}
+          CSC_NAME: ${{ !inputs.internal_release && secrets.IDENTITY || '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ !inputs.internal_release && 'false' || '' }}
           npm_config_cache: ${{ runner.temp }}/.npm
           ELECTRON_CACHE: ${{ runner.temp }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/.cache/electron-builder

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { gte, major } from 'semver';
 
 const projectRoot = resolve(__dirname, '../..');
 const itWithBash = spawnSync('bash', ['--version'], { encoding: 'utf8' }).status === 0 ? it : it.skip;
@@ -14,6 +15,16 @@ function readProjectFile(path: string): string {
 
 function readProjectJson<T>(path: string): T {
   return JSON.parse(readProjectFile(path)) as T;
+}
+
+function readSourceTree(directory: string): string {
+  return readdirSync(resolve(projectRoot, directory), { withFileTypes: true })
+    .flatMap((entry) => {
+      const relativePath = join(directory, entry.name);
+      if (entry.isDirectory()) return [readSourceTree(relativePath)];
+      return /\.tsx?$/.test(entry.name) ? [readProjectFile(relativePath)] : [];
+    })
+    .join('\n');
 }
 
 function yamlBlock(content: string, key: string): string {
@@ -27,7 +38,7 @@ function yamlBlock(content: string, key: string): string {
 }
 
 describe('release packaging configuration', () => {
-  it('keeps electron-builder on its compatible builder runtime', () => {
+  it('keeps packaging and updater code on the fixed compatible builder runtime', () => {
     const rootPackage = readProjectJson<{
       dependencies: Record<string, string>;
       resolutions: Record<string, string>;
@@ -41,11 +52,83 @@ describe('release packaging configuration', () => {
       deepAssign?: unknown;
     };
     const appBuilderRuntimePackage = appBuilderRequire('builder-util-runtime/package.json') as { version: string };
+    const electronUpdaterPackagePath = projectRequire.resolve('electron-updater/package.json');
+    const electronUpdaterRequire = createRequire(electronUpdaterPackagePath);
+    const electronUpdaterRuntime = electronUpdaterRequire('builder-util-runtime') as {
+      CancellationToken?: unknown;
+      deepAssign?: unknown;
+    };
+    const electronUpdaterRuntimePackage = electronUpdaterRequire('builder-util-runtime/package.json') as {
+      version: string;
+    };
 
-    expect(rootPackage.dependencies['builder-util-runtime']).toBe('9.5.1');
-    expect(rootPackage.resolutions).not.toHaveProperty('builder-util-runtime');
+    expect(rootPackage.dependencies['builder-util-runtime']).toBe('9.7.0');
+    expect(rootPackage.resolutions['builder-util-runtime']).toBe('9.7.0');
     expect(appBuilderRuntimePackage.version).toBe('9.7.0');
     expect(appBuilderRuntime.deepAssign).toBeTypeOf('function');
+    expect(electronUpdaterRuntimePackage.version).toBe('9.7.0');
+    expect(electronUpdaterRuntime.CancellationToken).toBeTypeOf('function');
+    expect(electronUpdaterRuntime.deepAssign).toBeTypeOf('function');
+  });
+
+  it('locks audited dependency families at or above their fixed release floors', () => {
+    const lockfile = readProjectFile('bun.lock');
+    const rootPackage = readProjectJson<{
+      dependencies: Record<string, string>;
+      resolutions: Record<string, string>;
+    }>('package.json');
+    const lockedVersions = (packageName: string): string[] =>
+      [...lockfile.matchAll(new RegExp(`\\[\"${packageName.replaceAll('-', '\\-')}@([^\"]+)\"`, 'g'))].map(
+        (match) => match[1]
+      );
+    const expectFixed = (packageName: string, floors: Record<number, string>) => {
+      const versions = lockedVersions(packageName);
+      expect(versions.length, `${packageName} must remain represented in bun.lock`).toBeGreaterThan(0);
+      for (const version of versions) {
+        const floor = floors[major(version)];
+        expect(floor, `${packageName}@${version} has no reviewed security floor`).toBeDefined();
+        expect(gte(version, floor), `${packageName}@${version} is below ${floor}`).toBe(true);
+      }
+    };
+
+    expect(rootPackage.dependencies.sharp).toBe('^0.35.3');
+    expect(rootPackage.dependencies['react-router-dom']).toBe('^7.18.2');
+    expect(rootPackage.resolutions).toMatchObject({
+      'builder-util-runtime': '9.7.0',
+      postcss: '^8.5.25',
+      tar: '^7.5.22',
+    });
+    expectFixed('brace-expansion', { 1: '1.1.17', 2: '2.1.3', 5: '5.0.8' });
+    expectFixed('builder-util-runtime', { 9: '9.7.0' });
+    expectFixed('js-yaml', { 3: '3.15.0', 4: '4.3.0' });
+    expectFixed('postcss', { 8: '8.5.18' });
+    expectFixed('react-router', { 7: '7.18.2' });
+    expectFixed('react-router-dom', { 7: '7.18.2' });
+    expectFixed('sharp', { 0: '0.35.0' });
+    expectFixed('tar', { 7: '7.5.21' });
+  });
+
+  it('uses declarative renderer routing without unstable React Server Component APIs', () => {
+    const rootPackage = readProjectJson<{
+      dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
+    }>('package.json');
+    const router = readProjectFile('packages/desktop/src/renderer/components/layout/Router.tsx');
+    const desktopSource = readSourceTree('packages/desktop/src');
+    const packageNames = [...Object.keys(rootPackage.dependencies), ...Object.keys(rootPackage.devDependencies)];
+
+    expect(router).toContain('<HashRouter>');
+    expect(packageNames.some((name) => /^@react-router\/(dev|node|cloudflare|express|serve)$/.test(name))).toBe(false);
+    for (const rscApi of [
+      'unstable_RSCHydratedRouter',
+      'unstable_RSCStaticRouter',
+      'unstable_createCallServer',
+      'unstable_getRSCStream',
+      'unstable_matchRSCServerRequest',
+      'unstable_routeRSCServerRequest',
+    ]) {
+      expect(desktopSource).not.toContain(rscApi);
+    }
   });
 
   it('uses WePrompt as the visible application identity while preserving compatibility identifiers', () => {
@@ -132,6 +215,9 @@ describe('release packaging configuration', () => {
     expect(workflow).toMatch(
       /- name: Validate Sentry source map upload configuration\s*\n\s+if: \$\{\{ !inputs\.internal_release && matrix\.platform == 'linux-x64' \}\}/
     );
+    expect(workflow).toMatch(
+      /- name: Setup macOS code signing \(macOS only\)\s*\n\s+if: \$\{\{ startsWith\(matrix\.platform, 'macos'\) && !inputs\.internal_release \}\}/
+    );
 
     const windowsBuildBlock = workflow.match(
       /- name: Build with electron-builder \(Windows\)([\s\S]*?)(?=\n\s*- name:|\n\s*# Clean up stale disk images)/
@@ -150,10 +236,28 @@ describe('release packaging configuration', () => {
       'SENTRY_ORG',
       'SENTRY_PROJECT',
       'SENTRY_RELEASE',
+      'CSC_LINK',
+      'CSC_KEY_PASSWORD',
+      'WIN_CSC_LINK',
+      'WIN_CSC_KEY_PASSWORD',
+      'BUILD_CERTIFICATE_BASE64',
+      'P12_PASSWORD',
+      'KEYCHAIN_PASSWORD',
+      'APPLE_ID',
+      'APPLE_ID_PASSWORD',
+      'TEAM_ID',
+      'IDENTITY',
+      'appleId',
+      'appleIdPassword',
+      'teamId',
+      'identity',
     ]) {
+      expect(workflow).toMatch(new RegExp(`Validate internal release environment[\\s\\S]*?${name}`));
+    }
+
+    for (const name of ['appleId', 'appleIdPassword', 'teamId', 'identity', 'CSC_NAME']) {
       expect(windowsBuildBlock).not.toContain(`${name}:`);
-      expect(macBuildBlock).not.toContain(`${name}:`);
-      expect(workflow).toMatch(new RegExp(`Validate internal release network configuration[\\s\\S]*?${name}`));
+      expect(macBuildBlock).toContain(`${name}: \${{ !inputs.internal_release && secrets.`);
     }
 
     expect(windowsBuildBlock).toContain('$BuildExitCode');

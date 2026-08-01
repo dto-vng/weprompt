@@ -37,6 +37,23 @@ const INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES = [
   'SENTRY_ORG',
   'SENTRY_PROJECT',
   'SENTRY_RELEASE',
+  'BUILD_CERTIFICATE_BASE64',
+  'P12_PASSWORD',
+  'KEYCHAIN_PASSWORD',
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'CSC_IDENTITY_AUTO_DISCOVERY',
+  'APPLE_ID',
+  'APPLE_ID_PASSWORD',
+  'TEAM_ID',
+  'IDENTITY',
+  'appleId',
+  'appleIdPassword',
+  'teamId',
+  'identity',
 ];
 
 function patchElectronBuilderNsisInstaller() {
@@ -499,12 +516,16 @@ function assertInternalReleaseBuildEnvironment() {
     return;
   }
 
-  const inheritedVariables = INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.filter(
-    (name) => typeof process.env[name] === 'string' && process.env[name].trim() !== ''
-  );
+  const inheritedVariables = [
+    ...new Set([...INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES, ...Object.keys(process.env)]),
+  ].filter((name) => {
+    const isForbiddenName =
+      INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
+    return isForbiddenName && typeof process.env[name] === 'string' && process.env[name].trim() !== '';
+  });
   if (inheritedVariables.length > 0) {
     throw new Error(
-      `Internal release build rejects ambient network/upload variables: ${inheritedVariables.join(', ')}`
+      `Internal release build rejects ambient network, upload, signing, or notarization variables: ${inheritedVariables.join(', ')}`
     );
   }
 }

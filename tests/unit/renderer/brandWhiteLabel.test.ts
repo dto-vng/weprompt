@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -50,6 +50,14 @@ function getNestedValue(value: JsonValue, keyPath: string): JsonValue | undefine
 
 function sourceWithoutLicense(relativePath: string): string {
   return readFileSync(path.join(repoRoot, relativePath), 'utf8').replace(/^\/\*\*[\s\S]*?\*\/\s*/, '');
+}
+
+function collectFiles(root: string, extension: string): string[] {
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(root, entry.name);
+    if (entry.isDirectory()) return collectFiles(entryPath, extension);
+    return entry.isFile() && entry.name.endsWith(extension) ? [entryPath] : [];
+  });
 }
 
 describe('WePrompt white-label branding', () => {
@@ -203,6 +211,20 @@ describe('WePrompt white-label branding', () => {
     expect(sourceWithoutLicense('packages/desktop/src/renderer/components/agent/ChannelConflictWarning.tsx')).toContain(
       "t('settings.channelConflict."
     );
+  });
+
+  it('keeps employee-visible NSIS detail messages free of the legacy product name', () => {
+    const installerFiles = collectFiles(path.join(repoRoot, 'resources/windows'), '.nsh');
+
+    for (const file of installerFiles) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/DetailPrint\s+([`"])(.*?)\1/g)) {
+        const visibleLiteral = match[2].replace(/\$[A-Za-z0-9_]+/g, '');
+        expect(visibleLiteral, `${path.relative(repoRoot, file)} contains stale installer copy`).not.toMatch(
+          /\bAionUi\b/i
+        );
+      }
+    }
   });
 
   it('does not present the Skills Market description as a link without a destination', () => {

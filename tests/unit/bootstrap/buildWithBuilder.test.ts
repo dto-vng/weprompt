@@ -205,7 +205,7 @@ describe('build-with-builder', () => {
     expect(sharedMessages).not.toMatch(/\bAionUi\b/);
   });
 
-  it('rejects non-internal package builds and every ambient Sentry build variable', () => {
+  it('rejects non-internal package builds plus ambient telemetry and signing variables', () => {
     const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
 
     expect(source).toContain("process.env.WEPROMPT_INTERNAL_RELEASE !== '1'");
@@ -216,6 +216,21 @@ describe('build-with-builder', () => {
       'SENTRY_ORG',
       'SENTRY_PROJECT',
       'SENTRY_RELEASE',
+      'CSC_LINK',
+      'CSC_KEY_PASSWORD',
+      'WIN_CSC_LINK',
+      'WIN_CSC_KEY_PASSWORD',
+      'BUILD_CERTIFICATE_BASE64',
+      'P12_PASSWORD',
+      'KEYCHAIN_PASSWORD',
+      'APPLE_ID',
+      'APPLE_ID_PASSWORD',
+      'TEAM_ID',
+      'IDENTITY',
+      'appleId',
+      'appleIdPassword',
+      'teamId',
+      'identity',
     ]) {
       expect(source).toContain(`'${variable}'`);
     }

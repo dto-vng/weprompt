@@ -100,6 +100,15 @@
       "owner": "security-lead",
       "review_by": "2026-10-07",
       "note": "Reached only via a never-instantiated Express/router surface (transitive via express@5 -> router). MCP transport is stdio, so no HTTP route parsing runs. The vulnerable 8.3.0 copy is pulled by router@2 with ^8.0.0; a flat resolution would also force serve-handler's exact path-to-regexp@3.3.0 and break it, so left as accepted-risk."
+    },
+    {
+      "id": 1124282,
+      "package": "react-router",
+      "severity": "high",
+      "disposition": "accept-risk",
+      "owner": "security-lead",
+      "review_by": "2026-08-15",
+      "note": "React Router 7.18.2 contains the upstream v7 backport for GHSA-qwww-vcr4-c8h2, but the advisory range still reports every v7 release as vulnerable. WePrompt uses declarative HashRouter routing and no unstable RSC APIs, which are the only affected mode. Remove this temporary entry when the advisory metadata recognizes the v7 backport."
     }
   ]
 }
