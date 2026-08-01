@@ -13,6 +13,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { resolveMacLogDirectoryNames } from '../packages/desktop/src/common/platform/appIdentity';
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -86,10 +87,10 @@ function agentPillByBackend(backend: string) {
 
 function getLogFilePath(): string {
   const today = new Date().toISOString().slice(0, 10);
-  // Dev mode uses "AionUi-Dev", production uses "AionUi"
-  const devPath = path.join(os.homedir(), 'Library', 'Logs', 'AionUi-Dev', `${today}.log`);
-  const prodPath = path.join(os.homedir(), 'Library', 'Logs', 'AionUi', `${today}.log`);
-  return fs.existsSync(devPath) ? devPath : prodPath;
+  const candidates = resolveMacLogDirectoryNames().map((directoryName) =>
+    path.join(os.homedir(), 'Library', 'Logs', directoryName, `${today}.log`)
+  );
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
 }
 
 function getLogFileSize(logPath: string): number {

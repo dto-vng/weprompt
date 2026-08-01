@@ -1,17 +1,9 @@
 import path from 'path';
+import { applyAppIdentity } from './appIdentity';
 import type { IPlatformServices } from './IPlatformServices';
 import { NodePlatformServices } from './NodePlatformServices';
 
 let _services: IPlatformServices | null = null;
-
-/**
- * Resolve the dev-mode app name for environment isolation.
- * Centralised so that every call-site stays in sync.
- */
-export function getDevAppName(): string {
-  const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
-  return isMultiInstance ? 'Forge-Dev-2' : 'Forge-Dev';
-}
 
 export function registerPlatformServices(services: IPlatformServices): void {
   _services = services;
@@ -36,14 +28,24 @@ export function getPlatformServices(): IPlatformServices {
       } else {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { app, net } = require('electron') as typeof import('electron');
-        // Dev isolation: set app name before any getPath('userData') call.
+        // Identity must be set before any getPath('userData') call.
         // Rollup may load this chunk before configureChromium.ts runs, so we
-        // must apply the dev name here as a safety net.
-        if (!app.isPackaged) {
-          const devAppName = getDevAppName();
-          app.setName(devAppName);
-          app.setPath('userData', path.join(path.dirname(app.getPath('userData')), devAppName));
-        }
+        // must apply the resolved identity here as a safety net.
+        applyAppIdentity(
+          app,
+          {
+            isPackaged: app.isPackaged,
+            isMultiInstance: process.env.AIONUI_MULTI_INSTANCE === '1',
+            e2eUserDataDir: process.env.AIONUI_E2E_TEST === '1' ? process.env.AIONUI_E2E_USER_DATA_DIR : undefined,
+          },
+          path.join,
+          (userDataPath) => {
+            // Keep filesystem IO main-process-only even though this module is shared.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const fs = require('fs') as typeof import('fs');
+            fs.mkdirSync(userDataPath, { recursive: true });
+          }
+        );
         // Typed as IPlatformPaths so tsc enforces completeness: any new method
         // added to the interface will cause a compile error here if omitted below.
         const paths: import('./IPlatformServices').IPlatformPaths = {

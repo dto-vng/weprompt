@@ -1,10 +1,10 @@
 appId: com.aionui.app
-productName: Forge
-executableName: Forge
+productName: WePrompt
+executableName: WePrompt
 copyright: Copyright © 2026 VNG Corporation
 
 protocols:
-  - name: Forge Protocol
+  - name: WePrompt Protocol
     schemes:
       - aionui
 
@@ -180,9 +180,9 @@ linux:
   description: ${description}
   desktop:
     entry:
-      Name: Forge
+      Name: WePrompt
       Comment: ${description}
-      Icon: Forge
+      Icon: WePrompt
       Categories: Office;Utility;
       MimeType: x-scheme-handler/aionui;
 

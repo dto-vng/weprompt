@@ -18,6 +18,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { resolveMacLogDirectoryNames } from '../packages/desktop/src/common/platform/appIdentity';
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -142,14 +143,15 @@ function getLogFilePath(): string {
   const candidates: string[] = [];
   if (process.platform === 'darwin') {
     candidates.push(
-      path.join(os.homedir(), 'Library', 'Logs', 'AionUi-Dev', `${today}.log`),
-      path.join(os.homedir(), 'Library', 'Logs', 'AionUi', `${today}.log`)
+      ...resolveMacLogDirectoryNames().map((directoryName) =>
+        path.join(os.homedir(), 'Library', 'Logs', directoryName, `${today}.log`)
+      )
     );
   } else if (process.platform === 'win32') {
     const appData = process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
-    candidates.push(path.join(appData, 'AionUi', 'logs', `${today}.log`));
+    candidates.push(path.join(appData, 'Forge', 'logs', `${today}.log`));
   } else {
-    candidates.push(path.join(os.homedir(), '.config', 'AionUi', 'logs', `${today}.log`));
+    candidates.push(path.join(os.homedir(), '.config', 'Forge', 'logs', `${today}.log`));
   }
   return candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
 }

@@ -63,4 +63,18 @@ describe('WePrompt white-label branding', () => {
       expect(source, `${file} should not hardcode the Forge wordmark`).not.toMatch(/'Forge'|>\s*Forge\s*</);
     }
   });
+
+  it('uses WePrompt in renderer and WebUI metadata', () => {
+    const rendererIndex = readFileSync(path.join(repoRoot, 'packages/desktop/src/renderer/index.html'), 'utf8');
+    const manifest = readJson<{ description: string; name: string; short_name: string }>('public/manifest.webmanifest');
+
+    expect(rendererIndex).toMatch(/<meta name="application-name" content="WePrompt" \/>/);
+    expect(rendererIndex).toMatch(/<meta name="apple-mobile-web-app-title" content="WePrompt" \/>/);
+    expect(rendererIndex).toContain('<title>WePrompt</title>');
+    expect(manifest).toMatchObject({
+      name: 'WePrompt',
+      short_name: 'WePrompt',
+      description: expect.stringContaining('WePrompt'),
+    });
+  });
 });

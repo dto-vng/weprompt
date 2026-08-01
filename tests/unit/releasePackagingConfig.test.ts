@@ -11,6 +11,10 @@ function readProjectFile(path: string): string {
   return readFileSync(resolve(projectRoot, path), 'utf8');
 }
 
+function readProjectJson<T>(path: string): T {
+  return JSON.parse(readProjectFile(path)) as T;
+}
+
 function yamlBlock(content: string, key: string): string {
   const startMatch = content.match(new RegExp(`^${key}:\\s*$`, 'm'));
   if (!startMatch || startMatch.index === undefined) return '';
@@ -22,6 +26,36 @@ function yamlBlock(content: string, key: string): string {
 }
 
 describe('release packaging configuration', () => {
+  it('uses WePrompt as the visible application identity while preserving compatibility identifiers', () => {
+    const rootPackage = readProjectJson<{
+      author: { email?: string; name: string };
+      name: string;
+      productName: string;
+    }>('package.json');
+    const desktopPackage = readProjectJson<{ description: string }>('packages/desktop/package.json');
+    const config = readProjectFile('packages/desktop/electron-builder.yml');
+    const nsisBlock = yamlBlock(config, 'nsis');
+    const linuxBlock = yamlBlock(config, 'linux');
+
+    expect(rootPackage).toMatchObject({
+      name: 'forge',
+      productName: 'WePrompt',
+      author: { name: 'VNG Corporation' },
+    });
+    expect(rootPackage.author.email).toBeUndefined();
+    expect(desktopPackage.description).toContain('WePrompt');
+    expect(config).toMatch(/^appId:\s+com\.aionui\.app$/m);
+    expect(config).toMatch(/^productName:\s+WePrompt$/m);
+    expect(config).toMatch(/^executableName:\s+WePrompt$/m);
+    expect(config).toMatch(/^\s+- name:\s+WePrompt Protocol$/m);
+    expect(config).toMatch(/^\s+- aionui$/m);
+    expect(nsisBlock).toMatch(/^\s+shortcutName:\s+\$\{productName\}$/m);
+    expect(nsisBlock).toMatch(/^\s+uninstallDisplayName:\s+\$\{productName\}$/m);
+    expect(config).toMatch(/^\s+artifactName:\s+\$\{productName\}-\$\{version\}-\$\{os\}-\$\{arch\}\.\$\{ext\}$/m);
+    expect(linuxBlock).toMatch(/^\s+Name:\s+WePrompt$/m);
+    expect(linuxBlock).toMatch(/^\s+Icon:\s+WePrompt$/m);
+  });
+
   it('keeps mac zip artifacts enabled', () => {
     const config = readProjectFile('packages/desktop/electron-builder.yml');
     const macBlock = yamlBlock(config, 'mac');

@@ -5,8 +5,7 @@
   "keywords": [],
   "license": "Apache-2.0",
   "author": {
-    "name": "AionUi",
-    "email": "service@aionui.com"
+    "name": "VNG Corporation"
   },
   "workspaces": [
     "packages/*"
@@ -280,5 +279,5 @@
   "patchedDependencies": {
     "7zip-bin@5.2.0": "patches/7zip-bin@5.2.0.patch"
   },
-  "productName": "Forge"
+  "productName": "WePrompt"
 }
