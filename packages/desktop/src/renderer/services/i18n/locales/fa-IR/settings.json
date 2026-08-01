@@ -6,8 +6,6 @@
   "profileEnableLabel": "اعمال دستورالعمل‌های من در گفتگوهای جدید",
   "profileInstructionsLabel": "دستورالعمل‌ها",
   "profileInstructionsPlaceholder": "مثلاً من در بخش منابع انسانی VNG کار می‌کنم. ویتنامیِ مختصر و رسمی را ترجیح می‌دهم. پیش از فرض‌کردن یک الگو بپرسید.",
-  "profilePreviewTitle": "آنچه به گفتگوهای شما افزوده می‌شود",
-  "profilePreviewEmpty": "هنوز چیزی نیست — دستورالعمل‌ها را در بالا اضافه کنید.",
   "profileScopeNote": "برای گفتگوهای شما اعمال می‌شود. دستیارهای تخصصی از قواعد خودشان پیروی می‌کنند.",
   "title": "تنظیمات",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "مدل عملیات برنامه ذخیره نشد.",
     "checkFailed": "بررسی سلامت عملیات برنامه ناموفق بود.",
     "backendUpdateRequired": "برای پیکربندی مدل عملیات برنامه، WePrompt را به‌روزرسانی کنید.",
+    "checkResult": {
+      "ready": "سالم · {{checked}}",
+      "setupRequired": "نیازمند راه‌اندازی · {{checked}}",
+      "unavailable": "بررسی ناموفق · {{checked}}",
+      "checkedJustNow": "همین حالا بررسی شد",
+      "checkedAt": "بررسی‌شده در {{time}}"
+    },
     "status": {
       "ready": "آماده",
       "checking": "در حال بررسی",

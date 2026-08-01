@@ -7,7 +7,10 @@ import {
   buildFallbackContextSnapshot,
   getContextFileName,
 } from '@/renderer/pages/conversation/contextHandoff/contextMarkdown';
-import { parseContextSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextSnapshot';
+import {
+  CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH,
+  parseContextSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextSnapshot';
 import {
   CONTEXT_MARKDOWN_SECTIONS,
   type ContextMarkdownSection,
@@ -132,6 +135,28 @@ describe('buildContextMarkdown', () => {
 
     expect(snapshot.current_state).toEqual(['User: Build the OPEX dashboard.']);
     expect(snapshot.current_state).not.toContain('System:');
+  });
+
+  it('ignores hidden assistant execution text and bounds fallback snapshot items', () => {
+    const visibleState = `Visible result ${'v'.repeat(700)}`;
+    const snapshot = buildFallbackContextSnapshot({
+      conversation,
+      messages: [
+        messages[0],
+        { ...messages[1], content: { content: visibleState } },
+        {
+          ...messages[1],
+          id: 'hidden-execution',
+          msg_id: 'hidden-execution',
+          hidden: true,
+          content: { content: `Internal execution ${'x'.repeat(1_400)}` },
+        },
+      ],
+    });
+
+    expect(snapshot.current_state[0]).toHaveLength(CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH);
+    expect(snapshot.current_state[0]).toContain('Visible result');
+    expect(snapshot.current_state[0]).not.toContain('Internal execution');
   });
 
   it('renders canonical markdown from the structured snapshot and keeps empty model sections empty', () => {

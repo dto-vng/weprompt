@@ -5,6 +5,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TChatConversation } from '@/common/config/storage';
 
 const showItemInFolderMock = vi.fn();
 const removeStoreMock = vi.fn();
@@ -17,6 +18,7 @@ const removeProjectMock = vi.fn();
 const findProjectByWorkspaceMock = vi.fn();
 const messageSuccessMock = vi.fn();
 const messageErrorMock = vi.fn();
+const conversationHistoryMock = { conversations: [] as TChatConversation[] };
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -48,7 +50,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('@renderer/hooks/context/ConversationHistoryContext', () => ({
-  useConversationHistoryContext: () => ({ conversations: [] }),
+  useConversationHistoryContext: () => conversationHistoryMock,
 }));
 
 // The header now branches on what projectStorage reports back, and the real
@@ -141,6 +143,7 @@ describe('ProjectHeader', () => {
     findProjectByWorkspaceMock.mockReset().mockReturnValue(null);
     messageSuccessMock.mockReset();
     messageErrorMock.mockReset();
+    conversationHistoryMock.conversations = [];
   });
 
   it('renders the project name and the chats/active subline', () => {
@@ -192,6 +195,38 @@ describe('ProjectHeader', () => {
     });
   });
 
+  it('detaches chats without resending immutable runtime snapshots', async () => {
+    conversationHistoryMock.conversations = [
+      {
+        id: 'c1',
+        name: 'Artifact chat',
+        created_at: 1,
+        modified_at: 1,
+        type: 'aionrs',
+        model: {},
+        extra: {
+          project_id: 'p1',
+          workspace: '/w/alpha',
+          custom_workspace: true,
+          skills: ['officecli'],
+          mcp_servers: ['project-knowledge'],
+        },
+      } as TChatConversation,
+    ];
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(conversationUpdateMock).toHaveBeenCalledExactlyOnceWith({
+        id: 'c1',
+        updates: { extra: { project_id: null, custom_workspace: false } },
+        merge_extra: true,
+      });
+    });
+  });
+
   it('reports a removal that did not go through, and stays on the page', async () => {
     // The project row was already gone, so nothing was removed — navigating
     // away would have claimed a deletion that never happened.
@@ -202,10 +237,73 @@ describe('ProjectHeader', () => {
     fireEvent.click(screen.getByText('conversation.projectHome.remove'));
 
     await vi.waitFor(() => {
-      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectFailed');
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectStateChanged');
     });
     expect(navigateMock).not.toHaveBeenCalled();
     expect(removeStoreMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the project and shows a retry action when a chat cannot detach', async () => {
+    conversationHistoryMock.conversations = [
+      {
+        id: 'c1',
+        name: 'Artifact chat',
+        created_at: 1,
+        modified_at: 1,
+        type: 'aionrs',
+        model: {},
+        extra: { project_id: 'p1', workspace: '/w/alpha', custom_workspace: true },
+      } as TChatConversation,
+    ];
+    conversationUpdateMock.mockResolvedValue(false);
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectChatDetachFailed');
+    });
+    expect(removeProjectMock).not.toHaveBeenCalled();
+    expect(removeStoreMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('logs a structured detach code but shows only the safe localized recovery message', async () => {
+    conversationHistoryMock.conversations = [
+      {
+        id: 'c1',
+        name: 'Artifact chat',
+        created_at: 1,
+        modified_at: 1,
+        type: 'aionrs',
+        model: {},
+        extra: { project_id: 'p1', workspace: '/w/alpha', custom_workspace: true },
+      } as TChatConversation,
+    ];
+    conversationUpdateMock.mockRejectedValue(
+      Object.assign(new Error('Private backend details'), {
+        name: 'BackendHttpError',
+        status: 409,
+        code: 'IMMUTABLE_EXTRA_FIELD',
+      })
+    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<ProjectHeader project={project} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.more' }));
+    fireEvent.click(screen.getByText('conversation.projectHome.remove'));
+
+    await vi.waitFor(() => {
+      expect(messageErrorMock).toHaveBeenCalledWith('conversation.history.removeProjectChatDetachFailed');
+    });
+    expect(consoleError).toHaveBeenCalledWith('Failed to remove project:', {
+      projectId: 'p1',
+      reason: 'chat_detach_failed',
+      diagnostics: [{ conversationId: 'c1', code: 'IMMUTABLE_EXTRA_FIELD', status: 409 }],
+    });
+    expect(messageErrorMock).not.toHaveBeenCalledWith(expect.stringContaining('Private backend details'));
+    consoleError.mockRestore();
   });
 
   it('confirms a successful removal before leaving the page', async () => {

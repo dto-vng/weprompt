@@ -167,6 +167,8 @@
     "removeProject": "プロジェクトを削除",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "このプロジェクト内で新しい会話",
+    "expandProjectChats": "プロジェクトのチャットを展開",
+    "collapseProjectChats": "プロジェクトのチャットを折りたたむ",
     "deleting": "削除中...",
     "reorderPinned": "ドラッグしてピン留め会話の順序を変更",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "プロジェクトを削除できませんでした。プロジェクトを開き直して再試行してください。フォルダー内のファイルは削除されていません。",
+    "removeProjectChatDetachFailed": "一部のチャットをこのプロジェクトから切り離せませんでした。プロジェクトは保持されています。削除を再試行してください。",
+    "removeProjectStateChanged": "削除前にプロジェクト一覧が変更されました。更新してからもう一度お試しください。",
+    "removeProjectStorageFailed": "プロジェクトの変更を保存できませんでした。WePrompt がアプリデータにアクセスできることを確認してから再試行してください。",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "今日",
     "weekToDate": "今週の合計",
     "monthToDate": "今月の合計",
-    "triggerLabel": "コンテキストの使用状況を表示"
+    "triggerLabel": "コンテキストの使用状況を表示",
+    "estimated": "推定",
+    "unavailable": "コンテキスト使用量を取得できません"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -766,6 +773,13 @@
     "importCard": "テンプレートをインポート (.md)",
     "empty": "利用可能なテンプレートがありません",
     "chipTooltip": "このメッセージはテンプレートを使用します",
+    "scratch": {
+      "prepareError": "成果物の一時領域を準備できませんでした: {{error}}",
+      "retained": "復旧用の一時ファイルを {{path}} に保持しました。",
+      "cleanup": "クリーンアップ",
+      "cleanupSuccess": "一時ファイルを削除しました",
+      "cleanupError": "クリーンアップに失敗しました: {{error}}"
+    },
     "importSuccess": "テンプレートをインポートしました",
     "importError": "インポートに失敗しました: {{error}}",
     "removeError": "削除に失敗しました: {{error}}",

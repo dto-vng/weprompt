@@ -62,6 +62,7 @@
       "installFailed": "Falha ao instalar o officecli automaticamente. Verifique os logs do backend e tente novamente.",
       "portTimeout": "O serviço de visualização iniciou, mas não ficou pronto a tempo. Tente novamente.",
       "startFailed": "Falha ao iniciar o serviço de visualização do Office.",
+      "invalidArtifact": "Este arquivo do Office está corrompido ou é inválido e não pode ser entregue com segurança.",
       "outsideSandbox": "Este arquivo está fora da sandbox atual do projeto.",
       "originalSafe": "O arquivo original do espaço de trabalho não foi alterado."
     },

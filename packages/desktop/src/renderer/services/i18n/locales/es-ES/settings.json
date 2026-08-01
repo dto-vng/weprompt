@@ -6,8 +6,6 @@
   "profileEnableLabel": "Aplicar mis instrucciones a los nuevos chats",
   "profileInstructionsLabel": "Instrucciones",
   "profileInstructionsPlaceholder": "p. ej. Trabajo en RR. HH. en VNG. Prefiero un vietnamita conciso y formal. Pregunta antes de dar por sentada una plantilla.",
-  "profilePreviewTitle": "Lo que se añade a tus chats",
-  "profilePreviewEmpty": "Nada todavía: añade instrucciones arriba.",
   "profileScopeNote": "Se aplica a tus chats. Los asistentes especializados siguen sus propias reglas.",
   "title": "Configuración",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "No se pudo guardar el modelo para operaciones de la aplicación.",
     "checkFailed": "La comprobación de estado de las operaciones de la aplicación falló.",
     "backendUpdateRequired": "Actualiza WePrompt para configurar el modelo para operaciones de la aplicación.",
+    "checkResult": {
+      "ready": "Saludable · {{checked}}",
+      "setupRequired": "Configuración necesaria · {{checked}}",
+      "unavailable": "Comprobación fallida · {{checked}}",
+      "checkedJustNow": "comprobado ahora mismo",
+      "checkedAt": "comprobado el {{time}}"
+    },
     "status": {
       "ready": "Listo",
       "checking": "Comprobando",

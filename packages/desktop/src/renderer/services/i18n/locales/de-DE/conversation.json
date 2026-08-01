@@ -167,6 +167,8 @@
     "removeProject": "Projekt entfernen",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Neuer Chat in diesem Projekt",
+    "expandProjectChats": "Projektchats ausklappen",
+    "collapseProjectChats": "Projektchats einklappen",
     "deleting": "Wird gelöscht...",
     "reorderPinned": "Ziehen, um angeheftete Unterhaltung neu anzuordnen",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Das Projekt konnte nicht entfernt werden. Öffne es erneut und versuche es noch einmal; die Dateien im Ordner wurden nicht gelöscht.",
+    "removeProjectChatDetachFailed": "Einige Chats konnten nicht von diesem Projekt getrennt werden. Das Projekt wurde beibehalten; versuche die Entfernung erneut.",
+    "removeProjectStateChanged": "Die Projektliste wurde vor dem Entfernen geändert. Aktualisiere sie und versuche es erneut.",
+    "removeProjectStorageFailed": "Die Projektänderungen konnten nicht gespeichert werden. Prüfe, ob WePrompt auf seine App-Daten zugreifen kann, und versuche es erneut.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -636,7 +641,9 @@
     "today": "Heute",
     "weekToDate": "Woche bis heute",
     "monthToDate": "Monat bis heute",
-    "triggerLabel": "Kontextnutzung anzeigen"
+    "triggerLabel": "Kontextnutzung anzeigen",
+    "estimated": "Geschätzt",
+    "unavailable": "Kontextnutzung nicht verfügbar"
   },
   "skill_generator": {
     "title": "Skill/Regel generieren",
@@ -767,6 +774,13 @@
     "importCard": "Vorlage importieren (.md)",
     "empty": "Keine Vorlagen verfügbar",
     "chipTooltip": "Diese Nachricht verwendet die Vorlage",
+    "scratch": {
+      "prepareError": "Temporärer Arbeitsbereich konnte nicht vorbereitet werden: {{error}}",
+      "retained": "Temporäre Artefaktdateien wurden zur Wiederherstellung unter {{path}} aufbewahrt.",
+      "cleanup": "Bereinigen",
+      "cleanupSuccess": "Temporäre Artefaktdateien entfernt",
+      "cleanupError": "Bereinigung fehlgeschlagen: {{error}}"
+    },
     "importSuccess": "Vorlage importiert",
     "importError": "Import fehlgeschlagen: {{error}}",
     "removeError": "Löschen fehlgeschlagen: {{error}}",

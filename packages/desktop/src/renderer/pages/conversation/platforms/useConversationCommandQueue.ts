@@ -16,6 +16,7 @@ export type ConversationCommandQueueItem = {
   input: string;
   files: string[];
   created_at: number;
+  artifactScratchRunId?: string;
 };
 
 export type ConversationCommandQueueMode = 'auto' | 'manual';
@@ -115,6 +116,9 @@ const normalizeQueueItem = (item: unknown): ConversationCommandQueueItem | null 
     input: candidate.input,
     files: uniqueFiles(candidate.files),
     created_at: candidate.created_at,
+    ...(typeof candidate.artifactScratchRunId === 'string'
+      ? { artifactScratchRunId: candidate.artifactScratchRunId }
+      : {}),
   };
 
   if (
@@ -168,11 +172,13 @@ export const estimateQueueStateBytes = (state: ConversationCommandQueueState): n
 export const createQueuedCommandItem = ({
   input,
   files,
-}: Pick<ConversationCommandQueueItem, 'input' | 'files'>): ConversationCommandQueueItem => ({
+  artifactScratchRunId,
+}: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'>): ConversationCommandQueueItem => ({
   id: uuid(),
   input,
   files: uniqueFiles(files),
   created_at: Date.now(),
+  ...(artifactScratchRunId ? { artifactScratchRunId } : {}),
 });
 
 const getQueueValidationFailureReason = (state: ConversationCommandQueueState): QueueValidationFailureReason | null => {
@@ -375,7 +381,7 @@ type UseConversationCommandQueueOptions = {
   onExecute: (item: ConversationCommandQueueItem) => Promise<void>;
 };
 
-type EnqueueCommandInput = Pick<ConversationCommandQueueItem, 'input' | 'files'>;
+type EnqueueCommandInput = Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'>;
 type UpdateCommandInput = Pick<ConversationCommandQueueItem, 'input'>;
 type BackgroundCommandQueueRunner = {
   conversation_id: string;
@@ -706,13 +712,13 @@ export const useConversationCommandQueue = ({
   );
 
   const enqueue = useCallback(
-    ({ input, files }: EnqueueCommandInput) => {
+    ({ input, files, artifactScratchRunId }: EnqueueCommandInput) => {
       if (!enabled) {
         return null;
       }
 
       const currentState = normalizeQueueState(stateRef.current);
-      const item = createQueuedCommandItem({ input, files });
+      const item = createQueuedCommandItem({ input, files, artifactScratchRunId });
       const validation = validateQueuedCommandItem(item, currentState);
 
       if (isQueueValidationFailure(validation)) {

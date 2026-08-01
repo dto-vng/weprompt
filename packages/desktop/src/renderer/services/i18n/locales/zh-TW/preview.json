@@ -62,6 +62,7 @@
       "installFailed": "自動安裝 officecli 失敗，請檢查後端日誌後再試一次。",
       "portTimeout": "預覽服務啟動後未能及時就緒，請重試。",
       "startFailed": "啟動 Office 預覽服務失敗。",
+      "invalidArtifact": "此 Office 檔案已損壞或無效，無法安全交付。",
       "outsideSandbox": "此檔案不在目前專案沙箱範圍內。",
       "originalSafe": "工作區中的原始檔案未被變更。"
     },

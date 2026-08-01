@@ -15,7 +15,6 @@ import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Mes
 import { iconColors } from '@/renderer/styles/colors';
 import { downloadFileFromPath } from '@/renderer/utils/file/download';
 import { buildTurnClose } from './toolActivity/buildTurnClose';
-import { collapseAdjacentSteps } from './toolActivity/collapseSteps';
 import { buildTurnWorkRecap } from './toolActivity/buildTurnWorkRecap';
 import { useToolActionText } from './toolActivity/useToolActionText';
 import ToolOutputCitations, { toolUsesKnowledgeSearch } from './ToolOutputCitations';
@@ -498,9 +497,7 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
     [isActive, rows]
   );
   const turnClose = useMemo(() => (isActive ? null : buildTurnClose(recap, recap.safeSubject)), [isActive, recap]);
-  // Resolve each step's display label, then collapse consecutive identical rows so
-  // a run of the same fallback label ("Finished the next step.") reads as one line.
-  const visibleSteps = useMemo(() => {
+  const allSteps = useMemo(() => {
     const labeled: Array<{ key: string; label: string; status: Exclude<NormalizedToolStatus, 'error'> }> = [];
     for (const row of rows) {
       if (row.status === 'error') continue;
@@ -510,8 +507,19 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
         status: row.status,
       });
     }
-    return collapseAdjacentSteps(labeled);
+    return labeled;
   }, [action, rows]);
+  const visibleSteps = useMemo(() => {
+    if (!isActive) return [];
+    const findLastStep = (status: NormalizedToolStatus) => {
+      for (let index = allSteps.length - 1; index >= 0; index -= 1) {
+        if (allSteps[index].status === status) return allSteps[index];
+      }
+      return undefined;
+    };
+    const currentStep = findLastStep('running') ?? findLastStep('pending');
+    return currentStep ? [currentStep] : [];
+  }, [allSteps, isActive]);
   const [showDetails, setShowDetails] = useState(false);
 
   if (rows.length === 0 && tools.length === 0) return null;
@@ -536,7 +544,7 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
           </div>
         )}
       </div>
-      {tools.length > 0 && (
+      {(allSteps.length > 0 || tools.length > 0) && (
         <Button
           type='text'
           size='mini'
@@ -554,6 +562,9 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
       )}
       {showDetails && (
         <div className='tool-group-summary__body'>
+          {allSteps.map((step) => (
+            <StepRow key={step.key} label={step.label} status={step.status} />
+          ))}
           {tools.map((item) => (
             <ToolItemDetail key={item.key} item={item} />
           ))}

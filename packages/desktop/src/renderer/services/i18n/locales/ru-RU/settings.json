@@ -6,8 +6,6 @@
   "profileEnableLabel": "Применять мои инструкции к новым чатам",
   "profileInstructionsLabel": "Инструкции",
   "profileInstructionsPlaceholder": "напр. Я работаю в отделе кадров в VNG. Предпочитаю краткий, официальный вьетнамский. Спрашивайте, прежде чем выбирать шаблон.",
-  "profilePreviewTitle": "Что добавляется в ваши чаты",
-  "profilePreviewEmpty": "Пока ничего — добавьте инструкции выше.",
   "profileScopeNote": "Применяется к вашим чатам. Специализированные ассистенты следуют своим правилам.",
   "title": "Настройки",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "Не удалось сохранить модель для операций приложения.",
     "checkFailed": "Проверка работоспособности операций приложения не удалась.",
     "backendUpdateRequired": "Обновите WePrompt, чтобы настроить модель для операций приложения.",
+    "checkResult": {
+      "ready": "Исправно · {{checked}}",
+      "setupRequired": "Требуется настройка · {{checked}}",
+      "unavailable": "Проверка не пройдена · {{checked}}",
+      "checkedJustNow": "проверено только что",
+      "checkedAt": "проверено {{time}}"
+    },
     "status": {
       "ready": "Готово",
       "checking": "Проверка",

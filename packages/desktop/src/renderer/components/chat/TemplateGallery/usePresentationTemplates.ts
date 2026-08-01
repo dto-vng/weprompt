@@ -4,13 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useState } from 'react';
+import { createElement, useCallback, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Message } from '@arco-design/web-react';
+import { Button, Message } from '@arco-design/web-react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
-import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type {
+  ArtifactScratchAllocation,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
 import { composePresentationSend } from './directive';
+import { useAddEventListener } from '@/renderer/utils/emitter';
 
 /**
  * Display name + description for a template.
@@ -47,10 +51,11 @@ export function useTemplateLabels() {
  * the import/remove actions. Consumed by the SendBox area to render the
  * toolbar button + gallery panel and to compose outgoing messages.
  */
-export function usePresentationTemplates() {
+export function usePresentationTemplates(conversationId?: string) {
   const { t } = useTranslation();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PresentationTemplateSummary | null>(null);
+  const scratchRunByTurnRef = useRef(new Map<string, string>());
 
   const {
     data: templates,
@@ -106,12 +111,119 @@ export function usePresentationTemplates() {
     [mutate, t]
   );
 
+  const prepareScratch = useCallback(
+    async (targetConversationId: string): Promise<ArtifactScratchAllocation | undefined> => {
+      if (!selectedTemplate?.referencePath || !['pptx', 'docx'].includes(selectedTemplate.manifest.format)) {
+        return undefined;
+      }
+      try {
+        return await ipcBridge.presentationTemplates.allocateScratch.invoke({
+          conversation_id: targetConversationId,
+          template_id: selectedTemplate.manifest.id,
+        });
+      } catch (error) {
+        Message.error(t('conversation.presentationTemplates.scratch.prepareError', { error: String(error) }));
+        throw error;
+      }
+    },
+    [selectedTemplate, t]
+  );
+
   const composeSend = useCallback(
-    (message: string, files: string[]) =>
+    (message: string, files: string[], scratch?: ArtifactScratchAllocation) =>
       selectedTemplate
-        ? composePresentationSend(selectedTemplate, message, files)
+        ? composePresentationSend(selectedTemplate, message, files, scratch)
         : { input: message, files, injectSkills: [] as string[] },
     [selectedTemplate]
+  );
+
+  const discardScratch = useCallback(
+    async (runId: string): Promise<void> => {
+      try {
+        await ipcBridge.presentationTemplates.discardScratch.invoke({ run_id: runId });
+        Message.success(t('conversation.presentationTemplates.scratch.cleanupSuccess'));
+      } catch (error) {
+        Message.error(t('conversation.presentationTemplates.scratch.cleanupError', { error: String(error) }));
+      }
+    },
+    [t]
+  );
+
+  const showRetainedScratch = useCallback(
+    (runId: string, directory: string): void => {
+      Message.warning({
+        duration: 0,
+        closable: true,
+        content: createElement(
+          'span',
+          null,
+          t('conversation.presentationTemplates.scratch.retained', { path: directory }),
+          createElement(
+            Button,
+            {
+              size: 'mini',
+              type: 'text',
+              className: 'ml-8px',
+              onClick: () => void discardScratch(runId),
+            },
+            t('conversation.presentationTemplates.scratch.cleanup')
+          )
+        ),
+      });
+    },
+    [discardScratch, t]
+  );
+
+  const registerScratchTurn = useCallback((turnId: string | undefined, runId: string | undefined): void => {
+    if (!turnId || !runId) return;
+    scratchRunByTurnRef.current.set(turnId, runId);
+  }, []);
+
+  const retainScratchRun = useCallback(
+    async (runId: string | undefined, reason: 'failed' | 'interrupted'): Promise<void> => {
+      if (!runId) return;
+      const result = await ipcBridge.presentationTemplates.retainScratch.invoke({ run_id: runId, reason });
+      if (result.status === 'retained') showRetainedScratch(runId, result.directory);
+    },
+    [showRetainedScratch]
+  );
+
+  const handleScratchTerminal = useCallback(
+    async (event: { turnId?: string; outcome: 'completed' | 'failed' }): Promise<void> => {
+      if (!event.turnId) return;
+      const runId = scratchRunByTurnRef.current.get(event.turnId);
+      if (!runId) return;
+      scratchRunByTurnRef.current.delete(event.turnId);
+
+      if (event.outcome === 'failed') {
+        await retainScratchRun(runId, 'failed');
+        return;
+      }
+
+      const result = await ipcBridge.presentationTemplates.completeScratch.invoke({ run_id: runId });
+      if (result.status === 'retained') showRetainedScratch(runId, result.directory);
+    },
+    [retainScratchRun, showRetainedScratch]
+  );
+
+  const interruptScratchTurn = useCallback(
+    async (turnId: string | null): Promise<void> => {
+      if (!turnId) return;
+      const runId = scratchRunByTurnRef.current.get(turnId);
+      if (!runId) return;
+      scratchRunByTurnRef.current.delete(turnId);
+      await retainScratchRun(runId, 'interrupted');
+    },
+    [retainScratchRun]
+  );
+
+  useAddEventListener(
+    'artifact.scratch.terminal',
+    (event) => {
+      if (event.conversationId !== conversationId) return;
+      void handleScratchTerminal(event);
+    },
+    [conversationId, handleScratchTerminal]
   );
 
   return {
@@ -126,6 +238,12 @@ export function usePresentationTemplates() {
     clearSelection,
     importFromDialog,
     removeTemplate,
+    prepareScratch,
     composeSend,
+    registerScratchTurn,
+    retainScratchRun,
+    handleScratchTerminal,
+    interruptScratchTurn,
+    discardScratch,
   };
 }

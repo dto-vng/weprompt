@@ -6,8 +6,6 @@
   "profileEnableLabel": "Apply my instructions to new chats",
   "profileInstructionsLabel": "Instructions",
   "profileInstructionsPlaceholder": "e.g. I work in HR at VNG. Prefer concise, formal Vietnamese. Ask before assuming a template.",
-  "profilePreviewTitle": "What gets added to your chats",
-  "profilePreviewEmpty": "Nothing yet — add instructions above.",
   "profileScopeNote": "Applies to your chats. Specialized assistants follow their own rules.",
   "title": "Settings",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "App operations model could not be saved.",
     "checkFailed": "The app operations health check failed.",
     "backendUpdateRequired": "Update WePrompt to configure the app operations model.",
+    "checkResult": {
+      "ready": "Healthy · {{checked}}",
+      "setupRequired": "Setup required · {{checked}}",
+      "unavailable": "Check failed · {{checked}}",
+      "checkedJustNow": "checked just now",
+      "checkedAt": "checked {{time}}"
+    },
     "status": {
       "ready": "Ready",
       "checking": "Checking",

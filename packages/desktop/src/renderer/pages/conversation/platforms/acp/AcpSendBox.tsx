@@ -32,7 +32,8 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import { useAddOrUpdateMessage } from '@/renderer/pages/conversation/Messages/hooks';
+import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
+import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
@@ -148,7 +149,7 @@ const AcpSendBox: React.FC<{
   const isLeaderInTeam = teamPermission && conversation_id === teamPermission.leaderConversationId;
   const { checkAndUpdateTitle } = useAutoTitle();
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
-  const presentationTemplates = usePresentationTemplates();
+  const presentationTemplates = usePresentationTemplates(conversation_id);
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
   const conversationContext = useConversationContextSafe();
@@ -160,6 +161,19 @@ const AcpSendBox: React.FC<{
       name,
       status: 'loaded',
     }));
+  const messages = useMessageList();
+  const contextBudget = useMemo(
+    () =>
+      resolveConversationContextBudgetSnapshot({
+        conversation: conversationContext?.conversation ?? null,
+        messages,
+        runtimeTokenUsage: tokenUsage,
+        contextLimit: context_limit,
+        skillNames: loadedSkills,
+        toolNames: loadedMcpStatuses.map((status) => status.name),
+      }),
+    [context_limit, conversationContext?.conversation, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
+  );
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
   const prepareRuntimeConfig = useCallback(async () => {
@@ -283,7 +297,11 @@ const AcpSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
+    async ({
+      input,
+      files,
+      artifactScratchRunId,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'>) => {
       const displayMessage = buildDisplayMessage(input, files, workspacePath || '');
 
       try {
@@ -306,8 +324,10 @@ const AcpSendBox: React.FC<{
           files,
         });
         markSendAccepted(result.turn_id, result.runtime, result.msg_id);
+        presentationTemplates.registerScratchTurn(result.turn_id, artifactScratchRunId);
         emitter.emit('chat.history.refresh');
       } catch (error: unknown) {
+        void presentationTemplates.retainScratchRun(artifactScratchRunId, 'failed').catch(() => {});
         const errorMsg =
           getConversationRuntimeWorkspaceErrorMessage(error, t) || parseError(error) || t('common.unknownError');
         const busyError = classifyConversationBusyError(error);
@@ -399,6 +419,7 @@ Please check your local CLI tool authentication status`,
       t,
       teamPermission,
       teamSendMessage,
+      presentationTemplates,
       workspacePath,
     ]
   );
@@ -434,7 +455,8 @@ Please check your local CLI tool authentication status`,
     emitter.emit('acp.selected.file.clear');
 
     // ACP ignores `injectSkills` here — agents discover skills themselves.
-    const composed = presentationTemplates.composeSend(message, allFiles);
+    const scratch = teamSendMessage ? undefined : await presentationTemplates.prepareScratch(conversation_id);
+    const composed = presentationTemplates.composeSend(message, allFiles, scratch);
 
     if (
       shouldEnqueueConversationCommand({
@@ -443,24 +465,35 @@ Please check your local CLI tool authentication status`,
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: composed.input, files: composed.files });
+      enqueue({
+        input: composed.input,
+        files: composed.files,
+        artifactScratchRunId: composed.artifactScratchRunId,
+      });
       presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: composed.input, files: composed.files });
+    await executeCommand({
+      input: composed.input,
+      files: composed.files,
+      artifactScratchRunId: composed.artifactScratchRunId,
+    });
     presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
+      if (item.artifactScratchRunId) {
+        void presentationTemplates.discardScratch(item.artifactScratchRunId);
+      }
       setContent(item.input);
       setUploadFile(Array.from(new Set(item.files)));
       setAtPath([]);
       emitter.emit('acp.selected.file.clear');
     },
-    [remove, setAtPath, setContent, setUploadFile]
+    [presentationTemplates, remove, setAtPath, setContent, setUploadFile]
   );
 
   const appendSelectedFiles = useCallback(
@@ -658,6 +691,7 @@ Please check your local CLI tool authentication status`,
       resetActiveExecution('stop');
       return;
     }
+    void presentationTemplates.interruptScratchTurn(turnId).catch(() => {});
     runtimeView.markStopRequested(turnId);
     try {
       const result = await ipcBridge.conversation.stop.invoke({ conversation_id, turn_id: turnId });
@@ -698,8 +732,17 @@ Please check your local CLI tool authentication status`,
         onSendNow={handleSendNowQueued}
         onToggleMode={toggleMode}
         onReorder={reorder}
-        onRemove={remove}
-        onClear={clear}
+        onRemove={(commandId) => {
+          const item = queuedCommands.find((command) => command.id === commandId);
+          remove(commandId);
+          if (item?.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+        }}
+        onClear={() => {
+          for (const item of queuedCommands) {
+            if (item.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+          }
+          clear();
+        }}
       />
       <ThoughtDisplay
         running={teamRuntime?.loading ?? (aiProcessing && !hasThinkingMessage)}
@@ -765,11 +808,7 @@ Please check your local CLI tool authentication status`,
                 loadConfigOptions={teamPermission?.loadConfigOptions}
               />
             )}
-            <ContextUsageIndicator
-              tokenUsage={tokenUsage}
-              context_limit={context_limit > 0 ? context_limit : undefined}
-              localUsage={localUsage}
-            />
+            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
           </div>
         }
         prefix={

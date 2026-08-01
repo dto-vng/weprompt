@@ -6,8 +6,6 @@
   "profileEnableLabel": "Meine Anweisungen auf neue Chats anwenden",
   "profileInstructionsLabel": "Anweisungen",
   "profileInstructionsPlaceholder": "z. B. Ich arbeite in der Personalabteilung bei VNG. Bevorzuge knappes, förmliches Vietnamesisch. Frag nach, bevor du eine Vorlage annimmst.",
-  "profilePreviewTitle": "Was zu deinen Chats hinzugefügt wird",
-  "profilePreviewEmpty": "Noch nichts – füge oben Anweisungen hinzu.",
   "profileScopeNote": "Gilt für deine Chats. Spezialisierte Assistenten folgen ihren eigenen Regeln.",
   "title": "Einstellungen",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "Das Modell für App-Vorgänge konnte nicht gespeichert werden.",
     "checkFailed": "Die Integritätsprüfung für App-Vorgänge ist fehlgeschlagen.",
     "backendUpdateRequired": "Aktualisieren Sie WePrompt, um das Modell für App-Vorgänge zu konfigurieren.",
+    "checkResult": {
+      "ready": "Fehlerfrei · {{checked}}",
+      "setupRequired": "Einrichtung erforderlich · {{checked}}",
+      "unavailable": "Prüfung fehlgeschlagen · {{checked}}",
+      "checkedJustNow": "gerade geprüft",
+      "checkedAt": "geprüft am {{time}}"
+    },
     "status": {
       "ready": "Bereit",
       "checking": "Wird überprüft",

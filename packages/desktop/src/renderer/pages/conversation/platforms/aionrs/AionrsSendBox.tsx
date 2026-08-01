@@ -36,7 +36,8 @@ import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import { getKnownModelContextLimit } from '@/renderer/utils/model/modelContextLimits';
+import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
+import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
@@ -159,7 +160,6 @@ const AionrsSendBox: React.FC<{
   const { t } = useTranslation();
   const { checkAndUpdateTitle } = useAutoTitle();
   const { current_model } = modelSelection;
-  const contextLimit = getKnownModelContextLimit(current_model?.use_model);
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
 
@@ -175,11 +175,24 @@ const AionrsSendBox: React.FC<{
     }
   );
   const localUsage = useLocalTokenUsage();
+  const messages = useMessageList();
+  const contextBudget = useMemo(
+    () =>
+      resolveConversationContextBudgetSnapshot({
+        conversation: conversationContext?.conversation ?? null,
+        messages,
+        runtimeTokenUsage: tokenUsage,
+        skillNames: loadedSkills,
+        toolNames: loadedMcpStatuses.map((status) => status.name),
+        model: current_model as { use_model?: string | null; model?: string | null; context_limit?: number } | null,
+      }),
+    [conversationContext?.conversation, current_model, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
+  );
   const runtimeView = useConversationRuntimeView(conversation_id);
   const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
-  const presentationTemplates = usePresentationTemplates();
+  const presentationTemplates = usePresentationTemplates(conversation_id);
 
   const handleContentChange = useCallback(
     (val: string) => {
@@ -284,7 +297,10 @@ const AionrsSendBox: React.FC<{
       input,
       files,
       injectSkills,
-    }: Pick<ConversationCommandQueueItem, 'input' | 'files'> & { injectSkills?: string[] }) => {
+      artifactScratchRunId,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'> & {
+      injectSkills?: string[];
+    }) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
@@ -315,11 +331,13 @@ const AionrsSendBox: React.FC<{
         });
         setActiveMsgId(res.msg_id);
         markSendAccepted(res.turn_id, res.runtime, res.msg_id);
+        presentationTemplates.registerScratchTurn(res.turn_id, artifactScratchRunId);
         emitter.emit('chat.history.refresh');
         if (files.length > 0) {
           emitter.emit('aionrs.workspace.refresh');
         }
       } catch (error) {
+        void presentationTemplates.retainScratchRun(artifactScratchRunId, 'failed').catch(() => {});
         const errorMessage =
           getConversationRuntimeWorkspaceErrorMessage(error, t) ||
           (error instanceof Error ? error.message : String(error));
@@ -352,6 +370,7 @@ const AionrsSendBox: React.FC<{
       t,
       teamPermission,
       teamSendMessage,
+      presentationTemplates,
       workspacePath,
     ]
   );
@@ -424,7 +443,8 @@ const AionrsSendBox: React.FC<{
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
 
-    const composed = presentationTemplates.composeSend(message, filesToSend);
+    const scratch = teamSendMessage ? undefined : await presentationTemplates.prepareScratch(conversation_id);
+    const composed = presentationTemplates.composeSend(message, filesToSend, scratch);
 
     if (
       shouldEnqueueConversationCommand({
@@ -435,24 +455,36 @@ const AionrsSendBox: React.FC<{
     ) {
       // Queued sends drop injectSkills — the directive still names the skill,
       // so the agent can pick it up when the queued command is executed.
-      enqueue({ input: composed.input, files: composed.files });
+      enqueue({
+        input: composed.input,
+        files: composed.files,
+        artifactScratchRunId: composed.artifactScratchRunId,
+      });
       presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: composed.input, files: composed.files, injectSkills: composed.injectSkills });
+    await executeCommand({
+      input: composed.input,
+      files: composed.files,
+      injectSkills: composed.injectSkills,
+      artifactScratchRunId: composed.artifactScratchRunId,
+    });
     presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
+      if (item.artifactScratchRunId) {
+        void presentationTemplates.discardScratch(item.artifactScratchRunId);
+      }
       setContent(item.input);
       setUploadFile(Array.from(new Set(item.files)));
       setAtPath([]);
       emitter.emit('aionrs.selected.file.clear');
     },
-    [remove, setAtPath, setContent, setUploadFile]
+    [presentationTemplates, remove, setAtPath, setContent, setUploadFile]
   );
 
   const appendSelectedFiles = useCallback(
@@ -673,6 +705,7 @@ const AionrsSendBox: React.FC<{
       resetActiveExecution('stop');
       return;
     }
+    void presentationTemplates.interruptScratchTurn(turnId).catch(() => {});
     runtimeView.markStopRequested(turnId);
     try {
       const result = await ipcBridge.conversation.stop.invoke({ conversation_id, turn_id: turnId });
@@ -715,8 +748,17 @@ const AionrsSendBox: React.FC<{
         onSendNow={handleSendNowQueued}
         onToggleMode={toggleMode}
         onReorder={reorder}
-        onRemove={remove}
-        onClear={clear}
+        onRemove={(commandId) => {
+          const item = queuedCommands.find((command) => command.id === commandId);
+          remove(commandId);
+          if (item?.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+        }}
+        onClear={() => {
+          for (const item of queuedCommands) {
+            if (item.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+          }
+          clear();
+        }}
       />
       <ThoughtDisplay
         thought={thoughtDisplayThought}
@@ -786,7 +828,7 @@ const AionrsSendBox: React.FC<{
               beforeRuntimeSet={teamPermission?.warmupSession}
               loadConfigOptions={teamPermission?.loadConfigOptions}
             />
-            <ContextUsageIndicator tokenUsage={tokenUsage} localUsage={localUsage} context_limit={contextLimit} />
+            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
           </div>
         }
         prefix={

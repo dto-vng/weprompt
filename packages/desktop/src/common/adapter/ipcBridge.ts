@@ -53,7 +53,11 @@ import type {
   OfficeArtifactUndoRequest,
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
-import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type {
+  ArtifactScratchAllocation,
+  ArtifactScratchResult,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
 import type {
   EnsureConversationRuntimeResponse,
   GetConfigOptionsResponse,
@@ -602,6 +606,18 @@ export const presentationTemplates = {
     { file_path: string }
   >('presentation-templates.import-spec'),
   remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
+  allocateScratch: bridge.buildProvider<ArtifactScratchAllocation, { conversation_id: string; template_id: string }>(
+    'presentation-templates.scratch.allocate'
+  ),
+  completeScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.complete'
+  ),
+  retainScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string; reason: 'failed' | 'interrupted' }>(
+    'presentation-templates.scratch.retain'
+  ),
+  discardScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.discard'
+  ),
 };
 
 // ---------------------------------------------------------------------------

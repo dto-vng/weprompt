@@ -80,6 +80,16 @@ const VALID_PAYLOADS = {
   'presentation-templates.list': undefined,
   'presentation-templates.import-spec': { file_path: '/tmp/theme.json' },
   'presentation-templates.remove': { id: 'template-1' },
+  'presentation-templates.scratch.allocate': {
+    conversation_id: 'conversation-1',
+    template_id: 'business-review',
+  },
+  'presentation-templates.scratch.complete': { run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed' },
+  'presentation-templates.scratch.retain': {
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    reason: 'interrupted',
+  },
+  'presentation-templates.scratch.discard': { run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed' },
   'project-knowledge.list-sources': { projectId: 'project-1' },
   'project-knowledge.add-sources': {
     projectId: 'project-1',

@@ -39,3 +39,18 @@ export type PresentationTemplateSummary = {
   /** data: URL for the thumbnail (image/svg+xml or image/png). */
   previewDataUrl: string;
 };
+
+/** Exact app-owned scratch location for one Office artifact run. */
+export type ArtifactScratchAllocation = {
+  runId: string;
+  directory: string;
+  readyMarker: string;
+};
+
+export type ArtifactScratchResult =
+  | { status: 'cleaned' }
+  | {
+      status: 'retained';
+      directory: string;
+      reason: 'delivery_not_ready' | 'failed' | 'interrupted';
+    };

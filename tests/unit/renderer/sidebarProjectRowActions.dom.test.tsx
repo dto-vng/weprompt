@@ -5,12 +5,19 @@
  */
 
 import type { ForgeProject } from '@/common/types/project/projectTypes';
+import type { TChatConversation } from '@/common/config/storage';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigateMock = vi.fn();
+const conversationsHarness = vi.hoisted(() => ({
+  expandedWorkspaces: [] as string[],
+  timelineSections: [] as Array<Record<string, unknown>>,
+  handleToggleWorkspace: vi.fn(),
+}));
 
 const project: ForgeProject = {
   id: 'p1',
@@ -18,6 +25,35 @@ const project: ForgeProject = {
   workspace: '/w/alpha',
   created_at: 1,
   updated_at: 1,
+};
+
+const projectConversation = (id: string): TChatConversation => ({
+  id,
+  name: `Project chat ${id}`,
+  created_at: 1,
+  updated_at: 1,
+  status: 'finished',
+  platform: 'acp',
+  extra: { backend: 'codex', project_id: project.id, workspace: project.workspace },
+});
+
+const setProjectChats = (conversations: TChatConversation[]): void => {
+  conversationsHarness.timelineSections = [
+    {
+      timeline: 'Today',
+      items: [
+        {
+          type: 'workspace',
+          time: 1,
+          workspaceGroup: {
+            workspace: project.workspace,
+            display_name: project.name,
+            conversations,
+          },
+        },
+      ],
+    },
+  ];
 };
 
 vi.mock('react-i18next', () => ({
@@ -50,7 +86,9 @@ vi.mock('@/renderer/components/settings/DirectorySelectionModal', () => ({
 }));
 
 vi.mock('@/renderer/pages/conversation/GroupedHistory/ConversationRow', () => ({
-  default: () => null,
+  default: ({ conversation }: { conversation: TChatConversation }) => (
+    <div data-testid={`project-conversation-${conversation.id}`}>{conversation.name}</div>
+  ),
 }));
 
 vi.mock('@/renderer/pages/conversation/GroupedHistory/SortableConversationRow', () => ({
@@ -72,10 +110,10 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversations', (
     getCompletion: () => undefined,
     getRecentFailureAt: () => undefined,
     getRecentStoppedAt: () => undefined,
-    expandedWorkspaces: [],
+    expandedWorkspaces: conversationsHarness.expandedWorkspaces,
     pinnedConversations: [],
-    timelineSections: [],
-    handleToggleWorkspace: vi.fn(),
+    timelineSections: conversationsHarness.timelineSections,
+    handleToggleWorkspace: conversationsHarness.handleToggleWorkspace,
     collapsedSections: new Set<string>(),
     toggleSection: vi.fn(),
   }),
@@ -156,6 +194,9 @@ const menuAction = (): HTMLElement => screen.getByLabelText('conversation.histor
 describe('sidebar project row actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    conversationsHarness.expandedWorkspaces = [];
+    conversationsHarness.timelineSections = [];
+    conversationsHarness.handleToggleWorkspace.mockReset();
   });
 
   it('places both actions in one right-aligned, vertically centred slot', () => {
@@ -204,5 +245,64 @@ describe('sidebar project row actions', () => {
     fireEvent.click(menuAction());
 
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not show a chat disclosure for a project with no chats', () => {
+    renderSidebar();
+
+    expect(screen.queryByLabelText('conversation.history.expandProjectChats')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('conversation.history.collapseProjectChats')).not.toBeInTheDocument();
+  });
+
+  it('shows a dedicated collapsed disclosure for a project with one chat', () => {
+    setProjectChats([projectConversation('c1')]);
+    renderSidebar();
+
+    const disclosure = screen.getByLabelText('conversation.history.expandProjectChats');
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(disclosure.querySelector('.i-icon-right')).not.toHaveClass('rotate-90');
+    expect(screen.queryByTestId('project-conversation-c1')).not.toBeInTheDocument();
+
+    fireEvent.click(disclosure);
+
+    expect(conversationsHarness.handleToggleWorkspace).toHaveBeenCalledExactlyOnceWith(project.workspace);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('shows an expanded disclosure and every chat for a project with multiple chats', () => {
+    setProjectChats([projectConversation('c1'), projectConversation('c2')]);
+    conversationsHarness.expandedWorkspaces = [project.workspace];
+    renderSidebar();
+
+    expect(screen.getByLabelText('conversation.history.collapseProjectChats')).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByLabelText('conversation.history.collapseProjectChats').querySelector('.i-icon-right')
+    ).toHaveClass('rotate-90');
+    expect(screen.getByTestId('project-conversation-c1')).toBeVisible();
+    expect(screen.getByTestId('project-conversation-c2')).toBeVisible();
+  });
+
+  it('activates the project chat disclosure from the keyboard without navigating', async () => {
+    const user = userEvent.setup();
+    setProjectChats([projectConversation('c1')]);
+    renderSidebar();
+
+    const disclosure = screen.getByLabelText('conversation.history.expandProjectChats');
+    expect(disclosure.className).toContain('focus-visible:[outline:2px_solid_rgb(var(--primary-6))]');
+    disclosure.focus();
+    await user.keyboard('{Enter}');
+
+    expect(conversationsHarness.handleToggleWorkspace).toHaveBeenCalledExactlyOnceWith(project.workspace);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('continues to open Project Home when the project name is clicked', () => {
+    setProjectChats([projectConversation('c1')]);
+    renderSidebar();
+
+    fireEvent.click(screen.getByText(project.name));
+
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/project/p1');
+    expect(conversationsHarness.handleToggleWorkspace).not.toHaveBeenCalled();
   });
 });

@@ -167,6 +167,8 @@
     "removeProject": "移除项目",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此项目中新建对话",
+    "expandProjectChats": "展开项目聊天",
+    "collapseProjectChats": "折叠项目聊天",
     "deleting": "删除中...",
     "reorderPinned": "拖动以调整置顶会话顺序",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "无法移除项目。请重新打开项目后重试；文件夹中的文件未被删除。",
+    "removeProjectChatDetachFailed": "部分聊天未能从此项目中移除。项目已保留；请重试移除。",
+    "removeProjectStateChanged": "项目列表在移除前发生了变化。请刷新后重试。",
+    "removeProjectStorageFailed": "无法保存项目更改。请检查 WePrompt 是否可以访问其应用数据，然后重试。",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "今天",
     "weekToDate": "本周至今",
     "monthToDate": "本月至今",
-    "triggerLabel": "显示上下文用量"
+    "triggerLabel": "显示上下文用量",
+    "estimated": "估算",
+    "unavailable": "上下文用量不可用"
   },
   "skill_generator": {
     "title": "生成 Skill/规则",
@@ -766,6 +773,13 @@
     "importCard": "导入模板 (.md)",
     "empty": "暂无可用模板",
     "chipTooltip": "此消息将使用该模板",
+    "scratch": {
+      "prepareError": "无法准备产物临时空间：{{error}}",
+      "retained": "临时产物文件已保留在 {{path}} 以便恢复。",
+      "cleanup": "清理",
+      "cleanupSuccess": "临时产物文件已移除",
+      "cleanupError": "清理失败：{{error}}"
+    },
     "importSuccess": "模板已导入",
     "importError": "导入失败：{{error}}",
     "removeError": "删除失败：{{error}}",

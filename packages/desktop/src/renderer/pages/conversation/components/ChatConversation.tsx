@@ -254,6 +254,7 @@ const AionrsConversationPanel: React.FC<{
     <ChatLayout {...chatLayoutProps} conversation_id={conversation.id}>
       <AionrsChat
         conversation_id={conversation.id}
+        conversation={conversation}
         emptySlot={<ConversationEmptySlot />}
         workspace={conversation.extra.workspace}
         modelSelection={modelSelection}
@@ -332,6 +333,7 @@ const ChatConversation: React.FC<{
           <AcpChat
             key={conversation.id}
             conversation_id={conversation.id}
+            conversation={conversation}
             // Interactive platforms only. LegacyReadOnlyConversation deliberately gets none:
             // inviting someone to start typing in a read-only conversation is a bug.
             emptySlot={<ConversationEmptySlot />}

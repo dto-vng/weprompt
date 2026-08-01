@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IConversationMcpStatus, ISessionMcpServer } from '@/common/config/storage';
+import type { IConversationMcpStatus, ISessionMcpServer, TChatConversation } from '@/common/config/storage';
 import type { ConversationContextValue } from '@/renderer/hooks/context/ConversationContext';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
 import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
@@ -28,6 +28,7 @@ import type { AionrsModelSelection } from './useAionrsModelSelection';
 
 const AionrsChat: React.FC<{
   conversation_id: string;
+  conversation?: TChatConversation;
   workspace: string;
   modelSelection: AionrsModelSelection;
   modelSelector?: React.ReactNode;
@@ -46,6 +47,7 @@ const AionrsChat: React.FC<{
   session_mcp_servers?: ISessionMcpServer[];
 }> = ({
   conversation_id,
+  conversation,
   workspace,
   modelSelection,
   modelSelector,
@@ -71,6 +73,7 @@ const AionrsChat: React.FC<{
   const conversationValue = useMemo<ConversationContextValue>(() => {
     return {
       conversation_id: conversation_id,
+      conversation,
       workspace,
       type: 'aionrs',
       cron_job_id,
@@ -79,7 +82,16 @@ const AionrsChat: React.FC<{
       loadedMcpStatuses,
       assistantId,
     };
-  }, [conversation_id, workspace, cron_job_id, loadedSkills, loadedMcpServers, loadedMcpStatuses, assistantId]);
+  }, [
+    conversation_id,
+    conversation,
+    workspace,
+    cron_job_id,
+    loadedSkills,
+    loadedMcpServers,
+    loadedMcpStatuses,
+    assistantId,
+  ]);
 
   return (
     <ConversationProvider value={conversationValue}>

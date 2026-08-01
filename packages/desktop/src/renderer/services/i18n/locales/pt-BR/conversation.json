@@ -167,6 +167,8 @@
     "removeProject": "Remover projeto",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Novo chat neste projeto",
+    "expandProjectChats": "Expandir conversas do projeto",
+    "collapseProjectChats": "Recolher conversas do projeto",
     "deleting": "Excluindo...",
     "reorderPinned": "Arraste para reordenar a conversa fixada",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Não foi possível remover o projeto. Abra-o novamente e tente de novo; os arquivos da pasta não foram excluídos.",
+    "removeProjectChatDetachFailed": "Não foi possível desvincular alguns chats deste projeto. O projeto foi mantido; tente removê-lo novamente.",
+    "removeProjectStateChanged": "A lista de projetos mudou antes da remoção. Atualize-a e tente novamente.",
+    "removeProjectStorageFailed": "Não foi possível salvar as alterações do projeto. Verifique se o WePrompt pode acessar os dados do aplicativo e tente novamente.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -641,7 +646,9 @@
     "today": "Hoje",
     "weekToDate": "Semana até hoje",
     "monthToDate": "Mês até hoje",
-    "triggerLabel": "Mostrar uso do contexto"
+    "triggerLabel": "Mostrar uso do contexto",
+    "estimated": "Estimado",
+    "unavailable": "Uso de contexto indisponível"
   },
   "skill_generator": {
     "title": "Gerar Habilidade/Regra",
@@ -772,6 +779,13 @@
     "importCard": "Importar modelo (.md)",
     "empty": "Nenhum modelo disponível",
     "chipTooltip": "Esta mensagem usará o modelo",
+    "scratch": {
+      "prepareError": "Não foi possível preparar o espaço temporário do artefato: {{error}}",
+      "retained": "Os arquivos temporários do artefato foram mantidos para recuperação em {{path}}.",
+      "cleanup": "Limpar",
+      "cleanupSuccess": "Arquivos temporários do artefato removidos",
+      "cleanupError": "Falha na limpeza: {{error}}"
+    },
     "importSuccess": "Modelo importado",
     "importError": "Falha na importação: {{error}}",
     "removeError": "Falha ao excluir: {{error}}",

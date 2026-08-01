@@ -25,6 +25,18 @@ export const readExpandedWorkspaces = (): string[] => {
   }
 };
 
+export const hasStoredWorkspaceExpansionPreference = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const stored = localStorage.getItem(WORKSPACE_EXPANSION_STORAGE_KEY);
+    if (!stored) return false;
+    return Array.isArray(JSON.parse(stored));
+  } catch {
+    return false;
+  }
+};
+
 export const dispatchWorkspaceExpansionChange = (expandedWorkspaces: string[]): void => {
   if (typeof window === 'undefined') {
     return;

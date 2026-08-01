@@ -37,6 +37,18 @@ describe('resolveOfficeArtifactPath', () => {
     });
   });
 
+  it('resolves a PowerPoint artifact for validated preview delivery', async () => {
+    const workspace = await createTemporaryDirectory();
+    const filePath = join(workspace, 'deck.PPTX');
+    await writeFile(filePath, 'presentation');
+
+    await expect(resolveOfficeArtifactPath(workspace, filePath)).resolves.toMatchObject({
+      workspace: await realpath(workspace),
+      filePath: await realpath(filePath),
+      kind: 'presentation',
+    });
+  });
+
   it('rejects a symlink that escapes the workspace', async () => {
     const workspace = await createTemporaryDirectory();
     const outsideDirectory = await createTemporaryDirectory();

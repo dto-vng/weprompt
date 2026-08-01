@@ -167,6 +167,8 @@
     "removeProject": "移除專案",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此專案中新建對話",
+    "expandProjectChats": "展開專案聊天",
+    "collapseProjectChats": "收合專案聊天",
     "deleting": "刪除中...",
     "reorderPinned": "拖動以調整置頂會話順序",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "無法移除專案。請重新開啟專案後再試；資料夾中的檔案未被刪除。",
+    "removeProjectChatDetachFailed": "部分聊天無法與此專案解除關聯。專案已保留；請重試移除。",
+    "removeProjectStateChanged": "專案清單在移除前已變更。請重新整理後再試。",
+    "removeProjectStorageFailed": "無法儲存專案變更。請確認 WePrompt 可以存取其應用程式資料，然後重試。",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "今天",
     "weekToDate": "本週至今",
     "monthToDate": "本月至今",
-    "triggerLabel": "顯示上下文用量"
+    "triggerLabel": "顯示上下文用量",
+    "estimated": "估算",
+    "unavailable": "上下文用量無法取得"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -766,6 +773,13 @@
     "importCard": "匯入範本 (.md)",
     "empty": "沒有可用的範本",
     "chipTooltip": "此訊息將使用該範本",
+    "scratch": {
+      "prepareError": "無法準備成果暫存空間：{{error}}",
+      "retained": "暫存成果檔案已保留於 {{path}} 以便復原。",
+      "cleanup": "清理",
+      "cleanupSuccess": "暫存成果檔案已移除",
+      "cleanupError": "清理失敗：{{error}}"
+    },
     "importSuccess": "範本已匯入",
     "importError": "匯入失敗：{{error}}",
     "removeError": "刪除失敗：{{error}}",

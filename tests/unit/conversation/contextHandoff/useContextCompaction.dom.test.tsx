@@ -311,6 +311,38 @@ describe('compactConversationContext', () => {
     });
   });
 
+  it('writes a schema-valid rules fallback after provider failure with hidden oversized assistant text', async () => {
+    const dependencies = createDependencies();
+    dependencies.compactWithAppOperations = vi.fn(async () => compactFailure('provider_request_failed'));
+    dependencies.readFile = vi.fn(async () => null);
+    dependencies.loadMessages = vi.fn(async () => [
+      messages[0],
+      { ...messages[1], content: { content: `Visible result ${'v'.repeat(700)}` } },
+      {
+        ...messages[1],
+        id: 'hidden-execution',
+        msg_id: 'hidden-execution',
+        hidden: true,
+        content: { content: `Internal execution ${'x'.repeat(1_400)}` },
+      },
+    ]);
+
+    const result = await compactConversationContext(
+      {
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        trigger: 'manual',
+        targetTurnId: 'turn-4',
+      },
+      dependencies
+    );
+
+    expect(result.source).toBe('rules');
+    expect(result.snapshot.current_state[0]).toContain('Visible result');
+    expect(result.snapshot.current_state[0]).not.toContain('Internal execution');
+    expect(dependencies.writeFile).toHaveBeenCalledWith(expect.objectContaining({ path: '/workspace/Context.md' }));
+  });
+
   it('does not advance the durable revision when writing Context.md fails', async () => {
     const dependencies = createDependencies();
     dependencies.writeFile = vi.fn(async () => false);

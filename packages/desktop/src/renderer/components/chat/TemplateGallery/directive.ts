@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type {
+  ArtifactScratchAllocation,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
 
 /**
  * First sentence of each directive. Exported so the chat renderer can detect
@@ -30,7 +33,30 @@ const htmlDirective = (themeFile: string): string =>
 /** User attachments that the agent should mine for content via officecli. */
 const OFFICE_SOURCE_EXT_RE = /\.(xlsx|xls|docx|doc|pptx|pdf|odt|ods|odp)$/i;
 
-const pptxDirective = (themeFile: string, referenceFile: string): string =>
+const officeArtifactScratchRules = (scratch?: ArtifactScratchAllocation): string[] => {
+  if (!scratch) {
+    return [
+      `Before creating QA or intermediate files, allocate one secure temporary directory outside the conversation workspace`,
+      `(use mktemp -d on macOS/Linux, or a GUID-named folder under the system temp directory on Windows) and retain its exact path.`,
+      `All QA renders, repair scripts, command payloads, backups, and intermediate copies must use explicit paths inside that scratch directory;`,
+      `only user sources and the declared final deliverable belong in the conversation workspace.`,
+      `After the final deliverable is installed and every delivery gate passes, remove only that exact scratch directory — never clean by filename pattern, extension, or wildcard.`,
+      `If the run fails or is interrupted, preserve the scratch directory and report its exact path so recovery remains possible.`,
+    ];
+  }
+
+  return [
+    `Use this app-managed scratch directory: \`${scratch.directory}\`.`,
+    `All QA renders, repair scripts, command payloads, backups, and intermediate copies must use explicit paths inside that scratch directory;`,
+    `only user sources and the declared final deliverable belong in the conversation workspace.`,
+    `After the final deliverable is installed and every delivery gate passes, write the delivery-ready marker \`${scratch.readyMarker}\`.`,
+    `Do not delete the scratch directory yourself; the app removes that exact owned directory after the successful turn.`,
+    `Never clean by filename pattern, extension, or wildcard.`,
+    `If the run fails or is interrupted, preserve the scratch directory and report its exact path so recovery remains possible.`,
+  ];
+};
+
+const pptxDirective = (themeFile: string, referenceFile: string, scratch?: ArtifactScratchAllocation): string =>
   [
     PPTX_DIRECTIVE_PREFIX,
     `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
@@ -43,6 +69,7 @@ const pptxDirective = (themeFile: string, referenceFile: string): string =>
     `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
     `\`officecli view <file> text\` reads Office files — and build slide content and chart data from it; never invent numbers when sources are attached.`,
     `Every content slide needs a non-text visual (chart, shape, or image) and speaker notes.`,
+    ...officeArtifactScratchRules(scratch),
     `Before declaring done, ALL delivery gates must pass: \`officecli validate\`; \`officecli view issues\` clean;`,
     `no leftover placeholder text; and a per-slide visual audit — render every slide with \`officecli view screenshot --page N\`,`,
     `inspect each image for text overflow, overlap, contrast, and margin problems, fix, and re-render until a full pass finds zero new issues (max 3 cycles).`,
@@ -52,7 +79,7 @@ const pptxDirective = (themeFile: string, referenceFile: string): string =>
     `Do not invent facts to fill template slots.`,
   ].join(' ');
 
-const docxDirective = (themeFile: string, referenceFile: string): string =>
+const docxDirective = (themeFile: string, referenceFile: string, scratch?: ArtifactScratchAllocation): string =>
   [
     DOCX_DIRECTIVE_PREFIX,
     `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
@@ -62,6 +89,7 @@ const docxDirective = (themeFile: string, referenceFile: string): string =>
     `Copy the attached ${referenceFile} to the output file, then edit the copy with officecli —`,
     `preserve its Word styles, numbering definitions, page setup, and header/footer parts; replace the sample content wholesale.`,
     `Never build a document from scratch and never write raw OOXML.`,
+    ...officeArtifactScratchRules(scratch),
     `If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first —`,
     `\`officecli view <file> text\` reads Office files — and build sections and tables from it; never invent numbers when sources are attached.`,
     `Before declaring done, ALL delivery gates must pass: \`officecli validate\` returning "no errors found";`,
@@ -84,15 +112,16 @@ const docxDirective = (themeFile: string, referenceFile: string): string =>
 export function composePresentationSend(
   template: PresentationTemplateSummary,
   message: string,
-  files: string[]
-): { input: string; files: string[]; injectSkills: string[] } {
+  files: string[],
+  scratch?: ArtifactScratchAllocation
+): { input: string; files: string[]; injectSkills: string[]; artifactScratchRunId?: string } {
   const { manifest } = template;
   const hasReference = Boolean(template.referencePath && manifest.referenceFile);
   let directive: string;
   if (manifest.format === 'pptx' && hasReference) {
-    directive = pptxDirective(manifest.themeFile, manifest.referenceFile!);
+    directive = pptxDirective(manifest.themeFile, manifest.referenceFile!, scratch);
   } else if (manifest.format === 'docx' && hasReference) {
-    directive = docxDirective(manifest.themeFile, manifest.referenceFile!);
+    directive = docxDirective(manifest.themeFile, manifest.referenceFile!, scratch);
   } else {
     // No retained reference resolved (corrupt pack): never tell the agent to copy
     // a file that is not attached — fall back to the spec-only directive.
@@ -114,5 +143,6 @@ export function composePresentationSend(
     // get the skill too when the user attached Office source documents the
     // agent must read with officecli.
     injectSkills: clonesReference || files.some((f) => OFFICE_SOURCE_EXT_RE.test(f)) ? ['officecli'] : [],
+    ...(scratch ? { artifactScratchRunId: scratch.runId } : {}),
   };
 }
