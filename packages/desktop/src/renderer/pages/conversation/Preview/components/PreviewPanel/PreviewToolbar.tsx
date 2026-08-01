@@ -96,12 +96,6 @@ type PreviewToolbarProps = {
   onDownload: () => void;
 
   /**
-   * 发布当前 HTML 到仪表盘（仅 HTML 类型）；未提供时不展示按钮
-   * Publish the current HTML to the Dashboard tab (HTML only); hidden when not provided
-   */
-  onPublishToDashboard?: () => void;
-
-  /**
    * HTML 审核元素模式（仅HTML类型使用）
    * HTML inspect mode (only for HTML type)
    */
@@ -151,7 +145,6 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   onSplitScreenToggle,
   onOpenInSystem,
   onDownload,
-  onPublishToDashboard,
   inspectMode,
   onInspectModeToggle,
   leftExtra,
@@ -352,25 +345,6 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
                 <line x1='12' y1='15' x2='12' y2='3' />
               </svg>
               <span>{t('common.download')}</span>
-            </div>
-          )}
-
-          {isHTML && onPublishToDashboard && (
-            <div className={toolbarBtn} onClick={() => void onPublishToDashboard()} title={t('dashboard.publish')}>
-              <svg
-                width={toolbarIconSize}
-                height={toolbarIconSize}
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-                className='text-t-secondary'
-              >
-                <path d='M12 15V3' />
-                <polyline points='7 8 12 3 17 8' />
-                <path d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2' />
-              </svg>
-              <span>{t('dashboard.publish')}</span>
             </div>
           )}
 

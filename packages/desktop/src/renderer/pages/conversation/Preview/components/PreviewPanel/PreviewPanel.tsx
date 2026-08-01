@@ -345,28 +345,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
   // Show "Open in System" button for all files with file_path (unified in toolbar)
   const showOpenInSystemButton = Boolean(metadata?.file_path) && !isOfficeDocument;
 
-  // 发布当前 HTML 到仪表盘 / Publish current HTML to the Dashboard tab
-  const handlePublishToDashboard = useCallback(async () => {
-    const html = typeof content === 'string' ? content : '';
-    if (!html.trim()) return;
-    const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
-    const name = (titleMatch?.[1] || metadata?.file_name || activeTab?.title || 'Dashboard')
-      .replace(/\.html?$/i, '')
-      .trim();
-    try {
-      const result = await ipcBridge.dashboards.publish.invoke({ name, html });
-      if (result.ok) {
-        messageApi.success(t('dashboard.publishSuccess'));
-      } else if ('error' in result) {
-        // `else if` (not plain `else`) so the union narrows under this project's
-        // tsconfig (no strictNullChecks); see usePresentationTemplates for the same pattern.
-        messageApi.error(t('dashboard.publishError', { error: result.error }));
-      }
-    } catch (error) {
-      messageApi.error(t('dashboard.publishError', { error: error instanceof Error ? error.message : String(error) }));
-    }
-  }, [content, metadata, activeTab, messageApi, t]);
-
   // 下载文件到本地 / Download file to local system
   const handleDownload = useCallback(async () => {
     try {
@@ -863,7 +841,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
             onSplitScreenToggle={() => setIsSplitScreenEnabled(!isSplitScreenEnabled)}
             onOpenInSystem={handleOpenInSystem}
             onDownload={handleDownload}
-            onPublishToDashboard={isHTML ? handlePublishToDashboard : undefined}
             inspectMode={inspectMode}
             onInspectModeToggle={() => setInspectMode(!inspectMode)}
             leftExtra={toolbarExtras?.left}

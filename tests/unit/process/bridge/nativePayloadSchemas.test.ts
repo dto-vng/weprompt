@@ -80,10 +80,6 @@ const VALID_PAYLOADS = {
   'presentation-templates.list': undefined,
   'presentation-templates.import-spec': { file_path: '/tmp/theme.json' },
   'presentation-templates.remove': { id: 'template-1' },
-  'dashboards.list': undefined,
-  'dashboards.read': { id: 'dashboard-1' },
-  'dashboards.publish': { name: 'VNG Headcount', html: '<html lang="en"></html>' },
-  'dashboards.remove': { id: 'dashboard-1' },
   'project-knowledge.list-sources': { projectId: 'project-1' },
   'project-knowledge.add-sources': {
     projectId: 'project-1',
@@ -201,7 +197,6 @@ const VOID_PROVIDER_KEYS = [
   'auto-update.download.cancel',
   'auto-update.quit-and-install',
   'presentation-templates.list',
-  'dashboards.list',
   'window-controls:minimize',
   'window-controls:maximize',
   'window-controls:unmaximize',

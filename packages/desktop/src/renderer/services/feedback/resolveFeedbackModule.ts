@@ -20,8 +20,6 @@ const ROUTE_MODULE_MAP: ReadonlyArray<readonly [prefix: string, tag: FeedbackMod
   ['/conversation', 'conversation-session'],
   // Project Home is a chats-first surface (scoped chat list + composer).
   ['/project', 'conversation-session'],
-  // Published dashboards are preview artifacts, same owners as the preview panels.
-  ['/dashboard', 'workspace-preview'],
   ['/team', 'agent-team'],
   ['/scheduled', 'scheduled-task'],
   ['/assistants', 'assistant-preset'],
