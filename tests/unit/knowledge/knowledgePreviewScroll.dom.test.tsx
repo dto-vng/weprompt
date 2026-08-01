@@ -44,10 +44,7 @@ vi.mock('@/common', () => ({
 import KnowledgeSourcePreview from '@/renderer/pages/project/components/KnowledgeSourcePreview';
 
 /** Mirrors renderPagesAsMarkdown's output for an 8-page PDF. */
-const EIGHT_PAGES = Array.from(
-  { length: 8 },
-  (_, i) => `## Page ${i + 1}\n\nbody text for page ${i + 1}`
-).join('\n\n');
+const EIGHT_PAGES = Array.from({ length: 8 }, (_, i) => `## Page ${i + 1}\n\nbody text for page ${i + 1}`).join('\n\n');
 
 const props = {
   fileName: 'so-tay-nhan-vien-2026.pdf',
