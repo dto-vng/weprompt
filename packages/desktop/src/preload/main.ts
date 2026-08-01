@@ -73,7 +73,6 @@ contextBridge.exposeInMainWorld('__backendStartupFailure', backendStartupFailure
 const trayEvents = [
   'tray:navigate-to-guid',
   'tray:navigate-to-conversation',
-  'tray:open-about',
   'tray:pause-all-tasks',
   'tray:check-update',
 ];
