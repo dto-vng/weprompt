@@ -6,8 +6,6 @@
   "profileEnableLabel": "自分の指示を新しいチャットに適用する",
   "profileInstructionsLabel": "指示",
   "profileInstructionsPlaceholder": "例：私は VNG の人事部で働いています。簡潔でフォーマルなベトナム語がよいです。テンプレートを決めつける前に確認してください。",
-  "profilePreviewTitle": "チャットに追加される内容",
-  "profilePreviewEmpty": "まだありません。上で指示を追加してください。",
   "profileScopeNote": "あなたのチャットに適用されます。専用アシスタントは独自のルールに従います。",
   "title": "Settings",
   "skillsHub": {
@@ -1328,6 +1326,13 @@
     "saveFailed": "アプリ操作モデルを保存できませんでした。",
     "checkFailed": "アプリ操作のヘルスチェックに失敗しました。",
     "backendUpdateRequired": "アプリ操作モデルを設定するには、WePrompt を更新してください。",
+    "checkResult": {
+      "ready": "正常 · {{checked}}",
+      "setupRequired": "セットアップが必要 · {{checked}}",
+      "unavailable": "チェック失敗 · {{checked}}",
+      "checkedJustNow": "たった今確認",
+      "checkedAt": "{{time}} に確認"
+    },
     "status": {
       "ready": "準備完了",
       "checking": "確認中",

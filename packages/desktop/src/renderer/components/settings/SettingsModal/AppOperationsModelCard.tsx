@@ -77,6 +77,14 @@ const REASON_KEYS: Record<AppOperationsModelReasonCode, string> = {
   health_check_failed: 'settings.appOperationsModel.reason.healthCheckFailed',
 };
 
+const CHECK_RESULT_KEYS: Record<Exclude<AppOperationsModelHealth, 'checking'>, string> = {
+  ready: 'settings.appOperationsModel.checkResult.ready',
+  setup_required: 'settings.appOperationsModel.checkResult.setupRequired',
+  unavailable: 'settings.appOperationsModel.checkResult.unavailable',
+};
+
+const JUST_CHECKED_MS = 60_000;
+
 export default function AppOperationsModelCard({
   providers,
   providersLoading,
@@ -265,6 +273,16 @@ export default function AppOperationsModelCard({
   const reasonCode: AppOperationsModelReasonCode | undefined = response?.reason_code;
   const showAddModelAction =
     response?.setting.mode === 'auto' && response.health === 'setup_required' && reasonCode === 'no_eligible_model';
+  const checkResult = (() => {
+    if (!response?.checked_at || response.health === 'checking') return undefined;
+    const checked =
+      Math.abs(Date.now() - response.checked_at) < JUST_CHECKED_MS
+        ? t('settings.appOperationsModel.checkResult.checkedJustNow')
+        : t('settings.appOperationsModel.checkResult.checkedAt', {
+            time: new Date(response.checked_at).toLocaleString(),
+          });
+    return t(CHECK_RESULT_KEYS[response.health], { checked });
+  })();
 
   return (
     <section className='flex flex-col gap-12px rounded-8px border border-border-2 p-16px'>
@@ -364,6 +382,7 @@ export default function AppOperationsModelCard({
             <span>{t('settings.appOperationsModel.usedByLabel')}</span>
             <Tag>{t('settings.appOperationsModel.contextCompaction')}</Tag>
             {reasonCode && <span>{t(REASON_KEYS[reasonCode])}</span>}
+            {checkResult && <span className='font-medium text-text-1'>{checkResult}</span>}
           </div>
 
           {showAddModelAction && (
@@ -373,6 +392,7 @@ export default function AppOperationsModelCard({
           )}
 
           <Button
+            className='self-start !min-h-36px px-12px'
             type='secondary'
             disabled={!canCheck}
             loading={pending === 'checking'}

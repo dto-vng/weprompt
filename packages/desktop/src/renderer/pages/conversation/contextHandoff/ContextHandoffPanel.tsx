@@ -4,7 +4,6 @@ import type {
   TChatConversation,
   TContextHandoffExtra,
   TContextHandoffItem,
-  TokenUsageData,
 } from '@/common/config/storage';
 import { uuid } from '@/common/utils';
 import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
@@ -15,10 +14,9 @@ import { Button, Input, Message, Modal, Progress, Space, Tooltip, Typography } f
 import { Add, Attention, Delete, Edit, FileText, Pin } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { estimateContextBudget } from './contextBudget';
+import { resolveConversationContextBudgetSnapshot } from './contextBudget';
 import { buildContextHandoffExtraPatch } from './contextConversationUpdate';
 import { resolveContextFile } from './contextFile';
-import { resolveConversationContextLimit } from './contextLimit';
 import { buildContextMarkdown } from './contextMarkdown';
 import { loadContextHandoffMessages, selectContextHandoffMessages } from './contextMessages';
 import {
@@ -64,12 +62,6 @@ const budgetPercent = (ratio: number | null): number => {
 
 const isAionrsConversation = (conversation: TChatConversation | null): conversation is AionrsConversation => {
   return conversation?.type === 'aionrs';
-};
-
-const getConversationTokenUsage = (conversation: TChatConversation | null): TokenUsageData | null => {
-  if (!conversation || !('last_token_usage' in conversation.extra)) return null;
-  const usage = conversation.extra.last_token_usage;
-  return usage && usage.total_tokens > 0 ? usage : null;
 };
 
 const getGenerationStateKey = (contextState: TContextHandoffExtra) => {
@@ -157,31 +149,15 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
   const hasContextError = !isCompacting && currentContextFile.status === 'failed';
   const contextErrorMessage = t(getContextErrorKey(currentContextFile.last_error_code));
   const contextFileName = currentContextFile.context_file_name || resolveContextFile(workspace).fileName;
-  const contextLimit = resolveConversationContextLimit(conversation);
-  const runtimeTokenUsage = getConversationTokenUsage(conversation);
-  const contextMarkdown = useMemo(
-    () =>
-      conversation
-        ? buildContextMarkdown({
-            conversation,
-            messages,
-          })
-        : '',
-    [conversation, messages]
-  );
-
   const budget = useMemo(
     () =>
-      estimateContextBudget({
+      resolveConversationContextBudgetSnapshot({
+        conversation,
         messages,
-        pinnedContext,
-        contextMarkdown,
-        contextLimit,
-        runtimeTokenUsage,
         skillNames: loadedSkills,
         toolNames: loadedMcpStatuses.map((status) => status.name),
       }),
-    [contextLimit, contextMarkdown, loadedMcpStatuses, loadedSkills, messages, pinnedContext, runtimeTokenUsage]
+    [conversation, loadedMcpStatuses, loadedSkills, messages]
   );
 
   const updateContextHandoff = useCallback(
@@ -364,7 +340,13 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
         <div className='context-handoff-budget'>
           <div className='context-handoff-budget-label'>
             <span>{t('conversation.contextHandoff.budgetLabel')}</span>
-            <span>{formatBudgetRatio(budget.ratio)}</span>
+            <span>
+              {budget.ratio === null
+                ? '--'
+                : budget.source === 'estimated'
+                  ? `${t('conversation.contextUsage.estimated')} · ${formatBudgetRatio(budget.ratio)}`
+                  : formatBudgetRatio(budget.ratio)}
+            </span>
           </div>
           <Progress
             percent={budgetPercent(budget.ratio)}

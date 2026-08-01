@@ -80,6 +80,7 @@ const AionrsTeamChat: React.FC<{
   return (
     <AionrsChat
       conversation_id={conversation.id}
+      conversation={conversation}
       workspace={conversation.extra.workspace}
       modelSelection={modelSelection}
       emptySlot={emptySlot}
@@ -213,6 +214,7 @@ const TeamChatView: React.FC<TeamChatViewProps> = ({
           <AcpChat
             key={conversation.id}
             conversation_id={conversation.id}
+            conversation={conversation}
             workspace={conversation.extra?.workspace}
             backend={resolvedAssistantBackend}
             session_mode={conversation.extra?.session_mode}

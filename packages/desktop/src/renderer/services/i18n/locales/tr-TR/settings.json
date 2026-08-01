@@ -6,8 +6,6 @@
   "profileEnableLabel": "Talimatlarımı yeni sohbetlere uygula",
   "profileInstructionsLabel": "Talimatlar",
   "profileInstructionsPlaceholder": "örn. VNG'de İnsan Kaynakları'nda çalışıyorum. Kısa ve resmi bir Vietnamca tercih ederim. Bir şablon varsaymadan önce sor.",
-  "profilePreviewTitle": "Sohbetlerinize eklenenler",
-  "profilePreviewEmpty": "Henüz bir şey yok — yukarıdan talimat ekleyin.",
   "profileScopeNote": "Sohbetlerinize uygulanır. Özel asistanlar kendi kurallarına uyar.",
   "title": "Ayarlar",
   "skillsHub": {
@@ -1326,6 +1324,13 @@
     "saveFailed": "Uygulama işlemleri modeli kaydedilemedi.",
     "checkFailed": "Uygulama işlemleri durum denetimi başarısız oldu.",
     "backendUpdateRequired": "Uygulama işlemleri modelini yapılandırmak için WePrompt'u güncelleyin.",
+    "checkResult": {
+      "ready": "Sağlıklı · {{checked}}",
+      "setupRequired": "Kurulum gerekli · {{checked}}",
+      "unavailable": "Kontrol başarısız · {{checked}}",
+      "checkedJustNow": "az önce kontrol edildi",
+      "checkedAt": "{{time}} tarihinde kontrol edildi"
+    },
     "status": {
       "ready": "Hazır",
       "checking": "Denetleniyor",

@@ -24,9 +24,11 @@ import type { OfficeCliRunner } from '@/process/services/office-artifact/officeC
 const WORKSPACE = '/workspace';
 const XLSX_FILE = '/workspace/forecast.xlsx';
 const DOCX_FILE = '/workspace/report.docx';
+const PPTX_FILE = '/workspace/deck.pptx';
 const STAGED_XLSX_FILE = '/workspace/.forecast.forge-edit.xlsx';
 const STAGED_DOCX_FILE = '/workspace/.report.forge-edit.docx';
 const PREVIEW_XLSX_FILE = '/preview/preview.xlsx';
+const PREVIEW_PPTX_FILE = '/preview/preview.pptx';
 const PREVIEW_WORKSPACE = '/preview';
 const VERSION_A = 'a'.repeat(64);
 const VERSION_B = 'b'.repeat(64);
@@ -190,6 +192,21 @@ describe('OfficeArtifactService preview leases', () => {
       workspace: PREVIEW_WORKSPACE,
     });
     expect(workingFiles.createPreview).toHaveBeenCalledWith(XLSX_FILE);
+    expect(runner.validate).toHaveBeenCalledWith(PREVIEW_XLSX_FILE);
+  });
+
+  it('rejects a corrupt presentation before exposing a preview lease', async () => {
+    resolveArtifact.mockResolvedValue(artifact('presentation', PPTX_FILE));
+    workingFiles.createPreview.mockResolvedValue({ filePath: PREVIEW_PPTX_FILE, workspace: PREVIEW_WORKSPACE });
+    hashArtifact.mockResolvedValueOnce(VERSION_A).mockResolvedValueOnce(VERSION_A);
+    runner.validate.mockRejectedValueOnce(new OfficeArtifactError('OFFICECLI_FAILED'));
+
+    await expect(createService().preparePreview({ workspace: WORKSPACE, filePath: PPTX_FILE })).resolves.toEqual({
+      ok: false,
+      code: 'INVALID_OFFICE_ARTIFACT',
+    });
+    expect(workingFiles.remove).toHaveBeenCalledWith(PREVIEW_PPTX_FILE);
+    expect(runner.watch).not.toHaveBeenCalled();
   });
 
   it('releases only a preview lease created by the service', async () => {

@@ -1,7 +1,12 @@
 import type { TMessage } from '@/common/chat/chatLib';
 import type { TChatConversation, TContextHandoffItem, TContextSnapshot } from '@/common/config/storage';
 import { readMessageContent } from '@/renderer/utils/chat/conversationExport';
-import { parseContextSnapshot } from './contextSnapshot';
+import {
+  CONTEXT_SNAPSHOT_MAX_GOAL_LENGTH,
+  CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH,
+  CONTEXT_SNAPSHOT_MAX_ITEMS_PER_SECTION,
+  parseContextSnapshot,
+} from './contextSnapshot';
 import { getConversationContextHandoffExtra } from './pinnedContext';
 import { CONTEXT_MARKDOWN_SECTIONS, type ContextMarkdownSection } from './types';
 
@@ -105,11 +110,13 @@ const messageRole = (message: TMessage): 'User' | 'Assistant' | 'System' => {
 };
 
 const firstUserMessage = (messages: TMessage[]): TMessage | undefined => {
-  return messages.find((message) => message.position === 'right' && message.type === 'text');
+  return messages.find((message) => message.hidden !== true && message.position === 'right' && message.type === 'text');
 };
 
 const latestAssistantMessage = (messages: TMessage[]): TMessage | undefined => {
-  return [...messages].toReversed().find((message) => message.position === 'left' && message.type === 'text');
+  return [...messages]
+    .toReversed()
+    .find((message) => message.hidden !== true && message.position === 'left' && message.type === 'text');
 };
 
 const isRendererHistoryGap = (message: TMessage): boolean =>
@@ -117,7 +124,7 @@ const isRendererHistoryGap = (message: TMessage): boolean =>
 
 const recentMessages = (messages: TMessage[], maxRecentMessages: number): string[] => {
   return messages
-    .filter((message) => !isRendererHistoryGap(message))
+    .filter((message) => message.hidden !== true && !isRendererHistoryGap(message))
     .slice(-maxRecentMessages)
     .map((message) => `${messageRole(message)}: ${excerpt(readMessageContent(message))}`)
     .filter((line) => line.trim() !== '');
@@ -129,13 +136,15 @@ const extractFileReferences = (conversation: TChatConversation, messages: TMessa
   const refs = new Set<string>();
   if (workspace) refs.add(`Workspace: ${workspace}`);
 
-  messages.forEach((message) => {
-    const content = readMessageContent(message);
-    for (const match of content.matchAll(FILE_PATH_RE)) {
-      const filePath = match[1]?.trim();
-      if (filePath) refs.add(filePath);
-    }
-  });
+  messages
+    .filter((message) => message.hidden !== true)
+    .forEach((message) => {
+      const content = readMessageContent(message);
+      for (const match of content.matchAll(FILE_PATH_RE)) {
+        const filePath = match[1]?.trim();
+        if (filePath) refs.add(filePath);
+      }
+    });
 
   return Array.from(refs);
 };
@@ -268,6 +277,12 @@ const deriveFallbackCurrentState = (messages: TMessage[], maxRecentMessages?: nu
   return recentMessages(messages, maxRecentMessages ?? 6);
 };
 
+const snapshotItems = (items: string[]): string[] =>
+  items
+    .map((item) => excerpt(item, CONTEXT_SNAPSHOT_MAX_ITEM_LENGTH))
+    .filter(Boolean)
+    .slice(0, CONTEXT_SNAPSHOT_MAX_ITEMS_PER_SECTION);
+
 export const buildFallbackContextSnapshot = (input: BuildContextMarkdownInput): TContextSnapshot => {
   const parsedSections = parseCanonicalSections(input.currentMarkdown);
   const goal =
@@ -277,15 +292,18 @@ export const buildFallbackContextSnapshot = (input: BuildContextMarkdownInput): 
   const artifacts = getParsedSnapshotSection(parsedSections, 'artifacts');
 
   const snapshot: TContextSnapshot = {
-    goal,
-    current_state:
-      currentState.length > 0 ? currentState : deriveFallbackCurrentState(input.messages, input.maxRecentMessages),
-    decisions: getParsedSnapshotSection(parsedSections, 'decisions'),
-    artifacts: artifacts.length > 0 ? artifacts : extractFileReferences(input.conversation, input.messages),
-    user_preferences: getParsedSnapshotSection(parsedSections, 'user_preferences'),
-    open_questions: getParsedSnapshotSection(parsedSections, 'open_questions'),
-    next_steps: getParsedSnapshotSection(parsedSections, 'next_steps'),
-    do_not_forget: getParsedSnapshotSection(parsedSections, 'do_not_forget'),
+    goal: excerpt(goal, CONTEXT_SNAPSHOT_MAX_GOAL_LENGTH),
+    current_state: snapshotItems(
+      currentState.length > 0 ? currentState : deriveFallbackCurrentState(input.messages, input.maxRecentMessages)
+    ),
+    decisions: snapshotItems(getParsedSnapshotSection(parsedSections, 'decisions')),
+    artifacts: snapshotItems(
+      artifacts.length > 0 ? artifacts : extractFileReferences(input.conversation, input.messages)
+    ),
+    user_preferences: snapshotItems(getParsedSnapshotSection(parsedSections, 'user_preferences')),
+    open_questions: snapshotItems(getParsedSnapshotSection(parsedSections, 'open_questions')),
+    next_steps: snapshotItems(getParsedSnapshotSection(parsedSections, 'next_steps')),
+    do_not_forget: snapshotItems(getParsedSnapshotSection(parsedSections, 'do_not_forget')),
   };
 
   const parsedSnapshot = parseContextSnapshot(snapshot);

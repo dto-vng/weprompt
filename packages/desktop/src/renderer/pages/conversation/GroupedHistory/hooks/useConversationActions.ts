@@ -7,7 +7,10 @@
 import { ipcBridge } from '@/common';
 import type { TChatConversation } from '@/common/config/storage';
 import { requestConversationSendBoxPrefill } from '@/renderer/hooks/chat/useSendBoxDraft';
-import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
+import {
+  detachAndRemoveProject,
+  PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS,
+} from '@/renderer/pages/conversation/projects/projectConversation';
 import { removeProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { refreshConversationCache } from '@/renderer/pages/conversation/utils/conversationCache';
 import { isLegacyReadOnlyConversationType } from '@/renderer/pages/conversation/utils/conversationRuntime';
@@ -288,22 +291,21 @@ export const useConversationActions = ({
     if (!removeProjectTarget) return;
     setRemoveProjectLoading(true);
     try {
-      const detachResults = await Promise.all(
-        removeProjectTarget.conversations.map((conversation) =>
+      const result = await detachAndRemoveProject({
+        projectId: removeProjectTarget.projectId,
+        conversations: removeProjectTarget.conversations,
+        detachConversation: (conversation, extra) =>
           ipcBridge.conversation.update.invoke({
             id: conversation.id,
             updates: {
-              extra: buildDetachedProjectExtra(conversation),
+              extra: extra as unknown as TChatConversation['extra'],
             } as Partial<TChatConversation>,
-            merge_extra: false,
-          })
-        )
-      );
+            merge_extra: true,
+          }),
+        removeProjectMetadata: removeProject,
+      });
 
-      const detachedAll = detachResults.every(Boolean);
-      const removedProject = removeProjectTarget.projectId ? removeProject(removeProjectTarget.projectId) : true;
-
-      if (removeProjectTarget.projectId && removedProject) {
+      if (result.success === true && removeProjectTarget.projectId) {
         // Best-effort cleanup: the project row is already gone, so a failed
         // knowledge-store delete must never block or reverse the deletion
         // the user just confirmed. An orphaned store directory is harmless
@@ -314,10 +316,15 @@ export const useConversationActions = ({
       }
 
       emitter.emit('chat.history.refresh');
-      if (detachedAll && removedProject) {
+      if (result.success === true) {
         Message.success(t('conversation.history.removeProjectSuccess'));
       } else {
-        Message.error(t('conversation.history.removeProjectFailed'));
+        console.error('Failed to remove project:', {
+          projectId: removeProjectTarget.projectId,
+          reason: result.reason,
+          diagnostics: result.diagnostics,
+        });
+        Message.error(t(PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS[result.reason]));
       }
       setRemoveProjectTarget(null);
     } catch (error) {

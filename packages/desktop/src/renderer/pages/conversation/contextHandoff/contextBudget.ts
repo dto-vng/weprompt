@@ -1,6 +1,15 @@
 import { extractDiagnosticTokenEstimate, type TMessage } from '@/common/chat/chatLib';
-import type { TContextHandoffItem, TContextHandoffBudgetSnapshot, TokenUsageData } from '@/common/config/storage';
+import type {
+  TChatConversation,
+  TContextHandoffItem,
+  TContextHandoffBudgetSnapshot,
+  TokenUsageData,
+} from '@/common/config/storage';
 import { readMessageContent } from '@/renderer/utils/chat/conversationExport';
+import type { ContextModelReference } from './contextLimit';
+import { resolveConversationContextLimit, resolveModelContextLimit } from './contextLimit';
+import { buildContextMarkdown } from './contextMarkdown';
+import { getConversationPinnedContext } from './pinnedContext';
 
 type EstimateContextBudgetInput = {
   messages?: TMessage[];
@@ -10,6 +19,24 @@ type EstimateContextBudgetInput = {
   runtimeTokenUsage?: TokenUsageData | null;
   skillNames?: string[];
   toolNames?: string[];
+};
+
+export type ContextUsageSnapshot = {
+  source: 'runtime' | 'estimated' | 'unknown';
+  totalTokens: number | null;
+  contextLimit?: number;
+  ratio: number | null;
+  status: TContextHandoffBudgetSnapshot['status'];
+};
+
+type ResolveConversationContextBudgetInput = {
+  conversation: TChatConversation | null;
+  messages?: TMessage[];
+  runtimeTokenUsage?: TokenUsageData | null;
+  skillNames?: string[];
+  toolNames?: string[];
+  contextLimit?: number;
+  model?: ContextModelReference | null;
 };
 
 const EMPTY_BUCKETS: TContextHandoffBudgetSnapshot['buckets'] = {
@@ -82,5 +109,63 @@ export const estimateContextBudget = (input: EstimateContextBudgetInput): TConte
     totalEstimatedTokens,
     contextLimit,
     buckets: totalEstimatedTokens > 0 ? buckets : EMPTY_BUCKETS,
+  };
+};
+
+const validTokenTotal = (usage: TokenUsageData | null | undefined): number | undefined => {
+  const total = usage?.total_tokens;
+  return typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : undefined;
+};
+
+const persistedTokenUsage = (conversation: TChatConversation): TokenUsageData | null => {
+  const usage = (conversation.extra as { last_token_usage?: TokenUsageData } | undefined)?.last_token_usage;
+  return validTokenTotal(usage) === undefined ? null : (usage ?? null);
+};
+
+const positiveContextLimit = (value: number | undefined): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+
+export const resolveConversationContextBudgetSnapshot = (
+  input: ResolveConversationContextBudgetInput
+): ContextUsageSnapshot => {
+  if (!input.conversation) {
+    return {
+      source: 'unknown',
+      totalTokens: null,
+      contextLimit: undefined,
+      ratio: null,
+      status: 'healthy',
+    };
+  }
+
+  const messages = input.messages ?? [];
+  const runtimeTokenUsage =
+    validTokenTotal(input.runtimeTokenUsage) === undefined
+      ? persistedTokenUsage(input.conversation)
+      : input.runtimeTokenUsage;
+  const contextLimit =
+    positiveContextLimit(input.contextLimit) ??
+    (input.model === undefined
+      ? resolveConversationContextLimit(input.conversation)
+      : resolveModelContextLimit(input.model));
+  const estimate = estimateContextBudget({
+    messages,
+    pinnedContext: getConversationPinnedContext(input.conversation),
+    contextMarkdown: buildContextMarkdown({ conversation: input.conversation, messages }),
+    contextLimit,
+    runtimeTokenUsage,
+    skillNames: input.skillNames,
+    toolNames: input.toolNames,
+  });
+  const runtimeTotal = validTokenTotal(runtimeTokenUsage);
+  const totalTokens = runtimeTotal ?? estimate.totalEstimatedTokens;
+  const ratio = contextLimit ? totalTokens / contextLimit : null;
+
+  return {
+    source: runtimeTotal === undefined ? 'estimated' : 'runtime',
+    totalTokens,
+    contextLimit,
+    ratio,
+    status: resolveStatus(ratio),
   };
 };

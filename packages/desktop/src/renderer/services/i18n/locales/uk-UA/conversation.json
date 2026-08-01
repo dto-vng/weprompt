@@ -167,6 +167,8 @@
     "removeProject": "Видалити проєкт",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Нова розмова в цьому проєкті",
+    "expandProjectChats": "Розгорнути чати проєкту",
+    "collapseProjectChats": "Згорнути чати проєкту",
     "deleting": "Видалення...",
     "reorderPinned": "Перетягніть, щоб змінити порядок закріплених розмов",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Не вдалося видалити проєкт. Відкрийте його знову та повторіть спробу; файли в папці не видалено.",
+    "removeProjectChatDetachFailed": "Не вдалося від’єднати деякі чати від цього проєкту. Проєкт збережено; повторіть видалення.",
+    "removeProjectStateChanged": "Список проєктів змінився до видалення. Оновіть його та повторіть спробу.",
+    "removeProjectStorageFailed": "Не вдалося зберегти зміни проєкту. Перевірте доступ WePrompt до даних програми та повторіть спробу.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "Сьогодні",
     "weekToDate": "З початку тижня",
     "monthToDate": "З початку місяця",
-    "triggerLabel": "Показати використання контексту"
+    "triggerLabel": "Показати використання контексту",
+    "estimated": "Орієнтовно",
+    "unavailable": "Дані про використання контексту недоступні"
   },
   "skill_generator": {
     "title": "Створити Навичку/Правило",
@@ -766,6 +773,13 @@
     "importCard": "Імпорт шаблону (.md)",
     "empty": "Немає доступних шаблонів",
     "chipTooltip": "Це повідомлення використає шаблон",
+    "scratch": {
+      "prepareError": "Не вдалося підготувати тимчасову область артефакту: {{error}}",
+      "retained": "Тимчасові файли артефакту збережено для відновлення в {{path}}.",
+      "cleanup": "Очистити",
+      "cleanupSuccess": "Тимчасові файли артефакту видалено",
+      "cleanupError": "Не вдалося очистити: {{error}}"
+    },
     "importSuccess": "Шаблон імпортовано",
     "importError": "Помилка імпорту: {{error}}",
     "removeError": "Помилка видалення: {{error}}",

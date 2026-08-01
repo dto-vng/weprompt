@@ -6,8 +6,6 @@
   "profileEnableLabel": "내 지침을 새 채팅에 적용",
   "profileInstructionsLabel": "지침",
   "profileInstructionsPlaceholder": "예: 저는 VNG 인사팀에서 일합니다. 간결하고 격식 있는 베트남어를 선호합니다. 템플릿을 단정하기 전에 먼저 물어봐 주세요.",
-  "profilePreviewTitle": "채팅에 추가되는 내용",
-  "profilePreviewEmpty": "아직 없습니다. 위에서 지침을 추가하세요.",
   "profileScopeNote": "내 채팅에 적용됩니다. 전문 어시스턴트는 자체 규칙을 따릅니다.",
   "title": "설정",
   "skillsHub": {
@@ -1328,6 +1326,13 @@
     "saveFailed": "앱 작업 모델을 저장할 수 없습니다.",
     "checkFailed": "앱 작업 상태 확인에 실패했습니다.",
     "backendUpdateRequired": "앱 작업 모델을 구성하려면 WePrompt를 업데이트하세요.",
+    "checkResult": {
+      "ready": "정상 · {{checked}}",
+      "setupRequired": "설정 필요 · {{checked}}",
+      "unavailable": "확인 실패 · {{checked}}",
+      "checkedJustNow": "방금 확인함",
+      "checkedAt": "{{time}}에 확인함"
+    },
     "status": {
       "ready": "준비됨",
       "checking": "확인 중",

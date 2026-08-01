@@ -10,6 +10,18 @@ import { getKnownModelContextLimit } from '@/renderer/utils/model/modelContextLi
 const positiveOrUndefined = (value: unknown): number | undefined =>
   typeof value === 'number' && value > 0 ? value : undefined;
 
+export type ContextModelReference = {
+  use_model?: string | null;
+  model?: string | null;
+  context_limit?: number;
+};
+
+export const resolveModelContextLimit = (model: ContextModelReference | null | undefined): number | undefined => {
+  const providerLimit = positiveOrUndefined(model?.context_limit);
+  if (providerLimit !== undefined) return providerLimit;
+  return getKnownModelContextLimit(model?.use_model || model?.model || undefined);
+};
+
 /**
  * Resolve the context window (in tokens) used to compute a conversation's
  * context budget ratio.
@@ -34,12 +46,9 @@ export const resolveConversationContextLimit = (conversation: TChatConversation 
   if (conversationLimit !== undefined) return conversationLimit;
 
   const model = (conversation as { model?: TProviderWithModel & { model?: string } }).model;
-  const providerLimit = positiveOrUndefined(model?.context_limit);
-  if (providerLimit !== undefined) return providerLimit;
 
   // aionrs conversations can surface the untransformed backend shape
   // ({ provider_id, model, use_model: null }), so read the model name from
   // either field before consulting the per-model map.
-  const modelName = model?.use_model || model?.model;
-  return getKnownModelContextLimit(modelName);
+  return resolveModelContextLimit(model);
 };

@@ -5,7 +5,30 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getCommandQueueExecutionGate } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import {
+  createQueuedCommandItem,
+  getCommandQueueExecutionGate,
+  normalizeQueueState,
+} from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+
+describe('artifact scratch queue metadata', () => {
+  it('survives creation and persisted-state normalization for delayed execution', () => {
+    const item = createQueuedCommandItem({
+      input: 'Create the deck',
+      files: [],
+      artifactScratchRunId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    });
+
+    expect(item.artifactScratchRunId).toBe('5a68fccc-7b90-49b4-88f9-d78bb88255ed');
+    expect(
+      normalizeQueueState({
+        items: [item],
+        isPaused: false,
+        mode: 'auto',
+      }).items[0]?.artifactScratchRunId
+    ).toBe('5a68fccc-7b90-49b4-88f9-d78bb88255ed');
+  });
+});
 
 describe('getCommandQueueExecutionGate', () => {
   it('keeps the legacy path gated by hydration and busy state', () => {

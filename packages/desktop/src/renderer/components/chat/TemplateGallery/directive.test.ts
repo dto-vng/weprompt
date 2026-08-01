@@ -58,6 +58,29 @@ describe('composePresentationSend', () => {
     expect(result.injectSkills).toEqual(['officecli']);
   });
 
+  it('keeps Office QA scratch outside the project and removes it only after successful delivery', () => {
+    for (const format of ['pptx', 'docx'] as const) {
+      const result = composePresentationSend(summary(format), 'Create the deliverable', [], {
+        runId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+        directory: '/private/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+        readyMarker: '/private/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed/.aionui-delivery-ready',
+      });
+
+      expect(result.input).toContain(
+        'Use this app-managed scratch directory: `/private/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed`'
+      );
+      expect(result.input).toContain(
+        'All QA renders, repair scripts, command payloads, backups, and intermediate copies'
+      );
+      expect(result.input).toContain(
+        'write the delivery-ready marker `/private/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed/.aionui-delivery-ready`'
+      );
+      expect(result.input).toContain('Do not delete the scratch directory yourself');
+      expect(result.input).toContain('If the run fails or is interrupted, preserve the scratch directory');
+      expect(result.artifactScratchRunId).toBe('5a68fccc-7b90-49b4-88f9-d78bb88255ed');
+    }
+  });
+
   it('does not duplicate files already attached', () => {
     const result = composePresentationSend(summary('html'), 'x', ['/abs/t1/THEME.md']);
     expect(result.files).toEqual(['/abs/t1/THEME.md']);

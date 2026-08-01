@@ -28,6 +28,7 @@ type OfficeWatchErrorCode =
   | 'OFFICECLI_INSTALL_FAILED'
   | 'OFFICECLI_PORT_TIMEOUT'
   | 'OFFICECLI_START_FAILED'
+  | 'INVALID_OFFICE_ARTIFACT'
   | 'PATH_OUTSIDE_SANDBOX';
 
 const BRIDGE = {
@@ -75,6 +76,7 @@ const OFFICE_ERROR_I18N_KEYS: Record<OfficeWatchErrorCode, string> = {
   OFFICECLI_INSTALL_FAILED: 'preview.office.errors.installFailed',
   OFFICECLI_PORT_TIMEOUT: 'preview.office.errors.portTimeout',
   OFFICECLI_START_FAILED: 'preview.office.errors.startFailed',
+  INVALID_OFFICE_ARTIFACT: 'preview.office.errors.invalidArtifact',
   PATH_OUTSIDE_SANDBOX: 'preview.office.errors.outsideSandbox',
 };
 
@@ -174,6 +176,7 @@ function normalizeOfficeWatchErrorCode(error?: string | null): OfficeWatchErrorC
     case 'OFFICECLI_INSTALL_FAILED':
     case 'OFFICECLI_PORT_TIMEOUT':
     case 'OFFICECLI_START_FAILED':
+    case 'INVALID_OFFICE_ARTIFACT':
     case 'PATH_OUTSIDE_SANDBOX':
       return error;
     case 'OFFICECLI_FAILED':
@@ -356,20 +359,37 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         setError(null);
       }
       try {
-        if (docType !== 'ppt' && isElectronDesktop()) {
+        if (isElectronDesktop()) {
           const preview = await ipcBridge.officeArtifact.preparePreview.invoke({
             conversationId,
             workspace: workspace ?? '',
             filePath: file_path,
           });
-          if (preview.ok === false) throw new Error(t(keys.startFailed));
+          if (preview.ok === false) {
+            const previewErrorCode = normalizeOfficeWatchErrorCode(preview.code);
+            if (previewErrorCode) {
+              const nextError = {
+                code: previewErrorCode,
+                message: t(OFFICE_ERROR_I18N_KEYS[previewErrorCode]),
+              };
+              if (isRefresh) {
+                setRefreshing(false);
+                notifyRefreshState('refreshFailed');
+              } else {
+                setError(nextError);
+                setInitialLoading(false);
+              }
+              return;
+            }
+            throw new Error(t(keys.startFailed));
+          }
           previewLeaseId = preview.leaseId;
           watchedFilePath = preview.filePath;
           watchedWorkspace = preview.workspace;
           if (cancelled) return;
         }
 
-        const usesMainProcessWatch = docType === 'excel' && isElectronDesktop() && previewLeaseId;
+        const usesMainProcessWatch = docType !== 'word' && isElectronDesktop() && previewLeaseId;
         let result = usesMainProcessWatch
           ? await ipcBridge.officeArtifact.startPreview.invoke({ leaseId: previewLeaseId })
           : await bridge.start.invoke({ file_path: watchedFilePath, workspace: watchedWorkspace });

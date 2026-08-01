@@ -6,8 +6,6 @@
   "profileEnableLabel": "将我的指令应用到新对话",
   "profileInstructionsLabel": "指令",
   "profileInstructionsPlaceholder": "例如：我在 VNG 的人力资源部门工作。偏好简洁、正式的越南语。在假定使用某个模板前先询问。",
-  "profilePreviewTitle": "将添加到对话中的内容",
-  "profilePreviewEmpty": "暂无内容——请在上方添加指令。",
   "profileScopeNote": "适用于你的对话。专用助手遵循各自的规则。",
   "title": "设置",
   "skillsHub": {
@@ -1327,6 +1325,13 @@
     "saveFailed": "无法保存应用操作模型。",
     "checkFailed": "应用操作运行状况检查失败。",
     "backendUpdateRequired": "请更新 WePrompt 以配置应用操作模型。",
+    "checkResult": {
+      "ready": "健康 · {{checked}}",
+      "setupRequired": "需要设置 · {{checked}}",
+      "unavailable": "检查失败 · {{checked}}",
+      "checkedJustNow": "刚刚检查",
+      "checkedAt": "检查于 {{time}}"
+    },
     "status": {
       "ready": "就绪",
       "checking": "正在检查",

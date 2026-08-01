@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IConversationMcpStatus, ISessionMcpServer } from '@/common/config/storage';
+import type { IConversationMcpStatus, ISessionMcpServer, TChatConversation } from '@/common/config/storage';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
 import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
 import { CHAT_SURFACE_CONTAINER_CLASS } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
@@ -28,6 +28,7 @@ import { useAcpMessage } from './useAcpMessage';
 
 const AcpChat: React.FC<{
   conversation_id: string;
+  conversation?: TChatConversation;
   workspace?: string;
   backend: string;
   session_mode?: string;
@@ -47,6 +48,7 @@ const AcpChat: React.FC<{
   session_mcp_servers?: ISessionMcpServer[];
 }> = ({
   conversation_id,
+  conversation,
   workspace,
   backend,
   session_mode,
@@ -76,6 +78,7 @@ const AcpChat: React.FC<{
     <ConversationProvider
       value={{
         conversation_id: conversation_id,
+        conversation,
         workspace,
         type: 'acp',
         cron_job_id,

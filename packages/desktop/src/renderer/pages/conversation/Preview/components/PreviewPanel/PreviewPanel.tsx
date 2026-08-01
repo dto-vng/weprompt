@@ -351,6 +351,24 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
       const rawFileName = metadata?.file_name || `${content_type}-${Date.now()}`;
 
       if (metadata?.file_path) {
+        if (content_type === 'ppt' && isElectronDesktop()) {
+          const preview = await ipcBridge.officeArtifact.preparePreview.invoke({
+            conversationId,
+            workspace: metadata.workspace ?? '',
+            filePath: metadata.file_path,
+          });
+          if (preview.ok === false) throw new Error(preview.code);
+
+          try {
+            await downloadFileFromPath(preview.filePath, rawFileName, preview.workspace);
+          } finally {
+            await ipcBridge.officeArtifact.releasePreview
+              .invoke({ leaseId: preview.leaseId })
+              .catch((): undefined => undefined);
+          }
+          return;
+        }
+
         // All files with a disk path (binary, image, zip, etc.) — unified path
         await downloadFileFromPath(metadata.file_path, rawFileName, metadata.workspace);
         return;
@@ -414,7 +432,17 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
       console.error('[PreviewPanel] Failed to download file:', error);
       messageApi.error(t('messages.downloadFailed', { defaultValue: 'Failed to download' }));
     }
-  }, [content, content_type, metadata?.file_name, metadata?.file_path, metadata?.language, messageApi, t]);
+  }, [
+    content,
+    content_type,
+    conversationId,
+    metadata?.file_name,
+    metadata?.file_path,
+    metadata?.language,
+    metadata?.workspace,
+    messageApi,
+    t,
+  ]);
 
   // 在系统默认应用中打开文件 / Open file in system default application
   const handleOpenInSystem = useCallback(async () => {
@@ -768,7 +796,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ fullBleed = false, onReques
     const tabWorkspace = tab.metadata?.workspace;
 
     if (tab.content_type === 'ppt') {
-      return <PptViewer file_path={tabFilePath} content={tab.content} workspace={tabWorkspace} />;
+      return (
+        <PptViewer
+          conversationId={conversationId}
+          file_path={tabFilePath}
+          content={tab.content}
+          workspace={tabWorkspace}
+        />
+      );
     }
 
     const tabRefreshToken = getOfficePreviewRefreshToken(

@@ -167,6 +167,8 @@
     "removeProject": "Quitar proyecto",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Nuevo chat en este proyecto",
+    "expandProjectChats": "Expandir chats del proyecto",
+    "collapseProjectChats": "Contraer chats del proyecto",
     "deleting": "Eliminando...",
     "reorderPinned": "Arrastra para reordenar la conversación fijada",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "No se pudo quitar el proyecto. Vuelve a abrirlo e inténtalo de nuevo; los archivos de la carpeta no se eliminaron.",
+    "removeProjectChatDetachFailed": "No se pudieron desvincular algunos chats de este proyecto. El proyecto se conservó; intenta quitarlo de nuevo.",
+    "removeProjectStateChanged": "La lista de proyectos cambió antes de quitarlo. Actualízala e inténtalo de nuevo.",
+    "removeProjectStorageFailed": "No se pudieron guardar los cambios del proyecto. Comprueba que WePrompt pueda acceder a los datos de la aplicación y vuelve a intentarlo.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -636,7 +641,9 @@
     "today": "Hoy",
     "weekToDate": "Semana hasta la fecha",
     "monthToDate": "Mes hasta la fecha",
-    "triggerLabel": "Mostrar uso del contexto"
+    "triggerLabel": "Mostrar uso del contexto",
+    "estimated": "Estimado",
+    "unavailable": "Uso del contexto no disponible"
   },
   "skill_generator": {
     "title": "Generar habilidad/regla",
@@ -767,6 +774,13 @@
     "importCard": "Importar plantilla (.md)",
     "empty": "No hay plantillas disponibles",
     "chipTooltip": "Este mensaje usará la plantilla",
+    "scratch": {
+      "prepareError": "No se pudo preparar el espacio temporal del artefacto: {{error}}",
+      "retained": "Los archivos temporales del artefacto se conservaron para recuperación en {{path}}.",
+      "cleanup": "Limpiar",
+      "cleanupSuccess": "Archivos temporales del artefacto eliminados",
+      "cleanupError": "Error al limpiar: {{error}}"
+    },
     "importSuccess": "Plantilla importada",
     "importError": "Error al importar: {{error}}",
     "removeError": "Error al eliminar: {{error}}",

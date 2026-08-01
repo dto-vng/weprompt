@@ -73,6 +73,31 @@ describe('useAionrsMessage runtime state', () => {
     localStorage.clear();
   });
 
+  it('reports matching finish and error terminals to lifecycle consumers', async () => {
+    const onTerminal = vi.fn();
+    renderHook(() => useAionrsMessage('conv-1', { onTerminal }));
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'msg-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'error',
+        data: 'failed',
+        msg_id: 'msg-2',
+        turn_id: 'turn-2',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    expect(onTerminal).toHaveBeenNthCalledWith(1, { turnId: 'turn-1', outcome: 'completed' });
+    expect(onTerminal).toHaveBeenNthCalledWith(2, { turnId: 'turn-2', outcome: 'failed' });
+  });
+
   it('clears active tool state when the stream finishes', async () => {
     const { result } = renderHook(() => useAionrsMessage('conv-1'));
 

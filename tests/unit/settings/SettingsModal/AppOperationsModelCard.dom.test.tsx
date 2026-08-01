@@ -19,7 +19,16 @@ const { checkMock, getMock, messageErrorMock, updateMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      if (key === 'settings.appOperationsModel.checkResult.checkedJustNow') return 'checked just now';
+      if (key === 'settings.appOperationsModel.checkResult.checkedAt') return `checked ${String(options?.time)}`;
+      if (key.startsWith('settings.appOperationsModel.checkResult.') && options?.checked) {
+        return `${key} · ${String(options.checked)}`;
+      }
+      return key;
+    },
+  }),
 }));
 
 vi.mock('@/common/adapter/ipcBridge', () => ({
@@ -449,6 +458,77 @@ describe('AppOperationsModelCard', () => {
       resolved_model: { provider_id: 'provider-a', model_id: 'model-b' },
     });
     await screen.findByText('model-b');
+  });
+
+  it('shows and politely announces a completed ready result with the checked model', async () => {
+    checkMock.mockResolvedValue({ ...autoReady, checked_at: Date.now() });
+    renderCard();
+    await screen.findByText('Provider A');
+
+    const checkButton = screen.getByRole('button', { name: 'settings.healthCheck' });
+    expect(checkButton).toHaveClass('self-start');
+    expect(checkButton).toHaveClass('!min-h-36px');
+    fireEvent.click(checkButton);
+
+    const result = await screen.findByText('settings.appOperationsModel.checkResult.ready · checked just now');
+    expect(result.closest('[aria-live="polite"]')).not.toBeNull();
+    expect(screen.getByText('Provider A')).toBeVisible();
+    expect(screen.getByText('model-a')).toBeVisible();
+  });
+
+  it('restores a prior check timestamp when Settings is reopened', async () => {
+    const checkedAt = Date.UTC(2026, 6, 31, 7, 30);
+    getMock.mockResolvedValue({ ...autoReady, checked_at: checkedAt });
+    renderCard();
+
+    expect(
+      await screen.findByText(
+        `settings.appOperationsModel.checkResult.ready · checked ${new Date(checkedAt).toLocaleString()}`
+      )
+    ).toBeVisible();
+  });
+
+  it('shows the failed health result and its actionable reason after a completed check', async () => {
+    checkMock.mockResolvedValue({
+      ...autoReady,
+      health: 'unavailable',
+      reason_code: 'health_check_failed',
+      checked_at: Date.now(),
+    });
+    renderCard();
+    await screen.findByText('Provider A');
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings.healthCheck' }));
+
+    expect(
+      await screen.findByText('settings.appOperationsModel.checkResult.unavailable · checked just now')
+    ).toBeVisible();
+    expect(screen.getByText('settings.appOperationsModel.reason.healthCheckFailed')).toBeVisible();
+  });
+
+  it('replaces the persisted completion time after a repeated check', async () => {
+    const previousCheckedAt = Date.UTC(2026, 6, 30, 7, 30);
+    const nextCheckedAt = Date.UTC(2026, 6, 31, 8, 45);
+    getMock.mockResolvedValue({ ...autoReady, checked_at: previousCheckedAt });
+    checkMock.mockResolvedValue({ ...autoReady, checked_at: nextCheckedAt });
+    renderCard();
+
+    expect(
+      await screen.findByText(
+        `settings.appOperationsModel.checkResult.ready · checked ${new Date(previousCheckedAt).toLocaleString()}`
+      )
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'settings.healthCheck' }));
+
+    expect(
+      await screen.findByText(
+        `settings.appOperationsModel.checkResult.ready · checked ${new Date(nextCheckedAt).toLocaleString()}`
+      )
+    ).toBeVisible();
+    const previousTime = new Date(previousCheckedAt).toLocaleString();
+    expect(
+      screen.queryByText((content, element) => element?.tagName === 'SPAN' && content.includes(previousTime))
+    ).not.toBeInTheDocument();
   });
 
   it('keeps a fixed health-check failure without resolution visible and retryable', async () => {

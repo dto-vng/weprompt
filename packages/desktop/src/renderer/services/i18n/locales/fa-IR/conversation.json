@@ -167,6 +167,8 @@
     "removeProject": "حذف پروژه",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "چت جدید در این پروژه",
+    "expandProjectChats": "گسترش گفتگوهای پروژه",
+    "collapseProjectChats": "جمع کردن گفتگوهای پروژه",
     "deleting": "در حال حذف...",
     "reorderPinned": "برای تغییر ترتیب گفتگوی سنجاق‌شده بکشید",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "پروژه حذف نشد. آن را دوباره باز کنید و دوباره امتحان کنید؛ فایل‌های پوشه حذف نشده‌اند.",
+    "removeProjectChatDetachFailed": "برخی گفت‌وگوها از این پروژه جدا نشدند. پروژه حفظ شد؛ حذف را دوباره امتحان کنید.",
+    "removeProjectStateChanged": "فهرست پروژه‌ها پیش از حذف تغییر کرد. آن را تازه‌سازی کنید و دوباره امتحان کنید.",
+    "removeProjectStorageFailed": "تغییرات پروژه ذخیره نشد. بررسی کنید WePrompt به داده‌های برنامه دسترسی دارد، سپس دوباره امتحان کنید.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "امروز",
     "weekToDate": "از ابتدای هفته",
     "monthToDate": "از ابتدای ماه",
-    "triggerLabel": "نمایش استفاده از زمینه"
+    "triggerLabel": "نمایش استفاده از زمینه",
+    "estimated": "تخمینی",
+    "unavailable": "میزان استفاده از زمینه در دسترس نیست"
   },
   "skill_generator": {
     "title": "ساخت مهارت/قانون",
@@ -766,6 +773,13 @@
     "importCard": "وارد کردن قالب (.md)",
     "empty": "قالبی موجود نیست",
     "chipTooltip": "این پیام از قالب استفاده می‌کند",
+    "scratch": {
+      "prepareError": "فضای موقت خروجی آماده نشد: {{error}}",
+      "retained": "فایل‌های موقت خروجی برای بازیابی در {{path}} نگه‌داری شدند.",
+      "cleanup": "پاک‌سازی",
+      "cleanupSuccess": "فایل‌های موقت خروجی حذف شدند",
+      "cleanupError": "پاک‌سازی ناموفق بود: {{error}}"
+    },
     "importSuccess": "قالب وارد شد",
     "importError": "خطا در وارد کردن: {{error}}",
     "removeError": "خطا در حذف: {{error}}",

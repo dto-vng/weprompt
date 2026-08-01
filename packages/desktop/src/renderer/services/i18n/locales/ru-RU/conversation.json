@@ -167,6 +167,8 @@
     "removeProject": "Удалить проект",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Новая беседа в этом проекте",
+    "expandProjectChats": "Развернуть чаты проекта",
+    "collapseProjectChats": "Свернуть чаты проекта",
     "deleting": "Удаление...",
     "reorderPinned": "Перетащите, чтобы изменить порядок закреплённых бесед",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Не удалось удалить проект. Откройте его снова и повторите попытку; файлы в папке не удалены.",
+    "removeProjectChatDetachFailed": "Некоторые чаты не удалось отсоединить от этого проекта. Проект сохранён; повторите удаление.",
+    "removeProjectStateChanged": "Список проектов изменился до удаления. Обновите его и повторите попытку.",
+    "removeProjectStorageFailed": "Не удалось сохранить изменения проекта. Проверьте доступ WePrompt к данным приложения и повторите попытку.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "Сегодня",
     "weekToDate": "С начала недели",
     "monthToDate": "С начала месяца",
-    "triggerLabel": "Показать использование контекста"
+    "triggerLabel": "Показать использование контекста",
+    "estimated": "Оценка",
+    "unavailable": "Данные об использовании контекста недоступны"
   },
   "skill_generator": {
     "title": "Создать навык/правило",
@@ -766,6 +773,13 @@
     "importCard": "Импорт шаблона (.md)",
     "empty": "Нет доступных шаблонов",
     "chipTooltip": "Это сообщение использует шаблон",
+    "scratch": {
+      "prepareError": "Не удалось подготовить временную область артефакта: {{error}}",
+      "retained": "Временные файлы артефакта сохранены для восстановления в {{path}}.",
+      "cleanup": "Очистить",
+      "cleanupSuccess": "Временные файлы артефакта удалены",
+      "cleanupError": "Не удалось очистить: {{error}}"
+    },
     "importSuccess": "Шаблон импортирован",
     "importError": "Ошибка импорта: {{error}}",
     "removeError": "Ошибка удаления: {{error}}",

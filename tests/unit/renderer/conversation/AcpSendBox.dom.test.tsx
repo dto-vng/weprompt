@@ -42,9 +42,14 @@ const {
   },
   contextUsageIndicatorProps: {
     current: null as {
-      tokenUsage: { total_tokens: number } | null;
+      budget: {
+        source: 'runtime' | 'estimated' | 'unknown';
+        totalTokens: number | null;
+        contextLimit?: number;
+        ratio: number | null;
+        status: 'healthy' | 'watch' | 'compress' | 'too_large';
+      };
       localUsage: { today: number; weekToDate: number; monthToDate: number };
-      context_limit?: number;
     } | null,
   },
   sendBoxProps: {
@@ -108,12 +113,17 @@ vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
 }));
 vi.mock('@/renderer/components/agent/ContextUsageIndicator', () => ({
   default: (props: {
-    tokenUsage: { total_tokens: number } | null;
+    budget: {
+      source: 'runtime' | 'estimated' | 'unknown';
+      totalTokens: number | null;
+      contextLimit?: number;
+      ratio: number | null;
+      status: 'healthy' | 'watch' | 'compress' | 'too_large';
+    };
     localUsage: { today: number; weekToDate: number; monthToDate: number };
-    context_limit?: number;
   }) => {
     contextUsageIndicatorProps.current = props;
-    return props.tokenUsage ? <span data-testid='context-usage-indicator' /> : null;
+    return <span data-testid='context-usage-indicator' />;
   },
 }));
 vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({ default: () => null }));
@@ -173,7 +183,18 @@ vi.mock('@/renderer/hooks/chat/useAutoTitle', () => ({
   }),
 }));
 vi.mock('@/renderer/hooks/context/ConversationContext', () => ({
-  useConversationContextSafe: () => null,
+  useConversationContextSafe: () => ({
+    conversation: {
+      id: 'conv-1',
+      name: 'ACP budget fixture',
+      type: 'acp',
+      created_at: 1,
+      modified_at: 1,
+      extra: { backend: 'codex' },
+    },
+    loadedSkills: [],
+    loadedMcpStatuses: [],
+  }),
 }));
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: isMobileMock.current }),
@@ -192,6 +213,7 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', () => ({
 }));
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useAddOrUpdateMessage: () => addOrUpdateMessageMock,
+  useMessageList: () => [],
 }));
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
   shouldEnqueueConversationCommand: () => false,
@@ -534,8 +556,13 @@ describe('AcpSendBox', () => {
 
     expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
     expect(contextUsageIndicatorProps.current).toEqual({
-      tokenUsage: { total_tokens: 12_000 },
-      context_limit: 32_000,
+      budget: {
+        source: 'runtime',
+        totalTokens: 12_000,
+        contextLimit: 32_000,
+        ratio: 12_000 / 32_000,
+        status: 'watch',
+      },
       localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
     expect(screen.getByRole('button', { name: 'send' })).toBeInTheDocument();
@@ -557,16 +584,24 @@ describe('AcpSendBox', () => {
     );
 
     expect(contextUsageIndicatorProps.current).toEqual({
-      tokenUsage: { total_tokens: 12_000 },
-      context_limit: undefined,
+      budget: {
+        source: 'runtime',
+        totalTokens: 12_000,
+        contextLimit: undefined,
+        ratio: null,
+        status: 'healthy',
+      },
       localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
   });
 
-  it('does not render a context usage meter when ACP usage is unavailable', () => {
+  it('keeps an unknown-state context usage meter when ACP capacity is unavailable', () => {
     render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
 
-    expect(screen.queryByTestId('context-usage-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
+    expect(contextUsageIndicatorProps.current?.budget.source).toBe('estimated');
+    expect(contextUsageIndicatorProps.current?.budget.contextLimit).toBeUndefined();
+    expect(contextUsageIndicatorProps.current?.budget.ratio).toBeNull();
   });
 
   it('applies runtime thought level from the mobile action sheet without persisting a global preference', async () => {

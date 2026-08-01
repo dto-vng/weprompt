@@ -5,12 +5,15 @@
  */
 
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { app } from 'electron';
 import { ipcBridge } from '@/common';
 import { BUILTIN_TEMPLATE_PACKS } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
+import { ArtifactScratchService } from './ArtifactScratchService';
 
 let service: PresentationTemplateService | null = null;
+let artifactScratchService: ArtifactScratchService | null = null;
 
 const getService = (): PresentationTemplateService => {
   service ??= new PresentationTemplateService({
@@ -18,6 +21,13 @@ const getService = (): PresentationTemplateService => {
     builtinPacks: BUILTIN_TEMPLATE_PACKS,
   });
   return service;
+};
+
+const getArtifactScratchService = (): ArtifactScratchService => {
+  artifactScratchService ??= new ArtifactScratchService({
+    rootDir: path.join(tmpdir(), 'aionui-artifact-runs'),
+  });
+  return artifactScratchService;
 };
 
 export function initPresentationTemplateBridge(): void {
@@ -30,4 +40,14 @@ export function initPresentationTemplateBridge(): void {
     }
   });
   ipcBridge.presentationTemplates.remove.provider(({ id }) => getService().remove(id));
+  ipcBridge.presentationTemplates.allocateScratch.provider(({ conversation_id, template_id }) =>
+    getArtifactScratchService().allocate({ conversationId: conversation_id, templateId: template_id })
+  );
+  ipcBridge.presentationTemplates.completeScratch.provider(({ run_id }) =>
+    getArtifactScratchService().complete(run_id)
+  );
+  ipcBridge.presentationTemplates.retainScratch.provider(({ run_id, reason }) =>
+    getArtifactScratchService().retain(run_id, reason)
+  );
+  ipcBridge.presentationTemplates.discardScratch.provider(({ run_id }) => getArtifactScratchService().discard(run_id));
 }

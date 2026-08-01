@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { TMessage } from '@/common/chat/chatLib';
-import type { TContextHandoffItem } from '@/common/config/storage';
-import { estimateContextBudget } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
+import type { TChatConversation, TContextHandoffItem } from '@/common/config/storage';
+import {
+  estimateContextBudget,
+  resolveConversationContextBudgetSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 
 const textMessage = (content: string): TMessage => ({
   id: content,
@@ -20,6 +23,24 @@ const tipMessage = (content: string): TMessage => ({
   position: 'center',
   content: { content, type: 'success' },
 });
+
+const aionrsConversation = (model: { model?: string; use_model?: string | null }): TChatConversation =>
+  ({
+    id: 'conv-1',
+    name: 'Budget fixture',
+    type: 'aionrs',
+    created_at: 1,
+    modified_at: 1,
+    extra: { backend: 'aionrs', workspace: '/tmp/budget-fixture' },
+    model: {
+      id: 'provider-1',
+      name: 'Provider',
+      platform: 'openai',
+      base_url: '',
+      api_key: '',
+      ...model,
+    },
+  }) as TChatConversation;
 
 describe('estimateContextBudget', () => {
   it('groups estimated tokens by context source', () => {
@@ -93,5 +114,43 @@ describe('estimateContextBudget', () => {
     expect(snapshot.totalEstimatedTokens).toBe(42_000);
     expect(snapshot.buckets.messages.estimatedTokens).toBe(42_000);
     expect(snapshot.status).toBe('watch');
+  });
+
+  it('prefers authoritative runtime usage over a larger local estimate', () => {
+    const snapshot = resolveConversationContextBudgetSnapshot({
+      conversation: aionrsConversation({ use_model: 'gpt-4.1' }),
+      messages: [textMessage('x'.repeat(4_000))],
+      runtimeTokenUsage: { total_tokens: 400 },
+    });
+
+    expect(snapshot.source).toBe('runtime');
+    expect(snapshot.totalTokens).toBe(400);
+  });
+
+  it('falls back to an explicitly labeled estimate and resolves the raw backend model field', () => {
+    const snapshot = resolveConversationContextBudgetSnapshot({
+      conversation: aionrsConversation({ model: 'minimax/minimax-m2.5', use_model: null }),
+      messages: [textMessage('Summarize this conversation.')],
+    });
+
+    expect(snapshot.source).toBe('estimated');
+    expect(snapshot.totalTokens).toBeGreaterThan(0);
+    expect(snapshot.contextLimit).toBe(204_800);
+    expect(snapshot.ratio).toBe(snapshot.totalTokens / 204_800);
+  });
+
+  it('keeps an unknown snapshot when neither the conversation nor its model limit is available', () => {
+    expect(
+      resolveConversationContextBudgetSnapshot({
+        conversation: null,
+        messages: [],
+      })
+    ).toEqual({
+      source: 'unknown',
+      totalTokens: null,
+      contextLimit: undefined,
+      ratio: null,
+      status: 'healthy',
+    });
   });
 });

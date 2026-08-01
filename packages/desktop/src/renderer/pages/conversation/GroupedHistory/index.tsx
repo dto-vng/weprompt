@@ -44,6 +44,7 @@ import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types
  */
 const PROJECT_ROW_ACTION_CLASS =
   '!flex items-center justify-center !w-20px !h-20px !min-w-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
+const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_CLASS} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
 
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   onSessionClick,
@@ -606,6 +607,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             )}
             {!collapsedSections.has('projects') &&
               projectGroups.map((group) => {
+                const projectExpanded = expandedWorkspaces.includes(group.workspace);
                 const projectMenu = (
                   <Menu
                     onClickMenuItem={(key) => {
@@ -651,7 +653,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                 return (
                   <div key={group.workspace} className='min-w-0'>
                     <WorkspaceCollapse
-                      expanded={expandedWorkspaces.includes(group.workspace)}
+                      expanded={projectExpanded}
                       onToggle={() => {
                         const target = resolveProjectClickTarget(group);
                         if (target.kind === 'home') {
@@ -670,6 +672,42 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                       }
                       trailing={
                         <>
+                          {group.conversations.length > 0 && (
+                            <Tooltip
+                              content={t(
+                                projectExpanded
+                                  ? 'conversation.history.collapseProjectChats'
+                                  : 'conversation.history.expandProjectChats'
+                              )}
+                              position='top'
+                            >
+                              <Button
+                                aria-label={t(
+                                  projectExpanded
+                                    ? 'conversation.history.collapseProjectChats'
+                                    : 'conversation.history.expandProjectChats'
+                                )}
+                                aria-expanded={projectExpanded}
+                                className={PROJECT_DISCLOSURE_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <Right
+                                    theme='outline'
+                                    size='14'
+                                    fill='currentColor'
+                                    className={classNames('block leading-none transition-transform duration-150', {
+                                      'rotate-90': projectExpanded,
+                                    })}
+                                  />
+                                }
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleToggleWorkspace(group.workspace);
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                           {/* Visibility lives on the wrapper, not the Button: `.arco-btn`
                               carries its own `display`, which ties with the `hidden` /
                               `group-hover:flex` utilities and leaves the actions stranded

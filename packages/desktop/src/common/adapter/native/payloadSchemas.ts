@@ -228,6 +228,14 @@ export const nativeBridgePayloadSchemas = {
   'presentation-templates.list': voidPayloadSchema,
   'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
   'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
+  'presentation-templates.scratch.allocate': z
+    .object({ conversation_id: identifierSchema, template_id: identifierSchema })
+    .strict(),
+  'presentation-templates.scratch.complete': z.object({ run_id: z.string().uuid() }).strict(),
+  'presentation-templates.scratch.retain': z
+    .object({ run_id: z.string().uuid(), reason: z.enum(['failed', 'interrupted']) })
+    .strict(),
+  'presentation-templates.scratch.discard': z.object({ run_id: z.string().uuid() }).strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,

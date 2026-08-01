@@ -167,6 +167,8 @@
     "removeProject": "Projeyi kaldır",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
+    "expandProjectChats": "Proje sohbetlerini genişlet",
+    "collapseProjectChats": "Proje sohbetlerini daralt",
     "deleting": "Siliniyor...",
     "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Proje kaldırılamadı. Projeyi yeniden açıp tekrar deneyin; klasördeki dosyalar silinmedi.",
+    "removeProjectChatDetachFailed": "Bazı sohbetlerin bu projeyle bağlantısı kesilemedi. Proje korundu; kaldırmayı yeniden deneyin.",
+    "removeProjectStateChanged": "Proje listesi kaldırma işleminden önce değişti. Yenileyip tekrar deneyin.",
+    "removeProjectStorageFailed": "Proje değişiklikleri kaydedilemedi. WePrompt'un uygulama verilerine erişebildiğini kontrol edip yeniden deneyin.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -620,7 +625,9 @@
     "today": "Bugün",
     "weekToDate": "Bu hafta",
     "monthToDate": "Bu ay",
-    "triggerLabel": "Bağlam kullanımını göster"
+    "triggerLabel": "Bağlam kullanımını göster",
+    "estimated": "Tahmini",
+    "unavailable": "Bağlam kullanımı kullanılamıyor"
   },
   "skill_generator": {
     "title": "Yetenek/Kural Oluştur",
@@ -768,6 +775,13 @@
     "importCard": "Şablon içe aktar (.md)",
     "empty": "Kullanılabilir şablon yok",
     "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "scratch": {
+      "prepareError": "Geçici çıktı alanı hazırlanamadı: {{error}}",
+      "retained": "Geçici çıktı dosyaları kurtarma için {{path}} konumunda tutuldu.",
+      "cleanup": "Temizle",
+      "cleanupSuccess": "Geçici çıktı dosyaları kaldırıldı",
+      "cleanupError": "Temizleme başarısız oldu: {{error}}"
+    },
     "importSuccess": "Şablon içe aktarıldı",
     "importError": "İçe aktarma başarısız: {{error}}",
     "removeError": "Silme başarısız: {{error}}",

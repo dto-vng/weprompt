@@ -142,13 +142,13 @@ describe('usage meter composer integration', () => {
     layoutState.current = { isMobile: false };
     const { rerender } = render(<SendBox defaultMultiLine lockMultiLine onSend={vi.fn()} rightTools={usageMeter} />);
 
-    const desktopTrigger = screen.getByRole('button', { name: 'Show context usage' });
+    const desktopTrigger = screen.getByRole('button', { name: 'Show context usage: 38% used' });
     expect(desktopTrigger).toHaveClass('arco-btn');
 
     layoutState.current = { isMobile: true };
     rerender(<SendBox onMobilePlusClick={vi.fn()} onSend={vi.fn()} rightTools={usageMeter} />);
 
-    expect(screen.queryByRole('button', { name: 'Show context usage' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show context usage: 38% used' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More' })).toHaveClass('arco-btn');
     style.remove();
   });

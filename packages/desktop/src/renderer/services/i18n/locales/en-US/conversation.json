@@ -167,6 +167,8 @@
     "removeProject": "Remove project",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "New chat in this project",
+    "expandProjectChats": "Expand project chats",
+    "collapseProjectChats": "Collapse project chats",
     "deleting": "Deleting...",
     "reorderPinned": "Drag to reorder pinned conversation",
     "newProject": "New project",
@@ -188,7 +190,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Project could not be removed. Reopen it and try again; folder files were not deleted.",
+    "removeProjectChatDetachFailed": "Some chats could not be disconnected from this project. The project was kept; retry removal.",
+    "removeProjectStateChanged": "The project list changed before removal. Refresh it and try again.",
+    "removeProjectStorageFailed": "Project changes could not be saved. Check that WePrompt can access its app data, then retry.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -635,7 +640,9 @@
     "today": "Today",
     "weekToDate": "Week to date",
     "monthToDate": "Month to date",
-    "triggerLabel": "Show context usage"
+    "triggerLabel": "Show context usage",
+    "estimated": "Estimated",
+    "unavailable": "Context usage unavailable"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -827,6 +834,13 @@
     "importCard": "Import template (.md)",
     "empty": "No templates available",
     "chipTooltip": "This message will use the template",
+    "scratch": {
+      "prepareError": "Could not prepare artifact scratch space: {{error}}",
+      "retained": "Temporary artifact files were kept for recovery at {{path}}.",
+      "cleanup": "Clean up",
+      "cleanupSuccess": "Temporary artifact files removed",
+      "cleanupError": "Cleanup failed: {{error}}"
+    },
     "importSuccess": "Template imported",
     "importError": "Import failed: {{error}}",
     "removeError": "Delete failed: {{error}}",

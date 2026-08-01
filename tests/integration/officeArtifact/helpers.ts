@@ -90,6 +90,7 @@ export function createOfficeArtifactService(
     resolveArtifact: resolveOfficeArtifactPath,
     hashArtifact: hashOfficeArtifact,
     workingFiles: new OfficeArtifactWorkingFiles(),
+    retainPreviewOrigin: (url) => ({ url, release: () => undefined }),
   });
 }
 

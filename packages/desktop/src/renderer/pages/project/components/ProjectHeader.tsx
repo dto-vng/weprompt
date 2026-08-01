@@ -5,8 +5,12 @@
  */
 
 import { ipcBridge } from '@/common';
+import type { TChatConversation } from '@/common/config/storage';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
-import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
+import {
+  detachAndRemoveProject,
+  PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS,
+} from '@/renderer/pages/conversation/projects/projectConversation';
 import {
   findProjectByWorkspace,
   removeProject,
@@ -159,42 +163,36 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ project }) => {
       cancelText: t('conversation.projectHome.cancel'),
       okButtonProps: { status: 'danger' },
       onOk: async () => {
-        try {
-          const detachResults = await Promise.all(
-            chats.map((conversationItem) =>
-              ipcBridge.conversation.update.invoke({
-                id: conversationItem.id,
-                updates: { extra: buildDetachedProjectExtra(conversationItem) },
-                merge_extra: false,
-              })
-            )
-          );
-          // Both results were discarded before: a chat that failed to detach or
-          // a project row that was already gone still navigated away as if the
-          // removal had gone through. The sidebar's equivalent checks both
-          // (`useConversationActions.ts`), so this now matches it.
-          const detachedAll = detachResults.every(Boolean);
-          const removedProject = removeProject(project.id);
-          // Best-effort cleanup: the project row is already gone, so a failed
-          // knowledge-store delete must never block or reverse the deletion
-          // the user just confirmed. An orphaned store directory is harmless
-          // leftover data, unlike leaving the user unable to finish deleting.
-          if (removedProject) {
-            void ipcBridge.projectKnowledge.removeStore.invoke({ projectId: project.id }).catch(() => {});
-          }
-          emitter.emit('chat.history.refresh');
-          if (!detachedAll || !removedProject) {
-            Message.error(t('conversation.history.removeProjectFailed'));
-            return;
-          }
-          Message.success(t('conversation.history.removeProjectSuccess'));
-          // Only leave the page once the project really is gone — otherwise the
-          // user lands on the home screen with the project still in the sidebar.
-          void navigate('/guid');
-        } catch (error) {
-          console.error('Failed to remove project:', error);
-          Message.error(t('conversation.history.removeProjectFailed'));
+        const result = await detachAndRemoveProject({
+          projectId: project.id,
+          conversations: chats,
+          detachConversation: (conversationItem, extra) =>
+            ipcBridge.conversation.update.invoke({
+              id: conversationItem.id,
+              updates: {
+                extra: extra as unknown as TChatConversation['extra'],
+              },
+              merge_extra: true,
+            }),
+          removeProjectMetadata: removeProject,
+        });
+
+        emitter.emit('chat.history.refresh');
+        if (result.success === false) {
+          console.error('Failed to remove project:', {
+            projectId: project.id,
+            reason: result.reason,
+            diagnostics: result.diagnostics,
+          });
+          Message.error(t(PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS[result.reason]));
+          return;
         }
+
+        // Best-effort cleanup: project metadata is already gone, so a failed
+        // knowledge-store delete must never reverse the removal.
+        void ipcBridge.projectKnowledge.removeStore.invoke({ projectId: project.id }).catch(() => {});
+        Message.success(t('conversation.history.removeProjectSuccess'));
+        void navigate('/guid');
       },
       alignCenter: true,
       getPopupContainer: () => document.body,

@@ -74,6 +74,13 @@ beforeEach(() => {
   translationMockState.translate = undefined;
 });
 
+const expandTechnicalDetails = (): HTMLElement => {
+  fireEvent.click(screen.getByRole('button', { name: 'common.technical_details' }));
+  const details = document.querySelector<HTMLElement>('.tool-group-summary__body');
+  if (!details) throw new Error('Expected Technical Details to be visible');
+  return details;
+};
+
 vi.mock('@arco-design/web-react', async () => {
   const actual = await vi.importActual<typeof import('@arco-design/web-react')>('@arco-design/web-react');
 
@@ -321,7 +328,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     expect(enUsMessages.toolActivity.status.recovered).toBe('Recovered after retry.');
   });
 
-  it('keeps completed phases visible while the latest phase is running', () => {
+  it('shows only the latest phase while running and keeps completed phases in Technical Details', () => {
     render(
       <MessageToolGroupSummary
         isActive
@@ -332,10 +339,12 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration rows are now always visible — no click needed, and there is no
-    // live "status" role for the active headline anymore (that copy is retired).
-    expect(screen.getByText('messages.toolActivity.categories.search.done')).toBeInTheDocument();
+    expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
     expect(screen.getByText('messages.toolActivity.categories.verify.running')).toBeInTheDocument();
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText('messages.toolActivity.categories.search.done')).toBeInTheDocument();
+    expect(details.getByText('messages.toolActivity.categories.verify.running')).toBeInTheDocument();
   });
 
   it('shows no live status region while active, only the plain narration', () => {
@@ -357,11 +366,10 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     expect(screen.getByText('messages.toolActivity.tools.render_report.done')).toBeInTheDocument();
   });
 
-  it('shows the reviewed-files narration immediately and keeps the raw command behind Technical Details', () => {
+  it('keeps reviewed-files narration and the raw command behind Technical Details once settled', () => {
     render(<MessageToolGroupSummary messages={[commandStep('completed', 'read-1', 'sed -n 1,10p file.txt')]} />);
 
-    // The friendly narration is part of the always-visible journal now.
-    expect(screen.getByText('messages.toolActivity.categories.fileRead.done')).toBeInTheDocument();
+    expect(screen.queryByText('messages.toolActivity.categories.fileRead.done')).not.toBeInTheDocument();
 
     const disclosure = screen.getByRole('button', { name: 'common.technical_details' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
@@ -370,6 +378,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     fireEvent.click(disclosure);
 
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('messages.toolActivity.categories.fileRead.done')).toBeInTheDocument();
     expect(screen.getByText('sed -n 1,10p file.txt')).toBeInTheDocument();
   });
 
@@ -435,7 +444,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     expect(screen.getByText('Status Marker')).toBeVisible();
   });
 
-  it('collapses repetitive same-label search commands into a single journal row', () => {
+  it('keeps the complete repeated search history behind Technical Details', () => {
     render(
       <MessageToolGroupSummary
         messages={[
@@ -445,9 +454,10 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Both searches resolve to the same display label, so the narration collapses
-    // the run into one row instead of repeating the identical line.
-    expect(screen.getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(1);
+    expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
+    expect(within(expandTechnicalDetails()).getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(
+      2
+    );
   });
 
   it('shows a safe thinking subject but not raw thinking content', () => {
@@ -471,9 +481,9 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    expect(screen.getByText('Reviewing the conversation activity')).toBeInTheDocument();
+    expect(screen.queryByText('Reviewing the conversation activity')).not.toBeInTheDocument();
     expect(screen.queryByText(/raw private reasoning/)).not.toBeInTheDocument();
+    expect(within(expandTechnicalDetails()).getByText('Reviewing the conversation activity')).toBeInTheDocument();
   });
 
   it('keeps safe trimmed plan narration visible', () => {
@@ -496,8 +506,8 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    expect(screen.getByText('Reviewing the activity flow')).toBeInTheDocument();
+    expect(screen.queryByText('Reviewing the activity flow')).not.toBeInTheDocument();
+    expect(within(expandTechnicalDetails()).getByText('Reviewing the activity flow')).toBeInTheDocument();
   });
 
   it('replaces unsafe plan narration with one localized fallback row', () => {
@@ -533,10 +543,13 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    expect(screen.getAllByText('messages.toolActivity.generic.done')).toHaveLength(1);
+    expect(screen.queryByText('messages.toolActivity.generic.done')).not.toBeInTheDocument();
     expect(screen.getAllByText('messages.toolActivity.generic.running')).toHaveLength(1);
     unsafeEntries.forEach((entry) => expect(screen.queryByText(entry)).not.toBeInTheDocument());
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getAllByText('messages.toolActivity.generic.done')).toHaveLength(1);
+    expect(details.getAllByText('messages.toolActivity.generic.running')).toHaveLength(1);
   });
 
   it('replaces technical provider narration shapes with one localized fallback row', () => {
@@ -664,9 +677,12 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    safeEntries.forEach((entry) => expect(screen.getByText(entry)).toBeInTheDocument());
+    expect(screen.getByText(safeEntries.at(-1)!)).toBeInTheDocument();
+    safeEntries.slice(0, -1).forEach((entry) => expect(screen.queryByText(entry)).not.toBeInTheDocument());
     expect(screen.queryByText('messages.toolActivity.generic.running')).not.toBeInTheDocument();
+
+    const details = within(expandTechnicalDetails());
+    safeEntries.forEach((entry) => expect(details.getByText(entry)).toBeInTheDocument());
   });
 
   it('rejects command and path shaped thinking subjects without exposing raw content', () => {
@@ -745,8 +761,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    const visibleSubject = screen.getByText((text) => text.startsWith('Reviewing'));
+    const visibleSubject = within(expandTechnicalDetails()).getByText((text) => text.startsWith('Reviewing'));
     expect(visibleSubject.textContent).toHaveLength(180);
     expect(visibleSubject.textContent).toMatch(/…$/);
   });
@@ -769,8 +784,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    const visibleContent = screen.getByText((text) => text.startsWith('Reviewing'));
+    const visibleContent = within(expandTechnicalDetails()).getByText((text) => text.startsWith('Reviewing'));
     expect(visibleContent.textContent).toHaveLength(180);
     expect(visibleContent.textContent).toMatch(/…$/);
   });
@@ -801,12 +815,18 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // No live status region while active, and narration is always visible now.
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByText('Planning changes').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
-    expect(screen.getByText('Reviewing options').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
+    expect(screen.queryByText('Planning changes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reviewing options')).not.toBeInTheDocument();
     expect(
       screen.getByText('messages.toolActivity.categories.verify.running').closest('[data-status]')
+    ).toHaveAttribute('data-status', 'running');
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText('Planning changes').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
+    expect(details.getByText('Reviewing options').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
+    expect(
+      details.getByText('messages.toolActivity.categories.verify.running').closest('[data-status]')
     ).toHaveAttribute('data-status', 'running');
   });
 
@@ -829,10 +849,13 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // No live status region while active, and narration is always visible now.
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByText('messages.toolActivity.categories.search.done')).toBeInTheDocument();
+    expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
     expect(screen.queryByText('messages.toolActivity.categories.search.running')).not.toBeInTheDocument();
+    expect(screen.getByText('Choosing the next change')).toBeInTheDocument();
+    expect(
+      within(expandTechnicalDetails()).getByText('messages.toolActivity.categories.search.done')
+    ).toBeInTheDocument();
   });
 
   it('settles every pending or running row in an inactive summary', () => {
@@ -860,14 +883,13 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    expect(screen.getByText('Queued work').closest('[data-status]')).toHaveAttribute('data-status', 'canceled');
-    expect(screen.getByText('Active work').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
-    expect(screen.getByText('messages.toolActivity.categories.verify.done')).toBeInTheDocument();
-    // The turn is settled (not active, and not trivial), so the warm close renders
-    // with role="status" — the inverse of the old active-only live region.
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText(/^messages\.toolActivity\.close\.canceled\.v\d$/)).toBeInTheDocument();
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText('Queued work').closest('[data-status]')).toHaveAttribute('data-status', 'canceled');
+    expect(details.getByText('Active work').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
+    expect(details.getByText('messages.toolActivity.categories.verify.done')).toBeInTheDocument();
   });
 
   it('switches an unsafe plan fallback to done narration when the summary settles', () => {
@@ -891,8 +913,10 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    const row = screen.getByText('messages.toolActivity.generic.done').closest('[data-status]');
+    expect(screen.queryByText('messages.toolActivity.generic.done')).not.toBeInTheDocument();
+    const row = within(expandTechnicalDetails())
+      .getByText('messages.toolActivity.generic.done')
+      .closest('[data-status]');
     expect(row).toHaveAttribute('data-status', 'completed');
     expect(row?.querySelector('[data-status-icon="completed"]')).toBeInTheDocument();
     expect(screen.queryByText('messages.toolActivity.generic.running')).not.toBeInTheDocument();
@@ -959,10 +983,14 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       />
     );
 
-    // Narration is always visible now — no "Technical details" click required.
-    expect(screen.getByText('Queued work').closest('[data-status]')).toHaveAttribute('data-status', 'pending');
     expect(screen.getByText('Active work').closest('[data-status]')).toHaveAttribute('data-status', 'running');
-    expect(screen.getByText('Finished work').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
+    expect(screen.queryByText('Queued work')).not.toBeInTheDocument();
+    expect(screen.queryByText('Finished work')).not.toBeInTheDocument();
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText('Queued work').closest('[data-status]')).toHaveAttribute('data-status', 'pending');
+    expect(details.getByText('Active work').closest('[data-status]')).toHaveAttribute('data-status', 'running');
+    expect(details.getByText('Finished work').closest('[data-status]')).toHaveAttribute('data-status', 'completed');
   });
 
   it('renders canceled work as a warning and never as success', () => {
@@ -999,8 +1027,8 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     );
     expect(screen.queryByText('messages.toolActivity.tools.render_report.failedTitle')).not.toBeInTheDocument();
     expect(screen.queryByText('messages.toolActivity.error.suggestion')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'common.technical_details' }));
-    expect(screen.getByText(/messages\.toolActivity\.tools\.render_report\.running/)).toBeInTheDocument();
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText(/messages\.toolActivity\.tools\.render_report\.running/)).toBeInTheDocument();
     expect(screen.getAllByText('forge-reports_render_report')).toHaveLength(3);
     expect(screen.queryByText(/messages\.toolActivity\.attempt/)).not.toBeInTheDocument();
   });
@@ -1088,7 +1116,7 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         },
       }) as unknown as IMessageAcpToolCall;
 
-    it('collapses repeated identical generic steps into a single journal row', () => {
+    it('keeps repeated generic steps in the opt-in Technical Details history', () => {
       render(
         <MessageToolGroupSummary
           messages={[
@@ -1099,10 +1127,11 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // Consecutive steps with the same label collapse to one row, so the journal
-      // no longer shows a wall of identical "next step" lines.
-      expect(screen.getAllByText('messages.toolActivity.categories.generic.done')).toHaveLength(1);
+      expect(screen.queryByText('messages.toolActivity.categories.generic.done')).not.toBeInTheDocument();
       expect(screen.getByText(/^messages\.toolActivity\.close\.completed\.v\d$/)).toBeInTheDocument();
+      expect(
+        within(expandTechnicalDetails()).getAllByText('messages.toolActivity.categories.generic.done')
+      ).toHaveLength(3);
     });
 
     it('shows every distinct work category in source order without truncation', () => {
@@ -1117,18 +1146,17 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // The redesign replaces the old top-3-plus-overflow category summary with a
-      // full narration row per action, in source order, so nothing is truncated.
-      const search = screen.getByText('messages.toolActivity.categories.search.done');
-      const fileRead = screen.getByText('messages.toolActivity.categories.fileRead.done');
-      const fileWrite = screen.getByText('messages.toolActivity.categories.fileWrite.done');
-      const verify = screen.getByText('messages.toolActivity.categories.verify.done');
+      const details = within(expandTechnicalDetails());
+      const search = details.getByText('messages.toolActivity.categories.search.done');
+      const fileRead = details.getByText('messages.toolActivity.categories.fileRead.done');
+      const fileWrite = details.getByText('messages.toolActivity.categories.fileWrite.done');
+      const verify = details.getByText('messages.toolActivity.categories.verify.done');
       expect(search.compareDocumentPosition(fileRead)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
       expect(fileRead.compareDocumentPosition(fileWrite)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
       expect(fileWrite.compareDocumentPosition(verify)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     });
 
-    it('keeps completed work visible alongside what is still underway while active', () => {
+    it('shows only underway work while active and keeps completed work in Technical Details', () => {
       render(
         <MessageToolGroupSummary
           isActive
@@ -1139,16 +1167,16 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // The count-based "Completed: N of M" outcome sentence is retired — the
-      // per-row narration and status now carry this instead.
-      expect(screen.getByText('messages.toolActivity.categories.search.done').closest('[data-status]')).toHaveAttribute(
-        'data-status',
-        'completed'
-      );
+      expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
       expect(
         screen.getByText('messages.toolActivity.categories.verify.running').closest('[data-status]')
       ).toHaveAttribute('data-status', 'running');
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+      const details = within(expandTechnicalDetails());
+      expect(
+        details.getByText('messages.toolActivity.categories.search.done').closest('[data-status]')
+      ).toHaveAttribute('data-status', 'completed');
     });
 
     it('keeps a failed step out of the active narration while other work continues', () => {
@@ -1186,8 +1214,12 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      expect(screen.getByText('Queued work').closest('[data-status]')).toHaveAttribute('data-status', 'canceled');
       expect(screen.getByText(/^messages\.toolActivity\.close\.canceled\.v\d$/)).toBeInTheDocument();
+      expect(screen.queryByText('Queued work')).not.toBeInTheDocument();
+      expect(within(expandTechnicalDetails()).getByText('Queued work').closest('[data-status]')).toHaveAttribute(
+        'data-status',
+        'canceled'
+      );
     });
 
     it('keeps pending work active while the turn remains active', () => {
@@ -1223,9 +1255,10 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // The old "(2)" count-safe category label is retired — two distinct search
-      // actions now each render their own narration row.
-      expect(screen.getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(2);
+      expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
+      expect(
+        within(expandTechnicalDetails()).getAllByText('messages.toolActivity.categories.search.done')
+      ).toHaveLength(2);
     });
 
     it('keeps every recap headline count-aware and locale-formatted', () => {
@@ -1256,10 +1289,9 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
 
-      // The narration row itself carries this text now; the old separate
-      // "Focus: ..." echo of the safe subject is retired as redundant.
-      expect(screen.getByText('Reviewing the account settings')).toBeInTheDocument();
+      expect(screen.queryByText('Reviewing the account settings')).not.toBeInTheDocument();
       expect(screen.queryByText(/^messages\.toolActivity\.recap\.subject/)).not.toBeInTheDocument();
+      expect(within(expandTechnicalDetails()).getByText('Reviewing the account settings')).toBeInTheDocument();
     });
 
     it('does not claim recovery for distinct failed and successful calls', () => {
@@ -1458,10 +1490,14 @@ describe('MessageToolGroupSummary narration-first journal', () => {
       },
     }) as unknown as WorkJournalSourceMessage;
 
-  it('shows the plan narration without expanding Technical details', () => {
+  it('keeps settled plan narration behind Technical Details', () => {
     render(<MessageToolGroupSummary messages={[planMessage()]} isActive={false} />);
-    expect(screen.getByText('Enable the Google Drive API')).toBeInTheDocument();
-    expect(screen.getByText('Verify authentication')).toBeInTheDocument();
+    expect(screen.queryByText('Enable the Google Drive API')).not.toBeInTheDocument();
+    expect(screen.queryByText('Verify authentication')).not.toBeInTheDocument();
+
+    const details = within(expandTechnicalDetails());
+    expect(details.getByText('Enable the Google Drive API')).toBeInTheDocument();
+    expect(details.getByText('Verify authentication')).toBeInTheDocument();
   });
 
   it('renders a warm close and none of the retired count/headline copy', () => {
@@ -1485,9 +1521,9 @@ describe('MessageToolGroupSummary narration-first journal', () => {
     expect(screen.queryByText(/done|finished|came together/i)).not.toBeInTheDocument();
   });
 
-  it('shows no Technical details toggle when there are no raw tool calls', () => {
+  it('offers Technical Details for plan narration without raw tool calls', () => {
     render(<MessageToolGroupSummary messages={[planMessage()]} isActive={false} />);
-    expect(screen.queryByText(/technical details/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'common.technical_details' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('renders a close for a single completed action that carries a safe subject', () => {
@@ -1581,5 +1617,99 @@ describe('MessageToolGroupSummary narration-first journal', () => {
     const close = screen.getByText(/got most of this done|Good progress/i);
     expect(close).toBeInTheDocument();
     expect(close).toHaveClass('text-warning');
+  });
+});
+
+describe('MessageToolGroupSummary concise journal', () => {
+  const commandStep = (status: string, toolCallId: string, command: string): IMessageAcpToolCall =>
+    ({
+      id: toolCallId,
+      conversation_id: 'conv-1',
+      type: 'acp_tool_call',
+      content: {
+        sessionId: 'sess-1',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          tool_call_id: toolCallId,
+          status,
+          title: 'exec_command',
+          kind: 'execute',
+          rawInput: { command },
+        },
+      },
+    }) as unknown as IMessageAcpToolCall;
+
+  it('shows only the current status while alternating tool work is active', () => {
+    render(
+      <MessageToolGroupSummary
+        isActive
+        messages={[
+          commandStep('completed', 'search-1', 'rg -n needle packages'),
+          commandStep('completed', 'verify-1', 'bun run test'),
+          commandStep('completed', 'search-2', 'rg -n another tests'),
+          commandStep('in_progress', 'verify-2', 'bunx tsc --noEmit'),
+        ]}
+      />
+    );
+
+    const liveJournal = screen.getByRole('log');
+    expect(within(liveJournal).getAllByText('messages.toolActivity.categories.verify.running')).toHaveLength(1);
+    expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
+    expect(screen.queryByText('messages.toolActivity.categories.verify.done')).not.toBeInTheDocument();
+  });
+
+  it('does not revive a completed step as the current status while the turn remains active', () => {
+    render(<MessageToolGroupSummary isActive messages={[commandStep('completed', 'verify-1', 'bun run test')]} />);
+
+    expect(within(screen.getByRole('log')).queryByText('messages.toolActivity.categories.verify.done')).toBeNull();
+    expect(within(expandTechnicalDetails()).getByText('messages.toolActivity.categories.verify.done')).toBeVisible();
+  });
+
+  it('hides a settled alternating checklist until Technical Details is expanded', () => {
+    render(
+      <MessageToolGroupSummary
+        messages={[
+          commandStep('completed', 'search-1', 'rg -n needle packages'),
+          commandStep('completed', 'verify-1', 'bun run test'),
+          commandStep('completed', 'search-2', 'rg -n another tests'),
+          commandStep('completed', 'verify-2', 'bunx tsc --noEmit'),
+        ]}
+      />
+    );
+
+    expect(screen.queryByText('messages.toolActivity.categories.search.done')).not.toBeInTheDocument();
+    expect(screen.queryByText('messages.toolActivity.categories.verify.done')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.technical_details' }));
+
+    expect(screen.getAllByText('messages.toolActivity.categories.search.done')).toHaveLength(2);
+    expect(screen.getAllByText('messages.toolActivity.categories.verify.done')).toHaveLength(2);
+    expect(document.querySelector('[aria-live]')).toBeNull();
+  });
+
+  it('keeps settled plan narration available only in Technical Details', () => {
+    const plan: WorkJournalSourceMessage = {
+      id: 'plan-1',
+      conversation_id: 'conv-1',
+      type: 'plan',
+      position: 'left',
+      created_at: 1,
+      content: {
+        entries: [
+          { content: 'Review the source material', status: 'completed' },
+          { content: 'Prepare the final presentation', status: 'completed' },
+        ],
+      },
+    } as unknown as WorkJournalSourceMessage;
+
+    render(<MessageToolGroupSummary messages={[plan]} />);
+
+    expect(screen.queryByText('Review the source material')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prepare the final presentation')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common.technical_details' }));
+
+    expect(screen.getByText('Review the source material')).toBeVisible();
+    expect(screen.getByText('Prepare the final presentation')).toBeVisible();
   });
 });
