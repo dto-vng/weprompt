@@ -34,7 +34,7 @@ function runPostInstall() {
     }
   } catch (e) {
     console.error('Postinstall failed:', e.message);
-    // Don't exit with error code to avoid breaking installation
+    throw e;
   }
 }
 

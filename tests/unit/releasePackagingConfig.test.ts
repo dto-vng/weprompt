@@ -257,6 +257,7 @@ describe('release packaging configuration', () => {
       expect(windowsBuildBlock).not.toContain(`${name}:`);
       expect(macBuildBlock).toContain(`${name}: \${{ !inputs.internal_release && secrets.`);
     }
+    expect(macBuildBlock).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'");
 
     expect(windowsBuildBlock).toContain('$BuildExitCode');
     expect(windowsBuildBlock).toContain('$LASTEXITCODE');

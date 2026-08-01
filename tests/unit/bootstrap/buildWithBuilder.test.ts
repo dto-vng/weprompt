@@ -473,6 +473,7 @@ childProcess.execSync = function mockedExecSync(command) {
       const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
       const hookPath = join(tempDir, 'hook.cjs');
       const callsPath = join(tempDir, 'prepare-calls.json');
+      const builderCallsPath = join(tempDir, 'builder-calls.json');
       const outDir = resolve(repoRoot, 'out');
       const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}-${expectedArch}`);
 
@@ -523,6 +524,15 @@ function ensurePlaceholder(relativePath) {
 
 childProcess.execSync = function mockedExecSync(command) {
   const commandText = String(command);
+  if (commandText.includes('electron-builder --config packages/desktop/electron-builder.yml')) {
+    const callsPath = process.env.AIONUI_BUILDER_CALLS_FILE;
+    const calls = fs.existsSync(callsPath) ? JSON.parse(fs.readFileSync(callsPath, 'utf8')) : [];
+    calls.push({
+      command: commandText,
+      cscIdentityAutoDiscovery: process.env.CSC_IDENTITY_AUTO_DISCOVERY ?? null,
+    });
+    fs.writeFileSync(callsPath, JSON.stringify(calls));
+  }
   if (commandText.includes('electron-vite build')) {
     ensurePlaceholder('out/main/index.js');
     ensurePlaceholder('out/preload/index.js');
@@ -551,7 +561,9 @@ childProcess.execSync = function mockedExecSync(command) {
           encoding: 'utf8',
           env: {
             ...process.env,
+            AIONUI_BUILDER_CALLS_FILE: builderCallsPath,
             AIONUI_PREPARE_CALLS_FILE: callsPath,
+            CSC_IDENTITY_AUTO_DISCOVERY: '',
             NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
             WEPROMPT_INTERNAL_RELEASE: '1',
           },
@@ -572,6 +584,18 @@ childProcess.execSync = function mockedExecSync(command) {
 
         const calls = JSON.parse(readFileSync(callsPath, 'utf8')) as Array<{ arch?: string } | null>;
         expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
+
+        const builderCalls = JSON.parse(readFileSync(builderCallsPath, 'utf8')) as Array<{
+          command: string;
+          cscIdentityAutoDiscovery: string | null;
+        }>;
+        expect(builderCalls).toHaveLength(1);
+        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe('false');
+        if (args.includes('--mac')) {
+          expect(builderCalls[0]?.command).toContain('--config.mac.identity=-');
+        } else {
+          expect(builderCalls[0]?.command).not.toContain('--config.mac.identity=-');
+        }
       } finally {
         rmSync(outDir, { recursive: true, force: true });
         if (movedExistingOut) {

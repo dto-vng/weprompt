@@ -519,15 +519,21 @@ function assertInternalReleaseBuildEnvironment() {
   const inheritedVariables = [
     ...new Set([...INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES, ...Object.keys(process.env)]),
   ].filter((name) => {
+    const value = process.env[name];
     const isForbiddenName =
       INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
-    return isForbiddenName && typeof process.env[name] === 'string' && process.env[name].trim() !== '';
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value?.trim() === 'false') {
+      return false;
+    }
+    return isForbiddenName && typeof value === 'string' && value.trim() !== '';
   });
   if (inheritedVariables.length > 0) {
     throw new Error(
       `Internal release build rejects ambient network, upload, signing, or notarization variables: ${inheritedVariables.join(', ')}`
     );
   }
+
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
 }
 
 function isValidPackageVersion(value) {
@@ -574,8 +580,9 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
   if (!appName) throw new Error(`No .app found in ${appDir}`);
   const appPath = path.join(appDir, appName);
 
+  const internalIdentityArg = process.env.WEPROMPT_INTERNAL_RELEASE === '1' ? ' --config.mac.identity=-' : '';
   execSync(
-    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never`,
+    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never${internalIdentityArg}`,
     {
       stdio: 'inherit',
       shell: process.platform === 'win32',
@@ -907,12 +914,15 @@ try {
   }
 
   const isWindowsBuild = builderArgs.includes('--win') || builderArgs.includes('--all');
+  const isMacBuild = builderArgs.includes('--mac') || (builderArgs.includes('--all') && process.platform === 'darwin');
   if (isWindowsBuild) {
     patchElectronBuilderNsisInstaller();
     cleanupWindowsPackOutput();
   }
 
-  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}`;
+  const internalMacIdentityArg =
+    process.env.WEPROMPT_INTERNAL_RELEASE === '1' && isMacBuild ? ' --config.mac.identity=-' : '';
+  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}${internalMacIdentityArg}`;
   try {
     buildWithDmgRetry(builderCommand, targetArch);
   } catch (error) {

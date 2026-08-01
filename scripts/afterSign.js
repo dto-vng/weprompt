@@ -22,9 +22,13 @@ const INTERNAL_RELEASE_SIGNING_ENV_NAMES = [
 
 function populatedSigningVariables(env) {
   return [...new Set([...INTERNAL_RELEASE_SIGNING_ENV_NAMES, ...Object.keys(env)])].filter((name) => {
+    const value = env[name];
     const isSigningName =
       INTERNAL_RELEASE_SIGNING_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
-    return isSigningName && typeof env[name] === 'string' && env[name].trim() !== '';
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value?.trim() === 'false') {
+      return false;
+    }
+    return isSigningName && typeof value === 'string' && value.trim() !== '';
   });
 }
 
@@ -49,6 +53,18 @@ async function afterSign(
     }
 
     runCommand(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+    runCommand(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'inherit' });
+    const signatureDetails = String(
+      runCommand(`codesign -dv --verbose=4 "${appPath}" 2>&1`, { encoding: 'utf8', stdio: 'pipe' })
+    );
+    const teamIdentifier = signatureDetails.match(/^TeamIdentifier=(.+)$/m)?.[1]?.trim();
+    const hasProductionIdentity =
+      !/^Signature=adhoc$/m.test(signatureDetails) ||
+      /^Authority=/m.test(signatureDetails) ||
+      (teamIdentifier != null && teamIdentifier.toLowerCase() !== 'not set');
+    if (hasProductionIdentity) {
+      throw new Error(`Internal release retained a production signing identity: ${appName}`);
+    }
     console.log(`Ad-hoc signature applied successfully to internal ${appName}`);
     return;
   }
