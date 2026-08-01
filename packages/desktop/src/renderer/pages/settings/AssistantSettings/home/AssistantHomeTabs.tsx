@@ -94,6 +94,10 @@ const AssistantHomeTabs: React.FC<AssistantHomeTabsProps> = ({
       >
         <div className='mx-auto w-full max-w-800px'>
           <SettingsPageHeader
+            // This header sits in its own fixed block above the scroll body, so it
+            // must not stick — and must not paint a background only as wide as the
+            // 800px content column it lives in.
+            sticky={false}
             data-testid='assistants-header'
             title={t('settings.assistants', { defaultValue: 'Assistants' })}
             description={t('settings.assistantHomeLeadShort', {
