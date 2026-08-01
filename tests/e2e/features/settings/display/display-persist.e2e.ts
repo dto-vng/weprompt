@@ -7,6 +7,7 @@
 
 import { test, expect } from '../../../fixtures';
 import { goToSettings, waitForSettle } from '../../../helpers';
+import type { Page } from '@playwright/test';
 
 const PERCENT_RE = /^\d{2,3}%$/;
 
@@ -36,18 +37,29 @@ async function currentPercent(page: import('@playwright/test').Page): Promise<nu
   return parseInt(text!.replace('%', ''), 10);
 }
 
-async function reloadAndGoToDisplay(page: import('@playwright/test').Page): Promise<void> {
+function themePresetGroup(page: Page) {
+  return page.locator('[role="radiogroup"]').first();
+}
+
+function themePresetOptions(page: Page) {
+  return themePresetGroup(page).locator('label:has(input[type="radio"])');
+}
+
+function themePresetRadios(page: Page) {
+  return themePresetGroup(page).locator('input[type="radio"]');
+}
+
+async function selectedThemePresetIndex(page: Page): Promise<number> {
+  return themePresetRadios(page).evaluateAll((radios) =>
+    radios.findIndex((radio) => (radio as HTMLInputElement).checked)
+  );
+}
+
+async function reloadAndGoToAppearance(page: Page): Promise<void> {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => (document.body.textContent?.length ?? 0) > 50, { timeout: 15_000 });
   await goToSettings(page, 'appearance');
   await waitForSettle(page);
-}
-
-async function activeThemeCardIndex(page: import('@playwright/test').Page): Promise<number> {
-  return page.evaluate(() => {
-    const cards = Array.from(document.querySelectorAll<HTMLDivElement>('.grid > div.cursor-pointer'));
-    return cards.findIndex((card) => card.className.includes('border-[var(--color-primary)]'));
-  });
 }
 
 test.describe('Display settings persistence across reload', () => {
@@ -59,37 +71,48 @@ test.describe('Display settings persistence across reload', () => {
   });
 
   test('theme persists after reload', async ({ page }) => {
-    const themeGroup = page.locator('[role="radiogroup"]');
-    await themeGroup.waitFor({ state: 'visible', timeout: 10_000 });
+    const options = themePresetOptions(page);
+    await options.first().waitFor({ state: 'visible', timeout: 10_000 });
+
+    const radios = themePresetRadios(page);
+    const presetCount = await radios.count();
+    expect(presetCount).toBeGreaterThanOrEqual(2);
+
+    const initialIndex = await selectedThemePresetIndex(page);
+    expect(initialIndex).toBeGreaterThanOrEqual(0);
+    const targetIndex = (initialIndex + 1) % presetCount;
 
     const initialTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     expect(initialTheme).toBeTruthy();
 
     const targetTheme = initialTheme === 'light' ? 'dark' : 'light';
-    const targetButton = themeGroup.locator('[role="radio"][aria-checked="false"]');
-    await targetButton.click();
 
-    await page.waitForFunction(
-      (expected) => document.documentElement.getAttribute('data-theme') === expected,
-      targetTheme,
-      { timeout: 5_000 }
-    );
+    try {
+      await options.nth(targetIndex).click();
+      await expect(radios.nth(targetIndex)).toBeChecked();
+      await page.waitForFunction(
+        (expected) => document.documentElement.getAttribute('data-theme') === expected,
+        targetTheme,
+        { timeout: 5_000 }
+      );
 
-    await reloadAndGoToDisplay(page);
+      await reloadAndGoToAppearance(page);
 
-    const afterReload = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-    expect(afterReload).toBe(targetTheme);
-
-    // Restore original theme
-    const revertGroup = page.locator('[role="radiogroup"]');
-    await revertGroup.waitFor({ state: 'visible', timeout: 10_000 });
-    const revertButton = revertGroup.locator('[role="radio"][aria-checked="false"]');
-    await revertButton.click();
-    await page.waitForFunction(
-      (expected) => document.documentElement.getAttribute('data-theme') === expected,
-      initialTheme,
-      { timeout: 5_000 }
-    );
+      const reloadedRadios = themePresetRadios(page);
+      await expect(reloadedRadios.nth(targetIndex)).toBeChecked();
+      const afterReload = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      expect(afterReload).toBe(targetTheme);
+    } finally {
+      const currentOptions = themePresetOptions(page);
+      await currentOptions.first().waitFor({ state: 'visible', timeout: 10_000 });
+      await currentOptions.nth(initialIndex).click();
+      await expect(themePresetRadios(page).nth(initialIndex)).toBeChecked();
+      await page.waitForFunction(
+        (expected) => document.documentElement.getAttribute('data-theme') === expected,
+        initialTheme,
+        { timeout: 5_000 }
+      );
+    }
   });
 
   test('zoom scale persists after reload', async ({ page }) => {
@@ -109,7 +132,7 @@ test.describe('Display settings persistence across reload', () => {
     const afterClick = await currentPercent(page);
     expect(afterClick).toBeGreaterThan(baseline);
 
-    await reloadAndGoToDisplay(page);
+    await reloadAndGoToAppearance(page);
 
     const afterReload = await currentPercent(page);
     expect(afterReload).toBe(afterClick);
@@ -124,49 +147,33 @@ test.describe('Display settings persistence across reload', () => {
   });
 
   test('CSS theme selection persists after reload', async ({ page }) => {
-    const cards = page.locator('.grid > div.cursor-pointer');
-    await cards.first().waitFor({ state: 'visible', timeout: 15_000 });
+    const options = themePresetOptions(page);
+    const radios = themePresetRadios(page);
+    await options.first().waitFor({ state: 'visible', timeout: 15_000 });
 
-    const cardCount = await cards.count();
-    if (cardCount < 2) {
-      test.skip(true, 'fewer than 2 CSS theme presets — cannot switch');
-      return;
-    }
+    const presetCount = await radios.count();
+    expect(presetCount).toBeGreaterThanOrEqual(2);
 
-    // Find current active card index
-    const activeIndex = await activeThemeCardIndex(page);
+    const initialIndex = await selectedThemePresetIndex(page);
+    expect(initialIndex).toBeGreaterThanOrEqual(0);
 
-    const targetIndex = activeIndex <= 0 ? 1 : 0;
-    const targetCard = cards.nth(targetIndex);
-    await targetCard.click();
+    const targetIndex = (initialIndex + 1) % presetCount;
 
-    await page.locator('.arco-message-success').first().waitFor({ state: 'visible', timeout: 5_000 });
+    try {
+      await options.nth(targetIndex).click();
+      await expect(radios.nth(targetIndex)).toBeChecked();
 
-    // Confirm selection took effect before reload
-    await page.waitForFunction(
-      (idx) => {
-        const card = document.querySelectorAll('.grid > div.cursor-pointer')[idx];
-        return card?.className.includes('border-[var(--color-primary)]');
-      },
-      targetIndex,
-      { timeout: 5_000 }
-    );
+      await reloadAndGoToAppearance(page);
 
-    await reloadAndGoToDisplay(page);
-
-    // Verify the same card is still active after reload
-    await cards.first().waitFor({ state: 'visible', timeout: 15_000 });
-    const afterReloadCls = await cards.nth(targetIndex).getAttribute('class');
-    expect(afterReloadCls).toContain('border-[var(--color-primary)]');
-
-    // Restore original active theme
-    if (activeIndex >= 0) {
-      await cards.nth(activeIndex).click();
-      await page
-        .locator('.arco-message-success')
-        .first()
-        .waitFor({ state: 'visible', timeout: 5_000 })
-        .catch(() => {});
+      const reloadedRadios = themePresetRadios(page);
+      await themePresetOptions(page).first().waitFor({ state: 'visible', timeout: 15_000 });
+      await expect(reloadedRadios.nth(targetIndex)).toBeChecked();
+    } finally {
+      const currentOptions = themePresetOptions(page);
+      const currentRadios = themePresetRadios(page);
+      await currentOptions.first().waitFor({ state: 'visible', timeout: 15_000 });
+      await currentOptions.nth(initialIndex).click();
+      await expect(currentRadios.nth(initialIndex)).toBeChecked();
     }
   });
 });

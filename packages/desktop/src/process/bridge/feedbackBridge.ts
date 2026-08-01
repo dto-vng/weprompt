@@ -19,15 +19,31 @@ import {
 } from '../feedback/localExport';
 
 let mainWindowRef: BrowserWindow | null = null;
+let trustedApplicationDocuments = new Set<string>();
 let handlersRegistered = false;
 
+function normalizeApplicationDocumentUrl(documentUrl: string): string | null {
+  try {
+    const normalizedUrl = new URL(documentUrl);
+    normalizedUrl.hash = '';
+    return normalizedUrl.href;
+  } catch {
+    return null;
+  }
+}
+
 function isAuthorizedMainWindowSender(event: IpcMainInvokeEvent): boolean {
-  return Boolean(
-    mainWindowRef &&
-    !mainWindowRef.isDestroyed() &&
-    !mainWindowRef.webContents.isDestroyed() &&
-    event.sender === mainWindowRef.webContents
-  );
+  if (!mainWindowRef || mainWindowRef.isDestroyed() || mainWindowRef.webContents.isDestroyed()) {
+    return false;
+  }
+
+  const boundWebContents = mainWindowRef.webContents;
+  if (event.sender !== boundWebContents || event.senderFrame !== boundWebContents.mainFrame) {
+    return false;
+  }
+
+  const senderDocument = normalizeApplicationDocumentUrl(event.senderFrame.url);
+  return senderDocument !== null && trustedApplicationDocuments.has(senderDocument);
 }
 
 async function exportLocalDiagnostics(
@@ -82,8 +98,13 @@ async function captureScreenshot(event: IpcMainInvokeEvent) {
  * authorized sender when Electron recreates the window, while handlers remain
  * registered exactly once for the process lifetime.
  */
-export function initializeFeedbackBridge(mainWindow: BrowserWindow): void {
+export function initializeFeedbackBridge(mainWindow: BrowserWindow, trustedRendererDocuments: Iterable<string>): void {
   mainWindowRef = mainWindow;
+  trustedApplicationDocuments = new Set(
+    [...trustedRendererDocuments]
+      .map(normalizeApplicationDocumentUrl)
+      .filter((documentUrl): documentUrl is string => documentUrl !== null)
+  );
   if (handlersRegistered) return;
 
   ipcMain.handle('feedback:export-local', exportLocalDiagnostics);

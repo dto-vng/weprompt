@@ -17,6 +17,7 @@ import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell 
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'node:url';
 import { withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
 import { DESKTOP_PET_ENABLED } from './common/config/constants';
@@ -702,9 +703,16 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     void app.dock.hide();
   }
 
+  // Define renderer documents once so loading and privileged feedback IPC use
+  // the same exact application-document paths. URL hashes are handled by the
+  // bridge because client-side routing may change them after load.
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
+  const fallbackFile = path.join(__dirname, '../renderer/index.html');
+  const trustedRendererDocuments = [...(rendererUrl ? [rendererUrl] : []), pathToFileURL(fallbackFile).href];
+
   initMainAdapterWithWindow(mainWindow);
   bindMainWindowReferences(mainWindow);
-  initializeFeedbackBridge(mainWindow);
+  initializeFeedbackBridge(mainWindow, trustedRendererDocuments);
 
   setupApplicationMenu();
 
@@ -740,9 +748,6 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   }
 
   // Load the renderer: dev server URL in development, built HTML file in production
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  const fallbackFile = path.join(__dirname, '../renderer/index.html');
-
   if (!app.isPackaged && rendererUrl) {
     console.log(`[AionUi] Loading renderer URL: ${rendererUrl}`);
     mainWindow.loadURL(rendererUrl).catch((error) => {

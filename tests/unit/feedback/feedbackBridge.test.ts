@@ -12,12 +12,22 @@ import { gunzipSync } from 'node:zlib';
 import { app, dialog } from 'electron';
 import { collectFeedbackLogAttachment } from '@/process/feedback/logs';
 
-const handlers = new Map<string, (event: { sender: unknown }, input?: unknown) => unknown>();
+type FakeFrame = {
+  url: string;
+};
+
+type FakeInvokeEvent = {
+  sender: unknown;
+  senderFrame: unknown;
+};
+
+const handlers = new Map<string, (event: FakeInvokeEvent, input?: unknown) => unknown>();
 const eventListeners = new Map<string, unknown>();
 
 type FakeWebContents = {
   capturePage: () => Promise<{ toPNG: () => Buffer }>;
   isDestroyed: () => boolean;
+  mainFrame: FakeFrame;
 };
 
 type FakeWindow = {
@@ -40,6 +50,8 @@ vi.mock('electron', () => ({
 
 const PNG_BYTES = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
 const JPEG_BYTES = [0xff, 0xd8, 0xff, 0xe0, 0x00];
+const TRUSTED_FILE_DOCUMENT = 'file:///Applications/WePrompt.app/Contents/Resources/app.asar/renderer/index.html';
+const TRUSTED_DEV_DOCUMENT = 'http://localhost:5173/';
 
 function validInput(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -69,6 +81,14 @@ function readArchive(outputPath: string) {
 
 let mainWindow: FakeWindow;
 
+function authorizedEvent(url = TRUSTED_FILE_DOCUMENT): FakeInvokeEvent {
+  mainWindow.webContents.mainFrame.url = url;
+  return {
+    sender: mainWindow.webContents,
+    senderFrame: mainWindow.webContents.mainFrame,
+  };
+}
+
 beforeEach(async () => {
   handlers.clear();
   eventListeners.clear();
@@ -78,10 +98,11 @@ beforeEach(async () => {
     webContents: {
       capturePage: vi.fn(async () => ({ toPNG: () => Buffer.from(PNG_BYTES) })),
       isDestroyed: () => false,
+      mainFrame: { url: TRUSTED_FILE_DOCUMENT },
     },
   };
   const { initializeFeedbackBridge } = await import('@/process/bridge/feedbackBridge');
-  initializeFeedbackBridge(mainWindow as never);
+  initializeFeedbackBridge(mainWindow as never, [TRUSTED_FILE_DOCUMENT, TRUSTED_DEV_DOCUMENT]);
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -96,24 +117,56 @@ describe('feedbackBridge authorization and surface', () => {
   it.each(['feedback:capture-screenshot', 'feedback:export-local'])(
     'rejects a sender other than the bound main window on %s',
     async (channel) => {
-      const result = await handlers.get(channel)!({ sender: {} }, validInput());
+      const result = await handlers.get(channel)!(
+        { sender: {}, senderFrame: mainWindow.webContents.mainFrame },
+        validInput()
+      );
       expect(result).toEqual(channel.endsWith('capture-screenshot') ? null : { status: 'failed' });
       expect(dialog.showSaveDialog).not.toHaveBeenCalled();
     }
   );
 
-  it('captures a screenshot only from the bound main window webContents', async () => {
-    const result = (await handlers.get('feedback:capture-screenshot')!({ sender: mainWindow.webContents })) as {
-      data: number[];
-      filename: string;
-    };
-    expect(result.filename).toMatch(/^screenshot-.*\.png$/);
-    expect(result.data).toEqual(PNG_BYTES);
+  it.each([TRUSTED_FILE_DOCUMENT, `${TRUSTED_DEV_DOCUMENT}#/settings`])(
+    'captures a screenshot only from the exact main frame at trusted document %s',
+    async (url) => {
+      const result = (await handlers.get('feedback:capture-screenshot')!(authorizedEvent(url))) as {
+        data: number[];
+        filename: string;
+      };
+      expect(result.filename).toMatch(/^screenshot-.*\.png$/);
+      expect(result.data).toEqual(PNG_BYTES);
+    }
+  );
+
+  it('rejects the bound WebContents after its top-level frame navigates to a foreign document', async () => {
+    await expect(
+      handlers.get('feedback:capture-screenshot')!(authorizedEvent('https://example.test/foreign'))
+    ).resolves.toBeNull();
+    expect(mainWindow.webContents.capturePage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a subframe even when it reports a trusted application document', async () => {
+    await expect(
+      handlers.get('feedback:capture-screenshot')!({
+        sender: mainWindow.webContents,
+        senderFrame: { url: TRUSTED_FILE_DOCUMENT },
+      })
+    ).resolves.toBeNull();
+    expect(mainWindow.webContents.capturePage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['arbitrary file URL', 'file:///tmp/untrusted/index.html'],
+    ['arbitrary path on the trusted loopback origin', 'http://localhost:5173/untrusted'],
+    ['arbitrary loopback origin', 'http://127.0.0.1:5174/'],
+  ])('rejects the bound main frame at an %s', async (_label, url) => {
+    await expect(handlers.get('feedback:capture-screenshot')!(authorizedEvent(url))).resolves.toBeNull();
+    expect(mainWindow.webContents.capturePage).not.toHaveBeenCalled();
   });
 
   it('rejects capture after the bound main window is destroyed', async () => {
     mainWindow.isDestroyed = () => true;
-    await expect(handlers.get('feedback:capture-screenshot')!({ sender: mainWindow.webContents })).resolves.toBeNull();
+    await expect(handlers.get('feedback:capture-screenshot')!(authorizedEvent())).resolves.toBeNull();
     expect(mainWindow.webContents.capturePage).not.toHaveBeenCalled();
   });
 });
@@ -124,7 +177,7 @@ describe('feedbackBridge local diagnostic export', () => {
     const outputPath = path.join(exportDir, 'diagnostics.json.gz');
     try {
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
-      const result = await handlers.get('feedback:export-local')!({ sender: mainWindow.webContents }, validInput());
+      const result = await handlers.get('feedback:export-local')!(authorizedEvent(), validInput());
 
       expect(result).toEqual({ status: 'saved', path: outputPath });
       expect(statSync(outputPath).mode & 0o777).toBe(0o600);
@@ -154,7 +207,7 @@ describe('feedbackBridge local diagnostic export', () => {
   it('does no collection or write when the save dialog is cancelled', async () => {
     vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: true, filePath: undefined });
     await expect(
-      handlers.get('feedback:export-local')!({ sender: mainWindow.webContents }, validInput({ collectLogs: true }))
+      handlers.get('feedback:export-local')!(authorizedEvent(), validInput({ collectLogs: true }))
     ).resolves.toEqual({ status: 'cancelled' });
   });
 
@@ -163,7 +216,7 @@ describe('feedbackBridge local diagnostic export', () => {
     const outputPath = path.join(exportDir, 'diagnostics.json.gz');
     try {
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
-      await handlers.get('feedback:export-local')!({ sender: mainWindow.webContents }, validInput());
+      await handlers.get('feedback:export-local')!(authorizedEvent(), validInput());
       const archive = readArchive(outputPath);
       expect(archive.report.description).toBe('Conversation stuck');
       expect(archive.privacy.user_description).toBe('included-unredacted');
@@ -181,7 +234,7 @@ describe('feedbackBridge local diagnostic export', () => {
     try {
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
       const result = await handlers.get('feedback:export-local')!(
-        { sender: mainWindow.webContents },
+        authorizedEvent(),
         validInput({
           screenshots: [
             { contentType, data: [...data], filename: `shot.${contentType === 'image/png' ? 'png' : 'jpg'}` },
@@ -232,7 +285,7 @@ describe('feedbackBridge local diagnostic export', () => {
     const outputPath = path.join(exportDir, 'diagnostics.json.gz');
     try {
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
-      await expect(handlers.get('feedback:export-local')!({ sender: mainWindow.webContents }, input)).resolves.toEqual({
+      await expect(handlers.get('feedback:export-local')!(authorizedEvent(), input)).resolves.toEqual({
         status: 'failed',
       });
       expect(dialog.showSaveDialog).not.toHaveBeenCalled();
@@ -248,9 +301,9 @@ describe('feedbackBridge local diagnostic export', () => {
     mkdirSync(occupiedDestination);
     try {
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: occupiedDestination });
-      await expect(
-        handlers.get('feedback:export-local')!({ sender: mainWindow.webContents }, validInput())
-      ).resolves.toEqual({ status: 'failed' });
+      await expect(handlers.get('feedback:export-local')!(authorizedEvent(), validInput())).resolves.toEqual({
+        status: 'failed',
+      });
       expect(readdirSync(exportDir)).toEqual(['occupied']);
     } finally {
       rmSync(exportDir, { recursive: true, force: true });
@@ -300,10 +353,7 @@ describe('feedback log collection', () => {
       vi.mocked(app.getPath).mockImplementation((name: string) => (name === 'logs' ? logsDir : exportDir));
       vi.mocked(dialog.showSaveDialog).mockResolvedValue({ canceled: false, filePath: outputPath });
 
-      await handlers.get('feedback:export-local')!(
-        { sender: mainWindow.webContents },
-        validInput({ collectLogs: true })
-      );
+      await handlers.get('feedback:export-local')!(authorizedEvent(), validInput({ collectLogs: true }));
       const archive = readArchive(outputPath);
       expect(archive.privacy.automatic_logs).toBe('metadata-only-no-content');
       expect(archive.report.attachments[0]).toEqual(

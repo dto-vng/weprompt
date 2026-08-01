@@ -7,6 +7,7 @@ import {
   type SubmitFeedbackReportResult,
   submitFeedbackReport,
 } from '@/renderer/services/feedback/submitFeedbackReport';
+import { useFeedback } from '@/renderer/hooks/context/FeedbackContext';
 
 type InstallationIntegrityDialogKind =
   | 'incomplete_installation'
@@ -195,11 +196,12 @@ export const PackageArchitectureMismatchFooter: React.FC<{ onClose?: () => void 
   );
 };
 
-const InstallationIntegrityFooter: React.FC<{
+export const InstallationIntegrityFooter: React.FC<{
   diagnostics?: InstallationIntegrityDiagnostics;
   diagnosticsKind?: InstallationIntegrityDialogKind;
 }> = ({ diagnostics, diagnosticsKind = 'incomplete_installation' }) => {
   const { t } = useTranslation();
+  const { isFeedbackAvailable } = useFeedback();
   const [reported, setReported] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -264,14 +266,16 @@ const InstallationIntegrityFooter: React.FC<{
 
   return (
     <Space>
-      <Button
-        data-testid='installation-integrity-report'
-        disabled={!diagnostics || reported}
-        loading={reporting}
-        onClick={handleReportDiagnostics}
-      >
-        {reported ? getInstallationIntegrityDiagnosticsSentText(t, diagnosticsKind) : actions.reportText}
-      </Button>
+      {isFeedbackAvailable ? (
+        <Button
+          data-testid='installation-integrity-report'
+          disabled={!diagnostics || reported}
+          loading={reporting}
+          onClick={handleReportDiagnostics}
+        >
+          {reported ? getInstallationIntegrityDiagnosticsSentText(t, diagnosticsKind) : actions.reportText}
+        </Button>
+      ) : null}
       {actions.recoverText ? (
         <Button
           data-testid='recoverable-database-corruption-rebuild'

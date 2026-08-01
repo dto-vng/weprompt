@@ -37,7 +37,8 @@ export interface ElectronBridgeAPI {
   getPathForFile?: (file: File) => string;
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
-  // Export a local, redacted diagnostic archive selected by the user.
+  // Export a local diagnostic archive selected by the user. The user description
+  // and screenshots are deliberately unredacted and must be reviewed before sharing.
   exportLocalFeedbackDiagnostics?: (
     input: LocalFeedbackDiagnosticExportInput
   ) => Promise<LocalFeedbackDiagnosticExportResult>;

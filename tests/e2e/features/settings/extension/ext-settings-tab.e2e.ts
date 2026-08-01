@@ -67,8 +67,7 @@ test.describe('Extension: Page-Route Entry', () => {
 
     const siderItem = page.locator(settingsSiderItemById(tabId!));
     await expect(siderItem).toBeVisible({ timeout: 5_000 });
-    const cls = await siderItem.evaluate((el) => el.className);
-    expect(cls).toMatch(/active|selected/i);
+    await expect(siderItem).toHaveAttribute('aria-current', 'page');
   });
 });
 

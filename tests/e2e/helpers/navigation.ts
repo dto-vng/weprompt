@@ -121,7 +121,21 @@ export async function navigateTo(page: Page, hash: string): Promise<void> {
     if (!isAlreadyAt(page, hash)) {
       const navItem = page.locator(`[data-settings-path="${settingsPath}"]`);
       await navItem.waitFor({ state: 'visible', timeout: 10_000 });
-      await navItem.click();
+      await navItem.scrollIntoViewIfNeeded();
+      const isTopmostAtCenter = await navItem.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return hit !== null && element.contains(hit);
+      });
+      if (!isTopmostAtCenter) {
+        throw new Error(`Settings navigation target is obstructed: ${settingsPath}`);
+      }
+
+      // Electron webContents zoom changes can leave Playwright's device-pixel
+      // click coordinates stale for the rest of a shared worker. We still
+      // verify the row is the renderer's topmost hit target above, then dispatch
+      // its click in the DOM so route-oriented tests remain zoom-independent.
+      await navItem.dispatchEvent('click');
       await page
         .waitForFunction((h) => window.location.hash.includes(h), `/settings/${settingsPath}`, { timeout: 10_000 })
         .catch(() => {});
