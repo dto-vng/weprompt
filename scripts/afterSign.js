@@ -25,7 +25,7 @@ function populatedSigningVariables(env) {
     const value = env[name];
     const isSigningName =
       INTERNAL_RELEASE_SIGNING_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
-    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value?.trim() === 'false') {
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value === 'false') {
       return false;
     }
     return isSigningName && typeof value === 'string' && value.trim() !== '';
@@ -47,6 +47,9 @@ async function afterSign(
   const appPath = `${appOutDir}/${appName}.app`;
 
   if (env.WEPROMPT_INTERNAL_RELEASE === '1') {
+    if (env.CSC_IDENTITY_AUTO_DISCOVERY !== 'false') {
+      throw new Error('Internal release requires CSC_IDENTITY_AUTO_DISCOVERY=false before signing');
+    }
     const inheritedVariables = populatedSigningVariables(env);
     if (inheritedVariables.length > 0) {
       throw new Error(`Internal release rejects signing/notarization variables: ${inheritedVariables.join(', ')}`);

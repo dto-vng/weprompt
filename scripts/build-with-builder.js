@@ -522,7 +522,7 @@ function assertInternalReleaseBuildEnvironment() {
     const value = process.env[name];
     const isForbiddenName =
       INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
-    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value?.trim() === 'false') {
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value === 'false') {
       return false;
     }
     return isForbiddenName && typeof value === 'string' && value.trim() !== '';

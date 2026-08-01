@@ -50,7 +50,7 @@ describe('internal macOS afterSign policy', () => {
     const loadNotarize = vi.fn(async () => ({ notarize: vi.fn(async () => {}) }));
 
     await afterSignModule.afterSign?.(context, {
-      env: { WEPROMPT_INTERNAL_RELEASE: '1' },
+      env: { WEPROMPT_INTERNAL_RELEASE: '1', CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
       execSync,
       loadNotarize,
     });
@@ -115,7 +115,12 @@ describe('internal macOS afterSign policy', () => {
     expect(loadNotarize).not.toHaveBeenCalled();
   });
 
-  it('rejects any enabled auto-discovery value in an internal release', async () => {
+  it.each([
+    ['missing', {}],
+    ['empty', { CSC_IDENTITY_AUTO_DISCOVERY: '' }],
+    ['whitespace padded', { CSC_IDENTITY_AUTO_DISCOVERY: ' false ' }],
+    ['enabled', { CSC_IDENTITY_AUTO_DISCOVERY: 'true' }],
+  ])('rejects a %s auto-discovery sentinel in an internal release', async (_label, env) => {
     const execSync = vi.fn();
     const loadNotarize = vi.fn(async () => ({ notarize: vi.fn(async () => {}) }));
 
@@ -123,7 +128,7 @@ describe('internal macOS afterSign policy', () => {
       afterSignModule.afterSign?.(context, {
         env: {
           WEPROMPT_INTERNAL_RELEASE: '1',
-          CSC_IDENTITY_AUTO_DISCOVERY: 'true',
+          ...env,
         },
         execSync,
         loadNotarize,
@@ -143,6 +148,7 @@ describe('internal macOS afterSign policy', () => {
       afterSignModule.afterSign?.(context, {
         env: {
           WEPROMPT_INTERNAL_RELEASE: '1',
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false',
           CSC_LINK: '/secrets/production-signing.p12',
         },
         execSync,
