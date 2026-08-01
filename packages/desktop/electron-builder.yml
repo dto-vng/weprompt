@@ -219,10 +219,3 @@ compression: normal
 removePackageScripts: true
 electronDownload:
   cache: ${env.ELECTRON_CACHE}
-
-publish:
-  provider: github
-  owner: iOfficeAI
-  repo: AionUi
-  publishAutoUpdate: true
-  releaseType: release

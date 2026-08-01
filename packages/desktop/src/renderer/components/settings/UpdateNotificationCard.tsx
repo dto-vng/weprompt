@@ -6,6 +6,7 @@
 
 import MarkdownView from '@/renderer/components/Markdown';
 import { useFeedback } from '@/renderer/hooks/context/FeedbackContext';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import { Button, Modal, Progress } from '@arco-design/web-react';
 import { CheckOne, Close, Download, Minus } from '@icon-park/react';
 import React from 'react';
@@ -21,7 +22,7 @@ const renderNotificationLayer = (node: React.ReactElement) => {
   return createPortal(node, document.body);
 };
 
-const UpdateNotificationCard: React.FC = () => {
+const UpdateNotificationCardContent: React.FC = () => {
   const { t } = useTranslation();
   const { state, versionLabel, actions } = useUpdateNotificationController();
   const { isFeedbackAvailable, openFeedback } = useFeedback();
@@ -336,6 +337,11 @@ const UpdateNotificationCard: React.FC = () => {
       </Modal>
     </>
   );
+};
+
+const UpdateNotificationCard: React.FC = () => {
+  if (!isUpdateFeatureEnabled()) return null;
+  return <UpdateNotificationCardContent />;
 };
 
 export default UpdateNotificationCard;

@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import type { AutoUpdateStatus, UpdateDownloadProgressEvent } from '@/common/update/updateTypes';
 import { uuid } from '@/common/utils';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
@@ -68,12 +69,11 @@ const reduceNotificationState = (
   event: UpdateNotificationEvent
 ): UpdateNotificationState => updateNotificationReducer(current, event).state;
 
-const RELEASES_PAGE_URL = 'https://github.com/iOfficeAI/AionUi/releases';
-
 const getVersionLabelFromState = (state: UpdateNotificationState): string =>
   state.updateInfo?.version || state.autoUpdateInfo?.version || '';
 
 export const useUpdateNotificationController = () => {
+  const updatesEnabled = isUpdateFeatureEnabled();
   const { t } = useTranslation();
   const [state, dispatchState] = useReducer(reduceNotificationState, undefined, createInitialState);
   const stateRef = useRef(state);
@@ -89,6 +89,7 @@ export const useUpdateNotificationController = () => {
   }, [state]);
 
   const loadManualReleaseInfoForDisplay = useCallback(async () => {
+    if (!updatesEnabled) return;
     try {
       const res = await ipcBridge.update.check.invoke({
         includePrerelease: getIncludePrerelease(),
@@ -104,10 +105,10 @@ export const useUpdateNotificationController = () => {
       console.warn('Manual release info check error:', error);
       dispatch({
         type: 'manualReleaseInfoFailed',
-        releasePageUrl: stateRef.current.releasePageUrl || RELEASES_PAGE_URL,
+        releasePageUrl: stateRef.current.releasePageUrl || '',
       });
     }
-  }, []);
+  }, [updatesEnabled]);
 
   const dispatchAutoAvailable = useCallback(
     (evt: AutoUpdateStatus) => {
@@ -123,6 +124,7 @@ export const useUpdateNotificationController = () => {
   );
 
   const checkForUpdates = useCallback(async () => {
+    if (!updatesEnabled) return;
     dispatch({ type: 'checkStarted' });
 
     const outcome = await runUpdateCheck({
@@ -154,7 +156,7 @@ export const useUpdateNotificationController = () => {
         dispatch({ type: 'checkError', message: outcome.message });
         return;
     }
-  }, [t]);
+  }, [t, updatesEnabled]);
 
   // Present an already-fetched "available" outcome directly, with no checking
   // flash and no second IPC check. Respects an in-progress/ready download so a
@@ -176,6 +178,7 @@ export const useUpdateNotificationController = () => {
   }, []);
 
   const restoreDownloadedUpdate = useCallback(async () => {
+    if (!updatesEnabled) return;
     try {
       const res = await ipcBridge.autoUpdate.restoreDownloaded.invoke();
       if (!res?.success || !res.data?.ready || !res.data.version) {
@@ -205,11 +208,12 @@ export const useUpdateNotificationController = () => {
     } finally {
       restoreDownloadedPendingRef.current = false;
     }
-  }, [dispatchAutoAvailable]);
+  }, [dispatchAutoAvailable, updatesEnabled]);
 
   useEffect(() => {
+    if (!updatesEnabled) return;
     void restoreDownloadedUpdate();
-  }, [restoreDownloadedUpdate]);
+  }, [restoreDownloadedUpdate, updatesEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +247,7 @@ export const useUpdateNotificationController = () => {
   );
 
   useEffect(() => {
+    if (!updatesEnabled) return;
     const removeOpenListener = ipcBridge.update.open.on((evt) => {
       openUpdateNotification(evt?.source ?? 'menu', true);
     });
@@ -267,9 +272,10 @@ export const useUpdateNotificationController = () => {
       window.removeEventListener('aionui-open-update-modal', handleWindowOpen);
       window.removeEventListener(UPDATE_AVAILABLE_EVENT, handleAvailable);
     };
-  }, [openUpdateNotification, presentAvailableOutcome]);
+  }, [openUpdateNotification, presentAvailableOutcome, updatesEnabled]);
 
   useEffect(() => {
+    if (!updatesEnabled) return;
     const removeListener = ipcBridge.autoUpdate.status.on((evt: AutoUpdateStatus) => {
       if (!evt) return;
 
@@ -305,9 +311,10 @@ export const useUpdateNotificationController = () => {
     });
 
     return () => removeListener();
-  }, [dispatchAutoAvailable, t]);
+  }, [dispatchAutoAvailable, t, updatesEnabled]);
 
   useEffect(() => {
+    if (!updatesEnabled) return;
     const removeProgressListener = ipcBridge.update.downloadProgress.on((evt: UpdateDownloadProgressEvent) => {
       if (!evt) return;
       dispatch({
@@ -321,7 +328,7 @@ export const useUpdateNotificationController = () => {
     });
 
     return () => removeProgressListener();
-  }, [t]);
+  }, [t, updatesEnabled]);
 
   const openReleasePage = useCallback(() => {
     if (!state.releasePageUrl) return;
@@ -331,14 +338,16 @@ export const useUpdateNotificationController = () => {
   }, [state.releasePageUrl]);
 
   const startAutoDownload = useCallback(async () => {
+    if (!updatesEnabled) return;
     dispatch({ type: 'autoDownloadStarted' });
     const res = await ipcBridge.autoUpdate.download.invoke();
     if (!res?.success) {
       dispatch({ type: 'autoError', message: res?.msg || t('update.downloadStartFailed') });
     }
-  }, [t]);
+  }, [t, updatesEnabled]);
 
   const startManualInstallDownload = useCallback(async () => {
+    if (!updatesEnabled) return;
     const asset = state.updateInfo?.recommendedAsset;
     if (!asset) return;
 
@@ -360,7 +369,7 @@ export const useUpdateNotificationController = () => {
       downloadId: res.data.downloadId,
       filePath: res.data.file_path,
     });
-  }, [state.updateInfo?.recommendedAsset, t]);
+  }, [state.updateInfo?.recommendedAsset, t, updatesEnabled]);
 
   const startDownload = useCallback(() => {
     if (state.autoUpdateAvailable) {
@@ -371,6 +380,7 @@ export const useUpdateNotificationController = () => {
   }, [startAutoDownload, startManualInstallDownload, state.autoUpdateAvailable]);
 
   const quitAndInstall = useCallback(() => {
+    if (!updatesEnabled) return;
     const current = stateRef.current;
     if (current.status === 'preparing-install') return;
     if (current.downloadPath) {
@@ -391,7 +401,7 @@ export const useUpdateNotificationController = () => {
         message: t('update.errors.prepareInstallFailed'),
       });
     });
-  }, [dispatch, t]);
+  }, [dispatch, t, updatesEnabled]);
 
   const openFile = useCallback(() => {
     if (!state.downloadPath) return;
@@ -413,14 +423,18 @@ export const useUpdateNotificationController = () => {
     dispatch({ type: 'dismissRequested', reason });
   }, []);
 
-  const cancelTask = useCallback(async (task: UpdateNotificationActiveTask | null) => {
-    if (!task) return;
-    if (task.kind === 'manual') {
-      await ipcBridge.update.cancelDownload.invoke({ downloadId: task.id });
-      return;
-    }
-    await ipcBridge.autoUpdate.cancelDownload.invoke();
-  }, []);
+  const cancelTask = useCallback(
+    async (task: UpdateNotificationActiveTask | null) => {
+      if (!updatesEnabled) return;
+      if (!task) return;
+      if (task.kind === 'manual') {
+        await ipcBridge.update.cancelDownload.invoke({ downloadId: task.id });
+        return;
+      }
+      await ipcBridge.autoUpdate.cancelDownload.invoke();
+    },
+    [updatesEnabled]
+  );
 
   const cancelDownload = useCallback(() => {
     const task = stateRef.current.activeTask;

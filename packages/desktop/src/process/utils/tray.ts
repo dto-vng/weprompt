@@ -14,6 +14,7 @@ import {
 import * as path from 'path';
 import { ipcBridge } from '@/common';
 import { DESKTOP_PET_ENABLED } from '@/common/config/constants';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import i18n from '@process/services/i18n';
 
 let tray: TrayInstance | null = null;
@@ -54,7 +55,7 @@ const getTrayIcon = (): Electron.NativeImage => {
 /**
  * Build tray context menu (async to support dynamic content).
  */
-const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
+export const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   const getRecentConversations = async (): Promise<Array<{ id: string; title: string }>> => {
     try {
       const result = await ipcBridge.database.getUserConversations.invoke({ limit: 5 });
@@ -200,14 +201,16 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
       ],
     });
   }
-  template.push({ type: 'separator' });
-  template.push({
-    label: i18n.t('common.tray.checkUpdate'),
-    click: () => {
-      showAndFocus();
-      mainWindowRef?.webContents.send('tray:check-update');
-    },
-  });
+  if (isUpdateFeatureEnabled()) {
+    template.push({ type: 'separator' });
+    template.push({
+      label: i18n.t('common.tray.checkUpdate'),
+      click: () => {
+        showAndFocus();
+        mainWindowRef?.webContents.send('tray:check-update');
+      },
+    });
+  }
   template.push({ type: 'separator' });
   template.push({
     label: i18n.t('common.tray.restart'),

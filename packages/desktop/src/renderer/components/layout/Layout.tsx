@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import forgeMark from '@renderer/assets/logos/brand/forge-mark.svg';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import Titlebar from '@/renderer/components/layout/Titlebar';
 import { Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
@@ -106,6 +107,7 @@ const Layout: React.FC<{
   sider: React.ReactNode;
   onSessionClick?: () => void;
 }> = ({ sider, onSessionClick: _onSessionClick }) => {
+  const updatesEnabled = isUpdateFeatureEnabled();
   const [collapsed, setCollapsed] = useState<boolean>(() => readPersistedSiderCollapsed());
   const [isMobile, setIsMobile] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
@@ -248,15 +250,19 @@ const Layout: React.FC<{
     window.addEventListener('tray:navigate-to-guid', handleNavigateToGuid as EventListener);
     window.addEventListener('tray:navigate-to-conversation', handleNavigateToConversation as EventListener);
     window.addEventListener('tray:pause-all-tasks', handlePauseAllTasks as EventListener);
-    window.addEventListener('tray:check-update', handleCheckUpdate as EventListener);
+    if (updatesEnabled) {
+      window.addEventListener('tray:check-update', handleCheckUpdate as EventListener);
+    }
 
     return () => {
       window.removeEventListener('tray:navigate-to-guid', handleNavigateToGuid as EventListener);
       window.removeEventListener('tray:navigate-to-conversation', handleNavigateToConversation as EventListener);
       window.removeEventListener('tray:pause-all-tasks', handlePauseAllTasks as EventListener);
-      window.removeEventListener('tray:check-update', handleCheckUpdate as EventListener);
+      if (updatesEnabled) {
+        window.removeEventListener('tray:check-update', handleCheckUpdate as EventListener);
+      }
     };
-  }, [navigate]);
+  }, [navigate, updatesEnabled]);
 
   const mobileSiderWidth = Math.max(
     MOBILE_SIDER_MIN_WIDTH,
@@ -400,9 +406,11 @@ const Layout: React.FC<{
               <Outlet />
               {directorySelectionContextHolder}
               <PwaPullToRefresh />
-              <Suspense fallback={null}>
-                <UpdateModal />
-              </Suspense>
+              {updatesEnabled && (
+                <Suspense fallback={null}>
+                  <UpdateModal />
+                </Suspense>
+              )}
             </ArcoLayout.Content>
           </ArcoLayout>
         </div>

@@ -72,6 +72,14 @@ describe('release packaging configuration', () => {
     expect(winBlock).not.toContain('    - zip');
   });
 
+  it('does not embed public publisher metadata in the internal desktop package config', () => {
+    const config = readProjectFile('packages/desktop/electron-builder.yml');
+
+    expect(config).not.toMatch(/^publish:\s*$/m);
+    expect(config).not.toContain('publishAutoUpdate');
+    expect(config).not.toContain('repo: AionUi');
+  });
+
   it('uploads mac zip artifacts without a stale Windows zip glob', () => {
     const workflow = readProjectFile('.github/workflows/_build-reusable.yml');
 

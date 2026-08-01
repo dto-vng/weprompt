@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { resolveDesktopReleaseBuildPolicy } from './src/common/update/updatePolicy';
 import UnoCSS from 'unocss/vite';
 import unoConfig from '../../uno.config.ts';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -67,31 +68,35 @@ const mainAliases = {
 
 export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
-  const enableSentrySourceMaps =
-    !isDevelopment &&
-    !!process.env.SENTRY_AUTH_TOKEN &&
-    (process.env.CI !== 'true' || process.env.SENTRY_UPLOAD_SOURCE_MAPS === 'true');
-  const sentryReleaseName = process.env.SENTRY_RELEASE ?? `v${rootPackageJson.version}`;
+  const releaseBuildPolicy = resolveDesktopReleaseBuildPolicy(process.env, { isDevelopment });
+  const { enableSentrySourceMaps } = releaseBuildPolicy;
 
-  const sentryPluginOptions = {
-    org: process.env.SENTRY_ORG,
-    project: process.env.SENTRY_PROJECT,
-    authToken: process.env.SENTRY_AUTH_TOKEN,
-    release: {
-      name: sentryReleaseName,
-    },
-    errorHandler: (error: Error) => {
-      throw error;
-    },
-    sourcemaps: {
-      filesToDeleteAfterUpload: ['./out/**/*.map'],
-      rewriteSources: (source: string) => {
-        // Normalize Windows backslashes and strip leading relative prefixes
-        // so Sentry paths match the GitHub repo structure (e.g.
-        // packages/desktop/src/process/...)
-        return source.replace(/\\/g, '/').replace(/^(\.\.\/)+(packages\/desktop\/src\/)/, '$2');
-      },
-    },
+  const sentryPluginOptions = enableSentrySourceMaps
+    ? {
+        org: releaseBuildPolicy.sentry.org,
+        project: releaseBuildPolicy.sentry.project,
+        authToken: releaseBuildPolicy.sentry.authToken,
+        release: {
+          name: releaseBuildPolicy.sentry.release,
+        },
+        errorHandler: (error: Error) => {
+          throw error;
+        },
+        sourcemaps: {
+          filesToDeleteAfterUpload: ['./out/**/*.map'],
+          rewriteSources: (source: string) => {
+            // Normalize Windows backslashes and strip leading relative prefixes
+            // so Sentry paths match the GitHub repo structure (e.g.
+            // packages/desktop/src/process/...)
+            return source.replace(/\\/g, '/').replace(/^(\.\.\/)+(packages\/desktop\/src\/)/, '$2');
+          },
+        },
+      }
+    : null;
+
+  const createSentryPlugin = () => {
+    if (!sentryPluginOptions) return [];
+    return [sentryVitePlugin(sentryPluginOptions)];
   };
 
   return {
@@ -130,7 +135,7 @@ export default defineConfig(({ mode }) => {
               }),
             ]
           : []),
-        ...(enableSentrySourceMaps ? [sentryVitePlugin(sentryPluginOptions)] : []),
+        ...createSentryPlugin(),
         ...(isDevelopment ? [buildMcpServersPlugin()] : []),
       ],
       resolve: { alias: mainAliases, extensions: ['.ts', '.tsx', '.js', '.json'] },
@@ -152,7 +157,9 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.NODE_ENV': JSON.stringify(mode),
         'process.env.env': JSON.stringify(process.env.env),
-        'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
+        'process.env.SENTRY_DSN': JSON.stringify(releaseBuildPolicy.sentry.dsn),
+        'process.env.WEPROMPT_INTERNAL_RELEASE': JSON.stringify(releaseBuildPolicy.internalRelease ? '1' : ''),
+        'process.env.WEPROMPT_UPDATE_BASE_URL': JSON.stringify(releaseBuildPolicy.updateBaseUrl ?? ''),
         'process.env.FORGE_GREENNODE_API_KEY': JSON.stringify(process.env.FORGE_GREENNODE_API_KEY ?? ''),
         'process.env.FORGE_TAVILY_API_KEY': JSON.stringify(process.env.FORGE_TAVILY_API_KEY ?? ''),
       },
@@ -236,11 +243,7 @@ export default defineConfig(({ mode }) => {
           '@lezer/highlight',
         ],
       },
-      plugins: [
-        UnoCSS(unoConfig),
-        iconParkPlugin(),
-        ...(enableSentrySourceMaps ? [sentryVitePlugin(sentryPluginOptions)] : []),
-      ],
+      plugins: [UnoCSS(unoConfig), iconParkPlugin(), ...createSentryPlugin()],
       build: {
         target: 'es2022',
         sourcemap: enableSentrySourceMaps ? 'hidden' : isDevelopment,
@@ -300,7 +303,9 @@ export default defineConfig(({ mode }) => {
         'process.env.NODE_ENV': JSON.stringify(mode),
         'process.env.env': JSON.stringify(process.env.env),
         'process.env.AIONUI_MULTI_INSTANCE': JSON.stringify(process.env.AIONUI_MULTI_INSTANCE ?? ''),
-        'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
+        'process.env.SENTRY_DSN': JSON.stringify(releaseBuildPolicy.sentry.dsn),
+        'process.env.WEPROMPT_INTERNAL_RELEASE': JSON.stringify(releaseBuildPolicy.internalRelease ? '1' : ''),
+        'process.env.WEPROMPT_UPDATE_BASE_URL': JSON.stringify(releaseBuildPolicy.updateBaseUrl ?? ''),
         // Inject the real AionUi version (root package.json) so renderer code
         // can show it without importing packages/desktop/package.json, which is
         // a workspace-internal placeholder frozen at "0.0.0".

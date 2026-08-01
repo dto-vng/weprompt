@@ -109,6 +109,7 @@ import type {
   UpdateDownloadProgressEvent,
   UpdateDownloadRequest,
   UpdateDownloadResult,
+  UpdateBridgeErrorCode,
 } from '../update/updateTypes';
 import type { AgentMetadata } from '@/renderer/utils/model/agentTypes';
 import type { Theme } from '@/common/theme/types';
@@ -579,7 +580,7 @@ export const autoUpdate = {
   ),
   download: bridge.buildProvider<IBridgeResponse, void>('auto-update.download'),
   cancelDownload: bridge.buildProvider<IBridgeResponse, void>('auto-update.download.cancel'),
-  quitAndInstall: bridge.buildProvider<void, void>('auto-update.quit-and-install'),
+  quitAndInstall: bridge.buildProvider<IBridgeResponse, void>('auto-update.quit-and-install'),
   status: bridge.buildEmitter<AutoUpdateStatus>('auto-update.status'),
 };
 
@@ -1870,6 +1871,7 @@ interface IBridgeResponse<D = {}> {
   success: boolean;
   data?: D;
   msg?: string;
+  code?: UpdateBridgeErrorCode;
 }
 
 // ---------------------------------------------------------------------------

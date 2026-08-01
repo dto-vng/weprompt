@@ -9,7 +9,7 @@ import type { UpdateInfo } from 'electron-updater';
 import type { AppUpdater } from 'electron-updater/out/AppUpdater';
 import type { ProviderRuntimeOptions } from 'electron-updater/out/providers/Provider';
 import { CdnGenericProvider } from '@/process/services/cdnGenericProvider';
-import { buildCdnFeedOptions, CDN_UPDATE_BASE_URL } from '@/process/services/updateFeed';
+import { buildCdnFeedOptions } from '@/process/services/updateFeed';
 
 const makeRuntimeOptions = (): ProviderRuntimeOptions => ({
   isUseMultipleRangeRequest: true,
@@ -20,12 +20,16 @@ const makeRuntimeOptions = (): ProviderRuntimeOptions => ({
 });
 
 describe('CDN update feed options', () => {
-  it('builds a custom electron-updater provider pointed at the release CDN', () => {
-    const options = buildCdnFeedOptions();
+  it('builds a custom electron-updater provider pointed at the configured product feed', () => {
+    const options = buildCdnFeedOptions('https://updates.weprompt.test/releases');
 
     expect(options.provider).toBe('custom');
-    expect(options.url).toBe(CDN_UPDATE_BASE_URL);
+    expect(options.url).toBe('https://updates.weprompt.test/releases');
     expect(options.updateProvider).toBe(CdnGenericProvider);
+  });
+
+  it('fails closed when no update feed is configured', () => {
+    expect(() => buildCdnFeedOptions(null)).toThrow('updates-disabled');
   });
 });
 
@@ -34,7 +38,7 @@ describe('CdnGenericProvider', () => {
     const provider = new CdnGenericProvider(
       {
         provider: 'custom',
-        url: 'https://static.aionui.com/releases',
+        url: 'https://updates.weprompt.test/releases',
       },
       {} as AppUpdater,
       makeRuntimeOptions()
@@ -44,15 +48,15 @@ describe('CdnGenericProvider', () => {
       version: '2.1.14',
       files: [
         {
-          url: 'AionUi-2.1.14-mac-arm64.dmg',
+          url: 'WePrompt-2.1.14-mac-arm64.dmg',
           sha512: 'sha512-value',
         },
       ],
-      path: 'AionUi-2.1.14-mac-arm64.dmg',
+      path: 'WePrompt-2.1.14-mac-arm64.dmg',
       sha512: 'sha512-value',
       releaseDate: '2026-06-08T00:00:00.000Z',
     } satisfies UpdateInfo);
 
-    expect(files[0]?.url.href).toBe('https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac-arm64.dmg');
+    expect(files[0]?.url.href).toBe('https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac-arm64.dmg');
   });
 });

@@ -23,10 +23,13 @@ const mocks = vi.hoisted(() => ({
   autoUpdateDownloadMock: vi.fn(),
   autoUpdateCancelDownloadMock: vi.fn(),
   autoUpdateQuitAndInstallMock: vi.fn(),
+  autoUpdateStatusOnMock: vi.fn(),
   consumeInstallerLastFailureMock: vi.fn(),
   updateCheckMock: vi.fn(),
   updateDownloadMock: vi.fn(),
   updateCancelDownloadMock: vi.fn(),
+  updateDownloadProgressOnMock: vi.fn(),
+  updateOpenOnMock: vi.fn(),
   openFeedbackMock: vi.fn(),
   shellOpenExternalMock: vi.fn(),
   shellOpenFileMock: vi.fn(),
@@ -54,10 +57,7 @@ vi.mock('@/common', () => ({
       cancelDownload: { invoke: mocks.autoUpdateCancelDownloadMock },
       quitAndInstall: { invoke: mocks.autoUpdateQuitAndInstallMock },
       status: {
-        on: vi.fn((handler: (evt: AutoUpdateStatus) => void) => {
-          mocks.autoStatusHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.autoUpdateStatusOnMock,
       },
     },
     update: {
@@ -66,16 +66,10 @@ vi.mock('@/common', () => ({
       download: { invoke: mocks.updateDownloadMock },
       cancelDownload: { invoke: mocks.updateCancelDownloadMock },
       downloadProgress: {
-        on: vi.fn((handler: (evt: UpdateDownloadProgressEvent) => void) => {
-          mocks.manualProgressHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.updateDownloadProgressOnMock,
       },
       open: {
-        on: vi.fn((handler: (evt: { source?: 'menu' | 'about' | 'tray' }) => void) => {
-          mocks.updateOpenHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.updateOpenOnMock,
       },
     },
     shell: {
@@ -90,6 +84,7 @@ import UpdateNotificationCard from '@/renderer/components/settings/UpdateNotific
 
 describe('UpdateNotificationCard', () => {
   beforeEach(() => {
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     vi.stubGlobal('__APP_VERSION__', '2.1.15');
     mocks.manualProgressHandler = null;
     mocks.autoStatusHandler = null;
@@ -99,8 +94,20 @@ describe('UpdateNotificationCard', () => {
     mocks.autoUpdateDownloadMock.mockResolvedValue({ success: true });
     mocks.autoUpdateCancelDownloadMock.mockResolvedValue({ success: true });
     mocks.autoUpdateQuitAndInstallMock.mockResolvedValue(undefined);
+    mocks.autoUpdateStatusOnMock.mockImplementation((handler: (evt: AutoUpdateStatus) => void) => {
+      mocks.autoStatusHandler = handler;
+      return vi.fn();
+    });
     mocks.consumeInstallerLastFailureMock.mockResolvedValue({ success: true, data: null });
     mocks.updateCancelDownloadMock.mockResolvedValue({ success: true });
+    mocks.updateDownloadProgressOnMock.mockImplementation((handler: (evt: UpdateDownloadProgressEvent) => void) => {
+      mocks.manualProgressHandler = handler;
+      return vi.fn();
+    });
+    mocks.updateOpenOnMock.mockImplementation((handler: (evt: { source?: 'menu' | 'about' | 'tray' }) => void) => {
+      mocks.updateOpenHandler = handler;
+      return vi.fn();
+    });
     mocks.updateCheckMock.mockResolvedValue({
       success: true,
       data: {
@@ -111,14 +118,14 @@ describe('UpdateNotificationCard', () => {
           version: '2.1.14',
           name: 'v2.1.14',
           body: 'notes',
-          htmlUrl: 'https://github.com/iOfficeAI/AionUi/releases/tag/v2.1.14',
+          htmlUrl: '',
           prerelease: false,
           draft: false,
           assets: [],
           recommendedAsset: {
-            name: 'AionUi-2.1.14-mac-arm64.dmg',
-            url: 'https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac-arm64.dmg',
-            fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.1.14/AionUi-2.1.14-mac-arm64.dmg',
+            name: 'WePrompt-2.1.14-mac-arm64.dmg',
+            url: 'https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac-arm64.dmg',
+            fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.1.14-mac-arm64.dmg',
             size: 123,
           },
         },
@@ -128,15 +135,31 @@ describe('UpdateNotificationCard', () => {
       success: true,
       data: {
         downloadId: request.downloadId ?? 'manual-download',
-        file_path: '/tmp/AionUi-2.1.14-mac-arm64.dmg',
+        file_path: '/tmp/WePrompt-2.1.14-mac-arm64.dmg',
       },
     }));
   });
 
   afterEach(() => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
     cleanup();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('renders nothing and makes no update IPC calls when updates are disabled', async () => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
+
+    const { container } = render(<UpdateNotificationCard />);
+    await act(async () => Promise.resolve());
+
+    expect(container).toBeEmptyDOMElement();
+    expect(mocks.autoUpdateStatusOnMock).not.toHaveBeenCalled();
+    expect(mocks.updateDownloadProgressOnMock).not.toHaveBeenCalled();
+    expect(mocks.updateOpenOnMock).not.toHaveBeenCalled();
+    expect(mocks.autoUpdateRestoreDownloadedMock).not.toHaveBeenCalled();
+    expect(mocks.autoUpdateCheckMock).not.toHaveBeenCalled();
+    expect(mocks.updateCheckMock).not.toHaveBeenCalled();
   });
 
   it('renders a bottom-right notification card for auto-update availability without a dialog', async () => {
@@ -177,7 +200,7 @@ describe('UpdateNotificationCard', () => {
       data: {
         ready: true,
         version: '2.1.14',
-        filePath: '/cache/pending/AionUi-2.1.14-mac.zip',
+        filePath: '/cache/pending/WePrompt-2.1.14-mac.zip',
       },
     });
 
@@ -380,7 +403,7 @@ describe('UpdateNotificationCard', () => {
 
     fireEvent.click(await screen.findByText('update.releaseLog'));
     expect(await screen.findByText('update.releaseNotesFailed')).toBeInTheDocument();
-    expect(screen.getByText('update.viewRelease')).toBeInTheDocument();
+    expect(screen.queryByText('update.viewRelease')).not.toBeInTheDocument();
   });
 
   it('keeps the cancel action available while downloading and cancel restores the initial state', async () => {

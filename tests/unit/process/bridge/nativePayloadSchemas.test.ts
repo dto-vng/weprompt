@@ -36,7 +36,7 @@ const VALID_PAYLOADS = {
   'update.installer-last-failure.consume': undefined,
   'update.download': {
     downloadId: 'download-1',
-    url: 'https://github.com/iOfficeAI/AionUi/releases/download/v1/app.dmg',
+    url: 'https://updates.weprompt.test/releases/v1/app.dmg',
     fallbackUrl: 'https://cdn.example.com/app.dmg',
     file_name: 'app.dmg',
   },

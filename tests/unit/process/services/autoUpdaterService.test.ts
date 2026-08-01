@@ -75,6 +75,7 @@ const setPlatform = (platform: NodeJS.Platform): void => {
 
 describe('AutoUpdaterService', () => {
   const originalPlatform = process.platform;
+  const originalUpdateBaseUrl = process.env.WEPROMPT_UPDATE_BASE_URL;
 
   beforeEach(() => {
     vi.resetModules();
@@ -90,6 +91,7 @@ describe('AutoUpdaterService', () => {
     appMock.getPath.mockImplementation(() => '/tmp/aionui-test');
     delete (autoUpdaterMock as { updateInfoAndProvider?: unknown }).updateInfoAndProvider;
     appMock.isPackaged = false;
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     delete process.env.AIONUI_FORCE_DEV_AUTO_UPDATE;
     delete process.env.AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION;
     nativeAutoUpdaterMock.on.mockReset();
@@ -104,6 +106,8 @@ describe('AutoUpdaterService', () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     setPlatform(originalPlatform);
+    if (originalUpdateBaseUrl === undefined) delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    else process.env.WEPROMPT_UPDATE_BASE_URL = originalUpdateBaseUrl;
   });
 
   it('does not use the stable CDN updater when prerelease manual mode is enabled', async () => {
@@ -111,8 +115,8 @@ describe('AutoUpdaterService', () => {
       isUpdateAvailable: true,
       updateInfo: {
         version: '2.1.14',
-        files: [{ url: 'AionUi-2.1.14-mac-arm64.dmg', sha512: 'sha512-value' }],
-        path: 'AionUi-2.1.14-mac-arm64.dmg',
+        files: [{ url: 'WePrompt-2.1.14-mac-arm64.dmg', sha512: 'sha512-value' }],
+        path: 'WePrompt-2.1.14-mac-arm64.dmg',
         sha512: 'sha512-value',
         releaseDate: '2026-06-08T00:00:00.000Z',
       },
@@ -129,7 +133,7 @@ describe('AutoUpdaterService', () => {
     expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
   });
 
-  it('configures electron-updater to read stable metadata from the CDN', async () => {
+  it('configures electron-updater to read stable metadata from the product-owned feed', async () => {
     const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
     const { CdnGenericProvider } = await import('@/process/services/cdnGenericProvider');
 
@@ -137,7 +141,7 @@ describe('AutoUpdaterService', () => {
 
     expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledWith({
       provider: 'custom',
-      url: 'https://static.aionui.com/releases',
+      url: 'https://updates.weprompt.test/releases',
       updateProvider: CdnGenericProvider,
     });
   });
@@ -295,16 +299,16 @@ describe('AutoUpdaterService', () => {
   it('restores a completed cached auto-update when the downloaded package validates', async () => {
     const updateInfo = {
       version: '2.1.14',
-      files: [{ url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' }],
-      path: 'AionUi-2.1.14-mac.zip',
+      files: [{ url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' }],
+      path: 'WePrompt-2.1.14-mac.zip',
       sha512: 'sha512-value',
       releaseDate: '2026-06-08T00:00:00.000Z',
     };
     const fileInfo = {
-      url: new URL('https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac.zip'),
-      info: { url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' },
+      url: new URL('https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac.zip'),
+      info: { url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' },
     };
-    const cachedUpdatePath = path.join('/cache/pending', 'AionUi-2.1.14-mac.zip');
+    const cachedUpdatePath = path.join('/cache/pending', 'WePrompt-2.1.14-mac.zip');
     const validateDownloadedPath = vi.fn().mockResolvedValue(cachedUpdatePath);
 
     autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
@@ -339,14 +343,14 @@ describe('AutoUpdaterService', () => {
   it('does not restore a cached auto-update when the downloaded package is missing or invalid', async () => {
     const updateInfo = {
       version: '2.1.14',
-      files: [{ url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' }],
-      path: 'AionUi-2.1.14-mac.zip',
+      files: [{ url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' }],
+      path: 'WePrompt-2.1.14-mac.zip',
       sha512: 'sha512-value',
       releaseDate: '2026-06-08T00:00:00.000Z',
     };
     const fileInfo = {
-      url: new URL('https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac.zip'),
-      info: { url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' },
+      url: new URL('https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac.zip'),
+      info: { url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' },
     };
     const validateDownloadedPath = vi.fn().mockResolvedValue(null);
 
