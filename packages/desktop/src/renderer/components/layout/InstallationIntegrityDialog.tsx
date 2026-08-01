@@ -7,7 +7,6 @@ import {
   type SubmitFeedbackReportResult,
   submitFeedbackReport,
 } from '@/renderer/services/feedback/submitFeedbackReport';
-import { useFeedback } from '@/renderer/hooks/context/FeedbackContext';
 
 type InstallationIntegrityDialogKind =
   | 'incomplete_installation'
@@ -201,7 +200,7 @@ export const InstallationIntegrityFooter: React.FC<{
   diagnosticsKind?: InstallationIntegrityDialogKind;
 }> = ({ diagnostics, diagnosticsKind = 'incomplete_installation' }) => {
   const { t } = useTranslation();
-  const { isFeedbackAvailable } = useFeedback();
+  const isDiagnosticsExportAvailable = Boolean(window.electronAPI?.exportLocalFeedbackDiagnostics);
   const [reported, setReported] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -266,7 +265,7 @@ export const InstallationIntegrityFooter: React.FC<{
 
   return (
     <Space>
-      {isFeedbackAvailable ? (
+      {isDiagnosticsExportAvailable ? (
         <Button
           data-testid='installation-integrity-report'
           disabled={!diagnostics || reported}

@@ -17,7 +17,6 @@ import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell 
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
-import { pathToFileURL } from 'node:url';
 import { withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
 import { DESKTOP_PET_ENABLED } from './common/config/constants';
@@ -27,6 +26,11 @@ import { startBackendOrExit } from './process/startup/backendStartup';
 import { assertStartupArchitectureCompatible } from './process/startup/architectureCompatibility';
 import { classifyBackendStartupFailure } from './process/startup/backendStartupFailure';
 import { installQuitCleanup } from './process/startup/quitCleanup';
+import {
+  createRendererDocumentPolicy,
+  isAuthorizedRendererSender,
+  isTrustedRendererDocument,
+} from './process/startup/rendererDocumentPolicy';
 import { shouldRegisterBackendStartup } from './process/startup/singleInstanceGating';
 import { ProcessConfig } from './process/utils/initStorage';
 import type { BackendStartupFailureInfo } from './common/types/platform/electron';
@@ -81,6 +85,14 @@ import {
 import { readCloseToTraySetting } from './process/utils/closeToTraySetting';
 // @ts-expect-error - electron-squirrel-startup doesn't have types
 import electronSquirrelStartup from 'electron-squirrel-startup';
+
+const rendererDirectory = path.join(__dirname, '../renderer');
+const fallbackRendererFile = path.join(rendererDirectory, 'index.html');
+const rendererDocumentPolicy = createRendererDocumentPolicy({
+  isPackaged: app.isPackaged,
+  rendererDirectory,
+  rendererUrl: process.env['ELECTRON_RENDERER_URL'],
+});
 
 // ============ Single Instance Lock ============
 // Acquire lock early so the second instance quits before doing unnecessary work.
@@ -226,6 +238,12 @@ ipcMain.on('get-backend-port', (event) => {
 // only thing separating the app's own renderer from any other page or process
 // that reaches the loopback port. Handed out over the preload bridge only.
 ipcMain.on('get-backend-local-token', (event) => {
+  const boundWebContents = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  if (!isAuthorizedRendererSender(event, boundWebContents, rendererDocumentPolicy.mainWindowDocuments)) {
+    console.warn('[AionUi][security] Denied backend local token request from an untrusted renderer document');
+    event.returnValue = '';
+    return;
+  }
   event.returnValue = backendManager.localToken;
 });
 
@@ -351,7 +369,7 @@ const scheduleBackendMigrations = (): void => {
  */
 function rendererAllowedOrigins(): string[] {
   const origins = ['null'];
-  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  const devUrl = rendererDocumentPolicy.developmentRendererUrl;
   if (devUrl) {
     try {
       origins.push(new URL(devUrl).origin);
@@ -449,35 +467,17 @@ function applyDebugBackendStartupFailure(failure: BackendStartupFailureInfo): vo
 }
 
 // ============ Renderer navigation allowlist ============
-// The renderer is loaded either from a local file (`loadFile` → file:// in
-// production and when the dev server is unreachable) or from the Vite dev
-// server URL (`ELECTRON_RENDERER_URL`, e.g. http://localhost:5173) in dev.
-// Pet windows load the same way (file:// or the dev server). Top-level
-// BrowserWindow contents must never navigate away from that app content;
-// this allowlist encodes what is legitimately part of the app shell.
+// The renderer is loaded from one of the exact application documents resolved
+// at startup. Pet windows have their own checked-in documents. Top-level
+// BrowserWindow contents must never navigate to a sibling local file or an
+// arbitrary loopback page just because its protocol or host looks familiar.
 //
 // NOTE: this list intentionally governs only top-level `window`-type contents.
 // The <webview> guest contents (HTML preview, external OAuth/settings pages)
 // are meant to browse arbitrary URLs and are handled separately — see
 // installWebContentsSecurity() below, which does NOT block guest navigation.
 const isAllowedTopLevelNavigation = (targetUrl: string): boolean => {
-  let parsed: URL;
-  try {
-    parsed = new URL(targetUrl);
-  } catch {
-    return false;
-  }
-  // Local built renderer (production) and pet windows loaded via loadFile.
-  if (parsed.protocol === 'file:') {
-    return true;
-  }
-  // Dev server (Vite) and the local backend. Port is dynamic in both cases
-  // (Vite may auto-increment; backend port is assigned at runtime), so allow
-  // any port on the loopback hosts rather than hardcoding one.
-  if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
-    return true;
-  }
-  return false;
+  return isTrustedRendererDocument(targetUrl, rendererDocumentPolicy.topLevelDocuments);
 };
 
 // ============ web-contents-created security guard (Task 1.5 / #2b) ============
@@ -706,13 +706,11 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   // Define renderer documents once so loading and privileged feedback IPC use
   // the same exact application-document paths. URL hashes are handled by the
   // bridge because client-side routing may change them after load.
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  const fallbackFile = path.join(__dirname, '../renderer/index.html');
-  const trustedRendererDocuments = [...(rendererUrl ? [rendererUrl] : []), pathToFileURL(fallbackFile).href];
+  const rendererUrl = rendererDocumentPolicy.developmentRendererUrl;
 
   initMainAdapterWithWindow(mainWindow);
   bindMainWindowReferences(mainWindow);
-  initializeFeedbackBridge(mainWindow, trustedRendererDocuments);
+  initializeFeedbackBridge(mainWindow, rendererDocumentPolicy.mainWindowDocuments);
 
   setupApplicationMenu();
 
@@ -752,13 +750,13 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     console.log(`[AionUi] Loading renderer URL: ${rendererUrl}`);
     mainWindow.loadURL(rendererUrl).catch((error) => {
       console.error('[AionUi] loadURL failed, falling back to file:', error.message || error);
-      mainWindow.loadFile(fallbackFile).catch((e2) => {
+      mainWindow.loadFile(fallbackRendererFile).catch((e2) => {
         console.error('[AionUi] loadFile fallback also failed:', e2.message || e2);
       });
     });
   } else {
-    console.log(`[AionUi] Loading renderer file: ${fallbackFile}`);
-    mainWindow.loadFile(fallbackFile).catch((error) => {
+    console.log(`[AionUi] Loading renderer file: ${fallbackRendererFile}`);
+    mainWindow.loadFile(fallbackRendererFile).catch((error) => {
       console.error('[AionUi] loadFile failed:', error.message || error);
     });
   }
@@ -781,7 +779,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
           console.error('[AionUi] Recovery loadURL failed:', error.message || error);
         });
       } else {
-        mainWindow.loadFile(fallbackFile).catch((error) => {
+        mainWindow.loadFile(fallbackRendererFile).catch((error) => {
           console.error('[AionUi] Recovery loadFile failed:', error.message || error);
         });
       }

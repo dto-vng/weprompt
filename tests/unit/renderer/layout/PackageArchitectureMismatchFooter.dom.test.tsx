@@ -5,7 +5,6 @@ import {
   InstallationIntegrityFooter,
   PackageArchitectureMismatchFooter,
 } from '@/renderer/components/layout/InstallationIntegrityDialog';
-import { FeedbackProvider } from '@/renderer/hooks/context/FeedbackContext';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -49,12 +48,10 @@ describe('PackageArchitectureMismatchFooter', () => {
 
   it('hides the local report action when Electron export is unavailable in WebUI mode', () => {
     render(
-      <FeedbackProvider>
-        <InstallationIntegrityFooter
-          diagnostics={{ source: 'runtime_status' }}
-          diagnosticsKind='recoverable_database_corruption'
-        />
-      </FeedbackProvider>
+      <InstallationIntegrityFooter
+        diagnostics={{ source: 'runtime_status' }}
+        diagnosticsKind='recoverable_database_corruption'
+      />
     );
 
     expect(screen.queryByTestId('installation-integrity-report')).not.toBeInTheDocument();
@@ -66,11 +63,7 @@ describe('PackageArchitectureMismatchFooter', () => {
       exportLocalFeedbackDiagnostics: vi.fn(),
     };
 
-    render(
-      <FeedbackProvider>
-        <InstallationIntegrityFooter diagnostics={{ source: 'runtime_status' }} />
-      </FeedbackProvider>
-    );
+    render(<InstallationIntegrityFooter diagnostics={{ source: 'runtime_status' }} />);
 
     expect(screen.getByTestId('installation-integrity-report')).toBeVisible();
   });
@@ -80,12 +73,10 @@ describe('PackageArchitectureMismatchFooter', () => {
     (window as unknown as { electronAPI?: Record<string, unknown> }).electronAPI = { recoverCorruptedDatabase };
 
     render(
-      <FeedbackProvider>
-        <InstallationIntegrityFooter
-          diagnostics={{ source: 'runtime_status' }}
-          diagnosticsKind='recoverable_database_corruption'
-        />
-      </FeedbackProvider>
+      <InstallationIntegrityFooter
+        diagnostics={{ source: 'runtime_status' }}
+        diagnosticsKind='recoverable_database_corruption'
+      />
     );
 
     fireEvent.click(screen.getByTestId('recoverable-database-corruption-rebuild'));

@@ -5,14 +5,16 @@
  */
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'path';
+import { pathToFileURL } from 'node:url';
 
 declare global {
   interface Window {
     __installationIntegrityReportCount?: number;
     __lastInstallationIntegrityReportMessage?: string;
+    __backendLocalToken?: string;
   }
 }
 
@@ -113,6 +115,58 @@ test.describe('Installation integrity failure dialog', () => {
     } finally {
       await electronApp?.close();
       await rm(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  test('does not expose the backend token after a forced untrusted-document load', async () => {
+    const projectRoot = path.resolve(__dirname, '../../..');
+    const testDir = await mkdtemp(path.join(tmpdir(), 'weprompt-renderer-policy-e2e-'));
+    const untrustedDocumentPath = path.join(testDir, 'untrusted.html');
+    const untrustedDocumentUrl = pathToFileURL(untrustedDocumentPath).href;
+    const launchEnv = {
+      ...process.env,
+      AIONUI_DISABLE_AUTO_UPDATE: '1',
+      AIONUI_DISABLE_DEVTOOLS: '1',
+      AIONUI_E2E_TEST: '1',
+      AIONUI_E2E_USER_DATA_DIR: path.join(testDir, 'user-data'),
+      AIONUI_CDP_PORT: '0',
+      NODE_ENV: 'development',
+    };
+    delete launchEnv.ELECTRON_RENDERER_URL;
+    let electronApp: ElectronApplication | undefined;
+
+    try {
+      await writeFile(untrustedDocumentPath, '<!doctype html><title>Untrusted renderer</title>', 'utf8');
+      electronApp = await electron.launch({
+        args: ['.'],
+        cwd: projectRoot,
+        env: launchEnv,
+        timeout: 60_000,
+      });
+      const page = await resolveMainWindow(electronApp);
+      await page.waitForFunction(() => Boolean(document.querySelector('#root')?.children.length), undefined, {
+        timeout: 30_000,
+      });
+
+      expect(await page.evaluate(() => Boolean(window.__backendLocalToken))).toBe(true);
+
+      const trustedDocumentUrl = page.url();
+      await page.evaluate((targetUrl) => window.location.assign(targetUrl), untrustedDocumentUrl);
+      await page.waitForTimeout(500);
+      expect(page.url()).toBe(trustedDocumentUrl);
+      expect(await page.evaluate(() => Boolean(window.__backendLocalToken))).toBe(true);
+
+      await electronApp.evaluate(async ({ BrowserWindow }, targetUrl) => {
+        const activeWindow = BrowserWindow.getAllWindows().find((window) => !window.isDestroyed());
+        if (!activeWindow) throw new Error('No active window available for renderer authorization check');
+        await activeWindow.webContents.loadURL(targetUrl);
+      }, untrustedDocumentUrl);
+      await page.waitForURL(untrustedDocumentUrl);
+
+      expect(await page.evaluate(() => Boolean(window.__backendLocalToken))).toBe(false);
+    } finally {
+      await electronApp?.close();
+      await rm(testDir, { recursive: true, force: true });
     }
   });
 });
