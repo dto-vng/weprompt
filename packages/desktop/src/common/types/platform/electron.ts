@@ -10,18 +10,18 @@ export interface WebUIStatus {
   initialPassword?: string;
 }
 
-export type FeedbackDiagnosticAttachment = {
-  contentType: string;
+export type FeedbackScreenshotAttachment = {
+  contentType: 'image/jpeg' | 'image/png';
   data: number[];
   filename: string;
 };
 
 export type LocalFeedbackDiagnosticExportInput = {
-  attachments: FeedbackDiagnosticAttachment[];
+  collectLogs: boolean;
   description: string;
-  extra?: Record<string, unknown>;
   module: string;
   moduleLabel: string;
+  screenshots: FeedbackScreenshotAttachment[];
   tags?: Record<string, string>;
 };
 
@@ -35,16 +35,12 @@ export interface ElectronBridgeAPI {
   on: (callback: (event: { value: string }) => void) => void;
   // 获取拖拽文件/目录的绝对路径 / Get absolute path for dragged file/directory
   getPathForFile?: (file: File) => string;
-  // Feedback log collection / 收集反馈日志
-  collectFeedbackLogs?: () => Promise<{ filename: string; data: number[] } | null>;
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
   // Export a local, redacted diagnostic archive selected by the user.
   exportLocalFeedbackDiagnostics?: (
     input: LocalFeedbackDiagnosticExportInput
   ) => Promise<LocalFeedbackDiagnosticExportResult>;
-  // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
-  logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
   recoverCorruptedDatabase?: () => Promise<void>;
 }
 

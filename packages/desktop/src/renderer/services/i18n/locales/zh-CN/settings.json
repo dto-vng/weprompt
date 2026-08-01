@@ -802,7 +802,7 @@
   "bugReportScreenshotUploaded": "（已上传 {{count}} 张）",
   "bugReportScreenshotDropzoneText": "点击、拖拽或粘贴截图到此处",
   "bugReportScreenshotFormats": "支持 PNG、JPG、GIF",
-  "bugReportAutoInfo": "系统信息、脱敏诊断数据和最近 3 天的日志可包含在本地诊断包中。",
+  "bugReportAutoInfo": "此诊断包只会保存到你选择的位置，绝不会上传。它只包含允许的元数据以及日志文件名、日期和大小，不包含日志内容。你的描述和截图将按原样收录，请检查其中是否包含敏感信息。",
   "bugReportSubmit": "保存诊断包",
   "bugReportCancel": "取消",
   "bugReportSuccess": "诊断包已保存",

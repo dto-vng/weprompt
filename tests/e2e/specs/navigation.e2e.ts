@@ -78,7 +78,7 @@ test.describe('Settings Pages', () => {
 
   test('legacy About route redirects to the live System settings surface', async ({ page }) => {
     await goToSettings(page, 'system');
-    await page.evaluate((hash) => window.location.assign(hash), ROUTES.settings.about);
+    await page.evaluate((hash) => window.location.assign(hash), ROUTES.legacySettings.about);
 
     await page.waitForFunction((hash) => window.location.hash === hash, ROUTES.settings.system, {
       timeout: 10_000,

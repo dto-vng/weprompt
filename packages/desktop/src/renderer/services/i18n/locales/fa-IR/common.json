@@ -94,7 +94,8 @@
     },
     "packageArchitectureMismatch": {
       "title": "عدم تطابق معماری بسته WePrompt",
-      "description": "این بسته WePrompt برای {{packageArch}} است، اما این مک {{deviceArch}} است. ممکن است بسته اشتباهی را دانلود کرده باشید. لطفاً بسته {{expectedArch}} را دانلود و نصب کنید."
+      "description": "این بسته WePrompt برای {{packageArch}} است، اما این مک از {{deviceArch}} استفاده می‌کند. نصب‌کننده {{expectedArch}} را از کانال توزیع داخلی تأییدشده دریافت کنید، WePrompt را ببندید و آن بسته را نصب کنید.",
+      "closeApplication": "بستن WePrompt"
     },
     "dataMigration": {
       "title": "مهاجرت داده‌های محلی ناموفق بود",

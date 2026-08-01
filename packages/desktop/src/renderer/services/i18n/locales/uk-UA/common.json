@@ -93,8 +93,9 @@
       "runtimeComponentDescription": "У цій інсталяції бракує потрібних вбудованих компонентів середовища виконання, тому {{resource}} не може запуститися. Перевстановіть найновіший пакет WePrompt. Якщо проблема повториться після перевстановлення, перевірте, чи не помістило програмне забезпечення безпеки або антивірус компоненти WePrompt у карантин."
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "Архітектура пакета WePrompt не збігається",
+      "description": "Цей пакет WePrompt призначений для {{packageArch}}, а цей Mac використовує {{deviceArch}}. Отримайте інсталятор {{expectedArch}} через схвалений внутрішній канал розповсюдження, закрийте WePrompt і встановіть цей пакет.",
+      "closeApplication": "Закрити WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",

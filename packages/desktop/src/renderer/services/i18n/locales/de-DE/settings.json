@@ -794,7 +794,7 @@
   "bugReportScreenshotUploaded": "({{count}} hochgeladen)",
   "bugReportScreenshotDropzoneText": "Screenshots hier klicken, ziehen oder einfügen",
   "bugReportScreenshotFormats": "Unterstützt PNG, JPG, GIF",
-  "bugReportAutoInfo": "Systeminformationen, bereinigte Diagnosedaten und Protokolle der letzten drei Tage können in einem lokalen Diagnosepaket gespeichert werden.",
+  "bugReportAutoInfo": "Dieses Paket wird nur am von Ihnen gewählten Ort gespeichert und nie hochgeladen. Es enthält nur freigegebene Metadaten sowie Namen, Daten und Größen von Protokolldateien, jedoch keine Protokollinhalte. Ihre Beschreibung und Screenshots werden unverändert übernommen; prüfen Sie sie auf vertrauliche Informationen.",
   "bugReportSubmit": "Diagnosepaket speichern",
   "bugReportCancel": "Abbrechen",
   "bugReportSuccess": "Diagnosepaket gespeichert",

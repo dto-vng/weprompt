@@ -802,7 +802,7 @@
   "bugReportScreenshotUploaded": "（已上傳 {{count}} 張）",
   "bugReportScreenshotDropzoneText": "點擊、拖曳或貼上截圖到此處",
   "bugReportScreenshotFormats": "支援 PNG、JPG、GIF",
-  "bugReportAutoInfo": "系統資訊、去識別化診斷資料和最近 3 天的日誌可包含在本機診斷套件中。",
+  "bugReportAutoInfo": "此診斷套件只會儲存到你選擇的位置，絕不會上傳。它只包含允許的中繼資料以及日誌檔名、日期和大小，不包含日誌內容。你的描述和螢幕截圖會原樣收錄，請檢查其中是否包含敏感資訊。",
   "bugReportSubmit": "儲存診斷套件",
   "bugReportCancel": "取消",
   "bugReportSuccess": "診斷套件已儲存",

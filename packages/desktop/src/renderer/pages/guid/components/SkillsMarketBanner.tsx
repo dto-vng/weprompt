@@ -73,8 +73,7 @@ const SkillsMarketBanner: React.FC = () => {
           </div>
           {hovered && (
             <div className='text-12px text-[var(--color-text-3)] mt-2px leading-tight animate-fade-in'>
-              {t('conversation.welcome.skillsMarketDesc')}{' '}
-              <span className='text-brand font-semibold'>{t('conversation.welcome.skillsMarketDetails')}</span>
+              {t('conversation.welcome.skillsMarketDesc')}
             </div>
           )}
         </div>

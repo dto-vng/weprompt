@@ -792,7 +792,7 @@
   "bugReportScreenshotUploaded": "({{count}} subidas)",
   "bugReportScreenshotDropzoneText": "Haz clic, arrastra o pega capturas de pantalla aquí",
   "bugReportScreenshotFormats": "Admite PNG, JPG, GIF",
-  "bugReportAutoInfo": "La información del sistema, diagnósticos redactados y registros de los últimos 3 días pueden incluirse en un paquete de diagnóstico local.",
+  "bugReportAutoInfo": "Este paquete se guarda solo donde elijas y nunca se carga. Incluye metadatos permitidos y los nombres, fechas y tamaños de los archivos de registro, pero no su contenido. Tu descripción y capturas se incluyen tal como las proporcionas; revísalas para detectar información confidencial.",
   "bugReportSubmit": "Guardar paquete de diagnóstico",
   "bugReportCancel": "Cancelar",
   "bugReportSuccess": "Paquete de diagnóstico guardado",

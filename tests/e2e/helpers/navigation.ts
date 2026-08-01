@@ -21,6 +21,8 @@ export const ROUTES = {
     appearance: '#/settings/appearance',
     webui: '#/settings/webui',
     system: '#/settings/system',
+  },
+  legacySettings: {
     about: '#/settings/about',
   },
   /** Dynamic extension settings tab route */

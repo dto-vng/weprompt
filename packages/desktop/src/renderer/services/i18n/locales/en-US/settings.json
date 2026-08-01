@@ -802,7 +802,7 @@
   "bugReportScreenshotUploaded": "({{count}} uploaded)",
   "bugReportScreenshotDropzoneText": "Click, drag, or paste screenshots here",
   "bugReportScreenshotFormats": "Supports PNG, JPG, GIF",
-  "bugReportAutoInfo": "System information, redacted diagnostics, and logs from the last 3 days can be included in a local diagnostic package.",
+  "bugReportAutoInfo": "This package is saved only where you choose and is never uploaded. It includes allowlisted metadata and log file names, dates, and sizes, but no log content. Your description and screenshots are included as provided; review them for sensitive information.",
   "bugReportSubmit": "Save diagnostic package",
   "bugReportCancel": "Cancel",
   "bugReportSuccess": "Diagnostic package saved",

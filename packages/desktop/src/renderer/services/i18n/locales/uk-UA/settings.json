@@ -1208,7 +1208,7 @@
   "bugReportScreenshotLabel": "Screenshots",
   "bugReportScreenshotDropzoneText": "Click, drag, or paste screenshots here",
   "bugReportScreenshotFormats": "Supports PNG, JPG, GIF",
-  "bugReportAutoInfo": "Системні відомості, очищені діагностичні дані та журнали за останні 3 дні можна додати до локального діагностичного пакета.",
+  "bugReportAutoInfo": "Пакет зберігається лише у вибраному вами місці й нікуди не надсилається. Він містить лише дозволені метадані, а також назви, дати й розміри файлів журналів, але не їхній вміст. Опис і знімки екрана додаються без змін; перевірте їх на наявність конфіденційних даних.",
   "bugReportSubmit": "Зберегти діагностичний пакет",
   "bugReportCancel": "Cancel",
   "bugReportSuccess": "Діагностичний пакет збережено",

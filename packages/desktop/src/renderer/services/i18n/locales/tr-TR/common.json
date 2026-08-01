@@ -93,8 +93,9 @@
       "runtimeComponentDescription": "Bu kurulumda gerekli yerleşik çalışma zamanı bileşenleri eksik olduğu için {{resource}} başlatılamıyor. En son WePrompt paketini yeniden yükleyin. Yeniden yükledikten sonra da devam ederse güvenlik veya antivirüs yazılımının WePrompt bileşenlerini karantinaya alıp almadığını kontrol edin."
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "WePrompt paket mimarisi uyuşmazlığı",
+      "description": "Bu WePrompt paketi {{packageArch}} içindir, ancak bu Mac {{deviceArch}} kullanıyor. {{expectedArch}} yükleyicisini onaylı şirket içi dağıtım kanalından alın, WePrompt'u kapatın ve bu paketi yükleyin.",
+      "closeApplication": "WePrompt'u kapat"
     },
     "dataMigration": {
       "title": "Local data migration failed",

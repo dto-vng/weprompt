@@ -790,7 +790,7 @@
   "bugReportScreenshotUploaded": "({{count}} yüklendi)",
   "bugReportScreenshotDropzoneText": "Ekran görüntülerini buraya tıklayarak, sürükleyerek veya yapıştırarak ekleyin",
   "bugReportScreenshotFormats": "PNG, JPG, GIF desteklenir",
-  "bugReportAutoInfo": "Sistem bilgileri, hassas bilgileri temizlenmiş tanılar ve son 3 günün günlükleri yerel bir tanı paketine eklenebilir.",
+  "bugReportAutoInfo": "Bu paket yalnızca seçtiğiniz konuma kaydedilir ve hiçbir zaman yüklenmez. Yalnızca izin verilen meta verileri ve günlük dosyalarının adlarını, tarihlerini ve boyutlarını içerir; günlük içeriğini içermez. Açıklamanız ve ekran görüntüleriniz sağlandığı biçimde eklenir; hassas bilgi içermediklerini kontrol edin.",
   "bugReportSubmit": "Tanı paketini kaydet",
   "bugReportCancel": "İptal",
   "bugReportSuccess": "Tanı paketi kaydedildi",

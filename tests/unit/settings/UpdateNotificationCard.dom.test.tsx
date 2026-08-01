@@ -42,7 +42,7 @@ vi.mock('@/renderer/components/Markdown', () => ({
 }));
 
 vi.mock('@/renderer/hooks/context/FeedbackContext', () => ({
-  useFeedback: () => ({ openFeedback: mocks.openFeedbackMock }),
+  useFeedback: () => ({ isFeedbackAvailable: true, openFeedback: mocks.openFeedbackMock }),
 }));
 
 vi.mock('@/common', () => ({
@@ -634,9 +634,6 @@ describe('UpdateNotificationCard', () => {
         tags: {
           kind: 'app-cannot-be-closed',
           message: 'installer-last-failure',
-        },
-        extra: {
-          installerLastFailure: marker,
         },
       });
     });

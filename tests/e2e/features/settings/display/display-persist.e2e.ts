@@ -39,7 +39,7 @@ async function currentPercent(page: import('@playwright/test').Page): Promise<nu
 async function reloadAndGoToDisplay(page: import('@playwright/test').Page): Promise<void> {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => (document.body.textContent?.length ?? 0) > 50, { timeout: 15_000 });
-  await goToSettings(page, 'display');
+  await goToSettings(page, 'appearance');
   await waitForSettle(page);
 }
 
@@ -54,7 +54,7 @@ test.describe('Display settings persistence across reload', () => {
   test.setTimeout(60_000);
 
   test.beforeEach(async ({ page }) => {
-    await goToSettings(page, 'display');
+    await goToSettings(page, 'appearance');
     await waitForSettle(page);
   });
 

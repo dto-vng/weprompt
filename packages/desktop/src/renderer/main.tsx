@@ -100,6 +100,7 @@ import type { IRuntimeStatusEvent, RuntimeFailureKind } from '@/common/adapter/i
 import {
   InstallationIntegrityContent,
   InstallationIntegrityModalHost,
+  PackageArchitectureMismatchFooter,
   type InstallationIntegrityDiagnostics,
   getBackendStartupInstallationDescription,
   getRuntimeComponentInstallationDescription,
@@ -373,7 +374,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
           visible
           closable={false}
           maskClosable={false}
-          footer={null}
+          footer={<PackageArchitectureMismatchFooter />}
           title={t('common.backendStartup.packageArchitectureMismatch.title')}
         >
           <InstallationIntegrityContent description={description} />

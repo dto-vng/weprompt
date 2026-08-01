@@ -790,7 +790,7 @@
   "bugReportScreenshotUploaded": "（{{count}} 枚アップロード済み）",
   "bugReportScreenshotDropzoneText": "クリック、ドラッグ、またはここに貼り付け",
   "bugReportScreenshotFormats": "PNG、JPG、GIF に対応",
-  "bugReportAutoInfo": "システム情報、伏せ字にした診断情報、直近3日間のログをローカル診断パッケージに含められます。",
+  "bugReportAutoInfo": "このパッケージは選択した場所にのみ保存され、アップロードされません。許可されたメタデータとログファイルの名前、日付、サイズだけを含み、ログ本文は含みません。説明とスクリーンショットは入力どおり含まれるため、機密情報がないか確認してください。",
   "bugReportSubmit": "診断パッケージを保存",
   "bugReportCancel": "キャンセル",
   "bugReportSuccess": "診断パッケージを保存しました",

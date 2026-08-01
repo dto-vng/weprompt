@@ -93,7 +93,8 @@
     },
     "packageArchitectureMismatch": {
       "title": "Incompatibilidad de arquitectura del paquete WePrompt",
-      "description": "Este paquete de WePrompt es para {{packageArch}}, pero esta Mac es {{deviceArch}}. Es posible que hayas descargado el paquete incorrecto. Descarga e instala el paquete {{expectedArch}}."
+      "description": "Este paquete de WePrompt es para {{packageArch}}, pero esta Mac es {{deviceArch}}. Obtén el instalador {{expectedArch}} del canal de distribución interno aprobado, cierra WePrompt e instala ese paquete.",
+      "closeApplication": "Cerrar WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",

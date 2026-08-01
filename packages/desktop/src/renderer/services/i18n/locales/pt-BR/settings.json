@@ -802,7 +802,7 @@
   "bugReportScreenshotUploaded": "({{count}} enviadas)",
   "bugReportScreenshotDropzoneText": "Clique, arraste ou cole capturas de tela aqui",
   "bugReportScreenshotFormats": "Suporta PNG, JPG, GIF",
-  "bugReportAutoInfo": "Informações do sistema, diagnósticos redigidos e logs dos últimos 3 dias podem ser incluídos em um pacote de diagnóstico local.",
+  "bugReportAutoInfo": "Este pacote é salvo somente no local que você escolher e nunca é enviado. Ele inclui metadados permitidos e nomes, datas e tamanhos dos arquivos de log, mas não o conteúdo dos logs. Sua descrição e capturas de tela são incluídas como fornecidas; revise-as para remover informações confidenciais.",
   "bugReportSubmit": "Salvar pacote de diagnóstico",
   "bugReportCancel": "Cancelar",
   "bugReportSuccess": "Pacote de diagnóstico salvo",

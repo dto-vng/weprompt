@@ -94,7 +94,8 @@
     },
     "packageArchitectureMismatch": {
       "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. Get the {{expectedArch}} installer from your approved internal distribution channel, close WePrompt, and install that package.",
+      "closeApplication": "Close WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",

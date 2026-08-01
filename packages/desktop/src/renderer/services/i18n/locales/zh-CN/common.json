@@ -94,7 +94,8 @@
     },
     "packageArchitectureMismatch": {
       "title": "WePrompt 安装包架构不匹配",
-      "description": "当前 WePrompt 安装包是 {{packageArch}}，但这台 Mac 是 {{deviceArch}}。你可能下载了错误的安装包，请重新下载并安装 {{expectedArch}} 版本。"
+      "description": "当前 WePrompt 安装包是 {{packageArch}}，但这台 Mac 是 {{deviceArch}}。请从获批的内部分发渠道获取 {{expectedArch}} 安装包，关闭 WePrompt 后再安装该版本。",
+      "closeApplication": "关闭 WePrompt"
     },
     "dataMigration": {
       "title": "本地数据迁移失败",

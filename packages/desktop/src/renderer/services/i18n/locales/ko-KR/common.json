@@ -93,8 +93,9 @@
       "runtimeComponentDescription": "현재 설치에 필요한 내장 런타임 구성 요소가 없어 {{resource}}을(를) 시작할 수 없습니다. 최신 WePrompt 패키지를 다시 설치하세요. 다시 설치한 후에도 문제가 계속되면 보안 또는 백신 소프트웨어가 WePrompt 구성 요소를 격리했는지 확인하세요."
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "WePrompt 패키지 아키텍처 불일치",
+      "description": "이 WePrompt 패키지는 {{packageArch}}용이지만 이 Mac은 {{deviceArch}}입니다. 승인된 내부 배포 채널에서 {{expectedArch}} 설치 프로그램을 받아 WePrompt를 닫은 후 해당 패키지를 설치하세요.",
+      "closeApplication": "WePrompt 닫기"
     },
     "dataMigration": {
       "title": "Local data migration failed",

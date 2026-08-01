@@ -7,7 +7,7 @@ const EDITED_THEME_NAME = `E2E Edited Theme ${Date.now()}`;
 const CUSTOM_CSS = ':root { --bg-1: #1a1a2e; }';
 
 async function navigateToCssThemes(page: import('@playwright/test').Page) {
-  await goToSettings(page, 'display');
+  await goToSettings(page, 'appearance');
   await page.locator('.grid > div.cursor-pointer').first().waitFor({ state: 'visible', timeout: 15_000 });
 }
 

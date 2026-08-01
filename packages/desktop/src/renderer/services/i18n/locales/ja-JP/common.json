@@ -93,8 +93,9 @@
       "runtimeComponentDescription": "このインストールには必要な組み込み実行コンポーネントが不足しているため、{{resource}} を起動できません。最新版の WePrompt パッケージを再インストールしてください。再インストール後も続く場合は、セキュリティソフトまたはウイルス対策ソフトが WePrompt コンポーネントを隔離していないか確認してください。"
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "WePrompt パッケージのアーキテクチャが一致しません",
+      "description": "この WePrompt パッケージは {{packageArch}} 用ですが、この Mac は {{deviceArch}} です。承認済みの社内配布チャネルから {{expectedArch}} インストーラーを取得し、WePrompt を閉じてからそのパッケージをインストールしてください。",
+      "closeApplication": "WePrompt を閉じる"
     },
     "dataMigration": {
       "title": "Local data migration failed",

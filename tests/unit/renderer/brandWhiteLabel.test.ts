@@ -205,6 +205,20 @@ describe('WePrompt white-label branding', () => {
     );
   });
 
+  it('does not present the Skills Market description as a link without a destination', () => {
+    const banner = sourceWithoutLicense('packages/desktop/src/renderer/pages/guid/components/SkillsMarketBanner.tsx');
+    expect(banner).not.toContain('skillsMarketDetails');
+
+    for (const language of i18nConfig.supportedLanguages) {
+      const conversation = readJson<JsonValue>(
+        `packages/desktop/src/renderer/services/i18n/locales/${language}/conversation.json`
+      );
+      expect(getNestedValue(conversation, 'welcome.skillsMarketDetails'), `${language} retains a false CTA`).toBe(
+        undefined
+      );
+    }
+  });
+
   it('keeps routed About removed and redirects its legacy route to system settings', () => {
     const navigation = sourceWithoutLicense('packages/desktop/src/renderer/components/layout/Router.tsx');
     const settingsModal = sourceWithoutLicense(

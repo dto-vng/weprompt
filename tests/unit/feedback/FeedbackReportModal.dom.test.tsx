@@ -162,12 +162,6 @@ describe('FeedbackReportModal — prefill', () => {
           agent_error_code: 'USER_LLM_PROVIDER_AUTH_FAILED',
           agent_error_ownership: 'user_llm_provider',
         }}
-        feedbackExtra={{
-          agent_error: {
-            code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-            ownership: 'user_llm_provider',
-          },
-        }}
       />
     );
 
@@ -178,12 +172,6 @@ describe('FeedbackReportModal — prefill', () => {
 
     expect(submitFeedbackReport).toHaveBeenCalledWith(
       expect.objectContaining({
-        extra: {
-          agent_error: {
-            code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-            ownership: 'user_llm_provider',
-          },
-        },
         tags: {
           agent_error_code: 'USER_LLM_PROVIDER_AUTH_FAILED',
           agent_error_ownership: 'user_llm_provider',
@@ -211,39 +199,9 @@ describe('FeedbackReportModal — prefill', () => {
     }
   });
 
-  it('submits route and module diagnostics context for DB attachment collection', async () => {
-    window.location.hash = '#/conversation/conv-1';
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            schema_version: 'feedback-diagnostics/v1',
-            profiles: [],
-            privacy: { raw_content_included: false, api_keys_included: false },
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      )
-    );
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('requests only main-side log collection and no renderer-collected diagnostics', async () => {
     const user = userEvent.setup();
-    renderModal(
-      <FeedbackReportModal
-        visible={true}
-        onCancel={vi.fn()}
-        defaultModule='system-settings'
-        feedbackDiagnosticsContext={{
-          explicitContext: { conversationId: 'conv-1' },
-          explicitProfiles: ['conversation-session'],
-          routeAtOpen: '#/conversation/conv-1',
-        }}
-      />
-    );
+    renderModal(<FeedbackReportModal visible={true} onCancel={vi.fn()} defaultModule='system-settings' />);
 
     await user.type(screen.getByPlaceholderText('settings.bugReportDescriptionPlaceholder'), 'wrong module selected');
     await user.click(screen.getByText('settings.bugReportSubmit'));
@@ -251,14 +209,9 @@ describe('FeedbackReportModal — prefill', () => {
     await waitFor(() => expect(submitFeedbackReport).toHaveBeenCalledOnce());
     expect(submitFeedbackReport).toHaveBeenCalledWith(
       expect.objectContaining({
-        collectDbDiagnostics: {
-          explicitContext: { conversationId: 'conv-1' },
-          explicitProfiles: ['conversation-session'],
-          routeAtOpen: '#/conversation/conv-1',
-          routeAtSubmit: '#/conversation/conv-1',
-          selectedModule: 'system-settings',
-        },
+        collectLogs: true,
       })
     );
+    expect(submitFeedbackReport.mock.calls[0][0]).not.toHaveProperty('collectDbDiagnostics');
   });
 });

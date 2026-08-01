@@ -120,9 +120,6 @@ export async function reportInstallationIntegrityDiagnostics(
   const result = await submitFeedbackReport({
     collectLogs: true,
     description: diagnostics.description ?? getBackendStartupInstallationDescription(t),
-    extra: {
-      installation_integrity: diagnostics,
-    },
     module: 'installation-integrity',
     moduleLabel: getInstallationIntegrityTitle(t, diagnosticsKind),
     tags: buildInstallationIntegrityTags(diagnostics),
@@ -185,6 +182,18 @@ export const InstallationIntegrityContent: React.FC<{ description: string; diagn
     ) : null}
   </div>
 );
+
+export const PackageArchitectureMismatchFooter: React.FC<{ onClose?: () => void }> = ({
+  onClose = () => window.close(),
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Button data-testid='package-architecture-mismatch-close' type='primary' onClick={onClose}>
+      {t('common.backendStartup.packageArchitectureMismatch.closeApplication')}
+    </Button>
+  );
+};
 
 const InstallationIntegrityFooter: React.FC<{
   diagnostics?: InstallationIntegrityDiagnostics;
