@@ -123,14 +123,31 @@ test.describe('Extension: Iframe Content Rendering', () => {
     const iframe = page.locator(IFRAME_SEL);
     const webview = page.locator('webview');
     const expected = KNOWN_TAB_CONTENT[tabId as KnownTabId];
+    await expect
+      .poll(async () => (await iframe.count()) + (await webview.count()), {
+        message: 'Waiting for exactly one extension settings host',
+      })
+      .toBe(1);
     const iframeCount = await iframe.count();
     const webviewCount = await webview.count();
-    expect(iframeCount + webviewCount).toBe(1);
 
     const host = iframeCount === 1 ? iframe : webview;
     const src = await host.getAttribute('src');
     expect(src).toMatch(/^https?:\/\/|^file:/);
     expect(new URL(src!).pathname.endsWith(expected.srcSuffix)).toBe(true);
+    await expect(host).toBeVisible();
+    const hostSurface = await host.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const centerElement = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return {
+        height: rect.height,
+        topmost: centerElement === element || (centerElement !== null && element.contains(centerElement)),
+        width: rect.width,
+      };
+    });
+    expect(hostSurface.width).toBeGreaterThan(0);
+    expect(hostSurface.height).toBeGreaterThan(0);
+    expect(hostSurface.topmost).toBe(true);
 
     if (iframeCount === 1) {
       await waitForIframeLoaded(page);

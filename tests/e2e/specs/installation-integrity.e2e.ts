@@ -6,6 +6,8 @@
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'path';
 import { pathToFileURL } from 'node:url';
@@ -166,6 +168,67 @@ test.describe('Installation integrity failure dialog', () => {
       expect(await page.evaluate(() => Boolean(window.__backendLocalToken))).toBe(false);
     } finally {
       await electronApp?.close();
+      await rm(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test('blocks a trusted development document from redirecting to another loopback document', async () => {
+    const projectRoot = path.resolve(__dirname, '../../..');
+    const testDir = await mkdtemp(path.join(tmpdir(), 'weprompt-renderer-redirect-e2e-'));
+    let trustedRequestCount = 0;
+    let untrustedRequestCount = 0;
+    let untrustedDocumentUrl = '';
+    const server = createServer((request, response) => {
+      if (request.url === '/trusted') {
+        trustedRequestCount += 1;
+        response.writeHead(302, { Location: untrustedDocumentUrl });
+        response.end();
+        return;
+      }
+
+      untrustedRequestCount += 1;
+      response.writeHead(200, { 'Content-Type': 'text/html' });
+      response.end('<!doctype html><title>Untrusted redirect</title>');
+    });
+    let electronApp: ElectronApplication | undefined;
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+      });
+      const address = server.address() as AddressInfo;
+      const trustedDocumentUrl = `http://127.0.0.1:${address.port}/trusted`;
+      untrustedDocumentUrl = `http://127.0.0.1:${address.port}/untrusted`;
+
+      electronApp = await electron.launch({
+        args: ['.'],
+        cwd: projectRoot,
+        env: {
+          ...process.env,
+          AIONUI_DEBUG_BACKEND_STARTUP_FAILURE: 'backend_incomplete_installation',
+          AIONUI_DISABLE_AUTO_UPDATE: '1',
+          AIONUI_DISABLE_DEVTOOLS: '1',
+          AIONUI_E2E_TEST: '1',
+          AIONUI_E2E_USER_DATA_DIR: path.join(testDir, 'user-data'),
+          AIONUI_CDP_PORT: '0',
+          ELECTRON_RENDERER_URL: trustedDocumentUrl,
+          NODE_ENV: 'development',
+        },
+        timeout: 60_000,
+      });
+      const page =
+        electronApp.windows().find((window) => !window.url().startsWith('devtools://')) ??
+        (await electronApp.waitForEvent('window', { timeout: 30_000 }));
+
+      await expect.poll(() => trustedRequestCount).toBeGreaterThan(0);
+      await page.waitForTimeout(500);
+
+      expect(untrustedRequestCount).toBe(0);
+      expect(page.url()).not.toBe(untrustedDocumentUrl);
+    } finally {
+      await electronApp?.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(testDir, { recursive: true, force: true });
     }
   });

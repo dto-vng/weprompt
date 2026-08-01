@@ -509,15 +509,17 @@ const installWebContentsSecurity = (): void => {
     // Block top-level navigation away from the app shell. Only applies to
     // `window`-type contents (main + pet windows); <webview> guests are meant
     // to browse arbitrary content, so their navigation is left untouched.
-    contents.on('will-navigate', (navEvent, targetUrl) => {
+    const enforceTopLevelDocumentPolicy = (navigationEvent: Electron.Event, targetUrl: string) => {
       if (contents.getType() !== 'window') {
         return;
       }
       if (!isAllowedTopLevelNavigation(targetUrl)) {
         console.warn(`[AionUi][security] Blocked top-level navigation to: ${targetUrl}`);
-        navEvent.preventDefault();
+        navigationEvent.preventDefault();
       }
-    });
+    };
+    contents.on('will-navigate', enforceTopLevelDocumentPolicy);
+    contents.on('will-redirect', enforceTopLevelDocumentPolicy);
 
     // Never let content open a new Electron window. External http(s) links are
     // handed to the OS browser (preserving legitimate external-link behavior);
