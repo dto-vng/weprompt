@@ -9,7 +9,6 @@ import {
   Communication,
   Computer,
   Earth,
-  Info,
   Lightning,
   LinkCloud,
   Puzzle,
@@ -36,7 +35,6 @@ export const BUILTIN_TAB_IDS = [
   'webui',
   'pet',
   'system',
-  'about',
 ] as const;
 
 /**
@@ -59,7 +57,6 @@ const GROUP_HEADER_BEFORE: Record<string, string> = {
   profile: 'settings.groupProfile',
   agent: 'settings.groupAiCore',
   appearance: 'settings.groupApp',
-  about: 'settings.groupAbout',
 };
 
 type SiderItem = {
@@ -115,7 +112,6 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
       },
       pet: { id: 'pet', label: t('pet.desktopPet'), icon: <Cat />, path: 'pet' },
       system: { id: 'system', label: t('settings.system'), icon: <System />, path: 'system' },
-      about: { id: 'about', label: t('settings.about'), icon: <Info />, path: 'about' },
     };
 
     // Start with ordered builtin IDs, hiding desktop-only tabs in browser mode

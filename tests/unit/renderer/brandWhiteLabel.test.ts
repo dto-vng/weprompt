@@ -53,7 +53,6 @@ describe('WePrompt white-label branding', () => {
 
   it('renders the brand name from login.brand instead of a hardcoded wordmark', () => {
     const chromeFiles = [
-      'packages/desktop/src/renderer/components/settings/SettingsModal/contents/AboutModalContent.tsx',
       'packages/desktop/src/renderer/components/layout/Titlebar/index.tsx',
       'packages/desktop/src/process/utils/tray.ts',
     ];

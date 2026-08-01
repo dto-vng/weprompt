@@ -210,13 +210,6 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   });
   template.push({ type: 'separator' });
   template.push({
-    label: i18n.t('common.tray.about'),
-    click: () => {
-      showAndFocus();
-      mainWindowRef?.webContents.send('tray:open-about');
-    },
-  });
-  template.push({
     label: i18n.t('common.tray.restart'),
     click: () => {
       isQuitting = true;

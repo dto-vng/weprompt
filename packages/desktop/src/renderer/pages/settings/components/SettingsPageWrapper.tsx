@@ -13,7 +13,6 @@ import {
   Communication,
   Computer,
   Earth,
-  Info,
   Lightning,
   LinkCloud,
   Puzzle,
@@ -80,7 +79,6 @@ export function getBuiltinSettingsNavItems(isDesktop: boolean, t: TranslateFn): 
     },
     pet: { id: 'pet', label: t('pet.desktopPet'), icon: <Cat theme='outline' size='16' />, path: 'pet' },
     system: { id: 'system', label: t('settings.system'), icon: <System theme='outline' size='16' />, path: 'system' },
-    about: { id: 'about', label: t('settings.about'), icon: <Info theme='outline' size='16' />, path: 'about' },
   };
 
   return BUILTIN_TAB_IDS.map((id) => builtinMap[id]);
