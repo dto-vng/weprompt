@@ -519,7 +519,11 @@ const installWebContentsSecurity = (): void => {
       }
     };
     contents.on('will-navigate', enforceTopLevelDocumentPolicy);
-    contents.on('will-redirect', enforceTopLevelDocumentPolicy);
+    contents.on('will-redirect', (redirectEvent, targetUrl, _isInPlace, isMainFrame) => {
+      if (isMainFrame) {
+        enforceTopLevelDocumentPolicy(redirectEvent, targetUrl);
+      }
+    });
 
     // Never let content open a new Electron window. External http(s) links are
     // handed to the OS browser (preserving legitimate external-link behavior);
