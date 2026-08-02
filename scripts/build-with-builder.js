@@ -510,9 +510,6 @@ function writeGeneratedSentryDsnInclude(projectRoot) {
 
 function assertInternalReleaseBuildEnvironment() {
   if (process.env.WEPROMPT_INTERNAL_RELEASE !== '1') {
-    if (process.env.CI !== 'true') {
-      throw new Error('Package builds require WEPROMPT_INTERNAL_RELEASE=1 for this internal release workflow.');
-    }
     return;
   }
 
