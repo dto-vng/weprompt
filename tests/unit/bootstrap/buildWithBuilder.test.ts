@@ -516,6 +516,7 @@ childProcess.execSync = function mockedExecSync(command) {
     const callsPath = process.env.AIONUI_BUILDER_CALLS_FILE;
     const calls = fs.existsSync(callsPath) ? JSON.parse(fs.readFileSync(callsPath, 'utf8')) : [];
     calls.push({
+      ci: process.env.CI ?? null,
       command: commandText,
       cscIdentityAutoDiscovery: process.env.CSC_IDENTITY_AUTO_DISCOVERY ?? null,
     });
@@ -544,7 +545,7 @@ childProcess.execSync = function mockedExecSync(command) {
           movedExistingOut = true;
         }
 
-        const { WEPROMPT_INTERNAL_RELEASE: _internalRelease, ...normalPackageEnvironment } = process.env;
+        const { CI: _ci, WEPROMPT_INTERNAL_RELEASE: _internalRelease, ...normalPackageEnvironment } = process.env;
         const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', ...args], {
           cwd: repoRoot,
           encoding: 'utf8',
@@ -580,10 +581,14 @@ childProcess.execSync = function mockedExecSync(command) {
         expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
 
         const builderCalls = JSON.parse(readFileSync(builderCallsPath, 'utf8')) as Array<{
+          ci: string | null;
           command: string;
           cscIdentityAutoDiscovery: string | null;
         }>;
         expect(builderCalls).toHaveLength(1);
+        if (!internalRelease) {
+          expect(builderCalls[0]?.ci).toBe(ci ?? null);
+        }
         expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe(
           internalRelease ? 'false' : (signingSentinel ?? 'preserve-me')
         );
