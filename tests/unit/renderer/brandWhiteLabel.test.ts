@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 type I18nConfig = {
@@ -20,6 +21,7 @@ const UPSTREAM_AIONUI_GUIDE_URLS = [
   'https://github.com/iOfficeAI/AionUi/wiki/LLM-Configuration',
   'https://github.com/iOfficeAI/AionUi/wiki/AionUi-Image-Generation-Tool-Model-Configuration-Guide',
 ] as const;
+const PWA_ICON_SIZES = [180, 192, 512] as const;
 
 const readJson = <T>(relativePath: string): T =>
   JSON.parse(readFileSync(path.join(repoRoot, relativePath), 'utf8')) as T;
@@ -61,6 +63,24 @@ function collectFiles(root: string, extension: string): string[] {
 }
 
 describe('WePrompt white-label branding', () => {
+  it('derives every active PWA icon exactly from the approved app mark', async () => {
+    for (const size of PWA_ICON_SIZES) {
+      const expected = await sharp(path.join(repoRoot, 'resources/app.png'))
+        .resize(size, size)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const actual = await sharp(path.join(repoRoot, `public/pwa/icon-${size}.png`))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      expect(expected.info).toMatchObject({ width: size, height: size, channels: 4 });
+      expect(actual.info).toMatchObject({ width: size, height: size, channels: 4 });
+      expect(actual.data.equals(expected.data)).toBe(true);
+    }
+  });
+
   it('uses the WePrompt wordmark in the primary brand lockup', () => {
     const lockup = readFileSync(
       path.join(repoRoot, 'packages/desktop/src/renderer/assets/logos/brand/forge-lockup-horizontal.svg'),

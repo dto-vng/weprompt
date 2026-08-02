@@ -205,37 +205,6 @@ describe('build-with-builder', () => {
     expect(sharedMessages).not.toMatch(/\bAionUi\b/);
   });
 
-  it('rejects non-internal package builds plus ambient telemetry and signing variables', () => {
-    const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
-
-    expect(source).toContain("process.env.WEPROMPT_INTERNAL_RELEASE !== '1'");
-    for (const variable of [
-      'SENTRY_DSN',
-      'SENTRY_AUTH_TOKEN',
-      'SENTRY_UPLOAD_SOURCE_MAPS',
-      'SENTRY_ORG',
-      'SENTRY_PROJECT',
-      'SENTRY_RELEASE',
-      'CSC_LINK',
-      'CSC_KEY_PASSWORD',
-      'WIN_CSC_LINK',
-      'WIN_CSC_KEY_PASSWORD',
-      'BUILD_CERTIFICATE_BASE64',
-      'P12_PASSWORD',
-      'KEYCHAIN_PASSWORD',
-      'APPLE_ID',
-      'APPLE_ID_PASSWORD',
-      'TEAM_ID',
-      'IDENTITY',
-      'appleId',
-      'appleIdPassword',
-      'teamId',
-      'identity',
-    ]) {
-      expect(source).toContain(`'${variable}'`);
-    }
-  });
-
   it('selects the unpacked app and DMG for only the requested macOS architecture', () => {
     const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
 
@@ -461,15 +430,34 @@ childProcess.execSync = function mockedExecSync(command) {
     {
       args: ['arm64', '--win', '--arm64'],
       expectedArch: 'arm64',
+      internalRelease: true,
+      mode: 'internal-release',
     },
     {
       args: ['auto', '--mac', '--x64'],
       expectedArch: 'x64',
+      internalRelease: true,
+      mode: 'internal-release',
+    },
+    {
+      args: ['auto', '--mac', '--x64'],
+      expectedArch: 'x64',
+      internalRelease: false,
+      mode: 'normal local',
+    },
+    {
+      args: ['auto', '--mac', '--x64'],
+      ci: 'true',
+      expectedArch: 'x64',
+      internalRelease: false,
+      internalReleaseValue: '0',
+      mode: 'non-internal CI',
+      signingSentinel: 'ci-signing-sentinel',
     },
   ])(
-    'prepares bundled AionCore for $expectedArch with args $args',
+    'runs a $mode package for $expectedArch with args $args',
     { timeout: BUILD_SCRIPT_TIMEOUT_MS },
-    ({ args, expectedArch }) => {
+    ({ args, ci, expectedArch, internalRelease, internalReleaseValue, signingSentinel }) => {
       const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
       const hookPath = join(tempDir, 'hook.cjs');
       const callsPath = join(tempDir, 'prepare-calls.json');
@@ -528,6 +516,7 @@ childProcess.execSync = function mockedExecSync(command) {
     const callsPath = process.env.AIONUI_BUILDER_CALLS_FILE;
     const calls = fs.existsSync(callsPath) ? JSON.parse(fs.readFileSync(callsPath, 'utf8')) : [];
     calls.push({
+      ci: process.env.CI ?? null,
       command: commandText,
       cscIdentityAutoDiscovery: process.env.CSC_IDENTITY_AUTO_DISCOVERY ?? null,
     });
@@ -556,16 +545,22 @@ childProcess.execSync = function mockedExecSync(command) {
           movedExistingOut = true;
         }
 
+        const { CI: _ci, WEPROMPT_INTERNAL_RELEASE: _internalRelease, ...normalPackageEnvironment } = process.env;
         const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', ...args], {
           cwd: repoRoot,
           encoding: 'utf8',
           env: {
-            ...process.env,
+            ...(internalRelease ? process.env : normalPackageEnvironment),
             AIONUI_BUILDER_CALLS_FILE: builderCallsPath,
             AIONUI_PREPARE_CALLS_FILE: callsPath,
-            CSC_IDENTITY_AUTO_DISCOVERY: '',
+            CSC_IDENTITY_AUTO_DISCOVERY: internalRelease ? '' : (signingSentinel ?? 'preserve-me'),
             NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
-            WEPROMPT_INTERNAL_RELEASE: '1',
+            ...(ci ? { CI: ci } : {}),
+            ...(internalRelease
+              ? { WEPROMPT_INTERNAL_RELEASE: '1' }
+              : internalReleaseValue
+                ? { WEPROMPT_INTERNAL_RELEASE: internalReleaseValue }
+                : {}),
           },
         });
 
@@ -586,12 +581,18 @@ childProcess.execSync = function mockedExecSync(command) {
         expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
 
         const builderCalls = JSON.parse(readFileSync(builderCallsPath, 'utf8')) as Array<{
+          ci: string | null;
           command: string;
           cscIdentityAutoDiscovery: string | null;
         }>;
         expect(builderCalls).toHaveLength(1);
-        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe('false');
-        if (args.includes('--mac')) {
+        if (!internalRelease) {
+          expect(builderCalls[0]?.ci).toBe(ci ?? null);
+        }
+        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe(
+          internalRelease ? 'false' : (signingSentinel ?? 'preserve-me')
+        );
+        if (internalRelease && args.includes('--mac')) {
           expect(builderCalls[0]?.command).toContain('--config.mac.identity=-');
         } else {
           expect(builderCalls[0]?.command).not.toContain('--config.mac.identity=-');
