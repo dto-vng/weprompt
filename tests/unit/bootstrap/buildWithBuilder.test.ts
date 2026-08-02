@@ -445,10 +445,19 @@ childProcess.execSync = function mockedExecSync(command) {
       internalRelease: false,
       mode: 'normal local',
     },
+    {
+      args: ['auto', '--mac', '--x64'],
+      ci: 'true',
+      expectedArch: 'x64',
+      internalRelease: false,
+      internalReleaseValue: '0',
+      mode: 'non-internal CI',
+      signingSentinel: 'ci-signing-sentinel',
+    },
   ])(
     'runs a $mode package for $expectedArch with args $args',
     { timeout: BUILD_SCRIPT_TIMEOUT_MS },
-    ({ args, expectedArch, internalRelease }) => {
+    ({ args, ci, expectedArch, internalRelease, internalReleaseValue, signingSentinel }) => {
       const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
       const hookPath = join(tempDir, 'hook.cjs');
       const callsPath = join(tempDir, 'prepare-calls.json');
@@ -543,9 +552,14 @@ childProcess.execSync = function mockedExecSync(command) {
             ...(internalRelease ? process.env : normalPackageEnvironment),
             AIONUI_BUILDER_CALLS_FILE: builderCallsPath,
             AIONUI_PREPARE_CALLS_FILE: callsPath,
-            CSC_IDENTITY_AUTO_DISCOVERY: internalRelease ? '' : 'preserve-me',
+            CSC_IDENTITY_AUTO_DISCOVERY: internalRelease ? '' : (signingSentinel ?? 'preserve-me'),
             NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
-            ...(internalRelease ? { WEPROMPT_INTERNAL_RELEASE: '1' } : {}),
+            ...(ci ? { CI: ci } : {}),
+            ...(internalRelease
+              ? { WEPROMPT_INTERNAL_RELEASE: '1' }
+              : internalReleaseValue
+                ? { WEPROMPT_INTERNAL_RELEASE: internalReleaseValue }
+                : {}),
           },
         });
 
@@ -570,7 +584,9 @@ childProcess.execSync = function mockedExecSync(command) {
           cscIdentityAutoDiscovery: string | null;
         }>;
         expect(builderCalls).toHaveLength(1);
-        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe(internalRelease ? 'false' : 'preserve-me');
+        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe(
+          internalRelease ? 'false' : (signingSentinel ?? 'preserve-me')
+        );
         if (internalRelease && args.includes('--mac')) {
           expect(builderCalls[0]?.command).toContain('--config.mac.identity=-');
         } else {
