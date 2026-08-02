@@ -368,13 +368,13 @@ describe('detectStartupArchitectureMismatch', () => {
 });
 
 describe('getInstallationIntegrityModalActions', () => {
-  it('exposes diagnostics reporting next to download-latest for blocking dialogs', () => {
+  it('exposes diagnostics-only recovery for blocking dialogs', () => {
     const t = (key: string) => key;
     const onReportDiagnostics = vi.fn();
 
     const actions = getInstallationIntegrityModalActions(t, { onReportDiagnostics });
 
-    expect(actions.downloadText).toBe('common.backendStartup.incompleteInstallation.downloadLatest');
+    expect('downloadText' in actions).toBe(false);
     expect(actions.reportText).toBe('common.backendStartup.incompleteInstallation.sendDiagnostics');
 
     actions.onReportDiagnostics();
@@ -394,7 +394,7 @@ describe('getInstallationIntegrityModalActions', () => {
     } as any);
 
     expect(actions.reportText).toBe('common.backendStartup.dataMigration.sendDiagnostics');
-    expect(actions.downloadText).toBeUndefined();
+    expect('downloadText' in actions).toBe(false);
     expect(failure.backendBoundaryStage).toBe('database.migration');
   });
 
@@ -406,7 +406,7 @@ describe('getInstallationIntegrityModalActions', () => {
     } as any);
 
     expect(actions.reportText).toBe('common.backendStartup.localDataRepair.sendDiagnostics');
-    expect(actions.downloadText).toBeUndefined();
+    expect('downloadText' in actions).toBe(false);
   });
 
   it('uses startup directory copy and diagnostics-only actions for directory failures', () => {
@@ -417,7 +417,7 @@ describe('getInstallationIntegrityModalActions', () => {
     } as any);
 
     expect(actions.reportText).toBe('common.backendStartup.startupDirectory.sendDiagnostics');
-    expect(actions.downloadText).toBeUndefined();
+    expect('downloadText' in actions).toBe(false);
   });
 
   it('uses recoverable database corruption copy and rebuild action', () => {
@@ -430,7 +430,7 @@ describe('getInstallationIntegrityModalActions', () => {
     } as any);
 
     expect(actions.reportText).toBe('common.backendStartup.recoverableDatabaseCorruption.sendDiagnostics');
-    expect(actions.downloadText).toBeUndefined();
+    expect('downloadText' in actions).toBe(false);
     expect((actions as any).recoverText).toBe('common.backendStartup.recoverableDatabaseCorruption.confirmRebuild');
     (actions as any).onRecoverCorruptedDatabase();
     expect(onRecoverCorruptedDatabase).toHaveBeenCalledOnce();

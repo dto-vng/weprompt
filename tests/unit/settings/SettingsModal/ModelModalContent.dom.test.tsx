@@ -145,6 +145,12 @@ describe('ModelModalContent', () => {
     expect(addPlatformOpenMock).toHaveBeenCalledTimes(1);
   });
 
+  it('labels the retained upstream setup link instead of presenting it as a WePrompt destination', () => {
+    render(<ModelModalContent />);
+
+    expect(screen.getByText('settings.upstreamAionUiDocumentation')).toBeInTheDocument();
+  });
+
   it('passes a loading provider query to the card without treating it as configured providers', () => {
     providersQueryData.current = undefined;
     render(<ModelModalContent />);

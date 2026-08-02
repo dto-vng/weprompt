@@ -157,14 +157,14 @@ describe('ClientFactory', () => {
       expect(rotatingOpts.retryDelay).toBe(2000);
     });
 
-    it('adds default HTTP-Referer and X-Title headers for OpenAI', async () => {
+    it('adds WePrompt product metadata without an AionUi referer for OpenAI', async () => {
       await ClientFactory.createRotatingClient(mockProvider);
       const calls = (OpenAIRotatingClient as any).mock.calls;
       const config = calls[0][1];
       expect(config.defaultHeaders).toEqual({
-        'HTTP-Referer': 'https://aionui.com',
-        'X-Title': 'AionUi',
+        'X-Title': 'WePrompt',
       });
+      expect(config.defaultHeaders['HTTP-Referer']).toBeUndefined();
     });
 
     it('handles proxy option for OpenAI', async () => {
@@ -205,6 +205,10 @@ describe('ClientFactory', () => {
       };
       await ClientFactory.createRotatingClient(unknownProvider);
       expect(OpenAIRotatingClient).toHaveBeenCalled();
+      const calls = (OpenAIRotatingClient as any).mock.calls;
+      const config = calls[0][1];
+      expect(config.defaultHeaders).toEqual({ 'X-Title': 'WePrompt' });
+      expect(config.defaultHeaders['HTTP-Referer']).toBeUndefined();
     });
   });
 });

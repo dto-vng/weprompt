@@ -8,7 +8,7 @@
  * Exit codes:
  *   0  - no new critical/high advisories (all present ones are in the baseline)
  *   1  - one or more critical/high advisories are NOT in the baseline (new finding),
- *        OR the audit looks degraded/empty and cannot be trusted (fail-closed)
+ *        the audit looks degraded/empty, OR an accepted-risk review date expired
  *   2  - the audit could not be run or parsed
  *
  * Fail-closed sanity floor: a non-empty baseline expects its known advisory IDs
@@ -16,9 +16,8 @@
  * baselined ID has simultaneously disappeared, the audit is treated as degraded
  * (it must not silently mask vulnerabilities) and the gate fails.
  *
- * Non-fatal warnings are printed for:
- *   - baseline entries whose `review_by` date has passed
- *   - SOME (but not all) baseline entries no longer present in the audit (prune hint)
+ * Non-fatal warnings are printed when SOME (but not all) baseline entries are
+ * no longer present in the audit (prune hint).
  *
  * Usage: node scripts/check-audit.js
  */
@@ -159,16 +158,25 @@ function main() {
     process.exit(1);
   }
 
-  // Warn about baseline entries that are past their review date.
+  // Accepted risk is valid only through its explicit review window. Once that
+  // date passes, fail closed until an owner re-reviews, fixes, or removes it.
   const now = new Date();
+  const expiredBaselineEntries = [];
   for (const [id, entry] of baseline) {
     if (!entry.review_by) continue;
     const reviewBy = new Date(entry.review_by);
     if (!Number.isNaN(reviewBy.getTime()) && reviewBy < now) {
-      console.warn(
-        `⚠️  Baseline advisory ${id} (${entry.package}) is past its review_by date ${entry.review_by} — re-review the accepted risk.`
+      expiredBaselineEntries.push({ id, entry });
+    }
+  }
+  if (expiredBaselineEntries.length > 0) {
+    console.error(`\n❌ ${expiredBaselineEntries.length} accepted-risk baseline review date(s) expired:`);
+    for (const { id, entry } of expiredBaselineEntries) {
+      console.error(
+        `   - Baseline advisory ${id} (${entry.package}) is past its review_by date ${entry.review_by} — re-review the accepted risk.`
       );
     }
+    process.exit(1);
   }
 
   // Note baseline entries no longer present in the audit (partial disappearance

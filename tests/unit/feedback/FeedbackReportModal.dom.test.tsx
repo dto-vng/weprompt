@@ -12,7 +12,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ConfigProvider } from '@arco-design/web-react';
+import { ConfigProvider, Message } from '@arco-design/web-react';
 
 vi.mock('@arco-design/web-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@arco-design/web-react')>();
@@ -36,18 +36,11 @@ vi.mock('@/renderer/hooks/context/ThemeContext', () => ({
   useThemeContext: () => ({ theme: 'light', fontScale: 1 }),
 }));
 
-const sentryMocks = vi.hoisted(() => {
-  const setTag = vi.fn();
-  return {
-    setTag,
-    captureEvent: vi.fn(),
-    withScope: vi.fn((callback: (scope: { setTag: typeof setTag }) => void) => {
-      callback({ setTag });
-    }),
-  };
-});
+const submitFeedbackReport = vi.hoisted(() => vi.fn());
 
-vi.mock('@sentry/electron/renderer', () => sentryMocks);
+vi.mock('@/renderer/services/feedback/submitFeedbackReport', () => ({
+  submitFeedbackReport,
+}));
 
 import FeedbackReportModal, {
   type PrefilledScreenshot,
@@ -66,9 +59,9 @@ describe('FeedbackReportModal — prefill', () => {
     // Ensure no leftover global electronAPI from other tests interferes.
     (window as unknown as { electronAPI?: unknown }).electronAPI = undefined;
     window.location.hash = '';
-    sentryMocks.setTag.mockClear();
-    sentryMocks.captureEvent.mockClear();
-    sentryMocks.withScope.mockClear();
+    submitFeedbackReport.mockReset();
+    submitFeedbackReport.mockResolvedValue({ status: 'saved', path: '/tmp/weprompt-diagnostics.json.gz' });
+    vi.mocked(Message.success).mockClear();
   });
 
   afterEach(() => {
@@ -157,7 +150,7 @@ describe('FeedbackReportModal — prefill', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('submits feedback tags and extra context to Sentry', async () => {
+  it('shows success only after a local diagnostic package is written', async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     renderModal(
@@ -169,88 +162,56 @@ describe('FeedbackReportModal — prefill', () => {
           agent_error_code: 'USER_LLM_PROVIDER_AUTH_FAILED',
           agent_error_ownership: 'user_llm_provider',
         }}
-        feedbackExtra={{
-          agent_error: {
-            code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-            ownership: 'user_llm_provider',
-          },
-        }}
       />
     );
 
     await user.type(screen.getByPlaceholderText('settings.bugReportDescriptionPlaceholder'), 'provider failed');
     await user.click(screen.getByText('settings.bugReportSubmit'));
 
-    await waitFor(() => {
-      expect(sentryMocks.captureEvent).toHaveBeenCalledTimes(1);
-    });
+    await waitFor(() => expect(submitFeedbackReport).toHaveBeenCalledOnce());
 
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('type', 'user-feedback');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('module', 'conversation-session');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('agent_error_code', 'USER_LLM_PROVIDER_AUTH_FAILED');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('agent_error_ownership', 'user_llm_provider');
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
+    expect(submitFeedbackReport).toHaveBeenCalledWith(
       expect.objectContaining({
-        extra: {
-          description: 'provider failed',
-          agent_error: {
-            code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-            ownership: 'user_llm_provider',
-          },
+        tags: {
+          agent_error_code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+          agent_error_ownership: 'user_llm_provider',
         },
-      }),
-      expect.objectContaining({ attachments: [] })
+      })
     );
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('submits route and module diagnostics context for DB attachment collection', async () => {
-    window.location.hash = '#/conversation/conv-1';
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            schema_version: 'feedback-diagnostics/v1',
-            profiles: [],
-            privacy: { raw_content_included: false, api_keys_included: false },
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      )
-    );
-    vi.stubGlobal('fetch', fetchMock);
-
+  it.each([
+    ['cancelled', 'settings.bugReportCancelled'],
+    ['failed', 'settings.bugReportError'],
+  ] as const)('does not show saved success when the local export is %s', async (status, expectedMessage) => {
     const user = userEvent.setup();
-    renderModal(
-      <FeedbackReportModal
-        visible={true}
-        onCancel={vi.fn()}
-        defaultModule='system-settings'
-        feedbackDiagnosticsContext={{
-          explicitContext: { conversationId: 'conv-1' },
-          explicitProfiles: ['conversation-session'],
-          routeAtOpen: '#/conversation/conv-1',
-        }}
-      />
-    );
+    submitFeedbackReport.mockResolvedValueOnce({ status });
+    renderModal(<FeedbackReportModal visible={true} onCancel={vi.fn()} defaultModule='conversation-session' />);
+
+    await user.type(screen.getByPlaceholderText('settings.bugReportDescriptionPlaceholder'), 'provider failed');
+    await user.click(screen.getByText('settings.bugReportSubmit'));
+
+    await waitFor(() => expect(submitFeedbackReport).toHaveBeenCalledOnce());
+    expect(Message.success).not.toHaveBeenCalled();
+    if (status === 'failed') {
+      expect(screen.getByText(expectedMessage)).toBeInTheDocument();
+    }
+  });
+
+  it('requests only main-side log collection and no renderer-collected diagnostics', async () => {
+    const user = userEvent.setup();
+    renderModal(<FeedbackReportModal visible={true} onCancel={vi.fn()} defaultModule='system-settings' />);
 
     await user.type(screen.getByPlaceholderText('settings.bugReportDescriptionPlaceholder'), 'wrong module selected');
     await user.click(screen.getByText('settings.bugReportSubmit'));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledOnce();
-    });
-    const [path, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(path).toContain('/api/system/diagnostics/feedback-report?');
-    expect(path).toContain('conversation_id=conv-1');
-    expect(path).toContain('profiles=conversation-session');
-    expect(path).toContain('route_at_open=%23%2Fconversation%2Fconv-1');
-    expect(path).toContain('route_at_submit=%23%2Fconversation%2Fconv-1');
-    expect(path).toContain('selected_module=system-settings');
-    expect(options.method).toBe('GET');
+    await waitFor(() => expect(submitFeedbackReport).toHaveBeenCalledOnce());
+    expect(submitFeedbackReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collectLogs: true,
+      })
+    );
+    expect(submitFeedbackReport.mock.calls[0][0]).not.toHaveProperty('collectDbDiagnostics');
   });
 });

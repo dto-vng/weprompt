@@ -5,19 +5,20 @@
  */
 
 import * as fs from 'node:fs';
+import { stat } from 'node:fs/promises';
 import * as path from 'node:path';
-import * as zlib from 'node:zlib';
 
 const LOG_SUFFIXES = ['.log', '.aioncore.log', '.aionrs.log'];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
 const YEAR_DIR_PATTERN = /^\d{4}$/;
 const MONTH_OR_DAY_DIR_PATTERN = /^\d{2}$/;
 const DEFAULT_LOG_DAYS = 3;
+const MAX_LOG_FILES = 12;
 
 export type FeedbackLogAttachment = {
   filename: string;
   data: Buffer;
-  contentType: 'application/gzip';
+  contentType: 'application/json';
 };
 
 type FeedbackLogCandidate = {
@@ -168,7 +169,13 @@ export function getRecentFeedbackLogPaths(logsDir: string, days = DEFAULT_LOG_DA
   return getRecentFeedbackLogPathsFromDirs([normalizedDir], days);
 }
 
-export function collectFeedbackLogAttachment(logsDirs: string | string[]): FeedbackLogAttachment | null {
+function sanitizeLogMetadataName(logPath: string, rootDir: string): string {
+  return getLogHeaderName(logPath, rootDir, true)
+    .replace(/[^A-Za-z0-9._/-]/g, '_')
+    .slice(0, 200);
+}
+
+export async function collectFeedbackLogAttachment(logsDirs: string | string[]): Promise<FeedbackLogAttachment | null> {
   const normalizedDirs = normalizeLogDirs(logsDirs);
   const logPaths =
     normalizedDirs.length === 1
@@ -178,16 +185,26 @@ export function collectFeedbackLogAttachment(logsDirs: string | string[]): Feedb
     return null;
   }
 
-  const parts: string[] = [];
-  for (const logPath of logPaths) {
-    const basename = getLogHeaderName(logPath, normalizedDirs[0], true);
-    const content = fs.readFileSync(logPath, 'utf8');
-    parts.push(`=== ${basename} ===\n${content}\n`);
+  const files: Array<{ date: string; name: string; size_bytes: number }> = [];
+  for (const logPath of logPaths.slice(0, MAX_LOG_FILES)) {
+    try {
+      const fileStat = await stat(logPath);
+      const date = DATE_PATTERN.exec(path.basename(logPath))?.[0];
+      if (!date || !fileStat.isFile()) continue;
+      files.push({
+        date,
+        name: sanitizeLogMetadataName(logPath, normalizedDirs[0]),
+        size_bytes: Math.max(0, Number(fileStat.size)),
+      });
+    } catch {
+      // Skip files that become unreadable between discovery and collection.
+    }
   }
+  if (files.length === 0) return null;
 
   return {
-    filename: 'logs.gz',
-    data: zlib.gzipSync(Buffer.from(parts.join('\n'), 'utf8')),
-    contentType: 'application/gzip',
+    filename: 'logs-metadata.json',
+    data: Buffer.from(JSON.stringify({ files, schema_version: 'weprompt-log-metadata/v1' }), 'utf8'),
+    contentType: 'application/json',
   };
 }

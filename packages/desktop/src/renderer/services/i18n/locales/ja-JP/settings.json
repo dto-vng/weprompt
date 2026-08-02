@@ -677,18 +677,18 @@
   "mcpDisconnected": "未テスト",
   "mcpError": "直近のテストに失敗",
   "mcpErrorNodeCommandNotFound": "コマンド {{command}} を準備できませんでした。AionCore は通常、管理対象の Node ランタイムを自動で準備します。接続テストを再試行し、それでも失敗する場合はバックエンドログを確認するか、この MCP サーバーに絶対コマンドパスを設定してください。",
-  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart AionUI, or configure this MCP server to use an absolute command path.",
+  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart WePrompt, or configure this MCP server to use an absolute command path.",
   "mcpErrorCommandNotFound": "Command {{command}} was not found. Install it or configure this MCP server to use an absolute command path.",
-  "mcpErrorCommandPermissionDenied": "AionUI cannot execute {{command}} because permission was denied.",
-  "mcpErrorCommandStartFailed": "AionUI failed to start {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt cannot execute {{command}} because permission was denied.",
+  "mcpErrorCommandStartFailed": "WePrompt failed to start {{command}}.",
   "mcpErrorTimeout": "Connection test timed out after {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI could not reach the MCP server.",
+  "mcpErrorConnectionFailed": "WePrompt could not reach the MCP server.",
   "mcpErrorHttp": "The MCP server returned HTTP {{status}}.",
   "mcpErrorRpc": "The MCP server returned an RPC error while handling {{method}}.",
-  "mcpErrorProtocol": "AionUI could not complete the MCP handshake.",
+  "mcpErrorProtocol": "WePrompt could not complete the MCP handshake.",
   "mcpLastCheckedAvailable": "ツール設定での直近の確認結果：利用可能",
   "mcpLastCheckedFailed": "ツール設定での直近の確認結果：失敗",
   "mcpCheckedAt": "確認時刻：{{time}}",
@@ -790,11 +790,11 @@
   "bugReportScreenshotUploaded": "（{{count}} 枚アップロード済み）",
   "bugReportScreenshotDropzoneText": "クリック、ドラッグ、またはここに貼り付け",
   "bugReportScreenshotFormats": "PNG、JPG、GIF に対応",
-  "bugReportAutoInfo": "送信時にシステム情報と直近3日間のログが自動的に添付され、問題の特定に役立ちます",
-  "bugReportSubmit": "送信",
+  "bugReportAutoInfo": "このパッケージは選択した場所にのみ保存され、アップロードされません。許可されたメタデータとログファイルの名前、日付、サイズだけを含み、ログ本文は含みません。説明とスクリーンショットは入力どおり含まれるため、機密情報がないか確認してください。",
+  "bugReportSubmit": "診断パッケージを保存",
   "bugReportCancel": "キャンセル",
-  "bugReportSuccess": "報告が送信されました。フィードバックありがとうございます",
-  "bugReportError": "送信に失敗しました。後でもう一度お試しください",
+  "bugReportSuccess": "診断パッケージを保存しました",
+  "bugReportError": "診断パッケージを保存できませんでした。もう一度お試しください。",
   "bugReportModuleSkills": "Skills とプラグイン",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP とツール",
@@ -1285,7 +1285,7 @@
       "addMcp": "MCP サーバーの設定を手伝ってください。",
       "addSkill": "スキルをインポートしてアシスタントに紐付けてください。",
       "diagnose": "WePrompt で問題が発生しました。診断を手伝ってください。\n\n【モジュール】{{module}}\n【問題の説明】{{description}}\n【添付】入力欄のスクリーンショットを参照。\n\n原因を診断し、解決方法を教えてください。",
-      "diagnoseChatError": "AionUi の会話中にエラーが発生しました。診断を手伝ってください。\n\n【エラー内容】{{error}}\n\n原因を診断し、解決方法を教えてください。"
+      "diagnoseChatError": "WePrompt の会話中にエラーが発生しました。診断を手伝ってください。\n\n【エラー内容】{{error}}\n\n原因を診断し、解決方法を教えてください。"
     },
     "solveWithButler": "執事に相談"
   },
@@ -1348,5 +1348,20 @@
       "authRequired": "保存されたプロバイダーには有効な認証情報が必要です。",
       "healthCheckFailed": "選択したモデルはヘルスチェックに合格しませんでした。"
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "上流 AionUi ドキュメント",
+  "channelConflict": {
+    "title": "{{platform}} チャネルの競合を検出しました",
+    "summary": "WePrompt ではなく OpenClaw が {{platform}} のメッセージを処理しています。WePrompt でアシスタントを切り替えてもこのボットには反映されませんが、メッセージは OpenClaw 経由で動作します。",
+    "howToUse": "WePrompt チャネルでアシスタントを切り替えるには:",
+    "optionDisable": "方法 1: OpenClaw の {{platform}} を無効にする（推奨）",
+    "restart": "その後、OpenClaw と WePrompt を再起動してください。",
+    "optionDifferentBot": "方法 2: WePrompt 用に別の {{platform}} ボットを使用する。",
+    "optionKeepOpenClaw": "方法 3: OpenClaw を使い続け、WePrompt チャネルの {{platform}} を無効にする。",
+    "helpDisable": "OpenClaw {{platform}} を無効にする",
+    "ignore": "無視する（内容を理解しています）",
+    "banner": "OpenClaw と {{platform}} の競合を検出しました。アシスタントの切り替えは機能しません。",
+    "learnMore": "詳細を見る"
+  },
+  "bugReportCancelled": "診断パッケージの保存を中止しました。"
 }

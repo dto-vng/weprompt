@@ -1,57 +1,80 @@
-# Internal Windows (x64 / Intel-AMD) Build — Pre-configured Installer
+# Internal WePrompt Windows x64 Build
 
-Builds `Forge-<version>-win-x64.exe` (NSIS installer) with the GreenNode/
-MiniMax provider and the OpenCode agent working on first launch — for
-internal distribution to colleagues. Built on GitHub Actions because the
-Windows native modules cannot be cross-compiled from macOS.
+Build `out\WePrompt-<version>-win-x64.exe` on a native Windows x64 machine or VM with Visual Studio Build Tools 2022 and the Windows SDK. A macOS cross-build or an artifact downloaded from an unrelated GitHub Actions workflow is not release evidence.
 
-## One-time setup
+## Verified source handoff
 
-1. **Repo must be private.** `khoapnt-vng/WePrompt` → Settings → General →
-   Danger Zone → Change visibility → Private. On a public repo, anyone can
-   download Actions artifacts — which embed the shared API key. The same
-   applies to GitHub Releases: tag pushes run the release pipeline through
-   the same keyed build steps, so release assets embed the key too. Keep the
-   repo private for as long as these secrets are configured.
-2. **Add the key as an Actions secret.** Settings → Secrets and variables →
-   Actions → New repository secret → name `FORGE_GREENNODE_API_KEY`, value =
-   the shared GreenNode key. **Never commit the key.**
-3. Optional, later: add `FORGE_TAVILY_API_KEY` the same way to also
-   pre-configure built-in Web Search. No code change needed — the workflow
-   already passes it; existing installs pick the key up on upgrade.
+Transfer these files through the approved internal file-sharing channel:
 
-## Build
+- `aioncore-appops-e582874c.bundle`
+- `weprompt-sprint1-release.bundle`
+- `DESKTOP-COMMIT.txt`
+- `SOURCE-SHA256SUMS`
 
-```bash
-gh workflow run build-manual.yml --repo khoapnt-vng/WePrompt \
-  -f branch=WePrompt -f platform=windows-x64
-gh run list --repo khoapnt-vng/WePrompt --workflow build-manual.yml --limit 1
-gh run watch --repo khoapnt-vng/WePrompt <run-id>
+Verify every received file with `Get-FileHash -Algorithm SHA256` against `SOURCE-SHA256SUMS` before cloning. Clone the desktop bundle into a new checkout, then require `git rev-parse HEAD` to equal the full commit in `DESKTOP-COMMIT.txt`. Build AionCore from the verified backend bundle at `e582874c881f507034a32d1b282a5c0d956b6b0e`, persist its SHA-256 before packaging, and prepare a complete `bundle-win32-x64` with `sourceType=local-binary`.
+
+## Prepare the internal build
+
+Install exactly the locked dependencies and run the Windows platform gates before packaging:
+
+```powershell
+bun install --frozen-lockfile
+bunx vitest run
+bunx tsc --noEmit
 ```
 
-Takes ~25–40 minutes on the `windows-2022` runner. Then download the
-`windows-build-x64` artifact from the run page (or
-`gh run download <run-id> --repo khoapnt-vng/WePrompt -n windows-build-x64`)
-— it contains `Forge-<version>-win-x64.exe`.
+Load `FORGE_GREENNODE_API_KEY` and `FORGE_TAVILY_API_KEY` from the approved secret store without printing them. Then set the internal flag and reject ambient update, telemetry, and signing configuration:
 
-Note: the workflow's Windows build step does not fail the run on build
-errors — judge success by the artifact existing and containing the `.exe`.
+```powershell
+$env:WEPROMPT_INTERNAL_RELEASE = '1'
+$Forbidden = @(
+  'WEPROMPT_UPDATE_BASE_URL',
+  'SENTRY_DSN',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_UPLOAD_SOURCE_MAPS',
+  'SENTRY_ORG',
+  'SENTRY_PROJECT',
+  'SENTRY_RELEASE',
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD'
+)
+foreach ($Name in $Forbidden) {
+  if (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($Name))) {
+    throw "$Name must be unset for the internal release"
+  }
+}
+if ([string]::IsNullOrWhiteSpace($env:FORGE_GREENNODE_API_KEY)) { throw 'GreenNode key is missing' }
+if ([string]::IsNullOrWhiteSpace($env:FORGE_TAVILY_API_KEY)) { throw 'Tavily key is missing' }
+```
 
-## What first launch seeds (one-shot)
+Clear all ambient AionCore source selectors, recreate the staging directory, and set only the immutable reviewed bundle:
 
-Identical to the macOS build (see `build-mac-internal.md`): GreenNode
-provider (`minimax/minimax-m2.5`, `openai/gpt-5`) enabled; OpenCode agent
-installed from the Agent Hub with the same models mirrored into
-`~/.config/opencode/`; built-in Web Search activates only when a build
-carries `FORGE_TAVILY_API_KEY`. Users can change or remove any of it and
-their choice sticks.
+```powershell
+$AioncoreSourceVariables = @(
+  'AIONUI_AIONCORE_SOURCE',
+  'AIONUI_BACKEND_RUN_ID',
+  'AIONUI_BACKEND_LOCAL_BUNDLE_DIR',
+  'AIONUI_BACKEND_LOCAL_BINARY',
+  'AIONUI_SKIP_AIONCORE_VERIFY',
+  'AIONUI_FORGE_SOURCE_REPO',
+  'AIONUI_FORGE_SOURCE_TAG'
+)
+foreach ($Name in $AioncoreSourceVariables) {
+  [Environment]::SetEnvironmentVariable($Name, $null, 'Process')
+}
+$env:AIONUI_BACKEND_VERSION = 'v0.1.55-appops-e582874c'
+$env:AIONUI_BACKEND_LOCAL_BUNDLE_DIR = 'C:\WePromptReleaseInput\WePrompt-2.1.39\backend\bundle-win32-x64'
+bun run build-win:x64
+```
 
-## Distributing (unsigned build)
+Require the native command to exit zero. Verify `out\win-unpacked\WePrompt.exe`, exactly one `resources\bundled-aioncore\win32-x64` runtime, the embedded backend hash, and absence of `resources\app-update.yml`. Record the installer SHA-256 only after those checks. The package must make no public AionUi updater or Sentry request; installer failures must produce only the local diagnostic export.
 
-The installer is not Authenticode-signed. Recipients:
+## Install and upgrade tests
 
-1. Run `Forge-<version>-win-x64.exe`.
-2. SmartScreen shows "Windows protected your PC" →
-   **More info → Run anyway** (needed once).
-3. Follow the install wizard, then launch — chat (MiniMax) and the OpenCode
-   agent work with no setup.
+The installer is not Authenticode-signed. On first open, choose **More info → Run anyway** in SmartScreen and record the override.
+
+Test both a fresh install and an in-place upgrade over the exact last internally distributed Forge installer. The upgraded machine must have one Apps & Features row named WePrompt, a working WePrompt shortcut and uninstaller, the existing Forge profile data, and `aionui://` opening WePrompt. A retained physical install directory such as `...\Programs\Forge` is compatible and must not be relocated during this release.
+
+A named security owner must accept the extractable shared desktop credentials before distribution. Transfer the verified EXE together with its build-time hash and provenance evidence through the approved internal channel; do not substitute an Actions artifact.

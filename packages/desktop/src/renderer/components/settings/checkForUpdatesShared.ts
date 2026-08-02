@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import type { UpdateReleaseInfo } from '@/common/update/updateTypes';
 
 /**
@@ -45,6 +46,10 @@ export const runUpdateCheck = async (opts: {
   fallbackVersion: string;
   checkFailedLabel: string;
 }): Promise<CheckUpdateOutcome> => {
+  if (!isUpdateFeatureEnabled()) {
+    return { kind: 'error', message: 'updates-disabled' };
+  }
+
   try {
     let autoUpdateAvailable = false;
     let autoUpdateInfo: { version: string; releaseNotes?: string } | null = null;

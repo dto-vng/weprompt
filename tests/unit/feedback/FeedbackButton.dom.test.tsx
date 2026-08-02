@@ -17,9 +17,15 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-const openFeedbackMock = vi.fn(() => Promise.resolve());
+const feedbackState = vi.hoisted(() => ({
+  isFeedbackAvailable: true,
+  openFeedbackMock: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('@/renderer/hooks/context/FeedbackContext', () => ({
-  useFeedback: () => ({ openFeedback: openFeedbackMock }),
+  useFeedback: () => ({
+    isFeedbackAvailable: feedbackState.isFeedbackAvailable,
+    openFeedback: feedbackState.openFeedbackMock,
+  }),
 }));
 
 import FeedbackButton from '@/renderer/components/base/FeedbackButton';
@@ -28,7 +34,8 @@ const renderButton = (ui: React.ReactElement) => render(<ConfigProvider>{ui}</Co
 
 describe('FeedbackButton', () => {
   beforeEach(() => {
-    openFeedbackMock.mockClear();
+    feedbackState.isFeedbackAvailable = true;
+    feedbackState.openFeedbackMock.mockClear();
   });
 
   afterEach(() => {
@@ -46,8 +53,8 @@ describe('FeedbackButton', () => {
 
     await user.click(screen.getByRole('button'));
 
-    expect(openFeedbackMock).toHaveBeenCalledTimes(1);
-    expect(openFeedbackMock).toHaveBeenCalledWith({
+    expect(feedbackState.openFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(feedbackState.openFeedbackMock).toHaveBeenCalledWith({
       module: 'agent-detection',
       autoScreenshot: true,
     });
@@ -64,7 +71,7 @@ describe('FeedbackButton', () => {
 
     await user.click(screen.getByRole('button'));
 
-    expect(openFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(feedbackState.openFeedbackMock).toHaveBeenCalledTimes(1);
     expect(parentClick).not.toHaveBeenCalled();
   });
 
@@ -74,14 +81,14 @@ describe('FeedbackButton', () => {
 
     await user.click(screen.getByRole('button'));
 
-    expect(openFeedbackMock).toHaveBeenCalledWith({
+    expect(feedbackState.openFeedbackMock).toHaveBeenCalledWith({
       module: undefined,
       autoScreenshot: true,
     });
   });
 
   it('swallows rejections from openFeedback without throwing to the caller', async () => {
-    openFeedbackMock.mockRejectedValueOnce(new Error('boom'));
+    feedbackState.openFeedbackMock.mockRejectedValueOnce(new Error('boom'));
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
     renderButton(<FeedbackButton module='system-settings' />);
@@ -91,8 +98,14 @@ describe('FeedbackButton', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(openFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(feedbackState.openFeedbackMock).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it('does not render a feedback entry point in browser/WebUI mode', () => {
+    feedbackState.isFeedbackAvailable = false;
+    renderButton(<FeedbackButton module='system-settings' />);
+    expect(screen.queryByText('settings.oneClickFeedback')).not.toBeInTheDocument();
   });
 });

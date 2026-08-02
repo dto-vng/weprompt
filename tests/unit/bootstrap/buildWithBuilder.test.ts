@@ -141,6 +141,112 @@ function resolveAppBuilderInstallUtil(): string {
 }
 
 describe('build-with-builder', () => {
+  it('uses the WePrompt executable for current outputs and retains legacy upgrade cleanup names', () => {
+    const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
+
+    expect(source).toContain("const CURRENT_WINDOWS_EXECUTABLE = 'WePrompt.exe'");
+    expect(source).toContain("const LEGACY_WINDOWS_EXECUTABLES = ['Forge.exe', 'AionUi.exe']");
+    expect(source).toContain("path.join(outDir, 'win-unpacked', CURRENT_WINDOWS_EXECUTABLE)");
+    expect(source).not.toContain("path.join(outDir, 'win-unpacked', 'AionUi.exe')");
+    expect(source).toContain('$PLUGINSDIR\\\\weprompt-fixed-uninstaller.exe');
+    expect(source).toContain('legacyBundledUninstallerOverride');
+  });
+
+  it('uses WePrompt for fresh installs while retaining Forge and AionUi upgrade candidates', () => {
+    const observability = readFileSync(resolve(repoRoot, 'resources/windows/installer-observability.nsh'), 'utf8');
+    const updateVerify = readFileSync(resolve(repoRoot, 'resources/windows/installer-update-verify.nsh'), 'utf8');
+    const repair = readFileSync(resolve(repoRoot, 'resources/windows/installer-repair-heal.nsh'), 'utf8');
+    const processControl = readFileSync(resolve(repoRoot, 'resources/windows/installer-process-control.nsh'), 'utf8');
+    const queryLockers = readFileSync(resolve(repoRoot, 'resources/windows/support/query-lockers.ps1'), 'utf8');
+
+    expect(observability).toContain('!define AIONUI_APP_EXECUTABLE_FILENAME "WePrompt.exe"');
+    expect(observability).toContain('!define AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME "Forge.exe"');
+    expect(observability).toContain('!define AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME "AionUi.exe"');
+    expect(observability).toContain('!define AIONUI_CURRENT_UNINSTALLER_FILENAME "Uninstall WePrompt.exe"');
+    expect(observability).toContain('!define AIONUI_LEGACY_FORGE_UNINSTALLER_FILENAME "Uninstall Forge.exe"');
+    expect(observability).toContain('!define AIONUI_LEGACY_AIONUI_UNINSTALLER_FILENAME "Uninstall AionUi.exe"');
+    expect(observability).toContain('$INSTDIR\\${AIONUI_APP_EXECUTABLE_FILENAME}');
+    expect(observability).not.toContain('$INSTDIR\\AionUi.exe');
+    expect(updateVerify).toContain('$INSTDIR\\${AIONUI_APP_EXECUTABLE_FILENAME}');
+    expect(updateVerify).not.toContain('$INSTDIR\\AionUi.exe');
+
+    for (const legacyMacro of ['AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME', 'AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME']) {
+      expect(repair).toContain(legacyMacro);
+      expect(processControl).toContain(legacyMacro);
+    }
+    for (const executable of [
+      'WePrompt.exe',
+      'Forge.exe',
+      'AionUi.exe',
+      'Uninstall WePrompt.exe',
+      'Uninstall Forge.exe',
+      'Uninstall AionUi.exe',
+    ]) {
+      expect(queryLockers).toContain(`'${executable}'`);
+    }
+  });
+
+  it('keeps internal installer failures local-only with WePrompt-visible diagnostics', () => {
+    const errors = readFileSync(resolve(repoRoot, 'resources/windows/installer-errors-sentry.nsh'), 'utf8');
+    const messages = readFileSync(resolve(repoRoot, 'resources/windows/installer-messages.nsh'), 'utf8');
+    const sharedMessages = readFileSync(resolve(repoRoot, 'resources/messages.yml'), 'utf8');
+    const reporter = readFileSync(resolve(repoRoot, 'resources/windows/support/report-installer-failure.ps1'), 'utf8');
+
+    expect(errors).toContain('AIONUI_EXPORT_LOCAL_DIAGNOSTICS');
+    expect(errors).toContain('MessageBox MB_OK|MB_ICONSTOP');
+    expect(errors).not.toContain('MB_YESNO');
+    expect(errors).not.toMatch(/SENTRY|Sentry|-Dsn/);
+    expect(reporter).toContain("$statusPath = Join-Path $env:TEMP 'weprompt-installer-report.json'");
+    expect(reporter).toContain("status = 'exported'");
+    expect(reporter).toContain('localExportPath');
+    expect(reporter).toContain('WePrompt installer failure');
+    expect(reporter).not.toMatch(/Invoke-RestMethod|https?:\/\/|Sentry|Dsn|analytics\.json/i);
+    expect(messages).not.toMatch(/"[^"\n]*\bAionUi\b[^"\n]*"/);
+    expect(sharedMessages).not.toMatch(/\bAionUi\b/);
+  });
+
+  it('rejects non-internal package builds plus ambient telemetry and signing variables', () => {
+    const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
+
+    expect(source).toContain("process.env.WEPROMPT_INTERNAL_RELEASE !== '1'");
+    for (const variable of [
+      'SENTRY_DSN',
+      'SENTRY_AUTH_TOKEN',
+      'SENTRY_UPLOAD_SOURCE_MAPS',
+      'SENTRY_ORG',
+      'SENTRY_PROJECT',
+      'SENTRY_RELEASE',
+      'CSC_LINK',
+      'CSC_KEY_PASSWORD',
+      'WIN_CSC_LINK',
+      'WIN_CSC_KEY_PASSWORD',
+      'BUILD_CERTIFICATE_BASE64',
+      'P12_PASSWORD',
+      'KEYCHAIN_PASSWORD',
+      'APPLE_ID',
+      'APPLE_ID_PASSWORD',
+      'TEAM_ID',
+      'IDENTITY',
+      'appleId',
+      'appleIdPassword',
+      'teamId',
+      'identity',
+    ]) {
+      expect(source).toContain(`'${variable}'`);
+    }
+  });
+
+  it('selects the unpacked app and DMG for only the requested macOS architecture', () => {
+    const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
+
+    expect(source).toContain('function resolveMacArtifactPaths(outDir, targetArch, version)');
+    expect(source).toContain("targetArch === 'arm64' ? 'mac-arm64' : 'mac'");
+    expect(source).toContain('`WePrompt-${version}-mac-${targetArch}.dmg`');
+    expect(source).toContain('resolveMacArtifactPaths(outDir, targetArch, packageVersion)');
+    expect(source).not.toContain('function dmgExists(outDir)');
+    expect(source).not.toContain("const candidates = ['mac', 'mac-arm64', 'mac-x64', 'mac-universal']");
+  });
+
   it('rejects skip-vite when renderer output is only a source html shell', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
     const outDir = resolve(repoRoot, 'out');
     const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}`);
@@ -236,7 +342,7 @@ childProcess.execSync = function mockedExecSync(command) {
     expect(queryScript).toContain("'installer-self-lock'");
     expect(queryScript).toContain('outerInstallerPid');
     expect(queryScript).toContain('currentOutDir');
-    expect(queryScript).toContain("name = 'AionUi installer'");
+    expect(queryScript).toContain("name = 'WePrompt installer'");
   });
 
   it('continues with the bundled uninstaller when installed-uninstaller repair remains locked', () => {
@@ -286,7 +392,7 @@ childProcess.execSync = function mockedExecSync(command) {
     const files = readdirSync(resourcesDir).filter((file) => file.endsWith('.nsh'));
 
     const allowedMessageBoxes = new Map<string, RegExp[]>([
-      ['installer-errors-sentry.nsh', [/MessageBox MB_YESNO\|MB_ICONSTOP/]],
+      ['installer-errors-sentry.nsh', [/MessageBox MB_OK\|MB_ICONSTOP/]],
       [
         'installer-process-control.nsh',
         [/AIONUI_MSG_FILE_OR_FOLDER_IN_USE_ZH/, /\$\(appRunning\)/, /AIONUI_MSG_CLOSE_OR_REMOVE_PREVIOUS_ZH/],
@@ -367,6 +473,7 @@ childProcess.execSync = function mockedExecSync(command) {
       const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-test-'));
       const hookPath = join(tempDir, 'hook.cjs');
       const callsPath = join(tempDir, 'prepare-calls.json');
+      const builderCallsPath = join(tempDir, 'builder-calls.json');
       const outDir = resolve(repoRoot, 'out');
       const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}-${expectedArch}`);
 
@@ -417,6 +524,15 @@ function ensurePlaceholder(relativePath) {
 
 childProcess.execSync = function mockedExecSync(command) {
   const commandText = String(command);
+  if (commandText.includes('electron-builder --config packages/desktop/electron-builder.yml')) {
+    const callsPath = process.env.AIONUI_BUILDER_CALLS_FILE;
+    const calls = fs.existsSync(callsPath) ? JSON.parse(fs.readFileSync(callsPath, 'utf8')) : [];
+    calls.push({
+      command: commandText,
+      cscIdentityAutoDiscovery: process.env.CSC_IDENTITY_AUTO_DISCOVERY ?? null,
+    });
+    fs.writeFileSync(callsPath, JSON.stringify(calls));
+  }
   if (commandText.includes('electron-vite build')) {
     ensurePlaceholder('out/main/index.js');
     ensurePlaceholder('out/preload/index.js');
@@ -445,8 +561,11 @@ childProcess.execSync = function mockedExecSync(command) {
           encoding: 'utf8',
           env: {
             ...process.env,
+            AIONUI_BUILDER_CALLS_FILE: builderCallsPath,
             AIONUI_PREPARE_CALLS_FILE: callsPath,
+            CSC_IDENTITY_AUTO_DISCOVERY: '',
             NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+            WEPROMPT_INTERNAL_RELEASE: '1',
           },
         });
 
@@ -457,13 +576,26 @@ childProcess.execSync = function mockedExecSync(command) {
 
         if (args.includes('--win')) {
           const installUtil = readFileSync(resolveAppBuilderInstallUtil(), 'utf8');
-          expect(installUtil).toContain('AionUi-bundled-uninstaller override source');
-          expect(installUtil).toContain('$PLUGINSDIR\\AionUi-fixed-uninstaller.exe');
-          expect(installUtil.match(/AionUi-bundled-uninstaller override source/g)).toHaveLength(1);
+          expect(installUtil).toContain('WePrompt bundled-uninstaller override source');
+          expect(installUtil).toContain('$PLUGINSDIR\\weprompt-fixed-uninstaller.exe');
+          expect(installUtil.match(/WePrompt bundled-uninstaller override source/g)).toHaveLength(1);
+          expect(installUtil).not.toContain('AionUi-bundled-uninstaller override source');
         }
 
         const calls = JSON.parse(readFileSync(callsPath, 'utf8')) as Array<{ arch?: string } | null>;
         expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));
+
+        const builderCalls = JSON.parse(readFileSync(builderCallsPath, 'utf8')) as Array<{
+          command: string;
+          cscIdentityAutoDiscovery: string | null;
+        }>;
+        expect(builderCalls).toHaveLength(1);
+        expect(builderCalls[0]?.cscIdentityAutoDiscovery).toBe('false');
+        if (args.includes('--mac')) {
+          expect(builderCalls[0]?.command).toContain('--config.mac.identity=-');
+        } else {
+          expect(builderCalls[0]?.command).not.toContain('--config.mac.identity=-');
+        }
       } finally {
         rmSync(outDir, { recursive: true, force: true });
         if (movedExistingOut) {

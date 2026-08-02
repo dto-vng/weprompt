@@ -670,18 +670,18 @@
   "mcpDisconnected": "Getrennt",
   "mcpError": "Fehler",
   "mcpErrorNodeCommandNotFound": "Der Befehl {{command}} konnte nicht vorbereitet werden. AionCore stellt normalerweise seine verwaltete Node-Runtime automatisch bereit. Wiederhole den Verbindungstest, überprüfe bei Fortsetzung des Problems die Backend-Protokolle, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
-  "mcpErrorBunCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Bun (das bun/bunx enthält), starte AionUI neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
-  "mcpErrorUvCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere uv, starte AionUI neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
-  "mcpErrorPythonCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Python, starte AionUI neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
-  "mcpErrorDenoCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Deno, starte AionUI neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
+  "mcpErrorBunCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Bun (das bun/bunx enthält), starte WePrompt neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
+  "mcpErrorUvCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere uv, starte WePrompt neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
+  "mcpErrorPythonCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Python, starte WePrompt neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
+  "mcpErrorDenoCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere Deno, starte WePrompt neu, oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
   "mcpErrorCommandNotFound": "Der Befehl {{command}} wurde nicht gefunden. Installiere ihn oder konfiguriere diesen MCP-Server, um einen absoluten Befehlspfad zu verwenden.",
-  "mcpErrorCommandPermissionDenied": "AionUI kann {{command}} nicht ausführen, da die Berechtigung verweigert wurde.",
-  "mcpErrorCommandStartFailed": "AionUI konnte {{command}} nicht starten.",
+  "mcpErrorCommandPermissionDenied": "WePrompt kann {{command}} nicht ausführen, da die Berechtigung verweigert wurde.",
+  "mcpErrorCommandStartFailed": "WePrompt konnte {{command}} nicht starten.",
   "mcpErrorTimeout": "Verbindungstest timed out nach {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI konnte den MCP-Server nicht erreichen.",
+  "mcpErrorConnectionFailed": "WePrompt konnte den MCP-Server nicht erreichen.",
   "mcpErrorHttp": "Der MCP-Server gab HTTP {{status}} zurück.",
   "mcpErrorRpc": "Der MCP-Server gab einen RPC-Fehler bei der Verarbeitung von {{method}} zurück.",
-  "mcpErrorProtocol": "AionUI konnte den MCP-Handshake nicht abschließen.",
+  "mcpErrorProtocol": "WePrompt konnte den MCP-Handshake nicht abschließen.",
   "mcpLastCheckedAvailable": "Letzte Prüfung in Tools-Einstellungen: Verfügbar",
   "mcpLastCheckedFailed": "Letzte Prüfung in Tools-Einstellungen: Fehlgeschlagen",
   "mcpCheckedAt": "Geprüft um: {{time}}",
@@ -794,11 +794,11 @@
   "bugReportScreenshotUploaded": "({{count}} hochgeladen)",
   "bugReportScreenshotDropzoneText": "Screenshots hier klicken, ziehen oder einfügen",
   "bugReportScreenshotFormats": "Unterstützt PNG, JPG, GIF",
-  "bugReportAutoInfo": "Systeminformationen und Protokolle der letzten 3 Tage werden automatisch beigefügt",
-  "bugReportSubmit": "Einreichen",
+  "bugReportAutoInfo": "Dieses Paket wird nur am von Ihnen gewählten Ort gespeichert und nie hochgeladen. Es enthält nur freigegebene Metadaten sowie Namen, Daten und Größen von Protokolldateien, jedoch keine Protokollinhalte. Ihre Beschreibung und Screenshots werden unverändert übernommen; prüfen Sie sie auf vertrauliche Informationen.",
+  "bugReportSubmit": "Diagnosepaket speichern",
   "bugReportCancel": "Abbrechen",
-  "bugReportSuccess": "Bericht eingereicht, vielen Dank für dein Feedback",
-  "bugReportError": "Einreichung fehlgeschlagen, bitte später erneut versuchen",
+  "bugReportSuccess": "Diagnosepaket gespeichert",
+  "bugReportError": "Das Diagnosepaket konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
   "bugReportModuleSkills": "Skills & Plugins",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP & Tools",
@@ -1251,7 +1251,7 @@
       "addMcp": "Hilf mir, einen MCP-Server einzurichten.",
       "addSkill": "Hilf mir, einen Skill zu importieren und einem Assistenten zuzuordnen.",
       "diagnose": "Ich habe ein Problem mit WePrompt, hilf mir bei der Diagnose.\n\n[Modul] {{module}}\n[Beschreibung] {{description}}\n[Anhänge] siehe die Screenshots im Eingabefeld.\n\nBitte diagnostiziere die Ursache und sag mir, wie ich es behebe.",
-      "diagnoseChatError": "Während einer Unterhaltung in AionUi ist ein Fehler aufgetreten, hilf mir bei der Diagnose.\n\n[Fehler] {{error}}\n\nBitte diagnostiziere die Ursache und sag mir, wie ich es behebe."
+      "diagnoseChatError": "Während einer Unterhaltung in WePrompt ist ein Fehler aufgetreten, hilf mir bei der Diagnose.\n\n[Fehler] {{error}}\n\nBitte diagnostiziere die Ursache und sag mir, wie ich es behebe."
     },
     "solveWithButler": "Butler fragen"
   },
@@ -1346,5 +1346,20 @@
       "authRequired": "Der gespeicherte Anbieter benötigt gültige Anmeldedaten.",
       "healthCheckFailed": "Das ausgewählte Modell hat die Integritätsprüfung nicht bestanden."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "Upstream-AionUi-Dokumentation",
+  "channelConflict": {
+    "title": "{{platform}}-Kanalkonflikt erkannt",
+    "summary": "OpenClaw verarbeitet {{platform}}-Nachrichten statt WePrompt. Das Wechseln von Assistenten in WePrompt beeinflusst diesen Bot nicht, Nachrichten laufen aber weiter über OpenClaw.",
+    "howToUse": "So verwenden Sie WePrompt-Kanäle und wechseln Assistenten:",
+    "optionDisable": "Option 1: OpenClaw {{platform}} deaktivieren (empfohlen)",
+    "restart": "Starten Sie anschließend OpenClaw und WePrompt neu.",
+    "optionDifferentBot": "Option 2: Einen anderen {{platform}}-Bot für WePrompt verwenden.",
+    "optionKeepOpenClaw": "Option 3: OpenClaw behalten und {{platform}} in WePrompt-Kanälen deaktivieren.",
+    "helpDisable": "Beim Deaktivieren von OpenClaw {{platform}} helfen",
+    "ignore": "Ignorieren (ich weiß, was ich tue)",
+    "banner": "OpenClaw-{{platform}}-Konflikt erkannt — Assistentenwechsel funktioniert nicht.",
+    "learnMore": "Mehr erfahren"
+  },
+  "bugReportCancelled": "Das Speichern des Diagnosepakets wurde abgebrochen."
 }

@@ -677,18 +677,18 @@
   "mcpDisconnected": "테스트 안 함",
   "mcpError": "최근 테스트 실패",
   "mcpErrorNodeCommandNotFound": "명령 {{command}}을(를) 준비하지 못했습니다. AionCore는 보통 관리형 Node 런타임을 자동으로 준비합니다. 연결 테스트를 다시 시도하고, 계속 실패하면 백엔드 로그를 확인하거나 이 MCP 서버에 절대 명령 경로를 설정하세요.",
-  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart AionUI, or configure this MCP server to use an absolute command path.",
+  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart WePrompt, or configure this MCP server to use an absolute command path.",
   "mcpErrorCommandNotFound": "Command {{command}} was not found. Install it or configure this MCP server to use an absolute command path.",
-  "mcpErrorCommandPermissionDenied": "AionUI cannot execute {{command}} because permission was denied.",
-  "mcpErrorCommandStartFailed": "AionUI failed to start {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt cannot execute {{command}} because permission was denied.",
+  "mcpErrorCommandStartFailed": "WePrompt failed to start {{command}}.",
   "mcpErrorTimeout": "Connection test timed out after {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI could not reach the MCP server.",
+  "mcpErrorConnectionFailed": "WePrompt could not reach the MCP server.",
   "mcpErrorHttp": "The MCP server returned HTTP {{status}}.",
   "mcpErrorRpc": "The MCP server returned an RPC error while handling {{method}}.",
-  "mcpErrorProtocol": "AionUI could not complete the MCP handshake.",
+  "mcpErrorProtocol": "WePrompt could not complete the MCP handshake.",
   "mcpLastCheckedAvailable": "도구 설정에서 최근 점검 결과: 사용 가능",
   "mcpLastCheckedFailed": "도구 설정에서 최근 점검 결과: 실패",
   "mcpCheckedAt": "점검 시간: {{time}}",
@@ -790,11 +790,11 @@
   "bugReportScreenshotUploaded": "({{count}}장 업로드됨)",
   "bugReportScreenshotDropzoneText": "클릭, 드래그 또는 여기에 스크린샷 붙여넣기",
   "bugReportScreenshotFormats": "PNG, JPG, GIF 지원",
-  "bugReportAutoInfo": "제출 시 시스템 정보와 최근 3일간의 로그가 자동으로 첨부되어 문제를 더 빠르게 파악할 수 있습니다",
-  "bugReportSubmit": "제출",
+  "bugReportAutoInfo": "이 패키지는 사용자가 선택한 위치에만 저장되며 업로드되지 않습니다. 허용된 메타데이터와 로그 파일 이름, 날짜, 크기만 포함하며 로그 내용은 포함하지 않습니다. 설명과 스크린샷은 제공한 그대로 포함되므로 민감한 정보가 없는지 확인하세요.",
+  "bugReportSubmit": "진단 패키지 저장",
   "bugReportCancel": "취소",
-  "bugReportSuccess": "보고가 제출되었습니다. 피드백 감사합니다",
-  "bugReportError": "제출에 실패했습니다. 나중에 다시 시도해 주세요",
+  "bugReportSuccess": "진단 패키지를 저장했습니다",
+  "bugReportError": "진단 패키지를 저장하지 못했습니다. 다시 시도하세요.",
   "bugReportModuleSkills": "Skills 및 플러그인",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP 및 도구",
@@ -1285,7 +1285,7 @@
       "addMcp": "MCP 서버 설정을 도와주세요.",
       "addSkill": "스킬을 가져와 어시스턴트에 연결해 주세요.",
       "diagnose": "WePrompt 사용 중 문제가 발생했습니다. 진단을 도와주세요.\n\n[모듈] {{module}}\n[문제 설명] {{description}}\n[첨부] 입력창의 스크린샷 참조.\n\n원인을 진단하고 해결 방법을 알려주세요.",
-      "diagnoseChatError": "AionUi 대화 중 오류가 발생했습니다. 진단을 도와주세요.\n\n[오류 내용] {{error}}\n\n원인을 진단하고 해결 방법을 알려주세요."
+      "diagnoseChatError": "WePrompt 대화 중 오류가 발생했습니다. 진단을 도와주세요.\n\n[오류 내용] {{error}}\n\n원인을 진단하고 해결 방법을 알려주세요."
     },
     "solveWithButler": "집사에게 문의"
   },
@@ -1348,5 +1348,20 @@
       "authRequired": "저장된 제공업체에는 유효한 자격 증명이 필요합니다.",
       "healthCheckFailed": "선택한 모델이 상태 확인을 통과하지 못했습니다."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "업스트림 AionUi 문서",
+  "channelConflict": {
+    "title": "{{platform}} 채널 충돌이 감지되었습니다",
+    "summary": "WePrompt 대신 OpenClaw가 {{platform}} 메시지를 처리하고 있습니다. WePrompt에서 어시스턴트를 바꿔도 이 봇에는 적용되지 않지만 메시지는 OpenClaw를 통해 계속 작동합니다.",
+    "howToUse": "WePrompt 채널을 사용하고 어시스턴트를 전환하려면:",
+    "optionDisable": "옵션 1: OpenClaw {{platform}} 비활성화(권장)",
+    "restart": "그런 다음 OpenClaw와 WePrompt를 다시 시작하세요.",
+    "optionDifferentBot": "옵션 2: WePrompt용 다른 {{platform}} 봇을 사용하세요.",
+    "optionKeepOpenClaw": "옵션 3: OpenClaw를 유지하고 WePrompt 채널에서 {{platform}}를 비활성화하세요.",
+    "helpDisable": "OpenClaw {{platform}} 비활성화 도움",
+    "ignore": "무시하기(위험을 이해합니다)",
+    "banner": "OpenClaw {{platform}} 충돌이 감지되었습니다. 어시스턴트 전환이 작동하지 않습니다.",
+    "learnMore": "자세히 알아보기"
+  },
+  "bugReportCancelled": "진단 패키지 저장이 취소되었습니다."
 }

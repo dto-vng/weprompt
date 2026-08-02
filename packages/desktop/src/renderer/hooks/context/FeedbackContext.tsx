@@ -6,26 +6,18 @@
 
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import FeedbackReportModal, {
-  type FeedbackEventExtra,
   type FeedbackEventTags,
   type PrefilledScreenshot,
 } from '@/renderer/components/settings/SettingsModal/contents/FeedbackReportModal';
-import type {
-  FeedbackDiagnosticsExplicitContext,
-  FeedbackDiagnosticsProfile,
-} from '@/common/types/feedbackDiagnostics';
-import { captureFeedbackRoute, feedbackDiagnosticsContextFromRoute } from '@/renderer/services/feedback/routeContext';
 
 type OpenFeedbackOptions = {
   module?: string;
   autoScreenshot?: boolean;
-  diagnosticsContext?: FeedbackDiagnosticsExplicitContext;
-  diagnosticsProfiles?: FeedbackDiagnosticsProfile[];
   tags?: FeedbackEventTags;
-  extra?: FeedbackEventExtra;
 };
 
 type FeedbackContextValue = {
+  isFeedbackAvailable: boolean;
   openFeedback: (options?: OpenFeedbackOptions) => Promise<void>;
 };
 
@@ -52,65 +44,44 @@ export const FeedbackProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [defaultModule, setDefaultModule] = useState<string | undefined>(undefined);
   const [prefilledScreenshots, setPrefilledScreenshots] = useState<PrefilledScreenshot[] | undefined>(undefined);
   const [feedbackTags, setFeedbackTags] = useState<FeedbackEventTags | undefined>(undefined);
-  const [feedbackExtra, setFeedbackExtra] = useState<FeedbackEventExtra | undefined>(undefined);
-  const [feedbackDiagnosticsContext, setFeedbackDiagnosticsContext] = useState<
-    | {
-        explicitContext?: FeedbackDiagnosticsExplicitContext;
-        explicitProfiles?: FeedbackDiagnosticsProfile[];
-        routeAtOpen?: string;
-      }
-    | undefined
-  >(undefined);
+  const isFeedbackAvailable = Boolean(window.electronAPI?.exportLocalFeedbackDiagnostics);
 
-  const openFeedback = useCallback(async (options?: OpenFeedbackOptions) => {
-    const routeAtOpen = captureFeedbackRoute();
-    const routeContext = feedbackDiagnosticsContextFromRoute(routeAtOpen);
-    const explicitContext =
-      routeContext || options?.diagnosticsContext
-        ? {
-            ...routeContext,
-            ...options?.diagnosticsContext,
-          }
-        : undefined;
-    setDefaultModule(options?.module);
-    setFeedbackTags(options?.tags);
-    setFeedbackExtra(options?.extra);
-    setFeedbackDiagnosticsContext({
-      explicitContext,
-      explicitProfiles: options?.diagnosticsProfiles,
-      routeAtOpen,
-    });
-    if (options?.autoScreenshot) {
-      const shot = await captureScreenshot();
-      setPrefilledScreenshots(shot ? [shot] : undefined);
-    } else {
-      setPrefilledScreenshots(undefined);
-    }
-    setVisible(true);
-  }, []);
+  const openFeedback = useCallback(
+    async (options?: OpenFeedbackOptions) => {
+      if (!isFeedbackAvailable) return;
+      setDefaultModule(options?.module);
+      setFeedbackTags(options?.tags);
+      if (options?.autoScreenshot) {
+        const shot = await captureScreenshot();
+        setPrefilledScreenshots(shot ? [shot] : undefined);
+      } else {
+        setPrefilledScreenshots(undefined);
+      }
+      setVisible(true);
+    },
+    [isFeedbackAvailable]
+  );
 
   const handleCancel = useCallback(() => {
     setVisible(false);
     setPrefilledScreenshots(undefined);
     setFeedbackTags(undefined);
-    setFeedbackExtra(undefined);
-    setFeedbackDiagnosticsContext(undefined);
   }, []);
 
-  const value = useMemo(() => ({ openFeedback }), [openFeedback]);
+  const value = useMemo(() => ({ isFeedbackAvailable, openFeedback }), [isFeedbackAvailable, openFeedback]);
 
   return (
     <FeedbackContext.Provider value={value}>
       {children}
-      <FeedbackReportModal
-        visible={visible}
-        onCancel={handleCancel}
-        defaultModule={defaultModule}
-        prefilledScreenshots={prefilledScreenshots}
-        feedbackTags={feedbackTags}
-        feedbackExtra={feedbackExtra}
-        feedbackDiagnosticsContext={feedbackDiagnosticsContext}
-      />
+      {isFeedbackAvailable ? (
+        <FeedbackReportModal
+          visible={visible}
+          onCancel={handleCancel}
+          defaultModule={defaultModule}
+          prefilledScreenshots={prefilledScreenshots}
+          feedbackTags={feedbackTags}
+        />
+      ) : null}
     </FeedbackContext.Provider>
   );
 };
@@ -120,6 +91,7 @@ export const useFeedback = (): FeedbackContextValue => {
   if (!ctx) {
     // Fallback so consumers don't crash when the provider isn't mounted (e.g. web build).
     return {
+      isFeedbackAvailable: false,
       openFeedback: async () => {
         /* no-op */
       },

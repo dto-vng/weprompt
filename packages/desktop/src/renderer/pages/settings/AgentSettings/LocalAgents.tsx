@@ -224,7 +224,7 @@ const LocalAgents: React.FC = () => {
                 void openExternalUrl(LOCAL_AGENT_SETUP_GUIDE_URL).catch(console.error);
               }}
             >
-              {t('settings.agentManagement.localAgentsSetupLink')}
+              {t('settings.upstreamAionUiDocumentation')}
             </Button>
           </>
         }

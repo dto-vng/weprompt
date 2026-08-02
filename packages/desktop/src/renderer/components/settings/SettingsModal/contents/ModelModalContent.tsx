@@ -431,7 +431,7 @@ const ModelModalContent: React.FC = () => {
                   rel='noopener noreferrer'
                   className='text-[rgb(var(--primary-6))] hover:text-[rgb(var(--primary-5))] underline ml-4px'
                 >
-                  {t('settings.configGuide')}
+                  {t('settings.upstreamAionUiDocumentation')}
                 </a>
                 {t('settings.configGuideSuffix')}
               </p>

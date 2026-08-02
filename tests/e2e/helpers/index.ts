@@ -23,7 +23,6 @@ export {
   modalCloseButton,
   collapseSidebarButton,
   expandSidebarButton,
-  titlebarFeedbackButton,
   buttonWithText,
   BTN_ADD_CUSTOM_AGENT,
   BTN_ADD_CUSTOM_AGENT_MANUAL,
@@ -52,10 +51,7 @@ export {
 } from './selectors';
 export {
   labelPattern,
-  exactLabelPattern,
-  FEEDBACK_MODULE_LABELS,
   FEEDBACK_PILL_LABELS,
-  BUG_REPORT_LABELS,
   TEST_CONNECTION_LABELS,
   TEAM_CREATE_TITLE_LABELS,
 } from './localizedLabels';

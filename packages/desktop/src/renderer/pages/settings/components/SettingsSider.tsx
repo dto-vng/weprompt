@@ -217,6 +217,7 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
               <div
                 data-settings-id={item.id}
                 data-settings-path={item.path}
+                aria-current={isSelected ? 'page' : undefined}
                 className={classNames(
                   'settings-sider__item h-34px rd-8px flex items-center gap-8px group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-2px transition-colors',
                   collapsed ? 'w-full justify-center px-0' : 'justify-start px-10px',

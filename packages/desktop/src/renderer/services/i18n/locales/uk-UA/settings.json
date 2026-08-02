@@ -675,18 +675,18 @@
   "mcpDisconnected": "Не тестувалося",
   "mcpError": "Останній тест завершився помилкою",
   "mcpErrorNodeCommandNotFound": "Не вдалося підготувати команду {{command}}. Зазвичай AionCore автоматично готує кероване середовище Node. Повторіть тест підключення; якщо помилка не зникне, перевірте логи бекенда або вкажіть для цього MCP-сервера абсолютний шлях до команди.",
-  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart AionUI, or configure this MCP server to use an absolute command path.",
-  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart AionUI, or configure this MCP server to use an absolute command path.",
+  "mcpErrorBunCommandNotFound": "Command {{command}} was not found. Install Bun (which includes bun/bunx), restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorUvCommandNotFound": "Command {{command}} was not found. Install uv, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorPythonCommandNotFound": "Command {{command}} was not found. Install Python, restart WePrompt, or configure this MCP server to use an absolute command path.",
+  "mcpErrorDenoCommandNotFound": "Command {{command}} was not found. Install Deno, restart WePrompt, or configure this MCP server to use an absolute command path.",
   "mcpErrorCommandNotFound": "Command {{command}} was not found. Install it or configure this MCP server to use an absolute command path.",
-  "mcpErrorCommandPermissionDenied": "AionUI cannot execute {{command}} because permission was denied.",
-  "mcpErrorCommandStartFailed": "AionUI failed to start {{command}}.",
+  "mcpErrorCommandPermissionDenied": "WePrompt cannot execute {{command}} because permission was denied.",
+  "mcpErrorCommandStartFailed": "WePrompt failed to start {{command}}.",
   "mcpErrorTimeout": "Connection test timed out after {{seconds}}s.",
-  "mcpErrorConnectionFailed": "AionUI could not reach the MCP server.",
+  "mcpErrorConnectionFailed": "WePrompt could not reach the MCP server.",
   "mcpErrorHttp": "The MCP server returned HTTP {{status}}.",
   "mcpErrorRpc": "The MCP server returned an RPC error while handling {{method}}.",
-  "mcpErrorProtocol": "AionUI could not complete the MCP handshake.",
+  "mcpErrorProtocol": "WePrompt could not complete the MCP handshake.",
   "mcpLastCheckedAvailable": "Останній результат перевірки в налаштуваннях інструментів: доступно",
   "mcpLastCheckedFailed": "Останній результат перевірки в налаштуваннях інструментів: помилка",
   "mcpCheckedAt": "Час перевірки: {{time}}",
@@ -1197,7 +1197,7 @@
       "addMcp": "Допоможи налаштувати сервер MCP.",
       "addSkill": "Допоможи імпортувати навичку та прив’язати її до асистента.",
       "diagnose": "У мене виникла проблема з WePrompt, допоможи її діагностувати.\n\n[Модуль] {{module}}\n[Опис] {{description}}\n[Вкладення] див. скриншоти в полі введення.\n\nБудь ласка, визнач причину та підкажи, як виправити.",
-      "diagnoseChatError": "Під час розмови в AionUi сталася помилка, допоможи її діагностувати.\n\n[Помилка] {{error}}\n\nБудь ласка, визнач причину та підкажи, як виправити."
+      "diagnoseChatError": "Під час розмови в WePrompt сталася помилка, допоможи її діагностувати.\n\n[Помилка] {{error}}\n\nБудь ласка, визнач причину та підкажи, як виправити."
     },
     "solveWithButler": "Запитати дворецького"
   },
@@ -1208,11 +1208,11 @@
   "bugReportScreenshotLabel": "Screenshots",
   "bugReportScreenshotDropzoneText": "Click, drag, or paste screenshots here",
   "bugReportScreenshotFormats": "Supports PNG, JPG, GIF",
-  "bugReportAutoInfo": "System info and logs from the last 3 days will be automatically attached to help us locate the issue faster",
-  "bugReportSubmit": "Submit",
+  "bugReportAutoInfo": "Пакет зберігається лише у вибраному вами місці й нікуди не надсилається. Він містить лише дозволені метадані, а також назви, дати й розміри файлів журналів, але не їхній вміст. Опис і знімки екрана додаються без змін; перевірте їх на наявність конфіденційних даних.",
+  "bugReportSubmit": "Зберегти діагностичний пакет",
   "bugReportCancel": "Cancel",
-  "bugReportSuccess": "Report submitted, thank you for your feedback",
-  "bugReportError": "Submission failed, please try again later",
+  "bugReportSuccess": "Діагностичний пакет збережено",
+  "bugReportError": "Не вдалося зберегти діагностичний пакет. Спробуйте ще раз.",
   "bugReportModuleSkills": "Skills & Plugins",
   "bugReportModuleWebui": "WebUI",
   "bugReportModuleMcp": "MCP & Tools",
@@ -1347,5 +1347,20 @@
       "authRequired": "Збереженому постачальнику потрібні дійсні облікові дані.",
       "healthCheckFailed": "Вибрана модель не пройшла перевірку працездатності."
     }
-  }
+  },
+  "upstreamAionUiDocumentation": "Документація вихідного AionUi",
+  "channelConflict": {
+    "title": "Виявлено конфлікт каналу {{platform}}",
+    "summary": "Повідомлення {{platform}} обробляє OpenClaw, а не WePrompt. Зміна асистента у WePrompt не вплине на цього бота, але повідомлення й далі працюватимуть через OpenClaw.",
+    "howToUse": "Щоб використовувати канали WePrompt і змінювати асистентів:",
+    "optionDisable": "Варіант 1: вимкнути OpenClaw {{platform}} (рекомендовано)",
+    "restart": "Потім перезапустіть OpenClaw і WePrompt.",
+    "optionDifferentBot": "Варіант 2: використовуйте іншого бота {{platform}} для WePrompt.",
+    "optionKeepOpenClaw": "Варіант 3: залиште OpenClaw і вимкніть {{platform}} у каналах WePrompt.",
+    "helpDisable": "Допомогти вимкнути OpenClaw {{platform}}",
+    "ignore": "Ігнорувати (я розумію наслідки)",
+    "banner": "Виявлено конфлікт OpenClaw і {{platform}}; перемикання асистента не працюватиме.",
+    "learnMore": "Докладніше"
+  },
+  "bugReportCancelled": "Збереження діагностичного пакета скасовано."
 }

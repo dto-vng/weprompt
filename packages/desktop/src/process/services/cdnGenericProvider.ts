@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { DownloadOptions, WindowsUpdateInfo } from 'builder-util-runtime';
+import type { ClientRequest, IncomingMessage } from 'electron';
 import type { UpdateInfo } from 'electron-updater';
+import { ElectronHttpExecutor } from 'electron-updater/out/electronHttpExecutor';
 import { GenericProvider } from 'electron-updater/out/providers/GenericProvider';
 import { resolveFiles as resolveProviderFiles } from 'electron-updater/out/providers/Provider';
 import { getChannelFilename, newUrlFromBase } from 'electron-updater/out/util';
 import log from 'electron-log';
+import type { RequestOptions } from 'http';
+import { isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
 
 type GenericProviderConfiguration = ConstructorParameters<typeof GenericProvider>[0];
 type GenericProviderUpdater = ConstructorParameters<typeof GenericProvider>[1];
@@ -20,6 +25,72 @@ export type CdnGenericProviderConfiguration = Omit<GenericProviderConfiguration,
 };
 
 const withTrailingSlash = (url: string): string => (url.endsWith('/') ? url : `${url}/`);
+
+const updateUrlError = (url: URL, baseUrl: URL): Error =>
+  new Error(`Update URL is outside the configured update base: ${url.href} (base: ${baseUrl.href})`);
+
+export function assertUpdateUrlWithinBase(url: URL, configuredBaseUrl: string): void {
+  const baseUrl = new URL(withTrailingSlash(configuredBaseUrl));
+  if (!isUpdateUrlWithinBase(url, baseUrl.href)) {
+    throw updateUrlError(url, baseUrl);
+  }
+}
+
+export function requestOptionsToUpdateUrl(options: RequestOptions): URL {
+  const protocol = options.protocol ?? 'https:';
+  const hostname = options.hostname;
+  let authority: string | undefined;
+
+  if (hostname) {
+    const normalizedHostname = hostname.includes(':') && !hostname.startsWith('[') ? `[${hostname}]` : hostname;
+    authority = `${normalizedHostname}${options.port ? `:${options.port}` : ''}`;
+  } else if (options.host) {
+    authority = options.host;
+  }
+
+  if (!authority) {
+    throw new Error('Update request is missing a hostname');
+  }
+
+  const requestPath = options.path ?? '/';
+  return new URL(`${protocol}//${authority}${requestPath.startsWith('/') ? requestPath : `/${requestPath}`}`);
+}
+
+export class ContainedElectronHttpExecutor extends ElectronHttpExecutor {
+  constructor(
+    private readonly updateBaseUrl: string,
+    proxyLoginCallback?: ConstructorParameters<typeof ElectronHttpExecutor>[0]
+  ) {
+    super(proxyLoginCallback);
+  }
+
+  override download(url: URL, destination: string, options: DownloadOptions): Promise<string> {
+    assertUpdateUrlWithinBase(url, this.updateBaseUrl);
+    return super.download(url, destination, options);
+  }
+
+  override createRequest(options: RequestOptions, callback: (response: IncomingMessage) => void): ClientRequest {
+    assertUpdateUrlWithinBase(requestOptionsToUpdateUrl(options), this.updateBaseUrl);
+    return super.createRequest(options, callback);
+  }
+
+  protected override addRedirectHandlers(
+    request: ClientRequest,
+    options: RequestOptions,
+    reject: (error: Error) => void,
+    redirectCount: number,
+    handler: (options: RequestOptions) => void
+  ): void {
+    super.addRedirectHandlers(request, options, reject, redirectCount, (redirectOptions) => {
+      try {
+        assertUpdateUrlWithinBase(requestOptionsToUpdateUrl(redirectOptions), this.updateBaseUrl);
+        handler(redirectOptions);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+  }
+}
 
 export class CdnGenericProvider extends GenericProvider {
   private readonly _cdnBaseUrl: URL;
@@ -60,16 +131,38 @@ export class CdnGenericProvider extends GenericProvider {
   }
 
   override async getLatestVersion(): Promise<UpdateInfo> {
-    log.info('[auto-update] Checking latest version from URL:', this.resolveLatestVersionUrl().href);
+    const latestVersionUrl = this.resolveLatestVersionUrl();
+    assertUpdateUrlWithinBase(latestVersionUrl, this._cdnBaseUrl.href);
+    log.info('[auto-update] Checking latest version from URL:', latestVersionUrl.href);
     return super.getLatestVersion();
   }
 
   override resolveFiles(updateInfo: UpdateInfo): ReturnType<GenericProvider['resolveFiles']> {
+    const versionBaseUrl = new URL(`${updateInfo.version}/`, this._cdnBaseUrl);
+    assertUpdateUrlWithinBase(versionBaseUrl, this._cdnBaseUrl.href);
+
+    const filePaths = updateInfo.files?.map((file) => file.url) ?? (updateInfo.path ? [updateInfo.path] : []);
+    for (const filePath of filePaths) {
+      assertUpdateUrlWithinBase(new URL(filePath, versionBaseUrl), this._cdnBaseUrl.href);
+    }
+    const packages = (updateInfo as UpdateInfo & Pick<WindowsUpdateInfo, 'packages'>).packages;
+    for (const packageInfo of Object.values(packages ?? {})) {
+      if (packageInfo?.path) {
+        assertUpdateUrlWithinBase(new URL(packageInfo.path, versionBaseUrl), this._cdnBaseUrl.href);
+      }
+    }
+
     const resolved = resolveProviderFiles(
       updateInfo,
       this._cdnBaseUrl,
       (filePath) => `${updateInfo.version}/${filePath}`
     );
+    for (const file of resolved) {
+      assertUpdateUrlWithinBase(file.url, this._cdnBaseUrl.href);
+      if (file.packageInfo?.path) {
+        assertUpdateUrlWithinBase(new URL(file.packageInfo.path), this._cdnBaseUrl.href);
+      }
+    }
     log.info('[auto-update] Update download URL(s) resolved:', {
       version: updateInfo.version,
       files: resolved.map((file) => file.url.href),

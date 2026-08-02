@@ -25,7 +25,7 @@ vi.mock('react-i18next', () => ({
 
 const openFeedbackMock = vi.fn(() => Promise.resolve());
 vi.mock('@/renderer/hooks/context/FeedbackContext', () => ({
-  useFeedback: () => ({ openFeedback: openFeedbackMock }),
+  useFeedback: () => ({ isFeedbackAvailable: true, openFeedback: openFeedbackMock }),
 }));
 
 import MessageAgentStatus from '@/renderer/pages/conversation/Messages/components/MessageAgentStatus';

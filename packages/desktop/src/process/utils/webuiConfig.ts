@@ -196,7 +196,7 @@ export const warnUnsupportedDesktopRemoteAccess = (
 ): void => {
   if (requestedBy.length === 0) return;
   warn(
-    `[WebUI] Remote access requested by ${requestedBy.join(', ')}, but Forge WebUI is local-only; binding to 127.0.0.1.`
+    `[WebUI] Remote access requested by ${requestedBy.join(', ')}, but WePrompt WebUI is local-only; binding to 127.0.0.1.`
   );
 };
 
