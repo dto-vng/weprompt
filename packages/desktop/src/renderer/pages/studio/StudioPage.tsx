@@ -39,6 +39,7 @@ import {
 } from './components';
 import { useStoryboardEditor, useStudioJobs, useStudioModels, useStudioProject } from './hooks';
 import styles from './StudioPage.module.css';
+import { resolveSceneDurationBounds } from './studioRouteConstraints';
 import { canOpenSingleSceneReview, deriveStudioReadiness } from './studioReadiness';
 
 type GenerationReviewState = {
@@ -238,6 +239,13 @@ const StudioProjectShell: React.FC = () => {
   );
   const selectedScene =
     project !== null && editor.selectedSceneId !== null ? (project.scenes[editor.selectedSceneId] ?? null) : null;
+  const sceneDurationBounds = useMemo(() => {
+    const mediaKind = editor.sceneDraft?.mediaKind ?? editor.selectedScene?.mediaKind;
+    if (project === null || mediaKind === undefined) {
+      return { minDurationSeconds: 1, maxDurationSeconds: 60, source: 'fallback' as const };
+    }
+    return resolveSceneDurationBounds(project, studioModels.catalog, mediaKind);
+  }, [editor.sceneDraft?.mediaKind, editor.selectedScene?.mediaKind, project, studioModels.catalog]);
   const selectedAsset =
     project !== null && selectedScene?.selectedAssetId ? (project.assets[selectedScene.selectedAssetId] ?? null) : null;
   const selectedReferenceAsset =
@@ -840,6 +848,7 @@ const StudioProjectShell: React.FC = () => {
             }
             saveState={editor.selectedSceneSaveState}
             conflict={inspectorRecoveryVisible}
+            durationBounds={sceneDurationBounds}
             onUpdateSceneDraft={editor.updateSceneDraft}
             onFlushSceneDraft={editor.flushSceneDraft}
             onRetryConflict={inspectorConflict ? editor.retryConflict : editor.flushSceneDraft}

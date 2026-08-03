@@ -47,8 +47,8 @@ const project = (id = 'project-1', revision = 4): StudioRendererProject => ({
 
 const catalog = (version: string): StudioRouteCatalog => ({
   storyboard: { status: 'selection_required', selected: null, options: [] },
-  image: { status: 'selection_required', selected: null, options: [] },
-  video: { status: 'selection_required', selected: null, options: [] },
+  image: { status: 'selection_required', selected: null, selectedRoute: null, options: [] },
+  video: { status: 'selection_required', selected: null, selectedRoute: null, options: [] },
   catalogVersion: version,
 });
 
@@ -370,5 +370,25 @@ describe('useStudioModels', () => {
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
     await act(async () => {});
     expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes when project aspect ratio or resolution changes', async () => {
+    const initial = project();
+    const view = renderHook(
+      ({ currentProject }) =>
+        useStudioModels({
+          project: currentProject,
+          refetch: vi.fn(async () => currentProject),
+          beforeMutation: vi.fn(async () => true),
+        }),
+      { initialProps: { currentProject: initial } }
+    );
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(1));
+
+    view.rerender({ currentProject: { ...initial, aspectRatio: '1:1' } });
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
+
+    view.rerender({ currentProject: { ...initial, aspectRatio: '1:1', resolution: '1080p' } });
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(3));
   });
 });

@@ -26,6 +26,8 @@ const projectCatalogKey = (project: StudioRendererProject | null): string => {
     storyboard === null ? 'none' : `${storyboard.providerId}\u0000${storyboard.model}`,
     mediaSelectionKey(project.routing.image),
     mediaSelectionKey(project.routing.video),
+    project.aspectRatio,
+    project.resolution,
   ].join('\u0001');
 };
 

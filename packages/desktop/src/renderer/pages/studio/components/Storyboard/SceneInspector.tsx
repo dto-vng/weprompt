@@ -6,7 +6,7 @@
 
 import { Button, Input, InputNumber, Select, Tabs } from '@arco-design/web-react';
 import { Picture } from '@icon-park/react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type {
@@ -16,6 +16,7 @@ import type {
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import type { SelectedSceneSaveState } from '../../hooks/useStoryboardEditor';
+import type { StudioSceneDurationBounds } from '../../studioRouteConstraints';
 
 import { createManagedStudioAssetUrl } from '../Preview/StagePreview';
 import styles from './Storyboard.module.css';
@@ -31,6 +32,7 @@ export type SceneInspectorProps = {
   errorMessageKey?: string | null;
   saveState: SelectedSceneSaveState;
   conflict: boolean;
+  durationBounds: StudioSceneDurationBounds;
   onUpdateSceneDraft: (patch: Partial<StudioEditableScene>) => void;
   onFlushSceneDraft: () => ActionResult;
   onRetryConflict: () => ActionResult;
@@ -49,6 +51,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   errorMessageKey = null,
   saveState,
   conflict,
+  durationBounds,
   onUpdateSceneDraft,
   onFlushSceneDraft,
   onRetryConflict,
@@ -57,23 +60,52 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   onImportReference,
 }) => {
   const { t } = useTranslation();
-  const [durationInvalid, setDurationInvalid] = useState(false);
+  const [durationChangeInvalid, setDurationChangeInvalid] = useState(false);
+  const durationInputInvalidRef = useRef(false);
 
   useEffect(() => {
-    setDurationInvalid(false);
-  }, [sceneDraft?.durationSeconds, selectedScene?.id]);
+    setDurationChangeInvalid(false);
+  }, [
+    sceneDraft?.durationSeconds,
+    selectedScene?.id,
+    durationBounds.maxDurationSeconds,
+    durationBounds.minDurationSeconds,
+  ]);
+
+  const durationInvalid =
+    durationChangeInvalid ||
+    (sceneDraft !== null &&
+      (!Number.isInteger(sceneDraft.durationSeconds) ||
+        sceneDraft.durationSeconds < durationBounds.minDurationSeconds ||
+        sceneDraft.durationSeconds > durationBounds.maxDurationSeconds));
 
   const flushDraft = () => {
     void onFlushSceneDraft();
   };
 
   const updateDuration = (value: number, reason?: string) => {
-    if (reason === 'outOfRange' || !Number.isInteger(value) || value < 1 || value > 60) {
-      setDurationInvalid(true);
+    if (
+      durationInputInvalidRef.current ||
+      reason === 'outOfRange' ||
+      !Number.isInteger(value) ||
+      value < durationBounds.minDurationSeconds ||
+      value > durationBounds.maxDurationSeconds
+    ) {
+      setDurationChangeInvalid(true);
       return;
     }
-    setDurationInvalid(false);
+    durationInputInvalidRef.current = false;
+    setDurationChangeInvalid(false);
     onUpdateSceneDraft({ durationSeconds: value });
+  };
+
+  const inspectDurationInput = (event: React.FormEvent<HTMLInputElement>) => {
+    const value = Number(event.currentTarget.value);
+    durationInputInvalidRef.current =
+      !Number.isInteger(value) ||
+      value < durationBounds.minDurationSeconds ||
+      value > durationBounds.maxDurationSeconds;
+    if (durationInputInvalidRef.current) setDurationChangeInvalid(true);
   };
 
   const titleId = selectedScene ? `studio-scene-title-${selectedScene.id}` : undefined;
@@ -181,11 +213,16 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
                       <InputNumber
                         id={durationId}
                         aria-label={t('conversation.creativeStudio.inspector.durationLabel')}
-                        aria-valuemin={1}
-                        aria-valuemax={60}
-                        value={sceneDraft.durationSeconds}
+                        aria-valuemin={durationBounds.minDurationSeconds}
+                        aria-valuemax={durationBounds.maxDurationSeconds}
+                        mode='button'
+                        min={durationBounds.minDurationSeconds}
+                        max={durationBounds.maxDurationSeconds}
                         step={1}
+                        precision={0}
+                        value={sceneDraft.durationSeconds}
                         error={durationInvalid}
+                        onInput={inspectDurationInput}
                         onChange={updateDuration}
                         onBlur={flushDraft}
                       />

@@ -99,8 +99,8 @@ const routes = (health: 'ready' | 'setup_required' | 'unavailable' = 'ready'): S
           ]
         : [],
   },
-  image: { status: 'setup_required', selected: null, options: [] },
-  video: { status: 'setup_required', selected: null, options: [] },
+  image: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
+  video: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
   catalogVersion: 'catalog-1',
 });
 

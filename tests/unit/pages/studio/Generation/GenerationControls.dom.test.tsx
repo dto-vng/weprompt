@@ -71,9 +71,10 @@ const catalog = (overrides: Partial<StudioRouteCatalog> = {}): StudioRouteCatalo
         providerId: suggested.providerId,
         model: suggested.model,
       },
+      selectedRoute: suggested,
       options: [suggested],
     },
-    video: { status: 'setup_required', selected: null, options: [] },
+    video: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
     catalogVersion: 'catalog-v1',
     ...overrides,
   };

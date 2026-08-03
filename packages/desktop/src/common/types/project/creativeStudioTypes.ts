@@ -307,22 +307,21 @@ export type StudioConnectionValidationResult = Omit<StudioConnectionRecord, 'bin
 
 export type StudioModelAvailability = 'ready' | 'selection_required' | 'setup_required' | 'unavailable';
 
+export type StudioMediaRouteCatalog = {
+  status: StudioModelAvailability;
+  selected: StudioMediaChoiceRef | null;
+  selectedRoute: StudioRouteCatalogEntry | null;
+  options: StudioRouteCatalogEntry[];
+};
+
 export type StudioRouteCatalog = {
   storyboard: {
     status: StudioModelAvailability;
     selected: StudioTextModelRef | null;
     options: StudioTextModelOption[];
   };
-  image: {
-    status: StudioModelAvailability;
-    selected: StudioMediaChoiceRef | null;
-    options: StudioRouteCatalogEntry[];
-  };
-  video: {
-    status: StudioModelAvailability;
-    selected: StudioMediaChoiceRef | null;
-    options: StudioRouteCatalogEntry[];
-  };
+  image: StudioMediaRouteCatalog;
+  video: StudioMediaRouteCatalog;
   catalogVersion: string;
 };
 

@@ -146,8 +146,8 @@ const routes = (): StudioRouteCatalog => ({
       },
     ],
   },
-  image: { status: 'setup_required', selected: null, options: [] },
-  video: { status: 'setup_required', selected: null, options: [] },
+  image: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
+  video: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
   catalogVersion: 'catalog-1',
 });
 
@@ -178,6 +178,7 @@ const routesWithImage = (route = imageRoute()): StudioRouteCatalog => ({
       providerId: route.providerId,
       model: route.model,
     },
+    selectedRoute: route,
     options: [route],
   },
 });

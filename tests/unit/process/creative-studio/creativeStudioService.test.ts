@@ -1674,6 +1674,39 @@ describe('CreativeStudioService', () => {
       expectRendererBoundaryToHideAdapters(catalog);
     });
 
+    it.each([3, 13])(
+      'keeps a selected video route with 4-12 second bounds visible when a scene duration is %i',
+      async (durationSeconds) => {
+        const selectedRoute = routeOption('video', {
+          constraints: { ...routeOption('video').constraints, minDurationSeconds: 4, maxDurationSeconds: 12 },
+        });
+        const harness = await createCatalogHarness({ routes: [selectedRoute] });
+        const selected = await harness.service.updateModelSelection({
+          projectId: harness.project.id,
+          expectedRevision: harness.project.revision,
+          role: 'video',
+          selection: { choiceId: selectedRoute.choiceId },
+        });
+        const withOutOfRangeScene = await harness.service.updateScene({
+          projectId: selected.id,
+          expectedRevision: selected.revision,
+          sceneId: 'scene_duration',
+          scene: makeScene('scene_duration', durationSeconds),
+        });
+
+        const catalog = await harness.service.listRoutes({ projectId: withOutOfRangeScene.id });
+
+        expect(catalog.video).toMatchObject({
+          status: 'ready',
+          selected: { choiceId: selectedRoute.choiceId },
+          selectedRoute: {
+            choiceId: selectedRoute.choiceId,
+            constraints: { minDurationSeconds: 4, maxDurationSeconds: 12 },
+          },
+        });
+      }
+    );
+
     it('projects storyboard options to safe public fields before returning the catalog', async () => {
       const harness = await createCatalogHarness();
       harness.listModels.mockResolvedValue([
@@ -1727,7 +1760,7 @@ describe('CreativeStudioService', () => {
       ).rejects.toMatchObject({ code: 'invalid_route' });
     });
 
-    it('filters media options against every current scene before allowing selection', async () => {
+    it('keeps project-compatible routes selectable so a scene can be repaired', async () => {
       const harness = await createCatalogHarness();
       const withScene = await harness.service.updateScene({
         projectId: harness.project.id,
@@ -1737,20 +1770,21 @@ describe('CreativeStudioService', () => {
       });
 
       const catalog = await harness.service.listRoutes({ projectId: withScene.id });
-      expect(catalog.video).toMatchObject({ status: 'setup_required', options: [] });
+      expect(catalog.video).toMatchObject({
+        status: 'selection_required',
+        options: [{ choiceId: routeOption('video').choiceId }],
+      });
       await expect(
         harness.service.updateModelSelection({
           projectId: withScene.id,
           expectedRevision: withScene.revision,
           role: 'video',
-          selection: {
-            choiceId: routeOption('video').choiceId,
-          },
+          selection: { choiceId: routeOption('video').choiceId },
         })
-      ).rejects.toMatchObject({ code: 'invalid_route' });
+      ).resolves.toMatchObject({ routing: { video: { model: 'video-model' } } });
     });
 
-    it('filters routes by project format, reference support, health, and silent output', async () => {
+    it('filters routes by project format, health, and silent output while leaving scene reference checks for generation', async () => {
       const harness = await createCatalogHarness({
         routes: [
           routeOption('video', {
@@ -1803,7 +1837,7 @@ describe('CreativeStudioService', () => {
 
       const catalog = await harness.service.listRoutes({ projectId: referenced.id });
 
-      expect(catalog.video.options).toEqual([]);
+      expect(catalog.video.options).toMatchObject([{ model: 'no-reference-model' }]);
     });
 
     it('clears a selection while preserving optimistic revision checks', async () => {

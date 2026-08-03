@@ -65,6 +65,7 @@ const createProps = (overrides: Partial<SceneInspectorProps> = {}): SceneInspect
   errorMessageKey: null,
   saveState: 'saved',
   conflict: false,
+  durationBounds: { minDurationSeconds: 1, maxDurationSeconds: 60, source: 'fallback' },
   onUpdateSceneDraft: vi.fn(),
   onFlushSceneDraft: vi.fn(),
   onRetryConflict: vi.fn(),
@@ -142,7 +143,7 @@ describe('SceneInspector', () => {
       const props = createProps();
       render(<SceneInspector {...props} />);
 
-      fireEvent.change(
+      fireEvent.input(
         screen.getByRole('spinbutton', {
           name: 'conversation.creativeStudio.inspector.durationLabel',
         }),
@@ -167,10 +168,54 @@ describe('SceneInspector', () => {
     });
   });
 
+  it.each(['3', '13'])('shows an error for %s seconds outside the selected route bounds', (durationSeconds) => {
+    const props = createProps({
+      durationBounds: { minDurationSeconds: 4, maxDurationSeconds: 12, source: 'selected_route' },
+    });
+    render(<SceneInspector {...props} />);
+
+    fireEvent.input(screen.getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' }), {
+      target: { value: durationSeconds },
+    });
+
+    expect(props.onUpdateSceneDraft).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.inspector.invalidDuration');
+  });
+
+  it.each([4, 12])('saves the selected route boundary value %i', (durationSeconds) => {
+    const props = createProps({
+      durationBounds: { minDurationSeconds: 4, maxDurationSeconds: 12, source: 'selected_route' },
+    });
+    render(<SceneInspector {...props} />);
+
+    const duration = screen.getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' });
+    fireEvent.change(duration, { target: { value: String(durationSeconds) } });
+    fireEvent.blur(duration);
+
+    expect(props.onUpdateSceneDraft).toHaveBeenCalledExactlyOnceWith({ durationSeconds });
+    expect(props.onFlushSceneDraft).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a persisted out-of-range duration visible with an error', () => {
+    render(
+      <SceneInspector
+        {...createProps({
+          sceneDraft: { ...sceneDraft, durationSeconds: 3 },
+          durationBounds: { minDurationSeconds: 4, maxDurationSeconds: 12, source: 'selected_route' },
+        })}
+      />
+    );
+
+    expect(screen.getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' })).toHaveValue(
+      '3'
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.inspector.invalidDuration');
+  });
+
   it('clears a local duration error after a new canonical draft is adopted', () => {
     const props = createProps();
     const view = render(<SceneInspector {...props} />);
-    fireEvent.change(
+    fireEvent.input(
       screen.getByRole('spinbutton', {
         name: 'conversation.creativeStudio.inspector.durationLabel',
       }),

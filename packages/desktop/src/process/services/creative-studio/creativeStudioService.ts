@@ -585,21 +585,10 @@ const toConnectionValidation = (binding: StudioConnectionBinding): StudioConnect
 const routeSupportsProject = (route: StudioGenerationRoute, project: StudioProject | null): boolean => {
   if (route.health === 'unavailable' || !route.constraints.silentOutput) return false;
   if (project === null) return true;
-  if (
-    !route.constraints.aspectRatios.includes(project.aspectRatio) ||
-    !route.constraints.resolutions.includes(project.resolution)
-  ) {
-    return false;
-  }
-  return project.sceneOrder
-    .map((sceneId) => project.scenes[sceneId])
-    .filter((scene): scene is StudioScene => scene !== undefined && scene.mediaKind === route.kind)
-    .every(
-      (scene) =>
-        scene.durationSeconds >= route.constraints.minDurationSeconds &&
-        scene.durationSeconds <= route.constraints.maxDurationSeconds &&
-        (scene.referenceAssetId === null || route.constraints.supportsFirstFrame)
-    );
+  return (
+    route.constraints.aspectRatios.includes(project.aspectRatio) &&
+    route.constraints.resolutions.includes(project.resolution)
+  );
 };
 
 type BuiltStudioCatalog = {
@@ -637,13 +626,24 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
     const imageOptions = imageRoutes.map(toRendererRoute);
     const videoOptions = videoRoutes.map(toRendererRoute);
     const selected = project?.routing ?? { storyboard: null, image: null, video: null };
+    const selectedMediaRoute = (
+      kind: 'image' | 'video',
+      selection: StudioProviderRef | null
+    ): StudioRouteCatalogEntry | null => {
+      if (selection === null) return null;
+      const route = generation.routes.find(
+        (candidate) =>
+          candidate.kind === kind && mediaRouteMatches(candidate, selection) && routeSupportsProject(candidate, project)
+      );
+      return route === undefined ? null : toRendererRoute(route);
+    };
+    const selectedImageRoute = selectedMediaRoute('image', selected.image);
+    const selectedVideoRoute = selectedMediaRoute('video', selected.video);
     const storyboardSelectionAvailable =
       selected.storyboard !== null &&
       storyboardOptions.some((option) => textModelMatches(option, selected.storyboard!));
-    const imageSelectionAvailable =
-      selected.image !== null && imageRoutes.some((route) => mediaRouteMatches(route, selected.image!));
-    const videoSelectionAvailable =
-      selected.video !== null && videoRoutes.some((route) => mediaRouteMatches(route, selected.video!));
+    const imageSelectionAvailable = selectedImageRoute !== null;
+    const videoSelectionAvailable = selectedVideoRoute !== null;
     const storyboard = {
       status: modelStatus(selected.storyboard, storyboardOptions.length, storyboardSelectionAvailable),
       selected: selected.storyboard,
@@ -652,11 +652,13 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
     const image = {
       status: modelStatus(selected.image, imageOptions.length, imageSelectionAvailable),
       selected: selected.image === null ? null : toRendererMediaChoice(selected.image, 'image'),
+      selectedRoute: selectedImageRoute,
       options: imageOptions,
     };
     const video = {
       status: modelStatus(selected.video, videoOptions.length, videoSelectionAvailable),
       selected: selected.video === null ? null : toRendererMediaChoice(selected.video, 'video'),
+      selectedRoute: selectedVideoRoute,
       options: videoOptions,
     };
     const catalogVersion = createHash('sha256')

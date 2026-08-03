@@ -12,6 +12,7 @@ import type {
   StudioAsset,
   StudioRendererProject,
   StudioRouteCatalog,
+  StudioRouteCatalogEntry,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
@@ -80,33 +81,35 @@ const project = (current: StudioScene): StudioRendererProject => ({
   updatedAt: '2026-08-03T00:00:00.000Z',
 });
 
-const catalog = (): StudioRouteCatalog => ({
-  storyboard: { status: 'setup_required', selected: null, options: [] },
-  image: {
-    status: 'ready',
-    selected: { choiceId: 'choice-image', providerId: 'provider-image', model: 'image-model' },
-    options: [
-      {
-        choiceId: 'choice-image',
-        providerId: 'provider-image',
-        providerName: 'Image provider',
-        model: 'image-model',
-        health: 'available',
-        kind: 'image',
-        constraints: {
-          aspectRatios: ['16:9'],
-          resolutions: ['720p'],
-          minDurationSeconds: 1,
-          maxDurationSeconds: 60,
-          supportsFirstFrame: true,
-          silentOutput: true,
-        },
-      },
-    ],
-  },
-  video: { status: 'setup_required', selected: null, options: [] },
-  catalogVersion: 'catalog-1',
-});
+const catalog = (): StudioRouteCatalog => {
+  const selectedRoute: StudioRouteCatalogEntry = {
+    choiceId: 'choice-image',
+    providerId: 'provider-image',
+    providerName: 'Image provider',
+    model: 'image-model',
+    health: 'available',
+    kind: 'image',
+    constraints: {
+      aspectRatios: ['16:9'],
+      resolutions: ['720p'],
+      minDurationSeconds: 1,
+      maxDurationSeconds: 60,
+      supportsFirstFrame: true,
+      silentOutput: true,
+    },
+  };
+  return {
+    storyboard: { status: 'setup_required', selected: null, options: [] },
+    image: {
+      status: 'ready',
+      selected: { choiceId: 'choice-image', providerId: 'provider-image', model: 'image-model' },
+      selectedRoute,
+      options: [selectedRoute],
+    },
+    video: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
+    catalogVersion: 'catalog-1',
+  };
+};
 
 describe('StagePreview managed media', () => {
   afterEach(() => {

@@ -47,8 +47,8 @@ const catalog = (overrides: Partial<StudioRouteCatalog> = {}): StudioRouteCatalo
       },
     ],
   },
-  image: { status: 'selection_required', selected: null, options: [mediaRoute('image')] },
-  video: { status: 'selection_required', selected: null, options: [mediaRoute('video')] },
+  image: { status: 'selection_required', selected: null, selectedRoute: null, options: [mediaRoute('image')] },
+  video: { status: 'selection_required', selected: null, selectedRoute: null, options: [mediaRoute('video')] },
   catalogVersion: 'catalog-1',
   ...overrides,
 });
