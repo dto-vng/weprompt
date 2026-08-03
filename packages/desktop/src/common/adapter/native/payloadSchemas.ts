@@ -243,15 +243,15 @@ export const nativeBridgePayloadSchemas = {
     .object({
       projectId: safeIdSchema,
       filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS),
-      workspace: pathSchema.optional(),
+      workspace: pathSchema,
     })
     .strict(),
   'project-knowledge.remove-source': z
-    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema })
     .strict(),
   'project-knowledge.get-source-text': projectKnowledgeSourceRefSchema,
   'project-knowledge.retry-source': z
-    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema })
     .strict(),
   'project-knowledge.sync-folder': projectKnowledgeFolderSchema,
   'project-knowledge.watch-folder': projectKnowledgeFolderSchema,
