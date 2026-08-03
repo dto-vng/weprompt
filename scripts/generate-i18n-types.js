@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const LOCALES_DIR = path.resolve(__dirname, '../packages/desktop/src/renderer/services/i18n/locales');
 const OUTPUT_FILE = path.resolve(__dirname, '../packages/desktop/src/renderer/services/i18n/i18n-keys.d.ts');
@@ -69,22 +69,15 @@ function generateI18nKeysDtsContent() {
 }
 
 function formatOutputFile(filePath) {
-  const commands = [`bunx prettier --write "${filePath}"`];
-
-  if (fs.existsSync(OXFMT_BIN)) {
-    commands.push(`"${OXFMT_BIN}" "${filePath}"`);
+  if (!fs.existsSync(OXFMT_BIN)) {
+    return;
   }
 
-  for (const command of commands) {
-    try {
-      execSync(command, { stdio: 'inherit' });
-      return;
-    } catch {
-      // Try the next available formatter.
-    }
+  try {
+    execFileSync(OXFMT_BIN, [filePath], { stdio: 'inherit' });
+  } catch {
+    console.warn(`⚠️  Unable to auto-format ${path.relative(process.cwd(), filePath)}. Continuing without formatting.`);
   }
-
-  console.warn(`⚠️  Unable to auto-format ${path.relative(process.cwd(), filePath)}. Continuing without formatting.`);
 }
 
 function writeOutputFile(content) {
