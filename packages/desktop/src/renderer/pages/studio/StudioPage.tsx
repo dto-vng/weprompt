@@ -766,6 +766,8 @@ const StudioProjectShell: React.FC = () => {
           targetDurationSeconds={project.targetDurationSeconds}
           durationTotalSeconds={editor.durationTotalSeconds}
           durationMatchesTarget={editor.durationMatchesTarget}
+          remainingDurationSeconds={editor.remainingDurationSeconds}
+          suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
           canAddScene={editor.canAddScene}
           mutationPending={canonicalMutationPending}
           errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
@@ -777,6 +779,7 @@ const StudioProjectShell: React.FC = () => {
           conflict={panelRecoveryVisible}
           onSelectScene={editor.selectScene}
           onAddScene={editor.addScene}
+          onIncreaseTargetDuration={editor.increaseTargetDuration}
           onRemoveScene={editor.removeScene}
           onReorderScenes={editor.reorderScenes}
           onMoveScene={editor.moveScene}

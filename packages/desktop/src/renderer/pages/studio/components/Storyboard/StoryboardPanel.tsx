@@ -29,6 +29,8 @@ export type StoryboardPanelProps = {
   targetDurationSeconds: number;
   durationTotalSeconds: number;
   durationMatchesTarget: boolean;
+  remainingDurationSeconds: number;
+  suggestedExpandedTargetSeconds: number | null;
   canAddScene: boolean;
   mutationPending: boolean;
   errorMessageKey?: string | null;
@@ -36,6 +38,7 @@ export type StoryboardPanelProps = {
   conflict: boolean;
   onSelectScene: (sceneId: string) => void;
   onAddScene: () => ActionResult;
+  onIncreaseTargetDuration: () => ActionResult;
   onRemoveScene: (sceneId: string) => ActionResult;
   onReorderScenes: (sceneOrder: string[]) => ActionResult;
   onMoveScene: (sceneId: string, direction: SceneMoveDirection) => ActionResult;
@@ -50,6 +53,8 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   targetDurationSeconds,
   durationTotalSeconds,
   durationMatchesTarget,
+  remainingDurationSeconds,
+  suggestedExpandedTargetSeconds,
   canAddScene,
   mutationPending,
   errorMessageKey = null,
@@ -57,6 +62,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   conflict,
   onSelectScene,
   onAddScene,
+  onIncreaseTargetDuration,
   onRemoveScene,
   onReorderScenes,
   onMoveScene,
@@ -115,6 +121,18 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
                 : 'conversation.creativeStudio.storyboard.durationMismatch'
             )}
           </span>
+          {remainingDurationSeconds > 0 && (
+            <span className={styles.timingState}>
+              {t('conversation.creativeStudio.storyboard.durationRemaining', { seconds: remainingDurationSeconds })}
+            </span>
+          )}
+          {remainingDurationSeconds < 0 && (
+            <span className={`${styles.timingState} ${styles.timingMismatch}`}>
+              {t('conversation.creativeStudio.storyboard.durationOver', {
+                seconds: Math.abs(remainingDurationSeconds),
+              })}
+            </span>
+          )}
         </p>
       </header>
 
@@ -172,7 +190,17 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
             </Button>
           </div>
         )}
-        {!canAddScene && <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.sceneLimit')}</p>}
+        {!canAddScene && remainingDurationSeconds > 0 && (
+          <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.sceneLimit')}</p>
+        )}
+        {!canAddScene && suggestedExpandedTargetSeconds !== null && (
+          <Button disabled={mutationPending} onClick={() => void onIncreaseTargetDuration()}>
+            {t('conversation.creativeStudio.storyboard.increaseTarget', { seconds: suggestedExpandedTargetSeconds })}
+          </Button>
+        )}
+        {!canAddScene && suggestedExpandedTargetSeconds === null && remainingDurationSeconds <= 0 && (
+          <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.shortenBeforeAdding')}</p>
+        )}
         <Button
           type='primary'
           long

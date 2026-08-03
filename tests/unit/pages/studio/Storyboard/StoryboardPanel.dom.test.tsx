@@ -61,7 +61,7 @@ vi.mock('react-i18next', () => ({
       if (key === 'conversation.creativeStudio.storyboard.durationTotal') {
         return `${key}:${params?.total}:${params?.target}`;
       }
-      return key;
+      return params === undefined ? key : `${key}:${Object.values(params).join(':')}`;
     },
   }),
 }));
@@ -90,6 +90,8 @@ const createProps = (overrides: Partial<StoryboardPanelProps> = {}): StoryboardP
   targetDurationSeconds: 20,
   durationTotalSeconds: 15,
   durationMatchesTarget: false,
+  remainingDurationSeconds: 5,
+  suggestedExpandedTargetSeconds: 25,
   canAddScene: true,
   mutationPending: false,
   errorMessageKey: null,
@@ -97,6 +99,7 @@ const createProps = (overrides: Partial<StoryboardPanelProps> = {}): StoryboardP
   conflict: false,
   onSelectScene: vi.fn(),
   onAddScene: vi.fn(),
+  onIncreaseTargetDuration: vi.fn(),
   onRemoveScene: vi.fn(),
   onReorderScenes: vi.fn(),
   onMoveScene: vi.fn(),
@@ -140,6 +143,48 @@ describe('StoryboardPanel', () => {
       <StoryboardPanel {...props} targetDurationSeconds={15} durationTotalSeconds={15} durationMatchesTarget />
     );
     expect(screen.getByText('conversation.creativeStudio.storyboard.durationMatches')).toBeInTheDocument();
+  });
+
+  it('keeps Add Scene enabled while project duration remains', () => {
+    const props = createProps({
+      remainingDurationSeconds: 5,
+      suggestedExpandedTargetSeconds: 25,
+      onIncreaseTargetDuration: vi.fn(),
+    });
+    render(<StoryboardPanel {...props} />);
+
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeEnabled();
+    expect(screen.getByText('conversation.creativeStudio.storyboard.durationRemaining:5')).toBeInTheDocument();
+  });
+
+  it('requires an explicit target increase when the storyboard reaches its duration', () => {
+    const props = createProps({
+      durationTotalSeconds: 20,
+      durationMatchesTarget: true,
+      remainingDurationSeconds: 0,
+      suggestedExpandedTargetSeconds: 25,
+      canAddScene: false,
+      onIncreaseTargetDuration: vi.fn(),
+    });
+    render(<StoryboardPanel {...props} />);
+
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeDisabled();
+    expect(screen.getByText('conversation.creativeStudio.storyboard.increaseTarget:25')).toBeInTheDocument();
+  });
+
+  it('asks to shorten scenes when a 60-second storyboard cannot expand further', () => {
+    const props = createProps({
+      targetDurationSeconds: 60,
+      durationTotalSeconds: 60,
+      durationMatchesTarget: true,
+      remainingDurationSeconds: 0,
+      suggestedExpandedTargetSeconds: null,
+      canAddScene: false,
+      onIncreaseTargetDuration: vi.fn(),
+    });
+    render(<StoryboardPanel {...props} />);
+
+    expect(screen.getByText('conversation.creativeStudio.storyboard.shortenBeforeAdding')).toBeInTheDocument();
   });
 
   it('disables add at the scene limit and blocks all ordering controls while a mutation is pending', () => {

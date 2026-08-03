@@ -17,6 +17,7 @@ import { useStoryboardEditor } from '@renderer/pages/studio/hooks/useStoryboardE
 
 const bridge = vi.hoisted(() => ({
   updateScene: { invoke: vi.fn() },
+  updateProject: { invoke: vi.fn() },
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
 }));
@@ -90,6 +91,7 @@ describe('useStoryboardEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     bridge.updateScene.invoke.mockImplementation(async () => ok(project(3)));
+    bridge.updateProject.invoke.mockImplementation(async () => ok(project(3)));
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project(3)));
     bridge.proposeStoryboard.invoke.mockImplementation(async () => ok(project(3)));
   });
@@ -137,8 +139,107 @@ describe('useStoryboardEditor', () => {
     });
 
     expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+    expect(bridge.updateProject.invoke).not.toHaveBeenCalled();
     expect(bridge.reorderScenes.invoke).not.toHaveBeenCalled();
     expect(bridge.proposeStoryboard.invoke).not.toHaveBeenCalled();
+  });
+
+  it('starts an empty 15-second project with a five-second scene', async () => {
+    const initial = project(2, [], { targetDurationSeconds: 15 });
+    bridge.updateScene.invoke.mockResolvedValueOnce(ok(project(3, [scene('new-scene', { durationSeconds: 5 })])));
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    await act(async () => {
+      await result.current.addScene();
+    });
+
+    expect(bridge.updateScene.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ scene: expect.objectContaining({ durationSeconds: 5 }) })
+    );
+  });
+
+  it('uses the three seconds remaining for a new scene', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 12 })], { targetDurationSeconds: 15 });
+    bridge.updateScene.invoke.mockResolvedValueOnce(
+      ok(project(3, [scene('scene-1', { durationSeconds: 12 }), scene('new-scene', { durationSeconds: 3 })]))
+    );
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    await act(async () => {
+      await result.current.addScene();
+    });
+
+    expect(bridge.updateScene.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ scene: expect.objectContaining({ durationSeconds: 3 }) })
+    );
+  });
+
+  it('does not create a scene after the target has been reached', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 15 })], { targetDurationSeconds: 15 });
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    await act(async () => {
+      expect(await result.current.addScene()).toBe(false);
+    });
+
+    expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+  });
+
+  it('increases the target through the revisioned project update intent', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 10 })], { targetDurationSeconds: 15 });
+    bridge.updateProject.invoke.mockResolvedValueOnce(
+      ok(project(3, [scene('scene-1', { durationSeconds: 10 })], { targetDurationSeconds: 20 }))
+    );
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+    const editor = result.current as typeof result.current & {
+      increaseTargetDuration?: () => Promise<boolean>;
+      suggestedExpandedTargetSeconds?: number | null;
+    };
+
+    expect(editor.suggestedExpandedTargetSeconds).toBe(20);
+    await act(async () => {
+      expect(await (editor.increaseTargetDuration?.() ?? Promise.resolve(false))).toBe(true);
+    });
+
+    expect(bridge.updateProject.invoke).toHaveBeenCalledWith({
+      projectId: 'project-1',
+      expectedRevision: 2,
+      targetDurationSeconds: 20,
+    });
+  });
+
+  it('shows a stale target increase conflict without replaying the update', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 10 })], { targetDurationSeconds: 15 });
+    const refreshed = project(3, [scene('scene-1', { durationSeconds: 10 })], { targetDurationSeconds: 15 });
+    bridge.updateProject.invoke.mockResolvedValueOnce(
+      failed('stale_project', 'conversation.creativeStudio.errors.staleProject')
+    );
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: initial, refetch: vi.fn(async () => refreshed) })
+    );
+    const editor = result.current as typeof result.current & { increaseTargetDuration?: () => Promise<boolean> };
+
+    await act(async () => {
+      expect(await (editor.increaseTargetDuration?.() ?? Promise.resolve(false))).toBe(false);
+    });
+
+    expect(bridge.updateProject.invoke).toHaveBeenCalledTimes(1);
+    expect(result.current.conflict).toMatchObject({ operation: 'update_target', code: 'stale_project' });
+  });
+
+  it('does not suggest or send a target increase beyond 60 seconds', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 60 })], { targetDurationSeconds: 60 });
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+    const editor = result.current as typeof result.current & {
+      increaseTargetDuration?: () => Promise<boolean>;
+      suggestedExpandedTargetSeconds?: number | null;
+    };
+
+    expect(editor.suggestedExpandedTargetSeconds).toBeNull();
+    await act(async () => {
+      expect(await (editor.increaseTargetDuration?.() ?? Promise.resolve(false))).toBe(false);
+    });
+    expect(bridge.updateProject.invoke).not.toHaveBeenCalled();
   });
 
   it('debounces a strict editable-scene command and adopts its canonical response', async () => {
@@ -376,6 +477,7 @@ describe('useStoryboardEditor', () => {
     const projectB = project(8, [scene('scene-1'), scene('scene-2')], {
       id: 'project-2',
       name: 'Second project',
+      targetDurationSeconds: 15,
     });
     const { result, rerender } = renderHook(
       ({ value }) => useStoryboardEditor({ project: value, refetch: vi.fn(async () => value) }),
@@ -411,6 +513,7 @@ describe('useStoryboardEditor', () => {
             {
               id: 'project-2',
               name: 'Second project',
+              targetDurationSeconds: 15,
             }
           )
         )

@@ -16,6 +16,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from 'react-i18next';
 
 const MAX_SCENES = 24;
+const DEFAULT_SCENE_DURATION_SECONDS = 5;
 const SCENE_SAVE_DEBOUNCE_MS = 450;
 const INVALID_DURATION_MESSAGE_KEY = 'conversation.creativeStudio.inspector.invalidDuration';
 const STORAGE_ERROR_MESSAGE_KEY = 'conversation.creativeStudio.errors.storage';
@@ -26,6 +27,7 @@ export type StoryboardEditorOperation =
   | 'add_scene'
   | 'remove_scene'
   | 'reorder_scenes'
+  | 'update_target'
   | 'draft_storyboard';
 
 export type StoryboardEditorIssue = {
@@ -66,6 +68,9 @@ export type UseStoryboardEditorResult = {
   canAddScene: boolean;
   durationTotalSeconds: number;
   durationMatchesTarget: boolean;
+  remainingDurationSeconds: number;
+  suggestedExpandedTargetSeconds: number | null;
+  increaseTargetDuration: () => Promise<boolean>;
   mutationPending: boolean;
   error: StoryboardEditorIssue | null;
   clearError: () => void;
@@ -638,6 +643,18 @@ export const useStoryboardEditor = ({
     () => orderedScenes.reduce((total, currentScene) => total + currentScene.durationSeconds, 0),
     [orderedScenes]
   );
+  const remainingDurationSeconds = project === null ? 0 : project.targetDurationSeconds - durationTotalSeconds;
+  const suggestedExpandedTargetSeconds = useMemo(() => {
+    if (project === null) return null;
+    const suggested = Math.min(
+      60,
+      Math.max(
+        project.targetDurationSeconds + DEFAULT_SCENE_DURATION_SECONDS,
+        durationTotalSeconds + DEFAULT_SCENE_DURATION_SECONDS
+      )
+    );
+    return suggested > project.targetDurationSeconds && suggested > durationTotalSeconds ? suggested : null;
+  }, [durationTotalSeconds, project]);
 
   const selectScene = useCallback((sceneId: string) => {
     const current = projectRef.current;
@@ -719,6 +736,7 @@ export const useStoryboardEditor = ({
     const remainingSeconds =
       current.targetDurationSeconds -
       current.sceneOrder.reduce((total, id) => total + (current.scenes[id]?.durationSeconds ?? 0), 0);
+    if (remainingSeconds <= 0) return false;
     const scene: StudioEditableScene = {
       title: t('conversation.creativeStudio.scene.defaultTitle'),
       purpose: '',
@@ -726,7 +744,7 @@ export const useStoryboardEditor = ({
       narration: '',
       onScreenText: '',
       mediaKind: 'image',
-      durationSeconds: remainingSeconds >= 1 && remainingSeconds <= 60 ? remainingSeconds : 5,
+      durationSeconds: Math.min(DEFAULT_SCENE_DURATION_SECONDS, remainingSeconds),
       referenceAssetId: null,
     };
     return enqueueIntent({
@@ -746,6 +764,20 @@ export const useStoryboardEditor = ({
       },
     });
   }, [enqueueIntent, t]);
+
+  const increaseTargetDuration = useCallback((): Promise<boolean> => {
+    const suggestedTarget = suggestedExpandedTargetSeconds;
+    if (suggestedTarget === null) return Promise.resolve(false);
+    return enqueueIntent({
+      operation: 'update_target',
+      invoke: (canonical) =>
+        ipcBridge.creativeStudio.updateProject.invoke({
+          projectId: canonical.id,
+          expectedRevision: canonical.revision,
+          targetDurationSeconds: suggestedTarget,
+        }),
+    });
+  }, [enqueueIntent, suggestedExpandedTargetSeconds]);
 
   const removeScene = useCallback(
     async (sceneId: string): Promise<boolean> => {
@@ -912,9 +944,12 @@ export const useStoryboardEditor = ({
     removeScene,
     reorderScenes,
     moveScene,
-    canAddScene: project !== null && project.sceneOrder.length < MAX_SCENES,
+    canAddScene: project !== null && project.sceneOrder.length < MAX_SCENES && remainingDurationSeconds > 0,
     durationTotalSeconds,
     durationMatchesTarget: project !== null && durationTotalSeconds === project.targetDurationSeconds,
+    remainingDurationSeconds,
+    suggestedExpandedTargetSeconds,
+    increaseTargetDuration,
     mutationPending: mutationCount > 0,
     error,
     clearError,
