@@ -263,4 +263,19 @@ describe('Creative Studio localization contract', () => {
 
     expect(issues).toEqual([]);
   });
+
+  it('distinguishes preserved dirty edits from saved scenes in Russian and Ukrainian', () => {
+    const expectedDirtyCopy = {
+      'ru-RU': 'Несохранённые изменения не потеряны.',
+      'uk-UA': 'Незбережені зміни не втрачено.',
+    } as const;
+
+    for (const [locale, expected] of Object.entries(expectedDirtyCopy)) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const leaves = flattenStringLeaves(creativeStudio);
+
+      expect(leaves['inspector.unsavedChanges']).toBe(expected);
+      expect(leaves['inspector.unsavedChanges']).not.toBe(leaves['inspector.saved']);
+    }
+  });
 });

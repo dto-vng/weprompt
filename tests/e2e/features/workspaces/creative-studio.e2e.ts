@@ -8,6 +8,7 @@
  */
 import { expect, test } from '../../fixtures';
 import { navigateTo, ROUTES } from '../../helpers';
+import type { Page } from '@playwright/test';
 import path from 'node:path';
 
 const mainProcessOnlySentinels = [
@@ -17,6 +18,90 @@ const mainProcessOnlySentinels = [
   'STUDIO_RAW_OUTPUT_BODY_SENTINEL',
   '/private/STUDIO_RAW_OUTPUT_PATH_SENTINEL/provider-output.bin',
 ];
+
+type CanonicalStudioSnapshot = {
+  projectId: string;
+  revision: number;
+  videoSelection: { choiceId: string; model: string } | null;
+  scenePrompts: Record<string, string>;
+  sceneJobIds: Record<string, string[]>;
+  jobs: Array<{ id: string; sceneId: string; status: string }>;
+};
+
+async function readCanonicalStudioSnapshot(page: Page, projectId: string): Promise<CanonicalStudioSnapshot> {
+  return page.evaluate(async (requestedProjectId) => {
+    type TestBridgeApi = {
+      emit(name: string, data: unknown): Promise<unknown> | void;
+      on(callback: (event: { value: string }) => void): () => void;
+    };
+    type RendererProject = {
+      id: string;
+      revision: number;
+      routing: { video: { choiceId: string; model: string } | null };
+      scenes: Record<string, { jobIds: string[]; visualPrompt: string }>;
+      jobs: Record<string, { id: string; sceneId: string; status: string }>;
+    };
+
+    const api = window.electronAPI as TestBridgeApi | undefined;
+    if (!api) throw new Error('Creative Studio E2E requires the native bridge');
+
+    const requestId = `studio-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const callbackName = `subscribe.callback-creative-studio.get-project${requestId}`;
+    const response = await new Promise<unknown>((resolve, reject) => {
+      let timeout = 0;
+      const off = api.on(({ value }) => {
+        const event = JSON.parse(value) as { data?: unknown; name?: unknown };
+        if (event.name !== callbackName) return;
+        window.clearTimeout(timeout);
+        off();
+        resolve(event.data);
+      });
+      timeout = window.setTimeout(() => {
+        off();
+        reject(new Error('Timed out reading the canonical Creative Studio project'));
+      }, 5_000);
+
+      Promise.resolve(
+        api.emit('subscribe-creative-studio.get-project', {
+          id: requestId,
+          data: { projectId: requestedProjectId },
+        })
+      ).catch((error: unknown) => {
+        window.clearTimeout(timeout);
+        off();
+        reject(error instanceof Error ? error : new Error('Canonical Creative Studio read failed'));
+      });
+    });
+
+    if (
+      typeof response !== 'object' ||
+      response === null ||
+      !('ok' in response) ||
+      response.ok !== true ||
+      !('data' in response) ||
+      typeof response.data !== 'object' ||
+      response.data === null
+    ) {
+      throw new Error('Canonical Creative Studio project was unavailable');
+    }
+    const project = response.data as RendererProject;
+
+    return {
+      projectId: project.id,
+      revision: project.revision,
+      videoSelection: project.routing.video,
+      scenePrompts: Object.fromEntries(
+        Object.entries(project.scenes).map(([sceneId, scene]) => [sceneId, scene.visualPrompt])
+      ),
+      sceneJobIds: Object.fromEntries(
+        Object.entries(project.scenes).map(([sceneId, scene]) => [sceneId, [...scene.jobIds]])
+      ),
+      jobs: Object.values(project.jobs)
+        .map((job) => ({ id: job.id, sceneId: job.sceneId, status: job.status }))
+        .toSorted((left, right) => left.id.localeCompare(right.id)),
+    };
+  }, projectId);
+}
 
 test.describe('Creative Studio workspace', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -30,6 +115,7 @@ test.describe('Creative Studio workspace', () => {
     page,
   }) => {
     const projectName = `Studio E2E ${Date.now()}`;
+    let projectId = '';
 
     await test.step('prove the fake-provider runtime gate is active', async () => {
       const gate = await electronApp.evaluate(({ app }) => ({
@@ -99,6 +185,8 @@ test.describe('Creative Studio workspace', () => {
       }
       await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
       await expect(page).toHaveURL(/#\/studio\/[A-Za-z0-9_-]+$/);
+      projectId = page.url().match(/#\/studio\/([A-Za-z0-9_-]+)$/)?.[1] ?? '';
+      expect(projectId).not.toBe('');
     });
 
     await test.step('select and persist the project Video model across renderer reload', async () => {
@@ -108,6 +196,15 @@ test.describe('Creative Studio workspace', () => {
       await expect(page.getByRole('region', { name: 'Project overview' })).toBeVisible();
 
       const videoModel = page.getByRole('combobox', { name: 'Video model' });
+      await expect(videoModel).toContainText('Select a model');
+      await expect(page.getByText('Choose a compatible generation route.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Generate scene' })).toBeDisabled();
+      expect(await readCanonicalStudioSnapshot(page, projectId)).toMatchObject({
+        projectId,
+        videoSelection: null,
+        jobs: [],
+      });
+
       await videoModel.click();
       const videoOption = page.locator('.arco-select-option').filter({ hasText: 'weprompt-e2e-video' });
       await expect(videoOption).toBeVisible();
@@ -121,6 +218,11 @@ test.describe('Creative Studio workspace', () => {
       await expect(page.getByRole('region', { name: 'Project overview' })).toBeVisible();
       await expect(page.getByRole('heading', { level: 1, name: projectName })).toBeVisible();
       await expect(page.getByRole('combobox', { name: 'Video model' })).toContainText('weprompt-e2e-video');
+      expect(await readCanonicalStudioSnapshot(page, projectId)).toMatchObject({
+        projectId,
+        videoSelection: { model: 'weprompt-e2e-video' },
+        jobs: [],
+      });
     });
 
     await test.step('build three five-second scenes and wait for the selected prompt to save', async () => {
@@ -178,9 +280,20 @@ test.describe('Creative Studio workspace', () => {
 
       const visualPrompt = page.getByLabel('Visual prompt');
       await visualPrompt.fill('A paper airplane crossing a calm blue studio backdrop.');
-      await visualPrompt.blur();
       const sceneInspector = page.getByRole('region', { name: 'Scene direction' });
+      await expect(sceneInspector.getByRole('status')).toHaveText('Your unsaved changes are preserved.');
+      await visualPrompt.blur();
       await expect(sceneInspector.getByRole('status')).toHaveText('Scene saved');
+
+      const persistedPrompt = 'A paper airplane crossing a calm blue studio backdrop.';
+      expect(Object.values((await readCanonicalStudioSnapshot(page, projectId)).scenePrompts)).toContain(
+        persistedPrompt
+      );
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByRole('region', { name: 'Project overview' })).toBeVisible();
+      await page.getByRole('button', { name: 'Scene 2: Untitled scene', exact: true }).click();
+      await expect(page.getByLabel('Visual prompt')).toHaveValue(persistedPrompt);
+      await expect(page.getByRole('region', { name: 'Scene direction' }).getByRole('status')).toHaveText('Scene saved');
     });
 
     await test.step('keep the editor operable at target desktop viewports and with reduced motion', async () => {
@@ -221,6 +334,10 @@ test.describe('Creative Studio workspace', () => {
     });
 
     await test.step('open review without provider submission, then confirm and cancel the queued job', async () => {
+      const beforeReview = await readCanonicalStudioSnapshot(page, projectId);
+      expect(beforeReview.jobs).toEqual([]);
+      expect(Object.values(beforeReview.sceneJobIds).flat()).toEqual([]);
+
       const generateScene = page.getByRole('button', { name: 'Generate scene' });
       await expect(generateScene).toBeEnabled();
       await generateScene.click();
@@ -232,12 +349,30 @@ test.describe('Creative Studio workspace', () => {
       await expect(reviewDialog.getByText('weprompt-media-gateway-v1')).toHaveCount(0);
       await expect(page.getByText('Queued by provider')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Cancel job' })).toHaveCount(0);
+      const whileReviewing = await readCanonicalStudioSnapshot(page, projectId);
+      expect(whileReviewing.jobs).toEqual([]);
+      expect(Object.values(whileReviewing.sceneJobIds).flat()).toEqual([]);
+      expect(whileReviewing.revision).toBe(beforeReview.revision);
 
       await reviewDialog.getByRole('button', { name: 'Confirm and generate' }).click();
 
       await expect(page.getByText('Queued by provider')).toBeVisible({ timeout: 5_000 });
+      await expect
+        .poll(async () => {
+          const canonical = await readCanonicalStudioSnapshot(page, projectId);
+          return {
+            jobCount: canonical.jobs.length,
+            revisionIncreased: canonical.revision > whileReviewing.revision,
+            sceneJobCount: Object.values(canonical.sceneJobIds).flat().length,
+            statuses: canonical.jobs.map((job) => job.status),
+          };
+        })
+        .toEqual({ jobCount: 1, revisionIncreased: true, sceneJobCount: 1, statuses: ['queued_remote'] });
       await page.getByRole('button', { name: 'Cancel job' }).click();
       await expect(page.getByText('Cancelled')).toBeVisible();
+      await expect
+        .poll(async () => (await readCanonicalStudioSnapshot(page, projectId)).jobs.map((job) => job.status))
+        .toEqual(['cancelled']);
       await expect(page.getByRole('button', { name: 'Cancel job' })).toHaveCount(0);
       const rendererText = await page.locator('body').innerText();
       for (const sentinel of mainProcessOnlySentinels) expect(rendererText).not.toContain(sentinel);
