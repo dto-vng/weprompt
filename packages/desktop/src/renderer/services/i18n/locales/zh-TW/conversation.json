@@ -798,6 +798,7 @@
       "resolution": "解析度",
       "sceneCount": "場景數",
       "readiness": "草稿就緒狀態",
+      "scenesReady": "{{ready}}/{{total}} 個場景已就緒",
       "emptyStoryboard": "尚無場景。可手動新增場景或建立分鏡草稿。",
       "backToLibrary": "返回創意工作室",
       "loadFailed": "無法載入專案。"
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "沒有可用的相容路線"
     },
     "review": {
-      "generateReadyScenes": "產生已就緒場景",
+      "generateReadyScenes": "產生 {{count}} 個已就緒場景",
+      "noReadyScenes": "沒有可產生的已就緒場景。",
       "generateScene": "產生場景",
       "regenerateScene": "產生另一個版本",
       "title": "檢視產生設定",
@@ -956,7 +958,10 @@
       "selectVersion": "選擇此版本",
       "importReference": "匯入首格圖片",
       "importing": "正在匯入參考圖片...",
-      "posterUnavailable": "影片海報無法使用"
+      "posterUnavailable": "影片海報無法使用",
+      "missingVisualPrompt": "請先加入視覺提示詞，再產生此場景。",
+      "missingModel": "請先選擇相容的專案模型，再產生此場景。",
+      "generateThisScene": "產生此場景"
     },
     "timeline": {
       "title": "場景列",
@@ -981,6 +986,7 @@
       "missingScenes": "缺漏場景：{{scenes}}",
       "failed": "無法匯出素材。",
       "noSelectedAssets": "沒有可供匯出的已選場景素材。",
+      "noAssetsToExport": "匯出前請至少選擇一個已產生的場景素材。",
       "folderLabel": "匯出資料夾"
     },
     "errors": {

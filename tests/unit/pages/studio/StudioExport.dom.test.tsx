@@ -279,22 +279,18 @@ describe('Studio asset export', () => {
     expect(screen.queryByText('conversation.creativeStudio.export.failed')).not.toBeInTheDocument();
   });
 
-  it('explains that no selected scene assets are ready and does not open the native chooser', async () => {
+  it('disables export with a visible reason when no canonical selected assets exist', async () => {
     bridge.getProject.invoke.mockResolvedValue(ok(project(false)));
     renderProject();
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
-      })
-    );
-
-    expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.export.noSelectedAssets');
-    const confirm = screen.getByRole('button', {
-      name: 'conversation.creativeStudio.export.confirm',
+    const exportAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.export.action',
     });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(confirm);
+    expect(exportAction).toBeDisabled();
+    expect(screen.getByText('conversation.creativeStudio.export.noAssetsToExport')).toBeVisible();
+    fireEvent.click(exportAction);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(bridge.chooseAndExportAssets.invoke).not.toHaveBeenCalled();
   });
 

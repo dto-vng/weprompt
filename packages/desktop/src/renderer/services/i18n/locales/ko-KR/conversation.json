@@ -798,6 +798,7 @@
       "resolution": "해상도",
       "sceneCount": "장면 수",
       "readiness": "초안 준비 상태",
+      "scenesReady": "{{ready}}/{{total}}개 장면 준비됨",
       "emptyStoryboard": "아직 장면이 없습니다. 직접 장면을 추가하거나 스토리보드 초안을 만드세요.",
       "backToLibrary": "크리에이티브 스튜디오로 돌아가기",
       "loadFailed": "프로젝트를 불러올 수 없습니다."
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "사용 가능한 호환 경로가 없습니다"
     },
     "review": {
-      "generateReadyScenes": "준비된 장면 생성",
+      "generateReadyScenes": "준비된 장면 {{count}}개 생성",
+      "noReadyScenes": "생성할 준비가 된 장면이 없습니다.",
       "generateScene": "장면 생성",
       "regenerateScene": "다른 변형 생성",
       "title": "생성 설정 검토",
@@ -956,7 +958,10 @@
       "selectVersion": "이 변형 선택",
       "importReference": "첫 프레임 이미지 가져오기",
       "importing": "참조 이미지를 가져오는 중...",
-      "posterUnavailable": "동영상 포스터를 사용할 수 없음"
+      "posterUnavailable": "동영상 포스터를 사용할 수 없음",
+      "missingVisualPrompt": "이 장면을 생성하기 전에 비주얼 프롬프트를 추가하세요.",
+      "missingModel": "이 장면을 생성하기 전에 호환되는 프로젝트 모델을 선택하세요.",
+      "generateThisScene": "이 장면 생성"
     },
     "timeline": {
       "title": "장면 스트립",
@@ -981,6 +986,7 @@
       "missingScenes": "누락된 장면: {{scenes}}",
       "failed": "에셋을 내보낼 수 없습니다.",
       "noSelectedAssets": "내보낼 수 있는 선택된 장면 에셋이 없습니다.",
+      "noAssetsToExport": "내보내기 전에 생성된 장면 에셋을 하나 이상 선택하세요.",
       "folderLabel": "내보내기 폴더"
     },
     "errors": {

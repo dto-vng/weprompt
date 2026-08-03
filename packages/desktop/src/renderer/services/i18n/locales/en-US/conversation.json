@@ -798,6 +798,7 @@
       "resolution": "Resolution",
       "sceneCount": "Scenes",
       "readiness": "Drafting readiness",
+      "scenesReady": "{{ready}}/{{total}} scenes ready",
       "emptyStoryboard": "No scenes yet. Add scenes manually or draft a storyboard.",
       "backToLibrary": "Back to Creative Studio",
       "loadFailed": "The project could not be loaded."
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "No compatible route is available"
     },
     "review": {
-      "generateReadyScenes": "Generate ready scenes",
+      "generateReadyScenes": "Generate {{count}} ready scenes",
+      "noReadyScenes": "No scenes are ready to generate.",
       "generateScene": "Generate scene",
       "regenerateScene": "Generate another variation",
       "title": "Review generation",
@@ -956,7 +958,10 @@
       "selectVersion": "Select this variation",
       "importReference": "Import first-frame image",
       "importing": "Importing reference...",
-      "posterUnavailable": "Video poster unavailable"
+      "posterUnavailable": "Video poster unavailable",
+      "missingVisualPrompt": "Add a visual prompt before generating this scene.",
+      "missingModel": "Select a compatible project model before generating this scene.",
+      "generateThisScene": "Generate this scene"
     },
     "timeline": {
       "title": "Scene strip",
@@ -981,6 +986,7 @@
       "missingScenes": "Missing scenes: {{scenes}}",
       "failed": "Assets could not be exported.",
       "noSelectedAssets": "No selected scene assets are ready to export.",
+      "noAssetsToExport": "Select at least one generated scene asset before exporting.",
       "folderLabel": "Export folder"
     },
     "errors": {

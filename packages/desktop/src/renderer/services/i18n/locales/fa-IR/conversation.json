@@ -798,6 +798,7 @@
       "resolution": "وضوح",
       "sceneCount": "تعداد صحنه‌ها",
       "readiness": "آمادگی پیش‌نویس",
+      "scenesReady": "{{ready}} از {{total}} صحنه آماده است",
       "emptyStoryboard": "هنوز صحنه‌ای وجود ندارد. صحنه‌ها را دستی اضافه کنید یا یک استوری‌بورد بسازید.",
       "backToLibrary": "بازگشت به استودیوی خلاقیت",
       "loadFailed": "پروژه بارگذاری نشد."
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "هیچ مسیر سازگاری در دسترس نیست"
     },
     "review": {
-      "generateReadyScenes": "تولید صحنه‌های آماده",
+      "generateReadyScenes": "تولید {{count}} صحنه آماده",
+      "noReadyScenes": "هیچ صحنه‌ای برای تولید آماده نیست.",
       "generateScene": "تولید صحنه",
       "regenerateScene": "تولید نسخه متفاوت",
       "title": "بازبینی تولید",
@@ -956,7 +958,10 @@
       "selectVersion": "انتخاب این نسخه",
       "importReference": "وارد کردن تصویر فریم نخست",
       "importing": "در حال وارد کردن تصویر مرجع...",
-      "posterUnavailable": "پوستر ویدیو در دسترس نیست"
+      "posterUnavailable": "پوستر ویدیو در دسترس نیست",
+      "missingVisualPrompt": "پیش از تولید این صحنه، یک دستور بصری اضافه کنید.",
+      "missingModel": "پیش از تولید این صحنه، یک مدل سازگار برای پروژه انتخاب کنید.",
+      "generateThisScene": "تولید این صحنه"
     },
     "timeline": {
       "title": "نوار صحنه‌ها",
@@ -981,6 +986,7 @@
       "missingScenes": "صحنه‌های ناقص: {{scenes}}",
       "failed": "از دارایی‌ها خروجی گرفته نشد.",
       "noSelectedAssets": "هیچ دارایی انتخاب‌شده‌ای برای خروجی آماده نیست.",
+      "noAssetsToExport": "پیش از خروجی گرفتن، حداقل یک دارایی تولیدشده صحنه را انتخاب کنید.",
       "folderLabel": "پوشه خروجی"
     },
     "errors": {

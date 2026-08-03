@@ -43,7 +43,7 @@ const project = (withScene = false): StudioRendererProject => ({
   name: 'Launch story',
   brief: 'Introduce a new product',
   aspectRatio: '16:9',
-  targetDurationSeconds: 15,
+  targetDurationSeconds: withScene ? 5 : 15,
   resolution: '720p',
   sceneOrder: withScene ? ['scene-1'] : [],
   scenes: withScene ? { 'scene-1': scene() } : {},

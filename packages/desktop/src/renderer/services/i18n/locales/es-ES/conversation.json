@@ -799,6 +799,7 @@
       "resolution": "Resolución",
       "sceneCount": "Escenas",
       "readiness": "Disponibilidad del borrador",
+      "scenesReady": "{{ready}}/{{total}} escenas listas",
       "emptyStoryboard": "Aún no hay escenas. Añádelas manualmente o crea un borrador del guion gráfico.",
       "backToLibrary": "Volver a Creative Studio",
       "loadFailed": "No se ha podido cargar el proyecto."
@@ -889,7 +890,8 @@
       "noCompatibleRoute": "No hay ninguna ruta compatible disponible"
     },
     "review": {
-      "generateReadyScenes": "Generar escenas listas",
+      "generateReadyScenes": "Generar {{count}} escenas listas",
+      "noReadyScenes": "No hay escenas listas para generar.",
       "generateScene": "Generar escena",
       "regenerateScene": "Generar otra variante",
       "title": "Revisar generación",
@@ -957,7 +959,10 @@
       "selectVersion": "Seleccionar esta variante",
       "importReference": "Importar imagen del primer fotograma",
       "importing": "Importando referencia...",
-      "posterUnavailable": "Miniatura de vídeo no disponible"
+      "posterUnavailable": "Miniatura de vídeo no disponible",
+      "missingVisualPrompt": "Añade una indicación visual antes de generar esta escena.",
+      "missingModel": "Selecciona un modelo de proyecto compatible antes de generar esta escena.",
+      "generateThisScene": "Generar esta escena"
     },
     "timeline": {
       "title": "Tira de escenas",
@@ -982,6 +987,7 @@
       "missingScenes": "Escenas ausentes: {{scenes}}",
       "failed": "No se han podido exportar los recursos.",
       "noSelectedAssets": "No hay recursos de escenas seleccionados listos para exportar.",
+      "noAssetsToExport": "Selecciona al menos un recurso de escena generado antes de exportar.",
       "folderLabel": "Carpeta de exportación"
     },
     "errors": {

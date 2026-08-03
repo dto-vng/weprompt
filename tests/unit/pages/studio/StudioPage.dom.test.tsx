@@ -506,6 +506,58 @@ describe('StudioPage and useStudioProject', () => {
     );
   });
 
+  it('opens the existing paid review from the preview CTA without submitting before confirmation', async () => {
+    const opening = scene({ durationSeconds: 5 });
+    bridge.getProject.invoke.mockResolvedValue(
+      ok(
+        project('project-1', {
+          targetDurationSeconds: 15,
+          sceneOrder: [opening.id],
+          scenes: { [opening.id]: opening },
+        })
+      )
+    );
+    bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
+    renderRoute();
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'conversation.creativeStudio.preview.generateThisScene',
+      })
+    );
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
+    expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' }));
+    await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(1));
+  });
+
+  it('keeps header batch review closed until storyboard timing exactly matches the target', async () => {
+    const opening = scene({ durationSeconds: 5 });
+    bridge.getProject.invoke.mockResolvedValue(
+      ok(
+        project('project-1', {
+          targetDurationSeconds: 15,
+          sceneOrder: [opening.id],
+          scenes: { [opening.id]: opening },
+        })
+      )
+    );
+    bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
+    renderRoute();
+
+    const batchActions = await screen.findAllByRole('button', {
+      name: 'conversation.creativeStudio.review.generateReadyScenes',
+    });
+    expect(batchActions[0]).toBeDisabled();
+    expect(screen.getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeVisible();
+    fireEvent.click(batchActions[0]!);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
+  });
+
   it('opens a canonical batch review from the header and submits every exact scene route only after confirmation', async () => {
     const opening = scene({ id: 'scene-1', durationSeconds: 5 });
     const closing = scene({ id: 'scene-2', title: 'Closing', durationSeconds: 10 });
@@ -583,7 +635,7 @@ describe('StudioPage and useStudioProject', () => {
     expect(screen.queryByText('conversation.creativeStudio.models.loading')).not.toBeInTheDocument();
   });
 
-  it('blocks confirmation when the canonical route constraints reject a single scene', async () => {
+  it('does not build a paid review when route constraints reject a single scene', async () => {
     const opening = scene({ durationSeconds: 61 });
     bridge.getProject.invoke.mockResolvedValue(
       ok(
@@ -597,18 +649,13 @@ describe('StudioPage and useStudioProject', () => {
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
     renderRoute();
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.review.generateScene',
-      })
-    );
+    const generate = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.review.generateScene',
+    });
+    expect(generate).toBeDisabled();
+    fireEvent.click(generate);
 
-    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.invalidRoute');
-    expect(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.review.confirm',
-      })
-    ).toBeDisabled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
   });
 

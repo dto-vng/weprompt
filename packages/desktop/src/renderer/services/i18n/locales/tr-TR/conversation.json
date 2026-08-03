@@ -800,6 +800,7 @@
       "resolution": "Çözünürlük",
       "sceneCount": "Sahneler",
       "readiness": "Taslak oluşturma durumu",
+      "scenesReady": "{{ready}}/{{total}} sahne hazır",
       "emptyStoryboard": "Henüz sahne yok. Sahneleri elle ekleyin veya bir storyboard taslağı oluşturun.",
       "backToLibrary": "Creative Studio'ya dön",
       "loadFailed": "Proje yüklenemedi."
@@ -890,7 +891,8 @@
       "noCompatibleRoute": "Kullanılabilir uyumlu rota yok"
     },
     "review": {
-      "generateReadyScenes": "Hazır sahneleri oluştur",
+      "generateReadyScenes": "{{count}} hazır sahne oluştur",
+      "noReadyScenes": "Oluşturulmaya hazır sahne yok.",
       "generateScene": "Sahneyi oluştur",
       "regenerateScene": "Başka bir varyasyon oluştur",
       "title": "Oluşturmayı gözden geçir",
@@ -958,7 +960,10 @@
       "selectVersion": "Bu varyasyonu seç",
       "importReference": "İlk kare görselini içe aktar",
       "importing": "Referans içe aktarılıyor...",
-      "posterUnavailable": "Video posteri kullanılamıyor"
+      "posterUnavailable": "Video posteri kullanılamıyor",
+      "missingVisualPrompt": "Bu sahneyi oluşturmadan önce görsel bir istem ekleyin.",
+      "missingModel": "Bu sahneyi oluşturmadan önce uyumlu bir proje modeli seçin.",
+      "generateThisScene": "Bu sahneyi oluştur"
     },
     "timeline": {
       "title": "Sahne şeridi",
@@ -983,6 +988,7 @@
       "missingScenes": "Eksik sahneler: {{scenes}}",
       "failed": "Varlıklar dışa aktarılamadı.",
       "noSelectedAssets": "Dışa aktarmaya hazır seçili sahne varlığı yok.",
+      "noAssetsToExport": "Dışa aktarmadan önce en az bir oluşturulmuş sahne varlığı seçin.",
       "folderLabel": "Dışa aktarma klasörü"
     },
     "errors": {

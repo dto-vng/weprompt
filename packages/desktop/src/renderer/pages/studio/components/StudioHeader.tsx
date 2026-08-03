@@ -10,12 +10,15 @@ import { Download, Left, Magic, VideoOne } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { deriveStudioReadiness, type StudioReadinessSummary } from '../studioReadiness';
+
 export type StudioHeaderProps = {
   project: StudioRendererProject;
   storyboard: StudioRouteCatalog['storyboard'] | null;
   catalogLoading: boolean;
   catalogErrorMessageKey: string | null;
   drafting: boolean;
+  readiness?: StudioReadinessSummary;
   draftDisabled?: boolean;
   generationDisabled?: boolean;
   generationPending?: boolean;
@@ -33,6 +36,7 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
   catalogLoading,
   catalogErrorMessageKey,
   drafting,
+  readiness = deriveStudioReadiness(project),
   draftDisabled = false,
   generationDisabled = false,
   generationPending = false,
@@ -59,7 +63,21 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
           (option) => option.providerId === selectedModel.providerId && option.model === selectedModel.model
         ) ?? null);
   const isReady = !isChecking && storyboardReady;
-  const generationActionDisabled = generationDisabled || generationPending || onOpenGenerationReview === undefined;
+  const readySceneCount = readiness.readySceneIds.length;
+  const generationActionDisabled =
+    generationDisabled ||
+    generationPending ||
+    readySceneCount === 0 ||
+    readiness.durationDeltaSeconds !== 0 ||
+    onOpenGenerationReview === undefined;
+  const exportActionDisabled =
+    exportDisabled || exportPending || readiness.selectedAssetCount === 0 || onOpenExport === undefined;
+  const generationBlockerKey =
+    readySceneCount === 0
+      ? 'conversation.creativeStudio.review.noReadyScenes'
+      : readiness.durationDeltaSeconds !== 0
+        ? 'conversation.creativeStudio.review.disabledDurationMismatch'
+        : null;
   const readinessKey = isChecking
     ? 'conversation.creativeStudio.draft.checking'
     : isReady
@@ -88,12 +106,7 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
         </div>
 
         <div className='flex flex-wrap items-center gap-8px'>
-          <Button
-            icon={<Download />}
-            loading={exportPending}
-            disabled={exportDisabled || exportPending || onOpenExport === undefined}
-            onClick={onOpenExport}
-          >
+          <Button icon={<Download />} loading={exportPending} disabled={exportActionDisabled} onClick={onOpenExport}>
             {t('conversation.creativeStudio.export.action')}
           </Button>
           <Button
@@ -106,7 +119,7 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
             disabled={generationActionDisabled}
             onClick={onOpenGenerationReview}
           >
-            {t('conversation.creativeStudio.review.generateReadyScenes')}
+            {t('conversation.creativeStudio.review.generateReadyScenes', { count: readySceneCount })}
           </Button>
           <Button
             type={hasStoryboard ? 'default' : 'primary'}
@@ -120,11 +133,26 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
         </div>
       </div>
 
+      {(generationBlockerKey !== null || readiness.selectedAssetCount === 0) && (
+        <div aria-live='polite' className='flex flex-wrap gap-x-12px gap-y-6px text-12px text-warning'>
+          {generationBlockerKey !== null && <span>{t(generationBlockerKey)}</span>}
+          {readiness.selectedAssetCount === 0 && (
+            <span>{t('conversation.creativeStudio.export.noAssetsToExport')}</span>
+          )}
+        </div>
+      )}
+
       <div
         aria-live='polite'
         className='flex flex-wrap items-center gap-x-12px gap-y-6px rounded-8px bg-fill-1 px-12px py-10px'
       >
         <span className='text-12px text-t-secondary'>{t('conversation.creativeStudio.project.readiness')}</span>
+        <span className='text-12px font-500 text-t-primary'>
+          {t('conversation.creativeStudio.project.scenesReady', {
+            ready: readySceneCount,
+            total: readiness.totalSceneCount,
+          })}
+        </span>
         <Tag color={isReady ? 'green' : undefined}>{t(readinessKey)}</Tag>
         {isReady && selectedModel && (
           <>

@@ -804,6 +804,7 @@
       "resolution": "Resolução",
       "sceneCount": "Cenas",
       "readiness": "Disponibilidade do rascunho",
+      "scenesReady": "{{ready}}/{{total}} cenas prontas",
       "emptyStoryboard": "Ainda não há cenas. Adicione cenas manualmente ou crie um rascunho do storyboard.",
       "backToLibrary": "Voltar ao Creative Studio",
       "loadFailed": "Não foi possível carregar o projeto."
@@ -894,7 +895,8 @@
       "noCompatibleRoute": "Nenhuma rota compatível está disponível"
     },
     "review": {
-      "generateReadyScenes": "Gerar cenas prontas",
+      "generateReadyScenes": "Gerar {{count}} cenas prontas",
+      "noReadyScenes": "Nenhuma cena está pronta para geração.",
       "generateScene": "Gerar cena",
       "regenerateScene": "Gerar outra variação",
       "title": "Revisar geração",
@@ -962,7 +964,10 @@
       "selectVersion": "Selecionar esta variação",
       "importReference": "Importar imagem do primeiro quadro",
       "importing": "Importando referência...",
-      "posterUnavailable": "Miniatura do vídeo indisponível"
+      "posterUnavailable": "Miniatura do vídeo indisponível",
+      "missingVisualPrompt": "Adicione um prompt visual antes de gerar esta cena.",
+      "missingModel": "Selecione um modelo de projeto compatível antes de gerar esta cena.",
+      "generateThisScene": "Gerar esta cena"
     },
     "timeline": {
       "title": "Faixa de cenas",
@@ -987,6 +992,7 @@
       "missingScenes": "Cenas ausentes: {{scenes}}",
       "failed": "Não foi possível exportar os recursos.",
       "noSelectedAssets": "Nenhum recurso de cena selecionado está pronto para exportação.",
+      "noAssetsToExport": "Selecione pelo menos um recurso de cena gerado antes de exportar.",
       "folderLabel": "Pasta de exportação"
     },
     "errors": {

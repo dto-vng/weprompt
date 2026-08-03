@@ -798,6 +798,7 @@
       "resolution": "分辨率",
       "sceneCount": "场景数",
       "readiness": "起草准备状态",
+      "scenesReady": "{{ready}}/{{total}} 个场景已就绪",
       "emptyStoryboard": "尚无场景。可手动添加场景或起草故事板。",
       "backToLibrary": "返回创意工作室",
       "loadFailed": "无法加载项目。"
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "没有可用的兼容路线"
     },
     "review": {
-      "generateReadyScenes": "生成已就绪场景",
+      "generateReadyScenes": "生成 {{count}} 个已就绪场景",
+      "noReadyScenes": "没有可生成的已就绪场景。",
       "generateScene": "生成场景",
       "regenerateScene": "生成另一个变体",
       "title": "审核生成设置",
@@ -956,7 +958,10 @@
       "selectVersion": "选择此变体",
       "importReference": "导入首帧图像",
       "importing": "正在导入参考图...",
-      "posterUnavailable": "视频封面不可用"
+      "posterUnavailable": "视频封面不可用",
+      "missingVisualPrompt": "请先添加视觉提示词，再生成此场景。",
+      "missingModel": "请先选择兼容的项目模型，再生成此场景。",
+      "generateThisScene": "生成此场景"
     },
     "timeline": {
       "title": "场景条",
@@ -981,6 +986,7 @@
       "missingScenes": "缺失场景：{{scenes}}",
       "failed": "无法导出素材。",
       "noSelectedAssets": "没有可导出的已选场景素材。",
+      "noAssetsToExport": "导出前请至少选择一个已生成的场景素材。",
       "folderLabel": "导出文件夹"
     },
     "errors": {

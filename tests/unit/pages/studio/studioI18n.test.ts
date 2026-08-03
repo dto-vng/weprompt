@@ -109,6 +109,15 @@ const stableMessageKeys = [
   'jobs.errors.unknown',
 ] as const;
 
+const readinessActionKeys = [
+  'project.scenesReady',
+  'review.noReadyScenes',
+  'preview.missingVisualPrompt',
+  'preview.missingModel',
+  'preview.generateThisScene',
+  'export.noAssetsToExport',
+] as const;
+
 function loadConversationLocale(locale: string): JsonObject {
   const localeUrl = new URL(`${locale}/conversation.json`, localeRoot);
   return JSON.parse(readFileSync(localeUrl, 'utf8')) as JsonObject;
@@ -234,6 +243,21 @@ describe('Creative Studio localization contract', () => {
         if (!leaves[key]?.trim()) {
           issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
         }
+      }
+    }
+
+    expect(issues).toEqual([]);
+  });
+
+  it('localizes every readiness action and blocker in every configured locale', () => {
+    const issues: string[] = [];
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const leaves = flattenStringLeaves(creativeStudio);
+
+      for (const key of readinessActionKeys) {
+        if (!leaves[key]?.trim()) issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
       }
     }
 

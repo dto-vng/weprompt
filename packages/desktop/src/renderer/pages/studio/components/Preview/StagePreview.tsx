@@ -4,20 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { StudioAsset, StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type {
+  StudioAsset,
+  StudioRendererProject,
+  StudioRouteCatalog,
+  StudioScene,
+} from '@/common/types/project/creativeStudioTypes';
+import { Button } from '@arco-design/web-react';
 import { Picture, VideoOne } from '@icon-park/react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { buildSingleSceneReviewRequest, type GenerationSingleReviewRequest } from '../Generation/GenerationControls';
+import { deriveStudioReadiness } from '../../studioReadiness';
 
 const SAFE_STUDIO_ID = /^[A-Za-z0-9_-]{1,256}$/;
 
 export type StagePreviewProps = {
   projectId: string;
+  project?: StudioRendererProject;
+  catalog?: StudioRouteCatalog | null;
   selectedScene: StudioScene | null;
   /** Canonical metadata for the selected generated output. Omitted only for the legacy ID-only caller. */
   selectedAsset?: StudioAsset | null;
   /** Canonical last-frame thumbnail resolved by the controller from the selected video's job lineage. */
   posterAsset?: StudioAsset | null;
+  generationDisabled?: boolean;
+  onOpenSingleReview?: (request: GenerationSingleReviewRequest) => void;
 };
 
 /** Builds the only renderer-supported Creative Studio media URL shape. */
@@ -48,7 +61,16 @@ const isCanonicalPosterAsset = (asset: StudioAsset, projectId: string, scene: St
   scene.assetIds.includes(asset.id) &&
   createManagedStudioAssetUrl(projectId, asset.id) !== null;
 
-const StagePreview: React.FC<StagePreviewProps> = ({ projectId, selectedScene, selectedAsset, posterAsset = null }) => {
+const StagePreview: React.FC<StagePreviewProps> = ({
+  projectId,
+  project,
+  catalog,
+  selectedScene,
+  selectedAsset,
+  posterAsset = null,
+  generationDisabled = false,
+  onOpenSingleReview,
+}) => {
   const { t } = useTranslation();
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const mediaKind = selectedScene?.mediaKind ?? 'image';
@@ -58,6 +80,24 @@ const StagePreview: React.FC<StagePreviewProps> = ({ projectId, selectedScene, s
       : 'conversation.creativeStudio.preview.imageAlt'
   );
   const selectedAssetId = selectedScene?.selectedAssetId ?? null;
+  const canonicalScene =
+    project?.id === projectId && selectedScene !== null && project.scenes[selectedScene.id]?.id === selectedScene.id
+      ? project.scenes[selectedScene.id]!
+      : null;
+  const sceneStatus =
+    project === undefined || canonicalScene === null
+      ? null
+      : deriveStudioReadiness(project).sceneStatuses[canonicalScene.id];
+  const singleReviewRequest =
+    generationDisabled || onOpenSingleReview === undefined || canonicalScene === null || sceneStatus !== 'ready'
+      ? null
+      : buildSingleSceneReviewRequest({
+          project: project!,
+          catalog: catalog ?? null,
+          scene: canonicalScene,
+          durationSeconds: canonicalScene.durationSeconds,
+          hasReference: canonicalScene.referenceAssetId !== null,
+        });
 
   useEffect(() => {
     setFailedSource(null);
@@ -81,8 +121,17 @@ const StagePreview: React.FC<StagePreviewProps> = ({ projectId, selectedScene, s
           {t('conversation.creativeStudio.preview.noAssetTitle')}
         </h2>
         <p className='m-0 max-w-420px text-13px text-t-secondary'>
-          {t('conversation.creativeStudio.preview.noAssetBody')}
+          {selectedScene !== null && selectedScene.visualPrompt.trim().length === 0
+            ? t('conversation.creativeStudio.preview.missingVisualPrompt')
+            : project !== undefined && !generationDisabled && sceneStatus === 'ready' && singleReviewRequest === null
+              ? t('conversation.creativeStudio.preview.missingModel')
+              : t('conversation.creativeStudio.preview.noAssetBody')}
         </p>
+        {singleReviewRequest !== null && (
+          <Button type='primary' onClick={() => onOpenSingleReview(singleReviewRequest)}>
+            {t('conversation.creativeStudio.preview.generateThisScene')}
+          </Button>
+        )}
       </section>
     );
   }

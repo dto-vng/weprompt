@@ -15,6 +15,7 @@ import type {
   StudioRouteCatalogEntry,
 } from '@/common/types/project/creativeStudioTypes';
 import {
+  buildSingleSceneReviewRequest,
   GenerationControls,
   type GenerationControlsProps,
 } from '@renderer/pages/studio/components/Generation/GenerationControls';
@@ -158,6 +159,34 @@ describe('GenerationControls', () => {
     vi.clearAllMocks();
   });
 
+  it('builds only a fully compatible canonical single-scene review request', () => {
+    expect(
+      buildSingleSceneReviewRequest({
+        project: project(),
+        catalog: catalog(),
+        scene: { id: 'scene-1', mediaKind: 'image' },
+        durationSeconds: 5,
+        hasReference: false,
+      })
+    ).toMatchObject({ sceneId: 'scene-1', catalogVersion: 'catalog-v1', routeStatus: 'valid' });
+
+    expect(
+      buildSingleSceneReviewRequest({
+        project: project({
+          routing: {
+            storyboard: null,
+            image: { choiceId: 'choice_image', providerId: 'foreign-provider', model: 'image-model-v1' },
+            video: null,
+          },
+        }),
+        catalog: catalog(),
+        scene: { id: 'scene-1', mediaKind: 'image' },
+        durationSeconds: 5,
+        hasReference: false,
+      })
+    ).toBeNull();
+  });
+
   it('derives review from persisted project routing without exposing Studio configuration controls', () => {
     const props = createProps();
     render(<GenerationControls {...props} />);
@@ -185,10 +214,8 @@ describe('GenerationControls', () => {
     render(<GenerationControls {...props} />);
 
     expect(screen.getByText('conversation.creativeStudio.routing.missingRoute')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' }));
-    expect(props.onOpenSingleReview).toHaveBeenCalledWith(
-      expect.objectContaining({ route: null, routeStatus: 'missing' })
-    );
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' })).toBeDisabled();
+    expect(props.onOpenSingleReview).not.toHaveBeenCalled();
   });
 
   it('can disable an unready selected scene without disabling the ready-scene batch action', () => {
@@ -196,7 +223,7 @@ describe('GenerationControls', () => {
 
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes' })
+      screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes:count=2' })
     ).toBeEnabled();
   });
 
@@ -276,13 +303,8 @@ describe('GenerationControls', () => {
     render(<GenerationControls {...componentProps} />);
 
     expect(screen.getByText('conversation.creativeStudio.routing.invalidRoute')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' }));
-    expect(componentProps.onOpenSingleReview).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        sceneId: 'scene-1',
-        routeStatus: 'invalid',
-      })
-    );
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' })).toBeDisabled();
+    expect(componentProps.onOpenSingleReview).not.toHaveBeenCalled();
   });
 
   it('opens Model Settings and exposes a typed refresh failure without owning connection commands', () => {
@@ -330,7 +352,9 @@ describe('GenerationControls', () => {
     });
     render(<GenerationControls {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes:count=2' })
+    );
     expect(props.onOpenBatchReview).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         routes: {

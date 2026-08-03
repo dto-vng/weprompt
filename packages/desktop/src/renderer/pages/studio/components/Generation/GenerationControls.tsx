@@ -83,6 +83,16 @@ export type GenerationControlsProps = {
   onReviewUnknownSubmission: (jobId: string) => ActionResult;
 };
 
+export type BuildSingleSceneReviewRequestInput = {
+  project: StudioRendererProject;
+  catalog: StudioRouteCatalog | null;
+  scene: GenerationControlScene;
+  aspectRatio?: StudioAspectRatio;
+  resolution?: StudioResolution;
+  durationSeconds?: number;
+  hasReference?: boolean;
+};
+
 const copyCatalogEntry = (route: StudioRouteCatalogEntry): StudioRouteCatalogEntry => ({
   choiceId: route.choiceId,
   providerId: route.providerId,
@@ -152,6 +162,46 @@ const resolvePersistedRoute = (
       routeSupportsScene(catalogRoute, routeContext)
         ? 'valid'
         : 'invalid',
+  };
+};
+
+/** Builds a paid single-scene review request only for a canonical, compatible persisted route. */
+export const buildSingleSceneReviewRequest = ({
+  project,
+  catalog,
+  scene,
+  aspectRatio = project.aspectRatio,
+  resolution = project.resolution,
+  durationSeconds,
+  hasReference,
+}: BuildSingleSceneReviewRequestInput): GenerationSingleReviewRequest | null => {
+  if (catalog === null || catalog.catalogVersion.trim().length === 0 || catalog[scene.mediaKind].status !== 'ready') {
+    return null;
+  }
+  const selected = project.routing[scene.mediaKind];
+  if (selected === null) return null;
+  const route = catalog[scene.mediaKind].options.find(
+    (candidate) =>
+      candidate.kind === scene.mediaKind &&
+      candidate.choiceId === selected.choiceId &&
+      candidate.providerId === selected.providerId &&
+      candidate.model === selected.model
+  );
+  if (route === undefined || !routeSupportsScene(route, { aspectRatio, resolution, durationSeconds, hasReference })) {
+    return null;
+  }
+  return {
+    sceneId: scene.id,
+    route: {
+      sceneId: scene.id,
+      choiceId: route.choiceId,
+      providerId: route.providerId,
+      model: route.model,
+      kind: route.kind,
+    },
+    routeStatus: 'valid',
+    catalogVersion: catalog.catalogVersion,
+    availableRoutes: catalogRoutes(catalog),
   };
 };
 
@@ -250,16 +300,22 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
         };
   const effectiveRouteStatus: GenerationSingleReviewRequest['routeStatus'] =
     effectiveRoute === null ? 'missing' : resolvedRoute!.routeStatus;
+  const singleReviewRequest =
+    scene === null
+      ? null
+      : buildSingleSceneReviewRequest({
+          project,
+          catalog,
+          scene,
+          aspectRatio,
+          resolution,
+          durationSeconds: sceneDurationSeconds,
+          hasReference,
+        });
 
   const openSingleReview = (): void => {
-    if (!scene || catalogLoading) return;
-    onOpenSingleReview({
-      sceneId: scene.id,
-      route: effectiveRoute,
-      routeStatus: effectiveRouteStatus,
-      catalogVersion: catalog?.catalogVersion ?? null,
-      availableRoutes,
-    });
+    if (catalogLoading || singleReviewRequest === null) return;
+    onOpenSingleReview(singleReviewRequest);
   };
 
   const openBatchReview = (): void => {
@@ -329,7 +385,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
       <div className='flex flex-wrap gap-8px'>
         <Button
           type='primary'
-          disabled={disabled || singleDisabled || scene === null || catalogLoading}
+          disabled={disabled || singleDisabled || singleReviewRequest === null || catalogLoading}
           onClick={openSingleReview}
         >
           {t(
@@ -339,7 +395,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
           )}
         </Button>
         <Button disabled={disabled || batchSceneCount < 1 || catalogLoading} onClick={openBatchReview}>
-          {t('conversation.creativeStudio.review.generateReadyScenes')}
+          {t('conversation.creativeStudio.review.generateReadyScenes', { count: batchSceneCount })}
         </Button>
       </div>
 

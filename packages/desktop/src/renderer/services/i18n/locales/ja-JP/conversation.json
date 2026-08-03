@@ -798,6 +798,7 @@
       "resolution": "解像度",
       "sceneCount": "シーン数",
       "readiness": "下書きの準備状況",
+      "scenesReady": "{{ready}}/{{total}} シーンが準備完了",
       "emptyStoryboard": "シーンがありません。手動で追加するか、ストーリーボードを作成してください。",
       "backToLibrary": "クリエイティブスタジオに戻る",
       "loadFailed": "プロジェクトを読み込めませんでした。"
@@ -888,7 +889,8 @@
       "noCompatibleRoute": "利用できる互換ルートがありません"
     },
     "review": {
-      "generateReadyScenes": "準備済みシーンを生成",
+      "generateReadyScenes": "準備済みの{{count}}シーンを生成",
+      "noReadyScenes": "生成準備ができたシーンはありません。",
       "generateScene": "シーンを生成",
       "regenerateScene": "別のバリエーションを生成",
       "title": "生成内容を確認",
@@ -956,7 +958,10 @@
       "selectVersion": "このバリエーションを選択",
       "importReference": "最初のフレーム画像を読み込む",
       "importing": "参照画像を読み込んでいます...",
-      "posterUnavailable": "動画ポスターを利用できません"
+      "posterUnavailable": "動画ポスターを利用できません",
+      "missingVisualPrompt": "このシーンを生成する前にビジュアルプロンプトを追加してください。",
+      "missingModel": "このシーンを生成する前に互換性のあるプロジェクトモデルを選択してください。",
+      "generateThisScene": "このシーンを生成"
     },
     "timeline": {
       "title": "シーンストリップ",
@@ -981,6 +986,7 @@
       "missingScenes": "不足しているシーン：{{scenes}}",
       "failed": "素材を書き出せませんでした。",
       "noSelectedAssets": "書き出せる選択済みのシーン素材がありません。",
+      "noAssetsToExport": "書き出す前に生成済みのシーン素材を1つ以上選択してください。",
       "folderLabel": "書き出しフォルダー"
     },
     "errors": {

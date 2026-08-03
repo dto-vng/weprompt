@@ -799,6 +799,7 @@
       "resolution": "Auflösung",
       "sceneCount": "Szenen",
       "readiness": "Entwurfsbereitschaft",
+      "scenesReady": "{{ready}}/{{total}} Szenen bereit",
       "emptyStoryboard": "Noch keine Szenen. Füge Szenen manuell hinzu oder entwirf ein Storyboard.",
       "backToLibrary": "Zurück zu Creative Studio",
       "loadFailed": "Das Projekt konnte nicht geladen werden."
@@ -889,7 +890,8 @@
       "noCompatibleRoute": "Keine kompatible Route verfügbar"
     },
     "review": {
-      "generateReadyScenes": "Bereite Szenen generieren",
+      "generateReadyScenes": "{{count}} bereite Szenen generieren",
+      "noReadyScenes": "Keine Szene ist bereit zur Generierung.",
       "generateScene": "Szene generieren",
       "regenerateScene": "Weitere Variante generieren",
       "title": "Generierung prüfen",
@@ -957,7 +959,10 @@
       "selectVersion": "Diese Variante auswählen",
       "importReference": "Bild für den ersten Frame importieren",
       "importing": "Referenz wird importiert...",
-      "posterUnavailable": "Videovorschaubild nicht verfügbar"
+      "posterUnavailable": "Videovorschaubild nicht verfügbar",
+      "missingVisualPrompt": "Füge vor der Generierung dieser Szene eine visuelle Anweisung hinzu.",
+      "missingModel": "Wähle vor der Generierung dieser Szene ein kompatibles Projektmodell aus.",
+      "generateThisScene": "Diese Szene generieren"
     },
     "timeline": {
       "title": "Szenenleiste",
@@ -982,6 +987,7 @@
       "missingScenes": "Fehlende Szenen: {{scenes}}",
       "failed": "Assets konnten nicht exportiert werden.",
       "noSelectedAssets": "Keine ausgewählten Szenen-Assets sind für den Export bereit.",
+      "noAssetsToExport": "Wähle vor dem Export mindestens ein generiertes Szenen-Asset aus.",
       "folderLabel": "Exportordner"
     },
     "errors": {

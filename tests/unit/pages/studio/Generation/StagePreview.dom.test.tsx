@@ -8,7 +8,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { StudioAsset, StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type {
+  StudioAsset,
+  StudioRendererProject,
+  StudioRouteCatalog,
+  StudioScene,
+} from '@/common/types/project/creativeStudioTypes';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
 import { StagePreview } from '@renderer/pages/studio/components/Preview/StagePreview';
 import { SceneTimeline } from '@renderer/pages/studio/components/SceneTimeline';
@@ -51,6 +56,56 @@ const asset = (overrides: Partial<StudioAsset> = {}): StudioAsset => ({
   sha256: '1'.repeat(64),
   createdAt: '2026-07-30T00:00:00.000Z',
   ...overrides,
+});
+
+const project = (current: StudioScene): StudioRendererProject => ({
+  schemaVersion: 1,
+  revision: 1,
+  id: 'project-1',
+  name: 'Project',
+  brief: '',
+  aspectRatio: '16:9',
+  targetDurationSeconds: current.durationSeconds,
+  resolution: '720p',
+  sceneOrder: [current.id],
+  scenes: { [current.id]: current },
+  assets: {},
+  jobs: {},
+  routing: {
+    storyboard: null,
+    image: { choiceId: 'choice-image', providerId: 'provider-image', model: 'image-model' },
+    video: null,
+  },
+  createdAt: '2026-08-03T00:00:00.000Z',
+  updatedAt: '2026-08-03T00:00:00.000Z',
+});
+
+const catalog = (): StudioRouteCatalog => ({
+  storyboard: { status: 'setup_required', selected: null, options: [] },
+  image: {
+    status: 'ready',
+    selected: { choiceId: 'choice-image', providerId: 'provider-image', model: 'image-model' },
+    options: [
+      {
+        choiceId: 'choice-image',
+        providerId: 'provider-image',
+        providerName: 'Image provider',
+        model: 'image-model',
+        health: 'available',
+        kind: 'image',
+        constraints: {
+          aspectRatios: ['16:9'],
+          resolutions: ['720p'],
+          minDurationSeconds: 1,
+          maxDurationSeconds: 60,
+          supportsFirstFrame: true,
+          silentOutput: true,
+        },
+      },
+    ],
+  },
+  video: { status: 'setup_required', selected: null, options: [] },
+  catalogVersion: 'catalog-1',
 });
 
 describe('StagePreview managed media', () => {
@@ -255,6 +310,62 @@ describe('StagePreview managed media', () => {
     expect(screen.getByLabelText('conversation.creativeStudio.preview.videoLabel').getAttribute('src')).not.toContain(
       'base64'
     );
+  });
+
+  it('shows the prompt requirement when the selected scene has no visual prompt', () => {
+    const current = scene({ visualPrompt: '   ' });
+    render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={catalog()}
+        selectedScene={current}
+        onOpenSingleReview={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.preview.missingVisualPrompt')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers contextual generation only when a compatible single-scene review can be built', () => {
+    const current = scene();
+    const onOpenSingleReview = vi.fn();
+    render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={catalog()}
+        selectedScene={current}
+        onOpenSingleReview={onOpenSingleReview}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' }));
+
+    expect(onOpenSingleReview).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sceneId: current.id, catalogVersion: 'catalog-1', routeStatus: 'valid' })
+    );
+  });
+
+  it('shows the model requirement instead of a generation shortcut when routing is unavailable', () => {
+    const current = scene();
+    render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={null}
+        selectedScene={current}
+        onOpenSingleReview={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.preview.missingModel')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
+    ).not.toBeInTheDocument();
   });
 });
 
