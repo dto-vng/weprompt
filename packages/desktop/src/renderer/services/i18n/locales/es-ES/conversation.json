@@ -821,13 +821,23 @@
       "dragScene": "Arrastra la escena para reordenarla",
       "removeScene": "Eliminar escena",
       "removeConfirmTitle": "¿Eliminar esta escena?",
-      "removeConfirmBody": "No se puede eliminar una escena con recursos generados o tareas activas.",
+      "removeConfirmBody": "No se pueden eliminar las escenas con recursos generados o historial de generación.",
+      "removeBlocked": "No se pueden eliminar las escenas con recursos generados o historial de generación.",
       "retry": "Reintentar el cambio",
       "discard": "Descartar cambios locales"
     },
     "scene": {
       "defaultTitle": "Escena sin título",
       "accessibleName": "Escena {{number}}: {{title}}",
+      "number": "Escena {{number}}",
+      "status": {
+        "needs_prompt": "Falta el prompt",
+        "ready": "Lista para generar",
+        "generating": "Generando",
+        "needs_selection": "Selecciona una variación",
+        "generated": "Generada",
+        "needs_attention": "Requiere atención"
+      },
       "image": "Imagen",
       "video": "Vídeo",
       "duration": "Duración",

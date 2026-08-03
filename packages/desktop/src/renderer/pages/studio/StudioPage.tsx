@@ -761,6 +761,7 @@ const StudioProjectShell: React.FC = () => {
           suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
           canAddScene={editor.canAddScene}
           mutationPending={canonicalMutationPending}
+          sceneStatuses={readiness?.sceneStatuses ?? {}}
           errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
           statusMessageKey={
             panelSceneIssue || nonDraftError || panelConflict

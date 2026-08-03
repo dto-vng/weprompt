@@ -820,13 +820,23 @@
       "dragScene": "برای تغییر ترتیب، صحنه را بکشید",
       "removeScene": "حذف صحنه",
       "removeConfirmTitle": "این صحنه حذف شود؟",
-      "removeConfirmBody": "صحنه‌ای که دارایی تولیدشده یا کار فعال دارد قابل حذف نیست.",
+      "removeConfirmBody": "صحنه‌های دارای دارایی تولیدشده یا سابقه تولید قابل حذف نیستند.",
+      "removeBlocked": "صحنه‌های دارای دارایی تولیدشده یا سابقه تولید قابل حذف نیستند.",
       "retry": "تلاش دوباره برای تغییر",
       "discard": "نادیده گرفتن تغییرات محلی"
     },
     "scene": {
       "defaultTitle": "صحنه بدون عنوان",
       "accessibleName": "صحنه {{number}}: {{title}}",
+      "number": "صحنه {{number}}",
+      "status": {
+        "needs_prompt": "به دستور نیاز دارد",
+        "ready": "آماده تولید",
+        "generating": "در حال تولید",
+        "needs_selection": "یک نسخه را انتخاب کنید",
+        "generated": "تولید شد",
+        "needs_attention": "نیازمند توجه"
+      },
       "image": "تصویر",
       "video": "ویدیو",
       "duration": "مدت",

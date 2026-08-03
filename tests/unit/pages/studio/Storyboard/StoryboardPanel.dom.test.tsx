@@ -9,6 +9,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type { StudioSceneStatus } from '@renderer/pages/studio/studioReadiness';
 import {
   StoryboardPanel,
   type StoryboardPanelProps,
@@ -61,12 +62,20 @@ vi.mock('react-i18next', () => ({
       if (key === 'conversation.creativeStudio.storyboard.durationTotal') {
         return `${key}:${params?.total}:${params?.target}`;
       }
+      if (key === 'conversation.creativeStudio.storyboard.removeBlocked') {
+        return 'Scenes with generated assets or generation history cannot be removed.';
+      }
       return params === undefined ? key : `${key}:${Object.values(params).join(':')}`;
     },
   }),
 }));
 
-const scene = (id: string, title: string, durationSeconds: number): StudioScene => ({
+const scene = (
+  id: string,
+  title: string,
+  durationSeconds: number,
+  overrides: Partial<StudioScene> = {}
+): StudioScene => ({
   id,
   title,
   purpose: `${title} purpose`,
@@ -80,6 +89,7 @@ const scene = (id: string, title: string, durationSeconds: number): StudioScene 
   assetIds: [],
   jobIds: [],
   reviewState: 'draft',
+  ...overrides,
 });
 
 const orderedScenes = [scene('scene-1', 'Opening', 4), scene('scene-2', 'Reveal', 6), scene('scene-3', 'Closing', 5)];
@@ -94,6 +104,7 @@ const createProps = (overrides: Partial<StoryboardPanelProps> = {}): StoryboardP
   suggestedExpandedTargetSeconds: 25,
   canAddScene: true,
   mutationPending: false,
+  sceneStatuses: Object.fromEntries(orderedScenes.map((item) => [item.id, 'ready' satisfies StudioSceneStatus])),
   errorMessageKey: null,
   statusMessageKey: null,
   conflict: false,
@@ -126,7 +137,7 @@ describe('StoryboardPanel', () => {
       'conversation.creativeStudio.scene.accessibleName:3:Closing',
     ]);
     expect(sceneButtons[0]).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByText('conversation.creativeStudio.scene.selected')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.scene.selected')).not.toBeInTheDocument();
 
     fireEvent.click(sceneButtons[1]);
     expect(props.onSelectScene).toHaveBeenCalledExactlyOnceWith('scene-2');
@@ -292,6 +303,32 @@ describe('StoryboardPanel', () => {
         name: 'conversation.creativeStudio.scene.accessibleName:2:Reveal',
       })
     ).toBeInTheDocument();
+  });
+
+  it('only offers removal for draft scenes with no generated assets or generation history', () => {
+    const removable = scene('scene-draft', 'Draft', 4);
+    const withAsset = scene('scene-asset', 'Asset', 4, { assetIds: ['asset-1'] });
+    const withCompletedJob = scene('scene-history', 'History', 4, { jobIds: ['job-completed'] });
+    const props = createProps({
+      orderedScenes: [removable, withAsset, withCompletedJob],
+      selectedSceneId: removable.id,
+      sceneStatuses: {
+        [removable.id]: 'ready',
+        [withAsset.id]: 'generated',
+        [withCompletedJob.id]: 'needs_attention',
+      },
+    });
+    render(<StoryboardPanel {...props} />);
+
+    const removeButtons = screen.getAllByRole('button', {
+      name: /conversation\.creativeStudio\.storyboard\.removeScene: conversation\.creativeStudio\.scene\.accessibleName/,
+    });
+    expect(removeButtons[0]).toBeEnabled();
+    expect(removeButtons[1]).toBeDisabled();
+    expect(removeButtons[2]).toBeDisabled();
+    expect(screen.getAllByText('Scenes with generated assets or generation history cannot be removed.')).toHaveLength(
+      2
+    );
   });
 
   it('keeps non-draft conflict recovery reachable when the storyboard has no scenes', () => {

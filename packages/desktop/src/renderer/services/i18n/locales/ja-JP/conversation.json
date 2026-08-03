@@ -820,13 +820,23 @@
       "dragScene": "シーンをドラッグして並べ替え",
       "removeScene": "シーンを削除",
       "removeConfirmTitle": "このシーンを削除しますか？",
-      "removeConfirmBody": "生成済み素材や進行中のジョブがあるシーンは削除できません。",
+      "removeConfirmBody": "生成済みアセットまたは生成履歴があるシーンは削除できません。",
+      "removeBlocked": "生成済みアセットまたは生成履歴があるシーンは削除できません。",
       "retry": "変更を再試行",
       "discard": "ローカルの変更を破棄"
     },
     "scene": {
       "defaultTitle": "無題のシーン",
       "accessibleName": "シーン {{number}}：{{title}}",
+      "number": "シーン {{number}}",
+      "status": {
+        "needs_prompt": "プロンプトが必要",
+        "ready": "生成準備完了",
+        "generating": "生成中",
+        "needs_selection": "バリエーションを選択",
+        "generated": "生成済み",
+        "needs_attention": "要対応"
+      },
       "image": "画像",
       "video": "動画",
       "duration": "時間",

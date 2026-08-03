@@ -826,13 +826,23 @@
       "dragScene": "Arraste a cena para reordenar",
       "removeScene": "Remover cena",
       "removeConfirmTitle": "Remover esta cena?",
-      "removeConfirmBody": "Uma cena com recursos gerados ou trabalhos ativos não pode ser removida.",
+      "removeConfirmBody": "Cenas com recursos gerados ou histórico de geração não podem ser removidas.",
+      "removeBlocked": "Cenas com recursos gerados ou histórico de geração não podem ser removidas.",
       "retry": "Tentar a alteração novamente",
       "discard": "Descartar alterações locais"
     },
     "scene": {
       "defaultTitle": "Cena sem título",
       "accessibleName": "Cena {{number}}: {{title}}",
+      "number": "Cena {{number}}",
+      "status": {
+        "needs_prompt": "Precisa de prompt",
+        "ready": "Pronta para gerar",
+        "generating": "Gerando",
+        "needs_selection": "Selecione uma variação",
+        "generated": "Gerada",
+        "needs_attention": "Requer atenção"
+      },
       "image": "Imagem",
       "video": "Vídeo",
       "duration": "Duração",

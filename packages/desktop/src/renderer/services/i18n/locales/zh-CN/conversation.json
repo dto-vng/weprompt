@@ -820,13 +820,23 @@
       "dragScene": "拖动场景以重新排序",
       "removeScene": "移除场景",
       "removeConfirmTitle": "移除此场景？",
-      "removeConfirmBody": "包含已生成素材或活动任务的场景无法移除。",
+      "removeConfirmBody": "包含已生成素材或生成记录的场景无法移除。",
+      "removeBlocked": "包含已生成素材或生成记录的场景无法移除。",
       "retry": "重试更改",
       "discard": "放弃本地更改"
     },
     "scene": {
       "defaultTitle": "未命名场景",
       "accessibleName": "场景 {{number}}：{{title}}",
+      "number": "场景 {{number}}",
+      "status": {
+        "needs_prompt": "需要提示词",
+        "ready": "可生成",
+        "generating": "正在生成",
+        "needs_selection": "请选择一个变体",
+        "generated": "已生成",
+        "needs_attention": "需要处理"
+      },
       "image": "图像",
       "video": "视频",
       "duration": "时长",

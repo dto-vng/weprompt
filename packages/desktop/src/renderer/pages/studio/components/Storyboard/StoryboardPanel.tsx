@@ -12,6 +12,7 @@ import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type { StudioSceneStatus } from '../../studioReadiness';
 
 import { SceneCard, type SceneMoveDirection } from './SceneCard';
 import styles from './Storyboard.module.css';
@@ -35,6 +36,7 @@ export type StoryboardPanelProps = {
   suggestedExpandedTargetSeconds: number | null;
   canAddScene: boolean;
   mutationPending: boolean;
+  sceneStatuses: Record<string, StudioSceneStatus>;
   errorMessageKey?: string | null;
   statusMessageKey?: string | null;
   conflict: boolean;
@@ -59,6 +61,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   suggestedExpandedTargetSeconds,
   canAddScene,
   mutationPending,
+  sceneStatuses,
   errorMessageKey = null,
   statusMessageKey = null,
   conflict,
@@ -151,6 +154,8 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
                   scene={scene}
                   index={index}
                   selected={selectedSceneId === scene.id}
+                  status={sceneStatuses[scene.id] ?? 'needs_prompt'}
+                  removeDisabled={scene.assetIds.length > 0 || scene.jobIds.length > 0}
                   mutationPending={mutationPending}
                   moveUpDisabled={index === 0}
                   moveDownDisabled={index === orderedScenes.length - 1}

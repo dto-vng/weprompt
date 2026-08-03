@@ -822,13 +822,23 @@
       "dragScene": "Yeniden sıralamak için sahneyi sürükleyin",
       "removeScene": "Sahneyi kaldır",
       "removeConfirmTitle": "Bu sahne kaldırılsın mı?",
-      "removeConfirmBody": "Oluşturulmuş varlıkları veya etkin işleri olan bir sahne kaldırılamaz.",
+      "removeConfirmBody": "Oluşturulmuş varlıkları veya oluşturma geçmişi olan sahneler kaldırılamaz.",
+      "removeBlocked": "Oluşturulmuş varlıkları veya oluşturma geçmişi olan sahneler kaldırılamaz.",
       "retry": "Değişikliği tekrar dene",
       "discard": "Yerel değişiklikleri at"
     },
     "scene": {
       "defaultTitle": "Adsız sahne",
       "accessibleName": "Sahne {{number}}: {{title}}",
+      "number": "Sahne {{number}}",
+      "status": {
+        "needs_prompt": "İstem gerekiyor",
+        "ready": "Oluşturmaya hazır",
+        "generating": "Oluşturuluyor",
+        "needs_selection": "Bir varyasyon seçin",
+        "generated": "Oluşturuldu",
+        "needs_attention": "Dikkat gerekiyor"
+      },
       "image": "Görsel",
       "video": "Video",
       "duration": "Süre",

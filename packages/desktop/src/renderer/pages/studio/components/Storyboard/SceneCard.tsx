@@ -6,12 +6,13 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button } from '@arco-design/web-react';
+import { Button, Tag } from '@arco-design/web-react';
 import { Delete, Drag, Down, Up } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type { StudioSceneStatus } from '../../studioReadiness';
 
 import styles from './Storyboard.module.css';
 
@@ -21,6 +22,8 @@ export type SceneCardProps = {
   scene: StudioScene;
   index: number;
   selected: boolean;
+  status: StudioSceneStatus;
+  removeDisabled: boolean;
   mutationPending: boolean;
   moveUpDisabled: boolean;
   moveDownDisabled: boolean;
@@ -34,6 +37,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   scene,
   index,
   selected,
+  status,
+  removeDisabled,
   mutationPending,
   moveUpDisabled,
   moveDownDisabled,
@@ -55,6 +60,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   const moveUpLabel = actionLabel('conversation.creativeStudio.storyboard.moveUp');
   const moveDownLabel = actionLabel('conversation.creativeStudio.storyboard.moveDown');
   const removeLabel = actionLabel('conversation.creativeStudio.storyboard.removeScene');
+  const statusKey = `conversation.creativeStudio.scene.status.${status}` as const;
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -86,18 +92,22 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         >
           <Drag size={15} />
         </Button>
-        <Button
-          type='text'
-          className={styles.sceneSelect}
-          aria-label={sceneLabel}
-          aria-current={selected ? 'true' : undefined}
-          onClick={onSelect}
-        >
-          <span className={styles.sceneTitle}>{scene.title}</span>
-        </Button>
+        <div className={styles.sceneIdentity}>
+          <Button
+            type='text'
+            className={styles.sceneSelect}
+            aria-label={sceneLabel}
+            aria-current={selected ? 'true' : undefined}
+            onClick={onSelect}
+          >
+            <span className={styles.sceneEyebrow}>
+              {t('conversation.creativeStudio.scene.number', { number: index + 1 })}
+            </span>
+            <span className={styles.sceneTitle}>{scene.title}</span>
+          </Button>
+          <Tag className={styles.sceneStatus}>{t(statusKey)}</Tag>
+        </div>
       </div>
-
-      {selected && <span className={styles.selectedLabel}>{t('conversation.creativeStudio.scene.selected')}</span>}
 
       <div className={styles.sceneMetadata}>
         <span>
@@ -112,6 +122,10 @@ export const SceneCard: React.FC<SceneCardProps> = ({
           {scene.durationSeconds} {t('conversation.creativeStudio.scene.seconds')}
         </span>
       </div>
+
+      {removeDisabled && (
+        <p className={styles.removeBlocked}>{t('conversation.creativeStudio.storyboard.removeBlocked')}</p>
+      )}
 
       <div className={styles.sceneActions}>
         <Button
@@ -140,7 +154,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
           status='danger'
           aria-label={removeLabel}
           title={removeLabel}
-          disabled={mutationPending}
+          disabled={mutationPending || removeDisabled}
           onClick={onRemove}
         >
           <Delete size={14} />

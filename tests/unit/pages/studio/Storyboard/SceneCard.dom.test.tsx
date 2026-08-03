@@ -33,6 +33,8 @@ vi.mock('react-i18next', () => ({
       if (key === 'conversation.creativeStudio.scene.accessibleName') {
         return `${key}:${params?.number}:${params?.title}`;
       }
+      if (key === 'conversation.creativeStudio.scene.number') return `Scene ${params?.number}`;
+      if (key === 'conversation.creativeStudio.scene.status.ready') return 'Ready to generate';
       return key;
     },
   }),
@@ -60,6 +62,8 @@ const renderSceneCard = () =>
       scene={scene}
       index={1}
       selected={false}
+      status='ready'
+      removeDisabled={false}
       mutationPending={false}
       moveUpDisabled={false}
       moveDownDisabled={false}
@@ -87,6 +91,34 @@ describe('SceneCard accessibility', () => {
       const actionLabel = `${action}: ${sceneLabel}`;
       expect(screen.getByRole('button', { name: actionLabel })).toHaveAttribute('title', actionLabel);
     }
+  });
+
+  it('keeps the selected state on the selection control while rendering the scene hierarchy and status', () => {
+    render(
+      <SceneCard
+        scene={scene}
+        index={1}
+        selected
+        status='ready'
+        removeDisabled={false}
+        mutationPending={false}
+        moveUpDisabled={false}
+        moveDownDisabled={false}
+        onSelect={vi.fn()}
+        onRemove={vi.fn()}
+        onMove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Scene 2')).toBeInTheDocument();
+    expect(screen.getByText('Reveal')).toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.scene.video')).toBeInTheDocument();
+    expect(screen.getByText('6 conversation.creativeStudio.scene.seconds')).toBeInTheDocument();
+    expect(screen.getByText('Ready to generate')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.scene.accessibleName:2:Reveal' })
+    ).toHaveAttribute('aria-current', 'true');
+    expect(screen.queryByText('conversation.creativeStudio.scene.selected')).not.toBeInTheDocument();
   });
 
   it('omits the inline dnd transition when reduced motion is preferred', () => {

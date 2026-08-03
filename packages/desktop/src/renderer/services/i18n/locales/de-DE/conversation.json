@@ -821,13 +821,23 @@
       "dragScene": "Szene zum Neuordnen ziehen",
       "removeScene": "Szene entfernen",
       "removeConfirmTitle": "Diese Szene entfernen?",
-      "removeConfirmBody": "Eine Szene mit generierten Assets oder aktiven Aufträgen kann nicht entfernt werden.",
+      "removeConfirmBody": "Szenen mit generierten Assets oder einer Generierungshistorie können nicht entfernt werden.",
+      "removeBlocked": "Szenen mit generierten Assets oder einer Generierungshistorie können nicht entfernt werden.",
       "retry": "Änderung erneut versuchen",
       "discard": "Lokale Änderungen verwerfen"
     },
     "scene": {
       "defaultTitle": "Unbenannte Szene",
       "accessibleName": "Szene {{number}}: {{title}}",
+      "number": "Szene {{number}}",
+      "status": {
+        "needs_prompt": "Prompt erforderlich",
+        "ready": "Bereit zur Generierung",
+        "generating": "Wird generiert",
+        "needs_selection": "Variation auswählen",
+        "generated": "Generiert",
+        "needs_attention": "Aufmerksamkeit erforderlich"
+      },
       "image": "Bild",
       "video": "Video",
       "duration": "Dauer",

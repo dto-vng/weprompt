@@ -820,13 +820,23 @@
       "dragScene": "拖曳場景以重新排序",
       "removeScene": "移除場景",
       "removeConfirmTitle": "要移除此場景嗎？",
-      "removeConfirmBody": "含有已產生素材或進行中工作的場景無法移除。",
+      "removeConfirmBody": "含有已產生素材或產生記錄的場景無法移除。",
+      "removeBlocked": "含有已產生素材或產生記錄的場景無法移除。",
       "retry": "重試變更",
       "discard": "捨棄本機變更"
     },
     "scene": {
       "defaultTitle": "未命名場景",
       "accessibleName": "場景 {{number}}：{{title}}",
+      "number": "場景 {{number}}",
+      "status": {
+        "needs_prompt": "需要提示詞",
+        "ready": "可開始產生",
+        "generating": "正在產生",
+        "needs_selection": "請選擇一個變體",
+        "generated": "已產生",
+        "needs_attention": "需要處理"
+      },
       "image": "圖片",
       "video": "影片",
       "duration": "時間",

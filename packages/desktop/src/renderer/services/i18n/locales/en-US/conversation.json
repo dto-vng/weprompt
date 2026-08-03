@@ -820,13 +820,23 @@
       "dragScene": "Drag scene to reorder",
       "removeScene": "Remove scene",
       "removeConfirmTitle": "Remove this scene?",
-      "removeConfirmBody": "A scene with generated assets or active jobs cannot be removed.",
+      "removeConfirmBody": "Scenes with generated assets or generation history cannot be removed.",
+      "removeBlocked": "Scenes with generated assets or generation history cannot be removed.",
       "retry": "Retry change",
       "discard": "Discard local changes"
     },
     "scene": {
       "defaultTitle": "Untitled scene",
       "accessibleName": "Scene {{number}}: {{title}}",
+      "number": "Scene {{number}}",
+      "status": {
+        "needs_prompt": "Needs prompt",
+        "ready": "Ready to generate",
+        "generating": "Generating",
+        "needs_selection": "Select a variation",
+        "generated": "Generated",
+        "needs_attention": "Needs attention"
+      },
       "image": "Image",
       "video": "Video",
       "duration": "Duration",
