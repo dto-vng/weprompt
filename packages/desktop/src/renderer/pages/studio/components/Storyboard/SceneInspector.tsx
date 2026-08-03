@@ -15,6 +15,7 @@ import type {
   StudioMediaKind,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
+import type { SelectedSceneSaveState } from '../../hooks/useStoryboardEditor';
 
 import { createManagedStudioAssetUrl } from '../Preview/StagePreview';
 import styles from './Storyboard.module.css';
@@ -28,7 +29,7 @@ export type SceneInspectorProps = {
   sceneDraft: StudioEditableScene | null;
   mutationPending: boolean;
   errorMessageKey?: string | null;
-  statusMessageKey?: string | null;
+  saveState: SelectedSceneSaveState;
   conflict: boolean;
   onUpdateSceneDraft: (patch: Partial<StudioEditableScene>) => void;
   onFlushSceneDraft: () => ActionResult;
@@ -46,7 +47,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   sceneDraft,
   mutationPending,
   errorMessageKey = null,
-  statusMessageKey = null,
+  saveState,
   conflict,
   onUpdateSceneDraft,
   onFlushSceneDraft,
@@ -93,11 +94,20 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
     selectedScene.assetIds.includes(referenceAsset.id)
       ? createManagedStudioAssetUrl(projectId, referenceAsset.id)
       : null;
+  const saveStatusMessageKey = {
+    saved: 'conversation.creativeStudio.inspector.saved',
+    dirty: 'conversation.creativeStudio.inspector.unsavedChanges',
+    saving: 'conversation.creativeStudio.inspector.saving',
+    failed: 'conversation.creativeStudio.inspector.saveFailed',
+  } as const satisfies Record<SelectedSceneSaveState, string>;
 
   return (
     <section aria-label={t('conversation.creativeStudio.inspector.title')} className={styles.inspector}>
       <header className={styles.inspectorHeader}>
         <h2>{t('conversation.creativeStudio.inspector.title')}</h2>
+        <span role='status' aria-live='polite' aria-atomic='true' className={styles.saveStatus} data-state={saveState}>
+          {t(saveStatusMessageKey[saveState])}
+        </span>
       </header>
 
       <div className={styles.inspectorBody}>
@@ -106,12 +116,6 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
             {t(errorMessageKey)}
           </div>
         )}
-        {statusMessageKey && (
-          <div role='status' className={`${styles.feedback} ${styles.status}`}>
-            {t(statusMessageKey)}
-          </div>
-        )}
-
         {!selectedScene || !sceneDraft ? (
           <p className={styles.emptyInspector}>{t('conversation.creativeStudio.storyboard.noScenes')}</p>
         ) : (
@@ -135,6 +139,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
                       <Input.TextArea
                         id={purposeId}
                         value={sceneDraft.purpose}
+                        placeholder={t('conversation.creativeStudio.inspector.purposePlaceholder')}
                         onChange={(purpose) => onUpdateSceneDraft({ purpose })}
                         onBlur={flushDraft}
                         rows={2}
@@ -146,6 +151,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
                       <Input.TextArea
                         id={promptId}
                         value={sceneDraft.visualPrompt}
+                        placeholder={t('conversation.creativeStudio.inspector.visualPromptPlaceholder')}
                         onChange={(visualPrompt) => onUpdateSceneDraft({ visualPrompt })}
                         onBlur={flushDraft}
                         rows={4}
@@ -222,11 +228,6 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
                             : 'conversation.creativeStudio.preview.importReference'
                         )}
                       </Button>
-                      {importingReference && (
-                        <span role='status' className='sr-only'>
-                          {t('conversation.creativeStudio.preview.importing')}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </Tabs.TabPane>

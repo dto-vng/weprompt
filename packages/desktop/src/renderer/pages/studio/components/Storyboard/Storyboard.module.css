@@ -23,6 +23,13 @@
   border-bottom: 1px solid var(--color-border-2);
 }
 
+.inspectorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .panelHeader h2,
 .inspectorHeader h2 {
   margin: 0;
@@ -105,8 +112,8 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .dragHandle {
@@ -140,13 +147,15 @@
 }
 
 .sceneTitle {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sceneStatus {
-  margin-top: 1px;
+  flex: none;
+  align-self: flex-start;
   border-color: var(--color-fill-3);
   color: var(--color-text-2);
   background: var(--color-fill-2);
@@ -178,6 +187,12 @@
   gap: 4px;
 }
 
+.sceneCard :global(.arco-btn):focus {
+  outline: 2px solid rgb(var(--primary-6)) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(var(--primary-6), 0.28) !important;
+}
+
 .panelFooter {
   display: flex;
   border-top: 1px solid var(--color-border-2);
@@ -200,6 +215,22 @@
 .status {
   color: var(--color-text-2);
   background: var(--color-fill-2);
+}
+
+.saveStatus {
+  flex: none;
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: end;
+}
+
+.saveStatus[data-state='saved'] {
+  color: rgb(var(--success-6));
+}
+
+.saveStatus[data-state='failed'] {
+  color: rgb(var(--danger-6));
 }
 
 .limit {

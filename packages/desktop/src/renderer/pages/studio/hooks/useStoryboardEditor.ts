@@ -41,6 +41,8 @@ export type StoryboardEditorConflict = StoryboardEditorIssue & {
   code: 'stale_project';
 };
 
+export type SelectedSceneSaveState = 'saved' | 'dirty' | 'saving' | 'failed';
+
 export type UseStoryboardEditorOptions = {
   project: StudioRendererProject | null;
   refetch: () => Promise<StudioRendererProject | null>;
@@ -54,6 +56,7 @@ export type UseStoryboardEditorResult = {
   sceneDraft: StudioEditableScene | null;
   hasUnsavedSceneDrafts: boolean;
   hasUnsavedSelectedSceneDraft: boolean;
+  selectedSceneSaveState: SelectedSceneSaveState;
   saveIssues: StoryboardEditorIssue[];
   selectScene: (sceneId: string) => void;
   updateSceneDraft: (patch: Partial<StudioEditableScene>) => void;
@@ -102,6 +105,12 @@ type InternalConflict = {
 type PausedMutationIntent = {
   intent: QueuedMutationIntent;
   resolve: (result: boolean) => void;
+};
+
+type ActiveSaveIntent = {
+  projectId: string;
+  session: number;
+  sceneId: string;
 };
 
 const editableScene = (scene: StudioScene): StudioEditableScene => ({
@@ -169,6 +178,7 @@ export const useStoryboardEditor = ({
   const [error, setError] = useState<StoryboardEditorIssue | null>(null);
   const [conflict, setConflict] = useState<StoryboardEditorConflict | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [activeSaveIntent, setActiveSaveIntent] = useState<ActiveSaveIntent | null>(null);
 
   const mountedRef = useRef(true);
   const projectRef = useRef<StudioRendererProject | null>(parentProject);
@@ -188,6 +198,7 @@ export const useStoryboardEditor = ({
   const storyboardEpochRef = useRef(0);
   const canonicalRefetchRequestRef = useRef(0);
   const draftingTokenRef = useRef<{ projectId: string; session: number } | null>(null);
+  const activeSaveIntentRef = useRef<ActiveSaveIntent | null>(null);
   const refetchRef = useRef(refetch);
   const flushSceneRef = useRef<(sceneId: string, allowMissingCanonical?: boolean) => Promise<boolean>>(
     async () => false
@@ -237,11 +248,13 @@ export const useStoryboardEditor = ({
     internalConflictRef.current = null;
     discardPausedIntents();
     draftingTokenRef.current = null;
+    activeSaveIntentRef.current = null;
     if (mountedRef.current) {
       setMutationCount(0);
       setConflict(null);
       setError(null);
       setDrafting(false);
+      setActiveSaveIntent(null);
     }
   }, [discardPausedIntents]);
 
@@ -329,6 +342,15 @@ export const useStoryboardEditor = ({
         return false;
       }
 
+      const saveIntent: ActiveSaveIntent | null =
+        intent.operation === 'save_scene' && intent.sceneId !== undefined
+          ? { projectId: intent.projectId, session: intent.session, sceneId: intent.sceneId }
+          : null;
+      if (saveIntent !== null) {
+        activeSaveIntentRef.current = saveIntent;
+        if (mountedRef.current) setActiveSaveIntent(saveIntent);
+      }
+
       try {
         const result = await intent.invoke(current);
         if (projectRef.current?.id !== intent.projectId || projectSessionRef.current !== intent.session) return false;
@@ -384,6 +406,11 @@ export const useStoryboardEditor = ({
         const issue = storageIssue(intent.operation, intent.sceneId);
         publishIssue(issue);
         return false;
+      } finally {
+        if (saveIntent !== null && activeSaveIntentRef.current === saveIntent) {
+          activeSaveIntentRef.current = null;
+          if (mountedRef.current) setActiveSaveIntent(null);
+        }
       }
     },
     [adoptProject, clearSaveIssue, publishIssue, refetchCanonical]
@@ -639,6 +666,23 @@ export const useStoryboardEditor = ({
     [draftVersion, project]
   );
   const saveIssues = useMemo(() => [...saveIssuesRef.current.values()], [saveIssueVersion]);
+  const selectedSceneSaveState: SelectedSceneSaveState = (() => {
+    if (selectedSceneId === null || selectedScene === null) return 'saved';
+    if (
+      activeSaveIntent?.projectId === project?.id &&
+      activeSaveIntent.session === projectSessionRef.current &&
+      activeSaveIntent.sceneId === selectedSceneId
+    ) {
+      return 'saving';
+    }
+    if (
+      (conflict?.operation === 'save_scene' && conflict.sceneId === selectedSceneId) ||
+      saveIssues.some((issue) => issue.sceneId === selectedSceneId)
+    ) {
+      return 'failed';
+    }
+    return dirtySceneIdsRef.current.has(selectedSceneId) ? 'dirty' : 'saved';
+  })();
   const durationTotalSeconds = useMemo(
     () => orderedScenes.reduce((total, currentScene) => total + currentScene.durationSeconds, 0),
     [orderedScenes]
@@ -933,6 +977,7 @@ export const useStoryboardEditor = ({
     sceneDraft,
     hasUnsavedSceneDrafts: dirtySceneIdsRef.current.size > 0,
     hasUnsavedSelectedSceneDraft: selectedSceneId !== null && dirtySceneIdsRef.current.has(selectedSceneId),
+    selectedSceneSaveState,
     saveIssues,
     selectScene,
     updateSceneDraft,

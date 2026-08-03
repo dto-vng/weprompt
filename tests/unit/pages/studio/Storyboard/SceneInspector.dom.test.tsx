@@ -12,7 +12,21 @@ import type { StudioAsset, StudioEditableScene, StudioScene } from '@/common/typ
 import { SceneInspector, type SceneInspectorProps } from '@renderer/pages/studio/components/Storyboard/SceneInspector';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) =>
+      ({
+        'conversation.creativeStudio.inspector.directionTab': 'Visual',
+        'conversation.creativeStudio.inspector.scriptTab': 'Script',
+        'conversation.creativeStudio.inspector.purposeLabel': 'Scene goal',
+        'conversation.creativeStudio.inspector.purposePlaceholder': 'What should this scene accomplish?',
+        'conversation.creativeStudio.inspector.visualPromptPlaceholder':
+          'Describe the shot, subject, setting, lighting, and motion.',
+        'conversation.creativeStudio.inspector.saved': 'Scene saved',
+        'conversation.creativeStudio.inspector.unsavedChanges': 'Your unsaved changes are preserved.',
+        'conversation.creativeStudio.inspector.saving': 'Saving scene...',
+        'conversation.creativeStudio.inspector.saveFailed': 'The scene could not be saved.',
+      })[key] ?? key,
+  }),
 }));
 
 const selectedScene: StudioScene = {
@@ -49,7 +63,7 @@ const createProps = (overrides: Partial<SceneInspectorProps> = {}): SceneInspect
   sceneDraft,
   mutationPending: false,
   errorMessageKey: null,
-  statusMessageKey: null,
+  saveState: 'saved',
   conflict: false,
   onUpdateSceneDraft: vi.fn(),
   onFlushSceneDraft: vi.fn(),
@@ -61,7 +75,7 @@ const createProps = (overrides: Partial<SceneInspectorProps> = {}): SceneInspect
 });
 
 describe('SceneInspector', () => {
-  it('hydrates every controlled direction and script field', () => {
+  it('hydrates the Visual and Script fields with clear labels and prompts', () => {
     const props = createProps();
     render(<SceneInspector {...props} />);
 
@@ -71,11 +85,16 @@ describe('SceneInspector', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue('Rooftop opening');
-    expect(screen.getByLabelText('conversation.creativeStudio.inspector.purposeLabel')).toHaveValue(
-      'Establish the city'
-    );
+    expect(screen.getByText('Visual')).toBeInTheDocument();
+    expect(screen.getByText('Script')).toBeInTheDocument();
+    expect(screen.getByLabelText('Scene goal')).toHaveValue('Establish the city');
+    expect(screen.getByLabelText('Scene goal')).toHaveAttribute('placeholder', 'What should this scene accomplish?');
     expect(screen.getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toHaveValue(
       'A quiet rooftop at blue hour'
+    );
+    expect(screen.getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toHaveAttribute(
+      'placeholder',
+      'Describe the shot, subject, setting, lighting, and motion.'
     );
     expect(
       screen.getByRole('combobox', {
@@ -88,7 +107,7 @@ describe('SceneInspector', () => {
       })
     ).toHaveValue('7');
 
-    fireEvent.click(screen.getByText('conversation.creativeStudio.inspector.scriptTab'));
+    fireEvent.click(screen.getByText('Script'));
     expect(screen.getByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toHaveValue(
       'Every launch starts with a view.'
     );
@@ -109,7 +128,7 @@ describe('SceneInspector', () => {
     fireEvent.blur(title);
     expect(props.onFlushSceneDraft).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText('conversation.creativeStudio.inspector.scriptTab'));
+    fireEvent.click(screen.getByText('Script'));
     const narration = screen.getByLabelText('conversation.creativeStudio.inspector.narrationLabel');
     fireEvent.change(narration, { target: { value: 'A revised line.' } });
     expect(props.onUpdateSceneDraft).toHaveBeenLastCalledWith({
@@ -175,18 +194,34 @@ describe('SceneInspector', () => {
     const props = createProps({
       conflict: true,
       errorMessageKey: 'conversation.creativeStudio.errors.staleProject',
-      statusMessageKey: 'conversation.creativeStudio.inspector.unsavedChanges',
+      saveState: 'failed',
     });
     render(<SceneInspector {...props} />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.errors.staleProject');
-    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.inspector.unsavedChanges');
+    expect(screen.getByRole('status')).toHaveTextContent('The scene could not be saved.');
     expect(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue('Rooftop opening');
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' }));
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' }));
     expect(props.onRetryConflict).toHaveBeenCalledTimes(1);
     expect(props.onDiscardConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['saved', 'Scene saved'],
+    ['dirty', 'Your unsaved changes are preserved.'],
+    ['saving', 'Saving scene...'],
+    ['failed', 'The scene could not be saved.'],
+  ] as const)('announces the %s save state once in the inspector header', (saveState, message) => {
+    const { container } = render(<SceneInspector {...createProps({ saveState })} />);
+
+    const statuses = screen.getAllByRole('status');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toHaveAttribute('aria-live', 'polite');
+    expect(statuses[0]).toHaveTextContent(message);
+    expect(statuses[0]?.closest('header')).not.toBeNull();
+    expect(container.querySelectorAll('[aria-live="polite"]')).toHaveLength(1);
   });
 
   it('offers a managed first-frame import without accepting renderer file input', () => {
@@ -252,7 +287,7 @@ describe('SceneInspector', () => {
         name: 'conversation.creativeStudio.preview.importing',
       })
     ).toBeDisabled();
-    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.preview.importing');
+    expect(screen.getByRole('status')).toHaveTextContent('Scene saved');
   });
 
   it('disables reference import while another canonical mutation is pending', () => {

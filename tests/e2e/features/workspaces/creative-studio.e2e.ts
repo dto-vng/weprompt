@@ -25,7 +25,10 @@ test.describe('Creative Studio workspace', () => {
     'Creative Studio E2E requires both fake-provider flags and an explicit unpackaged dev launch.'
   );
 
-  test('persists a project across reload and cancels a fake queued generation job', async ({ electronApp, page }) => {
+  test('saves a three-scene project and submits a reviewed fake generation explicitly', async ({
+    electronApp,
+    page,
+  }) => {
     const projectName = `Studio E2E ${Date.now()}`;
 
     await test.step('prove the fake-provider runtime gate is active', async () => {
@@ -83,7 +86,7 @@ test.describe('Creative Studio workspace', () => {
       await createDialog
         .getByLabel('Creative brief')
         .fill('A deterministic E2E story used to verify local Studio persistence and safe job cancellation.');
-      await createDialog.getByLabel('Target length in seconds').fill('5');
+      await createDialog.getByLabel('Target length in seconds').fill('15');
       await createDialog.getByRole('button', { name: 'Create project' }).click();
 
       const projectOverview = page.getByRole('region', { name: 'Project overview' });
@@ -120,8 +123,50 @@ test.describe('Creative Studio workspace', () => {
       await expect(page.getByRole('combobox', { name: 'Video model' })).toContainText('weprompt-e2e-video');
     });
 
-    await test.step('submit through the fake route and cancel while remotely queued', async () => {
-      await page.getByRole('button', { name: 'Add scene' }).click();
+    await test.step('build three five-second scenes and wait for the selected prompt to save', async () => {
+      const addScene = page.getByRole('button', { name: 'Add scene' });
+      const sceneSelectors = page.getByRole('button', { name: /^Scene \d+: Untitled scene$/ });
+      const addSceneAndWait = async (sceneCount: number) => {
+        await addScene.click();
+        await expect(sceneSelectors).toHaveCount(sceneCount);
+      };
+      await addSceneAndWait(1);
+      await addSceneAndWait(2);
+      await addSceneAndWait(3);
+      await expect(page.getByText('Storyboard timing: 15 of 15 seconds')).toBeVisible();
+      const storyboard = page.getByRole('region', { name: 'Storyboard' });
+      await expect(storyboard.getByText('5 seconds', { exact: true })).toHaveCount(3);
+      await expect(addScene).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Increase target to 20 seconds' })).toBeVisible();
+
+      const thirdScene = page.getByRole('button', { name: 'Scene 3: Untitled scene', exact: true });
+      await thirdScene.focus();
+      await expect(thirdScene).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(thirdScene).toHaveAttribute('aria-current', 'true');
+
+      const moveThirdSceneUp = page.getByRole('button', {
+        name: 'Move scene up: Scene 3: Untitled scene',
+        exact: true,
+      });
+      await page.keyboard.press('Tab');
+      await expect(moveThirdSceneUp).toBeFocused();
+      const focusOutline = await moveThirdSceneUp.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { halo: style.boxShadow, style: style.outlineStyle };
+      });
+      expect(focusOutline.style).toBe('solid');
+      expect(focusOutline.halo).not.toBe('none');
+      await test.info().attach('creative-studio-keyboard-focus', {
+        body: await page.screenshot(),
+        contentType: 'image/png',
+      });
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('button', { name: 'Scene 2: Untitled scene', exact: true })).toHaveAttribute(
+        'aria-current',
+        'true'
+      );
+
       await expect(page.getByLabel('Visual prompt')).toBeVisible();
 
       const outputType = page.getByLabel('Output type');
@@ -134,7 +179,48 @@ test.describe('Creative Studio workspace', () => {
       const visualPrompt = page.getByLabel('Visual prompt');
       await visualPrompt.fill('A paper airplane crossing a calm blue studio backdrop.');
       await visualPrompt.blur();
+      const sceneInspector = page.getByRole('region', { name: 'Scene direction' });
+      await expect(sceneInspector.getByRole('status')).toHaveText('Scene saved');
+    });
 
+    await test.step('keep the editor operable at target desktop viewports and with reduced motion', async () => {
+      const storyboard = page.getByRole('region', { name: 'Storyboard' });
+      const sceneMetadata = storyboard.getByText('5 seconds', { exact: true }).first();
+      expect(await sceneMetadata.evaluate((element) => getComputedStyle(element).fontSize)).toBe('12px');
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const firstSceneCard = storyboard.getByRole('listitem').first();
+      expect(await firstSceneCard.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+
+      const sceneInspector = page.getByRole('region', { name: 'Scene direction' });
+      const visualPrompt = page.getByLabel('Visual prompt');
+      const previewNextAction = page.getByRole('button', { name: 'Generate this scene' });
+      const verifyViewport = async (viewport: { width: number; height: number }) => {
+        await electronApp.evaluate(({ BrowserWindow }, size) => {
+          BrowserWindow.getAllWindows()
+            .find((candidate) => !candidate.isDestroyed())
+            ?.setContentSize(size.width, size.height);
+        }, viewport);
+        await page.evaluate(() => {
+          document.scrollingElement?.scrollTo({ top: 0, left: 0 });
+          document.querySelectorAll<HTMLElement>('*').forEach((element) => {
+            if (element.scrollTop > 0) element.scrollTop = 0;
+          });
+        });
+        await test.info().attach(`creative-studio-${viewport.width}x${viewport.height}`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+        await expect(sceneInspector.getByRole('status')).toBeInViewport();
+        await expect(visualPrompt).toBeInViewport();
+        await expect(previewNextAction).toBeInViewport();
+      };
+      await verifyViewport({ width: 1280, height: 800 });
+      await verifyViewport({ width: 1440, height: 900 });
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+    });
+
+    await test.step('open review without provider submission, then confirm and cancel the queued job', async () => {
       const generateScene = page.getByRole('button', { name: 'Generate scene' });
       await expect(generateScene).toBeEnabled();
       await generateScene.click();
@@ -144,6 +230,9 @@ test.describe('Creative Studio workspace', () => {
       await expect(reviewDialog.getByText('weprompt-e2e-video')).toBeVisible();
       await expect(reviewDialog.getByText('weprompt_studio_e2e')).toHaveCount(0);
       await expect(reviewDialog.getByText('weprompt-media-gateway-v1')).toHaveCount(0);
+      await expect(page.getByText('Queued by provider')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Cancel job' })).toHaveCount(0);
+
       await reviewDialog.getByRole('button', { name: 'Confirm and generate' }).click();
 
       await expect(page.getByText('Queued by provider')).toBeVisible({ timeout: 5_000 });

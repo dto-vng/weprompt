@@ -111,6 +111,101 @@ describe('useStoryboardEditor', () => {
     expect(result.current.durationTotalSeconds).toBe(10);
     expect(result.current.durationMatchesTarget).toBe(true);
     expect(result.current.hasUnsavedSelectedSceneDraft).toBe(false);
+    expect(result.current.selectedSceneSaveState).toBe('saved');
+  });
+
+  it('reports saved, dirty, saving, and saved for the selected scene debounce lifecycle', async () => {
+    vi.useFakeTimers();
+    const save = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.updateScene.invoke.mockReturnValueOnce(save.promise);
+    const initial = project();
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    expect(result.current.selectedSceneSaveState).toBe('saved');
+
+    act(() => result.current.updateSceneDraft({ title: 'A new opening' }));
+    expect(result.current.selectedSceneSaveState).toBe('dirty');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+    });
+    expect(result.current.selectedSceneSaveState).toBe('saving');
+
+    await act(async () => {
+      save.resolve(ok(project(3, [scene('scene-1', { title: 'A new opening' }), scene('scene-2')])));
+      await save.promise;
+    });
+    await vi.waitFor(() => expect(result.current.selectedSceneSaveState).toBe('saved'));
+  });
+
+  it('reports failure and returns to saving when the selected scene is retried', async () => {
+    vi.useFakeTimers();
+    const failedSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const retrySave = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.updateScene.invoke.mockReturnValueOnce(failedSave.promise).mockReturnValueOnce(retrySave.promise);
+    const initial = project();
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    act(() => result.current.updateSceneDraft({ visualPrompt: 'Preserve this prompt' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+      failedSave.resolve(failed('provider_error', 'conversation.creativeStudio.errors.provider'));
+      await failedSave.promise;
+    });
+    await vi.waitFor(() => expect(result.current.selectedSceneSaveState).toBe('failed'));
+
+    let retry!: Promise<boolean>;
+    act(() => {
+      retry = result.current.flushSceneDraft();
+    });
+    await act(async () => Promise.resolve());
+    expect(result.current.selectedSceneSaveState).toBe('saving');
+
+    await act(async () => {
+      retrySave.resolve(ok(project(3, [scene('scene-1', { visualPrompt: 'Preserve this prompt' }), scene('scene-2')])));
+      expect(await retry).toBe(true);
+    });
+    expect(result.current.selectedSceneSaveState).toBe('saved');
+  });
+
+  it('returns a failed selected scene to saved when its local draft is discarded', async () => {
+    vi.useFakeTimers();
+    bridge.updateScene.invoke.mockResolvedValueOnce(
+      failed('storage_error', 'conversation.creativeStudio.errors.storage')
+    );
+    const initial = project();
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    act(() => result.current.updateSceneDraft({ title: 'Discard this edit' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+    });
+    await vi.waitFor(() => expect(result.current.selectedSceneSaveState).toBe('failed'));
+
+    act(() => result.current.discardSceneDraft());
+
+    expect(result.current.selectedSceneSaveState).toBe('saved');
+  });
+
+  it('does not report saving when an in-flight save belongs to another scene', async () => {
+    vi.useFakeTimers();
+    const otherSceneSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.updateScene.invoke.mockReturnValueOnce(otherSceneSave.promise);
+    const initial = project();
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    act(() => result.current.updateSceneDraft({ title: 'Saving scene one' }));
+    act(() => result.current.selectScene('scene-2'));
+    await act(async () => Promise.resolve());
+
+    expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
+    expect(result.current.selectedSceneId).toBe('scene-2');
+    expect(result.current.selectedSceneSaveState).toBe('saved');
+
+    await act(async () => {
+      otherSceneSave.resolve(ok(project(3, [scene('scene-1', { title: 'Saving scene one' }), scene('scene-2')])));
+      await otherSceneSave.promise;
+    });
   });
 
   it('distinguishes the selected scene draft from unrelated dirty scene drafts', async () => {

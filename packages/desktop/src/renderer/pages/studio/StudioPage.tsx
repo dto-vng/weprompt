@@ -740,16 +740,18 @@ const StudioProjectShell: React.FC = () => {
           setExportVisible(true);
         }}
       />
-      <StudioModelBar
-        catalog={studioModels.catalog}
-        loading={studioModels.loading}
-        errorMessageKey={studioModels.errorMessageKey}
-        pendingRole={studioModels.pendingRole}
-        disabled={canonicalMutationPending || editor.drafting || studioJobs.mutationPending}
-        onRefresh={studioModels.refresh}
-        onSelectionChange={studioModels.updateSelection}
-        onOpenSettings={(path) => navigate(path)}
-      />
+      <div className={styles.modelBar}>
+        <StudioModelBar
+          catalog={studioModels.catalog}
+          loading={studioModels.loading}
+          errorMessageKey={studioModels.errorMessageKey}
+          pendingRole={studioModels.pendingRole}
+          disabled={canonicalMutationPending || editor.drafting || studioJobs.mutationPending}
+          onRefresh={studioModels.refresh}
+          onSelectionChange={studioModels.updateSelection}
+          onOpenSettings={(path) => navigate(path)}
+        />
+      </div>
       <div className={styles.editorGrid}>
         <StoryboardPanel
           orderedScenes={editor.orderedScenes}
@@ -828,13 +830,7 @@ const StudioProjectShell: React.FC = () => {
                 ? referenceImportIssue.messageKey
                 : null)
             }
-            statusMessageKey={
-              editor.mutationPending
-                ? 'conversation.creativeStudio.inspector.saving'
-                : inspectorSceneIssue
-                  ? 'conversation.creativeStudio.inspector.unsavedChanges'
-                  : null
-            }
+            saveState={editor.selectedSceneSaveState}
             conflict={inspectorRecoveryVisible}
             onUpdateSceneDraft={editor.updateSceneDraft}
             onFlushSceneDraft={editor.flushSceneDraft}
