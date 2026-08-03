@@ -1,0 +1,8 @@
+{
+  "selectFile": "Выбрать файл",
+  "selectDirectory": "Выбрать директорию",
+  "pleaseSelectFile": "Пожалуйста, выберите файл",
+  "pleaseSelectDirectory": "Пожалуйста, выберите директорию",
+  "emptyFolder": "Эта папка пуста",
+  "goToParent": "Перейти в родительскую папку"
+}

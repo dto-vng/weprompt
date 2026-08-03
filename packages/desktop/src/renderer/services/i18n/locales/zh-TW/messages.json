@@ -1,0 +1,248 @@
+{
+  "fileChanges": "檔案變更",
+  "fileChangesCount": "{{count}} 個檔案變更",
+  "conversationInProgress": "目前正在進行對話...",
+  "confirm": "確認",
+  "canceledExecution": "已取消執行",
+  "openLinkFailed": "無法開啟連結",
+  "imageGenerationModelDetected": "檢測到圖片模型，已自動開啟圖片工具，設置為默認模型：{{platform}}:{{model}}",
+  "auto_handling_permissions": "自動處理權限請求：{{request}}",
+  "copy": "複製",
+  "copySuccess": "複製成功",
+  "copyFailed": "複製失敗",
+  "copyLastOutput.empty": "目前沒有可複製的回覆",
+  "copiedToClipboard": "已複製到剪貼簿",
+  "downloadSuccess": "下載成功",
+  "downloadFailed": "下載失敗",
+  "imageLoadFailed": "圖片載入失敗",
+  "scrollToBottom": "滾動到底部",
+  "reasoning": "推理過程",
+  "availableCommands": "{{count}} 個可用指令",
+  "atFile.hint": "輸入以搜尋檔案",
+  "atFile.menuLabel": "檔案提及",
+  "atFile.loading": "載入中...",
+  "slash.title": "命令",
+  "slash.hint": "輸入 / 開啟命令選單",
+  "slash.empty": "找不到命令",
+  "export.commandDescription": "將目前對話匯出到檔案或剪貼簿",
+  "export.conversationLabel": "對話",
+  "export.conversationIdLabel": "對話 ID",
+  "export.exportedAtLabel": "匯出時間",
+  "export.typeLabel": "類型",
+  "export.noMessages": "沒有訊息",
+  "export.userLabel": "使用者",
+  "export.assistantLabel": "助理",
+  "export.systemLabel": "系統",
+  "export.menuTitle": "匯出對話",
+  "export.menuHint": "選擇匯出目前對話的方式",
+  "export.copyLabel": "複製到剪貼簿",
+  "export.copyDescription": "將目前對話複製到系統剪貼簿",
+  "export.saveLabel": "儲存到檔案",
+  "export.saveDescription": "將目前對話儲存到目前專案中的檔案",
+  "export.fileNameLabel": "輸入檔名",
+  "export.fileNamePlaceholder": "conversation-export.txt",
+  "export.pathLabel": "儲存路徑",
+  "export.copySuccess": "已將對話複製到剪貼簿",
+  "export.copyFailed": "複製對話失敗",
+  "export.saveSuccess": "對話已匯出到：{{path}}",
+  "export.saveFailed": "匯出對話失敗",
+  "export.prepareFailed": "準備匯出對話失敗",
+  "export.unavailable": "目前無法匯出對話",
+  "unknownMessageType": "未知訊息類型：{{type}}",
+  "permissionRequest": "權限請求",
+  "agentRequestingPermission": "代理正在請求權限。",
+  "permission": {
+    "intent": {
+      "run": "我想執行一條命令",
+      "edit": "我想編輯一個檔案",
+      "read": "我想讀取一個檔案",
+      "fetch": "我想從網路取得內容",
+      "tool": "我想使用一個工具",
+      "destructive": "我想刪除或移除檔案",
+      "generic": "我想執行一項需要你核准的操作"
+    },
+    "destructiveWarning": "這可能會永久刪除或覆寫檔案，且無法復原。"
+  },
+  "command": "命令：",
+  "chooseAction": "請選擇操作：",
+  "option": "選項",
+  "noOptionsAvailable": "沒有可用選項",
+  "processing": "處理中...",
+  "responseSentSuccessfully": "回覆已成功送出",
+  "permissionResponseFailed": "傳送回應失敗，請重試。",
+  "confirmation": {
+    "applyChange": "應用此更改？",
+    "allowExecution": "允許執行？",
+    "proceed": "您想要繼續嗎？",
+    "allowMCPTool": "允許執行來自伺服器 \"{{serverName}}\" 的 MCP 工具 \"{{toolName}}\"？",
+    "yesAllowOnce": "是，允許一次",
+    "yesAllowAlways": "是，始終允許",
+    "yesAlwaysAllowTool": "是，始終允許來自伺服器 \"{{serverName}}\" 的工具 \"{{toolName}}\"",
+    "yesAlwaysAllowServer": "是，始終允許來自伺服器 \"{{serverName}}\" 的所有工具",
+    "no": "否 (esc)"
+  },
+  "toolActivity": {
+    "recap": {
+      "headline": {
+        "active": "工作進行中（共 {{total, number}} 項）",
+        "completed": "工作已完成（共 {{total, number}} 項）",
+        "recovered": "工作已恢復並完成（共 {{total, number}} 項）",
+        "partial": "工作部分完成（共 {{total, number}} 項）",
+        "failed": "無法完成工作（共 {{total, number}} 項）",
+        "canceled": "工作已停止（共 {{total, number}} 項）"
+      },
+      "activity": "本輪涵蓋了{{categories}}。",
+      "subject": "重點：{{subject}}。",
+      "overflow": "另外 {{count, number}} 項",
+      "category": {
+        "web": "網頁搜尋（{{count, number}}）",
+        "search": "專案搜尋（{{count, number}}）",
+        "fileRead": "檔案檢閱（{{count, number}}）",
+        "fileWrite": "實作更新（{{count, number}}）",
+        "data": "資料檢閱（{{count, number}}）",
+        "report": "報告工作（{{count, number}}）",
+        "export": "匯出（{{count, number}}）",
+        "memory": "記憶更新（{{count, number}}）",
+        "code": "專案步驟（{{count, number}}）",
+        "verify": "驗證（{{count, number}}）",
+        "office": "文件工作（{{count, number}}）",
+        "generic": "專案步驟（{{count, number}}）"
+      },
+      "outcome": {
+        "active": "工作進展順利。已完成：{{completed, number}} / {{total, number}}。仍在進行：{{pending, number}}。",
+        "activeWithFailure": "工作正在推進，但部分步驟需要再次嘗試。已完成：{{completed, number}} / {{total, number}}。仍在進行：{{pending, number}}。需要再次嘗試：{{failed, number}}。",
+        "activeWithCanceled": "工作正在推進，但部分步驟已停止。已完成：{{completed, number}} / {{total, number}}。仍在進行：{{pending, number}}。已停止：{{canceled, number}}。",
+        "activeWithFailureAndCanceled": "工作正在推進，但部分步驟需要處理。已完成：{{completed, number}} / {{total, number}}。仍在進行：{{pending, number}}。需要再次嘗試：{{failed, number}}。已停止：{{canceled, number}}。",
+        "completed": "我已完成本輪計劃的全部工作。",
+        "recovered": "重新嘗試工作後，我已完成本輪計劃的全部工作。",
+        "partial": "我已完成部分計劃工作。已完成：{{completed, number}} / {{total, number}}。需要再次嘗試：{{failed, number}}。",
+        "partialWithCanceled": "我已完成部分計劃工作。已完成：{{completed, number}} / {{total, number}}。需要再次嘗試：{{failed, number}}。已停止：{{canceled, number}}。",
+        "failed": "我未能完成計劃工作。計劃工作：{{total, number}}。需要再次嘗試：{{failed, number}}。",
+        "failedWithCanceled": "我未能完成計劃工作。計劃工作：{{total, number}}。需要再次嘗試：{{failed, number}}。已停止：{{canceled, number}}。",
+        "canceled": "我在計劃工作完成前停止了本輪。計劃工作：{{total, number}}。尚未完成：{{unfinished, number}}。已停止：{{canceled, number}}。"
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "全部完成了——一切都按計畫順利進行。告訴我接下來您想做什麼。",
+        "v2": "這項工作已經完成並正常運作。告訴我接下來您想往哪個方向進行。",
+        "v3": "完成了——一切都順利收尾。您準備好後，我隨時可以開始下一項。"
+      },
+      "recovered": {
+        "v1": "完成了——其中一步重試了一次，現在都已妥善處理好。",
+        "v2": "已經完成——中途需要快速重試了一下，不過現在一切都已就緒。"
+      },
+      "partial": {
+        "v1": "大部分我已經完成了。還有幾處需要再處理一遍——詳情就在下方。",
+        "v2": "進展不錯——大部分已經完成，不過還有一小部分需要再試一次。詳細資訊可以在下方查看。"
+      },
+      "failed": {
+        "v1": "這一項我沒能完成。詳情在下方，您準備好後可以隨時讓我再試一次。",
+        "v2": "這次沒能成功。您可以看看下方的詳情，或者直接讓我再試一次。"
+      },
+      "canceled": {
+        "v1": "在這裡停下了。如果您希望我繼續，請告訴我。"
+      }
+    },
+    "attempt": "（第 {{n}} 次嘗試）",
+    "generic": {
+      "running": "我正在處理下一個步驟。",
+      "done": "已完成下一個步驟。",
+      "failedTitle": "我無法完成此步驟"
+    },
+    "status": {
+      "stopped": "已停止",
+      "recovered": "重試後已恢復。"
+    },
+    "error": {
+      "suggestion": "下方提供了錯誤詳細資料。準備好後，您可以重試此步驟。"
+    },
+    "categories": {
+      "web": {
+        "running": "我正在尋找相關資訊。",
+        "done": "已找到相關資訊。",
+        "failedTitle": "我無法完成資訊搜尋"
+      },
+      "search": {
+        "running": "我正在尋找相關的專案檔案。",
+        "done": "已找到相關的專案檔案。",
+        "failedTitle": "我無法完成專案檔案搜尋"
+      },
+      "fileRead": {
+        "running": "我正在檢閱相關檔案，以瞭解目前的運作方式。",
+        "done": "已檢閱相關檔案。",
+        "failedTitle": "我無法檢閱相關檔案"
+      },
+      "fileWrite": {
+        "running": "我正在更新實作。",
+        "done": "已更新實作。",
+        "failedTitle": "我無法更新實作"
+      },
+      "data": {
+        "running": "我正在檢閱相關資料，以瞭解目前的運作方式。",
+        "done": "已檢閱相關資料。",
+        "failedTitle": "我無法檢閱相關資料"
+      },
+      "report": {
+        "running": "我正在準備最終檔案。",
+        "done": "已準備好最終檔案。",
+        "failedTitle": "我無法準備最終檔案"
+      },
+      "export": {
+        "running": "我正在準備最終檔案。",
+        "done": "已準備好最終檔案。",
+        "failedTitle": "我無法準備最終檔案"
+      },
+      "memory": {
+        "running": "我正在更新已儲存的內容。",
+        "done": "已更新儲存的內容。",
+        "failedTitle": "我無法更新儲存的內容"
+      },
+      "code": {
+        "running": "我正在執行下一個專案步驟。",
+        "done": "已完成該專案步驟。",
+        "failedTitle": "我無法完成該專案步驟"
+      },
+      "verify": {
+        "running": "我正在檢查這些變更，確保一切仍正常運作。",
+        "done": "已完成變更檢查。",
+        "failedTitle": "我無法完成變更檢查"
+      },
+      "office": {
+        "running": "我正在準備最終檔案。",
+        "done": "已準備好最終檔案。",
+        "failedTitle": "我無法準備最終檔案"
+      }
+    },
+    "tools": {
+      "data_open": {
+        "running": "我正在檢閱相關資料，以瞭解目前的運作方式。",
+        "done": "已檢閱相關資料。",
+        "failedTitle": "我無法檢閱相關資料"
+      },
+      "data_get_schema": {
+        "running": "我正在檢閱相關資料，以瞭解目前的運作方式。",
+        "done": "已檢閱相關資料。",
+        "failedTitle": "我無法檢閱相關資料"
+      },
+      "data_run_sql": {
+        "running": "我正在檢閱相關資料，以瞭解目前的運作方式。",
+        "done": "已檢閱相關資料。",
+        "failedTitle": "我無法檢閱相關資料"
+      },
+      "render_report": {
+        "running": "我正在準備最終檔案。",
+        "done": "已準備好最終檔案。",
+        "failedTitle": "我無法準備最終檔案"
+      },
+      "export_pdf": {
+        "running": "我正在準備最終檔案。",
+        "done": "已準備好最終檔案。",
+        "failedTitle": "我無法準備最終檔案"
+      }
+    }
+  },
+  "plan": {
+    "title": "待辦清單"
+  }
+}

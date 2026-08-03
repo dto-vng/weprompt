@@ -1,0 +1,152 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * On first tarball launch, the aioncore's SQLite `users` table holds the
+ * seeded `system_default_user` row with an empty password_hash. We probe
+ * /api/auth/status; if `needs_setup === true`, ask the backend to generate and
+ * persist a random password via POST /api/webui/reset-password.
+ *
+ * SECURITY (#5): the generated password is deliberately NOT written to
+ * stdout/logs — that would persist it in terminal scrollback, journald,
+ * container/CI logs, and log shippers. We only log that a password was
+ * generated and how to obtain a working credential. To get a usable password,
+ * run the `resetpass` subcommand (runResetPassword in index.ts), which sets and
+ * prints a NEW password, or manage it in the desktop app's Settings.
+ *
+ * Mirrors Electron's maybeSeedInitialPassword in
+ * packages/desktop/src/process/bridge/webuiBridge.ts:52-77 and the Bun dev
+ * helper in scripts/webui.ts — when either changes, keep this in sync.
+ *
+ * scripts/smoke-test-web-cli.sh no longer greps this seed log for the password;
+ * it obtains one via `resetpass` instead. If you change the resetpass stdout
+ * format ("[aionui-web] new password: <pw>"), update that script's grep too.
+ */
+
+export type EnsureAdminPasswordDeps = {
+  fetch: typeof fetch;
+  log: (msg: string) => void;
+  warn: (msg: string) => void;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+};
+
+export type EnsureAdminPasswordOptions = {
+  /** 127.0.0.1 port where aioncore listens (from WebHostHandle.backendPort). */
+  backendPort: number;
+  /** Total wait budget for /api/auth/status coming up. Default: 15s. */
+  statusTimeoutMs?: number;
+  /** Poll interval between /api/auth/status attempts. Default: 500ms. */
+  statusPollIntervalMs?: number;
+  /**
+   * Command to show in fallback hints ("Forgot the password? Run ..."). Varies
+   * by launch context — packaged tarball = `aionui-web resetpass`, in-repo dev
+   * = `bun run resetpass`. Defaults to the packaged form.
+   */
+  resetCommand?: string;
+};
+
+type AuthStatus = {
+  needs_setup?: boolean;
+  data?: { needs_setup?: boolean };
+};
+
+type ResetPasswordResponse = {
+  data?: { new_password?: string };
+  new_password?: string;
+};
+
+type SystemUserResponse = {
+  data?: { username?: string } | null;
+};
+
+async function waitForStatus(
+  deps: EnsureAdminPasswordDeps,
+  url: string,
+  budgetMs: number,
+  intervalMs: number
+): Promise<AuthStatus> {
+  const deadline = deps.now() + budgetMs;
+  let lastErr: unknown = undefined;
+  while (deps.now() < deadline) {
+    try {
+      const res = await deps.fetch(url);
+      if (res.ok) {
+        return (await res.json()) as AuthStatus;
+      }
+      lastErr = new Error(`/api/auth/status returned ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    await deps.sleep(intervalMs);
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('/api/auth/status did not come up in time');
+}
+
+async function fetchAdminUsername(deps: EnsureAdminPasswordDeps, backendPort: number): Promise<string> {
+  try {
+    const res = await deps.fetch(`http://127.0.0.1:${backendPort}/api/auth/internal/users/system`);
+    if (!res.ok) return 'admin';
+    const json = (await res.json()) as SystemUserResponse;
+    return json.data?.username || 'admin';
+  } catch {
+    return 'admin';
+  }
+}
+
+/**
+ * Probe backend auth state. On fresh install, POST reset-password and print the
+ * generated credentials. Never throws — any failure is warned and the caller
+ * continues starting the server (user can still see the login page, they just
+ * need to run resetpass manually).
+ */
+export async function ensureAdminPassword(
+  opts: EnsureAdminPasswordOptions,
+  deps: EnsureAdminPasswordDeps
+): Promise<void> {
+  const timeoutMs = opts.statusTimeoutMs ?? 15_000;
+  const intervalMs = opts.statusPollIntervalMs ?? 500;
+  const resetCmd = opts.resetCommand ?? 'aionui-web resetpass';
+  const base = `http://127.0.0.1:${opts.backendPort}`;
+
+  let status: AuthStatus;
+  try {
+    status = await waitForStatus(deps, `${base}/api/auth/status`, timeoutMs, intervalMs);
+  } catch (err) {
+    deps.warn(`[aionui-web] could not verify admin credentials: ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+
+  const needsSetup = status.needs_setup ?? status.data?.needs_setup ?? false;
+
+  if (!needsSetup) {
+    const username = await fetchAdminUsername(deps, opts.backendPort);
+    deps.log(`[aionui-web] Log in with username "${username}". Forgot the password? Run \`${resetCmd}\`.`);
+    return;
+  }
+
+  try {
+    const resetRes = await deps.fetch(`${base}/api/webui/reset-password`, { method: 'POST' });
+    if (!resetRes.ok) {
+      deps.warn(`[aionui-web] /api/webui/reset-password returned ${resetRes.status} — run \`${resetCmd}\``);
+      return;
+    }
+    const payload = (await resetRes.json()) as ResetPasswordResponse;
+    const newPassword = payload.data?.new_password ?? payload.new_password;
+    if (!newPassword) {
+      deps.warn(`[aionui-web] /api/webui/reset-password returned no new_password — run \`${resetCmd}\``);
+      return;
+    }
+    const username = await fetchAdminUsername(deps, opts.backendPort);
+    // SECURITY (#5): never print the generated password to stdout/logs.
+    deps.log(
+      `[aionui-web] A random initial admin password was generated and is NOT logged for security. To sign in, set a new password with \`${resetCmd}\`, or manage it in the desktop app's Settings.`
+    );
+    deps.log(`[aionui-web] Log in with username "${username}" and change it from the UI.`);
+  } catch (err) {
+    deps.warn(
+      `[aionui-web] failed to seed initial admin password: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}

@@ -1,0 +1,28 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Inside a project, the composer's folder is fixed to the project's
+ * workspace (ProjectNewChatComposer seeds `useGuidInput` with
+ * `project.workspace`) — so the per-chat folder pill that
+ * `GuidInputCard`/`GuidWorkspaceFootnote` render (change/clear workspace)
+ * would let a user think an individual chat's folder can be repointed,
+ * which isn't true on this surface.
+ *
+ * `GuidInputCard` always renders that footnote and takes no prop to
+ * suppress it, and `GuidWorkspaceFootnote` is upstream Guid-page code this
+ * project must not fork/edit (see AGENTS.md) — so it is hidden structurally
+ * from this side instead of at the source. In every render branch (a
+ * populated or an empty `workspaceDir`), the footnote's root element is the
+ * sibling immediately before the input textarea, which upstream already
+ * marks with a stable `data-testid="guid-input"` (also relied on by this
+ * repo's e2e specs). Anchoring on that attribute — rather than any of
+ * GuidInputCard's/GuidWorkspaceFootnote's own CSS-module class names —
+ * keeps this rule independent of their hashed, module-private class names.
+ */
+.composerNoFolderPill div:has(+ [data-testid='guid-input']) {
+  display: none;
+}

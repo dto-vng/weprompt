@@ -1,0 +1,248 @@
+{
+  "fileChanges": "File Changes",
+  "fileChangesCount": "{{count}} File Changes",
+  "conversationInProgress": "A conversation is currently in progress...",
+  "confirm": "Confirm",
+  "canceledExecution": "Execution canceled",
+  "openLinkFailed": "Failed to open link",
+  "imageGenerationModelDetected": "Image model detected, image tool has been automatically enabled. Default model: {{platform}}:{{model}}",
+  "auto_handling_permissions": "Auto handling permission request: {{request}}",
+  "copy": "Copy",
+  "copySuccess": "Copied successfully",
+  "copyFailed": "Failed to copy",
+  "copyLastOutput.empty": "No response to copy yet",
+  "copiedToClipboard": "Copied to clipboard",
+  "downloadSuccess": "Download successful",
+  "downloadFailed": "Failed to download",
+  "imageLoadFailed": "Failed to load image",
+  "scrollToBottom": "Scroll to bottom",
+  "reasoning": "Reasoning",
+  "availableCommands": "{{count}} Available Commands",
+  "atFile.hint": "Type to search for files",
+  "atFile.menuLabel": "File mentions",
+  "atFile.loading": "Loading...",
+  "slash.title": "Commands",
+  "slash.hint": "Type / to open command menu",
+  "slash.empty": "No commands found",
+  "export.commandDescription": "Export the current conversation to a file or clipboard",
+  "export.conversationLabel": "Conversation",
+  "export.conversationIdLabel": "Conversation ID",
+  "export.exportedAtLabel": "Exported At",
+  "export.typeLabel": "Type",
+  "export.noMessages": "No messages",
+  "export.userLabel": "User",
+  "export.assistantLabel": "Assistant",
+  "export.systemLabel": "System",
+  "export.menuTitle": "Export Conversation",
+  "export.menuHint": "Choose how to export the current conversation",
+  "export.copyLabel": "Copy to clipboard",
+  "export.copyDescription": "Copy the conversation to your system clipboard",
+  "export.saveLabel": "Save to file",
+  "export.saveDescription": "Save the conversation to a file in the current project",
+  "export.fileNameLabel": "Enter filename",
+  "export.fileNamePlaceholder": "conversation-export.txt",
+  "export.pathLabel": "Save path",
+  "export.copySuccess": "Conversation copied to clipboard",
+  "export.copyFailed": "Failed to copy conversation",
+  "export.saveSuccess": "Conversation exported to: {{path}}",
+  "export.saveFailed": "Failed to export conversation",
+  "export.prepareFailed": "Failed to prepare conversation export",
+  "export.unavailable": "Conversation export is unavailable",
+  "unknownMessageType": "Unknown message type: {{type}}",
+  "permissionRequest": "Permission Request",
+  "agentRequestingPermission": "The agent is requesting permission.",
+  "permission": {
+    "intent": {
+      "run": "I'd like to run a command",
+      "edit": "I'd like to edit a file",
+      "read": "I'd like to read a file",
+      "fetch": "I'd like to fetch something from the web",
+      "tool": "I'd like to use a tool",
+      "destructive": "I'd like to delete or remove files",
+      "generic": "I'd like to do something that needs your approval"
+    },
+    "destructiveWarning": "This can permanently delete or overwrite files — it can't be undone."
+  },
+  "command": "Command:",
+  "chooseAction": "Choose an action:",
+  "option": "Option",
+  "noOptionsAvailable": "No options available",
+  "processing": "Processing...",
+  "responseSentSuccessfully": "Response sent successfully",
+  "permissionResponseFailed": "Couldn't send your response. Please try again.",
+  "confirmation": {
+    "applyChange": "Apply this change?",
+    "allowExecution": "Allow execution?",
+    "proceed": "Do you want to proceed?",
+    "allowMCPTool": "Allow execution of MCP tool \"{{toolName}}\" from server \"{{serverName}}\"?",
+    "yesAllowOnce": "Yes, allow once",
+    "yesAllowAlways": "Yes, allow always",
+    "yesAlwaysAllowTool": "Yes, always allow tool \"{{toolName}}\" from server \"{{serverName}}\"",
+    "yesAlwaysAllowServer": "Yes, always allow all tools from server \"{{serverName}}\"",
+    "no": "No (esc)"
+  },
+  "toolActivity": {
+    "recap": {
+      "headline": {
+        "active": "Work in progress ({{total, number}} total)",
+        "completed": "Work completed ({{total, number}} total)",
+        "recovered": "Work recovered and completed ({{total, number}} total)",
+        "partial": "Work partly completed ({{total, number}} total)",
+        "failed": "Work could not be completed ({{total, number}} total)",
+        "canceled": "Work stopped ({{total, number}} total)"
+      },
+      "activity": "This turn covered {{categories}}.",
+      "subject": "Focus: {{subject}}.",
+      "overflow": "{{count, number}} more",
+      "category": {
+        "web": "Web search ({{count, number}})",
+        "search": "Project search ({{count, number}})",
+        "fileRead": "File review ({{count, number}})",
+        "fileWrite": "Implementation update ({{count, number}})",
+        "data": "Data review ({{count, number}})",
+        "report": "Report task ({{count, number}})",
+        "export": "Export ({{count, number}})",
+        "memory": "Memory update ({{count, number}})",
+        "code": "Project step ({{count, number}})",
+        "verify": "Verification ({{count, number}})",
+        "office": "Document task ({{count, number}})",
+        "generic": "Project step ({{count, number}})"
+      },
+      "outcome": {
+        "active": "I'm making steady progress. Completed: {{completed, number}} of {{total, number}}. Actions still underway: {{pending, number}}.",
+        "activeWithFailure": "I'm making progress, though some work needs another attempt. Completed: {{completed, number}} of {{total, number}}. Actions still underway: {{pending, number}}. Actions needing another attempt: {{failed, number}}.",
+        "activeWithCanceled": "I'm making progress, with some work stopped. Completed: {{completed, number}} of {{total, number}}. Actions still underway: {{pending, number}}. Actions stopped: {{canceled, number}}.",
+        "activeWithFailureAndCanceled": "I'm making progress, though some work needs attention. Completed: {{completed, number}} of {{total, number}}. Actions still underway: {{pending, number}}. Actions needing another attempt: {{failed, number}}. Actions stopped: {{canceled, number}}.",
+        "completed": "I completed everything planned for this turn.",
+        "recovered": "I completed everything planned for this turn after retrying the work.",
+        "partial": "I completed part of the planned work. Completed: {{completed, number}} of {{total, number}}. Actions needing another attempt: {{failed, number}}.",
+        "partialWithCanceled": "I completed part of the planned work. Completed: {{completed, number}} of {{total, number}}. Actions needing another attempt: {{failed, number}}. Actions stopped: {{canceled, number}}.",
+        "failed": "I couldn't complete the planned work. Planned actions: {{total, number}}. Actions needing another attempt: {{failed, number}}.",
+        "failedWithCanceled": "I couldn't complete the planned work. Planned actions: {{total, number}}. Actions needing another attempt: {{failed, number}}. Actions stopped: {{canceled, number}}.",
+        "canceled": "I stopped this turn before the planned work was complete. Planned actions: {{total, number}}. Actions left unfinished: {{unfinished, number}}. Actions stopped: {{canceled, number}}."
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "All done — everything went through as planned. Tell me what you'd like to do next.",
+        "v2": "That's finished and working. Let me know where you'd like to go from here.",
+        "v3": "Done — it all came together. I'm ready for the next thing whenever you are."
+      },
+      "recovered": {
+        "v1": "Done — one step needed a second try, but it's all sorted now.",
+        "v2": "Finished — it took a quick retry along the way, but everything's in place."
+      },
+      "partial": {
+        "v1": "I got most of this done. A couple of things still need another pass — the details are just below.",
+        "v2": "Good progress — most of it is done, though a bit still needs another go. You'll find the specifics below."
+      },
+      "failed": {
+        "v1": "I wasn't able to finish this one. The details are below, and you can ask me to try again whenever you're ready.",
+        "v2": "This didn't go through. Take a look at the details below, or just tell me to give it another try."
+      },
+      "canceled": {
+        "v1": "Stopped here. Let me know if you'd like me to pick it back up."
+      }
+    },
+    "attempt": "(attempt {{n}})",
+    "generic": {
+      "running": "Working on the next step.",
+      "done": "Finished the next step.",
+      "failedTitle": "I couldn't complete this step"
+    },
+    "status": {
+      "stopped": "Stopped",
+      "recovered": "Recovered after retry."
+    },
+    "error": {
+      "suggestion": "The error details are available below. You can try this step again when you're ready."
+    },
+    "categories": {
+      "web": {
+        "running": "I'm locating the relevant information.",
+        "done": "Located the relevant information.",
+        "failedTitle": "I couldn't complete the search"
+      },
+      "search": {
+        "running": "I'm locating the relevant project files.",
+        "done": "Located the relevant project files.",
+        "failedTitle": "I couldn't complete the search"
+      },
+      "fileRead": {
+        "running": "I'm reviewing the relevant files to understand the current behavior.",
+        "done": "Reviewed the relevant files.",
+        "failedTitle": "I couldn't review the relevant files"
+      },
+      "fileWrite": {
+        "running": "I'm updating the implementation.",
+        "done": "Updated the implementation.",
+        "failedTitle": "I couldn't update the implementation"
+      },
+      "data": {
+        "running": "I'm reviewing the relevant data to understand the current behavior.",
+        "done": "Reviewed the relevant data.",
+        "failedTitle": "I couldn't review the relevant data"
+      },
+      "report": {
+        "running": "I'm preparing the finished file.",
+        "done": "Prepared the finished file.",
+        "failedTitle": "I couldn't prepare the finished file"
+      },
+      "export": {
+        "running": "I'm preparing the finished file.",
+        "done": "Prepared the finished file.",
+        "failedTitle": "I couldn't prepare the finished file"
+      },
+      "memory": {
+        "running": "I'm updating the saved context.",
+        "done": "Updated the saved context.",
+        "failedTitle": "I couldn't update the saved context"
+      },
+      "code": {
+        "running": "I'm running the next project step.",
+        "done": "Completed the project step.",
+        "failedTitle": "I couldn't complete the project step"
+      },
+      "verify": {
+        "running": "I'm checking the changes to make sure everything still works.",
+        "done": "Checked the changes for regressions.",
+        "failedTitle": "I couldn't finish checking the changes"
+      },
+      "office": {
+        "running": "I'm preparing the finished file.",
+        "done": "Prepared the finished file.",
+        "failedTitle": "I couldn't prepare the finished file"
+      }
+    },
+    "tools": {
+      "data_open": {
+        "running": "I'm reviewing the relevant data to understand the current behavior.",
+        "done": "Reviewed the relevant data.",
+        "failedTitle": "I couldn't review the relevant data"
+      },
+      "data_get_schema": {
+        "running": "I'm reviewing the relevant data to understand the current behavior.",
+        "done": "Reviewed the relevant data.",
+        "failedTitle": "I couldn't review the relevant data"
+      },
+      "data_run_sql": {
+        "running": "I'm reviewing the relevant data to understand the current behavior.",
+        "done": "Reviewed the relevant data.",
+        "failedTitle": "I couldn't review the relevant data"
+      },
+      "render_report": {
+        "running": "I'm preparing the finished file.",
+        "done": "Prepared the finished file.",
+        "failedTitle": "I couldn't prepare the finished file"
+      },
+      "export_pdf": {
+        "running": "I'm preparing the finished file.",
+        "done": "Prepared the finished file.",
+        "failedTitle": "I couldn't prepare the finished file"
+      }
+    }
+  },
+  "plan": {
+    "title": "To do list"
+  }
+}

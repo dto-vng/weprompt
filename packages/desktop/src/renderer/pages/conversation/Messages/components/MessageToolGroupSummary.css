@@ -1,0 +1,136 @@
+@keyframes breathing {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.badge-breathing .arco-badge-status-dot {
+  animation: breathing 1.5s ease-in-out infinite;
+}
+
+.tool-group-summary {
+  margin: 4px 0;
+}
+
+.tool-group-summary__header {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  width: fit-content;
+  height: auto;
+  padding: 0;
+  font-size: 13px;
+  color: var(--color-text-3);
+  user-select: none;
+  line-height: 1;
+}
+
+.tool-group-summary__header:hover {
+  color: var(--color-text-2);
+}
+
+.tool-group-summary__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-4);
+}
+
+.tool-group-summary__header:hover .tool-group-summary__icon {
+  color: var(--color-text-3);
+}
+
+.tool-group-summary__label {
+  white-space: nowrap;
+}
+
+.tool-group-summary__arrow {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-text-4);
+  transition: transform 0.2s ease;
+}
+
+.tool-group-summary__arrow--open {
+  transform: rotate(90deg);
+}
+
+.tool-group-summary__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: 6px;
+  margin-left: 20px;
+  background: var(--color-fill-1);
+  border-radius: 8px;
+}
+
+.tool-detail-panel {
+  border-left: 2px solid var(--color-border-2);
+  padding-left: 10px;
+  margin-bottom: 4px;
+}
+
+.tool-detail-section {
+  margin-bottom: 4px;
+}
+
+.tool-detail-label {
+  font-size: 11px;
+  color: var(--color-text-3);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.tool-detail-content {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-2);
+  background: var(--color-fill-1);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-breathing .arco-badge-status-dot,
+  .tool-group-summary .loading {
+    animation: none;
+  }
+
+  .tool-group-summary__arrow {
+    transition: none;
+  }
+}
+
+/* Clickable knowledge citation lines inside the expanded search tool result. */
+.tool-detail-content .kb-citation-link {
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.tool-detail-content .kb-citation-link:hover {
+  text-decoration: underline;
+}
+
+/* The citation is a role='button' anchor with no href, so it gets no focus ring for free. */
+.tool-detail-content .kb-citation-link:focus-visible {
+  outline: 1px solid rgb(var(--primary-6));
+  outline-offset: 2px;
+  border-radius: 2px;
+}

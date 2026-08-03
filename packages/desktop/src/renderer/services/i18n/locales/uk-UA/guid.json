@@ -1,0 +1,30 @@
+{
+  "promptExamplesHint": "Спробуйте ці інструкції",
+  "defaultPrompts": {
+    "understand": "Ознайомся з цим проєктом і поясни простими словами, що він робить і з чого почати",
+    "cleanup": "Знайди в цій папці дублікати та непотрібні файли й покажи список для мого підтвердження",
+    "create": "Зроби мені гарну персональну домашню сторінку й відкрий її, коли завершиш",
+    "reviewFolder": "Review the files in a folder"
+  },
+  "selectAssistantHint": "Виберіть асистента, щоб розпочати завдання",
+  "workspace": {
+    "workInProject": "Працювати в проєкті",
+    "optional": "Необов'язково",
+    "clearWorkspace": "Очистити",
+    "specifyWorkspace": "Вибрати папку проєкту",
+    "searchPlaceholder": "Пошук проєктів…",
+    "noProject": "Без проєкту"
+  },
+  "toolbar": {
+    "label": "Дії на головній",
+    "history": "Історія",
+    "saved": "Збережене",
+    "community": "Спільнота"
+  },
+  "defaultProjectPrompts": {
+    "reviewFiles": "Review the files in this project",
+    "summarizeFolder": "Summarize what this project contains",
+    "createPlan": "Create a plan for this project",
+    "findNextSteps": "Find the next useful steps for this project"
+  }
+}

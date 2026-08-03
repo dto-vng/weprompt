@@ -1,0 +1,109 @@
+/**
+ * Navigation – route transitions and sidebar.
+ *
+ * Ensures the app can navigate between the guid/chat page and all
+ * settings sub-pages without errors.
+ */
+import { test, expect } from '../fixtures';
+import {
+  goToGuid,
+  goToSettings,
+  ROUTES,
+  expectUrlContains,
+  settingsSiderItemById,
+  takeScreenshot,
+  type SettingsTab,
+} from '../helpers';
+
+// ── Guid Page ────────────────────────────────────────────────────────────────
+
+test.describe('Guid Page', () => {
+  test('navigates to guid page', async ({ page }) => {
+    await goToGuid(page);
+    await expectUrlContains(page, 'guid');
+  });
+
+  test('chat input area is present', async ({ page }) => {
+    await goToGuid(page);
+    const textarea = page.locator('textarea, [contenteditable="true"], [role="textbox"]').first();
+    await expect(textarea).toBeVisible({ timeout: 5000 });
+  });
+
+  test('can type in chat input', async ({ page }) => {
+    await goToGuid(page);
+    const input = page.locator('textarea, [contenteditable="true"], [role="textbox"]').first();
+    await input.click();
+    await input.fill('E2E test message');
+    const value = await input.inputValue().catch(() => input.textContent());
+    expect(value).toContain('E2E test');
+  });
+
+  test('screenshot: guid page', async ({ page }) => {
+    test.skip(!process.env.E2E_SCREENSHOTS, 'screenshots disabled');
+    await goToGuid(page);
+    await takeScreenshot(page, 'guid-page', { fullPage: true });
+  });
+});
+
+// ── Settings Pages ───────────────────────────────────────────────────────────
+
+test.describe('Settings Pages', () => {
+  const tabs: { tab: SettingsTab; name: string }[] = [
+    { tab: 'profile', name: 'Profile Settings' },
+    { tab: 'model', name: 'Model Settings' },
+    { tab: 'agent', name: 'Agent/ACP Settings' },
+    { tab: 'skills', name: 'Skills Settings' },
+    { tab: 'tools', name: 'Tools/MCP Settings' },
+    { tab: 'appearance', name: 'Appearance Settings' },
+    { tab: 'webui', name: 'WebUI Settings' },
+    { tab: 'system', name: 'System Settings' },
+  ];
+
+  for (const { tab, name } of tabs) {
+    test(`${name} loads`, async ({ page }) => {
+      await goToSettings(page, tab);
+      await expectUrlContains(page, tab);
+      const body = await page.locator('body').textContent();
+      expect(body!.length).toBeGreaterThan(10);
+    });
+  }
+
+  test('screenshot: settings pages', async ({ page }) => {
+    test.skip(!process.env.E2E_SCREENSHOTS, 'screenshots disabled');
+    for (const { tab } of tabs) {
+      await goToSettings(page, tab);
+      await takeScreenshot(page, `settings-${tab}`);
+    }
+  });
+
+  test('legacy About route redirects to the live System settings surface', async ({ page }) => {
+    await goToSettings(page, 'system');
+    await page.evaluate((hash) => window.location.assign(hash), ROUTES.legacySettings.about);
+
+    await page.waitForFunction((hash) => window.location.hash === hash, ROUTES.settings.system, {
+      timeout: 10_000,
+    });
+    await expectUrlContains(page, 'system');
+    await expect(page.locator(settingsSiderItemById('system')).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator(settingsSiderItemById('about'))).toHaveCount(0);
+    await expect(page.locator('[data-settings-path="about"]')).toHaveCount(0);
+    await expect(page.locator('.settings-page-wrapper')).toBeVisible();
+    const body = await page.locator('.settings-page-wrapper').textContent();
+    expect(body?.length ?? 0).toBeGreaterThan(10);
+  });
+});
+
+// ── Cross-page navigation ────────────────────────────────────────────────────
+
+test.describe('Sidebar Navigation', () => {
+  test('can navigate between pages via URL', async ({ page }) => {
+    await goToGuid(page);
+    expect(page.url()).toContain('guid');
+
+    await goToSettings(page, 'system');
+    expect(page.url()).toContain('system');
+
+    await goToGuid(page);
+    expect(page.url()).toContain('guid');
+  });
+});

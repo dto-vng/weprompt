@@ -1,0 +1,248 @@
+{
+  "fileChanges": "文件变更",
+  "fileChangesCount": "{{count}} 个文件变更",
+  "conversationInProgress": "当前正在进行对话中...",
+  "confirm": "确认",
+  "canceledExecution": "已取消执行",
+  "openLinkFailed": "打开链接失败",
+  "imageGenerationModelDetected": "检测到图片模型，已自动开启图片工具，设置为默认模型：{{platform}}:{{model}}",
+  "auto_handling_permissions": "自动处理权限请求：{{request}}",
+  "copy": "复制",
+  "copySuccess": "复制成功",
+  "copyFailed": "复制失败",
+  "copyLastOutput.empty": "暂无可复制的回复",
+  "copiedToClipboard": "已复制到剪贴板",
+  "downloadSuccess": "下载成功",
+  "downloadFailed": "下载失败",
+  "imageLoadFailed": "图片加载失败",
+  "scrollToBottom": "滚动到底部",
+  "reasoning": "推理过程",
+  "availableCommands": "{{count}} 个可用命令",
+  "atFile.hint": "输入以搜索文件",
+  "atFile.menuLabel": "文件提及",
+  "atFile.loading": "加载中...",
+  "slash.title": "命令",
+  "slash.hint": "输入 / 打开命令菜单",
+  "slash.empty": "未找到命令",
+  "export.commandDescription": "将当前对话导出到文件或剪贴板",
+  "export.conversationLabel": "对话",
+  "export.conversationIdLabel": "对话 ID",
+  "export.exportedAtLabel": "导出时间",
+  "export.typeLabel": "类型",
+  "export.noMessages": "暂无消息",
+  "export.userLabel": "用户",
+  "export.assistantLabel": "助手",
+  "export.systemLabel": "系统",
+  "export.menuTitle": "导出对话",
+  "export.menuHint": "选择导出当前对话的方式",
+  "export.copyLabel": "复制到剪贴板",
+  "export.copyDescription": "将当前对话复制到系统剪贴板",
+  "export.saveLabel": "保存到文件",
+  "export.saveDescription": "将当前对话保存到当前项目中的文件",
+  "export.fileNameLabel": "输入文件名",
+  "export.fileNamePlaceholder": "conversation-export.txt",
+  "export.pathLabel": "保存路径",
+  "export.copySuccess": "已将对话复制到剪贴板",
+  "export.copyFailed": "复制对话失败",
+  "export.saveSuccess": "对话已导出到：{{path}}",
+  "export.saveFailed": "导出对话失败",
+  "export.prepareFailed": "准备导出对话失败",
+  "export.unavailable": "当前无法导出对话",
+  "unknownMessageType": "未知消息类型：{{type}}",
+  "permissionRequest": "权限请求",
+  "agentRequestingPermission": "代理正在请求权限。",
+  "permission": {
+    "intent": {
+      "run": "我想执行一条命令",
+      "edit": "我想编辑一个文件",
+      "read": "我想读取一个文件",
+      "fetch": "我想从网络获取内容",
+      "tool": "我想使用一个工具",
+      "destructive": "我想删除或移除文件",
+      "generic": "我想执行一项需要你批准的操作"
+    },
+    "destructiveWarning": "这可能会永久删除或覆盖文件，且无法撤销。"
+  },
+  "command": "命令：",
+  "chooseAction": "选择一个操作：",
+  "option": "选项",
+  "noOptionsAvailable": "无可用选项",
+  "processing": "处理中...",
+  "responseSentSuccessfully": "响应已成功发送",
+  "permissionResponseFailed": "发送回应失败，请重试。",
+  "confirmation": {
+    "applyChange": "应用此更改？",
+    "allowExecution": "允许执行？",
+    "proceed": "您想要继续吗？",
+    "allowMCPTool": "允许执行来自服务器 \"{{serverName}}\" 的 MCP 工具 \"{{toolName}}\"？",
+    "yesAllowOnce": "是，允许一次",
+    "yesAllowAlways": "是，始终允许",
+    "yesAlwaysAllowTool": "是，始终允许来自服务器 \"{{serverName}}\" 的工具 \"{{toolName}}\"",
+    "yesAlwaysAllowServer": "是，始终允许来自服务器 \"{{serverName}}\" 的所有工具",
+    "no": "否 (esc)"
+  },
+  "toolActivity": {
+    "recap": {
+      "headline": {
+        "active": "工作进行中（共 {{total, number}} 项）",
+        "completed": "工作已完成（共 {{total, number}} 项）",
+        "recovered": "工作已恢复并完成（共 {{total, number}} 项）",
+        "partial": "工作部分完成（共 {{total, number}} 项）",
+        "failed": "无法完成工作（共 {{total, number}} 项）",
+        "canceled": "工作已停止（共 {{total, number}} 项）"
+      },
+      "activity": "本轮涵盖了{{categories}}。",
+      "subject": "重点：{{subject}}。",
+      "overflow": "另外 {{count, number}} 项",
+      "category": {
+        "web": "网页搜索（{{count, number}}）",
+        "search": "项目搜索（{{count, number}}）",
+        "fileRead": "文件审阅（{{count, number}}）",
+        "fileWrite": "实现更新（{{count, number}}）",
+        "data": "数据审阅（{{count, number}}）",
+        "report": "报告任务（{{count, number}}）",
+        "export": "导出（{{count, number}}）",
+        "memory": "记忆更新（{{count, number}}）",
+        "code": "项目步骤（{{count, number}}）",
+        "verify": "验证（{{count, number}}）",
+        "office": "文档任务（{{count, number}}）",
+        "generic": "项目步骤（{{count, number}}）"
+      },
+      "outcome": {
+        "active": "工作进展顺利。已完成：{{completed, number}} / {{total, number}}。仍在进行：{{pending, number}}。",
+        "activeWithFailure": "工作正在推进，但部分步骤需要再次尝试。已完成：{{completed, number}} / {{total, number}}。仍在进行：{{pending, number}}。需要再次尝试：{{failed, number}}。",
+        "activeWithCanceled": "工作正在推进，但部分步骤已停止。已完成：{{completed, number}} / {{total, number}}。仍在进行：{{pending, number}}。已停止：{{canceled, number}}。",
+        "activeWithFailureAndCanceled": "工作正在推进，但部分步骤需要处理。已完成：{{completed, number}} / {{total, number}}。仍在进行：{{pending, number}}。需要再次尝试：{{failed, number}}。已停止：{{canceled, number}}。",
+        "completed": "我已完成本轮计划的全部工作。",
+        "recovered": "重新尝试工作后，我已完成本轮计划的全部工作。",
+        "partial": "我已完成部分计划工作。已完成：{{completed, number}} / {{total, number}}。需要再次尝试：{{failed, number}}。",
+        "partialWithCanceled": "我已完成部分计划工作。已完成：{{completed, number}} / {{total, number}}。需要再次尝试：{{failed, number}}。已停止：{{canceled, number}}。",
+        "failed": "我未能完成计划工作。计划工作：{{total, number}}。需要再次尝试：{{failed, number}}。",
+        "failedWithCanceled": "我未能完成计划工作。计划工作：{{total, number}}。需要再次尝试：{{failed, number}}。已停止：{{canceled, number}}。",
+        "canceled": "我在计划工作完成前停止了本轮。计划工作：{{total, number}}。尚未完成：{{unfinished, number}}。已停止：{{canceled, number}}。"
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "全部完成了——一切都按计划顺利进行。告诉我接下来您想做什么。",
+        "v2": "这项工作已经完成并正常运行。告诉我接下来您想往哪个方向进行。",
+        "v3": "完成了——一切都顺利收尾。您准备好后，我随时可以开始下一项。"
+      },
+      "recovered": {
+        "v1": "完成了——其中一步重试了一次，现在都已妥善处理好。",
+        "v2": "已经完成——中途需要快速重试了一下，不过现在一切都已就绪。"
+      },
+      "partial": {
+        "v1": "大部分我已经完成了。还有几处需要再处理一遍——详情就在下方。",
+        "v2": "进展不错——大部分已经完成，不过还有一小部分需要再试一次。详细信息可以在下方查看。"
+      },
+      "failed": {
+        "v1": "这一项我没能完成。详情在下方，您准备好后可以随时让我再试一次。",
+        "v2": "这次没能成功。您可以看看下方的详情，或者直接让我再试一次。"
+      },
+      "canceled": {
+        "v1": "在这里停下了。如果您希望我继续，请告诉我。"
+      }
+    },
+    "attempt": "（第 {{n}} 次尝试）",
+    "generic": {
+      "running": "我正在处理下一步。",
+      "done": "已完成下一步。",
+      "failedTitle": "我无法完成此步骤"
+    },
+    "status": {
+      "stopped": "已停止",
+      "recovered": "重试后已恢复。"
+    },
+    "error": {
+      "suggestion": "下方提供了错误详情。准备好后，您可以重试此步骤。"
+    },
+    "categories": {
+      "web": {
+        "running": "我正在查找相关信息。",
+        "done": "已找到相关信息。",
+        "failedTitle": "我无法完成信息查找"
+      },
+      "search": {
+        "running": "我正在查找相关项目文件。",
+        "done": "已找到相关项目文件。",
+        "failedTitle": "我无法完成项目文件查找"
+      },
+      "fileRead": {
+        "running": "我正在查看相关文件，以了解当前行为。",
+        "done": "已查看相关文件。",
+        "failedTitle": "我无法查看相关文件"
+      },
+      "fileWrite": {
+        "running": "我正在更新实现。",
+        "done": "已更新实现。",
+        "failedTitle": "我无法更新实现"
+      },
+      "data": {
+        "running": "我正在查看相关数据，以了解当前行为。",
+        "done": "已查看相关数据。",
+        "failedTitle": "我无法查看相关数据"
+      },
+      "report": {
+        "running": "我正在准备最终文件。",
+        "done": "已准备好最终文件。",
+        "failedTitle": "我无法准备最终文件"
+      },
+      "export": {
+        "running": "我正在准备最终文件。",
+        "done": "已准备好最终文件。",
+        "failedTitle": "我无法准备最终文件"
+      },
+      "memory": {
+        "running": "我正在更新已保存的上下文。",
+        "done": "已更新保存的上下文。",
+        "failedTitle": "我无法更新保存的上下文"
+      },
+      "code": {
+        "running": "我正在运行下一个项目步骤。",
+        "done": "已完成该项目步骤。",
+        "failedTitle": "我无法完成该项目步骤"
+      },
+      "verify": {
+        "running": "我正在检查这些更改，确保一切仍正常运行。",
+        "done": "已完成更改检查。",
+        "failedTitle": "我无法完成更改检查"
+      },
+      "office": {
+        "running": "我正在准备最终文件。",
+        "done": "已准备好最终文件。",
+        "failedTitle": "我无法准备最终文件"
+      }
+    },
+    "tools": {
+      "data_open": {
+        "running": "我正在查看相关数据，以了解当前行为。",
+        "done": "已查看相关数据。",
+        "failedTitle": "我无法查看相关数据"
+      },
+      "data_get_schema": {
+        "running": "我正在查看相关数据，以了解当前行为。",
+        "done": "已查看相关数据。",
+        "failedTitle": "我无法查看相关数据"
+      },
+      "data_run_sql": {
+        "running": "我正在查看相关数据，以了解当前行为。",
+        "done": "已查看相关数据。",
+        "failedTitle": "我无法查看相关数据"
+      },
+      "render_report": {
+        "running": "我正在准备最终文件。",
+        "done": "已准备好最终文件。",
+        "failedTitle": "我无法准备最终文件"
+      },
+      "export_pdf": {
+        "running": "我正在准备最终文件。",
+        "done": "已准备好最终文件。",
+        "failedTitle": "我无法准备最终文件"
+      }
+    }
+  },
+  "plan": {
+    "title": "待办清单"
+  }
+}

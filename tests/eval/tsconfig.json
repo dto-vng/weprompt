@@ -1,0 +1,5 @@
+{
+  "$comment": "The root tsconfig's `include` covers packages/desktop/src only, so nothing under tests/ is typechecked by `bunx tsc --noEmit`. This scoped config exists so the harness can still be typechecked: `bunx tsc --noEmit -p tests/eval`. It intentionally does not widen the repo-wide gate.",
+  "extends": "../../tsconfig.json",
+  "include": ["**/*.ts"]
+}

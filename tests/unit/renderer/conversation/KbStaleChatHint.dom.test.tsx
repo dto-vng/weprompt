@@ -1,0 +1,135 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ISessionMcpServer } from '@/common/config/storage';
+import type { IKnowledgeSourceDto, IProjectKnowledgeListResult } from '@/common/types/project/knowledgeTypes';
+import { BUILTIN_KNOWLEDGE_NAME } from '@/common/knowledge/constants';
+import KbStaleChatHint from '@/renderer/pages/conversation/knowledge/KbStaleChatHint';
+import { kbStaleHintDismissKey } from '@/renderer/pages/conversation/knowledge/useKbStaleChatHint';
+
+const listSourcesMock = vi.fn();
+const navigateMock = vi.fn();
+
+vi.mock('@/common', () => ({
+  ipcBridge: {
+    projectKnowledge: {
+      listSources: { invoke: (...args: unknown[]) => listSourcesMock(...args) },
+      updated: { on: () => () => undefined },
+    },
+  },
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigateMock,
+}));
+
+const READY_SOURCE: IKnowledgeSourceDto = {
+  id: 's1',
+  fileName: 'policy.pdf',
+  byteSize: 10,
+  status: 'ready',
+  chunkCount: 4,
+  vectorCount: 0,
+  addedAt: 0,
+  error: null,
+  progress: null,
+  ocr: null,
+};
+
+const listResult = (sources: IKnowledgeSourceDto[]): IProjectKnowledgeListResult => ({
+  sources,
+  summary: { fileCount: sources.length, passageCount: 0, semantic: 'off' },
+  folderMissing: false,
+});
+
+const KNOWLEDGE_SERVER: ISessionMcpServer = {
+  id: 'project-kb-p1',
+  name: BUILTIN_KNOWLEDGE_NAME,
+  transport: { type: 'stdio' },
+};
+
+const STALE_PROPS = {
+  conversationId: 'c1',
+  projectId: 'p1',
+  workspace: '/tmp/project',
+  sessionMcpServers: [{ id: 'mcp_1', name: 'greennode-idp', transport: { type: 'stdio' } } as ISessionMcpServer],
+};
+
+const BODY_KEY = 'conversation.staleKnowledgeHint.body';
+const ACTION_KEY = 'conversation.staleKnowledgeHint.action';
+const CLOSE_KEY = 'common.close';
+
+beforeEach(() => {
+  localStorage.clear();
+  listSourcesMock.mockReset().mockResolvedValue(listResult([READY_SOURCE]));
+  navigateMock.mockReset();
+});
+
+describe('KbStaleChatHint', () => {
+  it('explains the problem and offers a new chat', async () => {
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    expect(await screen.findByText(BODY_KEY)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: ACTION_KEY })).toBeInTheDocument();
+  });
+
+  it('announces politely rather than interrupting, and names its close button', async () => {
+    // Arco's role='alert' would announce assertively, cutting off whatever the
+    // screen reader is saying; the explicit aria-live downgrades it. Its
+    // icon-only close button also ships with no accessible name.
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    const notice = await screen.findByTestId('kb-stale-chat-hint');
+    expect(notice).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('button', { name: CLOSE_KEY })).toBeInTheDocument();
+  });
+
+  it('renders nothing for a chat that already has the knowledge server', async () => {
+    render(<KbStaleChatHint {...STALE_PROPS} sessionMcpServers={[KNOWLEDGE_SERVER]} />);
+    await waitFor(() => expect(listSourcesMock).toHaveBeenCalled());
+    expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('kb-stale-chat-hint')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing for a non-project chat', async () => {
+    render(<KbStaleChatHint {...STALE_PROPS} projectId={undefined} />);
+    await waitFor(() => expect(listSourcesMock).not.toHaveBeenCalled());
+    expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when the project has no indexed sources', async () => {
+    listSourcesMock.mockResolvedValue(listResult([]));
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    await waitFor(() => expect(listSourcesMock).toHaveBeenCalled());
+    expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
+  });
+
+  it('renders nothing once dismissed', async () => {
+    localStorage.setItem(kbStaleHintDismissKey('c1'), '1');
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    await waitFor(() => expect(listSourcesMock).toHaveBeenCalled());
+    expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument();
+  });
+
+  it('navigates to the project-scoped new chat with the project carried in router state', async () => {
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    fireEvent.click(await screen.findByRole('button', { name: ACTION_KEY }));
+    expect(navigateMock).toHaveBeenCalledWith('/guid', { state: { workspace: '/tmp/project', projectId: 'p1' } });
+  });
+
+  it('closing it hides the notice and remembers the choice', async () => {
+    render(<KbStaleChatHint {...STALE_PROPS} />);
+    expect(await screen.findByText(BODY_KEY)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: CLOSE_KEY }));
+    await waitFor(() => expect(screen.queryByText(BODY_KEY)).not.toBeInTheDocument());
+    expect(localStorage.getItem(kbStaleHintDismissKey('c1'))).toBe('1');
+  });
+});
