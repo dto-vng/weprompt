@@ -7,6 +7,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
+import packagedTemplateInventory from '../../../../resources/presentation-templates/manifest.json';
 import editorialThemeMd from './editorial-field-report/THEME.md?raw';
 import editorialPreviewSvg from './editorial-field-report/preview.svg?raw';
 import simpleLightThemeMd from './simple-light/THEME.md?raw';
@@ -43,6 +44,42 @@ export type BuiltinTemplatePack = {
 const CREATED_AT = '2026-07-22T00:00:00Z';
 const DOCX_CREATED_AT = '2026-07-28T00:00:00Z';
 
+type BuiltinTemplateInventoryEntry = {
+  id: string;
+  format: PresentationTemplateManifest['format'];
+  packagedReferenceFile: string | null;
+};
+
+export const BUILTIN_TEMPLATE_INVENTORY = packagedTemplateInventory as BuiltinTemplateInventoryEntry[];
+
+const inventoryById = new Map(BUILTIN_TEMPLATE_INVENTORY.map((entry) => [entry.id, entry]));
+
+const requireInventoryEntry = (id: string): BuiltinTemplateInventoryEntry => {
+  const entry = inventoryById.get(id);
+  if (!entry) throw new Error(`Missing builtin presentation template inventory entry: ${id}`);
+  return entry;
+};
+
+const requirePackagedReference = (entry: BuiltinTemplateInventoryEntry): string => {
+  if (entry.packagedReferenceFile === null) {
+    throw new Error(`Builtin presentation template has no packaged reference: ${entry.id}`);
+  }
+  return entry.packagedReferenceFile;
+};
+
+const editorialFieldReportInventory = requireInventoryEntry('editorial-field-report');
+const simpleLightInventory = requireInventoryEntry('simple-light');
+const simpleDarkInventory = requireInventoryEntry('simple-dark');
+const marketTrendsReportInventory = requireInventoryEntry('market-trends-report');
+const businessReviewInventory = requireInventoryEntry('business-review');
+const projectKickoffInventory = requireInventoryEntry('project-kickoff');
+const monthlySteercoInventory = requireInventoryEntry('monthly-steerco');
+const connectedOpsInventory = requireInventoryEntry('connected-ops');
+const businessReportInventory = requireInventoryEntry('business-report');
+const decisionMemoInventory = requireInventoryEntry('decision-memo');
+const operationsGuideInventory = requireInventoryEntry('operations-guide');
+const proposalSowInventory = requireInventoryEntry('proposal-sow');
+
 /**
  * Bundled binary resources: packaged builds read from process.resourcesPath
  * (electron-builder extraResources); dev reads from the repo's
@@ -65,10 +102,10 @@ const resolveBundledReference = (fileName: string): string => {
 export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   {
     manifest: {
-      id: 'editorial-field-report',
+      id: editorialFieldReportInventory.id,
       name: 'Editorial Field Report',
       description: 'Long-read report — serif type, prose over bullets, one red accent.',
-      format: 'html',
+      format: editorialFieldReportInventory.format,
       kind: 'report',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -82,10 +119,10 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   },
   {
     manifest: {
-      id: 'simple-light',
+      id: simpleLightInventory.id,
       name: 'Simple Light',
       description: 'Minimal light deck — one idea per slide, single blue accent.',
-      format: 'html',
+      format: simpleLightInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -99,10 +136,10 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   },
   {
     manifest: {
-      id: 'simple-dark',
+      id: simpleDarkInventory.id,
       name: 'Simple Dark',
       description: 'Minimal dark deck for technical talks — code-friendly, green accent.',
-      format: 'html',
+      format: simpleDarkInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -116,10 +153,10 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   },
   {
     manifest: {
-      id: 'market-trends-report',
+      id: marketTrendsReportInventory.id,
       name: 'Market Trends Report',
       description: 'Data-forward scrolling report — charted exhibits with sourced notes.',
-      format: 'html',
+      format: marketTrendsReportInventory.format,
       kind: 'report',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -133,10 +170,10 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
   },
   {
     manifest: {
-      id: 'business-review',
+      id: businessReviewInventory.id,
       name: 'Business Review',
       description: 'Quarterly results deck — KPI summary, segment detail, outlook. Navy and amber.',
-      format: 'pptx',
+      format: businessReviewInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -147,14 +184,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: businessReviewThemeMd,
     previewSvg: businessReviewPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('business-review.pptx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(businessReviewInventory)),
   },
   {
     manifest: {
-      id: 'project-kickoff',
+      id: projectKickoffInventory.id,
       name: 'Project Kickoff',
       description: 'Kickoff deck — scope, team, timeline, next steps. Clean teal.',
-      format: 'pptx',
+      format: projectKickoffInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -165,14 +202,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: projectKickoffThemeMd,
     previewSvg: projectKickoffPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('project-kickoff.pptx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(projectKickoffInventory)),
   },
   {
     manifest: {
-      id: 'monthly-steerco',
+      id: monthlySteercoInventory.id,
       name: 'Monthly SteerCo',
       description: 'Steering committee update — portfolio status, risks, decisions needed. Serif and gold.',
-      format: 'pptx',
+      format: monthlySteercoInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -183,14 +220,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: monthlySteercoThemeMd,
     previewSvg: monthlySteercoPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('monthly-steerco.pptx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(monthlySteercoInventory)),
   },
   {
     manifest: {
-      id: 'connected-ops',
+      id: connectedOpsInventory.id,
       name: 'Connected Ops',
       description: 'Operations review — site metrics, uptime, incidents. Industrial green.',
-      format: 'pptx',
+      format: connectedOpsInventory.format,
       kind: 'deck',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -201,14 +238,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: connectedOpsThemeMd,
     previewSvg: connectedOpsPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('connected-ops.pptx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(connectedOpsInventory)),
   },
   {
     manifest: {
-      id: 'business-report',
+      id: businessReportInventory.id,
       name: 'Business Report',
       description: 'Long-form formal report — cover, contents, data tables, navy serif headings.',
-      format: 'docx',
+      format: businessReportInventory.format,
       kind: 'document',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -219,14 +256,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: businessReportThemeMd,
     previewSvg: businessReportPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('business-report.docx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(businessReportInventory)),
   },
   {
     manifest: {
-      id: 'decision-memo',
+      id: decisionMemoInventory.id,
       name: 'Decision Memo',
       description: 'Short decision memo — TO/FROM/RE block, recommendation up front, no cover.',
-      format: 'docx',
+      format: decisionMemoInventory.format,
       kind: 'document',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -237,14 +274,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: decisionMemoThemeMd,
     previewSvg: decisionMemoPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('decision-memo.docx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(decisionMemoInventory)),
   },
   {
     manifest: {
-      id: 'operations-guide',
+      id: operationsGuideInventory.id,
       name: 'Operations Guide',
       description: 'Compact SOP — numbered steps, note boxes, checklists, teal accent.',
-      format: 'docx',
+      format: operationsGuideInventory.format,
       kind: 'document',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -255,14 +292,14 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: operationsGuideThemeMd,
     previewSvg: operationsGuidePreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('operations-guide.docx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(operationsGuideInventory)),
   },
   {
     manifest: {
-      id: 'proposal-sow',
+      id: proposalSowInventory.id,
       name: 'Proposal / SOW',
       description: 'Client proposal — scope, timeline, pricing table, signature block.',
-      format: 'docx',
+      format: proposalSowInventory.format,
       kind: 'document',
       source: 'builtin',
       themeFile: 'THEME.md',
@@ -273,6 +310,6 @@ export const BUILTIN_TEMPLATE_PACKS: BuiltinTemplatePack[] = [
     },
     themeMd: proposalSowThemeMd,
     previewSvg: proposalSowPreviewSvg,
-    referenceSourcePath: () => resolveBundledReference('proposal-sow.docx'),
+    referenceSourcePath: () => resolveBundledReference(requirePackagedReference(proposalSowInventory)),
   },
 ];

@@ -9,6 +9,10 @@ const {
   getModulesToRebuild,
 } = require('./rebuildNativeModules');
 const { verifyBundledAioncoreResources } = require('../packages/shared-scripts/src/verify-bundled-aioncore-resources');
+const {
+  readPresentationTemplateInventory,
+  assertPresentationTemplateResources,
+} = require('../packages/shared-scripts/src/presentation-template-inventory');
 
 /**
  * afterPack hook for electron-builder
@@ -55,6 +59,18 @@ function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) 
   console.log(`   ✓ Bundled resources verified for ${result.runtimeKey} (${result.checked.length} checks)`);
 }
 
+function verifyPresentationTemplateResources(resourcesDir) {
+  const templatesDirectory = path.join(resourcesDir, 'presentation-templates');
+  const inventory = readPresentationTemplateInventory(path.join(templatesDirectory, 'manifest.json'));
+  const checked = assertPresentationTemplateResources({
+    inventory,
+    resourcesDirectory: templatesDirectory,
+  });
+
+  console.log(`   ✓ Presentation template resources verified (${checked.length} references)`);
+  return checked;
+}
+
 async function afterPack(context) {
   const { arch, electronPlatformName, appOutDir, packager } = context;
   const targetArch = normalizeArch(typeof arch === 'string' ? arch : Arch[arch] || process.arch);
@@ -91,6 +107,7 @@ async function afterPack(context) {
     }
 
     verifyBundledResources(resourcesDir, electronPlatformName, targetArch);
+    verifyPresentationTemplateResources(resourcesDir);
   } else {
     throw new Error(`resources directory not found: ${resourcesDir}`);
   }
@@ -246,3 +263,4 @@ async function afterPack(context) {
 module.exports = afterPack;
 module.exports.assertBundledRuntimeIsolation = assertBundledRuntimeIsolation;
 module.exports.resolveResourcesDir = resolveResourcesDir;
+module.exports.verifyPresentationTemplateResources = verifyPresentationTemplateResources;

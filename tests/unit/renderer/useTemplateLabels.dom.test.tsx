@@ -89,12 +89,13 @@ describe('useTemplateLabels', () => {
 // failure mode cannot hide.
 describe('built-in template catalog (real locale files)', () => {
   const LOCALES_DIR = path.resolve(__dirname, '../../../packages/desktop/src/renderer/services/i18n/locales');
-  const MANIFEST = path.resolve(
+  const INVENTORY_MANIFEST = path.resolve(
     __dirname,
-    '../../../packages/desktop/src/process/resources/presentation-templates/index.ts'
+    '../../../packages/desktop/resources/presentation-templates/manifest.json'
   );
-  const manifestSrc = fs.readFileSync(MANIFEST, 'utf-8');
-  const builtinIds = [...manifestSrc.matchAll(/id: '([^']+)'/g)].map((m) => m[1]);
+  const builtinIds = (JSON.parse(fs.readFileSync(INVENTORY_MANIFEST, 'utf-8')) as Array<{ id: string }>).map(
+    (entry) => entry.id
+  );
   const locales = fs.readdirSync(LOCALES_DIR).filter((d) => /^[a-z]{2}-[A-Z]{2}$/.test(d));
 
   const catalogOf = (locale: string) =>
