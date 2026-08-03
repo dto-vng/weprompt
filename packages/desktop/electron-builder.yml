@@ -167,6 +167,7 @@ dmg:
 
 afterPack: scripts/afterPack.js
 afterSign: scripts/afterSign.js
+artifactBuildStarted: scripts/afterSign.js
 
 linux:
   target:

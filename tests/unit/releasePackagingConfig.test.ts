@@ -526,6 +526,12 @@ describe('release packaging configuration', () => {
     expect(macBlock).toContain('    - zip');
   });
 
+  it('authorizes mac retries from the artifact build lifecycle hook', () => {
+    const config = readProjectFile('packages/desktop/electron-builder.yml');
+
+    expect(config).toContain('artifactBuildStarted: scripts/afterSign.js');
+  });
+
   it('does not build Windows zip artifacts', () => {
     const config = readProjectFile('packages/desktop/electron-builder.yml');
     const winBlock = yamlBlock(config, 'win');
