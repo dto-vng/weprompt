@@ -1012,18 +1012,20 @@ export const projectKnowledge = {
     'project-knowledge.list-sources'
   ),
   // `workspace` is the project workspace path; the `Knowledge Base/` folder
-  // inside it is the source of truth for knowledge files. Optional only until
-  // every renderer caller passes it (typed required again in the card work).
-  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace?: string }>(
+  // inside it is the source of truth for knowledge files. Required end-to-end:
+  // the native schema rejects payloads without it. NOTE the main process
+  // trusts the renderer's projectId→workspace pairing (projects live in
+  // renderer localStorage); ownership binding in main is a separate project.
+  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace: string }>(
     'project-knowledge.add-sources'
   ),
-  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace: string }>(
     'project-knowledge.remove-source'
   ),
   getSourceText: bridge.buildProvider<{ text: string; truncated: boolean }, { projectId: string; sourceId: string }>(
     'project-knowledge.get-source-text'
   ),
-  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace: string }>(
     'project-knowledge.retry-source'
   ),
   syncFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.sync-folder'),

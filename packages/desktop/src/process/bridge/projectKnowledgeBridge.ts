@@ -76,13 +76,13 @@ const getWatcher = (): KnowledgeFolderWatcher => {
 export function initProjectKnowledgeBridge(): void {
   ipcBridge.projectKnowledge.listSources.provider(({ projectId }) => getService().listSources(projectId));
   ipcBridge.projectKnowledge.addSources.provider(({ projectId, filePaths, workspace }) =>
-    getService().addSources(projectId, filePaths, workspace ?? '')
+    getService().addSources(projectId, filePaths, workspace)
   );
   ipcBridge.projectKnowledge.removeSource.provider(({ projectId, sourceId, workspace }) =>
-    getService().removeSource(projectId, sourceId, workspace ?? '')
+    getService().removeSource(projectId, sourceId, workspace)
   );
   ipcBridge.projectKnowledge.retrySource.provider(({ projectId, sourceId, workspace }) =>
-    getService().retrySource(projectId, sourceId, workspace ?? '')
+    getService().retrySource(projectId, sourceId, workspace)
   );
   ipcBridge.projectKnowledge.syncFolder.provider(({ projectId, workspace }) => syncAndWatch(projectId, workspace));
   ipcBridge.projectKnowledge.watchFolder.provider(async ({ projectId, workspace }) => {

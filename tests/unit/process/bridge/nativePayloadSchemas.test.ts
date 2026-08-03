@@ -389,6 +389,7 @@ const INVALID_PAYLOADS = [
   ],
   ['project-knowledge.list-sources', 'omitted required project identifier', {}],
   ['project-knowledge.add-sources', 'omitted required file paths', { projectId: 'project-1' }],
+  ['project-knowledge.add-sources', 'omitted workspace', { projectId: 'project-1', filePaths: ['/tmp/work/notes.md'] }],
   ['project-knowledge.add-sources', 'non-array file paths', { projectId: 'project-1', filePaths: 'not-an-array' }],
   [
     'project-knowledge.add-sources',
@@ -396,7 +397,9 @@ const INVALID_PAYLOADS = [
     { projectId: 'project-1', filePaths: Array.from({ length: 101 }, (_, index) => `/tmp/work/file-${index}.md`) },
   ],
   ['project-knowledge.remove-source', 'omitted required source identifier', { projectId: 'project-1' }],
+  ['project-knowledge.remove-source', 'omitted workspace', { projectId: 'project-1', sourceId: 'a1b2c3d4e5f6' }],
   ['project-knowledge.retry-source', 'non-string source identifier', { projectId: 'project-1', sourceId: 1 }],
+  ['project-knowledge.retry-source', 'omitted workspace', { projectId: 'project-1', sourceId: 'a1b2c3d4e5f6' }],
   ['project-knowledge.remove-store', 'empty project identifier', { projectId: '' }],
   ['project-knowledge.get-session-mcp-server', 'omitted required project identifier', {}],
   ['app-operations.cancel', 'omitted operation identifier', {}],
