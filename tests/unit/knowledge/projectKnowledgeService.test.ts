@@ -95,6 +95,37 @@ describe('projectKnowledgeService', () => {
     expect(summary.semantic).toBe('off');
   });
 
+  it('re-embeds stale hasVector chunks by upserting rows, never duplicating chunk ids', async () => {
+    // Full ingest: source ready, every chunk embedded, vectors on disk.
+    const file = await addFile('policy.md', 'travel policy: submit the visa letter request early');
+    await service.addSources('proj-1', [file], workspace);
+    await service.whenIdle('proj-1');
+    const storeDir = path.join(root, 'proj-1');
+    const chunks = await readChunks(storeDir);
+    expect(chunks.length).toBeGreaterThan(0);
+
+    // Simulate the documented partial-write window (see removeSourceRows):
+    // writeVectors succeeded but the follow-up writeChunks did not, so
+    // chunks.json claims "no vector" while vectors.bin already has the rows.
+    await writeChunks(
+      storeDir,
+      chunks.map((c) => ({ ...c, hasVector: false }))
+    );
+
+    // Any queue pass ends with the embed step re-running for "missing" chunks.
+    await service.syncFolder('proj-1', workspace);
+    await service.whenIdle('proj-1');
+
+    const meta = JSON.parse(readFileSync(path.join(storeDir, 'index', 'vectors.meta.json'), 'utf8')) as {
+      rowChunkIds: string[];
+    };
+    // One row per chunk: a duplicate id means recovery appended instead of upserting.
+    expect(meta.rowChunkIds.length).toBe(chunks.length);
+    expect(new Set(meta.rowChunkIds).size).toBe(meta.rowChunkIds.length);
+    const vectors = await readVectors(storeDir);
+    expect(vectors!.rows.size).toBe(chunks.length);
+  });
+
   it('marks unsupported extensions and oversized files without indexing them', async () => {
     const pptx = await addFile('deck.pptx', 'x');
     const big = await addFile('big.txt', 'x'.repeat(16 * 1024 * 1024));
