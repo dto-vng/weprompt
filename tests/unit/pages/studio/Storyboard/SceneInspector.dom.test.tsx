@@ -196,6 +196,21 @@ describe('SceneInspector', () => {
     expect(props.onFlushSceneDraft).toHaveBeenCalledOnce();
   });
 
+  it('recovers with the button stepper after rejecting an invalid raw duration', () => {
+    const props = createProps({
+      durationBounds: { minDurationSeconds: 4, maxDurationSeconds: 12, source: 'selected_route' },
+    });
+    const { container } = render(<SceneInspector {...props} />);
+    const duration = screen.getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' });
+    const stepUp = container.querySelectorAll('.arco-input-number-step-button')[1];
+    if (stepUp === undefined) throw new Error('Duration increment stepper is missing');
+
+    fireEvent.input(duration, { target: { value: '3' } });
+    fireEvent.mouseDown(stepUp);
+
+    expect(props.onUpdateSceneDraft).toHaveBeenCalledExactlyOnceWith({ durationSeconds: 8 });
+  });
+
   it('keeps a persisted out-of-range duration visible with an error', () => {
     render(
       <SceneInspector
@@ -233,6 +248,11 @@ describe('SceneInspector', () => {
       />
     );
     expect(screen.queryByText('conversation.creativeStudio.inspector.invalidDuration')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' }), {
+      target: { value: '10' },
+    });
+    expect(props.onUpdateSceneDraft).toHaveBeenCalledExactlyOnceWith({ durationSeconds: 10 });
   });
 
   it('keeps errors and conflict recovery actions visible without dropping the draft', () => {

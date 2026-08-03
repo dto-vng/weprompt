@@ -64,6 +64,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   const durationInputInvalidRef = useRef(false);
 
   useEffect(() => {
+    durationInputInvalidRef.current = false;
     setDurationChangeInvalid(false);
   }, [
     sceneDraft?.durationSeconds,
@@ -84,8 +85,9 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   };
 
   const updateDuration = (value: number, reason?: string) => {
+    const stepperRecovery = reason === 'increase' || reason === 'decrease';
     if (
-      durationInputInvalidRef.current ||
+      (durationInputInvalidRef.current && !stepperRecovery) ||
       reason === 'outOfRange' ||
       !Number.isInteger(value) ||
       value < durationBounds.minDurationSeconds ||

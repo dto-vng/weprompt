@@ -110,4 +110,36 @@ describe('resolveSceneDurationBounds', () => {
       source: 'fallback',
     });
   });
+
+  it('falls back when the project has no media selection despite a catalog route', () => {
+    const current = project();
+    expect(
+      resolveSceneDurationBounds({ ...current, routing: { ...current.routing, video: null } }, catalog(), 'video')
+    ).toEqual({
+      minDurationSeconds: 1,
+      maxDurationSeconds: 60,
+      source: 'fallback',
+    });
+  });
+
+  it('falls back when the project selection does not match the catalog selected route', () => {
+    const current = project();
+    expect(
+      resolveSceneDurationBounds(
+        {
+          ...current,
+          routing: {
+            ...current.routing,
+            video: { ...current.routing.video!, choiceId: 'choice-other' },
+          },
+        },
+        catalog(),
+        'video'
+      )
+    ).toEqual({
+      minDurationSeconds: 1,
+      maxDurationSeconds: 60,
+      source: 'fallback',
+    });
+  });
 });
