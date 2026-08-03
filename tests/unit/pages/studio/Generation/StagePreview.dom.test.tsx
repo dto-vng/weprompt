@@ -330,6 +330,61 @@ describe('StagePreview managed media', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows model-loading feedback and withholds review during initial catalog loading', () => {
+    const current = scene();
+    const onOpenSingleReview = vi.fn();
+    render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={null}
+        catalogLoading
+        selectedScene={current}
+        onOpenSingleReview={onOpenSingleReview}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.models.loading')).toBeVisible();
+    expect(screen.queryByText('conversation.creativeStudio.preview.missingModel')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
+    ).not.toBeInTheDocument();
+    expect(onOpenSingleReview).not.toHaveBeenCalled();
+  });
+
+  it('removes a stale catalog review action while the catalog refreshes', () => {
+    const current = scene();
+    const onOpenSingleReview = vi.fn();
+    const view = render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={catalog()}
+        catalogLoading={false}
+        selectedScene={current}
+        onOpenSingleReview={onOpenSingleReview}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })).toBeEnabled();
+
+    view.rerender(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        catalog={catalog()}
+        catalogLoading
+        selectedScene={current}
+        onOpenSingleReview={onOpenSingleReview}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.models.loading')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
+    ).not.toBeInTheDocument();
+    expect(onOpenSingleReview).not.toHaveBeenCalled();
+  });
+
   it('offers contextual generation only when a compatible single-scene review can be built', () => {
     const current = scene();
     const onOpenSingleReview = vi.fn();

@@ -227,6 +227,25 @@ describe('GenerationControls', () => {
     ).toBeEnabled();
   });
 
+  it('blocks the lower batch handler and shows the supplied duration reason', () => {
+    const props = createProps();
+    render(
+      <GenerationControls
+        {...props}
+        batchDisabled
+        batchDisabledReasonKey='conversation.creativeStudio.review.disabledDurationMismatch'
+      />
+    );
+
+    const batchAction = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.review.generateReadyScenes:count=2',
+    });
+    expect(batchAction).toBeDisabled();
+    expect(screen.getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeVisible();
+    fireEvent.click(batchAction);
+    expect(props.onOpenBatchReview).not.toHaveBeenCalled();
+  });
+
   it('labels a scene with a selected output as another paid variation', () => {
     render(
       <GenerationControls

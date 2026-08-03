@@ -27,8 +27,8 @@ export type StudioReadinessSummary = {
   durationDeltaSeconds: number;
 };
 
-export const canOpenSingleSceneReview = (status: StudioSceneStatus | undefined): boolean =>
-  status === 'ready' || status === 'needs_selection' || status === 'generated';
+export const canOpenSingleSceneReview = (status: StudioSceneStatus | undefined, visualPrompt: string): boolean =>
+  visualPrompt.trim().length > 0 && (status === 'ready' || status === 'needs_selection' || status === 'generated');
 
 const ACTIVE_JOB_STATUSES = new Set<StudioRendererJob['status']>([
   'queued_local',

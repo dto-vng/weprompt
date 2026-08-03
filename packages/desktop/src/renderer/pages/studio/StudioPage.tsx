@@ -221,6 +221,11 @@ const StudioProjectShell: React.FC = () => {
     [project]
   );
   const readiness = useMemo(() => (project === null ? null : deriveStudioReadiness(project)), [project]);
+  const modelSetupCalloutVisible =
+    studioModels.catalog !== null &&
+    (['storyboard', 'image', 'video'] as const).some(
+      (role) => studioModels.catalog?.[role].status === 'setup_required'
+    );
   const readyScenes = useMemo(
     () =>
       readiness === null || project === null
@@ -308,7 +313,7 @@ const StudioProjectShell: React.FC = () => {
     (request: GenerationSingleReviewRequest): void => {
       if (project === null || generationBlocked || request.catalogVersion === null) return;
       const scene = project.scenes[request.sceneId];
-      if (scene === undefined || !canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id])) {
+      if (scene === undefined || !canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id], scene.visualPrompt)) {
         return;
       }
       studioJobs.clearIssue();
@@ -460,7 +465,8 @@ const StudioProjectShell: React.FC = () => {
             generationReview.mode === 'single'
               ? generationReview.scenes.flatMap(({ id: sceneId }) => {
                   const scene = project.scenes[sceneId];
-                  return scene === undefined || !canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id])
+                  return scene === undefined ||
+                    !canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id], scene.visualPrompt)
                     ? []
                     : [toReviewScene(project, scene, projectRouteSnapshot(project, scene), availableRoutes)];
                 })
@@ -514,7 +520,7 @@ const StudioProjectShell: React.FC = () => {
           const route = scene === undefined ? null : projectRouteSnapshot(project, scene);
           const eligible =
             scene !== undefined &&
-            canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id]) &&
+            canOpenSingleSceneReview(readiness?.sceneStatuses[scene.id], scene.visualPrompt) &&
             (current.mode === 'single' || scene.selectedAssetId === null);
           if (eligible) {
             return [toReviewScene(project, scene, route, availableRoutes)];
@@ -797,6 +803,7 @@ const StudioProjectShell: React.FC = () => {
             projectId={project.id}
             project={project}
             catalog={studioModels.catalog}
+            catalogLoading={studioModels.loading}
             selectedScene={selectedScene}
             selectedAsset={selectedAsset}
             posterAsset={posterAsset}
@@ -860,10 +867,18 @@ const StudioProjectShell: React.FC = () => {
               sceneDurationSeconds={selectedScene?.durationSeconds}
               hasReference={selectedScene?.referenceAssetId !== null}
               batchSceneCount={readyScenes.length}
+              batchDisabled={readiness?.durationDeltaSeconds !== 0}
+              batchDisabledReasonKey={
+                readiness?.durationDeltaSeconds !== 0
+                  ? 'conversation.creativeStudio.review.disabledDurationMismatch'
+                  : null
+              }
               disabled={generationBlocked}
               singleDisabled={
-                selectedScene !== null && !canOpenSingleSceneReview(readiness?.sceneStatuses[selectedScene.id])
+                selectedScene !== null &&
+                !canOpenSingleSceneReview(readiness?.sceneStatuses[selectedScene.id], selectedScene.visualPrompt)
               }
+              showSettingsAction={!modelSetupCalloutVisible}
               jobs={selectedSceneJobs}
               pendingJobIds={studioJobs.mutationPending ? selectedSceneJobs.map((job) => job.id) : []}
               actionIssue={generationActionIssue}

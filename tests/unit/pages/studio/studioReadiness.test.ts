@@ -12,7 +12,7 @@ import type {
   StudioRendererProject,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
-import { deriveStudioReadiness } from '@renderer/pages/studio/studioReadiness';
+import { canOpenSingleSceneReview, deriveStudioReadiness } from '@renderer/pages/studio/studioReadiness';
 
 const scene = (id: string, overrides: Partial<StudioScene> = {}): StudioScene => ({
   id,
@@ -192,5 +192,16 @@ describe('deriveStudioReadiness', () => {
       totalSceneCount: 2,
       durationDeltaSeconds: expected,
     });
+  });
+
+  it.each(['generated', 'needs_selection'] as const)(
+    'keeps a %s scene out of single-scene review when its canonical visual prompt is blank',
+    (status) => {
+      expect(canOpenSingleSceneReview(status, '   ')).toBe(false);
+    }
+  );
+
+  it('keeps nonblank generated scenes eligible for explicit regeneration', () => {
+    expect(canOpenSingleSceneReview('generated', 'A revised cinematic frame')).toBe(true);
   });
 });

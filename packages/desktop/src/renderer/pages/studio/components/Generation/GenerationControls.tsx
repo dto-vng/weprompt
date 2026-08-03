@@ -69,8 +69,11 @@ export type GenerationControlsProps = {
   sceneDurationSeconds?: number;
   hasReference?: boolean;
   batchSceneCount: number;
+  batchDisabled?: boolean;
+  batchDisabledReasonKey?: string | null;
   disabled?: boolean;
   singleDisabled?: boolean;
+  showSettingsAction?: boolean;
   jobs: StudioRendererJob[];
   pendingJobIds?: readonly string[];
   actionIssue?: GenerationJobActionIssue | null;
@@ -262,8 +265,11 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
   sceneDurationSeconds,
   hasReference,
   batchSceneCount,
+  batchDisabled = false,
+  batchDisabledReasonKey = null,
   disabled = false,
   singleDisabled = false,
+  showSettingsAction = true,
   jobs,
   pendingJobIds = [],
   actionIssue = null,
@@ -319,7 +325,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
   };
 
   const openBatchReview = (): void => {
-    if (catalogLoading) return;
+    if (disabled || batchDisabled || batchSceneCount < 1 || catalogLoading) return;
     onOpenBatchReview({
       catalogVersion: catalog?.catalogVersion ?? null,
       routes: {
@@ -348,9 +354,11 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
           >
             {t('conversation.creativeStudio.models.refresh')}
           </Button>
-          <Button disabled={disabled} onClick={() => onOpenSettings('/settings/model')}>
-            {t('conversation.creativeStudio.models.openSettings')}
-          </Button>
+          {showSettingsAction && (
+            <Button disabled={disabled} onClick={() => onOpenSettings('/settings/model')}>
+              {t('conversation.creativeStudio.models.openSettings')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -394,10 +402,15 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
               : 'conversation.creativeStudio.review.generateScene'
           )}
         </Button>
-        <Button disabled={disabled || batchSceneCount < 1 || catalogLoading} onClick={openBatchReview}>
+        <Button disabled={disabled || batchDisabled || batchSceneCount < 1 || catalogLoading} onClick={openBatchReview}>
           {t('conversation.creativeStudio.review.generateReadyScenes', { count: batchSceneCount })}
         </Button>
       </div>
+      {batchDisabledReasonKey !== null && (
+        <p aria-live='polite' className='m-0 text-12px text-warning'>
+          {t(batchDisabledReasonKey)}
+        </p>
+      )}
 
       <section aria-label={t('conversation.creativeStudio.jobs.title')} className='flex flex-col gap-10px'>
         <h3 className='m-0 text-14px font-600 text-t-primary'>{t('conversation.creativeStudio.jobs.title')}</h3>

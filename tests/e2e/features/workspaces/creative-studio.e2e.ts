@@ -338,9 +338,9 @@ test.describe('Creative Studio workspace', () => {
       expect(beforeReview.jobs).toEqual([]);
       expect(Object.values(beforeReview.sceneJobIds).flat()).toEqual([]);
 
-      const generateScene = page.getByRole('button', { name: 'Generate scene' });
-      await expect(generateScene).toBeEnabled();
-      await generateScene.click();
+      const previewNextAction = page.getByRole('button', { name: 'Generate this scene' });
+      await expect(previewNextAction).toBeEnabled();
+      await previewNextAction.click();
 
       const reviewDialog = page.getByRole('dialog', { name: 'Review generation' });
       await expect(reviewDialog.getByText('WePrompt Studio E2E')).toBeVisible();

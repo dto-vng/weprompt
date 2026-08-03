@@ -16,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildSingleSceneReviewRequest, type GenerationSingleReviewRequest } from '../Generation/GenerationControls';
-import { deriveStudioReadiness } from '../../studioReadiness';
+import { canOpenSingleSceneReview, deriveStudioReadiness } from '../../studioReadiness';
 
 const SAFE_STUDIO_ID = /^[A-Za-z0-9_-]{1,256}$/;
 
@@ -29,6 +29,7 @@ export type StagePreviewProps = {
   selectedAsset?: StudioAsset | null;
   /** Canonical last-frame thumbnail resolved by the controller from the selected video's job lineage. */
   posterAsset?: StudioAsset | null;
+  catalogLoading?: boolean;
   generationDisabled?: boolean;
   onOpenSingleReview?: (request: GenerationSingleReviewRequest) => void;
 };
@@ -68,6 +69,7 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   selectedScene,
   selectedAsset,
   posterAsset = null,
+  catalogLoading = false,
   generationDisabled = false,
   onOpenSingleReview,
 }) => {
@@ -88,8 +90,14 @@ const StagePreview: React.FC<StagePreviewProps> = ({
     project === undefined || canonicalScene === null
       ? null
       : deriveStudioReadiness(project).sceneStatuses[canonicalScene.id];
+  const singleReviewEligible =
+    canonicalScene !== null && canOpenSingleSceneReview(sceneStatus, canonicalScene.visualPrompt);
   const singleReviewRequest =
-    generationDisabled || onOpenSingleReview === undefined || canonicalScene === null || sceneStatus !== 'ready'
+    catalogLoading ||
+    generationDisabled ||
+    onOpenSingleReview === undefined ||
+    canonicalScene === null ||
+    !singleReviewEligible
       ? null
       : buildSingleSceneReviewRequest({
           project: project!,
@@ -121,11 +129,13 @@ const StagePreview: React.FC<StagePreviewProps> = ({
           {t('conversation.creativeStudio.preview.noAssetTitle')}
         </h2>
         <p className='m-0 max-w-420px text-13px text-t-secondary'>
-          {selectedScene !== null && selectedScene.visualPrompt.trim().length === 0
-            ? t('conversation.creativeStudio.preview.missingVisualPrompt')
-            : project !== undefined && !generationDisabled && sceneStatus === 'ready' && singleReviewRequest === null
-              ? t('conversation.creativeStudio.preview.missingModel')
-              : t('conversation.creativeStudio.preview.noAssetBody')}
+          {catalogLoading
+            ? t('conversation.creativeStudio.models.loading')
+            : selectedScene !== null && selectedScene.visualPrompt.trim().length === 0
+              ? t('conversation.creativeStudio.preview.missingVisualPrompt')
+              : project !== undefined && !generationDisabled && singleReviewEligible && singleReviewRequest === null
+                ? t('conversation.creativeStudio.preview.missingModel')
+                : t('conversation.creativeStudio.preview.noAssetBody')}
         </p>
         {singleReviewRequest !== null && (
           <Button type='primary' onClick={() => onOpenSingleReview(singleReviewRequest)}>
