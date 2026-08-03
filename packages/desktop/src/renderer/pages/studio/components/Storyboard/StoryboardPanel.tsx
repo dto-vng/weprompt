@@ -18,6 +18,8 @@ import styles from './Storyboard.module.css';
 
 type ActionResult = void | Promise<unknown>;
 
+const MAX_SCENES = 24;
+
 type RemoveCandidate = {
   sceneId: string;
   sceneLabel: string;
@@ -79,6 +81,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
     })
   );
   const sceneOrder = orderedScenes.map((scene) => scene.id);
+  const sceneLimitReached = orderedScenes.length >= MAX_SCENES;
   const removeActionLabel = removeCandidate
     ? `${t('conversation.creativeStudio.storyboard.removeScene')}: ${removeCandidate.sceneLabel}`
     : t('conversation.creativeStudio.storyboard.removeScene');
@@ -190,17 +193,20 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
             </Button>
           </div>
         )}
-        {!canAddScene && remainingDurationSeconds > 0 && (
+        {!canAddScene && (sceneLimitReached || remainingDurationSeconds > 0) && (
           <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.sceneLimit')}</p>
         )}
-        {!canAddScene && suggestedExpandedTargetSeconds !== null && (
+        {!canAddScene && !sceneLimitReached && suggestedExpandedTargetSeconds !== null && (
           <Button disabled={mutationPending} onClick={() => void onIncreaseTargetDuration()}>
             {t('conversation.creativeStudio.storyboard.increaseTarget', { seconds: suggestedExpandedTargetSeconds })}
           </Button>
         )}
-        {!canAddScene && suggestedExpandedTargetSeconds === null && remainingDurationSeconds <= 0 && (
-          <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.shortenBeforeAdding')}</p>
-        )}
+        {!canAddScene &&
+          !sceneLimitReached &&
+          suggestedExpandedTargetSeconds === null &&
+          remainingDurationSeconds <= 0 && (
+            <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.shortenBeforeAdding')}</p>
+          )}
         <Button
           type='primary'
           long

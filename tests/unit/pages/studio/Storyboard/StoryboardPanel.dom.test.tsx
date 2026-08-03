@@ -187,12 +187,31 @@ describe('StoryboardPanel', () => {
     expect(screen.getByText('conversation.creativeStudio.storyboard.shortenBeforeAdding')).toBeInTheDocument();
   });
 
-  it('disables add at the scene limit and blocks all ordering controls while a mutation is pending', () => {
+  it('prioritizes the scene limit over target expansion when 24 scenes already fill the target', () => {
+    const fullStoryboard = Array.from({ length: 24 }, (_, index) =>
+      scene(`scene-${index + 1}`, `Scene ${index + 1}`, 1)
+    );
+    const props = createProps({
+      orderedScenes: fullStoryboard,
+      selectedSceneId: 'scene-1',
+      targetDurationSeconds: 24,
+      durationTotalSeconds: 24,
+      durationMatchesTarget: true,
+      remainingDurationSeconds: 0,
+      suggestedExpandedTargetSeconds: 29,
+      canAddScene: false,
+    });
+    render(<StoryboardPanel {...props} />);
+
+    expect(screen.queryByText('conversation.creativeStudio.storyboard.increaseTarget:29')).not.toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.storyboard.sceneLimit')).toBeInTheDocument();
+  });
+
+  it('disables add and blocks all ordering controls while a mutation is pending', () => {
     const props = createProps({ canAddScene: false, mutationPending: true });
     render(<StoryboardPanel {...props} />);
 
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeDisabled();
-    expect(screen.getByText('conversation.creativeStudio.storyboard.sceneLimit')).toBeInTheDocument();
     for (const button of screen.getAllByRole('button', {
       name: /conversation\.creativeStudio\.storyboard\.moveUp: conversation\.creativeStudio\.scene\.accessibleName/,
     })) {
