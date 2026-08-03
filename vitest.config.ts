@@ -86,12 +86,19 @@ export default defineConfig({
         'packages/desktop/src/common/config/i18n-config.json',
       ],
       // Thresholds apply to the included file set.
-      // Keeping them informational until coverage ramps up across all files.
+      // Ratchet toward the project's ≥80% target (AGENTS.md): use
+      // floor(measured) - 1, leaving between 1 and less than 2 percentage
+      // points of headroom. Remeasure when raising; test:coverage fails
+      // on regression below this configured floor. Raise as coverage grows
+      // — never lower. NOTE: GitHub coverage remains non-blocking
+      // (continue-on-error), and the repository has no tracked GitLab CI
+      // configuration. This is a manual guard, not CI enforcement, until
+      // the team wires a blocking CI step.
       thresholds: {
-        statements: 0,
-        branches: 0,
-        functions: 0,
-        lines: 0,
+        statements: 54,
+        branches: 50,
+        functions: 50,
+        lines: 55,
       },
     },
   },
