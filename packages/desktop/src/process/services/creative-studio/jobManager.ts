@@ -73,7 +73,7 @@ export type StudioResolvedSceneRouteSnapshot = StudioProviderRef & {
   kind: StudioMediaKind;
 };
 
-export type StudioResolvedSubmitScenesRequest = Omit<StudioSubmitScenesRequest, 'routes'> & {
+export type StudioResolvedSubmitScenesRequest = Omit<StudioSubmitScenesRequest, 'routes' | 'mode'> & {
   routes: StudioResolvedSceneRouteSnapshot[];
 };
 

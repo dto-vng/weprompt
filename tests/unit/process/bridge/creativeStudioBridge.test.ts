@@ -213,6 +213,7 @@ describe('initCreativeStudioBridge', () => {
     const submitInput = {
       projectId: 'project_1',
       expectedRevision: 1,
+      mode: 'single' as const,
       sceneIds: ['scene_1'],
       catalogVersion: '0123456789abcdef',
       routes: [

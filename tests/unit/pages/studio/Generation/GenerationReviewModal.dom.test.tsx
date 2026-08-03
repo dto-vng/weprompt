@@ -67,6 +67,8 @@ const createProps = (overrides: Partial<GenerationReviewModalProps> = {}): Gener
   aspectRatio: '16:9',
   resolution: '720p',
   targetDurationSeconds: 12,
+  selectedDurationSeconds: 12,
+  projectDurationSeconds: 12,
   submitting: false,
   errorMessageKey: null,
   onCancel: vi.fn(),
@@ -124,11 +126,48 @@ describe('GenerationReviewModal', () => {
     expect(screen.queryByRole('checkbox', { name: /audio/i })).not.toBeInTheDocument();
   });
 
-  it('blocks a batch whose selected scene timing does not exactly match the project target', () => {
-    render(<GenerationReviewModal {...createProps({ targetDurationSeconds: 13 })} />);
+  it('blocks a batch when the canonical storyboard timing does not match the project target', () => {
+    render(<GenerationReviewModal {...createProps({ projectDurationSeconds: 13 })} />);
 
     expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeDisabled();
+  });
+
+  it('allows a ready subset when the canonical full storyboard matches the target', () => {
+    render(
+      <GenerationReviewModal
+        {...createProps({
+          scenes: [{ ...mixedScenes()[0]! }, { ...mixedScenes()[1]!, durationSeconds: 5 }],
+          selectedDurationSeconds: 10,
+          projectDurationSeconds: 15,
+          targetDurationSeconds: 15,
+        })}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeEnabled();
+    expect(
+      screen.getByText(
+        'conversation.creativeStudio.timeline.totalDuration: conversation.creativeStudio.timeline.durationLabel:seconds=10'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
+  });
+
+  it('blocks a batch when selected ready scenes mask a mismatched full storyboard', () => {
+    render(
+      <GenerationReviewModal
+        {...createProps({
+          scenes: [{ ...mixedScenes()[0]! }, { ...mixedScenes()[1]!, durationSeconds: 10 }],
+          selectedDurationSeconds: 15,
+          projectDurationSeconds: 18,
+          targetDurationSeconds: 15,
+        })}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeDisabled();
   });
 

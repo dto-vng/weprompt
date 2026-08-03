@@ -49,6 +49,8 @@ export type GenerationReviewModalProps = {
   aspectRatio: StudioAspectRatio;
   resolution: StudioResolution;
   targetDurationSeconds: number;
+  selectedDurationSeconds: number;
+  projectDurationSeconds: number;
   submitting: boolean;
   /** Blocks another paid submit until the parent supplies a newly reviewed intent. */
   submissionBlocked?: boolean;
@@ -76,6 +78,8 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
   aspectRatio,
   resolution,
   targetDurationSeconds,
+  selectedDurationSeconds,
+  projectDurationSeconds,
   submitting,
   submissionBlocked = false,
   errorMessageKey = null,
@@ -84,7 +88,6 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const review = useMemo(() => {
-    const totalDurationSeconds = scenes.reduce((total, scene) => total + scene.durationSeconds, 0);
     const videoSeconds = scenes.reduce(
       (total, scene) => total + (scene.mediaKind === 'video' ? scene.durationSeconds : 0),
       0
@@ -93,14 +96,13 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
     const invalidRoute = scenes.some(
       (scene) => scene.route.status === 'invalid' || (scene.route.snapshot !== null && !routeMatchesScene(scene))
     );
-    const durationMismatch = mode === 'batch' && totalDurationSeconds !== targetDurationSeconds;
+    const durationMismatch = mode === 'batch' && projectDurationSeconds !== targetDurationSeconds;
     const validRoutes = scenes
       .filter((scene) => scene.route.status === 'valid' && routeMatchesScene(scene))
       .map((scene) => scene.route.snapshot)
       .filter((route): route is GenerationReviewRouteSnapshot => route !== null);
 
     return {
-      totalDurationSeconds,
       videoSeconds,
       missingRoute,
       invalidRoute,
@@ -113,7 +115,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
         !durationMismatch &&
         validRoutes.length === scenes.length,
     };
-  }, [mode, scenes, targetDurationSeconds]);
+  }, [mode, projectDurationSeconds, scenes, targetDurationSeconds]);
 
   const handleConfirm = (): void => {
     if (!review.canConfirm || submissionBlocked || submitting) return;
@@ -164,7 +166,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
           <Tag>
             {t('conversation.creativeStudio.timeline.totalDuration')}:{' '}
             {t('conversation.creativeStudio.timeline.durationLabel', {
-              seconds: review.totalDurationSeconds,
+              seconds: selectedDurationSeconds,
             })}
           </Tag>
           <Tag>

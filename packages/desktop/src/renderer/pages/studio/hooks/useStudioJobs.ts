@@ -19,6 +19,7 @@ const STORAGE_ERROR_MESSAGE_KEY = 'conversation.creativeStudio.errors.storage';
 
 const COMMAND_MESSAGE_KEYS: Record<StudioCommandErrorCode, string> = {
   invalid_payload: 'conversation.creativeStudio.errors.invalidPayload',
+  timing_mismatch: 'conversation.creativeStudio.review.durationMismatch',
   not_found: 'conversation.creativeStudio.errors.projectNotFound',
   storyboard_exists: 'conversation.creativeStudio.errors.storyboardExists',
   stale_project: 'conversation.creativeStudio.errors.staleProject',
@@ -63,7 +64,7 @@ export type StudioJobIssue = {
 
 export type StudioSubmitIntent = Pick<
   StudioSubmitScenesRequest,
-  'sceneIds' | 'routes' | 'catalogVersion' | 'expectedRevision'
+  'mode' | 'sceneIds' | 'routes' | 'catalogVersion' | 'expectedRevision'
 >;
 
 export type StudioStaleIntent =
@@ -159,6 +160,7 @@ const cloneSubmitIntent = (
   input: StudioSubmitIntent
 ): Extract<StudioMutationIntent, { operation: 'submit_scenes' }> => ({
   operation: 'submit_scenes',
+  mode: input.mode,
   sceneIds: [...input.sceneIds],
   routes: input.routes.map((route) => ({ ...route })),
   catalogVersion: input.catalogVersion,
@@ -199,6 +201,7 @@ const validSubmitIntent = (
   intent: Extract<StudioMutationIntent, { operation: 'submit_scenes' }>
 ): boolean => {
   if (!Number.isSafeInteger(intent.expectedRevision) || intent.expectedRevision < 1) return false;
+  if (intent.mode !== 'single' && intent.mode !== 'batch') return false;
   if (intent.sceneIds.length === 0 || new Set(intent.sceneIds).size !== intent.sceneIds.length) return false;
   if (intent.routes.length !== intent.sceneIds.length) return false;
   const selectedSceneIds = new Set(intent.sceneIds);
@@ -359,6 +362,7 @@ export const useStudioJobs = ({
         case 'submit_scenes':
           return ipcBridge.creativeStudio.submitScenes.invoke({
             projectId: current.id,
+            mode: intent.mode,
             sceneIds: [...intent.sceneIds],
             expectedRevision: intent.expectedRevision,
             routes: intent.routes.map((route) => ({ ...route })),

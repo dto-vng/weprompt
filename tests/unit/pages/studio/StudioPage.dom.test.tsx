@@ -528,6 +528,7 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() =>
       expect(bridge.submitScenes.invoke).toHaveBeenCalledExactlyOnceWith({
         projectId: 'project-1',
+        mode: 'single',
         sceneIds: ['scene-1'],
         expectedRevision: 2,
         routes: [
@@ -695,6 +696,7 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() =>
       expect(bridge.submitScenes.invoke).toHaveBeenCalledExactlyOnceWith({
         projectId: 'project-1',
+        mode: 'batch',
         sceneIds: ['scene-1', 'scene-2'],
         expectedRevision: 2,
         routes: [

@@ -455,6 +455,7 @@ describe('Creative Studio project recovery integration', () => {
       await beforeRestart.runtime.service.submitScenes({
         projectId: selectedProject.id,
         expectedRevision: selectedProject.revision,
+        mode: 'single',
         sceneIds: [scene.id],
         routes: [
           {

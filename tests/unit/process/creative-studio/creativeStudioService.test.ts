@@ -281,6 +281,7 @@ describe('CreativeStudioService', () => {
     const submitInput = {
       projectId: project.id,
       expectedRevision: project.revision,
+      mode: 'single' as const,
       sceneIds: ['scene_1'],
       catalogVersion: catalog.catalogVersion,
       routes: [
@@ -1064,6 +1065,7 @@ describe('CreativeStudioService', () => {
       await rendererService.submitScenes({
         projectId: 'project_1',
         expectedRevision: 3,
+        mode: 'single',
         sceneIds: ['scene_1'],
         catalogVersion: catalog.catalogVersion,
         routes: [
@@ -1791,6 +1793,7 @@ describe('CreativeStudioService', () => {
         harness.service.submitScenes({
           projectId: harness.project.id,
           expectedRevision: harness.project.revision,
+          mode: 'single',
           sceneIds: ['scene_1'],
           routes: [
             {
@@ -1802,6 +1805,147 @@ describe('CreativeStudioService', () => {
           catalogVersion: catalog.catalogVersion,
         })
       ).rejects.toMatchObject({ code: 'invalid_route' });
+      expect(harness.submitScenes).not.toHaveBeenCalled();
+    });
+
+    it('rejects a batch whose full canonical storyboard is 18 seconds even when its selected scenes total 15', async () => {
+      const harness = await createCatalogHarness();
+      const targeted = await harness.service.updateProject({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        targetDurationSeconds: 15,
+      });
+      const opening = await harness.service.updateScene({
+        projectId: targeted.id,
+        expectedRevision: targeted.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1', 10),
+      });
+      const middle = await harness.service.updateScene({
+        projectId: opening.id,
+        expectedRevision: opening.revision,
+        sceneId: 'scene_2',
+        scene: makeScene('scene_2', 5),
+      });
+      const fullCut = await harness.service.updateScene({
+        projectId: middle.id,
+        expectedRevision: middle.revision,
+        sceneId: 'scene_3',
+        scene: makeScene('scene_3', 3),
+      });
+      const catalog = await harness.service.listRoutes({ projectId: fullCut.id });
+      const route = catalog.video.options[0]!;
+
+      await expect(
+        harness.service.submitScenes({
+          projectId: fullCut.id,
+          expectedRevision: fullCut.revision,
+          mode: 'batch',
+          sceneIds: ['scene_1', 'scene_2'],
+          routes: [
+            { sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' },
+            { sceneId: 'scene_2', choiceId: route.choiceId, kind: 'video' },
+          ],
+          catalogVersion: catalog.catalogVersion,
+        })
+      ).rejects.toMatchObject({ code: 'timing_mismatch' });
+
+      expect(harness.submitScenes).not.toHaveBeenCalled();
+    });
+
+    it('permits a ready batch subset when the canonical full storyboard exactly matches its target', async () => {
+      const harness = await createCatalogHarness();
+      const targeted = await harness.service.updateProject({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        targetDurationSeconds: 15,
+      });
+      const opening = await harness.service.updateScene({
+        projectId: targeted.id,
+        expectedRevision: targeted.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1', 10),
+      });
+      const fullCut = await harness.service.updateScene({
+        projectId: opening.id,
+        expectedRevision: opening.revision,
+        sceneId: 'scene_2',
+        scene: makeScene('scene_2', 5),
+      });
+      const catalog = await harness.service.listRoutes({ projectId: fullCut.id });
+      const route = catalog.video.options[0]!;
+
+      await harness.service.submitScenes({
+        projectId: fullCut.id,
+        expectedRevision: fullCut.revision,
+        mode: 'batch',
+        sceneIds: ['scene_1'],
+        routes: [{ sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' }],
+        catalogVersion: catalog.catalogVersion,
+      });
+
+      expect(harness.submitScenes).toHaveBeenCalledOnce();
+    });
+
+    it('permits a mismatched single-scene regeneration and omits mode from the resolved provider request', async () => {
+      const harness = await createCatalogHarness();
+      const edited = await harness.service.updateScene({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1', 4),
+      });
+      const catalog = await harness.service.listRoutes({ projectId: edited.id });
+      const route = catalog.video.options[0]!;
+
+      await harness.service.submitScenes({
+        projectId: edited.id,
+        expectedRevision: edited.revision,
+        mode: 'single',
+        sceneIds: ['scene_1'],
+        routes: [{ sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' }],
+        catalogVersion: catalog.catalogVersion,
+      });
+
+      expect(harness.submitScenes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: edited.id,
+          sceneIds: ['scene_1'],
+        })
+      );
+      expect(harness.submitScenes.mock.calls[0]?.[0]).not.toHaveProperty('mode');
+    });
+
+    it('rejects a single-mode request that includes multiple scenes before resolving provider routes', async () => {
+      const harness = await createCatalogHarness();
+      const opening = await harness.service.updateScene({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1', 4),
+      });
+      const project = await harness.service.updateScene({
+        projectId: opening.id,
+        expectedRevision: opening.revision,
+        sceneId: 'scene_2',
+        scene: makeScene('scene_2', 4),
+      });
+      const catalog = await harness.service.listRoutes({ projectId: project.id });
+      const route = catalog.video.options[0]!;
+
+      await expect(
+        harness.service.submitScenes({
+          projectId: project.id,
+          expectedRevision: project.revision,
+          mode: 'single',
+          sceneIds: ['scene_1', 'scene_2'],
+          routes: [
+            { sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' },
+            { sceneId: 'scene_2', choiceId: route.choiceId, kind: 'video' },
+          ],
+          catalogVersion: catalog.catalogVersion,
+        })
+      ).rejects.toMatchObject({ code: 'invalid_payload' });
       expect(harness.submitScenes).not.toHaveBeenCalled();
     });
 

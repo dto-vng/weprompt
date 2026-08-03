@@ -165,7 +165,14 @@ type StudioInternalConnectionRequest = {
 
 /** A safe, stable service error that can cross only through the bridge error mapper. */
 export class CreativeStudioServiceError extends Error {
-  readonly code: 'storyboard_exists' | 'planning_unavailable' | 'busy' | 'provider_error' | 'invalid_route';
+  readonly code:
+    | 'invalid_payload'
+    | 'timing_mismatch'
+    | 'storyboard_exists'
+    | 'planning_unavailable'
+    | 'busy'
+    | 'provider_error'
+    | 'invalid_route';
 
   constructor(code: CreativeStudioServiceError['code']) {
     super(code);
@@ -329,6 +336,7 @@ const assertJobRequest = (input: StudioJobRequest): void => {
 const assertSubmitScenesInput = (input: StudioSubmitScenesRequest): void => {
   assertSafeId(input.projectId, 'project id');
   assertExpectedRevision(input.expectedRevision);
+  if (input.mode !== 'single' && input.mode !== 'batch') throw invalid('Invalid Studio generation mode');
   assertText(input.catalogVersion, 64, 'route catalog version', true);
   if (
     !Array.isArray(input.sceneIds) ||
@@ -1048,6 +1056,16 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       if (project.revision !== input.expectedRevision) {
         throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
       }
+      const fullDurationSeconds = project.sceneOrder.reduce(
+        (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
+        0
+      );
+      if (input.mode === 'batch' && fullDurationSeconds !== project.targetDurationSeconds) {
+        throw new CreativeStudioServiceError('timing_mismatch');
+      }
+      if (input.mode === 'single' && input.sceneIds.length !== 1) {
+        throw new CreativeStudioServiceError('invalid_payload');
+      }
       const built = await buildCatalog(project);
       if (input.catalogVersion !== built.catalog.catalogVersion) {
         throw new CreativeStudioServiceError('invalid_route');
@@ -1073,7 +1091,9 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       });
       return (
         await deps.jobManager.submitScenes({
-          ...input,
+          projectId: input.projectId,
+          sceneIds: input.sceneIds,
+          expectedRevision: input.expectedRevision,
           routes: resolvedRoutes,
           catalogVersion: built.generation.generationCatalogVersion,
         })

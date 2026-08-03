@@ -161,6 +161,7 @@ const VALID_PAYLOADS = {
   'creative-studio.submit-scenes': {
     projectId: 'project_1',
     expectedRevision: 1,
+    mode: 'single',
     sceneIds: ['scene_1'],
     catalogVersion: '0123456789abcdef',
     routes: [
@@ -796,6 +797,28 @@ const INVALID_PAYLOADS = [
     {
       ...VALID_PAYLOADS['creative-studio.submit-scenes'],
       catalogVersion: undefined,
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'missing required generation mode',
+    { ...VALID_PAYLOADS['creative-studio.submit-scenes'], mode: undefined },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'unknown generation mode',
+    { ...VALID_PAYLOADS['creative-studio.submit-scenes'], mode: 'all' },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'single mode with multiple scene and route selections',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      sceneIds: ['scene_1', 'scene_2'],
+      routes: [
+        ...VALID_PAYLOADS['creative-studio.submit-scenes'].routes,
+        { sceneId: 'scene_2', choiceId: 'binding_2', kind: 'video' },
+      ],
     },
   ],
   [

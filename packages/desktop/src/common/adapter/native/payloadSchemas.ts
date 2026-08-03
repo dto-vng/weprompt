@@ -242,6 +242,7 @@ const studioSubmitScenesSchema = z
   .object({
     projectId: safeIdSchema,
     expectedRevision: studioExpectedRevisionSchema,
+    mode: z.enum(['single', 'batch']),
     sceneIds: z
       .array(safeIdSchema)
       .min(1)
@@ -252,6 +253,9 @@ const studioSubmitScenesSchema = z
   })
   .strict()
   .superRefine((input, context) => {
+    if (input.mode === 'single' && input.sceneIds.length !== 1) {
+      context.addIssue({ code: 'custom', message: 'single mode requires exactly one scene', path: ['sceneIds'] });
+    }
     const routeSceneIds = input.routes.map((route) => route.sceneId);
     const selectedSceneIds = new Set(input.sceneIds);
     if (

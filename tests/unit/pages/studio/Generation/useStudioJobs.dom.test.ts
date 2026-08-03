@@ -195,6 +195,7 @@ describe('useStudioJobs', () => {
     let pending!: Promise<boolean>;
     act(() => {
       pending = result.current.submitScenes({
+        mode: 'single',
         sceneIds: ['scene-1'],
         routes: [route],
         catalogVersion: 'catalog-1',
@@ -230,6 +231,7 @@ describe('useStudioJobs', () => {
     await act(async () => {
       expect(
         await result.current.submitScenes({
+          mode: 'single',
           sceneIds: ['scene-1'],
           routes: [route],
           catalogVersion: 'catalog-1',
@@ -239,6 +241,7 @@ describe('useStudioJobs', () => {
     });
     expect(bridge.submitScenes.invoke).toHaveBeenCalledWith({
       projectId: 'project-1',
+      mode: 'single',
       sceneIds: ['scene-1'],
       expectedRevision: 2,
       routes: [route],
@@ -306,6 +309,7 @@ describe('useStudioJobs', () => {
     const refetch = vi.fn(async () => project(3));
     const { result } = renderHook(() => useStudioJobs({ project: project(), refetch }));
     const input = {
+      mode: 'single' as const,
       sceneIds: ['scene-1'],
       routes: [route],
       catalogVersion: 'catalog-1',
@@ -339,6 +343,7 @@ describe('useStudioJobs', () => {
       initialProps: { value: project() },
     });
     const input = {
+      mode: 'single' as const,
       sceneIds: ['scene-1'],
       routes: [route],
       catalogVersion: 'catalog-1',
@@ -378,6 +383,7 @@ describe('useStudioJobs', () => {
     await act(async () => {
       expect(
         await result.current.submitScenes({
+          mode: 'single',
           sceneIds: ['scene-1'],
           routes: [route],
           catalogVersion: 'catalog-1',
@@ -408,6 +414,7 @@ describe('useStudioJobs', () => {
     await act(async () => {
       expect(
         await result.current.submitScenes({
+          mode: 'batch',
           sceneIds: ['scene-1'],
           routes: [route],
           catalogVersion: 'catalog-1',
@@ -420,6 +427,7 @@ describe('useStudioJobs', () => {
     expect(result.current.project?.revision).toBe(8);
     expect(result.current.staleIntent).toEqual({
       operation: 'submit_scenes',
+      mode: 'batch',
       sceneIds: ['scene-1'],
       routes: [route],
       catalogVersion: 'catalog-1',

@@ -491,6 +491,7 @@ const StudioProjectShell: React.FC = () => {
       }
 
       const submitted = await studioJobs.submitScenes({
+        mode: generationReview.mode,
         sceneIds,
         routes,
         catalogVersion: generationReview.catalogVersion,
@@ -922,6 +923,13 @@ const StudioProjectShell: React.FC = () => {
         aspectRatio={project.aspectRatio}
         resolution={project.resolution}
         targetDurationSeconds={project.targetDurationSeconds}
+        selectedDurationSeconds={
+          generationReview?.scenes.reduce((total, scene) => total + scene.durationSeconds, 0) ?? 0
+        }
+        projectDurationSeconds={project.sceneOrder.reduce(
+          (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
+          0
+        )}
         submitting={studioJobs.mutationPending || generationReviewRefreshing}
         submissionBlocked={studioJobs.issue?.operation === 'submit_scenes' && studioJobs.issue.code === 'invalid_route'}
         errorMessageKey={
