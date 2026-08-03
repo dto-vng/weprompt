@@ -1,0 +1,179 @@
+/* Default Theme - Forge Design Language / 默认主题 */
+/* Reference of the system default color variables (Forge). The live values are
+   applied by styles/themes/default-color-scheme.css; this file mirrors them so
+   theme authors can copy/customize. / 此文件展示 Forge 默认配色变量，供主题作者参考。 */
+
+:root {
+  /* Primary Colors - Forge orange */
+  --color-primary: #f05a22;
+  --primary: #f05a22;
+  --color-primary-light-1: #fff2e8;
+  --color-primary-light-2: #fcd7bf;
+  --color-primary-light-3: #f9ba96;
+  --color-primary-dark-1: #c73f15;
+  --primary-rgb: 240, 90, 34;
+
+  /* Brand Colors - navy */
+  --brand: #374ea2;
+  --brand-light: #eef1fa;
+  --brand-hover: #6e82d6;
+  --color-brand-fill: #374ea2;
+  --color-brand-bg: #eef1fa;
+
+  /* AOU brand ramp (navy) */
+  --aou-1: #f5f7fd;
+  --aou-2: #eef1fa;
+  --aou-3: #d8dff3;
+  --aou-4: #aebbeb;
+  --aou-5: #6e82d6;
+  --aou-6: #374ea2;
+  --aou-7: #2e3f82;
+  --aou-8: #253266;
+  --aou-9: #1b2549;
+  --aou-10: #12172e;
+
+  /* Background Colors - cream working surfaces over a cool-grey canvas */
+  --color-bg-1: #f6f0e4;
+  --bg-1: #f6f0e4;
+  --color-bg-2: #edeef1;
+  --bg-2: #edeef1;
+  --color-bg-3: #dcdfe4;
+  --bg-3: #dcdfe4;
+  --color-bg-4: #cbd0d8;
+  --bg-4: #cbd0d8;
+  --bg-base: #faf6ee;
+  --bg-5: #c6cdd6;
+  --bg-6: #8a93a1;
+  --bg-8: #5b6472;
+  --bg-9: #2a303b;
+  --bg-10: #14181f;
+
+  /* Interactive State Colors */
+  --bg-hover: #f4f1ea;
+  --bg-active: #eae1d3;
+
+  /* Fill Colors */
+  --fill: #f4f1ea;
+  --color-fill: #f4f1ea;
+  --fill-0: #ffffff;
+  --fill-white-to-black: #ffffff;
+  --dialog-fill-0: #ffffff;
+  --inverse: #ffffff;
+
+  /* Text Colors - cool ink ramp */
+  --color-text-1: #14181f;
+  --text-primary: #14181f;
+  --color-text-2: #5b6472;
+  --text-secondary: #5b6472;
+  --color-text-3: #8a93a1;
+  --text-disabled: #c6cdd6;
+  --text-0: #14181f;
+  --text-white: #ffffff;
+
+  /* Border Colors */
+  --color-border: #dcdfe4;
+  --color-border-1: #dcdfe4;
+  --color-border-2: #eceef1;
+  --border-base: #dcdfe4;
+  --border-light: #eceef1;
+  --border-special: var(--bg-3);
+
+  /* Semantic Colors */
+  --success: #058b57;
+  --warning: #e0a800;
+  --danger: #d64541;
+  --info: #29a7de;
+
+  /* Message & UI Component Colors */
+  --message-user-bg: #eef1fa;
+  --message-tips-bg: #f5f7fd;
+  --workspace-btn-bg: #f4f1ea;
+}
+
+/* Dark Mode Overrides - 深色模式覆盖 */
+[data-theme='dark'] {
+  /* Primary Colors - Dark Mode (orange constant) */
+  --color-primary: #f05a22;
+  --primary: #f05a22;
+  --color-primary-light-1: #4d0a00;
+  --color-primary-light-2: #751704;
+  --color-primary-light-3: #9e290b;
+  --color-primary-dark-1: #f37b48;
+  --primary-rgb: 240, 90, 34;
+
+  /* Brand Colors - Dark Mode */
+  --brand: #4e63c0;
+  --brand-light: #1e2536;
+  --brand-hover: #6e82d6;
+  --color-brand-fill: #4e63c0;
+  --color-brand-bg: #1e2536;
+
+  /* AOU brand ramp (navy) - Dark Mode (inverted) */
+  --aou-1: #12172e;
+  --aou-2: #1b2549;
+  --aou-3: #253266;
+  --aou-4: #2e3f82;
+  --aou-5: #374ea2;
+  --aou-6: #4e63c0;
+  --aou-7: #6e82d6;
+  --aou-8: #8fa0e0;
+  --aou-9: #b8c2ee;
+  --aou-10: #e8ecfb;
+
+  /* Background Colors - Dark Mode (dark ground) */
+  --color-bg-1: #12161f;
+  --bg-1: #12161f;
+  --color-bg-2: #161c27;
+  --bg-2: #161c27;
+  --color-bg-3: #1e2536;
+  --bg-3: #1e2536;
+  --color-bg-4: #2a3344;
+  --bg-4: #2a3344;
+  --bg-base: #0b0e14;
+  --bg-5: #3b4658;
+  --bg-6: #5e7086;
+  --bg-8: #7c8da6;
+  --bg-9: #9db0c8;
+  --bg-10: #c4d0e0;
+
+  /* Interactive State Colors - Dark Mode */
+  --bg-hover: #161c27;
+  --bg-active: #1e2536;
+
+  /* Fill Colors - Dark Mode */
+  --fill: #12161f;
+  --color-fill: #12161f;
+  --fill-0: rgba(255, 255, 255, 0.08);
+  --fill-white-to-black: #000000;
+  --dialog-fill-0: #1e2536;
+  --inverse: #ffffff;
+
+  /* Text Colors - Dark Mode (cool light ramp) */
+  --color-text-1: #e6ecf5;
+  --text-primary: #e6ecf5;
+  --color-text-2: #9db0c8;
+  --text-secondary: #9db0c8;
+  --color-text-3: #5e7086;
+  --text-disabled: #5e7086;
+  --text-0: #e6ecf5;
+  --text-white: #ffffff;
+
+  /* Border Colors - Dark Mode */
+  --color-border: #2a3344;
+  --color-border-1: #2a3344;
+  --color-border-2: #1e2536;
+  --border-base: #2a3344;
+  --border-light: #1e2536;
+  --border-special: #3b4658;
+
+  /* Semantic Colors - Dark Mode */
+  --success: #03ca77;
+  --warning: #f0be2e;
+  --danger: #e86461;
+  --info: #4ebbea;
+
+  /* Message & UI Component Colors - Dark Mode */
+  --message-user-bg: #1e2536;
+  --message-tips-bg: #161c27;
+  --workspace-btn-bg: #161c27;
+}

@@ -1,0 +1,273 @@
+/* Default Color Scheme - Forge Design Language */
+/* Token values map the Forge design system onto AionUi's theming layer.
+   See docs/design/forge-rebrand-brief.md (§6) and docs/design/forge-themes/*.theme.json.
+   本文件将 Forge 设计系统的取值映射到 AionUi 主题变量（明/暗两套）。 */
+
+/* Light Mode */
+:root,
+[data-color-scheme='default'] {
+  /* Forge brand ramp (navy) — anchored at --aou-6 = #374EA2 (navy-500).
+     Lightest → darkest in light mode (inverts in dark). */
+  --aou-1: #f5f7fd;
+  --aou-2: #eef1fa;
+  --aou-3: #d8dff3;
+  --aou-4: #aebbeb;
+  --aou-5: #6e82d6;
+  --aou-6: #374ea2;
+  --aou-7: #2e3f82;
+  --aou-8: #253266;
+  --aou-9: #1b2549;
+  --aou-10: #12172e;
+
+  /* Background Colors - Light Mode
+     Warm cream surface family (no cool grey) so panels harmonize with the cream
+     working surface instead of reading as a cool patchwork. White cards still pop. */
+  --bg-base: #faf6ee; /* cream working surface (primary) / 主背景 */
+  --bg-1: #f6f0e4; /* cream, secondary surface / 次级背景 */
+  --bg-2: #f0e9db; /* warm cream — panels / cards / 三级背景 */
+  --bg-3: #e5dcc9; /* warm hairline border / 边框分隔 */
+  --bg-chat-surface: #fffdf9;
+  --bg-artifact-surface: #fffdf9;
+  --bg-4: #d8cbb6;
+  --bg-5: #d0c3ad;
+  --bg-6: #8a93a1; /* ink-500 — muted / tertiary text / 禁用·次要文字 */
+  --bg-8: #5b6472;
+  --bg-9: #2a303b;
+  --bg-10: #14181f;
+
+  /* Interactive State Colors - Light Mode (warm cream steps) */
+  --bg-hover: #f4f1ea; /* cream-300 / 悬停背景 */
+  --bg-active: #eae1d3; /* cream-border / 激活背景 */
+
+  /* Text Colors - Light Mode (cool ink ramp) */
+  --text-primary: #14181f; /* ink-900 / 主要文字 */
+  --color-text-1: #14181f; /* Arco 主文字 — aligned with --text-primary */
+  --text-secondary: #5b6472; /* ink-600 / 次要文字 (~5.5:1 on cream) */
+  --text-disabled: #c6cdd6; /* ink-300 / 禁用文字 */
+
+  /* Semantic Colors - Light Mode */
+  --primary: #f05a22; /* Forge orange — actions, links, accents */
+  --success: #058b57; /* pos-500 */
+  --warning: #e0a800; /* warn-500 (amber) */
+  --danger: #d64541; /* neg-500 */
+  --info: #29a7de; /* info-500 (cyan) */
+
+  /* Border Colors - Light Mode */
+  --border-base: #dcdfe4; /* cool border / 基础边框 */
+  --border-light: #eceef1; /* subtle border / 浅色边框 */
+
+  /* Brand Colors - Light Mode (navy is the structural partner) */
+  --brand: #374ea2; /* navy-500 / 品牌色 */
+  --brand-light: #eef1fa; /* navy-tint-bg / 品牌浅色背景 */
+  --brand-hover: #6e82d6; /* navy-300 / 品牌色悬停 */
+
+  /* Message & UI Component Colors - Light Mode */
+  --message-user-bg: #efe7d8; /* user chat — subtle warm bubble / 用户消息背景 */
+  --message-tips-bg: #f0e9db; /* warm cream — tips / error card / 提示信息背景 */
+  --workspace-btn-bg: #f4f1ea; /* cream-300 / 工作区按钮背景 */
+
+  /* Special Colors - Light Mode */
+  --fill: #f4f1ea; /* cream fill / 填充色 */
+  --inverse: #ffffff; /* 反色 */
+
+  /* Custom Colors - Light Mode */
+  --dialog-fill-0: #ffffff; /* white cards / dialogs / 对话框填充 */
+  --text-0: #14181f; /* 纯黑文字色 */
+  --text-white: #ffffff; /* 纯白文字色 */
+  --fill-0: #ffffff; /* 填充色 0 */
+  --fill-white-to-black: #ffffff; /* 白到黑填充色 */
+  --border-special: var(--bg-3); /* 特殊边框色 */
+  --color-guid-agent-bar: #f0e9db; /* 首页 Agent 选择条背景 — warm cream */
+
+  /* Document Surface - Light Mode
+     The artifact editor/preview body reads as a white "page" sitting inside the
+     warm cream chrome (tab bar, toolbar), instead of inheriting the cream --bg-1
+     surface. Deliberately neutral (not warm) so the page reads as paper. */
+  --bg-document: #ffffff; /* artifact editor/preview body / 文档编辑器·预览白色页面背景 */
+  --bg-document-muted: #f4f4f5; /* subtle highlight on the document surface (e.g. active line) / 文档表面上的浅色高亮 */
+  /* Arco's own palettes (--arcoblue/red/green/orange/cyan) and neutral fills are
+     defined on `body`, which shadows :root — so they're overridden in the
+     `body[arco-theme='...']` blocks below, not here. Primary is set via ConfigProvider. */
+}
+
+/* Dark Mode */
+[data-color-scheme='default'][data-theme='dark'] {
+  /* Forge brand ramp (navy) — inverted for dark; --aou-6 = #4E63C0 (lightened navy). */
+  --aou-1: #12172e;
+  --aou-2: #1b2549;
+  --color-guid-agent-bar: #1e2536; /* 首页 Agent 选择条背景 - 暗色 */
+  --aou-3: #253266;
+  --aou-4: #2e3f82;
+  --aou-5: #374ea2;
+  --aou-6: #4e63c0;
+  --aou-7: #6e82d6;
+  --aou-8: #8fa0e0;
+  --aou-9: #b8c2ee;
+  --aou-10: #e8ecfb;
+
+  /* Background Colors - Dark Mode (dark-ground ramp) */
+  --bg-base: #0b0e14; /* deep backdrop / 主背景 */
+  --bg-1: #12161f; /* 次级背景 */
+  --bg-2: #161c27; /* 三级背景 */
+  --bg-3: #1e2536; /* cards / raised surface / 边框分隔 */
+  --bg-chat-surface: var(--bg-base);
+  --bg-artifact-surface: var(--bg-1);
+  --bg-4: #2a3344;
+  --bg-5: #3b4658;
+  --bg-6: #5e7086; /* 禁用/次要文字 */
+  --bg-8: #7c8da6;
+  --bg-9: #9db0c8;
+  --bg-10: #c4d0e0;
+
+  /* Interactive State Colors - Dark Mode */
+  --bg-hover: #161c27; /* 悬停背景 */
+  --bg-active: #1e2536; /* 激活背景 */
+
+  /* Text Colors - Dark Mode (cool light ramp) */
+  --text-primary: #e6ecf5; /* 主要文字 */
+  --color-text-1: #e6ecf5; /* Arco 主文字 */
+  --text-secondary: #9db0c8; /* 次要文字 (~8.7:1 on dark ground) */
+  --text-disabled: #5e7086; /* 禁用文字 */
+
+  /* Semantic Colors - Dark Mode (brightened; orange unchanged) */
+  --primary: #f05a22; /* Forge orange — constant across themes */
+  --success: #03ca77;
+  --warning: #f0be2e;
+  --danger: #e86461;
+  --info: #4ebbea;
+
+  /* Border Colors - Dark Mode */
+  --border-base: #2a3344; /* 基础边框 */
+  --border-light: #1e2536; /* 浅色边框 */
+
+  /* Brand Colors - Dark Mode */
+  --brand: #4e63c0; /* navy lightened / 品牌色 */
+  --brand-light: #1e2536; /* 品牌深色背景 */
+  --brand-hover: #6e82d6; /* 品牌色悬停 */
+
+  /* Message & UI Component Colors - Dark Mode */
+  --message-user-bg: #1e2536; /* 用户消息背景 */
+  --message-tips-bg: #161c27; /* 提示信息背景 */
+  --workspace-btn-bg: #161c27; /* 工作区按钮背景 */
+
+  /* Special Colors - Dark Mode */
+  --fill: #12161f; /* 填充色 */
+  --inverse: #ffffff; /* 反色 */
+
+  /* Custom Colors - Dark Mode */
+  --dialog-fill-0: #1e2536; /* 对话框填充 */
+  --text-0: #e6ecf5; /* 纯黑文字色（暗色下为浅色） */
+  --text-white: #ffffff; /* 纯白文字色 */
+  --fill-0: rgba(255, 255, 255, 0.08); /* 填充色 0 - 半透明白 */
+  --fill-white-to-black: #000000; /* 白到黑填充色 */
+  --border-special: #3b4658; /* 特殊边框色 */
+
+  /* Document Surface - Dark Mode
+     Reuses the raised dark surface (same value as --bg-3) so the document body
+     reads as an elevated "page" without the glare of pure white. */
+  --bg-document: #1e2536; /* artifact editor/preview body / 文档编辑器·预览背景（深色） */
+  --bg-document-muted: #2a3344; /* subtle highlight on the document surface (e.g. active line), same as --bg-4 / 文档表面上的浅色高亮 */
+  /* Arco palettes + neutral fills are overridden in the `body[arco-theme='dark']`
+     block below (Arco defines them on `body`, shadowing :root). */
+}
+
+/* ---- Arco neutral fills (body scope) ----
+   Arco's --color-fill-* (hover / selection / disabled backgrounds, e.g. sidebar
+   nav pills, tree + list selection) are defined on `body`, which shadows :root —
+   so they must be overridden here. Light = a warm "sand" ramp that matches the
+   cream palette (no cool grey); dark = aligned to the dark surface ramp. */
+body[arco-theme='light'] {
+  /* Semantic palettes → Forge hues (Arco maps success→green, warning→orange,
+     danger→red; info→cyan). Primary (--arcoblue) is owned by ConfigProvider. */
+  --red-1: 255, 237, 232;
+  --red-2: 247, 203, 195;
+  --red-3: 239, 170, 159;
+  --red-4: 230, 136, 126;
+  --red-5: 222, 103, 94;
+  --red-6: 214, 69, 65; /* #D64541 */
+  --red-7: 180, 41, 41;
+  --red-8: 145, 22, 26;
+  --red-9: 111, 8, 15;
+  --red-10: 77, 0, 8;
+  --green-1: 232, 255, 242;
+  --green-2: 170, 232, 200;
+  --green-3: 117, 209, 164;
+  --green-4: 71, 185, 134;
+  --green-5: 34, 162, 109;
+  --green-6: 5, 139, 87; /* #058B57 */
+  --green-7: 3, 123, 81;
+  --green-8: 2, 108, 74;
+  --green-9: 1, 92, 66;
+  --green-10: 0, 77, 57;
+  --orange-1: 255, 253, 232;
+  --orange-2: 249, 241, 181;
+  --orange-3: 243, 226, 132;
+  --orange-4: 236, 209, 86;
+  --orange-5: 230, 189, 42;
+  --orange-6: 224, 168, 0; /* #E0A800 amber */
+  --orange-7: 187, 134, 0;
+  --orange-8: 150, 103, 0;
+  --orange-9: 113, 74, 0;
+  --orange-10: 77, 47, 0;
+  --cyan-1: 232, 252, 255;
+  --cyan-2: 190, 239, 248;
+  --cyan-3: 150, 223, 242;
+  --cyan-4: 112, 206, 235;
+  --cyan-5: 75, 188, 229;
+  --cyan-6: 41, 167, 222; /* #29A7DE */
+  --cyan-7: 26, 132, 186;
+  --cyan-8: 14, 100, 149;
+  --cyan-9: 5, 70, 113;
+  --cyan-10: 0, 43, 77;
+  /* Neutral fills → warm sand (hover / selection / disabled) */
+  --color-fill-1: #f6f1e8;
+  --color-fill-2: #f0e9db; /* hover */
+  --color-fill-3: #e9dfce; /* selected — warm sand */
+  --color-fill-4: #e0d4bf;
+}
+body[arco-theme='dark'] {
+  --red-1: 255, 236, 232;
+  --red-2: 250, 210, 203;
+  --red-3: 246, 184, 175;
+  --red-4: 241, 156, 148;
+  --red-5: 237, 128, 122;
+  --red-6: 232, 100, 97; /* #E86461 */
+  --red-7: 193, 61, 63;
+  --red-8: 154, 32, 38;
+  --red-9: 115, 12, 21;
+  --red-10: 77, 0, 9;
+  --green-1: 232, 255, 242;
+  --green-2: 179, 244, 208;
+  --green-3: 129, 234, 180;
+  --green-4: 83, 223, 156;
+  --green-5: 41, 213, 135;
+  --green-6: 3, 202, 119; /* #03CA77 */
+  --green-7: 2, 171, 106;
+  --green-8: 1, 139, 91;
+  --green-9: 0, 108, 74;
+  --green-10: 0, 77, 55;
+  --orange-1: 255, 253, 232;
+  --orange-2: 252, 245, 193;
+  --orange-3: 249, 235, 155;
+  --orange-4: 246, 223, 118;
+  --orange-5: 243, 208, 81;
+  --orange-6: 240, 190, 46; /* #F0BE2E amber */
+  --orange-7: 199, 151, 29;
+  --orange-8: 158, 113, 15;
+  --orange-9: 117, 78, 6;
+  --orange-10: 77, 47, 0;
+  --cyan-1: 232, 252, 255;
+  --cyan-2: 199, 242, 251;
+  --cyan-3: 168, 231, 247;
+  --cyan-4: 137, 218, 242;
+  --cyan-5: 107, 203, 238;
+  --cyan-6: 78, 187, 234; /* #4EBBEA */
+  --cyan-7: 49, 146, 195;
+  --cyan-8: 26, 108, 155;
+  --cyan-9: 10, 73, 116;
+  --cyan-10: 0, 43, 77;
+  --color-fill-1: #161c27;
+  --color-fill-2: #1e2536;
+  --color-fill-3: #2a3344;
+  --color-fill-4: #3b4658;
+}

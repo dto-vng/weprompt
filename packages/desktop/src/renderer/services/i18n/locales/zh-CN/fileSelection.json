@@ -1,0 +1,8 @@
+{
+  "selectFile": "选择文件",
+  "selectDirectory": "选择目录",
+  "pleaseSelectFile": "请选择一个文件",
+  "pleaseSelectDirectory": "请选择一个目录",
+  "emptyFolder": "此文件夹为空",
+  "goToParent": "返回上一级文件夹"
+}

@@ -1,0 +1,29 @@
+/*
+ * Project Home "Chats" list (see ProjectChatList.tsx) — a flat list of rows
+ * with no surrounding card frame. Layout, typography, and hover-state colors
+ * for the row/buttons are plain Uno utility classes on the component; this
+ * module only holds the one rule that doesn't map cleanly onto a utility
+ * class: `.row`'s divider needs `:last-child` (no divider under the final
+ * row) combined with a `:hover` background — a chained pseudo-class pattern
+ * that's clearer as a CSS rule than stacking Uno variants.
+ *
+ * Token choices (mapped to the nearest existing semantic token, not the
+ * hi-fi mockup's literal hex):
+ *   - .row divider: --bg-3 (light: #e5dcc9) — closely matches the mockup's
+ *     row divider (#EEE4D2).
+ *   - .row:hover background: --color-fill-2 (Arco's own hover fill, light:
+ *     #f0e9db) — closest existing match to the mockup's row hover
+ *     (#F3EADB).
+ */
+
+.row {
+  border-bottom: 1px solid var(--bg-3);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background-color: var(--color-fill-2);
+}

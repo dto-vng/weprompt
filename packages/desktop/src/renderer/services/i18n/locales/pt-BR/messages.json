@@ -1,0 +1,248 @@
+{
+  "fileChanges": "Alterações de Arquivo",
+  "fileChangesCount": "{{count}} Alterações de Arquivo",
+  "conversationInProgress": "Uma conversa está em andamento no momento...",
+  "confirm": "Confirmar",
+  "canceledExecution": "Execução cancelada",
+  "openLinkFailed": "Falha ao abrir o link",
+  "imageGenerationModelDetected": "Modelo de imagem detectado, a ferramenta de imagem foi ativada automaticamente. Modelo padrão: {{platform}}:{{model}}",
+  "auto_handling_permissions": "Manipulando automaticamente solicitação de permissão: {{request}}",
+  "copy": "Copiar",
+  "copySuccess": "Copiado com sucesso",
+  "copyFailed": "Falha ao copiar",
+  "copyLastOutput.empty": "Nenhuma resposta para copiar ainda",
+  "copiedToClipboard": "Copiado para a área de transferência",
+  "downloadSuccess": "Download bem-sucedido",
+  "downloadFailed": "Falha ao baixar",
+  "imageLoadFailed": "Falha ao carregar a imagem",
+  "scrollToBottom": "Rolar para o final",
+  "reasoning": "Raciocínio",
+  "availableCommands": "{{count}} Comandos Disponíveis",
+  "atFile.hint": "Digite para procurar arquivos",
+  "atFile.menuLabel": "Menções de arquivo",
+  "atFile.loading": "Carregando...",
+  "slash.title": "Comandos",
+  "slash.hint": "Digite / para abrir o menu de comandos",
+  "slash.empty": "Nenhum comando encontrado",
+  "export.commandDescription": "Exportar a conversa atual para um arquivo ou área de transferência",
+  "export.conversationLabel": "Conversa",
+  "export.conversationIdLabel": "ID da Conversa",
+  "export.exportedAtLabel": "Exportado Em",
+  "export.typeLabel": "Tipo",
+  "export.noMessages": "Nenhuma mensagem",
+  "export.userLabel": "Usuário",
+  "export.assistantLabel": "Assistente",
+  "export.systemLabel": "Sistema",
+  "export.menuTitle": "Exportar Conversa",
+  "export.menuHint": "Escolha como exportar a conversa atual",
+  "export.copyLabel": "Copiar para a área de transferência",
+  "export.copyDescription": "Copiar a conversa para a área de transferência do seu sistema",
+  "export.saveLabel": "Salvar em arquivo",
+  "export.saveDescription": "Salvar a conversa em um arquivo no projeto atual",
+  "export.fileNameLabel": "Digite o nome do arquivo",
+  "export.fileNamePlaceholder": "exportacao-conversa.txt",
+  "export.pathLabel": "Caminho de salvamento",
+  "export.copySuccess": "Conversa copiada para a área de transferência",
+  "export.copyFailed": "Falha ao copiar a conversa",
+  "export.saveSuccess": "Conversa exportada para: {{path}}",
+  "export.saveFailed": "Falha ao exportar a conversa",
+  "export.prepareFailed": "Falha ao preparar a exportação da conversa",
+  "export.unavailable": "Exportação da conversa indisponível",
+  "unknownMessageType": "Tipo de mensagem desconhecido: {{type}}",
+  "permissionRequest": "Solicitação de Permissão",
+  "agentRequestingPermission": "O agente está solicitando permissão.",
+  "permission": {
+    "intent": {
+      "run": "Gostaria de executar um comando",
+      "edit": "Gostaria de editar um arquivo",
+      "read": "Gostaria de ler um arquivo",
+      "fetch": "Gostaria de buscar algo na web",
+      "tool": "Gostaria de usar uma ferramenta",
+      "destructive": "Gostaria de excluir ou remover arquivos",
+      "generic": "Gostaria de fazer algo que precisa da sua aprovação"
+    },
+    "destructiveWarning": "Isso pode excluir ou sobrescrever arquivos permanentemente — não é possível desfazer."
+  },
+  "command": "Comando:",
+  "chooseAction": "Escolha uma ação:",
+  "option": "Opção",
+  "noOptionsAvailable": "Nenhuma opção disponível",
+  "processing": "Processando...",
+  "responseSentSuccessfully": "Resposta enviada com sucesso",
+  "permissionResponseFailed": "Não foi possível enviar sua resposta. Tente novamente.",
+  "confirmation": {
+    "applyChange": "Aplicar esta alteração?",
+    "allowExecution": "Permitir execução?",
+    "proceed": "Deseja prosseguir?",
+    "allowMCPTool": "Permitir execução da ferramenta MCP \"{{toolName}}\" do servidor \"{{serverName}}\"?",
+    "yesAllowOnce": "Sim, permitir uma vez",
+    "yesAllowAlways": "Sim, permitir sempre",
+    "yesAlwaysAllowTool": "Sim, sempre permitir a ferramenta \"{{toolName}}\" do servidor \"{{serverName}}\"",
+    "yesAlwaysAllowServer": "Sim, sempre permitir todas as ferramentas do servidor \"{{serverName}}\"",
+    "no": "Não (esc)"
+  },
+  "toolActivity": {
+    "recap": {
+      "headline": {
+        "active": "Trabalho em andamento ({{total, number}} no total)",
+        "completed": "Trabalho concluído ({{total, number}} no total)",
+        "recovered": "Trabalho recuperado e concluído ({{total, number}} no total)",
+        "partial": "Trabalho parcialmente concluído ({{total, number}} no total)",
+        "failed": "Não foi possível concluir o trabalho ({{total, number}} no total)",
+        "canceled": "Trabalho interrompido ({{total, number}} no total)"
+      },
+      "activity": "Este turno incluiu {{categories}}.",
+      "subject": "Foco: {{subject}}.",
+      "overflow": "mais {{count, number}}",
+      "category": {
+        "web": "Busca na web ({{count, number}})",
+        "search": "Busca no projeto ({{count, number}})",
+        "fileRead": "Revisão de arquivo ({{count, number}})",
+        "fileWrite": "Atualização da implementação ({{count, number}})",
+        "data": "Revisão de dados ({{count, number}})",
+        "report": "Tarefa de relatório ({{count, number}})",
+        "export": "Exportação ({{count, number}})",
+        "memory": "Atualização de memória ({{count, number}})",
+        "code": "Etapa do projeto ({{count, number}})",
+        "verify": "Verificação ({{count, number}})",
+        "office": "Tarefa de documento ({{count, number}})",
+        "generic": "Etapa do projeto ({{count, number}})"
+      },
+      "outcome": {
+        "active": "O trabalho está avançando bem. Conclusão: {{completed, number}} de {{total, number}}. Ainda em andamento: {{pending, number}}.",
+        "activeWithFailure": "O trabalho está avançando, embora parte dele precise de outra tentativa. Conclusão: {{completed, number}} de {{total, number}}. Ainda em andamento: {{pending, number}}. Aguardando nova tentativa: {{failed, number}}.",
+        "activeWithCanceled": "O trabalho está avançando, embora parte dele tenha sido interrompida. Conclusão: {{completed, number}} de {{total, number}}. Ainda em andamento: {{pending, number}}. Interrompidas: {{canceled, number}}.",
+        "activeWithFailureAndCanceled": "O trabalho está avançando, embora parte dele precise de atenção. Conclusão: {{completed, number}} de {{total, number}}. Ainda em andamento: {{pending, number}}. Aguardando nova tentativa: {{failed, number}}. Interrompidas: {{canceled, number}}.",
+        "completed": "Concluí tudo o que foi planejado para este turno.",
+        "recovered": "Concluí tudo o que foi planejado para este turno depois de uma nova tentativa.",
+        "partial": "Concluí parte do trabalho planejado. Conclusão: {{completed, number}} de {{total, number}}. Aguardando nova tentativa: {{failed, number}}.",
+        "partialWithCanceled": "Concluí parte do trabalho planejado. Conclusão: {{completed, number}} de {{total, number}}. Aguardando nova tentativa: {{failed, number}}. Interrompidas: {{canceled, number}}.",
+        "failed": "Não consegui concluir o trabalho planejado. Ações planejadas: {{total, number}}. Aguardando nova tentativa: {{failed, number}}.",
+        "failedWithCanceled": "Não consegui concluir o trabalho planejado. Ações planejadas: {{total, number}}. Aguardando nova tentativa: {{failed, number}}. Interrompidas: {{canceled, number}}.",
+        "canceled": "Interrompi este turno antes de concluir o trabalho planejado. Ações planejadas: {{total, number}}. Não concluídas: {{unfinished, number}}. Interrompidas: {{canceled, number}}."
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "Tudo pronto — deu tudo certo, como planejado. Me diga o que você gostaria de fazer agora.",
+        "v2": "Isso já está concluído e funcionando. Me diga por onde você quer seguir a partir daqui.",
+        "v3": "Pronto — tudo se encaixou. Estou à disposição para o próximo passo quando você quiser."
+      },
+      "recovered": {
+        "v1": "Pronto — uma etapa precisou de uma segunda tentativa, mas agora está tudo certo.",
+        "v2": "Concluído — foi preciso um retorno rápido no meio do caminho, mas agora está tudo no lugar."
+      },
+      "partial": {
+        "v1": "Fiz a maior parte disso. Algumas coisas ainda precisam de mais uma passada — os detalhes estão logo abaixo.",
+        "v2": "Bom avanço — a maior parte está feita, embora um pouco ainda precise de outra tentativa. Você encontra os detalhes abaixo."
+      },
+      "failed": {
+        "v1": "Não consegui concluir esta. Os detalhes estão abaixo e você pode me pedir para tentar de novo quando quiser.",
+        "v2": "Isso não deu certo. Dê uma olhada nos detalhes abaixo ou é só me dizer para tentar mais uma vez."
+      },
+      "canceled": {
+        "v1": "Parei por aqui. Me avise se quiser que eu retome."
+      }
+    },
+    "attempt": "(tentativa {{n}})",
+    "generic": {
+      "running": "Estou avançando para a próxima etapa.",
+      "done": "Concluí a próxima etapa.",
+      "failedTitle": "Não consegui concluir esta etapa"
+    },
+    "status": {
+      "stopped": "Interrompido",
+      "recovered": "Recuperado após nova tentativa."
+    },
+    "error": {
+      "suggestion": "Os detalhes do erro estão disponíveis abaixo. Quando quiser, você pode tentar esta etapa novamente."
+    },
+    "categories": {
+      "web": {
+        "running": "Estou localizando as informações relevantes.",
+        "done": "Localizei as informações relevantes.",
+        "failedTitle": "Não consegui concluir a busca por informações"
+      },
+      "search": {
+        "running": "Estou localizando os arquivos relevantes do projeto.",
+        "done": "Localizei os arquivos relevantes do projeto.",
+        "failedTitle": "Não consegui concluir a busca nos arquivos do projeto"
+      },
+      "fileRead": {
+        "running": "Estou revisando os arquivos relevantes para entender o comportamento atual.",
+        "done": "Revisei os arquivos relevantes.",
+        "failedTitle": "Não consegui revisar os arquivos relevantes"
+      },
+      "fileWrite": {
+        "running": "Estou atualizando a implementação.",
+        "done": "Atualizei a implementação.",
+        "failedTitle": "Não consegui atualizar a implementação"
+      },
+      "data": {
+        "running": "Estou revisando os dados relevantes para entender o comportamento atual.",
+        "done": "Revisei os dados relevantes.",
+        "failedTitle": "Não consegui revisar os dados relevantes"
+      },
+      "report": {
+        "running": "Estou preparando o arquivo final.",
+        "done": "Preparei o arquivo final.",
+        "failedTitle": "Não consegui preparar o arquivo final"
+      },
+      "export": {
+        "running": "Estou preparando o arquivo final.",
+        "done": "Preparei o arquivo final.",
+        "failedTitle": "Não consegui preparar o arquivo final"
+      },
+      "memory": {
+        "running": "Estou atualizando o contexto salvo.",
+        "done": "Atualizei o contexto salvo.",
+        "failedTitle": "Não consegui atualizar o contexto salvo"
+      },
+      "code": {
+        "running": "Estou executando a próxima etapa do projeto.",
+        "done": "Concluí a etapa do projeto.",
+        "failedTitle": "Não consegui concluir a etapa do projeto"
+      },
+      "verify": {
+        "running": "Estou verificando as alterações para garantir que tudo continue funcionando.",
+        "done": "Verifiquei se as alterações causaram regressões.",
+        "failedTitle": "Não consegui concluir a verificação das alterações"
+      },
+      "office": {
+        "running": "Estou preparando o arquivo final.",
+        "done": "Preparei o arquivo final.",
+        "failedTitle": "Não consegui preparar o arquivo final"
+      }
+    },
+    "tools": {
+      "data_open": {
+        "running": "Estou revisando os dados relevantes para entender o comportamento atual.",
+        "done": "Revisei os dados relevantes.",
+        "failedTitle": "Não consegui revisar os dados relevantes"
+      },
+      "data_get_schema": {
+        "running": "Estou revisando os dados relevantes para entender o comportamento atual.",
+        "done": "Revisei os dados relevantes.",
+        "failedTitle": "Não consegui revisar os dados relevantes"
+      },
+      "data_run_sql": {
+        "running": "Estou revisando os dados relevantes para entender o comportamento atual.",
+        "done": "Revisei os dados relevantes.",
+        "failedTitle": "Não consegui revisar os dados relevantes"
+      },
+      "render_report": {
+        "running": "Estou preparando o arquivo final.",
+        "done": "Preparei o arquivo final.",
+        "failedTitle": "Não consegui preparar o arquivo final"
+      },
+      "export_pdf": {
+        "running": "Estou preparando o arquivo final.",
+        "done": "Preparei o arquivo final.",
+        "failedTitle": "Não consegui preparar o arquivo final"
+      }
+    }
+  },
+  "plan": {
+    "title": "Lista de tarefas"
+  }
+}

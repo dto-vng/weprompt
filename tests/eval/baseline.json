@@ -1,0 +1,98 @@
+{
+  "$comment": "Committed baseline for the knowledge-base retrieval harness. Regenerate with `bun run eval:kb --update-baseline`. The hybrid block is pinned to one embedding model and is only compared when the current run uses the same one.",
+  "generatedOn": "2026-07-31",
+  "knobs": {
+    "chunkChars": 3200,
+    "overlapChars": 400,
+    "topK": 6
+  },
+  "corpus": {
+    "documentCount": 11,
+    "ocrDocumentCount": 1,
+    "chunkCount": 19
+  },
+  "bm25": {
+    "metrics": {
+      "scoredQuestions": 25,
+      "recallAt": {
+        "1": 0.8,
+        "3": 0.84,
+        "6": 0.84
+      },
+      "answerRecallAt": {
+        "1": 0.76,
+        "3": 0.84,
+        "6": 0.84
+      },
+      "mrr": 0.82,
+      "answerMrr": 0.8
+    },
+    "foundIds": [
+      "boundary-buddy-duration",
+      "distractor-vpn-approval",
+      "en-invoice-dispute-reason",
+      "en-meeting-owner",
+      "en-onboarding-training",
+      "en-postmortem-root-cause",
+      "en-roadmap-mobile",
+      "en-service-account-turnaround",
+      "id-cost-centre",
+      "id-invoice-disputed",
+      "id-po-vendor",
+      "nfd-admin-password",
+      "nfd-device-encryption",
+      "nfd-query-nfc-corpus",
+      "nfd-removable-media",
+      "ocr-id-transcribed-table-row",
+      "vn-guest-ssid",
+      "vn-per-diem-danang",
+      "vn-recruitment-offer-validity",
+      "vn-visa-documents",
+      "vn-visa-letter-notice"
+    ],
+    "zeroHitIds": ["unanswerable-no-overlap"]
+  },
+  "hybrid": {
+    "metrics": {
+      "scoredQuestions": 25,
+      "recallAt": {
+        "1": 0.8,
+        "3": 0.84,
+        "6": 0.88
+      },
+      "answerRecallAt": {
+        "1": 0.76,
+        "3": 0.84,
+        "6": 0.88
+      },
+      "mrr": 0.828,
+      "answerMrr": 0.808
+    },
+    "foundIds": [
+      "boundary-buddy-duration",
+      "distractor-vpn-approval",
+      "en-invoice-dispute-reason",
+      "en-meeting-owner",
+      "en-onboarding-training",
+      "en-postmortem-root-cause",
+      "en-roadmap-mobile",
+      "en-service-account-turnaround",
+      "id-cost-centre",
+      "id-invoice-disputed",
+      "id-po-vendor",
+      "nfd-admin-password",
+      "nfd-device-encryption",
+      "nfd-query-nfc-corpus",
+      "nfd-removable-media",
+      "ocr-id-transcribed-table-row",
+      "semantic-delay",
+      "vn-guest-ssid",
+      "vn-per-diem-danang",
+      "vn-recruitment-offer-validity",
+      "vn-visa-documents",
+      "vn-visa-letter-notice"
+    ],
+    "zeroHitIds": [],
+    "embeddingModel": "baai/bge-m3"
+  }
+}
