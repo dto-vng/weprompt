@@ -13,6 +13,13 @@ export type DesktopReleaseBuildEnvironment = Partial<
   Record<SentryBuildVariable | 'WEPROMPT_INTERNAL_RELEASE' | 'WEPROMPT_UPDATE_BASE_URL', string | undefined>
 >;
 
+export type DesktopUpdateRuntimeEnvironment = Partial<
+  Record<
+    'AIONUI_DISABLE_AUTO_UPDATE' | 'AIONUI_E2E_TEST' | 'CI' | 'GITHUB_ACTIONS' | 'WEPROMPT_UPDATE_BASE_URL',
+    string | undefined
+  >
+>;
+
 export type DesktopReleaseBuildPolicy = {
   internalRelease: boolean;
   updateBaseUrl: string | null;
@@ -171,6 +178,15 @@ export function getConfiguredUpdateBaseUrl(
   return resolveUpdateBaseUrl(value);
 }
 
-export function isUpdateFeatureEnabled(value: string | undefined = process.env.WEPROMPT_UPDATE_BASE_URL): boolean {
-  return getConfiguredUpdateBaseUrl(value) !== null;
+export function isUpdateFeatureEnabled(
+  value: string | undefined = process.env.WEPROMPT_UPDATE_BASE_URL,
+  environment: DesktopUpdateRuntimeEnvironment = process.env
+): boolean {
+  const isCiRuntime = environment.CI === 'true' || environment.CI === '1' || environment.GITHUB_ACTIONS === 'true';
+  return (
+    getConfiguredUpdateBaseUrl(value) !== null &&
+    environment.AIONUI_DISABLE_AUTO_UPDATE !== '1' &&
+    environment.AIONUI_E2E_TEST !== '1' &&
+    !isCiRuntime
+  );
 }

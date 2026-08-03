@@ -16,8 +16,6 @@ import { FEEDBACK_MODULES } from '@/common/types/feedbackDiagnostics';
 
 describe('resolveFeedbackModule', () => {
   it.each([
-    ['/studio', 'workspace-preview'],
-    ['/studio/project-1', 'workspace-preview'],
     ['/conversation/abc-123', 'conversation-session'],
     ['/team/team-1', 'agent-team'],
     ['/scheduled', 'scheduled-task'],
@@ -42,6 +40,8 @@ describe('resolveFeedbackModule', () => {
   });
 
   it('returns undefined for the home page and unknown routes', () => {
+    expect(resolveFeedbackModule('/studio')).toBeUndefined();
+    expect(resolveFeedbackModule('/studio/project-1')).toBeUndefined();
     expect(resolveFeedbackModule('/guid')).toBeUndefined();
     expect(resolveFeedbackModule('/login')).toBeUndefined();
     expect(resolveFeedbackModule('/')).toBeUndefined();
@@ -61,12 +61,18 @@ describe('resolveFeedbackModule', () => {
     // Pages where preselecting a module makes no sense (multi-purpose or
     // pre-auth surfaces where the user picks the module themselves).
     const moduleLess = new Set(['/guid', '/login', '/test/components']);
+    const moduleLessPrefixes = ['/studio'];
     const paths = [...routerSrc.matchAll(/path='([^*'][^']*)'/g)].map((m) => m[1]);
     expect(paths.length).toBeGreaterThan(10);
     for (const routePath of paths) {
       // Substitute params with plausible values so prefix matching applies.
       const concrete = routePath.replace(/:[^/]+/g, 'sample-id');
-      if (moduleLess.has(concrete)) continue;
+      if (
+        moduleLess.has(concrete) ||
+        moduleLessPrefixes.some((prefix) => concrete === prefix || concrete.startsWith(`${prefix}/`))
+      ) {
+        continue;
+      }
       expect(resolveFeedbackModule(concrete), `route ${routePath} has no feedback module`).toBeDefined();
     }
   });

@@ -16,7 +16,11 @@ import type {
   InstallerLastFailureMarker,
 } from '@/common/update/updateTypes';
 import { UPDATE_BRIDGE_DISABLED_CODE } from '@/common/update/updateTypes';
-import { getConfiguredUpdateBaseUrl, isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
+import {
+  getConfiguredUpdateBaseUrl,
+  isUpdateFeatureEnabled,
+  isUpdateUrlWithinBase,
+} from '@/common/update/updatePolicy';
 import { uuid } from '@/common/utils';
 import { app } from 'electron';
 import log from 'electron-log';
@@ -45,6 +49,9 @@ type AutoUpdaterService = (typeof import('../services/update/autoUpdaterService'
 
 const loadAutoUpdaterService = async (): Promise<AutoUpdaterService> => {
   const { autoUpdaterService } = await import('../services/update/autoUpdaterService');
+  if (!autoUpdaterService.isInitialized) {
+    autoUpdaterService.initialize(createAutoUpdateStatusBroadcast());
+  }
   return autoUpdaterService;
 };
 
@@ -396,7 +403,7 @@ export function initUpdateBridge(): void {
   );
 
   const updateBaseUrl = getConfiguredUpdateBaseUrl();
-  if (!updateBaseUrl) {
+  if (!updateBaseUrl || !isUpdateFeatureEnabled(updateBaseUrl)) {
     registerDisabledUpdateProviders();
     return;
   }

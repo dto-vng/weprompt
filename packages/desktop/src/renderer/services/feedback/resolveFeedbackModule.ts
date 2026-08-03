@@ -17,7 +17,6 @@ import type { FeedbackModuleTag } from '@/common/types/feedbackDiagnostics';
  * before the user can click the report button.
  */
 const ROUTE_MODULE_MAP: ReadonlyArray<readonly [prefix: string, tag: FeedbackModuleTag]> = [
-  ['/studio', 'workspace-preview'],
   ['/conversation', 'conversation-session'],
   // Project Home is a chats-first surface (scoped chat list + composer).
   ['/project', 'conversation-session'],
