@@ -820,8 +820,8 @@
       "dragScene": "拖动场景以重新排序",
       "removeScene": "移除场景",
       "removeConfirmTitle": "移除此场景？",
-      "removeConfirmBody": "包含已生成素材或生成记录的场景无法移除。",
-      "removeBlocked": "包含已生成素材或生成记录的场景无法移除。",
+      "removeConfirmBody": "包含导入或已生成媒体，或存在生成记录的场景无法移除。",
+      "removeBlocked": "包含导入或已生成媒体，或存在生成记录的场景无法移除。",
       "retry": "重试更改",
       "discard": "放弃本地更改"
     },

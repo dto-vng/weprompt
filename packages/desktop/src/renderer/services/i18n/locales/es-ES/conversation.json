@@ -821,8 +821,8 @@
       "dragScene": "Arrastra la escena para reordenarla",
       "removeScene": "Eliminar escena",
       "removeConfirmTitle": "¿Eliminar esta escena?",
-      "removeConfirmBody": "No se pueden eliminar las escenas con recursos generados o historial de generación.",
-      "removeBlocked": "No se pueden eliminar las escenas con recursos generados o historial de generación.",
+      "removeConfirmBody": "No se pueden eliminar las escenas con contenido importado o generado, ni con historial de generación.",
+      "removeBlocked": "No se pueden eliminar las escenas con contenido importado o generado, ni con historial de generación.",
       "retry": "Reintentar el cambio",
       "discard": "Descartar cambios locales"
     },

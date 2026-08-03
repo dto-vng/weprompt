@@ -63,7 +63,7 @@ vi.mock('react-i18next', () => ({
         return `${key}:${params?.total}:${params?.target}`;
       }
       if (key === 'conversation.creativeStudio.storyboard.removeBlocked') {
-        return 'Scenes with generated assets or generation history cannot be removed.';
+        return 'Scenes with imported or generated media, or generation history, cannot be removed.';
       }
       return params === undefined ? key : `${key}:${Object.values(params).join(':')}`;
     },
@@ -305,16 +305,21 @@ describe('StoryboardPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('only offers removal for draft scenes with no generated assets or generation history', () => {
+  it('only offers removal for draft scenes with no imported or generated media or generation history', () => {
     const removable = scene('scene-draft', 'Draft', 4);
-    const withAsset = scene('scene-asset', 'Asset', 4, { assetIds: ['asset-1'] });
+    const withImportedReference = scene('scene-reference', 'Reference', 4, {
+      referenceAssetId: 'asset-reference',
+      assetIds: ['asset-reference'],
+    });
+    const withGeneratedAsset = scene('scene-asset', 'Asset', 4, { assetIds: ['asset-1'] });
     const withCompletedJob = scene('scene-history', 'History', 4, { jobIds: ['job-completed'] });
     const props = createProps({
-      orderedScenes: [removable, withAsset, withCompletedJob],
+      orderedScenes: [removable, withImportedReference, withGeneratedAsset, withCompletedJob],
       selectedSceneId: removable.id,
       sceneStatuses: {
         [removable.id]: 'ready',
-        [withAsset.id]: 'generated',
+        [withImportedReference.id]: 'ready',
+        [withGeneratedAsset.id]: 'generated',
         [withCompletedJob.id]: 'needs_attention',
       },
     });
@@ -326,9 +331,10 @@ describe('StoryboardPanel', () => {
     expect(removeButtons[0]).toBeEnabled();
     expect(removeButtons[1]).toBeDisabled();
     expect(removeButtons[2]).toBeDisabled();
-    expect(screen.getAllByText('Scenes with generated assets or generation history cannot be removed.')).toHaveLength(
-      2
-    );
+    expect(removeButtons[3]).toBeDisabled();
+    expect(
+      screen.getAllByText('Scenes with imported or generated media, or generation history, cannot be removed.')
+    ).toHaveLength(3);
   });
 
   it('keeps non-draft conflict recovery reachable when the storyboard has no scenes', () => {

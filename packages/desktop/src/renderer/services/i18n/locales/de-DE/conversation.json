@@ -821,8 +821,8 @@
       "dragScene": "Szene zum Neuordnen ziehen",
       "removeScene": "Szene entfernen",
       "removeConfirmTitle": "Diese Szene entfernen?",
-      "removeConfirmBody": "Szenen mit generierten Assets oder einer Generierungshistorie können nicht entfernt werden.",
-      "removeBlocked": "Szenen mit generierten Assets oder einer Generierungshistorie können nicht entfernt werden.",
+      "removeConfirmBody": "Szenen mit importierten oder generierten Medien oder einer Generierungshistorie können nicht entfernt werden.",
+      "removeBlocked": "Szenen mit importierten oder generierten Medien oder einer Generierungshistorie können nicht entfernt werden.",
       "retry": "Änderung erneut versuchen",
       "discard": "Lokale Änderungen verwerfen"
     },

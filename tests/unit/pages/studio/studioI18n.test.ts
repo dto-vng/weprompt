@@ -174,6 +174,15 @@ describe('Creative Studio localization contract', () => {
     expect(JSON.stringify(creativeStudio)).not.toContain('App Operations');
   });
 
+  it('explains that imported media also protects a scene from deletion', () => {
+    const reference = loadConversationLocale(i18nConfig.referenceLanguage).creativeStudio;
+    const leaves = flattenStringLeaves(reference);
+    const expected = 'Scenes with imported or generated media, or generation history, cannot be removed.';
+
+    expect(leaves['storyboard.removeConfirmBody']).toBe(expected);
+    expect(leaves['storyboard.removeBlocked']).toBe(expected);
+  });
+
   it('keeps every configured locale exactly in parity, non-empty, translated, and placeholder-compatible', () => {
     const reference = loadConversationLocale(i18nConfig.referenceLanguage).creativeStudio;
     expect(isJsonObject(reference), 'Reference Creative Studio subtree is missing').toBe(true);

@@ -711,6 +711,50 @@ describe('CreativeStudioService', () => {
     expect(updated.scenes.scene_1.reviewState).toBe('draft');
   });
 
+  it('rejects removing a scene whose only media is an imported reference', async () => {
+    const project = await service.createProject(makeInput());
+    const withScene = await service.updateScene({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      sceneId: 'scene_1',
+      scene: makeScene('scene_1'),
+    });
+    const withImportedReference = await createCreativeStudioStore({ rootDir }).updateProject(
+      withScene.id,
+      (current) => {
+        const next = structuredClone(current);
+        next.assets.asset_reference = {
+          id: 'asset_reference',
+          projectId: next.id,
+          sceneId: 'scene_1',
+          mediaKind: 'image',
+          mimeType: 'image/png',
+          managedAsset: { collection: 'imports', fileName: 'asset_reference.png' },
+          byteSize: 1,
+          sha256: '3'.repeat(64),
+          createdAt: next.createdAt,
+        };
+        next.scenes.scene_1.referenceAssetId = 'asset_reference';
+        next.scenes.scene_1.assetIds = ['asset_reference'];
+        return next;
+      },
+      withScene.revision
+    );
+
+    await expect(
+      service.updateScene({
+        projectId: withImportedReference.id,
+        expectedRevision: withImportedReference.revision,
+        sceneId: 'scene_1',
+        scene: null,
+      })
+    ).rejects.toMatchObject({ code: 'invalid_payload' } satisfies Partial<CreativeStudioStoreError>);
+    await expect(service.getProject(withImportedReference.id)).resolves.toMatchObject({
+      sceneOrder: ['scene_1'],
+      scenes: { scene_1: { referenceAssetId: 'asset_reference', assetIds: ['asset_reference'] } },
+    });
+  });
+
   it('preserves main-owned scene history while applying renderer-editable fields', async () => {
     const project = await service.createProject(makeInput());
     const withScene = await service.updateScene({

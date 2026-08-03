@@ -826,8 +826,8 @@
       "dragScene": "Arraste a cena para reordenar",
       "removeScene": "Remover cena",
       "removeConfirmTitle": "Remover esta cena?",
-      "removeConfirmBody": "Cenas com recursos gerados ou histórico de geração não podem ser removidas.",
-      "removeBlocked": "Cenas com recursos gerados ou histórico de geração não podem ser removidas.",
+      "removeConfirmBody": "Cenas com mídia importada ou gerada, ou com histórico de geração, não podem ser removidas.",
+      "removeBlocked": "Cenas com mídia importada ou gerada, ou com histórico de geração, não podem ser removidas.",
       "retry": "Tentar a alteração novamente",
       "discard": "Descartar alterações locais"
     },

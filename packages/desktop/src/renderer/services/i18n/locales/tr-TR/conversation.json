@@ -822,8 +822,8 @@
       "dragScene": "Yeniden sıralamak için sahneyi sürükleyin",
       "removeScene": "Sahneyi kaldır",
       "removeConfirmTitle": "Bu sahne kaldırılsın mı?",
-      "removeConfirmBody": "Oluşturulmuş varlıkları veya oluşturma geçmişi olan sahneler kaldırılamaz.",
-      "removeBlocked": "Oluşturulmuş varlıkları veya oluşturma geçmişi olan sahneler kaldırılamaz.",
+      "removeConfirmBody": "İçe aktarılmış veya oluşturulmuş medyası ya da oluşturma geçmişi olan sahneler kaldırılamaz.",
+      "removeBlocked": "İçe aktarılmış veya oluşturulmuş medyası ya da oluşturma geçmişi olan sahneler kaldırılamaz.",
       "retry": "Değişikliği tekrar dene",
       "discard": "Yerel değişiklikleri at"
     },

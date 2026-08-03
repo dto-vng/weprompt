@@ -820,8 +820,8 @@
       "dragScene": "拖曳場景以重新排序",
       "removeScene": "移除場景",
       "removeConfirmTitle": "要移除此場景嗎？",
-      "removeConfirmBody": "含有已產生素材或產生記錄的場景無法移除。",
-      "removeBlocked": "含有已產生素材或產生記錄的場景無法移除。",
+      "removeConfirmBody": "包含匯入或已產生媒體，或存在產生記錄的場景無法移除。",
+      "removeBlocked": "包含匯入或已產生媒體，或存在產生記錄的場景無法移除。",
       "retry": "重試變更",
       "discard": "捨棄本機變更"
     },

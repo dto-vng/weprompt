@@ -820,8 +820,8 @@
       "dragScene": "Drag scene to reorder",
       "removeScene": "Remove scene",
       "removeConfirmTitle": "Remove this scene?",
-      "removeConfirmBody": "Scenes with generated assets or generation history cannot be removed.",
-      "removeBlocked": "Scenes with generated assets or generation history cannot be removed.",
+      "removeConfirmBody": "Scenes with imported or generated media, or generation history, cannot be removed.",
+      "removeBlocked": "Scenes with imported or generated media, or generation history, cannot be removed.",
       "retry": "Retry change",
       "discard": "Discard local changes"
     },
