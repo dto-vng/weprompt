@@ -313,8 +313,9 @@ fmt:
 fmt-check:
     bun run format:check
 
-# Type check
+# Type check (i18n key types are generated, not tracked — produce them first)
 typecheck:
+    bun run i18n:types
     bunx tsc --noEmit
 
 # Run i18n type generation and validation

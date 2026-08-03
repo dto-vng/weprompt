@@ -208,6 +208,9 @@ resources/bundled-aioncore
 resources/hub
 /resources/windows/support/_sentry-dsn.generated.nsh
 
+# Generated from locales/ by scripts/generate-i18n-types.js (see postinstall)
+packages/desktop/src/renderer/services/i18n/i18n-keys.d.ts
+
 # Server build output
 dist-server/
 .omc/
