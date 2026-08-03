@@ -41,7 +41,14 @@ import { useWorkspacePaste } from './hooks/useWorkspacePaste';
 import { useWorkspaceSearch } from './hooks/useWorkspaceSearch';
 import { useWorkspaceTree } from './hooks/useWorkspaceTree';
 import type { WorkspaceProps, WorkspaceTab } from './types';
-import { computeContextMenuPosition, flattenSingleRoot, getTargetFolderPath } from './utils/treeHelpers';
+import {
+  computeContextMenuPosition,
+  extractNodeData,
+  extractNodeKey,
+  flattenSingleRoot,
+  getTargetFolderPath,
+} from './utils/treeHelpers';
+import { setWorkspaceTreeSnapshot } from './utils/workspaceTreeCache';
 import './workspace.css';
 
 const formatProjectContextBudgetLabel = (ratio: number | null): string => {
@@ -130,7 +137,14 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
     conversation_id: conversation_id,
   });
 
-  const searchHook = useWorkspaceSearch({ workspace, loadWorkspace: treeHook.loadWorkspace });
+  const searchHook = useWorkspaceSearch({
+    workspace,
+    expandedKeys: treeHook.expandedKeys,
+    setFiles: treeHook.setFiles,
+    setExpandedKeys: treeHook.setExpandedKeys,
+    setTreeKey: treeHook.setTreeKey,
+    refreshWorkspace: treeHook.refreshWorkspace,
+  });
 
   const fileOpsHook = useWorkspaceFileOps({
     workspace,
@@ -157,12 +171,11 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // Setup events
   useWorkspaceEvents({
     conversation_id,
+    workspace,
     eventPrefix,
     refreshWorkspace: treeHook.refreshWorkspace,
     clearSelection: treeHook.clearSelection,
-    setFiles: treeHook.setFiles,
     setSelected: treeHook.setSelected,
-    setExpandedKeys: treeHook.setExpandedKeys,
     setTreeKey: treeHook.setTreeKey,
     selectedNodeRef: treeHook.selectedNodeRef,
     selectedKeysRef: treeHook.selectedKeysRef,
@@ -172,8 +185,12 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
     closeDeleteModal: modalsHook.closeDeleteModal,
   });
 
-  // Hide the transport root when it has one visible workspace child.
-  const treeData = flattenSingleRoot(treeHook.files);
+  // Context menu calculations
+  const hasOriginalFiles = treeHook.files.length > 0 && treeHook.files[0]?.children?.length > 0;
+  const rootName = treeHook.files[0]?.name ?? '';
+
+  // Hide root directory when there's a single root with children, as Toolbar serves as the first-level directory
+  const treeData = useMemo(() => flattenSingleRoot(treeHook.files), [treeHook.files]);
 
   // Authoritative source: `conversation.extra.is_temporary_workspace` is
   // derived by the backend on every response (see

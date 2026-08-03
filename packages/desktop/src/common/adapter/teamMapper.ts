@@ -6,6 +6,10 @@
 
 import type {
   BackendTeammateStatus,
+  ITeamRunAck,
+  ITeamRunEvent,
+  ITeamRunStateResponse,
+  ITeamSlotWork,
   TeamAssistant,
   TeammateRole,
   TeammateStatus,
@@ -27,7 +31,7 @@ export type ICreateTeamParams = {
   name: string;
   workspace: string;
   workspace_mode: WorkspaceMode;
-  assistants: TeamAssistantInput[];
+  agents: TeamAssistantInput[];
 };
 
 export type IAddTeamAssistantParams = {
@@ -117,6 +121,48 @@ export function fromBackendTeamList(raw: unknown): TTeam[] {
 
 export function fromBackendTeamOptional(raw: unknown): TTeam | null {
   return raw == null ? null : fromBackendTeam(raw);
+}
+
+// ── Team run state (backend → frontend) ────────────────────────────────
+
+/**
+ * `slot_work` and `session_generation` only exist in newer aioncore builds.
+ * Older backends answer `GET /api/teams/:id/run-state` with a bare
+ * `{"active_run":null}` and ship run events without `slot_work` at all, so the
+ * fields are absent — not null — on the wire whenever the installed backend
+ * predates the repo's `aioncoreVersion` pin.
+ *
+ * The renderer treats both as guaranteed (`ITeamRunStateResponse`,
+ * `ITeamRunEvent`), so normalization happens once here, at every ingress point,
+ * rather than at each consumer: `strictNullChecks` is off in this project, so
+ * declaring the fields optional would document the hazard without making
+ * TypeScript enforce a single guard.
+ */
+export function fromBackendSlotWork(raw: unknown): ITeamSlotWork[] {
+  return Array.isArray(raw) ? (raw as ITeamSlotWork[]) : [];
+}
+
+export function fromBackendTeamRunEvent(raw: unknown): ITeamRunEvent {
+  const r = (raw ?? {}) as ITeamRunEvent;
+  return { ...r, slot_work: fromBackendSlotWork(r.slot_work) };
+}
+
+export function fromBackendTeamRunEventOptional(raw: unknown): ITeamRunEvent | null {
+  return raw == null ? null : fromBackendTeamRunEvent(raw);
+}
+
+export function fromBackendTeamRunState(raw: unknown): ITeamRunStateResponse {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    session_generation: (r.session_generation as string | undefined) ?? null,
+    active_run: fromBackendTeamRunEventOptional(r.active_run),
+    slot_work: fromBackendSlotWork(r.slot_work),
+  };
+}
+
+export function fromBackendTeamRunAck(raw: unknown): ITeamRunAck {
+  const r = (raw ?? {}) as ITeamRunAck;
+  return { ...r, run: fromBackendTeamRunEvent(r.run) };
 }
 
 // ── Frontend → Backend ─────────────────────────────────────────────────

@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import forgeMark from '@renderer/assets/logos/brand/forge-mark.svg';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import Titlebar from '@/renderer/components/layout/Titlebar';
 import { Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
@@ -15,6 +16,7 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { setGlobalNavigate } from '@/renderer/utils/navigation';
+import { usePreviewContext } from '@renderer/pages/conversation/Preview';
 import {
   LayoutContext,
   persistSiderCollapsed,
@@ -105,6 +107,7 @@ const Layout: React.FC<{
   sider: React.ReactNode;
   onSessionClick?: () => void;
 }> = ({ sider, onSessionClick: _onSessionClick }) => {
+  const updatesEnabled = isUpdateFeatureEnabled();
   const [collapsed, setCollapsed] = useState<boolean>(() => readPersistedSiderCollapsed());
   const [isMobile, setIsMobile] = useState(false);
   const [viewportWidth, setViewportWidth] = useState<number>(() =>
@@ -147,6 +150,26 @@ const Layout: React.FC<{
   }, [navigate]);
   const workspaceAvailable =
     location.pathname.startsWith('/conversation/') || (TEAM_MODE_ENABLED && location.pathname.startsWith('/team/'));
+
+  // Close preview whenever the user leaves the conversation route entirely
+  // (e.g. switches to a team, /guid, or settings). Within /conversation/:id
+  // the finer-grained closePreviewIfWorkspaceChanged in conversation/index.tsx
+  // handles workspace changes, so we only need to act here on route-type changes.
+  // Use closePreview directly — closePreviewIfWorkspaceChanged skips the call
+  // when lastWorkspaceRef is already null (e.g. on team routes where it was
+  // never updated), which would leave the panel open.
+  const { closePreview: closePreviewOnRouteChange } = usePreviewContext();
+  const routeLayoutMountedRef = useRef(false);
+  useEffect(() => {
+    if (!routeLayoutMountedRef.current) {
+      routeLayoutMountedRef.current = true;
+      return; // skip initial mount — preview starts closed, don't wipe persisted tabs
+    }
+    if (!location.pathname.startsWith('/conversation/')) {
+      closePreviewOnRouteChange();
+    }
+  }, [location.pathname, closePreviewOnRouteChange]);
+
   const collapsedRef = useRef(collapsed);
   const { width: siderWidth, createDragHandle } = useSiderWidth();
 
@@ -209,12 +232,6 @@ const Layout: React.FC<{
       void navigate(`/conversation/${event.detail.conversation_id}`);
     };
 
-    // Open about dialog when requested from tray / 托盘请求打开关于对话框
-    const handleOpenAbout = () => {
-      // Navigate to settings/about page / 导航到设置/关于页面
-      void navigate('/settings/about');
-    };
-
     // Handle pause all tasks request from tray / 托盘请求暂停所有任务
     const handlePauseAllTasks = async () => {
       const result = await ipcBridge.task.stopAll.invoke();
@@ -232,18 +249,20 @@ const Layout: React.FC<{
     // Listen for tray events / 监听托盘事件
     window.addEventListener('tray:navigate-to-guid', handleNavigateToGuid as EventListener);
     window.addEventListener('tray:navigate-to-conversation', handleNavigateToConversation as EventListener);
-    window.addEventListener('tray:open-about', handleOpenAbout as EventListener);
     window.addEventListener('tray:pause-all-tasks', handlePauseAllTasks as EventListener);
-    window.addEventListener('tray:check-update', handleCheckUpdate as EventListener);
+    if (updatesEnabled) {
+      window.addEventListener('tray:check-update', handleCheckUpdate as EventListener);
+    }
 
     return () => {
       window.removeEventListener('tray:navigate-to-guid', handleNavigateToGuid as EventListener);
       window.removeEventListener('tray:navigate-to-conversation', handleNavigateToConversation as EventListener);
-      window.removeEventListener('tray:open-about', handleOpenAbout as EventListener);
       window.removeEventListener('tray:pause-all-tasks', handlePauseAllTasks as EventListener);
-      window.removeEventListener('tray:check-update', handleCheckUpdate as EventListener);
+      if (updatesEnabled) {
+        window.removeEventListener('tray:check-update', handleCheckUpdate as EventListener);
+      }
     };
-  }, [navigate]);
+  }, [navigate, updatesEnabled]);
 
   const mobileSiderWidth = Math.max(
     MOBILE_SIDER_MIN_WIDTH,
@@ -349,8 +368,8 @@ const Layout: React.FC<{
                     type='button'
                     className='app-titlebar__button app-titlebar__button--mobile'
                     onClick={() => setCollapsed(true)}
-                    title='Collapse sidebar'
-                    aria-label='Collapse sidebar'
+                    title={t('common.chrome.collapseSidebar')}
+                    aria-label={t('common.chrome.collapseSidebar')}
                   >
                     <SidebarIcon size={18} strokeWidth={2.5} />
                   </button>

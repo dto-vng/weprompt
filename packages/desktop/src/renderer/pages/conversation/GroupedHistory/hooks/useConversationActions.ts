@@ -6,9 +6,14 @@
 
 import { ipcBridge } from '@/common';
 import type { TChatConversation } from '@/common/config/storage';
-import { buildDetachedProjectExtra } from '@/renderer/pages/conversation/projects/projectConversation';
+import { requestConversationSendBoxPrefill } from '@/renderer/hooks/chat/useSendBoxDraft';
+import {
+  detachAndRemoveProject,
+  PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS,
+} from '@/renderer/pages/conversation/projects/projectConversation';
 import { removeProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { refreshConversationCache } from '@/renderer/pages/conversation/utils/conversationCache';
+import { isLegacyReadOnlyConversationType } from '@/renderer/pages/conversation/utils/conversationRuntime';
 import { emitter } from '@/renderer/utils/emitter';
 import { blockMobileInputFocus, blurActiveElement } from '@/renderer/utils/ui/focus';
 import { Message, Modal } from '@arco-design/web-react';
@@ -96,7 +101,7 @@ export const useConversationActions = ({
         content: t('conversation.history.deleteConfirm'),
         okText: t('conversation.history.confirmDelete'),
         cancelText: t('conversation.history.cancelDelete'),
-        okButtonProps: { status: 'warning' },
+        okButtonProps: { status: 'danger' },
         onOk: async () => {
           try {
             const success = await removeConversation(conversation_id);
@@ -130,7 +135,7 @@ export const useConversationActions = ({
       content: t('conversation.history.batchDeleteConfirm', { count: selectedConversationIds.size }),
       okText: t('conversation.history.confirmDelete'),
       cancelText: t('conversation.history.cancelDelete'),
-      okButtonProps: { status: 'warning' },
+      okButtonProps: { status: 'danger' },
       onOk: async () => {
         const selectedIds = Array.from(selectedConversationIds);
         try {
@@ -233,6 +238,31 @@ export const useConversationActions = ({
     setDropdownVisibleId(conversation.id);
   }, []);
 
+  const handleCreateCronTask = useCallback(
+    (conversation: TChatConversation) => {
+      const prefillPrompt = t('cron.status.defaultPrompt');
+      setDropdownVisibleId(null);
+
+      if (isLegacyReadOnlyConversationType(conversation.type)) {
+        void navigate('/guid', {
+          state: {
+            prefillPrompt,
+            preservePrefillDraft: true,
+            focusPrefill: true,
+          },
+        });
+      } else {
+        requestConversationSendBoxPrefill(conversation.id, prefillPrompt);
+        if (id !== conversation.id) {
+          void navigate(`/conversation/${conversation.id}`);
+        }
+      }
+
+      onSessionClick?.();
+    },
+    [id, navigate, onSessionClick, t]
+  );
+
   /**
    * Remove project state — rendered via AionModal in the GroupedHistory component.
    * Uses project's design system: AionModal component with danger-styled action button.
@@ -261,22 +291,21 @@ export const useConversationActions = ({
     if (!removeProjectTarget) return;
     setRemoveProjectLoading(true);
     try {
-      const detachResults = await Promise.all(
-        removeProjectTarget.conversations.map((conversation) =>
+      const result = await detachAndRemoveProject({
+        projectId: removeProjectTarget.projectId,
+        conversations: removeProjectTarget.conversations,
+        detachConversation: (conversation, extra) =>
           ipcBridge.conversation.update.invoke({
             id: conversation.id,
             updates: {
-              extra: buildDetachedProjectExtra(conversation),
+              extra: extra as unknown as TChatConversation['extra'],
             } as Partial<TChatConversation>,
-            merge_extra: false,
-          })
-        )
-      );
+            merge_extra: true,
+          }),
+        removeProjectMetadata: removeProject,
+      });
 
-      const detachedAll = detachResults.every(Boolean);
-      const removedProject = removeProjectTarget.projectId ? removeProject(removeProjectTarget.projectId) : true;
-
-      if (removeProjectTarget.projectId && removedProject) {
+      if (result.success === true && removeProjectTarget.projectId) {
         // Best-effort cleanup: the project row is already gone, so a failed
         // knowledge-store delete must never block or reverse the deletion
         // the user just confirmed. An orphaned store directory is harmless
@@ -287,10 +316,15 @@ export const useConversationActions = ({
       }
 
       emitter.emit('chat.history.refresh');
-      if (detachedAll && removedProject) {
+      if (result.success === true) {
         Message.success(t('conversation.history.removeProjectSuccess'));
       } else {
-        Message.error(t('conversation.history.removeProjectFailed'));
+        console.error('Failed to remove project:', {
+          projectId: removeProjectTarget.projectId,
+          reason: result.reason,
+          diagnostics: result.diagnostics,
+        });
+        Message.error(t(PROJECT_REMOVAL_FAILURE_MESSAGE_KEYS[result.reason]));
       }
       setRemoveProjectTarget(null);
     } catch (error) {
@@ -316,6 +350,7 @@ export const useConversationActions = ({
     handleTogglePin,
     handleMenuVisibleChange,
     handleOpenMenu,
+    handleCreateCronTask,
     handleRemoveProject,
     removeProjectTarget,
     removeProjectLoading,

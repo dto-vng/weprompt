@@ -5,7 +5,7 @@
  */
 
 import type { TConversationRuntimeSummary } from '@/common/config/storage';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createDefaultConversationRuntimeView,
   getConversationRuntimeViewSnapshot,
@@ -21,6 +21,8 @@ import {
   localStopRequested,
   localStopRequestedConversationRuntimeView,
   resetConversationRuntimeViewStoreForTest,
+  streamTerminalObserved,
+  subscribeConversationRuntimeView,
   turnCompleted,
   turnCompletedConversationRuntimeView,
 } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
@@ -108,7 +110,10 @@ describe('conversationRuntimeViewStore', () => {
 
   it('clears a failed local send gate and restores sendability without backend runtime', () => {
     const started = localSendStartedConversationRuntimeView(undefined, conversation_id).view;
-    const { view } = localSendFailedConversationRuntimeView(started, conversation_id, 'network error');
+    const { view } = localSendFailedConversationRuntimeView(started, conversation_id, {
+      kind: 'ordinary',
+      reason: 'network error',
+    });
 
     expect(view).toMatchObject({
       state: 'idle',
@@ -122,7 +127,10 @@ describe('conversationRuntimeViewStore', () => {
   it('clears a failed local send gate after an idle backend runtime was hydrated', () => {
     const hydrated = hydrateSucceededConversationRuntimeView(undefined, conversation_id, runtime({})).view;
     const started = localSendStartedConversationRuntimeView(hydrated, conversation_id).view;
-    const { view } = localSendFailedConversationRuntimeView(started, conversation_id, 'network error');
+    const { view } = localSendFailedConversationRuntimeView(started, conversation_id, {
+      kind: 'ordinary',
+      reason: 'network error',
+    });
 
     expect(view).toMatchObject({
       state: 'idle',
@@ -131,6 +139,79 @@ describe('conversationRuntimeViewStore', () => {
       localSubmitting: false,
       hasBackendRuntime: true,
       hydrated: true,
+    });
+  });
+
+  it('keeps an active backend turn not sendable after busy conflict', () => {
+    const running = hydrateSucceededConversationRuntimeView(
+      undefined,
+      conversation_id,
+      runtime({
+        state: 'running',
+        can_send_message: false,
+        has_task: true,
+        task_status: 'running',
+        is_processing: true,
+        turn_id: 'turn-21bfdd10',
+      })
+    ).view;
+    const { view, logs } = localSendFailedConversationRuntimeView(running, conversation_id, {
+      kind: 'busy_conflict',
+      reason: 'conversation 7261e2b5 is already running',
+      busyKind: 'active_turn',
+      status: 409,
+      code: 'CONFLICT',
+    });
+
+    expect(view).toMatchObject({
+      activeTurnId: 'turn-21bfdd10',
+      state: 'running',
+      isProcessing: true,
+      canSendMessage: false,
+      localSubmitting: false,
+      hydrated: true,
+    });
+    expect(logs[0]).toMatchObject({
+      event: 'local_send_busy',
+      data: { busyKind: 'active_turn', status: 409, code: 'CONFLICT' },
+    });
+  });
+
+  it('keeps a locally starting gate closed after busy conflict until hydrate or turn completion releases it', () => {
+    const started = localSendStartedConversationRuntimeView(undefined, conversation_id).view;
+    const { view } = localSendFailedConversationRuntimeView(started, conversation_id, {
+      kind: 'busy_conflict',
+      reason: 'conversation 7261e2b5 is already running',
+      busyKind: 'active_turn',
+    });
+
+    expect(view).toMatchObject({
+      state: 'starting',
+      isProcessing: true,
+      canSendMessage: false,
+      localSubmitting: false,
+    });
+  });
+
+  it('keeps the gate closed for runtime-unavailable busy conflicts', () => {
+    const started = localSendStartedConversationRuntimeView(undefined, conversation_id).view;
+    const { view, logs } = localSendFailedConversationRuntimeView(started, conversation_id, {
+      kind: 'busy_conflict',
+      reason: 'conversation runtime is shutting down',
+      busyKind: 'runtime_unavailable',
+      status: 409,
+      code: 'CONFLICT',
+    });
+
+    expect(view).toMatchObject({
+      state: 'starting',
+      isProcessing: true,
+      canSendMessage: false,
+      localSubmitting: false,
+    });
+    expect(logs[0]).toMatchObject({
+      event: 'local_send_busy',
+      data: { busyKind: 'runtime_unavailable', status: 409, code: 'CONFLICT' },
     });
   });
 
@@ -267,6 +348,47 @@ describe('conversationRuntimeViewStore', () => {
         runtime_turn_id: 'turn-1',
       },
     });
+  });
+
+  it('applies the same valid turn completion once', () => {
+    resetConversationRuntimeViewStoreForTest();
+    const listener = vi.fn();
+    const unsubscribe = subscribeConversationRuntimeView(listener);
+
+    const firstLogs = turnCompleted(conversation_id, 'turn-1', runtime({}));
+    const callsAfterFirst = listener.mock.calls.length;
+    const duplicateLogs = turnCompleted(conversation_id, 'turn-1', runtime({}));
+
+    expect(firstLogs.map((log) => log.event)).toContain('turn_completed_applied');
+    expect(duplicateLogs).toEqual([]);
+    expect(listener).toHaveBeenCalledTimes(callsAfterFirst);
+    unsubscribe();
+  });
+
+  it('applies turn completed once after the stream terminal was observed', () => {
+    resetConversationRuntimeViewStoreForTest();
+    streamTerminalObserved(conversation_id, 'turn-1');
+
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({}))).not.toEqual([]);
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({}))).toEqual([]);
+  });
+
+  it('allows a valid completion to recover a missing-runtime completion', () => {
+    resetConversationRuntimeViewStoreForTest();
+
+    expect(turnCompleted(conversation_id, 'turn-1', null)[0]?.event).toBe('turn_completed_missing_runtime');
+    expect(turnCompleted(conversation_id, 'turn-1', runtime({})).map((log) => log.event)).toContain(
+      'turn_completed_applied'
+    );
+  });
+
+  it('applies a completion for a different turn after a prior turn completes', () => {
+    resetConversationRuntimeViewStoreForTest();
+    turnCompleted(conversation_id, 'turn-1', runtime({}));
+
+    expect(turnCompleted(conversation_id, 'turn-2', runtime({})).map((log) => log.event)).toContain(
+      'turn_completed_applied'
+    );
   });
 
   it('does not unlock when turn completed has no runtime', () => {

@@ -324,19 +324,13 @@ const JsonImportModal: React.FC<JsonImportModalProps> = ({ visible, server, onCa
 
   return (
     <AionModal
+      variant='standard'
       visible={visible}
       onCancel={onCancel}
       onOk={handleSubmit}
       okButtonProps={{ disabled: !validation.isValid || submitting, loading: submitting }}
       header={{ title: server ? t('settings.mcpEditServer') : t('settings.mcpImportFromJSON'), showClose: true }}
-      style={{ width: 600, height: 450 }}
-      contentStyle={{
-        borderRadius: 16,
-        padding: '24px',
-        background: 'var(--dialog-fill-0)',
-        overflow: 'auto',
-        height: 420 - 80,
-      }} // 与“添加模型”弹窗保持统一尺寸 / Keep same size as Add Model modal
+      style={{ width: 600 }}
     >
       <div className='space-y-12px'>
         <div>
@@ -373,7 +367,7 @@ const JsonImportModal: React.FC<JsonImportModalProps> = ({ visible, server, onCa
               }}
               style={{
                 fontSize: '13px',
-                border: validation.isValid || !jsonInput.trim() ? '1px solid var(--bg-3)' : '1px solid var(--danger)',
+                border: validation.isValid || !jsonInput.trim() ? '1px solid var(--bg-4)' : '1px solid var(--danger)',
                 borderRadius: '6px',
                 marginBottom: '20px',
                 overflow: 'hidden',

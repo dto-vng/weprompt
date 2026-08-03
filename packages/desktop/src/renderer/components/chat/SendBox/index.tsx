@@ -13,6 +13,7 @@ import { useBtwCommand } from '@/renderer/components/chat/BtwOverlay/useBtwComma
 import { getFuzzyMatchIndices, useSlashCommandController } from '@/renderer/hooks/chat/useSlashCommandController';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
+import { appendPromptToDraft, useConversationSendBoxPrefill } from '@/renderer/hooks/chat/useSendBoxDraft';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { buildAtFileInsertion, getActiveAtFileQuery, getAllAtFileQueries } from '@/renderer/utils/chat/atFileQuery';
 import { getLastAssistantText } from '@/renderer/utils/chat/getLastAssistantText';
@@ -22,11 +23,10 @@ import type { FileOrFolderItem } from '@/renderer/utils/file/fileTypes';
 import { filterWorkspaceMentionItems } from '@/renderer/utils/file/workspaceMentions';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { blurActiveElement, shouldBlockMobileInputFocus } from '@/renderer/utils/ui/focus';
-import { Button, Input, Message, Tag } from '@arco-design/web-react';
+import { Button, Input, Message, Tag, Tooltip } from '@arco-design/web-react';
 import { ArrowUp, CloseSmall, Plus, Quote } from '@icon-park/react';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import { buildSkillSlashCommands, mergeSlashCommands } from '@/common/chat/slash/mergeSlashCommands';
-import { theme } from '@office-ai/platform';
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
@@ -52,7 +52,7 @@ const constVoid = (): void => undefined;
 // Threshold: switch to multi-line mode directly when character count exceeds this value to avoid heavy layout work
 const MAX_SINGLE_LINE_CHARACTERS = 800;
 const BTW_COMMAND_RE = /^\/btw(?:\s+([\s\S]*))?$/i;
-const AT_FILE_HIGHLIGHT_COLOR = theme.Color.PrimaryColor;
+const AT_FILE_HIGHLIGHT_COLOR = 'var(--primary)';
 
 const getSelectedItemMatchKeys = (item: FileSelectionItem): string[] => {
   if (typeof item === 'string') {
@@ -186,6 +186,10 @@ const SendBox: React.FC<{
    * `tools` and `rightTools` are not rendered inline on mobile.
    */
   onMobilePlusClick?: () => void;
+  /** When provided, registers the /presentation slash command and the gallery overlay. */
+  onOpenTemplateGallery?: () => void;
+  /** Gallery panel node; non-null means the gallery overlay is open. */
+  templateGalleryNode?: React.ReactNode;
 }> = ({
   onSend,
   onStop,
@@ -214,6 +218,8 @@ const SendBox: React.FC<{
   onSelectedWorkspaceItemsChange,
   bottomHint,
   onMobilePlusClick,
+  onOpenTemplateGallery,
+  templateGalleryNode,
 }) => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
@@ -240,6 +246,12 @@ const SendBox: React.FC<{
   const historyDraftRef = useRef<string | null>(null);
   const [replyQuote, setReplyQuote] = useState<ReplyQuote | null>(null);
   const [caretPosition, setCaretPosition] = useState(0);
+  const [prefillFocusRequest, setPrefillFocusRequest] = useState<{
+    requestId: number;
+    expectedValue: string;
+  } | null>(null);
+  const prefillDraftChainRef = useRef<string | null>(null);
+  const focusedPrefillRequestIdRef = useRef<number | null>(null);
   const [workspaceMentionItems, setWorkspaceMentionItems] = useState<FileOrFolderItem[]>([]);
   const [workspaceMentionLoading, setWorkspaceMentionLoading] = useState(false);
   const [atFileMenuActiveIndex, setAtFileMenuActiveIndex] = useState(0);
@@ -454,6 +466,16 @@ const SendBox: React.FC<{
         source: 'builtin',
       });
     }
+    if (onOpenTemplateGallery) {
+      commands.push({
+        name: 'presentation',
+        description: t('conversation.presentationTemplates.slashDescription', {
+          defaultValue: 'Choose a presentation template',
+        }),
+        kind: 'builtin',
+        source: 'builtin',
+      });
+    }
     if (conversationContext?.conversation_id) {
       commands.push({
         name: 'copy',
@@ -467,7 +489,14 @@ const SendBox: React.FC<{
       // kept intact for a future per-platform re-enable.
     }
     return commands;
-  }, [conversationContext?.conversation_id, enableBtw, enableContextCommand, onSlashBuiltinCommand, t]);
+  }, [
+    conversationContext?.conversation_id,
+    enableBtw,
+    enableContextCommand,
+    onOpenTemplateGallery,
+    onSlashBuiltinCommand,
+    t,
+  ]);
 
   // Skills loaded into this conversation are also invokable via slash. We reuse
   // the global skills index (shared SWR key `skills-index`) purely to attach a
@@ -510,6 +539,8 @@ const SendBox: React.FC<{
         }
       } else if (name === 'export') {
         void conversationExport.openExportFlow();
+      } else if (name === 'presentation') {
+        onOpenTemplateGallery?.();
       } else {
         onSlashBuiltinCommand?.(name);
       }
@@ -544,12 +575,38 @@ const SendBox: React.FC<{
     () => filterWorkspaceMentionItems(workspaceMentionItems, deferredAtFileQuery),
     [deferredAtFileQuery, workspaceMentionItems]
   );
-  const isOverlayOpen = isCommandMenuOpen || btwCommand.isOpen || isAtFileMenuOpen;
+  const isOverlayOpen = isCommandMenuOpen || btwCommand.isOpen || isAtFileMenuOpen || Boolean(templateGalleryNode);
 
   const getTextareaElement = useCallback((): HTMLTextAreaElement | null => {
     const textarea = containerRef.current?.querySelector('textarea');
     return textarea instanceof HTMLTextAreaElement ? textarea : null;
   }, []);
+
+  const handleConversationPrefill = useCallback(
+    ({ prompt, requestId }: { prompt: string; requestId: number }) => {
+      const expectedValue = appendPromptToDraft(prefillDraftChainRef.current ?? latestInputRef.current, prompt);
+      prefillDraftChainRef.current = expectedValue;
+      setInputRef.current(expectedValue);
+      setPrefillFocusRequest({ requestId, expectedValue });
+    },
+    [latestInputRef, setInputRef]
+  );
+  useConversationSendBoxPrefill(conversationContext?.conversation_id, handleConversationPrefill);
+
+  useEffect(() => {
+    if (!prefillFocusRequest || input !== prefillFocusRequest.expectedValue) {
+      return;
+    }
+    prefillDraftChainRef.current = null;
+    if (isMobile || focusedPrefillRequestIdRef.current === prefillFocusRequest.requestId) return;
+    const textarea = getTextareaElement();
+    if (!textarea) return;
+    focusedPrefillRequestIdRef.current = prefillFocusRequest.requestId;
+    textarea.focus();
+    const end = textarea.value.length;
+    textarea.setSelectionRange(end, end);
+    setCaretPosition(end);
+  }, [getTextareaElement, input, isMobile, prefillFocusRequest]);
 
   const syncCaretPosition = useCallback(
     (target?: EventTarget | null) => {
@@ -1253,28 +1310,39 @@ const SendBox: React.FC<{
   const isButtonDisabled = disabled || isUploading || (!input.trim() && domSnippets.length === 0);
 
   // Reusable send button component
+  const sendLabel = t('common.send', { defaultValue: 'Send' });
+  const stopLabel = t('conversation.chat.stopGenerating', { defaultValue: 'Stop generating' });
+
   const sendButton = (
-    <Button
-      shape='circle'
-      type='primary'
-      disabled={isButtonDisabled}
-      className='send-button-custom'
-      icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-      onClick={() => {
-        sendMessageHandler();
-      }}
-      data-testid='sendbox-send-btn'
-    />
+    <Tooltip content={sendLabel} mini>
+      <Button
+        shape='circle'
+        type='primary'
+        disabled={isButtonDisabled}
+        className='send-button-custom'
+        aria-label={sendLabel}
+        icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
+        onClick={() => {
+          sendMessageHandler();
+        }}
+        data-testid='sendbox-send-btn'
+      />
+    </Tooltip>
   );
 
   const stopButton = (
-    <Button
-      shape='circle'
-      type='secondary'
-      className='bg-animate sendbox-stop-button'
-      icon={<div className='mx-auto size-12px bg-6'></div>}
-      onClick={stopHandler}
-    ></Button>
+    <Tooltip content={stopLabel} mini>
+      <Button
+        shape='circle'
+        type='secondary'
+        className='bg-animate sendbox-stop-button'
+        aria-label={stopLabel}
+        // The glyph is a bare square div, so the button has no text to fall back on.
+        icon={<div className='mx-auto size-12px bg-6'></div>}
+        onClick={stopHandler}
+        data-testid='sendbox-stop-btn'
+      ></Button>
+    </Tooltip>
   );
 
   const renderActionButtons = () => {
@@ -1364,7 +1432,11 @@ const SendBox: React.FC<{
     <div className={className}>
       <div
         ref={containerRef}
-        className={`sendbox-panel relative p-16px border-3 b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
+        // No border-colour utility here on purpose: the inline `borderColor` below is set in
+        // every state (from useInputFocusRing, or the drag highlight), so a class-level colour
+        // never paints. `border-3` used to sit here and read as if the edge were themed by
+        // --bg-3 — it was not, in either theme.
+        className={`sendbox-panel relative p-16px b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
         style={{
           transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
           ...(isFileDragging
@@ -1407,6 +1479,9 @@ const SendBox: React.FC<{
               onSelectItem={insertSelectedAtFile}
             />
           </div>
+        )}
+        {templateGalleryNode != null && (
+          <div className='absolute left-12px right-12px bottom-[calc(100%+8px)] z-70'>{templateGalleryNode}</div>
         )}
         {isCommandMenuOpen && (
           <div className='absolute left-12px right-12px bottom-[calc(100%+8px)] z-70'>

@@ -5,7 +5,7 @@
  */
 
 import { DeleteOne, EditOne, Peoples, Plus, Pushpin, Right } from '@icon-park/react';
-import { Button, Input, Message, Modal, Tooltip } from '@arco-design/web-react';
+import { Button, Input, Message, Modal, Spin, Tooltip } from '@arco-design/web-react';
 import classNames from 'classnames';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,8 @@ import TeamCreateModal from '@renderer/pages/team/components/TeamCreateModal';
 import { ipcBridge } from '@/common';
 import SiderItem from './SiderItem';
 import type { SiderMenuItem } from './SiderItem';
+import { useSiderTeamRunning } from './useSiderTeamRunning';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 const TEAM_PINNED_KEY = 'team-pinned-ids';
 
@@ -40,8 +42,9 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { teams, mutate: refreshTeams, removeTeam } = useTeamList();
+  const { teams, isLoading, mutate: refreshTeams, removeTeam } = useTeamList();
   const teamBadgeCounts = useSiderTeamBadges(teams);
+  const isTeamRunning = useSiderTeamRunning(teams);
   const { mutate: globalMutate } = useSWRConfig();
 
   const [createTeamVisible, setCreateTeamVisible] = useState(false);
@@ -113,24 +116,41 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
           <div className='shrink-0 flex flex-col gap-2px'>
             {sortedTeams.map((team) => {
               const isActive = pathname.startsWith(`/team/${team.id}`);
+              const isRunning = isTeamRunning(team.id);
               return (
                 <Tooltip key={team.id} {...siderTooltipProps} content={team.name} position='right'>
                   <div
                     data-testid={`collapsed-team-item-${team.id}`}
                     className={classNames(
-                      'relative w-full h-40px flex items-center justify-center cursor-pointer transition-colors rd-8px',
+                      // 34px matches every other row in the collapsed rail (nav entries,
+                      // new-chat, conversation rows); this was 40px and broke the pitch.
+                      ROW_FOCUS_RING,
+                      'relative w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px',
                       isActive ? '!bg-active' : 'hover:bg-fill-3 active:bg-fill-4'
                     )}
                     onClick={() => handleTeamClick(team.id)}
+                    role='button'
+                    tabIndex={0}
+                    aria-label={team.name}
+                    onKeyDown={activateOnEnterOrSpace(() => handleTeamClick(team.id))}
                   >
-                    <Peoples
-                      data-testid={`collapsed-team-icon-${team.id}`}
-                      data-icon-fill={iconColors.primary}
-                      theme='outline'
-                      size='16'
-                      fill={iconColors.primary}
-                      style={{ lineHeight: 0 }}
-                    />
+                    {isRunning ? (
+                      <span
+                        data-testid={`collapsed-team-spinner-${team.id}`}
+                        className='flex items-center justify-center'
+                      >
+                        <Spin size={16} />
+                      </span>
+                    ) : (
+                      <Peoples
+                        data-testid={`collapsed-team-icon-${team.id}`}
+                        data-icon-fill={iconColors.primary}
+                        theme='outline'
+                        size='16'
+                        fill={iconColors.primary}
+                        style={{ lineHeight: 0 }}
+                      />
+                    )}
                     {(teamBadgeCounts.get(team.id) ?? 0) > 0 && (
                       <span
                         className='absolute top-4px right-4px w-18px h-18px rounded-full text-10px font-bold flex items-center justify-center leading-none bg-danger-6 text-white'
@@ -187,6 +207,18 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
               />
             </Tooltip>
           </div>
+          {/* Expanding used to render a header over a blank gap: an empty list looked
+              identical whether the fetch was still in flight or there genuinely are no
+              teams. Both rows are h-34px so the rail keeps its pitch either way. */}
+          {expanded && sortedTeams.length === 0 && (
+            <div className='h-34px flex items-center pl-10px' data-testid='team-sider-placeholder'>
+              {isLoading ? (
+                <Spin size={16} />
+              ) : (
+                <span className='text-13px text-t-secondary'>{t('team.sider.empty')}</span>
+              )}
+            </div>
+          )}
           {expanded &&
             sortedTeams.length > 0 &&
             sortedTeams.map((team) => {
@@ -210,13 +242,28 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
                 },
               ];
               const teamBadge = teamBadgeCounts.get(team.id) ?? 0;
+              const isRunning = isTeamRunning(team.id);
               return (
                 <div key={team.id} className='relative group'>
                   <SiderItem
-                    icon={<Peoples theme='outline' size='16' fill='currentColor' style={{ lineHeight: 0 }} />}
+                    icon={
+                      isRunning ? (
+                        <span data-testid={`team-spinner-${team.id}`} className='flex items-center justify-center'>
+                          <Spin size={16} />
+                        </span>
+                      ) : (
+                        <Peoples
+                          data-testid={`team-icon-${team.id}`}
+                          theme='outline'
+                          size='16'
+                          fill='currentColor'
+                          style={{ lineHeight: 0 }}
+                        />
+                      )
+                    }
                     name={team.name}
                     selected={pathname.startsWith(`/team/${team.id}`)}
-                    pinned={isPinned}
+                    pinned={isPinned && !isRunning}
                     menuItems={menuItems}
                     onMenuAction={(key) => {
                       if (key === 'pin') {
@@ -231,7 +278,7 @@ const TeamSiderSection: React.FC<TeamSiderSectionProps> = ({
                           content: t('team.sider.deleteConfirmContent'),
                           okText: t('team.sider.deleteOk'),
                           cancelText: t('team.sider.deleteCancel'),
-                          okButtonProps: { status: 'warning' },
+                          okButtonProps: { status: 'danger' },
                           onOk: async () => {
                             const teamIdToDelete = team.id;
                             await removeTeam(teamIdToDelete);

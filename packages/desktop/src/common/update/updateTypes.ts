@@ -6,9 +6,9 @@
 
 export interface GitHubReleaseAsset {
   name: string;
-  /** Primary download URL — rewritten to CDN for faster download. */
+  /** Primary download URL under the configured product-owned update base. */
   url: string;
-  /** Original GitHub download URL — used as fallback when CDN fails. */
+  /** Optional product-owned fallback URL under the same configured base. */
   fallbackUrl?: string;
   size: number;
   contentType?: string;
@@ -35,9 +35,12 @@ export interface UpdateCheckResult {
 
 export interface UpdateCheckRequest {
   includePrerelease?: boolean;
-  /** Defaults to iOfficeAI/AionUi when omitted */
+  /** Legacy caller field retained for bridge compatibility; no public repository fallback is used. */
   repo?: string;
 }
+
+export const UPDATE_BRIDGE_DISABLED_CODE = 'updates-disabled' as const;
+export type UpdateBridgeErrorCode = typeof UPDATE_BRIDGE_DISABLED_CODE;
 
 export interface UpdateDownloadRequest {
   /** Optional caller-provided id so renderer can match progress events immediately. */

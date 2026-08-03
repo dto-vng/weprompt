@@ -1672,14 +1672,11 @@ test.describe('Conversation Full Cycle', () => {
 
     await firstSkillItem.click();
 
-    // Should navigate to capabilities page with skills tab
-    await page
-      .waitForFunction(() => window.location.hash.includes('/settings/capabilities'), { timeout: 10_000 })
-      .catch(() => {});
+    // Should navigate to the live Skills settings page.
+    await page.waitForFunction(() => window.location.hash.startsWith('#/settings/skills'), { timeout: 10_000 });
 
     const url = page.url();
-    expect(url).toContain('/settings/capabilities');
-    expect(url).toContain('tab=skills');
+    expect(url).toContain('/settings/skills');
     // Note: highlight= param is consumed by SkillsHubSettings and then cleared
     // from the URL, so we verify the skill name is visible on the page instead.
 
@@ -1691,7 +1688,7 @@ test.describe('Conversation Full Cycle', () => {
           const text = await page.locator('body').textContent();
           return text?.includes(trimmedName) ?? false;
         },
-        { timeout: 15_000, message: `Waiting for skill "${trimmedName}" to appear on capabilities page` }
+        { timeout: 15_000, message: `Waiting for skill "${trimmedName}" to appear on Skills settings page` }
       )
       .toBeTruthy();
 

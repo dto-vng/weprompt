@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#0d0f12"/>
+  <text x="28" y="46" font-family="monospace" font-size="8" letter-spacing="2" fill="#34d399">ARCHITECTURE</text>
+  <text x="28" y="90" font-family="Helvetica, Arial, sans-serif" font-size="32" font-weight="700" fill="#e8eaed">Ship the pipeline</text>
+  <rect x="28" y="108" width="264" height="58" rx="4" fill="#16191e" stroke="#262b33" stroke-width="1"/>
+  <text x="40" y="130" font-family="monospace" font-size="10" fill="#8a8f98">$ deploy --stage prod</text>
+  <text x="40" y="148" font-family="monospace" font-size="10" fill="#34d399">✓ 214 services healthy</text>
+  <text x="292" y="188" font-family="monospace" font-size="8" fill="#8a8f98" text-anchor="end">04 / 11</text>
+</svg>

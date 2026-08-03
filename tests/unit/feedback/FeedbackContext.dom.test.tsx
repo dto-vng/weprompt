@@ -2,24 +2,17 @@
  * @license
  * Copyright 2025 AionUi (aionui.com)
  * SPDX-License-Identifier: Apache-2.0
- *
- * White-box tests for FeedbackProvider / useFeedback: verifies the provider
- * owns a single modal, screenshots are captured via the electronAPI shim,
- * and the modal receives module + screenshots props.
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
-  Trans: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
 }));
 
-// Capture props the provider passes to the modal so we can assert prefill wiring
-// without pulling the whole Upload/Sentry stack into the DOM.
 const modalSpy = vi.fn();
 vi.mock('@/renderer/components/settings/SettingsModal/contents/FeedbackReportModal', () => ({
   __esModule: true,
@@ -28,20 +21,13 @@ vi.mock('@/renderer/components/settings/SettingsModal/contents/FeedbackReportMod
     onCancel: () => void;
     defaultModule?: string;
     prefilledScreenshots?: Array<{ filename: string; data: Uint8Array; type: string }>;
-    feedbackTags?: Record<string, string>;
-    feedbackExtra?: Record<string, unknown>;
-    feedbackDiagnosticsContext?: {
-      explicitContext?: Record<string, string>;
-      explicitProfiles?: string[];
-      routeAtOpen?: string;
-    };
   }) => {
     modalSpy(props);
     if (!props.visible) return null;
     return (
       <div data-testid='modal-stub'>
-        <div data-testid='modal-module'>{props.defaultModule ?? 'none'}</div>
-        <div data-testid='modal-screenshots'>{props.prefilledScreenshots?.length ?? 0}</div>
+        <span>{props.defaultModule ?? 'none'}</span>
+        <span>{props.prefilledScreenshots?.length ?? 0}</span>
         <button type='button' onClick={props.onCancel}>
           close
         </button>
@@ -54,219 +40,121 @@ import { FeedbackProvider, useFeedback } from '@/renderer/hooks/context/Feedback
 
 type CaptureFn = () => Promise<{ filename: string; data: number[] } | null>;
 
-function setElectronAPI(capture: CaptureFn | undefined) {
-  (window as unknown as { electronAPI?: { captureFeedbackScreenshot?: CaptureFn } }).electronAPI =
-    capture === undefined ? undefined : { captureFeedbackScreenshot: capture };
+function setElectronAPI(options?: { capture?: CaptureFn; exportAvailable?: boolean }): void {
+  (window as unknown as { electronAPI?: Record<string, unknown> }).electronAPI = options?.exportAvailable
+    ? {
+        captureFeedbackScreenshot: options.capture,
+        exportLocalFeedbackDiagnostics: vi.fn(),
+      }
+    : undefined;
 }
 
-const Trigger: React.FC<{
-  module?: string;
-  autoScreenshot?: boolean;
-  diagnosticsContext?: Record<string, string>;
-  diagnosticsProfiles?: string[];
-  tags?: Record<string, string>;
-  extra?: Record<string, unknown>;
-}> = ({ module, autoScreenshot, diagnosticsContext, diagnosticsProfiles, tags, extra }) => {
-  const { openFeedback } = useFeedback();
+const Trigger: React.FC<{ autoScreenshot?: boolean; module?: string }> = ({ autoScreenshot, module }) => {
+  const { isFeedbackAvailable, openFeedback } = useFeedback();
   return (
     <button
       type='button'
-      onClick={() => {
-        openFeedback({ module, autoScreenshot, diagnosticsContext, diagnosticsProfiles, tags, extra });
-      }}
+      data-available={String(isFeedbackAvailable)}
+      onClick={() => void openFeedback({ autoScreenshot, module })}
     >
       open
     </button>
   );
 };
 
-const renderWithProvider = (ui: React.ReactElement) => render(<FeedbackProvider>{ui}</FeedbackProvider>);
-
 describe('FeedbackProvider / useFeedback', () => {
   beforeEach(() => {
     modalSpy.mockClear();
-    setElectronAPI(undefined);
-    window.location.hash = '';
+    setElectronAPI();
   });
 
-  afterEach(() => {
-    cleanup();
+  afterEach(() => cleanup());
+
+  it('hides the unsupported feedback modal in WebUI/browser mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <FeedbackProvider>
+        <Trigger module='mcp-tools' />
+      </FeedbackProvider>
+    );
+
+    expect(document.querySelector('button')?.dataset.available).toBe('false');
+    expect(modalSpy).not.toHaveBeenCalled();
+    await user.click(document.querySelector('button')!);
+    expect(modalSpy).not.toHaveBeenCalled();
   });
 
-  it('mounts the modal hidden by default', () => {
-    renderWithProvider(<Trigger />);
-    // First render: modalSpy called with visible=false
+  it('mounts one hidden modal when local Electron export is available', () => {
+    setElectronAPI({ exportAvailable: true });
+    render(
+      <FeedbackProvider>
+        <Trigger />
+      </FeedbackProvider>
+    );
+
     expect(modalSpy).toHaveBeenCalled();
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.visible).toBe(false);
+    expect(modalSpy.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ visible: false }));
   });
 
-  it('opens the modal and forwards the module prop', async () => {
+  it('opens the modal and forwards the selected module', async () => {
+    setElectronAPI({ exportAvailable: true });
     const user = userEvent.setup();
-    renderWithProvider(<Trigger module='mcp-tools' autoScreenshot={false} />);
-
-    await user.click(document.querySelector('button')!);
-
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.visible).toBe(true);
-    expect(lastCall.defaultModule).toBe('mcp-tools');
-    expect(lastCall.prefilledScreenshots).toBeUndefined();
-  });
-
-  it('forwards feedback tags and extra context to the modal', async () => {
-    const user = userEvent.setup();
-    renderWithProvider(
-      <Trigger
-        module='conversation-session'
-        autoScreenshot={false}
-        tags={{
-          agent_error_code: 'USER_AGENT_ACP_INIT_FAILED',
-          agent_error_ownership: 'user_agent',
-        }}
-        extra={{
-          agent_error: {
-            code: 'USER_AGENT_ACP_INIT_FAILED',
-            ownership: 'user_agent',
-          },
-        }}
-      />
+    render(
+      <FeedbackProvider>
+        <Trigger module='mcp-tools' />
+      </FeedbackProvider>
     );
 
     await user.click(document.querySelector('button')!);
-
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.visible).toBe(true);
-    expect(lastCall.feedbackTags).toEqual({
-      agent_error_code: 'USER_AGENT_ACP_INIT_FAILED',
-      agent_error_ownership: 'user_agent',
-    });
-    expect(lastCall.feedbackExtra).toEqual({
-      agent_error: {
-        code: 'USER_AGENT_ACP_INIT_FAILED',
-        ownership: 'user_agent',
-      },
-    });
+    expect(modalSpy.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ defaultModule: 'mcp-tools', visible: true })
+    );
   });
 
-  it('captures route and explicit diagnostics context when opening feedback', async () => {
-    window.location.hash = '#/conversation/conv-1';
+  it('captures a screenshot only through the authorized Electron bridge', async () => {
+    const capture = vi.fn().mockResolvedValue({ filename: 'shot.png', data: [1, 2, 3, 4] });
+    setElectronAPI({ capture, exportAvailable: true });
     const user = userEvent.setup();
-    renderWithProvider(
-      <Trigger
-        module='system-settings'
-        autoScreenshot={false}
-        diagnosticsContext={{ conversationId: 'conv-1' }}
-        diagnosticsProfiles={['conversation-session']}
-      />
+    render(
+      <FeedbackProvider>
+        <Trigger autoScreenshot module='agent-detection' />
+      </FeedbackProvider>
     );
 
     await user.click(document.querySelector('button')!);
-
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.visible).toBe(true);
-    expect(lastCall.feedbackDiagnosticsContext).toEqual({
-      explicitContext: { conversationId: 'conv-1' },
-      explicitProfiles: ['conversation-session'],
-      routeAtOpen: '#/conversation/conv-1',
+    await waitFor(() => {
+      expect(modalSpy.mock.calls.at(-1)?.[0]).toEqual(
+        expect.objectContaining({
+          prefilledScreenshots: [expect.objectContaining({ filename: 'shot.png' })],
+          visible: true,
+        })
+      );
     });
+    expect(capture).toHaveBeenCalledOnce();
   });
 
-  it('captures a screenshot via electronAPI when autoScreenshot=true', async () => {
-    const capture = vi.fn(() =>
-      Promise.resolve({
-        filename: 'shot.png',
-        data: [1, 2, 3, 4],
-      })
+  it('clears screenshots when the modal is cancelled', async () => {
+    const capture = vi.fn().mockResolvedValue({ filename: 'shot.png', data: [1, 2, 3, 4] });
+    setElectronAPI({ capture, exportAvailable: true });
+    const user = userEvent.setup();
+    const view = render(
+      <FeedbackProvider>
+        <Trigger autoScreenshot />
+      </FeedbackProvider>
     );
-    setElectronAPI(capture);
-
-    const user = userEvent.setup();
-    renderWithProvider(<Trigger module='agent-detection' autoScreenshot={true} />);
-
     await user.click(document.querySelector('button')!);
+    await view.findByTestId('modal-stub');
+    await user.click(view.getByText('close'));
 
-    await waitFor(() => {
-      const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-      expect(lastCall.visible).toBe(true);
-      expect(lastCall.prefilledScreenshots).toHaveLength(1);
-    });
-
-    expect(capture).toHaveBeenCalledTimes(1);
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.defaultModule).toBe('agent-detection');
-    expect(lastCall.prefilledScreenshots[0].filename).toBe('shot.png');
-    expect(lastCall.prefilledScreenshots[0].type).toBe('image/png');
-    expect(Array.from(lastCall.prefilledScreenshots[0].data)).toEqual([1, 2, 3, 4]);
-  });
-
-  it('opens the modal without screenshots when the electronAPI shim is missing', async () => {
-    const user = userEvent.setup();
-    renderWithProvider(<Trigger module='system-settings' autoScreenshot={true} />);
-
-    await user.click(document.querySelector('button')!);
-
-    await waitFor(() => {
-      const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-      expect(lastCall.visible).toBe(true);
-    });
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.prefilledScreenshots).toBeUndefined();
-  });
-
-  it('opens the modal with no screenshot when capture throws', async () => {
-    const capture = vi.fn(() => Promise.reject(new Error('denied')));
-    setElectronAPI(capture);
-
-    const user = userEvent.setup();
-    renderWithProvider(<Trigger module='conversation-session' autoScreenshot={true} />);
-
-    await user.click(document.querySelector('button')!);
-
-    await waitFor(() => {
-      const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-      expect(lastCall.visible).toBe(true);
-    });
-    expect(capture).toHaveBeenCalledTimes(1);
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.prefilledScreenshots).toBeUndefined();
-  });
-
-  it('clears screenshots and hides the modal on cancel', async () => {
-    const capture = vi.fn(() =>
-      Promise.resolve({
-        filename: 'shot.png',
-        data: [9, 9, 9],
-      })
+    expect(modalSpy.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ prefilledScreenshots: undefined, visible: false })
     );
-    setElectronAPI(capture);
-
-    const user = userEvent.setup();
-    const { getByText } = renderWithProvider(<Trigger module='mcp-tools' autoScreenshot={true} />);
-
-    await user.click(document.querySelector('button')!);
-
-    await waitFor(() => {
-      const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-      expect(lastCall.visible).toBe(true);
-    });
-
-    await user.click(getByText('close'));
-
-    const lastCall = modalSpy.mock.calls.at(-1)?.[0];
-    expect(lastCall.visible).toBe(false);
-    expect(lastCall.prefilledScreenshots).toBeUndefined();
-    expect(lastCall.feedbackTags).toBeUndefined();
-    expect(lastCall.feedbackExtra).toBeUndefined();
   });
 
-  it('returns a no-op openFeedback when used outside a provider', async () => {
-    // Render <Trigger /> without wrapping FeedbackProvider so the hook hits
-    // its fallback branch. The click must resolve without throwing.
+  it('returns an unavailable no-op outside the provider', async () => {
     const user = userEvent.setup();
-    render(<Trigger module='mcp-tools' autoScreenshot={true} />);
-
-    await user.click(document.querySelector('button')!);
-    // No modal rendered, no crash.
-    expect(document.querySelector('[data-testid="modal-stub"]')).toBeNull();
+    render(<Trigger />);
+    expect(document.querySelector('button')?.dataset.available).toBe('false');
+    await expect(user.click(document.querySelector('button')!)).resolves.toBeUndefined();
   });
 });

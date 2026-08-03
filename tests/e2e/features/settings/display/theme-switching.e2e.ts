@@ -10,7 +10,7 @@ import { goToSettings } from '../../../helpers/navigation';
 
 test.describe('Theme Switching', () => {
   test.beforeEach(async ({ page }) => {
-    await goToSettings(page, 'display');
+    await goToSettings(page, 'appearance');
   });
 
   test('switches from current theme to the other and back', async ({ page }) => {

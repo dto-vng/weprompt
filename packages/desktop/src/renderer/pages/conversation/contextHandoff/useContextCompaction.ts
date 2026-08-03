@@ -1,5 +1,9 @@
 import { ipcBridge } from '@/common';
-import type { IConversationTurnCompletedEvent, TContextCompactionTrigger } from '@/common/adapter/ipcBridge';
+import type {
+  IConversationTurnCompletedEvent,
+  IResponseMessage,
+  TContextCompactionTrigger,
+} from '@/common/adapter/ipcBridge';
 import type { TMessage } from '@/common/chat/chatLib';
 import type {
   TChatConversation,
@@ -34,6 +38,7 @@ export type CompactConversationContextInput = {
   trigger: TContextCompactionTrigger;
   targetTurnId?: string;
   budgetStatus?: TContextBudgetStatus;
+  turnsSinceCompaction?: number;
   operationId?: string;
   signal?: AbortSignal;
 };
@@ -159,6 +164,10 @@ export const compactConversationContext = async (
   if (!isAionrsConversation(conversation)) throw new ContextCompactionOperationError('unsupported_conversation');
 
   const contextState = getConversationContextHandoffExtra(conversation);
+  const durableTurnsSinceCompaction =
+    input.trigger === 'auto' && input.turnsSinceCompaction !== undefined
+      ? Math.max(contextState.turns_since_compaction ?? 0, input.turnsSinceCompaction)
+      : contextState.turns_since_compaction;
   const pinnedContext = getConversationPinnedContext(conversation);
   const { fileName, filePath } = resolveContextFile(input.workspace);
   const [messages, currentMarkdown] = await Promise.all([
@@ -171,7 +180,7 @@ export const compactConversationContext = async (
   const updating = buildContextSnapshotStatePatch(conversation, {
     source: contextState.source,
     status: 'updating',
-    turnsSinceCompaction: contextState.turns_since_compaction,
+    turnsSinceCompaction: durableTurnsSinceCompaction,
     updatedAt: now,
     lastErrorCode: null,
     didPersistFileUpdate: false,
@@ -239,7 +248,7 @@ export const compactConversationContext = async (
     const failed = buildContextSnapshotStatePatch(conversation, {
       source,
       status: 'failed',
-      turnsSinceCompaction: contextState.turns_since_compaction,
+      turnsSinceCompaction: durableTurnsSinceCompaction,
       updatedAt: dependencies.now(),
       lastErrorCode: 'file_write_failed',
       didPersistFileUpdate: false,
@@ -459,19 +468,60 @@ export const handoffConversationContext = async (
   return { conversation: created, markdown };
 };
 
-const readCompletedTurnText = (event: IConversationTurnCompletedEvent): string => {
-  const content = event.last_message.content;
+type ContextTurnStreamEvidence = {
+  hasMeaningfulAssistantText: boolean;
+  terminal: 'finish' | 'error' | null;
+};
+
+const readMessageContentText = (content: unknown): string => {
   if (typeof content === 'string') return content.trim();
   if (!content || typeof content !== 'object' || Array.isArray(content)) return '';
   if ('content' in content && typeof content.content === 'string') return content.content.trim();
   return '';
 };
 
-export const isMeaningfulContextTurn = (event: IConversationTurnCompletedEvent): boolean => {
+const readCompletedTurnText = (event: IConversationTurnCompletedEvent): string =>
+  readMessageContentText(event.last_message?.content);
+
+const updateContextTurnStreamEvidence = (
+  current: ContextTurnStreamEvidence | undefined,
+  message: IResponseMessage
+): ContextTurnStreamEvidence => {
+  const next: ContextTurnStreamEvidence = current ?? {
+    hasMeaningfulAssistantText: false,
+    terminal: null,
+  };
+  if (message.type === 'error' || message.status === 'error') {
+    return { ...next, terminal: 'error' };
+  }
+  if (
+    (message.type === 'text' || message.type === 'content') &&
+    (message.position === undefined || message.position === 'left') &&
+    message.hidden !== true &&
+    readMessageContentText(message.data).length > 0
+  ) {
+    next.hasMeaningfulAssistantText = true;
+  }
+  if (message.type === 'finish' && next.terminal !== 'error') {
+    next.terminal = 'finish';
+  }
+  return next;
+};
+
+export const isMeaningfulContextTurn = (
+  event: IConversationTurnCompletedEvent,
+  streamEvidence?: {
+    hasMeaningfulAssistantText: boolean;
+    terminal: 'finish' | 'error' | null;
+  }
+): boolean => {
   if (event.status !== 'finished' || event.state !== 'ai_waiting_input') return false;
-  if (event.last_message.type && event.last_message.type !== 'text') return false;
-  if (!event.last_message.type) return true;
-  return readCompletedTurnText(event).length > 0;
+  if (streamEvidence?.terminal === 'error') return false;
+  if (event.last_message) {
+    if (event.last_message.type && event.last_message.type !== 'text') return false;
+    return readCompletedTurnText(event).length > 0;
+  }
+  return streamEvidence?.terminal === 'finish' && streamEvidence.hasMeaningfulAssistantText;
 };
 
 type AutoCompactPolicyInput = {
@@ -489,6 +539,7 @@ const BUDGET_STATUS_RANK: Record<TContextBudgetStatus, number> = {
 };
 
 const AUTO_COMPACTION_TURN_THRESHOLD = 8;
+const TURN_COUNTER_WRITE_RETRY_LIMIT = 1;
 
 export const shouldAutoCompactContext = (input: AutoCompactPolicyInput): boolean => {
   if (input.turnsSinceCompaction >= AUTO_COMPACTION_TURN_THRESHOLD) return true;
@@ -519,8 +570,19 @@ type HookCompactionRequest = CompactConversationContextInput & {
   abortController: AbortController;
 };
 
+type ContextTurnBatch = {
+  count: number;
+  latestEvent: IConversationTurnCompletedEvent;
+};
+
+type ContextTurnBatchHandlingResult = {
+  persisted: boolean;
+  error?: unknown;
+};
+
 export type ContextCompactionHookDependencies = {
   subscribeTurnCompleted: (listener: (event: IConversationTurnCompletedEvent) => void) => () => void;
+  subscribeResponseStream?: (listener: (event: IResponseMessage) => void) => () => void;
   getConversation: (conversationId: string) => Promise<TChatConversation | null>;
   updateConversation: (input: ConversationUpdateInput) => Promise<boolean>;
   runCompaction: (input: CompactConversationContextInput) => Promise<CompactConversationContextResult>;
@@ -530,6 +592,7 @@ export type ContextCompactionHookDependencies = {
 
 const defaultHookDependencies: ContextCompactionHookDependencies = {
   subscribeTurnCompleted: (listener) => ipcBridge.conversation.turnCompleted.on(listener),
+  subscribeResponseStream: (listener) => ipcBridge.conversation.responseStream.on(listener),
   getConversation: getConversationOrNull,
   updateConversation: (input) => ipcBridge.conversation.update.invoke(input),
   runCompaction: (input) => compactConversationContext(input),
@@ -548,7 +611,8 @@ export type UseContextCompactionResult = {
   compact: (
     trigger?: TContextCompactionTrigger,
     targetTurnId?: string,
-    budgetStatus?: TContextBudgetStatus
+    budgetStatus?: TContextBudgetStatus,
+    turnsSinceCompaction?: number
   ) => Promise<CompactConversationContextResult | null>;
   isCompacting: boolean;
 };
@@ -562,17 +626,60 @@ export const useContextCompaction = ({
   const [isCompacting, setIsCompacting] = useState(false);
   const inFlightRef = useRef<Promise<CompactConversationContextResult | null> | null>(null);
   const pendingRequestRef = useRef<HookCompactionRequest | null>(null);
-  const pendingTurnRef = useRef<IConversationTurnCompletedEvent | null>(null);
-  const processingTurnRef = useRef(false);
+  const turnStreamEvidenceRef = useRef(new Map<string, ContextTurnStreamEvidence>());
   const inFlightOperationIdRef = useRef<string | null>(null);
   const inFlightAbortControllerRef = useRef<AbortController | null>(null);
   const disposedRef = useRef(false);
+  const serializedOperationActiveRef = useRef(false);
+  const serializedOperationQueueRef = useRef<Array<() => void>>([]);
+
+  const runSerialized = useCallback(<Result>(operation: () => Promise<Result>): Promise<Result> => {
+    return new Promise<Result>((resolve, reject) => {
+      const execute = (): void => {
+        serializedOperationActiveRef.current = true;
+        const finish = (): void => {
+          const next = serializedOperationQueueRef.current.shift();
+          if (next) {
+            next();
+          } else {
+            serializedOperationActiveRef.current = false;
+          }
+        };
+
+        let result: Promise<Result>;
+        try {
+          result = operation();
+        } catch (error) {
+          finish();
+          reject(error);
+          return;
+        }
+        void result.then(
+          (value) => {
+            finish();
+            resolve(value);
+          },
+          (error: unknown) => {
+            finish();
+            reject(error);
+          }
+        );
+      };
+
+      if (serializedOperationActiveRef.current) {
+        serializedOperationQueueRef.current.push(execute);
+      } else {
+        execute();
+      }
+    });
+  }, []);
 
   const compact = useCallback(
     (
       trigger: TContextCompactionTrigger = 'manual',
       targetTurnId?: string,
-      budgetStatus?: TContextBudgetStatus
+      budgetStatus?: TContextBudgetStatus,
+      turnsSinceCompaction?: number
     ): Promise<CompactConversationContextResult | null> => {
       const request: HookCompactionRequest = {
         conversationId,
@@ -580,6 +687,7 @@ export const useContextCompaction = ({
         trigger,
         targetTurnId,
         budgetStatus,
+        turnsSinceCompaction,
         operationId: uuid(),
         abortController: new AbortController(),
       };
@@ -600,7 +708,9 @@ export const useContextCompaction = ({
           try {
             const { abortController, ...compactionInput } = current;
             // eslint-disable-next-line no-await-in-loop -- coalesced compactions must commit in request order
-            result = await dependencies.runCompaction({ ...compactionInput, signal: abortController.signal });
+            result = await runSerialized(() =>
+              dependencies.runCompaction({ ...compactionInput, signal: abortController.signal })
+            );
           } catch (error) {
             firstError ??= error;
           }
@@ -621,7 +731,7 @@ export const useContextCompaction = ({
       inFlightRef.current = promise;
       return promise;
     },
-    [conversationId, dependencies, workspace]
+    [conversationId, dependencies, runSerialized, workspace]
   );
 
   useEffect(() => {
@@ -645,24 +755,34 @@ export const useContextCompaction = ({
 
     let cancelled = false;
     void (async () => {
+      if (cancelled) return;
       const conversation = await dependencies.getConversation(conversationId);
       if (cancelled || inFlightRef.current || !isAionrsConversation(conversation)) return;
 
       const contextState = getConversationContextHandoffExtra(conversation);
       if (contextState.status !== 'updating') return;
 
-      const pending = buildContextSnapshotStatePatch(conversation, {
-        source: contextState.source,
-        status: 'stale',
-        turnsSinceCompaction: contextState.turns_since_compaction,
-        updatedAt: dependencies.now(),
-        lastErrorCode: 'interrupted',
-        didPersistFileUpdate: false,
-      });
-      await dependencies.updateConversation({
-        id: conversation.id,
-        updates: { extra: pending as TChatConversation['extra'] },
-        merge_extra: true,
+      await runSerialized(async () => {
+        if (cancelled || inFlightRef.current) return;
+        const latestConversation = await dependencies.getConversation(conversationId);
+        if (cancelled || inFlightRef.current || !isAionrsConversation(latestConversation)) return;
+
+        const latestContextState = getConversationContextHandoffExtra(latestConversation);
+        if (latestContextState.status !== 'updating') return;
+
+        const pending = buildContextSnapshotStatePatch(latestConversation, {
+          source: latestContextState.source,
+          status: 'stale',
+          turnsSinceCompaction: latestContextState.turns_since_compaction,
+          updatedAt: dependencies.now(),
+          lastErrorCode: 'interrupted',
+          didPersistFileUpdate: false,
+        });
+        await dependencies.updateConversation({
+          id: latestConversation.id,
+          updates: { extra: pending as TChatConversation['extra'] },
+          merge_extra: true,
+        });
       });
     })().catch((error) => {
       console.warn('[ContextHandoff] Interrupted compaction recovery failed:', errorCode(error, 'unknown'));
@@ -671,81 +791,150 @@ export const useContextCompaction = ({
     return () => {
       cancelled = true;
     };
-  }, [conversationId, dependencies, enabled]);
+  }, [conversationId, dependencies, enabled, runSerialized]);
 
   const handleCompletedTurn = useCallback(
-    async (event: IConversationTurnCompletedEvent): Promise<void> => {
-      const conversation = await dependencies.getConversation(conversationId);
-      if (!isAionrsConversation(conversation)) return;
+    async (batch: ContextTurnBatch): Promise<ContextTurnBatchHandlingResult> => {
+      let prepared: {
+        shouldCompact: boolean;
+        turnsSinceCompaction: number;
+        nextBudgetStatus: TContextBudgetStatus;
+      } | null;
+      try {
+        prepared = await runSerialized(async () => {
+          const conversation = await dependencies.getConversation(conversationId);
+          if (!isAionrsConversation(conversation)) return null;
 
-      const contextState = getConversationContextHandoffExtra(conversation);
-      const turnsSinceCompaction = (contextState.turns_since_compaction ?? 0) + 1;
-      const previousBudgetStatus = contextState.last_budget_status ?? 'healthy';
-      const nextBudgetStatus = runtimeBudgetStatus(conversation, previousBudgetStatus);
-      const hasContext = Boolean(contextState.snapshot || contextState.context_file_path);
-
-      if (
-        shouldAutoCompactContext({
-          hasContext,
-          turnsSinceCompaction,
-          previousBudgetStatus,
-          nextBudgetStatus,
-        })
-      ) {
-        await compact('auto', event.turn_id, nextBudgetStatus);
-        return;
+          const contextState = getConversationContextHandoffExtra(conversation);
+          const turnsSinceCompaction = (contextState.turns_since_compaction ?? 0) + batch.count;
+          const previousBudgetStatus = contextState.last_budget_status ?? 'healthy';
+          const nextBudgetStatus = runtimeBudgetStatus(conversation, previousBudgetStatus);
+          const hasContext = Boolean(contextState.snapshot || contextState.context_file_path);
+          const shouldCompact = shouldAutoCompactContext({
+            hasContext,
+            turnsSinceCompaction,
+            previousBudgetStatus,
+            nextBudgetStatus,
+          });
+          const stale = buildContextSnapshotStatePatch(
+            conversation,
+            {
+              source: contextState.source,
+              status: 'stale',
+              turnsSinceCompaction,
+              updatedAt: dependencies.now(),
+              lastErrorCode: null,
+              didPersistFileUpdate: false,
+            },
+            { last_budget_status: nextBudgetStatus }
+          );
+          const countPersisted = await dependencies.updateConversation({
+            id: conversation.id,
+            updates: { extra: stale as TChatConversation['extra'] },
+            merge_extra: true,
+          });
+          if (!countPersisted) throw new ContextCompactionOperationError('metadata_write_failed');
+          return { shouldCompact, turnsSinceCompaction, nextBudgetStatus };
+        });
+      } catch (error) {
+        return { persisted: false, error };
       }
 
-      const stale = buildContextSnapshotStatePatch(
-        conversation,
-        {
-          source: contextState.source,
-          status: 'stale',
-          turnsSinceCompaction,
-          updatedAt: dependencies.now(),
-          lastErrorCode: null,
-          didPersistFileUpdate: false,
-        },
-        { last_budget_status: nextBudgetStatus }
-      );
-      await dependencies.updateConversation({
-        id: conversation.id,
-        updates: { extra: stale as TChatConversation['extra'] },
-        merge_extra: true,
-      });
+      if (!prepared?.shouldCompact || disposedRef.current) return { persisted: true };
+
+      const activeCompaction = inFlightRef.current;
+      if (activeCompaction) {
+        try {
+          await activeCompaction;
+        } catch {
+          // The completed-turn count is already durable; the automatic follow-up still owns this batch.
+        }
+      }
+      if (disposedRef.current) return { persisted: true };
+
+      try {
+        await compact('auto', batch.latestEvent.turn_id, prepared.nextBudgetStatus, prepared.turnsSinceCompaction);
+        return { persisted: true };
+      } catch (error) {
+        return { persisted: true, error };
+      }
     },
-    [compact, conversationId, dependencies]
+    [compact, conversationId, dependencies, runSerialized]
   );
 
   useEffect(() => {
     if (!enabled || !conversationId) return;
 
-    const processTurn = (event: IConversationTurnCompletedEvent): void => {
-      if (event.session_id !== conversationId || !isMeaningfulContextTurn(event)) return;
-      if (processingTurnRef.current) {
-        pendingTurnRef.current = event;
-        return;
-      }
+    let pendingTurn: ContextTurnBatch | null = null;
+    let processingTurn = false;
+    const unsubscribeResponseStream =
+      dependencies.subscribeResponseStream?.((message) => {
+        if (message.conversation_id !== conversationId || !message.turn_id) return;
+        const current = turnStreamEvidenceRef.current.get(message.turn_id);
+        turnStreamEvidenceRef.current.set(message.turn_id, updateContextTurnStreamEvidence(current, message));
+      }) ?? (() => {});
 
-      processingTurnRef.current = true;
+    const drainPendingTurns = (): void => {
+      processingTurn = true;
+      let failedPersistenceRetries = 0;
       void (async () => {
-        let current: IConversationTurnCompletedEvent | null = event;
-        while (current) {
-          pendingTurnRef.current = null;
+        while (true) {
+          const current = pendingTurn;
+          if (!current) {
+            processingTurn = false;
+            return;
+          }
+          pendingTurn = null;
           try {
-            // eslint-disable-next-line no-await-in-loop -- completed turns must update the shared cursor serially
-            await handleCompletedTurn(current);
+            // eslint-disable-next-line no-await-in-loop -- completed-turn batches must update the shared cursor serially
+            const handling = await handleCompletedTurn(current);
+            if (handling.error) {
+              console.warn('[ContextHandoff] Automatic compaction failed:', errorCode(handling.error, 'unknown'));
+            }
+            if (!handling.persisted) {
+              const newerPending = pendingTurn;
+              pendingTurn = {
+                count: current.count + (newerPending?.count ?? 0),
+                latestEvent: newerPending?.latestEvent ?? current.latestEvent,
+              };
+              if (newerPending) {
+                failedPersistenceRetries = 0;
+                continue;
+              }
+              if (failedPersistenceRetries < TURN_COUNTER_WRITE_RETRY_LIMIT) {
+                failedPersistenceRetries += 1;
+                continue;
+              }
+              processingTurn = false;
+              return;
+            }
+            failedPersistenceRetries = 0;
           } catch (error) {
             console.warn('[ContextHandoff] Automatic compaction failed:', errorCode(error, 'unknown'));
           }
-          current = pendingTurnRef.current;
         }
-      })().finally(() => {
-        processingTurnRef.current = false;
-      });
+      })();
     };
 
-    return dependencies.subscribeTurnCompleted(processTurn);
+    const processTurn = (event: IConversationTurnCompletedEvent): void => {
+      if (event.session_id !== conversationId) return;
+      const streamEvidence = turnStreamEvidenceRef.current.get(event.turn_id);
+      turnStreamEvidenceRef.current.delete(event.turn_id);
+      if (!isMeaningfulContextTurn(event, streamEvidence)) return;
+
+      pendingTurn = {
+        count: (pendingTurn?.count ?? 0) + 1,
+        latestEvent: event,
+      };
+      if (!processingTurn) drainPendingTurns();
+    };
+
+    const unsubscribeTurnCompleted = dependencies.subscribeTurnCompleted(processTurn);
+    return () => {
+      unsubscribeTurnCompleted();
+      unsubscribeResponseStream();
+      turnStreamEvidenceRef.current.clear();
+    };
   }, [conversationId, dependencies, enabled, handleCompletedTurn]);
 
   return { compact, isCompacting };

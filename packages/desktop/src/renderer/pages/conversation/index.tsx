@@ -13,28 +13,23 @@ const ChatConversationIndex: React.FC = () => {
   const { id } = useParams();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { closePreview } = usePreviewContext();
+  const { closePreviewIfWorkspaceChanged } = usePreviewContext();
   const { syncTitleFromHistory } = useAutoTitle();
-  const previousConversationIdRef = useRef<string | undefined>(undefined);
   const notFoundHandledIdRef = useRef<string | undefined>(undefined);
   const defaultConversationTitle = t('conversation.welcome.newConversation');
-
-  useEffect(() => {
-    if (!id) return;
-
-    // 切换会话时自动关闭预览面板，避免跨会话残留
-    // Close preview on every conversation change, including initial mount
-    // (component may remount via React Router, resetting the ref to undefined)
-    if (previousConversationIdRef.current !== id) {
-      closePreview();
-    }
-
-    previousConversationIdRef.current = id;
-  }, [id, closePreview]);
 
   const { data, isLoading, mutate } = useSWR(id ? `conversation/${id}` : null, () => {
     return getConversationOrNull(id!);
   });
+
+  // Close preview only when the workspace changes, not on every conversation
+  // switch. Same-workspace conversations (same project) keep the preview open.
+  // The ref lives in PreviewContext (app-root level) so it survives remounts.
+  useEffect(() => {
+    if (!data) return;
+    const workspace = (data.extra as { workspace?: string } | undefined)?.workspace ?? null;
+    closePreviewIfWorkspaceChanged(workspace);
+  }, [data, closePreviewIfWorkspaceChanged]);
 
   useEffect(() => {
     if (!id) return;
@@ -68,7 +63,11 @@ const ChatConversationIndex: React.FC = () => {
     navigate('/', { replace: true });
   }, [id, isLoading, data, navigate, t]);
 
-  if (isLoading) return <Spin loading></Spin>;
+  // Unwrapped, this painted a small spinner in the top-left of the content area and read as a
+  // broken layout. Deliberately a neutral spinner rather than the message-shaped skeleton: this
+  // phase is fetching the conversation *record*, and it can resolve into not-found → toast →
+  // redirect home (above), so a fake conversation would be shown and then yanked.
+  if (isLoading) return <Spin loading className='flex flex-1 items-center justify-center h-full' />;
   return <ChatConversation conversation={data ?? undefined}></ChatConversation>;
 };
 

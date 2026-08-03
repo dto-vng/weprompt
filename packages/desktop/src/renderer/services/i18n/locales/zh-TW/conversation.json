@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hi，今天有什麼安排？",
-    "placeholder": "發送訊息、上傳檔案、開啟資料夾或建立定時任務...",
+    "placeholder": "發送訊息、上傳檔案、開啟資料夾、建立定時任務，或輸入 / 喚起命令...",
     "linkFolder": "開啟資料夾",
     "newConversation": "新會話",
     "selectModel": "選擇模型",
@@ -17,7 +17,6 @@
     "quickActionStar": "喜歡我們？點個星吧",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "按需搜尋並啟用社區 Skills，一次設定，所有Agent通用。",
-    "skillsMarketDetails": "詳情 >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -43,6 +42,7 @@
     "scopedHint": "— 僅限此專案",
     "chats": "聊天",
     "showAll": "顯示全部",
+    "showLess": "收起",
     "emptyChatsTitle": "尚無聊天",
     "emptyChatsBody": "在上方發起一個聊天，即可開始處理這個專案。",
     "instructions": "指示",
@@ -53,6 +53,7 @@
     "save": "儲存",
     "cancel": "取消",
     "instructionsSaved": "指示已儲存",
+    "instructionsSaveFailed": "指示儲存失敗",
     "files": "檔案",
     "revealInFolder": "在資料夾中顯示",
     "filesReadonly": "唯讀 · 請在資料夾中管理",
@@ -71,23 +72,47 @@
     "remove": "移除",
     "knowledge": "知識庫",
     "knowledgeAdd": "新增檔案",
+    "knowledgeDropFolderMissing": "請先重新連結 Knowledge Base 資料夾，再新增檔案。",
+    "knowledgeDropUnsupported": "這些檔案均不支援。支援的格式：.md、.txt、.docx、.xlsx、.pdf",
+    "knowledgeRefreshFailed": "無法重新整理知識庫。",
+    "knowledgeRelinkFailed": "無法重新連結專案資料夾。",
+    "knowledgeRetryFailed": "無法將該檔案加入索引佇列。",
+    "knowledgeDeleteFailed": "無法將該檔案移到垃圾桶。",
+    "knowledgeAddFailed": "無法將這些檔案加入知識庫。",
     "knowledgeEmpty": "新增檔案以建立此專案的知識庫。助手會在這個專案的每個聊天中自動檢索這些內容。",
-    "knowledgeSummary": "{{files}} 個檔案 · {{passages}} 個片段",
-    "knowledgeSemanticOn": "語意搜尋已開啟",
     "knowledgeSemanticOff": "語意搜尋已關閉 — 未設定嵌入模型",
-    "knowledgePassages": "{{count}} 個片段",
+    "knowledgeSemanticOffAction": "新增嵌入模型",
+    "knowledgeEmbedAll": "全部向量化",
+    "knowledgePassagesTooltip": "此檔案已切分為可檢索的片段，助理回答時會取用其中最相關的部分。",
     "knowledgeStatusIndexing": "建立索引中……",
     "knowledgeProgressReading": "正在讀取第 {{done}}/{{total}} 頁",
-    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}} 個片段",
+    "knowledgeProgressTranscribing": "正在轉寫第 {{done}}/{{total}} 頁",
+    "knowledgeProgressEmbedding": "正在向量化 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "失敗",
     "knowledgeStatusUnsupported": "不支援",
+    "knowledgeStatusNotEmbedded": "僅關鍵字",
+    "knowledgeNotEmbeddedDetail": "可依關鍵字檢索，但僅 {{done}}/{{total}} 個片段已向量化。重試即可向量化其餘片段。",
     "knowledgeRetry": "重試",
-    "knowledgeRemove": "移除",
-    "knowledgeRemoveConfirm": "要將此檔案從知識庫中移除嗎？",
     "knowledgeError": "知識庫目前無法使用。",
-    "knowledgeSupportedTypes": "支援格式：.md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "支援格式：.md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "重新整理",
+    "knowledgeOpenOriginal": "開啟原始檔案",
+    "knowledgeDeleteFile": "刪除檔案",
+    "knowledgeDeleteConfirm": "將「{{fileName}}」移到垃圾桶？同時會從知識庫中移除。",
+    "knowledgeFolderHint": "檔案存放在專案資料夾內的「Knowledge Base」資料夾中。放進去的內容會自動建立索引。",
+    "knowledgeFolderMissingTitle": "找不到 Knowledge Base 資料夾",
+    "knowledgeFolderMissingBody": "它可能已被移動、重新命名或刪除。已建立索引的知識仍然保留——還原該資料夾或重新連結專案，然後重新整理。",
+    "knowledgePreviewNote": "這是助理檢索所用的索引文字，不是原始版面。",
+    "knowledgePreviewTruncated": "預覽已截斷。要看完整文件請開啟原始檔案。",
+    "knowledgePreviewError": "無法載入此檔案的索引文字。",
+    "knowledgePreviewNotReady": "尚無可開啟的索引文字。",
+    "knowledgeCitationMissing": "該檔案已不在知識庫中。",
+    "knowledgeOcrTag": "已轉寫（OCR）",
+    "knowledgeOcrDetail": "由 {{model}} 從掃描件轉寫。已略過的頁：{{pages}}",
+    "knowledgeOcrNoSkippedPages": "無"
   },
   "history": {
+    "moreActions": "更多操作",
     "recents": "最近",
     "today": "今天",
     "yesterday": "昨天",
@@ -102,6 +127,7 @@
     "saveName": "儲存",
     "cancelEdit": "取消",
     "rename": "重新命名",
+    "createCronTask": "建立排程任務",
     "renameTitle": "重新命名對話",
     "renamePlaceholder": "請輸入新名稱",
     "renameSuccess": "重新命名成功",
@@ -140,7 +166,10 @@
     "removeProject": "移除專案",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "在此專案中新建對話",
+    "expandProjectChats": "展開專案聊天",
+    "collapseProjectChats": "收合專案聊天",
     "deleting": "刪除中...",
+    "reorderPinned": "拖動以調整置頂會話順序",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -160,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "無法移除專案。請重新開啟專案後再試；資料夾中的檔案未被刪除。",
+    "removeProjectChatDetachFailed": "部分聊天無法與此專案解除關聯。專案已保留；請重試移除。",
+    "removeProjectStateChanged": "專案清單在移除前已變更。請重新整理後再試。",
+    "removeProjectStorageFailed": "無法儲存專案變更。請確認 WePrompt 可以存取其應用程式資料，然後重試。",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -181,7 +213,6 @@
   "noAgentsAvailable": "沒有可用的 Agent",
   "noModelConfigured": "未設定模型，請前往設定頁面設定。",
   "createFailed": "建立對話失敗",
-  "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "所選工作區路徑不可用。請確認工作區路徑「{{workspacePath}}」確實存在且可存取。"
@@ -521,6 +552,7 @@
     "noModelSelected": "當前會話未選擇模型，無法發送訊息",
     "sendMessageTo": "發送訊息到 {{model}}",
     "processing": "正在處理中……",
+    "stopGenerating": "停止產生",
     "quotaExceededTitle": "模型額度已用盡",
     "quotaExceededBody": "當前模型額度已用盡，是否切換到 {{model}}？",
     "quotaExceededNoFallback": "當前模型額度已用盡，請切換到其他可用模型。",
@@ -568,8 +600,8 @@
     "error": "順便提問失敗。"
   },
   "commandQueue": {
-    "title": "佇列中的指令",
-    "clear": "清空佇列",
+    "title": "草稿箱",
+    "clear": "清空草稿箱",
     "edit": "編輯",
     "editing": "編輯中",
     "editPlaceholder": "可以在執行前先調整這筆排隊指令。",
@@ -584,7 +616,19 @@
     "queueFull": "佇列已滿，請先移除部分指令再繼續新增。",
     "inputTooLong": "排隊指令內容過長，請縮短後再發送。",
     "tooManyFiles": "這條排隊指令附加的檔案過多。",
-    "queueTooLarge": "佇列資料過大，無法安全快取，請先移除部分排隊指令。"
+    "queueTooLarge": "佇列資料過大，無法安全快取，請先移除部分排隊指令。",
+    "sendNow": "立即發送",
+    "modeToggle": "切換發送模式",
+    "help": "使用說明",
+    "helpIntro": "AI 回覆期間你發送的訊息會先存到這裡。",
+    "helpAuto": "：AI 每輪回覆結束後自動依序發送。",
+    "helpManual": "：只暫存不自動發送，逐筆點「立即發送」。",
+    "clearConfirmTitle": "確定清空發送草稿箱？",
+    "clearConfirmContent": "所有待發送的訊息都會被移除，且無法復原。",
+    "mode": {
+      "auto": "自動發送",
+      "manual": "手動發送"
+    }
   },
   "contextUsage": {
     "contextUsed": "上下文已使用",
@@ -595,7 +639,9 @@
     "today": "今天",
     "weekToDate": "本週至今",
     "monthToDate": "本月至今",
-    "triggerLabel": "顯示上下文用量"
+    "triggerLabel": "顯示上下文用量",
+    "estimated": "估算",
+    "unavailable": "上下文用量無法取得"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -635,35 +681,22 @@
       "loaded": "已載入",
       "failed": "失敗",
       "unsupported": "不支援"
-    }
-  },
-  "status": {
-    "waitingApproval": "等待你的核准",
-    "running": "處理中",
-    "done": "已完成",
-    "doneIdle": "已完成 — 閒置",
-    "stopped": "已停止",
-    "failed": "失敗"
-  },
-  "statusTooltip": {
-    "waitingApproval": "正在等待你的核准以繼續。",
-    "running": "正在處理此聊天。",
-    "doneUnseen": "已完成，但你尚未查看。",
-    "doneSeen": "最近已完成並已查看。",
-    "doneIdle": "至少一分鐘前已完成並已查看。",
-    "stopped": "在完成前已停止。",
-    "failed": "因發生錯誤而無法完成。"
+    },
+    "selected": "已選 MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "正在準備執行環境。首次啟動可能會稍慢一些。"
   },
   "sendbox": {
-    "hint": "輸入 / 喚起命令，@ 引用檔案"
+    "hint": "輸入 / 喚起命令，@ 引用檔案，↑/↓ 切換歷史訊息"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "這次請求沒有產生任何可見回覆。"
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "這次請求沒有產生任何可見回覆。此 Agent 可能需要先登入：{{hint}}。"
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "這次請求在產生任何可見回覆前已達到模型輸出 token 上限。"
@@ -677,6 +710,89 @@
     }
   },
   "notFound": "會話不存在或已被刪除",
+  "emptyModelReply": "模型在沒有產生可見回覆的情況下結束了本輪對話。請重新發送請求；如果需要較大的輸出，請分多次索取結果。",
+  "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "業務回顧",
+        "description": "季度業績簡報 — KPI 概覽、分部細節、前景展望。藏青與琥珀色。"
+      },
+      "project-kickoff": {
+        "name": "專案啟動",
+        "description": "啟動簡報 — 範圍、團隊、時程、後續步驟。清爽青綠色。"
+      },
+      "monthly-steerco": {
+        "name": "月度指導委員會",
+        "description": "指導委員會報告 — 專案組合狀態、風險、待決事項。襯線體與金色。"
+      },
+      "connected-ops": {
+        "name": "互聯營運",
+        "description": "營運回顧 — 場站指標、運行時間、事件。工業綠。"
+      },
+      "editorial-field-report": {
+        "name": "編輯式實地報告",
+        "description": "長篇報告 — 襯線字體、以行文取代要點、單一紅色強調。"
+      },
+      "market-trends-report": {
+        "name": "市場趨勢報告",
+        "description": "以資料為主的滾動報告 — 附來源說明的圖表。"
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "極簡淺色簡報 — 每頁一個觀點、單一藍色強調。"
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "面向技術分享的極簡深色簡報 — 適合展示程式碼、綠色強調。"
+      },
+      "business-report": {
+        "name": "業務報告",
+        "description": "長篇正式報告 — 封面、目錄、資料表格、藏青襯線標題。"
+      },
+      "decision-memo": {
+        "name": "決策備忘錄",
+        "description": "簡短決策備忘錄 — 收件人/寄件人/主旨欄、結論前置、無封面。"
+      },
+      "operations-guide": {
+        "name": "營運指南",
+        "description": "精簡作業程序 — 編號步驟、提示框、檢查清單、青綠強調。"
+      },
+      "proposal-sow": {
+        "name": "提案 / SOW",
+        "description": "客戶提案 — 範圍、時程、報價表、簽署欄。"
+      }
+    },
+    "title": "範本",
+    "columnPptx": "簡報 · PPTX",
+    "columnHtml": "網頁 · HTML",
+    "columnDocx": "文件 · DOCX",
+    "selected": "已選擇",
+    "buttonTooltip": "範本",
+    "slashDescription": "選擇範本",
+    "importCard": "匯入範本 (.md)",
+    "empty": "沒有可用的範本",
+    "chipTooltip": "此訊息將使用該範本",
+    "scratch": {
+      "prepareError": "無法準備成果暫存空間：{{error}}",
+      "retained": "暫存成果檔案已保留於 {{path}} 以便復原。",
+      "cleanup": "清理",
+      "cleanupSuccess": "暫存成果檔案已移除",
+      "cleanupError": "清理失敗：{{error}}"
+    },
+    "importSuccess": "範本已匯入",
+    "importError": "匯入失敗：{{error}}",
+    "removeError": "刪除失敗：{{error}}",
+    "deleteTooltip": "刪除範本",
+    "deleteConfirm": "確定刪除該範本？"
+  },
+  "status": {
+    "waitingApproval": "等待你的核准",
+    "running": "處理中",
+    "done": "已完成",
+    "doneIdle": "已完成 — 閒置",
+    "stopped": "已停止",
+    "failed": "失敗"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -1035,5 +1151,19 @@
   "artifact": {
     "emptyTitle": "尚無開啟的工件",
     "emptyHint": "產生的檔案和文件會在這裡開啟。"
-  }
+  },
+  "statusTooltip": {
+    "waitingApproval": "正在等待你的核准以繼續。",
+    "running": "正在處理此聊天。",
+    "doneUnseen": "已完成，但你尚未查看。",
+    "doneSeen": "最近已完成並已查看。",
+    "doneIdle": "至少一分鐘前已完成並已查看。",
+    "stopped": "在完成前已停止。",
+    "failed": "因發生錯誤而無法完成。"
+  },
+  "staleKnowledgeHint": {
+    "body": "此對話無法檢索專案知識庫 —— 它建立於新增檔案之前。",
+    "action": "新建對話"
+  },
+  "emptyChat": "傳送訊息開始對話。"
 }

@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Hallo, was hast du heute vor?",
-    "placeholder": "Nachricht senden, Dateien hochladen, Ordner öffnen oder geplante Aufgabe erstellen...",
+    "placeholder": "Nachricht senden, Dateien hochladen, Ordner öffnen, eine geplante Aufgabe erstellen oder / für Befehle eingeben...",
     "linkFolder": "Ordner öffnen",
     "newConversation": "Neuer Chat",
     "selectModel": "Modell auswählen",
@@ -17,7 +17,6 @@
     "quickActionStar": "Gefällt dir WePrompt? Gib uns einen Stern!",
     "skillsMarket": "WePrompt Skills-Markt",
     "skillsMarketDesc": "Community-Skills auf Abruf suchen und aktivieren. Einmal konfigurieren, für alle Agenten verfügbar.",
-    "skillsMarketDetails": "Mehr anzeigen >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -43,6 +42,7 @@
     "scopedHint": "— beschränkt auf dieses Projekt",
     "chats": "Chats",
     "showAll": "Alle anzeigen",
+    "showLess": "Weniger anzeigen",
     "emptyChatsTitle": "Noch keine Chats",
     "emptyChatsBody": "Starte oben einen Chat, um mit der Arbeit an diesem Projekt zu beginnen.",
     "instructions": "Anweisungen",
@@ -53,6 +53,7 @@
     "save": "Speichern",
     "cancel": "Abbrechen",
     "instructionsSaved": "Anweisungen gespeichert",
+    "instructionsSaveFailed": "Anweisungen konnten nicht gespeichert werden",
     "files": "Dateien",
     "revealInFolder": "Im Ordner anzeigen",
     "filesReadonly": "Nur lesbar · Verwaltung im Ordner",
@@ -71,23 +72,47 @@
     "remove": "Entfernen",
     "knowledge": "Wissen",
     "knowledgeAdd": "Dateien hinzufügen",
+    "knowledgeDropFolderMissing": "Verbinden Sie den Ordner \"Knowledge Base\" erneut, bevor Sie Dateien hinzufügen.",
+    "knowledgeDropUnsupported": "Keine dieser Dateien wird unterstützt. Unterstützt: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Die Wissensdatenbank konnte nicht aktualisiert werden.",
+    "knowledgeRelinkFailed": "Der Projektordner konnte nicht neu verknüpft werden.",
+    "knowledgeRetryFailed": "Die Datei konnte nicht zur Indizierung eingereiht werden.",
+    "knowledgeDeleteFailed": "Die Datei konnte nicht in den Papierkorb verschoben werden.",
+    "knowledgeAddFailed": "Diese Dateien konnten nicht zur Wissensdatenbank hinzugefügt werden.",
     "knowledgeEmpty": "Füge Dokumente hinzu, um die Wissensdatenbank dieses Projekts aufzubauen. Der Assistent durchsucht sie automatisch in jedem Chat dieses Projekts.",
-    "knowledgeSummary": "{{files}} Dateien · {{passages}} Passagen",
-    "knowledgeSemanticOn": "Semantische Suche aktiv",
     "knowledgeSemanticOff": "Semantische Suche inaktiv — kein Embedding-Modell konfiguriert",
-    "knowledgePassages": "{{count}} Passagen",
+    "knowledgeSemanticOffAction": "Embedding-Modell hinzufügen",
+    "knowledgeEmbedAll": "Alle einbetten",
+    "knowledgePassagesTooltip": "Diese Datei wird in durchsuchbare Abschnitte geteilt, und der Assistent verwendet beim Antworten die passendsten davon.",
     "knowledgeStatusIndexing": "Wird indiziert…",
     "knowledgeProgressReading": "Seite {{done}}/{{total}} wird gelesen",
-    "knowledgeProgressEmbedding": "{{done}}/{{total}} Passagen werden eingebettet",
+    "knowledgeProgressTranscribing": "Seite {{done}}/{{total}} wird transkribiert",
+    "knowledgeProgressEmbedding": "Einbettung {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Fehlgeschlagen",
     "knowledgeStatusUnsupported": "Nicht unterstützt",
+    "knowledgeStatusNotEmbedded": "Nur Stichwort",
+    "knowledgeNotEmbeddedDetail": "Per Stichwort durchsuchbar, aber nur {{done}}/{{total}} Abschnitte sind eingebettet. Erneut versuchen, um die übrigen einzubetten.",
     "knowledgeRetry": "Erneut versuchen",
-    "knowledgeRemove": "Entfernen",
-    "knowledgeRemoveConfirm": "Diese Datei aus der Wissensdatenbank entfernen?",
     "knowledgeError": "Die Wissensdatenbank ist nicht verfügbar.",
-    "knowledgeSupportedTypes": "Unterstützt: .md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "Unterstützt: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Aktualisieren",
+    "knowledgeOpenOriginal": "Originaldatei öffnen",
+    "knowledgeDeleteFile": "Datei löschen",
+    "knowledgeDeleteConfirm": "„{{fileName}}“ in den Papierkorb verschieben? Die Datei wird auch aus der Wissensdatenbank entfernt.",
+    "knowledgeFolderHint": "Die Dateien liegen im Ordner „Knowledge Base“ innerhalb des Projektordners. Alles, was Sie dort ablegen, wird automatisch indexiert.",
+    "knowledgeFolderMissingTitle": "Ordner „Knowledge Base“ nicht gefunden",
+    "knowledgeFolderMissingBody": "Er wurde möglicherweise verschoben, umbenannt oder gelöscht. Ihr indexiertes Wissen bleibt erhalten – stellen Sie den Ordner wieder her oder verknüpfen Sie das Projekt neu, und aktualisieren Sie dann.",
+    "knowledgePreviewNote": "Dies ist der indexierte Text, den der Assistent durchsucht – nicht das ursprüngliche Layout.",
+    "knowledgePreviewTruncated": "Vorschau gekürzt. Öffnen Sie die Originaldatei für das vollständige Dokument.",
+    "knowledgePreviewError": "Der indexierte Text dieser Datei konnte nicht geladen werden.",
+    "knowledgePreviewNotReady": "Noch kein indexierter Text zum Öffnen.",
+    "knowledgeCitationMissing": "Diese Datei ist nicht mehr in der Wissensdatenbank.",
+    "knowledgeOcrTag": "Transkribiert (OCR)",
+    "knowledgeOcrDetail": "Von {{model}} aus einem Scan transkribiert. Übersprungene Seiten: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "keine"
   },
   "history": {
+    "moreActions": "Weitere Aktionen",
     "recents": "Zuletzt",
     "noHistory": "Kein Chatverlauf",
     "deleteTitle": "Löschen",
@@ -98,6 +123,7 @@
     "saveName": "Speichern",
     "cancelEdit": "Abbrechen",
     "rename": "Umbenennen",
+    "createCronTask": "Geplante Aufgabe erstellen",
     "renameTitle": "Chat umbenennen",
     "renamePlaceholder": "Bitte neuen Namen eingeben",
     "renameSuccess": "Erfolgreich umbenannt",
@@ -140,7 +166,10 @@
     "removeProject": "Projekt entfernen",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Neuer Chat in diesem Projekt",
+    "expandProjectChats": "Projektchats ausklappen",
+    "collapseProjectChats": "Projektchats einklappen",
     "deleting": "Wird gelöscht...",
+    "reorderPinned": "Ziehen, um angeheftete Unterhaltung neu anzuordnen",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -160,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Das Projekt konnte nicht entfernt werden. Öffne es erneut und versuche es noch einmal; die Dateien im Ordner wurden nicht gelöscht.",
+    "removeProjectChatDetachFailed": "Einige Chats konnten nicht von diesem Projekt getrennt werden. Das Projekt wurde beibehalten; versuche die Entfernung erneut.",
+    "removeProjectStateChanged": "Die Projektliste wurde vor dem Entfernen geändert. Aktualisiere sie und versuche es erneut.",
+    "removeProjectStorageFailed": "Die Projektänderungen konnten nicht gespeichert werden. Prüfe, ob WePrompt auf seine App-Daten zugreifen kann, und versuche es erneut.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -181,7 +213,6 @@
   "noAgentsAvailable": "Keine Agenten verfügbar",
   "noModelConfigured": "Kein Modell konfiguriert. Bitte in den Einstellungen konfigurieren.",
   "createFailed": "Gespräch konnte nicht erstellt werden",
-  "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Der ausgewählte Arbeitsbereichspfad ist nicht verfügbar. Stelle sicher, dass der Arbeitsbereichspfad \"{{workspacePath}}\" vorhanden und zugänglich ist."
@@ -521,6 +552,7 @@
     "noModelSelected": "Kein Modell für die aktuelle Sitzung ausgewählt, Nachricht kann nicht gesendet werden",
     "sendMessageTo": "Nachricht an {{model}} senden",
     "processing": "Wird verarbeitet...",
+    "stopGenerating": "Generierung stoppen",
     "quotaExceededTitle": "Modellkontingent erreicht",
     "quotaExceededBody": "Das aktuelle Modellkontingent ist erschöpft. Zu {{model}} wechseln, um fortzufahren?",
     "quotaExceededNoFallback": "Modellkontingent erreicht. Bitte zu einem anderen verfügbaren Modell wechseln.",
@@ -569,8 +601,8 @@
     "error": "Nebenfrage konnte nicht beantwortet werden."
   },
   "commandQueue": {
-    "title": "Wartende Befehle",
-    "clear": "Warteschlange leeren",
+    "title": "Entwurfsbox",
+    "clear": "Entwurfsbox leeren",
     "edit": "Bearbeiten",
     "editing": "Bearbeitung",
     "editPlaceholder": "Wartenden Befehl vor der Ausführung aktualisieren.",
@@ -585,7 +617,19 @@
     "queueFull": "Warteschlange ist voll. Entferne einen Befehl, bevor du weitere hinzufügst.",
     "inputTooLong": "Dieser wartende Befehl ist zu lang. Kürze ihn vor dem Senden.",
     "tooManyFiles": "Zu viele Dateien sind an diesen wartenden Befehl angehängt.",
-    "queueTooLarge": "Warteschlangendaten sind zu groß zum sicheren Speichern. Entferne zuerst einige Befehle."
+    "queueTooLarge": "Warteschlangendaten sind zu groß zum sicheren Speichern. Entferne zuerst einige Befehle.",
+    "sendNow": "Jetzt senden",
+    "modeToggle": "Sendemodus umschalten",
+    "help": "Hilfe",
+    "helpIntro": "Nachrichten, die du während der KI-Antwort sendest, warten hier.",
+    "helpAuto": ": werden nach jeder Antwort automatisch nacheinander gesendet.",
+    "helpManual": ": werden hier aufbewahrt, ohne zu senden; sende jede mit „Jetzt senden“.",
+    "clearConfirmTitle": "Sende-Entwurfsbox leeren?",
+    "clearConfirmContent": "Alle ausstehenden Nachrichten werden entfernt. Dies kann nicht rückgängig gemacht werden.",
+    "mode": {
+      "auto": "Auto senden",
+      "manual": "Manuell senden"
+    }
   },
   "contextUsage": {
     "contextUsed": "Kontext verwendet",
@@ -596,7 +640,9 @@
     "today": "Heute",
     "weekToDate": "Woche bis heute",
     "monthToDate": "Monat bis heute",
-    "triggerLabel": "Kontextnutzung anzeigen"
+    "triggerLabel": "Kontextnutzung anzeigen",
+    "estimated": "Geschätzt",
+    "unavailable": "Kontextnutzung nicht verfügbar"
   },
   "skill_generator": {
     "title": "Skill/Regel generieren",
@@ -636,35 +682,22 @@
       "loaded": "Geladen",
       "failed": "Fehlgeschlagen",
       "unsupported": "Nicht unterstützt"
-    }
-  },
-  "status": {
-    "waitingApproval": "Wartet auf deine Freigabe",
-    "running": "In Bearbeitung",
-    "done": "Abgeschlossen",
-    "doneIdle": "Abgeschlossen — inaktiv",
-    "stopped": "Gestoppt",
-    "failed": "Fehlgeschlagen"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Wartet auf deine Freigabe, um fortzufahren.",
-    "running": "Dieser Chat wird bearbeitet.",
-    "doneUnseen": "Abgeschlossen, aber noch nicht von dir angesehen.",
-    "doneSeen": "Kürzlich abgeschlossen und bereits angesehen.",
-    "doneIdle": "Vor mindestens einer Minute abgeschlossen und bereits angesehen.",
-    "stopped": "Vor dem Abschluss gestoppt.",
-    "failed": "Aufgrund eines Fehlers konnte der Vorgang nicht abgeschlossen werden."
+    },
+    "selected": "Ausgewählte MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Laufzeit-Umgebung wird vorbereitet. Der erste Start kann etwas länger dauern."
   },
   "sendbox": {
-    "hint": "Tippe / für Befehle, @ um Dateien zu referenzieren"
+    "hint": "Tippe / für Befehle, @ um Dateien zu referenzieren, ↑/↓ für den Nachrichtenverlauf"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Diese Anfrage hat keine sichtbare Antwort erzeugt."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Diese Anfrage hat keine sichtbare Antwort erzeugt. Der Agent muss möglicherweise zuerst angemeldet werden – {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "Diese Anfrage hat das Ausgabe-Token-Limit des Modells erreicht, bevor eine sichtbare Antwort erzeugt wurde."
@@ -678,6 +711,89 @@
     }
   },
   "notFound": "Unterhaltung nicht gefunden oder wurde gelöscht",
+  "emptyModelReply": "Das Modell hat den Zug ohne sichtbare Antwort beendet. Senden Sie die Anfrage erneut; fordern Sie große Ausgaben in kleineren Teilen an.",
+  "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Quartalsreview",
+        "description": "Deck für Quartalsergebnisse — KPI-Überblick, Segmentdetails, Ausblick. Navy und Amber."
+      },
+      "project-kickoff": {
+        "name": "Projekt-Kickoff",
+        "description": "Kickoff-Deck — Umfang, Team, Zeitplan, nächste Schritte. Klares Petrol."
+      },
+      "monthly-steerco": {
+        "name": "Monatliches Steuerungsgremium",
+        "description": "Update für das Steuerungsgremium — Portfoliostatus, Risiken, offene Entscheidungen. Serif und Gold."
+      },
+      "connected-ops": {
+        "name": "Connected Ops",
+        "description": "Betriebsreview — Standortkennzahlen, Verfügbarkeit, Störungen. Industriegrün."
+      },
+      "editorial-field-report": {
+        "name": "Redaktioneller Feldbericht",
+        "description": "Langform-Bericht — Serifenschrift, Fließtext statt Aufzählungen, ein roter Akzent."
+      },
+      "market-trends-report": {
+        "name": "Markttrend-Bericht",
+        "description": "Datengetriebener Scroll-Bericht — Diagramme mit Quellenangaben."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimalistisches helles Deck — eine Idee pro Folie, ein blauer Akzent."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Minimalistisches dunkles Deck für Technikvorträge — code-freundlich, grüner Akzent."
+      },
+      "business-report": {
+        "name": "Geschäftsbericht",
+        "description": "Ausführlicher formeller Bericht — Deckblatt, Inhalt, Datentabellen, Navy-Serifenüberschriften."
+      },
+      "decision-memo": {
+        "name": "Entscheidungsvorlage",
+        "description": "Kurze Entscheidungsvorlage — AN/VON/BETREFF-Block, Empfehlung vorangestellt, kein Deckblatt."
+      },
+      "operations-guide": {
+        "name": "Betriebshandbuch",
+        "description": "Kompakte Arbeitsanweisung — nummerierte Schritte, Hinweisboxen, Checklisten, Petrol-Akzent."
+      },
+      "proposal-sow": {
+        "name": "Angebot / SOW",
+        "description": "Kundenangebot — Leistungsumfang, Zeitplan, Preistabelle, Signaturblock."
+      }
+    },
+    "title": "Vorlagen",
+    "columnPptx": "Präsentationen · PPTX",
+    "columnHtml": "Web · HTML",
+    "columnDocx": "Dokumente · DOCX",
+    "selected": "Ausgewählt",
+    "buttonTooltip": "Vorlagen",
+    "slashDescription": "Eine Vorlage auswählen",
+    "importCard": "Vorlage importieren (.md)",
+    "empty": "Keine Vorlagen verfügbar",
+    "chipTooltip": "Diese Nachricht verwendet die Vorlage",
+    "scratch": {
+      "prepareError": "Temporärer Arbeitsbereich konnte nicht vorbereitet werden: {{error}}",
+      "retained": "Temporäre Artefaktdateien wurden zur Wiederherstellung unter {{path}} aufbewahrt.",
+      "cleanup": "Bereinigen",
+      "cleanupSuccess": "Temporäre Artefaktdateien entfernt",
+      "cleanupError": "Bereinigung fehlgeschlagen: {{error}}"
+    },
+    "importSuccess": "Vorlage importiert",
+    "importError": "Import fehlgeschlagen: {{error}}",
+    "removeError": "Löschen fehlgeschlagen: {{error}}",
+    "deleteTooltip": "Vorlage löschen",
+    "deleteConfirm": "Diese Vorlage löschen?"
+  },
+  "status": {
+    "waitingApproval": "Wartet auf deine Freigabe",
+    "running": "In Bearbeitung",
+    "done": "Abgeschlossen",
+    "doneIdle": "Abgeschlossen — inaktiv",
+    "stopped": "Gestoppt",
+    "failed": "Fehlgeschlagen"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -1036,5 +1152,19 @@
   "artifact": {
     "emptyTitle": "Kein Artefakt geöffnet",
     "emptyHint": "Generierte Dateien und Dokumente werden hier geöffnet."
-  }
+  },
+  "statusTooltip": {
+    "waitingApproval": "Wartet auf deine Freigabe, um fortzufahren.",
+    "running": "Dieser Chat wird bearbeitet.",
+    "doneUnseen": "Abgeschlossen, aber noch nicht von dir angesehen.",
+    "doneSeen": "Kürzlich abgeschlossen und bereits angesehen.",
+    "doneIdle": "Vor mindestens einer Minute abgeschlossen und bereits angesehen.",
+    "stopped": "Vor dem Abschluss gestoppt.",
+    "failed": "Aufgrund eines Fehlers konnte der Vorgang nicht abgeschlossen werden."
+  },
+  "staleKnowledgeHint": {
+    "body": "Dieser Chat kann die Wissensdatenbank des Projekts nicht durchsuchen – er wurde begonnen, bevor Dateien hinzugefügt wurden.",
+    "action": "Neuen Chat starten"
+  },
+  "emptyChat": "Sende eine Nachricht, um zu beginnen."
 }

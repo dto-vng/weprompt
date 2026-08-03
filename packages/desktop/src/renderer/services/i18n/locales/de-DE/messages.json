@@ -16,6 +16,7 @@
   "downloadFailed": "Download fehlgeschlagen",
   "imageLoadFailed": "Bild konnte nicht geladen werden",
   "scrollToBottom": "Nach unten scrollen",
+  "reasoning": "Überlegung",
   "availableCommands": "{{count}} verfügbare Befehle",
   "atFile.hint": "Zum Suchen nach Dateien tippen",
   "atFile.menuLabel": "Dateierwähnungen",
@@ -50,12 +51,25 @@
   "unknownMessageType": "Unbekannter Nachrichtentyp: {{type}}",
   "permissionRequest": "Berechtigungsanfrage",
   "agentRequestingPermission": "Der Agent fordert eine Berechtigung an.",
+  "permission": {
+    "intent": {
+      "run": "Ich möchte einen Befehl ausführen",
+      "edit": "Ich möchte eine Datei bearbeiten",
+      "read": "Ich möchte eine Datei lesen",
+      "fetch": "Ich möchte etwas aus dem Web abrufen",
+      "tool": "Ich möchte ein Tool verwenden",
+      "destructive": "Ich möchte Dateien löschen oder entfernen",
+      "generic": "Ich möchte etwas tun, das deine Zustimmung braucht"
+    },
+    "destructiveWarning": "Dies kann Dateien dauerhaft löschen oder überschreiben — das lässt sich nicht rückgängig machen."
+  },
   "command": "Befehl:",
   "chooseAction": "Aktion auswählen:",
   "option": "Option",
   "noOptionsAvailable": "Keine Optionen verfügbar",
   "processing": "Wird verarbeitet...",
   "responseSentSuccessfully": "Antwort erfolgreich gesendet",
+  "permissionResponseFailed": "Deine Antwort konnte nicht gesendet werden. Bitte versuche es erneut.",
   "confirmation": {
     "applyChange": "Diese Änderung anwenden?",
     "allowExecution": "Ausführung erlauben?",
@@ -227,5 +241,8 @@
         "failedTitle": "Ich konnte die fertige Datei nicht vorbereiten"
       }
     }
+  },
+  "plan": {
+    "title": "Aufgabenliste"
   }
 }

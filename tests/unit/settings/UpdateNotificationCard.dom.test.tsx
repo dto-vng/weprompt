@@ -23,10 +23,13 @@ const mocks = vi.hoisted(() => ({
   autoUpdateDownloadMock: vi.fn(),
   autoUpdateCancelDownloadMock: vi.fn(),
   autoUpdateQuitAndInstallMock: vi.fn(),
+  autoUpdateStatusOnMock: vi.fn(),
   consumeInstallerLastFailureMock: vi.fn(),
   updateCheckMock: vi.fn(),
   updateDownloadMock: vi.fn(),
   updateCancelDownloadMock: vi.fn(),
+  updateDownloadProgressOnMock: vi.fn(),
+  updateOpenOnMock: vi.fn(),
   openFeedbackMock: vi.fn(),
   shellOpenExternalMock: vi.fn(),
   shellOpenFileMock: vi.fn(),
@@ -42,7 +45,7 @@ vi.mock('@/renderer/components/Markdown', () => ({
 }));
 
 vi.mock('@/renderer/hooks/context/FeedbackContext', () => ({
-  useFeedback: () => ({ openFeedback: mocks.openFeedbackMock }),
+  useFeedback: () => ({ isFeedbackAvailable: true, openFeedback: mocks.openFeedbackMock }),
 }));
 
 vi.mock('@/common', () => ({
@@ -54,10 +57,7 @@ vi.mock('@/common', () => ({
       cancelDownload: { invoke: mocks.autoUpdateCancelDownloadMock },
       quitAndInstall: { invoke: mocks.autoUpdateQuitAndInstallMock },
       status: {
-        on: vi.fn((handler: (evt: AutoUpdateStatus) => void) => {
-          mocks.autoStatusHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.autoUpdateStatusOnMock,
       },
     },
     update: {
@@ -66,16 +66,10 @@ vi.mock('@/common', () => ({
       download: { invoke: mocks.updateDownloadMock },
       cancelDownload: { invoke: mocks.updateCancelDownloadMock },
       downloadProgress: {
-        on: vi.fn((handler: (evt: UpdateDownloadProgressEvent) => void) => {
-          mocks.manualProgressHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.updateDownloadProgressOnMock,
       },
       open: {
-        on: vi.fn((handler: (evt: { source?: 'menu' | 'about' | 'tray' }) => void) => {
-          mocks.updateOpenHandler = handler;
-          return vi.fn();
-        }),
+        on: mocks.updateOpenOnMock,
       },
     },
     shell: {
@@ -90,6 +84,7 @@ import UpdateNotificationCard from '@/renderer/components/settings/UpdateNotific
 
 describe('UpdateNotificationCard', () => {
   beforeEach(() => {
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     vi.stubGlobal('__APP_VERSION__', '2.1.15');
     mocks.manualProgressHandler = null;
     mocks.autoStatusHandler = null;
@@ -99,8 +94,20 @@ describe('UpdateNotificationCard', () => {
     mocks.autoUpdateDownloadMock.mockResolvedValue({ success: true });
     mocks.autoUpdateCancelDownloadMock.mockResolvedValue({ success: true });
     mocks.autoUpdateQuitAndInstallMock.mockResolvedValue(undefined);
+    mocks.autoUpdateStatusOnMock.mockImplementation((handler: (evt: AutoUpdateStatus) => void) => {
+      mocks.autoStatusHandler = handler;
+      return vi.fn();
+    });
     mocks.consumeInstallerLastFailureMock.mockResolvedValue({ success: true, data: null });
     mocks.updateCancelDownloadMock.mockResolvedValue({ success: true });
+    mocks.updateDownloadProgressOnMock.mockImplementation((handler: (evt: UpdateDownloadProgressEvent) => void) => {
+      mocks.manualProgressHandler = handler;
+      return vi.fn();
+    });
+    mocks.updateOpenOnMock.mockImplementation((handler: (evt: { source?: 'menu' | 'about' | 'tray' }) => void) => {
+      mocks.updateOpenHandler = handler;
+      return vi.fn();
+    });
     mocks.updateCheckMock.mockResolvedValue({
       success: true,
       data: {
@@ -111,14 +118,14 @@ describe('UpdateNotificationCard', () => {
           version: '2.1.14',
           name: 'v2.1.14',
           body: 'notes',
-          htmlUrl: 'https://github.com/iOfficeAI/AionUi/releases/tag/v2.1.14',
+          htmlUrl: '',
           prerelease: false,
           draft: false,
           assets: [],
           recommendedAsset: {
-            name: 'AionUi-2.1.14-mac-arm64.dmg',
-            url: 'https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac-arm64.dmg',
-            fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.1.14/AionUi-2.1.14-mac-arm64.dmg',
+            name: 'WePrompt-2.1.14-mac-arm64.dmg',
+            url: 'https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac-arm64.dmg',
+            fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.1.14-mac-arm64.dmg',
             size: 123,
           },
         },
@@ -128,15 +135,56 @@ describe('UpdateNotificationCard', () => {
       success: true,
       data: {
         downloadId: request.downloadId ?? 'manual-download',
-        file_path: '/tmp/AionUi-2.1.14-mac-arm64.dmg',
+        file_path: '/tmp/WePrompt-2.1.14-mac-arm64.dmg',
       },
     }));
   });
 
   afterEach(() => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
     cleanup();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('renders nothing, consumes local installer diagnostics, and makes no network-update IPC calls when disabled', async () => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
+
+    const { container } = render(<UpdateNotificationCard />);
+    await act(async () => Promise.resolve());
+
+    expect(container).toBeEmptyDOMElement();
+    expect(mocks.autoUpdateStatusOnMock).not.toHaveBeenCalled();
+    expect(mocks.updateDownloadProgressOnMock).not.toHaveBeenCalled();
+    expect(mocks.updateOpenOnMock).not.toHaveBeenCalled();
+    expect(mocks.autoUpdateRestoreDownloadedMock).not.toHaveBeenCalled();
+    expect(mocks.autoUpdateCheckMock).not.toHaveBeenCalled();
+    expect(mocks.updateCheckMock).not.toHaveBeenCalled();
+    expect(mocks.consumeInstallerLastFailureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows local installer diagnostics without retry or feedback actions when updates are disabled', async () => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    const marker: InstallerLastFailureMarker = {
+      schemaVersion: 1,
+      kind: 'app-cannot-be-closed',
+      phase: 'customCheckAppRunning',
+      silent: true,
+      updated: true,
+      retryCount: 3,
+      instDir: 'D:\\Forge',
+      logPath: 'C:\\Users\\me\\AppData\\Local\\Temp\\weprompt-installer-failure.log',
+      at: '2026-08-01T00:00:00.000Z',
+    };
+    mocks.consumeInstallerLastFailureMock.mockResolvedValue({ success: true, data: marker });
+
+    render(<UpdateNotificationCard />);
+
+    expect(await screen.findByText('update.installerLastFailure.title')).toBeInTheDocument();
+    expect(screen.getByText('update.installerLastFailure.viewLog')).toBeInTheDocument();
+    expect(screen.queryByText('update.installerLastFailure.retryUpdate')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings.oneClickFeedback')).not.toBeInTheDocument();
+    expect(mocks.autoUpdateCheckMock).not.toHaveBeenCalled();
   });
 
   it('renders a bottom-right notification card for auto-update availability without a dialog', async () => {
@@ -177,7 +225,7 @@ describe('UpdateNotificationCard', () => {
       data: {
         ready: true,
         version: '2.1.14',
-        filePath: '/cache/pending/AionUi-2.1.14-mac.zip',
+        filePath: '/cache/pending/WePrompt-2.1.14-mac.zip',
       },
     });
 
@@ -380,10 +428,10 @@ describe('UpdateNotificationCard', () => {
 
     fireEvent.click(await screen.findByText('update.releaseLog'));
     expect(await screen.findByText('update.releaseNotesFailed')).toBeInTheDocument();
-    expect(screen.getByText('update.viewRelease')).toBeInTheDocument();
+    expect(screen.queryByText('update.viewRelease')).not.toBeInTheDocument();
   });
 
-  it('shows only a close (cancel) icon while downloading and cancel restores the initial state', async () => {
+  it('keeps the cancel action available while downloading and cancel restores the initial state', async () => {
     render(<UpdateNotificationCard />);
 
     await waitFor(() => {
@@ -413,12 +461,14 @@ describe('UpdateNotificationCard', () => {
       });
     });
 
-    // Downloading hides text buttons; the only action is the top-right close (cancel) icon.
+    // Downloading hides text buttons while keeping the header actions available.
     expect(screen.queryByText('update.later')).not.toBeInTheDocument();
     expect(screen.queryByText('update.cancel')).not.toBeInTheDocument();
     expect(screen.queryByText('update.minimize')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update.minimize' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'update.cancel' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('update.cancel'));
+    fireEvent.click(screen.getByRole('button', { name: 'update.cancel' }));
 
     await waitFor(() => {
       expect(mocks.autoUpdateCancelDownloadMock).toHaveBeenCalled();
@@ -426,6 +476,62 @@ describe('UpdateNotificationCard', () => {
     expect(await screen.findByText('update.downloadButton')).toBeInTheDocument();
     expect(screen.getByText('update.later')).toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('minimizes an active download without cancelling and restores its progress', async () => {
+    render(<UpdateNotificationCard />);
+
+    await waitFor(() => {
+      expect(mocks.autoStatusHandler).toBeTruthy();
+    });
+
+    await act(async () => {
+      mocks.autoStatusHandler?.({
+        status: 'available',
+        version: '2.1.14',
+        currentVersion: '2.1.13',
+        releaseNotes: 'auto notes',
+      });
+    });
+
+    fireEvent.click(await screen.findByText('update.downloadButton'));
+
+    await act(async () => {
+      mocks.autoStatusHandler?.({
+        status: 'downloading',
+        progress: {
+          bytesPerSecond: 1048576,
+          percent: 18,
+          transferred: 1048576,
+          total: 4194304,
+        },
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'update.minimize' }));
+
+    const miniProgress = await screen.findByTestId('update-notification-mini-progress');
+    expect(miniProgress).toHaveTextContent('18%');
+    expect(mocks.autoUpdateCancelDownloadMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      mocks.autoStatusHandler?.({
+        status: 'downloading',
+        progress: {
+          bytesPerSecond: 2097152,
+          percent: 42,
+          transferred: 2097152,
+          total: 4194304,
+        },
+      });
+    });
+
+    expect(miniProgress).toHaveTextContent('42%');
+
+    fireEvent.click(miniProgress);
+
+    expect(await screen.findByTestId('update-notification-card')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '42');
   });
 
   it('shows restart guidance text and later/restart actions after download completes', async () => {
@@ -576,9 +682,6 @@ describe('UpdateNotificationCard', () => {
         tags: {
           kind: 'app-cannot-be-closed',
           message: 'installer-last-failure',
-        },
-        extra: {
-          installerLastFailure: marker,
         },
       });
     });

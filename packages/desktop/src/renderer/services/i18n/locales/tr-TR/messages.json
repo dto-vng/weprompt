@@ -16,6 +16,7 @@
   "downloadFailed": "İndirme başarısız",
   "imageLoadFailed": "Görüntü yüklenemedi",
   "scrollToBottom": "Aşağı kaydır",
+  "reasoning": "Akıl yürütme",
   "availableCommands": "{{count}} Kullanılabilir Komut",
   "atFile.hint": "Dosya aramak için yazın",
   "atFile.menuLabel": "Dosya bahsetmeleri",
@@ -50,12 +51,25 @@
   "unknownMessageType": "Bilinmeyen mesaj türü: {{type}}",
   "permissionRequest": "İzin İsteği",
   "agentRequestingPermission": "Ajan izin istiyor.",
+  "permission": {
+    "intent": {
+      "run": "Bir komut çalıştırmak istiyorum",
+      "edit": "Bir dosyayı düzenlemek istiyorum",
+      "read": "Bir dosyayı okumak istiyorum",
+      "fetch": "Web'den bir şey almak istiyorum",
+      "tool": "Bir araç kullanmak istiyorum",
+      "destructive": "Dosyaları silmek veya kaldırmak istiyorum",
+      "generic": "Onayınızı gerektiren bir şey yapmak istiyorum"
+    },
+    "destructiveWarning": "Bu işlem dosyaları kalıcı olarak silebilir veya üzerine yazabilir — geri alınamaz."
+  },
   "command": "Komut:",
   "chooseAction": "Bir işlem seçin:",
   "option": "Seçenek",
   "noOptionsAvailable": "Seçenek yok",
   "processing": "İşleniyor...",
   "responseSentSuccessfully": "Yanıt başarıyla gönderildi",
+  "permissionResponseFailed": "Yanıtınız gönderilemedi. Lütfen tekrar deneyin.",
   "confirmation": {
     "applyChange": "Bu değişikliği uygula?",
     "allowExecution": "Yürütmeye izin ver?",
@@ -227,5 +241,8 @@
         "failedTitle": "Tamamlanmış dosyayı hazırlayamadım"
       }
     }
+  },
+  "plan": {
+    "title": "Yapılacaklar listesi"
   }
 }

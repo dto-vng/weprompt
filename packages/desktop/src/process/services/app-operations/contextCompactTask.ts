@@ -191,10 +191,12 @@ export const contextCompactTask: AppOperationTaskDefinition<
   id: 'context.compact',
   promptVersion: 'context.compact.v1',
   inputSchema: contextCompactInputSchema as z.ZodType<ContextCompactInput>,
-  prepare: async (input) => {
+  prepare: async (input, { signal }) => {
     const page = await httpRequest<MessageCursorPage<TMessage>>(
       'GET',
-      `/api/conversations/${encodeURIComponent(input.conversation_id)}/messages?limit=${MAX_MESSAGES}&content_mode=compact`
+      `/api/conversations/${encodeURIComponent(input.conversation_id)}/messages?limit=${MAX_MESSAGES}&content_mode=compact`,
+      undefined,
+      { signal }
     );
     return { input, messages: page.items };
   },

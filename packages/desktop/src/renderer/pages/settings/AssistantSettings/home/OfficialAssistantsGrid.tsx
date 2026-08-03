@@ -21,6 +21,7 @@ type OfficialAssistantsGridProps = {
   onDuplicate: (assistant: AssistantListItem) => void;
   onToggleEnabled: (assistant: AssistantListItem, checked: boolean) => void;
   onStartChat: (assistant: AssistantListItem) => void;
+  searchActive?: boolean;
 };
 
 const FILTER_OPTIONS: AssistantEnabledFilter[] = ['all', 'enabled', 'disabled'];
@@ -37,6 +38,7 @@ const OfficialAssistantsGrid: React.FC<OfficialAssistantsGridProps> = ({
   onDuplicate,
   onToggleEnabled,
   onStartChat,
+  searchActive = false,
 }) => {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<AssistantEnabledFilter>('all');
@@ -92,6 +94,13 @@ const OfficialAssistantsGrid: React.FC<OfficialAssistantsGridProps> = ({
       </div>
 
       <div className='grid grid-cols-1 gap-14px sm:grid-cols-2 lg:grid-cols-3'>
+        {officialAssistants.length === 0 ? (
+          <div className='col-span-full rounded-14px border border-dashed border-[var(--color-border-2)] bg-fill-1/40 px-20px py-28px text-center text-13px text-t-secondary'>
+            {searchActive
+              ? t('settings.assistantNoMatch', { defaultValue: 'No assistants match the current filters.' })
+              : t('settings.assistantsEmpty', { defaultValue: 'No assistants configured.' })}
+          </div>
+        ) : null}
         {officialAssistants.map((assistant) => {
           const enabled = assistant.enabled !== false;
           const actionMenu = (
@@ -118,7 +127,7 @@ const OfficialAssistantsGrid: React.FC<OfficialAssistantsGridProps> = ({
             <div
               key={assistant.id}
               data-testid={`official-card-${assistant.id}`}
-              className='group flex cursor-pointer flex-col rounded-14px border border-solid border-transparent bg-base p-16px transition-all duration-180 hover:border-border-2'
+              className='group flex cursor-pointer flex-col rounded-14px border border-solid border-transparent bg-base p-16px transition-all duration-180 hover:border-[var(--color-border-2)]'
               onClick={() => onOpenSettings(assistant)}
             >
               {/* Header row: avatar on the left, enable switch on the right. */}

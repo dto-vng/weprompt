@@ -16,6 +16,7 @@
   "downloadFailed": "下載失敗",
   "imageLoadFailed": "圖片載入失敗",
   "scrollToBottom": "滾動到底部",
+  "reasoning": "推理過程",
   "availableCommands": "{{count}} 個可用指令",
   "atFile.hint": "輸入以搜尋檔案",
   "atFile.menuLabel": "檔案提及",
@@ -50,12 +51,25 @@
   "unknownMessageType": "未知訊息類型：{{type}}",
   "permissionRequest": "權限請求",
   "agentRequestingPermission": "代理正在請求權限。",
+  "permission": {
+    "intent": {
+      "run": "我想執行一條命令",
+      "edit": "我想編輯一個檔案",
+      "read": "我想讀取一個檔案",
+      "fetch": "我想從網路取得內容",
+      "tool": "我想使用一個工具",
+      "destructive": "我想刪除或移除檔案",
+      "generic": "我想執行一項需要你核准的操作"
+    },
+    "destructiveWarning": "這可能會永久刪除或覆寫檔案，且無法復原。"
+  },
   "command": "命令：",
   "chooseAction": "請選擇操作：",
   "option": "選項",
   "noOptionsAvailable": "沒有可用選項",
   "processing": "處理中...",
   "responseSentSuccessfully": "回覆已成功送出",
+  "permissionResponseFailed": "傳送回應失敗，請重試。",
   "confirmation": {
     "applyChange": "應用此更改？",
     "allowExecution": "允許執行？",
@@ -227,5 +241,8 @@
         "failedTitle": "我無法準備最終檔案"
       }
     }
+  },
+  "plan": {
+    "title": "待辦清單"
   }
 }

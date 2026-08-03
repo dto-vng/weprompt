@@ -14,7 +14,7 @@
 
 import type { IConfirmation } from '@/common/chat/chatLib';
 import type { AcpSlashCommandApiItem } from '@/common/chat/slash/types';
-import { bridge } from '@office-ai/platform';
+import { bridge } from '@/common/platform/bridge';
 import type { OpenDialogOptions } from 'electron';
 import type {
   ICssTheme,
@@ -54,7 +54,13 @@ import type {
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
 import type {
+  ArtifactScratchAllocation,
+  ArtifactScratchResult,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
+import type {
   EnsureConversationRuntimeResponse,
+  GetConfigOptionsResponse,
   SetConfigOptionRequest,
   SetConfigOptionResponse,
 } from '../types/platform/acpTypes';
@@ -102,18 +108,19 @@ import type {
 import type {
   ITeamAgentRemovedEvent,
   ITeamAgentRenamedEvent,
+  ITeamAgentRuntimeStatusEvent,
   ITeamAgentSpawnedEvent,
   ITeamAgentStatusEvent,
   ITeamChildTurnEvent,
   ITeamCreatedEvent,
   ITeamListChangedEvent,
-  ITeamMcpStatusEvent,
   ITeamRemovedEvent,
   ITeamRenamedEvent,
   ITeamRunAck,
   ITeamRunEvent,
   ITeamRunStateResponse,
   ITeamSessionChangedEvent,
+  ITeamSessionStatusChangedEvent,
   ITeamTaskChangedEvent,
   ICancelTeamChildTurnParams,
   ICancelTeamRunParams,
@@ -134,6 +141,7 @@ import type {
   UpdateDownloadProgressEvent,
   UpdateDownloadRequest,
   UpdateDownloadResult,
+  UpdateBridgeErrorCode,
 } from '../update/updateTypes';
 import type { AgentMetadata } from '@/renderer/utils/model/agentTypes';
 import type { Theme } from '@/common/theme/types';
@@ -171,6 +179,9 @@ import {
   fromBackendTeam,
   fromBackendTeamList,
   fromBackendTeamOptional,
+  fromBackendTeamRunAck,
+  fromBackendTeamRunEvent,
+  fromBackendTeamRunState,
   toBackendAssistant,
 } from './teamMapper';
 import { fromBackendCompareResult, type RawCompareResult } from './fileSnapshotMapper';
@@ -354,7 +365,7 @@ export const conversation = {
   turnCompleted: wsMappedEmitter<IConversationTurnCompletedEvent>('turn.completed', (raw) => {
     const r = raw as Record<string, unknown>;
     const rawLast = (r.last_message ?? r.lastMessage) as Record<string, unknown> | undefined;
-    const last_message: IConversationTurnCompletedEvent['last_message'] = rawLast
+    const lastMessage = rawLast
       ? {
           id: rawLast.id as string | undefined,
           type: rawLast.type as string | undefined,
@@ -362,21 +373,26 @@ export const conversation = {
           status: rawLast.status as string | null | undefined,
           created_at: (rawLast.created_at ?? rawLast.createdAt ?? Date.now()) as number,
         }
-      : {
-          content: null,
-          created_at: Date.now(),
-        };
-    const rawRuntime = (r.runtime ?? {}) as Record<string, unknown>;
-    const runtime: IConversationTurnCompletedEvent['runtime'] = {
-      state: (rawRuntime.state ?? 'idle') as IConversationTurnCompletedEvent['runtime']['state'],
-      can_send_message: (rawRuntime.can_send_message ?? rawRuntime.canSendMessage ?? true) as boolean,
-      has_task: (rawRuntime.has_task ?? rawRuntime.hasTask ?? false) as boolean,
-      task_status: (rawRuntime.task_status ??
-        rawRuntime.taskStatus) as IConversationTurnCompletedEvent['runtime']['task_status'],
-      is_processing: (rawRuntime.is_processing ?? rawRuntime.isProcessing ?? false) as boolean,
-      pending_confirmations: (rawRuntime.pending_confirmations ?? rawRuntime.pendingConfirmations ?? 0) as number,
-      turn_id: (rawRuntime.turn_id ?? rawRuntime.turnId ?? null) as string | null,
-    };
+      : undefined;
+    const rawRuntime = r.runtime;
+    const runtimeRecord =
+      typeof rawRuntime === 'object' && rawRuntime !== null && !Array.isArray(rawRuntime)
+        ? (rawRuntime as Record<string, unknown>)
+        : null;
+    const runtime: IConversationTurnCompletedEvent['runtime'] = runtimeRecord
+      ? {
+          state: (runtimeRecord.state ?? 'idle') as TConversationRuntimeSummary['state'],
+          can_send_message: (runtimeRecord.can_send_message ?? runtimeRecord.canSendMessage ?? true) as boolean,
+          has_task: (runtimeRecord.has_task ?? runtimeRecord.hasTask ?? false) as boolean,
+          task_status: (runtimeRecord.task_status ??
+            runtimeRecord.taskStatus) as TConversationRuntimeSummary['task_status'],
+          is_processing: (runtimeRecord.is_processing ?? runtimeRecord.isProcessing ?? false) as boolean,
+          pending_confirmations: (runtimeRecord.pending_confirmations ??
+            runtimeRecord.pendingConfirmations ??
+            0) as number,
+          turn_id: (runtimeRecord.turn_id ?? runtimeRecord.turnId ?? null) as string | null,
+        }
+      : null;
     const rawModel = (r.model ?? {}) as Record<string, unknown>;
     const model: IConversationTurnCompletedEvent['model'] = {
       platform: (rawModel.platform ?? '') as string,
@@ -385,16 +401,15 @@ export const conversation = {
     };
     return {
       session_id: (r.session_id ?? r.sessionId ?? r.conversation_id ?? '') as string,
-      turn_id: (r.turn_id ?? r.turnId ?? runtime.turn_id ?? '') as string,
+      turn_id: (r.turn_id ?? r.turnId ?? runtime?.turn_id ?? '') as string,
       status: (r.status ?? 'finished') as IConversationTurnCompletedEvent['status'],
-      state: (r.state ??
-        (r.status === 'finished' ? 'ai_waiting_input' : 'unknown')) as IConversationTurnCompletedEvent['state'],
+      ...(r.state !== undefined ? { state: r.state as NonNullable<IConversationTurnCompletedEvent['state']> } : {}),
       detail: (r.detail ?? '') as string,
       can_send_message: (r.can_send_message ?? r.canSendMessage ?? r.status === 'finished') as boolean,
       runtime,
       workspace: (r.workspace ?? '') as string,
       model,
-      last_message,
+      ...(lastMessage ? { last_message: lastMessage } : {}),
     };
   }),
   listChanged: wsEmitter<IConversationListChangedEvent>('conversation.listChanged'),
@@ -597,7 +612,7 @@ export const autoUpdate = {
   ),
   download: bridge.buildProvider<IBridgeResponse, void>('auto-update.download'),
   cancelDownload: bridge.buildProvider<IBridgeResponse, void>('auto-update.download.cancel'),
-  quitAndInstall: bridge.buildProvider<void, void>('auto-update.quit-and-install'),
+  quitAndInstall: bridge.buildProvider<IBridgeResponse, void>('auto-update.quit-and-install'),
   status: bridge.buildEmitter<AutoUpdateStatus>('auto-update.status'),
 };
 
@@ -611,6 +626,31 @@ export const dialog = {
     | { defaultPath?: string; properties?: OpenDialogOptions['properties']; filters?: OpenDialogOptions['filters'] }
     | undefined
   >('show-open'),
+};
+
+// ---------------------------------------------------------------------------
+// Presentation templates — Electron main-process pack directory (bridge IPC)
+// ---------------------------------------------------------------------------
+
+export const presentationTemplates = {
+  list: bridge.buildProvider<PresentationTemplateSummary[], void>('presentation-templates.list'),
+  importSpec: bridge.buildProvider<
+    { ok: true; template: PresentationTemplateSummary } | { ok: false; error: string },
+    { file_path: string }
+  >('presentation-templates.import-spec'),
+  remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
+  allocateScratch: bridge.buildProvider<ArtifactScratchAllocation, { conversation_id: string; template_id: string }>(
+    'presentation-templates.scratch.allocate'
+  ),
+  completeScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.complete'
+  ),
+  retainScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string; reason: 'failed' | 'interrupted' }>(
+    'presentation-templates.scratch.retain'
+  ),
+  discardScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.discard'
+  ),
 };
 
 // ---------------------------------------------------------------------------
@@ -990,7 +1030,7 @@ export const appOperations = {
 };
 
 export const appOperationsModel = {
-  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model'),
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model', { silentStatuses: [404] }),
   update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
   check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
 };
@@ -1003,9 +1043,26 @@ export const projectKnowledge = {
   listSources: bridge.buildProvider<IProjectKnowledgeListResult, { projectId: string }>(
     'project-knowledge.list-sources'
   ),
-  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[] }>('project-knowledge.add-sources'),
-  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.remove-source'),
-  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string }>('project-knowledge.retry-source'),
+  // `workspace` is the project workspace path; the `Knowledge Base/` folder
+  // inside it is the source of truth for knowledge files. Optional only until
+  // every renderer caller passes it (typed required again in the card work).
+  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace?: string }>(
+    'project-knowledge.add-sources'
+  ),
+  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+    'project-knowledge.remove-source'
+  ),
+  getSourceText: bridge.buildProvider<{ text: string; truncated: boolean }, { projectId: string; sourceId: string }>(
+    'project-knowledge.get-source-text'
+  ),
+  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace?: string }>(
+    'project-knowledge.retry-source'
+  ),
+  syncFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.sync-folder'),
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — the renderer registers folder watches.
+  watchFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.watch-folder'),
+  unwatchFolder: bridge.buildProvider<void, { projectId: string }>('project-knowledge.unwatch-folder'),
   removeStore: bridge.buildProvider<void, { projectId: string }>('project-knowledge.remove-store'),
   getSessionMcpServer: bridge.buildProvider<ISessionMcpServer | null, { projectId: string }>(
     'project-knowledge.get-session-mcp-server'
@@ -1554,6 +1611,7 @@ export const cron = {
       agent_config: p.updates.metadata?.agent_config,
       conversation_title: p.updates.metadata?.conversation_title,
       max_retries: p.updates.state?.max_retries,
+      queue_enabled: p.updates.state?.queue_enabled,
     })
   ),
   removeJob: httpDelete<void, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}`),
@@ -1611,6 +1669,7 @@ export interface ICronJob {
     run_count: number;
     retry_count: number;
     max_retries: number;
+    queue_enabled: boolean;
   };
 }
 
@@ -1654,6 +1713,7 @@ export interface ICreateCronJobParams {
   conversation_title?: string;
   created_by: 'user' | 'agent';
   execution_mode?: 'existing' | 'new_conversation';
+  queue_enabled?: boolean;
   agent_config?: ICronAgentConfigWrite;
 }
 
@@ -1672,6 +1732,7 @@ export interface ICronJobUpdateParams {
   };
   state?: {
     max_retries?: number;
+    queue_enabled?: boolean;
   };
 }
 
@@ -1877,7 +1938,7 @@ export interface IConversationTurnCompletedEvent {
   session_id: string;
   turn_id: string;
   status: 'pending' | 'running' | 'finished';
-  state:
+  state?:
     | 'ai_generating'
     | 'ai_waiting_input'
     | 'ai_waiting_confirmation'
@@ -1887,22 +1948,14 @@ export interface IConversationTurnCompletedEvent {
     | 'unknown';
   detail: string;
   can_send_message: boolean;
-  runtime: {
-    state: 'idle' | 'starting' | 'running' | 'cancelling' | 'waiting_confirmation';
-    can_send_message: boolean;
-    has_task: boolean;
-    task_status?: 'pending' | 'running' | 'finished';
-    is_processing: boolean;
-    pending_confirmations: number;
-    turn_id: string | null;
-  };
+  runtime: TConversationRuntimeSummary | null;
   workspace: string;
   model: {
     platform: string;
     name: string;
     use_model: string;
   };
-  last_message: {
+  last_message?: {
     id?: string;
     type?: string;
     content: unknown;
@@ -1928,6 +1981,7 @@ interface IBridgeResponse<D = {}> {
   success: boolean;
   data?: D;
   msg?: string;
+  code?: UpdateBridgeErrorCode;
 }
 
 // ---------------------------------------------------------------------------
@@ -2168,7 +2222,7 @@ export const team = {
   create: withResponseMap(
     httpPost<TTeam, ICreateTeamParams>('/api/teams', (p) => ({
       name: p.name,
-      assistants: p.assistants.map(toBackendAssistant),
+      agents: p.agents.map(toBackendAssistant),
       ...(p.workspace ? { workspace: p.workspace } : {}),
     })),
     fromBackendTeam
@@ -2194,6 +2248,9 @@ export const team = {
   ),
   stop: httpDelete<void, { team_id: string }>((p) => `/api/teams/${p.team_id}/session`),
   ensureSession: httpPost<void, { team_id: string }>((p) => `/api/teams/${p.team_id}/session`),
+  getConfigOptions: httpGet<GetConfigOptionsResponse, { team_id: string; conversation_id: string }>(
+    (p) => `/api/teams/${p.team_id}/conversations/${encodeURIComponent(p.conversation_id)}/config-options`
+  ),
   activeLease: httpPost<void, { team_id: string }>(
     (p) => `/api/teams/${p.team_id}/active-lease`,
     () => undefined
@@ -2210,20 +2267,31 @@ export const team = {
     (p) => `/api/teams/${p.team_id}/session-mode`,
     (p) => ({ mode: p.session_mode })
   ),
-  getRunState: httpGet<ITeamRunStateResponse, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
-  sendMessage: httpPost<ITeamRunAck, ISendTeamMessageParams>(
-    (p) => `/api/teams/${p.team_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  // Run payloads are normalized (see `fromBackendTeamRunState`) so `slot_work`
+  // is always an array, even on backends that predate the field.
+  getRunState: withResponseMap(
+    httpGet<unknown, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
+    fromBackendTeamRunState
   ),
-  sendMessageToAgent: httpPost<ITeamRunAck, ISendTeamAgentMessageParams>(
-    (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  sendMessage: withResponseMap(
+    httpPost<unknown, ISendTeamMessageParams>(
+      (p) => `/api/teams/${p.team_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
+  ),
+  sendMessageToAgent: withResponseMap(
+    httpPost<unknown, ISendTeamAgentMessageParams>(
+      (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
   ),
   cancelRun: httpPost<void, ICancelTeamRunParams>(
     (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/cancel`,
@@ -2248,20 +2316,21 @@ export const team = {
   agentSpawned: wsEmitter<ITeamAgentSpawnedEvent>('team.agentSpawned'),
   agentRemoved: wsEmitter<ITeamAgentRemovedEvent>('team.agentRemoved'),
   agentRenamed: wsEmitter<ITeamAgentRenamedEvent>('team.agentRenamed'),
+  agentRuntimeStatusChanged: wsEmitter<ITeamAgentRuntimeStatusEvent>('team.agentRuntimeStatusChanged'),
   listChanged: wsEmitter<ITeamListChangedEvent>('team.listChanged'),
   created: wsEmitter<ITeamCreatedEvent>('team.created'),
   removed: wsEmitter<ITeamRemovedEvent>('team.removed'),
   renamed: wsEmitter<ITeamRenamedEvent>('team.renamed'),
   teammateMessage: wsEmitter<ITeamTeammateMessageEvent>('team.teammateMessage'),
-  mcpStatus: wsEmitter<ITeamMcpStatusEvent>('team.mcpStatus'),
+  sessionStatusChanged: wsEmitter<ITeamSessionStatusChangedEvent>('team.sessionStatusChanged'),
   taskChanged: wsEmitter<ITeamTaskChangedEvent>('team.taskChanged'),
   sessionChanged: wsEmitter<ITeamSessionChangedEvent>('team.sessionChanged'),
-  runAccepted: wsEmitter<ITeamRunEvent>('team.runAccepted'),
-  runStarted: wsEmitter<ITeamRunEvent>('team.runStarted'),
-  runUpdated: wsEmitter<ITeamRunEvent>('team.runUpdated'),
-  runCompleted: wsEmitter<ITeamRunEvent>('team.runCompleted'),
-  runCancelled: wsEmitter<ITeamRunEvent>('team.runCancelled'),
-  runFailed: wsEmitter<ITeamRunEvent>('team.runFailed'),
+  runAccepted: wsMappedEmitter<ITeamRunEvent>('team.runAccepted', fromBackendTeamRunEvent),
+  runStarted: wsMappedEmitter<ITeamRunEvent>('team.runStarted', fromBackendTeamRunEvent),
+  runUpdated: wsMappedEmitter<ITeamRunEvent>('team.runUpdated', fromBackendTeamRunEvent),
+  runCompleted: wsMappedEmitter<ITeamRunEvent>('team.runCompleted', fromBackendTeamRunEvent),
+  runCancelled: wsMappedEmitter<ITeamRunEvent>('team.runCancelled', fromBackendTeamRunEvent),
+  runFailed: wsMappedEmitter<ITeamRunEvent>('team.runFailed', fromBackendTeamRunEvent),
   childTurnStarted: wsEmitter<ITeamChildTurnEvent>('team.childTurnStarted'),
   childTurnCompleted: wsEmitter<ITeamChildTurnEvent>('team.childTurnCompleted'),
   childTurnCancelled: wsEmitter<ITeamChildTurnEvent>('team.childTurnCancelled'),

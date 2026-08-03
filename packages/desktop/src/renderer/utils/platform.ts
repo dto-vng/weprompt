@@ -9,7 +9,7 @@
  * 平台检测工具函数
  */
 
-import { getBaseUrl } from '@/common/adapter/httpBridge';
+import { getBaseUrl, withLocalTokenQuery } from '@/common/adapter/httpBridge';
 
 /**
  * Check if running in Electron desktop environment
@@ -56,7 +56,9 @@ export const resolveBackendAssetUrl = (url: string | undefined): string | undefi
   if (!url) return url;
   if (isAbsoluteAssetUrl(url) || /^data:/i.test(url)) return url;
   if (url.startsWith('/')) {
-    return isElectronDesktop() ? `${getBaseUrl()}${url}` : url;
+    // These land in `<img src>` and similar, which cannot send a header — the
+    // local-mode secret has to travel in the query string instead.
+    return isElectronDesktop() ? withLocalTokenQuery(`${getBaseUrl()}${url}`) : url;
   }
   return url;
 };

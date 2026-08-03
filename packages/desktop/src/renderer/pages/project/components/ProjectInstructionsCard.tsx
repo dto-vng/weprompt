@@ -44,10 +44,28 @@ const ProjectInstructionsCard: React.FC<ProjectInstructionsCardProps> = ({ proje
     setEditing(false);
   };
 
+  /**
+   * `updateProject` reports a vanished project row by returning `null` and a
+   * workspace clash — reachable even from an instructions-only save, since the
+   * duplicate scan runs against the unchanged workspace — by throwing, and
+   * `writeProjects` can throw on a full quota. A bare call could tell none of
+   * those apart from a save that worked, so this claimed "Instructions saved"
+   * either way. `setEditing(false)` stays on the success path so a failed save
+   * keeps the draft on screen instead of discarding what the user typed.
+   */
   const handleSave = (): void => {
-    updateProject({ id: project.id, instructions: draft.trim() });
-    setEditing(false);
-    Message.success(t('conversation.projectHome.instructionsSaved'));
+    try {
+      const updated = updateProject({ id: project.id, instructions: draft.trim() });
+      if (!updated) {
+        Message.error(t('conversation.projectHome.instructionsSaveFailed'));
+        return;
+      }
+      setEditing(false);
+      Message.success(t('conversation.projectHome.instructionsSaved'));
+    } catch (saveError) {
+      console.error('Failed to save project instructions:', saveError);
+      Message.error(t('conversation.projectHome.instructionsSaveFailed'));
+    }
   };
 
   return (
@@ -86,7 +104,7 @@ const ProjectInstructionsCard: React.FC<ProjectInstructionsCardProps> = ({ proje
           </span>
         </div>
       ) : (
-        <div className='flex flex-col items-center gap-10px rd-10px border border-dashed border-border-2 px-16px py-20px text-center'>
+        <div className='flex flex-col items-center gap-10px rd-10px border border-dashed border-[var(--color-border-2)] px-16px py-20px text-center'>
           <span className='text-13px text-t-secondary'>{t('conversation.projectHome.instructionsEmpty')}</span>
           <Button type='outline' size='small' icon={<Plus theme='outline' size='14' />} onClick={startEdit}>
             {t('conversation.projectHome.addInstructions')}

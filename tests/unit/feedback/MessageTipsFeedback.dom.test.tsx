@@ -51,7 +51,7 @@ vi.mock('react-i18next', () => ({
 
 const openFeedbackMock = vi.fn(() => Promise.resolve());
 vi.mock('@/renderer/hooks/context/FeedbackContext', () => ({
-  useFeedback: () => ({ openFeedback: openFeedbackMock }),
+  useFeedback: () => ({ isFeedbackAvailable: true, openFeedback: openFeedbackMock }),
 }));
 
 // CollapsibleContent uses ResizeObserver and runtime theme context — stub it
@@ -193,22 +193,10 @@ describe('MessageTips — FeedbackButton wiring', () => {
         agent_error_retryable: 'false',
         agent_error_resolution: 'check_provider_credentials',
       },
-      extra: {
-        agent_error: {
-          code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-          ownership: 'user_llm_provider',
-          retryable: false,
-          feedback_recommended: true,
-          resolution: {
-            kind: 'check_provider_credentials',
-            target: 'provider_settings',
-          },
-        },
-      },
     });
   });
 
-  it('does not render FeedbackButton when structured error opts out of feedback', () => {
+  it('hides FeedbackButton but keeps ButlerDiagnoseButton when structured error opts out of feedback', () => {
     render(
       <MessageTips
         message={buildTips('error', 'raw provider 401', {
@@ -226,10 +214,13 @@ describe('MessageTips — FeedbackButton wiring', () => {
       />
     );
 
+    // User-environment errors don't funnel to the report modal…
     expect(screen.queryByText('settings.oneClickFeedback')).not.toBeInTheDocument();
+    // …but the Butler chip stays: these are exactly what it diagnoses best.
+    expect(screen.getByText('settings.talkToButler.solveWithButler')).toBeInTheDocument();
   });
 
-  it('carries the rawError diagnostic summary into the feedback extra for internal errors', async () => {
+  it('never carries raw error objects into the local export request', async () => {
     const user = userEvent.setup();
     render(
       <MessageTips
@@ -252,13 +243,16 @@ describe('MessageTips — FeedbackButton wiring', () => {
 
     await user.click(screen.getByText('settings.oneClickFeedback'));
 
-    const call = openFeedbackMock.mock.calls[0][0] as { extra: { agent_error: { rawError?: unknown } } };
-    expect(call.extra.agent_error.rawError).toEqual({
-      name: 'Error',
-      message: 'connect ECONNREFUSED 127.0.0.1:8080',
-      code: 'ECONNREFUSED',
-      stack: 'Error: connect ECONNREFUSED\n    at frame',
+    expect(openFeedbackMock).toHaveBeenCalledWith({
+      autoScreenshot: true,
+      module: 'conversation-session',
+      tags: {
+        agent_error_code: 'AIONUI_INTERNAL_ERROR',
+        agent_error_ownership: 'aionui',
+        agent_error_retryable: 'true',
+      },
     });
+    expect(JSON.stringify(openFeedbackMock.mock.calls[0][0])).not.toContain('ECONNREFUSED');
   });
 
   it('renders HTML-like error text as literal text', () => {

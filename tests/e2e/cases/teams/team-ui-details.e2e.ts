@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures';
-import { cleanupTeamsByName, createTeam } from '../../helpers';
+import { cleanupTeamsByName, collapseSidebarButton, createTeam, expandSidebarButton } from '../../helpers';
 
 const TEAM_COLLAPSED = 'E2E Collapsed Team';
 const TEAM_WORKSPACE = 'E2E Workspace Team';
@@ -16,8 +16,10 @@ test.describe('Team UI Details', () => {
       return;
     }
 
-    const collapseBtn = page.locator('button[aria-label="Collapse sidebar"], button[aria-label="折叠侧边栏"]');
-    const expandBtn = page.locator('button[aria-label="Expand sidebar"], button[aria-label="展开侧边栏"]');
+    // `.first()` because below the mobile breakpoint Layout renders a second
+    // button under the same name as the titlebar toggle; either one collapses.
+    const collapseBtn = page.locator(collapseSidebarButton()).first();
+    const expandBtn = page.locator(expandSidebarButton());
 
     await collapseBtn.click({ timeout: 5_000 });
 

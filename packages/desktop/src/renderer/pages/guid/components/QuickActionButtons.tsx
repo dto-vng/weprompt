@@ -6,7 +6,7 @@
 
 import ConversationSearchPopover from '@/renderer/pages/conversation/GroupedHistory/ConversationSearchPopover';
 import { Button } from '@arco-design/web-react';
-import { Earth, History, Star } from '@icon-park/react';
+import { History, Star } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,9 +18,9 @@ type QuickActionButtonsProps = {
 };
 
 const toolbarButtonClass =
-  '!h-34px !rounded-7px !border !border-border-2 !bg-bg-base !px-10px !text-13px !text-t-secondary hover:!bg-fill-2 hover:!text-t-primary';
+  '!h-34px !rounded-7px !border !border-[var(--color-border-2)] !bg-base !px-10px !text-13px !text-t-secondary hover:!bg-fill-2 hover:!text-t-primary';
 
-const QuickActionButtons: React.FC<QuickActionButtonsProps> = ({ onOpenLink }) => {
+const QuickActionButtons: React.FC<QuickActionButtonsProps> = ({ onOpenLink: _onOpenLink }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -49,14 +49,6 @@ const QuickActionButtons: React.FC<QuickActionButtonsProps> = ({ onOpenLink }) =
         onClick={handleOpenSaved}
       >
         {t('guid.toolbar.saved')}
-      </Button>
-      <Button
-        className={toolbarButtonClass}
-        type='text'
-        icon={<Earth theme='outline' size='16' />}
-        onClick={() => onOpenLink('https://github.com/iOfficeAI/AionUi')}
-      >
-        {t('guid.toolbar.community')}
       </Button>
     </div>
   );

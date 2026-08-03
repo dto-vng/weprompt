@@ -5,10 +5,12 @@
  */
 
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
+import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 import { Dropdown, Menu, Tooltip } from '@arco-design/web-react';
 import { MoreOne, Pushpin } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type SiderMenuItem = {
   key: string;
@@ -38,6 +40,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
   onClick,
   onContextMenu,
 }) => {
+  const { t } = useTranslation();
   const [menuVisible, setMenuVisible] = useState(false);
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
@@ -57,6 +60,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
       <div
         className={classNames(
           'h-34px rd-8px flex items-center gap-8px pl-10px pr-8px cursor-pointer relative overflow-hidden shrink-0 group min-w-0 transition-colors',
+          ROW_FOCUS_RING,
           {
             'hover:bg-fill-3': !selected,
             '!bg-fill-3': selected,
@@ -64,6 +68,10 @@ const SiderItem: React.FC<SiderItemProps> = ({
         )}
         onClick={onClick}
         onContextMenu={onContextMenu}
+        role='button'
+        tabIndex={0}
+        aria-label={name}
+        onKeyDown={activateOnEnterOrSpace(() => onClick?.())}
       >
         {/* Leading icon — pushpin overlays this slot on hover when row is pinned */}
         <span className='size-22px flex items-center justify-center shrink-0 line-height-0 text-t-primary relative'>
@@ -96,7 +104,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
           <div
             className={classNames('absolute right-8px top-1/2 -translate-y-1/2 items-center justify-end', {
               flex: isMobile || menuVisible,
-              'hidden group-hover:flex': !isMobile && !menuVisible,
+              'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
             })}
             onClick={(e) => e.stopPropagation()}
           >
@@ -112,7 +120,7 @@ const SiderItem: React.FC<SiderItemProps> = ({
                     <Menu.Item key={item.key}>
                       <div
                         className={classNames('flex items-center gap-8px', {
-                          'text-[rgb(var(--warning-6))]': item.danger,
+                          'text-danger-6': item.danger,
                         })}
                       >
                         {item.icon}
@@ -135,10 +143,19 @@ const SiderItem: React.FC<SiderItemProps> = ({
                   'flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px rd-4px sider-action-btn',
                   {
                     flex: isMobile || menuVisible,
-                    'hidden group-hover:flex': !isMobile && !menuVisible,
+                    'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
                   }
                 )}
                 onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuVisible(true);
+                }}
+                role='button'
+                tabIndex={0}
+                aria-label={t('conversation.history.moreActions')}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
                   e.stopPropagation();
                   setMenuVisible(true);
                 }}

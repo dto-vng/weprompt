@@ -8,11 +8,12 @@ import { iconColors } from '@/renderer/styles/colors';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import WorkspaceOpenButton from '@/renderer/pages/conversation/components/ChatLayout/WorkspaceOpenButton';
 import { Dropdown, Input, Menu, Tooltip } from '@arco-design/web-react';
+import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
 import { Down, Plus, Refresh, Search } from '@icon-park/react';
 import React from 'react';
 import UploadProgressBar from '@/renderer/components/media/UploadProgressBar';
+import { AionSearchInput } from '@/renderer/components/base';
 import type { TFunction } from 'i18next';
-import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
 
 type WorkspaceToolbarProps = {
   t: TFunction;
@@ -88,8 +89,6 @@ const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({
               setSearchText(value);
               onSearch(value);
             }}
-            allowClear
-            prefix={<Search theme='outline' size='14' fill={iconColors.primary} />}
           />
         )}
         <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />

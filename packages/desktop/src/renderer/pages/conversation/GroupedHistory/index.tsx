@@ -10,6 +10,7 @@ import AionModal from '@/renderer/components/base/AionModal';
 import DirectorySelectionModal from '@/renderer/components/settings/DirectorySelectionModal';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useCronJobsMap } from '@/renderer/pages/cron';
+import { restrictToVerticalAxis } from '@/renderer/utils/ui/dndModifiers';
 import { ProjectCreateModal } from '@/renderer/pages/conversation/projects/ProjectCreateModal';
 import { buildProjectSidebarGroups } from '@/renderer/pages/conversation/projects/projectGrouping';
 import { resolveProjectClickTarget } from '@/renderer/pages/conversation/projects/projectNavigation';
@@ -27,7 +28,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import WorkspaceCollapse from '../components/WorkspaceCollapse';
 import ConversationRow from './ConversationRow';
-import DragOverlayContent from './DragOverlayContent';
 import SortableConversationRow from './SortableConversationRow';
 import { useBatchSelection } from './hooks/useBatchSelection';
 import { useConversationActions } from './hooks/useConversationActions';
@@ -35,6 +35,16 @@ import { useConversations } from './hooks/useConversations';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { useExport } from './hooks/useExport';
 import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types';
+
+/**
+ * Compact 20px icon button for a project row's hover actions — the same
+ * footprint and opaque `sider-action-btn` backing that `ConversationRow` uses,
+ * so both kinds of sidebar row present their actions identically. `!flex`
+ * beats `.arco-btn`'s own `display` so the icon actually centres.
+ */
+const PROJECT_ROW_ACTION_CLASS =
+  '!flex items-center justify-center !w-20px !h-20px !min-w-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
+const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_CLASS} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
 
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   onSessionClick,
@@ -57,6 +67,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
 
   const {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentFailureAt,
@@ -130,6 +141,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     handleTogglePin,
     handleMenuVisibleChange,
     handleOpenMenu,
+    handleCreateCronTask,
     handleRemoveProject,
     removeProjectTarget,
     removeProjectLoading,
@@ -166,12 +178,11 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     onBatchModeChange,
   });
 
-  const { sensors, activeId, activeConversation, handleDragStart, handleDragEnd, handleDragCancel, isDragEnabled } =
-    useDragAndDrop({
-      pinnedConversations,
-      batchMode,
-      collapsed,
-    });
+  const { sensors, handleDragEnd, isDragEnabled } = useDragAndDrop({
+    pinnedConversations,
+    batchMode,
+    collapsed,
+  });
 
   const conversationSectionActions = !collapsed ? (
     onNewChat ? (
@@ -226,6 +237,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       onOpenMenu: handleOpenMenu,
       onMenuVisibleChange: handleMenuVisibleChange,
       onEditStart: handleEditStart,
+      onCreateCronTask: handleCreateCronTask,
       onDelete: handleDeleteClick,
       // Export UI entry intentionally disabled (kanban #14): omit onExport so
       // ConversationRow's `{onExport && ...}` guard hides the menu item. The
@@ -250,6 +262,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
       handleOpenMenu,
       handleMenuVisibleChange,
       handleEditStart,
+      handleCreateCronTask,
       handleDeleteClick,
       handleTogglePin,
       getJobStatus,
@@ -393,7 +406,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             <Button
               className='!w-full !justify-center !min-w-0 !h-30px !px-8px !text-12px whitespace-nowrap'
               size='mini'
-              status='warning'
+              status='danger'
               onClick={handleBatchDelete}
             >
               {t('conversation.history.batchDelete')}
@@ -555,9 +568,8 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
+          modifiers={[restrictToVerticalAxis]}
           onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
         >
           {pinnedConversations.length > 0 && (
             <div className='min-w-0'>
@@ -578,10 +590,6 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               )}
             </div>
           )}
-
-          <DragOverlay dropAnimation={null}>
-            {activeId && activeConversation ? <DragOverlayContent conversation={activeConversation} /> : null}
-          </DragOverlay>
         </DndContext>
 
         {/* Slot 由父级（Sider）填入：例如 Team / CronJob sections，位于「置顶」之后、「项目」之前 */}
@@ -599,6 +607,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             )}
             {!collapsedSections.has('projects') &&
               projectGroups.map((group) => {
+                const projectExpanded = expandedWorkspaces.includes(group.workspace);
                 const projectMenu = (
                   <Menu
                     onClickMenuItem={(key) => {
@@ -644,7 +653,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                 return (
                   <div key={group.workspace} className='min-w-0'>
                     <WorkspaceCollapse
-                      expanded={expandedWorkspaces.includes(group.workspace)}
+                      expanded={projectExpanded}
                       onToggle={() => {
                         const target = resolveProjectClickTarget(group);
                         if (target.kind === 'home') {
@@ -662,47 +671,100 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
                         </span>
                       }
                       trailing={
-                        <span className='flex items-center gap-6px'>
-                          <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
-                            <Button
-                              aria-label={t('conversation.history.newConversationInProject')}
-                              className={classNames(
-                                '!w-20px !h-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3 sider-action-btn',
-                                isMobile ? 'flex' : 'hidden group-hover:flex'
+                        <>
+                          {group.conversations.length > 0 && (
+                            <Tooltip
+                              content={t(
+                                projectExpanded
+                                  ? 'conversation.history.collapseProjectChats'
+                                  : 'conversation.history.expandProjectChats'
                               )}
-                              size='mini'
-                              type='text'
-                              icon={
-                                <Plus theme='outline' size='14' fill='currentColor' className='block leading-none' />
-                              }
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigateToProjectChat(group.workspace, group.project_id);
-                              }}
-                            />
-                          </Tooltip>
-                          <Dropdown
-                            droplist={projectMenu}
-                            trigger='click'
-                            position='br'
-                            getPopupContainer={() => document.body}
-                            unmountOnExit={false}
+                              position='top'
+                            >
+                              <Button
+                                aria-label={t(
+                                  projectExpanded
+                                    ? 'conversation.history.collapseProjectChats'
+                                    : 'conversation.history.expandProjectChats'
+                                )}
+                                aria-expanded={projectExpanded}
+                                className={PROJECT_DISCLOSURE_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <Right
+                                    theme='outline'
+                                    size='14'
+                                    fill='currentColor'
+                                    className={classNames('block leading-none transition-transform duration-150', {
+                                      'rotate-90': projectExpanded,
+                                    })}
+                                  />
+                                }
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleToggleWorkspace(group.workspace);
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                          {/* Visibility lives on the wrapper, not the Button: `.arco-btn`
+                              carries its own `display`, which ties with the `hidden` /
+                              `group-hover:flex` utilities and leaves the actions stranded
+                              on screen. A plain span has no such competing rule. */}
+                          <span
+                            className={classNames(
+                              'items-center justify-center',
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
+                            )}
                           >
-                            <Button
-                              aria-label={t('conversation.history.projectActions')}
-                              className={classNames(
-                                '!w-20px !h-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary hover:!bg-fill-3 sider-action-btn',
-                                isMobile ? 'flex' : 'hidden group-hover:flex'
-                              )}
-                              size='mini'
-                              type='text'
-                              icon={
-                                <MoreOne theme='outline' size='14' fill='currentColor' className='block leading-none' />
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </Dropdown>
-                        </span>
+                            <Tooltip content={t('conversation.history.newConversationInProject')} position='top'>
+                              <Button
+                                aria-label={t('conversation.history.newConversationInProject')}
+                                className={PROJECT_ROW_ACTION_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <Plus theme='outline' size='14' fill='currentColor' className='block leading-none' />
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigateToProjectChat(group.workspace, group.project_id);
+                                }}
+                              />
+                            </Tooltip>
+                          </span>
+                          <span
+                            className={classNames(
+                              'items-center justify-center',
+                              isMobile ? 'flex' : 'hidden group-hover:flex group-focus-within:flex'
+                            )}
+                          >
+                            <Dropdown
+                              droplist={projectMenu}
+                              trigger='click'
+                              position='br'
+                              getPopupContainer={() => document.body}
+                              unmountOnExit={false}
+                            >
+                              <Button
+                                aria-label={t('conversation.history.projectActions')}
+                                className={PROJECT_ROW_ACTION_CLASS}
+                                size='mini'
+                                type='text'
+                                icon={
+                                  <MoreOne
+                                    theme='outline'
+                                    size='14'
+                                    fill='currentColor'
+                                    className='block leading-none'
+                                  />
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </Dropdown>
+                          </span>
+                        </>
                       }
                     >
                       <div className={classNames('flex flex-col min-w-0', { 'mt-1px': !collapsed })}>
@@ -727,9 +789,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               />
             )}
             {batchSelectionPanel}
+            {/* Only claim there is no history once a load has actually settled —
+                otherwise every cold start flashes "No chat history" before the rows
+                arrive. The reserved block keeps the same footprint so the rail does
+                not jump when they do. */}
             {conversationOnlySections.length === 0 ? (
-              <div className='py-48px flex-center'>
-                <Empty description={t('conversation.history.noHistory')} />
+              <div className='py-48px flex-center' data-testid='conversation-history-empty-slot'>
+                {hasLoadedConversations ? <Empty description={t('conversation.history.noHistory')} /> : null}
               </div>
             ) : null}
             {!collapsedSections.has('conversations') &&

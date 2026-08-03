@@ -57,7 +57,7 @@ const httpBridgeMocks = vi.hoisted(() => {
 
 vi.mock('@/common/adapter/httpBridge', () => httpBridgeMocks);
 
-vi.mock('@office-ai/platform', () => ({
+vi.mock('@/common/platform/bridge', () => ({
   bridge: {
     buildProvider: vi.fn(() => ({
       provider: vi.fn(),
@@ -85,5 +85,68 @@ describe('ipcBridge team adapter', () => {
       path: '/api/teams/team-1/run-state',
       body: undefined,
     });
+  });
+
+  // The mocked backend answers `{ active_run: null }` — the literal payload
+  // older aioncore builds return, with `slot_work` absent rather than empty.
+  it('getRunState hands consumers an array of slot work even when the backend omits it', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    const snapshot = await team.getRunState.invoke({ team_id: 'team-1' });
+
+    expect(snapshot).toEqual({ session_generation: null, active_run: null, slot_work: [] });
+  });
+
+  it('sendMessage hands consumers an ack whose run carries slot work', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    const ack = await team.sendMessage.invoke({ team_id: 'team-1', input: 'hello' });
+
+    expect(ack.run.slot_work).toEqual([]);
+  });
+
+  it('run events are mapped rather than forwarded raw', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    expect(team.runUpdated.on).toBeDefined();
+    expect(httpBridgeMocks.wsMappedEmitter).toHaveBeenCalledWith('team.runUpdated', expect.any(Function));
+    expect(httpBridgeMocks.wsEmitter).not.toHaveBeenCalledWith('team.runUpdated');
+  });
+
+  it('team.create posts canonical agents payload', async () => {
+    const { team } = await import('@/common/adapter/ipcBridge');
+
+    await team.create.invoke({
+      user_id: 'user-1',
+      name: 'Alpha',
+      workspace: '/tmp/ws',
+      workspace_mode: 'shared',
+      agents: [
+        {
+          role: 'leader',
+          assistant_name: 'Lead',
+          assistant_id: 'assistant-lead',
+          model: 'claude-sonnet-4',
+        },
+      ],
+    });
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/teams',
+      body: {
+        name: 'Alpha',
+        workspace: '/tmp/ws',
+        agents: [
+          {
+            name: 'Lead',
+            role: 'lead',
+            model: 'claude-sonnet-4',
+            assistant_id: 'assistant-lead',
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(httpBridgeMocks.calls.at(-1)?.body)).not.toContain('assistants');
   });
 });

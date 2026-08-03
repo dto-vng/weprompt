@@ -61,5 +61,6 @@ export function isBuiltinVisionTransport(
 }
 
 export const BUILTIN_KNOWLEDGE_ID = 'builtin-project-knowledge';
-export const BUILTIN_KNOWLEDGE_NAME = 'aionui-project-knowledge';
+// BUILTIN_KNOWLEDGE_NAME lives in `@/common/knowledge/constants`: the renderer
+// matches conversations against it and may not import from `process/`.
 export const BUILTIN_KNOWLEDGE_SCRIPT = 'builtin-mcp-knowledge';

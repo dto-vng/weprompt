@@ -13,16 +13,15 @@ import type {
   UpdateDownloadRequest,
   UpdateDownloadResult,
   UpdateReleaseInfo,
-  GitHubReleaseAsset,
   InstallerLastFailureMarker,
 } from '@/common/update/updateTypes';
+import { UPDATE_BRIDGE_DISABLED_CODE } from '@/common/update/updateTypes';
+import { getConfiguredUpdateBaseUrl, isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
 import { uuid } from '@/common/utils';
 import { app } from 'electron';
 import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
-import semver from 'semver';
-import { autoUpdaterService } from '../services/update/autoUpdaterService';
 import { consumeInstallerLastFailure } from '../services/update/installerLastFailure';
 
 /** Lazily loads i18n to avoid pulling in initStorage chain at module load time */
@@ -35,175 +34,27 @@ const getI18n = async () => {
   return m.default;
 };
 
-type GitHubReleaseApiAsset = {
-  name: string;
-  browser_download_url: string;
-  size: number;
-  content_type?: string;
-};
-
-type GitHubReleaseApi = {
-  tag_name: string;
-  name?: string;
-  body?: string;
-  html_url: string;
-  published_at?: string;
-  prerelease: boolean;
-  draft: boolean;
-  assets?: GitHubReleaseApiAsset[];
-};
-
 /** Parameters for auto-update check via electron-updater */
 interface AutoUpdateCheckParams {
   /** Whether to include prerelease/dev builds in update check */
   includePrerelease?: boolean;
 }
 
-const DEFAULT_REPO = 'iOfficeAI/AionUi';
-const DEFAULT_USER_AGENT = 'AionUi';
-const ALLOWED_ASSET_EXTS = new Set(['.exe', '.msi', '.dmg', '.zip', '.deb', '.rpm']);
-const CDN_HOST = 'static.aionui.com';
-const CDN_BASE_URL = `https://${CDN_HOST}/releases`;
-const ALLOWED_DOWNLOAD_HOSTS = new Set<string>([
-  CDN_HOST,
-  'github.com',
-  'objects.githubusercontent.com',
-  'github-releases.githubusercontent.com',
-  'release-assets.githubusercontent.com',
-]);
 const MAX_REDIRECTS = 8;
+type AutoUpdaterService = (typeof import('../services/update/autoUpdaterService'))['autoUpdaterService'];
 
-const isAllowedAssetName = (name: string) => {
-  const ext = path.extname(name);
-  return ALLOWED_ASSET_EXTS.has(ext);
+const loadAutoUpdaterService = async (): Promise<AutoUpdaterService> => {
+  const { autoUpdaterService } = await import('../services/update/autoUpdaterService');
+  return autoUpdaterService;
 };
 
-const normalizeTagToSemver = (tag: string): string | null => {
-  const trimmed = tag.trim();
-  const withoutV = trimmed.startsWith('v') ? trimmed.slice(1) : trimmed;
-  // Ensure it looks like a semver prefix at least.
-  if (!/^\d+\.\d+\.\d+/.test(withoutV)) return null;
-  return semver.valid(withoutV);
-};
-
-/**
- * Rewrite a GitHub release asset URL to the CDN URL for faster download.
- * The CDN path follows the fixed convention `{base}/{version}/{original-filename}`,
- * matching electron-builder's artifactName output, so no name conversion is needed.
- */
-const rewriteAssetUrlToCDN = (assetName: string, version: string): string => {
-  return `${CDN_BASE_URL}/${version}/${assetName}`;
-};
-
-const mapAsset = (asset: GitHubReleaseApiAsset, version: string): GitHubReleaseAsset => ({
-  name: asset.name,
-  url: rewriteAssetUrlToCDN(asset.name, version),
-  fallbackUrl: asset.browser_download_url,
-  size: asset.size,
-  contentType: asset.content_type,
+const createUpdatesDisabledResult = () => ({
+  success: false as const,
+  code: UPDATE_BRIDGE_DISABLED_CODE,
+  msg: UPDATE_BRIDGE_DISABLED_CODE,
 });
 
-type RuntimePlatformInfo = {
-  platform: NodeJS.Platform;
-  arch: string;
-};
-
-type CanonicalArch = 'x64' | 'arm64' | 'ia32';
-
-const normalizeArch = (arch: string): CanonicalArch => {
-  if (arch === 'arm64') return 'arm64';
-  if (arch === 'ia32' || arch === 'x32') return 'ia32';
-  return 'x64';
-};
-
-const detectAssetArchs = (nameLower: string): Set<CanonicalArch> => {
-  const detected = new Set<CanonicalArch>();
-
-  if (/\b(arm64|aarch64)\b/.test(nameLower)) detected.add('arm64');
-  if (/\b(x64|x86_64|amd64)\b/.test(nameLower)) detected.add('x64');
-
-  const hasX86Token = /\bx86\b/.test(nameLower) && !/\bx86[_-]?64\b/.test(nameLower);
-  if (/\b(ia32|x32|32bit)\b/.test(nameLower) || hasX86Token) detected.add('ia32');
-
-  return detected;
-};
-
-const getPlatformHints = (runtime: RuntimePlatformInfo = { platform: process.platform, arch: process.arch }) => {
-  const platform = runtime.platform;
-  const arch = runtime.arch;
-  const normalizedArch = normalizeArch(arch);
-
-  const archHints =
-    normalizedArch === 'arm64'
-      ? ['arm64', 'aarch64']
-      : normalizedArch === 'ia32'
-        ? ['ia32', 'x86', 'x32', '32bit']
-        : ['x64', 'x86_64', 'amd64'];
-
-  // electron-builder artifact names often include one of these
-  const platformHints =
-    platform === 'win32' ? ['win', 'win32', 'windows'] : platform === 'darwin' ? ['mac', 'darwin', 'osx'] : ['linux'];
-
-  return { platform, arch, normalizedArch, archHints, platformHints };
-};
-
-const scoreAsset = (asset: GitHubReleaseAsset, runtime?: RuntimePlatformInfo): number => {
-  const { platform, normalizedArch, archHints, platformHints } = getPlatformHints(runtime);
-  const nameLower = asset.name.toLowerCase();
-  const ext = path.extname(asset.name);
-
-  const detectedArchs = detectAssetArchs(nameLower);
-  if (detectedArchs.size > 0 && !detectedArchs.has(normalizedArch)) {
-    return -1;
-  }
-
-  let score = 0;
-
-  // Platform match
-  if (platformHints.some((hint) => nameLower.includes(hint))) score += 20;
-
-  // Arch match
-  if (archHints.some((hint) => nameLower.includes(hint))) score += 10;
-  if (detectedArchs.has(normalizedArch)) score += 15;
-
-  // Prefer installer formats per platform
-  if (platform === 'win32') {
-    if (ext === '.exe') score += 100;
-    if (ext === '.msi') score += 90;
-    if (ext === '.zip') score += 50;
-  } else if (platform === 'darwin') {
-    if (ext === '.dmg') score += 100;
-    if (ext === '.zip') score += 70;
-  } else {
-    if (ext === '.deb') score += 100;
-    if (ext === '.rpm') score += 80;
-    if (ext === '.zip') score += 40;
-  }
-
-  return score;
-};
-
-export const pickRecommendedAsset = (
-  assets: GitHubReleaseAsset[],
-  runtime?: RuntimePlatformInfo
-): GitHubReleaseAsset | undefined => {
-  if (!assets.length) return undefined;
-
-  const scored = assets
-    .map((asset) => ({ asset, score: scoreAsset(asset, runtime) }))
-    .filter((item) => item.score >= 0)
-    .toSorted((a, b) => b.score - a.score);
-
-  return scored[0]?.asset;
-};
-
-const resolveRepo = (requestRepo?: string): string => {
-  const envRepo = process.env.AIONUI_GITHUB_REPO?.trim();
-  const repo = (requestRepo || envRepo || DEFAULT_REPO).trim();
-  return repo || DEFAULT_REPO;
-};
-
-const assertAllowedUrl = async (rawUrl: string) => {
+const assertAllowedUrl = async (rawUrl: string, updateBaseUrl: string) => {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -214,22 +65,26 @@ const assertAllowedUrl = async (rawUrl: string) => {
   if (parsed.protocol !== 'https:') {
     throw new Error((await getI18n()).t('update.errors.httpsOnly'));
   }
-  if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname)) {
+  if (!isUpdateUrlWithinBase(parsed, updateBaseUrl)) {
     throw new Error((await getI18n()).t('update.errors.hostNotAllowed', { host: parsed.hostname }));
   }
 };
 
-const fetchWithAllowlistedRedirects = async (rawUrl: string, signal: AbortSignal): Promise<Response> => {
+const fetchWithAllowlistedRedirects = async (
+  rawUrl: string,
+  signal: AbortSignal,
+  updateBaseUrl: string
+): Promise<Response> => {
   let current = rawUrl;
 
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    await assertAllowedUrl(current);
+    await assertAllowedUrl(current, updateBaseUrl);
 
     const res = await fetch(current, {
       signal,
       redirect: 'manual',
       headers: {
-        'User-Agent': DEFAULT_USER_AGENT,
+        'User-Agent': 'WePrompt',
       },
     });
 
@@ -248,63 +103,21 @@ const fetchWithAllowlistedRedirects = async (rawUrl: string, signal: AbortSignal
   throw new Error((await getI18n()).t('update.errors.tooManyRedirects'));
 };
 
-const fetchGitHubReleases = async (repo: string): Promise<GitHubReleaseApi[]> => {
-  const url = `https://api.github.com/repos/${repo}/releases`;
-
-  // 添加超时控制，防止网络问题导致无限等待 / Add timeout to prevent infinite wait on network issues
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 秒超时 / 30 second timeout
-
-  try {
-    const res = await fetch(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': DEFAULT_USER_AGENT,
-      },
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error((await getI18n()).t('update.errors.githubApiFailed', { status: res.status }));
-    }
-
-    const json = (await res.json()) as unknown;
-    if (!Array.isArray(json)) {
-      throw new Error((await getI18n()).t('update.errors.githubApiNotArray'));
-    }
-    return json as GitHubReleaseApi[];
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error((await getI18n()).t('update.errors.githubApiTimeout'), { cause: err });
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
-const mapRelease = (rel: GitHubReleaseApi): UpdateReleaseInfo | null => {
-  const version = normalizeTagToSemver(rel.tag_name);
-  if (!version) return null;
-
-  const assets = (rel.assets || [])
-    .filter((asset) => asset && asset.name && asset.browser_download_url)
-    .filter((asset) => isAllowedAssetName(asset.name))
-    .map((asset) => mapAsset(asset, version));
-
-  return {
-    tagName: rel.tag_name,
-    version,
-    name: rel.name,
-    body: rel.body,
-    htmlUrl: rel.html_url,
-    publishedAt: rel.published_at,
-    prerelease: Boolean(rel.prerelease),
-    draft: Boolean(rel.draft),
-    assets,
-    recommendedAsset: pickRecommendedAsset(assets),
-  };
-};
+const mapAutoUpdateInfo = (info: {
+  version: string;
+  releaseDate?: string;
+  releaseNotes?: unknown;
+}): UpdateReleaseInfo => ({
+  tagName: `v${info.version}`,
+  version: info.version,
+  name: info.version,
+  body: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
+  htmlUrl: '',
+  publishedAt: info.releaseDate,
+  prerelease: info.version.includes('-'),
+  draft: false,
+  assets: [],
+});
 
 type DownloadState = {
   abortController: AbortController;
@@ -325,7 +138,7 @@ const sanitizeFileName = (name: string): string => {
   // Keep only base name and trim weird whitespace.
   const base = path.basename(name).trim();
   // Avoid empty names.
-  return base || `AionUi-update-${Date.now()}`;
+  return base || `WePrompt-update-${Date.now()}`;
 };
 
 const ensureUniquePath = (target: string): string => {
@@ -377,7 +190,8 @@ const attemptDownload = async (
   downloadId: string,
   url: string,
   file_path: string,
-  abortController: AbortController
+  abortController: AbortController,
+  updateBaseUrl: string
 ): Promise<DownloadAttempt> => {
   let receivedBytes = 0;
   let totalBytes: number | undefined;
@@ -411,7 +225,7 @@ const attemptDownload = async (
 
   let stream: fs.WriteStream | null = null;
   try {
-    const res = await fetchWithAllowlistedRedirects(url, abortController.signal);
+    const res = await fetchWithAllowlistedRedirects(url, abortController.signal, updateBaseUrl);
 
     if (!res.ok) {
       throw new Error((await getI18n()).t('update.errors.downloadFailed', { status: res.status }));
@@ -487,16 +301,17 @@ const startDownloadInBackground = async (
   url: string,
   file_path: string,
   abortController: AbortController,
+  updateBaseUrl: string,
   fallbackUrl?: string
 ) => {
   const runWithFallback = async (): Promise<DownloadAttempt> => {
-    const primary = await attemptDownload(downloadId, url, file_path, abortController);
+    const primary = await attemptDownload(downloadId, url, file_path, abortController, updateBaseUrl);
     if (primary.ok) return primary;
     if (primary.isAbort) return primary;
     if (!fallbackUrl || fallbackUrl === url) return primary;
 
     try {
-      await assertAllowedUrl(fallbackUrl);
+      await assertAllowedUrl(fallbackUrl, updateBaseUrl);
     } catch (err) {
       // Fallback URL itself is invalid — keep the primary failure result.
       log.warn('[update-download] Fallback URL rejected by allowlist:', err);
@@ -504,7 +319,7 @@ const startDownloadInBackground = async (
     }
 
     log.warn(`[update-download] Primary download failed (${primary.message}). Retrying with fallback URL.`);
-    return attemptDownload(downloadId, fallbackUrl, file_path, abortController);
+    return attemptDownload(downloadId, fallbackUrl, file_path, abortController, updateBaseUrl);
   };
 
   const finalResult = await runWithFallback();
@@ -552,6 +367,20 @@ export function createAutoUpdateStatusBroadcast(): (
   };
 }
 
+const registerDisabledUpdateProviders = (): void => {
+  ipcBridge.update.check.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.update.download.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.update.cancelDownload.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.autoUpdate.check.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.autoUpdate.restoreDownloaded.provider(async () => ({
+    ...createUpdatesDisabledResult(),
+    data: { ready: false },
+  }));
+  ipcBridge.autoUpdate.download.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.autoUpdate.cancelDownload.provider(async () => createUpdatesDisabledResult());
+  ipcBridge.autoUpdate.quitAndInstall.provider(async () => createUpdatesDisabledResult());
+};
+
 export function initUpdateBridge(): void {
   ipcBridge.update.consumeInstallerLastFailure.provider(
     async (): Promise<{ success: boolean; data: InstallerLastFailureMarker | null; msg?: string }> => {
@@ -566,52 +395,33 @@ export function initUpdateBridge(): void {
     }
   );
 
+  const updateBaseUrl = getConfiguredUpdateBaseUrl();
+  if (!updateBaseUrl) {
+    registerDisabledUpdateProviders();
+    return;
+  }
+
   ipcBridge.update.check.provider(
     async (params): Promise<{ success: boolean; data?: UpdateCheckResult; msg?: string }> => {
       try {
-        const repo = resolveRepo(params?.repo);
         const includePrerelease = Boolean(params?.includePrerelease);
         const currentVersion = app.getVersion();
-
-        // EN: Versioning note
-        // Update comparisons are pure semver: `app.getVersion()` (packaged app version) vs release `tag_name`.
-        // If you want dev/prerelease updates to work reliably, CI must inject a prerelease semver into
-        // `package.json#version` for dev builds (e.g. `1.7.2-dev.1234+sha.abcdef0`) so semver ordering holds.
-        // We intentionally avoid heuristics based on tag strings when the app version is a stable semver.
-        //
-        // 中文：版本号说明
-        // 更新比较严格使用 semver：`app.getVersion()`（应用自身版本号）对比 Release 的 `tag_name`。
-        // 若要 dev/预发布版本更新可靠生效，需要 CI 在 dev 构建时把 `package.json#version`
-        // 注入为带 prerelease 的 semver（如 `1.7.2-dev.1234+sha.abcdef0`），以保证比较顺序正确。
-        // 这里刻意不对“当前是稳定版版本号但用户勾选了 prerelease”做字符串猜测。
-
-        const releases = await fetchGitHubReleases(repo);
-        const candidates = releases
-          .filter((r) => r && !r.draft)
-          .filter((r) => (includePrerelease ? true : !r.prerelease))
-          .map(mapRelease)
-          .filter((r): r is UpdateReleaseInfo => Boolean(r));
-
-        const currentSemver = semver.valid(currentVersion) || semver.coerce(currentVersion)?.version;
-        if (!currentSemver) {
+        const autoUpdaterService = await loadAutoUpdaterService();
+        autoUpdaterService.setAllowPrerelease(includePrerelease);
+        const result = await autoUpdaterService.checkForUpdates();
+        if (!result.success) {
+          return { success: false, msg: result.error };
+        }
+        if (!result.updateInfo) {
           return { success: true, data: { currentVersion, updateAvailable: false } };
         }
 
-        const latest = candidates
-          .filter((r) => semver.valid(r.version))
-          .toSorted((a, b) => semver.rcompare(a.version, b.version))[0];
-
-        if (!latest) {
-          return { success: true, data: { currentVersion, updateAvailable: false } };
-        }
-
-        const updateAvailable = semver.gt(latest.version, currentSemver);
         return {
           success: true,
           data: {
             currentVersion,
-            updateAvailable,
-            latest,
+            updateAvailable: true,
+            latest: mapAutoUpdateInfo(result.updateInfo),
           },
         };
       } catch (err: unknown) {
@@ -627,13 +437,11 @@ export function initUpdateBridge(): void {
           return { success: false, msg: (await getI18n()).t('update.errors.missingUrl') };
         }
 
-        // Defense-in-depth: do not allow arbitrary downloads from renderer.
-        // EN: Only allowlisted hosts (CDN + GitHub release hosts) are permitted;
-        // each redirect hop is re-validated against the allowlist.
-        // 中文：仅允许白名单内的域名（CDN + GitHub release 相关），并手动处理重定向，每一跳都校验白名单。
-        await assertAllowedUrl(params.url);
+        // Defense-in-depth: every URL and redirect must remain under the
+        // configured product-owned update base.
+        await assertAllowedUrl(params.url, updateBaseUrl);
         if (params.fallbackUrl) {
-          await assertAllowedUrl(params.fallbackUrl);
+          await assertAllowedUrl(params.fallbackUrl, updateBaseUrl);
         }
 
         const downloadId = params.downloadId || uuid();
@@ -655,7 +463,14 @@ export function initUpdateBridge(): void {
         manualDownloadKeysById.set(downloadId, activeKey);
 
         // Start background download, but return immediately so the UI stays responsive.
-        void startDownloadInBackground(downloadId, params.url, targetPath, abortController, params.fallbackUrl);
+        void startDownloadInBackground(
+          downloadId,
+          params.url,
+          targetPath,
+          abortController,
+          updateBaseUrl,
+          params.fallbackUrl
+        );
 
         return Promise.resolve({ success: true, data: { downloadId, file_path: targetPath } });
       } catch (err: unknown) {
@@ -704,6 +519,7 @@ export function initUpdateBridge(): void {
       msg?: string;
     }> => {
       try {
+        const autoUpdaterService = await loadAutoUpdaterService();
         // Set prerelease preference before checking
         const includePrerelease = Boolean(params?.includePrerelease);
         autoUpdaterService.setAllowPrerelease(includePrerelease);
@@ -733,6 +549,7 @@ export function initUpdateBridge(): void {
 
   ipcBridge.autoUpdate.download.provider(async (): Promise<{ success: boolean; msg?: string }> => {
     try {
+      const autoUpdaterService = await loadAutoUpdaterService();
       const result = await autoUpdaterService.downloadUpdate();
       return { success: result.success, msg: result.error };
     } catch (err: unknown) {
@@ -743,6 +560,7 @@ export function initUpdateBridge(): void {
   ipcBridge.autoUpdate.restoreDownloaded.provider(
     async (): Promise<{ success: boolean; data: AutoUpdateReadyResult; msg?: string }> => {
       try {
+        const autoUpdaterService = await loadAutoUpdaterService();
         const result = await autoUpdaterService.restoreDownloadedUpdateIfAvailable();
         return { success: result.success, data: result.data, msg: result.error };
       } catch (err: unknown) {
@@ -757,6 +575,7 @@ export function initUpdateBridge(): void {
 
   ipcBridge.autoUpdate.cancelDownload.provider(async (): Promise<{ success: boolean; msg?: string }> => {
     try {
+      const autoUpdaterService = await loadAutoUpdaterService();
       const result = await autoUpdaterService.cancelDownload();
       return { success: result.success, msg: result.error };
     } catch (err: unknown) {
@@ -764,7 +583,9 @@ export function initUpdateBridge(): void {
     }
   });
 
-  ipcBridge.autoUpdate.quitAndInstall.provider(async (): Promise<void> => {
+  ipcBridge.autoUpdate.quitAndInstall.provider(async (): Promise<{ success: boolean; msg?: string }> => {
+    const autoUpdaterService = await loadAutoUpdaterService();
     await autoUpdaterService.quitAndInstall();
+    return { success: true };
   });
 }

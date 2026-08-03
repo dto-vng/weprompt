@@ -146,7 +146,7 @@ const WorkspaceFolderSelect: React.FC<WorkspaceFolderSelectProps> = ({
         className={`flex items-center gap-10px rounded-10px border px-12px py-10px transition-all ${
           menuVisible
             ? 'border-primary-5 bg-fill-2 shadow-sm'
-            : 'border-border-2 bg-fill-1 hover:border-border-1 hover:bg-fill-2'
+            : 'border-[var(--color-border-2)] bg-fill-1 hover:border-[var(--color-border-1)] hover:bg-fill-2'
         }`}
       >
         <FolderOpen
@@ -157,10 +157,9 @@ const WorkspaceFolderSelect: React.FC<WorkspaceFolderSelectProps> = ({
           style={{ transform: 'translateY(3px)' }}
         />
         {value ? (
-          <div className='flex min-w-0 flex-1 flex-col justify-center'>
-            <span className='text-sm leading-20px text-t-primary'>{folderName}</span>
-            <span className='truncate text-11px leading-16px text-t-tertiary'>{value}</span>
-          </div>
+          <span className='min-w-0 flex-1 truncate text-sm leading-20px text-t-primary' title={value}>
+            {folderName}
+          </span>
         ) : (
           <span className='min-w-0 flex-1 truncate text-sm leading-20px text-t-secondary'>{placeholder}</span>
         )}
@@ -195,7 +194,7 @@ const WorkspaceFolderSelect: React.FC<WorkspaceFolderSelectProps> = ({
             WebkitBackdropFilter: 'none',
             isolation: 'isolate',
           }}
-          className='overflow-x-hidden overflow-y-auto rounded-12px border border-border-1 p-6px shadow-[0_18px_48px_rgba(0,0,0,0.42)]'
+          className='overflow-x-hidden overflow-y-auto rounded-12px border border-[var(--color-border-1)] p-6px shadow-[0_18px_48px_rgba(0,0,0,0.42)]'
         >
           {recentWorkspaces.length > 0 && (
             <>

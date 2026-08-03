@@ -5,7 +5,7 @@
  *
  * Two modes:
  *   1. **Packaged mode** (CI default): Launches from electron-builder's unpacked output
- *      (e.g. out/linux-unpacked/aionui, out/mac-arm64/AionUi.app, out/win-unpacked/AionUi.exe).
+ *      (e.g. out/linux-unpacked/weprompt, out/mac-arm64/WePrompt.app, out/win-unpacked/WePrompt.exe).
  *      This validates that packaged resources are intact.
  *   2. **Dev mode** (local default): Launches via `electron .` from project root with
  *      the Vite dev server (electron-vite dev).
@@ -17,7 +17,6 @@ import { _electron as electron } from 'playwright';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { resolvePackagedApp } from './helpers/packagedApp';
 
 type Fixtures = {
   electronApp: ElectronApplication;
@@ -28,27 +27,104 @@ type WorkerFixtures = {
   e2eWorkerCleanup: void;
 };
 
+type RendererDiagnostic = {
+  type: 'console' | 'pageerror' | 'requestfailed';
+  text: string;
+};
+
 // Singleton – one app per test worker
 let app: ElectronApplication | null = null;
 let mainPage: Page | null = null;
 const projectRoot = path.resolve(__dirname, '../..');
-const productMetadata = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')) as {
-  productName?: unknown;
-};
-const productName = typeof productMetadata.productName === 'string' ? productMetadata.productName : 'AionUi';
 const e2eStateSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aionui-e2e-state-'));
 const e2eStateFile = path.join(e2eStateSandboxDir, 'extension-states.json');
 const e2eUserDataSandboxDir = path.join(e2eStateSandboxDir, 'user-data');
 fs.mkdirSync(e2eUserDataSandboxDir, { recursive: true });
+const rendererDiagnostics = new WeakMap<Page, RendererDiagnostic[]>();
 
 function isDevToolsWindow(page: Page): boolean {
   return page.url().startsWith('devtools://');
 }
 
+function attachRendererDiagnostics(page: Page): void {
+  if (rendererDiagnostics.has(page)) return;
+
+  const diagnostics: RendererDiagnostic[] = [];
+  rendererDiagnostics.set(page, diagnostics);
+
+  page.on('console', (message) => {
+    if (!['error', 'warning'].includes(message.type())) return;
+    diagnostics.push({ type: 'console', text: `${message.type()}: ${message.text()}` });
+  });
+  page.on('pageerror', (error) => {
+    diagnostics.push({ type: 'pageerror', text: error.stack || error.message });
+  });
+  page.on('requestfailed', (request) => {
+    const failure = request.failure()?.errorText ?? 'unknown';
+    diagnostics.push({ type: 'requestfailed', text: `${request.url()} - ${failure}` });
+  });
+}
+
+async function getRendererReadinessSnapshot(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const root = document.querySelector('#root');
+    const scripts = Array.from(document.scripts)
+      .map((script) => script.src || script.getAttribute('src') || '')
+      .filter(Boolean);
+    const stylesheets = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map((link) => (link as HTMLLinkElement).href || link.getAttribute('href') || '')
+      .filter(Boolean);
+
+    return {
+      href: window.location.href,
+      title: document.title,
+      readyState: document.readyState,
+      bodyTextLength: document.body?.innerText?.trim().length ?? 0,
+      bodyHtmlSample: document.body?.innerHTML?.slice(0, 300) ?? '',
+      rootExists: Boolean(root),
+      rootChildCount: root?.children.length ?? -1,
+      scriptCount: scripts.length,
+      stylesheetCount: stylesheets.length,
+      scripts,
+      stylesheets,
+    };
+  });
+}
+
+async function ensureRendererAppMounted(page: Page): Promise<void> {
+  attachRendererDiagnostics(page);
+  await page.waitForLoadState('domcontentloaded', { timeout: 30_000 });
+
+  try {
+    await page.waitForFunction(
+      () => {
+        const root = document.querySelector('#root');
+        return Boolean(root && root.children.length > 0 && document.scripts.length > 0);
+      },
+      undefined,
+      { timeout: 30_000 }
+    );
+  } catch (error) {
+    const snapshot = await getRendererReadinessSnapshot(page).catch((snapshotError: unknown) => ({
+      snapshotError: snapshotError instanceof Error ? snapshotError.message : String(snapshotError),
+    }));
+    const diagnostics = rendererDiagnostics.get(page)?.slice(-20) ?? [];
+    throw new Error(
+      [
+        'Electron renderer did not mount a non-empty app root.',
+        `Wait failure: ${error instanceof Error ? error.message : String(error)}`,
+        `Snapshot: ${JSON.stringify(snapshot, null, 2)}`,
+        `Diagnostics: ${JSON.stringify(diagnostics, null, 2)}`,
+      ].join('\n'),
+      { cause: error }
+    );
+  }
+}
+
 async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page> {
   const existingMainWindow = electronApp.windows().find((win) => !isDevToolsWindow(win));
   if (existingMainWindow) {
-    await existingMainWindow.waitForLoadState('domcontentloaded');
+    await ensureRendererAppMounted(existingMainWindow);
     return existingMainWindow;
   }
 
@@ -59,7 +135,7 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
 
     const win = await electronApp.waitForEvent('window', { timeout: 1_000 }).catch(() => null);
     if (win && !isDevToolsWindow(win)) {
-      await win.waitForLoadState('domcontentloaded');
+      await ensureRendererAppMounted(win);
       return win;
     }
 
@@ -67,6 +143,38 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
   };
 
   return resolveWindowBefore(Date.now() + 30_000);
+}
+
+/** Resolve the current WePrompt executable from electron-builder's unpacked output. */
+function resolvePackagedApp(): { executablePath: string; cwd: string } | null {
+  const outDir = path.join(projectRoot, 'out');
+  if (!fs.existsSync(outDir)) return null;
+
+  if (process.platform === 'win32') {
+    for (const dir of ['win-unpacked', 'win-x64-unpacked', 'win-arm64-unpacked']) {
+      const executablePath = path.join(outDir, dir, 'WePrompt.exe');
+      if (fs.existsSync(executablePath)) return { executablePath, cwd: path.join(outDir, dir) };
+    }
+  } else if (process.platform === 'darwin') {
+    for (const dir of ['mac-arm64', 'mac-x64', 'mac', 'mac-universal']) {
+      const cwd = path.join(outDir, dir);
+      if (!fs.existsSync(cwd)) continue;
+      const appBundle = fs.readdirSync(cwd).find((file) => file.endsWith('.app'));
+      if (!appBundle) continue;
+      const executablePath = path.join(cwd, appBundle, 'Contents', 'MacOS', 'WePrompt');
+      if (fs.existsSync(executablePath)) return { executablePath, cwd };
+    }
+  } else {
+    for (const dir of ['linux-unpacked', 'linux-x64-unpacked', 'linux-arm64-unpacked']) {
+      const cwd = path.join(outDir, dir);
+      for (const name of ['weprompt', 'WePrompt']) {
+        const executablePath = path.join(cwd, name);
+        if (fs.existsSync(executablePath)) return { executablePath, cwd };
+      }
+    }
+  }
+
+  return null;
 }
 
 function shouldUsePackagedMode(): boolean {
@@ -86,16 +194,12 @@ async function launchApp(): Promise<ElectronApplication> {
     AIONUI_DISABLE_AUTO_UPDATE: '1',
     AIONUI_DISABLE_DEVTOOLS: '1',
     AIONUI_E2E_TEST: '1',
+    AIONUI_E2E_USER_DATA_DIR: process.env.AIONUI_E2E_USER_DATA_DIR || e2eUserDataSandboxDir,
     AIONUI_CDP_PORT: '0',
-    ...(process.env.AIONUI_E2E_STUDIO_FAKE === '1' ? { AIONUI_E2E_USER_DATA_DIR: e2eUserDataSandboxDir } : {}),
   };
 
   if (usePackaged) {
-    const packaged = resolvePackagedApp({
-      outDir: path.join(projectRoot, 'out'),
-      platform: process.platform,
-      productName,
-    });
+    const packaged = resolvePackagedApp();
     if (!packaged) {
       throw new Error(
         'E2E packaged mode: could not find packaged app under out/. ' +
@@ -210,7 +314,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     // to speed up consecutive tests sharing the same window.
     try {
       if (mainPage.url() === 'about:blank' || mainPage.url() === '') {
-        await mainPage.waitForLoadState('domcontentloaded', { timeout: 15_000 });
+        await ensureRendererAppMounted(mainPage);
       }
     } catch {
       // Page may have been replaced – resolve again
@@ -220,6 +324,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     if (mainPage.isClosed()) {
       mainPage = await resolveMainWindow(electronApp);
     }
+    await ensureRendererAppMounted(mainPage);
     await use(mainPage);
 
     // Attach screenshot on failure so it appears in the HTML report.

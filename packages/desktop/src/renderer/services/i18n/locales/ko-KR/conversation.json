@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "안녕하세요, 오늘의 계획은 무엇인가요?",
-    "placeholder": "메시지 전송, 파일 업로드, 폴더 열기 또는 예약 작업 만들기...",
+    "placeholder": "메시지 전송, 파일 업로드, 폴더 열기, 예약 작업 만들기 또는 / 로 명령 호출...",
     "linkFolder": "폴더 열기",
     "newConversation": "새 채팅",
     "selectModel": "모델 선택",
@@ -17,7 +17,6 @@
     "quickActionStar": "마음에 드시나요? 별을 주세요!",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "커뮤니티 Skills를 필요에 따라 검색하고 활성화. 한 번 설정하면 모든 Agent에서 사용 가능.",
-    "skillsMarketDetails": "자세히 >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -43,6 +42,7 @@
     "scopedHint": "— 이 프로젝트로 범위 한정",
     "chats": "채팅",
     "showAll": "모두 보기",
+    "showLess": "간략히 보기",
     "emptyChatsTitle": "아직 채팅이 없습니다",
     "emptyChatsBody": "위에서 채팅을 시작하면 이 프로젝트에서 작업을 시작할 수 있습니다.",
     "instructions": "지침",
@@ -53,6 +53,7 @@
     "save": "저장",
     "cancel": "취소",
     "instructionsSaved": "지침이 저장되었습니다",
+    "instructionsSaveFailed": "지침을 저장할 수 없습니다",
     "files": "파일",
     "revealInFolder": "폴더에서 보기",
     "filesReadonly": "읽기 전용 · 폴더에서 관리",
@@ -71,23 +72,47 @@
     "remove": "제거",
     "knowledge": "지식",
     "knowledgeAdd": "파일 추가",
+    "knowledgeDropFolderMissing": "파일을 추가하기 전에 Knowledge Base 폴더를 다시 연결하세요.",
+    "knowledgeDropUnsupported": "지원되지 않는 파일입니다. 지원 형식: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "지식 베이스를 새로 고칠 수 없습니다.",
+    "knowledgeRelinkFailed": "프로젝트 폴더를 다시 연결할 수 없습니다.",
+    "knowledgeRetryFailed": "해당 파일을 색인 대기열에 추가할 수 없습니다.",
+    "knowledgeDeleteFailed": "해당 파일을 휴지통으로 이동할 수 없습니다.",
+    "knowledgeAddFailed": "해당 파일을 지식 베이스에 추가할 수 없습니다.",
     "knowledgeEmpty": "문서를 추가하면 이 프로젝트의 지식 베이스를 구축할 수 있습니다. 어시스턴트가 이 프로젝트의 모든 채팅에서 자동으로 검색합니다.",
-    "knowledgeSummary": "파일 {{files}}개 · 구절 {{passages}}개",
-    "knowledgeSemanticOn": "시맨틱 검색 켜짐",
     "knowledgeSemanticOff": "시맨틱 검색 꺼짐 — 임베딩 모델 미설정",
-    "knowledgePassages": "구절 {{count}}개",
+    "knowledgeSemanticOffAction": "임베딩 모델 추가",
+    "knowledgeEmbedAll": "모두 임베딩",
+    "knowledgePassagesTooltip": "이 파일은 검색 가능한 구절로 나뉘며, 어시스턴트가 답변할 때 가장 관련 있는 부분을 가져옵니다.",
     "knowledgeStatusIndexing": "색인 중…",
     "knowledgeProgressReading": "{{total}}페이지 중 {{done}}페이지 읽는 중",
-    "knowledgeProgressEmbedding": "구절 {{total}}개 중 {{done}}개 임베딩 중",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} 페이지 텍스트 변환 중",
+    "knowledgeProgressEmbedding": "임베딩 중 {{done}}/{{total}}…",
     "knowledgeStatusFailed": "실패",
     "knowledgeStatusUnsupported": "지원되지 않음",
+    "knowledgeStatusNotEmbedded": "키워드 전용",
+    "knowledgeNotEmbeddedDetail": "키워드로는 검색되지만 {{done}}/{{total}} 구절만 임베딩되었습니다. 다시 시도하면 나머지를 임베딩합니다.",
     "knowledgeRetry": "다시 시도",
-    "knowledgeRemove": "제거",
-    "knowledgeRemoveConfirm": "이 파일을 지식 베이스에서 제거하시겠습니까?",
     "knowledgeError": "지식 베이스를 사용할 수 없습니다.",
-    "knowledgeSupportedTypes": "지원 형식: .md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "지원 형식: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "새로 고침",
+    "knowledgeOpenOriginal": "원본 파일 열기",
+    "knowledgeDeleteFile": "파일 삭제",
+    "knowledgeDeleteConfirm": "\"{{fileName}}\"을(를) 휴지통으로 옮길까요? 지식 베이스에서도 제거됩니다.",
+    "knowledgeFolderHint": "파일은 프로젝트 폴더 안의 \"Knowledge Base\" 폴더에 있습니다. 넣어 두면 자동으로 색인됩니다.",
+    "knowledgeFolderMissingTitle": "Knowledge Base 폴더를 찾을 수 없습니다",
+    "knowledgeFolderMissingBody": "이동, 이름 변경 또는 삭제되었을 수 있습니다. 색인된 지식은 그대로 유지됩니다. 폴더를 복원하거나 프로젝트를 다시 연결한 후 새로 고치세요.",
+    "knowledgePreviewNote": "어시스턴트가 검색하는 색인 텍스트이며 원본 서식이 아닙니다.",
+    "knowledgePreviewTruncated": "미리보기가 잘렸습니다. 전체 문서는 원본 파일을 열어 확인하세요.",
+    "knowledgePreviewError": "이 파일의 색인 텍스트를 불러올 수 없습니다.",
+    "knowledgePreviewNotReady": "아직 열 수 있는 색인 텍스트가 없습니다.",
+    "knowledgeCitationMissing": "이 파일은 더 이상 지식 베이스에 없습니다.",
+    "knowledgeOcrTag": "텍스트 변환됨(OCR)",
+    "knowledgeOcrDetail": "{{model}}이(가) 스캔본에서 변환했습니다. 건너뛴 페이지: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "없음"
   },
   "history": {
+    "moreActions": "추가 작업",
     "recents": "최근",
     "today": "오늘",
     "yesterday": "어제",
@@ -102,6 +127,7 @@
     "saveName": "저장",
     "cancelEdit": "취소",
     "rename": "이름 변경",
+    "createCronTask": "예약 작업 만들기",
     "renameTitle": "채팅 이름 변경",
     "renamePlaceholder": "새 이름을 입력하세요",
     "renameSuccess": "이름이 변경되었습니다",
@@ -140,7 +166,10 @@
     "removeProject": "프로젝트 제거",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "이 프로젝트에서 새 대화",
+    "expandProjectChats": "프로젝트 채팅 펼치기",
+    "collapseProjectChats": "프로젝트 채팅 접기",
     "deleting": "삭제 중...",
+    "reorderPinned": "드래그하여 고정된 대화 순서 변경",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -160,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "프로젝트를 제거하지 못했습니다. 프로젝트를 다시 연 후 재시도하세요. 폴더의 파일은 삭제되지 않았습니다.",
+    "removeProjectChatDetachFailed": "일부 채팅을 이 프로젝트에서 분리하지 못했습니다. 프로젝트는 유지되었습니다. 제거를 다시 시도하세요.",
+    "removeProjectStateChanged": "제거하기 전에 프로젝트 목록이 변경되었습니다. 새로 고친 후 다시 시도하세요.",
+    "removeProjectStorageFailed": "프로젝트 변경 사항을 저장하지 못했습니다. WePrompt가 앱 데이터에 접근할 수 있는지 확인한 후 다시 시도하세요.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -181,7 +213,6 @@
   "noAgentsAvailable": "사용 가능한 에이전트가 없습니다",
   "noModelConfigured": "모델이 설정되지 않았습니다. 설정 페이지에서 설정하세요.",
   "createFailed": "대화 생성에 실패했습니다",
-  "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "선택한 작업공간 경로를 사용할 수 없습니다. 작업공간 경로 \"{{workspacePath}}\" 가 실제로 존재하고 접근 가능한지 확인하세요."
@@ -521,6 +552,7 @@
     "noModelSelected": "현재 세션에 선택된 모델이 없어 메시지를 보낼 수 없습니다",
     "sendMessageTo": "{{model}}에게 메시지 보내기",
     "processing": "처리 중...",
+    "stopGenerating": "생성 중지",
     "quotaExceededTitle": "모델 할당량 도달",
     "quotaExceededBody": "현재 모델 할당량이 소진되었습니다. {{model}}(으)로 전환하여 계속하시겠습니까?",
     "quotaExceededNoFallback": "모델 할당량에 도달했습니다. 다른 사용 가능한 모델로 전환하세요.",
@@ -568,8 +600,8 @@
     "error": "보조 질문에 답하지 못했습니다."
   },
   "commandQueue": {
-    "title": "대기 중인 명령",
-    "clear": "대기열 비우기",
+    "title": "임시함",
+    "clear": "임시함 비우기",
     "edit": "편집",
     "editing": "편집 중",
     "editPlaceholder": "실행되기 전에 이 대기 명령을 수정하세요.",
@@ -584,7 +616,19 @@
     "queueFull": "대기열이 가득 찼습니다. 일부 명령을 제거한 뒤 다시 추가하세요.",
     "inputTooLong": "대기열에 넣을 명령이 너무 깁니다. 줄인 뒤 다시 보내세요.",
     "tooManyFiles": "이 대기 명령에는 파일이 너무 많이 첨부되었습니다.",
-    "queueTooLarge": "대기열 데이터가 너무 커서 안전하게 저장할 수 없습니다. 일부 명령을 먼저 제거하세요."
+    "queueTooLarge": "대기열 데이터가 너무 커서 안전하게 저장할 수 없습니다. 일부 명령을 먼저 제거하세요.",
+    "sendNow": "지금 보내기",
+    "modeToggle": "전송 모드 전환",
+    "help": "사용 안내",
+    "helpIntro": "AI가 응답하는 동안 보낸 메시지가 여기에 임시로 보관됩니다.",
+    "helpAuto": ": 각 응답이 끝날 때마다 자동으로 하나씩 전송됩니다.",
+    "helpManual": ": 자동 전송하지 않고 보관하며, 각각 \"지금 보내기\"로 전송합니다.",
+    "clearConfirmTitle": "보내기 임시함을 비울까요?",
+    "clearConfirmContent": "대기 중인 모든 메시지가 삭제되며 되돌릴 수 없습니다.",
+    "mode": {
+      "auto": "자동 전송",
+      "manual": "수동 전송"
+    }
   },
   "contextUsage": {
     "contextUsed": "사용된 컨텍스트",
@@ -595,7 +639,9 @@
     "today": "오늘",
     "weekToDate": "이번 주 누적",
     "monthToDate": "이번 달 누적",
-    "triggerLabel": "컨텍스트 사용량 표시"
+    "triggerLabel": "컨텍스트 사용량 표시",
+    "estimated": "예상",
+    "unavailable": "컨텍스트 사용량을 확인할 수 없음"
   },
   "skill_generator": {
     "title": "스킬/규칙 생성",
@@ -635,35 +681,22 @@
       "loaded": "로드됨",
       "failed": "실패",
       "unsupported": "지원되지 않음"
-    }
-  },
-  "status": {
-    "waitingApproval": "승인을 기다리는 중",
-    "running": "작업 중",
-    "done": "완료",
-    "doneIdle": "완료 — 유휴",
-    "stopped": "중지됨",
-    "failed": "실패"
-  },
-  "statusTooltip": {
-    "waitingApproval": "계속하려면 승인을 기다리고 있습니다.",
-    "running": "이 채팅을 처리하고 있습니다.",
-    "doneUnseen": "완료되었지만 아직 확인하지 않았습니다.",
-    "doneSeen": "최근에 완료되었으며 확인했습니다.",
-    "doneIdle": "최소 1분 전에 완료되었으며 확인했습니다.",
-    "stopped": "완료되기 전에 중지되었습니다.",
-    "failed": "오류로 인해 완료하지 못했습니다."
+    },
+    "selected": "선택된 MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "실행 환경을 준비하는 중입니다. 첫 시작은 조금 더 오래 걸릴 수 있습니다."
   },
   "sendbox": {
-    "hint": "/ 로 명령, @ 로 파일 참조"
+    "hint": "/ 로 명령, @ 로 파일 참조, ↑/↓ 로 메시지 기록 전환"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "이번 요청에서는 표시할 수 있는 응답이 없었습니다."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "이 요청은 표시할 응답을 생성하지 않았습니다. 이 에이전트는 먼저 로그인이 필요할 수 있습니다: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "이번 요청은 표시 가능한 응답이 나오기 전에 모델의 출력 토큰 한도에 도달했습니다."
@@ -677,6 +710,89 @@
     }
   },
   "notFound": "대화를 찾을 수 없거나 삭제되었습니다",
+  "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
+  "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "비즈니스 리뷰",
+        "description": "분기 실적 덱 — KPI 요약, 세그먼트 상세, 전망. 네이비와 앰버."
+      },
+      "project-kickoff": {
+        "name": "프로젝트 킥오프",
+        "description": "킥오프 덱 — 범위, 팀, 일정, 다음 단계. 깔끔한 청록."
+      },
+      "monthly-steerco": {
+        "name": "월간 운영위원회",
+        "description": "운영위원회 보고 — 포트폴리오 현황, 리스크, 결정 필요 사항. 세리프와 골드."
+      },
+      "connected-ops": {
+        "name": "커넥티드 운영",
+        "description": "운영 리뷰 — 사업장 지표, 가동률, 장애. 인더스트리얼 그린."
+      },
+      "editorial-field-report": {
+        "name": "에디토리얼 현장 보고서",
+        "description": "장문 보고서 — 세리프 서체, 불릿보다 서술문, 빨강 강조 하나."
+      },
+      "market-trends-report": {
+        "name": "시장 동향 보고서",
+        "description": "데이터 중심 스크롤 보고서 — 출처가 있는 차트."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "미니멀 라이트 덱 — 슬라이드당 하나의 메시지, 파랑 강조 하나."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "기술 발표용 미니멀 다크 덱 — 코드에 적합, 초록 강조."
+      },
+      "business-report": {
+        "name": "비즈니스 보고서",
+        "description": "장문 공식 보고서 — 표지, 목차, 데이터 표, 네이비 세리프 제목."
+      },
+      "decision-memo": {
+        "name": "의사결정 메모",
+        "description": "짧은 의사결정 메모 — 수신/발신/제목 블록, 권고를 앞에, 표지 없음."
+      },
+      "operations-guide": {
+        "name": "운영 가이드",
+        "description": "간결한 표준 절차 — 번호 단계, 참고 박스, 체크리스트, 청록 강조."
+      },
+      "proposal-sow": {
+        "name": "제안서 / SOW",
+        "description": "고객 제안서 — 범위, 일정, 가격표, 서명란."
+      }
+    },
+    "title": "템플릿",
+    "columnPptx": "프레젠테이션 · PPTX",
+    "columnHtml": "웹 · HTML",
+    "columnDocx": "문서 · DOCX",
+    "selected": "선택됨",
+    "buttonTooltip": "템플릿",
+    "slashDescription": "템플릿 선택",
+    "importCard": "템플릿 가져오기 (.md)",
+    "empty": "사용 가능한 템플릿이 없습니다",
+    "chipTooltip": "이 메시지는 템플릿을 사용합니다",
+    "scratch": {
+      "prepareError": "아티팩트 임시 공간을 준비하지 못했습니다: {{error}}",
+      "retained": "복구를 위해 임시 아티팩트 파일을 {{path}}에 보관했습니다.",
+      "cleanup": "정리",
+      "cleanupSuccess": "임시 아티팩트 파일을 제거했습니다",
+      "cleanupError": "정리 실패: {{error}}"
+    },
+    "importSuccess": "템플릿을 가져왔습니다",
+    "importError": "가져오기 실패: {{error}}",
+    "removeError": "삭제 실패: {{error}}",
+    "deleteTooltip": "템플릿 삭제",
+    "deleteConfirm": "이 템플릿을 삭제하시겠습니까?"
+  },
+  "status": {
+    "waitingApproval": "승인을 기다리는 중",
+    "running": "작업 중",
+    "done": "완료",
+    "doneIdle": "완료 — 유휴",
+    "stopped": "중지됨",
+    "failed": "실패"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -1035,5 +1151,19 @@
   "artifact": {
     "emptyTitle": "열린 아티팩트 없음",
     "emptyHint": "생성된 파일과 문서가 여기에 열립니다."
-  }
+  },
+  "statusTooltip": {
+    "waitingApproval": "계속하려면 승인을 기다리고 있습니다.",
+    "running": "이 채팅을 처리하고 있습니다.",
+    "doneUnseen": "완료되었지만 아직 확인하지 않았습니다.",
+    "doneSeen": "최근에 완료되었으며 확인했습니다.",
+    "doneIdle": "최소 1분 전에 완료되었으며 확인했습니다.",
+    "stopped": "완료되기 전에 중지되었습니다.",
+    "failed": "오류로 인해 완료하지 못했습니다."
+  },
+  "staleKnowledgeHint": {
+    "body": "이 대화는 프로젝트 지식 베이스를 검색할 수 없습니다. 파일이 추가되기 전에 시작되었기 때문입니다.",
+    "action": "새 대화 시작"
+  },
+  "emptyChat": "메시지를 보내 시작하세요."
 }

@@ -18,6 +18,7 @@ import { isConversationProcessing } from '@/renderer/pages/conversation/utils/co
 import { ensureConversationRuntime } from '@/renderer/pages/conversation/utils/ensureConversationRuntime';
 import type { ThoughtData } from '@/renderer/components/chat/ThoughtDisplay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { emitter } from '@/renderer/utils/emitter';
 
 export type UseAcpMessageReturn = {
   thought: ThoughtData;
@@ -56,7 +57,14 @@ function fetchAcpSlashCommands(conversation_id: string): Promise<SlashCommandIte
   return promise;
 }
 
-export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: boolean }): UseAcpMessageReturn => {
+export const useAcpMessage = (
+  conversation_id: string,
+  options?: {
+    skipWarmup?: boolean;
+    prepareRuntime?: () => Promise<void>;
+    onTerminal?: (event: { turnId?: string; outcome: 'completed' | 'failed' }) => void;
+  }
+): UseAcpMessageReturn => {
   const mergeLiveMessage = useMergeLiveMessage();
   const [running, setRunning] = useState(false);
   const [hasHydratedRunningState, setHasHydratedRunningState] = useState(false);
@@ -71,6 +79,11 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const [context_limit, setContextLimit] = useState<number>(0);
   const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
+  const onTerminalRef = useRef(options?.onTerminal);
+
+  useEffect(() => {
+    onTerminalRef.current = options?.onTerminal;
+  }, [options?.onTerminal]);
 
   // Use refs to sync state for immediate access in event handlers
   const runningRef = useRef(running);
@@ -187,6 +200,12 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
       }
 
       if (isErrorTipMessage(message)) {
+        onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'failed' });
+        emitter.emit('artifact.scratch.terminal', {
+          conversationId: conversation_id,
+          turnId: message.turn_id,
+          outcome: 'failed',
+        });
         turnFinishedRef.current = true;
         setRunning(false);
         runningRef.current = false;
@@ -277,6 +296,12 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
           break;
         case 'finish':
           {
+            onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'completed' });
+            emitter.emit('artifact.scratch.terminal', {
+              conversationId: conversation_id,
+              turnId: message.turn_id,
+              outcome: 'completed',
+            });
             logStreamTerminalObserved(conversation_id, message.turn_id, 'acp', message.type);
             // Mark turn as finished to prevent auto-recover from late messages
             turnFinishedRef.current = true;
@@ -419,6 +444,12 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
           }
           break;
         case 'error':
+          onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'failed' });
+          emitter.emit('artifact.scratch.terminal', {
+            conversationId: conversation_id,
+            turnId: message.turn_id,
+            outcome: 'failed',
+          });
           logStreamTerminalObserved(conversation_id, message.turn_id, 'acp', message.type);
           // Stop all loading states when error occurs
           turnFinishedRef.current = true;
@@ -551,9 +582,10 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
   // StreamRelay is listening, so the initial load must come from HTTP.
   // In team mode, runtime preparation is coordinated by the team send box.
   useEffect(() => {
-    if (options?.skipWarmup) return;
+    if (options?.skipWarmup && !options.prepareRuntime) return;
     let cancelled = false;
-    void ensureConversationRuntime(conversation_id)
+    const runtimeReady = options?.prepareRuntime?.() ?? ensureConversationRuntime(conversation_id);
+    void runtimeReady
       .then(() => {
         if (cancelled) return;
         return fetchAcpSlashCommands(conversation_id);
@@ -567,7 +599,7 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
     return () => {
       cancelled = true;
     };
-  }, [conversation_id, options?.skipWarmup]);
+  }, [conversation_id, options?.prepareRuntime, options?.skipWarmup]);
 
   const resetState = useCallback(() => {
     turnFinishedRef.current = true;
@@ -583,14 +615,15 @@ export const useAcpMessage = (conversation_id: string, options?: { skipWarmup?: 
   }, []);
 
   const fetchSlashCommands = useCallback(() => {
-    void ensureConversationRuntime(conversation_id)
+    const runtimeReady = options?.prepareRuntime?.() ?? ensureConversationRuntime(conversation_id);
+    void runtimeReady
       .then(() => fetchAcpSlashCommands(conversation_id))
       .then((commands) => {
         if (!commands.length) return;
         setSlashCommands(commands);
       })
       .catch(() => {});
-  }, [conversation_id]);
+  }, [conversation_id, options?.prepareRuntime]);
 
   return {
     thought,

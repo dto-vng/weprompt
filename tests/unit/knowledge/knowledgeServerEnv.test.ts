@@ -160,11 +160,21 @@ describe('createSearchHandler', () => {
 });
 
 describe('buildToolDescription', () => {
-  it('steers away from file tools and states the docs are not on disk', () => {
+  it('steers the model to search before reaching for file tools', () => {
     const d = buildToolDescription([]);
     expect(d).toMatch(/USE THIS FIRST/);
-    expect(d).toMatch(/do NOT live in the working directory/);
-    expect(d).toMatch(/glob, grep/);
+    expect(d).toMatch(/before file listing, glob, or grep/);
+  });
+
+  // The documents now live in the workspace, so the old "they are not on
+  // disk" claim would actively mislead: whole-document questions are answered
+  // by reading the file, which the model only does if told the path.
+  it('tells the model whole documents are readable at Knowledge Base/<fileName>', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain('Knowledge Base/');
+    expect(d).toMatch(/file tools/);
+    expect(d).not.toMatch(/do NOT live in the working directory/);
+    expect(d).not.toMatch(/cannot be found with file listing/);
   });
 
   it('names the attached documents so the tool is discoverable by topic', () => {
@@ -181,5 +191,27 @@ describe('buildToolDescription', () => {
     expect(d).toContain('- doc-19.md');
     expect(d).not.toContain('- doc-20.md');
     expect(d).toContain('…and 5 more');
+  });
+
+  it('points the model at the citation header as the source of the fileName', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain('[n] <fileName> — <section>');
+    expect(d).toMatch(/CITE BY fileName/);
+  });
+
+  // Prose citations only linkify on an exact fileName (see
+  // linkifyKnownSources.ts). Observed in acceptance: the model cited a document
+  // by the title printed inside the passage text, so the answer carried no
+  // clickable source at all. The old passive "each cited with its source
+  // filename" line never told it to do otherwise, so its absence is asserted
+  // too — the rule must replace that line, not sit alongside it.
+  it('forbids citing by document title instead of fileName', () => {
+    const d = buildToolDescription([]);
+    expect(d).toContain("never the document's title");
+    expect(d).not.toMatch(/each cited with its source filename/);
+  });
+
+  it('keeps the citation rule when documents are attached', () => {
+    expect(buildToolDescription(['policy.docx'])).toMatch(/CITE BY fileName/);
   });
 });

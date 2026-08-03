@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Message } from '@arco-design/web-react';
+import { BackendHttpError } from '@/common/adapter/httpBridge';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
 
@@ -54,6 +56,9 @@ const {
   translateMock,
   useTeamPermissionMock,
   setSendBoxHandlerMock,
+  markSendFailedMock,
+  markSendStartedMock,
+  markSendAcceptedMock,
   contextUsageIndicatorProps,
   sendBoxProps,
 } = vi.hoisted(() => ({
@@ -90,11 +95,19 @@ const {
   translateMock: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
   useTeamPermissionMock: vi.fn(),
   setSendBoxHandlerMock: vi.fn(),
+  markSendFailedMock: vi.fn(),
+  markSendStartedMock: vi.fn(),
+  markSendAcceptedMock: vi.fn(),
   contextUsageIndicatorProps: {
     current: null as {
-      tokenUsage: { total_tokens: number } | null;
+      budget: {
+        source: 'runtime' | 'estimated' | 'unknown';
+        totalTokens: number | null;
+        contextLimit?: number;
+        ratio: number | null;
+        status: 'healthy' | 'watch' | 'compress' | 'too_large';
+      };
       localUsage: { today: number; weekToDate: number; monthToDate: number };
-      context_limit?: number;
     } | null,
   },
   sendBoxProps: {
@@ -160,12 +173,17 @@ vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
 }));
 vi.mock('@/renderer/components/agent/ContextUsageIndicator', () => ({
   default: (props: {
-    tokenUsage: { total_tokens: number } | null;
+    budget: {
+      source: 'runtime' | 'estimated' | 'unknown';
+      totalTokens: number | null;
+      contextLimit?: number;
+      ratio: number | null;
+      status: 'healthy' | 'watch' | 'compress' | 'too_large';
+    };
     localUsage: { today: number; weekToDate: number; monthToDate: number };
-    context_limit?: number;
   }) => {
     contextUsageIndicatorProps.current = props;
-    return props.tokenUsage ? <span data-testid='context-usage-indicator' /> : null;
+    return <span data-testid='context-usage-indicator' />;
   },
 }));
 vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({ default: () => null }));
@@ -202,7 +220,26 @@ vi.mock('@/renderer/hooks/context/ConversationContext', () => ({
   useConversationContextSafe: () => ({
     loadedSkills: [],
     loadedMcpStatuses: [],
+    conversation: {
+      id: 'conv-1',
+      name: 'AionRS budget fixture',
+      type: 'aionrs',
+      created_at: 1,
+      modified_at: 1,
+      extra: { backend: 'aionrs', workspace: '/tmp/aionrs-budget' },
+      model: {
+        id: 'provider-1',
+        name: 'Provider',
+        platform: 'openai',
+        base_url: '',
+        api_key: '',
+        use_model: 'gpt-4.1',
+      },
+    },
   }),
+}));
+vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
+  useMessageList: () => [],
 }));
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: false }),
@@ -334,7 +371,12 @@ describe('AionrsSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     aionrsMessageState.current = createAionrsMessageState();
-    runtimeViewState.current = createRuntimeViewState();
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      markSendStarted: markSendStartedMock,
+      markSendAccepted: markSendAcceptedMock,
+      markSendFailed: markSendFailedMock,
+    };
     thoughtDisplayProps.current = null;
     contextUsageIndicatorProps.current = null;
     sendBoxProps.current = null;
@@ -392,12 +434,57 @@ describe('AionrsSendBox', () => {
     });
   });
 
+  it('does not start standalone runtime while preparing a team conversation', async () => {
+    const warmupSession = vi.fn().mockResolvedValue(undefined);
+    useTeamPermissionMock.mockReturnValue({
+      isTeamMode: true,
+      isLeaderAgent: true,
+      leaderConversationId: 'conv-1',
+      allConversationIds: ['conv-1'],
+      propagateMode: vi.fn(),
+      warmupSession,
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => {
+      expect(warmupSession).toHaveBeenCalled();
+    });
+    expect(ensureConversationRuntimeMock).not.toHaveBeenCalled();
+  });
+
   it('uses runtime ensure instead of legacy warmup for standalone runtime preparation', async () => {
     render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
 
     await waitFor(() => {
       expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1');
     });
+  });
+
+  it('suppresses visible error and preserves runtime gate for active-turn busy conflicts', async () => {
+    sendMessageInvokeMock.mockRejectedValue(
+      new BackendHttpError({
+        method: 'POST',
+        path: '/api/conversations/conv-1/messages',
+        status: 409,
+        body: { success: false, code: 'CONFLICT', error: 'conversation conv-1 is already running' },
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await waitFor(() => expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1'));
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => {
+      expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1);
+    });
+    expect(markSendFailedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'busy_conflict', busyKind: 'active_turn' })
+    );
+    expect(Message.error).not.toHaveBeenCalled();
   });
 
   it('renders model and permission controls in the composer action row', () => {
@@ -431,9 +518,14 @@ describe('AionrsSendBox', () => {
 
     expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
     expect(contextUsageIndicatorProps.current).toEqual({
-      tokenUsage: { total_tokens: 12_000 },
+      budget: {
+        source: 'runtime',
+        totalTokens: 12_000,
+        contextLimit: 204_800,
+        ratio: 12_000 / 204_800,
+        status: 'healthy',
+      },
       localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
-      context_limit: 204_800,
     });
     expect(screen.getByRole('button', { name: 'send' })).toBeInTheDocument();
     expect(sendBoxProps.current).not.toHaveProperty('tokenUsage');
@@ -441,10 +533,28 @@ describe('AionrsSendBox', () => {
     expect(sendBoxProps.current).not.toHaveProperty('context_limit');
   });
 
-  it('does not render a context usage meter when AionRS usage is unavailable', () => {
+  it('renders an estimated context usage meter when AionRS runtime usage is unavailable', () => {
     render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
 
-    expect(screen.queryByTestId('context-usage-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
+    expect(contextUsageIndicatorProps.current?.budget.source).toBe('estimated');
+    expect(contextUsageIndicatorProps.current?.budget.contextLimit).toBe(1_047_576);
+    expect(contextUsageIndicatorProps.current?.budget.totalTokens).toBeGreaterThan(0);
+  });
+
+  it('resolves the AionRS context window from the raw backend model field', () => {
+    const rawModelSelection = {
+      current_model: {
+        provider_id: 'minimax',
+        model: 'minimax/minimax-m2.5',
+        use_model: null,
+      },
+    } as unknown as AionrsModelSelection;
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={rawModelSelection} />);
+
+    expect(contextUsageIndicatorProps.current?.budget.contextLimit).toBe(204_800);
+    expect(contextUsageIndicatorProps.current?.budget.source).toBe('estimated');
   });
   it('hides stale processing when the hydrated runtime view is idle', () => {
     aionrsMessageState.current = {

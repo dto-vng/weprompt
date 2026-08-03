@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ElectronBridgeAPI } from '@/common/types/platform/electron';
 import type { IKnowledgeSourceDto, IProjectKnowledgeSummary } from '@/common/types/project/knowledgeTypes';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -11,40 +12,78 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const showOpenMock = vi.fn();
+const openFileMock = vi.fn();
+const showItemInFolderMock = vi.fn();
 const addSourcesMock = vi.fn();
 const removeSourceMock = vi.fn();
 const retrySourceMock = vi.fn();
+const syncNowMock = vi.fn();
+const getSourceTextMock = vi.fn();
+const updateProjectMock = vi.fn();
+const navigateMock = vi.fn();
+// vi.hoisted: vi.mock is lifted above plain const declarations, so the factory below
+// cannot close over ordinary top-level vi.fn()s.
+const arcoMessage = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), success: vi.fn() }));
 
 type HookState = {
   sources: IKnowledgeSourceDto[];
   summary: IProjectKnowledgeSummary | null;
   loading: boolean;
   error: boolean;
+  folderMissing: boolean;
 };
 
-let hookState: HookState = { sources: [], summary: null, loading: false, error: false };
+let hookState: HookState = { sources: [], summary: null, loading: false, error: false, folderMissing: false };
 
 vi.mock('react-i18next', () => ({
   // Mirrors the neighbouring *.dom.test.tsx convention of returning the raw
-  // key, but also interpolates `count` so `knowledgePassages` renders
-  // distinguishably from other status tags in the same row.
+  // key, but also interpolates the counts and the file name so progress and
+  // confirmation strings stay distinguishable from bare keys.
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
-      if (options && typeof options.count === 'number') return `${key}:${options.count}`;
       if (options && typeof options.done === 'number') return `${key}:${options.done}/${String(options.total)}`;
+      if (options && typeof options.fileName === 'string') return `${key}:${options.fileName}`;
       return key;
     },
   }),
 }));
 
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
+// The card now reports failures through Arco's imperative Message, which mounts via the
+// legacy ReactDOM.render that React 18 removed — left real it throws
+// "CopyReactDOM.render is not a function" out of the test as an unhandled rejection.
+// Only the imperative surface is replaced; every rendered Arco component stays real.
+vi.mock('@arco-design/web-react', async () => {
+  const actual = await vi.importActual<typeof import('@arco-design/web-react')>('@arco-design/web-react');
+  return {
+    ...actual,
+    Message: { ...actual.Message, ...arcoMessage },
+  };
+});
+
 vi.mock('@/common', () => ({
   ipcBridge: {
-    dialog: {
-      showOpen: {
-        invoke: (...args: unknown[]) => showOpenMock(...args),
-      },
+    dialog: { showOpen: { invoke: (...args: unknown[]) => showOpenMock(...args) } },
+    shell: {
+      openFile: { invoke: (...args: unknown[]) => openFileMock(...args) },
+      showItemInFolder: { invoke: (...args: unknown[]) => showItemInFolderMock(...args) },
     },
   },
+}));
+
+// MarkdownView renders into a shadow root, which jsdom queries cannot reach.
+// The card's contract is "hand the indexed text to the renderer", so a stub
+// that exposes the text keeps the assertion about the card, not the renderer.
+vi.mock('@/renderer/components/Markdown', () => ({
+  default: ({ children }: { children: string }) => <div data-testid='preview-markdown'>{children}</div>,
+}));
+
+vi.mock('@renderer/pages/conversation/projects/projectStorage', () => ({
+  updateProject: (...args: unknown[]) => updateProjectMock(...args),
 }));
 
 vi.mock('@/renderer/pages/project/hooks/useProjectKnowledge', () => ({
@@ -53,6 +92,8 @@ vi.mock('@/renderer/pages/project/hooks/useProjectKnowledge', () => ({
     addSources: addSourcesMock,
     removeSource: removeSourceMock,
     retrySource: retrySourceMock,
+    syncNow: syncNowMock,
+    getSourceText: getSourceTextMock,
     refetch: vi.fn(),
   }),
 }));
@@ -77,6 +118,7 @@ const readySource: IKnowledgeSourceDto = {
   addedAt: 1,
   error: null,
   progress: null,
+  ocr: null,
 };
 
 const indexingSource: IKnowledgeSourceDto = {
@@ -89,6 +131,7 @@ const indexingSource: IKnowledgeSourceDto = {
   addedAt: 2,
   error: null,
   progress: null,
+  ocr: null,
 };
 
 const failedSource: IKnowledgeSourceDto = {
@@ -101,6 +144,7 @@ const failedSource: IKnowledgeSourceDto = {
   addedAt: 3,
   error: 'Could not parse file.',
   progress: null,
+  ocr: null,
 };
 
 const unsupportedSource: IKnowledgeSourceDto = {
@@ -113,90 +157,116 @@ const unsupportedSource: IKnowledgeSourceDto = {
   addedAt: 4,
   error: 'Unsupported file type.',
   progress: null,
+  ocr: null,
+};
+
+/** A file BM25 made searchable but that no embedding model ever reached. */
+const partialSource: IKnowledgeSourceDto = { ...readySource, id: 's-partial', fileName: 'spec.pdf', vectorCount: 0 };
+
+const setState = (partial: Partial<HookState>): void => {
+  hookState = { sources: [], summary: null, loading: false, error: false, folderMissing: false, ...partial };
+};
+
+// Electron 37 removed `File.path`, so the renderer only learns a dropped
+// file's real location through the preload's `getPathForFile`.
+const droppedPaths = new Map<File, string>();
+
+const dropFile = (name: string, path?: string): File => {
+  const file = new File(['x'], name);
+  if (path) droppedPaths.set(file, path);
+  return file;
+};
+
+const dataTransferOf = (entries: Array<{ file: File; directory?: boolean }>) => ({
+  files: entries.map((entry) => entry.file),
+  items: entries.map((entry) => ({ webkitGetAsEntry: () => ({ isDirectory: !!entry.directory }) })),
+});
+
+const dropOnCard = (entries: Array<{ file: File; directory?: boolean }>): void => {
+  fireEvent.drop(screen.getByTestId('project-knowledge-card'), { dataTransfer: dataTransferOf(entries) });
 };
 
 describe('ProjectKnowledgeCard', () => {
   beforeEach(() => {
     showOpenMock.mockReset();
+    openFileMock.mockReset().mockResolvedValue(undefined);
     addSourcesMock.mockReset().mockResolvedValue(undefined);
     removeSourceMock.mockReset().mockResolvedValue(undefined);
     retrySourceMock.mockReset().mockResolvedValue(undefined);
-    hookState = { sources: [], summary: null, loading: false, error: false };
+    syncNowMock.mockReset().mockResolvedValue(undefined);
+    getSourceTextMock.mockReset().mockResolvedValue({ text: '# Indexed\n\nbody text', truncated: false });
+    updateProjectMock.mockReset();
+    showItemInFolderMock.mockReset().mockResolvedValue(undefined);
+    navigateMock.mockReset();
+    droppedPaths.clear();
+    window.electronAPI = {
+      getPathForFile: (file: File) => droppedPaths.get(file) as string,
+    } as unknown as ElectronBridgeAPI;
+    setState({});
   });
 
-  it('renders the empty state when the project has no knowledge sources', () => {
+  it('renders the empty state explaining the folder', () => {
     render(<ProjectKnowledgeCard project={project} />);
 
     expect(screen.getByTestId('project-knowledge-card')).toBeInTheDocument();
     expect(screen.getByText('conversation.projectHome.knowledgeEmpty')).toBeInTheDocument();
+    expect(screen.getByText('conversation.projectHome.knowledgeFolderHint')).toBeInTheDocument();
   });
 
   it('shows a loading indicator while sources are being fetched', () => {
-    hookState = { sources: [], summary: null, loading: true, error: false };
-
+    setState({ loading: true });
     render(<ProjectKnowledgeCard project={project} />);
-
     expect(screen.getByTestId('project-knowledge-loading')).toBeInTheDocument();
   });
 
   it('shows an error message when the knowledge base is unavailable', async () => {
-    hookState = { sources: [], summary: null, loading: false, error: true };
-
+    setState({ error: true });
     render(<ProjectKnowledgeCard project={project} />);
-
     expect(await screen.findByText('conversation.projectHome.knowledgeError')).toBeInTheDocument();
   });
 
-  it('renders source rows with status-specific affordances and the summary line', () => {
-    hookState = {
-      sources: [readySource, indexingSource, failedSource],
-      summary: { fileCount: 3, passageCount: 5, semantic: 'on' },
-      loading: false,
-      error: false,
-    };
+  // The passage count was retrieval jargon on a row the user just wants to
+  // read; a ready file is simply quiet now.
+  it('leaves a ready row free of status jargon', () => {
+    setState({ sources: [readySource], summary: { fileCount: 1, passageCount: 5, semantic: 'on' } });
 
     render(<ProjectKnowledgeCard project={project} />);
 
     expect(screen.getByText('readme.md')).toBeInTheDocument();
-    expect(screen.getByText('notes.txt')).toBeInTheDocument();
-    expect(screen.getByText('broken.docx')).toBeInTheDocument();
-
-    // Ready row: passages count, distinguishable from other counts via the count-aware t() mock.
-    expect(screen.getByText('conversation.projectHome.knowledgePassages:5')).toBeInTheDocument();
-    // Indexing row.
-    expect(screen.getByText('conversation.projectHome.knowledgeStatusIndexing')).toBeInTheDocument();
-    // Failed row: status tag plus a retry control.
-    expect(screen.getByText('conversation.projectHome.knowledgeStatusFailed')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).toBeInTheDocument();
-
-    // Summary line concatenates the summary and semantic status into one node — match by substring,
-    // not exact text, and scope to <span> so the assertion isn't tripped up by ancestor nodes whose
-    // aggregate textContent also happens to contain the same substring.
-    const summaryLine = screen.getByText(/knowledgeSummary/, { selector: 'span' });
-    expect(summaryLine).toHaveTextContent('conversation.projectHome.knowledgeSemanticOn');
+    expect(screen.queryByText(/passages/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/knowledgePassages/)).not.toBeInTheDocument();
   });
 
-  it('shows the semantic-off summary text when semantic search is off', () => {
-    hookState = {
-      sources: [readySource],
-      summary: { fileCount: 1, passageCount: 5, semantic: 'off' },
-      loading: false,
-      error: false,
-    };
+  it('says nothing in the footer while everything is healthy', () => {
+    setState({ sources: [readySource], summary: { fileCount: 1, passageCount: 5, semantic: 'on' } });
+    render(<ProjectKnowledgeCard project={project} />);
+    expect(screen.queryByTestId('knowledge-degraded-note')).not.toBeInTheDocument();
+  });
+
+  it('warns only when semantic search is degraded', () => {
+    setState({ sources: [readySource], summary: { fileCount: 1, passageCount: 5, semantic: 'off' } });
 
     render(<ProjectKnowledgeCard project={project} />);
 
-    const summaryLine = screen.getByText(/knowledgeSummary/, { selector: 'span' });
-    expect(summaryLine).toHaveTextContent('conversation.projectHome.knowledgeSemanticOff');
+    expect(screen.getByTestId('knowledge-degraded-note')).toHaveTextContent(
+      'conversation.projectHome.knowledgeSemanticOff'
+    );
+  });
+
+  it('still shows indexing, failed and unsupported states', () => {
+    setState({ sources: [indexingSource, failedSource, unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeStatusIndexing')).toBeInTheDocument();
+    expect(screen.getByText('conversation.projectHome.knowledgeStatusFailed')).toBeInTheDocument();
+    expect(screen.getByText('conversation.projectHome.knowledgeStatusUnsupported')).toBeInTheDocument();
   });
 
   it('replaces the bare indexing tag with the page being read', () => {
-    hookState = {
+    setState({
       sources: [{ ...indexingSource, fileName: 'contract.pdf', progress: { stage: 'reading', done: 12, total: 50 } }],
-      summary: null,
-      loading: false,
-      error: false,
-    };
+    });
 
     render(<ProjectKnowledgeCard project={project} />);
 
@@ -204,104 +274,90 @@ describe('ProjectKnowledgeCard', () => {
     expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
   });
 
+  // Transcribing a scan is the slowest thing ingestion does — one model call per
+  // page, minutes for a capped document — so this label is the one that most
+  // needs to move. A motionless tag for that long reads as a hang.
+  it('shows the page being transcribed while a scan is being read by the model', () => {
+    setState({
+      sources: [{ ...indexingSource, fileName: 'scan.pdf', progress: { stage: 'transcribing', done: 7, total: 20 } }],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeProgressTranscribing:7/20')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusIndexing')).not.toBeInTheDocument();
+  });
+
+  it('marks a transcribed source, so a doubted answer can be traced to the scan', () => {
+    setState({
+      sources: [
+        {
+          ...readySource,
+          fileName: 'contract.pdf',
+          ocr: { model: 'google/gemma-4-31b-it', skippedPages: [3, 4] },
+        },
+      ],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    // Present on a HEALTHY ready row, where the card otherwise stays silent:
+    // transcription can be wrong in ways reading a file cannot, so this is not
+    // a "needs attention" tag but a permanent provenance marker.
+    expect(screen.getByTestId('knowledge-ocr-s-ready')).toHaveTextContent('conversation.projectHome.knowledgeOcrTag');
+  });
+
+  it('leaves an ordinary source unmarked', () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-ocr-s-ready')).not.toBeInTheDocument();
+  });
+
+  // The real-world OCR row carries BOTH: skipped pages become a non-fatal note
+  // in `error` while `status` stays ready. The provenance tag and the note live
+  // on different elements with different tooltips, so neither may swallow the
+  // other — a scan with unreadable pages is exactly when a user needs both.
+  it('shows the transcription tag and the skipped-pages note together', async () => {
+    setState({
+      sources: [
+        {
+          ...readySource,
+          fileName: 'contract.pdf',
+          ocr: { model: 'google/gemma-4-31b-it', skippedPages: [3, 4] },
+          error: 'Transcribed from a scan; skipped 2 page(s): 3, 4.',
+        },
+      ],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    expect(screen.getByTestId('knowledge-ocr-s-ready')).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByText('contract.pdf'));
+
+    expect(await screen.findByText('Transcribed from a scan; skipped 2 page(s): 3, 4.')).toBeInTheDocument();
+    // Still a healthy row: the note must not have promoted it to a failed tag.
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusFailed')).not.toBeInTheDocument();
+  });
+
   // BM25 marks a source ready before embedding starts, so the embed pass always
   // runs against an already-`ready` row — this is the only place its progress
-  // can surface. Asserting it on an `indexing` row would test a state the
-  // service never produces.
+  // can surface.
   it('shows embedding progress on a ready source, in place of Retry', () => {
-    hookState = {
+    setState({
       sources: [
         { ...readySource, chunkCount: 200, vectorCount: 64, progress: { stage: 'embedding', done: 64, total: 200 } },
       ],
-      summary: null,
-      loading: false,
-      error: false,
-    };
+    });
 
     render(<ProjectKnowledgeCard project={project} />);
 
     expect(screen.getByText('conversation.projectHome.knowledgeProgressEmbedding:64/200')).toBeInTheDocument();
-    // vectorCount < chunkCount would normally offer Retry; not while it is running.
     expect(screen.queryByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).not.toBeInTheDocument();
-    expect(screen.queryByText('conversation.projectHome.knowledgePassages:200')).not.toBeInTheDocument();
-  });
-
-  it('restores the passage count and Retry once embedding stops', () => {
-    hookState = {
-      sources: [{ ...readySource, chunkCount: 200, vectorCount: 64, progress: null }],
-      summary: null,
-      loading: false,
-      error: false,
-    };
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    expect(screen.getByText('conversation.projectHome.knowledgePassages:200')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).toBeInTheDocument();
-  });
-
-  it('falls back to the plain indexing tag when no progress has been reported yet', () => {
-    hookState = { sources: [indexingSource], summary: null, loading: false, error: false };
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    expect(screen.getByText('conversation.projectHome.knowledgeStatusIndexing')).toBeInTheDocument();
-  });
-
-  it('renders an unsupported source with its status tag', () => {
-    hookState = { sources: [unsupportedSource], summary: null, loading: false, error: false };
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    expect(screen.getByText('archive.zip')).toBeInTheDocument();
-    expect(screen.getByText('conversation.projectHome.knowledgeStatusUnsupported')).toBeInTheDocument();
-  });
-
-  it('opens a file picker and forwards the selected paths to addSources', async () => {
-    showOpenMock.mockResolvedValue(['/tmp/a.md', '/tmp/b.txt']);
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
-
-    await waitFor(() => expect(addSourcesMock).toHaveBeenCalledWith(['/tmp/a.md', '/tmp/b.txt']));
-    expect(showOpenMock).toHaveBeenCalledWith({
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'conversation.projectHome.knowledge', extensions: ['md', 'txt', 'docx', 'xlsx', 'pdf'] }],
-    });
-  });
-
-  it('does not call addSources when the file picker is cancelled', async () => {
-    showOpenMock.mockResolvedValue(undefined);
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
-
-    await waitFor(() => expect(showOpenMock).toHaveBeenCalled());
-    expect(addSourcesMock).not.toHaveBeenCalled();
-  });
-
-  it('retries a failed source', () => {
-    hookState = { sources: [failedSource], summary: null, loading: false, error: false };
-
-    render(<ProjectKnowledgeCard project={project} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
-
-    expect(retrySourceMock).toHaveBeenCalledWith('s-failed');
   });
 
   it('offers retry on a ready source whose chunks are not all embedded', () => {
-    // Indexed while no embedding model was configured: searchable via BM25 but
-    // vectorless. Without this affordance the only way to embed it later is to
-    // remove and re-add the file.
-    hookState = {
-      sources: [{ ...readySource, id: 's-partial', vectorCount: 0 }],
-      summary: { fileCount: 1, passageCount: 5, semantic: 'off' },
-      loading: false,
-      error: false,
-    };
+    setState({ sources: [{ ...readySource, id: 's-partial', vectorCount: 0 }] });
 
     render(<ProjectKnowledgeCard project={project} />);
     fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
@@ -309,21 +365,485 @@ describe('ProjectKnowledgeCard', () => {
     expect(retrySourceMock).toHaveBeenCalledWith('s-partial');
   });
 
-  it('does not offer retry on a fully embedded ready source', () => {
-    hookState = { sources: [readySource], summary: null, loading: false, error: false };
+  it('names the keyword-only state beside that retry, and explains it on hover', async () => {
+    setState({ sources: [{ ...readySource, id: 's-partial', vectorCount: 2, chunkCount: 5 }] });
 
     render(<ProjectKnowledgeCard project={project} />);
 
-    expect(screen.queryByRole('button', { name: 'conversation.projectHome.knowledgeRetry' })).not.toBeInTheDocument();
+    // Retry alone told the user nothing: the row showed no problem to retry from.
+    expect(screen.getByTestId('knowledge-not-embedded-s-partial')).toHaveTextContent(
+      'conversation.projectHome.knowledgeStatusNotEmbedded'
+    );
+    fireEvent.mouseEnter(screen.getByText('conversation.projectHome.knowledgeStatusNotEmbedded'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgeNotEmbeddedDetail:2/5')).toBeInTheDocument();
   });
 
-  it('reveals the remove confirmation when the remove control is clicked', async () => {
-    hookState = { sources: [readySource], summary: null, loading: false, error: false };
+  it('keeps the keyword-only tag off a fully embedded row', () => {
+    setState({ sources: [readySource] });
 
     render(<ProjectKnowledgeCard project={project} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRemove' }));
+    expect(screen.queryByTestId('knowledge-not-embedded-s-ready')).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('conversation.projectHome.knowledgeRemoveConfirm')).toBeInTheDocument();
+  it('retries a failed source', () => {
+    setState({ sources: [failedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
+
+    expect(retrySourceMock).toHaveBeenCalledWith('s-failed');
+  });
+
+  // ---- folder actions -------------------------------------------------
+
+  it('opens the original file from the Knowledge Base folder', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-open-s-ready'));
+
+    await waitFor(() => expect(openFileMock).toHaveBeenCalledWith('/w/alpha/Knowledge Base/readme.md'));
+  });
+
+  it('confirms by name before deleting a file', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-delete-s-ready'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md')).toBeInTheDocument();
+    expect(removeSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('deletes the file once the confirmation is accepted', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-delete-s-ready'));
+    await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+
+    // The row's icon trigger carries the same accessible name as the
+    // confirmation's OK button, so pick the one that is not the trigger.
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+      .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+    fireEvent.click(confirmButton!);
+
+    await waitFor(() => expect(removeSourceMock).toHaveBeenCalledWith('s-ready'));
+  });
+
+  it('offers the delete confirmation in danger red, like the trigger beside it', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const trigger = screen.getByTestId('knowledge-delete-s-ready');
+    fireEvent.click(trigger);
+    await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+
+    // Compared against the row trigger — which has carried status='danger' all
+    // along — rather than against a hardcoded Arco class name, so this survives
+    // Arco renaming its internals.
+    const dangerClass = [...trigger.classList].find((name) => name.includes('danger'));
+    expect(dangerClass).toBeDefined();
+    const confirmButton = screen
+      .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+      .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+    expect(confirmButton).toHaveClass(dangerClass!);
+  });
+
+  it('re-scans the folder when Refresh is used', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRefresh' }));
+
+    await waitFor(() => expect(syncNowMock).toHaveBeenCalled());
+  });
+
+  it('opens a file picker and forwards the selected paths to addSources', async () => {
+    showOpenMock.mockResolvedValue(['/tmp/a.md', '/tmp/b.txt']);
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
+
+    await waitFor(() => expect(addSourcesMock).toHaveBeenCalledWith(['/tmp/a.md', '/tmp/b.txt']));
+  });
+
+  it('does not call addSources when the file picker is cancelled', async () => {
+    showOpenMock.mockResolvedValue(undefined);
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
+
+    await waitFor(() => expect(showOpenMock).toHaveBeenCalled());
+    expect(addSourcesMock).not.toHaveBeenCalled();
+  });
+
+  // ---- folderMissing: an error state, never a deletion --------------------
+
+  it('warns about a missing folder while still listing the preserved index', () => {
+    setState({ sources: [readySource], folderMissing: true });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByText('conversation.projectHome.knowledgeFolderMissingTitle')).toBeInTheDocument();
+    expect(screen.getByText('readme.md')).toBeInTheDocument(); // index survives
+  });
+
+  it('relinks the workspace and re-syncs from the missing-folder warning', async () => {
+    setState({ sources: [readySource], folderMissing: true });
+    showOpenMock.mockResolvedValue(['/w/moved']);
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.folderMissingRelink' }));
+
+    await waitFor(() => expect(updateProjectMock).toHaveBeenCalledWith({ id: 'p1', workspace: '/w/moved' }));
+    await waitFor(() => expect(syncNowMock).toHaveBeenCalled());
+  });
+
+  // ---- preview drawer ----------------------------------------------------
+
+  it('previews the indexed text when a row is clicked', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByText('readme.md'));
+
+    await waitFor(() => expect(getSourceTextMock).toHaveBeenCalledWith('s-ready'));
+    expect(await screen.findByTestId('preview-markdown')).toHaveTextContent('body text');
+    expect(screen.getByText('conversation.projectHome.knowledgePreviewNote')).toBeInTheDocument();
+  });
+
+  it('flags a truncated preview', async () => {
+    setState({ sources: [readySource] });
+    getSourceTextMock.mockResolvedValue({ text: 'partial', truncated: true });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByText('readme.md'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePreviewTruncated')).toBeInTheDocument();
+  });
+
+  it('reports a preview that cannot be loaded', async () => {
+    setState({ sources: [readySource] });
+    getSourceTextMock.mockRejectedValue(new Error('no converted.md'));
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByText('readme.md'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePreviewError')).toBeInTheDocument();
+  });
+
+  it('does not preview a source that has no indexed text yet', () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByText('archive.zip'));
+
+    expect(getSourceTextMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the preview from the keyboard on a ready row', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.keyDown(screen.getByText('readme.md'), { key: 'Enter' });
+
+    await waitFor(() => expect(getSourceTextMock).toHaveBeenCalledWith('s-ready'));
+  });
+
+  it('offers no affordance at all on a row with nothing to open', () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    const name = screen.getByText('archive.zip');
+
+    // The name used to look and behave identically on every row while only a
+    // ready row led anywhere — a click into nothing.
+    expect(name).not.toHaveAttribute('role', 'button');
+    expect(name).not.toHaveAttribute('tabindex');
+    expect(name.className).not.toContain('cursor-pointer');
+  });
+
+  it('says in the row tooltip why a non-ready row opens nothing', async () => {
+    setState({ sources: [unsupportedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('archive.zip'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePreviewNotReady')).toBeInTheDocument();
+  });
+
+  it('leaves that line off a ready row, which does open', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('readme.md'));
+
+    await screen.findByText('conversation.projectHome.knowledgePassagesTooltip');
+    expect(screen.queryByText('conversation.projectHome.knowledgePreviewNotReady')).not.toBeInTheDocument();
+  });
+
+  // ---- row tooltip: what happened to the file, plus any note ---------------
+
+  it('explains on hover what an indexed file was split into', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('readme.md'));
+
+    expect(await screen.findByText('conversation.projectHome.knowledgePassagesTooltip')).toBeInTheDocument();
+  });
+
+  // The standalone Note tag was clutter beside the file name, but the note
+  // itself is the only record of a partial extraction — it moves, not goes.
+  it('folds a ready source note into the row tooltip instead of tagging the row', async () => {
+    setState({ sources: [{ ...readySource, error: 'Only the first 200 pages were indexed.' }] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    expect(screen.queryByText('conversation.projectHome.knowledgeStatusNote')).not.toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByText('readme.md'));
+
+    expect(await screen.findByText('Only the first 200 pages were indexed.')).toBeInTheDocument();
+  });
+
+  it('keeps a failed source note on its own red tag, not in the passages line', async () => {
+    setState({ sources: [failedSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.mouseEnter(screen.getByText('broken.docx'));
+
+    await waitFor(() =>
+      expect(screen.queryByText('conversation.projectHome.knowledgePassagesTooltip')).not.toBeInTheDocument()
+    );
+  });
+
+  // ---- Embed all: backfill for files indexed before a model existed -------
+
+  it('offers Embed all when a ready source never got its vectors', () => {
+    setState({ sources: [partialSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId('knowledge-embed-all')).toBeInTheDocument();
+  });
+
+  it('hides Embed all when every ready source is fully embedded', () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-embed-all')).not.toBeInTheDocument();
+  });
+
+  it('backfills every source missing vectors, not just the first', async () => {
+    setState({
+      sources: [partialSource, readySource, { ...partialSource, id: 's-partial-2', fileName: 'notes.md' }],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-embed-all'));
+
+    await waitFor(() => expect(retrySourceMock).toHaveBeenCalledTimes(2));
+    expect(retrySourceMock).toHaveBeenCalledWith('s-partial');
+    expect(retrySourceMock).toHaveBeenCalledWith('s-partial-2');
+  });
+
+  it('leaves the ready source alone when backfilling', async () => {
+    setState({ sources: [partialSource, readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-embed-all'));
+
+    await waitFor(() => expect(retrySourceMock).toHaveBeenCalledTimes(1));
+    expect(retrySourceMock).not.toHaveBeenCalledWith('s-ready');
+  });
+
+  // An embed pass already holds the queue; a second wave would only stack up.
+  it('disables Embed all while a source is still indexing', () => {
+    setState({ sources: [partialSource, indexingSource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId('knowledge-embed-all')).toBeDisabled();
+  });
+
+  it('disables Embed all while an embed pass is already reporting progress', () => {
+    setState({
+      sources: [partialSource, { ...readySource, progress: { stage: 'embedding', done: 3, total: 9 } }],
+    });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId('knowledge-embed-all')).toBeDisabled();
+  });
+
+  // ---- semantic off is a state with a fix, not just a diagnosis ----------
+
+  it('sends the user to the model settings page from the semantic-off note', () => {
+    setState({ sources: [readySource], summary: { fileCount: 1, passageCount: 5, semantic: 'off' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-semantic-off-action'));
+
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/settings/model');
+  });
+
+  it('offers no model-settings link while semantic search is healthy', () => {
+    setState({ sources: [readySource], summary: { fileCount: 1, passageCount: 5, semantic: 'on' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-semantic-off-action')).not.toBeInTheDocument();
+  });
+
+  // ---- reveal the folder the card is a view of ---------------------------
+
+  it('reveals the Knowledge Base folder from the header', async () => {
+    setState({ sources: [readySource] });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    fireEvent.click(screen.getByTestId('knowledge-reveal-folder'));
+
+    await waitFor(() => expect(showItemInFolderMock).toHaveBeenCalledExactlyOnceWith('/w/alpha/Knowledge Base'));
+  });
+
+  it('hides the reveal action when there is no folder to reveal', () => {
+    setState({ sources: [readySource], folderMissing: true });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.queryByTestId('knowledge-reveal-folder')).not.toBeInTheDocument();
+  });
+
+  // ---- drag & drop -------------------------------------------------------
+
+  it('adds a supported file dropped onto the card', async () => {
+    render(<ProjectKnowledgeCard project={project} />);
+    dropOnCard([{ file: dropFile('notes.md', '/drop/notes.md') }]);
+
+    await waitFor(() => expect(addSourcesMock).toHaveBeenCalledExactlyOnceWith(['/drop/notes.md']));
+  });
+
+  it('drops only the supported files out of a mixed selection', async () => {
+    render(<ProjectKnowledgeCard project={project} />);
+    dropOnCard([
+      { file: dropFile('notes.md', '/drop/notes.md') },
+      { file: dropFile('archive.zip', '/drop/archive.zip') },
+      { file: dropFile('report.PDF', '/drop/report.PDF') },
+    ]);
+
+    await waitFor(() => expect(addSourcesMock).toHaveBeenCalledExactlyOnceWith(['/drop/notes.md', '/drop/report.PDF']));
+  });
+
+  it('ignores a dropped folder', async () => {
+    render(<ProjectKnowledgeCard project={project} />);
+    dropOnCard([{ file: dropFile('Docs', '/drop/Docs'), directory: true }]);
+
+    await waitFor(() => expect(addSourcesMock).not.toHaveBeenCalled());
+  });
+
+  it('ignores a drop whose files carry no resolvable path', async () => {
+    render(<ProjectKnowledgeCard project={project} />);
+    dropOnCard([{ file: dropFile('notes.md') }]);
+
+    await waitFor(() => expect(addSourcesMock).not.toHaveBeenCalled());
+  });
+
+  it('takes no drops while the Knowledge Base folder is missing', async () => {
+    setState({ sources: [readySource], folderMissing: true });
+
+    render(<ProjectKnowledgeCard project={project} />);
+    dropOnCard([{ file: dropFile('notes.md', '/drop/notes.md') }]);
+
+    await waitFor(() => expect(addSourcesMock).not.toHaveBeenCalled());
+  });
+
+  describe('failure feedback', () => {
+    // Every one of these paths used to be silent: console.error at best, and for the row
+    // actions not even that — a bare `void asyncCall()` produced an unhandled rejection
+    // while the UI showed nothing at all.
+    beforeEach(() => {
+      arcoMessage.error.mockReset();
+      arcoMessage.warning.mockReset();
+    });
+
+    it('reports a failed add', async () => {
+      showOpenMock.mockResolvedValue(['/w/alpha/Knowledge Base/a.md']);
+      addSourcesMock.mockRejectedValue(new Error('nope'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeAdd' }));
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeAddFailed')
+      );
+    });
+
+    it('reports a failed delete instead of leaving the row silently in place', async () => {
+      setState({ sources: [readySource] });
+      removeSourceMock.mockRejectedValue(new Error('trash failed'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByTestId('knowledge-delete-s-ready'));
+      await screen.findByText('conversation.projectHome.knowledgeDeleteConfirm:readme.md');
+      // The row trigger shares its accessible name with the confirm's OK button, so pick
+      // the one that is not the trigger — same approach as the neighbouring delete test.
+      const confirmButton = screen
+        .getAllByRole('button', { name: 'conversation.projectHome.knowledgeDeleteFile' })
+        .find((button) => button.getAttribute('data-testid') !== 'knowledge-delete-s-ready');
+      fireEvent.click(confirmButton!);
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeDeleteFailed')
+      );
+    });
+
+    it('reports a failed retry', async () => {
+      setState({ sources: [failedSource] });
+      retrySourceMock.mockRejectedValue(new Error('queue full'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' }));
+
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeRetryFailed')
+      );
+    });
+
+    it('warns when a drop contained nothing supported, rather than swallowing it', () => {
+      render(<ProjectKnowledgeCard project={project} />);
+
+      dropOnCard([{ file: dropFile('archive.zip', '/tmp/archive.zip') }]);
+
+      expect(arcoMessage.warning).toHaveBeenCalledWith('conversation.projectHome.knowledgeDropUnsupported');
+      expect(addSourcesMock).not.toHaveBeenCalled();
+    });
+
+    it('warns when dropping onto a card whose folder is gone', () => {
+      setState({ folderMissing: true });
+      render(<ProjectKnowledgeCard project={project} />);
+
+      dropOnCard([{ file: dropFile('a.md', '/tmp/a.md') }]);
+
+      expect(arcoMessage.warning).toHaveBeenCalledWith('conversation.projectHome.knowledgeDropFolderMissing');
+      expect(addSourcesMock).not.toHaveBeenCalled();
+    });
+
+    it('reports embed-all failure once, not once per source', async () => {
+      setState({ sources: [partialSource, { ...partialSource, id: 's-partial-2', fileName: 'other.pdf' }] });
+      retrySourceMock.mockRejectedValue(new Error('no model'));
+      render(<ProjectKnowledgeCard project={project} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'conversation.projectHome.knowledgeEmbedAll' }));
+
+      await waitFor(() => expect(retrySourceMock).toHaveBeenCalledTimes(2));
+      await waitFor(() =>
+        expect(arcoMessage.error).toHaveBeenCalledWith('conversation.projectHome.knowledgeRetryFailed')
+      );
+      expect(arcoMessage.error).toHaveBeenCalledTimes(1);
+    });
   });
 });

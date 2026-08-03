@@ -100,6 +100,12 @@ export const getSidebarStreamGuardDecision = ({
 };
 
 type ConversationListSyncSnapshot = {
+  /**
+   * False until the first conversation load settles, whichever way it settles.
+   * `conversations: []` alone cannot tell "not fetched yet" from "genuinely empty",
+   * which made the sidebar paint its empty state on every cold start.
+   */
+  hasLoadedConversations: boolean;
   conversations: TChatConversation[];
   generatingConversationIds: Set<string>;
   completionByConversationId: Map<string, TConversationCompletionRecord>;
@@ -110,6 +116,7 @@ type ConversationListSyncSnapshot = {
 const listeners = new Set<() => void>();
 
 let isStoreInitialized = false;
+let hasLoadedConversationsState = false;
 let conversationsState: TChatConversation[] = [];
 let generatingConversationIdsState = new Set<string>();
 let completionByConversationIdState = new Map<string, TConversationCompletionRecord>();
@@ -122,6 +129,7 @@ let latestRefreshRequestId = 0;
 let latestRuntimeRefreshRequestId = 0;
 let runtimeRefreshRequestIdByConversationId = new Map<string, number>();
 let snapshotState: ConversationListSyncSnapshot = {
+  hasLoadedConversations: hasLoadedConversationsState,
   conversations: conversationsState,
   generatingConversationIds: generatingConversationIdsState,
   completionByConversationId: completionByConversationIdState,
@@ -131,6 +139,7 @@ let snapshotState: ConversationListSyncSnapshot = {
 
 const emitStoreChange = () => {
   snapshotState = {
+    hasLoadedConversations: hasLoadedConversationsState,
     conversations: conversationsState,
     generatingConversationIds: generatingConversationIdsState,
     completionByConversationId: completionByConversationIdState,
@@ -181,12 +190,14 @@ const refreshConversations = () => {
         // responseStream listener recognises them as known and doesn't
         // trigger an infinite refreshConversations loop.
         conversation_idsState = new Set(items.map((conversation) => conversation.id));
+        hasLoadedConversationsState = true;
         emitStoreChange();
         return;
       }
 
       conversationsState = [];
       conversation_idsState = new Set();
+      hasLoadedConversationsState = true;
       emitStoreChange();
     })
     .catch((error) => {
@@ -197,6 +208,9 @@ const refreshConversations = () => {
       console.error('[WorkspaceGroupedHistory] Failed to load conversations:', error);
       conversationsState = [];
       conversation_idsState = new Set();
+      // A failed load has still settled: leaving this false would hide the empty
+      // state forever and leave the rail blank with no explanation.
+      hasLoadedConversationsState = true;
       emitStoreChange();
     });
 };
@@ -472,7 +486,9 @@ const initializeConversationListSyncStore = () => {
   });
   ipcBridge.conversation.turnCompleted.on((event) => {
     advanceConversationRuntimeRequest(event.session_id);
-    applyConversationRuntime(event.session_id, event.runtime);
+    if (event.runtime) {
+      applyConversationRuntime(event.session_id, event.runtime);
+    }
     const terminalMark = resolveConversationTerminalMark(event.state);
     if (terminalMark) {
       markTerminalState(event.session_id, terminalMark, event.turn_id);
@@ -490,6 +506,7 @@ export const useConversationListSync = () => {
 
   const {
     conversations,
+    hasLoadedConversations,
     generatingConversationIds,
     completionByConversationId,
     recentStoppedAtByConversationId,
@@ -538,6 +555,7 @@ export const useConversationListSync = () => {
 
   return {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
     getCompletion,
     getRecentStoppedAt,

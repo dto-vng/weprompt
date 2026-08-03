@@ -13,6 +13,12 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateChipCard,
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -26,7 +32,8 @@ import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import { useAddOrUpdateMessage } from '@/renderer/pages/conversation/Messages/hooks';
+import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
+import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
@@ -48,6 +55,7 @@ import { Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { classifyConversationBusyError } from '../conversationBusyError';
 import { buildSendFailureError } from './buildSendFailureError';
 import { useAcpInitialMessage } from './useAcpInitialMessage';
 import type { UseAcpMessageReturn } from './useAcpMessage';
@@ -141,6 +149,7 @@ const AcpSendBox: React.FC<{
   const isLeaderInTeam = teamPermission && conversation_id === teamPermission.leaderConversationId;
   const { checkAndUpdateTitle } = useAutoTitle();
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates(conversation_id);
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
   const conversationContext = useConversationContextSafe();
@@ -152,16 +161,29 @@ const AcpSendBox: React.FC<{
       name,
       status: 'loaded',
     }));
+  const messages = useMessageList();
+  const contextBudget = useMemo(
+    () =>
+      resolveConversationContextBudgetSnapshot({
+        conversation: conversationContext?.conversation ?? null,
+        messages,
+        runtimeTokenUsage: tokenUsage,
+        contextLimit: context_limit,
+        skillNames: loadedSkills,
+        toolNames: loadedMcpStatuses.map((status) => status.name),
+      }),
+    [context_limit, conversationContext?.conversation, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
+  );
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const [currentMode, setCurrentMode] = useState<string | undefined>(session_mode);
   const prepareRuntimeConfig = useCallback(async () => {
-    if (teamPermission) {
-      await teamPermission.warmupSession();
-    }
+    if (teamPermission) return;
   }, [teamPermission]);
   const runtimeConfig = useAcpConfigOptions({
     conversation_id,
     prepareRuntime: prepareRuntimeConfig,
+    prepareSetRuntime: teamPermission?.warmupSession,
+    loadConfigOptions: teamPermission?.loadConfigOptions,
     enabled: true,
   });
   const runtimeMode = runtimeConfig.mode;
@@ -180,6 +202,8 @@ const AcpSendBox: React.FC<{
     conversation_id,
     backend,
     prepareRuntime: prepareRuntimeConfig,
+    prepareSetRuntime: teamPermission?.warmupSession,
+    loadConfigOptions: teamPermission?.loadConfigOptions,
     enabled: isMobile,
     onSelectModelSuccess: () => Message.success(t('agent.model.switchSuccess')),
     onSelectModelFailed: (_modelId, error) => Message.error(t(configErrorMessageKey(error))),
@@ -205,19 +229,6 @@ const AcpSendBox: React.FC<{
     [isLeaderInTeam, runtimeConfig, runtimeMode, t, teamPermission]
   );
 
-  // In team mode, warmup the agent then fetch slash commands
-  useEffect(() => {
-    if (!teamPermission) return;
-    void teamPermission
-      .warmupSession()
-      .then(() => {
-        fetchSlashCommands();
-      })
-      .catch((error) => {
-        Message.error(getConversationRuntimeWorkspaceErrorMessage(error, t));
-      });
-  }, [teamPermission, fetchSlashCommands, t]);
-
   const handleContentChange = useCallback(
     (val: string) => {
       setContent(val);
@@ -234,6 +245,7 @@ const AcpSendBox: React.FC<{
   const addOrUpdateMessage = useAddOrUpdateMessage(); // Move this here so it's available in useEffect
   const addOrUpdateMessageRef = useLatestRef(addOrUpdateMessage);
   const runtimeView = useConversationRuntimeView(conversation_id);
+  const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
   // Shared file handling logic
   const { handleFilesAdded, clearFiles } = useSendBoxFiles({
@@ -277,15 +289,19 @@ const AcpSendBox: React.FC<{
     workspacePath,
     setAiProcessing,
     resetState,
-    markSendStarted: runtimeView.markSendStarted,
-    markSendAccepted: runtimeView.markSendAccepted,
-    markSendFailed: runtimeView.markSendFailed,
+    markSendStarted,
+    markSendAccepted,
+    markSendFailed,
     checkAndUpdateTitle,
     addOrUpdateMessage: addOrUpdateMessageRef.current,
   });
 
   const executeCommand = useCallback(
-    async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
+    async ({
+      input,
+      files,
+      artifactScratchRunId,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'>) => {
       const displayMessage = buildDisplayMessage(input, files, workspacePath || '');
 
       try {
@@ -300,19 +316,33 @@ const AcpSendBox: React.FC<{
           return;
         }
 
-        runtimeView.markSendStarted();
+        markSendStarted();
         setAiProcessing(true);
         const result = await ipcBridge.acpConversation.sendMessage.invoke({
           input: displayMessage,
           conversation_id,
           files,
         });
-        runtimeView.markSendAccepted(result.turn_id, result.runtime, result.msg_id);
+        markSendAccepted(result.turn_id, result.runtime, result.msg_id);
+        presentationTemplates.registerScratchTurn(result.turn_id, artifactScratchRunId);
         emitter.emit('chat.history.refresh');
       } catch (error: unknown) {
+        void presentationTemplates.retainScratchRun(artifactScratchRunId, 'failed').catch(() => {});
         const errorMsg =
           getConversationRuntimeWorkspaceErrorMessage(error, t) || parseError(error) || t('common.unknownError');
-        runtimeView.markSendFailed(errorMsg);
+        const busyError = classifyConversationBusyError(error);
+        if (busyError) {
+          markSendFailed({
+            kind: 'busy_conflict',
+            reason: errorMsg,
+            busyKind: busyError.kind,
+            status: busyError.status,
+            code: busyError.code,
+          });
+          throw error;
+        }
+
+        markSendFailed({ kind: 'ordinary', reason: errorMsg });
 
         // Archived conversation (e.g. legacy Gemini). Backend signals this
         // via HTTP 410 + code='CONVERSATION_ARCHIVED' — identified by code,
@@ -381,24 +411,31 @@ Please check your local CLI tool authentication status`,
       backend,
       checkAndUpdateTitle,
       conversation_id,
+      markSendAccepted,
+      markSendFailed,
+      markSendStarted,
       resetState,
-      runtimeView,
       setAiProcessing,
       t,
       teamPermission,
       teamSendMessage,
+      presentationTemplates,
       workspacePath,
     ]
   );
 
   const {
     items: queuedCommands,
+    mode: queueMode,
     isInteractionLocked: isQueueInteractionLocked,
     hasPendingCommands,
     enqueue,
     remove,
+    prioritize,
+    sendNow,
     clear,
     reorder,
+    toggleMode,
     lockInteraction,
     unlockInteraction,
     resetActiveExecution,
@@ -417,6 +454,10 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     emitter.emit('acp.selected.file.clear');
 
+    // ACP ignores `injectSkills` here — agents discover skills themselves.
+    const scratch = teamSendMessage ? undefined : await presentationTemplates.prepareScratch(conversation_id);
+    const composed = presentationTemplates.composeSend(message, allFiles, scratch);
+
     if (
       shouldEnqueueConversationCommand({
         enabled: true,
@@ -424,22 +465,35 @@ Please check your local CLI tool authentication status`,
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: allFiles });
+      enqueue({
+        input: composed.input,
+        files: composed.files,
+        artifactScratchRunId: composed.artifactScratchRunId,
+      });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: allFiles });
+    await executeCommand({
+      input: composed.input,
+      files: composed.files,
+      artifactScratchRunId: composed.artifactScratchRunId,
+    });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
+      if (item.artifactScratchRunId) {
+        void presentationTemplates.discardScratch(item.artifactScratchRunId);
+      }
       setContent(item.input);
       setUploadFile(Array.from(new Set(item.files)));
       setAtPath([]);
       emitter.emit('acp.selected.file.clear');
     },
-    [remove, setAtPath, setContent, setUploadFile]
+    [presentationTemplates, remove, setAtPath, setContent, setUploadFile]
   );
 
   const appendSelectedFiles = useCallback(
@@ -562,10 +616,10 @@ Please check your local CLI tool authentication status`,
       entries.push({
         key: 'skills',
         icon: <MagicHat theme='outline' size='16' />,
-        label: t('common.skills', { defaultValue: 'Skills' }),
+        label: t('common.selectedSkills', { defaultValue: 'Selected skills' }),
         variant: 'muted',
         submenu: {
-          title: t('common.skills', { defaultValue: 'Skills' }),
+          title: t('common.selectedSkills', { defaultValue: 'Selected skills' }),
           selectable: false,
           options: skillOptions,
           onSelect: (name) => {
@@ -589,10 +643,10 @@ Please check your local CLI tool authentication status`,
       entries.push({
         key: 'mcp',
         icon: <Shield theme='outline' size='16' />,
-        label: t('conversation.mcp.loaded', { defaultValue: 'Loaded MCP' }),
+        label: t('conversation.mcp.selected', { defaultValue: 'Selected MCP' }),
         variant: 'muted',
         submenu: {
-          title: t('conversation.mcp.loaded', { defaultValue: 'Loaded MCP' }),
+          title: t('conversation.mcp.selected', { defaultValue: 'Selected MCP' }),
           selectable: false,
           options: mcpOptions,
           onSelect: () => undefined,
@@ -637,6 +691,7 @@ Please check your local CLI tool authentication status`,
       resetActiveExecution('stop');
       return;
     }
+    void presentationTemplates.interruptScratchTurn(turnId).catch(() => {});
     runtimeView.markStopRequested(turnId);
     try {
       const result = await ipcBridge.conversation.stop.invoke({ conversation_id, turn_id: turnId });
@@ -650,22 +705,50 @@ Please check your local CLI tool authentication status`,
     }
   };
   const effectiveHandleStop = teamRuntime?.onStop ?? handleStop;
+  const handleSendNowQueued = useCallback(
+    async (item: ConversationCommandQueueItem) => {
+      // Stop the current reply (best-effort), then promote the chosen command
+      // to the front of the queue in auto mode.  The drain effect will fire it
+      // once the execution gate shows canExecute — avoiding the 409 race that
+      // occurs when sendNow() calls onExecute() directly before the backend
+      // has finished processing the stop.
+      await effectiveHandleStop();
+      prioritize(item.id);
+    },
+    [effectiveHandleStop, prioritize]
+  );
   const sendBoxWidthClass = getChatSurfaceWidthClass(Boolean(teamPermission));
 
   return (
     <div className={`${sendBoxWidthClass} flex flex-col mt-auto mb-16px`}>
       <CommandQueuePanel
         items={queuedCommands}
+        mode={queueMode}
+        isMobile={isMobile}
         interactionLocked={isQueueInteractionLocked}
         onInteractionLock={lockInteraction}
         onInteractionUnlock={unlockInteraction}
         onEdit={handleEditQueuedCommand}
+        onSendNow={handleSendNowQueued}
+        onToggleMode={toggleMode}
         onReorder={reorder}
-        onRemove={remove}
-        onClear={clear}
+        onRemove={(commandId) => {
+          const item = queuedCommands.find((command) => command.id === commandId);
+          remove(commandId);
+          if (item?.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+        }}
+        onClear={() => {
+          for (const item of queuedCommands) {
+            if (item.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+          }
+          clear();
+        }}
       />
       <ThoughtDisplay
         running={teamRuntime?.loading ?? (aiProcessing && !hasThinkingMessage)}
+        statusText={teamRuntime?.statusText}
+        externalElapsedSource={Boolean(teamRuntime)}
+        startedAtMs={teamRuntime?.startedAtMs ?? null}
         onStop={effectiveHandleStop}
       />
 
@@ -693,11 +776,14 @@ Please check your local CLI tool authentication status`,
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
@@ -718,17 +804,23 @@ Please check your local CLI tool authentication status`,
                 }
                 onModeChanged={isLeaderInTeam ? teamPermission?.propagateMode : undefined}
                 beforeRuntimeSync={prepareRuntimeConfig}
+                beforeRuntimeSet={teamPermission?.warmupSession}
+                loadConfigOptions={teamPermission?.loadConfigOptions}
               />
             )}
-            <ContextUsageIndicator
-              tokenUsage={tokenUsage}
-              context_limit={context_limit > 0 ? context_limit : undefined}
-              localUsage={localUsage}
-            />
+            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
           </div>
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <TemplateChipCard
+                  template={presentationTemplates.selectedTemplate}
+                  onRemove={presentationTemplates.clearSelection}
+                />
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -771,6 +863,20 @@ Please check your local CLI tool authentication status`,
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         allowSendWhileLoading
         compactActions={false}
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              selectedId={presentationTemplates.selectedTemplate?.manifest.id ?? null}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       ></SendBox>
       {isMobile && (
         <>

@@ -11,11 +11,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { BUILTIN_KNOWLEDGE_NAME, EXTRACTED_TEXT_DIR_NAME, KNOWLEDGE_FOLDER_NAME } from '@/common/knowledge/constants';
 import { embedTexts, type EmbedConfig } from '@/common/knowledge/embedCore';
 import { KB_ENV } from '@/common/knowledge/envKeys';
 import { formatHitsAsText, loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
 import { readManifest } from '@/common/knowledge/store';
-import { BUILTIN_KNOWLEDGE_NAME } from './constants';
 
 export type KnowledgeServerEnv = {
   projectId: string;
@@ -38,15 +38,19 @@ export function parseKnowledgeServerEnv(env: Record<string, string | undefined>)
 
 const TOOL_DESCRIPTION_BASE = `Search the documents the user attached to this project.
 
-USE THIS FIRST — before any file search — when the user asks about specs, reports, policies, requirements, decisions, or any other project document.
+USE THIS FIRST — before file listing, glob, or grep — when the user asks about specs, reports, policies, requirements, decisions, or any other project document. It searches every attached document at once and returns the passages that actually match, which plain file search cannot do.
 
-These documents do NOT live in the working directory. They cannot be found with file listing, glob, grep, or read tools; this tool is the only way to reach them. "I couldn't find any files about X in the working directory" is the wrong answer when this tool has not been tried.
+For whole-document work (summarise this contract, list every invoice number, walk through the policy), search first to find the right document, then read it with your normal file tools inside the working directory:
+- .md and .txt documents: read "${KNOWLEDGE_FOLDER_NAME}/<fileName>" directly.
+- PDF and Office documents: the original is binary, so read the extracted text at "${KNOWLEDGE_FOLDER_NAME}/${EXTRACTED_TEXT_DIR_NAME}/<fileName>.md" (e.g. "${KNOWLEDGE_FOLDER_NAME}/${EXTRACTED_TEXT_DIR_NAME}/report.pdf.md").
 
 Input:
 - query: natural-language question or keywords.
 - max_results: optional, defaults to 6 (max 20).
 
-Output: the most relevant passages, each cited with its source filename so you can attribute your answer.`;
+Output: the most relevant passages, each headed by "[n] <fileName> — <section>".
+
+CITE BY fileName. When you attribute a claim in your answer, write the fileName exactly as it appears in that header — "annual-report-2026.pdf", never the document's title ("Annual Report 2026"), a translation of it, or a vague reference ("the report"). The app turns an exact fileName into a link the user can click to open the source; anything else stays plain text and the user cannot reach the document.`;
 
 /**
  * Naming the attached documents in the tool description is what makes the tool

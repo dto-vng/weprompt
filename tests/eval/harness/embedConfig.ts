@@ -26,6 +26,20 @@ import { pickEmbeddingModel, resolveEmbedConfigForModel } from '@process/service
 const DEFAULT_BACKEND_PORT = 13400;
 const PROVIDER_FETCH_TIMEOUT_MS = 3000;
 
+/**
+ * The header the desktop app presents on every local backend call, carrying a
+ * per-launch secret (see `common/adapter/httpBridge.ts`, which mirrors AionCore's
+ * `LOCAL_TOKEN_HEADER`).
+ *
+ * This harness cannot present it, and that is not an oversight to fix here: the
+ * secret is minted on each spawn and **never persisted** — it exists only in the
+ * app process's globals — so a separate headless process has nowhere to read it
+ * from. The name is duplicated rather than imported because it is used only to
+ * explain a 401, never to authenticate, and importing the app's adapter layer
+ * into a CLI would be a real dependency for a string.
+ */
+const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
+
 export type EmbedConfigSource = 'env' | 'running-app';
 
 /**
@@ -48,11 +62,32 @@ const fromEnv = (env: NodeJS.ProcessEnv): EmbedConfigResult | null => {
   return { config: { baseUrl, apiKey, model }, source: 'env', reason: null };
 };
 
+/**
+ * Separated so a transport failure can be named for what it is. Everything here
+ * ends up in the report's one-line `reason:`, and that line is the only thing a
+ * reader gets to explain why half the numbers are missing — "fetch failed" reads
+ * as a mystery, "nothing answered on 127.0.0.1:13400" reads as an instruction.
+ */
+const getProviders = async (url: string, port: number): Promise<Response> => {
+  try {
+    return await fetch(url, { signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS) });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`nothing answered on 127.0.0.1:${port} — is the dev app running? (${detail})`, { cause: error });
+  }
+};
+
 const fetchProviders = async (env: NodeJS.ProcessEnv): Promise<IProvider[]> => {
   const port = Number(env.AIONUI_BACKEND_PORT) || DEFAULT_BACKEND_PORT;
-  const response = await fetch(`http://127.0.0.1:${port}/api/providers`, {
-    signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS),
-  });
+  const response = await getProviders(`http://127.0.0.1:${port}/api/providers`, port);
+  // A refusal is not an outage, and treating it as one sends the reader looking
+  // for a backend that is running fine. See LOCAL_TOKEN_HEADER: this route is
+  // simply closed to a headless caller, so say so and point at the way in.
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(
+      `the backend refused an unauthenticated request (HTTP ${response.status}). It requires the per-launch ${LOCAL_TOKEN_HEADER}, which is never persisted, so a headless run cannot present it`
+    );
+  }
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body: unknown = await response.json();
   // The endpoint has returned both a bare array and a { data } envelope across
@@ -76,7 +111,7 @@ export const resolveEvalEmbedConfig = async (env: NodeJS.ProcessEnv = process.en
     return {
       config: null,
       source: null,
-      reason: `no KB_EVAL_EMBED_* env vars, and the running app's provider list was unreachable (${detail})`,
+      reason: `no KB_EVAL_EMBED_* env vars, and the app's provider list could not be read: ${detail}. Set KB_EVAL_EMBED_BASE_URL / _API_KEY / _MODEL to measure the hybrid half.`,
     };
   }
 

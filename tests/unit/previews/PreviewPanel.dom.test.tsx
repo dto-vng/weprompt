@@ -5,7 +5,7 @@
  */
 
 import type { OfficeArtifactSelection } from '@/common/types/office/artifactEditor';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 
@@ -20,6 +20,12 @@ const mocks = vi.hoisted(() => ({
   inspect: vi.fn(),
   apply: vi.fn(),
   undo: vi.fn(),
+  preparePreview: vi.fn(),
+  startPreview: vi.fn(),
+  releasePreview: vi.fn(),
+  pptPreviewStart: vi.fn(),
+  pptPreviewStop: vi.fn(),
+  pptPreviewStatusOn: vi.fn(),
   openFile: vi.fn(),
   showItemInFolder: vi.fn(),
   downloadFileFromPath: vi.fn(),
@@ -37,6 +43,14 @@ vi.mock('@/common', () => ({
       inspect: { invoke: mocks.inspect },
       apply: { invoke: mocks.apply },
       undo: { invoke: mocks.undo },
+      preparePreview: { invoke: mocks.preparePreview },
+      startPreview: { invoke: mocks.startPreview },
+      releasePreview: { invoke: mocks.releasePreview },
+    },
+    pptPreview: {
+      start: { invoke: mocks.pptPreviewStart },
+      stop: { invoke: mocks.pptPreviewStop },
+      status: { on: mocks.pptPreviewStatusOn },
     },
     shell: {
       openFile: { invoke: mocks.openFile },
@@ -121,8 +135,8 @@ vi.mock('@/renderer/pages/conversation/Preview/components/viewers/ExcelViewer', 
   },
 }));
 
-vi.mock('@/renderer/pages/conversation/Preview/components/viewers/PptViewer', () => ({
-  default: () => <div data-testid='ppt-viewer' />,
+vi.mock('@/renderer/components/media/WebviewHost', () => ({
+  default: () => <div data-testid='office-preview-webview-host' />,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -180,6 +194,28 @@ describe('PreviewPanel Office artifact integration', () => {
     vi.clearAllMocks();
     mocks.showItemInFolder.mockResolvedValue(undefined);
     mocks.downloadFileFromPath.mockResolvedValue(undefined);
+    mocks.preparePreview.mockResolvedValue({
+      ok: true,
+      leaseId: 'ppt-download-lease',
+      filePath: '/preview/report.pptx',
+      workspace: '/preview',
+    });
+    mocks.startPreview.mockResolvedValue({ ok: true, url: 'http://127.0.0.1:26315/' });
+    mocks.releasePreview.mockResolvedValue({ ok: true });
+    mocks.pptPreviewStatusOn.mockReturnValue(() => undefined);
+  });
+
+  it('authorizes PowerPoint preview with the current conversation', async () => {
+    setActiveTab('ppt');
+    render(<PreviewPanel />);
+
+    await waitFor(() =>
+      expect(mocks.preparePreview).toHaveBeenCalledWith({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        filePath: '/workspace/report.ppt',
+      })
+    );
   });
 
   it('renders one artifact toolbar and forwards Word guest selection controls', () => {
@@ -240,6 +276,46 @@ describe('PreviewPanel Office artifact integration', () => {
 
     act(() => (mocks.editorOptions.current?.onArtifactMutated as (() => void) | undefined)?.());
     expect(mocks.wordViewerProps.current?.refreshToken).toBe(initialRefreshToken);
+  });
+
+  it('downloads a PowerPoint artifact only from a validated private copy', async () => {
+    setActiveTab('ppt');
+    render(<PreviewPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('preview.downloadFile'));
+    });
+
+    expect(mocks.preparePreview).toHaveBeenCalledWith({
+      conversationId: 'conversation-1',
+      workspace: '/workspace',
+      filePath: '/workspace/report.ppt',
+    });
+    expect(mocks.downloadFileFromPath).toHaveBeenCalledWith('/preview/report.pptx', 'report.ppt', '/preview');
+    expect(mocks.releasePreview).toHaveBeenCalledWith({ leaseId: 'ppt-download-lease' });
+  });
+
+  it('blocks a PowerPoint download when validation fails', async () => {
+    mocks.preparePreview.mockResolvedValueOnce({ ok: false, code: 'INVALID_OFFICE_ARTIFACT' });
+    setActiveTab('ppt');
+    render(<PreviewPanel />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('preview.downloadFile'));
+    });
+
+    expect(mocks.downloadFileFromPath).not.toHaveBeenCalled();
+    expect(mocks.releasePreview).not.toHaveBeenCalled();
+  });
+
+  it('keeps PowerPoint recovery actions available when preview validation fails', async () => {
+    mocks.preparePreview.mockResolvedValue({ ok: false, code: 'INVALID_OFFICE_ARTIFACT' });
+    setActiveTab('ppt');
+    render(<PreviewPanel />);
+
+    expect(await screen.findByText('preview.office.errors.invalidArtifact')).toBeVisible();
+    expect(screen.getByTitle('preview.openInSystemApp')).toBeVisible();
+    expect(screen.getByTitle('preview.downloadFile')).toBeVisible();
   });
 
   it('resynchronizes editor state and refreshes the isolated Office copy for a workspace revision', () => {

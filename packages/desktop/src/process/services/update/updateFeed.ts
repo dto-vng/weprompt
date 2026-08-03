@@ -6,17 +6,20 @@
 
 import { CdnGenericProvider } from './cdnGenericProvider';
 import type { CdnGenericProviderConfiguration } from './cdnGenericProvider';
-
-export const CDN_UPDATE_BASE_URL = 'https://static.aionui.com/releases';
+import { getConfiguredUpdateBaseUrl } from '@/common/update/updatePolicy';
 
 export type CdnFeedOptions = CdnGenericProviderConfiguration & {
   updateProvider: typeof CdnGenericProvider;
 };
 
-export function buildCdnFeedOptions(): CdnFeedOptions {
+export function buildCdnFeedOptions(updateBaseUrl = getConfiguredUpdateBaseUrl()): CdnFeedOptions {
+  if (!updateBaseUrl) {
+    throw new Error('updates-disabled');
+  }
+
   return {
     provider: 'custom',
-    url: CDN_UPDATE_BASE_URL,
+    url: updateBaseUrl,
     updateProvider: CdnGenericProvider,
   };
 }

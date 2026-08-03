@@ -38,10 +38,19 @@ export type GoldenQuestion = {
   notes: string;
 };
 
+/**
+ * Where a corpus document's text came from. 'ocr' documents are model
+ * transcriptions of scans, which read differently from hand-authored markdown
+ * — page markers instead of real section headings, and no text layer to fall
+ * back on — so the distinction has to survive into the report.
+ */
+export type DocumentProvenance = 'authored' | 'ocr';
+
 export type EvalDocument = {
   fileName: string;
   /** Exactly the bytes on disk, decoded as UTF-8 — normalisation form included. */
   text: string;
+  provenance: DocumentProvenance;
 };
 
 export type EvalFixture = {
@@ -71,6 +80,13 @@ export type QuestionResult = {
   sourceRank: number | null;
   /** 1-based rank of the first expected-source hit containing answerHint. */
   answerRank: number | null;
+  /**
+   * Vector mode only: the rank in the UNTRUNCATED ranking, before the top-k cut.
+   * The whole point of the diagnostic is the questions that miss, and a miss
+   * measured at top-6 says only "not in the top 6" — the same non-answer the
+   * fused run already gave. This is where the passage actually sat.
+   */
+  deepSourceRank?: number | null;
 };
 
 export type ModeMetrics = {
@@ -89,7 +105,13 @@ export type ModeMetrics = {
   answerMrr: number;
 };
 
-export type EvalMode = 'bm25' | 'hybrid';
+/**
+ * 'vector' is a DIAGNOSTIC lens, not a shipping configuration — production is
+ * always hybrid. It exists to answer one question the fused result cannot: when
+ * hybrid misses, was the passage never found, or found and then buried by
+ * fusion? For that reason it is reported but deliberately not baselined.
+ */
+export type EvalMode = 'bm25' | 'hybrid' | 'vector';
 
 export type ModeResult = {
   mode: EvalMode;
@@ -110,7 +132,8 @@ export type EmbeddingInfo = {
 
 export type EvalRun = {
   knobs: EvalKnobs;
-  corpus: { documentCount: number; chunkCount: number };
+  /** `ocrDocumentCount` is a subset of `documentCount`, not an addition to it. */
+  corpus: { documentCount: number; ocrDocumentCount: number; chunkCount: number };
   /** null when no embedding model was available — BM25-only run. */
   embedding: EmbeddingInfo | null;
   /** Why the hybrid half was skipped, when it was. */

@@ -41,13 +41,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 获取拖拽文件/目录的绝对路径 / Get absolute path for dragged file/directory
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
-  // Feedback: collect and compress recent log files
-  collectFeedbackLogs: () => ipcRenderer.invoke('feedback:collect-logs'),
   // Feedback: capture a screenshot of the current window
   captureFeedbackScreenshot: () => ipcRenderer.invoke('feedback:capture-screenshot'),
-  // Feedback: forward diagnostics logs to the main process console
-  logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
-    ipcRenderer.send('feedback:renderer-log', payload),
+  // Feedback: export a local diagnostic package chosen by the user
+  exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   recoverCorruptedDatabase: () => ipcRenderer.invoke('backend:recover-corrupted-database'),
 });
 
@@ -57,7 +54,12 @@ const backendPort = ipcRenderer.sendSync('get-backend-port') as number;
 const initialLanguage = ipcRenderer.sendSync('get-initial-language') as string | null;
 const backendStartupFailed = ipcRenderer.sendSync('get-backend-startup-failed') as boolean;
 const backendStartupFailure = ipcRenderer.sendSync('get-backend-startup-failure') as unknown;
+const backendLocalToken = ipcRenderer.sendSync('get-backend-local-token') as string;
 contextBridge.exposeInMainWorld('__backendPort', backendPort > 0 ? backendPort : 0);
+// Secret the `--local` backend requires on every call. Exposed to the app's own
+// renderer only — webviews and iframes get their own preload (or none), so page
+// content rendered inside the app never sees it.
+contextBridge.exposeInMainWorld('__backendLocalToken', backendLocalToken || '');
 contextBridge.exposeInMainWorld('__initialLanguage', initialLanguage ?? null);
 contextBridge.exposeInMainWorld('__aionuiE2ETest', process.env.AIONUI_E2E_TEST === '1');
 contextBridge.exposeInMainWorld('__backendStartupFailed', backendStartupFailed === true);
@@ -68,7 +70,6 @@ contextBridge.exposeInMainWorld('__backendStartupFailure', backendStartupFailure
 const trayEvents = [
   'tray:navigate-to-guid',
   'tray:navigate-to-conversation',
-  'tray:open-about',
   'tray:pause-all-tasks',
   'tray:check-update',
 ];

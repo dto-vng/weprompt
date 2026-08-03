@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Привет! Каковы ваши планы на сегодня?",
-    "placeholder": "Отправьте сообщение, загрузите файлы, откройте папку или создайте запланированную задачу...",
+    "placeholder": "Отправьте сообщение, загрузите файлы, откройте папку, создайте запланированную задачу или введите / для команд...",
     "linkFolder": "Открыть папку",
     "newConversation": "Новый чат",
     "selectModel": "Выбрать модель",
@@ -17,7 +17,6 @@
     "quickActionStar": "Нравится? Поставьте нам звезду!",
     "skillsMarket": "Маркет навыков WePrompt",
     "skillsMarketDesc": "Находите и активируйте навыки сообщества по запросу. Настройте один раз — доступно для всех агентов.",
-    "skillsMarketDetails": "Подробнее >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -43,6 +42,7 @@
     "scopedHint": "— только в этом проекте",
     "chats": "Чаты",
     "showAll": "Показать все",
+    "showLess": "Показать меньше",
     "emptyChatsTitle": "Пока нет чатов",
     "emptyChatsBody": "Начните чат выше, чтобы приступить к работе над этим проектом.",
     "instructions": "Инструкции",
@@ -53,6 +53,7 @@
     "save": "Сохранить",
     "cancel": "Отмена",
     "instructionsSaved": "Инструкции сохранены",
+    "instructionsSaveFailed": "Не удалось сохранить инструкции",
     "files": "Файлы",
     "revealInFolder": "Показать в папке",
     "filesReadonly": "Только чтение · управление в папке",
@@ -71,23 +72,47 @@
     "remove": "Удалить",
     "knowledge": "Знания",
     "knowledgeAdd": "Добавить файлы",
+    "knowledgeDropFolderMissing": "Перед добавлением файлов заново подключите папку Knowledge Base.",
+    "knowledgeDropUnsupported": "Ни один из этих файлов не поддерживается. Поддерживаются: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Не удалось обновить базу знаний.",
+    "knowledgeRelinkFailed": "Не удалось повторно связать папку проекта.",
+    "knowledgeRetryFailed": "Не удалось поставить файл в очередь на индексацию.",
+    "knowledgeDeleteFailed": "Не удалось переместить файл в корзину.",
+    "knowledgeAddFailed": "Не удалось добавить эти файлы в базу знаний.",
     "knowledgeEmpty": "Добавьте документы, чтобы создать базу знаний этого проекта. Ассистент автоматически ищет по ним в любом чате этого проекта.",
-    "knowledgeSummary": "{{files}} файлов · {{passages}} фрагментов",
-    "knowledgeSemanticOn": "семантический поиск включён",
     "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
-    "knowledgePassages": "{{count}} фрагментов",
+    "knowledgeSemanticOffAction": "Добавить модель эмбеддинга",
+    "knowledgeEmbedAll": "Векторизовать все",
+    "knowledgePassagesTooltip": "Этот файл разбит на фрагменты для поиска, и ассистент использует наиболее подходящие из них при ответе.",
     "knowledgeStatusIndexing": "Индексация…",
     "knowledgeProgressReading": "Чтение страницы {{done}}/{{total}}",
-    "knowledgeProgressEmbedding": "Векторизация {{done}}/{{total}} фрагментов",
+    "knowledgeProgressTranscribing": "Распознавание страницы {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Векторизация {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Ошибка",
     "knowledgeStatusUnsupported": "Не поддерживается",
+    "knowledgeStatusNotEmbedded": "Только ключевые слова",
+    "knowledgeNotEmbeddedDetail": "Файл находится по ключевым словам, но встроено только {{done}}/{{total}} фрагментов. Повторите, чтобы встроить остальные.",
     "knowledgeRetry": "Повторить",
-    "knowledgeRemove": "Удалить",
-    "knowledgeRemoveConfirm": "Удалить этот файл из базы знаний?",
     "knowledgeError": "База знаний недоступна.",
-    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Обновить",
+    "knowledgeOpenOriginal": "Открыть исходный файл",
+    "knowledgeDeleteFile": "Удалить файл",
+    "knowledgeDeleteConfirm": "Переместить «{{fileName}}» в корзину? Файл также будет удалён из базы знаний.",
+    "knowledgeFolderHint": "Файлы хранятся в папке «Knowledge Base» внутри папки проекта. Всё, что вы туда положите, индексируется автоматически.",
+    "knowledgeFolderMissingTitle": "Папка Knowledge Base не найдена",
+    "knowledgeFolderMissingBody": "Возможно, её переместили, переименовали или удалили. Проиндексированные знания сохранены — восстановите папку или заново привяжите проект, затем обновите.",
+    "knowledgePreviewNote": "Это проиндексированный текст, по которому ищет ассистент, а не исходное оформление.",
+    "knowledgePreviewTruncated": "Предпросмотр сокращён. Откройте исходный файл, чтобы увидеть весь документ.",
+    "knowledgePreviewError": "Не удалось загрузить проиндексированный текст этого файла.",
+    "knowledgePreviewNotReady": "Проиндексированного текста для открытия пока нет.",
+    "knowledgeCitationMissing": "Этот файл больше не находится в базе знаний.",
+    "knowledgeOcrTag": "Распознано (OCR)",
+    "knowledgeOcrDetail": "Распознано из сканированного документа моделью {{model}}. Пропущенные страницы: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "нет"
   },
   "history": {
+    "moreActions": "Другие действия",
     "recents": "Недавние",
     "noHistory": "Нет истории чатов",
     "deleteTitle": "Удалить",
@@ -98,12 +123,13 @@
     "saveName": "Сохранить",
     "cancelEdit": "Отмена",
     "rename": "Переименовать",
+    "createCronTask": "Создать запланированную задачу",
     "renameTitle": "Переименовать чат",
     "renamePlaceholder": "Введите новое имя",
     "renameSuccess": "Успешно переименовано",
     "renameFailed": "Не удалось переименовать",
     "batchManage": "Массовое управление",
-    "batchModeExit": "Выйти из режима массового управления",
+    "batchModeExit": "Выйти из массового режима",
     "selectAll": "Выбрать все",
     "selectedCount": "Выбрано: {{count}}",
     "batchExport": "Массовый экспорт",
@@ -140,7 +166,10 @@
     "removeProject": "Удалить проект",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Новая беседа в этом проекте",
+    "expandProjectChats": "Развернуть чаты проекта",
+    "collapseProjectChats": "Свернуть чаты проекта",
     "deleting": "Удаление...",
+    "reorderPinned": "Перетащите, чтобы изменить порядок закреплённых бесед",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -160,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Не удалось удалить проект. Откройте его снова и повторите попытку; файлы в папке не удалены.",
+    "removeProjectChatDetachFailed": "Некоторые чаты не удалось отсоединить от этого проекта. Проект сохранён; повторите удаление.",
+    "removeProjectStateChanged": "Список проектов изменился до удаления. Обновите его и повторите попытку.",
+    "removeProjectStorageFailed": "Не удалось сохранить изменения проекта. Проверьте доступ WePrompt к данным приложения и повторите попытку.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -181,15 +213,14 @@
   "noAgentsAvailable": "Нет доступных агентов",
   "noModelConfigured": "Модель не настроена. Настройте в параметрах.",
   "createFailed": "Не удалось создать диалог",
-  "emptyModelReply": "Модель завершила ход, не сформировав видимый ответ. Отправьте запрос ещё раз; для больших результатов запрашивайте их по частям.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Выбранный путь рабочей области недоступен. Убедитесь, что путь рабочей области \"{{workspacePath}}\" действительно существует и доступен."
     },
     "codes": {
-      "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
-      "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_ID_REQUIRED": "Перед созданием команды выберите ассистента.",
+      "TEAM_ASSISTANT_NOT_FOUND": "Ассистент {{assistantId}} больше недоступен. Обновите список ассистентов и выберите другого.",
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Используйте assistant_id вместо {{field}}."
     }
   },
   "agentError": {
@@ -274,7 +305,7 @@
         "body": "Агент сообщил, что параметры запроса недействительны."
       },
       "USER_AGENT_HANDSHAKE_FAILED": {
-        "title": "Не удалось выполнить рукопожатие с агентом",
+        "title": "Не удалось согласовать соединение с агентом",
         "body": "Выбранный агент не смог завершить стартовое рукопожатие. Перезапустите или переподключите агента, затем повторите попытку."
       },
       "USER_AGENT_HANDSHAKE_TIMEOUT": {
@@ -286,20 +317,20 @@
         "body": "Приложение не смогло инициализировать сессию Agent Client Protocol с этим агентом."
       },
       "USER_AGENT_PROTOCOL_PARSE_ERROR": {
-        "title": "Agent сообщил об ошибке разбора протокола",
-        "body": "Выбранный Agent сообщил, что сообщение ACP/JSON-RPC не удалось разобрать."
+        "title": "Агент сообщил об ошибке разбора протокола",
+        "body": "Выбранный агент сообщил, что сообщение ACP/JSON-RPC не удалось разобрать."
       },
       "USER_AGENT_INVALID_REQUEST": {
-        "title": "Agent сообщил о недействительном протокольном запросе",
-        "body": "Выбранный Agent сообщил, что объект запроса ACP/JSON-RPC недействителен."
+        "title": "Агент сообщил о недействительном протокольном запросе",
+        "body": "Выбранный агент сообщил, что объект запроса ACP/JSON-RPC недействителен."
       },
       "USER_AGENT_RESOURCE_NOT_FOUND": {
-        "title": "Agent не нашел нужный ресурс",
-        "body": "Выбранный Agent сообщил, что нужный ресурс, например файл, не найден."
+        "title": "Агент не нашёл нужный ресурс",
+        "body": "Выбранный агент сообщил, что нужный ресурс, например файл, не найден."
       },
       "USER_AGENT_PROTOCOL_ERROR": {
-        "title": "Agent вернул ошибку протокола",
-        "body": "Выбранный Agent вернул нестандартный ACP-код ошибки."
+        "title": "Агент вернул ошибку протокола",
+        "body": "Выбранный агент вернул нестандартный ACP-код ошибки."
       },
       "USER_AGENT_PROTOCOL_MISMATCH": {
         "title": "Версии протокола агента несовместимы",
@@ -391,36 +422,36 @@
         "body": "Приложение получило внешнюю ошибку, но не смогло определить, пришла ли она от агента, поставщика, сети или локальной среды."
       },
       "MCP_HTTP_RESPONSE_READ_FAILED": {
-        "title": "Failed to read the team helper response",
+        "title": "Не удалось прочитать ответ командного помощника",
         "body": "WePrompt could not read the local team helper response. Retry once, and if it keeps happening, restart the app."
       },
       "MCP_TOOL_REMOTE_ERROR": {
-        "title": "The local team helper rejected the request",
-        "body": "The local team helper returned an error while processing this request. Review the details below and retry after adjusting the team action."
+        "title": "Локальный командный помощник отклонил запрос",
+        "body": "Локальный командный помощник вернул ошибку при обработке запроса. Проверьте подробности ниже, измените командное действие и повторите попытку."
       },
       "MCP_TOOL_RESPONSE_UNEXPECTED": {
-        "title": "The team helper returned an unexpected response",
+        "title": "Командный помощник вернул неожиданный ответ",
         "body": "WePrompt received an unexpected response from the local team helper. Retry once, and report it if the problem persists."
       },
       "MCP_TCP_READ_FAILED": {
-        "title": "Failed to read from the local team helper",
+        "title": "Не удалось прочитать данные локального командного помощника",
         "body": "WePrompt could not read the local team helper TCP response. Retry once, and restart the app if it keeps failing."
       },
       "TEAM_SERVICE_UNAVAILABLE": {
-        "title": "Team service is not ready yet",
-        "body": "The local team session is still starting or has been interrupted. Wait a moment and retry."
+        "title": "Командный сервис ещё не готов",
+        "body": "Локальная командная сессия ещё запускается или была прервана. Подождите немного и повторите попытку."
       },
       "TEAM_ASSISTANT_ID_REQUIRED": {
-        "title": "A teammate assistant must be selected",
-        "body": "Choose a real assistant from the available assistant catalog before creating or spawning a teammate."
+        "title": "Выберите ассистента для участника команды",
+        "body": "Перед созданием или запуском участника команды выберите доступного ассистента из каталога."
       },
       "TEAM_ASSISTANT_NOT_FOUND": {
-        "title": "The selected assistant is no longer available",
-        "body": "Refresh the assistant catalog, then choose another assistant for this teammate."
+        "title": "Выбранный ассистент больше недоступен",
+        "body": "Обновите каталог ассистентов и выберите другого ассистента для этого участника команды."
       },
       "TEAM_ASSISTANT_FIELD_UNSUPPORTED": {
-        "title": "The request used a legacy team identity field",
-        "body": "This team action must use assistant_id instead of legacy backend or agent fields."
+        "title": "В запросе использовано устаревшее поле идентификации команды",
+        "body": "Это командное действие должно использовать assistant_id вместо устаревших полей backend или agent."
       }
     }
   },
@@ -521,6 +552,7 @@
     "noModelSelected": "Модель для текущей сессии не выбрана, невозможно отправить сообщение",
     "sendMessageTo": "Отправить сообщение {{model}}",
     "processing": "Обработка...",
+    "stopGenerating": "Остановить генерацию",
     "quotaExceededTitle": "Лимит модели исчерпан",
     "quotaExceededBody": "Лимит текущей модели исчерпан. Переключиться на {{model}}?",
     "quotaExceededNoFallback": "Лимит модели исчерпан. Переключитесь на другую доступную модель.",
@@ -568,8 +600,8 @@
     "error": "Не удалось ответить на боковой вопрос."
   },
   "commandQueue": {
-    "title": "Очередь команд",
-    "clear": "Очистить очередь",
+    "title": "Черновики",
+    "clear": "Очистить черновики",
     "edit": "Редактировать",
     "editing": "Редактирование",
     "editPlaceholder": "Обновите команду в очереди перед выполнением.",
@@ -584,7 +616,19 @@
     "queueFull": "Очередь заполнена. Удалите команду перед добавлением.",
     "inputTooLong": "Эта команда в очереди слишком длинная. Сократите перед отправкой.",
     "tooManyFiles": "Слишком много файлов прикреплено к этой команде.",
-    "queueTooLarge": "Данные очереди слишком большие для безопасного сохранения. Сначала удалите несколько команд."
+    "queueTooLarge": "Данные очереди слишком большие для безопасного сохранения. Сначала удалите несколько команд.",
+    "sendNow": "Отправить сейчас",
+    "modeToggle": "Переключить режим отправки",
+    "help": "Справка",
+    "helpIntro": "Сообщения, отправленные во время ответа ИИ, ждут здесь.",
+    "helpAuto": ": отправляются автоматически по очереди после каждого ответа.",
+    "helpManual": ": хранятся без отправки; отправьте каждое кнопкой «Отправить сейчас».",
+    "clearConfirmTitle": "Очистить черновики отправки?",
+    "clearConfirmContent": "Все ожидающие сообщения будут удалены. Это действие необратимо.",
+    "mode": {
+      "auto": "Авто-отправка",
+      "manual": "Ручная отправка"
+    }
   },
   "contextUsage": {
     "contextUsed": "контекст использован",
@@ -595,7 +639,9 @@
     "today": "Сегодня",
     "weekToDate": "С начала недели",
     "monthToDate": "С начала месяца",
-    "triggerLabel": "Показать использование контекста"
+    "triggerLabel": "Показать использование контекста",
+    "estimated": "Оценка",
+    "unavailable": "Данные об использовании контекста недоступны"
   },
   "skill_generator": {
     "title": "Создать навык/правило",
@@ -635,35 +681,22 @@
       "loaded": "Загружен",
       "failed": "Ошибка",
       "unsupported": "Не поддерживается"
-    }
-  },
-  "status": {
-    "waitingApproval": "Ожидает вашего подтверждения",
-    "running": "Выполняется",
-    "done": "Завершено",
-    "doneIdle": "Завершено — неактивно",
-    "stopped": "Остановлено",
-    "failed": "Ошибка"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Ожидается ваше подтверждение для продолжения.",
-    "running": "Идёт работа над этим чатом.",
-    "doneUnseen": "Завершено, но вы ещё не просмотрели результат.",
-    "doneSeen": "Недавно завершено и уже просмотрено.",
-    "doneIdle": "Завершено не менее минуты назад и уже просмотрено.",
-    "stopped": "Остановлено до завершения.",
-    "failed": "Не удалось завершить из-за ошибки."
+    },
+    "selected": "Выбранные MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Подготавливается среда выполнения. Первый запуск может занять немного больше времени."
   },
   "sendbox": {
-    "hint": "Введите / для команд, @ для ссылок на файлы"
+    "hint": "Введите / для команд, @ для ссылок на файлы, ↑/↓ для истории сообщений"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Этот запрос завершился без видимого ответа."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Этот запрос не дал видимого ответа. Возможно, агенту сначала нужно, чтобы вы вошли в систему: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "В этом запросе модель достигла лимита выходных токенов до того, как появился видимый ответ."
@@ -677,6 +710,89 @@
     }
   },
   "notFound": "Беседа не найдена или была удалена",
+  "emptyModelReply": "Модель завершила ход, не сформировав видимый ответ. Отправьте запрос ещё раз; для больших результатов запрашивайте их по частям.",
+  "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Бизнес-обзор",
+        "description": "Презентация квартальных результатов — сводка KPI, детализация по сегментам, прогноз. Тёмно-синий и янтарный."
+      },
+      "project-kickoff": {
+        "name": "Запуск проекта",
+        "description": "Презентация запуска — объём работ, команда, сроки, следующие шаги. Чистый бирюзовый."
+      },
+      "monthly-steerco": {
+        "name": "Ежемесячный управляющий комитет",
+        "description": "Отчёт управляющему комитету — статус портфеля, риски, требуемые решения. Антиква и золото."
+      },
+      "connected-ops": {
+        "name": "Связанные операции",
+        "description": "Обзор операций — показатели площадок, время работы, инциденты. Промышленный зелёный."
+      },
+      "editorial-field-report": {
+        "name": "Редакционный отчёт с места",
+        "description": "Развёрнутый отчёт — антиква, связный текст вместо списков, один красный акцент."
+      },
+      "market-trends-report": {
+        "name": "Отчёт о трендах рынка",
+        "description": "Отчёт с прокруткой на основе данных — графики со ссылками на источники."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Минималистичная светлая презентация — одна мысль на слайд, один синий акцент."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Минималистичная тёмная презентация для технических докладов — удобна для кода, зелёный акцент."
+      },
+      "business-report": {
+        "name": "Бизнес-отчёт",
+        "description": "Объёмный официальный отчёт — обложка, содержание, таблицы данных, тёмно-синие заголовки антиквой."
+      },
+      "decision-memo": {
+        "name": "Памятка о решении",
+        "description": "Короткая памятка о решении — блок КОМУ/ОТ/ТЕМА, рекомендация в начале, без обложки."
+      },
+      "operations-guide": {
+        "name": "Руководство по операциям",
+        "description": "Компактный регламент — нумерованные шаги, блоки примечаний, чек-листы, бирюзовый акцент."
+      },
+      "proposal-sow": {
+        "name": "Предложение / SOW",
+        "description": "Предложение клиенту — объём работ, сроки, таблица цен, блок подписи."
+      }
+    },
+    "title": "Шаблоны",
+    "columnPptx": "Презентации · PPTX",
+    "columnHtml": "Веб · HTML",
+    "columnDocx": "Документы · DOCX",
+    "selected": "Выбрано",
+    "buttonTooltip": "Шаблоны",
+    "slashDescription": "Выбрать шаблон",
+    "importCard": "Импорт шаблона (.md)",
+    "empty": "Нет доступных шаблонов",
+    "chipTooltip": "Это сообщение использует шаблон",
+    "scratch": {
+      "prepareError": "Не удалось подготовить временную область артефакта: {{error}}",
+      "retained": "Временные файлы артефакта сохранены для восстановления в {{path}}.",
+      "cleanup": "Очистить",
+      "cleanupSuccess": "Временные файлы артефакта удалены",
+      "cleanupError": "Не удалось очистить: {{error}}"
+    },
+    "importSuccess": "Шаблон импортирован",
+    "importError": "Ошибка импорта: {{error}}",
+    "removeError": "Ошибка удаления: {{error}}",
+    "deleteTooltip": "Удалить шаблон",
+    "deleteConfirm": "Удалить этот шаблон?"
+  },
+  "status": {
+    "waitingApproval": "Ожидает вашего подтверждения",
+    "running": "Выполняется",
+    "done": "Завершено",
+    "doneIdle": "Завершено — неактивно",
+    "stopped": "Остановлено",
+    "failed": "Ошибка"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -1035,5 +1151,19 @@
   "artifact": {
     "emptyTitle": "Нет открытых артефактов",
     "emptyHint": "Созданные файлы и документы открываются здесь."
-  }
+  },
+  "statusTooltip": {
+    "waitingApproval": "Ожидается ваше подтверждение для продолжения.",
+    "running": "Идёт работа над этим чатом.",
+    "doneUnseen": "Завершено, но вы ещё не просмотрели результат.",
+    "doneSeen": "Недавно завершено и уже просмотрено.",
+    "doneIdle": "Завершено не менее минуты назад и уже просмотрено.",
+    "stopped": "Остановлено до завершения.",
+    "failed": "Не удалось завершить из-за ошибки."
+  },
+  "staleKnowledgeHint": {
+    "body": "Этот чат не может искать в базе знаний проекта — он был начат до добавления файлов.",
+    "action": "Начать новый чат"
+  },
+  "emptyChat": "Отправьте сообщение, чтобы начать."
 }

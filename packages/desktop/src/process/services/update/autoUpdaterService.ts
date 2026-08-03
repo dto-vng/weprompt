@@ -24,6 +24,7 @@ import {
   recordAutoUpdateQuitAndInstall,
   recordAutoUpdateStatus,
 } from './autoUpdateDiagnostics';
+import { ContainedElectronHttpExecutor } from './cdnGenericProvider';
 import { buildCdnFeedOptions } from './updateFeed';
 
 const FORCE_DEV_AUTO_UPDATE_ENV = 'AIONUI_FORCE_DEV_AUTO_UPDATE';
@@ -130,6 +131,10 @@ class AutoUpdaterService extends EventEmitter {
     // Disable auto-download for manual control
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    // electron-updater's differential downloaders can follow redirects without
+    // passing them through our contained HTTP executor. Full downloads use the
+    // executor's request and redirect guards, so keep differential mode off.
+    autoUpdater.disableDifferentialDownload = true;
     this.configureDevAutoUpdateDebug();
     const cdnFeedOptions = buildCdnFeedOptions();
 
@@ -140,9 +145,16 @@ class AutoUpdaterService extends EventEmitter {
       autoUpdater.channel = channel;
       log.info(`Update channel set to: ${channel}`);
     }
+    (
+      autoUpdater as unknown as {
+        httpExecutor: ContainedElectronHttpExecutor;
+      }
+    ).httpExecutor = new ContainedElectronHttpExecutor(cdnFeedOptions.url, (authInfo, callback) => {
+      autoUpdater.emit('login', authInfo, callback);
+    });
     autoUpdater.setFeedURL(cdnFeedOptions);
-    log.info('Update feed set to CDN provider');
-    log.debug('[auto-update] CDN feed configured', {
+    log.info('Product-owned update feed configured');
+    log.debug('[auto-update] Product-owned feed configured', {
       provider: cdnFeedOptions.provider,
       url: cdnFeedOptions.url,
       channel: channel ?? 'latest',
@@ -207,6 +219,22 @@ class AutoUpdaterService extends EventEmitter {
       log.warn(`[auto-update] Dev update config written to: ${configPath}`);
     } catch (err) {
       log.error('[auto-update] Failed to write dev update config:', err);
+    }
+  }
+
+  private moveCwdOutOfInstallDirForWindowsHandoff(): void {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    try {
+      const safeCwd = path.join(app.getPath('temp'), 'aionui-updater-cwd');
+      fs.mkdirSync(safeCwd, { recursive: true });
+      process.chdir(safeCwd);
+      log.info('[auto-update] Moved process cwd before Windows installer handoff', { cwd: safeCwd });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.warn('[auto-update] Failed to move process cwd before Windows installer handoff', { error: message });
     }
   }
 
@@ -320,8 +348,9 @@ class AutoUpdaterService extends EventEmitter {
     // (e.g. 'latest-arm64'): it treats the channel as a prerelease identifier
     // and tries to match it against tag prerelease components, which always fails
     // with "No published versions on GitHub".
-    // Prerelease filtering is handled by the manual update check (GitHub API) instead.
-    log.info(`Prerelease updates ${allow ? 'enabled' : 'disabled'} (manual check only)`);
+    // This custom feed currently exposes stable channels only. Permanent
+    // prerelease channel design remains product-owned future work.
+    log.info(`Prerelease updates ${allow ? 'requested but unavailable' : 'disabled'} for the configured feed`);
   }
 
   /**
@@ -600,8 +629,7 @@ class AutoUpdaterService extends EventEmitter {
       });
 
       if (this._allowPrerelease) {
-        log.info('Skipping electron-updater check for prerelease manual mode');
-        log.debug('[auto-update] CDN stable feed skipped because prerelease mode is handled by GitHub API');
+        log.info('Skipping update check because the configured feed has no prerelease channel');
         return { success: true };
       }
 
@@ -615,12 +643,12 @@ class AutoUpdaterService extends EventEmitter {
       // When isUpdateAvailable is false, updateInfoAndProvider is NOT set internally,
       // so a subsequent downloadUpdate() call would fail with "Please check update first".
       if (!result.isUpdateAvailable) {
-        log.debug('[auto-update] no update available from CDN feed', {
+        log.debug('[auto-update] no update available from configured feed', {
           version: result.updateInfo.version,
         });
         return { success: true };
       }
-      log.debug('[auto-update] update available from CDN feed', {
+      log.debug('[auto-update] update available from configured feed', {
         version: result.updateInfo.version,
         releaseDate: result.updateInfo.releaseDate,
       });
@@ -837,6 +865,7 @@ class AutoUpdaterService extends EventEmitter {
 
     log.info('Quitting and installing update...');
     try {
+      this.moveCwdOutOfInstallDirForWindowsHandoff();
       // The first argument maps to electron-updater's silent installer flag.
       // User-clicked "install now" should show NSIS progress/completion pages;
       // autoInstallOnAppQuit remains true for background app-quit installs.

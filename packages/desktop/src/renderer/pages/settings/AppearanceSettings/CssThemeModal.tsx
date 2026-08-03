@@ -117,12 +117,42 @@ const CssThemeModal: React.FC<CssThemeModalProps> = ({ visible, theme, onClose, 
 
   return (
     <AionModal
+      variant='standard'
       visible={visible}
-      header={isEditing ? t('settings.cssTheme.editTheme') : t('settings.cssTheme.addToPreset')}
+      header={{
+        title: isEditing ? t('settings.cssTheme.editTheme') : t('settings.cssTheme.addToPreset'),
+        showClose: true,
+      }}
       onCancel={onClose}
-      footer={null}
       style={{ width: 600 }}
       unmountOnExit
+      footer={{
+        render: () => (
+          <div className='flex justify-between items-center'>
+            <div>
+              {onDelete && (
+                <Button type='text' icon={<Delete theme='outline' size='14' />} onClick={onDelete}>
+                  {t('common.delete')}
+                </Button>
+              )}
+            </div>
+            <div className='flex gap-10px'>
+              <Button onClick={onClose} className='px-20px min-w-80px' style={{ borderRadius: 8 }}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type='primary'
+                onClick={handleSave}
+                disabled={!name.trim()}
+                className='px-20px min-w-80px'
+                style={{ borderRadius: 8 }}
+              >
+                {t('common.save')}
+              </Button>
+            </div>
+          </div>
+        ),
+      }}
     >
       <div className='space-y-20px'>
         {/* 封面和名称行 / Cover and name row */}
@@ -131,7 +161,7 @@ const CssThemeModal: React.FC<CssThemeModalProps> = ({ visible, theme, onClose, 
           <div className='flex-shrink-0'>
             <div className='text-13px text-t-secondary mb-8px'>{t('settings.cssTheme.previewCover')}</div>
             <div
-              className='w-120px h-80px rounded-8px border border-dashed border-border-2 flex flex-col items-center justify-center cursor-pointer hover:border-[var(--color-primary)] transition-colors overflow-hidden bg-[var(--fill-0)]'
+              className='w-120px h-80px rounded-8px border border-dashed border-[var(--color-border-2)] flex flex-col items-center justify-center cursor-pointer hover:border-[var(--color-primary)] transition-colors overflow-hidden bg-[var(--fill-0)]'
               onClick={handleCoverUpload}
             >
               {cover ? (
@@ -184,23 +214,6 @@ const CssThemeModal: React.FC<CssThemeModalProps> = ({ visible, theme, onClose, 
             className='[&_.cm-editor]:rounded-[6px]'
             height='200px'
           />
-        </div>
-
-        {/* 底部操作按钮 / Footer action buttons */}
-        <div className='flex justify-between items-center pt-16px border-t border-border-2'>
-          <div>
-            {onDelete && (
-              <Button type='text' icon={<Delete theme='outline' size='14' />} onClick={onDelete}>
-                {t('common.delete')}
-              </Button>
-            )}
-          </div>
-          <div className='flex gap-10px'>
-            <Button onClick={onClose}>{t('common.cancel')}</Button>
-            <Button type='primary' onClick={handleSave} disabled={!name.trim()}>
-              {t('common.save')}
-            </Button>
-          </div>
         </div>
       </div>
     </AionModal>

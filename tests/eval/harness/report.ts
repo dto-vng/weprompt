@@ -14,7 +14,7 @@ import { RECALL_KS, isScored } from './metrics';
 import type { ComparisonResult } from './baseline';
 import type { EvalMode, EvalRun, ModeResult, QuestionResult } from './types';
 
-const MODE_LABEL: Record<EvalMode, string> = { bm25: 'BM25-only', hybrid: 'Hybrid' };
+const MODE_LABEL: Record<EvalMode, string> = { bm25: 'BM25-only', hybrid: 'Hybrid', vector: 'Vector-only' };
 
 const pct = (value: number | undefined): string => (value === undefined ? '   n/a' : value.toFixed(3).padStart(6));
 
@@ -90,6 +90,49 @@ const failureDetail = (mode: ModeResult): string[] => {
   return lines;
 };
 
+/**
+ * The diagnostic this mode exists for: for every question hybrid failed to
+ * answer, where did the semantic half actually rank the right passage?
+ *
+ * A passage near the top here that hybrid still missed means fusion discarded
+ * it — RRF gives a passage present in only one list 1/(k+rank), so a semantic
+ * hit with no lexical counterpart loses to anything appearing in both. A passage
+ * near the bottom means the embedding model never found it, and no fusion
+ * tuning will help. Those two have completely different fixes, which is the
+ * whole reason for measuring separately.
+ */
+const semanticDepthSection = (run: EvalRun): string[] => {
+  const vector = run.modes.find((mode) => mode.mode === 'vector');
+  const hybrid = run.modes.find((mode) => mode.mode === 'hybrid');
+  if (!vector || !hybrid) return [];
+
+  const hybridById = new Map(hybrid.questions.map((question) => [question.id, question]));
+  const rows = vector.questions.filter(
+    (question) => isScored(question) && hybridById.get(question.id)?.sourceRank == null
+  );
+  if (rows.length === 0) return [];
+
+  const total = run.corpus.chunkCount;
+  const lines = [
+    '',
+    '  where the semantic half ranked what Hybrid missed',
+    `  (near the top = fusion discarded it; near ${total} = the embedding never found it)`,
+  ];
+  for (const question of rows) {
+    const depth = question.deepSourceRank;
+    const verdict =
+      depth === null || depth === undefined
+        ? 'absent from the whole ranking'
+        : depth <= 3
+          ? `rank ${depth} of ${total} — FOUND, then lost in fusion`
+          : depth <= Math.ceil(total / 2)
+            ? `rank ${depth} of ${total} — mid-pack`
+            : `rank ${depth} of ${total} — effectively not found`;
+    lines.push(`    [${question.id}] ${verdict}`);
+  }
+  return lines;
+};
+
 const unanswerableSection = (run: EvalRun): string[] => {
   const ids = run.modes[0].questions.filter((question) => question.kind === 'unanswerable').map((q) => q.id);
   if (ids.length === 0) return [];
@@ -115,7 +158,8 @@ const unanswerableSection = (run: EvalRun): string[] => {
 
 export const renderReport = (run: EvalRun, comparison: ComparisonResult, nfdFileNames: string[]): string => {
   const lines: string[] = ['', 'Knowledge-base retrieval evaluation', ''];
-  lines.push(`  corpus     ${run.corpus.documentCount} documents, ${run.corpus.chunkCount} passages`);
+  const ocrNote = run.corpus.ocrDocumentCount > 0 ? ` (${run.corpus.ocrDocumentCount} OCR-derived)` : '';
+  lines.push(`  corpus     ${run.corpus.documentCount} documents${ocrNote}, ${run.corpus.chunkCount} passages`);
   if (nfdFileNames.length > 0) lines.push(`             stored NFD on disk: ${nfdFileNames.join(', ')}`);
   lines.push(`  knobs      chunk=${run.knobs.chunkChars}  overlap=${run.knobs.overlapChars}  topK=${run.knobs.topK}`);
 
@@ -134,7 +178,11 @@ export const renderReport = (run: EvalRun, comparison: ComparisonResult, nfdFile
 
   lines.push('', ...metricsTable(run));
   lines.push(...perQuestionTable(run));
-  for (const mode of run.modes) lines.push(...failureDetail(mode));
+  // Vector-only is excluded from the generic failure detail: its misses are the
+  // subject of semanticDepthSection, which says something the generic list
+  // cannot, and printing both would be the same questions twice.
+  for (const mode of run.modes) if (mode.mode !== 'vector') lines.push(...failureDetail(mode));
+  lines.push(...semanticDepthSection(run));
   lines.push(...unanswerableSection(run));
 
   lines.push('');

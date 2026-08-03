@@ -165,6 +165,7 @@ const safeIdSchema = z
 
 const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
 const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
+const projectKnowledgeFolderSchema = z.object({ projectId: safeIdSchema, workspace: pathSchema }).strict();
 
 const studioExpectedRevisionSchema = z.number().finite().int().positive();
 const studioProjectInputSchema = z
@@ -354,14 +355,37 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict()
     .optional(),
+  'presentation-templates.list': voidPayloadSchema,
+  'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
+  'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
+  'presentation-templates.scratch.allocate': z
+    .object({ conversation_id: identifierSchema, template_id: identifierSchema })
+    .strict(),
+  'presentation-templates.scratch.complete': z.object({ run_id: z.string().uuid() }).strict(),
+  'presentation-templates.scratch.retain': z
+    .object({ run_id: z.string().uuid(), reason: z.enum(['failed', 'interrupted']) })
+    .strict(),
+  'presentation-templates.scratch.discard': z.object({ run_id: z.string().uuid() }).strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
   'project-knowledge.add-sources': z
-    .object({ projectId: safeIdSchema, filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS) })
+    .object({
+      projectId: safeIdSchema,
+      filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS),
+      workspace: pathSchema.optional(),
+    })
     .strict(),
-  'project-knowledge.remove-source': projectKnowledgeSourceRefSchema,
-  'project-knowledge.retry-source': projectKnowledgeSourceRefSchema,
+  'project-knowledge.remove-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .strict(),
+  'project-knowledge.get-source-text': projectKnowledgeSourceRefSchema,
+  'project-knowledge.retry-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema.optional() })
+    .strict(),
+  'project-knowledge.sync-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.watch-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.unwatch-folder': projectKnowledgeProjectIdSchema,
   'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
   'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
   'creative-studio.list-projects': voidPayloadSchema,

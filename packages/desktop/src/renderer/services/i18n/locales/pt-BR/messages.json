@@ -16,6 +16,7 @@
   "downloadFailed": "Falha ao baixar",
   "imageLoadFailed": "Falha ao carregar a imagem",
   "scrollToBottom": "Rolar para o final",
+  "reasoning": "Raciocínio",
   "availableCommands": "{{count}} Comandos Disponíveis",
   "atFile.hint": "Digite para procurar arquivos",
   "atFile.menuLabel": "Menções de arquivo",
@@ -50,12 +51,25 @@
   "unknownMessageType": "Tipo de mensagem desconhecido: {{type}}",
   "permissionRequest": "Solicitação de Permissão",
   "agentRequestingPermission": "O agente está solicitando permissão.",
+  "permission": {
+    "intent": {
+      "run": "Gostaria de executar um comando",
+      "edit": "Gostaria de editar um arquivo",
+      "read": "Gostaria de ler um arquivo",
+      "fetch": "Gostaria de buscar algo na web",
+      "tool": "Gostaria de usar uma ferramenta",
+      "destructive": "Gostaria de excluir ou remover arquivos",
+      "generic": "Gostaria de fazer algo que precisa da sua aprovação"
+    },
+    "destructiveWarning": "Isso pode excluir ou sobrescrever arquivos permanentemente — não é possível desfazer."
+  },
   "command": "Comando:",
   "chooseAction": "Escolha uma ação:",
   "option": "Opção",
   "noOptionsAvailable": "Nenhuma opção disponível",
   "processing": "Processando...",
   "responseSentSuccessfully": "Resposta enviada com sucesso",
+  "permissionResponseFailed": "Não foi possível enviar sua resposta. Tente novamente.",
   "confirmation": {
     "applyChange": "Aplicar esta alteração?",
     "allowExecution": "Permitir execução?",
@@ -227,5 +241,8 @@
         "failedTitle": "Não consegui preparar o arquivo final"
       }
     }
+  },
+  "plan": {
+    "title": "Lista de tarefas"
   }
 }

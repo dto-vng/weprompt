@@ -29,6 +29,10 @@
   "download": "Download",
   "close": "Close",
   "retry": "Retry",
+  "routeError": {
+    "title": "This page could not be displayed",
+    "description": "Something went wrong while opening this page. The rest of the app is still running — retry, or choose another item in the sidebar."
+  },
   "reload": "Reload",
   "technical_details": "Technical Details",
   "error_details": "Error Details",
@@ -82,42 +86,60 @@
       "title": "WePrompt installation is incomplete",
       "description": "This installation is missing required local resources, so AionCore cannot start. Please download and reinstall the latest WePrompt. If the issue returns after reinstalling, check whether security or antivirus software quarantined AionCore.",
       "downloadLatest": "Download latest",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package",
       "runtimeComponentDescription": "This installation is missing required bundled runtime components, so {{resource}} cannot start. Reinstall the latest WePrompt package. If it still happens after reinstalling, check whether security or antivirus software quarantined WePrompt components."
     },
     "packageArchitectureMismatch": {
       "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. Get the {{expectedArch}} installer from your approved internal distribution channel, close WePrompt, and install that package.",
+      "closeApplication": "Close WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",
-      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Save the diagnostic package locally so the database migration can be reviewed.",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package"
     },
     "localDataRepair": {
       "title": "Local data repair failed",
-      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Save the diagnostic package locally so the local database can be reviewed.",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package"
+    },
+    "startupDirectory": {
+      "title": "Startup directory is unavailable",
+      "description": "WePrompt opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart WePrompt.",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package"
     },
     "recoverableDatabaseCorruption": {
       "title": "Local data is corrupted",
       "description": "WePrompt detected that the local database is corrupted and cannot continue startup. After confirmation, WePrompt will back up the old database and create a new local database to continue startup. Historical local data will not be shown for now, and the old database will be kept as a backup.",
       "confirmRebuild": "Back up old DB and rebuild new DB",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsHint": "Sending diagnostics will not modify the local database.",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsHint": "Saving diagnostics does not modify the local database.",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package",
       "rebuildFailed": "Failed to back up old DB and rebuild new DB"
+    },
+    "transientConcurrentStartup": {
+      "title": "WePrompt is starting up",
+      "description": "Another WePrompt startup was still using the local data when this window opened. This is temporary and your data is safe — no reinstall is needed. Please wait a moment and try again, or restart WePrompt.",
+      "sendDiagnostics": "Save diagnostics",
+      "diagnosticsSent": "Diagnostics saved",
+      "diagnosticsReportSuccess": "Diagnostic package saved",
+      "diagnosticsReportFailed": "Could not save the diagnostic package",
+      "diagnosticsHint": "Saving diagnostics does not modify the local database."
     }
   },
   "fileAttach.addFiles": "Add files",
@@ -139,5 +161,17 @@
   "unit": {
     "minute_short": "m",
     "second_short": "s"
+  },
+  "selectedCount": "Selected {{count}}",
+  "selectedSkills": "Selected skills",
+  "chrome": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "toggleProjectPanel": "Toggle project panel",
+    "expandProjectPanel": "Expand project panel",
+    "collapseProjectPanel": "Collapse project panel"
   }
 }

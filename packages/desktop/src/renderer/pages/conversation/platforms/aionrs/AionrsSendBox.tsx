@@ -17,6 +17,12 @@ import MobileActionSheet, {
 } from '@/renderer/components/chat/MobileActionSheet';
 import SendBox from '@/renderer/components/chat/SendBox';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import {
+  TemplateChipCard,
+  TemplateGalleryButton,
+  TemplateGalleryPanel,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -30,7 +36,8 @@ import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
-import { getKnownModelContextLimit } from '@/renderer/utils/model/modelContextLimits';
+import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
+import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
@@ -56,6 +63,7 @@ import { Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { classifyConversationBusyError } from '../conversationBusyError';
 import { useAionrsMessage } from './useAionrsMessage';
 import type { AionrsModelSelection } from './useAionrsModelSelection';
 
@@ -152,7 +160,6 @@ const AionrsSendBox: React.FC<{
   const { t } = useTranslation();
   const { checkAndUpdateTitle } = useAutoTitle();
   const { current_model } = modelSelection;
-  const contextLimit = getKnownModelContextLimit(current_model?.use_model);
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
 
@@ -168,9 +175,24 @@ const AionrsSendBox: React.FC<{
     }
   );
   const localUsage = useLocalTokenUsage();
+  const messages = useMessageList();
+  const contextBudget = useMemo(
+    () =>
+      resolveConversationContextBudgetSnapshot({
+        conversation: conversationContext?.conversation ?? null,
+        messages,
+        runtimeTokenUsage: tokenUsage,
+        skillNames: loadedSkills,
+        toolNames: loadedMcpStatuses.map((status) => status.name),
+        model: current_model as { use_model?: string | null; model?: string | null; context_limit?: number } | null,
+      }),
+    [conversationContext?.conversation, current_model, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
+  );
   const runtimeView = useConversationRuntimeView(conversation_id);
+  const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
+  const presentationTemplates = usePresentationTemplates(conversation_id);
 
   const handleContentChange = useCallback(
     (val: string) => {
@@ -181,19 +203,20 @@ const AionrsSendBox: React.FC<{
 
   const [agentWarmed, setAgentWarmed] = useState(false);
   const prepareRuntimeConfig = useCallback(async () => {
-    if (teamPermission) {
-      await teamPermission.warmupSession();
-    }
+    if (teamPermission) return;
   }, [teamPermission]);
   const prepareRuntimeSync = useCallback(async () => {
     if (teamPermission) {
       await teamPermission.warmupSession();
+      return;
     }
     await ensureConversationRuntime(conversation_id);
   }, [conversation_id, teamPermission]);
   const runtimeConfig = useAcpConfigOptions({
     conversation_id,
     prepareRuntime: prepareRuntimeConfig,
+    prepareSetRuntime: teamPermission?.warmupSession,
+    loadConfigOptions: teamPermission?.loadConfigOptions,
     enabled: Boolean(conversation_id),
   });
   const runtimeMode = runtimeConfig.mode;
@@ -226,6 +249,7 @@ const AionrsSendBox: React.FC<{
   const slash_commands = useSlashCommands(conversation_id, {
     conversation_type: 'aionrs',
     agentStatus: agentWarmed ? 'active' : null,
+    prepareRuntime: teamPermission ? prepareRuntimeSync : undefined,
   });
 
   const { setSendBoxHandler } = usePreviewContext();
@@ -269,7 +293,14 @@ const AionrsSendBox: React.FC<{
   });
 
   const executeCommand = useCallback(
-    async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
+    async ({
+      input,
+      files,
+      injectSkills,
+      artifactScratchRunId,
+    }: Pick<ConversationCommandQueueItem, 'input' | 'files' | 'artifactScratchRunId'> & {
+      injectSkills?: string[];
+    }) => {
       if (teamPermission) await teamPermission.warmupSession();
       if (!current_model?.use_model) {
         Message.warning(t('conversation.chat.noModelSelected'));
@@ -288,7 +319,7 @@ const AionrsSendBox: React.FC<{
           return;
         }
 
-        runtimeView.markSendStarted();
+        markSendStarted();
         setWaitingResponse(true);
         const latestConversation = await getConversationOrNull(conversation_id);
         const res = await ipcBridge.conversation.sendMessage.invoke({
@@ -296,18 +327,33 @@ const AionrsSendBox: React.FC<{
           conversation_id,
           files,
           pinned_context: getConversationPinnedContext(latestConversation),
+          inject_skills: injectSkills && injectSkills.length > 0 ? injectSkills : undefined,
         });
         setActiveMsgId(res.msg_id);
-        runtimeView.markSendAccepted(res.turn_id, res.runtime, res.msg_id);
+        markSendAccepted(res.turn_id, res.runtime, res.msg_id);
+        presentationTemplates.registerScratchTurn(res.turn_id, artifactScratchRunId);
         emitter.emit('chat.history.refresh');
         if (files.length > 0) {
           emitter.emit('aionrs.workspace.refresh');
         }
       } catch (error) {
+        void presentationTemplates.retainScratchRun(artifactScratchRunId, 'failed').catch(() => {});
         const errorMessage =
           getConversationRuntimeWorkspaceErrorMessage(error, t) ||
           (error instanceof Error ? error.message : String(error));
-        runtimeView.markSendFailed(errorMessage);
+        const busyError = classifyConversationBusyError(error);
+        if (busyError) {
+          markSendFailed({
+            kind: 'busy_conflict',
+            reason: errorMessage,
+            busyKind: busyError.kind,
+            status: busyError.status,
+            code: busyError.code,
+          });
+          throw error;
+        }
+
+        markSendFailed({ kind: 'ordinary', reason: errorMessage });
         Message.error(errorMessage);
         throw error;
       }
@@ -316,24 +362,31 @@ const AionrsSendBox: React.FC<{
       checkAndUpdateTitle,
       conversation_id,
       current_model?.use_model,
-      runtimeView,
+      markSendAccepted,
+      markSendFailed,
+      markSendStarted,
       setActiveMsgId,
       setWaitingResponse,
       t,
       teamPermission,
       teamSendMessage,
+      presentationTemplates,
       workspacePath,
     ]
   );
 
   const {
     items: queuedCommands,
+    mode: queueMode,
     isInteractionLocked: isQueueInteractionLocked,
     hasPendingCommands,
     enqueue,
     remove,
+    prioritize,
+    sendNow,
     clear,
     reorder,
+    toggleMode,
     lockInteraction,
     unlockInteraction,
     resetActiveExecution,
@@ -361,8 +414,8 @@ const AionrsSendBox: React.FC<{
       sessionStorage.removeItem(storageKey);
 
       try {
-        const { input, files: initialFiles } = JSON.parse(storedMessage);
-        await executeCommand({ input, files: initialFiles || [] });
+        const { input, files: initialFiles, injectSkills } = JSON.parse(storedMessage);
+        await executeCommand({ input, files: initialFiles || [], injectSkills });
       } catch (error) {
         console.error('[AionrsSendBox] Failed to send initial message:', error);
         sessionStorage.removeItem(processedKey);
@@ -390,6 +443,9 @@ const AionrsSendBox: React.FC<{
     clearFiles();
     emitter.emit('aionrs.selected.file.clear');
 
+    const scratch = teamSendMessage ? undefined : await presentationTemplates.prepareScratch(conversation_id);
+    const composed = presentationTemplates.composeSend(message, filesToSend, scratch);
+
     if (
       shouldEnqueueConversationCommand({
         enabled: true,
@@ -397,22 +453,38 @@ const AionrsSendBox: React.FC<{
         hasPendingCommands,
       })
     ) {
-      enqueue({ input: message, files: filesToSend });
+      // Queued sends drop injectSkills — the directive still names the skill,
+      // so the agent can pick it up when the queued command is executed.
+      enqueue({
+        input: composed.input,
+        files: composed.files,
+        artifactScratchRunId: composed.artifactScratchRunId,
+      });
+      presentationTemplates.clearSelection();
       return;
     }
 
-    await executeCommand({ input: message, files: filesToSend });
+    await executeCommand({
+      input: composed.input,
+      files: composed.files,
+      injectSkills: composed.injectSkills,
+      artifactScratchRunId: composed.artifactScratchRunId,
+    });
+    presentationTemplates.clearSelection();
   };
 
   const handleEditQueuedCommand = useCallback(
     (item: ConversationCommandQueueItem) => {
       remove(item.id);
+      if (item.artifactScratchRunId) {
+        void presentationTemplates.discardScratch(item.artifactScratchRunId);
+      }
       setContent(item.input);
       setUploadFile(Array.from(new Set(item.files)));
       setAtPath([]);
       emitter.emit('aionrs.selected.file.clear');
     },
-    [remove, setAtPath, setContent, setUploadFile]
+    [presentationTemplates, remove, setAtPath, setContent, setUploadFile]
   );
 
   const appendSelectedFiles = useCallback(
@@ -559,10 +631,10 @@ const AionrsSendBox: React.FC<{
       entries.push({
         key: 'skills',
         icon: <MagicHat theme='outline' size='16' />,
-        label: t('common.skills', { defaultValue: 'Skills' }),
+        label: t('common.selectedSkills', { defaultValue: 'Selected skills' }),
         variant: 'muted',
         submenu: {
-          title: t('common.skills', { defaultValue: 'Skills' }),
+          title: t('common.selectedSkills', { defaultValue: 'Selected skills' }),
           selectable: false,
           options: skillOptions,
           onSelect: (name) => {
@@ -586,10 +658,10 @@ const AionrsSendBox: React.FC<{
       entries.push({
         key: 'mcp',
         icon: <Shield theme='outline' size='16' />,
-        label: t('conversation.mcp.loaded', { defaultValue: 'Loaded MCP' }),
+        label: t('conversation.mcp.selected', { defaultValue: 'Selected MCP' }),
         variant: 'muted',
         submenu: {
-          title: t('conversation.mcp.loaded', { defaultValue: 'Loaded MCP' }),
+          title: t('conversation.mcp.selected', { defaultValue: 'Selected MCP' }),
           selectable: false,
           options: mcpOptions,
           onSelect: () => undefined,
@@ -633,6 +705,7 @@ const AionrsSendBox: React.FC<{
       resetActiveExecution('stop');
       return;
     }
+    void presentationTemplates.interruptScratchTurn(turnId).catch(() => {});
     runtimeView.markStopRequested(turnId);
     try {
       const result = await ipcBridge.conversation.stop.invoke({ conversation_id, turn_id: turnId });
@@ -646,6 +719,18 @@ const AionrsSendBox: React.FC<{
     }
   };
   const effectiveHandleStop = teamRuntime?.onStop ?? handleStop;
+  const handleSendNowQueued = useCallback(
+    async (item: ConversationCommandQueueItem) => {
+      // Stop the current reply (best-effort), then promote the chosen command
+      // to the front of the queue in auto mode.  The drain effect will fire it
+      // once the execution gate shows canExecute — avoiding the 409 race that
+      // occurs when sendNow() calls onExecute() directly before the backend
+      // has finished processing the stop.
+      await effectiveHandleStop();
+      prioritize(item.id);
+    },
+    [effectiveHandleStop, prioritize]
+  );
   const sendBoxWidthClass = getChatSurfaceWidthClass(Boolean(teamPermission));
   const thoughtDisplayRunning = teamRuntime?.loading ?? (runtimeView.hydrated ? runtimeView.isProcessing : running);
   const thoughtDisplayThought = thoughtDisplayRunning ? thought : undefined;
@@ -654,15 +739,35 @@ const AionrsSendBox: React.FC<{
     <div className={`${sendBoxWidthClass} flex flex-col mt-auto mb-16px`}>
       <CommandQueuePanel
         items={queuedCommands}
+        mode={queueMode}
+        isMobile={isMobile}
         interactionLocked={isQueueInteractionLocked}
         onInteractionLock={lockInteraction}
         onInteractionUnlock={unlockInteraction}
         onEdit={handleEditQueuedCommand}
+        onSendNow={handleSendNowQueued}
+        onToggleMode={toggleMode}
         onReorder={reorder}
-        onRemove={remove}
-        onClear={clear}
+        onRemove={(commandId) => {
+          const item = queuedCommands.find((command) => command.id === commandId);
+          remove(commandId);
+          if (item?.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+        }}
+        onClear={() => {
+          for (const item of queuedCommands) {
+            if (item.artifactScratchRunId) void presentationTemplates.discardScratch(item.artifactScratchRunId);
+          }
+          clear();
+        }}
       />
-      <ThoughtDisplay thought={thoughtDisplayThought} running={thoughtDisplayRunning} onStop={effectiveHandleStop} />
+      <ThoughtDisplay
+        thought={thoughtDisplayThought}
+        running={thoughtDisplayRunning}
+        statusText={teamRuntime?.statusText}
+        externalElapsedSource={Boolean(teamRuntime)}
+        startedAtMs={teamRuntime?.startedAtMs ?? null}
+        onStop={effectiveHandleStop}
+      />
 
       <SendBox
         data-testid='aionrs-sendbox'
@@ -692,11 +797,14 @@ const AionrsSendBox: React.FC<{
         defaultMultiLine={!isMobile}
         lockMultiLine={!isMobile}
         tools={
-          <FileAttachButton
-            openFileSelector={openFileSelector}
-            onLocalFilesAdded={handleFilesAdded}
-            loadedMcpStatuses={loadedMcpStatuses}
-          />
+          <>
+            <FileAttachButton
+              openFileSelector={openFileSelector}
+              onLocalFilesAdded={handleFilesAdded}
+              loadedMcpStatuses={loadedMcpStatuses}
+            />
+            <TemplateGalleryButton onClick={presentationTemplates.toggleGallery} />
+          </>
         }
         rightTools={
           <div className='flex items-center gap-8px min-w-0'>
@@ -717,12 +825,22 @@ const AionrsSendBox: React.FC<{
               }
               onModeChanged={propagateMode}
               beforeRuntimeSync={prepareRuntimeConfig}
+              beforeRuntimeSet={teamPermission?.warmupSession}
+              loadConfigOptions={teamPermission?.loadConfigOptions}
             />
-            <ContextUsageIndicator tokenUsage={tokenUsage} localUsage={localUsage} context_limit={contextLimit} />
+            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
           </div>
         }
         prefix={
           <>
+            {presentationTemplates.selectedTemplate && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                <TemplateChipCard
+                  template={presentationTemplates.selectedTemplate}
+                  onRemove={presentationTemplates.clearSelection}
+                />
+              </div>
+            )}
             {uploadFile.length > 0 && (
               <HorizontalFileList>
                 {uploadFile.map((path) => (
@@ -768,6 +886,20 @@ const AionrsSendBox: React.FC<{
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         enableContextCommand
         allowSendWhileLoading
+        onOpenTemplateGallery={presentationTemplates.openGallery}
+        templateGalleryNode={
+          presentationTemplates.galleryOpen ? (
+            <TemplateGalleryPanel
+              templates={presentationTemplates.templates}
+              selectedId={presentationTemplates.selectedTemplate?.manifest.id ?? null}
+              loading={presentationTemplates.templatesLoading}
+              onSelect={presentationTemplates.selectTemplate}
+              onImport={presentationTemplates.importFromDialog}
+              onRemove={presentationTemplates.removeTemplate}
+              onClose={presentationTemplates.closeGallery}
+            />
+          ) : null
+        }
       />
       {isMobile && (
         <>

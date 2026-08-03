@@ -16,6 +16,7 @@
   "downloadFailed": "下载失败",
   "imageLoadFailed": "图片加载失败",
   "scrollToBottom": "滚动到底部",
+  "reasoning": "推理过程",
   "availableCommands": "{{count}} 个可用命令",
   "atFile.hint": "输入以搜索文件",
   "atFile.menuLabel": "文件提及",
@@ -50,12 +51,25 @@
   "unknownMessageType": "未知消息类型：{{type}}",
   "permissionRequest": "权限请求",
   "agentRequestingPermission": "代理正在请求权限。",
+  "permission": {
+    "intent": {
+      "run": "我想执行一条命令",
+      "edit": "我想编辑一个文件",
+      "read": "我想读取一个文件",
+      "fetch": "我想从网络获取内容",
+      "tool": "我想使用一个工具",
+      "destructive": "我想删除或移除文件",
+      "generic": "我想执行一项需要你批准的操作"
+    },
+    "destructiveWarning": "这可能会永久删除或覆盖文件，且无法撤销。"
+  },
   "command": "命令：",
   "chooseAction": "选择一个操作：",
   "option": "选项",
   "noOptionsAvailable": "无可用选项",
   "processing": "处理中...",
   "responseSentSuccessfully": "响应已成功发送",
+  "permissionResponseFailed": "发送回应失败，请重试。",
   "confirmation": {
     "applyChange": "应用此更改？",
     "allowExecution": "允许执行？",
@@ -227,5 +241,8 @@
         "failedTitle": "我无法准备最终文件"
       }
     }
+  },
+  "plan": {
+    "title": "待办清单"
   }
 }

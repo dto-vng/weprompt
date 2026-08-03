@@ -8,6 +8,7 @@ import React from 'react';
 import OfficeWatchViewer from './OfficeWatchViewer';
 
 interface PptViewerProps {
+  conversationId: string;
   file_path?: string;
   content?: string;
   workspace?: string;

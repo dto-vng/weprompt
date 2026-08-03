@@ -9,7 +9,8 @@ import type { ForgeProject } from '@/common/types/project/projectTypes';
 import WorkspaceProjectFilesFlyout from '@renderer/pages/conversation/Workspace/components/WorkspaceProjectFilesFlyout';
 import '@renderer/pages/conversation/Workspace/workspace.css';
 import { getWorkspaceBasename, updateProject } from '@renderer/pages/conversation/projects/projectStorage';
-import { Alert, Button, Card, Spin } from '@arco-design/web-react';
+import { Alert, Button, Card, Message, Spin, Tooltip } from '@arco-design/web-react';
+import { FolderOpen } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -53,9 +54,15 @@ const ProjectFilesCard: React.FC<ProjectFilesCardProps> = ({ project }) => {
       data-testid='project-files-card'
       title={t('conversation.projectHome.files')}
       extra={
-        <Button type='text' size='mini' onClick={() => void ipcBridge.shell.showItemInFolder.invoke(project.workspace)}>
-          {t('conversation.projectHome.revealInFolder')}
-        </Button>
+        <Tooltip content={t('conversation.projectHome.revealInFolder')}>
+          <Button
+            type='text'
+            size='mini'
+            aria-label={t('conversation.projectHome.revealInFolder')}
+            icon={<FolderOpen theme='outline' size='14' />}
+            onClick={() => void ipcBridge.shell.showItemInFolder.invoke(project.workspace)}
+          />
+        </Tooltip>
       }
     >
       {loading ? (
@@ -87,10 +94,17 @@ const ProjectFilesCard: React.FC<ProjectFilesCardProps> = ({ project }) => {
               files={files}
               expandedKeys={expandedKeys}
               onToggleFolder={toggleFolder}
-              onOpenFile={(node) => void ipcBridge.shell.showItemInFolder.invoke(node.fullPath)}
+              // A row click opens the file, as it does in a chat's Workspace
+              // tab; the card's `extra` action above is the deliberate
+              // reveal-in-Finder path, which this used to duplicate.
+              onOpenFile={(node) =>
+                void ipcBridge.shell.openFile
+                  .invoke(node.fullPath)
+                  .catch(() => Message.error(t('conversation.workspace.contextMenu.openFailed')))
+              }
             />
           </div>
-          <span className='border-t border-t-light pt-8px text-center text-11px text-t-tertiary'>
+          <span className='border-t border-t-4 pt-8px text-center text-11px text-t-tertiary'>
             {t('conversation.projectHome.filesReadonly')}
           </span>
         </div>

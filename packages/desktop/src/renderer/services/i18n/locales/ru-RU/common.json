@@ -20,7 +20,7 @@
   "website": "Сайт",
   "version": "Версия",
   "contact": "Контакты",
-  "github": "Github",
+  "github": "GitHub",
   "loading": "Пожалуйста, подождите...",
   "copy": "Копировать",
   "reply": "Ответить",
@@ -29,6 +29,10 @@
   "download": "Скачать",
   "close": "Закрыть",
   "retry": "Повторить",
+  "routeError": {
+    "title": "Не удалось отобразить эту страницу",
+    "description": "При открытии страницы произошла ошибка. Остальная часть приложения продолжает работать — повторите попытку или выберите другой элемент на боковой панели."
+  },
   "reload": "Обновить",
   "technical_details": "Технические детали",
   "error_details": "Детали ошибки",
@@ -81,42 +85,60 @@
       "title": "Установка WePrompt неполная",
       "description": "В этой установке отсутствуют обязательные локальные ресурсы, поэтому AionCore не может запуститься. Загрузите и переустановите последнюю версию WePrompt. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО AionCore в карантин.",
       "downloadLatest": "Скачать последнюю версию",
-      "sendDiagnostics": "Отправить диагностику",
-      "diagnosticsSent": "Диагностика отправлена",
-      "diagnosticsReportSuccess": "Диагностический отчет отправлен",
-      "diagnosticsReportFailed": "Не удалось отправить диагностический отчет",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет",
       "runtimeComponentDescription": "В этой установке отсутствуют необходимые встроенные компоненты среды выполнения, поэтому {{resource}} не может запуститься. Переустановите последнюю версию WePrompt. Если проблема повторится после переустановки, проверьте, не поместило ли защитное или антивирусное ПО компоненты WePrompt в карантин."
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "Архитектура пакета WePrompt не совпадает",
+      "description": "Этот пакет WePrompt предназначен для {{packageArch}}, а этот Mac использует {{deviceArch}}. Получите установщик {{expectedArch}} через утверждённый внутренний канал распространения, закройте WePrompt и установите этот пакет.",
+      "closeApplication": "Закрыть WePrompt"
     },
     "dataMigration": {
-      "title": "Local data migration failed",
-      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "title": "Не удалось перенести локальные данные",
+      "description": "WePrompt открылся, но AionCore остановился при инициализации локальных данных. Переустановка WePrompt может не решить проблему. Сохраните диагностический пакет локально, чтобы можно было проверить миграцию базы данных.",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет"
     },
     "localDataRepair": {
-      "title": "Local data repair failed",
-      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "title": "Не удалось восстановить локальные данные",
+      "description": "WePrompt открылся, но AionCore остановился при восстановлении данных кэша локального агента. Переустановка WePrompt может не решить проблему. Сохраните диагностический пакет локально, чтобы можно было проверить локальную базу данных.",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет"
+    },
+    "startupDirectory": {
+      "title": "Папка запуска недоступна",
+      "description": "WePrompt открылся, но AionCore не смог запуститься: настроенная рабочая папка или папка логов отсутствует, недоступна либо заблокирована правами. Убедитесь, что эти папки существуют и доступны для записи, затем перезапустите WePrompt.",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет"
     },
     "recoverableDatabaseCorruption": {
       "title": "Локальные данные повреждены",
       "description": "WePrompt обнаружил повреждение локальной базы данных и не может продолжить запуск. После подтверждения старая база данных будет сохранена как резервная копия, а для продолжения запуска будет создана новая локальная база данных. Исторические локальные данные пока не будут отображаться, старая база данных будет сохранена как резервная копия.",
       "confirmRebuild": "Сохранить старую БД и создать новую",
-      "sendDiagnostics": "Отправить диагностику",
-      "diagnosticsHint": "Отправка диагностики не изменит локальную базу данных.",
-      "diagnosticsSent": "Диагностика отправлена",
-      "diagnosticsReportSuccess": "Диагностический отчет отправлен",
-      "diagnosticsReportFailed": "Не удалось отправить диагностический отчет",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsHint": "Сохранение диагностики не изменяет локальную базу данных.",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет",
       "rebuildFailed": "Не удалось сохранить старую БД и создать новую"
+    },
+    "transientConcurrentStartup": {
+      "title": "WePrompt запускается",
+      "description": "При открытии этого окна другой процесс запуска WePrompt всё ещё использовал локальные данные. Это временно, и ваши данные в безопасности — переустановка не требуется. Подождите немного и повторите попытку или перезапустите WePrompt.",
+      "sendDiagnostics": "Сохранить диагностику",
+      "diagnosticsSent": "Диагностика сохранена",
+      "diagnosticsReportSuccess": "Диагностический пакет сохранён",
+      "diagnosticsReportFailed": "Не удалось сохранить диагностический пакет",
+      "diagnosticsHint": "Сохранение диагностики не изменяет локальную базу данных."
     }
   },
   "fileAttach.addFiles": "Добавить файлы",
@@ -139,5 +161,17 @@
   "unit": {
     "minute_short": "мин",
     "second_short": "с"
+  },
+  "selectedCount": "Выбрано {{count}}",
+  "selectedSkills": "Выбранные навыки",
+  "chrome": {
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
+    "restore": "Восстановить",
+    "collapseSidebar": "Свернуть боковую панель",
+    "expandSidebar": "Развернуть боковую панель",
+    "toggleProjectPanel": "Показать или скрыть панель проекта",
+    "expandProjectPanel": "Развернуть панель проекта",
+    "collapseProjectPanel": "Свернуть панель проекта"
   }
 }

@@ -15,6 +15,7 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { buildBm25Index } from '@/common/knowledge/bm25';
 import { embedTexts } from '@/common/knowledge/embedCore';
 import { loadStore, searchKnowledge, type KnowledgeStoreData } from '@/common/knowledge/searchCore';
 import { buildEvalStore } from './buildStore';
@@ -67,6 +68,45 @@ const runQuestions = async (
     });
   }
   return results;
+};
+
+/**
+ * The store as the semantic half alone sees it.
+ *
+ * `searchKnowledge` does not expose its two retrieval lists separately, so the
+ * only way to isolate the semantic one WITHOUT reimplementing ranking here — the
+ * thing this harness exists not to do — is to make the other list empty.
+ * `searchBm25` returns `[]` the moment `totalDocs === 0`, so an index built from
+ * no chunks silently removes the lexical contribution and leaves RRF fusing a
+ * single list, which is order-preserving. Cosine, the candidate cap and the
+ * chunk mapping all remain the shipping code.
+ *
+ * Note the query still has to tokenise to something: `searchKnowledge`
+ * short-circuits on an empty token list before either path runs, so this is not
+ * a perfectly pure semantic probe for a query with no word characters. No golden
+ * question is in that shape.
+ */
+const withoutLexicalHalf = (store: KnowledgeStoreData): KnowledgeStoreData => ({
+  ...store,
+  bm25: buildBm25Index([]),
+});
+
+/**
+ * Re-score a deep ranking as if it had been cut at `topK`, keeping the true rank.
+ *
+ * Without this the vector row would not be comparable to the other two: a
+ * passage found at rank 9 contributes 1/9 to MRR here but 0 in a mode truncated
+ * at 6, so the diagnostic would look better purely for being measured deeper.
+ */
+const cappedAt = (result: QuestionResult, topK: number): QuestionResult => {
+  const hits = result.hits.slice(0, topK);
+  return {
+    ...result,
+    hits,
+    sourceRank: sourceRankOf(hits, result.expectedSources),
+    answerRank: answerRankOf(hits, result.expectedSources),
+    deepSourceRank: result.sourceRank,
+  };
 };
 
 export const runEvaluation = async (options: RunEvaluationOptions): Promise<EvalRun> => {
@@ -129,12 +169,30 @@ export const runEvaluation = async (options: RunEvaluationOptions): Promise<Eval
       const hybridQuestions = await runQuestions(store, fixture.questions, knobs.topK, (query) =>
         activeCache.embedOne(query)
       );
-      await activeCache.flush();
       modes.push({
         mode: 'hybrid',
         metrics: computeMetrics(hybridQuestions, knobs.topK),
         questions: hybridQuestions,
       });
+
+      // Semantic-only, run to full corpus depth so a miss reports where the
+      // passage actually sat rather than repeating "not in the top k". Costs no
+      // embeddings: every query vector is already in the cache from the hybrid
+      // pass above.
+      const deep = await runQuestions(
+        withoutLexicalHalf(store),
+        fixture.questions,
+        Math.max(knobs.topK, built.chunkCount),
+        (query) => activeCache.embedOne(query)
+      );
+      const vectorQuestions = deep.map((question) => cappedAt(question, knobs.topK));
+      modes.push({
+        mode: 'vector',
+        metrics: computeMetrics(vectorQuestions, knobs.topK),
+        questions: vectorQuestions,
+      });
+
+      await activeCache.flush();
       embedding = {
         model: embeddingModel,
         dim: built.embeddingDim ?? 0,
@@ -148,7 +206,11 @@ export const runEvaluation = async (options: RunEvaluationOptions): Promise<Eval
 
     return {
       knobs,
-      corpus: { documentCount: fixture.documents.length, chunkCount: built.chunkCount },
+      corpus: {
+        documentCount: fixture.documents.length,
+        ocrDocumentCount: fixture.documents.filter((doc) => doc.provenance === 'ocr').length,
+        chunkCount: built.chunkCount,
+      },
       embedding,
       hybridSkippedReason: embedding ? null : (hybridSkippedReason ?? 'no embedding model available'),
       modes,

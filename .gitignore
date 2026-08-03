@@ -135,6 +135,7 @@ dist/
 build/
 out/
 out-fast-builds/
+/artifacts/internal-release/
 
 # Keep extension example dist (pre-built distributable assets)
 !examples/**/dist/
@@ -217,3 +218,6 @@ graphify-out/
 .graphify_python
 
 .snow/
+
+# Local scratch/analysis (wireframes, candidate mockups)
+.analysis/

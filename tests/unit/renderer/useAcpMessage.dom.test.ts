@@ -76,6 +76,32 @@ describe('useAcpMessage', () => {
     responseStreamHandlerRef.current = undefined;
   });
 
+  it('reports matching finish and error terminals to lifecycle consumers', () => {
+    vi.mocked(getConversationOrNull).mockResolvedValue(null);
+    const onTerminal = vi.fn();
+    renderHook(() => useAcpMessage('conv-1', { onTerminal }));
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'msg-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'error',
+        data: 'failed',
+        msg_id: 'msg-2',
+        turn_id: 'turn-2',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    expect(onTerminal).toHaveBeenNthCalledWith(1, { turnId: 'turn-1', outcome: 'completed' });
+    expect(onTerminal).toHaveBeenNthCalledWith(2, { turnId: 'turn-2', outcome: 'failed' });
+  });
+
   it('completes hydration when the conversation lookup fails', async () => {
     vi.mocked(getConversationOrNull).mockRejectedValue(new TypeError('Failed to fetch'));
 
@@ -328,6 +354,34 @@ describe('useAcpMessage', () => {
         },
       ]);
     });
+  });
+
+  it('uses injected runtime preparation for initial slash commands in team mode', async () => {
+    vi.mocked(getConversationOrNull).mockResolvedValue(null);
+    const prepareRuntime = vi.fn().mockResolvedValue(undefined);
+    getSlashCommandsInvokeMock.mockResolvedValue([
+      {
+        command: 'review',
+        description: 'Review the current diff',
+      },
+    ]);
+
+    const { result } = renderHook(() => useAcpMessage('conv-1', { prepareRuntime }));
+
+    await waitFor(() => {
+      expect(prepareRuntime).toHaveBeenCalled();
+      expect(getSlashCommandsInvokeMock).toHaveBeenCalledWith({ conversation_id: 'conv-1' });
+    });
+    expect(ensureRuntimeInvokeMock).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.fetchSlashCommands();
+    });
+
+    await waitFor(() => {
+      expect(prepareRuntime).toHaveBeenCalledTimes(2);
+    });
+    expect(ensureRuntimeInvokeMock).not.toHaveBeenCalled();
   });
 
   it('deduplicates slash command fetches while a request is in flight', async () => {

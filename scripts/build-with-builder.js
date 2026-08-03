@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Simplified build script for AionUi
+ * Simplified build script for WePrompt
  * Coordinates electron-vite (bundling) and electron-builder (packaging)
  *
  * Features:
@@ -27,13 +27,46 @@ const DMG_RETRY_DELAY_SEC = 30;
 // Incremental build: hash of source files to detect changes
 const INCREMENTAL_CACHE_FILE = 'out/.build-hash';
 const DEBUG_AUTO_UPDATE_CURRENT_VERSION_ENV = 'AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION';
+const CURRENT_WINDOWS_EXECUTABLE = 'WePrompt.exe';
+const LEGACY_WINDOWS_EXECUTABLES = ['Forge.exe', 'AionUi.exe'];
+const INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES = [
+  'WEPROMPT_UPDATE_BASE_URL',
+  'SENTRY_DSN',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_UPLOAD_SOURCE_MAPS',
+  'SENTRY_ORG',
+  'SENTRY_PROJECT',
+  'SENTRY_RELEASE',
+  'BUILD_CERTIFICATE_BASE64',
+  'P12_PASSWORD',
+  'KEYCHAIN_PASSWORD',
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'CSC_IDENTITY_AUTO_DISCOVERY',
+  'APPLE_ID',
+  'APPLE_ID_PASSWORD',
+  'TEAM_ID',
+  'IDENTITY',
+  'appleId',
+  'appleIdPassword',
+  'teamId',
+  'identity',
+];
 
 function patchElectronBuilderNsisInstaller() {
   const rootDir = path.resolve(__dirname, '..');
+  // Resolve app-builder-lib inside THIS repo first. require.resolve walks up
+  // parent directories, so in a git worktree (whose bun install has no
+  // top-level node_modules/app-builder-lib) it would escape to the main
+  // checkout's copy and patch the wrong file.
   let appBuilderDir = '';
-  try {
-    appBuilderDir = path.dirname(require.resolve('app-builder-lib/package.json'));
-  } catch (error) {
+  const directDir = path.join(rootDir, 'node_modules', 'app-builder-lib');
+  if (fs.existsSync(path.join(directDir, 'package.json'))) {
+    appBuilderDir = directDir;
+  } else {
     const bunModulesDir = path.join(rootDir, 'node_modules', '.bun');
     if (fs.existsSync(bunModulesDir)) {
       const candidates = fs
@@ -44,7 +77,11 @@ function patchElectronBuilderNsisInstaller() {
         .sort();
       appBuilderDir = candidates[0] || '';
     }
-    if (!appBuilderDir) {
+  }
+  if (!appBuilderDir) {
+    try {
+      appBuilderDir = path.dirname(require.resolve('app-builder-lib/package.json'));
+    } catch (error) {
       console.warn(`Warning: app-builder-lib is not resolvable; skipping NSIS template patch: ${error.message}`);
       return;
     }
@@ -101,6 +138,48 @@ function patchElectronBuilderNsisInstaller() {
   } else if (!patched.includes(copiedUninstallerExecWithLog)) {
     throw new Error(
       'electron-builder copied-uninstaller ExecWait template changed; update patchElectronBuilderNsisInstaller.'
+    );
+  }
+
+  const uninstallerCopySource = [
+    '  StrCpy $uninstallerFileNameTemp "$PLUGINSDIR\\old-uninstaller.exe"',
+    '  !insertmacro copyFile "$uninstallerFileName" "$uninstallerFileNameTemp"',
+  ].join('\n');
+  const bundledUninstallerOverride = [
+    '  ${if} ${FileExists} "$PLUGINSDIR\\weprompt-fixed-uninstaller.exe"',
+    '    DetailPrint `WePrompt bundled-uninstaller override source.`',
+    '    StrCpy $uninstallerFileName "$PLUGINSDIR\\weprompt-fixed-uninstaller.exe"',
+    '  ${endIf}',
+  ].join('\n');
+  const legacyBundledUninstallerOverride = [
+    '  ${if} ${FileExists} "$PLUGINSDIR\\AionUi-fixed-uninstaller.exe"',
+    '    DetailPrint `AionUi-bundled-uninstaller override source.`',
+    '    StrCpy $uninstallerFileName "$PLUGINSDIR\\AionUi-fixed-uninstaller.exe"',
+    '  ${endIf}',
+  ].join('\n');
+  const bundledUninstallerCopySource = [
+    bundledUninstallerOverride,
+    '',
+    '  StrCpy $uninstallerFileNameTemp "$PLUGINSDIR\\old-uninstaller.exe"',
+    '  !insertmacro copyFile "$uninstallerFileName" "$uninstallerFileNameTemp"',
+  ].join('\n');
+
+  while (patched.includes(`${bundledUninstallerOverride}\n\n${bundledUninstallerOverride}`)) {
+    patched = patched.replace(
+      `${bundledUninstallerOverride}\n\n${bundledUninstallerOverride}`,
+      bundledUninstallerOverride
+    );
+  }
+
+  if (patched.includes(legacyBundledUninstallerOverride)) {
+    patched = patched.replace(legacyBundledUninstallerOverride, bundledUninstallerOverride);
+  } else if (patched.includes(bundledUninstallerOverride)) {
+    // Already patched.
+  } else if (patched.includes(uninstallerCopySource)) {
+    patched = patched.replace(uninstallerCopySource, bundledUninstallerCopySource);
+  } else {
+    throw new Error(
+      'electron-builder old-uninstaller copy template changed; update patchElectronBuilderNsisInstaller.'
     );
   }
 
@@ -212,7 +291,109 @@ function viteBuildExists() {
   const mainDir = path.join(outDir, 'main');
   const rendererDir = path.join(outDir, 'renderer');
 
-  return fs.existsSync(path.join(mainDir, 'index.js')) && fs.existsSync(path.join(rendererDir, 'index.html'));
+  return (
+    fs.existsSync(path.join(mainDir, 'index.js')) &&
+    fs.existsSync(path.join(outDir, 'preload', 'index.js')) &&
+    validateRendererBuildOutput(rendererDir).valid
+  );
+}
+
+function collectHtmlAssetRefs(html, htmlDirRelative) {
+  const refs = [];
+  const attrRe = /\b(?:src|href)=["']([^"']+)["']/g;
+  for (const match of html.matchAll(attrRe)) {
+    const rawRef = match[1];
+    if (!rawRef || rawRef.startsWith('http:') || rawRef.startsWith('https:') || rawRef.startsWith('data:')) continue;
+    if (!rawRef.startsWith('./') && !rawRef.startsWith('../')) continue;
+
+    const normalized = path
+      .normalize(path.join(htmlDirRelative, rawRef.split(/[?#]/)[0]))
+      .replace(/\\/g, '/')
+      .replace(/^\.\//, '');
+    if (normalized.startsWith('assets/')) {
+      refs.push(normalized);
+    }
+  }
+  return refs;
+}
+
+function walkHtmlFiles(dir, baseDir = dir, acc = []) {
+  if (!fs.existsSync(dir)) return acc;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkHtmlFiles(fullPath, baseDir, acc);
+    } else if (entry.isFile() && entry.name.endsWith('.html')) {
+      acc.push({
+        fullPath,
+        relativePath: path.relative(baseDir, fullPath).replace(/\\/g, '/'),
+      });
+    }
+  }
+  return acc;
+}
+
+function validateRendererBuildOutput(rendererDir) {
+  const problems = [];
+  const indexHtmlPath = path.join(rendererDir, 'index.html');
+  if (!fs.existsSync(indexHtmlPath)) {
+    return { valid: false, problems: ['Renderer build output is incomplete: missing out/renderer/index.html'] };
+  }
+
+  const htmlFiles = walkHtmlFiles(rendererDir);
+  if (htmlFiles.length === 0) {
+    return { valid: false, problems: ['Renderer build output is incomplete: no HTML files under out/renderer'] };
+  }
+
+  const assetRefs = new Set();
+  for (const htmlFile of htmlFiles) {
+    const html = fs.readFileSync(htmlFile.fullPath, 'utf8');
+    if (/src=["'][^"']*\.tsx(?:[?#][^"']*)?["']/.test(html)) {
+      problems.push(`Renderer build output is incomplete: ${htmlFile.relativePath} still references TypeScript source`);
+    }
+
+    const htmlDirRelative = path.dirname(htmlFile.relativePath);
+    const baseRelative = htmlDirRelative === '.' ? '' : htmlDirRelative;
+    for (const ref of collectHtmlAssetRefs(html, baseRelative)) {
+      assetRefs.add(ref);
+    }
+  }
+
+  const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+  if (!/<div\s+id=["']root["']/.test(indexHtml)) {
+    problems.push('Renderer build output is incomplete: index.html is missing #root');
+  }
+  if (!/<script\b[^>]*type=["']module["'][^>]*\bsrc=["']\.\/assets\/[^"']+\.js["']/.test(indexHtml)) {
+    problems.push('Renderer build output is incomplete: index.html has no bundled module script');
+  }
+
+  if (assetRefs.size === 0) {
+    problems.push('Renderer build output is incomplete: no bundled renderer asset references found');
+  }
+
+  for (const ref of [...assetRefs].sort()) {
+    if (!fs.existsSync(path.join(rendererDir, ref))) {
+      problems.push(`Renderer build output is incomplete: missing referenced asset ${ref}`);
+    }
+  }
+
+  return { valid: problems.length === 0, problems };
+}
+
+function validateViteBuildOutput() {
+  const outDir = path.resolve(__dirname, '../out');
+  const problems = [];
+
+  for (const relPath of ['main/index.js', 'preload/index.js']) {
+    if (!fs.existsSync(path.join(outDir, relPath))) {
+      problems.push(`Vite build output is incomplete: missing out/${relPath}`);
+    }
+  }
+
+  const rendererValidation = validateRendererBuildOutput(path.join(outDir, 'renderer'));
+  problems.push(...rendererValidation.problems);
+
+  return { valid: problems.length === 0, problems };
 }
 
 function shouldSkipViteBuild(skipViteFlag, forceFlag) {
@@ -226,6 +407,16 @@ function shouldSkipViteBuild(skipViteFlag, forceFlag) {
   if (cachedHash && currentHash === cachedHash && viteBuildExists()) {
     console.log('📦 Incremental build: Vite output unchanged, skipping compilation');
     return true;
+  }
+
+  if (cachedHash && currentHash === cachedHash) {
+    const validation = validateViteBuildOutput();
+    if (!validation.valid) {
+      console.warn('Incremental build cache matched but output is incomplete; rebuilding.');
+      for (const problem of validation.problems.slice(0, 5)) {
+        console.warn(`   ${problem}`);
+      }
+    }
   }
 
   return false;
@@ -253,26 +444,12 @@ function cleanupDiskImages() {
   }
 }
 
-// Find the .app directory from electron-builder output
-function findAppDir(outDir) {
-  const candidates = ['mac', 'mac-arm64', 'mac-x64', 'mac-universal'];
-  for (const dir of candidates) {
-    const fullPath = path.join(outDir, dir);
-    if (fs.existsSync(fullPath)) {
-      const hasApp = fs.readdirSync(fullPath).some((f) => f.endsWith('.app'));
-      if (hasApp) return fullPath;
-    }
-  }
-  return null;
-}
-
-// Check if DMG exists in output directory
-function dmgExists(outDir) {
-  try {
-    return fs.readdirSync(outDir).some((f) => f.endsWith('.dmg'));
-  } catch {
-    return false;
-  }
+function resolveMacArtifactPaths(outDir, targetArch, version) {
+  const appDirName = targetArch === 'arm64' ? 'mac-arm64' : 'mac';
+  return {
+    appDir: path.join(outDir, appDirName),
+    dmgPath: path.join(outDir, `WePrompt-${version}-mac-${targetArch}.dmg`),
+  };
 }
 
 function tryRemoveDir(targetDir) {
@@ -331,6 +508,31 @@ function writeGeneratedSentryDsnInclude(projectRoot) {
   );
 }
 
+function assertInternalReleaseBuildEnvironment() {
+  if (process.env.WEPROMPT_INTERNAL_RELEASE !== '1') {
+    return;
+  }
+
+  const inheritedVariables = [
+    ...new Set([...INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES, ...Object.keys(process.env)]),
+  ].filter((name) => {
+    const value = process.env[name];
+    const isForbiddenName =
+      INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value === 'false') {
+      return false;
+    }
+    return isForbiddenName && typeof value === 'string' && value.trim() !== '';
+  });
+  if (inheritedVariables.length > 0) {
+    throw new Error(
+      `Internal release build rejects ambient network, upload, signing, or notarization variables: ${inheritedVariables.join(', ')}`
+    );
+  }
+
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+}
+
 function isValidPackageVersion(value) {
   return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
     value
@@ -375,8 +577,9 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
   if (!appName) throw new Error(`No .app found in ${appDir}`);
   const appPath = path.join(appDir, appName);
 
+  const internalIdentityArg = process.env.WEPROMPT_INTERNAL_RELEASE === '1' ? ' --config.mac.identity=-' : '';
   execSync(
-    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never`,
+    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never${internalIdentityArg}`,
     {
       stdio: 'inherit',
       shell: process.platform === 'win32',
@@ -387,14 +590,15 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
 function buildWithDmgRetry(cmd, targetArch) {
   const isMac = process.platform === 'darwin';
   const outDir = path.resolve(__dirname, '../out');
+  const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
+  const { appDir, dmgPath } = resolveMacArtifactPaths(outDir, targetArch, packageVersion);
 
   try {
     execSync(cmd, { stdio: 'inherit', shell: process.platform === 'win32' });
     return;
   } catch (error) {
-    // On non-macOS or if .app doesn't exist, just throw
-    const appDir = isMac ? findAppDir(outDir) : null;
-    if (!appDir || dmgExists(outDir)) throw error;
+    const hasTargetApp = isMac && fs.existsSync(appDir) && fs.readdirSync(appDir).some((file) => file.endsWith('.app'));
+    if (!hasTargetApp || fs.existsSync(dmgPath)) throw error;
 
     // .app exists but no .dmg → DMG creation failed
     console.log('\n🔄 Build failed during DMG creation (.app exists, .dmg missing)');
@@ -595,16 +799,11 @@ try {
     throw new Error('electron-vite did not generate out/ directory');
   }
 
-  // 4. Validate output structure
-  const mainIndex = path.join(outDir, 'main', 'index.js');
-  const rendererIndex = path.join(outDir, 'renderer', 'index.html');
-
-  if (!fs.existsSync(mainIndex)) {
-    throw new Error('Missing main entry: out/main/index.js');
-  }
-
-  if (!fs.existsSync(rendererIndex)) {
-    throw new Error('Missing renderer entry: out/renderer/index.html');
+  // 4. Validate output structure. This must reject source-only renderer shells;
+  // otherwise local fast builds can package a white-screen app.
+  const viteOutputValidation = validateViteBuildOutput();
+  if (!viteOutputValidation.valid) {
+    throw new Error(`Vite build output is incomplete:\n${viteOutputValidation.problems.join('\n')}`);
   }
 
   // If --pack-only, skip electron-builder distributable creation
@@ -612,6 +811,8 @@ try {
     console.log('✅ Package completed! (skipped distributable creation)');
     return;
   }
+
+  assertInternalReleaseBuildEnvironment();
 
   // 5. Prepare aioncore binary (for packaged runtime usage)
   const { prepareAioncore } = require('../packages/shared-scripts/src/prepare-aioncore.js');
@@ -694,30 +895,35 @@ try {
     const winUnpackedDir = path.join(outDir, 'win-unpacked');
     let cleaned = tryRemoveDir(winUnpackedDir);
     if (!cleaned) {
-      const aionRunning = isProcessRunningWindows('AionUi.exe');
+      const appRunning = [CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES].some((name) =>
+        isProcessRunningWindows(name)
+      );
       const electronRunning = isProcessRunningWindows('electron.exe');
-      if (aionRunning || electronRunning) {
-        console.log('⚠️  Detected running AionUi/Electron process. Attempting to close...');
-        killWindowsProcesses(['AionUi.exe', 'electron.exe']);
+      if (appRunning || electronRunning) {
+        console.log('⚠️  Detected running WePrompt/legacy/Electron process. Attempting to close...');
+        killWindowsProcesses([CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES, 'electron.exe']);
         cleaned = tryRemoveDir(winUnpackedDir);
         if (!cleaned) {
-          console.log('⚠️  Directory still locked. Please close any running AionUi/Electron processes and retry.');
+          console.log('⚠️  Directory still locked. Please close any running WePrompt or legacy processes and retry.');
         }
       }
     }
   }
 
   const isWindowsBuild = builderArgs.includes('--win') || builderArgs.includes('--all');
+  const isMacBuild = builderArgs.includes('--mac') || (builderArgs.includes('--all') && process.platform === 'darwin');
   if (isWindowsBuild) {
     patchElectronBuilderNsisInstaller();
     cleanupWindowsPackOutput();
   }
 
-  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}`;
+  const internalMacIdentityArg =
+    process.env.WEPROMPT_INTERNAL_RELEASE === '1' && isMacBuild ? ' --config.mac.identity=-' : '';
+  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}${internalMacIdentityArg}`;
   try {
     buildWithDmgRetry(builderCommand, targetArch);
   } catch (error) {
-    const winExePath = path.join(outDir, 'win-unpacked', 'AionUi.exe');
+    const winExePath = path.join(outDir, 'win-unpacked', CURRENT_WINDOWS_EXECUTABLE);
     const firstError = formatExecError(error);
     const canRetryWithoutExecutableEdit =
       process.platform === 'win32' && isWindowsBuild && process.env.CI !== 'true' && fs.existsSync(winExePath);
@@ -726,7 +932,7 @@ try {
       throw error;
     }
 
-    console.log('⚠️  Windows local build failed after AionUi.exe was produced.');
+    console.log(`⚠️  Windows local build failed after ${CURRENT_WINDOWS_EXECUTABLE} was produced.`);
     if (firstError) {
       console.log('   First failure summary:');
       console.log(
@@ -739,7 +945,7 @@ try {
     }
     console.log('   Retrying local build with win.signAndEditExecutable=false...');
     console.log('   This fallback is intended for transient rcedit / file-lock failures on developer machines.');
-    killWindowsProcesses(['AionUi.exe', 'electron.exe']);
+    killWindowsProcesses([CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES, 'electron.exe']);
     cleanupWindowsPackOutput();
 
     try {

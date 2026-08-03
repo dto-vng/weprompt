@@ -2,5 +2,7 @@
   "selectFile": "Seleccionar archivo",
   "selectDirectory": "Seleccionar directorio",
   "pleaseSelectFile": "Por favor selecciona un archivo",
-  "pleaseSelectDirectory": "Por favor selecciona un directorio"
+  "pleaseSelectDirectory": "Por favor selecciona un directorio",
+  "emptyFolder": "Esta carpeta está vacía",
+  "goToParent": "Ir a la carpeta principal"
 }

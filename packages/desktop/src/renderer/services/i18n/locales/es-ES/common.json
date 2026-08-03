@@ -28,6 +28,10 @@
   "download": "Descargar",
   "close": "Cerrar",
   "retry": "Reintentar",
+  "routeError": {
+    "title": "No se pudo mostrar esta página",
+    "description": "Se produjo un problema al abrir esta página. El resto de la aplicación sigue funcionando: vuelve a intentarlo o elige otro elemento en la barra lateral."
+  },
   "reload": "Recargar",
   "technical_details": "Detalles técnicos",
   "error_details": "Detalles del error",
@@ -81,42 +85,60 @@
       "title": "La instalación de WePrompt está incompleta",
       "description": "Esta instalación no tiene los recursos locales necesarios, por lo que AionCore no puede iniciar. Descarga e instala la última versión de WePrompt. Si el problema persiste después de reinstalar, verifica si el software de seguridad o antivirus puso en cuarentena AionCore.",
       "downloadLatest": "Descargar la última versión",
-      "sendDiagnostics": "Enviar diagnóstico",
-      "diagnosticsSent": "Diagnóstico enviado",
-      "diagnosticsReportSuccess": "Reporte de diagnóstico enviado",
-      "diagnosticsReportFailed": "Error al enviar el reporte de diagnóstico",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico",
       "runtimeComponentDescription": "Esta instalación no tiene los componentes de runtime necesarios, por lo que {{resource}} no puede iniciar. Reinstala el último paquete de WePrompt. Si sigue fallando, verifica si el software de seguridad o antivirus puso en cuarentena componentes de WePrompt."
     },
     "packageArchitectureMismatch": {
       "title": "Incompatibilidad de arquitectura del paquete WePrompt",
-      "description": "Este paquete de WePrompt es para {{packageArch}}, pero esta Mac es {{deviceArch}}. Es posible que hayas descargado el paquete incorrecto. Descarga e instala el paquete {{expectedArch}}."
+      "description": "Este paquete de WePrompt es para {{packageArch}}, pero esta Mac es {{deviceArch}}. Obtén el instalador {{expectedArch}} del canal de distribución interno aprobado, cierra WePrompt e instala ese paquete.",
+      "closeApplication": "Cerrar WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",
-      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt se abrió, pero AionCore se detuvo al inicializar los datos locales. Es posible que reinstalar WePrompt no resuelva el problema. Guarda el paquete de diagnóstico localmente para poder revisar la migración de la base de datos.",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico"
     },
     "localDataRepair": {
       "title": "Local data repair failed",
-      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt se abrió, pero AionCore se detuvo al reparar los datos de caché del agente local. Es posible que reinstalar WePrompt no resuelva el problema. Guarda el paquete de diagnóstico localmente para poder revisar la base de datos local.",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico"
+    },
+    "startupDirectory": {
+      "title": "Startup directory is unavailable",
+      "description": "WePrompt opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart WePrompt.",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico"
     },
     "recoverableDatabaseCorruption": {
       "title": "Local data is corrupted",
       "description": "WePrompt detected that the local database is corrupted and cannot continue startup. After confirmation, WePrompt will back up the old database and create a new local database to continue startup. Historical local data will not be shown for now, and the old database will be kept as a backup.",
       "confirmRebuild": "Back up old DB and rebuild new DB",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsHint": "Sending diagnostics will not modify the local database.",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsHint": "Guardar diagnósticos no modifica la base de datos local.",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico",
       "rebuildFailed": "Failed to back up old DB and rebuild new DB"
+    },
+    "transientConcurrentStartup": {
+      "title": "WePrompt se está iniciando",
+      "description": "Cuando se abrió esta ventana, otro proceso de inicio de WePrompt todavía estaba usando los datos locales. Esto es temporal y tus datos están seguros: no es necesario reinstalar. Espera un momento e inténtalo de nuevo, o reinicia WePrompt.",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico",
+      "diagnosticsHint": "Guardar diagnósticos no modifica la base de datos local."
     }
   },
   "fileAttach.addFiles": "Agregar archivos",
@@ -139,5 +161,17 @@
     "minute_short": "m",
     "second_short": "s"
   },
-  "goBack": "Back"
+  "goBack": "Back",
+  "selectedCount": "{{count}} seleccionado(s)",
+  "selectedSkills": "Habilidades seleccionadas",
+  "chrome": {
+    "minimize": "Minimizar",
+    "maximize": "Maximizar",
+    "restore": "Restaurar",
+    "collapseSidebar": "Contraer la barra lateral",
+    "expandSidebar": "Expandir la barra lateral",
+    "toggleProjectPanel": "Alternar el panel de proyecto",
+    "expandProjectPanel": "Expandir el panel de proyecto",
+    "collapseProjectPanel": "Contraer el panel de proyecto"
+  }
 }

@@ -42,9 +42,14 @@ const {
   },
   contextUsageIndicatorProps: {
     current: null as {
-      tokenUsage: { total_tokens: number } | null;
+      budget: {
+        source: 'runtime' | 'estimated' | 'unknown';
+        totalTokens: number | null;
+        contextLimit?: number;
+        ratio: number | null;
+        status: 'healthy' | 'watch' | 'compress' | 'too_large';
+      };
       localUsage: { today: number; weekToDate: number; monthToDate: number };
-      context_limit?: number;
     } | null,
   },
   sendBoxProps: {
@@ -108,12 +113,17 @@ vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
 }));
 vi.mock('@/renderer/components/agent/ContextUsageIndicator', () => ({
   default: (props: {
-    tokenUsage: { total_tokens: number } | null;
+    budget: {
+      source: 'runtime' | 'estimated' | 'unknown';
+      totalTokens: number | null;
+      contextLimit?: number;
+      ratio: number | null;
+      status: 'healthy' | 'watch' | 'compress' | 'too_large';
+    };
     localUsage: { today: number; weekToDate: number; monthToDate: number };
-    context_limit?: number;
   }) => {
     contextUsageIndicatorProps.current = props;
-    return props.tokenUsage ? <span data-testid='context-usage-indicator' /> : null;
+    return <span data-testid='context-usage-indicator' />;
   },
 }));
 vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({ default: () => null }));
@@ -173,7 +183,18 @@ vi.mock('@/renderer/hooks/chat/useAutoTitle', () => ({
   }),
 }));
 vi.mock('@/renderer/hooks/context/ConversationContext', () => ({
-  useConversationContextSafe: () => null,
+  useConversationContextSafe: () => ({
+    conversation: {
+      id: 'conv-1',
+      name: 'ACP budget fixture',
+      type: 'acp',
+      created_at: 1,
+      modified_at: 1,
+      extra: { backend: 'codex' },
+    },
+    loadedSkills: [],
+    loadedMcpStatuses: [],
+  }),
 }));
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: isMobileMock.current }),
@@ -192,6 +213,7 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', () => ({
 }));
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useAddOrUpdateMessage: () => addOrUpdateMessageMock,
+  useMessageList: () => [],
 }));
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
   shouldEnqueueConversationCommand: () => false,
@@ -313,6 +335,40 @@ describe('AcpSendBox', () => {
     });
   });
 
+  it('suppresses internal error cards and loading reset for active-turn busy conflicts', async () => {
+    sendMessageInvokeMock.mockRejectedValue(
+      new BackendHttpError({
+        method: 'POST',
+        path: '/api/conversations/conv-1/messages',
+        status: 409,
+        body: {
+          success: false,
+          code: 'CONFLICT',
+          error: 'conversation conv-1 is already running',
+        },
+      })
+    );
+
+    render(
+      <AcpSendBox
+        conversation_id='conv-1'
+        backend='codex'
+        workspacePath='/tmp/workspace'
+        messageState={makeMessageState()}
+      />
+    );
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => {
+      expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1);
+    });
+    expect(addOrUpdateMessageMock).not.toHaveBeenCalled();
+    expect(resetStateMock).not.toHaveBeenCalled();
+  });
+
   it('uses container-responsive fluid width instead of a fixed max width', () => {
     render(
       <AcpSendBox
@@ -356,7 +412,7 @@ describe('AcpSendBox', () => {
     expect(wrapper?.className).not.toContain('md:w-[calc(100%-clamp(80px,10vw,240px))]');
   });
 
-  it('does not warm up team session when draft content changes', async () => {
+  it('does not warm up team session on mount or draft content changes', async () => {
     const warmupSession = vi.fn().mockResolvedValue(undefined);
     useTeamPermissionMock.mockReturnValue({
       isTeamMode: true,
@@ -375,16 +431,72 @@ describe('AcpSendBox', () => {
         messageState={makeMessageState()}
       />
     );
-    await waitFor(() => {
-      expect(warmupSession).toHaveBeenCalled();
-    });
-    warmupSession.mockClear();
+
+    expect(warmupSession).not.toHaveBeenCalled();
 
     await act(async () => {
       screen.getByRole('button', { name: 'change' }).click();
     });
 
     expect(warmupSession).not.toHaveBeenCalled();
+  });
+
+  it('does not warm up team session when config options prepare runtime runs', async () => {
+    const warmupSession = vi.fn().mockResolvedValue(undefined);
+    useTeamPermissionMock.mockReturnValue({
+      isTeamMode: true,
+      isLeaderAgent: true,
+      leaderConversationId: 'conv-1',
+      allConversationIds: ['conv-1'],
+      propagateMode: vi.fn(),
+      warmupSession,
+    });
+
+    render(
+      <AcpSendBox
+        conversation_id='conv-1'
+        backend='codex'
+        workspacePath='/tmp/workspace'
+        messageState={makeMessageState()}
+      />
+    );
+
+    const configOptionsArgs = useAcpConfigOptionsMock.mock.calls[0]?.[0] as
+      | { prepareRuntime?: () => Promise<void> }
+      | undefined;
+    await configOptionsArgs?.prepareRuntime?.();
+
+    expect(warmupSession).not.toHaveBeenCalled();
+  });
+
+  it('still warms up team session before sending a message', async () => {
+    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'turn-1', runtime: null, msg_id: 'msg-1' });
+    const warmupSession = vi.fn().mockResolvedValue(undefined);
+    useTeamPermissionMock.mockReturnValue({
+      isTeamMode: true,
+      isLeaderAgent: true,
+      leaderConversationId: 'conv-1',
+      allConversationIds: ['conv-1'],
+      propagateMode: vi.fn(),
+      warmupSession,
+    });
+
+    render(
+      <AcpSendBox
+        conversation_id='conv-1'
+        backend='codex'
+        workspacePath='/tmp/workspace'
+        messageState={makeMessageState()}
+      />
+    );
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => {
+      expect(warmupSession).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('keeps ACP config options enabled on desktop without rendering a standalone thought selector', () => {
@@ -444,8 +556,13 @@ describe('AcpSendBox', () => {
 
     expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
     expect(contextUsageIndicatorProps.current).toEqual({
-      tokenUsage: { total_tokens: 12_000 },
-      context_limit: 32_000,
+      budget: {
+        source: 'runtime',
+        totalTokens: 12_000,
+        contextLimit: 32_000,
+        ratio: 12_000 / 32_000,
+        status: 'watch',
+      },
       localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
     expect(screen.getByRole('button', { name: 'send' })).toBeInTheDocument();
@@ -467,16 +584,24 @@ describe('AcpSendBox', () => {
     );
 
     expect(contextUsageIndicatorProps.current).toEqual({
-      tokenUsage: { total_tokens: 12_000 },
-      context_limit: undefined,
+      budget: {
+        source: 'runtime',
+        totalTokens: 12_000,
+        contextLimit: undefined,
+        ratio: null,
+        status: 'healthy',
+      },
       localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
   });
 
-  it('does not render a context usage meter when ACP usage is unavailable', () => {
+  it('keeps an unknown-state context usage meter when ACP capacity is unavailable', () => {
     render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
 
-    expect(screen.queryByTestId('context-usage-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('context-usage-indicator')).toBeInTheDocument();
+    expect(contextUsageIndicatorProps.current?.budget.source).toBe('estimated');
+    expect(contextUsageIndicatorProps.current?.budget.contextLimit).toBeUndefined();
+    expect(contextUsageIndicatorProps.current?.budget.ratio).toBeNull();
   });
 
   it('applies runtime thought level from the mobile action sheet without persisting a global preference', async () => {

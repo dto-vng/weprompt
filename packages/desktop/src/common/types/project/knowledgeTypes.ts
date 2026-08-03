@@ -9,7 +9,7 @@
 // import from common/knowledge/types, so this file is safe from renderer
 // type positions.
 
-import type { KnowledgeIngestProgress, KnowledgeSourceStatus } from '@/common/knowledge/types';
+import type { KnowledgeIngestProgress, KnowledgeOcrProvenance, KnowledgeSourceStatus } from '@/common/knowledge/types';
 
 export type IKnowledgeSourceDto = {
   id: string;
@@ -34,6 +34,15 @@ export type IKnowledgeSourceDto = {
    * in flight — including for sources that settle too fast to report.
    */
   progress: KnowledgeIngestProgress | null;
+  /**
+   * Set when this source's text was TRANSCRIBED from a scan by a multimodal
+   * model rather than read from the file. Null for every ordinary source.
+   *
+   * Surfaced because transcription can be wrong in ways reading cannot: the
+   * card marks such a source and names the model plus any pages that produced
+   * nothing, so a user who doubts an answer can see where the text came from.
+   */
+  ocr: KnowledgeOcrProvenance | null;
 };
 
 export type IProjectKnowledgeSummary = {
@@ -45,4 +54,11 @@ export type IProjectKnowledgeSummary = {
 export type IProjectKnowledgeListResult = {
   sources: IKnowledgeSourceDto[];
   summary: IProjectKnowledgeSummary;
+  /**
+   * True when the last sync found the project's `Knowledge Base/` folder
+   * missing or unreadable while indexed sources exist. The index is preserved
+   * while this is set; the card shows a warning + relink affordance instead of
+   * treating the knowledge as deleted.
+   */
+  folderMissing: boolean;
 };

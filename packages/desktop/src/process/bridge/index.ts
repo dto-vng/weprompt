@@ -16,6 +16,7 @@ import { initProjectKnowledgeBridge } from './projectKnowledgeBridge';
 import { initCreativeStudioBridge } from './creativeStudioBridge';
 import { ipcBridge } from '@/common';
 import { runContextCompact } from '@process/services/app-operations';
+import { initPresentationTemplateBridge } from '@process/services/presentation-template/bridge';
 
 type AppOperationsBridgeDependencies = {
   runContextCompact: typeof runContextCompact;
@@ -51,6 +52,7 @@ export type BridgeDependencies = Record<string, never>;
 
 export function initAllBridges(_deps: BridgeDependencies = {}): void {
   initDialogBridge();
+  initPresentationTemplateBridge();
   initApplicationBridge();
   initWindowControlsBridge();
   initUpdateBridge();

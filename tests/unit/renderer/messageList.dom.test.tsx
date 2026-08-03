@@ -18,11 +18,14 @@ import MessageList from '@/renderer/pages/conversation/Messages/MessageList';
 import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Messages/types';
 import { CHAT_MESSAGE_JUMP_EVENT } from '@/renderer/utils/chat/chatMinimapEvents';
 
-const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissionMock } = vi.hoisted(() => ({
-  scrollElementIntoViewMock: vi.fn(),
-  useConversationArtifactsMock: vi.fn(),
-  useTeamPermissionMock: vi.fn(),
-}));
+const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissionMock, autoScrollState } = vi.hoisted(
+  () => ({
+    scrollElementIntoViewMock: vi.fn(),
+    useConversationArtifactsMock: vi.fn(),
+    useTeamPermissionMock: vi.fn(),
+    autoScrollState: { showScrollButton: false, scrollToBottom: vi.fn() },
+  })
+);
 const workSummaryMessagesMock = vi.hoisted(() => vi.fn());
 const loadConversationMessagePageMock = vi.hoisted(() => vi.fn());
 
@@ -48,6 +51,17 @@ vi.mock('@arco-design/web-react', () => ({
   Image: {
     PreviewGroup: ({ children }: PropsWithChildren) => <>{children}</>,
   },
+  Button: ({
+    children,
+    icon,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; shape?: string }) => (
+    <button type='button' {...props}>
+      {icon}
+      {children}
+    </button>
+  ),
+  Tooltip: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 vi.mock('@/renderer/hooks/context/ConversationContext', () => ({
@@ -78,8 +92,10 @@ vi.mock('@/renderer/pages/conversation/Messages/useAutoScroll', () => ({
     handleScroll: () => {},
     handleWheel: () => {},
     handlePointerDown: () => {},
-    showScrollButton: false,
-    scrollToBottom: () => {},
+    get showScrollButton() {
+      return autoScrollState.showScrollButton;
+    },
+    scrollToBottom: autoScrollState.scrollToBottom,
     scrollElementIntoView: scrollElementIntoViewMock,
     hideScrollButton: () => {},
   }),
@@ -1004,5 +1020,32 @@ describe('MessageList', () => {
 
     expect(screen.getByTestId('message-list-skeleton')).toBeInTheDocument();
     expect(screen.queryByText('empty state')).not.toBeInTheDocument();
+  });
+
+  describe('scroll-to-bottom control', () => {
+    afterEach(() => {
+      autoScrollState.showScrollButton = false;
+      autoScrollState.scrollToBottom.mockClear();
+    });
+
+    it('is a real button with an accessible name and no dead gradient div beside it', () => {
+      autoScrollState.showScrollButton = true;
+
+      const { container } = render(<MessageList />, {
+        wrapper: ({ children }) => <Wrapper>{children}</Wrapper>,
+      });
+
+      const control = screen.getByRole('button', { name: 'messages.scrollToBottom' });
+      fireEvent.click(control);
+      expect(autoScrollState.scrollToBottom).toHaveBeenCalled();
+
+      // `!b` paints the width and `!border-4` the colour. Both need the important prefix:
+      // `border-4` is colour-only, the Uno preflight zeroes border-width, and `.arco-btn`'s own
+      // `border-color: transparent` beats an unprefixed utility (measured in the running app).
+      expect(control.className).toContain('!border-4');
+      expect(control.className).toMatch(/(^|\s)!b(\s|$)/);
+      expect(control.className).not.toContain('border-3');
+      expect(container.querySelector('.h-100px.pointer-events-none')).toBeNull();
+    });
   });
 });

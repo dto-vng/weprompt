@@ -117,6 +117,11 @@ export class OfficeArtifactService {
       const artifact = await this.resolveArtifact(request.workspace, request.filePath);
       const version = await this.hashArtifact(artifact.filePath);
       preview = await this.workingFiles.createPreview(artifact.filePath);
+      try {
+        await this.runner.validate(preview.filePath);
+      } catch {
+        throw new OfficeArtifactError('INVALID_OFFICE_ARTIFACT');
+      }
       if (
         (await this.hashArtifact(preview.filePath)) !== version ||
         (await this.hashArtifact(artifact.filePath)) !== version
@@ -316,6 +321,8 @@ export class OfficeArtifactService {
         return await inspectDocxSelection(this.runner, artifact.filePath, selection);
       }
 
+      if (artifact.kind === 'presentation') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
+
       if (selection.kind !== 'excel') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
       return await inspectXlsxSelection(this.runner, artifact.filePath, selection);
     } finally {
@@ -328,6 +335,7 @@ export class OfficeArtifactService {
     inspection: OfficeArtifactInspection,
     edit: OfficeArtifactApplyRequest['edit']
   ): Promise<void> {
+    if (artifact.kind === 'presentation') throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
     return artifact.kind === 'word'
       ? mutateDocxSelection(this.runner, artifact.filePath, inspection, edit)
       : mutateXlsxSelection(this.runner, artifact.filePath, inspection, edit);

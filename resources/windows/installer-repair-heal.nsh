@@ -9,11 +9,11 @@ Var /GLOBAL AionUiInnerFailureReadResult
 !macro AIONUI_READ_LAST_INNER_FAILURE
   InitPluginsDir
   StrCpy $AionUiInnerRootCode ""
-  StrCpy $AionUiInnerFailureSummary "No specific locking process was identified. Close AionUi, terminals, editors, and file managers opened in the install folder."
+  StrCpy $AionUiInnerFailureSummary "No specific locking process was identified. Close WePrompt, terminals, editors, and file managers opened in the install folder."
   nsExec::ExecToStack `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "& { \
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$logPath = '$AionUiSessionLogPath'; \
-    $$summary = 'No specific locking process was identified. Close AionUi, terminals, editors, and file managers opened in the install folder.'; \
+    $$summary = 'No specific locking process was identified. Close WePrompt, terminals, editors, and file managers opened in the install folder.'; \
     $$code = ''; \
     if ($$logPath -and (Test-Path -LiteralPath $$logPath)) { \
       $$events = @(Get-Content -LiteralPath $$logPath -ErrorAction SilentlyContinue | ForEach-Object { try { $$_ | ConvertFrom-Json } catch { $$null } } | Where-Object { $$_ }); \
@@ -70,9 +70,9 @@ Var /GLOBAL AionUiInnerFailureReadResult
   StrCpy $AionUiInstalledUninstaller "$INSTDIR\${UNINSTALL_FILENAME}"
 
   InitPluginsDir
-  StrCpy $AionUiBundledUninstaller "$PLUGINSDIR\AionUi-fixed-uninstaller.exe"
+  StrCpy $AionUiBundledUninstaller "$PLUGINSDIR\weprompt-fixed-uninstaller.exe"
   SetOverwrite on
-  File "/oname=$PLUGINSDIR\AionUi-fixed-uninstaller.exe" "${UNINSTALLER_OUT_FILE}"
+  File "/oname=$PLUGINSDIR\weprompt-fixed-uninstaller.exe" "${UNINSTALLER_OUT_FILE}"
 
   ${If} ${FileExists} "$AionUiInstalledUninstaller"
     ClearErrors
@@ -85,8 +85,12 @@ Var /GLOBAL AionUiInnerFailureReadResult
       ClearErrors
       CopyFiles /SILENT "$AionUiBundledUninstaller" "$AionUiInstalledUninstaller"
       ${If} ${Errors}
-        MessageBox MB_OK|MB_ICONEXCLAMATION "${AIONUI_MSG_UNINSTALLER_LOCKED_ZH}$\r$\n$\r$\n${AIONUI_MSG_BLOCK_SEPARATOR}$\r$\n$\r$\n${AIONUI_MSG_UNINSTALLER_LOCKED_EN}"
-        !insertmacro AIONUI_FAIL_REPORTABLE_BILINGUAL ${AIONUI_E_UNINSTALLER_COPY_OR_REBUILD_FAILED} "uninstaller-repair copy-failed-retry" "${AIONUI_MSG_UNINSTALLER_COPY_LOCKED_EN}" "${AIONUI_MSG_UNINSTALLER_COPY_LOCKED_ZH}" "${AIONUI_MSG_UNINSTALLER_REPAIR_ACTION_EN}" "${AIONUI_MSG_UNINSTALLER_REPAIR_ACTION_ZH}"
+        ${If} ${FileExists} "$AionUiBundledUninstaller"
+          !insertmacro AIONUI_LOG_UNINSTALLER_REPAIR "copy-failed-using-bundled"
+          !insertmacro AIONUI_LOG_EVENT "event=uninstaller-repair phase=copy-failed-using-bundled"
+        ${Else}
+          !insertmacro AIONUI_FAIL_REPORTABLE_BILINGUAL ${AIONUI_E_UNINSTALLER_COPY_OR_REBUILD_FAILED} "uninstaller-repair copy-failed-retry-bundled-missing" "${AIONUI_MSG_UNINSTALLER_COPY_LOCKED_EN}" "${AIONUI_MSG_UNINSTALLER_COPY_LOCKED_ZH}" "${AIONUI_MSG_UNINSTALLER_REPAIR_ACTION_EN}" "${AIONUI_MSG_UNINSTALLER_REPAIR_ACTION_ZH}"
+        ${EndIf}
       ${Else}
         !insertmacro AIONUI_LOG_UNINSTALLER_REPAIR "after-copy-retry"
       ${EndIf}
@@ -124,6 +128,12 @@ Var /GLOBAL AionUiInnerFailureReadResult
     !insertmacro AIONUI_CLEAR_INSTALL_REGISTRY "missing-install-location"
   ${Else}
     StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_APP_EXECUTABLE_FILENAME}"
+    ${IfNot} ${FileExists} "$AionUiRegInstallExe"
+      StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME}"
+    ${EndIf}
+    ${IfNot} ${FileExists} "$AionUiRegInstallExe"
+      StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME}"
+    ${EndIf}
     ${If} ${FileExists} "$AionUiRegInstallExe"
       StrCpy $INSTDIR "$AionUiRegInstallLocation"
       StrCpy $AionUiRegistryInstallIsValid "1"

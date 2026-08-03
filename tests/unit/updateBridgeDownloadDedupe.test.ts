@@ -7,7 +7,7 @@
 import fs from 'fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@office-ai/platform', () => ({
+vi.mock('@/common/platform/bridge', () => ({
   bridge: {
     buildProvider: vi.fn(() => {
       const handlerMap = new Map<string, Function>();
@@ -24,14 +24,6 @@ vi.mock('@office-ai/platform', () => ({
       emit: vi.fn(),
       on: vi.fn(),
     })),
-  },
-  storage: {
-    buildStorage: () => ({
-      getSync: () => undefined,
-      setSync: () => {},
-      get: () => Promise.resolve(undefined),
-      set: () => Promise.resolve(),
-    }),
   },
 }));
 
@@ -105,7 +97,10 @@ const getDownloadHandlers = async () => {
 };
 
 describe('updateBridge manual download dedupe', () => {
+  const originalUpdateBaseUrl = process.env.WEPROMPT_UPDATE_BASE_URL;
+
   beforeEach(() => {
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     vi.clearAllMocks();
     vi.stubGlobal(
       'fetch',
@@ -114,15 +109,17 @@ describe('updateBridge manual download dedupe', () => {
   });
 
   afterEach(() => {
+    if (originalUpdateBaseUrl === undefined) delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    else process.env.WEPROMPT_UPDATE_BASE_URL = originalUpdateBaseUrl;
     vi.unstubAllGlobals();
   });
 
   it('reuses the active manual download for the same URL, fallback URL, and file name', async () => {
     const handler = await getDownloadHandler();
     const request = {
-      url: 'https://static.aionui.com/releases/2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      file_name: 'AionUi-2.2.0-mac-arm64.dmg',
+      url: 'https://updates.weprompt.test/releases/2.2.0/WePrompt-2.2.0-mac-arm64.dmg',
+      fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.2.0-mac-arm64.dmg',
+      file_name: 'WePrompt-2.2.0-mac-arm64.dmg',
     };
 
     const first = await handler({
@@ -157,9 +154,9 @@ describe('updateBridge manual download dedupe', () => {
 
     const handler = await getDownloadHandler();
     const request = {
-      url: 'https://static.aionui.com/releases/2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      file_name: 'AionUi-2.2.0-mac-arm64.dmg',
+      url: 'https://updates.weprompt.test/releases/2.2.0/WePrompt-2.2.0-mac-arm64.dmg',
+      fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.2.0-mac-arm64.dmg',
+      file_name: 'WePrompt-2.2.0-mac-arm64.dmg',
     };
 
     const first = await handler({
@@ -201,9 +198,9 @@ describe('updateBridge manual download dedupe', () => {
 
     const { download, cancel, ipcBridge } = await getDownloadHandlers();
     const request = {
-      url: 'https://static.aionui.com/releases/2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.2.0/AionUi-2.2.0-mac-arm64.dmg',
-      file_name: 'AionUi-2.2.0-mac-arm64.dmg',
+      url: 'https://updates.weprompt.test/releases/2.2.0/WePrompt-2.2.0-mac-arm64.dmg',
+      fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.2.0-mac-arm64.dmg',
+      file_name: 'WePrompt-2.2.0-mac-arm64.dmg',
     };
 
     const first = await download({

@@ -152,6 +152,32 @@ describe('static-server', () => {
     expect(r.headers.get('set-cookie')).toMatch(/Max-Age=0/);
   });
 
+  it('stop() does not wait out an idle keep-alive connection', async () => {
+    // Every caller of stop() is a shutdown path — a signal handler, a fatal-error handler, a
+    // restart. None of them wants to block on a browser that is merely holding its connection open.
+    // `tcp_server.close()` fires its callback only once every connection is gone, and a raw
+    // net.Server has no notion of an idle one (the automatic idle close Node >=19 added applies to
+    // http.Server), so an already-served keep-alive socket used to pin shutdown until the client's
+    // own timer expired: ~3s, reproducibly, and 8 tests in this file each paid it in afterEach.
+    //
+    // The threshold is deliberately far from both sides: the work stop() actually has to do is
+    // sub-millisecond even on a loaded machine, and the bug it guards against is a fixed ~3s wait.
+    const backend = await startMockBackend((_req, res) => res.end('nope'));
+    stopBackend = backend.close;
+    const started = await startStaticServer({ staticDir, backendPort: backend.port, port: 0 });
+
+    // fetch() keeps the connection alive in undici's pool, which is what pins the listener.
+    const served = await fetch(`${started.localUrl}/`);
+    expect(served.status).toBe(200);
+    await served.text();
+
+    const before = performance.now();
+    await started.stop();
+    const elapsed = performance.now() - before;
+
+    expect(elapsed).toBeLessThan(1500);
+  });
+
   it('/api proxy returns 502 when backend unreachable', async () => {
     // allocate a port then free it
     const placeholder = await startMockBackend((_req, res) => res.end());

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { theme } from '@office-ai/platform';
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { addImportantToAll } from '@renderer/utils/theme/customCssProcessor';
@@ -69,7 +68,7 @@ const createInitStyle = (
     margin-block-end: 6px;
   }
   a{
-    color:${theme.Color.PrimaryColor};
+    color:var(--primary);
     text-decoration: none;
     cursor: pointer;
     word-break: break-all;
@@ -254,6 +253,19 @@ const createInitStyle = (
     overflow-x: auto;
     overflow-y: hidden;
     padding: 0.5em 0;
+  }
+
+  /* Focus ring for CodeBlock's copy / collapse / view-more controls.
+   *
+   * The colour is a literal on purpose. UnoCSS output never crosses the shadow boundary, so a
+   * utility class is not an option, and \`--primary-6\` cannot be forwarded through the cssVars
+   * map below either: it is defined on <body> by Arco, not on <html>, which is what
+   * updateStyles reads. A theme-derived neutral is the same approach the scrollbar rules above
+   * already take in this stylesheet. */
+  .markdown-code-control:focus-visible {
+    outline: 2px solid ${currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.55)'};
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   .loading {

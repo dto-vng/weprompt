@@ -5,6 +5,7 @@
  * correctly without crashing the app or submitting invalid data.
  */
 import { test, expect } from '../../fixtures';
+import { modalCloseButton } from '../../helpers';
 
 type ModalHandles = {
   modal: import('@playwright/test').Locator;
@@ -13,14 +14,15 @@ type ModalHandles = {
 };
 
 async function openCreateModal(page: import('@playwright/test').Page): Promise<ModalHandles> {
-  const createBtn = page.locator('.h-20px.w-20px.rd-4px').first();
+  // The sider create button carries a stable testid; the utility-class chain this used to
+  // match (.h-20px.w-20px.rd-4px) exists on no element — TeamSiderSection renders
+  // `!w-22px !h-22px !rounded-6px` — so openCreateModal timed out before reaching any
+  // assertion, in every locale.
+  const createBtn = page.locator('[data-testid="team-create-btn"]').first();
   await expect(createBtn).toBeVisible({ timeout: 10_000 });
   await createBtn.click();
 
-  const modal = page
-    .locator('.arco-modal')
-    .filter({ hasText: /Create Team|创建团队/ })
-    .first();
+  const modal = page.locator('.arco-modal.team-create-modal');
   await expect(modal).toBeVisible({ timeout: 5_000 });
 
   const nameInput = modal.locator('input').first();
@@ -32,7 +34,7 @@ async function openCreateModal(page: import('@playwright/test').Page): Promise<M
 }
 
 async function closeModal(page: import('@playwright/test').Page): Promise<void> {
-  const closeIcon = page.locator('.arco-modal .arco-modal-close-icon');
+  const closeIcon = page.locator(modalCloseButton('.arco-modal')).first();
   const visible = await closeIcon.isVisible().catch(() => false);
   if (visible) {
     await closeIcon.click();

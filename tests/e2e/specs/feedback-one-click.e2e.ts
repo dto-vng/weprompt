@@ -2,13 +2,11 @@
  * One-click feedback – verifies the feedback infrastructure introduced for
  * the inline "一键反馈 >>" error-adjacent links.
  *
- * These tests do not try to trigger real runtime errors (which would require
- * bad credentials / unreachable MCP URLs and would be flaky). Instead they
- * verify the underlying pieces that the inline links rely on:
- *   1. The main-process `feedback:capture-screenshot` IPC returns PNG bytes.
- *   2. The existing About → Bug Report entry still opens the modal that the
- *      new one-click flow re-uses (FeedbackReportModal).
- *   3. The modal displays its title and module select control.
+ * This focused spec verifies that the main-process
+ * `feedback:capture-screenshot` IPC returns PNG bytes. The live
+ * error-adjacent button and modal wiring are covered by
+ * feedback-butler-diagnose.e2e.ts; local archive export is covered by
+ * installation-integrity.e2e.ts.
  */
 import { test, expect } from '../fixtures';
 import { goToSettings } from '../helpers';
@@ -23,7 +21,7 @@ declare global {
 
 test.describe('One-click feedback infrastructure', () => {
   test('captureFeedbackScreenshot IPC returns PNG bytes', async ({ page }) => {
-    await goToSettings(page, 'about');
+    await goToSettings(page, 'system');
 
     const result = await page.evaluate(async () => {
       const capture = window.electronAPI?.captureFeedbackScreenshot;
@@ -51,34 +49,5 @@ test.describe('One-click feedback infrastructure', () => {
     expect(result.filename).toMatch(/^screenshot-.*\.png$/);
     expect(result.byteCount).toBeGreaterThan(100);
     expect(result.startsWithPngSignature).toBe(true);
-  });
-
-  test('About → Bug Report opens the feedback modal with module select visible', async ({ page }) => {
-    await goToSettings(page, 'about');
-
-    // The about page lists a row whose title resolves from i18n key
-    // `settings.bugReport`. We click the row text which triggers
-    // setShowFeedbackModal(true) in AboutModalContent.
-    const bugReportRow = page
-      .locator('div')
-      .filter({ hasText: /^Bug Report$|^问题报告$|^バグ報告$|^버그 보고$/ })
-      .first();
-    await expect(bugReportRow).toBeVisible({ timeout: 10_000 });
-    await bugReportRow.click();
-
-    // The modal is rendered by FeedbackReportModal (a ModalWrapper). Verify it
-    // surfaces the scroll body and module select placeholder text.
-    const modalBody = page.locator('[data-testid="feedback-report-scroll-body"]');
-    await expect(modalBody).toBeVisible({ timeout: 5_000 });
-
-    // Auto-info banner confirms the modal is fully rendered.
-    const autoInfo = page.locator('[data-testid="feedback-report-auto-info"]');
-    await expect(autoInfo).toBeVisible();
-
-    // Close via the custom close button in the modal header. ModalWrapper is
-    // configured with closable={false} so Escape alone does not dismiss it.
-    const closeBtn = page.locator('.aionui-modal-close-btn').first();
-    await closeBtn.click();
-    await expect(modalBody).toBeHidden({ timeout: 5_000 });
   });
 });

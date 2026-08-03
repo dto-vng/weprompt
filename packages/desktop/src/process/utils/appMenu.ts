@@ -5,6 +5,8 @@
  */
 
 import { ipcBridge } from '@/common';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
+import i18n from '@process/services/i18n';
 import type { MenuItemConstructorOptions } from 'electron';
 import { Menu, app } from 'electron';
 
@@ -62,14 +64,16 @@ export function setupApplicationMenu(): void {
 
   template.push({
     label: 'Help',
-    submenu: [
-      {
-        label: 'Check for Updates...',
-        click: () => {
-          ipcBridge.update.open.emit({ source: 'menu' });
-        },
-      },
-    ],
+    submenu: isUpdateFeatureEnabled()
+      ? [
+          {
+            label: i18n.t('common.tray.checkUpdate'),
+            click: () => {
+              ipcBridge.update.open.emit({ source: 'menu' });
+            },
+          },
+        ]
+      : [],
   });
 
   const menu = Menu.buildFromTemplate(template);

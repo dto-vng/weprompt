@@ -1,7 +1,7 @@
 {
   "welcome": {
     "title": "Merhaba, bugünkü planın nedir?",
-    "placeholder": "Mesaj gönder, dosya yükle veya klasör aç...",
+    "placeholder": "Mesaj gönder, dosya yükle, klasör aç veya komutlar için / yaz...",
     "linkFolder": "Klasör Aç",
     "newConversation": "Yeni Sohbet",
     "selectModel": "Model Seç",
@@ -17,7 +17,6 @@
     "quickActionStar": "Bizi beğendiniz mi? Yıldız verin!",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "Topluluk Skills'lerini ihtiyaç duyduğunuzda arayın ve etkinleştirin. Bir kez yapılandırın, tüm Agent'larda kullanılabilir.",
-    "skillsMarketDetails": "Ayrıntılar >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -43,6 +42,7 @@
     "scopedHint": "— yalnızca bu projeyle sınırlı",
     "chats": "Sohbetler",
     "showAll": "Tümünü göster",
+    "showLess": "Daha az göster",
     "emptyChatsTitle": "Henüz sohbet yok",
     "emptyChatsBody": "Bu projede çalışmaya başlamak için yukarıdan bir sohbet başlat.",
     "instructions": "Talimatlar",
@@ -53,6 +53,7 @@
     "save": "Kaydet",
     "cancel": "İptal",
     "instructionsSaved": "Talimatlar kaydedildi",
+    "instructionsSaveFailed": "Talimatlar kaydedilemedi",
     "files": "Dosyalar",
     "revealInFolder": "Klasörde göster",
     "filesReadonly": "Salt okunur · klasörden yönetilir",
@@ -71,23 +72,47 @@
     "remove": "Kaldır",
     "knowledge": "Bilgi",
     "knowledgeAdd": "Dosya Ekle",
+    "knowledgeDropFolderMissing": "Dosya eklemeden önce Knowledge Base klasörünü yeniden bağlayın.",
+    "knowledgeDropUnsupported": "Bu dosyaların hiçbiri desteklenmiyor. Desteklenen: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Bilgi tabanı yenilenemedi.",
+    "knowledgeRelinkFailed": "Proje klasörü yeniden bağlanamadı.",
+    "knowledgeRetryFailed": "Bu dosya dizinleme kuyruğuna alınamadı.",
+    "knowledgeDeleteFailed": "Bu dosya Çöp Kutusu'na taşınamadı.",
+    "knowledgeAddFailed": "Bu dosyalar bilgi tabanına eklenemedi.",
     "knowledgeEmpty": "Bu projenin bilgi bankasını oluşturmak için belge ekleyin. Asistan bunları bu projedeki her sohbette otomatik olarak arar.",
-    "knowledgeSummary": "{{files}} dosya · {{passages}} parça",
-    "knowledgeSemanticOn": "anlamsal arama açık",
     "knowledgeSemanticOff": "anlamsal arama kapalı — gömme modeli yapılandırılmamış",
-    "knowledgePassages": "{{count}} parça",
+    "knowledgeSemanticOffAction": "Gömme modeli ekle",
+    "knowledgeEmbedAll": "Tümünü göm",
+    "knowledgePassagesTooltip": "Bu dosya aranabilir bölümlere ayrılır ve asistan yanıt verirken en ilgili olanları kullanır.",
     "knowledgeStatusIndexing": "Dizinleniyor…",
     "knowledgeProgressReading": "Sayfa {{done}}/{{total}} okunuyor",
-    "knowledgeProgressEmbedding": "{{done}}/{{total}} parça gömülüyor",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}}. sayfa yazıya dökülüyor",
+    "knowledgeProgressEmbedding": "Gömülüyor {{done}}/{{total}}…",
     "knowledgeStatusFailed": "Başarısız",
     "knowledgeStatusUnsupported": "Desteklenmiyor",
+    "knowledgeStatusNotEmbedded": "Yalnızca anahtar kelime",
+    "knowledgeNotEmbeddedDetail": "Anahtar kelimeyle aranabilir, ancak yalnızca {{done}}/{{total}} bölüm gömülü. Kalanları gömmek için yeniden deneyin.",
     "knowledgeRetry": "Yeniden dene",
-    "knowledgeRemove": "Kaldır",
-    "knowledgeRemoveConfirm": "Bu dosya bilgi bankasından kaldırılsın mı?",
     "knowledgeError": "Bilgi bankası kullanılamıyor.",
-    "knowledgeSupportedTypes": "Desteklenen: .md, .txt, .docx, .xlsx, .pdf"
+    "knowledgeSupportedTypes": "Desteklenen: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Yenile",
+    "knowledgeOpenOriginal": "Özgün dosyayı aç",
+    "knowledgeDeleteFile": "Dosyayı sil",
+    "knowledgeDeleteConfirm": "\"{{fileName}}\" çöp kutusuna taşınsın mı? Bilgi tabanından da kaldırılır.",
+    "knowledgeFolderHint": "Dosyalar proje klasörünün içindeki \"Knowledge Base\" klasöründe bulunur. Oraya koyduğunuz her şey otomatik olarak dizinlenir.",
+    "knowledgeFolderMissingTitle": "Knowledge Base klasörü bulunamadı",
+    "knowledgeFolderMissingBody": "Taşınmış, yeniden adlandırılmış veya silinmiş olabilir. Dizinlenmiş bilgileriniz korunuyor — klasörü geri getirin ya da projeyi yeniden bağlayın, sonra yenileyin.",
+    "knowledgePreviewNote": "Bu, asistanın aradığı dizinlenmiş metindir; özgün sayfa düzeni değildir.",
+    "knowledgePreviewTruncated": "Ön izleme kısaltıldı. Belgenin tamamı için özgün dosyayı açın.",
+    "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi.",
+    "knowledgePreviewNotReady": "Açılacak dizinlenmiş metin henüz yok.",
+    "knowledgeCitationMissing": "Bu dosya artık bilgi bankasında değil.",
+    "knowledgeOcrTag": "Yazıya döküldü (OCR)",
+    "knowledgeOcrDetail": "{{model}} tarafından bir taramadan yazıya döküldü. Atlanan sayfalar: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "yok"
   },
   "history": {
+    "moreActions": "Diğer işlemler",
     "recents": "Son",
     "today": "Bugün",
     "yesterday": "Dün",
@@ -102,6 +127,7 @@
     "saveName": "Kaydet",
     "cancelEdit": "İptal",
     "rename": "Yeniden Adlandır",
+    "createCronTask": "Zamanlanmış Görev Oluştur",
     "renameTitle": "Sohbeti Yeniden Adlandır",
     "renamePlaceholder": "Lütfen yeni bir isim girin",
     "renameSuccess": "Başarıyla yeniden adlandırıldı",
@@ -140,7 +166,10 @@
     "removeProject": "Projeyi kaldır",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
+    "expandProjectChats": "Proje sohbetlerini genişlet",
+    "collapseProjectChats": "Proje sohbetlerini daralt",
     "deleting": "Siliniyor...",
+    "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin",
     "newProject": "New project",
     "createProjectTitle": "Create project",
     "projectNameLabel": "Project name",
@@ -160,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Proje kaldırılamadı. Projeyi yeniden açıp tekrar deneyin; klasördeki dosyalar silinmedi.",
+    "removeProjectChatDetachFailed": "Bazı sohbetlerin bu projeyle bağlantısı kesilemedi. Proje korundu; kaldırmayı yeniden deneyin.",
+    "removeProjectStateChanged": "Proje listesi kaldırma işleminden önce değişti. Yenileyip tekrar deneyin.",
+    "removeProjectStorageFailed": "Proje değişiklikleri kaydedilemedi. WePrompt'un uygulama verilerine erişebildiğini kontrol edip yeniden deneyin.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -505,6 +537,7 @@
     "noModelSelected": "Mevcut oturum için model seçilmedi, mesaj gönderilemiyor",
     "sendMessageTo": "{{model}} modeline mesaj gönder",
     "processing": "İşleniyor...",
+    "stopGenerating": "Üretimi durdur",
     "quotaExceededTitle": "Model kotasına ulaşıldı",
     "quotaExceededBody": "Mevcut model kotası tükendi. Devam etmek için {{model}} modeline geçilsin mi?",
     "quotaExceededNoFallback": "Model kotasına ulaşıldı. Lütfen başka bir uygun modele geçin.",
@@ -552,8 +585,8 @@
     "error": "Yan soru yanıtlanamadı."
   },
   "commandQueue": {
-    "title": "Sıradaki Komutlar",
-    "clear": "Kuyruğu Temizle",
+    "title": "Taslak kutusu",
+    "clear": "Taslak kutusunu temizle",
     "edit": "Düzenle",
     "editing": "Düzenleniyor",
     "editPlaceholder": "Bu bekleyen komutu çalıştırılmadan önce güncelleyin.",
@@ -568,7 +601,19 @@
     "queueFull": "Kuyruk dolu. Yeni komut eklemeden önce bazılarını kaldırın.",
     "inputTooLong": "Sıraya alınan komut çok uzun. Göndermeden önce kısaltın.",
     "tooManyFiles": "Bu kuyruk komutuna çok fazla dosya eklendi.",
-    "queueTooLarge": "Kuyruk verisi güvenli şekilde saklanamayacak kadar büyük. Önce bazı komutları kaldırın."
+    "queueTooLarge": "Kuyruk verisi güvenli şekilde saklanamayacak kadar büyük. Önce bazı komutları kaldırın.",
+    "sendNow": "Şimdi gönder",
+    "modeToggle": "Gönderim modunu değiştir",
+    "help": "Yardım",
+    "helpIntro": "Yapay zeka yanıt verirken gönderdiğin mesajlar burada bekler.",
+    "helpAuto": ": her yanıt bittikten sonra otomatik olarak tek tek gönderilir.",
+    "helpManual": ": gönderilmeden burada tutulur; her birini \"Şimdi gönder\" ile yolla.",
+    "clearConfirmTitle": "Gönderim taslak kutusu temizlensin mi?",
+    "clearConfirmContent": "Bekleyen tüm mesajlar kaldırılır. Bu işlem geri alınamaz.",
+    "mode": {
+      "auto": "Otomatik gönder",
+      "manual": "Elle gönder"
+    }
   },
   "contextUsage": {
     "contextUsed": "bağlam kullanıldı",
@@ -579,7 +624,9 @@
     "today": "Bugün",
     "weekToDate": "Bu hafta",
     "monthToDate": "Bu ay",
-    "triggerLabel": "Bağlam kullanımını göster"
+    "triggerLabel": "Bağlam kullanımını göster",
+    "estimated": "Tahmini",
+    "unavailable": "Bağlam kullanımı kullanılamıyor"
   },
   "skill_generator": {
     "title": "Yetenek/Kural Oluştur",
@@ -610,7 +657,6 @@
   "noAgentsAvailable": "No agents available",
   "noModelConfigured": "No model configured. Please configure in settings.",
   "createFailed": "Failed to create conversation",
-  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
   "createError": {
     "pathVariants": {
       "WORKSPACE_PATH_UNAVAILABLE": "Seçilen çalışma alanı yolu kullanılamıyor. Çalışma alanı yolu \"{{workspacePath}}\" gerçekten var ve erişilebilir olduğundan emin olun."
@@ -637,35 +683,22 @@
       "loaded": "Yüklendi",
       "failed": "Başarısız",
       "unsupported": "Desteklenmiyor"
-    }
-  },
-  "status": {
-    "waitingApproval": "Onayınızı bekliyor",
-    "running": "Çalışıyor",
-    "done": "Tamamlandı",
-    "doneIdle": "Tamamlandı — boşta",
-    "stopped": "Durduruldu",
-    "failed": "Başarısız"
-  },
-  "statusTooltip": {
-    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
-    "running": "Bu sohbet üzerinde çalışılıyor.",
-    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
-    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
-    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
-    "stopped": "Tamamlanmadan önce durduruldu.",
-    "failed": "Bir hata nedeniyle tamamlanamadı."
+    },
+    "selected": "Seçili MCP"
   },
   "runtimePreparing": {
     "sendboxHint": "Çalışma ortamı hazırlanıyor. İlk başlatma biraz daha uzun sürebilir."
   },
   "sendbox": {
-    "hint": "Komutlar için /, dosya için @ yazın"
+    "hint": "Komutlar için /, dosya için @ yazın, ↑/↓ ile mesaj geçmişi"
   },
   "agentTip": {
     "codes": {
       "ACP_EMPTY_TURN": {
         "body": "Bu istek görünür bir yanıt üretmedi."
+      },
+      "ACP_EMPTY_TURN_NEEDS_AUTH": {
+        "body": "Bu istek görünür bir yanıt üretmedi. Aracı önce oturum açmanızı gerektirebilir: {{hint}}."
       },
       "ACP_EMPTY_TURN_MAX_TOKENS": {
         "body": "Bu istek, görünür bir yanıt üretilmeden önce modelin çıktı token sınırına ulaştı."
@@ -679,6 +712,89 @@
     }
   },
   "notFound": "Konuşma bulunamadı veya silinmiş",
+  "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
+  "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "İş değerlendirmesi",
+        "description": "Çeyreklik sonuç sunumu — KPI özeti, segment detayı, görünüm. Lacivert ve amber."
+      },
+      "project-kickoff": {
+        "name": "Proje başlangıcı",
+        "description": "Başlangıç sunumu — kapsam, ekip, takvim, sonraki adımlar. Temiz turkuaz."
+      },
+      "monthly-steerco": {
+        "name": "Aylık yönlendirme kurulu",
+        "description": "Yönlendirme kurulu raporu — portföy durumu, riskler, gereken kararlar. Serif ve altın."
+      },
+      "connected-ops": {
+        "name": "Bağlı operasyonlar",
+        "description": "Operasyon değerlendirmesi — saha metrikleri, çalışma süresi, olaylar. Endüstriyel yeşil."
+      },
+      "editorial-field-report": {
+        "name": "Editoryal saha raporu",
+        "description": "Uzun okuma raporu — serif yazı, madde yerine düz metin, tek kırmızı vurgu."
+      },
+      "market-trends-report": {
+        "name": "Pazar trendleri raporu",
+        "description": "Veri odaklı kaydırmalı rapor — kaynak notlu grafikler."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimal açık sunum — slayt başına tek fikir, tek mavi vurgu."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Teknik sunumlar için minimal koyu sunum — koda uygun, yeşil vurgu."
+      },
+      "business-report": {
+        "name": "İş raporu",
+        "description": "Uzun biçimli resmî rapor — kapak, içindekiler, veri tabloları, lacivert serif başlıklar."
+      },
+      "decision-memo": {
+        "name": "Karar notu",
+        "description": "Kısa karar notu — KİME/KİMDEN/KONU bloğu, öneri başta, kapak yok."
+      },
+      "operations-guide": {
+        "name": "Operasyon kılavuzu",
+        "description": "Derli toplu prosedür — numaralı adımlar, not kutuları, kontrol listeleri, turkuaz vurgu."
+      },
+      "proposal-sow": {
+        "name": "Teklif / SOW",
+        "description": "Müşteri teklifi — kapsam, takvim, fiyat tablosu, imza bloğu."
+      }
+    },
+    "title": "Şablonlar",
+    "columnPptx": "Sunumlar · PPTX",
+    "columnHtml": "Web · HTML",
+    "columnDocx": "Belgeler · DOCX",
+    "selected": "Seçildi",
+    "buttonTooltip": "Şablonlar",
+    "slashDescription": "Bir şablon seçin",
+    "importCard": "Şablon içe aktar (.md)",
+    "empty": "Kullanılabilir şablon yok",
+    "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "scratch": {
+      "prepareError": "Geçici çıktı alanı hazırlanamadı: {{error}}",
+      "retained": "Geçici çıktı dosyaları kurtarma için {{path}} konumunda tutuldu.",
+      "cleanup": "Temizle",
+      "cleanupSuccess": "Geçici çıktı dosyaları kaldırıldı",
+      "cleanupError": "Temizleme başarısız oldu: {{error}}"
+    },
+    "importSuccess": "Şablon içe aktarıldı",
+    "importError": "İçe aktarma başarısız: {{error}}",
+    "removeError": "Silme başarısız: {{error}}",
+    "deleteTooltip": "Şablonu sil",
+    "deleteConfirm": "Bu şablon silinsin mi?"
+  },
+  "status": {
+    "waitingApproval": "Onayınızı bekliyor",
+    "running": "Çalışıyor",
+    "done": "Tamamlandı",
+    "doneIdle": "Tamamlandı — boşta",
+    "stopped": "Durduruldu",
+    "failed": "Başarısız"
+  },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
     "addPinned": "Add pinned context",
@@ -1037,5 +1153,19 @@
   "artifact": {
     "emptyTitle": "Açık artefakt yok",
     "emptyHint": "Oluşturulan dosyalar ve belgeler burada açılır."
-  }
+  },
+  "statusTooltip": {
+    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
+    "running": "Bu sohbet üzerinde çalışılıyor.",
+    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
+    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
+    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
+    "stopped": "Tamamlanmadan önce durduruldu.",
+    "failed": "Bir hata nedeniyle tamamlanamadı."
+  },
+  "staleKnowledgeHint": {
+    "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
+    "action": "Yeni sohbet başlat"
+  },
+  "emptyChat": "Başlamak için bir mesaj gönderin."
 }

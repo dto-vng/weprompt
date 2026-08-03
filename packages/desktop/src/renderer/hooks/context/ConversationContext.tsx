@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IConversationMcpStatus } from '@/common/config/storage';
+import type { IConversationMcpStatus, TChatConversation } from '@/common/config/storage';
 import React, { createContext, useContext } from 'react';
 
 /**
@@ -17,6 +17,9 @@ export interface ConversationContextValue {
    * 会话 ID
    */
   conversation_id: string;
+
+  /** Current persisted conversation snapshot used by shared composer/panel context-budget resolution. */
+  conversation?: TChatConversation;
 
   /**
    * Workspace directory path

@@ -6,6 +6,7 @@
  *
  * When the app adds `data-testid` later, update these selectors in one place.
  */
+import { CLOSE_LABELS, COLLAPSE_SIDEBAR_LABELS, EXPAND_SIDEBAR_LABELS } from './localizedLabels';
 
 // ── Generic ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,62 @@ export function settingsSiderItemById(id: string): string {
 // ── Settings modal ───────────────────────────────────────────────────────────
 
 export const SETTINGS_MODAL = '.settings-modal';
+
+// ── Modal chrome ─────────────────────────────────────────────────────────────
+
+/** Class on each titlebar window control (WindowControls.tsx). */
+const WINDOW_CONTROL_CLASS = 'app-window-controls__button';
+
+/**
+ * Build a CSS selector list matching a button under any of `labels`.
+ *
+ * `scope` and `exclude` are distributed over every alternative rather than
+ * concatenated once: a CSS selector list binds looser than anything else, so
+ * `'.arco-modal ' + 'button[…A], button[…B]'` would scope only the first
+ * alternative and leave the rest matching page-wide.
+ */
+function buttonByAnyLabel(labels: string[], scope = '', exclude = ''): string {
+  const prefix = scope ? `${scope} ` : '';
+  const suffix = exclude ? `:not(.${exclude})` : '';
+  return labels.map((label) => `${prefix}button[aria-label="${label}"]${suffix}`).join(', ');
+}
+
+/**
+ * A `<button>` whose visible **text** is any of `labels`, for the controls that
+ * carry no `aria-label` (Arco Buttons render their label as text).
+ *
+ * `:has-text()` is a case-insensitive substring match — the same semantics as the
+ * hand-written English/Chinese pairs this replaces. `scope` is distributed for
+ * the reason given on {@link buttonByAnyLabel}.
+ */
+export function buttonWithText(labels: string[], scope = ''): string {
+  const prefix = scope ? `${scope} ` : '';
+  return labels.map((label) => `${prefix}button:has-text("${label}")`).join(', ');
+}
+
+/**
+ * AionModal's header close button, in whatever language the app is running.
+ *
+ * Both header variants label the button `aria-label={t('common.close')}`, so a
+ * selector pinned to the literal `"Close"` stops matching the moment the app
+ * runs in a locale that translates the key (see {@link CLOSE_LABELS}). This
+ * accepts every locale's spelling.
+ *
+ * Still anchor the result to a modal — either via `scope` or by chaining — so a
+ * sweep cannot reach a different modal than the one under test. The window
+ * chrome is excluded structurally as well: WindowControls labels the titlebar
+ * close button from this same `common.close` key, giving it an accessible name
+ * identical to the modal's in every locale, and an unanchored match on it would
+ * quit the app mid-suite rather than close a dialog.
+ *
+ * @param scope Optional CSS ancestor to scope the button to (`'.arco-modal'`,
+ *   `'.arco-modal-wrapper:visible'`, …). Pass it here rather than
+ *   concatenating — see {@link buttonByAnyLabel} for why. Omit it when chaining
+ *   off an existing locator, which scopes the whole list.
+ */
+export function modalCloseButton(scope = ''): string {
+  return buttonByAnyLabel(CLOSE_LABELS, scope, WINDOW_CONTROL_CLASS);
+}
 
 // ── Arco Design components ───────────────────────────────────────────────────
 
@@ -69,6 +126,29 @@ export const MESSAGE_TEXT_CONTENT = '[data-testid="message-text-content"]';
 
 /** New chat trigger button in sidebar (CSS module hash varies). */
 export const NEW_CHAT_TRIGGER = 'div[class*="newChatTrigger"]';
+
+/**
+ * The sidebar toggle while the sidebar is open, in whatever language the app is
+ * running (see {@link COLLAPSE_SIDEBAR_LABELS}).
+ *
+ * The control lives in the titlebar (Titlebar/index.tsx), which renders it at
+ * every viewport width; Layout.tsx adds a second button carrying the same
+ * `common.chrome.collapseSidebar` name below the mobile breakpoint
+ * (`window.innerWidth < 768`). Both collapse the sidebar, so either is a valid
+ * target — but two can be on screen at once, which trips Playwright's strict
+ * mode. Take `.first()` or pass a `scope`.
+ */
+export function collapseSidebarButton(scope = ''): string {
+  return buttonByAnyLabel(COLLAPSE_SIDEBAR_LABELS, scope);
+}
+
+/**
+ * The same toggle once the sidebar is collapsed. Only the titlebar renders this
+ * state, so it is unambiguous at any width.
+ */
+export function expandSidebarButton(scope = ''): string {
+  return buttonByAnyLabel(EXPAND_SIDEBAR_LABELS, scope);
+}
 
 // ── Agent pill bar ───────────────────────────────────────────────────────────
 
@@ -121,6 +201,20 @@ export function channelSwitchById(id: string): string {
 export function webuiTabByKey(key: 'webui' | 'channels'): string {
   return `[data-webui-tab="${key}"]`;
 }
+
+// ── Agent Settings ──────────────────────────────────────────────────────────
+
+/**
+ * "Add custom Agent" dropdown trigger, and its "Add manually" menu item.
+ *
+ * TalkToButlerButton forwards its `data-testid` to the Arco Button and derives
+ * `${testId}-manual` for the manual Menu.Item, so neither needs a translated
+ * label. Arco strips only `popup`/`triggerProps`/`selectable` from a Menu.Item,
+ * so `data-*` reaches the DOM — two unit tests already select the `-manual` node
+ * that way.
+ */
+export const BTN_ADD_CUSTOM_AGENT = '[data-testid="btn-add-custom-agent"]';
+export const BTN_ADD_CUSTOM_AGENT_MANUAL = '[data-testid="btn-add-custom-agent-manual"]';
 
 // ── Assistant Settings ──────────────────────────────────────────────────────
 

@@ -200,8 +200,7 @@ describe('LocalAgents', () => {
     // Proves L30 (useManagedAgents) ran and fed the derived lists.
     expect(useManagedAgents).toHaveBeenCalled();
     expect(screen.getByText('Aion CLI')).toBeTruthy();
-    // Not-installed official agents are hidden from the page entirely.
-    expect(screen.queryByText('Claude Code')).toBeNull();
+    expect(screen.getByText('Claude Code')).toBeTruthy();
     expect(screen.getByText('My Agent')).toBeTruthy();
   });
 
@@ -226,8 +225,8 @@ describe('LocalAgents', () => {
 
     expect(screen.getByText('settings.agents')).toBeTruthy();
     expect(screen.getByText('settings.agentManagement.customAgents')).toBeTruthy();
-    // Not-installed official agents (Claude Code) are hidden, so no 'missing' status renders.
-    expect(screen.queryByText('settings.agentManagement.statusMissing')).toBeNull();
+    // Only Claude Code shows 'missing' now; openclaw-gateway is filtered out as deprecated
+    expect(screen.getByText('settings.agentManagement.statusMissing')).toBeTruthy();
     expect(screen.getByText('settings.agentManagement.statusOffline')).toBeTruthy();
     expect(screen.queryByText('settings.agentManagement.goToChat')).toBeNull();
     // Verify deprecated agent is filtered out
@@ -257,14 +256,14 @@ describe('LocalAgents', () => {
 
     render(<LocalAgents />);
 
-    // Only detected (online) agent names render
+    // Agent names render
     expect(screen.getByText('Aion CLI')).toBeInTheDocument();
-    expect(screen.queryByText('Claude Code')).toBeNull();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
     // Deprecated openclaw-gateway agent is filtered out
     expect(screen.queryByText('OpenClaw Gateway')).toBeNull();
-    // Status tags render for visible agents only
+    // Status tags render
     expect(screen.getByText('settings.agentManagement.statusOnline')).toBeInTheDocument();
-    expect(screen.queryByText('settings.agentManagement.statusMissing')).toBeNull();
+    expect(screen.getByText('settings.agentManagement.statusMissing')).toBeInTheDocument();
   });
 
   it('does not render the market-install CTA in the diagnostics-only agent page', () => {
@@ -289,7 +288,7 @@ describe('LocalAgents', () => {
 
     render(<LocalAgents />);
 
-    fireEvent.click(screen.getByText('settings.agentManagement.localAgentsSetupLink'));
+    fireEvent.click(screen.getByText('settings.upstreamAionUiDocumentation'));
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/iOfficeAI/AionUi/wiki/ACP-Setup');
   });
@@ -347,6 +346,37 @@ describe('LocalAgents', () => {
     expect(getBoundAssistants(aionrsAgent, assistants)).toEqual([]);
   });
 
+  it('pins Kimi right after the aionrs agent in the official list', () => {
+    useManagedAgents.mockReturnValue({
+      agents: [
+        ...makeAgents(),
+        {
+          id: 'acp-kimi',
+          name: 'Kimi',
+          agent_type: 'acp',
+          agent_source: 'builtin',
+          backend: 'kimi',
+          enabled: true,
+          available: false,
+          installed: false,
+          status: 'missing',
+        },
+      ],
+      revalidate: vi.fn(),
+      refreshCatalog: vi.fn(),
+    });
+
+    render(<LocalAgents />);
+
+    // Alphabetically Claude Code < Kimi, so this order proves the pin rule:
+    // aionrs stays first, Kimi jumps ahead of the localeCompare ordering.
+    const aion = screen.getByText('Aion CLI');
+    const kimi = screen.getByText('Kimi');
+    const claude = screen.getByText('Claude Code');
+    expect(kimi.compareDocumentPosition(aion) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(claude.compareDocumentPosition(kimi) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
   it('renders agent management as a single diagnostics page without local/remote tabs', () => {
     useManagedAgents.mockReturnValue({
       agents: makeAgents(),
@@ -391,7 +421,7 @@ describe('LocalAgents', () => {
     expect(refreshCatalog).not.toHaveBeenCalled();
   });
 
-  it('shows only installed agents without availability filter tabs', () => {
+  it('renders the availability filter as underline tabs and switches the visible official agents', () => {
     useManagedAgents.mockReturnValue({
       agents: makeAgents(),
       revalidate: vi.fn(),
@@ -400,13 +430,24 @@ describe('LocalAgents', () => {
 
     render(<LocalAgents />);
 
-    // The All/Available/Unavailable tabs are gone.
-    expect(screen.queryByTestId('settings-tab-all')).toBeNull();
-    expect(screen.queryByTestId('settings-tab-available')).toBeNull();
-    expect(screen.queryByTestId('settings-tab-unavailable')).toBeNull();
+    // Filter tabs render as buttons (underline-tab style), not an Arco radio group.
+    const allTab = screen.getByTestId('settings-tab-all');
+    const availableTab = screen.getByTestId('settings-tab-available');
+    const unavailableTab = screen.getByTestId('settings-tab-unavailable');
+    expect(allTab.tagName).toBe('BUTTON');
 
-    // Only the online official agent renders; not-installed ones stay hidden.
+    // Default "all": both official agents visible (Aion CLI online, Claude Code missing).
+    expect(screen.getByText('Aion CLI')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+
+    // "available" keeps only the online agent.
+    fireEvent.click(availableTab);
     expect(screen.getByText('Aion CLI')).toBeInTheDocument();
     expect(screen.queryByText('Claude Code')).toBeNull();
+
+    // "unavailable" keeps only the non-online agent.
+    fireEvent.click(unavailableTab);
+    expect(screen.queryByText('Aion CLI')).toBeNull();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
   });
 });

@@ -11,15 +11,21 @@ import { useAionrsMessage } from '@/renderer/pages/conversation/platforms/aionrs
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { getLocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
-const { mergeLiveMessageMock, responseStreamOnMock, responseStreamHandlerRef, updateConversationInvokeMock } =
-  vi.hoisted(() => ({
-    mergeLiveMessageMock: vi.fn(),
-    responseStreamOnMock: vi.fn(),
-    responseStreamHandlerRef: {
-      current: undefined as ((message: IResponseMessage) => void) | undefined,
-    },
-    updateConversationInvokeMock: vi.fn(),
-  }));
+const {
+  mergeLiveMessageMock,
+  processLocalCronResponseMock,
+  responseStreamOnMock,
+  responseStreamHandlerRef,
+  updateConversationInvokeMock,
+} = vi.hoisted(() => ({
+  mergeLiveMessageMock: vi.fn(),
+  processLocalCronResponseMock: vi.fn(),
+  responseStreamOnMock: vi.fn(),
+  responseStreamHandlerRef: {
+    current: undefined as ((message: IResponseMessage) => void) | undefined,
+  },
+  updateConversationInvokeMock: vi.fn(),
+}));
 
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useMergeLiveMessage: () => mergeLiveMessageMock,
@@ -31,6 +37,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/renderer/pages/conversation/runtime/useConversationRuntimeView', () => ({
   logStreamTerminalObserved: vi.fn(),
+}));
+
+vi.mock('@/renderer/pages/conversation/platforms/aionrs/localCronCommands', () => ({
+  processLocalCronResponse: processLocalCronResponseMock,
 }));
 
 vi.mock('@/renderer/pages/conversation/utils/conversationCache', () => ({
@@ -58,8 +68,34 @@ describe('useAionrsMessage runtime state', () => {
     vi.clearAllMocks();
     vi.mocked(getConversationOrNull).mockResolvedValue(null);
     updateConversationInvokeMock.mockResolvedValue(undefined);
+    processLocalCronResponseMock.mockResolvedValue({ systemResponses: [] });
     responseStreamHandlerRef.current = undefined;
     localStorage.clear();
+  });
+
+  it('reports matching finish and error terminals to lifecycle consumers', async () => {
+    const onTerminal = vi.fn();
+    renderHook(() => useAionrsMessage('conv-1', { onTerminal }));
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'msg-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'error',
+        data: 'failed',
+        msg_id: 'msg-2',
+        turn_id: 'turn-2',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    expect(onTerminal).toHaveBeenNthCalledWith(1, { turnId: 'turn-1', outcome: 'completed' });
+    expect(onTerminal).toHaveBeenNthCalledWith(2, { turnId: 'turn-2', outcome: 'failed' });
   });
 
   it('clears active tool state when the stream finishes', async () => {
@@ -92,6 +128,181 @@ describe('useAionrsMessage runtime state', () => {
     });
 
     expect(result.current.running).toBe(false);
+  });
+
+  it('keeps a final replacement snapshot terminal while allowing a later chunk to resume', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+    });
+
+    expect(result.current.running).toBe(false);
+    expect(mergeLiveMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg_id: 'reply-1',
+        content: expect.objectContaining({ content: 'Hello world', replace: true }),
+      })
+    );
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: ' continued' },
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    expect(result.current.running).toBe(true);
+  });
+
+  it('keeps the text alias replacement terminal after finish', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'text',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'text',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-text',
+        turn_id: 'turn-text',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+    });
+
+    expect(result.current.running).toBe(false);
+    expect(mergeLiveMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg_id: 'reply-text',
+        content: expect.objectContaining({ content: 'Hello world', replace: true }),
+      })
+    );
+  });
+
+  it('replaces buffered raw content before finalizing an assistant message', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Hello world' },
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    await waitFor(() => {
+      expect(processLocalCronResponseMock).toHaveBeenCalledWith('conv-1', 'Hello world');
+    });
+  });
+
+  it('resets buffered raw content when an explicit replacement is empty', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'stale' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: '' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+        replace: true,
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'content',
+        data: { content: 'Fresh' },
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        msg_id: 'reply-reset',
+        turn_id: 'turn-reset',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    await waitFor(() => {
+      expect(processLocalCronResponseMock).toHaveBeenCalledWith('conv-1', 'Fresh');
+    });
   });
 
   it('records explicit completed-turn usage once with a stable event id', async () => {

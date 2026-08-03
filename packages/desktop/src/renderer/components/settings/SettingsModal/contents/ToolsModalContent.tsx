@@ -223,7 +223,7 @@ const ModalMcpManagementSection: React.FC<{
 
       <div className='flex-1 min-h-0'>
         {visibleMcpServers.length === 0 && extensionMcpServers.length === 0 ? (
-          <div className='py-24px text-center text-t-secondary text-14px border border-dashed border-border-2 rd-12px'>
+          <div className='py-24px text-center text-t-secondary text-14px border border-dashed border-[var(--color-border-2)] rd-12px'>
             {t('settings.mcpNoServersFound')}
           </div>
         ) : (
@@ -288,7 +288,7 @@ const ModalMcpManagementSection: React.FC<{
         okText={t('common.confirm')}
         cancelText={t('common.cancel')}
       >
-        <p>{t('settings.mcpDeleteConfirm')}</p>
+        <p>{t('settings.mcpDeleteConfirm', { name: serverToDelete })}</p>
       </Modal>
     </div>
   );
@@ -356,7 +356,7 @@ export const CapabilitiesSection: React.FC<{
   );
 
   return (
-    <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px border border-border-2'>
+    <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px border border-[var(--color-border-2)]'>
       <div className='mb-16px'>
         <span className='text-14px text-t-primary'>{t('settings.capabilitiesSection')}</span>
         <div className='text-12px text-t-secondary mt-4px'>{t('settings.capabilitiesSectionDesc')}</div>
@@ -661,7 +661,7 @@ const ToolsModalContent: React.FC = () => {
       <AionScrollArea className='flex-1 min-h-0 pb-16px' disableOverflow={isPageMode}>
         <div className='space-y-16px'>
           {/* MCP 工具配置 */}
-          <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px flex flex-col min-h-0 border border-border-2'>
+          <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px flex flex-col min-h-0 border border-[var(--color-border-2)]'>
             <div className='flex-1 min-h-0'>
               <AionScrollArea
                 className={classNames('h-full', isPageMode && 'overflow-visible')}
@@ -680,7 +680,7 @@ const ToolsModalContent: React.FC = () => {
           </div>
           <CapabilitiesSection message={mcpMessage} mcpServers={mcpServers} saveMcpServers={saveMcpServers} />
           {/* 图像生成 */}
-          <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px border border-border-2'>
+          <div className='px-[12px] md:px-[32px] py-[24px] bg-2 rd-12px md:rd-16px border border-[var(--color-border-2)]'>
             <div className='flex items-center justify-between mb-16px'>
               <span className='text-14px text-t-primary'>{t('settings.imageGeneration')}</span>
               <Switch
@@ -765,7 +765,7 @@ const ToolsModalContent: React.FC = () => {
                             className='text-[rgb(var(--primary-6))] hover:text-[rgb(var(--primary-5))] underline ml-4px'
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {t('settings.configGuide')}
+                            {t('settings.upstreamAionUiDocumentation')}
                           </a>
                         </div>
                       }
@@ -777,6 +777,7 @@ const ToolsModalContent: React.FC = () => {
                         className='ml-8px text-[rgb(var(--primary-6))] hover:text-[rgb(var(--primary-5))] cursor-pointer'
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <span className='sr-only'>{t('settings.upstreamAionUiDocumentation')}</span>
                         <Help theme='outline' size='14' />
                       </a>
                     </Tooltip>

@@ -90,6 +90,7 @@ import { bootstrapRendererConfig } from '@renderer/services/bootstrapRenderer';
 // Components and utilities
 import Layout from './components/layout/Layout';
 import Router from './components/layout/Router';
+import { useKnowledgeFolderWatchers } from './pages/conversation/projects/useKnowledgeFolderWatchers';
 import Sider from './components/layout/Sider';
 import { useAuth } from './hooks/context/AuthContext';
 import { ConversationHistoryProvider } from './hooks/context/ConversationHistoryContext';
@@ -99,9 +100,9 @@ import type { IRuntimeStatusEvent, RuntimeFailureKind } from '@/common/adapter/i
 import {
   InstallationIntegrityContent,
   InstallationIntegrityModalHost,
+  PackageArchitectureMismatchFooter,
   type InstallationIntegrityDiagnostics,
   getBackendStartupInstallationDescription,
-  getDownloadLatestModalActionProps,
   getRuntimeComponentInstallationDescription,
   showInstallationIntegrityModal,
 } from './components/layout/InstallationIntegrityDialog';
@@ -275,6 +276,10 @@ const Main = () => {
   const { ready } = useAuth();
   const [configReady, setConfigReady] = useState(false);
 
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — this is what gets knowledge folders watched.
+  useKnowledgeFolderWatchers();
+
   useEffect(() => {
     if (!ready) return;
     void bootstrapRendererConfig().finally(() => setConfigReady(true));
@@ -310,6 +315,8 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
   const isDataMigrationFailure = failure.reason === 'backend_data_migration_failed';
   const isLocalDataRepairFailure = failure.reason === 'backend_local_data_repair_failed';
   const isRecoverableDatabaseCorruption = failure.reason === 'backend_recoverable_database_corruption';
+  const isTransientConcurrentStartup = failure.reason === 'backend_transient_concurrent_startup';
+  const isStartupDirectoryFailure = failure.reason === 'backend_startup_directory_unavailable';
   const title = t('common.backendStartup.incompatibleRuntime.title');
   const description = isIncompatibleRuntime
     ? t('common.backendStartup.incompatibleRuntime.description')
@@ -323,24 +330,32 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
         ? t('common.backendStartup.dataMigration.description')
         : isLocalDataRepairFailure
           ? t('common.backendStartup.localDataRepair.description')
-          : isRecoverableDatabaseCorruption
-            ? t('common.backendStartup.recoverableDatabaseCorruption.description')
-            : getBackendStartupInstallationDescription(t);
+          : isTransientConcurrentStartup
+            ? t('common.backendStartup.transientConcurrentStartup.description')
+            : isStartupDirectoryFailure
+              ? t('common.backendStartup.startupDirectory.description')
+              : isRecoverableDatabaseCorruption
+                ? t('common.backendStartup.recoverableDatabaseCorruption.description')
+                : getBackendStartupInstallationDescription(t);
   const requiredVersions = failure.requiredVersions?.map((version) => `GLIBC_${version}`).join(', ');
 
   if (!isIncompatibleRuntime && !isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <InstallationIntegrityModalHost
           description={description}
           diagnosticsKind={
-            isRecoverableDatabaseCorruption
-              ? 'recoverable_database_corruption'
-              : isLocalDataRepairFailure
-                ? 'local_data_repair'
-                : isDataMigrationFailure
-                  ? 'data_migration'
-                  : 'incomplete_installation'
+            isTransientConcurrentStartup
+              ? 'transient_concurrent_startup'
+              : isRecoverableDatabaseCorruption
+                ? 'recoverable_database_corruption'
+                : isStartupDirectoryFailure
+                  ? 'startup_directory'
+                  : isLocalDataRepairFailure
+                    ? 'local_data_repair'
+                    : isDataMigrationFailure
+                      ? 'data_migration'
+                      : 'incomplete_installation'
           }
           diagnostics={{
             source: 'backend_startup_failure',
@@ -354,13 +369,13 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
 
   if (isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <Modal
           visible
           closable={false}
           maskClosable={false}
+          footer={<PackageArchitectureMismatchFooter />}
           title={t('common.backendStartup.packageArchitectureMismatch.title')}
-          {...getDownloadLatestModalActionProps(t)}
         >
           <InstallationIntegrityContent description={description} />
         </Modal>
@@ -369,7 +384,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
   }
 
   return (
-    <div className='min-h-screen bg-bg-1'>
+    <div className='min-h-screen bg-1'>
       <Modal visible closable={false} maskClosable={false} footer={null} title={title}>
         <div className='text-t-1'>
           <Typography.Paragraph className='mb-0 text-t-secondary'>{description}</Typography.Paragraph>
@@ -395,6 +410,7 @@ const shouldShowBackendStartupFailureDialog =
   backendStartupFailure?.reason === 'backend_data_migration_failed' ||
   backendStartupFailure?.reason === 'backend_local_data_repair_failed' ||
   backendStartupFailure?.reason === 'backend_recoverable_database_corruption' ||
+  backendStartupFailure?.reason === 'backend_transient_concurrent_startup' ||
   backendStartupFailure?.reason === 'backend_startup_failed';
 if (backendStartupFailure && shouldShowBackendStartupFailureDialog) {
   root.render(
