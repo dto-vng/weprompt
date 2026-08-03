@@ -71,6 +71,12 @@ const NONTERMINAL_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
   'running',
   'needs_attention',
 ]);
+const ACTIVE_GENERATION_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
+  'queued_local',
+  'submitting',
+  'queued_remote',
+  'running',
+]);
 const MEDIA_INTEGRATIONS = [
   {
     integrationId: 'integration_g7Q2mB4p',
@@ -363,6 +369,31 @@ const assertSubmitScenesInput = (input: StudioSubmitScenesRequest): void => {
     }
     routedSceneIds.add(route.sceneId);
   }
+};
+
+const batchSceneIsReady = (project: StudioProject, sceneId: string): boolean => {
+  const scene = project.scenes[sceneId];
+  if (scene?.id !== sceneId || !project.sceneOrder.includes(sceneId) || scene.visualPrompt.trim().length === 0) {
+    return false;
+  }
+  const jobs = scene.jobIds.flatMap((jobId) => {
+    const job = project.jobs[jobId];
+    return job?.id === jobId && job.projectId === project.id && job.sceneId === scene.id ? [job] : [];
+  });
+  if (jobs.some((job) => ACTIVE_GENERATION_JOB_STATUSES.has(job.status))) return false;
+  const hasGeneratedAsset = scene.assetIds.some((assetId) => {
+    const asset = project.assets[assetId];
+    return (
+      asset?.id === assetId &&
+      asset.projectId === project.id &&
+      asset.sceneId === scene.id &&
+      asset.mediaKind === scene.mediaKind &&
+      asset.managedAsset.collection === 'assets'
+    );
+  });
+  if (hasGeneratedAsset) return false;
+  const latestJob = jobs.at(-1);
+  return latestJob?.status !== 'failed' && latestJob?.status !== 'needs_attention';
 };
 
 const assertScene = (scene: StudioEditableScene): void => {
@@ -1064,6 +1095,9 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
         throw new CreativeStudioServiceError('timing_mismatch');
       }
       if (input.mode === 'single' && input.sceneIds.length !== 1) {
+        throw new CreativeStudioServiceError('invalid_payload');
+      }
+      if (input.mode === 'batch' && input.sceneIds.some((sceneId) => !batchSceneIsReady(project, sceneId))) {
         throw new CreativeStudioServiceError('invalid_payload');
       }
       const built = await buildCatalog(project);

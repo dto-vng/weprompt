@@ -15,6 +15,7 @@ import type {
   StudioAsset,
   StudioEditableScene,
   StudioJob,
+  StudioProject,
   StudioRendererProject,
   StudioRouteCatalogEntry,
   StudioScene,
@@ -1504,6 +1505,91 @@ describe('CreativeStudioService', () => {
       };
     };
 
+    const makeCanonicalJob = (project: StudioProject, status: StudioJob['status'], id = 'job_1'): StudioJob => ({
+      id,
+      projectId: project.id,
+      sceneId: 'scene_1',
+      status,
+      provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'video-model' },
+      idempotencyKey: `key_${id}`,
+      providerJobId: null,
+      outputAssetIds: [],
+      error:
+        status === 'failed' || status === 'needs_attention'
+          ? {
+              code: 'provider_unavailable',
+              messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
+            }
+          : null,
+      retryOfJobId: null,
+      retryReason: null,
+      duplicateChargeAcknowledged: false,
+      duplicateChargeAcknowledgedAt: null,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+    });
+
+    const makeGeneratedAsset = (project: StudioProject): StudioAsset => ({
+      id: 'asset_1',
+      projectId: project.id,
+      sceneId: 'scene_1',
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'asset_1.mp4' },
+      byteSize: 1,
+      sha256: '1'.repeat(64),
+      durationSeconds: 12,
+      createdAt: project.createdAt,
+    });
+
+    const createVideoSubmissionHarness = async (mutate?: (project: StudioProject) => void) => {
+      const harness = await createCatalogHarness();
+      const rendered = await harness.service.updateScene({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1', 12),
+      });
+      if (mutate) {
+        await harness.store.updateProject(
+          rendered.id,
+          (current) => {
+            const next = structuredClone(current);
+            mutate(next);
+            return next;
+          },
+          rendered.revision
+        );
+      }
+      const project = (await harness.store.getProject(rendered.id))!;
+      const catalog = await harness.service.listRoutes({ projectId: project.id });
+      const route = catalog.video.options[0]!;
+      harness.listModels.mockClear();
+      harness.listGenerationRoutes.mockClear();
+      harness.submitScenes.mockClear();
+      const submit = (mode: 'single' | 'batch') =>
+        harness.service.submitScenes({
+          projectId: project.id,
+          expectedRevision: project.revision,
+          mode,
+          sceneIds: ['scene_1'],
+          routes: [{ sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' }],
+          catalogVersion: catalog.catalogVersion,
+        });
+      return { ...harness, project, submit };
+    };
+
+    const expectBatchRejectedBeforeCatalog = async (
+      harness: Awaited<ReturnType<typeof createVideoSubmissionHarness>>
+    ): Promise<void> => {
+      await expect(harness.submit('batch')).rejects.toMatchObject({ code: 'invalid_payload' });
+      expect([
+        harness.listModels.mock.calls.length,
+        harness.listGenerationRoutes.mock.calls.length,
+        harness.submitScenes.mock.calls.length,
+      ]).toEqual([0, 0, 0]);
+    };
+
     it('persists only a freshly available storyboard selection', async () => {
       const harness = await createCatalogHarness();
       const requested = {
@@ -1851,6 +1937,94 @@ describe('CreativeStudioService', () => {
       ).rejects.toMatchObject({ code: 'timing_mismatch' });
 
       expect(harness.submitScenes).not.toHaveBeenCalled();
+    });
+
+    it('rejects a batch scene with no visual prompt before catalog or manager work even when review state says ready', async () => {
+      const harness = await createVideoSubmissionHarness((project) => {
+        project.scenes.scene_1.visualPrompt = '   ';
+        project.scenes.scene_1.reviewState = 'ready';
+      });
+
+      await expectBatchRejectedBeforeCatalog(harness);
+    });
+
+    it.each(['queued_local', 'submitting', 'queued_remote', 'running'] as const)(
+      'rejects a batch scene with a canonical %s job before catalog or manager work',
+      async (status) => {
+        const harness = await createVideoSubmissionHarness((project) => {
+          project.jobs.job_1 = makeCanonicalJob(project, status);
+          project.scenes.scene_1.jobIds = ['job_1'];
+          project.scenes.scene_1.reviewState = 'ready';
+        });
+
+        await expectBatchRejectedBeforeCatalog(harness);
+      }
+    );
+
+    it.each(['failed', 'needs_attention'] as const)(
+      'rejects a batch scene whose latest canonical job is %s before catalog or manager work',
+      async (status) => {
+        const harness = await createVideoSubmissionHarness((project) => {
+          project.jobs.job_1 = makeCanonicalJob(project, status);
+          project.scenes.scene_1.jobIds = ['job_1'];
+          project.scenes.scene_1.reviewState = 'ready';
+        });
+
+        await expectBatchRejectedBeforeCatalog(harness);
+      }
+    );
+
+    it.each([
+      { selectedAssetId: null, label: 'unselected' },
+      { selectedAssetId: 'asset_1', label: 'selected' },
+    ] as const)(
+      'rejects a batch scene with a canonical generated $label asset before catalog or manager work',
+      async ({ selectedAssetId }) => {
+        const harness = await createVideoSubmissionHarness((project) => {
+          project.assets.asset_1 = makeGeneratedAsset(project);
+          project.scenes.scene_1.assetIds = ['asset_1'];
+          project.scenes.scene_1.selectedAssetId = selectedAssetId;
+          project.scenes.scene_1.reviewState = 'ready';
+        });
+
+        await expectBatchRejectedBeforeCatalog(harness);
+      }
+    );
+
+    it('rejects a batch scene whose stored identity does not match its canonical scene key', async () => {
+      const harness = await createVideoSubmissionHarness();
+      const forged = structuredClone(harness.project);
+      forged.scenes.scene_1.id = 'scene_alias';
+      vi.spyOn(harness.store, 'getProject').mockResolvedValueOnce(forged);
+
+      await expectBatchRejectedBeforeCatalog(harness);
+    });
+
+    it('permits a ready batch when an older failure is followed by a canonical cancelled job', async () => {
+      const harness = await createVideoSubmissionHarness((project) => {
+        project.jobs.job_failed = makeCanonicalJob(project, 'failed', 'job_failed');
+        project.jobs.job_cancelled = makeCanonicalJob(project, 'cancelled', 'job_cancelled');
+        project.scenes.scene_1.jobIds = ['job_failed', 'job_cancelled'];
+        project.scenes.scene_1.reviewState = 'blocked';
+      });
+
+      await harness.submit('batch');
+
+      expect(harness.submitScenes).toHaveBeenCalledOnce();
+    });
+
+    it('permits single-scene regeneration for a selected generated scene and strips mode at the manager boundary', async () => {
+      const harness = await createVideoSubmissionHarness((project) => {
+        project.assets.asset_1 = makeGeneratedAsset(project);
+        project.scenes.scene_1.assetIds = ['asset_1'];
+        project.scenes.scene_1.selectedAssetId = 'asset_1';
+        project.scenes.scene_1.reviewState = 'complete';
+      });
+
+      await harness.submit('single');
+
+      expect(harness.submitScenes).toHaveBeenCalledOnce();
+      expect(harness.submitScenes.mock.calls[0]?.[0]).not.toHaveProperty('mode');
     });
 
     it('permits a ready batch subset when the canonical full storyboard exactly matches its target', async () => {
