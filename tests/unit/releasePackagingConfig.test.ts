@@ -59,6 +59,7 @@ function createInventoryManifest(contents: unknown): { root: string; manifestPat
 
 function createPresentationTemplateResources(): string {
   const root = mkdtempSync(resolve(tmpdir(), 'weprompt-template-resources-'));
+  writeFileSync(resolve(root, 'manifest.json'), `${JSON.stringify(REQUIRED_PRESENTATION_TEMPLATE_INVENTORY)}\n`);
   for (const fileName of EXPECTED_PRESENTATION_TEMPLATE_FILES) {
     writeFileSync(resolve(root, fileName), fileName);
   }
@@ -272,6 +273,42 @@ describe('release packaging configuration', () => {
             resourcesDirectory,
           })
         ).toThrow(/extra.*unexpected\.pptx/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a nested undeclared binary without following the directory', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      const unexpectedDirectory = resolve(resourcesDirectory, 'nested-binaries');
+      mkdirSync(unexpectedDirectory);
+      writeFileSync(resolve(unexpectedDirectory, 'hidden.pptx'), 'unexpected');
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/unexpected director.*nested-binaries/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an unexpected empty child directory', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      mkdirSync(resolve(resourcesDirectory, 'unexpected-directory'));
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/unexpected director.*unexpected-directory/i);
       } finally {
         rmSync(resourcesDirectory, { recursive: true, force: true });
       }

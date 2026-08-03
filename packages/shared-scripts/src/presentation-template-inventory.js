@@ -112,6 +112,40 @@ function readPresentationTemplateInventory(manifestPath) {
   return validatePresentationTemplateInventory(parsed, `inventory at ${manifestPath}`);
 }
 
+function assertExactPresentationTemplateInventory({ inventory, requiredInventory } = {}) {
+  const actual = validatePresentationTemplateInventory(inventory, 'packaged inventory');
+  const required = validatePresentationTemplateInventory(requiredInventory, 'required inventory');
+  const actualById = new Map(actual.map((entry) => [entry.id, entry]));
+  const requiredIds = new Set(required.map((entry) => entry.id));
+  const differences = [];
+
+  for (const requiredEntry of required) {
+    const actualEntry = actualById.get(requiredEntry.id);
+    if (!actualEntry) {
+      differences.push(`missing ${requiredEntry.id}`);
+      continue;
+    }
+    if (
+      actualEntry.format !== requiredEntry.format ||
+      actualEntry.packagedReferenceFile !== requiredEntry.packagedReferenceFile
+    ) {
+      differences.push(`mismatched ${requiredEntry.id}`);
+    }
+  }
+
+  for (const actualEntry of actual) {
+    if (!requiredIds.has(actualEntry.id)) differences.push(`unexpected ${actualEntry.id}`);
+  }
+
+  if (actual.length !== required.length || differences.length > 0) {
+    throw new Error(
+      `Packaged presentation template manifest must match the exact required inventory (${differences.join(', ') || `expected ${required.length} entries, found ${actual.length}`})`
+    );
+  }
+
+  return required;
+}
+
 function expectedPresentationTemplateFiles(inventory) {
   return validatePresentationTemplateInventory(inventory).flatMap((entry) =>
     entry.packagedReferenceFile === null ? [] : [entry.packagedReferenceFile]
@@ -139,13 +173,14 @@ function assertPresentationTemplateResources({ inventory, resourcesDirectory } =
   }
 
   const expectedFiles = expectedPresentationTemplateFiles(inventory);
-  const expectedFileSet = new Set(expectedFiles);
+  const requiredFiles = ['manifest.json', ...expectedFiles];
+  const requiredFileSet = new Set(requiredFiles);
   const resolvedResourcesDirectory = path.resolve(resourcesDirectory);
   const missingFiles = [];
   const symlinkFiles = [];
   const invalidFiles = [];
 
-  for (const fileName of expectedFiles) {
+  for (const fileName of requiredFiles) {
     if (!isSafeBasename(fileName)) {
       throw new Error(`Presentation template packaged reference must be a safe basename: ${fileName}`);
     }
@@ -173,17 +208,33 @@ function assertPresentationTemplateResources({ inventory, resourcesDirectory } =
     }
   }
 
-  const extraBinaryFiles = fs
-    .readdirSync(resourcesDirectory, { withFileTypes: true })
-    .map((entry) => entry.name)
-    .filter((fileName) => ['.pptx', '.docx'].includes(path.extname(fileName).toLowerCase()))
-    .filter((fileName) => !expectedFileSet.has(fileName));
+  const extraBinaryFiles = [];
+  const unexpectedDirectories = [];
+  const unexpectedSymlinks = [];
+  const unexpectedFiles = [];
+  for (const entry of fs.readdirSync(resourcesDirectory, { withFileTypes: true })) {
+    if (requiredFileSet.has(entry.name)) continue;
+    if (entry.isSymbolicLink()) {
+      unexpectedSymlinks.push(entry.name);
+    } else if (entry.isDirectory()) {
+      unexpectedDirectories.push(entry.name);
+    } else if (['.pptx', '.docx'].includes(path.extname(entry.name).toLowerCase())) {
+      extraBinaryFiles.push(entry.name);
+    } else {
+      unexpectedFiles.push(entry.name);
+    }
+  }
 
   const problems = [];
   if (missingFiles.length > 0) problems.push(`missing files: ${missingFiles.join(', ')}`);
   if (extraBinaryFiles.length > 0) problems.push(`extra binary files: ${extraBinaryFiles.join(', ')}`);
   if (symlinkFiles.length > 0) problems.push(`symlinks are not allowed: ${symlinkFiles.join(', ')}`);
-  if (invalidFiles.length > 0) problems.push(`references must be regular files: ${invalidFiles.join(', ')}`);
+  if (invalidFiles.length > 0) problems.push(`required resources must be regular files: ${invalidFiles.join(', ')}`);
+  if (unexpectedDirectories.length > 0) {
+    problems.push(`unexpected directories: ${unexpectedDirectories.join(', ')}`);
+  }
+  if (unexpectedSymlinks.length > 0) problems.push(`unexpected symlinks: ${unexpectedSymlinks.join(', ')}`);
+  if (unexpectedFiles.length > 0) problems.push(`unexpected files: ${unexpectedFiles.join(', ')}`);
 
   if (problems.length > 0) {
     throw new Error(`Presentation template resources failed inventory verification (${problems.join('; ')})`);
@@ -194,6 +245,7 @@ function assertPresentationTemplateResources({ inventory, resourcesDirectory } =
 
 module.exports = {
   readPresentationTemplateInventory,
+  assertExactPresentationTemplateInventory,
   expectedPresentationTemplateFiles,
   assertPresentationTemplateResources,
 };

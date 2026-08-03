@@ -98,4 +98,15 @@ describe('afterPack presentation template verification', () => {
       new RegExp(`missing.*${missingFile.replace('.', '\\.')}`, 'i')
     );
   });
+
+  it('fails closed when the packaged manifest and file both omit a required template', () => {
+    const resourcesDir = createPackagedPresentationTemplates();
+    const templatesDir = join(resourcesDir, 'presentation-templates');
+    const omittedEntry = PRESENTATION_TEMPLATE_INVENTORY.find((entry) => entry.id === 'business-review');
+    const truncatedInventory = PRESENTATION_TEMPLATE_INVENTORY.filter((entry) => entry !== omittedEntry);
+    writeFileSync(join(templatesDir, 'manifest.json'), `${JSON.stringify(truncatedInventory, null, 2)}\n`);
+    rmSync(join(templatesDir, omittedEntry!.packagedReferenceFile!));
+
+    expect(() => verifyPresentationTemplateResources(resourcesDir)).toThrow(/exact required inventory/i);
+  });
 });

@@ -11,6 +11,7 @@ const {
 const { verifyBundledAioncoreResources } = require('../packages/shared-scripts/src/verify-bundled-aioncore-resources');
 const {
   readPresentationTemplateInventory,
+  assertExactPresentationTemplateInventory,
   assertPresentationTemplateResources,
 } = require('../packages/shared-scripts/src/presentation-template-inventory');
 
@@ -61,7 +62,14 @@ function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) 
 
 function verifyPresentationTemplateResources(resourcesDir) {
   const templatesDirectory = path.join(resourcesDir, 'presentation-templates');
-  const inventory = readPresentationTemplateInventory(path.join(templatesDirectory, 'manifest.json'));
+  const requiredInventory = readPresentationTemplateInventory(
+    path.join(__dirname, '../packages/desktop/resources/presentation-templates/manifest.json')
+  );
+  const packagedInventory = readPresentationTemplateInventory(path.join(templatesDirectory, 'manifest.json'));
+  const inventory = assertExactPresentationTemplateInventory({
+    inventory: packagedInventory,
+    requiredInventory,
+  });
   const checked = assertPresentationTemplateResources({
     inventory,
     resourcesDirectory: templatesDirectory,
