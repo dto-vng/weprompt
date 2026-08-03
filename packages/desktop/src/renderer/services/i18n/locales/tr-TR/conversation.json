@@ -852,6 +852,7 @@
     },
     "draft": {
       "action": "Storyboard taslağı oluştur",
+      "redraftAction": "Storyboard'u yeniden oluştur",
       "title": "Storyboard taslağı oluştur",
       "body": "WePrompt incelemeniz için sahneler, anlatım, ekran metni ve zamanlama önerecek.",
       "checking": "Seçilen hikâye panosu modeli kontrol ediliyor...",
@@ -1002,6 +1003,9 @@
       "setupRequired": "Model kurulumu gerekli",
       "unavailable": "Seçilen model kullanılamıyor",
       "suggested": "Önerilen",
+      "setupTitle": "Model kurulumunu tamamlayın",
+      "setupBody": "Sağlayıcı kimlik bilgilerini ve medya bağlamalarını Model Ayarları'nda yapılandırın.",
+      "missingRoles": "Kurulum gerekli: {{roles}}",
       "openSettings": "Model Ayarlarını Aç",
       "refresh": "Modelleri yenile",
       "loading": "Modeller yükleniyor...",

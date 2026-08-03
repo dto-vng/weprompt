@@ -35,7 +35,6 @@ const textIdentity = (route: StudioTextModelRef): string => `${route.providerId}
 const mediaIdentity = (route: StudioMediaChoiceRef): string => route.choiceId;
 
 type RoleSelectProps = {
-  role: ModelRole;
   label: string;
   status: StudioRouteCatalog[ModelRole]['status'] | null;
   value: string | undefined;
@@ -44,7 +43,6 @@ type RoleSelectProps = {
   disabled: boolean;
   onChange: (value: string) => void;
   onClear: () => void;
-  onOpenSettings: () => void;
 };
 
 const RoleSelect: React.FC<RoleSelectProps> = ({
@@ -56,7 +54,6 @@ const RoleSelect: React.FC<RoleSelectProps> = ({
   disabled,
   onChange,
   onClear,
-  onOpenSettings,
 }) => {
   const { t } = useTranslation();
   return (
@@ -83,11 +80,6 @@ const RoleSelect: React.FC<RoleSelectProps> = ({
           </Select.Option>
         ))}
       </Select>
-      {status === 'setup_required' && (
-        <Button type='text' size='mini' onClick={onOpenSettings}>
-          {t('conversation.creativeStudio.models.openSettings')}
-        </Button>
-      )}
       {status === 'unavailable' && (
         <span className='block text-11px text-warning'>{t('conversation.creativeStudio.models.unavailable')}</span>
       )}
@@ -122,6 +114,10 @@ export const StudioModelBar: React.FC<StudioModelBarProps> = ({
   const storyboardSelected = catalog?.storyboard.selected ?? null;
   const imageSelected = catalog?.image.selected ?? null;
   const videoSelected = catalog?.video.selected ?? null;
+  const missingRoles = (['storyboard', 'image', 'video'] as const).filter(
+    (role) => catalog?.[role].status === 'setup_required'
+  );
+  const missingRoleLabels = missingRoles.map((role) => t(`conversation.creativeStudio.models.${role}`)).join(', ');
 
   const textOptions: RoleSelectProps['options'] = storyboardOptions.map((route) => ({
     value: textIdentity(route),
@@ -200,9 +196,25 @@ export const StudioModelBar: React.FC<StudioModelBarProps> = ({
         </div>
       )}
       {errorMessageKey !== null && <Alert type='error' content={t(errorMessageKey)} />}
+      {missingRoles.length > 0 && (
+        <Alert
+          type='warning'
+          title={t('conversation.creativeStudio.models.setupTitle')}
+          content={
+            <div className='flex flex-wrap items-center gap-8px'>
+              <span>{t('conversation.creativeStudio.models.setupBody')}</span>
+              <span className='text-t-secondary'>
+                {t('conversation.creativeStudio.models.missingRoles', { roles: missingRoleLabels })}
+              </span>
+              <Button type='text' size='mini' disabled={disabled} onClick={() => onOpenSettings('/settings/model')}>
+                {t('conversation.creativeStudio.models.openSettings')}
+              </Button>
+            </div>
+          }
+        />
+      )}
       <div className='flex flex-wrap gap-12px'>
         <RoleSelect
-          role='storyboard'
           label={t('conversation.creativeStudio.models.storyboard')}
           status={catalog?.storyboard.status ?? null}
           value={storyboardSelected === null ? undefined : textIdentity(storyboardSelected)}
@@ -211,10 +223,8 @@ export const StudioModelBar: React.FC<StudioModelBarProps> = ({
           disabled={disabled || pendingRole === 'storyboard'}
           onChange={selectStoryboard}
           onClear={() => void onSelectionChange({ role: 'storyboard', selection: null })}
-          onOpenSettings={() => onOpenSettings('/settings/model')}
         />
         <RoleSelect
-          role='image'
           label={t('conversation.creativeStudio.models.image')}
           status={catalog?.image.status ?? null}
           value={imageSelected === null ? undefined : mediaIdentity(imageSelected)}
@@ -223,10 +233,8 @@ export const StudioModelBar: React.FC<StudioModelBarProps> = ({
           disabled={disabled || pendingRole === 'image'}
           onChange={(value) => selectMedia('image', imageOptions, value)}
           onClear={() => void onSelectionChange({ role: 'image', selection: null })}
-          onOpenSettings={() => onOpenSettings('/settings/model')}
         />
         <RoleSelect
-          role='video'
           label={t('conversation.creativeStudio.models.video')}
           status={catalog?.video.status ?? null}
           value={videoSelected === null ? undefined : mediaIdentity(videoSelected)}
@@ -235,7 +243,6 @@ export const StudioModelBar: React.FC<StudioModelBarProps> = ({
           disabled={disabled || pendingRole === 'video'}
           onChange={(value) => selectMedia('video', videoOptions, value)}
           onClear={() => void onSelectionChange({ role: 'video', selection: null })}
-          onOpenSettings={() => onOpenSettings('/settings/model')}
         />
       </div>
     </section>

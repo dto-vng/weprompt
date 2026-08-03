@@ -266,7 +266,7 @@ describe('StudioPage and useStudioProject', () => {
     expect(await screen.findByText('conversation.creativeStudio.storyboard.title')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.preview.noAssetTitle')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.inspector.title')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.action' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.redraftAction' })).toBeInTheDocument();
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledWith({ projectId: 'project-1' }));
     expect(
       screen.queryByRole('button', { name: 'conversation.creativeStudio.routing.connectProvider' })
@@ -275,6 +275,20 @@ describe('StudioPage and useStudioProject', () => {
     expect(bridge.listConnections.invoke).not.toHaveBeenCalled();
     expect(bridge.saveConnection.invoke).not.toHaveBeenCalled();
     expect(bridge.removeConnection.invoke).not.toHaveBeenCalled();
+  });
+
+  it('keeps manual storyboard editing available when Storyboard setup is required', async () => {
+    bridge.listRoutes.invoke.mockResolvedValue(
+      ok({
+        ...routes(),
+        storyboard: { status: 'setup_required', selected: null, options: [] },
+      })
+    );
+
+    renderRoute();
+
+    expect(await screen.findByRole('button', { name: 'conversation.creativeStudio.draft.action' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeEnabled();
   });
 
   it('imports a first frame through the native managed-asset command and refetches canonical state', async () => {

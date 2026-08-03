@@ -850,6 +850,7 @@
     },
     "draft": {
       "action": "Draft storyboard",
+      "redraftAction": "Redraft storyboard",
       "title": "Draft a storyboard",
       "body": "WePrompt will propose scenes, narration, on-screen text, and timing for your review.",
       "checking": "Checking the selected Storyboard model...",
@@ -1000,6 +1001,9 @@
       "setupRequired": "Model setup required",
       "unavailable": "The selected model is unavailable",
       "suggested": "Suggested",
+      "setupTitle": "Complete model setup",
+      "setupBody": "Configure provider credentials and media bindings in Model Settings.",
+      "missingRoles": "Needs setup: {{roles}}",
       "openSettings": "Open Model Settings",
       "refresh": "Refresh models",
       "loading": "Loading models...",

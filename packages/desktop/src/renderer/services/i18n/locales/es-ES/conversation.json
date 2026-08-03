@@ -851,6 +851,7 @@
     },
     "draft": {
       "action": "Crear borrador del guion gráfico",
+      "redraftAction": "Volver a crear el guion gráfico",
       "title": "Crear un borrador del guion gráfico",
       "body": "WePrompt propondrá escenas, narración, texto en pantalla y tiempos para que los revises.",
       "checking": "Comprobando el modelo de guion gráfico seleccionado...",
@@ -1001,6 +1002,9 @@
       "setupRequired": "Se requiere configurar el modelo",
       "unavailable": "El modelo seleccionado no está disponible",
       "suggested": "Sugerido",
+      "setupTitle": "Completa la configuración de modelos",
+      "setupBody": "Configura las credenciales del proveedor y las vinculaciones de medios en Ajustes de modelos.",
+      "missingRoles": "Requiere configuración: {{roles}}",
       "openSettings": "Abrir ajustes de modelos",
       "refresh": "Actualizar modelos",
       "loading": "Cargando modelos...",

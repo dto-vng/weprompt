@@ -117,12 +117,14 @@ describe('StudioModelBar', () => {
     expect(document.body).toHaveTextContent('conversation.creativeStudio.models.unavailable');
   });
 
-  it('offers Model Settings when setup is required', () => {
+  it('consolidates an all-setup-required catalog into one Settings action', () => {
     const onOpenSettings = vi.fn();
     render(
       <StudioModelBar
         {...props({
           catalog: catalog({
+            storyboard: { status: 'setup_required', selected: null, options: [] },
+            image: { status: 'setup_required', selected: null, options: [] },
             video: { status: 'setup_required', selected: null, options: [] },
           }),
           onOpenSettings,
@@ -130,8 +132,41 @@ describe('StudioModelBar', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.models.openSettings' }));
+    const settingsActions = screen.getAllByRole('button', {
+      name: 'conversation.creativeStudio.models.openSettings',
+    });
+    expect(settingsActions).toHaveLength(1);
+    expect(screen.getByLabelText('conversation.creativeStudio.models.storyboard')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByLabelText('conversation.creativeStudio.models.image')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByLabelText('conversation.creativeStudio.models.video')).toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.click(settingsActions[0]!);
     expect(onOpenSettings).toHaveBeenCalledExactlyOnceWith('/settings/model');
+  });
+
+  it('keeps configured model selectors usable when another role needs setup', () => {
+    render(
+      <StudioModelBar
+        {...props({
+          catalog: catalog({
+            storyboard: { status: 'setup_required', selected: null, options: [] },
+          }),
+        })}
+      />
+    );
+
+    expect(screen.getAllByRole('button', { name: 'conversation.creativeStudio.models.openSettings' })).toHaveLength(1);
+    expect(screen.getByLabelText('conversation.creativeStudio.models.storyboard')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.getByLabelText('conversation.creativeStudio.models.image')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('emits only a role-compatible route and disables the pending role', async () => {

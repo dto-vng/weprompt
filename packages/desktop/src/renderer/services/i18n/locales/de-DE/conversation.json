@@ -851,6 +851,7 @@
     },
     "draft": {
       "action": "Storyboard entwerfen",
+      "redraftAction": "Storyboard erneut entwerfen",
       "title": "Storyboard entwerfen",
       "body": "WePrompt schlägt Szenen, Sprechertext, Bildschirmtext und Timing zur Prüfung vor.",
       "checking": "Ausgewähltes Storyboard-Modell wird geprüft...",
@@ -1001,6 +1002,9 @@
       "setupRequired": "Modelleinrichtung erforderlich",
       "unavailable": "Das ausgewählte Modell ist nicht verfügbar",
       "suggested": "Empfohlen",
+      "setupTitle": "Modelleinrichtung abschließen",
+      "setupBody": "Konfiguriere Anbieter-Zugangsdaten und Medienbindungen in den Modelleinstellungen.",
+      "missingRoles": "Einrichtung erforderlich: {{roles}}",
       "openSettings": "Modelleinstellungen öffnen",
       "refresh": "Modelle aktualisieren",
       "loading": "Modelle werden geladen...",

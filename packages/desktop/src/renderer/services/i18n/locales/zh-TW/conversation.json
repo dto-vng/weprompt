@@ -850,6 +850,7 @@
     },
     "draft": {
       "action": "建立分鏡草稿",
+      "redraftAction": "重新建立分鏡草稿",
       "title": "建立分鏡草稿",
       "body": "WePrompt 會提出場景、旁白、畫面文字與時間，供你檢視。",
       "checking": "正在檢查所選分鏡模型...",
@@ -1000,6 +1001,9 @@
       "setupRequired": "需要設定模型",
       "unavailable": "所選模型無法使用",
       "suggested": "建議",
+      "setupTitle": "完成模型設定",
+      "setupBody": "請在模型設定中設定供應商憑證與媒體繫結。",
+      "missingRoles": "需要設定：{{roles}}",
       "openSettings": "開啟模型設定",
       "refresh": "重新整理模型",
       "loading": "正在載入模型...",

@@ -44,6 +44,12 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
   onOpenExport,
 }) => {
   const { t } = useTranslation();
+  const hasStoryboard = project.sceneOrder.length > 0;
+  const storyboardReady = storyboard?.status === 'ready' && storyboard.selected !== null;
+  const draftLabelKey = hasStoryboard
+    ? 'conversation.creativeStudio.draft.redraftAction'
+    : 'conversation.creativeStudio.draft.action';
+  const draftActionDisabled = drafting || draftDisabled || !storyboardReady;
   const isChecking = catalogLoading && storyboard === null;
   const selectedModel = storyboard?.selected ?? null;
   const selectedOption =
@@ -52,7 +58,7 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
       : (storyboard?.options.find(
           (option) => option.providerId === selectedModel.providerId && option.model === selectedModel.model
         ) ?? null);
-  const isReady = !isChecking && storyboard?.status === 'ready' && selectedModel !== null;
+  const isReady = !isChecking && storyboardReady;
   const generationActionDisabled = generationDisabled || generationPending || onOpenGenerationReview === undefined;
   const readinessKey = isChecking
     ? 'conversation.creativeStudio.draft.checking'
@@ -103,13 +109,13 @@ const StudioHeader: React.FC<StudioHeaderProps> = ({
             {t('conversation.creativeStudio.review.generateReadyScenes')}
           </Button>
           <Button
-            type='primary'
+            type={hasStoryboard ? 'default' : 'primary'}
             icon={<Magic />}
             loading={drafting}
-            disabled={drafting || draftDisabled}
+            disabled={draftActionDisabled}
             onClick={onOpenDraft}
           >
-            {t('conversation.creativeStudio.draft.action')}
+            {t(draftLabelKey)}
           </Button>
         </div>
       </div>

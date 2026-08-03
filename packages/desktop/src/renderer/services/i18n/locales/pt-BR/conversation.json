@@ -856,6 +856,7 @@
     },
     "draft": {
       "action": "Criar rascunho do storyboard",
+      "redraftAction": "Refazer storyboard",
       "title": "Criar um rascunho do storyboard",
       "body": "O WePrompt vai propor cenas, narração, texto na tela e duração para você revisar.",
       "checking": "Verificando o modelo de storyboard selecionado...",
@@ -1006,6 +1007,9 @@
       "setupRequired": "Configuração de modelo necessária",
       "unavailable": "O modelo selecionado não está disponível",
       "suggested": "Sugerido",
+      "setupTitle": "Conclua a configuração de modelos",
+      "setupBody": "Configure as credenciais do provedor e os vínculos de mídia em Configurações de modelos.",
+      "missingRoles": "Requer configuração: {{roles}}",
       "openSettings": "Abrir configurações de modelos",
       "refresh": "Atualizar modelos",
       "loading": "Carregando modelos...",
