@@ -293,6 +293,25 @@ const StudioProjectShell: React.FC = () => {
   );
   const canonicalMutationPending =
     editor.mutationPending || studioJobs.mutationPending || variationPending || headerBatchLoading;
+  const hasLockedScenes = useMemo(() => {
+    if (project === null) return false;
+    const activeStatuses = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
+    return (
+      Object.values(project.assets).some(
+        (asset) => asset.sceneId !== null && asset.managedAsset.collection === 'assets'
+      ) || Object.values(project.jobs).some((job) => activeStatuses.has(job.status))
+    );
+  }, [project]);
+  const fitDisabled =
+    editor.hasUnsavedSceneDrafts ||
+    editor.conflict !== null ||
+    studioModels.loading ||
+    studioModels.catalog === null ||
+    !studioModels.catalog.catalogVersion ||
+    canonicalMutationPending ||
+    studioModels.pendingRole !== null ||
+    referenceImportSceneId !== null ||
+    generationReviewRefreshing;
   const generationBlocked =
     project === null ||
     editor.hasUnsavedSceneDrafts ||
@@ -778,6 +797,9 @@ const StudioProjectShell: React.FC = () => {
           suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
           canAddScene={editor.canAddScene}
           mutationPending={canonicalMutationPending}
+          fitDisabled={fitDisabled}
+          fitOutcome={editor.latestFitOutcome}
+          hasLockedScenes={hasLockedScenes || (editor.latestFitOutcome?.lockedSceneIds.length ?? 0) > 0}
           sceneStatuses={readiness?.sceneStatuses ?? {}}
           errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
           statusMessageKey={
@@ -789,6 +811,12 @@ const StudioProjectShell: React.FC = () => {
           onSelectScene={editor.selectScene}
           onAddScene={editor.addScene}
           onIncreaseTargetDuration={editor.increaseTargetDuration}
+          onFitToTarget={() => {
+            const catalogVersion = studioModels.catalog?.catalogVersion;
+            if (fitDisabled || !catalogVersion) return;
+            editor.clearLatestFitOutcome();
+            void editor.fitToTarget(catalogVersion);
+          }}
           onRemoveScene={editor.removeScene}
           onReorderScenes={editor.reorderScenes}
           onMoveScene={editor.moveScene}

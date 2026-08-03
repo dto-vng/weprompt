@@ -11,7 +11,7 @@ import { Add } from '@icon-park/react';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type { StudioFitStoryboardOutcome, StudioScene } from '@/common/types/project/creativeStudioTypes';
 import type { StudioSceneStatus } from '../../studioReadiness';
 
 import { SceneCard, type SceneMoveDirection } from './SceneCard';
@@ -36,6 +36,9 @@ export type StoryboardPanelProps = {
   suggestedExpandedTargetSeconds: number | null;
   canAddScene: boolean;
   mutationPending: boolean;
+  fitDisabled: boolean;
+  fitOutcome: StudioFitStoryboardOutcome | null;
+  hasLockedScenes: boolean;
   sceneStatuses: Record<string, StudioSceneStatus>;
   errorMessageKey?: string | null;
   statusMessageKey?: string | null;
@@ -43,6 +46,7 @@ export type StoryboardPanelProps = {
   onSelectScene: (sceneId: string) => void;
   onAddScene: () => ActionResult;
   onIncreaseTargetDuration: () => ActionResult;
+  onFitToTarget: () => ActionResult;
   onRemoveScene: (sceneId: string) => ActionResult;
   onReorderScenes: (sceneOrder: string[]) => ActionResult;
   onMoveScene: (sceneId: string, direction: SceneMoveDirection) => ActionResult;
@@ -61,6 +65,9 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   suggestedExpandedTargetSeconds,
   canAddScene,
   mutationPending,
+  fitDisabled,
+  fitOutcome,
+  hasLockedScenes,
   sceneStatuses,
   errorMessageKey = null,
   statusMessageKey = null,
@@ -68,6 +75,7 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   onSelectScene,
   onAddScene,
   onIncreaseTargetDuration,
+  onFitToTarget,
   onRemoveScene,
   onReorderScenes,
   onMoveScene,
@@ -88,6 +96,10 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   const removeActionLabel = removeCandidate
     ? `${t('conversation.creativeStudio.storyboard.removeScene')}: ${removeCandidate.sceneLabel}`
     : t('conversation.creativeStudio.storyboard.removeScene');
+  const fitErrorMessageKey =
+    fitOutcome?.status === 'unreachable'
+      ? (`conversation.creativeStudio.storyboard.fitUnreachable.${fitOutcome.reason}` as const)
+      : null;
 
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
@@ -127,6 +139,11 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
                 : 'conversation.creativeStudio.storyboard.durationMismatch'
             )}
           </span>
+          {!durationMatchesTarget && (
+            <Button size='mini' disabled={fitDisabled} onClick={() => void onFitToTarget()}>
+              {t('conversation.creativeStudio.storyboard.fitToTarget', { seconds: targetDurationSeconds })}
+            </Button>
+          )}
           {remainingDurationSeconds > 0 && (
             <span className={styles.timingState}>
               {t('conversation.creativeStudio.storyboard.durationRemaining', { seconds: remainingDurationSeconds })}
@@ -178,6 +195,14 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
       )}
 
       <footer className={styles.panelFooter}>
+        {hasLockedScenes && !durationMatchesTarget && (
+          <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.fitUnlockedOnly')}</p>
+        )}
+        {fitErrorMessageKey && (
+          <div role='alert' className={`${styles.feedback} ${styles.error}`}>
+            {t(fitErrorMessageKey)}
+          </div>
+        )}
         {errorMessageKey && (
           <div role='alert' className={`${styles.feedback} ${styles.error}`}>
             {t(errorMessageKey)}

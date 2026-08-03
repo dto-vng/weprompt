@@ -927,6 +927,13 @@
       "durationTotal": "分鏡時間：{{total}} / {{target}} 秒",
       "durationMatches": "場景時間與專案目標相符。",
       "durationMismatch": "批次產生前，場景時間必須符合專案目標。",
+      "fitToTarget": "調整為 {{seconds}} 秒",
+      "fitUnlockedOnly": "僅調整未算繪鏡頭的時間。",
+      "fitUnreachable": {
+        "route_unavailable": "請為每個未算繪鏡頭選擇相容的模型，然後重試。",
+        "no_adjustable_scenes": "所有鏡頭均已算繪或正在處理。請變更目標，或編輯未算繪鏡頭。",
+        "target_out_of_bounds": "目標時間超出所選模型支援的範圍。"
+      },
       "durationOver": "超出目標 {{seconds}} 秒",
       "durationRemaining": "剩餘 {{seconds}} 秒",
       "increaseTarget": "將目標時長增加至 {{seconds}} 秒",

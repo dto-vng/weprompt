@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   proposeStoryboardProvider: vi.fn(),
   updateModelSelectionProvider: vi.fn(),
   updateProjectProvider: vi.fn(),
+  fitStoryboardProvider: vi.fn(),
   deleteProjectProvider: vi.fn(),
   updateSceneProvider: vi.fn(),
   reorderScenesProvider: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('@/common', () => ({
       proposeStoryboard: { provider: mocks.proposeStoryboardProvider },
       updateModelSelection: { provider: mocks.updateModelSelectionProvider },
       updateProject: { provider: mocks.updateProjectProvider },
+      fitStoryboard: { provider: mocks.fitStoryboardProvider },
       deleteProject: { provider: mocks.deleteProjectProvider },
       updateScene: { provider: mocks.updateSceneProvider },
       reorderScenes: { provider: mocks.reorderScenesProvider },
@@ -104,6 +106,12 @@ describe('initCreativeStudioBridge', () => {
         proposeStoryboard: vi.fn(async () => project),
         updateModelSelection: vi.fn(async () => project),
         updateProject: vi.fn(async () => project),
+        fitStoryboard: vi.fn(async () => ({
+          status: 'already_matches' as const,
+          project,
+          changedSceneIds: [] as [],
+          lockedSceneIds: [],
+        })),
         deleteProject: vi.fn(async () => true),
         updateScene: vi.fn(async () => project),
         reorderScenes: vi.fn(async () => project),
@@ -133,6 +141,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.proposeStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.updateModelSelectionProvider).toHaveBeenCalledOnce();
     expect(mocks.updateProjectProvider).toHaveBeenCalledOnce();
+    expect(mocks.fitStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.deleteProjectProvider).toHaveBeenCalledOnce();
     expect(mocks.updateSceneProvider).toHaveBeenCalledOnce();
     expect(mocks.reorderScenesProvider).toHaveBeenCalledOnce();
@@ -236,6 +245,23 @@ describe('initCreativeStudioBridge', () => {
     expect(service.cancelJob).toHaveBeenCalledWith(jobInput);
     expect(service.retryJob).toHaveBeenCalledWith(retryInput);
     expect(service.retryDownload).toHaveBeenCalledWith(jobInput);
+  });
+
+  it('delegates one structured fit request and returns the structured outcome', async () => {
+    const service = dependencies.getService();
+    initCreativeStudioBridge({ getService: () => service });
+    const handler = mocks.fitStoryboardProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const input = {
+      projectId: 'project_1',
+      expectedRevision: 1,
+      catalogVersion: '0123456789abcdef',
+    };
+
+    await expect(handler(input)).resolves.toMatchObject({
+      ok: true,
+      data: { status: 'already_matches', changedSceneIds: [], lockedSceneIds: [] },
+    });
+    expect(service.fitStoryboard).toHaveBeenCalledExactlyOnceWith(input);
   });
 
   it.each([

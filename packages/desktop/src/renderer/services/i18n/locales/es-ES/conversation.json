@@ -928,6 +928,13 @@
       "durationTotal": "Duración del guion gráfico: {{total}} de {{target}} segundos",
       "durationMatches": "La duración de las escenas coincide con el objetivo del proyecto.",
       "durationMismatch": "La duración de las escenas debe coincidir con el objetivo del proyecto antes de la generación por lotes.",
+      "fitToTarget": "Ajustar a {{seconds}} s",
+      "fitUnlockedOnly": "Solo reajusta las tomas sin renderizar.",
+      "fitUnreachable": {
+        "route_unavailable": "Selecciona un modelo compatible para cada toma sin renderizar e inténtalo de nuevo.",
+        "no_adjustable_scenes": "Todas las tomas están renderizadas o activas. Cambia el objetivo o edita una toma sin renderizar.",
+        "target_out_of_bounds": "El objetivo está fuera del intervalo de duración admitido por los modelos seleccionados."
+      },
       "durationOver": "{{seconds}} segundos por encima del objetivo",
       "durationRemaining": "{{seconds}} segundos restantes",
       "increaseTarget": "Aumentar el objetivo a {{seconds}} segundos",

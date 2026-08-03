@@ -929,6 +929,13 @@
       "durationTotal": "Storyboard zamanlaması: {{target}} saniyenin {{total}} saniyesi",
       "durationMatches": "Sahne zamanlaması proje hedefiyle eşleşiyor.",
       "durationMismatch": "Toplu oluşturmadan önce sahne zamanlaması proje hedefiyle eşleşmelidir.",
+      "fitToTarget": "{{seconds}} sn'ye uyarla",
+      "fitUnlockedOnly": "Yalnızca işlenmemiş çekimlerin süresini değiştirir.",
+      "fitUnreachable": {
+        "route_unavailable": "İşlenmemiş her çekim için uyumlu bir model seçip yeniden deneyin.",
+        "no_adjustable_scenes": "Tüm çekimler işlendi veya etkin. Hedefi değiştirin ya da işlenmemiş bir çekimi düzenleyin.",
+        "target_out_of_bounds": "Hedef, seçilen modellerin desteklediği süre aralığının dışında."
+      },
       "durationOver": "Hedefin {{seconds}} saniye üzerindesiniz",
       "durationRemaining": "{{seconds}} saniye kaldı",
       "increaseTarget": "Hedefi {{seconds}} saniyeye çıkar",

@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   StudioCommandResult,
   StudioEditableScene,
+  StudioFitStoryboardOutcome,
   StudioRendererProject,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
@@ -20,6 +21,7 @@ const bridge = vi.hoisted(() => ({
   updateProject: { invoke: vi.fn() },
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
+  fitStoryboard: { invoke: vi.fn() },
 }));
 
 vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
@@ -94,6 +96,14 @@ describe('useStoryboardEditor', () => {
     bridge.updateProject.invoke.mockImplementation(async () => ok(project(3)));
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project(3)));
     bridge.proposeStoryboard.invoke.mockImplementation(async () => ok(project(3)));
+    bridge.fitStoryboard.invoke.mockImplementation(async () =>
+      ok<StudioFitStoryboardOutcome>({
+        status: 'already_matches',
+        project: project(3),
+        changedSceneIds: [],
+        lockedSceneIds: [],
+      })
+    );
   });
 
   afterEach(() => {
@@ -112,6 +122,88 @@ describe('useStoryboardEditor', () => {
     expect(result.current.durationMatchesTarget).toBe(true);
     expect(result.current.hasUnsavedSelectedSceneDraft).toBe(false);
     expect(result.current.selectedSceneSaveState).toBe('saved');
+  });
+
+  it('fits through one serialized atomic intent and never emits per-scene updates', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 10 }), scene('scene-2', { durationSeconds: 8 })], {
+      targetDurationSeconds: 15,
+    });
+    const fitted = project(3, [scene('scene-1', { durationSeconds: 9 }), scene('scene-2', { durationSeconds: 6 })], {
+      targetDurationSeconds: 15,
+    });
+    const outcome: StudioFitStoryboardOutcome = {
+      status: 'applied',
+      project: fitted,
+      changedSceneIds: ['scene-1', 'scene-2'],
+      lockedSceneIds: [],
+    };
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(ok(outcome));
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    await act(async () => {
+      await expect(result.current.fitToTarget('0123456789abcdef')).resolves.toEqual(outcome);
+    });
+
+    expect(bridge.fitStoryboard.invoke).toHaveBeenCalledExactlyOnceWith({
+      projectId: initial.id,
+      expectedRevision: initial.revision,
+      catalogVersion: '0123456789abcdef',
+    });
+    expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+    expect(result.current.project?.revision).toBe(3);
+    expect(result.current.durationMatchesTarget).toBe(true);
+    expect(result.current.latestFitOutcome).toEqual(outcome);
+  });
+
+  it('publishes a structured unreachable outcome after an explicit stale retry', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 18 })], { targetDurationSeconds: 15 });
+    const refreshed = project(3, [scene('scene-1', { durationSeconds: 18 })], { targetDurationSeconds: 15 });
+    const outcome: StudioFitStoryboardOutcome = {
+      status: 'unreachable',
+      reason: 'target_out_of_bounds',
+      project: refreshed,
+      lockedSceneIds: [],
+      minimumTotalSeconds: 4,
+      maximumTotalSeconds: 12,
+    };
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(failed('stale_project')).mockResolvedValueOnce(ok(outcome));
+    const refetch = vi.fn(async () => refreshed);
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch }));
+
+    await act(async () => {
+      await expect(result.current.fitToTarget('0123456789abcdef')).resolves.toBeNull();
+    });
+    expect(result.current.conflict).toMatchObject({ operation: 'fit_duration', code: 'stale_project' });
+    expect(result.current.latestFitOutcome).toBeNull();
+
+    await act(async () => {
+      await expect(result.current.retryConflict()).resolves.toBe(true);
+    });
+    expect(bridge.fitStoryboard.invoke).toHaveBeenNthCalledWith(2, {
+      projectId: refreshed.id,
+      expectedRevision: refreshed.revision,
+      catalogVersion: '0123456789abcdef',
+    });
+    expect(result.current.latestFitOutcome).toEqual(outcome);
+  });
+
+  it('clears the latest structured fit explanation without changing the project', async () => {
+    const initial = project();
+    const outcome: StudioFitStoryboardOutcome = {
+      status: 'unreachable',
+      reason: 'route_unavailable',
+      project: initial,
+      lockedSceneIds: [],
+      unavailableSceneIds: ['scene-1'],
+    };
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(ok(outcome));
+    const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
+
+    await act(async () => void (await result.current.fitToTarget('0123456789abcdef')));
+    act(() => result.current.clearLatestFitOutcome());
+
+    expect(result.current.latestFitOutcome).toBeNull();
+    expect(result.current.project).toEqual(initial);
   });
 
   it('reports saved, dirty, saving, and saved for the selected scene debounce lifecycle', async () => {

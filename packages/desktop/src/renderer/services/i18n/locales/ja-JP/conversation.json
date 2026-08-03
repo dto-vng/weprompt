@@ -927,6 +927,13 @@
       "durationTotal": "ストーリーボードの時間：{{total}} / {{target}} 秒",
       "durationMatches": "シーンの合計時間がプロジェクトの目標と一致しています。",
       "durationMismatch": "一括生成するには、シーンの合計時間をプロジェクトの目標に合わせてください。",
+      "fitToTarget": "{{seconds}}秒に合わせる",
+      "fitUnlockedOnly": "未レンダリングのショットのみ時間を調整します。",
+      "fitUnreachable": {
+        "route_unavailable": "未レンダリングの各ショットに対応モデルを選択して、もう一度お試しください。",
+        "no_adjustable_scenes": "すべてのショットがレンダリング済みまたは処理中です。目標を変更するか、未レンダリングのショットを編集してください。",
+        "target_out_of_bounds": "目標時間が選択したモデルで対応可能な範囲外です。"
+      },
       "durationOver": "目標より{{seconds}}秒超過",
       "durationRemaining": "{{seconds}}秒残り",
       "increaseTarget": "目標を{{seconds}}秒に延長",

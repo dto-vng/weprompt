@@ -933,6 +933,13 @@
       "durationTotal": "Duração do storyboard: {{total}} de {{target}} segundos",
       "durationMatches": "A duração das cenas corresponde ao objetivo do projeto.",
       "durationMismatch": "A duração das cenas deve corresponder ao objetivo do projeto antes da geração em lote.",
+      "fitToTarget": "Ajustar para {{seconds}} s",
+      "fitUnlockedOnly": "Reajusta somente as tomadas não renderizadas.",
+      "fitUnreachable": {
+        "route_unavailable": "Selecione um modelo compatível para cada tomada não renderizada e tente novamente.",
+        "no_adjustable_scenes": "Todas as tomadas estão renderizadas ou ativas. Altere o objetivo ou edite uma tomada não renderizada.",
+        "target_out_of_bounds": "O objetivo está fora do intervalo de duração aceito pelos modelos selecionados."
+      },
       "durationOver": "{{seconds}} segundos acima do objetivo",
       "durationRemaining": "{{seconds}} segundos restantes",
       "increaseTarget": "Aumentar a duração para {{seconds}} segundos",

@@ -8,7 +8,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type { StudioFitStoryboardOutcome, StudioScene } from '@/common/types/project/creativeStudioTypes';
 import type { StudioSceneStatus } from '@renderer/pages/studio/studioReadiness';
 import {
   StoryboardPanel,
@@ -104,6 +104,9 @@ const createProps = (overrides: Partial<StoryboardPanelProps> = {}): StoryboardP
   suggestedExpandedTargetSeconds: 25,
   canAddScene: true,
   mutationPending: false,
+  fitDisabled: false,
+  fitOutcome: null,
+  hasLockedScenes: false,
   sceneStatuses: Object.fromEntries(orderedScenes.map((item) => [item.id, 'ready' satisfies StudioSceneStatus])),
   errorMessageKey: null,
   statusMessageKey: null,
@@ -111,6 +114,7 @@ const createProps = (overrides: Partial<StoryboardPanelProps> = {}): StoryboardP
   onSelectScene: vi.fn(),
   onAddScene: vi.fn(),
   onIncreaseTargetDuration: vi.fn(),
+  onFitToTarget: vi.fn(),
   onRemoveScene: vi.fn(),
   onReorderScenes: vi.fn(),
   onMoveScene: vi.fn(),
@@ -154,6 +158,68 @@ describe('StoryboardPanel', () => {
       <StoryboardPanel {...props} targetDurationSeconds={15} durationTotalSeconds={15} durationMatchesTarget />
     );
     expect(screen.getByText('conversation.creativeStudio.storyboard.durationMatches')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget:15' })).toBeNull();
+  });
+
+  it('offers one fit action only while the full cut mismatches', () => {
+    const props = createProps();
+    render(<StoryboardPanel {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget:20' }));
+
+    expect(props.onFitToTarget).toHaveBeenCalledOnce();
+  });
+
+  it('disables fit for external authorization gates and explains locked shots', () => {
+    const props = createProps({ fitDisabled: true, hasLockedScenes: true });
+    render(<StoryboardPanel {...props} />);
+
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget:20' })
+    ).toBeDisabled();
+    expect(screen.getByText('conversation.creativeStudio.storyboard.fitUnlockedOnly')).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'route_unavailable',
+      {
+        status: 'unreachable',
+        reason: 'route_unavailable',
+        project: {} as never,
+        lockedSceneIds: [],
+        unavailableSceneIds: ['scene-1'],
+      },
+    ],
+    [
+      'no_adjustable_scenes',
+      {
+        status: 'unreachable',
+        reason: 'no_adjustable_scenes',
+        project: {} as never,
+        lockedSceneIds: ['scene-1'],
+        fixedTotalSeconds: 15,
+      },
+    ],
+    [
+      'target_out_of_bounds',
+      {
+        status: 'unreachable',
+        reason: 'target_out_of_bounds',
+        project: {} as never,
+        lockedSceneIds: [],
+        minimumTotalSeconds: 18,
+        maximumTotalSeconds: 24,
+      },
+    ],
+  ] as const)('shows actionable %s fit feedback while leaving the mismatch visible', (_reason, fitOutcome) => {
+    const props = createProps({ fitOutcome: fitOutcome as StudioFitStoryboardOutcome });
+    render(<StoryboardPanel {...props} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      `conversation.creativeStudio.storyboard.fitUnreachable.${fitOutcome.reason}`
+    );
+    expect(screen.getByText('conversation.creativeStudio.storyboard.durationMismatch')).toBeInTheDocument();
   });
 
   it('keeps Add Scene enabled while project duration remains', () => {

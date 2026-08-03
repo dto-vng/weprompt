@@ -35,6 +35,8 @@ import type {
   StudioRetryDownloadRequest,
   StudioRetryJobRequest,
   StudioSubmitScenesRequest,
+  StudioFitStoryboardOutcome,
+  StudioFitStoryboardRequest,
   StudioModelAvailability,
   StudioMediaChoiceRef,
   StudioProviderRef,
@@ -59,6 +61,7 @@ import {
   StudioStoryboardPlannerError,
   type StudioStoryboardPlanner,
 } from '@process/services/creative-studio/planning/storyboardPlanner';
+import { fitStoryboardDurations } from '@process/services/creative-studio/planning/fitStoryboardDurations';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
@@ -113,6 +116,7 @@ export type CreativeStudioService = {
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioRendererProject>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioRendererProject>;
   selectAsset(input: StudioSelectAssetRequest): Promise<StudioRendererProject>;
+  fitStoryboard(input: StudioFitStoryboardRequest): Promise<StudioFitStoryboardOutcome>;
   submitScenes(input: StudioSubmitScenesRequest): Promise<StudioRendererJob[]>;
   cancelJob(input: StudioJobRequest): Promise<StudioRendererJob>;
   retryJob(input: StudioRetryJobRequest): Promise<StudioRendererJob>;
@@ -369,6 +373,12 @@ const assertSubmitScenesInput = (input: StudioSubmitScenesRequest): void => {
     }
     routedSceneIds.add(route.sceneId);
   }
+};
+
+const assertFitStoryboardInput = (input: StudioFitStoryboardRequest): void => {
+  assertSafeId(input.projectId, 'project id');
+  assertExpectedRevision(input.expectedRevision);
+  if (!/^[a-f0-9]{16}$/.test(input.catalogVersion)) throw invalid('Invalid Studio route catalog version');
 };
 
 const batchSceneIsReady = (project: StudioProject, sceneId: string): boolean => {
@@ -853,6 +863,139 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       return notify(
         await deps.store.updateProject(projectId, (project) => ({ ...project, ...update }), expectedRevision)
       );
+    },
+
+    async fitStoryboard(input: StudioFitStoryboardRequest): Promise<StudioFitStoryboardOutcome> {
+      assertFitStoryboardInput(input);
+      const project = await deps.store.getProject(input.projectId);
+      if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+      if (project.revision !== input.expectedRevision) {
+        throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
+      }
+      const built = await buildCatalog(project);
+      if (built.catalog.catalogVersion !== input.catalogVersion) {
+        throw new CreativeStudioServiceError('invalid_route');
+      }
+
+      const lockedByAsset = new Set(
+        Object.values(project.assets)
+          .filter((asset) => asset.sceneId !== null && asset.managedAsset.collection === 'assets')
+          .map((asset) => asset.sceneId!)
+      );
+      const lockedByJob = new Set(
+        Object.values(project.jobs)
+          .filter((job) => NONTERMINAL_JOB_STATUSES.has(job.status))
+          .map((job) => job.sceneId)
+      );
+      const lockedSceneIds = project.sceneOrder.filter(
+        (sceneId) => lockedByAsset.has(sceneId) || lockedByJob.has(sceneId)
+      );
+      const lockedSet = new Set(lockedSceneIds);
+      const adjustableSceneIds = project.sceneOrder.filter((sceneId) => !lockedSet.has(sceneId));
+      const lockedTotalSeconds = lockedSceneIds.reduce(
+        (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
+        0
+      );
+      const rendererProject = toRendererProject(project);
+
+      if (adjustableSceneIds.length === 0) {
+        if (lockedTotalSeconds === project.targetDurationSeconds) {
+          return {
+            status: 'already_matches',
+            project: rendererProject,
+            changedSceneIds: [],
+            lockedSceneIds,
+          };
+        }
+        return {
+          status: 'unreachable',
+          reason: 'no_adjustable_scenes',
+          project: rendererProject,
+          lockedSceneIds,
+          fixedTotalSeconds: lockedTotalSeconds,
+        };
+      }
+
+      const unavailableSceneIds: string[] = [];
+      const durationItems = adjustableSceneIds.flatMap((sceneId) => {
+        const scene = project.scenes[sceneId]!;
+        const selected = project.routing[scene.mediaKind];
+        const route =
+          selected === null
+            ? undefined
+            : built.generation.routes.find(
+                (candidate) =>
+                  candidate.kind === scene.mediaKind &&
+                  mediaRouteMatches(candidate, selected) &&
+                  routeSupportsProject(candidate, project)
+              );
+        if (route === undefined) {
+          unavailableSceneIds.push(sceneId);
+          return [];
+        }
+        return [
+          {
+            sceneId,
+            currentDurationSeconds: scene.durationSeconds,
+            minDurationSeconds: route.constraints.minDurationSeconds,
+            maxDurationSeconds: route.constraints.maxDurationSeconds,
+          },
+        ];
+      });
+      if (unavailableSceneIds.length > 0) {
+        return {
+          status: 'unreachable',
+          reason: 'route_unavailable',
+          project: rendererProject,
+          lockedSceneIds,
+          unavailableSceneIds,
+        };
+      }
+
+      const fitted = fitStoryboardDurations(durationItems, project.targetDurationSeconds - lockedTotalSeconds);
+      if (fitted.status === 'unreachable') {
+        return {
+          status: 'unreachable',
+          reason: 'target_out_of_bounds',
+          project: rendererProject,
+          lockedSceneIds,
+          minimumTotalSeconds: lockedTotalSeconds + fitted.minimumSeconds,
+          maximumTotalSeconds: lockedTotalSeconds + fitted.maximumSeconds,
+        };
+      }
+      const changedSceneIds = fitted.allocations
+        .filter(({ sceneId, durationSeconds }) => project.scenes[sceneId]!.durationSeconds !== durationSeconds)
+        .map(({ sceneId }) => sceneId);
+      if (changedSceneIds.length === 0) {
+        return {
+          status: 'already_matches',
+          project: rendererProject,
+          changedSceneIds: [],
+          lockedSceneIds,
+        };
+      }
+      const allocationBySceneId = new Map(
+        fitted.allocations.map(({ sceneId, durationSeconds }) => [sceneId, durationSeconds])
+      );
+      const updated = await deps.store.updateProject(
+        project.id,
+        (current) => ({
+          ...current,
+          scenes: Object.fromEntries(
+            Object.entries(current.scenes).map(([sceneId, scene]) => {
+              const durationSeconds = allocationBySceneId.get(sceneId);
+              return [sceneId, durationSeconds === undefined ? scene : { ...scene, durationSeconds }];
+            })
+          ),
+        }),
+        input.expectedRevision
+      );
+      return {
+        status: 'applied',
+        project: notify(updated),
+        changedSceneIds,
+        lockedSceneIds,
+      };
     },
 
     async updateModelSelection(input: StudioUpdateModelSelectionRequest): Promise<StudioRendererProject> {

@@ -266,6 +266,13 @@ const studioSubmitScenesSchema = z
       context.addIssue({ code: 'custom', message: 'routes must exactly match sceneIds', path: ['routes'] });
     }
   });
+const studioFitStoryboardSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    catalogVersion: z.string().regex(/^[a-f0-9]{16}$/),
+  })
+  .strict();
 const studioJobRequestSchema = z
   .object({
     projectId: safeIdSchema,
@@ -444,6 +451,7 @@ export const nativeBridgePayloadSchemas = {
   'creative-studio.choose-and-export-assets': z
     .object({ projectId: safeIdSchema, includeReferences: z.boolean() })
     .strict(),
+  'creative-studio.fit-storyboard': studioFitStoryboardSchema,
   'creative-studio.submit-scenes': studioSubmitScenesSchema,
   'creative-studio.cancel-job': studioJobRequestSchema,
   'creative-studio.retry-job': studioJobRequestSchema

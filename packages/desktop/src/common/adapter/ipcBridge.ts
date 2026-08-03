@@ -93,6 +93,8 @@ import type {
   StudioRetryJobRequest,
   StudioSelectAssetRequest,
   StudioSubmitScenesRequest,
+  StudioFitStoryboardOutcome,
+  StudioFitStoryboardRequest,
   StudioUpdateModelSelectionRequest,
   StudioUpdateProjectRequest,
   StudioUpdateSceneRequest,
@@ -1114,6 +1116,9 @@ export const creativeStudio = {
     StudioCommandResult<StudioExportOutcome>,
     StudioChooseAndExportAssetsRequest
   >('creative-studio.choose-and-export-assets'),
+  fitStoryboard: bridge.buildProvider<StudioCommandResult<StudioFitStoryboardOutcome>, StudioFitStoryboardRequest>(
+    'creative-studio.fit-storyboard'
+  ),
   submitScenes: bridge.buildProvider<StudioCommandResult<StudioRendererJob[]>, StudioSubmitScenesRequest>(
     'creative-studio.submit-scenes'
   ),

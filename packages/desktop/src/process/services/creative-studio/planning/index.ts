@@ -27,3 +27,5 @@ export type {
   StudioStoryboardPlannerDeps,
   StudioStoryboardPlannerErrorCode,
 } from './storyboardPlanner';
+export { fitStoryboardDurations } from './fitStoryboardDurations';
+export type { FitStoryboardDurationItem, FitStoryboardDurationsResult } from './fitStoryboardDurations';

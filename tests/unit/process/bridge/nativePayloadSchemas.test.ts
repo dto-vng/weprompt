@@ -158,6 +158,11 @@ const VALID_PAYLOADS = {
     expectedRevision: 1,
   },
   'creative-studio.choose-and-export-assets': { projectId: 'project_1', includeReferences: true },
+  'creative-studio.fit-storyboard': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    catalogVersion: '0123456789abcdef',
+  },
   'creative-studio.submit-scenes': {
     projectId: 'project_1',
     expectedRevision: 1,
@@ -790,6 +795,26 @@ const INVALID_PAYLOADS = [
     'creative-studio.select-asset',
     'asset id traversal',
     { projectId: 'project_1', expectedRevision: 1, sceneId: 'scene_1', assetId: '../../asset_1' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'uppercase catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'ABCDEF0123456789' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'wrong-length catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'abcdef012345678' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'non-hex catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'gggggggggggggggg' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'non-positive expected revision',
+    { projectId: 'project_1', expectedRevision: 0, catalogVersion: '0123456789abcdef' },
   ],
   [
     'creative-studio.submit-scenes',

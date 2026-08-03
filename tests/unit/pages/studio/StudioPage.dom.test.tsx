@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   StudioAsset,
   StudioCommandResult,
+  StudioFitStoryboardOutcome,
   StudioRendererJob,
   StudioRendererProject,
   StudioRouteCatalog,
@@ -29,6 +30,7 @@ const bridge = vi.hoisted(() => ({
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
   chooseAndImportReference: { invoke: vi.fn() },
+  fitStoryboard: { invoke: vi.fn() },
   submitScenes: { invoke: vi.fn() },
   cancelJob: { invoke: vi.fn() },
   retryJob: { invoke: vi.fn() },
@@ -232,6 +234,14 @@ describe('StudioPage and useStudioProject', () => {
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project()));
     bridge.proposeStoryboard.invoke.mockImplementation(async () => ok(project()));
     bridge.chooseAndImportReference.invoke.mockResolvedValue(ok({ status: 'cancelled' }));
+    bridge.fitStoryboard.invoke.mockResolvedValue(
+      ok<StudioFitStoryboardOutcome>({
+        status: 'already_matches',
+        project: project(),
+        changedSceneIds: [],
+        lockedSceneIds: [],
+      })
+    );
     bridge.submitScenes.invoke.mockResolvedValue(ok([]));
     bridge.cancelJob.invoke.mockResolvedValue(failure());
     bridge.retryJob.invoke.mockResolvedValue(failure());
@@ -665,6 +675,148 @@ describe('StudioPage and useStudioProject', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
+  });
+
+  it('fits 18 seconds to 15 with one atomic command, no scene updates, and opens both batch gates', async () => {
+    const opening = scene({ id: 'scene-1', durationSeconds: 6 });
+    const reveal = scene({ id: 'scene-2', title: 'Reveal', durationSeconds: 6 });
+    const closing = scene({ id: 'scene-3', title: 'Closing', durationSeconds: 6 });
+    const initial = project('project-1', {
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id, reveal.id, closing.id],
+      scenes: { [opening.id]: opening, [reveal.id]: reveal, [closing.id]: closing },
+    });
+    const fitted = project('project-1', {
+      revision: 3,
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id, reveal.id, closing.id],
+      scenes: {
+        [opening.id]: { ...opening, durationSeconds: 5 },
+        [reveal.id]: { ...reveal, durationSeconds: 5 },
+        [closing.id]: { ...closing, durationSeconds: 5 },
+      },
+    });
+    bridge.getProject.invoke.mockResolvedValue(ok(initial));
+    bridge.listRoutes.invoke.mockResolvedValue(ok({ ...routesWithImage(), catalogVersion: '0123456789abcdef' }));
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(
+      ok<StudioFitStoryboardOutcome>({
+        status: 'applied',
+        project: fitted,
+        changedSceneIds: ['scene-1', 'scene-2', 'scene-3'],
+        lockedSceneIds: [],
+      })
+    );
+    renderRoute();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' }));
+
+    await waitFor(() =>
+      expect(bridge.fitStoryboard.invoke).toHaveBeenCalledExactlyOnceWith({
+        projectId: 'project-1',
+        expectedRevision: 2,
+        catalogVersion: '0123456789abcdef',
+      })
+    );
+    expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' })).toBeNull()
+    );
+    const { headerAction, lowerAction } = await findBatchActions();
+    expect(headerAction).toBeEnabled();
+    expect(lowerAction).toBeEnabled();
+  });
+
+  it('keeps the batch gate closed and explains an unreachable fit', async () => {
+    const opening = scene({ durationSeconds: 18 });
+    const initial = project('project-1', {
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id],
+      scenes: { [opening.id]: opening },
+    });
+    bridge.getProject.invoke.mockResolvedValue(ok(initial));
+    bridge.listRoutes.invoke.mockResolvedValue(ok({ ...routesWithImage(), catalogVersion: '0123456789abcdef' }));
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(
+      ok<StudioFitStoryboardOutcome>({
+        status: 'unreachable',
+        reason: 'target_out_of_bounds',
+        project: initial,
+        lockedSceneIds: [],
+        minimumTotalSeconds: 1,
+        maximumTotalSeconds: 12,
+      })
+    );
+    renderRoute();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' }));
+
+    expect(
+      await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
+    ).toBeInTheDocument();
+    const { headerAction, lowerAction } = await findBatchActions();
+    expect(headerAction).toBeDisabled();
+    expect(lowerAction).toBeDisabled();
+  });
+
+  it('keeps fit disabled for the entire reference import mutation', async () => {
+    const opening = scene({ durationSeconds: 10 });
+    const initial = project('project-1', {
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id],
+      scenes: { [opening.id]: opening },
+    });
+    let resolveImport!: (result: StudioCommandResult<{ status: 'cancelled' }>) => void;
+    bridge.getProject.invoke.mockResolvedValue(ok(initial));
+    bridge.listRoutes.invoke.mockResolvedValue(ok({ ...routesWithImage(), catalogVersion: '0123456789abcdef' }));
+    bridge.chooseAndImportReference.invoke.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveImport = resolve;
+      })
+    );
+    renderRoute();
+    const fit = await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' });
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.preview.importReference',
+      })
+    );
+    await waitFor(() => expect(bridge.chooseAndImportReference.invoke).toHaveBeenCalledOnce());
+    expect(fit).toBeDisabled();
+
+    resolveImport(ok({ status: 'cancelled' }));
+    await waitFor(() => expect(fit).toBeEnabled());
+  });
+
+  it('keeps fit disabled for the entire model-selection mutation', async () => {
+    const opening = scene({ durationSeconds: 10 });
+    const initial = project('project-1', {
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id],
+      scenes: { [opening.id]: opening },
+    });
+    const alternate = imageRoute({
+      choiceId: 'choice_image_alternate',
+      providerId: 'provider-image-alternate',
+      providerName: 'Alternate image provider',
+      model: 'alternate-image-model',
+    });
+    const catalog = routesWithImage();
+    catalog.catalogVersion = '0123456789abcdef';
+    catalog.image.options.push(alternate);
+    const selection = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.getProject.invoke.mockResolvedValue(ok(initial));
+    bridge.listRoutes.invoke.mockResolvedValue(ok(catalog));
+    bridge.updateModelSelection.invoke.mockReturnValueOnce(selection.promise);
+    renderRoute();
+    const fit = await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' });
+
+    fireEvent.click(screen.getByLabelText('conversation.creativeStudio.models.image'));
+    fireEvent.click(await screen.findByText(/alternate-image-model/));
+    await waitFor(() => expect(bridge.updateModelSelection.invoke).toHaveBeenCalledOnce());
+    expect(fit).toBeDisabled();
+
+    selection.resolve(ok(project('project-1', { revision: 3 })));
+    await waitFor(() => expect(fit).toBeEnabled());
   });
 
   it('opens a canonical batch review from the header and submits every exact scene route only after confirmation', async () => {

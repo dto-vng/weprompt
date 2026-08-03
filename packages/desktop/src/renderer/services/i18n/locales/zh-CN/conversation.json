@@ -927,6 +927,13 @@
       "durationTotal": "故事板时长：{{total}} / {{target}} 秒",
       "durationMatches": "场景总时长与项目目标一致。",
       "durationMismatch": "批量生成前，场景总时长必须与项目目标一致。",
+      "fitToTarget": "调整为 {{seconds}} 秒",
+      "fitUnlockedOnly": "仅调整未渲染镜头的时长。",
+      "fitUnreachable": {
+        "route_unavailable": "请为每个未渲染镜头选择兼容的模型，然后重试。",
+        "no_adjustable_scenes": "所有镜头均已渲染或正在处理。请更改目标，或编辑未渲染镜头。",
+        "target_out_of_bounds": "目标时长超出所选模型支持的范围。"
+      },
       "durationOver": "超出目标 {{seconds}} 秒",
       "durationRemaining": "剩余 {{seconds}} 秒",
       "increaseTarget": "将目标时长增加到 {{seconds}} 秒",

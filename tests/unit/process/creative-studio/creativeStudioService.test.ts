@@ -1455,6 +1455,7 @@ describe('CreativeStudioService', () => {
       options: {
         models?: StudioTextModelOption[];
         routes?: StudioRouteCatalogEntry[];
+        projectInput?: Partial<CreateStudioProjectInput>;
       } = {}
     ) => {
       const store = createCreativeStudioStore({ rootDir });
@@ -1492,7 +1493,7 @@ describe('CreativeStudioService', () => {
           return () => `draft_scene_${++index}`;
         })(),
       } as unknown as Parameters<typeof createCreativeStudioService>[0]) as SelectionService;
-      const project = await catalogService.createProject(makeInput());
+      const project = await catalogService.createProject(makeInput(options.projectInput));
       return {
         store,
         service: catalogService,
@@ -1578,6 +1579,378 @@ describe('CreativeStudioService', () => {
         });
       return { ...harness, project, submit };
     };
+
+    const createFitHarness = async (options: {
+      targetDurationSeconds?: number;
+      scenes: Array<{ id: string; durationSeconds: number; mediaKind?: 'image' | 'video' }>;
+      routes?: Array<ReturnType<typeof routeOption>>;
+      selectImage?: boolean;
+      selectVideo?: boolean;
+      mutate?: (project: StudioProject) => void;
+    }) => {
+      const routes = options.routes ?? [routeOption('image'), routeOption('video')];
+      const harness = await createCatalogHarness({
+        routes,
+        projectInput: { targetDurationSeconds: options.targetDurationSeconds ?? 15 },
+      });
+      const canonical = await harness.store.updateProject(harness.project.id, (current) => {
+        const scenes = Object.fromEntries(
+          options.scenes.map(({ id, durationSeconds, mediaKind = 'video' }) => [
+            id,
+            {
+              ...makeScene(id, durationSeconds),
+              id,
+              mediaKind,
+              selectedAssetId: null,
+              assetIds: [],
+              jobIds: [],
+              reviewState: 'draft' as const,
+            },
+          ])
+        );
+        const imageRoute = routes.find((route) => route.kind === 'image');
+        const videoRoute = routes.find((route) => route.kind === 'video');
+        const next: StudioProject = {
+          ...current,
+          sceneOrder: options.scenes.map(({ id }) => id),
+          scenes,
+          routing: {
+            ...current.routing,
+            image:
+              options.selectImage === false || imageRoute === undefined
+                ? null
+                : {
+                    providerId: imageRoute.providerId,
+                    adapterId: imageRoute.adapterId,
+                    model: imageRoute.model,
+                  },
+            video:
+              options.selectVideo === false || videoRoute === undefined
+                ? null
+                : {
+                    providerId: videoRoute.providerId,
+                    adapterId: videoRoute.adapterId,
+                    model: videoRoute.model,
+                  },
+          },
+        };
+        options.mutate?.(next);
+        return next;
+      });
+      const catalog = await harness.service.listRoutes({ projectId: canonical.id });
+      harness.listModels.mockClear();
+      harness.listGenerationRoutes.mockClear();
+      onProjectUpdated.mockClear();
+      return {
+        ...harness,
+        canonical,
+        catalog,
+        fit: (overrides: Partial<{ expectedRevision: number; catalogVersion: string }> = {}) =>
+          harness.service.fitStoryboard({
+            projectId: canonical.id,
+            expectedRevision: overrides.expectedRevision ?? canonical.revision,
+            catalogVersion: overrides.catalogVersion ?? catalog.catalogVersion,
+          }),
+      };
+    };
+
+    describe('atomic route-aware duration fitting', () => {
+      it('uses fresh independent image and video route bounds and writes once', async () => {
+        const videoRoute = routeOption('video', {
+          constraints: {
+            ...routeOption('video').constraints,
+            minDurationSeconds: 4,
+            maxDurationSeconds: 12,
+          },
+        });
+        const imageRoute = routeOption('image', {
+          constraints: {
+            ...routeOption('image').constraints,
+            minDurationSeconds: 1,
+            maxDurationSeconds: 8,
+          },
+        });
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'video_scene', durationSeconds: 10 },
+            { id: 'image_scene', durationSeconds: 8, mediaKind: 'image' },
+          ],
+          routes: [imageRoute, videoRoute],
+        });
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        const outcome = await harness.fit();
+
+        expect(outcome).toMatchObject({
+          status: 'applied',
+          changedSceneIds: ['image_scene'],
+          lockedSceneIds: [],
+          project: {
+            revision: harness.canonical.revision + 1,
+            scenes: {
+              video_scene: { durationSeconds: 10 },
+              image_scene: { durationSeconds: 5 },
+            },
+          },
+        });
+        expect(updateProject).toHaveBeenCalledOnce();
+        expect(onProjectUpdated).toHaveBeenCalledExactlyOnceWith(harness.canonical.id);
+      });
+
+      it('returns route_unavailable in storyboard order without writing', async () => {
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'video_scene', durationSeconds: 9 },
+            { id: 'image_scene', durationSeconds: 9, mediaKind: 'image' },
+          ],
+          selectImage: false,
+          selectVideo: false,
+        });
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'route_unavailable',
+          unavailableSceneIds: ['video_scene', 'image_scene'],
+        });
+        expect(updateProject).not.toHaveBeenCalled();
+        expect(onProjectUpdated).not.toHaveBeenCalled();
+      });
+
+      it('does not require a route for a locked scene but still reports an adjustable missing route', async () => {
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'locked_scene', durationSeconds: 10 },
+            { id: 'adjustable_scene', durationSeconds: 8 },
+          ],
+          selectVideo: false,
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'route_unavailable',
+          lockedSceneIds: ['locked_scene'],
+          unavailableSceneIds: ['adjustable_scene'],
+        });
+      });
+
+      it('includes locked duration in the full-project bounds', async () => {
+        const bounded = routeOption('video', {
+          constraints: {
+            ...routeOption('video').constraints,
+            minDurationSeconds: 4,
+            maxDurationSeconds: 8,
+          },
+        });
+        const harness = await createFitHarness({
+          targetDurationSeconds: 20,
+          scenes: [
+            { id: 'locked_scene', durationSeconds: 10 },
+            { id: 'adjustable_scene', durationSeconds: 8 },
+          ],
+          routes: [bounded],
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'target_out_of_bounds',
+          lockedSceneIds: ['locked_scene'],
+          minimumTotalSeconds: 14,
+          maximumTotalSeconds: 18,
+        });
+      });
+
+      it.each(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention'] as const)(
+        'locks exactly the active %s job status',
+        async (status) => {
+          const harness = await createFitHarness({
+            scenes: [
+              { id: 'scene_1', durationSeconds: 10 },
+              { id: 'scene_2', durationSeconds: 8 },
+            ],
+            mutate: (project) => {
+              const job = makeCanonicalJob(project, status);
+              project.jobs[job.id] = job;
+              project.scenes.scene_1!.jobIds = [job.id];
+            },
+          });
+
+          await expect(harness.fit()).resolves.toMatchObject({
+            status: 'applied',
+            lockedSceneIds: ['scene_1'],
+            changedSceneIds: ['scene_2'],
+            project: { scenes: { scene_1: { durationSeconds: 10 }, scene_2: { durationSeconds: 5 } } },
+          });
+        }
+      );
+
+      it.each(['succeeded', 'failed', 'cancelled'] as const)('does not lock terminal %s jobs', async (status) => {
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'scene_1', durationSeconds: 10 },
+            { id: 'scene_2', durationSeconds: 8 },
+          ],
+          mutate: (project) => {
+            const job = makeCanonicalJob(project, status);
+            project.jobs[job.id] = job;
+            project.scenes.scene_1!.jobIds = [job.id];
+          },
+        });
+
+        const outcome = await harness.fit();
+
+        expect(outcome).toMatchObject({ status: 'applied', lockedSceneIds: [] });
+        if (outcome.status === 'applied') expect(outcome.changedSceneIds).toContain('scene_1');
+      });
+
+      it.each([
+        ['assets', false, true],
+        ['assets', true, true],
+        ['imports', true, false],
+        ['thumbnails', true, false],
+      ] as const)('treats %s ownership with selected=%s as locked=%s', async (collection, selected, locked) => {
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'scene_1', durationSeconds: 10 },
+            { id: 'scene_2', durationSeconds: 8 },
+          ],
+          mutate: (project) => {
+            const asset = {
+              ...makeGeneratedAsset(project),
+              id: 'owned_asset',
+              sceneId: 'scene_1',
+              managedAsset: { collection, fileName: 'owned.bin' },
+            };
+            project.assets[asset.id] = asset;
+            project.scenes.scene_1!.assetIds = [asset.id];
+            project.scenes.scene_1!.selectedAssetId = selected ? asset.id : null;
+          },
+        });
+
+        const outcome = await harness.fit();
+
+        expect(outcome.lockedSceneIds.includes('scene_1')).toBe(locked);
+      });
+
+      it('returns already_matches for a fully locked matching cut without any write or notification', async () => {
+        const harness = await createFitHarness({
+          targetDurationSeconds: 15,
+          scenes: [{ id: 'locked_scene', durationSeconds: 15 }],
+          selectVideo: false,
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+        const before = structuredClone((await harness.store.getProject(harness.canonical.id))!);
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'already_matches',
+          changedSceneIds: [],
+          lockedSceneIds: ['locked_scene'],
+          project: { revision: before.revision, updatedAt: before.updatedAt },
+        });
+        expect(updateProject).not.toHaveBeenCalled();
+        expect(onProjectUpdated).not.toHaveBeenCalled();
+        await expect(harness.store.getProject(before.id)).resolves.toEqual(before);
+      });
+
+      it('returns no_adjustable_scenes when a fully locked cut mismatches', async () => {
+        const harness = await createFitHarness({
+          targetDurationSeconds: 15,
+          scenes: [{ id: 'locked_scene', durationSeconds: 14 }],
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'no_adjustable_scenes',
+          fixedTotalSeconds: 14,
+          lockedSceneIds: ['locked_scene'],
+        });
+      });
+
+      it('normalizes an already-on-target scene that violates its selected route bounds', async () => {
+        const bounded = routeOption('video', {
+          constraints: {
+            ...routeOption('video').constraints,
+            minDurationSeconds: 3,
+            maxDurationSeconds: 10,
+          },
+        });
+        const harness = await createFitHarness({
+          targetDurationSeconds: 8,
+          scenes: [
+            { id: 'invalid_scene', durationSeconds: 1 },
+            { id: 'valid_scene', durationSeconds: 7 },
+          ],
+          routes: [bounded],
+        });
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'applied',
+          project: { scenes: { invalid_scene: { durationSeconds: 3 }, valid_scene: { durationSeconds: 5 } } },
+        });
+      });
+
+      it('rejects stale revisions and a compare-and-swap race without a partial duration write', async () => {
+        const staleHarness = await createFitHarness({
+          scenes: [
+            { id: 'scene_1', durationSeconds: 10 },
+            { id: 'scene_2', durationSeconds: 8 },
+          ],
+        });
+        await expect(staleHarness.fit({ expectedRevision: staleHarness.canonical.revision - 1 })).rejects.toMatchObject(
+          {
+            code: 'stale_project',
+          }
+        );
+
+        const originalUpdate = staleHarness.store.updateProject.bind(staleHarness.store);
+        vi.spyOn(staleHarness.store, 'updateProject').mockImplementationOnce(async (projectId, update, revision) => {
+          await originalUpdate(projectId, (current) => ({ ...current, brief: 'Concurrent edit' }), revision);
+          return originalUpdate(projectId, update, revision);
+        });
+        await expect(staleHarness.fit()).rejects.toMatchObject({ code: 'stale_project' });
+        const persisted = (await staleHarness.store.getProject(staleHarness.canonical.id))!;
+        expect(persisted.brief).toBe('Concurrent edit');
+        expect(persisted.sceneOrder.map((sceneId) => persisted.scenes[sceneId]!.durationSeconds)).toEqual([10, 8]);
+      });
+
+      it('rejects stale route catalogs and malformed versions before writing', async () => {
+        const harness = await createFitHarness({
+          scenes: [
+            { id: 'scene_1', durationSeconds: 10 },
+            { id: 'scene_2', durationSeconds: 8 },
+          ],
+        });
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        await expect(harness.fit({ catalogVersion: '0000000000000000' })).rejects.toMatchObject({
+          code: 'invalid_route',
+        });
+        for (const catalogVersion of ['ABCDEF0123456789', 'abcdef012345678', 'gggggggggggggggg']) {
+          await expect(harness.fit({ catalogVersion })).rejects.toMatchObject({ code: 'invalid_payload' });
+        }
+        expect(updateProject).not.toHaveBeenCalled();
+      });
+    });
 
     const expectBatchRejectedBeforeCatalog = async (
       harness: Awaited<ReturnType<typeof createVideoSubmissionHarness>>

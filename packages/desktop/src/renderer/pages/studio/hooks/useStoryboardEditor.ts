@@ -9,6 +9,7 @@ import type {
   StudioCommandErrorCode,
   StudioCommandResult,
   StudioEditableScene,
+  StudioFitStoryboardOutcome,
   StudioRendererProject,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
@@ -28,6 +29,7 @@ export type StoryboardEditorOperation =
   | 'remove_scene'
   | 'reorder_scenes'
   | 'update_target'
+  | 'fit_duration'
   | 'draft_storyboard';
 
 export type StoryboardEditorIssue = {
@@ -74,6 +76,9 @@ export type UseStoryboardEditorResult = {
   remainingDurationSeconds: number;
   suggestedExpandedTargetSeconds: number | null;
   increaseTargetDuration: () => Promise<boolean>;
+  fitToTarget: (catalogVersion: string) => Promise<StudioFitStoryboardOutcome | null>;
+  latestFitOutcome: StudioFitStoryboardOutcome | null;
+  clearLatestFitOutcome: () => void;
   mutationPending: boolean;
   error: StoryboardEditorIssue | null;
   clearError: () => void;
@@ -178,6 +183,7 @@ export const useStoryboardEditor = ({
   const [error, setError] = useState<StoryboardEditorIssue | null>(null);
   const [conflict, setConflict] = useState<StoryboardEditorConflict | null>(null);
   const [drafting, setDrafting] = useState(false);
+  const [latestFitOutcome, setLatestFitOutcome] = useState<StudioFitStoryboardOutcome | null>(null);
   const [activeSaveIntent, setActiveSaveIntent] = useState<ActiveSaveIntent | null>(null);
 
   const mountedRef = useRef(true);
@@ -254,6 +260,7 @@ export const useStoryboardEditor = ({
       setConflict(null);
       setError(null);
       setDrafting(false);
+      setLatestFitOutcome(null);
       setActiveSaveIntent(null);
     }
   }, [discardPausedIntents]);
@@ -823,6 +830,32 @@ export const useStoryboardEditor = ({
     });
   }, [enqueueIntent, suggestedExpandedTargetSeconds]);
 
+  const fitToTarget = useCallback(
+    async (catalogVersion: string): Promise<StudioFitStoryboardOutcome | null> => {
+      if (projectRef.current === null) return null;
+      if (mountedRef.current) setLatestFitOutcome(null);
+      let immediateOutcome: StudioFitStoryboardOutcome | null = null;
+      const accepted = await enqueueIntent({
+        operation: 'fit_duration',
+        invoke: async (canonical) => {
+          const result = await ipcBridge.creativeStudio.fitStoryboard.invoke({
+            projectId: canonical.id,
+            expectedRevision: canonical.revision,
+            catalogVersion,
+          });
+          if (result.ok === false) return result;
+          immediateOutcome = result.data;
+          if (mountedRef.current) setLatestFitOutcome(result.data);
+          return { ok: true, data: result.data.project };
+        },
+      });
+      return accepted ? immediateOutcome : null;
+    },
+    [enqueueIntent]
+  );
+
+  const clearLatestFitOutcome = useCallback(() => setLatestFitOutcome(null), []);
+
   const removeScene = useCallback(
     async (sceneId: string): Promise<boolean> => {
       const current = projectRef.current;
@@ -995,6 +1028,9 @@ export const useStoryboardEditor = ({
     remainingDurationSeconds,
     suggestedExpandedTargetSeconds,
     increaseTargetDuration,
+    fitToTarget,
+    latestFitOutcome,
+    clearLatestFitOutcome,
     mutationPending: mutationCount > 0,
     error,
     clearError,

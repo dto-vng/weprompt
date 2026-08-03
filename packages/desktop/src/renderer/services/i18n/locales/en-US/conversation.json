@@ -783,6 +783,13 @@
       "durationTotal": "Storyboard timing: {{total}} of {{target}} seconds",
       "durationMatches": "Scene timing matches the project target.",
       "durationMismatch": "Scene timing must match the project target before batch generation.",
+      "fitToTarget": "Fit to {{seconds}}s",
+      "fitUnlockedOnly": "Retimes unrendered shots only.",
+      "fitUnreachable": {
+        "route_unavailable": "Select a compatible model for every unrendered shot, then try again.",
+        "no_adjustable_scenes": "All shots are rendered or active. Change the target or edit an unrendered shot.",
+        "target_out_of_bounds": "The target is outside the supported duration range for the selected models."
+      },
       "durationOver": "{{seconds}} seconds over target",
       "durationRemaining": "{{seconds}} seconds remaining",
       "increaseTarget": "Increase target to {{seconds}} seconds",

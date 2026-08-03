@@ -438,6 +438,47 @@ export type StudioSubmitScenesRequest = StudioProjectRequest & {
   catalogVersion: string;
 };
 
+export type StudioFitStoryboardRequest = StudioProjectRequest & {
+  expectedRevision: number;
+  catalogVersion: string;
+};
+
+export type StudioFitStoryboardOutcome =
+  | {
+      status: 'applied';
+      project: StudioRendererProject;
+      changedSceneIds: string[];
+      lockedSceneIds: string[];
+    }
+  | {
+      status: 'already_matches';
+      project: StudioRendererProject;
+      changedSceneIds: [];
+      lockedSceneIds: string[];
+    }
+  | {
+      status: 'unreachable';
+      reason: 'route_unavailable';
+      project: StudioRendererProject;
+      lockedSceneIds: string[];
+      unavailableSceneIds: string[];
+    }
+  | {
+      status: 'unreachable';
+      reason: 'no_adjustable_scenes';
+      project: StudioRendererProject;
+      lockedSceneIds: string[];
+      fixedTotalSeconds: number;
+    }
+  | {
+      status: 'unreachable';
+      reason: 'target_out_of_bounds';
+      project: StudioRendererProject;
+      lockedSceneIds: string[];
+      minimumTotalSeconds: number;
+      maximumTotalSeconds: number;
+    };
+
 export type StudioChooseAndImportReferenceRequest = StudioProjectRequest & {
   sceneId?: string;
   expectedRevision: number;
@@ -484,6 +525,7 @@ export type StudioDesktopApi = {
   ): Promise<StudioCommandResult<StudioImportOutcome>>;
   selectVariation(input: StudioSelectVariationRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   submitScenes(input: StudioSubmitScenesRequest): Promise<StudioCommandResult<StudioRendererJob[]>>;
+  fitStoryboard(input: StudioFitStoryboardRequest): Promise<StudioCommandResult<StudioFitStoryboardOutcome>>;
   cancelJob(input: StudioJobRequest): Promise<StudioCommandResult<StudioRendererJob>>;
   retryJob(input: StudioRetryJobRequest): Promise<StudioCommandResult<StudioRendererJob>>;
   retryDownload(input: StudioRetryDownloadRequest): Promise<StudioCommandResult<StudioRendererJob>>;

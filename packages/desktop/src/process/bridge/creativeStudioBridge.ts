@@ -141,6 +141,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
       return toCommandError(error);
     }
   });
+  ipcBridge.creativeStudio.fitStoryboard.provider((input) =>
+    command(() => dependencies.getService().fitStoryboard(input))
+  );
   ipcBridge.creativeStudio.submitScenes.provider((input) =>
     command(() => dependencies.getService().submitScenes(input))
   );

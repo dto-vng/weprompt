@@ -928,6 +928,13 @@
       "durationTotal": "Storyboard-Timing: {{total}} von {{target}} Sekunden",
       "durationMatches": "Das Szenen-Timing entspricht dem Projektziel.",
       "durationMismatch": "Das Szenen-Timing muss vor der Stapelgenerierung dem Projektziel entsprechen.",
+      "fitToTarget": "Auf {{seconds}} s anpassen",
+      "fitUnlockedOnly": "Passt nur nicht gerenderte Einstellungen zeitlich an.",
+      "fitUnreachable": {
+        "route_unavailable": "Wähle für jede nicht gerenderte Einstellung ein kompatibles Modell aus und versuche es erneut.",
+        "no_adjustable_scenes": "Alle Einstellungen sind gerendert oder aktiv. Ändere das Ziel oder bearbeite eine nicht gerenderte Einstellung.",
+        "target_out_of_bounds": "Das Ziel liegt außerhalb des unterstützten Dauerbereichs der ausgewählten Modelle."
+      },
       "durationOver": "{{seconds}} Sekunden über dem Ziel",
       "durationRemaining": "{{seconds}} Sekunden verbleibend",
       "increaseTarget": "Zieldauer auf {{seconds}} Sekunden erhöhen",
