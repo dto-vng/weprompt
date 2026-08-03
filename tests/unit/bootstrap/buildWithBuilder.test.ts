@@ -5,6 +5,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   linkSync,
@@ -282,6 +283,72 @@ childProcess.execSync = function mockedExecSync(command) {
     }
   });
 
+  it('rejects skip-vite for a stale template inventory cache', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
+    const outDir = resolve(repoRoot, 'out');
+    const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}`);
+    const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-stale-template-inventory-test-'));
+    const hookPath = join(tempDir, 'hook.cjs');
+
+    writeFileSync(
+      hookPath,
+      `
+const childProcess = require('node:child_process');
+childProcess.execSync = function mockedExecSync() {
+  return Buffer.from('');
+};
+`,
+      'utf8'
+    );
+
+    let movedExistingOut = false;
+    try {
+      if (existsSync(outDir)) {
+        renameSync(outDir, backupOutDir);
+        movedExistingOut = true;
+      }
+      mkdirSync(resolve(outDir, 'main'), { recursive: true });
+      mkdirSync(resolve(outDir, 'preload'), { recursive: true });
+      mkdirSync(resolve(outDir, 'renderer/assets'), { recursive: true });
+      const staleManifest = `${JSON.stringify(
+        [{ id: 'legacy-template', format: 'html', packagedReferenceFile: null }],
+        null,
+        2
+      )}\n`;
+      const staleDigest = createHash('sha256').update(staleManifest).digest('hex');
+      writeFileSync(resolve(outDir, 'main/index.js'), `const staleTemplateInventory = ${staleManifest};\n`, 'utf8');
+      writeFileSync(resolve(outDir, 'main/presentation-template-inventory.sha256'), `${staleDigest}\n`, 'utf8');
+      writeFileSync(resolve(outDir, 'preload/index.js'), '', 'utf8');
+      writeFileSync(resolve(outDir, 'renderer/assets/index-test.js'), '', 'utf8');
+      writeFileSync(
+        resolve(outDir, 'renderer/index.html'),
+        '<!doctype html><html><body><div id="root"></div><script type="module" src="./assets/index-test.js"></script></body></html>\n',
+        'utf8'
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        ['scripts/build-with-builder.js', 'x64', '--skip-vite', '--pack-only'],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+          },
+        }
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr + result.stdout).toMatch(/presentation template inventory/i);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      if (movedExistingOut) {
+        renameSync(backupOutDir, outDir);
+      }
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('releases the NSIS output directory before any update repair or uninstall work', () => {
     const script = readFileSync(resolve(repoRoot, 'resources/windows/installer-update-verify.nsh'), 'utf8');
     const preInit = script.match(/!macro AIONUI_INSTALLER_PREINIT([\s\S]*?)!macroend/)?.[1];
@@ -479,6 +546,7 @@ childProcess.execSync = function mockedExecSync(command) {
         hookPath,
         `
 const childProcess = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const Module = require('node:module');
 const path = require('node:path');
@@ -534,6 +602,14 @@ childProcess.execSync = function mockedExecSync(command) {
   }
   if (commandText.includes('electron-vite build')) {
     ensurePlaceholder('out/main/index.js');
+    const templateInventory = fs.readFileSync(
+      path.join(process.cwd(), 'packages/desktop/resources/presentation-templates/manifest.json')
+    );
+    const templateInventoryDigest = crypto.createHash('sha256').update(templateInventory).digest('hex');
+    fs.writeFileSync(
+      path.join(process.cwd(), 'out/main/presentation-template-inventory.sha256'),
+      templateInventoryDigest + '\\n'
+    );
     ensurePlaceholder('out/preload/index.js');
     ensurePlaceholder('out/renderer/assets/index-test.js');
     ensurePlaceholder('out/renderer/assets/index-test.css');

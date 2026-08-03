@@ -4,6 +4,8 @@ const path = require('path');
 const SUPPORTED_FORMATS = new Set(['html', 'pptx', 'docx']);
 const ENTRY_KEYS = ['format', 'id', 'packagedReferenceFile'];
 const TEMPLATE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PACKAGED_REFERENCE_FILE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:pptx|docx)$/;
+const WINDOWS_RESERVED_BASENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/;
 
 function describeEntry(index, id) {
   return `Presentation template inventory entry ${index}${id ? ` (${id})` : ''}`;
@@ -32,6 +34,20 @@ function validatePresentationTemplateInventory(value, sourceLabel = 'inventory')
 
   const ids = new Set();
   const packagedFiles = new Set();
+  for (const candidate of value) {
+    if (!isPlainObject(candidate)) continue;
+    const { format, packagedReferenceFile } = candidate;
+    if (format === 'html' || typeof packagedReferenceFile !== 'string') continue;
+
+    const portableFileKey = packagedReferenceFile.toLowerCase();
+    if (packagedFiles.has(portableFileKey)) {
+      throw new Error(
+        `Duplicate packaged reference file in presentation template ${sourceLabel}: ${packagedReferenceFile}`
+      );
+    }
+    packagedFiles.add(portableFileKey);
+  }
+
   const inventory = value.map((candidate, index) => {
     if (!isPlainObject(candidate)) {
       throw new Error(`${describeEntry(index)} must be an object`);
@@ -63,15 +79,17 @@ function validatePresentationTemplateInventory(value, sourceLabel = 'inventory')
       if (!isSafeBasename(packagedReferenceFile)) {
         throw new Error(`${describeEntry(index, id)} packagedReferenceFile must be a safe basename`);
       }
+      if (!PACKAGED_REFERENCE_FILE_PATTERN.test(packagedReferenceFile)) {
+        throw new Error(
+          `${describeEntry(index, id)} packagedReferenceFile must be a lowercase ASCII kebab-case basename`
+        );
+      }
+      if (WINDOWS_RESERVED_BASENAME_PATTERN.test(path.parse(packagedReferenceFile).name)) {
+        throw new Error(`${describeEntry(index, id)} packagedReferenceFile must not use a reserved Windows basename`);
+      }
       if (path.extname(packagedReferenceFile) !== `.${format}`) {
         throw new Error(`${describeEntry(index, id)} packagedReferenceFile must use the .${format} extension`);
       }
-      if (packagedFiles.has(packagedReferenceFile)) {
-        throw new Error(
-          `Duplicate packaged reference file in presentation template ${sourceLabel}: ${packagedReferenceFile}`
-        );
-      }
-      packagedFiles.add(packagedReferenceFile);
     }
 
     return Object.freeze({ id, format, packagedReferenceFile });

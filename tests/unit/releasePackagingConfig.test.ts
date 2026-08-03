@@ -151,6 +151,14 @@ describe('release packaging configuration', () => {
         message: /duplicate packaged reference file/i,
       },
       {
+        caseName: 'duplicate packaged files that differ only by case',
+        inventory: [
+          { id: 'first', format: 'pptx', packagedReferenceFile: 'shared.pptx' },
+          { id: 'second', format: 'pptx', packagedReferenceFile: 'SHARED.pptx' },
+        ],
+        message: /duplicate packaged reference file/i,
+      },
+      {
         caseName: 'a PPTX entry with a DOCX extension',
         inventory: [{ id: 'wrong-extension', format: 'pptx', packagedReferenceFile: 'wrong-extension.docx' }],
         message: /must use the \.pptx extension/i,
@@ -191,6 +199,40 @@ describe('release packaging configuration', () => {
         }
       }
     );
+
+    it.each(['Uppercase.pptx', 'under_score.pptx', 'r\u00e9sum\u00e9.pptx', 'colon:name.pptx'])(
+      'rejects non-portable packaged reference %s',
+      (packagedReferenceFile) => {
+        const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+        const { root, manifestPath } = createInventoryManifest([
+          { id: 'non-portable-reference', format: 'pptx', packagedReferenceFile },
+        ]);
+
+        try {
+          expect(() => readPresentationTemplateInventory(manifestPath)).toThrow();
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      }
+    );
+
+    it.each([
+      { format: 'pptx', packagedReferenceFile: 'con.pptx' },
+      { format: 'docx', packagedReferenceFile: 'aux.docx' },
+      { format: 'pptx', packagedReferenceFile: 'com1.pptx' },
+      { format: 'docx', packagedReferenceFile: 'lpt9.docx' },
+    ] as const)('rejects reserved packaged reference $packagedReferenceFile', ({ format, packagedReferenceFile }) => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const { root, manifestPath } = createInventoryManifest([
+        { id: 'reserved-reference', format, packagedReferenceFile },
+      ]);
+
+      try {
+        expect(() => readPresentationTemplateInventory(manifestPath)).toThrow();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
 
     it.each([
       { caseName: 'a non-array root', manifest: { templates: [] }, message: /json array/i },

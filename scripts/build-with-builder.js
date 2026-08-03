@@ -26,6 +26,8 @@ const DMG_RETRY_DELAY_SEC = 30;
 
 // Incremental build: hash of source files to detect changes
 const INCREMENTAL_CACHE_FILE = 'out/.build-hash';
+const PRESENTATION_TEMPLATE_MANIFEST_FILE = 'packages/desktop/resources/presentation-templates/manifest.json';
+const PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE = 'out/main/presentation-template-inventory.sha256';
 const DEBUG_AUTO_UPDATE_CURRENT_VERSION_ENV = 'AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION';
 const CURRENT_WINDOWS_EXECUTABLE = 'WePrompt.exe';
 const LEGACY_WINDOWS_EXECUTABLES = ['Forge.exe', 'AionUi.exe'];
@@ -286,16 +288,47 @@ function saveCurrentHash(hash) {
   } catch {}
 }
 
-function viteBuildExists() {
-  const outDir = path.resolve(__dirname, '../out');
-  const mainDir = path.join(outDir, 'main');
-  const rendererDir = path.join(outDir, 'renderer');
+function computePresentationTemplateInventoryDigest() {
+  const manifestPath = path.resolve(__dirname, '..', PRESENTATION_TEMPLATE_MANIFEST_FILE);
+  return crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex');
+}
 
-  return (
-    fs.existsSync(path.join(mainDir, 'index.js')) &&
-    fs.existsSync(path.join(outDir, 'preload', 'index.js')) &&
-    validateRendererBuildOutput(rendererDir).valid
-  );
+function validatePresentationTemplateBuildBinding() {
+  const digestPath = path.resolve(__dirname, '..', PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE);
+  if (!fs.existsSync(digestPath)) {
+    return {
+      valid: false,
+      problems: [
+        `Vite build output is incomplete: missing ${PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE}; rebuild without --skip-vite`,
+      ],
+    };
+  }
+
+  const builtDigest = fs.readFileSync(digestPath, 'utf8').trim();
+  if (!/^[a-f0-9]{64}$/.test(builtDigest)) {
+    return {
+      valid: false,
+      problems: [
+        `Vite build output is incomplete: invalid ${PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE}; rebuild without --skip-vite`,
+      ],
+    };
+  }
+
+  const currentDigest = computePresentationTemplateInventoryDigest();
+  if (builtDigest !== currentDigest) {
+    return {
+      valid: false,
+      problems: [
+        'Vite build output is stale: cached main presentation template inventory does not match the current manifest; rebuild without --skip-vite',
+      ],
+    };
+  }
+
+  return { valid: true, problems: [] };
+}
+
+function viteBuildExists() {
+  return validateViteBuildOutput().valid;
 }
 
 function collectHtmlAssetRefs(html, htmlDirRelative) {
@@ -392,6 +425,8 @@ function validateViteBuildOutput() {
 
   const rendererValidation = validateRendererBuildOutput(path.join(outDir, 'renderer'));
   problems.push(...rendererValidation.problems);
+  const templateInventoryValidation = validatePresentationTemplateBuildBinding();
+  problems.push(...templateInventoryValidation.problems);
 
   return { valid: problems.length === 0, problems };
 }
