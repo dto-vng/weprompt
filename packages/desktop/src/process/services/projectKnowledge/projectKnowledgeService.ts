@@ -600,10 +600,14 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         );
         return manifest;
       }
-      // Read the existing rows once; the loop below appends to this array and
+      // Read the existing rows once; the loop below upserts into this map and
       // rewrites the file after every batch, so a failure part-way through
-      // keeps everything embedded so far and Retry resumes from there.
-      let rows: Array<[string, Float32Array]> | null = null;
+      // keeps everything embedded so far and Retry resumes from there. Keyed
+      // by chunk id because hasVector can lag reality (writeVectors succeeds,
+      // then writeChunks fails — the same stale-flag window removeSourceRows
+      // defends against): a retried chunk must replace its row, not append a
+      // duplicate.
+      let rows: Map<string, Float32Array> | null = null;
       for (let start = 0; start < missing.length; start += EMBED_BATCH_SIZE) {
         const batch = missing.slice(start, start + EMBED_BATCH_SIZE);
         const vectors = await embedTexts(
@@ -621,13 +625,13 @@ export const createProjectKnowledgeService = (deps: ProjectKnowledgeServiceDeps)
         const embedding = manifest.embedding ?? { model, dim };
         if (rows === null) {
           const existing = await readVectors(storeDir);
-          rows = existing && existing.dim === embedding.dim ? [...existing.rows.entries()] : [];
+          rows = existing && existing.dim === embedding.dim ? new Map(existing.rows) : new Map();
         }
         batch.forEach((chunk, i) => {
-          rows!.push([chunk.chunkId, Float32Array.from(vectors[i])]);
+          rows!.set(chunk.chunkId, Float32Array.from(vectors[i]));
           chunk.hasVector = true;
         });
-        await writeVectors(storeDir, embedding.dim, rows);
+        await writeVectors(storeDir, embedding.dim, [...rows!.entries()]);
         manifest.embedding = embedding;
         await writeChunks(storeDir, chunks);
         syncEmbedCounts(manifest, chunks);
