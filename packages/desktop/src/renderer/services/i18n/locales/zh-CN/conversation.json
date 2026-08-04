@@ -920,6 +920,7 @@
         "visualPlaceholder": "描述画面内容…",
         "suggestVisual": "建议画面",
         "addReference": "添加参考图",
+        "moreDetails": "更多详情",
         "invalidTitle": "请先输入镜头标题再保存。",
         "placeholder": {
           "opening": "开场镜头",

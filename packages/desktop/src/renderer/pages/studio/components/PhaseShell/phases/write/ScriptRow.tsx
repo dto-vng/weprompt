@@ -6,9 +6,9 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, Input, InputNumber, Modal, Select } from '@arco-design/web-react';
+import { Button, Input, Modal, Select } from '@arco-design/web-react';
 import { Delete, Down, Drag, Magic, Picture, Up } from '@icon-park/react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type {
@@ -94,24 +94,22 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
   onMove,
 }) => {
   const { t } = useTranslation();
-  const [durationChangeInvalid, setDurationChangeInvalid] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [removeConfirmVisible, setRemoveConfirmVisible] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
-  const durationInputInvalidRef = useRef(false);
   const fieldId = (field: string): string => `studio-scene-${field}-${scene.id}`;
   const durationBounds = durationBoundsByMediaKind[draft.mediaKind];
+  const durationOptions = Array.from(
+    { length: durationBounds.maxDurationSeconds - durationBounds.minDurationSeconds + 1 },
+    (_, offset) => durationBounds.minDurationSeconds + offset
+  );
+  const formatDuration = (seconds: number): string => `${seconds}${t('common.unit.second_short')}`;
   const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
     id: scene.id,
     disabled: mutationPending,
   });
 
-  useEffect(() => {
-    durationInputInvalidRef.current = false;
-    setDurationChangeInvalid(false);
-  }, [draft.durationSeconds, durationBounds.maxDurationSeconds, durationBounds.minDurationSeconds, scene.id]);
-
   const durationInvalid =
-    durationChangeInvalid ||
     !Number.isInteger(draft.durationSeconds) ||
     draft.durationSeconds < durationBounds.minDurationSeconds ||
     draft.durationSeconds > durationBounds.maxDurationSeconds;
@@ -135,29 +133,13 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
       ? createManagedStudioAssetUrl(projectId, referenceAsset.id)
       : null;
 
-  const inspectDurationInput = (event: React.FormEvent<HTMLInputElement>): void => {
-    const value = Number(event.currentTarget.value);
-    durationInputInvalidRef.current =
-      !Number.isInteger(value) ||
-      value < durationBounds.minDurationSeconds ||
-      value > durationBounds.maxDurationSeconds;
-    if (durationInputInvalidRef.current) setDurationChangeInvalid(true);
-  };
-
-  const updateDuration = (value: number, reason?: string): void => {
-    const stepperRecovery = reason === 'increase' || reason === 'decrease';
+  const updateDuration = (value: number): void => {
     if (
-      (durationInputInvalidRef.current && !stepperRecovery) ||
-      reason === 'outOfRange' ||
       !Number.isInteger(value) ||
       value < durationBounds.minDurationSeconds ||
       value > durationBounds.maxDurationSeconds
-    ) {
-      setDurationChangeInvalid(true);
+    )
       return;
-    }
-    durationInputInvalidRef.current = false;
-    setDurationChangeInvalid(false);
     onUpdate({ durationSeconds: value });
   };
 
@@ -216,22 +198,26 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
           <label htmlFor={fieldId('duration')} className={styles.srOnly}>
             {t('conversation.creativeStudio.inspector.durationLabel')}
           </label>
-          <InputNumber
+          <Select
             id={fieldId('duration')}
+            className={styles.durationChip}
             aria-label={t('conversation.creativeStudio.inspector.durationLabel')}
-            aria-valuemin={durationBounds.minDurationSeconds}
-            aria-valuemax={durationBounds.maxDurationSeconds}
-            min={durationBounds.minDurationSeconds}
-            max={durationBounds.maxDurationSeconds}
-            mode='button'
-            step={1}
-            precision={0}
+            aria-invalid={durationInvalid}
+            size='mini'
+            status={durationInvalid ? 'error' : undefined}
             value={draft.durationSeconds}
-            error={durationInvalid}
-            onInput={inspectDurationInput}
-            onChange={updateDuration}
+            renderFormat={() => formatDuration(draft.durationSeconds)}
+            onChange={(value) => {
+              if (typeof value === 'number') updateDuration(value);
+            }}
             onBlur={flushIfTitleValid}
-          />
+          >
+            {durationOptions.map((seconds) => (
+              <Select.Option key={seconds} value={seconds}>
+                {formatDuration(seconds)}
+              </Select.Option>
+            ))}
+          </Select>
           {durationInvalid && (
             <span role='alert' className={styles.fieldError}>
               {t('conversation.creativeStudio.inspector.invalidDuration')}
@@ -274,13 +260,17 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
 
         <div data-script-zone='script' className={styles.zone}>
           <div className={styles.field}>
-            <label htmlFor={fieldId('title')}>{t('conversation.creativeStudio.inspector.titleLabel')}</label>
+            <label htmlFor={fieldId('title')} className={styles.srOnly}>
+              {t('conversation.creativeStudio.inspector.titleLabel')}
+            </label>
             <Input
               id={fieldId('title')}
+              className={styles.editorControl}
               value={draft.title}
               placeholder={t(titlePlaceholderKey)}
               maxLength={MAX_SCENE_TITLE_CHARS}
               error={titleBlocksFlush}
+              aria-invalid={titleBlocksFlush}
               onChange={(title) => {
                 setTitleTouched(true);
                 onUpdate({ title });
@@ -294,50 +284,75 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
             )}
           </div>
           <div className={styles.field}>
-            <label htmlFor={fieldId('narration')}>{t('conversation.creativeStudio.inspector.narrationLabel')}</label>
+            <label htmlFor={fieldId('narration')} className={styles.srOnly}>
+              {t('conversation.creativeStudio.inspector.narrationLabel')}
+            </label>
             <Input.TextArea
               id={fieldId('narration')}
+              className={styles.editorControl}
               value={draft.narration}
-              rows={3}
+              placeholder={t('conversation.creativeStudio.inspector.narrationLabel')}
+              rows={2}
               onChange={(narration) => onUpdate({ narration })}
               onBlur={flushIfTitleValid}
             />
           </div>
-          <div className={styles.secondaryFields}>
-            <div className={styles.field}>
-              <label htmlFor={fieldId('purpose')}>{t('conversation.creativeStudio.inspector.purposeLabel')}</label>
-              <Input.TextArea
-                id={fieldId('purpose')}
-                value={draft.purpose}
-                placeholder={t('conversation.creativeStudio.inspector.purposePlaceholder')}
-                rows={2}
-                onChange={(purpose) => onUpdate({ purpose })}
-                onBlur={flushIfTitleValid}
-              />
+          <Button
+            type='text'
+            size='mini'
+            className={styles.detailsToggle}
+            aria-expanded={detailsExpanded}
+            aria-controls={fieldId('details')}
+            onClick={() => setDetailsExpanded((expanded) => !expanded)}
+          >
+            {t('conversation.creativeStudio.phase.write.moreDetails')}
+            <Down aria-hidden='true' className={styles.detailsIcon} />
+          </Button>
+          {detailsExpanded && (
+            <div id={fieldId('details')} className={styles.secondaryFields}>
+              <div className={styles.field}>
+                <label htmlFor={fieldId('purpose')} className={styles.srOnly}>
+                  {t('conversation.creativeStudio.inspector.purposeLabel')}
+                </label>
+                <Input.TextArea
+                  id={fieldId('purpose')}
+                  className={styles.editorControl}
+                  value={draft.purpose}
+                  placeholder={t('conversation.creativeStudio.inspector.purposePlaceholder')}
+                  rows={2}
+                  onChange={(purpose) => onUpdate({ purpose })}
+                  onBlur={flushIfTitleValid}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor={fieldId('on-screen-text')} className={styles.srOnly}>
+                  {t('conversation.creativeStudio.inspector.onScreenTextLabel')}
+                </label>
+                <Input.TextArea
+                  id={fieldId('on-screen-text')}
+                  className={styles.editorControl}
+                  value={draft.onScreenText}
+                  placeholder={t('conversation.creativeStudio.inspector.onScreenTextLabel')}
+                  rows={2}
+                  onChange={(onScreenText) => onUpdate({ onScreenText })}
+                  onBlur={flushIfTitleValid}
+                />
+              </div>
             </div>
-            <div className={styles.field}>
-              <label htmlFor={fieldId('on-screen-text')}>
-                {t('conversation.creativeStudio.inspector.onScreenTextLabel')}
-              </label>
-              <Input.TextArea
-                id={fieldId('on-screen-text')}
-                value={draft.onScreenText}
-                rows={3}
-                onChange={(onScreenText) => onUpdate({ onScreenText })}
-                onBlur={flushIfTitleValid}
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         <div data-script-zone='visual' className={styles.zone}>
           <div className={styles.field}>
-            <label htmlFor={fieldId('prompt')}>{t('conversation.creativeStudio.inspector.visualPromptLabel')}</label>
+            <label htmlFor={fieldId('prompt')} className={styles.srOnly}>
+              {t('conversation.creativeStudio.inspector.visualPromptLabel')}
+            </label>
             <Input.TextArea
               id={fieldId('prompt')}
+              className={styles.editorControl}
               value={draft.visualPrompt}
               placeholder={t('conversation.creativeStudio.phase.write.visualPlaceholder')}
-              rows={5}
+              rows={3}
               onChange={(visualPrompt) => onUpdate({ visualPrompt })}
               onBlur={flushIfTitleValid}
             />
@@ -375,9 +390,12 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
 
         <div data-script-zone='output' className={`${styles.zone} ${styles.outputZone}`}>
           <div className={styles.field}>
-            <label htmlFor={fieldId('media')}>{t('conversation.creativeStudio.inspector.mediaKindLabel')}</label>
+            <label htmlFor={fieldId('media')} className={styles.srOnly}>
+              {t('conversation.creativeStudio.inspector.mediaKindLabel')}
+            </label>
             <Select
               id={fieldId('media')}
+              className={styles.outputSelect}
               aria-label={t('conversation.creativeStudio.inspector.mediaKindLabel')}
               value={draft.mediaKind}
               onChange={(mediaKind) => updateMediaKind(mediaKind as StudioMediaKind)}

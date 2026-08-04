@@ -923,6 +923,7 @@
         "visualPlaceholder": "Опишіть, що ми бачимо…",
         "suggestVisual": "Запропонувати зображення",
         "addReference": "Додати референс",
+        "moreDetails": "Докладніше",
         "invalidTitle": "Введіть назву кадру перед збереженням.",
         "placeholder": {
           "opening": "Початковий кадр",
