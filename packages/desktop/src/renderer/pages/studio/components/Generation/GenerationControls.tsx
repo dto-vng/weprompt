@@ -6,22 +6,18 @@
 
 import type {
   StudioAspectRatio,
-  StudioCommandErrorCode,
   StudioMediaChoiceRef,
   StudioMediaKind,
-  StudioRendererJob,
   StudioRendererProject,
   StudioResolution,
   StudioRouteCatalog,
   StudioRouteCatalogEntry,
   StudioSceneGenerationChoice,
 } from '@/common/types/project/creativeStudioTypes';
-import { Alert, Button, Progress, Spin } from '@arco-design/web-react';
-import { Attention, CheckOne, CloseOne, Loading, Refresh, Time } from '@icon-park/react';
+import { Alert, Button, Spin } from '@arco-design/web-react';
+import { Refresh } from '@icon-park/react';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-type ActionResult = void | Promise<unknown>;
 
 export type GenerationControlScene = {
   id: string;
@@ -51,12 +47,6 @@ export type GenerationBatchReviewRequest = {
   availableRoutes: StudioRouteCatalogEntry[];
 };
 
-export type GenerationJobActionIssue = {
-  jobId: string;
-  code: StudioCommandErrorCode;
-  messageKey: string;
-};
-
 export type GenerationControlsProps = {
   project: StudioRendererProject;
   catalog: StudioRouteCatalog | null;
@@ -74,16 +64,9 @@ export type GenerationControlsProps = {
   disabled?: boolean;
   singleDisabled?: boolean;
   showSettingsAction?: boolean;
-  jobs: StudioRendererJob[];
-  pendingJobIds?: readonly string[];
-  actionIssue?: GenerationJobActionIssue | null;
   onOpenSettings: (path: '/settings/model') => void;
   onOpenSingleReview: (request: GenerationSingleReviewRequest) => void;
   onOpenBatchReview: (request: GenerationBatchReviewRequest) => void;
-  onCancelJob: (jobId: string) => ActionResult;
-  onRetryJob: (jobId: string) => ActionResult;
-  onRetryDownload: (jobId: string) => ActionResult;
-  onReviewUnknownSubmission: (jobId: string) => ActionResult;
 };
 
 export type BuildSingleSceneReviewRequestInput = {
@@ -208,50 +191,10 @@ export const buildSingleSceneReviewRequest = ({
   };
 };
 
-const jobStatusKey = (status: StudioRendererJob['status']): string => {
-  switch (status) {
-    case 'queued_local':
-      return 'conversation.creativeStudio.jobs.status.queuedLocal';
-    case 'submitting':
-      return 'conversation.creativeStudio.jobs.status.submitting';
-    case 'queued_remote':
-      return 'conversation.creativeStudio.jobs.status.queuedRemote';
-    case 'running':
-      return 'conversation.creativeStudio.jobs.status.running';
-    case 'needs_attention':
-      return 'conversation.creativeStudio.jobs.status.needsAttention';
-    case 'succeeded':
-      return 'conversation.creativeStudio.jobs.status.succeeded';
-    case 'failed':
-      return 'conversation.creativeStudio.jobs.status.failed';
-    case 'cancelled':
-      return 'conversation.creativeStudio.jobs.status.cancelled';
-  }
-};
-
-const statusIcon = (status: StudioRendererJob['status']): React.ReactNode => {
-  switch (status) {
-    case 'queued_local':
-    case 'queued_remote':
-      return <Time />;
-    case 'submitting':
-    case 'running':
-      return <Loading />;
-    case 'succeeded':
-      return <CheckOne />;
-    case 'needs_attention':
-      return <Attention />;
-    case 'failed':
-    case 'cancelled':
-      return <CloseOne />;
-  }
-};
-
 /**
- * Persisted project route reviewer and job-action surface.
+ * Persisted project route reviewer.
  *
- * Every button here either opens review/setup or delegates a typed job intent;
- * it never submits paid generation directly.
+ * Every button here opens review or setup; it never submits paid generation directly.
  */
 export const GenerationControls: React.FC<GenerationControlsProps> = ({
   project,
@@ -270,24 +213,11 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
   disabled = false,
   singleDisabled = false,
   showSettingsAction = true,
-  jobs,
-  pendingJobIds = [],
-  actionIssue = null,
   onOpenSettings,
   onOpenSingleReview,
   onOpenBatchReview,
-  onCancelJob,
-  onRetryJob,
-  onRetryDownload,
-  onReviewUnknownSubmission,
 }) => {
   const { t } = useTranslation();
-  const pendingIds = useMemo(() => new Set(pendingJobIds), [pendingJobIds]);
-  const retryParentIds = useMemo(
-    () => new Set(jobs.flatMap((job) => (job.retryOfJobId === null ? [] : [job.retryOfJobId]))),
-    [jobs]
-  );
-
   const kind = scene?.mediaKind ?? null;
   const availableRoutes = useMemo(() => catalogRoutes(catalog), [catalog]);
   const routeContext = {
@@ -411,114 +341,6 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
           {t(batchDisabledReasonKey)}
         </p>
       )}
-
-      <section aria-label={t('conversation.creativeStudio.jobs.title')} className='flex flex-col gap-10px'>
-        <h3 className='m-0 text-14px font-600 text-t-primary'>{t('conversation.creativeStudio.jobs.title')}</h3>
-        {actionIssue && (
-          <div role='alert' className='rounded-8px border border-danger-3 bg-danger-light-1 p-10px text-danger'>
-            <span>{t(actionIssue.messageKey)}</span>
-            <code className='ml-8px text-11px'>{actionIssue.code}</code>
-          </div>
-        )}
-        {jobs.length === 0 ? (
-          <p className='m-0 text-12px text-t-tertiary'>{t('conversation.creativeStudio.jobs.noJobs')}</p>
-        ) : (
-          <ul className='m-0 flex list-none flex-col gap-8px p-0'>
-            {jobs.map((job) => {
-              const pending = pendingIds.has(job.id);
-              const hasRetryChild = retryParentIds.has(job.id);
-              const hasOtherActiveJob = jobs.some(
-                (candidate) =>
-                  candidate.id !== job.id && !['succeeded', 'failed', 'cancelled'].includes(candidate.status)
-              );
-              const recoveryBlocked = hasRetryChild || hasOtherActiveJob;
-              const submissionUnknown =
-                job.status === 'needs_attention' && job.error?.code === 'submission_unknown' && !recoveryBlocked;
-              const downloadFailed =
-                job.status === 'failed' &&
-                job.error?.code === 'download_failed' &&
-                job.canRetryDownload &&
-                !recoveryBlocked;
-              const canRetry =
-                (job.status === 'failed' || job.status === 'needs_attention') &&
-                job.error?.code !== 'submission_unknown' &&
-                job.error?.code !== 'download_failed' &&
-                job.error?.code !== 'poll_deadline' &&
-                !recoveryBlocked;
-              const canCancel = job.canCancel;
-
-              return (
-                <li key={job.id} aria-label={job.id} className='rounded-8px border border-border-2 bg-fill-1 p-10px'>
-                  <div role='status' aria-live='polite' className='flex flex-wrap items-center gap-8px'>
-                    <span aria-hidden='true' className='flex text-t-secondary'>
-                      {statusIcon(job.status)}
-                    </span>
-                    <span className='text-12px font-500 text-t-primary'>{t(jobStatusKey(job.status))}</span>
-                    <span className='break-all text-11px text-t-tertiary'>
-                      {job.provider.providerId} · {job.provider.model}
-                    </span>
-                  </div>
-
-                  {(job.status === 'submitting' || job.status === 'running') && typeof job.progress !== 'number' && (
-                    <div
-                      role='progressbar'
-                      aria-label={t(jobStatusKey(job.status))}
-                      className='mt-8px flex items-center'
-                    >
-                      <Spin size={12} />
-                    </div>
-                  )}
-
-                  {typeof job.progress === 'number' && (
-                    <div className='mt-8px'>
-                      <Progress percent={job.progress} size='small' showText={false} />
-                      <span className='text-11px text-t-secondary'>
-                        {t('conversation.creativeStudio.jobs.progress', { percent: job.progress })}
-                      </span>
-                    </div>
-                  )}
-
-                  {job.error && (
-                    <div role='alert' className='mt-8px text-12px text-danger'>
-                      <span>{t(job.error.messageKey)}</span>
-                      <code className='ml-8px text-11px'>{job.error.code}</code>
-                    </div>
-                  )}
-
-                  {(canCancel || canRetry || downloadFailed || submissionUnknown) && (
-                    <div className='mt-8px flex flex-wrap gap-8px'>
-                      {canCancel && (
-                        <Button size='mini' disabled={pending} onClick={() => void onCancelJob(job.id)}>
-                          {t('conversation.creativeStudio.jobs.cancel')}
-                        </Button>
-                      )}
-                      {canRetry && (
-                        <Button size='mini' disabled={disabled || pending} onClick={() => void onRetryJob(job.id)}>
-                          {t('conversation.creativeStudio.jobs.retry')}
-                        </Button>
-                      )}
-                      {downloadFailed && (
-                        <Button size='mini' disabled={pending} onClick={() => void onRetryDownload(job.id)}>
-                          {t('conversation.creativeStudio.jobs.retryDownload')}
-                        </Button>
-                      )}
-                      {submissionUnknown && (
-                        <Button
-                          size='mini'
-                          disabled={disabled || pending}
-                          onClick={() => void onReviewUnknownSubmission(job.id)}
-                        >
-                          {t('conversation.creativeStudio.jobs.retry')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
     </section>
   );
 };
