@@ -201,7 +201,7 @@ describe('Studio asset export', () => {
       /path|directory|destination|file:|https?:|data:/i
     );
     expect(
-      await screen.findByText('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500')
+      await screen.findByText('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500,2')
     ).toBeInTheDocument();
     expect(screen.queryByText(/Export video/i)).not.toBeInTheDocument();
   });
@@ -242,7 +242,7 @@ describe('Studio asset export', () => {
         missingSceneIds: ['scene-2'],
       })
     );
-    renderProject();
+    const { router } = renderProject();
 
     fireEvent.click(
       await screen.findByRole('button', {
@@ -261,7 +261,45 @@ describe('Studio asset export', () => {
       })
     ).toHaveTextContent('conversation.creativeStudio.export.partialBody:Launch-film-20260730-151500-2');
     expect(screen.getByText('Launch-film-20260730-151500-2')).toBeInTheDocument();
-    expect(screen.getByText(/conversation\.creativeStudio\.export\.missingScenes:.*scene-2/)).toBeInTheDocument();
+    const missingSlates = screen.getByRole('list', {
+      name: 'conversation.creativeStudio.phase.review.missingSlates:1',
+    });
+    expect(within(missingSlates).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(missingSlates).getByText('scene-2')).toBeVisible();
+    expect(within(missingSlates).queryByText('scene-1')).not.toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.partialHandoff')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.openProduce',
+      })
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/produce'));
+  });
+
+  it('reports a complete selected-assets handoff without slate or movie claims', async () => {
+    renderProject();
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'conversation.creativeStudio.export.action',
+      })
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.export.confirm',
+      })
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'conversation.creativeStudio.export.successTitle',
+    });
+    expect(dialog).toHaveTextContent('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500,2');
+    expect(
+      within(dialog).queryByRole('button', { name: 'conversation.creativeStudio.phase.review.openProduce' })
+    ).not.toBeInTheDocument();
+    expect(dialog.textContent).not.toMatch(/slates exported|stitched|final movie|composed/i);
   });
 
   it('treats native chooser cancellation as a harmless closed flow', async () => {

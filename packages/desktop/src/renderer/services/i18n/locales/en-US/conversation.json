@@ -780,9 +780,10 @@
         "description": "Check selected media, fill missing slates, and prepare the handoff.",
         "handoff": "Prepare handoff",
         "noAssets": "No selected media is ready for handoff.",
+        "selectedTake": "In cut",
         "slateLabel": "Slate",
         "slateDescription": "A slate keeps a shot in sequence when no rendered media is selected.",
-        "excludedFromHandoff": "Shots without selected media or a slate are excluded from the handoff.",
+        "excludedFromHandoff": "Scenes without selected media are excluded from the handoff. Review slates are not exported.",
         "renderedShots": "{{count}} rendered shots",
         "renderedShots_one": "{{count}} rendered shot",
         "renderedShots_other": "{{count}} rendered shots",
@@ -790,8 +791,8 @@
         "missingSlates_one": "{{count}} missing slate",
         "missingSlates_other": "{{count}} missing slates",
         "openProduce": "Open Produce",
-        "handoffDescription": "The handoff includes selected media and slates in storyboard order.",
-        "partialHandoff": "This handoff is partial because some shots have neither selected media nor a slate."
+        "handoffDescription": "The handoff contains the storyboard manifest and selected media only. Review slates are not exported.",
+        "partialHandoff": "This handoff is partial because some scenes have no selected media."
       }
     },
     "library": {
@@ -1075,7 +1076,9 @@
       "cancel": "Cancel",
       "choosing": "Choose an export folder...",
       "successTitle": "Assets exported",
-      "successBody": "Exported to “{{folderName}}”.",
+      "successBody": "Handed off {{count}} selected scenes to “{{folderName}}”.",
+      "successBody_one": "Handed off {{count}} selected scene to “{{folderName}}”.",
+      "successBody_other": "Handed off {{count}} selected scenes to “{{folderName}}”.",
       "partialTitle": "Assets exported with missing scenes",
       "partialBody": "Exported available assets to “{{folderName}}”.",
       "missingScenes": "Missing scenes: {{scenes}}",

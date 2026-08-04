@@ -925,9 +925,10 @@
         "description": "Prüfe ausgewählte Medien, ergänze fehlende Platzhalter und bereite die Übergabe vor.",
         "handoff": "Übergabe vorbereiten",
         "noAssets": "Keine ausgewählten Medien sind für die Übergabe bereit.",
+        "selectedTake": "Im Schnitt",
         "slateLabel": "Platzhalter",
         "slateDescription": "Ein Platzhalter hält eine Einstellung in der Abfolge, wenn kein gerendertes Medium ausgewählt ist.",
-        "excludedFromHandoff": "Einstellungen ohne ausgewähltes Medium oder Platzhalter werden von der Übergabe ausgeschlossen.",
+        "excludedFromHandoff": "Einstellungen ohne ausgewähltes Medium werden von der Übergabe ausgeschlossen. Platzhalter aus der Prüfung werden nicht exportiert.",
         "renderedShots": "{{count}} gerenderte Einstellungen",
         "renderedShots_one": "{{count}} gerenderte Einstellung",
         "renderedShots_other": "{{count}} gerenderte Einstellungen",
@@ -935,8 +936,8 @@
         "missingSlates_one": "{{count}} fehlender Platzhalter",
         "missingSlates_other": "{{count}} fehlende Platzhalter",
         "openProduce": "Produzieren öffnen",
-        "handoffDescription": "Die Übergabe enthält ausgewählte Medien und Platzhalter in Storyboard-Reihenfolge.",
-        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen sowohl ausgewählte Medien als auch Platzhalter fehlen."
+        "handoffDescription": "Die Übergabe enthält nur das Storyboard-Manifest und ausgewählte Medien. Platzhalter aus der Prüfung werden nicht exportiert.",
+        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt."
       }
     },
     "library": {
@@ -1220,7 +1221,9 @@
       "cancel": "Abbrechen",
       "choosing": "Exportordner auswählen...",
       "successTitle": "Assets exportiert",
-      "successBody": "Nach „{{folderName}}“ exportiert.",
+      "successBody": "{{count}} ausgewählte Einstellungen nach „{{folderName}}“ übergeben.",
+      "successBody_one": "{{count}} ausgewählte Einstellung nach „{{folderName}}“ übergeben.",
+      "successBody_other": "{{count}} ausgewählte Einstellungen nach „{{folderName}}“ übergeben.",
       "partialTitle": "Assets mit fehlenden Szenen exportiert",
       "partialBody": "Verfügbare Assets nach „{{folderName}}“ exportiert.",
       "missingScenes": "Fehlende Szenen: {{scenes}}",

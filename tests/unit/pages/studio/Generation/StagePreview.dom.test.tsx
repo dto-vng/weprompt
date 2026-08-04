@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -333,6 +333,27 @@ describe('StagePreview managed media', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders a review slate without exposing Produce generation controls', () => {
+    const current = scene({ title: 'Opening slate', durationSeconds: 9 });
+    render(
+      <StagePreview
+        projectId='project-1'
+        project={project(current)}
+        selectedScene={current}
+        presentation='review'
+        slate={{ title: current.title, durationSeconds: current.durationSeconds }}
+        onOpenSingleReview={vi.fn()}
+      />
+    );
+
+    const preview = screen.getByRole('region', { name: 'conversation.creativeStudio.preview.title' });
+    expect(within(preview).getByText('Opening slate')).toBeVisible();
+    expect(within(preview).getByText('conversation.creativeStudio.scene.durationSeconds:9')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
+    ).not.toBeInTheDocument();
+  });
+
   it('shows model-loading feedback and withholds review during initial catalog loading', () => {
     const current = scene();
     const onOpenSingleReview = vi.fn();
@@ -558,6 +579,40 @@ describe('SceneTimeline storyboard strip', () => {
 
     expect(onSelectScene).toHaveBeenNthCalledWith(1, 'scene-2');
     expect(onSelectScene).toHaveBeenNthCalledWith(2, 'scene-2');
+  });
+
+  it('shows explicit Review state text while retaining keyboard selection', () => {
+    const orderedScenes = [
+      scene({ id: 'scene-1', title: 'Opening' }),
+      scene({ id: 'scene-2', title: 'Reveal' }),
+      scene({ id: 'scene-3', title: 'Build' }),
+      scene({ id: 'scene-4', title: 'Closing' }),
+    ];
+    const onSelectScene = vi.fn();
+    const { container } = render(
+      <SceneTimeline
+        orderedScenes={orderedScenes}
+        selectedSceneId='scene-1'
+        onSelectScene={onSelectScene}
+        reviewStates={{
+          'scene-1': 'selected-take',
+          'scene-2': 'missing-slate',
+          'scene-3': 'running',
+          'scene-4': 'failed',
+        }}
+      />
+    );
+
+    expect(
+      Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
+    ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
+    const controls = screen.getAllByRole('button', {
+      name: /conversation\.creativeStudio\.timeline\.selectSceneAccessible/,
+    });
+    controls[0].focus();
+    fireEvent.keyDown(controls[0], { key: 'ArrowRight' });
+    expect(controls[1]).toHaveFocus();
+    expect(onSelectScene).toHaveBeenCalledWith('scene-2');
   });
 
   it('shows the localized empty state without waveform, music, or caption claims', () => {

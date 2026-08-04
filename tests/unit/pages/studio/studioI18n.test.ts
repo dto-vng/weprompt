@@ -87,6 +87,7 @@ const phaseKeys = [
   'phase.review.description',
   'phase.review.handoff',
   'phase.review.noAssets',
+  'phase.review.selectedTake',
   'phase.review.slateLabel',
   'phase.review.slateDescription',
   'phase.review.excludedFromHandoff',
@@ -191,6 +192,7 @@ const readinessActionKeys = [
 ] as const;
 
 const pluralLogicalKeys = [
+  'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',
   'timeline.totalDurationFull',

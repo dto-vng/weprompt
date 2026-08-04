@@ -923,16 +923,17 @@
         "description": "선택한 미디어를 확인하고 빠진 슬레이트를 채운 뒤 전달을 준비하세요.",
         "handoff": "전달 준비",
         "noAssets": "전달할 수 있는 선택된 미디어가 없습니다.",
+        "selectedTake": "컷에 포함",
         "slateLabel": "슬레이트",
         "slateDescription": "렌더링된 미디어를 선택하지 않은 경우에도 슬레이트로 숏을 순서에 유지할 수 있습니다.",
-        "excludedFromHandoff": "선택된 미디어나 슬레이트가 없는 숏은 전달에서 제외됩니다.",
+        "excludedFromHandoff": "선택된 미디어가 없는 장면은 전달에서 제외됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
         "renderedShots": "렌더링된 숏 {{count}}개",
         "renderedShots_other": "렌더링된 숏 {{count}}개",
         "missingSlates": "누락된 슬레이트 {{count}}개",
         "missingSlates_other": "누락된 슬레이트 {{count}}개",
         "openProduce": "제작 열기",
-        "handoffDescription": "전달에는 선택된 미디어와 슬레이트가 스토리보드 순서대로 포함됩니다.",
-        "partialHandoff": "일부 숏에 선택된 미디어와 슬레이트가 모두 없어 이번 전달은 일부만 포함합니다."
+        "handoffDescription": "전달에는 스토리보드 매니페스트와 선택된 미디어만 포함됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
+        "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다."
       }
     },
     "library": {
@@ -1210,7 +1211,8 @@
       "cancel": "취소",
       "choosing": "내보낼 폴더 선택...",
       "successTitle": "에셋을 내보냈습니다",
-      "successBody": "‘{{folderName}}’ 폴더로 내보냈습니다.",
+      "successBody": "선택된 장면 {{count}}개를 ‘{{folderName}}’ 폴더로 전달했습니다.",
+      "successBody_other": "선택된 장면 {{count}}개를 ‘{{folderName}}’ 폴더로 전달했습니다.",
       "partialTitle": "일부 장면을 제외하고 에셋을 내보냈습니다",
       "partialBody": "사용 가능한 에셋을 ‘{{folderName}}’ 폴더로 내보냈습니다.",
       "missingScenes": "누락된 장면: {{scenes}}",
