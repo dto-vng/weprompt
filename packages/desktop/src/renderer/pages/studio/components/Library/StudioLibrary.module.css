@@ -31,24 +31,40 @@
 }
 
 .composer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: start;
+  gap: 8px 10px;
+  padding: 14px 16px;
   border: 1px solid var(--color-border-2);
   border-radius: 14px;
-  background: var(--color-bg-2);
+  background: transparent;
 }
 
 .composerLabel {
+  grid-column: 1 / -1;
   color: var(--color-text-1);
   font-size: 18px;
   font-weight: 600;
 }
 
 .composerInput {
-  min-height: 42px;
+  min-height: 32px;
+  border-color: transparent;
+  background-color: transparent;
   resize: none;
+}
+
+.composerInput:hover {
+  background-color: var(--color-fill-1);
+}
+
+.composerInput:focus,
+.composerInput:focus-visible,
+.composerInput:global(.arco-textarea-focus) {
+  border-color: var(--brand);
+  background-color: var(--color-bg-2);
+  box-shadow: var(--ring-focus);
 }
 
 .composerActions,
@@ -59,12 +75,14 @@
 }
 
 .composerActions {
-  justify-content: space-between;
+  align-self: start;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
 .guessSelect {
   width: auto;
-  min-width: 104px;
+  min-width: 96px;
 }
 
 .shapes {
@@ -89,6 +107,8 @@
 }
 
 .alert {
+  grid-column: 1 / -1;
+  margin: 0;
   color: var(--color-danger-6);
 }
 
@@ -178,14 +198,17 @@
   font-weight: 600;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .header {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .composer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .composerActions {
-    align-items: stretch;
-    flex-direction: column;
+    flex-wrap: wrap;
   }
 }

@@ -56,6 +56,7 @@ export const Composer: React.FC<ComposerProps> = ({ creating, disabled, errorMes
         value={sentence}
         maxLength={16 * 1024}
         rows={1}
+        autoSize={{ minRows: 1, maxRows: 6 }}
         className={styles.composerInput}
         placeholder={t('conversation.creativeStudio.library.composer.placeholder')}
         disabled={disabled}
@@ -75,6 +76,7 @@ export const Composer: React.FC<ComposerProps> = ({ creating, disabled, errorMes
           <Select
             aria-label={t('conversation.creativeStudio.library.composer.aspectRatioLabel')}
             className={styles.guessSelect}
+            size='small'
             value={aspectRatio}
             disabled={disabled}
             onChange={(value) => setAspectRatio(value as StudioAspectRatio)}
@@ -88,6 +90,7 @@ export const Composer: React.FC<ComposerProps> = ({ creating, disabled, errorMes
           <Select
             aria-label={t('conversation.creativeStudio.library.composer.durationLabel')}
             className={styles.guessSelect}
+            size='small'
             value={targetDurationSeconds}
             disabled={disabled}
             renderFormat={(option) =>
@@ -104,6 +107,7 @@ export const Composer: React.FC<ComposerProps> = ({ creating, disabled, errorMes
         </div>
         <Button
           type='primary'
+          size='small'
           icon={<ArrowRight />}
           loading={creating}
           disabled={disabled}
