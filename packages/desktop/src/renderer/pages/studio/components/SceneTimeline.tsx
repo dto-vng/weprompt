@@ -5,19 +5,28 @@
  */
 
 import { Button } from '@arco-design/web-react';
+import { Attention, CheckOne, Loading, Picture } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
 
+export type SceneTimelineReviewState = 'selected-take' | 'missing-slate' | 'running' | 'failed';
+
 export type SceneTimelineProps = {
   orderedScenes: readonly StudioScene[];
   selectedSceneId: string | null;
   onSelectScene: (sceneId: string) => void;
+  reviewStates?: Readonly<Partial<Record<string, SceneTimelineReviewState>>>;
 };
 
 /** Keyboard-selectable scene order and duration strip. */
-export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, selectedSceneId, onSelectScene }) => {
+export const SceneTimeline: React.FC<SceneTimelineProps> = ({
+  orderedScenes,
+  selectedSceneId,
+  onSelectScene,
+  reviewStates,
+}) => {
   const { t } = useTranslation();
   const totalDurationSeconds = orderedScenes.reduce((total, scene) => total + scene.durationSeconds, 0);
 
@@ -75,6 +84,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, sel
       ) : (
         <ol className='m-0 flex min-w-0 list-none gap-4px overflow-x-auto p-0'>
           {orderedScenes.map((scene, index) => {
+            const reviewState = reviewStates?.[scene.id];
             const durationLabel = t('conversation.creativeStudio.scene.durationSeconds', {
               count: scene.durationSeconds,
               seconds: scene.durationSeconds,
@@ -85,6 +95,32 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, sel
               count: scene.durationSeconds,
               seconds: scene.durationSeconds,
             });
+            const reviewPresentation = (() => {
+              switch (reviewState) {
+                case 'selected-take':
+                  return {
+                    icon: <CheckOne aria-hidden='true' />,
+                    label: t('conversation.creativeStudio.scene.status.generated'),
+                  };
+                case 'missing-slate':
+                  return {
+                    icon: <Picture aria-hidden='true' />,
+                    label: t('conversation.creativeStudio.phase.review.slateLabel'),
+                  };
+                case 'running':
+                  return {
+                    icon: <Loading aria-hidden='true' />,
+                    label: t('conversation.creativeStudio.scene.status.generating'),
+                  };
+                case 'failed':
+                  return {
+                    icon: <Attention aria-hidden='true' />,
+                    label: t('conversation.creativeStudio.jobs.status.failed'),
+                  };
+                default:
+                  return null;
+              }
+            })();
             return (
               <li key={scene.id} className='flex min-w-72px' style={{ flexGrow: scene.durationSeconds, flexBasis: 0 }}>
                 <Button
@@ -99,6 +135,15 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, sel
                 >
                   <span className='max-w-full truncate text-12px font-500 text-t-primary'>{scene.title}</span>
                   <span className='text-11px text-t-tertiary'>{durationLabel}</span>
+                  {reviewState !== undefined && reviewPresentation !== null && (
+                    <span
+                      data-review-state={reviewState}
+                      className='flex max-w-full items-center gap-4px rounded-full bg-fill-2 px-6px py-2px text-10px text-t-secondary'
+                    >
+                      {reviewPresentation.icon}
+                      <span className='truncate'>{reviewPresentation.label}</span>
+                    </span>
+                  )}
                 </Button>
               </li>
             );

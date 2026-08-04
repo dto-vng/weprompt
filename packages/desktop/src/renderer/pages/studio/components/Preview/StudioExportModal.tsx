@@ -62,6 +62,11 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
           <Button disabled={pending} onClick={onCancel}>
             {t('conversation.creativeStudio.export.cancel')}
           </Button>
+          {exportedFolderName !== null && missingSceneIds.length > 0 && onOpenProduce !== undefined && (
+            <Button type='primary' disabled={pending} onClick={onOpenProduce}>
+              {t('conversation.creativeStudio.phase.review.openProduce')}
+            </Button>
+          )}
           {exportedFolderName === null && (
             <Button type='primary' loading={pending} disabled={pending || selectedAssetCount === 0} onClick={onConfirm}>
               {t('conversation.creativeStudio.export.confirm')}
@@ -108,16 +113,24 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
             <dd className='m-0 break-all text-13px text-t-primary'>{exportedFolderName}</dd>
           </dl>
           {missingSceneIds.length > 0 && (
-            <p className='m-0 text-13px text-warning'>
-              {t('conversation.creativeStudio.export.missingScenes', {
-                scenes: missingSceneIds
-                  .map((sceneId) => {
-                    const title = project.scenes[sceneId]?.title;
-                    return title === undefined ? sceneId : `${title} (${sceneId})`;
-                  })
-                  .join(', '),
-              })}
-            </p>
+            <div className='flex flex-col gap-8px rounded-8px bg-warning-light-1 p-10px text-13px text-warning'>
+              <ul
+                aria-label={t('conversation.creativeStudio.phase.review.missingSlates', {
+                  count: missingSceneIds.length,
+                })}
+                className='m-0 flex list-disc flex-col gap-4px pl-18px'
+              >
+                {missingSceneIds.map((sceneId) => (
+                  <li key={sceneId}>
+                    {project.scenes[sceneId]?.title !== undefined && (
+                      <span className='mr-6px'>{project.scenes[sceneId]!.title}</span>
+                    )}
+                    <code>{sceneId}</code>
+                  </li>
+                ))}
+              </ul>
+              <p className='m-0'>{t('conversation.creativeStudio.phase.review.excludedFromHandoff')}</p>
+            </div>
           )}
         </div>
       )}

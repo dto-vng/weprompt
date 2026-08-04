@@ -335,24 +335,36 @@ describe('StudioPage and useStudioProject', () => {
         'conversation.creativeStudio.phase.produce.title',
         'conversation.creativeStudio.phase.produce.providerChargeDisclosure',
       ],
-      [
-        'review',
-        'conversation.creativeStudio.phase.review.title',
-        'conversation.creativeStudio.phase.review.handoffDescription',
-      ],
+      ['review', 'conversation.creativeStudio.phase.review.title', 'conversation.creativeStudio.export.body'],
     ])('renders the localized %s phase heading and guidance', async (phase, heading, guidance) => {
       renderRoute(`/studio/project-1/${phase}`);
 
       expect(await screen.findByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
       expect(screen.getByText(guidance)).toBeInTheDocument();
+      if (phase === 'review') {
+        expect(screen.queryByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeNull();
+      }
     });
 
-    it('renders the Review slate and handoff guidance as visible copy', async () => {
+    it('renders a missing-asset Review slate without claiming slates are handed off', async () => {
+      const missingScene = scene({ title: 'Missing close', durationSeconds: 7 });
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(
+          project('project-1', {
+            targetDurationSeconds: missingScene.durationSeconds,
+            sceneOrder: [missingScene.id],
+            scenes: { [missingScene.id]: missingScene },
+          })
+        )
+      );
       renderRoute('/studio/project-1/review');
 
-      expect(await screen.findByText('conversation.creativeStudio.phase.review.slateDescription')).toBeVisible();
-      expect(screen.getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
-      expect(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeVisible();
+      const preview = await screen.findByRole('region', { name: 'conversation.creativeStudio.preview.title' });
+      expect(within(preview).getByText('Missing close')).toBeVisible();
+      expect(within(preview).getByText('conversation.creativeStudio.scene.durationSeconds')).toBeVisible();
+      expect(within(preview).getByText('conversation.creativeStudio.phase.review.slateDescription')).toBeVisible();
+      expect(within(preview).getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
+      expect(screen.queryByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeNull();
     });
 
     it('renders one localized four-step phase navigation with Brief current', async () => {

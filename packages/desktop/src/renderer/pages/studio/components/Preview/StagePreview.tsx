@@ -31,6 +31,12 @@ export type StagePreviewProps = {
   posterAsset?: StudioAsset | null;
   catalogLoading?: boolean;
   generationDisabled?: boolean;
+  /** Review opts into a non-generating slate; Produce remains the default presentation. */
+  presentation?: 'produce' | 'review';
+  slate?: {
+    title: string;
+    durationSeconds: number;
+  } | null;
   onOpenSingleReview?: (request: GenerationSingleReviewRequest) => void;
 };
 
@@ -71,6 +77,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   posterAsset = null,
   catalogLoading = false,
   generationDisabled = false,
+  presentation = 'produce',
+  slate = null,
   onOpenSingleReview,
 }) => {
   const { t } = useTranslation();
@@ -113,6 +121,38 @@ const StagePreview: React.FC<StagePreviewProps> = ({
 
   if (selectedAssetId === null) {
     const PlaceholderIcon = mediaKind === 'video' ? VideoOne : Picture;
+    if (presentation === 'review' && slate !== null) {
+      return (
+        <section
+          aria-label={t('conversation.creativeStudio.preview.title')}
+          className='flex min-h-320px flex-col items-center justify-center gap-10px rounded-12px border border-border-2 bg-fill-1 p-24px text-center'
+        >
+          <div
+            role='img'
+            aria-label={accessibleName}
+            className='flex h-64px w-64px items-center justify-center rounded-full bg-fill-2 text-30px text-t-tertiary'
+          >
+            <PlaceholderIcon />
+          </div>
+          <p className='m-0 text-12px font-600 uppercase tracking-wide text-t-tertiary'>
+            {t('conversation.creativeStudio.phase.review.slateLabel')}
+          </p>
+          <h2 className='m-0 text-18px font-600 text-t-primary'>{slate.title}</h2>
+          <p className='m-0 text-13px text-t-secondary'>
+            {t('conversation.creativeStudio.scene.durationSeconds', {
+              count: slate.durationSeconds,
+              seconds: slate.durationSeconds,
+            })}
+          </p>
+          <p className='m-0 max-w-480px text-13px text-t-secondary'>
+            {t('conversation.creativeStudio.phase.review.slateDescription')}
+          </p>
+          <p className='m-0 max-w-480px text-12px text-t-tertiary'>
+            {t('conversation.creativeStudio.phase.review.excludedFromHandoff')}
+          </p>
+        </section>
+      );
+    }
     return (
       <section
         aria-label={t('conversation.creativeStudio.preview.title')}

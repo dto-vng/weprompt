@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { SceneTimeline } from '../../SceneTimeline';
-import { AssetStrip, StagePreview } from '../../Preview';
+import { ReviewCut } from '../../Preview';
 import type { ReviewPhaseController } from '../types';
 import styles from './ReviewPhase.module.css';
 
@@ -19,15 +18,7 @@ export type ReviewPhaseProps = {
 export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller }) => {
   const { t } = useTranslation();
   const { project, readiness, editor, selectedAsset, posterAsset, mutationPending, selectVariation } = controller;
-  const selectedScene = editor.selectedSceneId === null ? null : (project.scenes[editor.selectedSceneId] ?? null);
-  const canonicalOrderedScenes = useMemo(
-    () =>
-      project.sceneOrder.flatMap((sceneId) => {
-        const scene = project.scenes[sceneId];
-        return scene === undefined ? [] : [scene];
-      }),
-    [project]
-  );
+  const missingSlateCount = Math.max(0, readiness.totalSceneCount - readiness.selectedAssetCount);
 
   return (
     <section className={styles.phase} aria-labelledby='studio-review-phase-heading'>
@@ -35,47 +26,35 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller }) => {
         {t('conversation.creativeStudio.phase.review.title')}
       </h2>
       <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.review.description')}</p>
-      <section aria-labelledby='studio-review-slate-heading'>
-        <h3 id='studio-review-slate-heading' className='m-0 text-14px font-600 text-t-primary'>
-          {t('conversation.creativeStudio.phase.review.slateLabel')}
-        </h3>
-        <p className='m-0 text-12px text-t-secondary'>
-          {t('conversation.creativeStudio.phase.review.slateDescription')}
-        </p>
-        <p className='m-0 text-12px text-t-secondary'>
-          {t('conversation.creativeStudio.phase.review.excludedFromHandoff')}
-        </p>
-      </section>
       <div className={styles.previewArea}>
-        <StagePreview
-          projectId={project.id}
+        <ReviewCut
           project={project}
-          selectedScene={selectedScene}
+          readiness={readiness}
+          selectedSceneId={editor.selectedSceneId}
           selectedAsset={selectedAsset}
           posterAsset={posterAsset}
-          generationDisabled
-        />
-        <AssetStrip
-          projectId={project.id}
-          scene={selectedScene}
-          assets={project.assets}
-          projectRevision={project.revision}
           mutationPending={mutationPending || editor.hasUnsavedSceneDrafts}
           onSelectAsset={selectVariation}
+          onSelectScene={editor.selectScene}
         />
       </div>
-      <SceneTimeline
-        orderedScenes={canonicalOrderedScenes}
-        selectedSceneId={editor.selectedSceneId}
-        onSelectScene={editor.selectScene}
-      />
-      <section aria-labelledby='studio-review-handoff-heading'>
+      <section aria-labelledby='studio-review-handoff-heading' className={styles.handoff}>
         <h3 id='studio-review-handoff-heading' className='m-0 text-14px font-600 text-t-primary'>
           {t('conversation.creativeStudio.phase.review.handoff')}
         </h3>
-        <p className='m-0 text-12px text-t-secondary'>
-          {t('conversation.creativeStudio.phase.review.handoffDescription')}
-        </p>
+        <div className={styles.handoffSummary}>
+          <span>
+            {t('conversation.creativeStudio.phase.review.renderedShots', {
+              count: readiness.selectedAssetCount,
+            })}
+          </span>
+          <span>
+            {t('conversation.creativeStudio.phase.review.missingSlates', {
+              count: missingSlateCount,
+            })}
+          </span>
+        </div>
+        <p className='m-0 text-12px text-t-secondary'>{t('conversation.creativeStudio.export.body')}</p>
         {readiness.selectedAssetCount === 0 && (
           <p className='m-0 text-12px text-t-secondary'>{t('conversation.creativeStudio.phase.review.noAssets')}</p>
         )}

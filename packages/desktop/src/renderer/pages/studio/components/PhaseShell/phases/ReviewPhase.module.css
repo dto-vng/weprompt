@@ -22,3 +22,26 @@
   flex-direction: column;
   gap: 16px;
 }
+
+.handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 12px;
+  background: var(--color-fill-1);
+  padding: 14px;
+}
+
+.handoffSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.handoffSummary span {
+  border-radius: 999px;
+  background: var(--color-fill-2);
+  padding: 4px 8px;
+}
