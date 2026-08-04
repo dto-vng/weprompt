@@ -952,6 +952,25 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
         };
       }
 
+      const minimumTotalSeconds = durationItems.reduce(
+        (total, item) => total + item.minDurationSeconds,
+        lockedTotalSeconds
+      );
+      const maximumTotalSeconds = durationItems.reduce(
+        (total, item) => total + item.maxDurationSeconds,
+        lockedTotalSeconds
+      );
+      if (project.targetDurationSeconds < minimumTotalSeconds || project.targetDurationSeconds > maximumTotalSeconds) {
+        return {
+          status: 'unreachable',
+          reason: 'target_out_of_bounds',
+          project: rendererProject,
+          lockedSceneIds,
+          minimumTotalSeconds,
+          maximumTotalSeconds,
+        };
+      }
+
       const fitted = fitStoryboardDurations(durationItems, project.targetDurationSeconds - lockedTotalSeconds);
       if (fitted.status === 'unreachable') {
         return {

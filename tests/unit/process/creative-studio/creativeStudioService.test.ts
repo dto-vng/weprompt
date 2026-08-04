@@ -1770,6 +1770,79 @@ describe('CreativeStudioService', () => {
         });
       });
 
+      it('returns full-project bounds without writing when locked duration exceeds the target', async () => {
+        const bounded = routeOption('video', {
+          constraints: {
+            ...routeOption('video').constraints,
+            minDurationSeconds: 4,
+            maxDurationSeconds: 8,
+          },
+        });
+        const harness = await createFitHarness({
+          targetDurationSeconds: 15,
+          scenes: [
+            { id: 'locked_scene', durationSeconds: 20 },
+            { id: 'adjustable_scene', durationSeconds: 8 },
+          ],
+          routes: [bounded],
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+        const before = structuredClone((await harness.store.getProject(harness.canonical.id))!);
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'target_out_of_bounds',
+          lockedSceneIds: ['locked_scene'],
+          minimumTotalSeconds: 24,
+          maximumTotalSeconds: 28,
+          project: {
+            revision: before.revision,
+            updatedAt: before.updatedAt,
+            scenes: {
+              locked_scene: { durationSeconds: 20 },
+              adjustable_scene: { durationSeconds: 8 },
+            },
+          },
+        });
+        expect(updateProject).not.toHaveBeenCalled();
+        expect(onProjectUpdated).not.toHaveBeenCalled();
+        await expect(harness.store.getProject(before.id)).resolves.toEqual(before);
+      });
+
+      it('returns full-project bounds when locked duration equals the target but adjustable minimum is positive', async () => {
+        const harness = await createFitHarness({
+          targetDurationSeconds: 15,
+          scenes: [
+            { id: 'locked_scene', durationSeconds: 15 },
+            { id: 'adjustable_scene', durationSeconds: 8 },
+          ],
+          mutate: (project) => {
+            const asset = { ...makeGeneratedAsset(project), id: 'locked_asset', sceneId: 'locked_scene' };
+            project.assets[asset.id] = asset;
+            project.scenes.locked_scene!.assetIds = [asset.id];
+          },
+        });
+        const before = structuredClone((await harness.store.getProject(harness.canonical.id))!);
+        const updateProject = vi.spyOn(harness.store, 'updateProject');
+
+        await expect(harness.fit()).resolves.toMatchObject({
+          status: 'unreachable',
+          reason: 'target_out_of_bounds',
+          lockedSceneIds: ['locked_scene'],
+          minimumTotalSeconds: 16,
+          maximumTotalSeconds: 27,
+          project: { revision: before.revision, updatedAt: before.updatedAt },
+        });
+        expect(updateProject).not.toHaveBeenCalled();
+        expect(onProjectUpdated).not.toHaveBeenCalled();
+        await expect(harness.store.getProject(before.id)).resolves.toEqual(before);
+      });
+
       it.each(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention'] as const)(
         'locks exactly the active %s job status',
         async (status) => {
