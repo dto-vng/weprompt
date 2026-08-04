@@ -382,7 +382,7 @@ const validateScene = (sceneId: string, value: unknown): value is StudioScene =>
     Object.keys(value).every((key) => SCENE_KEYS.has(key)) &&
     value.id === sceneId &&
     isSafeId(sceneId) &&
-    isNonEmptyString(value.title) &&
+    isString(value.title) &&
     isString(value.purpose) &&
     isString(value.visualPrompt) &&
     isString(value.narration) &&

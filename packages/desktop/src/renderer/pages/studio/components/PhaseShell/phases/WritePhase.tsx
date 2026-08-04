@@ -8,11 +8,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveSceneDurationBounds } from '../../../studioRouteConstraints';
-import { StoryboardPanel, WriteSceneRow } from '../../Storyboard';
 import { AssistantDock } from '../AssistantDock';
 import type { WritePhaseController } from '../types';
 import type { StudioLayoutMode } from '../useStudioLayoutMode';
-import styles from './WritePhase.module.css';
+import { PacingBar, ScriptRow, ScriptTable } from './write';
+import styles from './write/write.module.css';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 
@@ -29,6 +29,7 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode =
     editor,
     models,
     writeFocusIntent,
+    advisory,
     mutationPending,
     openDraftReview,
     importReference,
@@ -104,27 +105,26 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode =
 
   return (
     <section data-layout={layoutMode} className={styles.phase} aria-labelledby='studio-write-phase-heading'>
-      <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
-        {t('conversation.creativeStudio.phase.write.title')}
-      </h2>
-      <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.write.description')}</p>
-      <p className='m-0 text-12px text-t-tertiary'>{t('conversation.creativeStudio.phase.shared.noMediaGeneration')}</p>
+      <div className={styles.intro}>
+        <div>
+          <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
+            {t('conversation.creativeStudio.phase.write.title')}
+          </h2>
+          <p className='mb-0 mt-4px text-12px text-t-tertiary'>
+            {t('conversation.creativeStudio.phase.shared.noMediaGeneration')}
+          </p>
+        </div>
+        <p className={styles.briefLine}>
+          <strong>{t('conversation.creativeStudio.project.brief')}</strong>
+          <span>{project.brief}</span>
+        </p>
+      </div>
       <div className={styles.workspace} data-layout={layoutMode}>
-        <div className={styles.storyboardSlot}>
-          <StoryboardPanel
+        <div className={styles.mainColumn}>
+          <ScriptTable
             orderedScenes={editor.orderedScenes}
-            selectedSceneId={editor.selectedSceneId}
-            targetDurationSeconds={project.targetDurationSeconds}
-            durationTotalSeconds={editor.durationTotalSeconds}
-            durationMatchesTarget={editor.durationMatchesTarget}
-            remainingDurationSeconds={editor.remainingDurationSeconds}
-            suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
             canAddScene={editor.canAddScene}
             mutationPending={mutationPending}
-            fitDisabled={fitDisabled}
-            fitOutcome={currentFitOutcome}
-            hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
-            sceneStatuses={readiness.sceneStatuses}
             errorMessageKey={panelConflict?.messageKey ?? firstSceneIssue?.messageKey ?? nonDraftError?.messageKey}
             statusMessageKey={
               firstSceneIssue || nonDraftError || panelConflict
@@ -132,18 +132,8 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode =
                 : null
             }
             conflict={panelConflict !== null || firstSceneIssue !== null}
-            onSelectScene={editor.selectScene}
             onAddScene={editor.addScene}
-            onIncreaseTargetDuration={editor.increaseTargetDuration}
-            onFitToTarget={() => {
-              const catalogVersion = models.catalog?.catalogVersion;
-              if (fitDisabled || !catalogVersion) return;
-              editor.clearLatestFitOutcome();
-              void editor.fitToTarget(catalogVersion);
-            }}
-            onRemoveScene={editor.removeScene}
             onReorderScenes={editor.reorderScenes}
-            onMoveScene={editor.moveScene}
             onRetryConflict={
               panelConflict !== null
                 ? editor.retryConflict
@@ -158,55 +148,87 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode =
                   ? () => editor.discardSceneDraftById(firstSceneIssue.sceneId!)
                   : editor.discardConflict
             }
+          >
+            {editor.orderedScenes.map((scene, index) => {
+              const draft = editor.sceneDrafts[scene.id];
+              if (draft === undefined) return null;
+              const saveIssue = editor.saveIssues.find((issue) => issue.sceneId === scene.id) ?? null;
+              const staleConflict = saveConflict?.sceneId === scene.id ? saveConflict : null;
+              const issue = staleConflict ?? saveIssue;
+              const referenceAsset =
+                scene.referenceAssetId === null ? null : (project.assets[scene.referenceAssetId] ?? null);
+              return (
+                <ScriptRow
+                  key={scene.id}
+                  projectId={project.id}
+                  scene={project.scenes[scene.id] ?? scene}
+                  draft={draft}
+                  index={index}
+                  sceneCount={editor.orderedScenes.length}
+                  status={readiness.sceneStatuses[scene.id] ?? 'needs_prompt'}
+                  referenceAsset={referenceAsset}
+                  saveState={editor.sceneSaveStates[scene.id] ?? 'saved'}
+                  errorMessageKey={issue?.messageKey ?? null}
+                  conflict={issue !== null}
+                  selected={editor.selectedSceneId === scene.id}
+                  mutationPending={mutationPending}
+                  importingReference={importingSceneId === scene.id}
+                  removeDisabled={scene.assetIds.length > 0 || scene.jobIds.length > 0}
+                  moveUpDisabled={index === 0}
+                  moveDownDisabled={index === editor.orderedScenes.length - 1}
+                  durationBoundsByMediaKind={{
+                    image: resolveSceneDurationBounds(project, models.catalog, 'image'),
+                    video: resolveSceneDurationBounds(project, models.catalog, 'video'),
+                  }}
+                  onSelect={() => editor.selectScene(scene.id)}
+                  onUpdate={(patch) => editor.updateSceneDraftById(scene.id, patch)}
+                  onFlush={() => editor.flushSceneDraftById(scene.id)}
+                  onRetryConflict={
+                    staleConflict !== null ? editor.retryConflict : () => editor.flushSceneDraftById(scene.id)
+                  }
+                  onDiscardConflict={
+                    staleConflict !== null ? editor.discardConflict : () => editor.discardSceneDraftById(scene.id)
+                  }
+                  onImportReference={() => {
+                    if (importingSceneId !== null) return;
+                    setImportingSceneId(scene.id);
+                    void importReference(scene.id).finally(() => setImportingSceneId(null));
+                  }}
+                  onSuggestVisual={() => {
+                    editor.selectScene(scene.id);
+                    if (layoutMode === 'inline') {
+                      document.querySelector<HTMLElement>("[data-assistant-presentation='inline']")?.focus();
+                    } else {
+                      setAssistantOpen(true);
+                    }
+                  }}
+                  onRemove={() => editor.removeScene(scene.id)}
+                  onMove={(direction) => editor.moveScene(scene.id, direction)}
+                />
+              );
+            })}
+          </ScriptTable>
+          <PacingBar
+            orderedScenes={editor.orderedScenes}
+            selectedSceneId={editor.selectedSceneId}
+            targetDurationSeconds={project.targetDurationSeconds}
+            durationTotalSeconds={editor.durationTotalSeconds}
+            durationMatchesTarget={editor.durationMatchesTarget}
+            fitDisabled={fitDisabled}
+            fitOutcome={currentFitOutcome}
+            hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
+            advisoryMessageKey={advisory?.anchor === 'pacing' ? advisory.messageKey : null}
+            onSelectScene={editor.selectScene}
+            onFitToGoal={() => {
+              const catalogVersion = models.catalog?.catalogVersion;
+              if (fitDisabled || !catalogVersion) return;
+              editor.clearLatestFitOutcome();
+              void editor.fitToTarget(catalogVersion);
+            }}
           />
         </div>
 
-        <div className={styles.sceneRows}>
-          {editor.orderedScenes.map((scene) => {
-            const draft = editor.sceneDrafts[scene.id];
-            if (draft === undefined) return null;
-            const saveIssue = editor.saveIssues.find((issue) => issue.sceneId === scene.id) ?? null;
-            const staleConflict = saveConflict?.sceneId === scene.id ? saveConflict : null;
-            const issue = staleConflict ?? saveIssue;
-            const referenceAsset =
-              scene.referenceAssetId === null ? null : (project.assets[scene.referenceAssetId] ?? null);
-            return (
-              <WriteSceneRow
-                key={scene.id}
-                projectId={project.id}
-                scene={project.scenes[scene.id] ?? scene}
-                draft={draft}
-                referenceAsset={referenceAsset}
-                saveState={editor.sceneSaveStates[scene.id] ?? 'saved'}
-                errorMessageKey={issue?.messageKey ?? null}
-                conflict={issue !== null}
-                selected={editor.selectedSceneId === scene.id}
-                mutationPending={mutationPending}
-                importingReference={importingSceneId === scene.id}
-                durationBoundsByMediaKind={{
-                  image: resolveSceneDurationBounds(project, models.catalog, 'image'),
-                  video: resolveSceneDurationBounds(project, models.catalog, 'video'),
-                }}
-                onSelect={() => editor.selectScene(scene.id)}
-                onUpdate={(patch) => editor.updateSceneDraftById(scene.id, patch)}
-                onFlush={() => editor.flushSceneDraftById(scene.id)}
-                onRetryConflict={
-                  staleConflict !== null ? editor.retryConflict : () => editor.flushSceneDraftById(scene.id)
-                }
-                onDiscardConflict={
-                  staleConflict !== null ? editor.discardConflict : () => editor.discardSceneDraftById(scene.id)
-                }
-                onImportReference={() => {
-                  if (importingSceneId !== null) return;
-                  setImportingSceneId(scene.id);
-                  void importReference(scene.id).finally(() => setImportingSceneId(null));
-                }}
-              />
-            );
-          })}
-        </div>
-
-        <div className={styles.assistantSlot}>
+        <div className={styles.assistantSlot} data-write-assistant-column data-layout={layoutMode}>
           <AssistantDock
             kind='write'
             layoutMode={layoutMode}

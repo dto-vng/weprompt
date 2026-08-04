@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -253,6 +253,126 @@ describe('WritePhase', () => {
     vi.unstubAllGlobals();
   });
 
+  it('lays out every seeded shot as one four-zone script row', () => {
+    render(<WritePhase controller={controller()} />);
+
+    const table = screen.getByRole('region', {
+      name: 'conversation.creativeStudio.phase.write.scriptTableTitle',
+    });
+    const opening = within(table).getByRole('region', { name: 'Opening' });
+    const reveal = within(table).getByRole('region', { name: 'Reveal' });
+
+    for (const row of [opening, reveal]) {
+      expect(
+        [...row.querySelectorAll('[data-script-zone]')].map((zone) => zone.getAttribute('data-script-zone'))
+      ).toEqual(['timing', 'script', 'visual', 'output']);
+      expect(
+        within(row).getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' })
+      ).toBeInTheDocument();
+      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toBeInTheDocument();
+      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toBeInTheDocument();
+      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toBeInTheDocument();
+      expect(
+        within(row).getByRole('combobox', { name: 'conversation.creativeStudio.inspector.mediaKindLabel' })
+      ).toBeInTheDocument();
+    }
+  });
+
+  it('offers a visual suggestion from an empty visual cell', () => {
+    const emptyReveal = scene('scene-2', {
+      visualPrompt: '',
+      referenceAssetId: reference.id,
+      assetIds: [reference.id],
+    });
+    const emptyScenes = [scenes[0]!, emptyReveal];
+    const emptyProject: StudioRendererProject = {
+      ...project,
+      sceneOrder: emptyScenes.map(({ id }) => id),
+      scenes: Object.fromEntries(emptyScenes.map((item) => [item.id, item])),
+    };
+    const phaseEditor = editor('scene-1', {
+      project: emptyProject,
+      orderedScenes: emptyScenes,
+      sceneDrafts: Object.fromEntries(emptyScenes.map((item) => [item.id, editable(item)])),
+    });
+
+    render(<WritePhase controller={controller({ project: emptyProject, editor: phaseEditor })} />);
+
+    const reveal = screen.getByRole('region', { name: 'Reveal' });
+    expect(within(reveal).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toHaveAttribute(
+      'placeholder',
+      'conversation.creativeStudio.phase.write.visualPlaceholder'
+    );
+    expect(
+      within(reveal).getByRole('button', { name: 'conversation.creativeStudio.phase.write.suggestVisual' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a cleared title local and surfaces the required field error', () => {
+    const clearedDraft = { ...editable(scenes[0]!), title: '' };
+    const phaseEditor = editor('scene-1', {
+      sceneDrafts: { 'scene-1': clearedDraft, 'scene-2': editable(scenes[1]!) },
+    });
+    render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+    const title = screen.getAllByLabelText('conversation.creativeStudio.inspector.titleLabel')[0]!;
+    const opening = title.closest('section');
+    expect(opening).not.toBeNull();
+    expect(title).toHaveAttribute('maxlength', '256');
+    expect(within(opening!).getByRole('alert')).toHaveTextContent(
+      'conversation.creativeStudio.phase.write.invalidTitle'
+    );
+
+    fireEvent.blur(title);
+    fireEvent.blur(within(opening!).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel'));
+    expect(phaseEditor.flushSceneDraftById).not.toHaveBeenCalled();
+  });
+
+  it('renders empty seeded titles as position-based placeholders and needs-title readiness', () => {
+    const emptyScenes = [
+      scene('scene-1', { title: '' }),
+      scene('scene-2', { title: '' }),
+      scene('scene-3', { title: '', durationSeconds: 4 }),
+    ];
+    const emptyProject: StudioRendererProject = {
+      ...project,
+      sceneOrder: emptyScenes.map(({ id }) => id),
+      scenes: Object.fromEntries(emptyScenes.map((item) => [item.id, item])),
+    };
+    const phaseEditor = editor('scene-1', {
+      project: emptyProject,
+      orderedScenes: emptyScenes,
+      sceneDrafts: Object.fromEntries(emptyScenes.map((item) => [item.id, editable(item)])),
+    });
+
+    render(
+      <WritePhase
+        controller={controller({
+          project: emptyProject,
+          editor: phaseEditor,
+          readiness: {
+            sceneStatuses: { 'scene-1': 'needs_prompt', 'scene-2': 'needs_prompt', 'scene-3': 'needs_prompt' },
+            totalSceneCount: 3,
+            readySceneIds: [],
+            selectedAssetCount: 0,
+            durationDeltaSeconds: -1,
+          },
+        })}
+      />
+    );
+
+    expect(
+      screen
+        .getAllByLabelText('conversation.creativeStudio.inspector.titleLabel')
+        .map((input) => input.getAttribute('placeholder'))
+    ).toEqual([
+      'conversation.creativeStudio.phase.write.placeholder.opening',
+      'conversation.creativeStudio.phase.write.placeholder.middle',
+      'conversation.creativeStudio.phase.write.placeholder.closing',
+    ]);
+    expect(screen.getAllByText('conversation.creativeStudio.phase.write.needsTitle')).toHaveLength(3);
+  });
+
   it('renders every scene as a by-ID editor with route-aware duration bounds', () => {
     const props = controller();
     render(<WritePhase controller={props} />);
@@ -329,7 +449,7 @@ describe('WritePhase', () => {
       'weprompt-studio://asset/project-1/reference-2'
     );
     const referenceActions = screen.getAllByRole('button', {
-      name: 'conversation.creativeStudio.preview.importReference',
+      name: 'conversation.creativeStudio.phase.write.addReference',
     });
     expect(referenceActions).toHaveLength(2);
     fireEvent.click(referenceActions[1]!);
@@ -342,13 +462,70 @@ describe('WritePhase', () => {
     render(<WritePhase controller={props} />);
 
     const fitButton = screen.getByRole('button', {
-      name: 'conversation.creativeStudio.storyboard.fitToTarget',
+      name: 'conversation.creativeStudio.phase.write.fitToGoal',
     });
     expect(fitButton).toBeEnabled();
     fireEvent.click(fitButton);
     expect(phaseEditor.fitToTarget).toHaveBeenCalledWith('0123456789abcdef');
     expect(screen.queryByRole('button', { name: /render|generate image|generate video/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/credit|session spend|estimated cost/i)).not.toBeInTheDocument();
+  });
+
+  it('renders proportional pacing blocks, positions the goal marker, and selects a clicked shot', () => {
+    const phaseEditor = editor('scene-1', { hasUnsavedSceneDrafts: false });
+    render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+    const pacing = screen.getByRole('region', {
+      name: 'conversation.creativeStudio.phase.write.pacingTitle',
+    });
+    const blocks = [...pacing.querySelectorAll<HTMLElement>('[data-pacing-scene]')];
+    expect(blocks.map((block) => block.style.flexGrow)).toEqual(['5', '6']);
+    expect(pacing.querySelector<HTMLElement>('[data-pacing-shot-span]')).toHaveStyle({
+      width: `${(11 / 15) * 100}%`,
+    });
+    expect(pacing.querySelector<HTMLElement>('[data-pacing-goal]')).toHaveStyle({
+      left: `${(15 / 11) * 100}%`,
+    });
+
+    fireEvent.click(within(pacing).getAllByRole('button')[1]!);
+    expect(phaseEditor.selectScene).toHaveBeenCalledWith('scene-2');
+  });
+
+  it('renders the Write timing advisory exactly once at the pacing bar', () => {
+    render(
+      <WritePhase
+        controller={controller({
+          advisory: {
+            messageKey: 'conversation.creativeStudio.review.durationMismatch',
+            anchor: 'pacing',
+          },
+        })}
+      />
+    );
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.review.durationMismatch');
+  });
+
+  it('docks the assistant in the inline right column and keeps the drawer trigger for narrower layouts', () => {
+    const view = render(<WritePhase controller={controller()} layoutMode='inline' />);
+
+    const assistant = screen.getByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    expect(assistant).toHaveAttribute('data-assistant-presentation', 'inline');
+    expect(assistant.closest('[data-write-assistant-column]')).toHaveAttribute('data-layout', 'inline');
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })
+    ).not.toBeInTheDocument();
+
+    view.rerender(<WritePhase controller={controller()} layoutMode='drawer' />);
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+    ).not.toBeInTheDocument();
   });
 
   it('selects and focuses the requested visual prompt, then clears the route intent', async () => {

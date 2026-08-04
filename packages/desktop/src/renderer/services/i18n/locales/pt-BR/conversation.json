@@ -908,7 +908,26 @@
         "addShot": "Adicionar tomada",
         "addVisual": "Adicionar visual",
         "fitToGoal": "Ajustar à meta",
-        "noScenes": "Adicione uma tomada ou crie um rascunho do storyboard para começar."
+        "noScenes": "Adicione uma tomada ou crie um rascunho do storyboard para começar.",
+        "scriptTableTitle": "Roteiro",
+        "scriptTableHelp": "Uma linha por tomada para ajustar texto, visual, duração e saída em conjunto.",
+        "shotColumn": "Tomada",
+        "scriptColumn": "Roteiro",
+        "visualColumn": "Visual",
+        "outputColumn": "Saída",
+        "visualPlaceholder": "Descreva o que vemos…",
+        "suggestVisual": "Sugerir um visual",
+        "addReference": "Adicionar referência",
+        "invalidTitle": "Insira um título para a tomada antes de salvar.",
+        "placeholder": {
+          "opening": "Tomada de abertura",
+          "middle": "Tomada intermediária",
+          "closing": "Tomada de encerramento"
+        },
+        "needsTitle": "Precisa de título",
+        "pacingTitle": "Ritmo",
+        "pacingSummary": "{{total}} s no total · meta de {{target}} s",
+        "goalMarker": "Meta de {{seconds}} s"
       },
       "produce": {
         "title": "Produzir",
@@ -1048,7 +1067,6 @@
       "discard": "Descartar alterações locais"
     },
     "scene": {
-      "defaultTitle": "Cena sem título",
       "accessibleName": "Cena {{number}}: {{title}}",
       "number": "Cena {{number}}",
       "status": {

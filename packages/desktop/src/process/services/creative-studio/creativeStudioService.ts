@@ -416,7 +416,12 @@ const assertFitStoryboardInput = (input: StudioFitStoryboardRequest): void => {
 
 const batchSceneIsReady = (project: StudioProject, sceneId: string): boolean => {
   const scene = project.scenes[sceneId];
-  if (scene?.id !== sceneId || !project.sceneOrder.includes(sceneId) || scene.visualPrompt.trim().length === 0) {
+  if (
+    scene?.id !== sceneId ||
+    !project.sceneOrder.includes(sceneId) ||
+    scene.title.trim().length === 0 ||
+    scene.visualPrompt.trim().length === 0
+  ) {
     return false;
   }
   const jobs = scene.jobIds.flatMap((jobId) => {
@@ -440,7 +445,7 @@ const batchSceneIsReady = (project: StudioProject, sceneId: string): boolean => 
 };
 
 const assertScene = (scene: StudioEditableScene): void => {
-  assertText(scene.title, 256, 'scene title', true);
+  assertText(scene.title, 256, 'scene title');
   assertText(scene.purpose, 256, 'scene purpose');
   assertText(scene.visualPrompt, 8 * 1024, 'scene visual prompt');
   assertText(scene.narration, 4 * 1024, 'scene narration');
@@ -1210,7 +1215,8 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
                 selectedAssetId: null,
                 assetIds: [],
                 jobIds: [],
-                reviewState: input.scene.visualPrompt.trim().length > 0 ? 'ready' : 'draft',
+                reviewState:
+                  input.scene.title.trim().length > 0 && input.scene.visualPrompt.trim().length > 0 ? 'ready' : 'draft',
               };
             } else {
               const mediaKindChanged = current.mediaKind !== input.scene.mediaKind;
@@ -1234,7 +1240,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
                 assetIds: [...current.assetIds],
                 jobIds: [...current.jobIds],
                 reviewState: mediaKindChanged
-                  ? input.scene.visualPrompt.trim().length > 0
+                  ? input.scene.title.trim().length > 0 && input.scene.visualPrompt.trim().length > 0
                     ? 'ready'
                     : 'draft'
                   : current.reviewState,

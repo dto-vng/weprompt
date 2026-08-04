@@ -902,7 +902,26 @@
         "addShot": "添加镜头",
         "addVisual": "添加视觉素材",
         "fitToGoal": "匹配目标",
-        "noScenes": "添加镜头或起草故事板即可开始。"
+        "noScenes": "添加镜头或起草故事板即可开始。",
+        "scriptTableTitle": "脚本",
+        "scriptTableHelp": "每个镜头一行，同时调整文案、画面、时长和输出。",
+        "shotColumn": "镜头",
+        "scriptColumn": "脚本",
+        "visualColumn": "画面",
+        "outputColumn": "输出",
+        "visualPlaceholder": "描述画面内容…",
+        "suggestVisual": "建议画面",
+        "addReference": "添加参考图",
+        "invalidTitle": "请先输入镜头标题再保存。",
+        "placeholder": {
+          "opening": "开场镜头",
+          "middle": "中段镜头",
+          "closing": "收尾镜头"
+        },
+        "needsTitle": "需要标题",
+        "pacingTitle": "节奏",
+        "pacingSummary": "总时长 {{total}} 秒 · 目标 {{target}} 秒",
+        "goalMarker": "目标 {{seconds}} 秒"
       },
       "produce": {
         "title": "制作",
@@ -1036,7 +1055,6 @@
       "discard": "放弃本地更改"
     },
     "scene": {
-      "defaultTitle": "未命名场景",
       "accessibleName": "场景 {{number}}：{{title}}",
       "number": "场景 {{number}}",
       "status": {

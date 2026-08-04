@@ -116,6 +116,40 @@ describe('deriveStudioReadiness', () => {
     expect(summary.selectedAssetCount).toBe(1);
   });
 
+  it('treats an empty scene title as needing a prompt even when the visual is ready', () => {
+    const missingTitle = scene('missing-title', { title: '   ' });
+    const summary = deriveStudioReadiness(project([missingTitle]));
+
+    expect(summary.sceneStatuses[missingTitle.id]).toBe('needs_prompt');
+    expect(summary.readySceneIds).toEqual([]);
+  });
+
+  it('gives a missing title precedence over active jobs and generated outputs', () => {
+    const active = scene('active-missing-title', { title: '', jobIds: ['active'] });
+    const generated = scene('generated-missing-title', {
+      title: '   ',
+      selectedAssetId: 'selected',
+      assetIds: ['selected'],
+      jobIds: ['succeeded'],
+    });
+    const summary = deriveStudioReadiness(
+      project([active, generated], {
+        assets: { selected: asset('selected', generated.id) },
+        jobs: {
+          active: job('active', active.id, { status: 'running' }),
+          succeeded: job('succeeded', generated.id, { outputAssetIds: ['selected'] }),
+        },
+      })
+    );
+
+    expect(summary.sceneStatuses).toEqual({
+      'active-missing-title': 'needs_prompt',
+      'generated-missing-title': 'needs_prompt',
+    });
+    expect(summary.readySceneIds).toEqual([]);
+    expect(summary.selectedAssetCount).toBe(1);
+  });
+
   it.each(['queued_local', 'submitting', 'queued_remote', 'running'] as const)(
     'treats a canonical %s job as generating even when a selected output exists',
     (status) => {

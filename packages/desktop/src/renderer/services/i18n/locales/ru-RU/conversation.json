@@ -902,7 +902,26 @@
         "addShot": "Добавить кадр",
         "addVisual": "Добавить визуальный материал",
         "fitToGoal": "Подогнать под цель",
-        "noScenes": "Чтобы начать, добавьте кадр или создайте черновик раскадровки."
+        "noScenes": "Чтобы начать, добавьте кадр или создайте черновик раскадровки.",
+        "scriptTableTitle": "Сценарий",
+        "scriptTableHelp": "Один кадр — одна строка: вместе настройте текст, изображение, длительность и формат результата.",
+        "shotColumn": "Кадр",
+        "scriptColumn": "Сценарий",
+        "visualColumn": "Изображение",
+        "outputColumn": "Результат",
+        "visualPlaceholder": "Опишите, что мы видим…",
+        "suggestVisual": "Предложить изображение",
+        "addReference": "Добавить референс",
+        "invalidTitle": "Введите название кадра перед сохранением.",
+        "placeholder": {
+          "opening": "Начальный кадр",
+          "middle": "Промежуточный кадр",
+          "closing": "Финальный кадр"
+        },
+        "needsTitle": "Нужно название",
+        "pacingTitle": "Темп",
+        "pacingSummary": "Всего {{total}} с · цель {{target}} с",
+        "goalMarker": "Цель {{seconds}} с"
       },
       "produce": {
         "title": "Создание",
@@ -1045,7 +1064,6 @@
       "discard": "Отменить локальные изменения"
     },
     "scene": {
-      "defaultTitle": "Сцена без названия",
       "accessibleName": "Сцена {{number}}: {{title}}",
       "number": "Сцена {{number}}",
       "status": {
