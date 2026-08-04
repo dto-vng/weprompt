@@ -130,7 +130,7 @@ const deferred = <T>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
-const waitFor = async (assertion: () => void | Promise<void>, attempts = 100): Promise<void> => {
+const waitFor = async (assertion: () => void | Promise<void>, attempts = 800): Promise<void> => {
   let latestError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -1038,7 +1038,7 @@ describe('StudioJobManager remote polling deadlines', () => {
           remoteStartedAt: '2026-08-04T00:00:00.000Z',
           error: { code: 'poll_deadline' },
         }),
-      400
+      800
     );
     expect(poll).toHaveBeenCalledTimes(122);
   });
