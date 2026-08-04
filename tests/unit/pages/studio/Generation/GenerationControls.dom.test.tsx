@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   StudioRendererProject,
-  StudioRendererJob,
   StudioRouteCatalog,
   StudioRouteCatalogEntry,
 } from '@/common/types/project/creativeStudioTypes';
@@ -107,29 +106,6 @@ const project = (overrides: Partial<StudioRendererProject> = {}): StudioRenderer
   ...overrides,
 });
 
-const job = (overrides: Partial<StudioRendererJob>): StudioRendererJob => ({
-  id: 'job-1',
-  projectId: 'project-1',
-  sceneId: 'scene-1',
-  status: 'running',
-  provider: {
-    choiceId: 'choice_video',
-    providerId: 'provider_video',
-    model: 'seedance-1-5-pro',
-  },
-  outputAssetIds: [],
-  error: null,
-  canCancel: false,
-  canRetryDownload: false,
-  retryOfJobId: null,
-  retryReason: null,
-  duplicateChargeAcknowledged: false,
-  duplicateChargeAcknowledgedAt: null,
-  createdAt: '2026-07-30T00:00:00.000Z',
-  updatedAt: '2026-07-30T00:00:00.000Z',
-  ...overrides,
-});
-
 const createProps = (overrides: Partial<GenerationControlsProps> = {}): GenerationControlsProps => ({
   catalog: catalog(),
   project: project(),
@@ -143,16 +119,9 @@ const createProps = (overrides: Partial<GenerationControlsProps> = {}): Generati
   hasReference: false,
   batchSceneCount: 2,
   disabled: false,
-  jobs: [],
-  pendingJobIds: [],
-  actionIssue: null,
   onOpenSettings: vi.fn(),
   onOpenSingleReview: vi.fn(),
   onOpenBatchReview: vi.fn(),
-  onCancelJob: vi.fn(),
-  onRetryJob: vi.fn(),
-  onRetryDownload: vi.fn(),
-  onReviewUnknownSubmission: vi.fn(),
   ...overrides,
 });
 
@@ -384,291 +353,5 @@ describe('GenerationControls', () => {
         },
       })
     );
-  });
-
-  it('announces indeterminate progress for submitting and running jobs without a numeric percentage', async () => {
-    render(
-      <GenerationControls
-        {...createProps({
-          jobs: [
-            job({ id: 'job-submitting', status: 'submitting', progress: undefined }),
-            job({ id: 'job-running', status: 'running', progress: undefined }),
-            job({ id: 'job-queued', status: 'queued_remote', progress: undefined }),
-          ],
-        })}
-      />
-    );
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-submitting' })).getByRole('progressbar', {
-        name: 'conversation.creativeStudio.jobs.status.submitting',
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-running' })).getByRole('progressbar', {
-        name: 'conversation.creativeStudio.jobs.status.running',
-      })
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-queued' })).queryByRole('progressbar')
-    ).not.toBeInTheDocument();
-  });
-
-  it('announces localized job states, redacts provider details, and delegates only main-authorized cancellation', async () => {
-    const props = createProps({
-      jobs: [
-        job({ id: 'job-running', status: 'running', progress: 42, canCancel: false }),
-        job({ id: 'job-running-cancellable', status: 'running', canCancel: true }),
-        job({
-          id: 'job-failed',
-          status: 'failed',
-          error: {
-            code: 'auth',
-            messageKey: 'conversation.creativeStudio.jobs.errors.auth',
-            rawMessage: 'secret provider response',
-          } as StudioRendererJob['error'],
-        }),
-        job({
-          id: 'job-download',
-          status: 'failed',
-          canRetryDownload: true,
-          error: {
-            code: 'download_failed',
-            messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
-          },
-        }),
-        job({
-          id: 'job-unknown',
-          status: 'needs_attention',
-          error: {
-            code: 'submission_unknown',
-            messageKey: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
-          },
-        }),
-        job({
-          id: 'job-attention',
-          status: 'needs_attention',
-          error: {
-            code: 'provider_unavailable',
-            messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
-          },
-        }),
-        job({ id: 'job-queued', status: 'queued_remote', canCancel: false }),
-      ],
-      actionIssue: {
-        jobId: 'job-running',
-        code: 'cancellation_refused',
-        messageKey: 'conversation.creativeStudio.errors.cancellationRefused',
-      },
-    });
-    const { container } = render(<GenerationControls {...props} />);
-    expect(screen.getAllByText('conversation.creativeStudio.jobs.status.running')).toHaveLength(2);
-    expect(screen.getByText('conversation.creativeStudio.jobs.progress:percent=42')).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.jobs.errors.auth')).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.errors.cancellationRefused')).toBeInTheDocument();
-    expect(screen.queryByText('secret provider response')).not.toBeInTheDocument();
-    expect(screen.queryByText('byteplus-seedance-v1')).not.toBeInTheDocument();
-    expect(container.querySelectorAll('[aria-hidden="true"] svg').length).toBeGreaterThanOrEqual(5);
-
-    expect(
-      screen.queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retry',
-      })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retryDownload',
-      })
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole('listitem', { name: 'job-running-cancellable' })).getByRole('button', {
-        name: 'conversation.creativeStudio.jobs.cancel',
-      })
-    );
-
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-running' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.cancel',
-      })
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-queued' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.cancel',
-      })
-    ).not.toBeInTheDocument();
-    expect(props.onCancelJob).toHaveBeenCalledExactlyOnceWith('job-running-cancellable');
-    await waitFor(() => expect(screen.getAllByRole('status').length).toBeGreaterThanOrEqual(5));
-  });
-
-  it('hides retry on a failed parent while its retry child is active', async () => {
-    render(
-      <GenerationControls
-        {...createProps({
-          jobs: [
-            job({
-              id: 'job-parent',
-              status: 'failed',
-              error: {
-                code: 'auth',
-                messageKey: 'conversation.creativeStudio.jobs.errors.auth',
-              },
-            }),
-            job({
-              id: 'job-child',
-              status: 'running',
-              retryOfJobId: 'job-parent',
-              retryReason: 'provider_failure',
-            }),
-          ],
-        })}
-      />
-    );
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-parent' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retry',
-      })
-    ).not.toBeInTheDocument();
-  });
-
-  it('hides retry when remote polling reached its durable lifecycle deadline', () => {
-    const props = createProps({
-      jobs: [
-        job({
-          id: 'job-poll-deadline',
-          status: 'needs_attention',
-          error: {
-            code: 'poll_deadline',
-            messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
-          },
-        }),
-      ],
-    });
-
-    render(<GenerationControls {...props} />);
-
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-poll-deadline' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retry',
-      })
-    ).not.toBeInTheDocument();
-  });
-
-  it('makes only the terminal retry child retryable after it fails', async () => {
-    const props = createProps({
-      jobs: [
-        job({
-          id: 'job-parent',
-          status: 'failed',
-          error: {
-            code: 'auth',
-            messageKey: 'conversation.creativeStudio.jobs.errors.auth',
-          },
-        }),
-        job({
-          id: 'job-child',
-          status: 'failed',
-          error: {
-            code: 'provider_unavailable',
-            messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
-          },
-          retryOfJobId: 'job-parent',
-          retryReason: 'provider_failure',
-        }),
-      ],
-    });
-    render(<GenerationControls {...props} />);
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-parent' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retry',
-      })
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole('listitem', { name: 'job-child' })).getByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retry',
-      })
-    );
-    expect(props.onRetryJob).toHaveBeenCalledExactlyOnceWith('job-child');
-  });
-
-  it('disables retry when the editor is disabled', async () => {
-    const props = createProps({
-      disabled: true,
-      jobs: [
-        job({
-          id: 'job-failed',
-          status: 'failed',
-          error: {
-            code: 'auth',
-            messageKey: 'conversation.creativeStudio.jobs.errors.auth',
-          },
-        }),
-      ],
-    });
-    render(<GenerationControls {...props} />);
-    const retry = within(screen.getByRole('listitem', { name: 'job-failed' })).getByRole('button', {
-      name: 'conversation.creativeStudio.jobs.retry',
-    });
-    expect(retry).toBeDisabled();
-    fireEvent.click(retry);
-    expect(props.onRetryJob).not.toHaveBeenCalled();
-  });
-
-  it('disables submission-unknown acknowledgement when the editor is disabled', async () => {
-    const props = createProps({
-      disabled: true,
-      jobs: [
-        job({
-          id: 'job-unknown',
-          status: 'needs_attention',
-          error: {
-            code: 'submission_unknown',
-            messageKey: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
-          },
-        }),
-      ],
-    });
-    render(<GenerationControls {...props} />);
-    const retry = within(screen.getByRole('listitem', { name: 'job-unknown' })).getByRole('button', {
-      name: 'conversation.creativeStudio.jobs.retry',
-    });
-    expect(retry).toBeDisabled();
-    fireEvent.click(retry);
-    expect(props.onReviewUnknownSubmission).not.toHaveBeenCalled();
-  });
-
-  it('exposes download retry only when main reports that the download is retryable', async () => {
-    const props = createProps({
-      jobs: [
-        job({
-          id: 'job-download-disabled',
-          status: 'failed',
-          canRetryDownload: false,
-          error: {
-            code: 'download_failed',
-            messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
-          },
-        }),
-        job({
-          id: 'job-download-enabled',
-          status: 'failed',
-          canRetryDownload: true,
-          error: {
-            code: 'download_failed',
-            messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
-          },
-        }),
-      ],
-    });
-    render(<GenerationControls {...props} />);
-    expect(
-      within(screen.getByRole('listitem', { name: 'job-download-disabled' })).queryByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retryDownload',
-      })
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole('listitem', { name: 'job-download-enabled' })).getByRole('button', {
-        name: 'conversation.creativeStudio.jobs.retryDownload',
-      })
-    );
-    expect(props.onRetryDownload).toHaveBeenCalledExactlyOnceWith('job-download-enabled');
   });
 });
