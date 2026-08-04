@@ -5,10 +5,11 @@
  */
 
 import { Button } from '@arco-design/web-react';
-import { Download, Magic, VideoOne } from '@icon-park/react';
+import { Download, Right } from '@icon-park/react';
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { SelectedSceneSaveState } from '../../hooks/useStoryboardEditor';
 import type { StudioPhase } from '../../studioPhaseRoute';
 import { BriefPhase, ProducePhase, ReviewPhase, WritePhase } from './phases';
 import { StudioPhaseHeader } from './StudioPhaseHeader';
@@ -44,88 +45,75 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
     return () => cancelAnimationFrame(frame);
   }, [activePhase, controller.writeFocusIntent]);
 
-  const hasStoryboard = controller.project.sceneOrder.length > 0;
-  const storyboardReady =
-    controller.models.catalog?.storyboard.status === 'ready' && controller.models.catalog.storyboard.selected !== null;
+  const shellSaveState: SelectedSceneSaveState = (() => {
+    const states = new Set([controller.editor.projectSaveState, ...Object.values(controller.editor.sceneSaveStates)]);
+    if (states.has('failed')) return 'failed';
+    if (states.has('saving')) return 'saving';
+    if (controller.editor.hasUnsavedProjectDraft || controller.editor.hasUnsavedSceneDrafts) return 'dirty';
+    return 'saved';
+  })();
   const headerAction = (() => {
     switch (activePhase) {
       case 'brief':
-        return (
-          <Button type='primary' onClick={() => controller.requestTransition({ phase: 'write' })}>
-            {t('conversation.creativeStudio.phase.brief.startWriting')}
-          </Button>
-        );
+        return undefined;
       case 'write':
         return (
           <Button
-            type={hasStoryboard ? 'default' : 'primary'}
-            icon={<Magic />}
-            loading={controller.editor.drafting}
-            disabled={
-              controller.editor.drafting ||
-              controller.editor.conflict !== null ||
-              !storyboardReady ||
-              controller.mutationPending
-            }
-            onClick={controller.openDraftReview}
+            type='primary'
+            disabled={navigationDisabled || controller.mutationPending}
+            onClick={() => controller.requestTransition({ phase: 'produce' })}
           >
-            {t(
-              hasStoryboard
-                ? 'conversation.creativeStudio.draft.redraftAction'
-                : 'conversation.creativeStudio.draft.action'
-            )}
+            {t('conversation.creativeStudio.phase.write.continueToProduce')}
+            <Right aria-hidden='true' />
           </Button>
         );
       case 'produce':
         return (
-          <div className={styles.actionStack}>
-            <Button
-              icon={<VideoOne />}
-              loading={controller.jobs.mutationPending}
-              disabled={controller.mutationPending || controller.readiness.readySceneIds.length === 0}
-              onClick={() => void controller.openReadyScenesReview()}
-            >
-              {t('conversation.creativeStudio.review.generateReadyScenes', {
-                count: controller.readiness.readySceneIds.length,
-              })}
-            </Button>
-            {controller.readiness.readySceneIds.length === 0 && (
-              <span className={styles.actionIssue} aria-live='polite'>
-                {t('conversation.creativeStudio.review.noReadyScenes')}
-              </span>
-            )}
-          </div>
+          <Button
+            type='primary'
+            disabled={navigationDisabled || controller.mutationPending}
+            onClick={() => controller.requestTransition({ phase: 'review' })}
+          >
+            {t('conversation.creativeStudio.phase.produce.reviewCut')}
+            <Right aria-hidden='true' />
+          </Button>
         );
       case 'review':
         return (
-          <div className={styles.actionStack}>
-            <Button
-              icon={<Download />}
-              disabled={controller.mutationPending || controller.readiness.selectedAssetCount === 0}
-              onClick={controller.openExport}
-            >
-              {t('conversation.creativeStudio.export.action')}
-            </Button>
-            {controller.readiness.selectedAssetCount === 0 && (
-              <span className={styles.actionIssue} aria-live='polite'>
-                {t('conversation.creativeStudio.export.noAssetsToExport')}
-              </span>
-            )}
-          </div>
+          <Button
+            type='primary'
+            icon={<Download />}
+            disabled={navigationDisabled || controller.mutationPending || controller.readiness.selectedAssetCount === 0}
+            onClick={controller.openExport}
+          >
+            {t('conversation.creativeStudio.phase.review.handoff')}
+          </Button>
         );
     }
   })();
 
   return (
     <div ref={containerRef} data-studio-layout-root data-layout={layoutMode} className={styles.shell}>
-      <StudioPhaseHeader project={controller.project} onBack={onBack} actions={headerAction} />
+      <StudioPhaseHeader
+        project={controller.project}
+        saveState={shellSaveState}
+        onBack={onBack}
+        actions={headerAction}
+      />
       <StudioPhaseNav
         activePhase={activePhase}
+        project={controller.project}
+        readiness={controller.readiness}
         disabled={navigationDisabled}
         onSelect={(phase) => {
           if (phase !== activePhase) controller.requestTransition({ phase });
         }}
       />
+      {controller.advisory?.anchor === 'shell' && (
+        <div role='alert' className={styles.shellAdvisory}>
+          {t(controller.advisory.messageKey)}
+        </div>
+      )}
       <div className={styles.phaseFrame}>
         {activePhase === 'brief' && <BriefPhase controller={controller} layoutMode={layoutMode} />}
         {activePhase === 'write' && <WritePhase controller={controller} layoutMode={layoutMode} />}

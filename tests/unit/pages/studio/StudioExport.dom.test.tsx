@@ -177,7 +177,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.export.body');
@@ -211,7 +211,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     fireEvent.click(
@@ -246,7 +246,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     fireEvent.click(
@@ -283,7 +283,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     fireEvent.click(
@@ -308,7 +308,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     fireEvent.click(
@@ -327,10 +327,10 @@ describe('Studio asset export', () => {
     renderProject();
 
     const exportAction = await screen.findByRole('button', {
-      name: 'conversation.creativeStudio.export.action',
+      name: 'conversation.creativeStudio.phase.review.handoff',
     });
     expect(exportAction).toBeDisabled();
-    expect(screen.getByText('conversation.creativeStudio.export.noAssetsToExport')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.noAssets')).toBeVisible();
     fireEvent.click(exportAction);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -349,7 +349,7 @@ describe('Studio asset export', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.export.action',
+        name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
     fireEvent.click(
@@ -381,7 +381,7 @@ describe('Studio asset export', () => {
     );
     await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
     expect(router.state.location.pathname).toBe('/studio/project-1/write');
-    expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.export.action' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.phase.review.handoff' })).toBeNull();
     expect(bridge.chooseAndExportAssets.invoke).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -389,6 +389,6 @@ describe('Studio asset export', () => {
       await save.promise;
     });
     await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/review'));
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.export.action' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.handoff' })).toBeEnabled();
   });
 });

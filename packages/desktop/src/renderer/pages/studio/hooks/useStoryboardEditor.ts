@@ -51,6 +51,11 @@ export type StoryboardEditorConflict = StoryboardEditorIssue & {
 
 export type SelectedSceneSaveState = 'saved' | 'dirty' | 'saving' | 'failed';
 
+export type SceneDraftFlushResult = {
+  failed: string[];
+  dirtied: string[];
+};
+
 export type StudioProjectDraft = Pick<
   StudioRendererProject,
   'name' | 'brief' | 'aspectRatio' | 'targetDurationSeconds'
@@ -84,7 +89,7 @@ export type UseStoryboardEditorResult = {
   discardProjectDraft: () => void;
   flushSceneDraft: () => Promise<boolean>;
   flushSceneDraftById: (sceneId: string) => Promise<boolean>;
-  flushAllSceneDrafts: () => Promise<boolean>;
+  flushAllSceneDrafts: () => Promise<SceneDraftFlushResult>;
   discardSceneDraft: () => void;
   discardSceneDraftById: (sceneId: string) => void;
   addScene: () => Promise<boolean>;
@@ -772,19 +777,81 @@ export const useStoryboardEditor = ({
     [clearSaveTimer, drainMutationQueue, flushScene]
   );
 
-  const flushAllSceneDrafts = useCallback(async (): Promise<boolean> => {
-    const dirtySceneIds = [...dirtySceneIdsRef.current];
-    for (const sceneId of dirtySceneIds) clearSaveTimer(sceneId);
-    for (const sceneId of dirtySceneIds) {
-      if (internalConflictRef.current !== null) return false;
+  const flushAllSceneDrafts = useCallback(async (): Promise<SceneDraftFlushResult> => {
+    const initialSceneIds = [...dirtySceneIdsRef.current];
+    const initialVersions = new Map(
+      initialSceneIds.map((sceneId) => [sceneId, sceneEditVersionsRef.current.get(sceneId) ?? 0] as const)
+    );
+    const attemptedSceneIds = new Set<string>();
+    const cleanAfterAttemptSceneIds = new Set<string>();
+    const failedSceneIds = new Set<string>();
+    const dirtiedSceneIds = new Set<string>();
+
+    for (const sceneId of initialSceneIds) clearSaveTimer(sceneId);
+    for (const sceneId of initialSceneIds) {
+      const blockingConflict = internalConflictRef.current;
+      if (blockingConflict !== null) {
+        failedSceneIds.add(blockingConflict.publicIssue.sceneId ?? sceneId);
+        break;
+      }
+
+      attemptedSceneIds.add(sceneId);
       const flushed = await flushScene(sceneId);
-      if (!flushed) {
-        await drainMutationQueue();
-        if (dirtySceneIdsRef.current.has(sceneId) || internalConflictRef.current !== null) return false;
+      if (!flushed) await drainMutationQueue();
+
+      const remainsDirty = dirtySceneIdsRef.current.has(sceneId);
+      if (!remainsDirty) {
+        cleanAfterAttemptSceneIds.add(sceneId);
+      } else {
+        const initialVersion = initialVersions.get(sceneId) ?? 0;
+        const currentVersion = sceneEditVersionsRef.current.get(sceneId) ?? 0;
+        const versionChanged = currentVersion !== initialVersion;
+        const saveFailed =
+          saveIssuesRef.current.has(sceneId) || internalConflictRef.current?.publicIssue.sceneId === sceneId;
+        if (!flushed && (saveFailed || !versionChanged)) {
+          failedSceneIds.add(sceneId);
+        } else if (versionChanged) {
+          dirtiedSceneIds.add(sceneId);
+        } else {
+          failedSceneIds.add(sceneId);
+        }
+      }
+
+      if (failedSceneIds.size > 0 || internalConflictRef.current !== null) break;
+    }
+
+    await drainMutationQueue();
+
+    const blockingConflictSceneId = internalConflictRef.current?.publicIssue.sceneId;
+    if (blockingConflictSceneId !== undefined) {
+      failedSceneIds.add(blockingConflictSceneId);
+      dirtiedSceneIds.delete(blockingConflictSceneId);
+    }
+    for (const sceneId of dirtySceneIdsRef.current) {
+      if (saveIssuesRef.current.has(sceneId) || blockingConflictSceneId === sceneId) {
+        failedSceneIds.add(sceneId);
+        dirtiedSceneIds.delete(sceneId);
+        continue;
+      }
+
+      const initialVersion = initialVersions.get(sceneId);
+      const currentVersion = sceneEditVersionsRef.current.get(sceneId) ?? 0;
+      if (
+        initialVersion === undefined ||
+        cleanAfterAttemptSceneIds.has(sceneId) ||
+        currentVersion !== initialVersion ||
+        dirtiedSceneIds.has(sceneId)
+      ) {
+        if (!failedSceneIds.has(sceneId)) dirtiedSceneIds.add(sceneId);
+      } else if (attemptedSceneIds.has(sceneId)) {
+        failedSceneIds.add(sceneId);
       }
     }
-    await drainMutationQueue();
-    return dirtySceneIdsRef.current.size === 0 && internalConflictRef.current === null;
+
+    return {
+      failed: [...failedSceneIds],
+      dirtied: [...dirtiedSceneIds].filter((sceneId) => !failedSceneIds.has(sceneId)),
+    };
   }, [clearSaveTimer, drainMutationQueue, flushScene]);
 
   const scheduleSceneSave = useCallback(

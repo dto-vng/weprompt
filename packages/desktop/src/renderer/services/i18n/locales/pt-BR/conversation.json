@@ -871,6 +871,7 @@
         "write": "Escrever",
         "produce": "Produzir",
         "review": "Revisar",
+        "saved": "Salvo",
         "saving": "Salvando alterações..."
       },
       "shared": {
@@ -947,6 +948,9 @@
         "handoffDescription": "A entrega contém somente o manifesto do storyboard e as mídias selecionadas. As cartelas de revisão não são exportadas.",
         "partialHandoff": "Esta entrega é parcial porque algumas cenas não têm mídia selecionada."
       }
+    },
+    "transition": {
+      "savingBlocked": "Suas edições ainda estão sendo salvas — tente novamente em instantes."
     },
     "library": {
       "title": "Creative Studio",

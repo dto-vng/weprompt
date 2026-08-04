@@ -721,6 +721,7 @@
         "write": "Write",
         "produce": "Produce",
         "review": "Review",
+        "saved": "Saved",
         "saving": "Saving changes..."
       },
       "shared": {
@@ -794,6 +795,9 @@
         "handoffDescription": "The handoff contains the storyboard manifest and selected media only. Review slates are not exported.",
         "partialHandoff": "This handoff is partial because some scenes have no selected media."
       }
+    },
+    "transition": {
+      "savingBlocked": "Still saving your edits — try again in a moment."
     },
     "library": {
       "title": "Creative Studio",

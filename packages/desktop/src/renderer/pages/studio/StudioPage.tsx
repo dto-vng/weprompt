@@ -175,7 +175,10 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
 
   useEffect(() => {
     if (project === null) return;
-    if (routePhase !== null) return;
+    if (routePhase !== null) {
+      rememberStudioPhase(project.id, routePhase);
+      return;
+    }
     navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneOrder.length)), {
       replace: true,
     });
@@ -186,13 +189,12 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     beforeMutation: async () => {
       if (editor.mutationPending) return false;
       if (!(await editor.flushProjectDraft())) return false;
-      return editor.flushAllSceneDrafts();
+      const result = await editor.flushAllSceneDrafts();
+      return result.failed.length === 0 && result.dirtied.length === 0;
     },
   });
   const [draftModalVisible, setDraftModalVisible] = useState(false);
   const [generationReview, setGenerationReview] = useState<GenerationReviewState | null>(null);
-  const [headerBatchLoading, setHeaderBatchLoading] = useState(false);
-  const [headerGenerationIssue, setHeaderGenerationIssue] = useState<string | null>(null);
   const [generationReviewIssueMessageKey, setGenerationReviewIssueMessageKey] = useState<string | null>(null);
   const [generationReviewRefreshing, setGenerationReviewRefreshing] = useState(false);
   const [duplicateChargeJobId, setDuplicateChargeJobId] = useState<string | null>(null);
@@ -210,9 +212,9 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   const [exportMissingSceneIds, setExportMissingSceneIds] = useState<string[]>([]);
   const [exportIssueMessageKey, setExportIssueMessageKey] = useState<string | null>(null);
   const [pendingTransition, setPendingTransition] = useState<StudioPhaseTransition | null>(null);
-  const [transitionSavesComplete, setTransitionSavesComplete] = useState(false);
+  const [transitionReady, setTransitionReady] = useState(false);
+  const [transitionIssueMessageKey, setTransitionIssueMessageKey] = useState<string | null>(null);
   const [postModalTransition, setPostModalTransition] = useState<StudioPhaseTransition | null>(null);
-  const headerBatchLoadingRef = useRef(false);
   const generationReviewRefreshingRef = useRef(false);
   const variationPendingRef = useRef(false);
   const referenceImportSceneIdRef = useRef<string | null>(null);
@@ -281,11 +283,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     return posters.length === 1 ? posters[0]! : null;
   }, [project, selectedScene]);
   const canonicalMutationPending =
-    editor.mutationPending ||
-    studioModels.pendingRole !== null ||
-    studioJobs.mutationPending ||
-    variationPending ||
-    headerBatchLoading;
+    editor.mutationPending || studioModels.pendingRole !== null || studioJobs.mutationPending || variationPending;
   const generationBlocked =
     project === null ||
     editor.hasUnsavedProjectDraft ||
@@ -320,7 +318,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         return;
       }
       studioJobs.clearIssue();
-      setHeaderGenerationIssue(null);
       setGenerationReviewIssueMessageKey(null);
       setGenerationReview({
         mode: 'single',
@@ -345,7 +342,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         return toReviewScene(project, scene, route, request.availableRoutes, resolved?.routeStatus);
       });
       studioJobs.clearIssue();
-      setHeaderGenerationIssue(null);
       setGenerationReviewIssueMessageKey(null);
       setGenerationReview({
         mode: 'batch',
@@ -358,66 +354,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     },
     [generationBlocked, project, readyScenes, studioJobs]
   );
-
-  const openHeaderBatchReview = useCallback(async (): Promise<void> => {
-    if (
-      project === null ||
-      generationBlocked ||
-      readyScenes.length === 0 ||
-      headerBatchLoading ||
-      headerBatchLoadingRef.current
-    ) {
-      return;
-    }
-    headerBatchLoadingRef.current = true;
-    setHeaderBatchLoading(true);
-    setHeaderGenerationIssue(null);
-    const reviewedProjectId = project.id;
-    const reviewedProjectRevision = project.revision;
-    try {
-      let catalog = studioModels.catalog;
-      if (catalog === null) {
-        await studioModels.refresh();
-        catalog = studioModels.catalog;
-        if (catalog === null) {
-          setHeaderGenerationIssue('conversation.creativeStudio.models.loading');
-          return;
-        }
-      }
-      const canonical = canonicalProjectRef.current;
-      if (canonical?.id !== reviewedProjectId || canonical.revision !== reviewedProjectRevision) {
-        setHeaderGenerationIssue('conversation.creativeStudio.errors.staleProject');
-        return;
-      }
-      const selectedRoute = (kind: 'image' | 'video') => {
-        const route = project.routing[kind];
-        return route === null
-          ? null
-          : {
-              route: {
-                choiceId: route.choiceId,
-                providerId: route.providerId,
-                model: route.model,
-                kind,
-              },
-              routeStatus: 'valid' as const,
-            };
-      };
-      openBatchReview({
-        catalogVersion: catalog.catalogVersion,
-        routes: {
-          image: selectedRoute('image'),
-          video: selectedRoute('video'),
-        },
-        availableRoutes: catalogEntries(catalog),
-      });
-    } catch {
-      setHeaderGenerationIssue('conversation.creativeStudio.errors.provider');
-    } finally {
-      headerBatchLoadingRef.current = false;
-      setHeaderBatchLoading(false);
-    }
-  }, [generationBlocked, headerBatchLoading, openBatchReview, project, readyScenes.length, studioModels]);
 
   const confirmGeneration = useCallback(
     async ({ sceneIds, routes }: { sceneIds: string[]; routes: StudioSceneGenerationChoice[] }): Promise<void> => {
@@ -703,28 +639,44 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       }
       pendingTransitionRef.current = transition;
       setPendingTransition(transition);
-      setTransitionSavesComplete(false);
+      setTransitionReady(false);
+      setTransitionIssueMessageKey(null);
       void (async (): Promise<void> => {
-        const currentEditor = editorRef.current;
-        const projectSaved = await currentEditor.flushProjectDraft();
-        const scenesSaved = projectSaved ? await editorRef.current.flushAllSceneDrafts() : false;
-        if (!projectSaved || !scenesSaved || editorRef.current.conflict !== null) {
+        const clearPendingTransition = (): void => {
           pendingTransitionRef.current = null;
           setPendingTransition(null);
-          setTransitionSavesComplete(false);
+          setTransitionReady(false);
+        };
+        const projectSaved = await editorRef.current.flushProjectDraft();
+        if (!projectSaved || editorRef.current.conflict !== null) {
+          clearPendingTransition();
           focusRecoveryAlert();
           return;
         }
-        setTransitionSavesComplete(true);
+
+        for (let round = 0; round < 3; round += 1) {
+          const result = await editorRef.current.flushAllSceneDrafts();
+          if (result.failed.length > 0 || editorRef.current.conflict !== null) {
+            clearPendingTransition();
+            focusRecoveryAlert();
+            return;
+          }
+          if (result.dirtied.length === 0) {
+            setTransitionReady(true);
+            return;
+          }
+        }
+
+        clearPendingTransition();
+        setTransitionIssueMessageKey('conversation.creativeStudio.transition.savingBlocked');
+        focusRecoveryAlert();
       })();
     },
     [focusRecoveryAlert, project, routePhase, transitionBlocked]
   );
 
   useEffect(() => {
-    if (project === null || pendingTransition === null || !transitionSavesComplete || navigationLocked) {
-      return;
-    }
+    if (project === null || pendingTransition === null || !transitionReady || navigationLocked) return;
     const transition = pendingTransition;
     rememberStudioPhase(project.id, transition.phase);
     navigate(studioPhasePath(project.id, transition.phase), {
@@ -732,8 +684,8 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     });
     pendingTransitionRef.current = null;
     setPendingTransition(null);
-    setTransitionSavesComplete(false);
-  }, [navigate, navigationLocked, pendingTransition, project, transitionSavesComplete]);
+    setTransitionReady(false);
+  }, [navigate, navigationLocked, pendingTransition, project, transitionReady]);
 
   const clearWriteFocusIntent = useCallback((): void => {
     if (parseWriteFocusIntent(location.state) === null) return;
@@ -788,6 +740,27 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     );
   }
 
+  const activePhase = routePhase ?? resolveStudioEntryPhase(project.id, project.sceneOrder.length);
+  const projectUpdateIssue =
+    editor.conflict?.operation === 'update_project'
+      ? editor.conflict.messageKey
+      : editor.error?.operation === 'update_project'
+        ? editor.error.messageKey
+        : null;
+  const shellIssueMessageKey =
+    transitionIssueMessageKey ??
+    errorMessageKey ??
+    variationIssueMessageKey ??
+    referenceImportIssue?.messageKey ??
+    (activePhase === 'brief' ? null : projectUpdateIssue);
+  const advisory: StudioPhaseControllers['advisory'] =
+    shellIssueMessageKey !== null
+      ? { messageKey: shellIssueMessageKey, anchor: 'shell' }
+      : activePhase === 'produce' && readiness!.readySceneIds.length === 0
+        ? { messageKey: 'conversation.creativeStudio.review.noReadyScenes', anchor: 'batch' }
+        : activePhase === 'produce' && readiness!.durationDeltaSeconds !== 0
+          ? { messageKey: 'conversation.creativeStudio.review.durationMismatch', anchor: 'batch' }
+          : null;
   const controller: StudioPhaseControllers = {
     project,
     readiness: readiness!,
@@ -798,13 +771,13 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     posterAsset,
     selectedReferenceAsset,
     writeFocusIntent,
+    advisory,
     mutationPending:
       canonicalMutationPending || referenceImportSceneId !== null || generationReviewRefreshing || exportPending,
     requestTransition,
     openDraftReview: () => setDraftModalVisible(true),
     openSingleGenerationReview: openSingleReview,
     openBatchGenerationReview: openBatchReview,
-    openReadyScenesReview: openHeaderBatchReview,
     openExport,
     openModelSettings,
     importReference: handleImportReference,
@@ -812,23 +785,12 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     clearWriteFocusIntent,
     openDuplicateChargeConfirmation: setDuplicateChargeJobId,
   };
-  const shellIssueMessageKey =
-    errorMessageKey ??
-    headerGenerationIssue ??
-    variationIssueMessageKey ??
-    referenceImportIssue?.messageKey ??
-    (editor.error?.operation === 'update_project' ? editor.error.messageKey : null);
 
   return (
     <section aria-label={t('conversation.creativeStudio.project.title')} className={styles.projectShell}>
       <StudioNavigationLock locked={navigationLocked} />
-      {shellIssueMessageKey && (
-        <div role='alert' className={styles.projectAlert}>
-          {t(shellIssueMessageKey)}
-        </div>
-      )}
       <StudioPhaseShell
-        activePhase={routePhase ?? resolveStudioEntryPhase(project.id, project.sceneOrder.length)}
+        activePhase={activePhase}
         controller={controller}
         navigationDisabled={transitionBlocked || pendingTransition !== null}
         onBack={() => navigate('/studio')}

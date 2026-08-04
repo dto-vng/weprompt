@@ -867,6 +867,7 @@
         "write": "Yaz",
         "produce": "Üret",
         "review": "İncele",
+        "saved": "Kaydedildi",
         "saving": "Değişiklikler kaydediliyor..."
       },
       "shared": {
@@ -940,6 +941,9 @@
         "handoffDescription": "Devir yalnızca hikâye panosu bildirim dosyasını ve seçilen medyayı içerir. İnceleme slaytları dışa aktarılmaz.",
         "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir."
       }
+    },
+    "transition": {
+      "savingBlocked": "Düzenlemeleriniz hâlâ kaydediliyor — kısa bir süre sonra tekrar deneyin."
     },
     "library": {
       "title": "Creative Studio",

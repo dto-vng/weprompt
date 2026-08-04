@@ -16,6 +16,11 @@ import type { StudioPhaseTransition, StudioWriteFocusIntent } from '../../studio
 import type { StudioReadinessSummary } from '../../studioReadiness';
 import type { GenerationBatchReviewRequest, GenerationSingleReviewRequest } from '../Generation/GenerationControls';
 
+export type StudioPhaseAdvisory = {
+  messageKey: string;
+  anchor: 'shell' | 'batch';
+};
+
 export type StudioPhaseControllers = {
   project: StudioRendererProject;
   readiness: StudioReadinessSummary;
@@ -26,12 +31,12 @@ export type StudioPhaseControllers = {
   posterAsset: StudioAsset | null;
   selectedReferenceAsset: StudioAsset | null;
   writeFocusIntent: StudioWriteFocusIntent | null;
+  advisory: StudioPhaseAdvisory | null;
   mutationPending: boolean;
   requestTransition: (transition: StudioPhaseTransition) => void;
   openDraftReview: () => void;
   openSingleGenerationReview: (request: GenerationSingleReviewRequest) => void;
   openBatchGenerationReview: (request: GenerationBatchReviewRequest) => void;
-  openReadyScenesReview: () => Promise<void>;
   openExport: () => void;
   openModelSettings: () => void;
   importReference: (sceneId: string) => Promise<void>;
@@ -42,7 +47,7 @@ export type StudioPhaseControllers = {
 
 export type BriefPhaseController = Pick<
   StudioPhaseControllers,
-  'project' | 'readiness' | 'editor' | 'mutationPending' | 'requestTransition'
+  'project' | 'readiness' | 'editor' | 'advisory' | 'mutationPending' | 'requestTransition'
 >;
 
 export type WritePhaseController = Pick<
@@ -53,6 +58,7 @@ export type WritePhaseController = Pick<
   | 'models'
   | 'selectedReferenceAsset'
   | 'writeFocusIntent'
+  | 'advisory'
   | 'mutationPending'
   | 'requestTransition'
   | 'openDraftReview'
@@ -69,11 +75,11 @@ export type ProducePhaseController = Pick<
   | 'jobs'
   | 'selectedAsset'
   | 'posterAsset'
+  | 'advisory'
   | 'mutationPending'
   | 'requestTransition'
   | 'openSingleGenerationReview'
   | 'openBatchGenerationReview'
-  | 'openReadyScenesReview'
   | 'openModelSettings'
   | 'selectVariation'
   | 'openDuplicateChargeConfirmation'
@@ -86,6 +92,7 @@ export type ReviewPhaseController = Pick<
   | 'editor'
   | 'selectedAsset'
   | 'posterAsset'
+  | 'advisory'
   | 'mutationPending'
   | 'requestTransition'
   | 'openExport'

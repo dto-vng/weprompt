@@ -205,7 +205,7 @@ const editor = (currentProject: StudioRendererProject, selectedSceneId = 'scene-
     discardProjectDraft: vi.fn(),
     flushSceneDraft: vi.fn(async () => true),
     flushSceneDraftById: vi.fn(async () => true),
-    flushAllSceneDrafts: vi.fn(async () => true),
+    flushAllSceneDrafts: vi.fn(async () => ({ failed: [], dirtied: [] })),
     discardSceneDraft: vi.fn(),
     discardSceneDraftById: vi.fn(),
     addScene: vi.fn(async () => true),
@@ -272,11 +272,11 @@ const createController = (
         ? null
         : (currentProject.assets[currentEditor.selectedScene.selectedAssetId] ?? null),
     posterAsset: null,
+    advisory: null,
     mutationPending: false,
     requestTransition: vi.fn(),
     openSingleGenerationReview: vi.fn(),
     openBatchGenerationReview: vi.fn(),
-    openReadyScenesReview: vi.fn(async () => undefined),
     openModelSettings: vi.fn((_path?: '/settings/model') => undefined),
     selectVariation: vi.fn(async () => undefined),
     openDuplicateChargeConfirmation: vi.fn(),
@@ -382,7 +382,7 @@ describe('ProducePhase', () => {
     expect(controller.jobs.submitScenes).not.toHaveBeenCalled();
   });
 
-  it('keeps batch review available while Fit changes advisory timing to exact timing', () => {
+  it('renders the batch advisory only when the controller routes it to the batch anchor', () => {
     const mismatchedProject = project({ targetDurationSeconds: 12 });
     const mismatch = createController(mismatchedProject);
     const exact = createController(project());
@@ -393,16 +393,20 @@ describe('ProducePhase', () => {
       name: 'conversation.creativeStudio.review.generateReadyScenes:count=1',
     });
     expect(mismatchedBatch).toBeEnabled();
-    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
+    expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
     fireEvent.click(mismatchedBatch);
     expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(1);
 
+    exact.advisory = {
+      messageKey: 'conversation.creativeStudio.review.durationMismatch',
+      anchor: 'batch',
+    };
     rerender(<ProducePhase controller={exact} />);
     const batch = screen.getByRole('button', {
       name: 'conversation.creativeStudio.review.generateReadyScenes:count=1',
     });
     expect(batch).toBeEnabled();
-    expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
     fireEvent.click(batch);
     expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(2);
     expect(exact.jobs.submitScenes).not.toHaveBeenCalled();
@@ -433,12 +437,13 @@ describe('ProducePhase', () => {
     expect(within(activity).getByText('Closing shot')).toBeVisible();
   });
 
-  it('always allows review navigation even when some shots have no output', () => {
+  it('does not duplicate the shell-owned Review cut action inside Produce', () => {
     const controller = createController();
     render(<ProducePhase controller={controller} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.produce.reviewCut' }));
-
-    expect(controller.requestTransition).toHaveBeenCalledExactlyOnceWith({ phase: 'review' });
+    expect(
+      screen.queryByRole('button', { name: 'conversation.creativeStudio.phase.produce.reviewCut' })
+    ).not.toBeInTheDocument();
+    expect(controller.requestTransition).not.toHaveBeenCalled();
   });
 });

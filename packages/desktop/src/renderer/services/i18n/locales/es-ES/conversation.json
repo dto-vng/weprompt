@@ -866,6 +866,7 @@
         "write": "Escribir",
         "produce": "Producir",
         "review": "Revisar",
+        "saved": "Guardado",
         "saving": "Guardando cambios..."
       },
       "shared": {
@@ -942,6 +943,9 @@
         "handoffDescription": "La entrega contiene únicamente el manifiesto del guion gráfico y el contenido seleccionado. Las claquetas de revisión no se exportan.",
         "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado."
       }
+    },
+    "transition": {
+      "savingBlocked": "Tus cambios todavía se están guardando; inténtalo de nuevo en un momento."
     },
     "library": {
       "title": "Creative Studio",

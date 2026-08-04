@@ -865,6 +865,7 @@
         "write": "작성",
         "produce": "제작",
         "review": "검토",
+        "saved": "저장됨",
         "saving": "변경 사항 저장 중..."
       },
       "shared": {
@@ -935,6 +936,9 @@
         "handoffDescription": "전달에는 스토리보드 매니페스트와 선택된 미디어만 포함됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
         "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다."
       }
+    },
+    "transition": {
+      "savingBlocked": "수정 내용을 저장하는 중입니다. 잠시 후 다시 시도해 주세요."
     },
     "library": {
       "title": "크리에이티브 스튜디오",

@@ -866,6 +866,7 @@
         "write": "Schreiben",
         "produce": "Produzieren",
         "review": "Prüfen",
+        "saved": "Gespeichert",
         "saving": "Änderungen werden gespeichert..."
       },
       "shared": {
@@ -939,6 +940,9 @@
         "handoffDescription": "Die Übergabe enthält nur das Storyboard-Manifest und ausgewählte Medien. Platzhalter aus der Prüfung werden nicht exportiert.",
         "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt."
       }
+    },
+    "transition": {
+      "savingBlocked": "Deine Änderungen werden noch gespeichert — versuche es gleich noch einmal."
     },
     "library": {
       "title": "Creative Studio",

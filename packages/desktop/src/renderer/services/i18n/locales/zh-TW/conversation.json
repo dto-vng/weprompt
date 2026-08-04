@@ -865,6 +865,7 @@
         "write": "編寫",
         "produce": "製作",
         "review": "檢視",
+        "saved": "已儲存",
         "saving": "正在儲存變更..."
       },
       "shared": {
@@ -935,6 +936,9 @@
         "handoffDescription": "交付內容僅包含分鏡資訊清單與已選媒體。檢視用場記卡不會匯出。",
         "partialHandoff": "部分場景沒有已選媒體，因此此次交付不完整。"
       }
+    },
+    "transition": {
+      "savingBlocked": "仍在儲存你的編輯——請稍候片刻再試一次。"
     },
     "library": {
       "title": "創意工作室",

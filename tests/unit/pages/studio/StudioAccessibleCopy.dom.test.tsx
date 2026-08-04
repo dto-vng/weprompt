@@ -19,6 +19,7 @@ import { AssistantDock } from '@renderer/pages/studio/components/PhaseShell/Assi
 import { StudioPhaseHeader } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseHeader';
 import { StudioPhaseNav } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseNav';
 import { StudioPhaseShell } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseShell';
+import { deriveStudioPhaseCompletion } from '@renderer/pages/studio/components/PhaseShell/studioPhaseCompletion';
 import type { StudioPhaseControllers } from '@renderer/pages/studio/components/PhaseShell/types';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
 import { StudioExportModal } from '@renderer/pages/studio/components/Preview/StudioExportModal';
@@ -112,7 +113,7 @@ const asset = (id: string): StudioAsset => ({
   createdAt: '2026-08-03T00:00:00.000Z',
 });
 
-const project = (): StudioRendererProject => ({
+const project = (overrides: Partial<StudioRendererProject> = {}): StudioRendererProject => ({
   schemaVersion: 1,
   revision: 1,
   id: 'project-1',
@@ -128,6 +129,7 @@ const project = (): StudioRendererProject => ({
   routing: { storyboard: null, image: null, video: null },
   createdAt: '2026-08-03T00:00:00.000Z',
   updatedAt: '2026-08-03T00:00:00.000Z',
+  ...overrides,
 });
 
 const phaseController = (): StudioPhaseControllers => {
@@ -138,6 +140,8 @@ const phaseController = (): StudioPhaseControllers => {
     selectedSceneId: null,
     selectedScene: null,
     sceneDraft: null,
+    sceneDrafts: {},
+    sceneSaveStates: {},
     projectDraft: null,
     projectSaveState: 'saved',
     hasUnsavedProjectDraft: false,
@@ -147,12 +151,13 @@ const phaseController = (): StudioPhaseControllers => {
     saveIssues: [],
     selectScene: vi.fn(),
     updateSceneDraft: vi.fn(),
+    updateSceneDraftById: vi.fn(),
     updateProjectDraft: vi.fn(),
     flushProjectDraft: vi.fn(async () => true),
     discardProjectDraft: vi.fn(),
     flushSceneDraft: vi.fn(async () => true),
     flushSceneDraftById: vi.fn(async () => true),
-    flushAllSceneDrafts: vi.fn(async () => true),
+    flushAllSceneDrafts: vi.fn(async () => ({ failed: [], dirtied: [] })),
     discardSceneDraft: vi.fn(),
     discardSceneDraftById: vi.fn(),
     addScene: vi.fn(async () => true),
@@ -216,12 +221,12 @@ const phaseController = (): StudioPhaseControllers => {
     posterAsset: null,
     selectedReferenceAsset: null,
     writeFocusIntent: null,
+    advisory: null,
     mutationPending: false,
     requestTransition: vi.fn(),
     openDraftReview: vi.fn(),
     openSingleGenerationReview: vi.fn(),
     openBatchGenerationReview: vi.fn(),
-    openReadyScenesReview: vi.fn(async () => undefined),
     openExport: vi.fn(),
     openModelSettings: vi.fn(),
     importReference: vi.fn(async () => undefined),
@@ -232,7 +237,7 @@ const phaseController = (): StudioPhaseControllers => {
 };
 
 describe('Creative Studio full-sentence English copy', () => {
-  it('labels the Brief primary action with the phase start-writing copy', async () => {
+  it('keeps Brief start-writing only in its validated footer', async () => {
     await renderEnglish(
       <StudioPhaseShell
         activePhase='brief'
@@ -243,8 +248,28 @@ describe('Creative Studio full-sentence English copy', () => {
     );
 
     const headerActions = document.querySelector<HTMLElement>('[data-studio-phase-actions]');
+    expect(headerActions).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Start writing' })).toHaveLength(1);
+  });
+
+  it.each([
+    ['write', 'Continue to Produce'],
+    ['produce', 'Review cut'],
+    ['review', 'Prepare handoff'],
+  ] as const)('renders one %s phase action in the header', async (activePhase, actionName) => {
+    await renderEnglish(
+      <StudioPhaseShell
+        activePhase={activePhase}
+        controller={phaseController()}
+        navigationDisabled={false}
+        onBack={vi.fn()}
+      />
+    );
+
+    const headerActions = document.querySelector<HTMLElement>('[data-studio-phase-actions]');
     expect(headerActions).not.toBeNull();
-    expect(within(headerActions!).getByRole('button', { name: 'Start writing' })).toBeInTheDocument();
+    expect(within(headerActions!).getAllByRole('button')).toHaveLength(1);
+    expect(within(headerActions!).getByRole('button', { name: actionName })).toBeInTheDocument();
   });
 
   it('renders every phase in every configured locale without raw visible or accessible copy', async () => {
@@ -288,7 +313,19 @@ describe('Creative Studio full-sentence English copy', () => {
   it('renders the phase workflow and assistant dock with localized accessible names', async () => {
     await renderEnglish(
       <>
-        <StudioPhaseNav activePhase='brief' disabled={false} onSelect={vi.fn()} />
+        <StudioPhaseNav
+          activePhase='brief'
+          project={project()}
+          readiness={{
+            sceneStatuses: {},
+            totalSceneCount: 0,
+            readySceneIds: [],
+            selectedAssetCount: 0,
+            durationDeltaSeconds: -5,
+          }}
+          disabled={false}
+          onSelect={vi.fn()}
+        />
         <AssistantDock>
           <span>Assistant controls</span>
         </AssistantDock>
@@ -299,13 +336,90 @@ describe('Creative Studio full-sentence English copy', () => {
     );
 
     const navigation = screen.getByRole('navigation', { name: 'Creative workflow' });
-    expect(
-      within(navigation)
-        .getAllByRole('button')
-        .map((button) => button.textContent)
-    ).toEqual(['Brief', 'Write', 'Produce', 'Review']);
+    expect(within(navigation).getAllByRole('button')).toHaveLength(4);
+    for (const phaseName of ['Brief', 'Write', 'Produce', 'Review']) {
+      expect(within(navigation).getByRole('button', { name: phaseName })).toBeVisible();
+    }
     expect(screen.getByRole('complementary', { name: 'Writing assistant' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Generation activity' })).toBeInTheDocument();
+  });
+
+  it('derives phase completion from durable project content', () => {
+    const completeScene = scene({ id: 'scene-1', visualPrompt: 'A finished visual prompt' });
+    const currentProject = project({
+      brief: 'A useful intent',
+      sceneOrder: [completeScene.id],
+      scenes: { [completeScene.id]: completeScene },
+    });
+
+    expect(
+      deriveStudioPhaseCompletion(currentProject, {
+        sceneStatuses: { [completeScene.id]: 'generated' },
+        totalSceneCount: 1,
+        readySceneIds: [],
+        selectedAssetCount: 1,
+        durationDeltaSeconds: 0,
+      })
+    ).toEqual({ brief: true, write: true, produce: true, review: false });
+  });
+
+  it('derives rail checkmarks from phase content while keeping Review numbered', async () => {
+    const completeScene = scene({ id: 'scene-1', visualPrompt: 'A finished visual prompt' });
+    const completeProject = project({
+      brief: 'A useful intent',
+      sceneOrder: [completeScene.id],
+      scenes: { [completeScene.id]: completeScene },
+    });
+    await renderEnglish(
+      <StudioPhaseNav
+        activePhase='review'
+        project={completeProject}
+        readiness={{
+          sceneStatuses: { [completeScene.id]: 'generated' },
+          totalSceneCount: 1,
+          readySceneIds: [],
+          selectedAssetCount: 1,
+          durationDeltaSeconds: 0,
+        }}
+        disabled={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    expect(document.querySelector('[data-studio-phase-marker="brief"]')).toHaveAttribute('data-complete', 'true');
+    expect(document.querySelector('[data-studio-phase-marker="write"]')).toHaveAttribute('data-complete', 'true');
+    expect(document.querySelector('[data-studio-phase-marker="produce"]')).toHaveAttribute('data-complete', 'true');
+    expect(document.querySelector('[data-studio-phase-marker="review"]')).toHaveAttribute('data-complete', 'false');
+    expect(document.querySelector('[data-studio-phase-marker="review"]')).toHaveTextContent('4');
+    expect(screen.getByRole('button', { current: 'step' })).toHaveTextContent('Review');
+  });
+
+  it('keeps Write incomplete when any ordered shot has a blank visual prompt', async () => {
+    const completeScene = scene({ id: 'scene-1', visualPrompt: 'A finished visual prompt' });
+    const blankScene = scene({ id: 'scene-2', visualPrompt: '   ' });
+    await renderEnglish(
+      <StudioPhaseNav
+        activePhase='write'
+        project={project({
+          brief: '   ',
+          sceneOrder: [completeScene.id, blankScene.id],
+          scenes: { [completeScene.id]: completeScene, [blankScene.id]: blankScene },
+        })}
+        readiness={{
+          sceneStatuses: { [completeScene.id]: 'ready', [blankScene.id]: 'needs_prompt' },
+          totalSceneCount: 2,
+          readySceneIds: [completeScene.id],
+          selectedAssetCount: 0,
+          durationDeltaSeconds: 5,
+        }}
+        disabled={false}
+        onSelect={vi.fn()}
+      />
+    );
+
+    expect(document.querySelector('[data-studio-phase-marker="brief"]')).toHaveAttribute('data-complete', 'false');
+    expect(document.querySelector('[data-studio-phase-marker="write"]')).toHaveAttribute('data-complete', 'false');
+    expect(document.querySelector('[data-studio-phase-marker="produce"]')).toHaveAttribute('data-complete', 'false');
   });
 
   it('renders complete scene action names and a grammatically singular duration', async () => {
@@ -519,6 +633,7 @@ describe('Creative Studio full-sentence English copy', () => {
       return (
         <StudioPhaseHeader
           project={project()}
+          saveState='saved'
           onBack={vi.fn()}
           actions={
             <button type='button'>{t('conversation.creativeStudio.review.generateReadyScenes', { count })}</button>

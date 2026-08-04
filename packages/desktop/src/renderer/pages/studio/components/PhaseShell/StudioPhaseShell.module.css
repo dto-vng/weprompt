@@ -11,20 +11,23 @@
 .header {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
 .headerCopy {
+  display: flex;
   min-width: 0;
   flex: 1;
+  align-items: center;
+  gap: 8px;
 }
 
 .breadcrumb {
   display: flex;
-  min-width: 0;
-  margin-bottom: 8px;
+  flex: none;
   align-items: center;
 }
 
@@ -33,32 +36,37 @@
   color: var(--color-text-4);
 }
 
-.breadcrumbProject {
-  overflow: hidden;
-  color: var(--color-text-2);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .projectTitle {
   overflow: hidden;
   margin: 0;
   color: var(--color-text-1);
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.projectBrief {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 6px 0 0;
-  color: var(--color-text-2);
-  font-size: 14px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.aspectChip {
+  flex: none;
+}
+
+.headerMeta {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.saveState {
+  color: var(--color-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.saveState[data-state='failed'] {
+  color: var(--color-danger-6);
 }
 
 .headerActions {
@@ -71,25 +79,11 @@
   gap: 8px;
 }
 
-.actionStack {
+.phaseNavigation {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.actionIssue {
   max-width: 100%;
-  color: var(--color-warning-6);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.phaseNavigation {
-  min-width: 0;
-  max-width: 100%;
-  border-bottom: 1px solid var(--color-border-2);
+  justify-content: center;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
@@ -98,22 +92,75 @@
 .phaseList {
   display: flex;
   width: max-content;
-  min-width: 100%;
+  min-width: 0;
   margin: 0;
-  padding: 0 0 10px;
+  padding: 2px;
   flex-wrap: nowrap;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
   list-style: none;
 }
 
 .phaseItem {
-  min-width: 128px;
-  flex: 1 0 128px;
+  min-width: 0;
+  flex: none;
 }
 
 .phaseButton {
-  width: 100%;
+  display: inline-flex;
+  min-width: 0;
+  padding-inline: 10px;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-3);
   white-space: nowrap;
+}
+
+.phaseButtonActive {
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.phaseMarker {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-3);
+  border-radius: 50%;
+  background: var(--color-bg-2);
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.phaseButtonActive .phaseMarker {
+  border-color: var(--color-primary-6);
+  background: var(--color-primary-light-1);
+  color: var(--color-primary-6);
+}
+
+.phaseMarkerComplete {
+  border-color: var(--color-success-6);
+  background: var(--color-success-light-1);
+  color: var(--color-success-6);
+}
+
+.phaseLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shellAdvisory {
+  padding: 10px 12px;
+  border: 1px solid var(--color-warning-light-3);
+  border-radius: var(--border-radius-medium);
+  background: var(--color-warning-light-1);
+  color: var(--color-text-2);
+  font-size: 13px;
 }
 
 .phaseFrame {
@@ -130,16 +177,18 @@
 }
 
 .shell[data-layout='compact'] .header {
-  flex-direction: column;
+  align-items: flex-start;
 }
 
-.shell[data-layout='compact'] .headerActions {
+.shell[data-layout='compact'] .headerCopy,
+.shell[data-layout='compact'] .headerMeta {
   width: 100%;
+  flex-wrap: wrap;
   justify-content: flex-start;
 }
 
-.shell[data-layout='compact'] .actionStack {
-  align-items: flex-start;
+.shell[data-layout='compact'] .phaseNavigation {
+  justify-content: flex-start;
 }
 
 @media (prefers-reduced-motion: reduce) {

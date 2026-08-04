@@ -32,6 +32,7 @@ const plannedGroups = [
   'scene',
   'storyboard',
   'timeline',
+  'transition',
 ] as const;
 
 const phaseKeys = [
@@ -40,6 +41,7 @@ const phaseKeys = [
   'phase.nav.write',
   'phase.nav.produce',
   'phase.nav.review',
+  'phase.nav.saved',
   'phase.nav.saving',
   'phase.shared.backToLibrary',
   'phase.shared.noMediaGeneration',
@@ -96,6 +98,7 @@ const phaseKeys = [
   'phase.review.openProduce',
   'phase.review.handoffDescription',
   'phase.review.partialHandoff',
+  'transition.savingBlocked',
 ] as const;
 
 const phasePluralLogicalKeys = [
@@ -229,6 +232,7 @@ const streamFullSentenceKeys = [
   'phase.review.excludedFromHandoff',
   'phase.review.handoffDescription',
   'phase.review.partialHandoff',
+  'transition.savingBlocked',
   ...pluralLogicalKeys,
 ] as const;
 
@@ -455,9 +459,11 @@ describe('Creative Studio localization contract', () => {
         }
 
         const fallbackPlaceholders = getPlaceholders(fallback);
-        const referenceTemplates = Object.entries(referenceLeaves)
-          .filter(([key]) => key === base || key.startsWith(`${base}_`))
-          .map(([, value]) => value);
+        const referenceTemplates = new Set(
+          Object.entries(referenceLeaves)
+            .filter(([key]) => key === base || key.startsWith(`${base}_`))
+            .map(([, value]) => value)
+        );
         for (const variantKey of expectedVariantKeys) {
           const variant = leaves[variantKey];
           if (!variant?.trim()) {
@@ -467,7 +473,7 @@ describe('Creative Studio localization contract', () => {
           if (getPlaceholders(variant).join('\n') !== fallbackPlaceholders.join('\n')) {
             issues.push(`${locale}.${variantKey} placeholders do not match ${base}`);
           }
-          if (locale !== i18nConfig.referenceLanguage && referenceTemplates.includes(variant)) {
+          if (locale !== i18nConfig.referenceLanguage && referenceTemplates.has(variant)) {
             issues.push(`${locale}.${variantKey} copies the English plural text`);
           }
         }

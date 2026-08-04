@@ -865,6 +865,7 @@
         "write": "编写",
         "produce": "制作",
         "review": "审阅",
+        "saved": "已保存",
         "saving": "正在保存更改..."
       },
       "shared": {
@@ -935,6 +936,9 @@
         "handoffDescription": "交付内容仅包含故事板清单和已选媒体。审阅场记卡不会导出。",
         "partialHandoff": "部分场景没有已选媒体，因此此次交付不完整。"
       }
+    },
+    "transition": {
+      "savingBlocked": "仍在保存你的编辑——请稍等片刻后重试。"
     },
     "library": {
       "title": "创意工作室",

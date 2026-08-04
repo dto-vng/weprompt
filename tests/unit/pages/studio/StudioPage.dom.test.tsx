@@ -34,6 +34,7 @@ const bridge = vi.hoisted(() => ({
   getProject: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
   updateModelSelection: { invoke: vi.fn() },
+  updateProject: { invoke: vi.fn() },
   updateScene: { invoke: vi.fn() },
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
@@ -265,16 +266,16 @@ const installResizeObserverMock = (): {
   };
 };
 
-const findBatchActions = async (): Promise<{ headerAction: HTMLElement; lowerAction: HTMLElement }> => {
+const findBatchAction = async (): Promise<{ batchAction: HTMLElement; routingPanel: HTMLElement }> => {
   const routingPanel = await screen.findByRole('region', { name: 'conversation.creativeStudio.routing.title' });
-  const lowerAction = within(routingPanel).getByRole('button', {
+  const batchAction = within(routingPanel).getByRole('button', {
     name: 'conversation.creativeStudio.review.generateReadyScenes',
   });
-  const headerAction = screen
-    .getAllByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes' })
-    .find((candidate) => !routingPanel.contains(candidate));
-  if (headerAction === undefined) throw new Error('Studio header batch action is missing');
-  return { headerAction, lowerAction };
+  const allBatchActions = screen.getAllByRole('button', {
+    name: 'conversation.creativeStudio.review.generateReadyScenes',
+  });
+  if (allBatchActions.length !== 1) throw new Error('Studio must expose exactly one batch-generation action');
+  return { batchAction, routingPanel };
 };
 
 const ProjectHookHarness: React.FC = () => {
@@ -298,6 +299,7 @@ describe('StudioPage and useStudioProject', () => {
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
     bridge.updateModelSelection.invoke.mockResolvedValue(ok(project()));
+    bridge.updateProject.invoke.mockImplementation(async () => ok(project()));
     bridge.updateScene.invoke.mockImplementation(async () => ok(project()));
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project()));
     bridge.proposeStoryboard.invoke.mockImplementation(async () => ok(project()));
@@ -381,6 +383,20 @@ describe('StudioPage and useStudioProject', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     });
 
+    it('remembers a directly routed Review phase for the next project entry', async () => {
+      const firstVisit = renderRoute('/studio/project-1/review');
+      await screen.findByRole('heading', {
+        level: 2,
+        name: 'conversation.creativeStudio.phase.review.title',
+      });
+      await waitFor(() => expect(readLastStudioPhase('project-1')).toBe('review'));
+      firstVisit.view.unmount();
+
+      const { router } = renderRoute('/studio/project-1');
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/review'));
+    });
+
     it.each([
       ['brief', 'conversation.creativeStudio.phase.brief.title', 'conversation.creativeStudio.phase.brief.description'],
       [
@@ -436,12 +452,13 @@ describe('StudioPage and useStudioProject', () => {
       const actions = within(phaseNavigation).getAllByRole('button');
 
       expect(actions).toHaveLength(4);
-      expect(actions.map((action) => action.textContent)).toEqual([
-        'conversation.creativeStudio.phase.nav.brief',
-        'conversation.creativeStudio.phase.nav.write',
-        'conversation.creativeStudio.phase.nav.produce',
-        'conversation.creativeStudio.phase.nav.review',
-      ]);
+      for (const phase of ['brief', 'write', 'produce', 'review']) {
+        expect(
+          within(phaseNavigation).getByRole('button', {
+            name: `conversation.creativeStudio.phase.nav.${phase}`,
+          })
+        ).toBeVisible();
+      }
       expect(within(phaseNavigation).getByRole('button', { current: 'step' })).toHaveTextContent(
         'conversation.creativeStudio.phase.nav.brief'
       );
@@ -625,6 +642,102 @@ describe('StudioPage and useStudioProject', () => {
       await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/produce'));
     });
 
+    it('re-flushes a scene edited during transition saving before changing phase', async () => {
+      const opening = scene({ title: 'Opening' });
+      const initial = project('project-1', {
+        sceneOrder: [opening.id],
+        scenes: { [opening.id]: opening },
+      });
+      const afterFirst = project('project-1', {
+        revision: 3,
+        sceneOrder: [opening.id],
+        scenes: { [opening.id]: { ...opening, title: 'First edit' } },
+      });
+      const afterSecond = project('project-1', {
+        revision: 4,
+        sceneOrder: [opening.id],
+        scenes: { [opening.id]: { ...opening, title: 'Newer edit' } },
+      });
+      const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+      bridge.getProject.invoke.mockResolvedValue(ok(initial));
+      bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise).mockResolvedValueOnce(ok(afterSecond));
+      const { router } = renderRoute('/studio/project-1/write');
+      const titleInput = await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel');
+
+      fireEvent.change(titleInput, { target: { value: 'First edit' } });
+      fireEvent.click(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          { name: 'conversation.creativeStudio.phase.nav.produce' }
+        )
+      );
+      await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+
+      fireEvent.change(titleInput, { target: { value: 'Newer edit' } });
+      await act(async () => firstSave.resolve(ok(afterFirst)));
+
+      await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(2));
+      expect(bridge.updateScene.invoke.mock.calls[1]?.[0]).toMatchObject({
+        sceneId: opening.id,
+        expectedRevision: 3,
+        scene: expect.objectContaining({ title: 'Newer edit' }),
+      });
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/produce'));
+    });
+
+    it('shows a retryable message after three transition rounds keep getting dirtied', async () => {
+      const opening = scene({ title: 'Opening' });
+      const initial = project('project-1', {
+        sceneOrder: [opening.id],
+        scenes: { [opening.id]: opening },
+      });
+      const savedVersions = ['First edit', 'Second edit', 'Third edit'].map((title, index) =>
+        project('project-1', {
+          revision: index + 3,
+          sceneOrder: [opening.id],
+          scenes: { [opening.id]: { ...opening, title } },
+        })
+      );
+      const saves = [
+        deferred<StudioCommandResult<StudioRendererProject>>(),
+        deferred<StudioCommandResult<StudioRendererProject>>(),
+        deferred<StudioCommandResult<StudioRendererProject>>(),
+      ];
+      bridge.getProject.invoke.mockResolvedValue(ok(initial));
+      for (const save of saves) bridge.updateScene.invoke.mockReturnValueOnce(save.promise);
+      const { router } = renderRoute('/studio/project-1/write');
+
+      fireEvent.change(await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+        target: { value: 'First edit' },
+      });
+      fireEvent.click(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          { name: 'conversation.creativeStudio.phase.nav.produce' }
+        )
+      );
+
+      for (const [index, nextTitle] of ['Second edit', 'Third edit', 'Fourth edit'].entries()) {
+        await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(index + 1));
+        fireEvent.change(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+          target: { value: nextTitle },
+        });
+        await act(async () => saves[index]!.resolve(ok(savedVersions[index]!)));
+      }
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('conversation.creativeStudio.transition.savingBlocked');
+      expect(router.state.location.pathname).toBe('/studio/project-1/write');
+      expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(3);
+      expect(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue('Fourth edit');
+      expect(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          { name: 'conversation.creativeStudio.phase.nav.produce' }
+        )
+      ).toBeEnabled();
+    });
+
     it('keeps a failed phase-transition draft recoverable and focuses its alert', async () => {
       const opening = scene();
       bridge.getProject.invoke.mockResolvedValue(
@@ -653,6 +766,24 @@ describe('StudioPage and useStudioProject', () => {
         'Recoverable local title'
       );
       await waitFor(() => expect(document.activeElement).toHaveAttribute('role', 'alert'));
+    });
+
+    it('renders one Brief save-failure alert instead of duplicating it in the shell', async () => {
+      bridge.updateProject.invoke.mockResolvedValueOnce(failure());
+      const { router } = renderRoute('/studio/project-1/brief');
+      const nameInput = await screen.findByLabelText('conversation.creativeStudio.phase.brief.nameLabel');
+
+      fireEvent.change(nameInput, { target: { value: 'Unsaved launch film' } });
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'conversation.creativeStudio.phase.brief.startWriting',
+        })
+      );
+
+      await waitFor(() => expect(bridge.updateProject.invoke).toHaveBeenCalledOnce());
+      await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(1));
+      expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.errors.storage');
+      expect(router.state.location.pathname).toBe('/studio/project-1/brief');
     });
 
     it('focuses and clears only a valid typed Write focus intent', async () => {
@@ -739,7 +870,9 @@ describe('StudioPage and useStudioProject', () => {
     renderRoute();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.action' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.continueToProduce' })
+    ).toBeInTheDocument();
   });
 
   it('composes the storyboard-first workspace from the canonical project', async () => {
@@ -762,7 +895,9 @@ describe('StudioPage and useStudioProject', () => {
     expect(within(openingRow).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue(
       'Opening'
     );
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.redraftAction' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.continueToProduce' })
+    ).toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.preview.noAssetTitle')).toBeNull();
 
     fireEvent.click(
@@ -795,8 +930,12 @@ describe('StudioPage and useStudioProject', () => {
 
     renderRoute();
 
-    expect(await screen.findByRole('button', { name: 'conversation.creativeStudio.draft.action' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeEnabled();
+    expect(
+      await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.continueToProduce' })
+    ).toBeEnabled();
   });
 
   it.each([
@@ -1100,7 +1239,7 @@ describe('StudioPage and useStudioProject', () => {
     const regenerate = await screen.findByRole('button', {
       name: 'conversation.creativeStudio.review.regenerateScene',
     });
-    expect(regenerate).toBeEnabled();
+    await waitFor(() => expect(regenerate).toBeEnabled());
     fireEvent.click(regenerate);
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
@@ -1133,7 +1272,7 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(1));
   });
 
-  it('opens and submits both batch entry points with an 18-second storyboard against a 15-second target', async () => {
+  it('opens and submits the single batch entry point with an 18-second storyboard against a 15-second target', async () => {
     const opening = scene({ id: 'scene-1', durationSeconds: 6 });
     const reveal = scene({ id: 'scene-2', title: 'Reveal', durationSeconds: 6 });
     const closing = scene({ id: 'scene-3', title: 'Closing', durationSeconds: 6 });
@@ -1149,26 +1288,22 @@ describe('StudioPage and useStudioProject', () => {
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
     renderRoute('/studio/project-1/produce');
 
-    const { headerAction, lowerAction } = await findBatchActions();
-    const routingPanel = screen.getByRole('region', { name: 'conversation.creativeStudio.routing.title' });
-    expect(headerAction).toBeEnabled();
-    expect(lowerAction).toBeEnabled();
-    expect(headerAction.closest('header')).not.toHaveTextContent('conversation.creativeStudio.review.durationMismatch');
+    const { batchAction, routingPanel } = await findBatchAction();
+    expect(batchAction).toBeEnabled();
+    expect(
+      within(screen.getByRole('banner')).getByRole('button', {
+        name: 'conversation.creativeStudio.phase.produce.reviewCut',
+      })
+    ).toBeEnabled();
     expect(within(routingPanel).getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
 
-    fireEvent.click(headerAction);
+    fireEvent.click(batchAction);
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' }));
     await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-
-    fireEvent.click(lowerAction);
-    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' }));
-    await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(2));
   });
 
-  it('fits 18 seconds to 15 with one atomic command, no scene updates, and opens both batch gates', async () => {
+  it('fits 18 seconds to 15 with one atomic command, no scene updates, and keeps the batch gate open', async () => {
     const opening = scene({ id: 'scene-1', durationSeconds: 6 });
     const reveal = scene({ id: 'scene-2', title: 'Reveal', durationSeconds: 6 });
     const closing = scene({ id: 'scene-3', title: 'Closing', durationSeconds: 6 });
@@ -1220,9 +1355,8 @@ describe('StudioPage and useStudioProject', () => {
         }
       )
     );
-    const { headerAction, lowerAction } = await findBatchActions();
-    expect(headerAction).toBeEnabled();
-    expect(lowerAction).toBeEnabled();
+    const { batchAction } = await findBatchAction();
+    expect(batchAction).toBeEnabled();
   });
 
   it('keeps batch generation available and explains an unreachable advisory fit', async () => {
@@ -1259,9 +1393,8 @@ describe('StudioPage and useStudioProject', () => {
         }
       )
     );
-    const { headerAction, lowerAction } = await findBatchActions();
-    expect(headerAction).toBeEnabled();
-    expect(lowerAction).toBeEnabled();
+    const { batchAction } = await findBatchAction();
+    expect(batchAction).toBeEnabled();
     expect(
       within(screen.getByRole('region', { name: 'conversation.creativeStudio.routing.title' })).getByText(
         'conversation.creativeStudio.review.durationMismatch'
@@ -1388,7 +1521,7 @@ describe('StudioPage and useStudioProject', () => {
     ).toBeEnabled();
   });
 
-  it('opens a canonical batch review from the header and submits every exact scene route only after confirmation', async () => {
+  it('opens a canonical batch review from the batch control and submits every exact scene route only after confirmation', async () => {
     const opening = scene({ id: 'scene-1', durationSeconds: 5 });
     const closing = scene({ id: 'scene-2', title: 'Closing', durationSeconds: 10 });
     bridge.getProject.invoke.mockResolvedValue(
@@ -1403,8 +1536,9 @@ describe('StudioPage and useStudioProject', () => {
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
     renderRoute('/studio/project-1/produce');
 
-    const { headerAction } = await findBatchActions();
-    fireEvent.click(headerAction);
+    const { batchAction } = await findBatchAction();
+    await waitFor(() => expect(batchAction).toBeEnabled());
+    fireEvent.click(batchAction);
 
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.sceneCount');
@@ -1441,7 +1575,7 @@ describe('StudioPage and useStudioProject', () => {
     );
   });
 
-  it('opens the header review with a catalog that becomes ready during refresh', async () => {
+  it('opens batch review after the route catalog becomes ready during an explicit refresh', async () => {
     const opening = scene({ durationSeconds: 5 });
     bridge.getProject.invoke.mockResolvedValue(
       ok(
@@ -1456,9 +1590,10 @@ describe('StudioPage and useStudioProject', () => {
     renderRoute('/studio/project-1/produce');
 
     await screen.findAllByText('conversation.creativeStudio.errors.storage');
-    await act(async () => {});
-    const { headerAction } = await findBatchActions();
-    fireEvent.click(headerAction);
+    fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.models.refresh' })[0]!);
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
+    const { batchAction } = await findBatchAction();
+    fireEvent.click(batchAction);
 
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
     expect(screen.queryByText('conversation.creativeStudio.models.loading')).not.toBeInTheDocument();
@@ -1558,7 +1693,7 @@ describe('StudioPage and useStudioProject', () => {
     const batchButtons = screen.getAllByRole('button', {
       name: 'conversation.creativeStudio.review.generateReadyScenes',
     });
-    expect(batchButtons).toHaveLength(2);
+    expect(batchButtons).toHaveLength(1);
     batchButtons.forEach((button) => expect(button).toBeDisabled());
     expect(
       screen.getByRole('button', {
@@ -1794,11 +1929,11 @@ describe('StudioPage and useStudioProject', () => {
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
     renderRoute('/studio/project-1/produce');
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.review.generateScene',
-      })
-    );
+    const generateScene = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.review.generateScene',
+    });
+    await waitFor(() => expect(generateScene).toBeEnabled());
+    fireEvent.click(generateScene);
     await screen.findByRole('dialog');
 
     await act(async () => onUpdate?.({ projectId: 'project-1' }));
@@ -1893,11 +2028,11 @@ describe('StudioPage and useStudioProject', () => {
     bridge.submitScenes.invoke.mockResolvedValueOnce(stale()).mockResolvedValueOnce(ok([]));
     renderRoute('/studio/project-1/produce');
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.review.generateScene',
-      })
-    );
+    const generateScene = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.review.generateScene',
+    });
+    await waitFor(() => expect(generateScene).toBeEnabled());
+    fireEvent.click(generateScene);
     fireEvent.click(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.review.confirm',

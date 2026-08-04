@@ -5,7 +5,6 @@
  */
 
 import type { StudioRendererProject, StudioScene } from '@/common/types/project/creativeStudioTypes';
-import { Button } from '@arco-design/web-react';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,6 +47,7 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller, layoutMo
     jobs,
     selectedAsset,
     posterAsset,
+    advisory,
     mutationPending,
     requestTransition,
     openSingleGenerationReview,
@@ -100,9 +100,6 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller, layoutMo
             {t('conversation.creativeStudio.phase.produce.providerChargeDisclosure')}
           </p>
         </div>
-        <Button onClick={() => requestTransition({ phase: 'review' })}>
-          {t('conversation.creativeStudio.phase.produce.reviewCut')}
-        </Button>
       </div>
 
       <StudioModelBar
@@ -185,9 +182,7 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller, layoutMo
           sceneDurationSeconds={selectedScene?.durationSeconds}
           hasReference={selectedScene?.referenceAssetId != null}
           batchSceneCount={readiness.readySceneIds.length}
-          batchAdvisoryMessageKey={
-            readiness.durationDeltaSeconds !== 0 ? 'conversation.creativeStudio.review.durationMismatch' : null
-          }
+          batchAdvisoryMessageKey={advisory?.anchor === 'batch' ? advisory.messageKey : null}
           disabled={generationBlocked}
           singleDisabled={!selectedSceneEligible}
           showSettingsAction={!modelSetupCalloutVisible}

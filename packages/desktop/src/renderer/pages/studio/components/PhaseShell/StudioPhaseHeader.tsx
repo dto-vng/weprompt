@@ -5,20 +5,29 @@
  */
 
 import type { StudioRendererProject } from '@/common/types/project/creativeStudioTypes';
-import { Button } from '@arco-design/web-react';
+import { Button, Tag } from '@arco-design/web-react';
 import { Left } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { SelectedSceneSaveState } from '../../hooks/useStoryboardEditor';
 import styles from './StudioPhaseShell.module.css';
 
 export type StudioPhaseHeaderProps = {
   project: StudioRendererProject;
+  saveState: SelectedSceneSaveState;
   onBack: () => void;
   actions?: React.ReactNode;
 };
 
-export const StudioPhaseHeader: React.FC<StudioPhaseHeaderProps> = ({ project, onBack, actions }) => {
+const SAVE_STATE_KEYS: Record<SelectedSceneSaveState, string> = {
+  saved: 'conversation.creativeStudio.phase.nav.saved',
+  dirty: 'conversation.creativeStudio.phase.nav.saving',
+  saving: 'conversation.creativeStudio.phase.nav.saving',
+  failed: 'conversation.creativeStudio.inspector.saveFailed',
+};
+
+export const StudioPhaseHeader: React.FC<StudioPhaseHeaderProps> = ({ project, saveState, onBack, actions }) => {
   const { t } = useTranslation();
 
   return (
@@ -31,18 +40,26 @@ export const StudioPhaseHeader: React.FC<StudioPhaseHeaderProps> = ({ project, o
           <span aria-hidden='true' className={styles.breadcrumbSeparator}>
             /
           </span>
-          <span aria-current='page' className={styles.breadcrumbProject}>
-            {project.name}
-          </span>
         </nav>
         <h1 className={styles.projectTitle}>{project.name}</h1>
-        <p className={styles.projectBrief}>{project.brief}</p>
+        <Tag
+          size='small'
+          aria-label={`${t('conversation.creativeStudio.project.aspectRatio')}: ${project.aspectRatio}`}
+          className={styles.aspectChip}
+        >
+          {project.aspectRatio}
+        </Tag>
       </div>
-      {actions !== undefined && (
-        <div data-studio-phase-actions className={styles.headerActions}>
-          {actions}
-        </div>
-      )}
+      <div className={styles.headerMeta}>
+        <span role='status' aria-live='polite' aria-atomic='true' data-state={saveState} className={styles.saveState}>
+          {t(SAVE_STATE_KEYS[saveState])}
+        </span>
+        {actions !== undefined && (
+          <div data-studio-phase-actions className={styles.headerActions}>
+            {actions}
+          </div>
+        )}
+      </div>
     </header>
   );
 };

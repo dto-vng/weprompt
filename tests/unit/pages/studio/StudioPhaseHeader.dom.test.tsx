@@ -32,8 +32,10 @@ const project: StudioRendererProject = {
 };
 
 describe('StudioPhaseHeader', () => {
-  it('keeps the project breadcrumb and renders only the active phase action slot', () => {
-    render(<StudioPhaseHeader project={project} onBack={vi.fn()} actions={<span>phase action</span>} />);
+  it('keeps the project breadcrumb, aspect, save state, and active phase action in one header', () => {
+    render(
+      <StudioPhaseHeader project={project} saveState='saved' onBack={vi.fn()} actions={<span>phase action</span>} />
+    );
 
     expect(
       screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.shared.backToLibrary' })
@@ -42,13 +44,26 @@ describe('StudioPhaseHeader', () => {
       screen.getByRole('button', { name: 'conversation.creativeStudio.phase.shared.backToLibrary' })
     ).toBeVisible();
     expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeVisible();
+    expect(screen.getByText('16:9')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.phase.nav.saved');
     expect(screen.getByText('phase action')).toBeVisible();
+    expect(screen.queryByText('A short launch video')).not.toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.project.readiness')).not.toBeInTheDocument();
   });
 
   it('omits the action container when the active phase has no page-level action', () => {
-    const { container } = render(<StudioPhaseHeader project={project} onBack={vi.fn()} />);
+    const { container } = render(<StudioPhaseHeader project={project} saveState='saving' onBack={vi.fn()} />);
 
     expect(container.querySelector('[data-studio-phase-actions]')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.phase.nav.saving');
+  });
+
+  it.each([
+    ['dirty', 'conversation.creativeStudio.phase.nav.saving'],
+    ['failed', 'conversation.creativeStudio.inspector.saveFailed'],
+  ] as const)('announces the %s shell save state', (saveState, messageKey) => {
+    render(<StudioPhaseHeader project={project} saveState={saveState} onBack={vi.fn()} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(messageKey);
   });
 });

@@ -204,7 +204,7 @@ describe('useStoryboardEditor', () => {
 
     expect(result.current.flushAllSceneDrafts).toBeTypeOf('function');
     await act(async () => {
-      expect(await result.current.flushAllSceneDrafts()).toBe(true);
+      expect(await result.current.flushAllSceneDrafts()).toEqual({ failed: [], dirtied: [] });
       expect(await result.current.flushProjectDraft()).toBe(true);
     });
     expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('useStoryboardEditor', () => {
     act(() => result.current.updateSceneDraft({ title: 'Opening v2' }));
     await act(async () => {
       expect(await result.current.flushProjectDraft()).toBe(true);
-      expect(await result.current.flushAllSceneDrafts()).toBe(true);
+      expect(await result.current.flushAllSceneDrafts()).toEqual({ failed: [], dirtied: [] });
     });
 
     expect(operationOrder).toEqual(['project', 'scene']);
@@ -436,7 +436,7 @@ describe('useStoryboardEditor', () => {
     act(() => result.current.updateSceneDraft({ title: 'First edit' }));
     act(() => result.current.selectScene('scene-2'));
     act(() => result.current.updateSceneDraft({ title: 'Second edit' }));
-    let flushed!: Promise<boolean>;
+    let flushed!: Promise<unknown>;
     act(() => {
       flushed = result.current.flushAllSceneDrafts();
     });
@@ -445,12 +445,89 @@ describe('useStoryboardEditor', () => {
 
     await act(async () => {
       first.resolve(ok(afterFirst));
-      expect(await flushed).toBe(true);
+      expect(await flushed).toEqual({ failed: [], dirtied: [] });
     });
 
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(2);
     expect(bridge.updateScene.invoke.mock.calls[1]?.[0]).toMatchObject({ sceneId: 'scene-2', expectedRevision: 3 });
     expect(result.current.hasUnsavedSceneDrafts).toBe(false);
+  });
+
+  it('reports a newer same-scene edit as dirtied instead of a failed save', async () => {
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const afterFirst = project(3, [scene('scene-1', { title: 'First edit' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    act(() => result.current.updateSceneDraft({ title: 'First edit' }));
+    let flushed!: Promise<unknown>;
+    act(() => {
+      flushed = result.current.flushAllSceneDrafts();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.updateSceneDraft({ title: 'Newer edit' }));
+    await act(async () => {
+      firstSave.resolve(ok(afterFirst));
+      expect(await flushed).toEqual({ failed: [], dirtied: ['scene-1'] });
+    });
+
+    expect(result.current.sceneDraft?.title).toBe('Newer edit');
+    expect(result.current.hasUnsavedSceneDrafts).toBe(true);
+    expect(result.current.saveIssues).toEqual([]);
+  });
+
+  it('keeps a failed in-flight save classified as failed when a newer edit also lands', async () => {
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    act(() => result.current.updateSceneDraft({ title: 'First edit' }));
+    let flushed!: Promise<unknown>;
+    act(() => {
+      flushed = result.current.flushAllSceneDrafts();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.updateSceneDraft({ title: 'Newer edit' }));
+    await act(async () => {
+      firstSave.resolve(failed('provider_error'));
+      expect(await flushed).toEqual({ failed: ['scene-1'], dirtied: [] });
+    });
+
+    expect(result.current.sceneDraft?.title).toBe('Newer edit');
+    expect(result.current.saveIssues).toEqual([
+      expect.objectContaining({ sceneId: 'scene-1', code: 'provider_error' }),
+    ]);
+  });
+
+  it('reports a scene first edited during the flush as dirtied for the next round', async () => {
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const afterFirst = project(3, [scene('scene-1', { title: 'First edit' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    act(() => result.current.updateSceneDraft({ title: 'First edit' }));
+    let flushed!: Promise<unknown>;
+    act(() => {
+      flushed = result.current.flushAllSceneDrafts();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.updateSceneDraftById('scene-2', { title: 'New during flush' }));
+    await act(async () => {
+      firstSave.resolve(ok(afterFirst));
+      expect(await flushed).toEqual({ failed: [], dirtied: ['scene-2'] });
+    });
+
+    expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
+    expect(result.current.sceneDrafts['scene-2']?.title).toBe('New during flush');
   });
 
   it('waits for an already queued autosave before reporting all scene drafts clean', async () => {
@@ -468,13 +545,13 @@ describe('useStoryboardEditor', () => {
     });
     await vi.waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
 
-    let flushed!: Promise<boolean>;
+    let flushed!: Promise<unknown>;
     act(() => {
       flushed = result.current.flushAllSceneDrafts();
     });
     await act(async () => {
       save.resolve(ok(saved));
-      expect(await flushed).toBe(true);
+      expect(await flushed).toEqual({ failed: [], dirtied: [] });
     });
     expect(result.current.hasUnsavedSceneDrafts).toBe(false);
   });
@@ -486,7 +563,7 @@ describe('useStoryboardEditor', () => {
 
     act(() => result.current.updateSceneDraft({ durationSeconds: 0 }));
     await act(async () => {
-      expect(await result.current.flushAllSceneDrafts()).toBe(false);
+      expect(await result.current.flushAllSceneDrafts()).toEqual({ failed: ['scene-1'], dirtied: [] });
     });
 
     expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
@@ -507,7 +584,7 @@ describe('useStoryboardEditor', () => {
     act(() => result.current.updateSceneDraft({ title: 'Local first' }));
     act(() => result.current.selectScene('scene-2'));
     act(() => result.current.updateSceneDraft({ title: 'Local second' }));
-    let flushed!: Promise<boolean>;
+    let flushed!: Promise<unknown>;
     act(() => {
       flushed = result.current.flushAllSceneDrafts();
     });
@@ -515,7 +592,7 @@ describe('useStoryboardEditor', () => {
 
     await act(async () => {
       first.resolve(failed('stale_project', 'conversation.creativeStudio.errors.staleProject'));
-      expect(await flushed).toBe(false);
+      expect(await flushed).toEqual({ failed: ['scene-1'], dirtied: [] });
     });
 
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
@@ -539,14 +616,14 @@ describe('useStoryboardEditor', () => {
       await vi.waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
     });
 
-    let flushed!: Promise<boolean>;
+    let flushed!: Promise<unknown>;
     act(() => {
       flushed = result.current.flushAllSceneDrafts();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(450);
       firstSave.resolve(failed('stale_project', 'conversation.creativeStudio.errors.staleProject'));
-      expect(await flushed).toBe(false);
+      expect(await flushed).toEqual({ failed: ['scene-1'], dirtied: [] });
     });
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
 
