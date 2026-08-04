@@ -275,7 +275,10 @@ const providerIsAvailable = (provider: IProvider, model: string, requireListedMo
   provider.enabled !== false &&
   provider.model_enabled?.[model] !== false &&
   provider.model_health?.[model]?.status !== 'unhealthy' &&
+  typeof provider.api_key === 'string' &&
   provider.api_key.trim().length > 0 &&
+  typeof provider.base_url === 'string' &&
+  provider.base_url.trim().length > 0 &&
   (!requireListedModel || provider.models.includes(model));
 
 const sanitizedCapabilities = (
