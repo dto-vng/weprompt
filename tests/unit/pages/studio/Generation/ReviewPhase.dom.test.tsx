@@ -196,7 +196,7 @@ describe('Review phase cut', () => {
     expect(
       Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
     ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
-    expect(screen.getByText('conversation.creativeStudio.phase.review.selectedTake')).toBeVisible();
+    expect(screen.getAllByText('conversation.creativeStudio.phase.review.selectedTake')).toHaveLength(2);
     expect(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.timeline.selectSceneAccessible:1,Selected opening,5,5',

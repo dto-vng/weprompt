@@ -449,6 +449,22 @@ describe('StagePreview managed media', () => {
 });
 
 describe('AssetStrip canonical variations', () => {
+  it('shows a visible in-cut badge on the selected take', () => {
+    const selected = asset();
+    render(
+      <AssetStrip
+        projectId='project-1'
+        scene={scene({ selectedAssetId: selected.id, assetIds: [selected.id] })}
+        assets={{ [selected.id]: selected }}
+        projectRevision={8}
+        mutationPending={false}
+        onSelectAsset={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('conversation.creativeStudio.phase.review.selectedTake')).toBeVisible();
+  });
+
   it('renders only generated outputs that canonically belong to the scene', () => {
     const generated = asset();
     const imported = asset({

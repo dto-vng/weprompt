@@ -449,6 +449,57 @@ describe('Creative Studio full-sentence English copy', () => {
     expect(screen.getByText('Handed off 2 selected scenes to “Launch-film-export”.')).toBeVisible();
   });
 
+  it('warns about slate gaps before committing a partial export', async () => {
+    const first = scene({ id: 'scene-1', title: 'Opening', selectedAssetId: 'asset-1' });
+    const second = scene({ id: 'scene-2', title: 'Product close-up', selectedAssetId: 'asset-2' });
+    const third = scene({ id: 'scene-3', title: 'Closing slate' });
+    const currentProject: StudioRendererProject = {
+      ...project(),
+      sceneOrder: [first.id, second.id, third.id],
+      scenes: { [first.id]: first, [second.id]: second, [third.id]: third },
+    };
+
+    await renderEnglish(
+      <StudioExportModal
+        visible
+        project={currentProject}
+        selectedAssetCount={2}
+        pending={false}
+        includeReferences={false}
+        exportedFolderName={null}
+        missingSceneIds={[third.id]}
+        issueMessageKey={null}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        onIncludeReferencesChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Shot 03 is still a slate — it won't be included.")).toBeVisible();
+    expect(screen.getByText('Export 2 shots?')).toBeVisible();
+  });
+
+  it('does not show a slate-gap warning before a complete export', async () => {
+    await renderEnglish(
+      <StudioExportModal
+        visible
+        project={project()}
+        selectedAssetCount={2}
+        pending={false}
+        includeReferences={false}
+        exportedFolderName={null}
+        missingSceneIds={[]}
+        issueMessageKey={null}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        onIncludeReferencesChange={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/still a slate/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Export 2 shots\?/)).not.toBeInTheDocument();
+  });
+
   it('explains that a partial handoff is missing selected media and never exports Review slates', async () => {
     await renderEnglish(
       <StudioExportModal

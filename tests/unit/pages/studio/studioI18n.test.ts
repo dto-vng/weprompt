@@ -192,6 +192,8 @@ const readinessActionKeys = [
 ] as const;
 
 const pluralLogicalKeys = [
+  'export.confirmSelectedCount',
+  'export.gapWarning',
   'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',
@@ -455,9 +457,11 @@ describe('Creative Studio localization contract', () => {
         }
 
         const fallbackPlaceholders = getPlaceholders(fallback);
-        const referenceTemplates = Object.entries(referenceLeaves)
-          .filter(([key]) => key === base || key.startsWith(`${base}_`))
-          .map(([, value]) => value);
+        const referenceTemplates = new Set(
+          Object.entries(referenceLeaves)
+            .filter(([key]) => key === base || key.startsWith(`${base}_`))
+            .map(([, value]) => value)
+        );
         for (const variantKey of expectedVariantKeys) {
           const variant = leaves[variantKey];
           if (!variant?.trim()) {
@@ -467,7 +471,7 @@ describe('Creative Studio localization contract', () => {
           if (getPlaceholders(variant).join('\n') !== fallbackPlaceholders.join('\n')) {
             issues.push(`${locale}.${variantKey} placeholders do not match ${base}`);
           }
-          if (locale !== i18nConfig.referenceLanguage && referenceTemplates.includes(variant)) {
+          if (locale !== i18nConfig.referenceLanguage && referenceTemplates.has(variant)) {
             issues.push(`${locale}.${variantKey} copies the English plural text`);
           }
         }
@@ -479,11 +483,13 @@ describe('Creative Studio localization contract', () => {
             count,
             seconds: count,
             number: 2,
+            shots: '03',
             title: 'Product close-up',
             returnDetails: true,
           });
           const expectedExactKey = `${key}${resolver.getSuffix(locale, count)}`;
-          if (typeof details.res !== 'string' || !details.res.includes(String(count))) {
+          const expectedRenderedValue = base === 'export.gapWarning' ? '03' : String(count);
+          if (typeof details.res !== 'string' || !details.res.includes(expectedRenderedValue)) {
             issues.push(`${locale}.${base} did not render count ${count}`);
           }
           if (details.res === key) issues.push(`${locale}.${base} returned the raw key for ${count}`);
