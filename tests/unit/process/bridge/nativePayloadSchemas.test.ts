@@ -10,11 +10,20 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { NATIVE_BRIDGE_PROVIDER_KEYS, type NativeBridgeProviderKey } from '@/common/adapter/native/constants';
+import {
+  NATIVE_BRIDGE_PROVIDER_KEYS,
+  RENDERER_BRIDGE_QUERY_KEYS,
+  type NativeBridgeProviderKey,
+  type RendererBridgeQueryKey,
+} from '@/common/adapter/native/constants';
 import {
   INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE,
+  INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE,
   nativeBridgePayloadSchemas,
   parseNativeBridgePayload,
+  parseRendererBridgeQueryRequest,
+  parseRendererBridgeQueryResponse,
+  rendererBridgeQuerySchemas,
 } from '@/common/adapter/native/payloadSchemas';
 
 const VALID_PAYLOADS = {
@@ -315,7 +324,7 @@ type InvalidPayloadCase = readonly [NativeBridgeProviderKey, string, unknown];
 
 const IPC_BRIDGE_PATH = resolve(process.cwd(), 'packages/desktop/src/common/adapter/ipcBridge.ts');
 
-function collectBridgeBuildProviderKeys(source: string): string[] {
+function collectBridgeBuilderKeys(source: string, builderName: 'buildProvider' | 'buildRendererQuery'): string[] {
   const sourceFile = ts.createSourceFile(IPC_BRIDGE_PATH, source, ts.ScriptTarget.Latest, true);
   const providerKeys: string[] = [];
 
@@ -325,11 +334,11 @@ function collectBridgeBuildProviderKeys(source: string): string[] {
       ts.isPropertyAccessExpression(node.expression) &&
       ts.isIdentifier(node.expression.expression) &&
       node.expression.expression.text === 'bridge' &&
-      node.expression.name.text === 'buildProvider'
+      node.expression.name.text === builderName
     ) {
       const [providerKey] = node.arguments;
       if (providerKey === undefined || !ts.isStringLiteral(providerKey)) {
-        throw new Error('bridge.buildProvider provider key must be a string literal');
+        throw new Error(`bridge.${builderName} provider key must be a string literal`);
       }
       providerKeys.push(providerKey.text);
     }
@@ -339,6 +348,14 @@ function collectBridgeBuildProviderKeys(source: string): string[] {
 
   visit(sourceFile);
   return providerKeys;
+}
+
+function collectBridgeBuildProviderKeys(source: string): string[] {
+  return collectBridgeBuilderKeys(source, 'buildProvider');
+}
+
+function collectBridgeBuildRendererQueryKeys(source: string): string[] {
+  return collectBridgeBuilderKeys(source, 'buildRendererQuery');
 }
 
 const INVALID_PAYLOADS = [
@@ -1035,15 +1052,70 @@ describe('native bridge payload schemas', () => {
     expect(providerKeys).toEqual(NATIVE_BRIDGE_PROVIDER_KEYS);
   });
 
+  it('keeps renderer-owned query declarations equal to their separate manifest', () => {
+    const queryKeys = collectBridgeBuildRendererQueryKeys(readFileSync(IPC_BRIDGE_PATH, 'utf8'));
+
+    expect(queryKeys).toEqual(RENDERER_BRIDGE_QUERY_KEYS);
+    expect(queryKeys.some((key) => NATIVE_BRIDGE_PROVIDER_KEYS.includes(key as NativeBridgeProviderKey))).toBe(false);
+  });
+
   it('rejects non-literal native provider declarations in the inventory', () => {
     expect(() => collectBridgeBuildProviderKeys("const key = 'provider'; bridge.buildProvider(key);")).toThrow(
       /provider key must be a string literal/i
     );
   });
 
+  it('rejects non-literal renderer query declarations in the inventory', () => {
+    expect(() =>
+      collectBridgeBuildRendererQueryKeys("const key = 'query'; bridge.buildRendererQuery(key, {});")
+    ).toThrow(/provider key must be a string literal/i);
+  });
+
   it('has exactly one schema for every manifested native provider', () => {
     expect(Object.keys(nativeBridgePayloadSchemas)).toEqual(NATIVE_BRIDGE_PROVIDER_KEYS);
   });
+
+  it('has exactly one request and response schema for every renderer-owned query', () => {
+    expect(Object.keys(rendererBridgeQuerySchemas)).toEqual(RENDERER_BRIDGE_QUERY_KEYS);
+    expect(
+      Object.values(rendererBridgeQuerySchemas).every(
+        (schemas) => schemas.request !== undefined && schemas.response !== undefined
+      )
+    ).toBe(true);
+  });
+
+  it.each(RENDERER_BRIDGE_QUERY_KEYS)('accepts only a void request for renderer-owned query %s', (queryKey) => {
+    expect(parseRendererBridgeQueryRequest(queryKey, undefined)).toBeUndefined();
+    expect(() => parseRendererBridgeQueryRequest(queryKey, {})).toThrow(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
+  });
+
+  it.each([
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 0 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 24 }],
+    ['creative-studio.flush-unsaved-work', { saved: true }],
+    ['creative-studio.flush-unsaved-work', { saved: false }],
+  ] as const satisfies ReadonlyArray<readonly [RendererBridgeQueryKey, unknown]>)(
+    'accepts a strict response for renderer-owned query %s',
+    (queryKey, response) => {
+      expect(parseRendererBridgeQueryResponse(queryKey, response)).toEqual(response);
+    }
+  );
+
+  it.each([
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: -1 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 25 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 1.5 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 1, unexpected: true }],
+    ['creative-studio.flush-unsaved-work', { saved: 'yes' }],
+    ['creative-studio.flush-unsaved-work', { saved: false, unexpected: true }],
+  ] as const satisfies ReadonlyArray<readonly [RendererBridgeQueryKey, unknown]>)(
+    'rejects an invalid response for renderer-owned query %s',
+    (queryKey, response) => {
+      expect(() => parseRendererBridgeQueryResponse(queryKey, response)).toThrow(
+        INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE
+      );
+    }
+  );
 
   it.each(NATIVE_BRIDGE_PROVIDER_KEYS)('accepts the current payload shape for %s', (providerKey) => {
     expect(() => parseNativeBridgePayload(providerKey, VALID_PAYLOADS[providerKey])).not.toThrow();

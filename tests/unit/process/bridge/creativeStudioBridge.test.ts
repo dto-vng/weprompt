@@ -69,7 +69,12 @@ vi.mock('@/common', () => ({
   },
 }));
 
-import { initCreativeStudioBridge, type CreativeStudioBridgeDependencies } from '@process/bridge/creativeStudioBridge';
+import {
+  createCreativeStudioCloseHandshake,
+  initCreativeStudioBridge,
+  type CreativeStudioBridgeDependencies,
+  type CreativeStudioCloseHandshakeDependencies,
+} from '@process/bridge/creativeStudioBridge';
 import { CreativeStudioServiceError } from '@process/services/creative-studio/creativeStudioService';
 import { StudioJobManagerError } from '@process/services/creative-studio/jobManager';
 
@@ -625,5 +630,206 @@ describe('initCreativeStudioBridge', () => {
     expect(service.updateScene).toHaveBeenCalledOnce();
     expect(service.reorderScenes).toHaveBeenCalledOnce();
     expect(service.selectAsset).toHaveBeenCalledOnce();
+  });
+});
+
+type CloseEvent = { preventDefault: ReturnType<typeof vi.fn> };
+
+const createCloseEvent = (): CloseEvent => ({ preventDefault: vi.fn() });
+
+const createCloseHandshakeDependencies = (
+  overrides: Partial<CreativeStudioCloseHandshakeDependencies> = {}
+): CreativeStudioCloseHandshakeDependencies => ({
+  getCurrentUrl: () => 'file:///Applications/WePrompt/index.html#/studio/project_1/write',
+  queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 0 })),
+  flushUnsavedWork: vi.fn(async () => ({ saved: true })),
+  showMessageBox: vi.fn(async () => ({ response: 2 })),
+  translate: (key, options) => (options?.count === undefined ? key : `${key}:${options.count}`),
+  closeWindow: vi.fn(),
+  quitApp: vi.fn(),
+  onQuitCancelled: vi.fn(),
+  ...overrides,
+});
+
+describe('createCreativeStudioCloseHandshake', () => {
+  it.each([
+    'file:///Applications/WePrompt/index.html#/guid',
+    'file:///Applications/WePrompt/index.html#/studio',
+    'http://localhost:5173/#/studio-tools',
+    'not a renderer URL',
+  ])('leaves a non-Studio renderer route to the normal close lifecycle: %s', (currentUrl) => {
+    const dependencies = createCloseHandshakeDependencies({ getCurrentUrl: () => currentUrl });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+    const event = createCloseEvent();
+
+    expect(handshake.handleWindowClose(event)).toBe(false);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(dependencies.queryUnsavedWork).not.toHaveBeenCalled();
+  });
+
+  it('prevents close synchronously and closes once when the Studio renderer is clean', async () => {
+    const dependencies = createCloseHandshakeDependencies();
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+    const firstEvent = createCloseEvent();
+
+    expect(handshake.handleWindowClose(firstEvent)).toBe(true);
+    expect(firstEvent.preventDefault).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
+
+    const recursiveEvent = createCloseEvent();
+    expect(handshake.handleWindowClose(recursiveEvent)).toBe(false);
+    expect(recursiveEvent.preventDefault).not.toHaveBeenCalled();
+    expect(dependencies.queryUnsavedWork).toHaveBeenCalledExactlyOnceWith({ timeoutMs: 3_000 });
+  });
+
+  it('offers save, discard, and cancel for dirty scenes before flushing and closing', async () => {
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 2 })),
+      showMessageBox: vi.fn(async () => ({ response: 0 })),
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleWindowClose(createCloseEvent());
+
+    await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
+    expect(dependencies.showMessageBox).toHaveBeenCalledExactlyOnceWith({
+      type: 'warning',
+      buttons: [
+        'conversation.creativeStudio.close.saveAndClose',
+        'conversation.creativeStudio.close.discard',
+        'conversation.creativeStudio.close.cancel',
+      ],
+      defaultId: 0,
+      cancelId: 2,
+      message: 'conversation.creativeStudio.close.unsavedMessage:2',
+    });
+    expect(dependencies.flushUnsavedWork).toHaveBeenCalledExactlyOnceWith({ timeoutMs: 3_000 });
+  });
+
+  it('keeps the window open when the dirty-work dialog is cancelled', async () => {
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 1 })),
+      showMessageBox: vi.fn(async () => ({ response: 2 })),
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleWindowClose(createCloseEvent());
+
+    await vi.waitFor(() => expect(dependencies.showMessageBox).toHaveBeenCalledOnce());
+    expect(dependencies.closeWindow).not.toHaveBeenCalled();
+    expect(dependencies.flushUnsavedWork).not.toHaveBeenCalled();
+  });
+
+  it('offers only discard or cancel when the renderer query is unavailable', async () => {
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => {
+        throw new Error('renderer query timed out');
+      }),
+      showMessageBox: vi.fn(async () => ({ response: 0 })),
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleWindowClose(createCloseEvent());
+
+    await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
+    expect(dependencies.showMessageBox).toHaveBeenCalledExactlyOnceWith({
+      type: 'warning',
+      buttons: ['conversation.creativeStudio.close.discard', 'conversation.creativeStudio.close.cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      message: 'conversation.creativeStudio.close.unavailableMessage',
+    });
+    expect(dependencies.flushUnsavedWork).not.toHaveBeenCalled();
+  });
+
+  it('offers only discard or cancel when saving cannot complete', async () => {
+    const showMessageBox = vi.fn().mockResolvedValueOnce({ response: 0 }).mockResolvedValueOnce({ response: 1 });
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 1 })),
+      flushUnsavedWork: vi.fn(async () => {
+        throw new Error('renderer flush timed out');
+      }),
+      showMessageBox,
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleWindowClose(createCloseEvent());
+
+    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledTimes(2));
+    expect(showMessageBox.mock.calls[1]?.[0]).toMatchObject({
+      buttons: ['conversation.creativeStudio.close.discard', 'conversation.creativeStudio.close.cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    expect(dependencies.flushUnsavedWork).toHaveBeenCalledExactlyOnceWith({ timeoutMs: 3_000 });
+    expect(dependencies.closeWindow).not.toHaveBeenCalled();
+  });
+
+  it('runs only one renderer preflight while repeated close events are in flight', async () => {
+    let resolveQuery: ((value: { dirtySceneCount: number }) => void) | undefined;
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(
+        () =>
+          new Promise<{ dirtySceneCount: number }>((resolve) => {
+            resolveQuery = resolve;
+          })
+      ),
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+    const firstEvent = createCloseEvent();
+    const secondEvent = createCloseEvent();
+
+    handshake.handleWindowClose(firstEvent);
+    handshake.handleWindowClose(secondEvent);
+
+    expect(firstEvent.preventDefault).toHaveBeenCalledOnce();
+    expect(secondEvent.preventDefault).toHaveBeenCalledOnce();
+    expect(dependencies.queryUnsavedWork).toHaveBeenCalledOnce();
+    resolveQuery?.({ dirtySceneCount: 0 });
+    await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
+  });
+
+  it('uses the same preflight for explicit quit and bypasses its confirmed retry', async () => {
+    const dependencies = createCloseHandshakeDependencies();
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+    const firstEvent = createCloseEvent();
+
+    expect(handshake.handleBeforeQuit(firstEvent)).toBe(true);
+    expect(firstEvent.preventDefault).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(dependencies.quitApp).toHaveBeenCalledOnce());
+
+    const retryEvent = createCloseEvent();
+    expect(handshake.handleBeforeQuit(retryEvent)).toBe(false);
+    expect(retryEvent.preventDefault).not.toHaveBeenCalled();
+    expect(dependencies.queryUnsavedWork).toHaveBeenCalledOnce();
+  });
+
+  it('resets explicit-quit state after cancellation so a later quit can retry', async () => {
+    const showMessageBox = vi.fn().mockResolvedValueOnce({ response: 2 }).mockResolvedValueOnce({ response: 1 });
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 1 })),
+      showMessageBox,
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleBeforeQuit(createCloseEvent());
+    await vi.waitFor(() => expect(dependencies.onQuitCancelled).toHaveBeenCalledOnce());
+    handshake.handleBeforeQuit(createCloseEvent());
+    await vi.waitFor(() => expect(dependencies.quitApp).toHaveBeenCalledOnce());
+
+    expect(dependencies.queryUnsavedWork).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not repeat the renderer query when ordinary close is followed by process quit', async () => {
+    const dependencies = createCloseHandshakeDependencies();
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleWindowClose(createCloseEvent());
+    await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
+    const quitEvent = createCloseEvent();
+
+    expect(handshake.handleBeforeQuit(quitEvent)).toBe(false);
+    expect(quitEvent.preventDefault).not.toHaveBeenCalled();
+    expect(dependencies.queryUnsavedWork).toHaveBeenCalledOnce();
   });
 });

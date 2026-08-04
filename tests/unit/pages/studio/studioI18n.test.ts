@@ -14,6 +14,7 @@ type JsonObject = Record<string, unknown>;
 const localeRoot = new URL('../../../../packages/desktop/src/renderer/services/i18n/locales/', import.meta.url);
 
 const plannedGroups = [
+  'close',
   'create',
   'draft',
   'empty',
@@ -107,6 +108,14 @@ const phasePluralLogicalKeys = [
   'phase.review.missingSlates',
 ] as const;
 
+const closeKeys = [
+  'close.saveAndClose',
+  'close.discard',
+  'close.cancel',
+  'close.unsavedMessage',
+  'close.unavailableMessage',
+] as const;
+
 const taskSevenKeys = [
   'nav.title',
   'library.title',
@@ -195,6 +204,7 @@ const readinessActionKeys = [
 ] as const;
 
 const pluralLogicalKeys = [
+  'close.unsavedMessage',
   'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',
@@ -292,6 +302,43 @@ describe('Creative Studio localization contract', () => {
     for (const key of phaseKeys) {
       expect(leaves[key], `Missing conversation.creativeStudio.${key}`).toBeTruthy();
     }
+    for (const key of closeKeys) {
+      expect(leaves[key], `Missing conversation.creativeStudio.${key}`).toBeTruthy();
+    }
+  });
+
+  it('renders the close handshake vocabulary and required Slavic plurals in every locale', async () => {
+    const issues: string[] = [];
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const conversation = loadConversationLocale(locale);
+      const instance = i18next.createInstance();
+      await instance.init({
+        lng: locale,
+        fallbackLng: false,
+        resources: { [locale]: { translation: { conversation } } },
+        interpolation: { escapeValue: false },
+      });
+
+      for (const closeKey of closeKeys) {
+        const key = `conversation.creativeStudio.${closeKey}`;
+        const rendered = instance.t(key, closeKey === 'close.unsavedMessage' ? { count: 2 } : undefined);
+        if (!rendered.trim() || rendered === key || rendered.includes('conversation.creativeStudio.')) {
+          issues.push(`${locale}.${closeKey} rendered ${rendered}`);
+        }
+      }
+
+      if (locale === 'ru-RU' || locale === 'uk-UA') {
+        const close = (conversation.creativeStudio as JsonObject | undefined)?.close;
+        for (const suffix of ['one', 'few', 'many', 'other']) {
+          if (!isJsonObject(close) || typeof close[`unsavedMessage_${suffix}`] !== 'string') {
+            issues.push(`${locale}.close.unsavedMessage_${suffix} missing`);
+          }
+        }
+      }
+    }
+
+    expect(issues).toEqual([]);
   });
 
   it('renders the complete phase vocabulary in every configured locale without exposing raw keys', async () => {

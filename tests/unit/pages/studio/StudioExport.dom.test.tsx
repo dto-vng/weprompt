@@ -19,6 +19,8 @@ import type {
 import StudioPage from '@renderer/pages/studio/StudioPage';
 
 const bridge = vi.hoisted(() => ({
+  hasUnsavedWork: { provider: vi.fn() },
+  flushUnsavedWork: { provider: vi.fn() },
   getProject: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
   updateProject: { invoke: vi.fn() },
@@ -141,6 +143,7 @@ const deferred = <T,>() => {
 describe('Studio asset export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
     bridge.updateProject.invoke.mockResolvedValue(ok(project()));
@@ -170,6 +173,8 @@ describe('Studio asset export', () => {
     bridge.saveConnection.invoke.mockResolvedValue(ok(null));
     bridge.removeConnection.invoke.mockResolvedValue(ok(false));
     bridge.projectUpdated.on.mockReturnValue(() => {});
+    bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
+    bridge.flushUnsavedWork.provider.mockReturnValue(() => {});
   });
 
   it('opens the native destination chooser with IDs only and reports the returned folder name', async () => {

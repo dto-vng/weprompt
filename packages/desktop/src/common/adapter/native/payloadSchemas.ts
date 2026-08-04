@@ -9,7 +9,7 @@ import {
   OFFICE_ARTIFACT_MAX_SELECTED_CELLS,
   OFFICE_ARTIFACT_MAX_SELECTION_MESSAGE_BYTES,
 } from '../../types/office/artifactEditor';
-import type { NativeBridgeProviderKey } from './constants';
+import type { NativeBridgeProviderKey, RendererBridgeQueryKey } from './constants';
 
 const MAX_PATH_LENGTH = 4096;
 const MAX_IDENTIFIER_LENGTH = 256;
@@ -309,6 +309,19 @@ const studioUpdateProjectSchema = z
   .refine((input) => Object.keys(input).some((key) => key !== 'projectId' && key !== 'expectedRevision'));
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
+export const INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE =
+  '[adapter] Renderer IPC query rejected: invalid operation payload';
+
+export const rendererBridgeQuerySchemas = {
+  'creative-studio.has-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ dirtySceneCount: z.number().finite().int().min(0).max(24) }).strict(),
+  },
+  'creative-studio.flush-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ saved: z.boolean() }).strict(),
+  },
+} satisfies Record<RendererBridgeQueryKey, { request: z.ZodTypeAny; response: z.ZodTypeAny }>;
 
 export const nativeBridgePayloadSchemas = {
   'restart-app': voidPayloadSchema,
@@ -514,6 +527,22 @@ export function parseNativeBridgePayload(providerKey: NativeBridgeProviderKey, p
   const result = nativeBridgePayloadSchemas[providerKey].safeParse(payload);
   if (!result.success) {
     throw new Error(INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryRequest(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].request.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryResponse(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].response.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
   }
   return result.data;
 }

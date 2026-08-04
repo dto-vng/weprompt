@@ -11,4 +11,3 @@ export * from './PhaseShell';
 export { AssetStrip, StagePreview, StudioExportModal } from './Preview';
 export { SceneTimeline } from './SceneTimeline';
 export { SceneCard, SceneInspector, StoryboardDraftModal, StoryboardPanel } from './Storyboard';
-export { StudioNavigationLock } from './StudioNavigationLock';

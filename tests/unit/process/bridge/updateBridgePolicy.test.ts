@@ -26,6 +26,10 @@ vi.mock('@/common/platform/bridge', () => ({
       provider: vi.fn(),
       invoke: vi.fn(),
     })),
+    buildRendererQuery: vi.fn(() => ({
+      provider: vi.fn(),
+      invoke: vi.fn(),
+    })),
     buildEmitter: vi.fn(() => ({
       emit: vi.fn(),
       on: vi.fn(),

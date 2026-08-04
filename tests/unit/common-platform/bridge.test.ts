@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type TransportEmitter = {
   emit: (name: string, data: unknown) => unknown;
@@ -56,6 +56,10 @@ const loadSerializingBridge = async () => {
 describe('local bridge', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('routes provider requests and replies through the subscribe protocol', async () => {
@@ -116,5 +120,46 @@ describe('local bridge', () => {
 
     expect(console.error).toHaveBeenCalledWith('[bridge] Provider "test.failure" failed:', error);
     expect(outbound.some(({ name }) => name === 'subscribe.callback-test.failurerequest-1')).toBe(false);
+  });
+
+  it('routes renderer-owned queries through the subscribe protocol', async () => {
+    const { bridge, outbound } = await loadLoopbackBridge();
+    const query = bridge.buildRendererQuery<{ dirtySceneCount: number }>('test.renderer-query', {
+      dirtySceneCount: 24,
+    });
+    query.provider(() => ({ dirtySceneCount: 3 }));
+
+    await expect(query.invoke({ timeoutMs: 100 })).resolves.toEqual({ dirtySceneCount: 3 });
+    expect(outbound[0]?.name).toBe('subscribe-test.renderer-query');
+    expect(outbound[1]?.name).toMatch(/^subscribe\.callback-test\.renderer-querytest\.renderer-query[a-f0-9]{8}$/);
+  });
+
+  it('returns the typed fallback when a renderer query provider rejects', async () => {
+    const { bridge } = await loadLoopbackBridge();
+    const error = new Error('renderer unavailable');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const query = bridge.buildRendererQuery<{ saved: boolean }>('test.renderer-failure', { saved: false });
+    query.provider(() => Promise.reject(error));
+
+    await expect(query.invoke({ timeoutMs: 100 })).resolves.toEqual({ saved: false });
+    expect(console.error).toHaveBeenCalledWith(
+      '[bridge] Renderer query provider "test.renderer-failure" failed:',
+      error
+    );
+  });
+
+  it('disposes a renderer query callback listener when the invoke times out', async () => {
+    vi.useFakeTimers();
+    const { bridge, getIncoming, outbound } = await loadLoopbackBridge();
+    const query = bridge.buildRendererQuery<{ saved: boolean }>('test.renderer-timeout', { saved: false });
+
+    const pending = query.invoke({ timeoutMs: 25 });
+    const request = outbound[0]?.data as { id: string };
+    const callbackName = `subscribe.callback-test.renderer-timeout${request.id}`;
+    const rejection = expect(pending).rejects.toThrow('timed out after 25ms');
+    await vi.advanceTimersByTimeAsync(25);
+    await rejection;
+
+    expect(getIncoming()?.emit(callbackName, { saved: true })).toBe(false);
   });
 });

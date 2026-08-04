@@ -864,6 +864,16 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "close": {
+      "saveAndClose": "Salvar e fechar",
+      "discard": "Descartar e fechar",
+      "cancel": "Cancelar",
+      "unsavedMessage": "{{count}} cenas têm edições não salvas. Deseja salvá-las antes de fechar?",
+      "unsavedMessage_one": "{{count}} cena tem edições não salvas. Deseja salvá-la antes de fechar?",
+      "unsavedMessage_many": "{{count}} cenas têm edições não salvas. Deseja salvá-las antes de fechar?",
+      "unsavedMessage_other": "{{count}} cenas têm edições não salvas. Deseja salvá-las antes de fechar?",
+      "unavailableMessage": "O Estúdio Criativo não respondeu. Fechar agora pode descartar edições de cena não salvas."
+    },
     "phase": {
       "nav": {
         "label": "Fluxo criativo",

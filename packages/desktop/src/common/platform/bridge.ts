@@ -25,6 +25,10 @@ type ProviderHandler<Data, Params> = [Params] extends [void]
 
 type ProviderInvoke<Data, Params> = [Params] extends [void] ? () => Promise<Data> : (params: Params) => Promise<Data>;
 
+type RendererQueryInvokeOptions = {
+  timeoutMs?: number;
+};
+
 type EmitterHandler<Params> = [Params] extends [void] ? () => void : (params: Params) => void;
 type EmitterEmit<Params> = [Params] extends [void] ? () => void : (params: Params) => void;
 
@@ -32,11 +36,18 @@ const eventEmitter = new EventEmitter();
 const interceptors: Interceptor[] = [];
 const listenerWrappers = new Map<string, Map<EventHandler, Set<EventHandler>>>();
 const noop = (): void => {};
+const DEFAULT_RENDERER_QUERY_TIMEOUT_MS = 3_000;
+const REQUEST_ID_SUFFIX_PATTERN = /^[a-f0-9]{8}$/;
 
 let emitToAdapter: BridgeAdapter['emit'] = () => undefined;
 let disconnectAdapter: (() => void) | undefined;
 
-const createRequestId = (key: string): string => `${key}${Math.random().toString(16).slice(2, 10)}`;
+const createRequestId = (key: string): string => {
+  const suffix = Math.floor(Math.random() * 0x1_0000_0000)
+    .toString(16)
+    .padStart(8, '0');
+  return `${key}${suffix}`;
+};
 
 export const adapter = (config: BridgeAdapter): void => {
   disconnectAdapter?.();
@@ -116,6 +127,8 @@ export const intercept = (callback: Interceptor): (() => void) => {
   };
 };
 
+export const hasListener = (name: string): boolean => eventEmitter.listenerCount(name) > 0;
+
 export const subscribe = <Params = unknown, Data = unknown>(
   name: string,
   handler: (data: Params) => MaybePromise<Data>
@@ -135,6 +148,41 @@ export const subscribe = <Params = unknown, Data = unknown>(
       });
   });
 
+const subscribeRendererQuery = <Data>(
+  name: string,
+  handler: () => MaybePromise<Data>,
+  providerFailureResult: Data
+): (() => void) =>
+  on(`subscribe-${name}`, (request) => {
+    if (typeof request !== 'object' || request === null || Array.isArray(request) || !('id' in request)) {
+      return;
+    }
+
+    const requestId = request.id;
+    if (typeof requestId !== 'string' || !requestId.startsWith(name)) {
+      return;
+    }
+    const requestIdSuffix = requestId.slice(name.length);
+    if (!REQUEST_ID_SUFFIX_PATTERN.test(requestIdSuffix)) {
+      return;
+    }
+    if ('data' in request && request.data !== undefined) {
+      return;
+    }
+
+    const emitResponse = (result: Data): void => {
+      emit(`subscribe.callback-${name}${requestId}`, result);
+    };
+
+    void Promise.resolve()
+      .then(handler)
+      .then(emitResponse)
+      .catch((error: unknown) => {
+        console.error(`[bridge] Renderer query provider "${name}" failed:`, error);
+        emitResponse(providerFailureResult);
+      });
+  });
+
 export const invoke = <Data = unknown>(name: string, data?: unknown): Promise<Data> => {
   const id = createRequestId(name);
   const callbackName = `subscribe.callback-${name}${id}`;
@@ -145,6 +193,44 @@ export const invoke = <Data = unknown>(name: string, data?: unknown): Promise<Da
       resolve(result as Data);
     });
     emit(`subscribe-${name}`, { id, data });
+  });
+};
+
+const invokeWithTimeout = <Data>(name: string, data: unknown, timeoutMs: number): Promise<Data> => {
+  if (!Number.isFinite(timeoutMs) || !Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+    return Promise.reject(new RangeError('[bridge] Renderer query timeout must be a positive integer'));
+  }
+
+  const id = createRequestId(name);
+  const callbackName = `subscribe.callback-${name}${id}`;
+
+  return new Promise<Data>((resolve, reject) => {
+    let settled = false;
+    let dispose = noop;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      dispose();
+      reject(new Error(`[bridge] Renderer query "${name}" timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    dispose = on(callbackName, (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      dispose();
+      resolve(result as Data);
+    });
+
+    try {
+      emit(`subscribe-${name}`, { id, data });
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      dispose();
+      reject(error);
+    }
   });
 };
 
@@ -161,6 +247,21 @@ export const buildProvider = <Data, Params = undefined>(key: string) => {
   };
 };
 
+export const buildRendererQuery = <Data>(key: string, providerFailureResult: Data) => {
+  let disposeProvider = noop;
+
+  return {
+    provider(handler: () => MaybePromise<Data>): () => void {
+      disposeProvider();
+      disposeProvider = subscribeRendererQuery(key, handler, providerFailureResult);
+      return disposeProvider;
+    },
+    invoke(options: RendererQueryInvokeOptions = {}): Promise<Data> {
+      return invokeWithTimeout<Data>(key, undefined, options.timeoutMs ?? DEFAULT_RENDERER_QUERY_TIMEOUT_MS);
+    },
+  };
+};
+
 export const buildEmitter = <Params = undefined>(key: string) => ({
   on: ((callback: EmitterHandler<Params>) => on(key, callback as EventHandler)) as (
     callback: EmitterHandler<Params>
@@ -172,7 +273,9 @@ export const bridge = {
   adapter,
   buildEmitter,
   buildProvider,
+  buildRendererQuery,
   emit,
+  hasListener,
   intercept,
   invoke,
   off,
