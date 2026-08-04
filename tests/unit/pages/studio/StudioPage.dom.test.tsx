@@ -31,6 +31,8 @@ import {
 } from '@renderer/pages/studio/studioPhaseRoute';
 
 const bridge = vi.hoisted(() => ({
+  hasUnsavedWork: { provider: vi.fn() },
+  flushUnsavedWork: { provider: vi.fn() },
   getProject: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
   updateModelSelection: { invoke: vi.fn() },
@@ -296,6 +298,7 @@ describe('StudioPage and useStudioProject', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    window.sessionStorage.clear();
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
@@ -324,9 +327,12 @@ describe('StudioPage and useStudioProject', () => {
     bridge.saveConnection.invoke.mockResolvedValue(failure());
     bridge.removeConnection.invoke.mockResolvedValue(failure());
     bridge.projectUpdated.on.mockReturnValue(() => {});
+    bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
+    bridge.flushUnsavedWork.provider.mockReturnValue(() => {});
   });
 
   afterEach(() => {
+    window.sessionStorage.clear();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -2184,7 +2190,7 @@ describe('StudioPage and useStudioProject', () => {
     ).toBeInTheDocument();
   });
 
-  it('blocks project navigation until a stale scene draft is explicitly retried or discarded', async () => {
+  it('allows project navigation while a stale scene recovery choice is visible', async () => {
     const opening = scene();
     let projectOneFetches = 0;
     bridge.getProject.invoke.mockImplementation(async ({ projectId }: { projectId: string }) => {
@@ -2213,24 +2219,12 @@ describe('StudioPage and useStudioProject', () => {
 
     await act(async () => router.navigate('/studio/project-2'));
 
-    expect(router.state.location.pathname).toBe('/studio/project-1/write');
-    expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
-    expect(bridge.getProject.invoke).not.toHaveBeenCalledWith({ projectId: 'project-2' });
-
-    fireEvent.click(
-      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
-      ).not.toBeInTheDocument()
-    );
-    await act(async () => router.navigate('/studio/project-2'));
-
+    expect(router.state.location.pathname).toBe('/studio/project-2/brief');
     expect(await screen.findByRole('heading', { level: 1, name: 'Second film' })).toBeInTheDocument();
+    expect(bridge.getProject.invoke).toHaveBeenCalledWith({ projectId: 'project-2' });
   });
 
-  it('offers explicit retry and discard before leaving after a typed scene-save failure', async () => {
+  it('persists a typed scene-save failure and allows leaving the project', async () => {
     const opening = scene();
     bridge.getProject.invoke.mockImplementation(async ({ projectId }: { projectId: string }) =>
       ok(
@@ -2254,20 +2248,10 @@ describe('StudioPage and useStudioProject', () => {
     expect(
       within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
     ).toBeInTheDocument();
+    expect(window.sessionStorage.getItem('weprompt.studio.drafts.project-1')).toContain('Unsaved typed failure');
 
     await act(async () => router.navigate('/studio/project-2'));
-    expect(router.state.location.pathname).toBe('/studio/project-1/write');
-
-    fireEvent.click(
-      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
-      ).not.toBeInTheDocument()
-    );
-    await act(async () => router.navigate('/studio/project-2'));
-
+    expect(router.state.location.pathname).toBe('/studio/project-2/write');
     expect(await screen.findByRole('heading', { level: 1, name: 'Second film' })).toBeInTheDocument();
   });
 

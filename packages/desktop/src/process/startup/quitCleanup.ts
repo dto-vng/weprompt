@@ -10,6 +10,7 @@ type BeforeQuitEvent = {
 
 type QuitCleanupDeps = {
   onBeforeQuit: (handler: (event: BeforeQuitEvent) => void) => void;
+  beforeCleanup?: (event: BeforeQuitEvent) => boolean;
   quitApp: () => void;
   setIsQuitting: (value: boolean) => void;
   markExplicitQuit: () => void;
@@ -85,12 +86,15 @@ export function installQuitCleanup(deps: QuitCleanupDeps): void {
     if (cleanupCompleted) {
       return;
     }
-
-    event.preventDefault();
     if (cleanupStarted) {
+      event.preventDefault();
+      return;
+    }
+    if (deps.beforeCleanup?.(event)) {
       return;
     }
 
+    event.preventDefault();
     cleanupStarted = true;
     void runQuitCleanup(deps).finally(() => {
       cleanupCompleted = true;

@@ -28,7 +28,6 @@ import {
   StoryboardDraftModal,
   StudioExportModal,
   StudioLibrary,
-  StudioNavigationLock,
   StudioPhaseShell,
   type StudioPhaseControllers,
 } from './components';
@@ -294,14 +293,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     referenceImportSceneId !== null;
   const exportBlocked = generationBlocked;
   const transitionBlocked = generationReview !== null || duplicateChargeJobId !== null || exportVisible;
-  const navigationLocked =
-    editor.hasUnsavedProjectDraft ||
-    editor.hasUnsavedSceneDrafts ||
-    editor.conflict !== null ||
-    editor.drafting ||
-    canonicalMutationPending ||
-    referenceImportSceneId !== null ||
-    transitionBlocked;
 
   const handleDraftStoryboard = useCallback(
     async (replaceExisting: boolean): Promise<void> => {
@@ -676,7 +667,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   );
 
   useEffect(() => {
-    if (project === null || pendingTransition === null || !transitionReady || navigationLocked) return;
+    if (project === null || pendingTransition === null || !transitionReady) return;
     const transition = pendingTransition;
     rememberStudioPhase(project.id, transition.phase);
     navigate(studioPhasePath(project.id, transition.phase), {
@@ -685,7 +676,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     pendingTransitionRef.current = null;
     setPendingTransition(null);
     setTransitionReady(false);
-  }, [navigate, navigationLocked, pendingTransition, project, transitionReady]);
+  }, [navigate, pendingTransition, project, transitionReady]);
 
   const clearWriteFocusIntent = useCallback((): void => {
     if (parseWriteFocusIntent(location.state) === null) return;
@@ -707,11 +698,11 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   }, [exportPending]);
 
   useEffect(() => {
-    if (postModalTransition === null || exportVisible || navigationLocked) return;
+    if (postModalTransition === null || exportVisible) return;
     const transition = postModalTransition;
     setPostModalTransition(null);
     requestTransition(transition);
-  }, [exportVisible, navigationLocked, postModalTransition, requestTransition]);
+  }, [exportVisible, postModalTransition, requestTransition]);
 
   if (loading) {
     return (
@@ -792,7 +783,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
 
   return (
     <section aria-label={t('conversation.creativeStudio.project.title')} className={styles.projectShell}>
-      <StudioNavigationLock locked={navigationLocked} />
       <StudioPhaseShell
         activePhase={activePhase}
         controller={controller}

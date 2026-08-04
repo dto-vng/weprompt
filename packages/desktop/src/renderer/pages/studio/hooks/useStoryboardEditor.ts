@@ -14,6 +14,8 @@ import type {
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { draftKey, persistDrafts, takePersistedDrafts, type PersistedDrafts } from './useDraftPersistence';
 
 const MAX_SCENES = 24;
 const DEFAULT_SCENE_DURATION_SECONDS = 5;
@@ -196,6 +198,56 @@ const EDITABLE_SCENE_FIELDS = [
   'referenceAssetId',
 ] as const satisfies readonly (keyof StudioEditableScene)[];
 
+const draftSnapshotOwners = new Map<string, symbol>();
+
+type SceneDraftState = {
+  drafts: Map<string, StudioEditableScene>;
+  dirtySceneIds: Set<string>;
+  dirtyFields: Map<string, Set<keyof StudioEditableScene>>;
+  dirtyFieldVersions: Map<string, Map<keyof StudioEditableScene, number>>;
+  sceneEditVersions: Map<string, number>;
+  restoredSceneIds: Set<string>;
+};
+
+const emptySceneDraftState = (): SceneDraftState => ({
+  drafts: new Map(),
+  dirtySceneIds: new Set(),
+  dirtyFields: new Map(),
+  dirtyFieldVersions: new Map(),
+  sceneEditVersions: new Map(),
+  restoredSceneIds: new Set(),
+});
+
+const restoredSceneDraftState = (project: StudioRendererProject | null): SceneDraftState => {
+  const state = emptySceneDraftState();
+  if (project === null) return state;
+  const persisted = takePersistedDrafts(project.id, project.revision);
+  draftSnapshotOwners.delete(draftKey(project.id));
+  if (persisted === null || typeof persisted !== 'object') return state;
+
+  for (const [sceneId, patch] of Object.entries(persisted)) {
+    const canonicalScene = project.scenes[sceneId];
+    if (canonicalScene === undefined || typeof patch !== 'object' || patch === null) continue;
+    const draft = editableScene(canonicalScene);
+    const fields = new Set<keyof StudioEditableScene>();
+    const fieldVersions = new Map<keyof StudioEditableScene, number>();
+    for (const field of EDITABLE_SCENE_FIELDS) {
+      if (!Object.hasOwn(patch, field) || patch[field] === undefined) continue;
+      Object.assign(draft, { [field]: patch[field] });
+      fields.add(field);
+      fieldVersions.set(field, 1);
+    }
+    if (fields.size === 0) continue;
+    state.drafts.set(sceneId, draft);
+    state.dirtySceneIds.add(sceneId);
+    state.dirtyFields.set(sceneId, fields);
+    state.dirtyFieldVersions.set(sceneId, fieldVersions);
+    state.sceneEditVersions.set(sceneId, 1);
+    state.restoredSceneIds.add(sceneId);
+  }
+  return state;
+};
+
 const applyLocalFields = (
   base: StudioEditableScene,
   local: StudioEditableScene,
@@ -272,19 +324,27 @@ export const useStoryboardEditor = ({
   const [latestFitCatalogVersion, setLatestFitCatalogVersion] = useState<string | null>(null);
   const [activeSaveIntent, setActiveSaveIntent] = useState<ActiveSaveIntent | null>(null);
 
+  const initialSceneDraftStateRef = useRef<SceneDraftState | null>(null);
+  if (initialSceneDraftStateRef.current === null) {
+    initialSceneDraftStateRef.current = restoredSceneDraftState(parentProject);
+  }
+  const initialSceneDraftState = initialSceneDraftStateRef.current;
   const mountedRef = useRef(true);
   const projectRef = useRef<StudioRendererProject | null>(parentProject);
   const selectedSceneIdRef = useRef<string | null>(parentProject?.sceneOrder[0] ?? null);
-  const draftsRef = useRef(new Map<string, StudioEditableScene>());
+  const draftsRef = useRef(initialSceneDraftState.drafts);
   const projectDraftRef = useRef<StudioProjectDraft | null>(null);
   const projectDirtyFieldsRef = useRef(new Set<keyof StudioProjectDraft>());
   const projectFieldVersionsRef = useRef(new Map<keyof StudioProjectDraft, number>());
   const projectEditVersionRef = useRef(0);
   const queuedProjectVersionRef = useRef<number | null>(null);
-  const dirtySceneIdsRef = useRef(new Set<string>());
-  const dirtyFieldsRef = useRef(new Map<string, Set<keyof StudioEditableScene>>());
-  const dirtyFieldVersionsRef = useRef(new Map<string, Map<keyof StudioEditableScene, number>>());
-  const sceneEditVersionsRef = useRef(new Map<string, number>());
+  const dirtySceneIdsRef = useRef(initialSceneDraftState.dirtySceneIds);
+  const dirtyFieldsRef = useRef(initialSceneDraftState.dirtyFields);
+  const dirtyFieldVersionsRef = useRef(initialSceneDraftState.dirtyFieldVersions);
+  const sceneEditVersionsRef = useRef(initialSceneDraftState.sceneEditVersions);
+  const restoredSceneIdsRef = useRef(initialSceneDraftState.restoredSceneIds);
+  const draftSnapshotOwnerRef = useRef(Symbol('studio-draft-snapshot-owner'));
+  const lastPersistedDraftValueRef = useRef<{ projectId: string; value: string } | null>(null);
   const saveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const queuedSceneVersionsRef = useRef(new Map<string, number>());
   const saveIssuesRef = useRef(new Map<string, StoryboardEditorIssue>());
@@ -313,6 +373,54 @@ export const useStoryboardEditor = ({
     if (mountedRef.current) setProjectDraftVersion((version) => version + 1);
   }, []);
 
+  const persistDirtySceneDrafts = useCallback((canonical: StudioRendererProject, allowOverwrite: boolean): void => {
+    const scenes: PersistedDrafts['scenes'] = {};
+    for (const sceneId of dirtySceneIdsRef.current) {
+      const draft = draftsRef.current.get(sceneId);
+      const dirtyFields = dirtyFieldsRef.current.get(sceneId);
+      if (draft === undefined || dirtyFields === undefined || dirtyFields.size === 0) continue;
+      const patch: Partial<StudioEditableScene> = {};
+      for (const field of dirtyFields) Object.assign(patch, { [field]: draft[field] });
+      scenes[sceneId] = patch;
+    }
+
+    try {
+      const key = draftKey(canonical.id);
+      const currentValue = sessionStorage.getItem(key);
+      const ownedValue = lastPersistedDraftValueRef.current;
+      const ownsCurrentValue =
+        draftSnapshotOwners.get(key) === draftSnapshotOwnerRef.current &&
+        ownedValue?.projectId === canonical.id &&
+        currentValue !== null &&
+        currentValue === ownedValue.value;
+      if (!allowOverwrite && !ownsCurrentValue) return;
+
+      if (Object.keys(scenes).length === 0) {
+        if (ownsCurrentValue) {
+          persistDrafts(canonical.id, canonical.revision, scenes);
+          draftSnapshotOwners.delete(key);
+          lastPersistedDraftValueRef.current = null;
+        }
+        return;
+      }
+
+      const nextValue = JSON.stringify({ revision: canonical.revision, scenes } satisfies PersistedDrafts);
+      persistDrafts(canonical.id, canonical.revision, scenes);
+      draftSnapshotOwners.set(key, draftSnapshotOwnerRef.current);
+      lastPersistedDraftValueRef.current = { projectId: canonical.id, value: nextValue };
+    } catch {
+      // Session-scoped recovery is best-effort; canonical saves still own durability.
+    }
+  }, []);
+
+  const initialPersistenceAppliedRef = useRef(false);
+  if (!initialPersistenceAppliedRef.current) {
+    initialPersistenceAppliedRef.current = true;
+    if (parentProject !== null && initialSceneDraftState.restoredSceneIds.size > 0) {
+      persistDirtySceneDrafts(parentProject, true);
+    }
+  }
+
   const clearProjectDraft = useCallback(() => {
     projectDraftRef.current = null;
     projectDirtyFieldsRef.current.clear();
@@ -330,23 +438,29 @@ export const useStoryboardEditor = ({
     }
   }, []);
 
-  const clearAllDrafts = useCallback(() => {
-    storyboardEpochRef.current += 1;
-    for (const timer of saveTimersRef.current.values()) clearTimeout(timer);
-    saveTimersRef.current.clear();
-    draftsRef.current.clear();
-    dirtySceneIdsRef.current.clear();
-    dirtyFieldsRef.current.clear();
-    dirtyFieldVersionsRef.current.clear();
-    sceneEditVersionsRef.current.clear();
-    queuedSceneVersionsRef.current.clear();
-    saveIssuesRef.current.clear();
-    if (mountedRef.current) {
-      setSaveIssueVersion((version) => version + 1);
-      setError((currentError) => (currentError?.operation === 'save_scene' ? null : currentError));
-    }
-    rerenderDrafts();
-  }, [rerenderDrafts]);
+  const clearAllDrafts = useCallback(
+    (discardPersisted = true) => {
+      const canonical = projectRef.current;
+      storyboardEpochRef.current += 1;
+      for (const timer of saveTimersRef.current.values()) clearTimeout(timer);
+      saveTimersRef.current.clear();
+      draftsRef.current.clear();
+      dirtySceneIdsRef.current.clear();
+      dirtyFieldsRef.current.clear();
+      dirtyFieldVersionsRef.current.clear();
+      sceneEditVersionsRef.current.clear();
+      restoredSceneIdsRef.current.clear();
+      queuedSceneVersionsRef.current.clear();
+      saveIssuesRef.current.clear();
+      if (mountedRef.current) {
+        setSaveIssueVersion((version) => version + 1);
+        setError((currentError) => (currentError?.operation === 'save_scene' ? null : currentError));
+      }
+      if (discardPersisted && canonical !== null) persistDirtySceneDrafts(canonical, mountedRef.current);
+      rerenderDrafts();
+    },
+    [persistDirtySceneDrafts, rerenderDrafts]
+  );
 
   const discardPausedIntents = useCallback(() => {
     const paused = pausedIntentsRef.current.splice(0);
@@ -378,14 +492,25 @@ export const useStoryboardEditor = ({
   }, [discardPausedIntents]);
 
   const adoptProject = useCallback(
-    (candidate: StudioRendererProject): StudioRendererProject => {
+    (candidate: StudioRendererProject, rewritePersistedRevision = true): StudioRendererProject => {
       const current = projectRef.current;
       if (current?.id === candidate.id && current.revision >= candidate.revision) return current;
 
       const projectChanged = current?.id !== candidate.id;
       const localProjectDraft = projectDraftRef.current;
       const localProjectDirtyFields = projectDirtyFieldsRef.current;
-      if (!projectChanged) {
+      if (projectChanged) {
+        if (current !== null) persistDirtySceneDrafts(current, mountedRef.current);
+        startProjectSession();
+        clearAllDrafts(false);
+        const restored = restoredSceneDraftState(candidate);
+        draftsRef.current = restored.drafts;
+        dirtySceneIdsRef.current = restored.dirtySceneIds;
+        dirtyFieldsRef.current = restored.dirtyFields;
+        dirtyFieldVersionsRef.current = restored.dirtyFieldVersions;
+        sceneEditVersionsRef.current = restored.sceneEditVersions;
+        restoredSceneIdsRef.current = restored.restoredSceneIds;
+      } else {
         for (const [sceneId, draft] of draftsRef.current) {
           const canonicalScene = candidate.scenes[sceneId];
           const dirtyFields = dirtyFieldsRef.current.get(sceneId);
@@ -402,6 +527,11 @@ export const useStoryboardEditor = ({
         }
       }
       projectRef.current = candidate;
+      if (projectChanged) {
+        if (restoredSceneIdsRef.current.size > 0) persistDirtySceneDrafts(candidate, true);
+      } else if (rewritePersistedRevision) {
+        persistDirtySceneDrafts(candidate, mountedRef.current);
+      }
       if (mountedRef.current) {
         setProject(candidate);
         setLatestFitOutcome(null);
@@ -409,8 +539,6 @@ export const useStoryboardEditor = ({
       }
 
       if (projectChanged) {
-        startProjectSession();
-        clearAllDrafts();
         const firstSceneId = candidate.sceneOrder[0] ?? null;
         selectedSceneIdRef.current = firstSceneId;
         if (mountedRef.current) {
@@ -435,7 +563,7 @@ export const useStoryboardEditor = ({
 
       return candidate;
     },
-    [clearAllDrafts, clearProjectDraft, rerenderProjectDraft, startProjectSession]
+    [clearAllDrafts, clearProjectDraft, persistDirtySceneDrafts, rerenderProjectDraft, startProjectSession]
   );
 
   const refetchCanonical = useCallback(
@@ -452,7 +580,7 @@ export const useStoryboardEditor = ({
       ) {
         return null;
       }
-      return adoptProject(candidate);
+      return adoptProject(candidate, false);
     },
     [adoptProject]
   );
@@ -754,6 +882,7 @@ export const useStoryboardEditor = ({
               );
             }
           }
+          persistDirtySceneDrafts(canonical, mountedRef.current);
           rerenderDrafts();
         },
         onDiscard: () => {
@@ -762,6 +891,8 @@ export const useStoryboardEditor = ({
           dirtyFieldVersionsRef.current.delete(sceneId);
           sceneEditVersionsRef.current.delete(sceneId);
           draftsRef.current.delete(sceneId);
+          const canonical = projectRef.current;
+          if (canonical !== null) persistDirtySceneDrafts(canonical, mountedRef.current);
           rerenderDrafts();
         },
       });
@@ -771,7 +902,7 @@ export const useStoryboardEditor = ({
         }
       });
     },
-    [clearSaveTimer, enqueueIntent, publishIssue, rerenderDrafts]
+    [clearSaveTimer, enqueueIntent, persistDirtySceneDrafts, publishIssue, rerenderDrafts]
   );
   flushSceneRef.current = flushScene;
 
@@ -875,13 +1006,19 @@ export const useStoryboardEditor = ({
     [clearSaveTimer]
   );
 
+  useEffect(() => {
+    const restoredSceneIds = [...restoredSceneIdsRef.current];
+    restoredSceneIdsRef.current.clear();
+    for (const sceneId of restoredSceneIds) scheduleSceneSave(sceneId);
+  }, [project?.id, scheduleSceneSave]);
+
   useLayoutEffect(() => {
     const current = projectRef.current;
     if (parentProject === null) {
       if (current !== null) {
         startProjectSession();
+        clearAllDrafts(false);
         projectRef.current = null;
-        clearAllDrafts();
         selectedSceneIdRef.current = null;
         setProject(null);
         setSelectedSceneId(null);
@@ -1028,10 +1165,11 @@ export const useStoryboardEditor = ({
       dirtyFieldsRef.current.set(sceneId, dirtyFields);
       dirtyFieldVersionsRef.current.set(sceneId, dirtyFieldVersions);
       sceneEditVersionsRef.current.set(sceneId, nextVersion);
+      persistDirtySceneDrafts(current, true);
       rerenderDrafts();
       scheduleSceneSave(sceneId);
     },
-    [rerenderDrafts, scheduleSceneSave]
+    [persistDirtySceneDrafts, rerenderDrafts, scheduleSceneSave]
   );
 
   const updateSceneDraft = useCallback(
@@ -1139,6 +1277,35 @@ export const useStoryboardEditor = ({
   }, [clearProjectDraft, drainMutationQueue, enqueueIntent, publishIssue, rerenderProjectDraft]);
   flushProjectRef.current = flushProjectDraft;
 
+  const flushUnsavedWork = useCallback(async (): Promise<{ saved: boolean }> => {
+    try {
+      if (!(await flushProjectDraft()) || internalConflictRef.current !== null) return { saved: false };
+
+      for (let round = 0; round < 3; round += 1) {
+        const result = await flushAllSceneDrafts();
+        if (result.failed.length > 0 || internalConflictRef.current !== null) return { saved: false };
+        if (result.dirtied.length === 0) return { saved: true };
+      }
+      return { saved: false };
+    } catch {
+      return { saved: false };
+    }
+  }, [flushAllSceneDrafts, flushProjectDraft]);
+
+  const activeProjectId = project?.id;
+  useEffect(() => {
+    if (activeProjectId === undefined) return;
+
+    const disposeHasUnsavedWork = ipcBridge.creativeStudio.hasUnsavedWork.provider(() => ({
+      dirtySceneCount: dirtySceneIdsRef.current.size,
+    }));
+    const disposeFlushUnsavedWork = ipcBridge.creativeStudio.flushUnsavedWork.provider(flushUnsavedWork);
+    return () => {
+      disposeFlushUnsavedWork();
+      disposeHasUnsavedWork();
+    };
+  }, [activeProjectId, flushUnsavedWork]);
+
   const discardProjectDraft = useCallback(() => {
     clearProjectDraft();
     if (mountedRef.current) {
@@ -1160,9 +1327,11 @@ export const useStoryboardEditor = ({
       dirtyFieldVersionsRef.current.delete(sceneId);
       sceneEditVersionsRef.current.delete(sceneId);
       clearSaveIssue(sceneId);
+      const canonical = projectRef.current;
+      if (canonical !== null) persistDirtySceneDrafts(canonical, mountedRef.current);
       rerenderDrafts();
     },
-    [clearSaveIssue, clearSaveTimer, rerenderDrafts]
+    [clearSaveIssue, clearSaveTimer, persistDirtySceneDrafts, rerenderDrafts]
   );
 
   const discardSceneDraft = useCallback(() => {
@@ -1279,18 +1448,19 @@ export const useStoryboardEditor = ({
             expectedRevision: canonical.revision,
             scene: null,
           }),
-        onSuccess: () => {
+        onSuccess: (canonical) => {
           draftsRef.current.delete(sceneId);
           dirtySceneIdsRef.current.delete(sceneId);
           dirtyFieldsRef.current.delete(sceneId);
           dirtyFieldVersionsRef.current.delete(sceneId);
           sceneEditVersionsRef.current.delete(sceneId);
           clearSaveIssue(sceneId);
+          persistDirtySceneDrafts(canonical, mountedRef.current);
           rerenderDrafts();
         },
       });
     },
-    [clearSaveIssue, enqueueIntent, rerenderDrafts]
+    [clearSaveIssue, enqueueIntent, persistDirtySceneDrafts, rerenderDrafts]
   );
 
   const reorderScenes = useCallback(

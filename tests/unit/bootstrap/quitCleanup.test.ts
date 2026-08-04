@@ -18,6 +18,39 @@ const flushMicrotasks = async (remaining = 10): Promise<void> => {
 };
 
 describe('installQuitCleanup', () => {
+  it('runs an unsaved-work preflight before cleanup and skips disposal while it intercepts quit', async () => {
+    const calls: string[] = [];
+    let beforeQuitHandler: ((event: BeforeQuitEvent) => void) | undefined;
+
+    installQuitCleanup({
+      onBeforeQuit: (handler) => {
+        beforeQuitHandler = handler;
+      },
+      beforeCleanup: () => {
+        calls.push('preflight');
+        return true;
+      },
+      quitApp: () => calls.push('quit-app'),
+      setIsQuitting: () => calls.push('set-quitting'),
+      markExplicitQuit: () => calls.push('mark-explicit-quit'),
+      destroyTray: () => calls.push('destroy-tray'),
+      disposeCronResumeListener: () => calls.push('dispose-cron'),
+      cancelAppOperations: () => calls.push('cancel-app-operations'),
+      disposeCreativeStudio: async () => calls.push('dispose-creative-studio'),
+      disposeOfficeArtifacts: async () => calls.push('dispose-office-artifacts'),
+      stopBackend: async () => calls.push('stop-backend'),
+      destroyPetWindow: () => calls.push('destroy-pet'),
+      logInfo: vi.fn(),
+      logWarn: vi.fn(),
+      logError: vi.fn(),
+    });
+
+    beforeQuitHandler?.({ preventDefault: vi.fn() });
+    await flushMicrotasks();
+
+    expect(calls).toEqual(['preflight']);
+  });
+
   it('prevents the first quit until cleanup finishes, then requests quit again', async () => {
     const calls: string[] = [];
     let beforeQuitHandler: ((event: BeforeQuitEvent) => void) | undefined;

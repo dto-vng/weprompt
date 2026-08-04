@@ -14,9 +14,12 @@ import type {
   StudioRendererProject,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
+import { draftKey, persistDrafts } from '@renderer/pages/studio/hooks/useDraftPersistence';
 import { useStoryboardEditor } from '@renderer/pages/studio/hooks/useStoryboardEditor';
 
 const bridge = vi.hoisted(() => ({
+  hasUnsavedWork: { provider: vi.fn() },
+  flushUnsavedWork: { provider: vi.fn() },
   updateScene: { invoke: vi.fn() },
   updateProject: { invoke: vi.fn() },
   reorderScenes: { invoke: vi.fn() },
@@ -89,9 +92,36 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+type HasUnsavedWorkHandler = () => { dirtySceneCount: number };
+type FlushUnsavedWorkHandler = () => Promise<{ saved: boolean }>;
+
 describe('useStoryboardEditor', () => {
+  let hasUnsavedWorkHandler: HasUnsavedWorkHandler | null;
+  let flushUnsavedWorkHandler: FlushUnsavedWorkHandler | null;
+  let disposeHasUnsavedWork: ReturnType<typeof vi.fn>;
+  let disposeFlushUnsavedWork: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
+    hasUnsavedWorkHandler = null;
+    flushUnsavedWorkHandler = null;
+    disposeHasUnsavedWork = vi.fn();
+    disposeFlushUnsavedWork = vi.fn();
+    bridge.hasUnsavedWork.provider.mockImplementation((handler: HasUnsavedWorkHandler) => {
+      hasUnsavedWorkHandler = handler;
+      disposeHasUnsavedWork.mockImplementation(() => {
+        if (hasUnsavedWorkHandler === handler) hasUnsavedWorkHandler = null;
+      });
+      return disposeHasUnsavedWork;
+    });
+    bridge.flushUnsavedWork.provider.mockImplementation((handler: FlushUnsavedWorkHandler) => {
+      flushUnsavedWorkHandler = handler;
+      disposeFlushUnsavedWork.mockImplementation(() => {
+        if (flushUnsavedWorkHandler === handler) flushUnsavedWorkHandler = null;
+      });
+      return disposeFlushUnsavedWork;
+    });
     bridge.updateScene.invoke.mockImplementation(async () => ok(project(3)));
     bridge.updateProject.invoke.mockImplementation(async () => ok(project(3)));
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project(3)));
@@ -108,6 +138,7 @@ describe('useStoryboardEditor', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    window.sessionStorage.clear();
   });
 
   it('hydrates the ordered scenes, selection, draft, and duration summary', async () => {
@@ -127,6 +158,208 @@ describe('useStoryboardEditor', () => {
       'scene-2': { title: 'Scene scene-2' },
     });
     expect(result.current.sceneSaveStates).toEqual({ 'scene-1': 'saved', 'scene-2': 'saved' });
+  });
+
+  it('answers close queries from synchronous dirty refs and drains the save queue', async () => {
+    const afterFirst = project(3, [scene('scene-1', { title: 'First edit' }), scene('scene-2')]);
+    const afterSecond = project(4, [
+      scene('scene-1', { title: 'First edit' }),
+      scene('scene-2', { title: 'Second edit' }),
+    ]);
+    bridge.updateScene.invoke.mockResolvedValueOnce(ok(afterFirst)).mockResolvedValueOnce(ok(afterSecond));
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    await waitFor(() => {
+      expect(hasUnsavedWorkHandler).not.toBeNull();
+      expect(flushUnsavedWorkHandler).not.toBeNull();
+    });
+    act(() => {
+      result.current.updateSceneDraftById('scene-1', { title: 'First edit' });
+      result.current.updateSceneDraftById('scene-2', { title: 'Second edit' });
+    });
+
+    expect(hasUnsavedWorkHandler?.()).toEqual({ dirtySceneCount: 2 });
+    await act(async () => {
+      await expect(flushUnsavedWorkHandler?.()).resolves.toEqual({ saved: true });
+    });
+    expect(hasUnsavedWorkHandler?.()).toEqual({ dirtySceneCount: 0 });
+    expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps close providers unavailable until a persisted draft is adopted', () => {
+    vi.useFakeTimers();
+    bridge.updateScene.invoke.mockReturnValue(new Promise(() => {}));
+    persistDrafts('project-1', 2, { 'scene-1': { narration: 'pending restore' } });
+    const { result, rerender } = renderHook(
+      ({ canonical }: { canonical: StudioRendererProject | null }) =>
+        useStoryboardEditor({ project: canonical, refetch: vi.fn(async () => canonical) }),
+      { initialProps: { canonical: null } }
+    );
+
+    expect(bridge.hasUnsavedWork.provider).not.toHaveBeenCalled();
+    expect(bridge.flushUnsavedWork.provider).not.toHaveBeenCalled();
+    expect(hasUnsavedWorkHandler).toBeNull();
+    expect(flushUnsavedWorkHandler).toBeNull();
+
+    rerender({ canonical: project() });
+
+    expect(result.current.sceneDrafts['scene-1']?.narration).toBe('pending restore');
+    expect(result.current.sceneSaveStates['scene-1']).toBe('dirty');
+    expect(hasUnsavedWorkHandler?.()).toEqual({ dirtySceneCount: 1 });
+    expect(flushUnsavedWorkHandler).not.toBeNull();
+  });
+
+  it('disposes close providers when the canonical project returns to null', () => {
+    const { rerender } = renderHook(
+      ({ canonical }: { canonical: StudioRendererProject | null }) =>
+        useStoryboardEditor({ project: canonical, refetch: vi.fn(async () => canonical) }),
+      { initialProps: { canonical: project() as StudioRendererProject | null } }
+    );
+
+    expect(hasUnsavedWorkHandler).not.toBeNull();
+    expect(flushUnsavedWorkHandler).not.toBeNull();
+
+    rerender({ canonical: null });
+
+    expect(disposeHasUnsavedWork).toHaveBeenCalledOnce();
+    expect(disposeFlushUnsavedWork).toHaveBeenCalledOnce();
+    expect(hasUnsavedWorkHandler).toBeNull();
+    expect(flushUnsavedWorkHandler).toBeNull();
+  });
+
+  it('restores unsaved drafts after unmount and remount of the same project', () => {
+    vi.useFakeTimers();
+    bridge.updateScene.invoke.mockReturnValue(new Promise(() => {}));
+    const first = renderHook(() => useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) }));
+
+    act(() => first.result.current.updateSceneDraftById('scene-1', { narration: 'half-typed thought' }));
+
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBe(
+      JSON.stringify({
+        revision: 2,
+        scenes: { 'scene-1': { narration: 'half-typed thought' } },
+      })
+    );
+    first.unmount();
+
+    const second = renderHook(() => useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) }));
+
+    expect(second.result.current.sceneDrafts['scene-1']?.narration).toBe('half-typed thought');
+    expect(second.result.current.sceneSaveStates['scene-1']).toBe('dirty');
+    second.unmount();
+  });
+
+  it('drops persisted drafts once the scene saves cleanly', async () => {
+    const saved = project(3, [scene('scene-1', { narration: 'text' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockResolvedValueOnce(ok(saved));
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    act(() => result.current.updateSceneDraftById('scene-1', { narration: 'text' }));
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).not.toBeNull();
+
+    await act(async () => {
+      expect(await result.current.flushAllSceneDrafts()).toEqual({ failed: [], dirtied: [] });
+    });
+
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBeNull();
+  });
+
+  it('ignores persisted drafts from a stale revision after a conflict', () => {
+    window.sessionStorage.setItem(
+      draftKey('project-1'),
+      JSON.stringify({ revision: 3, scenes: { 'scene-1': { narration: 'stale thought' } } })
+    );
+
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(7), refetch: vi.fn(async () => project(7)) })
+    );
+
+    expect(result.current.sceneSaveStates['scene-1']).toBe('saved');
+    expect(result.current.sceneDrafts['scene-1']?.narration).toBe('');
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBeNull();
+  });
+
+  it('rewrites the remaining dirty snapshot at the accepted canonical revision', async () => {
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const afterFirst = project(3, [scene('scene-1', { title: 'First edit' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+
+    act(() => result.current.updateSceneDraftById('scene-1', { title: 'First edit' }));
+    let flushed!: Promise<unknown>;
+    act(() => {
+      flushed = result.current.flushAllSceneDrafts();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledOnce());
+
+    act(() => result.current.updateSceneDraftById('scene-1', { narration: 'New during save' }));
+    await act(async () => {
+      firstSave.resolve(ok(afterFirst));
+      expect(await flushed).toEqual({ failed: [], dirtied: ['scene-1'] });
+    });
+
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBe(
+      JSON.stringify({
+        revision: 3,
+        scenes: { 'scene-1': { narration: 'New during save' } },
+      })
+    );
+  });
+
+  it('does not bless a stale snapshot with a conflict refetch revision', async () => {
+    const refreshed = project(8, [scene('scene-1', { title: 'Remote title' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockResolvedValueOnce(
+      failed('stale_project', 'conversation.creativeStudio.errors.staleProject')
+    );
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => refreshed) })
+    );
+
+    act(() => result.current.updateSceneDraftById('scene-1', { title: 'Local title' }));
+    await act(async () => {
+      expect(await result.current.flushSceneDraftById('scene-1')).toBe(false);
+    });
+
+    expect(result.current.conflict).toMatchObject({ operation: 'save_scene', sceneId: 'scene-1' });
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBe(
+      JSON.stringify({
+        revision: 2,
+        scenes: { 'scene-1': { title: 'Local title' } },
+      })
+    );
+  });
+
+  it('does not let an old unmount save delete a newer same-project snapshot', async () => {
+    vi.useFakeTimers();
+    const oldSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    bridge.updateScene.invoke.mockReturnValueOnce(oldSave.promise);
+    const first = renderHook(() => useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) }));
+    act(() => first.result.current.updateSceneDraftById('scene-1', { title: 'Old instance' }));
+    first.unmount();
+    await vi.waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledOnce());
+
+    const second = renderHook(() => useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) }));
+    act(() => second.result.current.updateSceneDraftById('scene-1', { title: 'New instance' }));
+    const newerSnapshot = window.sessionStorage.getItem(draftKey('project-1'));
+
+    await act(async () => {
+      oldSave.resolve(ok(project(3, [scene('scene-1', { title: 'Old instance' }), scene('scene-2')])));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(window.sessionStorage.getItem(draftKey('project-1'))).toBe(newerSnapshot);
+    expect(JSON.parse(newerSnapshot ?? '{}')).toMatchObject({
+      revision: 2,
+      scenes: { 'scene-1': { title: 'New instance' } },
+    });
+    second.unmount();
   });
 
   it('edits and saves a scene by ID without changing the current selection', async () => {

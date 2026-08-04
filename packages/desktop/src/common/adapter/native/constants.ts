@@ -110,8 +110,22 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
 
 export type NativeBridgeProviderKey = (typeof NATIVE_BRIDGE_PROVIDER_KEYS)[number];
 
+/**
+ * Renderer-owned queries that the main process may invoke. These are kept
+ * separate from native providers so a renderer cannot invoke them through the
+ * privileged renderer-to-main request path.
+ */
+export const RENDERER_BRIDGE_QUERY_KEYS = [
+  'creative-studio.has-unsaved-work',
+  'creative-studio.flush-unsaved-work',
+] as const;
+
+export type RendererBridgeQueryKey = (typeof RENDERER_BRIDGE_QUERY_KEYS)[number];
+
 const NATIVE_BRIDGE_PROVIDER_KEY_SET = new Set<string>(NATIVE_BRIDGE_PROVIDER_KEYS);
 const NATIVE_BRIDGE_REQUEST_PREFIX = 'subscribe-';
+const RENDERER_BRIDGE_QUERY_CALLBACK_PREFIX = 'subscribe.callback-';
+const BRIDGE_REQUEST_ID_SUFFIX_PATTERN = /^[a-f0-9]{8}$/;
 
 export function getNativeBridgeProviderKey(name: string): NativeBridgeProviderKey | null {
   if (!name.startsWith(NATIVE_BRIDGE_REQUEST_PREFIX)) return null;
@@ -121,6 +135,20 @@ export function getNativeBridgeProviderKey(name: string): NativeBridgeProviderKe
 
 export function isAllowedNativeBridgeRequestName(name: string): boolean {
   return getNativeBridgeProviderKey(name) !== null;
+}
+
+export function getRendererBridgeQueryResponseKey(name: string): RendererBridgeQueryKey | null {
+  if (!name.startsWith(RENDERER_BRIDGE_QUERY_CALLBACK_PREFIX)) return null;
+
+  for (const queryKey of RENDERER_BRIDGE_QUERY_KEYS) {
+    const responsePrefix = `${RENDERER_BRIDGE_QUERY_CALLBACK_PREFIX}${queryKey}${queryKey}`;
+    if (!name.startsWith(responsePrefix)) continue;
+
+    const requestIdSuffix = name.slice(responsePrefix.length);
+    return BRIDGE_REQUEST_ID_SUFFIX_PATTERN.test(requestIdSuffix) ? queryKey : null;
+  }
+
+  return null;
 }
 
 /**

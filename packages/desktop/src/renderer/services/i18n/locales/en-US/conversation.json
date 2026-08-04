@@ -714,6 +714,15 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "close": {
+      "saveAndClose": "Save and close",
+      "discard": "Discard and close",
+      "cancel": "Cancel",
+      "unsavedMessage": "{{count}} scenes have unsaved edits. Save them before closing?",
+      "unsavedMessage_one": "{{count}} scene has unsaved edits. Save it before closing?",
+      "unsavedMessage_other": "{{count}} scenes have unsaved edits. Save them before closing?",
+      "unavailableMessage": "Creative Studio did not respond. Closing now may discard unsaved scene edits."
+    },
     "phase": {
       "nav": {
         "label": "Creative workflow",

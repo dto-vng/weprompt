@@ -13,7 +13,7 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, powerMonitor, protocol, session, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -45,9 +45,13 @@ import { registerWindowMaximizeListeners } from '@process/bridge';
 import { BackendLifecycleManager } from '@aionui/web-host';
 import { resolveBinaryPath } from '@process/backend';
 import { initializeFeedbackBridge } from './process/bridge/feedbackBridge';
+import {
+  createCreativeStudioCloseHandshake,
+  type CreativeStudioCloseHandshake,
+} from './process/bridge/creativeStudioBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
-import { setInitialLanguage } from '@process/services/i18n';
+import i18n, { setInitialLanguage } from '@process/services/i18n';
 import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
 import { disposeOfficeArtifactService } from '@process/services/office-artifact';
@@ -220,6 +224,7 @@ let isExplicitQuit = false;
 let appReadyDone = false;
 
 let mainWindow: BrowserWindow;
+let creativeStudioCloseHandshake: CreativeStudioCloseHandshake | null = null;
 const backendManager = new BackendLifecycleManager(
   {
     version: app.getVersion(),
@@ -729,6 +734,21 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   const rendererUrl = rendererDocumentPolicy.developmentRendererUrl;
 
   initMainAdapterWithWindow(mainWindow);
+  const studioWindow = mainWindow;
+  const closeHandshake = createCreativeStudioCloseHandshake({
+    getCurrentUrl: () =>
+      studioWindow.isDestroyed() || studioWindow.webContents.isDestroyed() ? '' : studioWindow.webContents.getURL(),
+    queryUnsavedWork: (options) => ipcBridge.creativeStudio.hasUnsavedWork.invoke(options),
+    flushUnsavedWork: (options) => ipcBridge.creativeStudio.flushUnsavedWork.invoke(options),
+    showMessageBox: (options) => dialog.showMessageBox(studioWindow, options),
+    translate: (key, options) => i18n.t(key, options ?? {}),
+    closeWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.close();
+    },
+    quitApp: () => app.quit(),
+    onQuitCancelled: () => setIsQuitting(false),
+  });
+  creativeStudioCloseHandshake = closeHandshake;
   bindMainWindowReferences(mainWindow);
   initializeFeedbackBridge(mainWindow, rendererDocumentPolicy.mainWindowDocuments);
 
@@ -809,6 +829,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
 
   mainWindow.on('closed', () => {
     console.log('[AionUi] Main window closed');
+    if (creativeStudioCloseHandshake === closeHandshake) creativeStudioCloseHandshake = null;
   });
 
   // DevTools is no longer auto-opened at startup.
@@ -830,7 +851,9 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     if (getCloseToTrayEnabled() && !getIsQuitting()) {
       event.preventDefault();
       mainWindow.hide();
+      return;
     }
+    closeHandshake.handleWindowClose(event);
   });
 };
 
@@ -1244,6 +1267,7 @@ app.on('activate', () => {
 
 installQuitCleanup({
   onBeforeQuit: (handler) => app.on('before-quit', (event) => handler(event)),
+  beforeCleanup: (event) => creativeStudioCloseHandshake?.handleBeforeQuit(event) ?? false,
   quitApp: () => app.quit(),
   setIsQuitting,
   markExplicitQuit: () => {

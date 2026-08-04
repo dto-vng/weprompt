@@ -1076,6 +1076,14 @@ export const projectKnowledge = {
 // Creative Studio — native main process owns durable project manifests
 // ---------------------------------------------------------------------------
 
+export type StudioUnsavedWorkStatus = {
+  dirtySceneCount: number;
+};
+
+export type StudioFlushUnsavedWorkResult = {
+  saved: boolean;
+};
+
 export const creativeStudio = {
   listProjects: bridge.buildProvider<StudioCommandResult<StudioProjectSummary[]>, void>(
     'creative-studio.list-projects'
@@ -1150,6 +1158,12 @@ export const creativeStudio = {
   listRoutes: bridge.buildProvider<StudioCommandResult<StudioRouteCatalog>, StudioListRoutesRequest | undefined>(
     'creative-studio.list-routes'
   ),
+  hasUnsavedWork: bridge.buildRendererQuery<StudioUnsavedWorkStatus>('creative-studio.has-unsaved-work', {
+    dirtySceneCount: 24,
+  }),
+  flushUnsavedWork: bridge.buildRendererQuery<StudioFlushUnsavedWorkResult>('creative-studio.flush-unsaved-work', {
+    saved: false,
+  }),
   projectUpdated: bridge.buildEmitter<{ projectId: string }>('studio.project-updated'),
 };
 
