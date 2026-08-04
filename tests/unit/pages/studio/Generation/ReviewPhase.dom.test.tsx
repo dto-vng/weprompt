@@ -216,4 +216,13 @@ describe('Review phase cut', () => {
     expect(screen.queryByText('conversation.creativeStudio.review.generateScene')).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/stitched|final movie|play all/i);
   });
+
+  it('exposes the handoff summary as a complementary region beside the review workspace', () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    const handoff = screen.getByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.review.handoff',
+    });
+    expect(handoff).toContainElement(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription'));
+  });
 });

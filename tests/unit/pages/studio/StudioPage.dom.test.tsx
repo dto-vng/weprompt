@@ -208,6 +208,63 @@ const renderRoute = (path: string | { pathname: string; state?: unknown } = '/st
   return { router, view: render(<RouterProvider router={router} />) };
 };
 
+type ResizeObservation = {
+  callback: ResizeObserverCallback;
+  disconnect: ReturnType<typeof vi.fn>;
+  observer: ResizeObserver;
+  target: Element | null;
+};
+
+const installResizeObserverMock = (): {
+  observations: ResizeObservation[];
+  resize: (width: number) => void;
+} => {
+  const observations: ResizeObservation[] = [];
+
+  class ResizeObserverMock implements ResizeObserver {
+    readonly observation: ResizeObservation;
+
+    constructor(callback: ResizeObserverCallback) {
+      this.observation = {
+        callback,
+        disconnect: vi.fn(),
+        observer: this,
+        target: null,
+      };
+      observations.push(this.observation);
+    }
+
+    disconnect(): void {
+      this.observation.disconnect();
+    }
+
+    observe(target: Element): void {
+      this.observation.target = target;
+    }
+
+    takeRecords(): ResizeObserverEntry[] {
+      return [];
+    }
+
+    unobserve(): void {}
+  }
+
+  vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+  return {
+    observations,
+    resize: (width) => {
+      const observation = observations[0];
+      if (observation?.target === null || observation === undefined) {
+        throw new Error('Studio layout container was not observed');
+      }
+      observation.callback(
+        [{ target: observation.target, contentRect: { width } } as ResizeObserverEntry],
+        observation.observer
+      );
+    },
+  };
+};
+
 const findBatchActions = async (): Promise<{ headerAction: HTMLElement; lowerAction: HTMLElement }> => {
   const routingPanel = await screen.findByRole('region', { name: 'conversation.creativeStudio.routing.title' });
   const lowerAction = within(routingPanel).getByRole('button', {
@@ -267,6 +324,7 @@ describe('StudioPage and useStudioProject', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -387,6 +445,91 @@ describe('StudioPage and useStudioProject', () => {
       expect(within(phaseNavigation).getByRole('button', { current: 'step' })).toHaveTextContent(
         'conversation.creativeStudio.phase.nav.brief'
       );
+    });
+
+    it('shares one measured Studio layout across every phase without observing the viewport', async () => {
+      const { observations, resize } = installResizeObserverMock();
+      const { router, view } = renderRoute('/studio/project-1/brief');
+
+      const phaseNavigation = await screen.findByRole('navigation', {
+        name: 'conversation.creativeStudio.phase.nav.label',
+      });
+      expect(observations).toHaveLength(1);
+      const layoutRoot = observations[0]!.target;
+      expect(layoutRoot).toHaveAttribute('data-studio-layout-root');
+      expect(layoutRoot).not.toBe(document.documentElement);
+      expect(layoutRoot).not.toBe(document.body);
+
+      act(() => resize(1121));
+      expect(layoutRoot).toHaveAttribute('data-layout', 'inline');
+
+      const expectSharedPhaseLayout = async (phase: 'brief' | 'write' | 'produce' | 'review'): Promise<void> => {
+        if (router.state.location.pathname !== `/studio/project-1/${phase}`) {
+          fireEvent.click(
+            within(phaseNavigation).getByRole('button', {
+              name: `conversation.creativeStudio.phase.nav.${phase}`,
+            })
+          );
+          await waitFor(() => expect(router.state.location.pathname).toBe(`/studio/project-1/${phase}`));
+        }
+        const heading = await screen.findByRole('heading', {
+          level: 2,
+          name: `conversation.creativeStudio.phase.${phase}.title`,
+        });
+        expect(heading.closest('section')).toHaveAttribute('data-layout', 'inline');
+        expect(observations).toHaveLength(1);
+      };
+      await expectSharedPhaseLayout('brief');
+      await expectSharedPhaseLayout('write');
+      await expectSharedPhaseLayout('produce');
+      await expectSharedPhaseLayout('review');
+
+      act(() => resize(1120));
+      expect(layoutRoot).toHaveAttribute('data-layout', 'drawer');
+      act(() => resize(821));
+      expect(layoutRoot).toHaveAttribute('data-layout', 'drawer');
+      act(() => resize(820));
+      expect(layoutRoot).toHaveAttribute('data-layout', 'compact');
+
+      view.unmount();
+      expect(observations[0]!.disconnect).toHaveBeenCalledOnce();
+    });
+
+    it('keeps assistant focus recoverable while measured width crosses both Drawer thresholds', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      const { resize } = installResizeObserverMock();
+      renderRoute('/studio/project-1/write');
+
+      await screen.findByRole('heading', {
+        level: 2,
+        name: 'conversation.creativeStudio.phase.write.title',
+      });
+      act(() => resize(820));
+      const opener = screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.write.askAssistant',
+      });
+      fireEvent.click(opener);
+      const draftAction = await screen.findByRole('button', {
+        name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+      });
+      draftAction.focus();
+
+      act(() => resize(1121));
+      const inlineAssistant = await screen.findByRole('complementary', {
+        name: 'conversation.creativeStudio.phase.write.assistantTitle',
+      });
+      await waitFor(() => expect(inlineAssistant).toHaveFocus());
+
+      act(() => resize(1120));
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })
+        ).toHaveFocus()
+      );
+      expect(document.querySelectorAll('.arco-drawer')).toHaveLength(0);
     });
 
     it('renders only the active phase and keeps project owners mounted across clean phase changes', async () => {

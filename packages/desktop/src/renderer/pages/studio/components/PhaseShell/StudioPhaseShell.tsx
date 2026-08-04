@@ -14,6 +14,7 @@ import { BriefPhase, ProducePhase, ReviewPhase, WritePhase } from './phases';
 import { StudioPhaseHeader } from './StudioPhaseHeader';
 import { StudioPhaseNav } from './StudioPhaseNav';
 import type { StudioPhaseControllers } from './types';
+import { useStudioLayoutMode } from './useStudioLayoutMode';
 import styles from './StudioPhaseShell.module.css';
 
 export type StudioPhaseShellProps = {
@@ -31,6 +32,7 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
 }) => {
   const { t } = useTranslation();
   const previousPhaseRef = useRef(activePhase);
+  const { containerRef, layoutMode } = useStudioLayoutMode(controller.project.id);
 
   useEffect(() => {
     if (previousPhaseRef.current === activePhase) return;
@@ -123,7 +125,7 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
   })();
 
   return (
-    <div className={styles.shell}>
+    <div ref={containerRef} data-studio-layout-root data-layout={layoutMode} className={styles.shell}>
       <StudioPhaseHeader project={controller.project} onBack={onBack} actions={headerAction} />
       <StudioPhaseNav
         activePhase={activePhase}
@@ -133,10 +135,10 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
         }}
       />
       <div className={styles.phaseFrame}>
-        {activePhase === 'brief' && <BriefPhase controller={controller} />}
-        {activePhase === 'write' && <WritePhase controller={controller} />}
-        {activePhase === 'produce' && <ProducePhase controller={controller} />}
-        {activePhase === 'review' && <ReviewPhase controller={controller} />}
+        {activePhase === 'brief' && <BriefPhase controller={controller} layoutMode={layoutMode} />}
+        {activePhase === 'write' && <WritePhase controller={controller} layoutMode={layoutMode} />}
+        {activePhase === 'produce' && <ProducePhase controller={controller} layoutMode={layoutMode} />}
+        {activePhase === 'review' && <ReviewPhase controller={controller} layoutMode={layoutMode} />}
       </div>
     </div>
   );

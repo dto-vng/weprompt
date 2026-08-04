@@ -14,10 +14,12 @@ import { GenerationControls, GenerationJobList, ProduceShotCard } from '../../Ge
 import { StudioModelBar } from '../../Models';
 import { AssetStrip, StagePreview } from '../../Preview';
 import type { ProducePhaseController } from '../types';
+import type { StudioLayoutMode } from '../useStudioLayoutMode';
 import styles from './ProducePhase.module.css';
 
 export type ProducePhaseProps = {
   controller: ProducePhaseController;
+  layoutMode?: StudioLayoutMode;
 };
 
 const selectedTakeNumber = (project: StudioRendererProject, scene: StudioScene): number | null => {
@@ -36,7 +38,7 @@ const selectedTakeNumber = (project: StudioRendererProject, scene: StudioScene):
   return selectedIndex < 0 ? null : selectedIndex + 1;
 };
 
-export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller }) => {
+export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller, layoutMode = 'inline' }) => {
   const { t } = useTranslation();
   const {
     project,
@@ -85,7 +87,7 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller }) => {
       : null;
 
   return (
-    <section className={styles.phase} aria-labelledby='studio-produce-phase-heading'>
+    <section data-layout={layoutMode} className={styles.phase} aria-labelledby='studio-produce-phase-heading'>
       <div className={styles.phaseIntroduction}>
         <div>
           <h2 id='studio-produce-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>

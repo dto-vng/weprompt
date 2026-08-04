@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { BriefPhaseController } from '../types';
+import type { StudioLayoutMode } from '../useStudioLayoutMode';
 import styles from './BriefPhase.module.css';
 
 const MAX_PROJECT_NAME_CHARS = 256;
@@ -27,9 +28,10 @@ const ASPECT_RATIO_LABEL_KEYS = {
 
 export type BriefPhaseProps = {
   controller: BriefPhaseController;
+  layoutMode?: StudioLayoutMode;
 };
 
-export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
+export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller, layoutMode = 'inline' }) => {
   const { t } = useTranslation();
   const { project, editor, mutationPending, requestTransition } = controller;
   const [startingWrite, setStartingWrite] = useState(false);
@@ -73,7 +75,7 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
   };
 
   return (
-    <section className={styles.phase} aria-labelledby='studio-brief-phase-heading'>
+    <section data-layout={layoutMode} className={styles.phase} aria-labelledby='studio-brief-phase-heading'>
       <div className={styles.intro}>
         <h2 id='studio-brief-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
           {t('conversation.creativeStudio.phase.brief.title')}

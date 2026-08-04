@@ -7,7 +7,7 @@
 import type { StudioRouteCatalog } from '@/common/types/project/creativeStudioTypes';
 import { Button, Drawer } from '@arco-design/web-react';
 import { Magic } from '@icon-park/react';
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioLayoutMode } from './useStudioLayoutMode';
@@ -27,6 +27,8 @@ export type AssistantDockProps = {
 };
 
 const modelIdentity = (providerId: string, model: string): string => `${providerId}\u0000${model}`;
+const assistantPresentation = (layoutMode: StudioLayoutMode): 'inline' | 'drawer' =>
+  layoutMode === 'inline' ? 'inline' : 'drawer';
 
 export const AssistantDock: React.FC<AssistantDockProps> = ({
   children,
@@ -42,9 +44,10 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
 }) => {
   const { t } = useTranslation();
   const openerRef = useRef<HTMLButtonElement>(null);
-  const inlineAssistantRef = useRef<HTMLElement>(null);
+  const assistantRegionRef = useRef<HTMLElement>(null);
   const assistantOwnsFocusRef = useRef(false);
-  const previousLayoutModeRef = useRef(layoutMode);
+  const presentation = assistantPresentation(layoutMode);
+  const previousPresentationRef = useRef(presentation);
   const previousDrawerVisibleRef = useRef(drawerVisible);
   const labelKey =
     kind === 'write'
@@ -52,29 +55,44 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       : 'conversation.creativeStudio.phase.produce.activityTitle';
 
   useLayoutEffect(() => {
-    const previousLayoutMode = previousLayoutModeRef.current;
+    const previousPresentation = previousPresentationRef.current;
     const previousDrawerVisible = previousDrawerVisibleRef.current;
     if (kind === 'write') {
-      if (previousLayoutMode === 'drawer' && layoutMode === 'inline' && previousDrawerVisible) {
+      if (
+        previousPresentation === 'drawer' &&
+        presentation === 'inline' &&
+        (previousDrawerVisible || assistantOwnsFocusRef.current)
+      ) {
         if (drawerVisible) onOpenChange?.(false);
-        inlineAssistantRef.current?.focus();
+        assistantRegionRef.current?.focus();
         assistantOwnsFocusRef.current = true;
-      } else if (previousLayoutMode === 'inline' && layoutMode === 'drawer' && assistantOwnsFocusRef.current) {
+      } else if (previousPresentation === 'inline' && presentation === 'drawer' && assistantOwnsFocusRef.current) {
         openerRef.current?.focus();
-        assistantOwnsFocusRef.current = false;
+        assistantOwnsFocusRef.current = openerRef.current !== null && document.activeElement === openerRef.current;
       } else if (
-        previousLayoutMode === 'drawer' &&
-        layoutMode === 'drawer' &&
+        previousPresentation === 'drawer' &&
+        presentation === 'drawer' &&
         previousDrawerVisible &&
         !drawerVisible
       ) {
         openerRef.current?.focus();
-        assistantOwnsFocusRef.current = false;
+        assistantOwnsFocusRef.current = openerRef.current !== null && document.activeElement === openerRef.current;
       }
     }
-    previousLayoutModeRef.current = layoutMode;
+    previousPresentationRef.current = presentation;
     previousDrawerVisibleRef.current = drawerVisible;
-  }, [drawerVisible, kind, layoutMode, onOpenChange]);
+  }, [drawerVisible, kind, onOpenChange, presentation]);
+
+  useEffect(() => {
+    const trackAssistantFocus = (event: FocusEvent): void => {
+      const target = event.target;
+      assistantOwnsFocusRef.current =
+        target instanceof Node &&
+        (openerRef.current?.contains(target) === true || assistantRegionRef.current?.contains(target) === true);
+    };
+    document.addEventListener('focusin', trackAssistantFocus, true);
+    return () => document.removeEventListener('focusin', trackAssistantFocus, true);
+  }, []);
 
   if (kind === 'produce') {
     return (
@@ -102,8 +120,16 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
         : 'conversation.creativeStudio.draft.unavailable';
   const draftDisabled = disabled || drafting || !ready;
   const content = (
-    <div
-      className='flex flex-col gap-14px'
+    <aside
+      ref={assistantRegionRef}
+      aria-label={t(labelKey)}
+      tabIndex={presentation === 'inline' ? -1 : undefined}
+      data-assistant-presentation={presentation}
+      className={
+        presentation === 'inline'
+          ? 'flex min-w-0 flex-col gap-14px rounded-12px border border-border-2 bg-fill-1 p-16px'
+          : 'flex min-w-0 flex-col gap-14px'
+      }
       onFocusCapture={() => {
         assistantOwnsFocusRef.current = true;
       }}
@@ -146,20 +172,11 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       >
         {t('conversation.creativeStudio.phase.write.draftStoryboard')}
       </Button>
-    </div>
+    </aside>
   );
 
-  if (layoutMode === 'inline') {
-    return (
-      <aside
-        ref={inlineAssistantRef}
-        aria-label={t(labelKey)}
-        tabIndex={-1}
-        className='min-w-0 rounded-12px border border-border-2 bg-fill-1 p-16px'
-      >
-        {content}
-      </aside>
-    );
+  if (presentation === 'inline') {
+    return content;
   }
 
   return (
@@ -170,7 +187,8 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       <Drawer
         visible={drawerVisible}
         title={t(labelKey)}
-        width={380}
+        width='min(380px, 100vw)'
+        wrapClassName={styles.assistantDrawer}
         footer={null}
         unmountOnExit
         onCancel={() => onOpenChange?.(false)}

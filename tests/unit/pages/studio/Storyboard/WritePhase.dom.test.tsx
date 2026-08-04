@@ -22,19 +22,14 @@ import type { UseStudioModelsResult } from '@renderer/pages/studio/hooks/useStud
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-let resizeCallback: ResizeObserverCallback | null = null;
-const disconnect = vi.fn();
+const observedTargets: Element[] = [];
 
 class ResizeObserverMock {
-  constructor(callback: ResizeObserverCallback) {
-    resizeCallback = callback;
+  observe(target: Element): void {
+    observedTargets.push(target);
   }
 
-  observe(): void {}
-
-  disconnect(): void {
-    disconnect();
-  }
+  disconnect(): void {}
 
   unobserve(): void {}
 }
@@ -249,8 +244,7 @@ const controller = (overrides: Partial<WritePhaseController> = {}): WritePhaseCo
 
 describe('WritePhase', () => {
   beforeEach(() => {
-    resizeCallback = null;
-    disconnect.mockClear();
+    observedTargets.length = 0;
     vi.stubGlobal('ResizeObserver', ResizeObserverMock);
   });
 
@@ -389,12 +383,11 @@ describe('WritePhase', () => {
     expect(phaseEditor.selectScene).not.toHaveBeenCalled();
   });
 
-  it('disconnects the shell ResizeObserver on unmount', () => {
-    const view = render(<WritePhase controller={controller()} />);
-    expect(resizeCallback).not.toBeNull();
-    const disconnectCountBeforeUnmount = disconnect.mock.calls.length;
+  it('uses the shell layout contract without observing its own phase root', () => {
+    const { container } = render(<WritePhase controller={controller()} />);
 
-    view.unmount();
-    expect(disconnect.mock.calls.length).toBeGreaterThan(disconnectCountBeforeUnmount);
+    const phaseRoot = container.querySelector('section[data-layout]');
+    expect(phaseRoot).not.toBeNull();
+    expect(observedTargets).not.toContain(phaseRoot);
   });
 });

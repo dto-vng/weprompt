@@ -1,5 +1,7 @@
 .phase {
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   gap: 14px;
@@ -9,11 +11,20 @@
   margin: 0;
   color: var(--color-text-1);
   font-size: 18px;
+  scroll-margin-block: 24px;
 }
 
 .heading:focus-visible {
   outline: 2px solid var(--color-primary-6);
   outline-offset: 4px;
+}
+
+.workspace {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 16px;
 }
 
 .previewArea {
@@ -25,6 +36,7 @@
 
 .handoff {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 8px;
   border-radius: 12px;
@@ -44,4 +56,8 @@
   border-radius: 999px;
   background: var(--color-fill-2);
   padding: 4px 8px;
+}
+
+.phase[data-layout='compact'] .workspace {
+  grid-template-columns: minmax(0, 1fr);
 }
