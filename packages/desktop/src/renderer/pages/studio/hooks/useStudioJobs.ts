@@ -19,7 +19,6 @@ const STORAGE_ERROR_MESSAGE_KEY = 'conversation.creativeStudio.errors.storage';
 
 const COMMAND_MESSAGE_KEYS: Record<StudioCommandErrorCode, string> = {
   invalid_payload: 'conversation.creativeStudio.errors.invalidPayload',
-  timing_mismatch: 'conversation.creativeStudio.review.durationMismatch',
   not_found: 'conversation.creativeStudio.errors.projectNotFound',
   storyboard_exists: 'conversation.creativeStudio.errors.storyboardExists',
   stale_project: 'conversation.creativeStudio.errors.staleProject',

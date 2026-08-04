@@ -345,7 +345,6 @@ export type StudioRouteCatalog = {
 
 export type StudioCommandErrorCode =
   | 'invalid_payload'
-  | 'timing_mismatch'
   | 'not_found'
   | 'storyboard_exists'
   | 'stale_project'

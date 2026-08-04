@@ -122,12 +122,16 @@ describe('GenerationReviewModal', () => {
     expect(screen.queryByRole('checkbox', { name: /audio/i })).not.toBeInTheDocument();
   });
 
-  it('blocks a batch when the canonical storyboard timing does not match the project target', () => {
-    render(<GenerationReviewModal {...createProps({ projectDurationSeconds: 13 })} />);
+  it('keeps a mismatched batch advisory and submits after explicit confirmation', () => {
+    const onConfirm = vi.fn();
+    render(<GenerationReviewModal {...createProps({ projectDurationSeconds: 13, onConfirm })} />);
 
-    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeDisabled();
+    expect(screen.getAllByText('conversation.creativeStudio.review.durationMismatch')).toHaveLength(1);
+    const confirm = screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' });
+    expect(confirm).toBeEnabled();
+
+    fireEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledOnce();
   });
 
   it('allows a ready subset when the canonical full storyboard matches the target', () => {
@@ -149,7 +153,7 @@ describe('GenerationReviewModal', () => {
     expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
   });
 
-  it('blocks a batch when selected ready scenes mask a mismatched full storyboard', () => {
+  it('allows a batch when selected ready scenes total 15 seconds and the full storyboard totals 18', () => {
     render(
       <GenerationReviewModal
         {...createProps({
@@ -162,7 +166,7 @@ describe('GenerationReviewModal', () => {
     );
 
     expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeEnabled();
   });
 
   it('allows one valid scene despite a whole-storyboard mismatch and submits only after explicit confirmation', () => {

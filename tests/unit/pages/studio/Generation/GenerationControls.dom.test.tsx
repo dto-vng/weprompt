@@ -198,23 +198,19 @@ describe('GenerationControls', () => {
     ).toBeEnabled();
   });
 
-  it('blocks the lower batch handler and shows the supplied duration reason', () => {
+  it('shows the duration advisory without blocking the lower batch handler', () => {
     const props = createProps();
     render(
-      <GenerationControls
-        {...props}
-        batchDisabled
-        batchDisabledReasonKey='conversation.creativeStudio.review.disabledDurationMismatch'
-      />
+      <GenerationControls {...props} batchAdvisoryMessageKey='conversation.creativeStudio.review.durationMismatch' />
     );
 
     const batchAction = screen.getByRole('button', {
       name: 'conversation.creativeStudio.review.generateReadyScenes:count=2',
     });
-    expect(batchAction).toBeDisabled();
-    expect(screen.getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeVisible();
+    expect(batchAction).toBeEnabled();
+    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
     fireEvent.click(batchAction);
-    expect(props.onOpenBatchReview).not.toHaveBeenCalled();
+    expect(props.onOpenBatchReview).toHaveBeenCalledOnce();
   });
 
   it('labels a scene with a selected output as another paid variation', () => {

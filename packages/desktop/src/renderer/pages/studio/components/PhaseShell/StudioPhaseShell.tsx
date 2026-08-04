@@ -82,24 +82,16 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
             <Button
               icon={<VideoOne />}
               loading={controller.jobs.mutationPending}
-              disabled={
-                controller.mutationPending ||
-                controller.readiness.readySceneIds.length === 0 ||
-                controller.readiness.durationDeltaSeconds !== 0
-              }
+              disabled={controller.mutationPending || controller.readiness.readySceneIds.length === 0}
               onClick={() => void controller.openReadyScenesReview()}
             >
               {t('conversation.creativeStudio.review.generateReadyScenes', {
                 count: controller.readiness.readySceneIds.length,
               })}
             </Button>
-            {(controller.readiness.readySceneIds.length === 0 || controller.readiness.durationDeltaSeconds !== 0) && (
+            {controller.readiness.readySceneIds.length === 0 && (
               <span className={styles.actionIssue} aria-live='polite'>
-                {t(
-                  controller.readiness.readySceneIds.length === 0
-                    ? 'conversation.creativeStudio.review.noReadyScenes'
-                    : 'conversation.creativeStudio.review.disabledDurationMismatch'
-                )}
+                {t('conversation.creativeStudio.review.noReadyScenes')}
               </span>
             )}
           </div>

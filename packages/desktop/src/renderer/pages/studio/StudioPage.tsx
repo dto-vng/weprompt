@@ -336,13 +336,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
 
   const openBatchReview = useCallback(
     (request: GenerationBatchReviewRequest): void => {
-      if (
-        project === null ||
-        generationBlocked ||
-        request.catalogVersion === null ||
-        readyScenes.length === 0 ||
-        readiness?.durationDeltaSeconds !== 0
-      ) {
+      if (project === null || generationBlocked || request.catalogVersion === null || readyScenes.length === 0) {
         return;
       }
       const scenes = readyScenes.map((scene) => {
@@ -362,7 +356,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         projectRevision: project.revision,
       });
     },
-    [generationBlocked, project, readiness?.durationDeltaSeconds, readyScenes, studioJobs]
+    [generationBlocked, project, readyScenes, studioJobs]
   );
 
   const openHeaderBatchReview = useCallback(async (): Promise<void> => {
@@ -370,7 +364,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       project === null ||
       generationBlocked ||
       readyScenes.length === 0 ||
-      readiness?.durationDeltaSeconds !== 0 ||
       headerBatchLoading ||
       headerBatchLoadingRef.current
     ) {
@@ -424,15 +417,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       headerBatchLoadingRef.current = false;
       setHeaderBatchLoading(false);
     }
-  }, [
-    generationBlocked,
-    headerBatchLoading,
-    openBatchReview,
-    project,
-    readiness?.durationDeltaSeconds,
-    readyScenes.length,
-    studioModels,
-  ]);
+  }, [generationBlocked, headerBatchLoading, openBatchReview, project, readyScenes.length, studioModels]);
 
   const confirmGeneration = useCallback(
     async ({ sceneIds, routes }: { sceneIds: string[]; routes: StudioSceneGenerationChoice[] }): Promise<void> => {

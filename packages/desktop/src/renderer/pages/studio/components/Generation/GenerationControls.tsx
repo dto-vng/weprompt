@@ -59,8 +59,7 @@ export type GenerationControlsProps = {
   sceneDurationSeconds?: number;
   hasReference?: boolean;
   batchSceneCount: number;
-  batchDisabled?: boolean;
-  batchDisabledReasonKey?: string | null;
+  batchAdvisoryMessageKey?: string | null;
   disabled?: boolean;
   singleDisabled?: boolean;
   showSettingsAction?: boolean;
@@ -208,8 +207,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
   sceneDurationSeconds,
   hasReference,
   batchSceneCount,
-  batchDisabled = false,
-  batchDisabledReasonKey = null,
+  batchAdvisoryMessageKey = null,
   disabled = false,
   singleDisabled = false,
   showSettingsAction = true,
@@ -255,7 +253,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
   };
 
   const openBatchReview = (): void => {
-    if (disabled || batchDisabled || batchSceneCount < 1 || catalogLoading) return;
+    if (disabled || batchSceneCount < 1 || catalogLoading) return;
     onOpenBatchReview({
       catalogVersion: catalog?.catalogVersion ?? null,
       routes: {
@@ -332,13 +330,13 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
               : 'conversation.creativeStudio.review.generateScene'
           )}
         </Button>
-        <Button disabled={disabled || batchDisabled || batchSceneCount < 1 || catalogLoading} onClick={openBatchReview}>
+        <Button disabled={disabled || batchSceneCount < 1 || catalogLoading} onClick={openBatchReview}>
           {t('conversation.creativeStudio.review.generateReadyScenes', { count: batchSceneCount })}
         </Button>
       </div>
-      {batchDisabledReasonKey !== null && (
+      {batchAdvisoryMessageKey !== null && (
         <p aria-live='polite' className='m-0 text-12px text-warning'>
-          {t(batchDisabledReasonKey)}
+          {t(batchAdvisoryMessageKey)}
         </p>
       )}
     </section>

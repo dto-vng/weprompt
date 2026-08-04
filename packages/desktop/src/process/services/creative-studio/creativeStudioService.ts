@@ -177,7 +177,6 @@ type StudioInternalConnectionRequest = {
 export class CreativeStudioServiceError extends Error {
   readonly code:
     | 'invalid_payload'
-    | 'timing_mismatch'
     | 'storyboard_exists'
     | 'planning_unavailable'
     | 'busy'
@@ -1284,13 +1283,6 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
       if (project.revision !== input.expectedRevision) {
         throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
-      }
-      const fullDurationSeconds = project.sceneOrder.reduce(
-        (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
-        0
-      );
-      if (input.mode === 'batch' && fullDurationSeconds !== project.targetDurationSeconds) {
-        throw new CreativeStudioServiceError('timing_mismatch');
       }
       if (input.mode === 'single' && input.sceneIds.length !== 1) {
         throw new CreativeStudioServiceError('invalid_payload');

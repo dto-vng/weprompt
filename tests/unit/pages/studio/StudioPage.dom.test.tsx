@@ -1133,14 +1133,16 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(1));
   });
 
-  it('keeps both batch entry points and their handler closed until storyboard timing exactly matches the target', async () => {
-    const opening = scene({ durationSeconds: 5 });
+  it('opens and submits both batch entry points with an 18-second storyboard against a 15-second target', async () => {
+    const opening = scene({ id: 'scene-1', durationSeconds: 6 });
+    const reveal = scene({ id: 'scene-2', title: 'Reveal', durationSeconds: 6 });
+    const closing = scene({ id: 'scene-3', title: 'Closing', durationSeconds: 6 });
     bridge.getProject.invoke.mockResolvedValue(
       ok(
         project('project-1', {
           targetDurationSeconds: 15,
-          sceneOrder: [opening.id],
-          scenes: { [opening.id]: opening },
+          sceneOrder: [opening.id, reveal.id, closing.id],
+          scenes: { [opening.id]: opening, [reveal.id]: reveal, [closing.id]: closing },
         })
       )
     );
@@ -1149,17 +1151,21 @@ describe('StudioPage and useStudioProject', () => {
 
     const { headerAction, lowerAction } = await findBatchActions();
     const routingPanel = screen.getByRole('region', { name: 'conversation.creativeStudio.routing.title' });
-    expect(headerAction).toBeDisabled();
-    expect(lowerAction).toBeDisabled();
-    expect(headerAction.closest('header')).toHaveTextContent(
-      'conversation.creativeStudio.review.disabledDurationMismatch'
-    );
-    expect(within(routingPanel).getByText('conversation.creativeStudio.review.disabledDurationMismatch')).toBeVisible();
-    fireEvent.click(headerAction);
-    fireEvent.click(lowerAction);
+    expect(headerAction).toBeEnabled();
+    expect(lowerAction).toBeEnabled();
+    expect(headerAction.closest('header')).not.toHaveTextContent('conversation.creativeStudio.review.durationMismatch');
+    expect(within(routingPanel).getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
+    fireEvent.click(headerAction);
+    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' }));
+    await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    fireEvent.click(lowerAction);
+    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' }));
+    await waitFor(() => expect(bridge.submitScenes.invoke).toHaveBeenCalledTimes(2));
   });
 
   it('fits 18 seconds to 15 with one atomic command, no scene updates, and opens both batch gates', async () => {
@@ -1219,7 +1225,7 @@ describe('StudioPage and useStudioProject', () => {
     expect(lowerAction).toBeEnabled();
   });
 
-  it('keeps the batch gate closed and explains an unreachable fit', async () => {
+  it('keeps batch generation available and explains an unreachable advisory fit', async () => {
     const opening = scene({ durationSeconds: 18 });
     const initial = project('project-1', {
       targetDurationSeconds: 15,
@@ -1254,8 +1260,13 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     const { headerAction, lowerAction } = await findBatchActions();
-    expect(headerAction).toBeDisabled();
-    expect(lowerAction).toBeDisabled();
+    expect(headerAction).toBeEnabled();
+    expect(lowerAction).toBeEnabled();
+    expect(
+      within(screen.getByRole('region', { name: 'conversation.creativeStudio.routing.title' })).getByText(
+        'conversation.creativeStudio.review.durationMismatch'
+      )
+    ).toBeVisible();
   });
 
   it('hides unreachable fit feedback after the route catalog version changes', async () => {

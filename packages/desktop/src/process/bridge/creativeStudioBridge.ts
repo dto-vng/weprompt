@@ -22,7 +22,6 @@ import { BrowserWindow, dialog } from 'electron';
 
 const errorMessageKeys: Record<StudioCommandErrorCode, string> = {
   invalid_payload: 'conversation.creativeStudio.errors.invalidPayload',
-  timing_mismatch: 'conversation.creativeStudio.review.durationMismatch',
   not_found: 'conversation.creativeStudio.errors.projectNotFound',
   storyboard_exists: 'conversation.creativeStudio.errors.storyboardExists',
   stale_project: 'conversation.creativeStudio.errors.staleProject',

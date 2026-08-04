@@ -1134,8 +1134,7 @@
       "confirm": "確認して生成",
       "cancel": "キャンセル",
       "submitFailed": "生成を送信できませんでした。",
-      "disabledMissingRoutes": "選択した各シーンに有効なルートを指定してください。",
-      "disabledDurationMismatch": "一括生成する前にストーリーボードの時間を目標に合わせてください。"
+      "disabledMissingRoutes": "選択した各シーンに有効なルートを指定してください。"
     },
     "jobs": {
       "title": "生成ジョブ",

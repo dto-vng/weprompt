@@ -823,15 +823,17 @@ describe('useStoryboardEditor', () => {
     );
   });
 
-  it('does not create a scene after the target has been reached', async () => {
+  it('creates a default-duration scene after the target has been reached', async () => {
     const initial = project(2, [scene('scene-1', { durationSeconds: 15 })], { targetDurationSeconds: 15 });
     const { result } = renderHook(() => useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) }));
 
     await act(async () => {
-      expect(await result.current.addScene()).toBe(false);
+      expect(await result.current.addScene()).toBe(true);
     });
 
-    expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+    expect(bridge.updateScene.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ scene: expect.objectContaining({ durationSeconds: 5 }) })
+    );
   });
 
   it('increases the target through the revisioned project update intent', async () => {

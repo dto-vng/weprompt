@@ -255,34 +255,35 @@ describe('StoryboardPanel', () => {
     expect(screen.getByText('conversation.creativeStudio.storyboard.durationRemaining:5')).toBeInTheDocument();
   });
 
-  it('requires an explicit target increase when the storyboard reaches its duration', () => {
+  it('keeps Add Scene enabled when the storyboard reaches its duration target', () => {
     const props = createProps({
       durationTotalSeconds: 20,
       durationMatchesTarget: true,
       remainingDurationSeconds: 0,
       suggestedExpandedTargetSeconds: 25,
-      canAddScene: false,
+      canAddScene: true,
       onIncreaseTargetDuration: vi.fn(),
     });
     render(<StoryboardPanel {...props} />);
 
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeDisabled();
-    expect(screen.getByText('conversation.creativeStudio.storyboard.increaseTarget:25')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeEnabled();
+    expect(screen.queryByText('conversation.creativeStudio.storyboard.increaseTarget:25')).not.toBeInTheDocument();
   });
 
-  it('asks to shorten scenes when a 60-second storyboard cannot expand further', () => {
+  it('keeps Add Scene enabled at the maximum duration target when the scene limit is not reached', () => {
     const props = createProps({
       targetDurationSeconds: 60,
       durationTotalSeconds: 60,
       durationMatchesTarget: true,
       remainingDurationSeconds: 0,
       suggestedExpandedTargetSeconds: null,
-      canAddScene: false,
+      canAddScene: true,
       onIncreaseTargetDuration: vi.fn(),
     });
     render(<StoryboardPanel {...props} />);
 
-    expect(screen.getByText('conversation.creativeStudio.storyboard.shortenBeforeAdding')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeEnabled();
+    expect(screen.queryByText('conversation.creativeStudio.storyboard.shortenBeforeAdding')).not.toBeInTheDocument();
   });
 
   it('prioritizes the scene limit over target expansion when 24 scenes already fill the target', () => {

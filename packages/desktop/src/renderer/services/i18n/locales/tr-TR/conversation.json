@@ -1143,8 +1143,7 @@
       "confirm": "Onayla ve oluştur",
       "cancel": "İptal",
       "submitFailed": "Oluşturma gönderilemedi.",
-      "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin.",
-      "disabledDurationMismatch": "Toplu oluşturmadan önce storyboard zamanlamasını hedefle eşleştirin."
+      "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin."
     },
     "jobs": {
       "title": "Oluşturma işleri",

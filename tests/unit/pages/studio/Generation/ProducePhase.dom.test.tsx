@@ -382,24 +382,29 @@ describe('ProducePhase', () => {
     expect(controller.jobs.submitScenes).not.toHaveBeenCalled();
   });
 
-  it('reenables batch review when a successful Fit publishes exact timing', () => {
+  it('keeps batch review available while Fit changes advisory timing to exact timing', () => {
     const mismatchedProject = project({ targetDurationSeconds: 12 });
     const mismatch = createController(mismatchedProject);
     const exact = createController(project());
     exact.openBatchGenerationReview = mismatch.openBatchGenerationReview;
     const { rerender } = render(<ProducePhase controller={mismatch} />);
 
-    expect(
-      screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateReadyScenes:count=1' })
-    ).toBeDisabled();
+    const mismatchedBatch = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.review.generateReadyScenes:count=1',
+    });
+    expect(mismatchedBatch).toBeEnabled();
+    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
+    fireEvent.click(mismatchedBatch);
+    expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(1);
 
     rerender(<ProducePhase controller={exact} />);
     const batch = screen.getByRole('button', {
       name: 'conversation.creativeStudio.review.generateReadyScenes:count=1',
     });
     expect(batch).toBeEnabled();
+    expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
     fireEvent.click(batch);
-    expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(1);
+    expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(2);
     expect(exact.jobs.submitScenes).not.toHaveBeenCalled();
   });
 

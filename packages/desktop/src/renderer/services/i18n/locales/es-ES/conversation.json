@@ -1149,8 +1149,7 @@
       "confirm": "Confirmar y generar",
       "cancel": "Cancelar",
       "submitFailed": "No se ha podido enviar la generación.",
-      "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada.",
-      "disabledDurationMismatch": "Haz que la duración del guion gráfico coincida con el objetivo antes de generar por lotes."
+      "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada."
     },
     "jobs": {
       "title": "Tareas de generación",

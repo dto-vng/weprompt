@@ -185,9 +185,8 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller, layoutMo
           sceneDurationSeconds={selectedScene?.durationSeconds}
           hasReference={selectedScene?.referenceAssetId != null}
           batchSceneCount={readiness.readySceneIds.length}
-          batchDisabled={readiness.durationDeltaSeconds !== 0}
-          batchDisabledReasonKey={
-            readiness.durationDeltaSeconds !== 0 ? 'conversation.creativeStudio.review.disabledDurationMismatch' : null
+          batchAdvisoryMessageKey={
+            readiness.durationDeltaSeconds !== 0 ? 'conversation.creativeStudio.review.durationMismatch' : null
           }
           disabled={generationBlocked}
           singleDisabled={!selectedSceneEligible}

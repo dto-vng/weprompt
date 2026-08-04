@@ -1134,8 +1134,7 @@
       "confirm": "确认并生成",
       "cancel": "取消",
       "submitFailed": "无法提交生成任务。",
-      "disabledMissingRoutes": "请为每个所选场景选择有效路线。",
-      "disabledDurationMismatch": "批量生成前，请使故事板时长与目标一致。"
+      "disabledMissingRoutes": "请为每个所选场景选择有效路线。"
     },
     "jobs": {
       "title": "生成任务",

@@ -1101,7 +1101,6 @@ export const useStoryboardEditor = ({
     const remainingSeconds =
       current.targetDurationSeconds -
       current.sceneOrder.reduce((total, id) => total + (current.scenes[id]?.durationSeconds ?? 0), 0);
-    if (remainingSeconds <= 0) return false;
     const scene: StudioEditableScene = {
       title: t('conversation.creativeStudio.scene.defaultTitle'),
       purpose: '',
@@ -1109,7 +1108,10 @@ export const useStoryboardEditor = ({
       narration: '',
       onScreenText: '',
       mediaKind: 'image',
-      durationSeconds: Math.min(DEFAULT_SCENE_DURATION_SECONDS, remainingSeconds),
+      durationSeconds:
+        remainingSeconds > 0
+          ? Math.min(DEFAULT_SCENE_DURATION_SECONDS, remainingSeconds)
+          : DEFAULT_SCENE_DURATION_SECONDS,
       referenceAssetId: null,
     };
     return enqueueIntent({
@@ -1357,7 +1359,7 @@ export const useStoryboardEditor = ({
     removeScene,
     reorderScenes,
     moveScene,
-    canAddScene: project !== null && project.sceneOrder.length < MAX_SCENES && remainingDurationSeconds > 0,
+    canAddScene: project !== null && project.sceneOrder.length < MAX_SCENES,
     durationTotalSeconds,
     durationMatchesTarget: project !== null && durationTotalSeconds === project.targetDurationSeconds,
     remainingDurationSeconds,

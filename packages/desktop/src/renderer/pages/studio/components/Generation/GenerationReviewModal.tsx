@@ -108,12 +108,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
       invalidRoute,
       durationMismatch,
       validRoutes,
-      canConfirm:
-        scenes.length > 0 &&
-        !missingRoute &&
-        !invalidRoute &&
-        !durationMismatch &&
-        validRoutes.length === scenes.length,
+      canConfirm: scenes.length > 0 && !missingRoute && !invalidRoute && validRoutes.length === scenes.length,
     };
   }, [mode, projectDurationSeconds, scenes, targetDurationSeconds]);
 
@@ -126,11 +121,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
   };
 
   const disabledReason =
-    review.missingRoute || review.invalidRoute
-      ? 'conversation.creativeStudio.review.disabledMissingRoutes'
-      : review.durationMismatch
-        ? 'conversation.creativeStudio.review.disabledDurationMismatch'
-        : null;
+    review.missingRoute || review.invalidRoute ? 'conversation.creativeStudio.review.disabledMissingRoutes' : null;
 
   const footer = (
     <div className='flex flex-wrap justify-end gap-8px'>

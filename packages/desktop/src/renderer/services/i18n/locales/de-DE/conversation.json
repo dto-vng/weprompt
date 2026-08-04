@@ -1142,8 +1142,7 @@
       "confirm": "Bestätigen und generieren",
       "cancel": "Abbrechen",
       "submitFailed": "Die Generierung konnte nicht übermittelt werden.",
-      "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route.",
-      "disabledDurationMismatch": "Gleiche das Storyboard-Timing vor der Stapelgenerierung an das Ziel an."
+      "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route."
     },
     "jobs": {
       "title": "Generierungsaufträge",

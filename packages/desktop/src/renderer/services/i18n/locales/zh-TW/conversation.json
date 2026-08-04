@@ -1134,8 +1134,7 @@
       "confirm": "確認並產生",
       "cancel": "取消",
       "submitFailed": "無法提交產生工作。",
-      "disabledMissingRoutes": "請為每個所選場景選擇有效路線。",
-      "disabledDurationMismatch": "批次產生前，請讓分鏡時間符合目標。"
+      "disabledMissingRoutes": "請為每個所選場景選擇有效路線。"
     },
     "jobs": {
       "title": "產生工作",

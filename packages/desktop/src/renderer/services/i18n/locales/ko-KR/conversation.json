@@ -1134,8 +1134,7 @@
       "confirm": "확인 후 생성",
       "cancel": "취소",
       "submitFailed": "생성 작업을 제출할 수 없습니다.",
-      "disabledMissingRoutes": "선택한 모든 장면에 유효한 경로를 지정하세요.",
-      "disabledDurationMismatch": "일괄 생성 전에 스토리보드 시간을 목표에 맞추세요."
+      "disabledMissingRoutes": "선택한 모든 장면에 유효한 경로를 지정하세요."
     },
     "jobs": {
       "title": "생성 작업",

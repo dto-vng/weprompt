@@ -2541,7 +2541,7 @@ describe('CreativeStudioService', () => {
       expect(harness.submitScenes).not.toHaveBeenCalled();
     });
 
-    it('rejects a batch whose full canonical storyboard is 18 seconds even when its selected scenes total 15', async () => {
+    it('submits a batch whose full canonical storyboard is 18 seconds against a 15-second target', async () => {
       const harness = await createCatalogHarness();
       const targeted = await harness.service.updateProject({
         projectId: harness.project.id,
@@ -2569,21 +2569,19 @@ describe('CreativeStudioService', () => {
       const catalog = await harness.service.listRoutes({ projectId: fullCut.id });
       const route = catalog.video.options[0]!;
 
-      await expect(
-        harness.service.submitScenes({
-          projectId: fullCut.id,
-          expectedRevision: fullCut.revision,
-          mode: 'batch',
-          sceneIds: ['scene_1', 'scene_2'],
-          routes: [
-            { sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' },
-            { sceneId: 'scene_2', choiceId: route.choiceId, kind: 'video' },
-          ],
-          catalogVersion: catalog.catalogVersion,
-        })
-      ).rejects.toMatchObject({ code: 'timing_mismatch' });
+      await harness.service.submitScenes({
+        projectId: fullCut.id,
+        expectedRevision: fullCut.revision,
+        mode: 'batch',
+        sceneIds: ['scene_1', 'scene_2'],
+        routes: [
+          { sceneId: 'scene_1', choiceId: route.choiceId, kind: 'video' },
+          { sceneId: 'scene_2', choiceId: route.choiceId, kind: 'video' },
+        ],
+        catalogVersion: catalog.catalogVersion,
+      });
 
-      expect(harness.submitScenes).not.toHaveBeenCalled();
+      expect(harness.submitScenes).toHaveBeenCalledOnce();
     });
 
     it('rejects a batch scene with no visual prompt before catalog or manager work even when review state says ready', async () => {

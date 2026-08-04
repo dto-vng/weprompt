@@ -835,7 +835,6 @@ export type I18nKey =
   | 'conversation.creativeStudio.review.cancel'
   | 'conversation.creativeStudio.review.chargeNotice'
   | 'conversation.creativeStudio.review.confirm'
-  | 'conversation.creativeStudio.review.disabledDurationMismatch'
   | 'conversation.creativeStudio.review.disabledMissingRoutes'
   | 'conversation.creativeStudio.review.durationMismatch'
   | 'conversation.creativeStudio.review.generateReadyScenes'

@@ -1154,8 +1154,7 @@
       "confirm": "Confirmar e gerar",
       "cancel": "Cancelar",
       "submitFailed": "Não foi possível enviar a geração.",
-      "disabledMissingRoutes": "Escolha uma rota válida para cada cena selecionada.",
-      "disabledDurationMismatch": "Faça a duração do storyboard corresponder ao objetivo antes da geração em lote."
+      "disabledMissingRoutes": "Escolha uma rota válida para cada cena selecionada."
     },
     "jobs": {
       "title": "Trabalhos de geração",

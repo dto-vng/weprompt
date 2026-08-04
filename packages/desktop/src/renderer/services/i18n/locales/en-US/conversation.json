@@ -997,8 +997,7 @@
       "confirm": "Confirm and generate",
       "cancel": "Cancel",
       "submitFailed": "Generation could not be submitted.",
-      "disabledMissingRoutes": "Choose a valid route for every selected scene.",
-      "disabledDurationMismatch": "Match storyboard timing to the target before batch generation."
+      "disabledMissingRoutes": "Choose a valid route for every selected scene."
     },
     "jobs": {
       "title": "Generation jobs",
