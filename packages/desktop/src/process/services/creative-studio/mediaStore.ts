@@ -14,6 +14,18 @@ import { CreativeStudioStoreError, type CreativeStudioStore } from './store';
 import { downloadRemoteMedia, type RemoteMediaDownloadDeps } from '../remote-media/remoteMediaDownloader';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
+type VerifiedIdentity = { size: number; mtimeMs: number; sha256: string };
+const verifiedFiles = new Map<string, VerifiedIdentity>();
+const VERIFIED_FILE_CACHE_LIMIT = 256;
+
+const cacheVerifiedIdentity = (filePath: string, identity: VerifiedIdentity): void => {
+  verifiedFiles.delete(filePath);
+  verifiedFiles.set(filePath, identity);
+  if (verifiedFiles.size <= VERIFIED_FILE_CACHE_LIMIT) return;
+  const oldestKey = verifiedFiles.keys().next().value;
+  if (oldestKey !== undefined) verifiedFiles.delete(oldestKey);
+};
+
 export type StudioMediaLimits = {
   referenceMaxBytes: number;
   imageOutputMaxBytes: number;
@@ -259,8 +271,10 @@ type VerifiedReadExpectation = {
   dev: string;
   ino: string;
   byteSize: number;
+  mtimeMs: number;
   sha256: string;
   mimeType: string;
+  verifyContent?: boolean;
 };
 
 /** Opens a file only after comparing path and descriptor identity, so a swap after validation is rejected. */
@@ -275,7 +289,10 @@ export const openVerifiedReadStream = async (
   const beforeIdentity = fileIdentity(before);
   if (
     expected &&
-    (beforeIdentity.dev !== expected.dev || beforeIdentity.ino !== expected.ino || before.size !== expected.byteSize)
+    (beforeIdentity.dev !== expected.dev ||
+      beforeIdentity.ino !== expected.ino ||
+      before.size !== expected.byteSize ||
+      before.mtimeMs !== expected.mtimeMs)
   ) {
     throw new CreativeStudioMediaError('storage_error');
   }
@@ -291,11 +308,12 @@ export const openVerifiedReadStream = async (
       (expected !== undefined &&
         (openedIdentity.dev !== expected.dev ||
           openedIdentity.ino !== expected.ino ||
-          opened.size !== expected.byteSize))
+          opened.size !== expected.byteSize ||
+          opened.mtimeMs !== expected.mtimeMs))
     ) {
       throw new CreativeStudioMediaError('storage_error');
     }
-    if (expected) {
+    if (expected && expected.verifyContent !== false) {
       const hash = createHash('sha256');
       const readBuffer = Buffer.allocUnsafe(64 * 1024);
       let sample = Buffer.alloc(0);
@@ -424,6 +442,7 @@ const finalizeManagedPart = async (
         await destinationHandle.close();
       }
       await fs.unlink(partPath);
+      verifiedFiles.delete(destinationPath);
       return verifiedIdentity;
     } catch (error) {
       if (linkedIdentity) {
@@ -745,29 +764,85 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
       const pathStats = await regularFile(filePath);
       if ((await fs.realpath(filePath)) !== filePath) return null;
       const stats = await fs.stat(filePath);
-      if (stats.size !== asset.byteSize) return null;
-      const verifier = createHash('sha256');
-      let sample = Buffer.alloc(0);
-      for await (const chunk of await openVerifiedReadStream(filePath)) {
-        const bytes = Buffer.from(chunk);
-        verifier.update(bytes);
-        if (sample.length < 32) sample = Buffer.concat([sample, bytes]).subarray(0, 32);
+      const pathIdentity = fileIdentity(pathStats);
+      const statsIdentity = fileIdentity(stats);
+      if (pathIdentity.dev !== statsIdentity.dev || pathIdentity.ino !== statsIdentity.ino) return null;
+      const cached = verifiedFiles.get(filePath);
+      let sha256: string;
+      let sample: Buffer;
+      let shouldCache = false;
+      if (cached?.size === stats.size && cached.mtimeMs === stats.mtimeMs) {
+        sha256 = cached.sha256;
+        const sampleHandle = await fs.open(filePath, 'r');
+        try {
+          const opened = await sampleHandle.stat();
+          const openedIdentity = fileIdentity(opened);
+          if (
+            openedIdentity.dev !== pathIdentity.dev ||
+            openedIdentity.ino !== pathIdentity.ino ||
+            opened.size !== stats.size ||
+            opened.mtimeMs !== stats.mtimeMs
+          ) {
+            return null;
+          }
+          const sampleBuffer = Buffer.alloc(32);
+          const { bytesRead } = await sampleHandle.read(sampleBuffer, 0, sampleBuffer.length, 0);
+          sample = sampleBuffer.subarray(0, bytesRead);
+        } finally {
+          await sampleHandle.close();
+        }
+      } else {
+        const verifier = createHash('sha256');
+        sample = Buffer.alloc(0);
+        for await (const chunk of await openVerifiedReadStream(filePath)) {
+          const bytes = Buffer.from(chunk);
+          verifier.update(bytes);
+          if (sample.length < 32) sample = Buffer.concat([sample, bytes]).subarray(0, 32);
+        }
+        sha256 = verifier.digest('hex');
+        shouldCache = true;
       }
       const signature = sniff(sample);
-      if (verifier.digest('hex') !== asset.sha256 || !signature || signature.mimeType !== asset.mimeType) return null;
+      if (
+        stats.size !== asset.byteSize ||
+        sha256 !== asset.sha256 ||
+        !signature ||
+        signature.mimeType !== asset.mimeType
+      )
+        return null;
       const after = await fs.lstat(filePath);
-      const pathIdentity = fileIdentity(pathStats);
       const afterIdentity = fileIdentity(after);
-      if (pathIdentity.dev !== afterIdentity.dev || pathIdentity.ino !== afterIdentity.ino) return null;
+      if (
+        pathIdentity.dev !== afterIdentity.dev ||
+        pathIdentity.ino !== afterIdentity.ino ||
+        after.size !== stats.size ||
+        after.mtimeMs !== stats.mtimeMs
+      )
+        return null;
+      if (shouldCache) cacheVerifiedIdentity(filePath, { size: stats.size, mtimeMs: stats.mtimeMs, sha256 });
       const expectation: VerifiedReadExpectation = {
         ...pathIdentity,
         byteSize: asset.byteSize,
+        mtimeMs: stats.mtimeMs,
         sha256: asset.sha256,
         mimeType: asset.mimeType,
+        verifyContent: false,
       };
       return {
         asset,
-        openVerifiedStream: (start, end) => openVerifiedReadStream(filePath, start, end, undefined, expectation),
+        openVerifiedStream: async (start, end) => {
+          const current = await fs.stat(filePath);
+          const currentCached = verifiedFiles.get(filePath);
+          if (
+            currentCached?.size !== current.size ||
+            currentCached.mtimeMs !== current.mtimeMs ||
+            currentCached.sha256 !== asset.sha256
+          ) {
+            const refreshed = await resolveAsset(projectId, assetId);
+            if (refreshed === null) throw new CreativeStudioMediaError('storage_error');
+          }
+          return openVerifiedReadStream(filePath, start, end, undefined, expectation);
+        },
       };
     } catch {
       return null;
