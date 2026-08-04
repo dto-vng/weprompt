@@ -50,7 +50,7 @@ export const StudioPhaseShell: React.FC<StudioPhaseShellProps> = ({
       case 'brief':
         return (
           <Button type='primary' onClick={() => controller.requestTransition({ phase: 'write' })}>
-            {t('conversation.creativeStudio.storyboard.title')}
+            {t('conversation.creativeStudio.phase.brief.startWriting')}
           </Button>
         );
       case 'write':
