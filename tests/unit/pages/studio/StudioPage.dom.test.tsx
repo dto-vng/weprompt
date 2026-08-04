@@ -323,23 +323,55 @@ describe('StudioPage and useStudioProject', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     });
 
+    it.each([
+      ['brief', 'conversation.creativeStudio.phase.brief.title', 'conversation.creativeStudio.phase.brief.description'],
+      [
+        'write',
+        'conversation.creativeStudio.phase.write.title',
+        'conversation.creativeStudio.phase.write.textChargeDisclosure',
+      ],
+      [
+        'produce',
+        'conversation.creativeStudio.phase.produce.title',
+        'conversation.creativeStudio.phase.produce.providerChargeDisclosure',
+      ],
+      [
+        'review',
+        'conversation.creativeStudio.phase.review.title',
+        'conversation.creativeStudio.phase.review.handoffDescription',
+      ],
+    ])('renders the localized %s phase heading and guidance', async (phase, heading, guidance) => {
+      renderRoute(`/studio/project-1/${phase}`);
+
+      expect(await screen.findByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
+      expect(screen.getByText(guidance)).toBeInTheDocument();
+    });
+
+    it('renders the Review slate and handoff guidance as visible copy', async () => {
+      renderRoute('/studio/project-1/review');
+
+      expect(await screen.findByText('conversation.creativeStudio.phase.review.slateDescription')).toBeVisible();
+      expect(screen.getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
+      expect(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeVisible();
+    });
+
     it('renders one localized four-step phase navigation with Brief current', async () => {
       renderRoute('/studio/project-1/brief');
 
       const phaseNavigation = await screen.findByRole('navigation', {
-        name: 'conversation.creativeStudio.nav.title',
+        name: 'conversation.creativeStudio.phase.nav.label',
       });
       const actions = within(phaseNavigation).getAllByRole('button');
 
       expect(actions).toHaveLength(4);
       expect(actions.map((action) => action.textContent)).toEqual([
-        'conversation.creativeStudio.project.brief',
-        'conversation.creativeStudio.storyboard.title',
-        'conversation.creativeStudio.models.title',
-        'conversation.creativeStudio.review.title',
+        'conversation.creativeStudio.phase.nav.brief',
+        'conversation.creativeStudio.phase.nav.write',
+        'conversation.creativeStudio.phase.nav.produce',
+        'conversation.creativeStudio.phase.nav.review',
       ]);
       expect(within(phaseNavigation).getByRole('button', { current: 'step' })).toHaveTextContent(
-        'conversation.creativeStudio.project.brief'
+        'conversation.creativeStudio.phase.nav.brief'
       );
     });
 
@@ -352,22 +384,25 @@ describe('StudioPage and useStudioProject', () => {
 
       const briefHeading = await screen.findByRole('heading', {
         level: 2,
-        name: 'conversation.creativeStudio.project.brief',
+        name: 'conversation.creativeStudio.phase.brief.title',
       });
       expect(screen.queryByRole('region', { name: 'conversation.creativeStudio.storyboard.title' })).toBeNull();
       const loadCount = bridge.getProject.invoke.mock.calls.length;
 
       fireEvent.click(
-        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-          name: 'conversation.creativeStudio.storyboard.title',
-        })
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          {
+            name: 'conversation.creativeStudio.phase.nav.write',
+          }
+        )
       );
 
       await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/write'));
       const writeHeading = (
         await screen.findAllByRole('heading', {
           level: 2,
-          name: 'conversation.creativeStudio.storyboard.title',
+          name: 'conversation.creativeStudio.phase.write.title',
         })
       )[0]!;
       await waitFor(() => expect(document.activeElement).toBe(writeHeading));
@@ -409,9 +444,12 @@ describe('StudioPage and useStudioProject', () => {
         target: { value: 'Closing v2' },
       });
       fireEvent.click(
-        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-          name: 'conversation.creativeStudio.models.title',
-        })
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          {
+            name: 'conversation.creativeStudio.phase.nav.produce',
+          }
+        )
       );
 
       await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
@@ -441,9 +479,12 @@ describe('StudioPage and useStudioProject', () => {
 
       fireEvent.change(titleInput, { target: { value: 'Recoverable local title' } });
       fireEvent.click(
-        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-          name: 'conversation.creativeStudio.models.title',
-        })
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+          'button',
+          {
+            name: 'conversation.creativeStudio.phase.nav.produce',
+          }
+        )
       );
 
       expect(
@@ -564,9 +605,12 @@ describe('StudioPage and useStudioProject', () => {
     expect(screen.queryByText('conversation.creativeStudio.preview.noAssetTitle')).toBeNull();
 
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-        name: 'conversation.creativeStudio.models.title',
-      })
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+        'button',
+        {
+          name: 'conversation.creativeStudio.phase.nav.produce',
+        }
+      )
     );
     expect(await screen.findByText('conversation.creativeStudio.preview.noAssetTitle')).toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.inspector.title')).toBeNull();
@@ -1002,9 +1046,12 @@ describe('StudioPage and useStudioProject', () => {
       expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' })).toBeNull()
     );
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-        name: 'conversation.creativeStudio.models.title',
-      })
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+        'button',
+        {
+          name: 'conversation.creativeStudio.phase.nav.produce',
+        }
+      )
     );
     const { headerAction, lowerAction } = await findBatchActions();
     expect(headerAction).toBeEnabled();
@@ -1038,9 +1085,12 @@ describe('StudioPage and useStudioProject', () => {
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-        name: 'conversation.creativeStudio.models.title',
-      })
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+        'button',
+        {
+          name: 'conversation.creativeStudio.phase.nav.produce',
+        }
+      )
     );
     const { headerAction, lowerAction } = await findBatchActions();
     expect(headerAction).toBeDisabled();
@@ -1075,14 +1125,18 @@ describe('StudioPage and useStudioProject', () => {
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();
 
-    const phaseNavigation = screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' });
-    fireEvent.click(within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.models.title' }));
+    const phaseNavigation = screen.getByRole('navigation', {
+      name: 'conversation.creativeStudio.phase.nav.label',
+    });
+    fireEvent.click(
+      within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.phase.nav.produce' })
+    );
     const modelBar = await screen.findByRole('region', { name: 'conversation.creativeStudio.models.title' });
     fireEvent.click(within(modelBar).getByRole('button', { name: 'conversation.creativeStudio.models.refresh' }));
 
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
     fireEvent.click(
-      within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.storyboard.title' })
+      within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.phase.nav.write' })
     );
     await waitFor(() =>
       expect(
@@ -1143,10 +1197,10 @@ describe('StudioPage and useStudioProject', () => {
     bridge.updateModelSelection.invoke.mockReturnValueOnce(selection.promise);
     const { router } = renderRoute('/studio/project-1/produce');
     const phaseNavigation = await screen.findByRole('navigation', {
-      name: 'conversation.creativeStudio.nav.title',
+      name: 'conversation.creativeStudio.phase.nav.label',
     });
     const writePhaseAction = within(phaseNavigation).getByRole('button', {
-      name: 'conversation.creativeStudio.storyboard.title',
+      name: 'conversation.creativeStudio.phase.nav.write',
     });
 
     fireEvent.click(screen.getByLabelText('conversation.creativeStudio.models.image'));
@@ -1182,7 +1236,7 @@ describe('StudioPage and useStudioProject', () => {
 
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.sceneCount');
-    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' }))
       .getAllByRole('button')
       .forEach((button) => expect(button).toBeDisabled());
 
@@ -1343,7 +1397,7 @@ describe('StudioPage and useStudioProject', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.jobs.retryChargeBody');
-    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' }))
       .getAllByRole('button')
       .forEach((button) => expect(button).toBeDisabled());
     expect(bridge.retryJob.invoke).not.toHaveBeenCalled();

@@ -860,6 +860,86 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "phase": {
+      "nav": {
+        "label": "Yaratıcı iş akışı",
+        "brief": "Özet",
+        "write": "Yaz",
+        "produce": "Üret",
+        "review": "İncele",
+        "saving": "Değişiklikler kaydediliyor..."
+      },
+      "shared": {
+        "backToLibrary": "Proje kitaplığına dön",
+        "noMediaGeneration": "Bu adımda görüntü veya video oluşturulmaz.",
+        "providerChargesMayApply": "Yapılandırdığınız sağlayıcı model kullanımı için ücret alabilir."
+      },
+      "brief": {
+        "title": "Özet",
+        "description": "Yazmaya başlamadan önce proje hedefini, biçimini ve süresini belirleyin.",
+        "nameLabel": "Proje adı",
+        "intentLabel": "Yaratıcı amaç",
+        "durationLabel": "Hedef süre",
+        "aspectRatioLabel": "En boy oranı",
+        "startWriting": "Yazmaya başla",
+        "saved": "Özetteki tüm değişiklikler kaydedildi.",
+        "saving": "Özet değişiklikleri kaydediliyor...",
+        "unsaved": "Özet değişiklikleri henüz kaydedilmedi.",
+        "invalidName": "Devam etmeden önce bir proje adı girin.",
+        "invalidDuration": "1 ile 3.600 saniye arasında bir hedef süre girin.",
+        "aspectLocked": "En boy oranı kilitli",
+        "aspectLockedHelp": "Oluşturulan medya eklendikten sonra en boy oranı değiştirilemez."
+      },
+      "write": {
+        "title": "Yaz",
+        "description": "Medya oluşturmadan önce hikâye panosunu kurun ve her çekimi geliştirin.",
+        "continueToProduce": "Üretime devam et",
+        "askAssistant": "Asistana sor",
+        "hideAssistant": "Asistanı gizle",
+        "assistantTitle": "Yazım asistanı",
+        "assistantDescription": "Hikâye yapısını, çekim fikirlerini ve istemleri geliştirmek için asistanı kullanın.",
+        "textChargeDisclosure": "Hikâye panosu taslağı yapılandırdığınız metin modelini kullanır. Sağlayıcınız model kullanımı için ücret alabilir.",
+        "draftStoryboard": "Hikâye panosu taslağı oluştur",
+        "addShot": "Çekim ekle",
+        "addVisual": "Görsel ekle",
+        "fitToGoal": "Hedefe uydur",
+        "noScenes": "Başlamak için bir çekim ekleyin veya hikâye panosu taslağı oluşturun."
+      },
+      "produce": {
+        "title": "Üret",
+        "description": "Modelleri seçin, medya oluşturun ve her çekim için en iyi sonucu belirleyin.",
+        "reviewCut": "Kurguyu incele",
+        "addVisual": "Görsel ekle",
+        "modelsTitle": "Modeller",
+        "modelsHelp": "Hikâye panosu, görüntü ve video oluşturmak için kullanılacak modelleri seçin.",
+        "openModelSettings": "Model ayarlarını aç",
+        "activityTitle": "Oluşturma etkinliği",
+        "activityEmpty": "Çalışan bir oluşturma işi yok.",
+        "jobsRunning": "{{count}} oluşturma işi çalışıyor",
+        "jobsRunning_one": "{{count}} oluşturma işi çalışıyor",
+        "jobsRunning_other": "{{count}} oluşturma işi çalışıyor",
+        "batchTimingBlocker": "Hazır çekimlerin tümünü oluşturmadan önce hikâye panosu süresini hedefle eşleştirin.",
+        "providerChargeDisclosure": "Medya oluşturma, yapılandırdığınız sağlayıcıları kullanır. Sağlayıcılarınız model kullanımı için ücret alabilir."
+      },
+      "review": {
+        "title": "İncele",
+        "description": "Seçilen medyayı kontrol edin, eksik slaytları tamamlayın ve devri hazırlayın.",
+        "handoff": "Devri hazırla",
+        "noAssets": "Devir için hazır seçilmiş medya yok.",
+        "slateLabel": "Slayt",
+        "slateDescription": "İşlenmiş medya seçilmediğinde slayt, çekimin sırada kalmasını sağlar.",
+        "excludedFromHandoff": "Seçilmiş medyası veya slaytı olmayan çekimler devirden çıkarılır.",
+        "renderedShots": "İşlenmiş {{count}} çekim",
+        "renderedShots_one": "İşlenmiş {{count}} çekim",
+        "renderedShots_other": "İşlenmiş {{count}} çekim",
+        "missingSlates": "Eksik {{count}} slayt",
+        "missingSlates_one": "Eksik {{count}} slayt",
+        "missingSlates_other": "Eksik {{count}} slayt",
+        "openProduce": "Üretimi aç",
+        "handoffDescription": "Devir, seçilen medya ve slaytları hikâye panosu sırasıyla içerir.",
+        "partialHandoff": "Bazı çekimlerde seçilmiş medya veya slayt bulunmadığından bu devir kısmidir."
+      }
+    },
     "library": {
       "title": "Creative Studio",
       "subtitle": "Hikâyeler planlayın, her sahneyi gözden geçirin ve görsel ya da video varlıkları oluşturun.",

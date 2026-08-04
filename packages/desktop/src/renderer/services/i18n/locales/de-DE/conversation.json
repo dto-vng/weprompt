@@ -859,6 +859,86 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "phase": {
+      "nav": {
+        "label": "Kreativer Ablauf",
+        "brief": "Briefing",
+        "write": "Schreiben",
+        "produce": "Produzieren",
+        "review": "Prüfen",
+        "saving": "Änderungen werden gespeichert..."
+      },
+      "shared": {
+        "backToLibrary": "Zurück zur Projektbibliothek",
+        "noMediaGeneration": "In diesem Schritt werden keine Bilder oder Videos erzeugt.",
+        "providerChargesMayApply": "Der konfigurierte Anbieter kann die Modellnutzung berechnen."
+      },
+      "brief": {
+        "title": "Briefing",
+        "description": "Lege vor dem Schreiben Projektziel, Format und Dauer fest.",
+        "nameLabel": "Projektname",
+        "intentLabel": "Kreative Absicht",
+        "durationLabel": "Zieldauer",
+        "aspectRatioLabel": "Seitenverhältnis",
+        "startWriting": "Mit dem Schreiben beginnen",
+        "saved": "Alle Änderungen am Briefing sind gespeichert.",
+        "saving": "Änderungen am Briefing werden gespeichert...",
+        "unsaved": "Die Änderungen am Briefing sind noch nicht gespeichert.",
+        "invalidName": "Gib vor dem Fortfahren einen Projektnamen ein.",
+        "invalidDuration": "Gib eine Zieldauer zwischen 1 und 3.600 Sekunden ein.",
+        "aspectLocked": "Seitenverhältnis ist gesperrt",
+        "aspectLockedHelp": "Nach dem Hinzufügen erzeugter Medien kann das Seitenverhältnis nicht mehr geändert werden."
+      },
+      "write": {
+        "title": "Schreiben",
+        "description": "Erstelle das Storyboard und verfeinere jede Einstellung, bevor Medien erzeugt werden.",
+        "continueToProduce": "Weiter zu Produzieren",
+        "askAssistant": "Assistenten fragen",
+        "hideAssistant": "Assistenten ausblenden",
+        "assistantTitle": "Schreibassistent",
+        "assistantDescription": "Nutze den Assistenten für Erzählstruktur, Einstellungsideen und Prompts.",
+        "textChargeDisclosure": "Der Storyboard-Entwurf verwendet dein konfiguriertes Textmodell. Der Anbieter kann die Modellnutzung berechnen.",
+        "draftStoryboard": "Storyboard entwerfen",
+        "addShot": "Einstellung hinzufügen",
+        "addVisual": "Bild hinzufügen",
+        "fitToGoal": "An Ziel anpassen",
+        "noScenes": "Füge eine Einstellung hinzu oder entwirf ein Storyboard, um zu beginnen."
+      },
+      "produce": {
+        "title": "Produzieren",
+        "description": "Wähle Modelle, erzeuge Medien und bestimme für jede Einstellung das beste Ergebnis.",
+        "reviewCut": "Schnitt prüfen",
+        "addVisual": "Bild hinzufügen",
+        "modelsTitle": "Modelle",
+        "modelsHelp": "Wähle die Modelle für Storyboard-, Bild- und Videoerzeugung.",
+        "openModelSettings": "Modelleinstellungen öffnen",
+        "activityTitle": "Erzeugungsaktivität",
+        "activityEmpty": "Es werden keine Erzeugungsaufträge ausgeführt.",
+        "jobsRunning": "{{count}} Erzeugungsaufträge laufen",
+        "jobsRunning_one": "{{count}} Erzeugungsauftrag läuft",
+        "jobsRunning_other": "{{count}} Erzeugungsaufträge laufen",
+        "batchTimingBlocker": "Gleiche die Storyboard-Dauer an das Ziel an, bevor alle bereiten Einstellungen erzeugt werden.",
+        "providerChargeDisclosure": "Die Medienerzeugung verwendet deine konfigurierten Anbieter. Die Anbieter können die Modellnutzung berechnen."
+      },
+      "review": {
+        "title": "Prüfen",
+        "description": "Prüfe ausgewählte Medien, ergänze fehlende Platzhalter und bereite die Übergabe vor.",
+        "handoff": "Übergabe vorbereiten",
+        "noAssets": "Keine ausgewählten Medien sind für die Übergabe bereit.",
+        "slateLabel": "Platzhalter",
+        "slateDescription": "Ein Platzhalter hält eine Einstellung in der Abfolge, wenn kein gerendertes Medium ausgewählt ist.",
+        "excludedFromHandoff": "Einstellungen ohne ausgewähltes Medium oder Platzhalter werden von der Übergabe ausgeschlossen.",
+        "renderedShots": "{{count}} gerenderte Einstellungen",
+        "renderedShots_one": "{{count}} gerenderte Einstellung",
+        "renderedShots_other": "{{count}} gerenderte Einstellungen",
+        "missingSlates": "{{count}} fehlende Platzhalter",
+        "missingSlates_one": "{{count}} fehlender Platzhalter",
+        "missingSlates_other": "{{count}} fehlende Platzhalter",
+        "openProduce": "Produzieren öffnen",
+        "handoffDescription": "Die Übergabe enthält ausgewählte Medien und Platzhalter in Storyboard-Reihenfolge.",
+        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen sowohl ausgewählte Medien als auch Platzhalter fehlen."
+      }
+    },
     "library": {
       "title": "Creative Studio",
       "subtitle": "Plane Geschichten, prüfe jede Szene und erstelle Bild- oder Video-Assets.",

@@ -59,10 +59,14 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller }) => {
       : null;
 
   return (
-    <div className={styles.phase}>
+    <section className={styles.phase} aria-labelledby='studio-produce-phase-heading'>
       <h2 id='studio-produce-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
-        {t('conversation.creativeStudio.models.title')}
+        {t('conversation.creativeStudio.phase.produce.title')}
       </h2>
+      <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.produce.description')}</p>
+      <p className='m-0 text-12px text-t-tertiary'>
+        {t('conversation.creativeStudio.phase.produce.providerChargeDisclosure')}
+      </p>
       <StudioModelBar
         catalog={models.catalog}
         loading={models.loading}
@@ -95,7 +99,7 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller }) => {
             onSelectAsset={selectVariation}
           />
         </div>
-        <AssistantDock>
+        <AssistantDock kind='produce'>
           <GenerationControls
             project={project}
             catalog={models.catalog}
@@ -141,6 +145,6 @@ export const ProducePhase: React.FC<ProducePhaseProps> = ({ controller }) => {
           />
         </AssistantDock>
       </div>
-    </div>
+    </section>
   );
 };

@@ -21,23 +21,24 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
   return (
     <section className={styles.phase} aria-labelledby='studio-brief-phase-heading'>
       <h2 id='studio-brief-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
-        {t('conversation.creativeStudio.project.brief')}
+        {t('conversation.creativeStudio.phase.brief.title')}
       </h2>
+      <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.brief.description')}</p>
       <dl className={styles.metadata}>
         <div className={styles.metadataItem}>
-          <dt>{t('conversation.creativeStudio.project.title')}</dt>
+          <dt>{t('conversation.creativeStudio.phase.brief.nameLabel')}</dt>
           <dd>{project.name}</dd>
         </div>
         <div className={styles.metadataItem}>
-          <dt>{t('conversation.creativeStudio.project.brief')}</dt>
+          <dt>{t('conversation.creativeStudio.phase.brief.intentLabel')}</dt>
           <dd>{project.brief}</dd>
         </div>
         <div className={styles.metadataItem}>
-          <dt>{t('conversation.creativeStudio.project.aspectRatio')}</dt>
+          <dt>{t('conversation.creativeStudio.phase.brief.aspectRatioLabel')}</dt>
           <dd>{project.aspectRatio}</dd>
         </div>
         <div className={styles.metadataItem}>
-          <dt>{t('conversation.creativeStudio.project.targetDuration')}</dt>
+          <dt>{t('conversation.creativeStudio.phase.brief.durationLabel')}</dt>
           <dd>{project.targetDurationSeconds}</dd>
         </div>
       </dl>

@@ -864,6 +864,89 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "phase": {
+      "nav": {
+        "label": "Fluxo criativo",
+        "brief": "Briefing",
+        "write": "Escrever",
+        "produce": "Produzir",
+        "review": "Revisar",
+        "saving": "Salvando alterações..."
+      },
+      "shared": {
+        "backToLibrary": "Voltar à biblioteca de projetos",
+        "noMediaGeneration": "Esta etapa não gera imagens nem vídeos.",
+        "providerChargesMayApply": "O provedor configurado pode cobrar pelo uso do modelo."
+      },
+      "brief": {
+        "title": "Briefing",
+        "description": "Defina o objetivo, o formato e a duração do projeto antes de escrever.",
+        "nameLabel": "Nome do projeto",
+        "intentLabel": "Intenção criativa",
+        "durationLabel": "Duração desejada",
+        "aspectRatioLabel": "Proporção",
+        "startWriting": "Começar a escrever",
+        "saved": "Todas as alterações do briefing foram salvas.",
+        "saving": "Salvando alterações do briefing...",
+        "unsaved": "As alterações do briefing ainda não foram salvas.",
+        "invalidName": "Informe um nome de projeto antes de continuar.",
+        "invalidDuration": "Informe uma duração desejada entre 1 e 3.600 segundos.",
+        "aspectLocked": "A proporção está bloqueada",
+        "aspectLockedHelp": "A proporção não pode ser alterada depois que uma mídia gerada for adicionada."
+      },
+      "write": {
+        "title": "Escrever",
+        "description": "Monte o storyboard e refine cada tomada antes de gerar mídia.",
+        "continueToProduce": "Continuar para Produzir",
+        "askAssistant": "Perguntar ao assistente",
+        "hideAssistant": "Ocultar assistente",
+        "assistantTitle": "Assistente de escrita",
+        "assistantDescription": "Use o assistente para desenvolver a estrutura da história, ideias de tomadas e prompts.",
+        "textChargeDisclosure": "O rascunho do storyboard usa o modelo de texto configurado. O provedor pode cobrar pelo uso do modelo.",
+        "draftStoryboard": "Criar rascunho do storyboard",
+        "addShot": "Adicionar tomada",
+        "addVisual": "Adicionar visual",
+        "fitToGoal": "Ajustar à meta",
+        "noScenes": "Adicione uma tomada ou crie um rascunho do storyboard para começar."
+      },
+      "produce": {
+        "title": "Produzir",
+        "description": "Escolha modelos, gere mídia e selecione o melhor resultado para cada tomada.",
+        "reviewCut": "Revisar corte",
+        "addVisual": "Adicionar visual",
+        "modelsTitle": "Modelos",
+        "modelsHelp": "Escolha os modelos usados para gerar storyboard, imagens e vídeos.",
+        "openModelSettings": "Abrir configurações de modelo",
+        "activityTitle": "Atividade de geração",
+        "activityEmpty": "Nenhum trabalho de geração está em execução.",
+        "jobsRunning": "{{count}} trabalhos de geração em execução",
+        "jobsRunning_one": "{{count}} trabalho de geração em execução",
+        "jobsRunning_many": "{{count}} trabalhos de geração em execução",
+        "jobsRunning_other": "{{count}} trabalhos de geração em execução",
+        "batchTimingBlocker": "Ajuste a duração do storyboard à meta antes de gerar todas as tomadas prontas.",
+        "providerChargeDisclosure": "A geração de mídia usa os provedores configurados. Eles podem cobrar pelo uso do modelo."
+      },
+      "review": {
+        "title": "Revisar",
+        "description": "Confira a mídia selecionada, preencha as cartelas ausentes e prepare a entrega.",
+        "handoff": "Preparar entrega",
+        "noAssets": "Nenhuma mídia selecionada está pronta para entrega.",
+        "slateLabel": "Cartela",
+        "slateDescription": "Uma cartela mantém a tomada na sequência quando nenhuma mídia renderizada está selecionada.",
+        "excludedFromHandoff": "Tomadas sem mídia selecionada nem cartela são excluídas da entrega.",
+        "renderedShots": "{{count}} tomadas renderizadas",
+        "renderedShots_one": "{{count}} tomada renderizada",
+        "renderedShots_many": "{{count}} tomadas renderizadas",
+        "renderedShots_other": "{{count}} tomadas renderizadas",
+        "missingSlates": "{{count}} cartelas ausentes",
+        "missingSlates_one": "{{count}} cartela ausente",
+        "missingSlates_many": "{{count}} cartelas ausentes",
+        "missingSlates_other": "{{count}} cartelas ausentes",
+        "openProduce": "Abrir Produzir",
+        "handoffDescription": "A entrega inclui as mídias selecionadas e as cartelas na ordem do storyboard.",
+        "partialHandoff": "Esta entrega é parcial porque algumas tomadas não têm mídia selecionada nem cartela."
+      }
+    },
     "library": {
       "title": "Creative Studio",
       "subtitle": "Planeje histórias, revise cada cena e gere recursos de imagem ou vídeo.",

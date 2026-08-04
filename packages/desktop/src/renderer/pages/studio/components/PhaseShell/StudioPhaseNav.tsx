@@ -12,10 +12,10 @@ import { STUDIO_PHASES, type StudioPhase } from '../../studioPhaseRoute';
 import styles from './StudioPhaseShell.module.css';
 
 const PHASE_LABEL_KEYS: Record<StudioPhase, string> = {
-  brief: 'conversation.creativeStudio.project.brief',
-  write: 'conversation.creativeStudio.storyboard.title',
-  produce: 'conversation.creativeStudio.models.title',
-  review: 'conversation.creativeStudio.review.title',
+  brief: 'conversation.creativeStudio.phase.nav.brief',
+  write: 'conversation.creativeStudio.phase.nav.write',
+  produce: 'conversation.creativeStudio.phase.nav.produce',
+  review: 'conversation.creativeStudio.phase.nav.review',
 };
 
 export type StudioPhaseNavProps = {
@@ -28,7 +28,7 @@ export const StudioPhaseNav: React.FC<StudioPhaseNavProps> = ({ activePhase, dis
   const { t } = useTranslation();
 
   return (
-    <nav aria-label={t('conversation.creativeStudio.nav.title')} className={styles.phaseNavigation}>
+    <nav aria-label={t('conversation.creativeStudio.phase.nav.label')} className={styles.phaseNavigation}>
       <ol className={styles.phaseList}>
         {STUDIO_PHASES.map((phase) => (
           <li key={phase} className={styles.phaseItem}>

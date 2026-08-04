@@ -108,10 +108,14 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
   }, [clearWriteFocusIntent, editor, project.scenes, writeFocusIntent]);
 
   return (
-    <div className={styles.phase}>
+    <section className={styles.phase} aria-labelledby='studio-write-phase-heading'>
       <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
-        {t('conversation.creativeStudio.storyboard.title')}
+        {t('conversation.creativeStudio.phase.write.title')}
       </h2>
+      <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.write.description')}</p>
+      <p className='m-0 text-12px text-t-tertiary'>
+        {t('conversation.creativeStudio.phase.write.textChargeDisclosure')}
+      </p>
       <div className={styles.workspace}>
         <StoryboardPanel
           orderedScenes={editor.orderedScenes}
@@ -161,7 +165,7 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
               : editor.discardConflict
           }
         />
-        <AssistantDock>
+        <AssistantDock kind='write'>
           <SceneInspector
             projectId={project.id}
             selectedScene={editor.selectedScene}
@@ -186,6 +190,6 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
           />
         </AssistantDock>
       </div>
-    </div>
+    </section>
   );
 };

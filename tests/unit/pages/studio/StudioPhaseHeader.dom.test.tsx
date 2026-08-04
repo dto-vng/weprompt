@@ -35,7 +35,12 @@ describe('StudioPhaseHeader', () => {
   it('keeps the project breadcrumb and renders only the active phase action slot', () => {
     render(<StudioPhaseHeader project={project} onBack={vi.fn()} actions={<span>phase action</span>} />);
 
-    expect(screen.getByRole('navigation', { name: 'conversation.creativeStudio.project.backToLibrary' })).toBeVisible();
+    expect(
+      screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.shared.backToLibrary' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.shared.backToLibrary' })
+    ).toBeVisible();
     expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeVisible();
     expect(screen.getByText('phase action')).toBeVisible();
     expect(screen.queryByText('conversation.creativeStudio.project.readiness')).not.toBeInTheDocument();

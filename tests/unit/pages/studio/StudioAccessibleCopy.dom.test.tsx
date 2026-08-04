@@ -12,7 +12,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { StudioAsset, StudioRendererProject, StudioScene } from '@/common/types/project/creativeStudioTypes';
 import { GenerationReviewModal } from '@renderer/pages/studio/components/Generation/GenerationReviewModal';
+import { AssistantDock } from '@renderer/pages/studio/components/PhaseShell/AssistantDock';
 import { StudioPhaseHeader } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseHeader';
+import { StudioPhaseNav } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseNav';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
 import { SceneTimeline } from '@renderer/pages/studio/components/SceneTimeline';
 import { SceneCard } from '@renderer/pages/studio/components/Storyboard/SceneCard';
@@ -113,6 +115,29 @@ const project = (): StudioRendererProject => ({
   updatedAt: '2026-08-03T00:00:00.000Z',
 });
 describe('Creative Studio full-sentence English copy', () => {
+  it('renders the phase workflow and assistant dock with localized accessible names', async () => {
+    await renderEnglish(
+      <>
+        <StudioPhaseNav activePhase='brief' disabled={false} onSelect={vi.fn()} />
+        <AssistantDock>
+          <span>Assistant controls</span>
+        </AssistantDock>
+        <AssistantDock kind='produce'>
+          <span>Generation controls</span>
+        </AssistantDock>
+      </>
+    );
+
+    const navigation = screen.getByRole('navigation', { name: 'Creative workflow' });
+    expect(
+      within(navigation)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+    ).toEqual(['Brief', 'Write', 'Produce', 'Review']);
+    expect(screen.getByRole('complementary', { name: 'Writing assistant' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Generation activity' })).toBeInTheDocument();
+  });
+
   it('renders complete scene action names and a grammatically singular duration', async () => {
     await renderEnglish(
       <SceneCard

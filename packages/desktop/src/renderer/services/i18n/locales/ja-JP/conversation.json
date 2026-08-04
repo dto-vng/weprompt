@@ -858,6 +858,83 @@
     "nav": {
       "title": "クリエイティブスタジオ"
     },
+    "phase": {
+      "nav": {
+        "label": "制作ワークフロー",
+        "brief": "概要",
+        "write": "構成",
+        "produce": "生成",
+        "review": "確認",
+        "saving": "変更を保存しています..."
+      },
+      "shared": {
+        "backToLibrary": "プロジェクト一覧に戻る",
+        "noMediaGeneration": "この手順では画像や動画は生成されません。",
+        "providerChargesMayApply": "設定したプロバイダーからモデル利用料が請求される場合があります。"
+      },
+      "brief": {
+        "title": "概要",
+        "description": "構成を始める前に、プロジェクトの目的、形式、尺を決めます。",
+        "nameLabel": "プロジェクト名",
+        "intentLabel": "制作意図",
+        "durationLabel": "目標尺",
+        "aspectRatioLabel": "アスペクト比",
+        "startWriting": "構成を始める",
+        "saved": "概要の変更はすべて保存されています。",
+        "saving": "概要の変更を保存しています...",
+        "unsaved": "概要の変更はまだ保存されていません。",
+        "invalidName": "続行する前にプロジェクト名を入力してください。",
+        "invalidDuration": "目標尺は 1～3,600 秒で入力してください。",
+        "aspectLocked": "アスペクト比は固定されています",
+        "aspectLockedHelp": "生成済みメディアを追加した後はアスペクト比を変更できません。"
+      },
+      "write": {
+        "title": "構成",
+        "description": "メディアを生成する前に、ストーリーボードを作り各ショットを調整します。",
+        "continueToProduce": "生成へ進む",
+        "askAssistant": "アシスタントに相談",
+        "hideAssistant": "アシスタントを隠す",
+        "assistantTitle": "構成アシスタント",
+        "assistantDescription": "ストーリー構成、ショット案、プロンプトの作成にアシスタントを利用できます。",
+        "textChargeDisclosure": "ストーリーボードの下書きには設定済みのテキストモデルを使用します。プロバイダーから利用料が請求される場合があります。",
+        "draftStoryboard": "ストーリーボードを下書き",
+        "addShot": "ショットを追加",
+        "addVisual": "ビジュアルを追加",
+        "fitToGoal": "目標に合わせる",
+        "noScenes": "ショットを追加するか、ストーリーボードを下書きして開始します。"
+      },
+      "produce": {
+        "title": "生成",
+        "description": "モデルを選び、メディアを生成して、各ショットに最適な結果を選択します。",
+        "reviewCut": "編集結果を確認",
+        "addVisual": "ビジュアルを追加",
+        "modelsTitle": "モデル",
+        "modelsHelp": "ストーリーボード、画像、動画の生成に使うモデルを選択します。",
+        "openModelSettings": "モデル設定を開く",
+        "activityTitle": "生成状況",
+        "activityEmpty": "実行中の生成ジョブはありません。",
+        "jobsRunning": "{{count}} 件の生成ジョブが実行中",
+        "jobsRunning_other": "{{count}} 件の生成ジョブが実行中",
+        "batchTimingBlocker": "準備済みの全ショットを生成する前に、ストーリーボードの尺を目標に合わせてください。",
+        "providerChargeDisclosure": "メディア生成には設定済みのプロバイダーを使用します。プロバイダーからモデル利用料が請求される場合があります。"
+      },
+      "review": {
+        "title": "確認",
+        "description": "選択したメディアを確認し、不足するスレートを補って引き渡しを準備します。",
+        "handoff": "引き渡しを準備",
+        "noAssets": "引き渡せる選択済みメディアがありません。",
+        "slateLabel": "スレート",
+        "slateDescription": "レンダリング済みメディアが未選択でも、スレートによってショットをシーケンスに残せます。",
+        "excludedFromHandoff": "選択済みメディアもスレートもないショットは引き渡しから除外されます。",
+        "renderedShots": "レンダリング済みショット {{count}} 件",
+        "renderedShots_other": "レンダリング済みショット {{count}} 件",
+        "missingSlates": "不足しているスレート {{count}} 件",
+        "missingSlates_other": "不足しているスレート {{count}} 件",
+        "openProduce": "生成を開く",
+        "handoffDescription": "引き渡しには、選択したメディアとスレートがストーリーボード順に含まれます。",
+        "partialHandoff": "選択済みメディアもスレートもないショットがあるため、この引き渡しは一部のみです。"
+      }
+    },
     "library": {
       "title": "クリエイティブスタジオ",
       "subtitle": "物語を組み立て、各シーンを確認して、画像や動画の素材を生成します。",

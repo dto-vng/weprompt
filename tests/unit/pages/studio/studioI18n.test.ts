@@ -24,6 +24,7 @@ const plannedGroups = [
   'library',
   'models',
   'nav',
+  'phase',
   'preview',
   'project',
   'review',
@@ -31,6 +32,75 @@ const plannedGroups = [
   'scene',
   'storyboard',
   'timeline',
+] as const;
+
+const phaseKeys = [
+  'phase.nav.label',
+  'phase.nav.brief',
+  'phase.nav.write',
+  'phase.nav.produce',
+  'phase.nav.review',
+  'phase.nav.saving',
+  'phase.shared.backToLibrary',
+  'phase.shared.noMediaGeneration',
+  'phase.shared.providerChargesMayApply',
+  'phase.brief.title',
+  'phase.brief.description',
+  'phase.brief.nameLabel',
+  'phase.brief.intentLabel',
+  'phase.brief.durationLabel',
+  'phase.brief.aspectRatioLabel',
+  'phase.brief.startWriting',
+  'phase.brief.saved',
+  'phase.brief.saving',
+  'phase.brief.unsaved',
+  'phase.brief.invalidName',
+  'phase.brief.invalidDuration',
+  'phase.brief.aspectLocked',
+  'phase.brief.aspectLockedHelp',
+  'phase.write.title',
+  'phase.write.description',
+  'phase.write.continueToProduce',
+  'phase.write.askAssistant',
+  'phase.write.hideAssistant',
+  'phase.write.assistantTitle',
+  'phase.write.assistantDescription',
+  'phase.write.textChargeDisclosure',
+  'phase.write.draftStoryboard',
+  'phase.write.addShot',
+  'phase.write.addVisual',
+  'phase.write.fitToGoal',
+  'phase.write.noScenes',
+  'phase.produce.title',
+  'phase.produce.description',
+  'phase.produce.reviewCut',
+  'phase.produce.addVisual',
+  'phase.produce.modelsTitle',
+  'phase.produce.modelsHelp',
+  'phase.produce.openModelSettings',
+  'phase.produce.activityTitle',
+  'phase.produce.activityEmpty',
+  'phase.produce.jobsRunning',
+  'phase.produce.batchTimingBlocker',
+  'phase.produce.providerChargeDisclosure',
+  'phase.review.title',
+  'phase.review.description',
+  'phase.review.handoff',
+  'phase.review.noAssets',
+  'phase.review.slateLabel',
+  'phase.review.slateDescription',
+  'phase.review.excludedFromHandoff',
+  'phase.review.renderedShots',
+  'phase.review.missingSlates',
+  'phase.review.openProduce',
+  'phase.review.handoffDescription',
+  'phase.review.partialHandoff',
+] as const;
+
+const phasePluralLogicalKeys = [
+  'phase.produce.jobsRunning',
+  'phase.review.renderedShots',
+  'phase.review.missingSlates',
 ] as const;
 
 const taskSevenKeys = [
@@ -127,6 +197,7 @@ const pluralLogicalKeys = [
   'timeline.selectSceneAccessible',
   'review.selectedDurationFull',
   'review.targetDurationFull',
+  ...phasePluralLogicalKeys,
 ] as const;
 
 const streamFullSentenceKeys = [
@@ -135,6 +206,27 @@ const streamFullSentenceKeys = [
   'storyboard.moveSceneDownAccessible',
   'storyboard.removeSceneAccessible',
   'preview.selectVersionAccessible',
+  'phase.shared.noMediaGeneration',
+  'phase.shared.providerChargesMayApply',
+  'phase.brief.description',
+  'phase.brief.invalidName',
+  'phase.brief.invalidDuration',
+  'phase.brief.aspectLockedHelp',
+  'phase.write.description',
+  'phase.write.assistantDescription',
+  'phase.write.textChargeDisclosure',
+  'phase.write.noScenes',
+  'phase.produce.description',
+  'phase.produce.modelsHelp',
+  'phase.produce.activityEmpty',
+  'phase.produce.batchTimingBlocker',
+  'phase.produce.providerChargeDisclosure',
+  'phase.review.description',
+  'phase.review.noAssets',
+  'phase.review.slateDescription',
+  'phase.review.excludedFromHandoff',
+  'phase.review.handoffDescription',
+  'phase.review.partialHandoff',
   ...pluralLogicalKeys,
 ] as const;
 
@@ -178,7 +270,7 @@ function isPluralVariantKey(key: string): boolean {
 }
 
 describe('Creative Studio localization contract', () => {
-  it('defines the complete planned group and Task 7 key contract in the reference locale', () => {
+  it('defines the complete planned group, phase-shell, and Task 7 key contract in the reference locale', () => {
     const reference = loadConversationLocale(i18nConfig.referenceLanguage);
     const creativeStudio = reference.creativeStudio;
 
@@ -191,6 +283,34 @@ describe('Creative Studio localization contract', () => {
     for (const key of taskSevenKeys) {
       expect(leaves[key], `Missing conversation.creativeStudio.${key}`).toBeTruthy();
     }
+    for (const key of phaseKeys) {
+      expect(leaves[key], `Missing conversation.creativeStudio.${key}`).toBeTruthy();
+    }
+  });
+
+  it('renders the complete phase vocabulary in every configured locale without exposing raw keys', async () => {
+    const issues: string[] = [];
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const conversation = loadConversationLocale(locale);
+      const instance = i18next.createInstance();
+      await instance.init({
+        lng: locale,
+        fallbackLng: false,
+        resources: { [locale]: { translation: { conversation } } },
+        interpolation: { escapeValue: false },
+      });
+
+      for (const phaseKey of phaseKeys) {
+        const key = `conversation.creativeStudio.${phaseKey}`;
+        const rendered = instance.t(key, phasePluralLogicalKeys.includes(phaseKey) ? { count: 2 } : undefined);
+        if (!rendered.trim() || rendered === key || rendered.includes('conversation.creativeStudio.')) {
+          issues.push(`${locale}.${phaseKey} rendered ${rendered}`);
+        }
+      }
+    }
+
+    expect(issues).toEqual([]);
   });
 
   it('does not retain Studio connection ownership or App Operations copy', () => {

@@ -181,7 +181,7 @@ describe('Studio asset export', () => {
       })
     );
     expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.export.body');
-    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' }))
       .getAllByRole('button')
       .forEach((button) => expect(button).toBeDisabled());
 
@@ -333,9 +333,12 @@ describe('Studio asset export', () => {
     const prompt = await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
     fireEvent.change(prompt, { target: { value: 'A newly edited cinematic frame' } });
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
-        name: 'conversation.creativeStudio.review.title',
-      })
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+        'button',
+        {
+          name: 'conversation.creativeStudio.phase.nav.review',
+        }
+      )
     );
     await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
     expect(router.state.location.pathname).toBe('/studio/project-1/write');

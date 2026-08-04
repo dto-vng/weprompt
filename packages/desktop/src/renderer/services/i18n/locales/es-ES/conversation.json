@@ -859,6 +859,89 @@
     "nav": {
       "title": "Creative Studio"
     },
+    "phase": {
+      "nav": {
+        "label": "Flujo creativo",
+        "brief": "Briefing",
+        "write": "Escribir",
+        "produce": "Producir",
+        "review": "Revisar",
+        "saving": "Guardando cambios..."
+      },
+      "shared": {
+        "backToLibrary": "Volver a la biblioteca de proyectos",
+        "noMediaGeneration": "Este paso no genera imágenes ni vídeos.",
+        "providerChargesMayApply": "El proveedor configurado puede cobrar por el uso del modelo."
+      },
+      "brief": {
+        "title": "Briefing",
+        "description": "Define el objetivo, el formato y la duración del proyecto antes de escribir.",
+        "nameLabel": "Nombre del proyecto",
+        "intentLabel": "Intención creativa",
+        "durationLabel": "Duración objetivo",
+        "aspectRatioLabel": "Relación de aspecto",
+        "startWriting": "Empezar a escribir",
+        "saved": "Todos los cambios del briefing están guardados.",
+        "saving": "Guardando cambios del briefing...",
+        "unsaved": "Los cambios del briefing aún no se han guardado.",
+        "invalidName": "Introduce un nombre de proyecto antes de continuar.",
+        "invalidDuration": "Introduce una duración objetivo de entre 1 y 3.600 segundos.",
+        "aspectLocked": "La relación de aspecto está bloqueada",
+        "aspectLockedHelp": "La relación de aspecto no se puede cambiar después de añadir contenido generado."
+      },
+      "write": {
+        "title": "Escribir",
+        "description": "Crea el guion gráfico y perfecciona cada plano antes de generar contenido.",
+        "continueToProduce": "Continuar a Producir",
+        "askAssistant": "Preguntar al asistente",
+        "hideAssistant": "Ocultar asistente",
+        "assistantTitle": "Asistente de escritura",
+        "assistantDescription": "Usa el asistente para desarrollar la estructura de la historia, ideas de planos y prompts.",
+        "textChargeDisclosure": "El borrador del guion gráfico usa el modelo de texto configurado. El proveedor puede cobrar por el uso del modelo.",
+        "draftStoryboard": "Crear borrador del guion gráfico",
+        "addShot": "Añadir plano",
+        "addVisual": "Añadir elemento visual",
+        "fitToGoal": "Ajustar al objetivo",
+        "noScenes": "Añade un plano o crea un borrador del guion gráfico para empezar."
+      },
+      "produce": {
+        "title": "Producir",
+        "description": "Elige modelos, genera contenido y selecciona el mejor resultado para cada plano.",
+        "reviewCut": "Revisar montaje",
+        "addVisual": "Añadir elemento visual",
+        "modelsTitle": "Modelos",
+        "modelsHelp": "Elige los modelos usados para generar guiones gráficos, imágenes y vídeos.",
+        "openModelSettings": "Abrir ajustes de modelos",
+        "activityTitle": "Actividad de generación",
+        "activityEmpty": "No hay trabajos de generación en curso.",
+        "jobsRunning": "{{count}} trabajos de generación en curso",
+        "jobsRunning_one": "{{count}} trabajo de generación en curso",
+        "jobsRunning_many": "{{count}} trabajos de generación en curso",
+        "jobsRunning_other": "{{count}} trabajos de generación en curso",
+        "batchTimingBlocker": "Ajusta la duración del guion gráfico al objetivo antes de generar todos los planos listos.",
+        "providerChargeDisclosure": "La generación de contenido usa los proveedores configurados. Los proveedores pueden cobrar por el uso del modelo."
+      },
+      "review": {
+        "title": "Revisar",
+        "description": "Comprueba el contenido seleccionado, completa las claquetas que faltan y prepara la entrega.",
+        "handoff": "Preparar entrega",
+        "noAssets": "No hay contenido seleccionado listo para entregar.",
+        "slateLabel": "Claqueta",
+        "slateDescription": "Una claqueta mantiene un plano en la secuencia cuando no hay contenido renderizado seleccionado.",
+        "excludedFromHandoff": "Los planos sin contenido seleccionado ni claqueta se excluyen de la entrega.",
+        "renderedShots": "{{count}} planos renderizados",
+        "renderedShots_one": "{{count}} plano renderizado",
+        "renderedShots_many": "{{count}} planos renderizados",
+        "renderedShots_other": "{{count}} planos renderizados",
+        "missingSlates": "{{count}} claquetas ausentes",
+        "missingSlates_one": "{{count}} claqueta ausente",
+        "missingSlates_many": "{{count}} claquetas ausentes",
+        "missingSlates_other": "{{count}} claquetas ausentes",
+        "openProduce": "Abrir Producir",
+        "handoffDescription": "La entrega incluye el contenido seleccionado y las claquetas en el orden del guion gráfico.",
+        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado ni claqueta."
+      }
+    },
     "library": {
       "title": "Creative Studio",
       "subtitle": "Planifica historias, revisa cada escena y genera recursos de imagen o vídeo.",

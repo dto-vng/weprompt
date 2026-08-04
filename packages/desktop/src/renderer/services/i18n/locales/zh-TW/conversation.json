@@ -858,6 +858,83 @@
     "nav": {
       "title": "創意工作室"
     },
+    "phase": {
+      "nav": {
+        "label": "創作流程",
+        "brief": "簡報",
+        "write": "編寫",
+        "produce": "製作",
+        "review": "檢視",
+        "saving": "正在儲存變更..."
+      },
+      "shared": {
+        "backToLibrary": "返回專案庫",
+        "noMediaGeneration": "此步驟不會產生圖片或影片。",
+        "providerChargesMayApply": "您設定的供應商可能會收取模型使用費。"
+      },
+      "brief": {
+        "title": "簡報",
+        "description": "在編寫前先確認專案目標、格式與時長。",
+        "nameLabel": "專案名稱",
+        "intentLabel": "創作意圖",
+        "durationLabel": "目標時長",
+        "aspectRatioLabel": "長寬比",
+        "startWriting": "開始編寫",
+        "saved": "簡報的所有變更均已儲存。",
+        "saving": "正在儲存簡報變更...",
+        "unsaved": "簡報變更尚未儲存。",
+        "invalidName": "請先輸入專案名稱再繼續。",
+        "invalidDuration": "請輸入 1 至 3,600 秒之間的目標時長。",
+        "aspectLocked": "長寬比已鎖定",
+        "aspectLockedHelp": "加入產生的媒體後，無法變更長寬比。"
+      },
+      "write": {
+        "title": "編寫",
+        "description": "建立分鏡並完善每個鏡頭，之後再產生媒體。",
+        "continueToProduce": "繼續製作",
+        "askAssistant": "詢問助理",
+        "hideAssistant": "隱藏助理",
+        "assistantTitle": "編寫助理",
+        "assistantDescription": "使用助理完善故事結構、鏡頭構想與提示詞。",
+        "textChargeDisclosure": "起草分鏡會使用您設定的文字模型。供應商可能會收取模型使用費。",
+        "draftStoryboard": "起草分鏡",
+        "addShot": "新增鏡頭",
+        "addVisual": "新增視覺素材",
+        "fitToGoal": "符合目標",
+        "noScenes": "新增鏡頭或起草分鏡即可開始。"
+      },
+      "produce": {
+        "title": "製作",
+        "description": "選擇模型、產生媒體，並為每個鏡頭挑選最佳結果。",
+        "reviewCut": "檢視剪輯",
+        "addVisual": "新增視覺素材",
+        "modelsTitle": "模型",
+        "modelsHelp": "選擇用於分鏡、圖片與影片產生的模型。",
+        "openModelSettings": "開啟模型設定",
+        "activityTitle": "產生活動",
+        "activityEmpty": "目前沒有執行中的產生工作。",
+        "jobsRunning": "有 {{count}} 個產生工作正在執行",
+        "jobsRunning_other": "有 {{count}} 個產生工作正在執行",
+        "batchTimingBlocker": "請先讓分鏡時長符合目標，再產生所有已就緒鏡頭。",
+        "providerChargeDisclosure": "產生媒體會使用您設定的供應商。供應商可能會收取模型使用費。"
+      },
+      "review": {
+        "title": "檢視",
+        "description": "檢查已選媒體、補齊缺少的場記卡，並準備交付。",
+        "handoff": "準備交付",
+        "noAssets": "沒有可供交付的已選媒體。",
+        "slateLabel": "場記卡",
+        "slateDescription": "未選擇算繪媒體時，場記卡可讓鏡頭保留在序列中。",
+        "excludedFromHandoff": "沒有已選媒體或場記卡的鏡頭不會包含在交付中。",
+        "renderedShots": "{{count}} 個已算繪鏡頭",
+        "renderedShots_other": "{{count}} 個已算繪鏡頭",
+        "missingSlates": "缺少 {{count}} 個場記卡",
+        "missingSlates_other": "缺少 {{count}} 個場記卡",
+        "openProduce": "開啟製作",
+        "handoffDescription": "交付內容會依分鏡順序包含已選媒體與場記卡。",
+        "partialHandoff": "部分鏡頭沒有已選媒體或場記卡，因此此次交付不完整。"
+      }
+    },
     "library": {
       "title": "創意工作室",
       "subtitle": "規劃故事、逐幕檢視，並產生圖片或影片素材。",
