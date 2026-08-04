@@ -7,11 +7,11 @@
 import { ipcBridge } from '@/common';
 import type {
   StudioConnectionCandidate,
-  StudioConnectionCapabilities,
   StudioConnectionIntegration,
   StudioConnectionRecord,
   StudioConnectionValidationResult,
   StudioMediaKind,
+  StudioRendererConnectionCapabilities,
   StudioSaveConnectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
 import { Alert, AutoComplete, Button, Modal, Popconfirm, Select, Spin, Tag } from '@arco-design/web-react';
@@ -37,7 +37,9 @@ export type StudioMediaModelsSectionProps = {
   onAddProvider: () => void;
 };
 
-const sanitizeCapabilities = (capabilities: StudioConnectionCapabilities): StudioConnectionCapabilities => ({
+const sanitizeCapabilities = (
+  capabilities: StudioRendererConnectionCapabilities
+): StudioRendererConnectionCapabilities => ({
   mediaKinds: [...capabilities.mediaKinds],
   ...(capabilities.audioModes ? { audioModes: [...capabilities.audioModes] } : {}),
   ...(capabilities.aspectRatios ? { aspectRatios: [...capabilities.aspectRatios] } : {}),
@@ -45,7 +47,6 @@ const sanitizeCapabilities = (capabilities: StudioConnectionCapabilities): Studi
   ...(capabilities.minDurationSeconds === undefined ? {} : { minDurationSeconds: capabilities.minDurationSeconds }),
   ...(capabilities.maxDurationSeconds === undefined ? {} : { maxDurationSeconds: capabilities.maxDurationSeconds }),
   ...(capabilities.supportsFirstFrame === undefined ? {} : { supportsFirstFrame: capabilities.supportsFirstFrame }),
-  ...(capabilities.cancellation === undefined ? {} : { cancellation: capabilities.cancellation }),
 });
 
 const sanitizeCandidate = (candidate: StudioConnectionCandidate): SafeCandidate => ({

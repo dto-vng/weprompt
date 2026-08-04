@@ -127,6 +127,7 @@ const sanitizeJob = (candidate: StudioRendererJob): StudioRendererJob => {
     },
     outputAssetIds: [...candidate.outputAssetIds],
     canRetryDownload: candidate.canRetryDownload === true,
+    canCancel: candidate.canCancel === true,
     error:
       candidate.error === null
         ? null
@@ -433,7 +434,7 @@ export const useStudioJobs = ({
           publishIssue(localIssue(operation, 'invalid_payload', intent.jobId));
           return false;
         }
-        if (intent.operation === 'cancel_job' && !['queued_local', 'queued_remote'].includes(currentJob.status)) {
+        if (intent.operation === 'cancel_job' && currentJob.canCancel !== true) {
           publishIssue(localIssue(operation, 'cancellation_refused', intent.jobId));
           return false;
         }

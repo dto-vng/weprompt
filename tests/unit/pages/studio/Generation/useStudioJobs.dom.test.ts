@@ -62,6 +62,7 @@ const job = (id: string, overrides: Partial<StudioRendererJob> = {}): StudioRend
   },
   outputAssetIds: [],
   error: null,
+  canCancel: true,
   canRetryDownload: false,
   retryOfJobId: null,
   retryReason: null,
@@ -572,11 +573,11 @@ describe('useStudioJobs', () => {
     });
   });
 
-  it('cancels queued jobs and reports a typed refusal for a running job', async () => {
-    const queued = job('job-queued', { status: 'queued_remote' });
-    const running = job('job-running', { status: 'running', sceneId: 'scene-1' });
-    const cancelled = job('job-queued', { status: 'cancelled' });
-    const afterCancel = project(4, { 'job-queued': cancelled, 'job-running': running });
+  it('trusts main-derived canCancel instead of inferring authority from job status', async () => {
+    const queued = job('job-queued', { status: 'queued_remote', canCancel: false });
+    const running = job('job-running', { status: 'running', sceneId: 'scene-1', canCancel: true });
+    const cancelled = job('job-running', { status: 'cancelled', canCancel: false });
+    const afterCancel = project(4, { 'job-queued': queued, 'job-running': cancelled });
     bridge.cancelJob.invoke.mockResolvedValueOnce(ok(cancelled));
     const { result } = renderHook(() =>
       useStudioJobs({
@@ -586,14 +587,14 @@ describe('useStudioJobs', () => {
     );
 
     await act(async () => {
-      expect(await result.current.cancelJob('job-queued')).toBe(true);
-      expect(await result.current.cancelJob('job-running')).toBe(false);
+      expect(await result.current.cancelJob('job-running')).toBe(true);
+      expect(await result.current.cancelJob('job-queued')).toBe(false);
     });
 
     expect(bridge.cancelJob.invoke).toHaveBeenCalledTimes(1);
     expect(result.current.issue).toEqual({
       operation: 'cancel_job',
-      jobId: 'job-running',
+      jobId: 'job-queued',
       code: 'cancellation_refused',
       messageKey: 'conversation.creativeStudio.errors.cancellationRefused',
     });
@@ -603,6 +604,7 @@ describe('useStudioJobs', () => {
     const unsafeLocal = {
       ...job('job-local'),
       providerJobId: 'provider-secret-task',
+      cancellationPolicy: 'queued_and_running',
       rawProviderMessage: 'API key sk-secret',
       error: {
         code: 'provider_unavailable',
@@ -632,6 +634,7 @@ describe('useStudioJobs', () => {
       expect.objectContaining({
         id: 'job-local',
         canRetryDownload: false,
+        canCancel: true,
         error: {
           code: 'provider_unavailable',
           messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
@@ -639,6 +642,7 @@ describe('useStudioJobs', () => {
       })
     );
     expect(result.current.jobs[0]).not.toHaveProperty('providerJobId');
+    expect(result.current.jobs[0]).not.toHaveProperty('cancellationPolicy');
     expect(result.current.jobs[0]).not.toHaveProperty('rawProviderMessage');
     expect(result.current.jobs[0]?.error).not.toHaveProperty('rawMessage');
 

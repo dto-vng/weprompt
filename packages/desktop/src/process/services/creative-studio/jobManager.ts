@@ -10,6 +10,7 @@ import { createReadStream, promises as fs } from 'node:fs';
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 import type {
   StudioJob,
+  StudioCancellationPolicy,
   StudioJobError,
   StudioJobErrorCode,
   StudioJobRequest,
@@ -108,6 +109,7 @@ type ExecutionContext = {
 
 type PreparedSubmission = ExecutionContext & {
   request: ResolvedStudioGenerationRequest;
+  cancellationPolicy: StudioCancellationPolicy;
 };
 
 class JobMutationSkipped extends Error {
@@ -243,6 +245,9 @@ const providerIsAvailable = (provider: IProvider, model: string): boolean =>
   provider.model_health?.[model]?.status !== 'unhealthy' &&
   provider.api_key.trim().length > 0;
 
+const providerCredentialsAreUsable = (provider: IProvider): boolean =>
+  provider.enabled !== false && provider.api_key.trim().length > 0;
+
 const routeMatches = (
   candidate: {
     providerId: string;
@@ -314,6 +319,16 @@ const snapshotFailureCode = (
 const pollBaseDelay = (attempt: number): number => POLL_BASE_DELAYS_MS[attempt] ?? MAX_POLL_DELAY_MS;
 const executionKey = (projectId: string, jobId: string): string => `${projectId}\u0000${jobId}`;
 
+const canCancelJob = (job: StudioJob): boolean => {
+  const policy = job.cancellationPolicy ?? 'none';
+  if (job.status === 'queued_local') return true;
+  if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;
+  if (job.status === 'running' || job.status === 'needs_attention') {
+    return policy === 'queued_and_running' && job.providerJobId !== null;
+  }
+  return false;
+};
+
 /** Creates one runtime-owned durable scheduler for all Studio projects. */
 export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobManager => {
   const now = deps.now ?? (() => new Date().toISOString());
@@ -326,6 +341,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
   const controllers = new Map<string, AbortController>();
   const executionReservations = new Set<string>();
   const operationControllers = new Set<AbortController>();
+  const cancellationFlights = new Map<string, Promise<StudioJob>>();
   const activeRuns = new Set<Promise<unknown>>();
   const activeRunByKey = new Map<string, Promise<unknown>>();
   const admittedOperations = new Set<Promise<void>>();
@@ -490,6 +506,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       jobId: '',
       adapter,
       provider: resolvedProvider,
+      cancellationPolicy: catalogRoute.cancellationPolicy,
       request: {
         ...baseRequest,
         ...validation.normalized,
@@ -511,6 +528,29 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       const provider = (await deps.listProviders()).find((candidate) => candidate.id === job.provider.providerId);
       const adapter = deps.adapters.get(job.provider.adapterId);
       if (!provider || !adapter || !providerIsAvailable(provider, job.provider.model)) return null;
+      return {
+        projectId: project.id,
+        sceneId: scene.id,
+        mediaKind: scene.mediaKind,
+        jobId: job.id,
+        adapter,
+        provider: providerWithModel(provider, job.provider.model),
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const resolveCancellationContext = async (
+    project: StudioProject,
+    job: StudioJob
+  ): Promise<ExecutionContext | null> => {
+    const scene = project.scenes[job.sceneId];
+    if (!scene) return null;
+    try {
+      const provider = (await deps.listProviders()).find((candidate) => candidate.id === job.provider.providerId);
+      const adapter = deps.adapters.get(job.provider.adapterId);
+      if (!provider || !adapter || !providerCredentialsAreUsable(provider)) return null;
       return {
         projectId: project.id,
         sceneId: scene.id,
@@ -908,6 +948,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
         },
         idempotencyKey,
         providerJobId: null,
+        cancellationPolicy: candidate.cancellationPolicy,
         outputAssetIds: [],
         error: null,
         retryOfJobId: lineage?.retryOfJobId ?? null,
@@ -1028,11 +1069,8 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     return persisted.map(({ job }) => job);
   };
 
-  const cancelJob = async (input: StudioJobRequest): Promise<StudioJob> => {
+  const cancelJobOnce = async (input: StudioJobRequest, project: StudioProject): Promise<StudioJob> => {
     if (disposed) throw new StudioJobManagerError('invalid_request');
-    const project = await requireExpectedProject(input.projectId, input.expectedRevision);
-    if (disposed) throw new StudioJobManagerError('invalid_request');
-    requireSafeId(input.jobId);
     const current = project.jobs[input.jobId];
     if (!current) throw new CreativeStudioStoreError('not_found', 'Studio job not found');
     if (current.status === 'cancelled') return current;
@@ -1053,10 +1091,11 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       controllers.get(executionKey(project.id, current.id))?.abort();
       return cancelled;
     }
-    if (current.status !== 'queued_remote' || !current.providerJobId) {
+    if (!canCancelJob(current) || current.providerJobId === null) {
       throw new StudioJobManagerError('cancellation_refused');
     }
-    const context = await resolveExistingContext(project, current);
+    const providerJobId = current.providerJobId;
+    const context = await resolveCancellationContext(project, current);
     if (disposed) throw new StudioJobManagerError('invalid_request');
     if (!context?.adapter.cancel) throw new StudioJobManagerError('cancellation_refused');
     const cancellationController = new AbortController();
@@ -1064,7 +1103,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     const cancellationOperation = (async (): Promise<StudioJob> => {
       let result;
       try {
-        result = await context.adapter.cancel!(current.providerJobId!, context.provider, cancellationController.signal);
+        result = await context.adapter.cancel!(providerJobId, context.provider, cancellationController.signal);
       } catch {
         throw new StudioJobManagerError('cancellation_refused');
       }
@@ -1072,8 +1111,8 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       const cancelled = await mutateJob(project.id, current.id, (nextProject, job) => {
         if (job.status === 'cancelled') return false;
         if (
-          (job.status !== 'queued_remote' && job.status !== 'running') ||
-          job.providerJobId !== current.providerJobId
+          (job.status !== 'queued_remote' && job.status !== 'running' && job.status !== 'needs_attention') ||
+          job.providerJobId !== providerJobId
         ) {
           return false;
         }
@@ -1096,6 +1135,35 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       activeRuns.delete(cancellationOperation);
       operationControllers.delete(cancellationController);
     }
+  };
+
+  const cancelJob = async (input: StudioJobRequest): Promise<StudioJob> => {
+    if (disposed) throw new StudioJobManagerError('invalid_request');
+    requireSafeId(input.projectId);
+    requireSafeId(input.jobId);
+    const project = await requireExpectedProject(input.projectId, input.expectedRevision);
+    if (disposed) throw new StudioJobManagerError('invalid_request');
+    const current = project.jobs[input.jobId];
+    if (
+      current === undefined ||
+      current.status === 'queued_local' ||
+      current.status === 'cancelled' ||
+      !canCancelJob(current) ||
+      current.providerJobId === null
+    ) {
+      return cancelJobOnce(input, project);
+    }
+    const key = executionKey(input.projectId, input.jobId);
+    const existing = cancellationFlights.get(key);
+    if (existing) return existing;
+    const operation = cancelJobOnce(input, project);
+    cancellationFlights.set(key, operation);
+    void operation
+      .finally(() => {
+        if (cancellationFlights.get(key) === operation) cancellationFlights.delete(key);
+      })
+      .catch((): undefined => undefined);
+    return operation;
   };
 
   const retryJob = async (input: StudioRetryJobRequest): Promise<StudioJob> => {
@@ -1316,6 +1384,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       controllers.clear();
       executionReservations.clear();
       operationControllers.clear();
+      cancellationFlights.clear();
       activeRunByKey.clear();
     })();
     return disposePromise;

@@ -431,6 +431,17 @@ describe('Creative Studio provider adapters', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('advertises queued-only cancellation for Seedance because running tasks are refused', async () => {
+    const adapter = createBytePlusSeedanceAdapter({ fetch: async () => response(200, {}) });
+
+    await expect(
+      adapter.validateConnection({ model: 'seedance-1-5-pro-251215' }, provider(), new AbortController().signal)
+    ).resolves.toMatchObject({
+      ok: true,
+      capabilities: { cancellationPolicy: 'queued_only' },
+    });
+  });
+
   it('maps BytePlus auth, rate-limit, and service failures without leaking response text', async () => {
     const statuses = [401, 429, 503] as const;
     await Promise.all(
@@ -680,7 +691,8 @@ describe('Creative Studio provider adapters', () => {
             min_duration_seconds: 2,
             max_duration_seconds: 30,
             supports_first_frame: true,
-            cancellation: true,
+            cancellation_policy: 'queued_and_running',
+            cancellation: false,
           },
         })
       )
@@ -705,7 +717,7 @@ describe('Creative Studio provider adapters', () => {
         minDurationSeconds: 2,
         maxDurationSeconds: 30,
         supportsFirstFrame: true,
-        cancellation: true,
+        cancellationPolicy: 'queued_and_running',
       },
     });
     await expect(
@@ -725,6 +737,48 @@ describe('Creative Studio provider adapters', () => {
       audio_mode: 'none',
       inputs: [{ role: 'first_frame', mime_type: 'image/png', data_base64: 'QUJD' }],
     });
+  });
+
+  it.each([
+    { label: 'explicit none', video: { cancellation_policy: 'none', cancellation: true }, expected: 'none' },
+    {
+      label: 'explicit queued only',
+      video: { cancellation_policy: 'queued_only', cancellation: false },
+      expected: 'queued_only',
+    },
+    {
+      label: 'explicit queued and running',
+      video: { cancellation_policy: 'queued_and_running', cancellation: false },
+      expected: 'queued_and_running',
+    },
+    { label: 'legacy true', video: { cancellation: true }, expected: 'queued_only' },
+    { label: 'legacy false', video: { cancellation: false }, expected: 'none' },
+    { label: 'missing', video: {}, expected: 'none' },
+  ])('maps gateway cancellation policy from $label', async ({ video, expected }) => {
+    const adapter = createMediaGatewayAdapter({
+      fetch: async () =>
+        response(200, {
+          schema_version: 1,
+          media_kinds: ['video'],
+          models: ['open-sora'],
+          video: {
+            audio_modes: ['none'],
+            aspect_ratios: ['16:9'],
+            resolutions: ['720p'],
+            min_duration_seconds: 2,
+            max_duration_seconds: 12,
+            ...video,
+          },
+        }),
+    });
+
+    await expect(
+      adapter.validateConnection(
+        { model: 'open-sora' },
+        provider({ base_url: 'https://gateway.example', use_model: 'open-sora' }),
+        new AbortController().signal
+      )
+    ).resolves.toMatchObject({ ok: true, capabilities: { cancellationPolicy: expected } });
   });
 
   it('rejects redirects for every credentialed gateway operation', async () => {
@@ -868,6 +922,8 @@ describe('Creative Studio provider adapters', () => {
       { ...valid, video: { ...valid.video, max_duration_seconds: '12' } },
       { ...valid, video: { ...valid.video, supports_first_frame: 'yes' } },
       { ...valid, video: { ...valid.video, cancellation: 1 } },
+      { ...valid, video: { ...valid.video, cancellation_policy: true } },
+      { ...valid, video: { ...valid.video, cancellation_policy: 'always', cancellation: true } },
     ];
 
     await Promise.all(

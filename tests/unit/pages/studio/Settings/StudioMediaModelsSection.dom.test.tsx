@@ -190,7 +190,6 @@ const binding = (overrides: Partial<StudioConnectionRecord> = {}): StudioConnect
     minDurationSeconds: 2,
     maxDurationSeconds: 12,
     supportsFirstFrame: true,
-    cancellation: true,
   },
   validatedAt: '2026-07-30T00:00:00.000Z',
   ...overrides,
@@ -280,6 +279,31 @@ describe('StudioMediaModelsSection', () => {
       screen.queryByText(/weprompt-media-gateway-v1|candidate-secret|Bearer secret|secret\.invalid|private\/provider/)
     ).toBeNull();
     expect(document.body.innerHTML).not.toMatch(/weprompt-(?:image|media-gateway)-v1|byteplus-seedance-v1/);
+  });
+
+  it('does not read raw cancellation fields into renderer connection state', async () => {
+    const forbiddenReads = vi.fn();
+    const rawCapabilities = {
+      ...binding().capabilities,
+      get cancellation(): boolean {
+        forbiddenReads('cancellation');
+        return true;
+      },
+      get cancellationPolicy(): 'queued_and_running' {
+        forbiddenReads('cancellationPolicy');
+        return 'queued_and_running';
+      },
+    };
+    bridge.listConnections.invoke.mockResolvedValue(
+      ok(inventory([{ ...binding(), capabilities: rawCapabilities } as unknown as StudioConnectionRecord]))
+    );
+
+    render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
+
+    expect(await screen.findByText('open-sora')).toBeInTheDocument();
+    expect(forbiddenReads).not.toHaveBeenCalled();
+    expect(binding().capabilities).not.toHaveProperty('cancellation');
+    expect(binding().capabilities).not.toHaveProperty('cancellationPolicy');
   });
 
   it('shows loading, empty inventory, and the provider action', async () => {

@@ -252,7 +252,7 @@ const sanitizedCapabilities = (
   capabilities: Record<string, unknown> | undefined
 ): StudioConnectionBinding['capabilities'] => {
   if (adapterId === 'weprompt-image-v1') {
-    return { mediaKinds: ['image'], supportsFirstFrame: !isImagesApiModel(model) };
+    return { mediaKinds: ['image'], supportsFirstFrame: !isImagesApiModel(model), cancellationPolicy: 'none' };
   }
   if (adapterId === 'byteplus-seedance-v1') {
     const constraints =
@@ -280,7 +280,7 @@ const sanitizedCapabilities = (
       mediaKinds: ['video'],
       audioModes: ['none'],
       supportsFirstFrame: true,
-      cancellation: true,
+      cancellationPolicy: 'queued_only',
       ...constraints,
     };
   }
@@ -306,7 +306,10 @@ const sanitizedCapabilities = (
     ...(isIntegerInRange(minimum, 1, 60) ? { minDurationSeconds: minimum } : {}),
     ...(isIntegerInRange(maximum, 1, 60) ? { maxDurationSeconds: maximum } : {}),
     supportsFirstFrame: capabilities?.supportsFirstFrame === true,
-    cancellation: capabilities?.cancellation === true,
+    cancellationPolicy:
+      capabilities?.cancellationPolicy === 'queued_only' || capabilities?.cancellationPolicy === 'queued_and_running'
+        ? capabilities.cancellationPolicy
+        : 'none',
   };
 };
 
@@ -419,6 +422,16 @@ const toRendererMediaChoice = (
   model: provider.model,
 });
 
+const canCancelJob = (job: StudioJob): boolean => {
+  const policy = job.cancellationPolicy ?? 'none';
+  if (job.status === 'queued_local') return true;
+  if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;
+  if (job.status === 'running' || job.status === 'needs_attention') {
+    return policy === 'queued_and_running' && job.providerJobId !== null;
+  }
+  return false;
+};
+
 const toRendererJob = (job: StudioJob): StudioRendererJob => ({
   id: job.id,
   projectId: job.projectId,
@@ -427,6 +440,7 @@ const toRendererJob = (job: StudioJob): StudioRendererJob => ({
   provider: toRendererMediaChoice(job.provider),
   outputAssetIds: [...job.outputAssetIds],
   error: job.error === null ? null : { ...job.error },
+  canCancel: canCancelJob(job),
   canRetryDownload: job.status === 'failed' && job.error?.code === 'download_failed' && job.providerJobId !== null,
   ...(job.progress === undefined ? {} : { progress: job.progress }),
   retryOfJobId: job.retryOfJobId,
@@ -566,13 +580,18 @@ const integrationForAdapter = (adapterId: StudioConnectionBinding['adapterId']) 
 const toConnectionRecord = (binding: StudioConnectionBinding): StudioConnectionRecord => {
   const integration = integrationForAdapter(binding.adapterId);
   if (!integration) throw new CreativeStudioStoreError('storage_error', 'Unknown Studio connection integration');
+  const {
+    cancellationPolicy: _cancellationPolicy,
+    cancellation: _legacyCancellation,
+    ...rendererCapabilities
+  } = sanitizedCapabilities(binding.adapterId, binding.model, binding.capabilities);
   return {
     bindingId: binding.id,
     providerId: binding.providerId,
     integrationId: integration.integrationId,
     labelKey: integration.labelKey,
     model: binding.model,
-    capabilities: sanitizedCapabilities(binding.adapterId, binding.model, binding.capabilities),
+    capabilities: rendererCapabilities,
     validatedAt: binding.validatedAt,
   };
 };

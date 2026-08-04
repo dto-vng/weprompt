@@ -118,6 +118,7 @@ const job = (overrides: Partial<StudioRendererJob>): StudioRendererJob => ({
   },
   outputAssetIds: [],
   error: null,
+  canCancel: false,
   canRetryDownload: false,
   retryOfJobId: null,
   retryReason: null,
@@ -411,10 +412,11 @@ describe('GenerationControls', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('announces localized job states, redacts provider details, and delegates cancellation', async () => {
+  it('announces localized job states, redacts provider details, and delegates only main-authorized cancellation', async () => {
     const props = createProps({
       jobs: [
-        job({ id: 'job-running', status: 'running', progress: 42 }),
+        job({ id: 'job-running', status: 'running', progress: 42, canCancel: false }),
+        job({ id: 'job-running-cancellable', status: 'running', canCancel: true }),
         job({
           id: 'job-failed',
           status: 'failed',
@@ -449,7 +451,7 @@ describe('GenerationControls', () => {
             messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
           },
         }),
-        job({ id: 'job-queued', status: 'queued_remote' }),
+        job({ id: 'job-queued', status: 'queued_remote', canCancel: false }),
       ],
       actionIssue: {
         jobId: 'job-running',
@@ -458,7 +460,7 @@ describe('GenerationControls', () => {
       },
     });
     const { container } = render(<GenerationControls {...props} />);
-    expect(screen.getByText('conversation.creativeStudio.jobs.status.running')).toBeInTheDocument();
+    expect(screen.getAllByText('conversation.creativeStudio.jobs.status.running')).toHaveLength(2);
     expect(screen.getByText('conversation.creativeStudio.jobs.progress:percent=42')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.jobs.errors.auth')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.errors.cancellationRefused')).toBeInTheDocument();
@@ -477,12 +479,22 @@ describe('GenerationControls', () => {
       })
     ).not.toBeInTheDocument();
     fireEvent.click(
-      within(screen.getByRole('listitem', { name: 'job-queued' })).getByRole('button', {
+      within(screen.getByRole('listitem', { name: 'job-running-cancellable' })).getByRole('button', {
         name: 'conversation.creativeStudio.jobs.cancel',
       })
     );
 
-    expect(props.onCancelJob).toHaveBeenCalledExactlyOnceWith('job-queued');
+    expect(
+      within(screen.getByRole('listitem', { name: 'job-running' })).queryByRole('button', {
+        name: 'conversation.creativeStudio.jobs.cancel',
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('listitem', { name: 'job-queued' })).queryByRole('button', {
+        name: 'conversation.creativeStudio.jobs.cancel',
+      })
+    ).not.toBeInTheDocument();
+    expect(props.onCancelJob).toHaveBeenCalledExactlyOnceWith('job-running-cancellable');
     await waitFor(() => expect(screen.getAllByRole('status').length).toBeGreaterThanOrEqual(5));
   });
 

@@ -90,6 +90,7 @@ const addActiveImageJob = async (store: CreativeStudioStore): Promise<void> => {
       },
       idempotencyKey: 'key_1',
       providerJobId: null,
+      cancellationPolicy: 'none',
       outputAssetIds: [],
       error: null,
       retryOfJobId: null,

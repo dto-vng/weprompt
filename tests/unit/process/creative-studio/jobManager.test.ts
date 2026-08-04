@@ -8,7 +8,14 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { IProvider } from '@/common/config/storage';
-import type { StudioProject, StudioRouteConstraints, StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type {
+  StudioCancellationPolicy,
+  StudioJob,
+  StudioJobStatus,
+  StudioProject,
+  StudioRouteConstraints,
+  StudioScene,
+} from '@/common/types/project/creativeStudioTypes';
 import type { StudioGenerationRouteCatalog } from '@process/services/creative-studio/providerResolver';
 import type {
   GenerationProviderAdapter,
@@ -57,7 +64,10 @@ const incompatibleConstraints: Array<[string, Partial<StudioRouteConstraints>]> 
   ['maximum duration', { maxDurationSeconds: 4 }],
 ];
 
-const catalog = (routes: StudioResolvedSceneRouteSnapshot[] = [route]): StudioGenerationRouteCatalog => ({
+const catalog = (
+  routes: StudioResolvedSceneRouteSnapshot[] = [route],
+  cancellationPolicy: StudioCancellationPolicy = 'none'
+): StudioGenerationRouteCatalog => ({
   routes: routes.map((candidate) => ({
     providerId: candidate.providerId,
     providerName: 'Provider',
@@ -65,6 +75,7 @@ const catalog = (routes: StudioResolvedSceneRouteSnapshot[] = [route]): StudioGe
     health: 'available',
     adapterId: candidate.adapterId,
     kind: candidate.kind,
+    cancellationPolicy,
     constraints: {
       aspectRatios: ['16:9'],
       resolutions: ['720p'],
@@ -145,6 +156,8 @@ type HarnessOptions = {
   catalog?: () => Promise<StudioGenerationRouteCatalog>;
   decorateMediaStore?: (mediaStore: StudioMediaStore) => StudioMediaStore;
   onProjectUpdated?: (projectId: string) => void;
+  cancellationPolicy?: StudioCancellationPolicy;
+  isGenerationRouteAvailable?: (candidate: StudioResolvedSceneRouteSnapshot) => Promise<boolean>;
 };
 
 const sequence = (values: string[]): (() => string) => {
@@ -186,15 +199,17 @@ const createHarness = async (adapter: GenerationProviderAdapter, options: Harnes
     mediaStore: managerMediaStore,
     providerResolver: {
       listConnectionCandidates: async () => [],
-      listGenerationRoutes: options.catalog ?? (async () => catalog(routes)),
-      isGenerationRouteAvailable: async (candidate) =>
-        routes.some(
-          (available) =>
-            available.providerId === candidate.providerId &&
-            available.adapterId === candidate.adapterId &&
-            available.model === candidate.model &&
-            available.kind === candidate.kind
-        ),
+      listGenerationRoutes: options.catalog ?? (async () => catalog(routes, options.cancellationPolicy)),
+      isGenerationRouteAvailable:
+        options.isGenerationRouteAvailable ??
+        (async (candidate) =>
+          routes.some(
+            (available) =>
+              available.providerId === candidate.providerId &&
+              available.adapterId === candidate.adapterId &&
+              available.model === candidate.model &&
+              available.kind === candidate.kind
+          )),
     },
     adapters: new Map([[adapter.id, adapter]]),
     listProviders: async () => [selectedProvider],
@@ -258,6 +273,43 @@ describe('StudioJobManager durable submission', () => {
         status: 'needs_attention',
         error: { code: 'submission_unknown' },
       })
+    );
+  });
+
+  it('snapshots the freshly resolved route cancellation policy on every new job', async () => {
+    const submission = deferred<ProviderSubmitResult>();
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (input) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: input.aspectRatio,
+          resolution: input.resolution,
+          durationSeconds: input.durationSeconds,
+        },
+      }),
+      submit: async () => submission.promise,
+    };
+    const harness = await createHarness(adapter, {
+      catalog: async () => ({
+        ...catalog(),
+        routes: catalog().routes.map((candidate) => ({ ...candidate, cancellationPolicy: 'queued_only' })),
+      }),
+    });
+
+    const [job] = await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [route],
+      catalogVersion: 'catalog_1',
+    });
+
+    expect(job?.cancellationPolicy).toBe('queued_only');
+    submission.resolve({ kind: 'complete', outputs: [] });
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.status).toBe('failed')
     );
   });
 
@@ -1076,6 +1128,353 @@ describe('StudioJobManager scheduling', () => {
 });
 
 describe('StudioJobManager cancellation', () => {
+  const seedCancellationJob = async (
+    harness: Harness,
+    status: StudioJobStatus,
+    cancellationPolicy: StudioCancellationPolicy,
+    providerJobId: string | null = status === 'queued_local' || status === 'submitting' ? null : 'remote_1'
+  ): Promise<StudioProject> =>
+    harness.store.updateProject(harness.project.id, (project) => {
+      const next = structuredClone(project);
+      next.jobs.job_1 = {
+        id: 'job_1',
+        projectId: project.id,
+        sceneId: 'scene_1',
+        status,
+        provider: selectionFor(route),
+        idempotencyKey: 'key_1',
+        providerJobId,
+        cancellationPolicy,
+        outputAssetIds: [],
+        error: null,
+        retryOfJobId: null,
+        retryReason: null,
+        duplicateChargeAcknowledged: false,
+        duplicateChargeAcknowledgedAt: null,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+      };
+      next.scenes.scene_1.jobIds = ['job_1'];
+      next.scenes.scene_1.reviewState = status === 'succeeded' ? 'complete' : 'generating';
+      return next;
+    });
+
+  it.each([
+    { status: 'queued_local', policy: 'none', outcome: 'cancelled', providerCalls: 0 },
+    { status: 'submitting', policy: 'queued_and_running', outcome: 'refused', providerCalls: 0 },
+    { status: 'queued_remote', policy: 'none', outcome: 'refused', providerCalls: 0 },
+    { status: 'queued_remote', policy: 'queued_only', outcome: 'cancelled', providerCalls: 1 },
+    { status: 'queued_remote', policy: 'queued_and_running', outcome: 'cancelled', providerCalls: 1 },
+    { status: 'running', policy: 'none', outcome: 'refused', providerCalls: 0 },
+    { status: 'running', policy: 'queued_only', outcome: 'refused', providerCalls: 0 },
+    { status: 'running', policy: 'queued_and_running', outcome: 'cancelled', providerCalls: 1 },
+    { status: 'needs_attention', policy: 'none', outcome: 'refused', providerCalls: 0 },
+    { status: 'needs_attention', policy: 'queued_only', outcome: 'refused', providerCalls: 0 },
+    { status: 'needs_attention', policy: 'queued_and_running', outcome: 'cancelled', providerCalls: 1 },
+    { status: 'succeeded', policy: 'queued_and_running', outcome: 'refused', providerCalls: 0 },
+    { status: 'failed', policy: 'queued_and_running', outcome: 'refused', providerCalls: 0 },
+    { status: 'cancelled', policy: 'queued_and_running', outcome: 'cancelled', providerCalls: 0 },
+  ] as const)(
+    '$status with $policy resolves as $outcome using $providerCalls provider calls',
+    async ({ status, policy, outcome, providerCalls }) => {
+      const cancel = vi.fn(async () => ({ kind: 'cancelled' as const }));
+      const adapter: GenerationProviderAdapter = {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+        submit: vi.fn(),
+        cancel,
+      };
+      const harness = await createHarness(adapter);
+      const seeded = await seedCancellationJob(harness, status, policy);
+      const operation = harness.manager.cancelJob({
+        projectId: seeded.id,
+        jobId: 'job_1',
+        expectedRevision: seeded.revision,
+      });
+
+      if (outcome === 'cancelled') await expect(operation).resolves.toMatchObject({ status: 'cancelled' });
+      else await expect(operation).rejects.toMatchObject({ code: 'cancellation_refused' });
+      expect(cancel).toHaveBeenCalledTimes(providerCalls);
+    }
+  );
+
+  it('uses the durable job tuple after project selection and current route catalog both change', async () => {
+    const cancel = vi.fn(async () => ({ kind: 'cancelled' as const }));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter, {
+      provider: {
+        ...provider,
+        models: [],
+        model_enabled: { 'image-model': false },
+        model_health: { 'image-model': { status: 'unhealthy' } },
+      },
+      isGenerationRouteAvailable: async () => false,
+    });
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const changedSelection = await harness.store.updateProject(seeded.id, (project) => {
+      project.routing.image = null;
+      return project;
+    });
+
+    await expect(
+      harness.manager.cancelJob({
+        projectId: changedSelection.id,
+        jobId: 'job_1',
+        expectedRevision: changedSelection.revision,
+      })
+    ).resolves.toMatchObject({ status: 'cancelled' });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['disabled provider', { ...provider, enabled: false }],
+    ['missing credential', { ...provider, api_key: '   ' }],
+    ['different provider identity', { ...provider, id: 'provider_2' }],
+  ] as const)('refuses durable cancellation with a %s row', async (_label, currentProvider) => {
+    const cancel = vi.fn(async () => ({ kind: 'cancelled' as const }));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter, { provider: currentProvider });
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+
+    await expect(
+      harness.manager.cancelJob({
+        projectId: seeded.id,
+        jobId: 'job_1',
+        expectedRevision: seeded.revision,
+      })
+    ).rejects.toMatchObject({ code: 'cancellation_refused' });
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('single-flights concurrent remote cancellation by project and job', async () => {
+    const providerResult = deferred<{ kind: 'cancelled' }>();
+    const cancel = vi.fn(async () => providerResult.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const input = { projectId: seeded.id, jobId: 'job_1', expectedRevision: seeded.revision };
+
+    const first = harness.manager.cancelJob(input);
+    const second = harness.manager.cancelJob(input);
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    providerResult.resolve({ kind: 'cancelled' });
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult).toEqual(secondResult);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('does not let a stale concurrent cancellation inherit an authorized flight', async () => {
+    const providerResult = deferred<{ kind: 'cancelled' }>();
+    const cancel = vi.fn(async () => providerResult.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const authorized = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    const stale = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision - 1,
+    });
+    const staleAssertion = expect(stale).rejects.toMatchObject({ code: 'stale_project' });
+    providerResult.resolve({ kind: 'cancelled' });
+
+    await expect(authorized).resolves.toMatchObject({ status: 'cancelled' });
+    await staleAssertion;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('single-flights separately valid project revisions for the same remote job', async () => {
+    const providerResult = deferred<{ kind: 'cancelled' }>();
+    const cancel = vi.fn(async () => providerResult.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const first = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    const revised = await harness.store.updateProject(seeded.id, (project) => {
+      project.name = 'Revised while cancellation is pending';
+      return project;
+    });
+    const second = harness.manager.cancelJob({
+      projectId: revised.id,
+      jobId: 'job_1',
+      expectedRevision: revised.revision,
+    });
+
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    providerResult.resolve({ kind: 'cancelled' });
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult).toEqual(secondResult);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('keeps local cancellation outside the remote flight when a newer valid revision arrives', async () => {
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_local', 'none');
+    const originalUpdate = harness.store.updateProject.bind(harness.store);
+    let validationSnapshot = seeded;
+    let newerCancellation: Promise<StudioJob> | undefined;
+    let newerAssertion: Promise<void> | undefined;
+    vi.spyOn(harness.store, 'getProject').mockImplementation(async () => structuredClone(validationSnapshot));
+    let interceptFirstLocalMutation = true;
+    vi.spyOn(harness.store, 'updateProject').mockImplementation(async (projectId, mutate, expectedRevision) => {
+      if (interceptFirstLocalMutation && expectedRevision === seeded.revision) {
+        interceptFirstLocalMutation = false;
+        validationSnapshot = await originalUpdate(projectId, (project) => {
+          project.name = 'Unrelated revision before local cancellation';
+          return project;
+        });
+        newerCancellation = harness.manager.cancelJob({
+          projectId,
+          jobId: 'job_1',
+          expectedRevision: validationSnapshot.revision,
+        });
+        newerAssertion = expect(newerCancellation).resolves.toMatchObject({ status: 'cancelled' });
+        await Promise.resolve();
+      }
+      return originalUpdate(projectId, mutate, expectedRevision);
+    });
+
+    const staleCancellation = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    const staleAssertion = expect(staleCancellation).rejects.toMatchObject({ code: 'stale_project' });
+    await waitFor(() => expect(newerCancellation).toBeDefined());
+    await staleAssertion;
+    await newerAssertion;
+  });
+
+  it('commits an authorized queued-only cancellation after polling uncertainty moves the same task to needs-attention', async () => {
+    const providerResult = deferred<{ kind: 'cancelled' }>();
+    const cancel = vi.fn(async () => providerResult.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const cancellation = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    await harness.store.updateProject(seeded.id, (project) => {
+      project.jobs.job_1.status = 'needs_attention';
+      project.jobs.job_1.error = {
+        code: 'timeout',
+        messageKey: 'conversation.creativeStudio.jobs.errors.timeout',
+      };
+      return project;
+    });
+    providerResult.resolve({ kind: 'cancelled' });
+
+    await expect(cancellation).resolves.toMatchObject({ status: 'cancelled', error: null });
+  });
+
+  it.each([
+    ['terminal success', (project: StudioProject) => void (project.jobs.job_1.status = 'succeeded')],
+    ['terminal failure', (project: StudioProject) => void (project.jobs.job_1.status = 'failed')],
+    ['changed provider identity', (project: StudioProject) => void (project.jobs.job_1.providerJobId = 'remote_2')],
+  ] as const)('preserves %s when provider cancellation returns later', async (_label, mutate) => {
+    const providerResult = deferred<{ kind: 'cancelled' }>();
+    const cancel = vi.fn(async () => providerResult.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+    const cancellation = harness.manager.cancelJob({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    const raced = await harness.store.updateProject(seeded.id, (project) => {
+      mutate(project);
+      return project;
+    });
+    providerResult.resolve({ kind: 'cancelled' });
+
+    await expect(cancellation).rejects.toMatchObject({ code: 'cancellation_refused' });
+    await expect(harness.store.getProject(seeded.id)).resolves.toMatchObject({ jobs: { job_1: raced.jobs.job_1 } });
+  });
+
+  it('keeps provider refusal typed and leaves the durable job non-cancelled', async () => {
+    const cancel = vi.fn(async () => ({ kind: 'refused' as const, error: { code: 'cancellation_refused' as const } }));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+      submit: vi.fn(),
+      cancel,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+
+    await expect(
+      harness.manager.cancelJob({ projectId: seeded.id, jobId: 'job_1', expectedRevision: seeded.revision })
+    ).rejects.toMatchObject({ code: 'cancellation_refused' });
+    await expect(harness.store.getProject(seeded.id)).resolves.toMatchObject({
+      jobs: { job_1: { status: 'queued_remote' } },
+    });
+  });
   it('cancels FIFO work that is still queued locally without another provider call', async () => {
     const selectedProvider = { ...provider, models: ['video-model'] };
     const scenes = [
@@ -1170,6 +1569,7 @@ describe('StudioJobManager cancellation', () => {
       routes: [videoRoute],
       provider: selectedProvider,
       sleep: async () => undefined,
+      cancellationPolicy: 'queued_only',
     });
     const outputPath = path.join(harness.rootDir, 'late.mp4');
     await writeFile(outputPath, mp4);
@@ -1312,6 +1712,7 @@ describe('StudioJobManager cancellation', () => {
       routes: [videoRoute],
       provider: selectedProvider,
       sleep: async () => firstSleep.promise,
+      cancellationPolicy: 'queued_only',
     });
     await harness.manager.submitScenes({
       projectId: harness.project.id,
@@ -1372,6 +1773,7 @@ describe('StudioJobManager cancellation', () => {
         },
         idempotencyKey: 'key_1',
         providerJobId: 'remote_1',
+        cancellationPolicy: 'queued_only',
         outputAssetIds: [],
         error: null,
         retryOfJobId: null,
@@ -1439,6 +1841,7 @@ describe('StudioJobManager retries', () => {
         provider: selectionFor(route),
         idempotencyKey: 'key_1',
         providerJobId: null,
+        cancellationPolicy: 'none',
         outputAssetIds: [],
         error: {
           code: 'no_output',
@@ -1497,6 +1900,7 @@ describe('StudioJobManager retries', () => {
         },
         idempotencyKey: 'key_1',
         providerJobId: null,
+        cancellationPolicy: 'none',
         outputAssetIds: [],
         error: {
           code: 'download_failed',
@@ -1579,6 +1983,7 @@ describe('StudioJobManager retries', () => {
   });
 
   it('creates a new paid attempt only after a confirmed provider failure snapshot', async () => {
+    let cancellationPolicy: 'queued_only' | 'none' = 'queued_only';
     let submissionCount = 0;
     const submit = vi.fn(async () => {
       submissionCount += 1;
@@ -1608,6 +2013,10 @@ describe('StudioJobManager retries', () => {
       jobIds: ['job_1', 'job_2'],
       idempotencyKeys: ['key_1', 'key_2'],
       sleep: async () => undefined,
+      catalog: async () => ({
+        ...catalog(),
+        routes: catalog().routes.map((candidate) => ({ ...candidate, cancellationPolicy })),
+      }),
     });
 
     await harness.manager.submitScenes({
@@ -1624,6 +2033,8 @@ describe('StudioJobManager retries', () => {
       })
     );
     const confirmedFailure = (await harness.store.getProject(harness.project.id))!;
+    expect(confirmedFailure.jobs.job_1.cancellationPolicy).toBe('queued_only');
+    cancellationPolicy = 'none';
 
     const retry = await harness.manager.retryJob({
       projectId: confirmedFailure.id,
@@ -1638,6 +2049,7 @@ describe('StudioJobManager retries', () => {
       retryReason: 'provider_failure',
       duplicateChargeAcknowledged: false,
       duplicateChargeAcknowledgedAt: null,
+      cancellationPolicy: 'none',
     });
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
     await waitFor(async () =>
@@ -1942,6 +2354,7 @@ describe('StudioJobManager retries', () => {
         },
         idempotencyKey: 'key_1',
         providerJobId: 'remote_1',
+        cancellationPolicy: 'queued_only',
         outputAssetIds: [],
         error: {
           code: 'download_failed',
@@ -2096,6 +2509,7 @@ describe('StudioJobManager recovery', () => {
         model: 'image-model',
       },
       outputAssetIds: [],
+      cancellationPolicy: 'none',
       error: null,
       retryOfJobId: null,
       retryReason: null,
@@ -2203,6 +2617,7 @@ describe('StudioJobManager recovery', () => {
           model: route.model,
         },
         outputAssetIds: [],
+        cancellationPolicy: 'queued_and_running',
         retryOfJobId: null,
         retryReason: null,
         duplicateChargeAcknowledged: false,
@@ -2328,6 +2743,7 @@ describe('StudioJobManager disposal fencing', () => {
         },
         idempotencyKey: 'key_1',
         providerJobId: 'remote_1',
+        cancellationPolicy: 'queued_only',
         outputAssetIds: [],
         error: null,
         retryOfJobId: null,

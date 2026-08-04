@@ -101,8 +101,16 @@ const storyboardOptions: StudioTextModelOption[] = [
 
 const routeOption = (
   kind: 'image' | 'video',
-  overrides: Partial<StudioRouteCatalogEntry & { adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1' }> = {}
-): StudioRouteCatalogEntry & { adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1' } => {
+  overrides: Partial<
+    StudioRouteCatalogEntry & {
+      adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1';
+      cancellationPolicy: 'none' | 'queued_only' | 'queued_and_running';
+    }
+  > = {}
+): StudioRouteCatalogEntry & {
+  adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1';
+  cancellationPolicy: 'none' | 'queued_only' | 'queued_and_running';
+} => {
   const route = {
     providerId: 'provider_1',
     providerName: 'Provider One',
@@ -110,6 +118,7 @@ const routeOption = (
     model: `${kind}-model`,
     health: 'available' as const,
     kind,
+    cancellationPolicy: 'none' as const,
     constraints: {
       aspectRatios: ['16:9'],
       resolutions: ['1080p'],
@@ -232,6 +241,7 @@ describe('CreativeStudioService', () => {
       provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'open-sora' },
       idempotencyKey: 'key_1',
       providerJobId: null,
+      cancellationPolicy: 'none',
       outputAssetIds: [],
       error: {
         code: 'provider_unavailable',
@@ -488,7 +498,7 @@ describe('CreativeStudioService', () => {
         minDurationSeconds: 2,
         maxDurationSeconds: 20,
         supportsFirstFrame: true,
-        cancellation: true,
+        cancellationPolicy: 'queued_and_running',
         rawProviderField: STUDIO_E2E_BOUNDARY_SENTINELS,
       },
     }));
@@ -517,7 +527,6 @@ describe('CreativeStudioService', () => {
       listProviders: async () => [manualProvider],
       adapterRegistry: new Map([['weprompt-media-gateway-v1', adapter]]),
     });
-
     const saved = await connectionService.saveConnection({
       providerId: 'provider_1',
       integrationId: GATEWAY_INTEGRATION_ID,
@@ -540,9 +549,10 @@ describe('CreativeStudioService', () => {
         minDurationSeconds: 2,
         maxDurationSeconds: 20,
         supportsFirstFrame: true,
-        cancellation: true,
       },
     });
+    expect(saved.capabilities).not.toHaveProperty('cancellation');
+    expect(saved.capabilities).not.toHaveProperty('cancellationPolicy');
     expect(saved.capabilities).not.toHaveProperty('rawProviderField');
     const exposedConnections = await connectionService.listConnections();
     const storedConnections = await readFile(path.join(rootDir, 'connections.json'), 'utf8');
@@ -790,6 +800,7 @@ describe('CreativeStudioService', () => {
           provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'model_1' },
           idempotencyKey: 'key_1',
           providerJobId: 'remote_1',
+          cancellationPolicy: 'queued_only',
           outputAssetIds: ['asset_1'],
           error: null,
           retryOfJobId: null,
@@ -846,6 +857,7 @@ describe('CreativeStudioService', () => {
           provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'model_1' },
           idempotencyKey: 'key_1',
           providerJobId: null,
+          cancellationPolicy: 'queued_only',
           outputAssetIds: [],
           error: {
             code: 'submission_unknown',
@@ -955,6 +967,7 @@ describe('CreativeStudioService', () => {
       provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'model_1' },
       idempotencyKey: 'secret_idempotency_key',
       providerJobId: STUDIO_E2E_BOUNDARY_SENTINELS.providerJobId,
+      cancellationPolicy: 'queued_and_running',
       outputAssetIds: [],
       error: null,
       retryOfJobId: null,
@@ -1062,6 +1075,7 @@ describe('CreativeStudioService', () => {
       name: 'Renderer-safe project',
     });
     const catalog = await rendererService.listRoutes({ projectId: 'project_1' });
+    expect(catalog.video.options[0]).not.toHaveProperty('cancellationPolicy');
     const jobResults = [
       await rendererService.submitScenes({
         projectId: 'project_1',
@@ -1084,6 +1098,8 @@ describe('CreativeStudioService', () => {
 
     expect(projectResult?.jobs.job_1).not.toHaveProperty('providerJobId');
     expect(projectResult?.jobs.job_1).not.toHaveProperty('idempotencyKey');
+    expect(projectResult?.jobs.job_1).not.toHaveProperty('cancellationPolicy');
+    expect(projectResult?.jobs.job_1.canCancel).toBe(true);
     expect(projectResult?.jobs.job_1.canRetryDownload).toBe(false);
     expect(projectResult?.scenes.scene_1).not.toHaveProperty('providerJobId');
     expect(projectResult?.assets.asset_1).not.toHaveProperty('idempotencyKey');
@@ -1098,6 +1114,7 @@ describe('CreativeStudioService', () => {
     for (const result of sanitizedJobResults) {
       expect(result).not.toHaveProperty('providerJobId');
       expect(result).not.toHaveProperty('idempotencyKey');
+      expect(result).not.toHaveProperty('cancellationPolicy');
     }
     for (const rendererDto of [projectResult, updatedProjectResult, sanitizedJobResults, catalog]) {
       expectRendererBoundaryToHideAdapters(rendererDto);
@@ -1513,6 +1530,7 @@ describe('CreativeStudioService', () => {
       provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'video-model' },
       idempotencyKey: `key_${id}`,
       providerJobId: null,
+      cancellationPolicy: 'none',
       outputAssetIds: [],
       error:
         status === 'failed' || status === 'needs_attention'
