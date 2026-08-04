@@ -9,6 +9,7 @@ import {
   OFFICE_ARTIFACT_MAX_SELECTED_CELLS,
   OFFICE_ARTIFACT_MAX_SELECTION_MESSAGE_BYTES,
 } from '../../types/office/artifactEditor';
+import { PRESENTATION_RUN_LIMITS } from '../../types/office/presentationRunPolicy';
 import type { NativeBridgeProviderKey } from './constants';
 
 const MAX_PATH_LENGTH = 4096;
@@ -166,7 +167,9 @@ const safeIdSchema = z
 const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
 const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
 const projectKnowledgeFolderSchema = z.object({ projectId: safeIdSchema, workspace: pathSchema }).strict();
-const presentationUuidSchema = z.string().uuid();
+const presentationUuidSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 const presentationRevisionSchema = z
   .number()
   .finite()
@@ -195,6 +198,50 @@ const presentationRelativePathSchema = z
     const segments = value.split('/');
     return segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
   });
+const presentationSha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
+const presentationTemplateIdSchema = z
+  .string()
+  .min(2)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]+$/);
+const presentationSourceRefSchema = z
+  .object({
+    grantId: presentationUuidSchema,
+    expectedByteLength: z.number().finite().int().min(1).max(PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES),
+    expectedSha256: presentationSha256Schema,
+  })
+  .strict();
+const startPresentationRunSchema = z
+  .object({
+    conversation_id: presentationUuidSchema,
+    client_request_id: presentationUuidSchema,
+    input: z
+      .string()
+      .min(1)
+      .max(PRESENTATION_RUN_LIMITS.MAX_EXTRACTED_CHARS_PER_SOURCE)
+      .refine((value) => value.trim().length > 0),
+    selected_template_id: presentationTemplateIdSchema,
+    sources: z.array(presentationSourceRefSchema).max(PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    const grantIds = new Set(request.sources.map(({ grantId }) => grantId.toLowerCase()));
+    const totalBytes = request.sources.reduce((total, source) => total + source.expectedByteLength, 0);
+    if (grantIds.size !== request.sources.length)
+      context.addIssue({ code: 'custom', message: 'duplicate source grant' });
+    if (totalBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES) {
+      context.addIssue({ code: 'custom', message: 'aggregate source bytes exceeded' });
+    }
+  });
+const getPresentationRunSchema = z.union([
+  z.object({ conversation_id: presentationUuidSchema, run_id: presentationUuidSchema }).strict(),
+  z.object({ conversation_id: presentationUuidSchema, client_request_id: presentationUuidSchema }).strict(),
+]);
+const presentationRecoveryCursorSchema = z
+  .string()
+  .min(3)
+  .max(2048)
+  .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 
@@ -289,6 +336,35 @@ export const nativeBridgePayloadSchemas = {
       owner: presentationGrantOwnerSchema,
       grant_id: presentationUuidSchema,
       expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.start': startPresentationRunSchema,
+  'presentation-runs.get': getPresentationRunSchema,
+  'presentation-runs.list-recoverable': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      cursor: presentationRecoveryCursorSchema.optional(),
+      limit: z
+        .number()
+        .finite()
+        .int()
+        .min(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MIN_LIMIT)
+        .max(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MAX_LIMIT)
+        .optional(),
+    })
+    .strict(),
+  'presentation-runs.open-recovery': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      expected_sha256: presentationSha256Schema,
+    })
+    .strict(),
+  'presentation-runs.discard': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
     })
     .strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,

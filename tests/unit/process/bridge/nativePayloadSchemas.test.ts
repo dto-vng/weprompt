@@ -113,6 +113,37 @@ const VALID_PAYLOADS = {
     grant_id: '229ca31e-1150-4ad1-ad62-1c3368330adc',
     expected_owner_revision: 2,
   },
+  'presentation-runs.start': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8',
+    input: 'Create a concise board update',
+    selected_template_id: 'business-review',
+    sources: [
+      {
+        grantId: '229ca31e-1150-4ad1-ad62-1c3368330adc',
+        expectedByteLength: 128,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ],
+  },
+  'presentation-runs.get': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+  },
+  'presentation-runs.list-recoverable': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    limit: 20,
+  },
+  'presentation-runs.open-recovery': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    expected_sha256: 'a'.repeat(64),
+  },
+  'presentation-runs.discard': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    expected_revision: 2,
+  },
   'project-knowledge.list-sources': { projectId: 'project-1' },
   'project-knowledge.add-sources': {
     projectId: 'project-1',
@@ -248,6 +279,10 @@ const VOID_PROVIDER_KEYS = [
 type InvalidPayloadCase = readonly [NativeBridgeProviderKey, string, unknown];
 
 const IPC_BRIDGE_PATH = resolve(process.cwd(), 'packages/desktop/src/common/adapter/ipcBridge.ts');
+const NATIVE_PAYLOAD_SCHEMAS_PATH = resolve(
+  process.cwd(),
+  'packages/desktop/src/common/adapter/native/payloadSchemas.ts'
+);
 
 function collectBridgeBuildProviderKeys(source: string): string[] {
   const sourceFile = ts.createSourceFile(IPC_BRIDGE_PATH, source, ts.ScriptTarget.Latest, true);
@@ -273,6 +308,18 @@ function collectBridgeBuildProviderKeys(source: string): string[] {
 
   visit(sourceFile);
   return providerKeys;
+}
+
+function collectNamedImportSources(source: string, importedName: string): string[] {
+  const sourceFile = ts.createSourceFile(NATIVE_PAYLOAD_SCHEMAS_PATH, source, ts.ScriptTarget.Latest, true);
+  return sourceFile.statements.flatMap((statement) => {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) return [];
+    return bindings.elements.some((element) => (element.propertyName ?? element.name).text === importedName)
+      ? [statement.moduleSpecifier.text]
+      : [];
+  });
 }
 
 const INVALID_PAYLOADS = [
@@ -454,6 +501,152 @@ const INVALID_PAYLOADS = [
     { ...VALID_PAYLOADS['presentation-sources.revoke'], grant_id: 'grant-1' },
   ],
   [
+    'presentation-runs.start',
+    'path-shaped conversation UUID',
+    { ...VALID_PAYLOADS['presentation-runs.start'], conversation_id: '../foreign' },
+  ],
+  [
+    'presentation-runs.start',
+    'path-shaped request UUID',
+    { ...VALID_PAYLOADS['presentation-runs.start'], client_request_id: '/private/request' },
+  ],
+  [
+    'presentation-runs.start',
+    'path-shaped template identifier',
+    { ...VALID_PAYLOADS['presentation-runs.start'], selected_template_id: '../business-review' },
+  ],
+  ['presentation-runs.start', 'empty input', { ...VALID_PAYLOADS['presentation-runs.start'], input: '' }],
+  ['presentation-runs.start', 'whitespace-only input', { ...VALID_PAYLOADS['presentation-runs.start'], input: '   ' }],
+  [
+    'presentation-runs.start',
+    'oversized input',
+    { ...VALID_PAYLOADS['presentation-runs.start'], input: 'x'.repeat(200_001) },
+  ],
+  [
+    'presentation-runs.start',
+    'too many source refs',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: Array.from({ length: 17 }, (_, index) => ({
+        grantId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
+        expectedByteLength: 1,
+        expectedSha256: 'a'.repeat(64),
+      })),
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'duplicate source grant',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: [
+        VALID_PAYLOADS['presentation-runs.start'].sources[0],
+        VALID_PAYLOADS['presentation-runs.start'].sources[0],
+      ],
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'aggregate source byte limit',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: Array.from({ length: 5 }, (_, index) => ({
+        grantId: `44444444-4444-4444-8444-${String(index + 1).padStart(12, '0')}`,
+        expectedByteLength: 64 * 1_024 * 1_024,
+        expectedSha256: 'a'.repeat(64),
+      })),
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'unknown nested source field',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: [{ ...VALID_PAYLOADS['presentation-runs.start'].sources[0], native_path: '/private/source.pdf' }],
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'path-shaped source grant id',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: [{ ...VALID_PAYLOADS['presentation-runs.start'].sources[0], grantId: '../grant' }],
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'oversized source byte claim',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: [
+        { ...VALID_PAYLOADS['presentation-runs.start'].sources[0], expectedByteLength: 64 * 1_024 * 1_024 + 1 },
+      ],
+    },
+  ],
+  [
+    'presentation-runs.start',
+    'uppercase source hash',
+    {
+      ...VALID_PAYLOADS['presentation-runs.start'],
+      sources: [{ ...VALID_PAYLOADS['presentation-runs.start'].sources[0], expectedSha256: 'A'.repeat(64) }],
+    },
+  ],
+  [
+    'presentation-runs.get',
+    'omitted selector',
+    { conversation_id: VALID_PAYLOADS['presentation-runs.get'].conversation_id },
+  ],
+  [
+    'presentation-runs.get',
+    'nonexclusive selectors',
+    { ...VALID_PAYLOADS['presentation-runs.get'], client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8' },
+  ],
+  [
+    'presentation-runs.get',
+    'path-shaped run UUID',
+    { ...VALID_PAYLOADS['presentation-runs.get'], run_id: '/private/run' },
+  ],
+  [
+    'presentation-runs.list-recoverable',
+    'zero limit',
+    { ...VALID_PAYLOADS['presentation-runs.list-recoverable'], limit: 0 },
+  ],
+  [
+    'presentation-runs.list-recoverable',
+    'oversized limit',
+    { ...VALID_PAYLOADS['presentation-runs.list-recoverable'], limit: 21 },
+  ],
+  [
+    'presentation-runs.list-recoverable',
+    'path-shaped cursor',
+    { ...VALID_PAYLOADS['presentation-runs.list-recoverable'], cursor: '/private/cursor' },
+  ],
+  [
+    'presentation-runs.list-recoverable',
+    'oversized cursor',
+    { ...VALID_PAYLOADS['presentation-runs.list-recoverable'], cursor: `${'a'.repeat(2047)}.b` },
+  ],
+  [
+    'presentation-runs.open-recovery',
+    'path-shaped run UUID',
+    { ...VALID_PAYLOADS['presentation-runs.open-recovery'], run_id: '../run' },
+  ],
+  [
+    'presentation-runs.open-recovery',
+    'invalid expected hash',
+    { ...VALID_PAYLOADS['presentation-runs.open-recovery'], expected_sha256: '/private/hash' },
+  ],
+  [
+    'presentation-runs.discard',
+    'negative expected revision',
+    { ...VALID_PAYLOADS['presentation-runs.discard'], expected_revision: -1 },
+  ],
+  [
+    'presentation-runs.discard',
+    'unsafe expected revision',
+    { ...VALID_PAYLOADS['presentation-runs.discard'], expected_revision: Number.MAX_SAFE_INTEGER + 1 },
+  ],
+  [
     'app-operations.context-compact',
     'renderer-supplied model selection',
     {
@@ -607,6 +800,27 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it('loads presentation limits through the side-effect-free common policy boundary', () => {
+    const policyImports = collectNamedImportSources(
+      readFileSync(NATIVE_PAYLOAD_SCHEMAS_PATH, 'utf8'),
+      'PRESENTATION_RUN_LIMITS'
+    );
+
+    expect(policyImports).toEqual(['../../types/office/presentationRunPolicy']);
+  });
+
+  it('exposes only the five approved renderer run operations', async () => {
+    const adapter = await import('@/common/adapter/ipcBridge');
+
+    expect(Object.keys(Reflect.get(adapter, 'presentationRuns') ?? {})).toEqual([
+      'start',
+      'get',
+      'listRecoverable',
+      'openRecovery',
+      'discard',
+    ]);
+  });
+
   it('keeps the native manifest equal to adapter provider string literals', () => {
     const providerKeys = collectBridgeBuildProviderKeys(readFileSync(IPC_BRIDGE_PATH, 'utf8'));
 
