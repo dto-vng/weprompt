@@ -968,6 +968,42 @@
       "createFailed": "Não foi possível criar o projeto.",
       "deleteFailed": "Não foi possível excluir o projeto.",
       "sceneCount": "{{count}} cenas",
+      "composer": {
+        "label": "O que vamos criar?",
+        "placeholder": "A ideia da história em uma frase…",
+        "aspectRatioLabel": "Proporção",
+        "durationLabel": "Duração estimada",
+        "durationGuess": "Cerca de {{seconds}}s",
+        "submit": "Ler meu briefing →",
+        "empty": "Uma frase basta — diga o que vamos criar."
+      },
+      "shape": {
+        "title": "Começar por uma estrutura",
+        "label": "{{count}} planos · {{seconds}}s",
+        "sceneTitle": "Plano {{number}}"
+      },
+      "scriptOnly": "SÓ ROTEIRO",
+      "posterBadge": "Plano {{scene}} · Take {{take}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} de {{total}} planos renderizados",
+        "handedOff": "Entregue · {{seconds}}s",
+        "scriptOnly": "{{count}} planos escritos, nenhum renderizado"
+      },
+      "meta": "{{shots}} · {{seconds}}s · {{relative}}",
+      "shotCount": "{{count}} planos",
+      "shotCount_one": "{{count}} plano",
+      "shotCount_many": "{{count}} planos",
+      "shotCount_other": "{{count}} planos",
+      "projectCount": "{{count}} projetos",
+      "projectCount_one": "{{count}} projeto",
+      "projectCount_many": "{{count}} projetos",
+      "projectCount_other": "{{count}} projetos",
+      "sidebar": {
+        "recents": "Projetos recentes do Creative Studio",
+        "all": "TODOS",
+        "noCreditsTitle": "SEM CRÉDITOS DE MÍDIA AQUI",
+        "noCreditsBody": "Nenhum crédito de geração de mídia é gasto em Brief ou Write. Perguntar ao assistente pode gerar cobranças do provedor do modelo de texto."
+      },
       "deleteConfirm": "Excluir"
     },
     "empty": {

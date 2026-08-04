@@ -19,6 +19,7 @@ import type {
   StudioTextModelRef,
 } from '@/common/types/project/creativeStudioTypes';
 import { isValidProviderJobId } from '@process/services/creative-studio/adapters/types';
+import { toStudioProjectSummary } from '@/common/types/project/creativeStudioProjectSummary';
 
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
@@ -658,17 +659,7 @@ const validateProject = (value: unknown): value is StudioProject => {
   });
 };
 
-const toSummary = (project: StudioProject): StudioProjectSummary => ({
-  id: project.id,
-  name: project.name,
-  ...(project.forgeProjectId === undefined ? {} : { forgeProjectId: project.forgeProjectId }),
-  aspectRatio: project.aspectRatio,
-  targetDurationSeconds: project.targetDurationSeconds,
-  resolution: project.resolution,
-  sceneCount: project.sceneOrder.length,
-  createdAt: project.createdAt,
-  updatedAt: project.updatedAt,
-});
+const toSummary = (project: StudioProject): StudioProjectSummary => toStudioProjectSummary(project);
 
 const compareSummaries = (left: StudioProjectSummary, right: StudioProjectSummary): number => {
   const byUpdatedAt = right.updatedAt.localeCompare(left.updatedAt);

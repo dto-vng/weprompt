@@ -960,6 +960,40 @@
       "createFailed": "Das Projekt konnte nicht erstellt werden.",
       "deleteFailed": "Das Projekt konnte nicht gelöscht werden.",
       "sceneCount": "{{count}} Szenen",
+      "composer": {
+        "label": "Was erstellen wir?",
+        "placeholder": "Die Story-Idee in einem Satz…",
+        "aspectRatioLabel": "Seitenverhältnis",
+        "durationLabel": "Geschätzte Länge",
+        "durationGuess": "Etwa {{seconds}} s",
+        "submit": "Briefing lesen →",
+        "empty": "Ein Satz genügt – sag, was wir erstellen."
+      },
+      "shape": {
+        "title": "Mit einer Struktur starten",
+        "label": "{{count}} Shots · {{seconds}} s",
+        "sceneTitle": "Shot {{number}}"
+      },
+      "scriptOnly": "NUR SKRIPT",
+      "posterBadge": "Shot {{scene}} · Take {{take}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} von {{total}} Shots gerendert",
+        "handedOff": "Übergeben · {{seconds}} s",
+        "scriptOnly": "{{count}} Shots geschrieben, keiner gerendert"
+      },
+      "meta": "{{shots}} · {{seconds}} s · {{relative}}",
+      "shotCount": "{{count}} Shots",
+      "shotCount_one": "{{count}} Shot",
+      "shotCount_other": "{{count}} Shots",
+      "projectCount": "{{count}} Projekte",
+      "projectCount_one": "{{count}} Projekt",
+      "projectCount_other": "{{count}} Projekte",
+      "sidebar": {
+        "recents": "Letzte Creative-Studio-Projekte",
+        "all": "ALLE",
+        "noCreditsTitle": "HIER KEINE MEDIEN-CREDITS",
+        "noCreditsBody": "In Briefing und Schreiben werden keine Mediengenerierungs-Credits verbraucht. Fragen an den Assistenten können Kosten beim Textmodellanbieter verursachen."
+      },
       "deleteConfirm": "Löschen"
     },
     "empty": {

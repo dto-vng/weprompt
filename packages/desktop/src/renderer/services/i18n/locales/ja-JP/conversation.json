@@ -956,6 +956,38 @@
       "createFailed": "プロジェクトを作成できませんでした。",
       "deleteFailed": "プロジェクトを削除できませんでした。",
       "sceneCount": "{{count}} シーン",
+      "composer": {
+        "label": "何を作りますか？",
+        "placeholder": "ストーリーのアイデアを一文で…",
+        "aspectRatioLabel": "アスペクト比",
+        "durationLabel": "想定尺",
+        "durationGuess": "約{{seconds}}秒",
+        "submit": "ブリーフを確認 →",
+        "empty": "一文で十分です。何を作るのか教えてください。"
+      },
+      "shape": {
+        "title": "構成から始める",
+        "label": "{{count}}ショット · {{seconds}}秒",
+        "sceneTitle": "ショット {{number}}"
+      },
+      "scriptOnly": "脚本のみ",
+      "posterBadge": "ショット {{scene}} · テイク {{take}}",
+      "status": {
+        "partiallyRendered": "{{total}}ショット中{{rendered}}件を生成済み",
+        "handedOff": "引き渡し済み · {{seconds}}秒",
+        "scriptOnly": "{{count}}ショット執筆済み、生成なし"
+      },
+      "meta": "{{shots}} · {{seconds}}秒 · {{relative}}",
+      "shotCount": "{{count}}ショット",
+      "shotCount_other": "{{count}}ショット",
+      "projectCount": "{{count}}件のプロジェクト",
+      "projectCount_other": "{{count}}件のプロジェクト",
+      "sidebar": {
+        "recents": "最近の Creative Studio プロジェクト",
+        "all": "すべて",
+        "noCreditsTitle": "メディアクレジットは不要",
+        "noCreditsBody": "ブリーフと作成ではメディア生成クレジットを消費しません。アシスタントへの質問にはテキストモデル提供元の料金が発生する場合があります。"
+      },
       "deleteConfirm": "削除"
     },
     "empty": {

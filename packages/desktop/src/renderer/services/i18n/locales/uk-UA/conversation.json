@@ -965,6 +965,44 @@
       "createFailed": "Не вдалося створити проєкт.",
       "deleteFailed": "Не вдалося видалити проєкт.",
       "sceneCount": "{{count}} сцен",
+      "composer": {
+        "label": "Що ми створюємо?",
+        "placeholder": "Ідея історії одним реченням…",
+        "aspectRatioLabel": "Співвідношення сторін",
+        "durationLabel": "Орієнтовна тривалість",
+        "durationGuess": "Близько {{seconds}} с",
+        "submit": "Прочитати мій бриф →",
+        "empty": "Одного речення достатньо — скажіть, що ми створюємо."
+      },
+      "shape": {
+        "title": "Почати зі структури",
+        "label": "{{count}} кадрів · {{seconds}} с",
+        "sceneTitle": "Кадр {{number}}"
+      },
+      "scriptOnly": "ЛИШЕ СЦЕНАРІЙ",
+      "posterBadge": "Кадр {{scene}} · Дубль {{take}}",
+      "status": {
+        "partiallyRendered": "Створено кадрів: {{rendered}} з {{total}}",
+        "handedOff": "Передано · {{seconds}} с",
+        "scriptOnly": "Написано кадрів: {{count}}, нічого не створено"
+      },
+      "meta": "{{shots}} · {{seconds}} с · {{relative}}",
+      "shotCount": "{{count}} кадрів",
+      "shotCount_one": "{{count}} кадр",
+      "shotCount_few": "{{count}} кадри",
+      "shotCount_many": "{{count}} кадрів",
+      "shotCount_other": "{{count}} кадру",
+      "projectCount": "{{count}} проєктів",
+      "projectCount_one": "{{count}} проєкт",
+      "projectCount_few": "{{count}} проєкти",
+      "projectCount_many": "{{count}} проєктів",
+      "projectCount_other": "{{count}} проєкту",
+      "sidebar": {
+        "recents": "Нещодавні проєкти Creative Studio",
+        "all": "УСІ",
+        "noCreditsTitle": "ТУТ НЕ ПОТРІБНІ МЕДІАКРЕДИТИ",
+        "noCreditsBody": "На етапах Brief і Write кредити на генерацію медіа не витрачаються. Звернення до асистента може спричинити оплату провайдеру текстової моделі."
+      },
       "deleteConfirm": "Видалити"
     },
     "empty": {

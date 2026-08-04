@@ -961,6 +961,40 @@
       "createFailed": "Proje oluşturulamadı.",
       "deleteFailed": "Proje silinemedi.",
       "sceneCount": "{{count}} sahne",
+      "composer": {
+        "label": "Ne hazırlıyoruz?",
+        "placeholder": "Hikâye fikrini tek cümleyle yazın…",
+        "aspectRatioLabel": "En-boy oranı",
+        "durationLabel": "Tahmini uzunluk",
+        "durationGuess": "Yaklaşık {{seconds}} sn",
+        "submit": "Özetimi oku →",
+        "empty": "Bir cümle yeter — ne hazırladığımızı söyleyin."
+      },
+      "shape": {
+        "title": "Bir yapıyla başla",
+        "label": "{{count}} çekim · {{seconds}} sn",
+        "sceneTitle": "Çekim {{number}}"
+      },
+      "scriptOnly": "YALNIZCA SENARYO",
+      "posterBadge": "Çekim {{scene}} · Deneme {{take}}",
+      "status": {
+        "partiallyRendered": "{{total}} çekimin {{rendered}} tanesi oluşturuldu",
+        "handedOff": "Teslim edildi · {{seconds}} sn",
+        "scriptOnly": "{{count}} çekim yazıldı, hiçbiri oluşturulmadı"
+      },
+      "meta": "{{shots}} · {{seconds}} sn · {{relative}}",
+      "shotCount": "{{count}} çekim",
+      "shotCount_one": "{{count}} çekim",
+      "shotCount_other": "{{count}} çekim",
+      "projectCount": "{{count}} proje",
+      "projectCount_one": "{{count}} proje",
+      "projectCount_other": "{{count}} proje",
+      "sidebar": {
+        "recents": "Son Creative Studio projeleri",
+        "all": "TÜMÜ",
+        "noCreditsTitle": "BURADA MEDYA KREDİSİ YOK",
+        "noCreditsBody": "Brief veya Write aşamasında medya üretim kredisi harcanmaz. Asistana soru sormak metin modeli sağlayıcısı ücretlerine yol açabilir."
+      },
       "deleteConfirm": "Sil"
     },
     "empty": {

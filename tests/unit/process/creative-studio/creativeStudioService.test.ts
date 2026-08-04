@@ -266,6 +266,126 @@ describe('CreativeStudioService', () => {
     expect(raw).not.toHaveProperty('providerMetadata');
   });
 
+  it('lists field-by-field project cards with a canonical poster or no poster', async () => {
+    const projectIds = ['rendered_project', 'script_project'];
+    const listingStore = createCreativeStudioStore({
+      rootDir,
+      now: () => '2026-07-30T00:00:00.000Z',
+      createId: () => projectIds.shift()!,
+    });
+    const listingService = createCreativeStudioService({
+      store: listingStore,
+      onProjectUpdated,
+      storyboardPlanner: makePlanner(),
+    });
+    const rendered = await listingService.createProject(makeInput({ name: 'Rendered film' }));
+    const withScene = await listingService.updateScene({
+      projectId: rendered.id,
+      expectedRevision: rendered.revision,
+      sceneId: 'scene_1',
+      scene: makeScene('scene_1', 6),
+    });
+    await listingStore.updateProject(withScene.id, (current) => ({
+      ...current,
+      scenes: {
+        ...current.scenes,
+        scene_1: {
+          ...current.scenes.scene_1!,
+          selectedAssetId: 'take_2',
+          assetIds: ['take_1', 'take_2', 'poster_2'],
+          jobIds: ['job_2'],
+          reviewState: 'complete',
+        },
+      },
+      assets: {
+        take_1: {
+          id: 'take_1',
+          projectId: current.id,
+          sceneId: 'scene_1',
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'assets', fileName: 'take_1.mp4' },
+          byteSize: 10,
+          sha256: 'a'.repeat(64),
+          createdAt: current.createdAt,
+        },
+        take_2: {
+          id: 'take_2',
+          projectId: current.id,
+          sceneId: 'scene_1',
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'assets', fileName: 'take_2.mp4' },
+          byteSize: 10,
+          sha256: 'b'.repeat(64),
+          createdAt: current.createdAt,
+        },
+        poster_2: {
+          id: 'poster_2',
+          projectId: current.id,
+          sceneId: 'scene_1',
+          mediaKind: 'image',
+          mimeType: 'image/png',
+          managedAsset: { collection: 'thumbnails', fileName: 'poster_2.png' },
+          byteSize: 10,
+          sha256: 'c'.repeat(64),
+          createdAt: current.createdAt,
+        },
+      },
+      jobs: {
+        job_2: {
+          id: 'job_2',
+          projectId: current.id,
+          sceneId: 'scene_1',
+          status: 'succeeded',
+          provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'video-model' },
+          idempotencyKey: 'idempotency_2',
+          providerJobId: 'provider_job_2',
+          remoteStartedAt: current.createdAt,
+          cancellationPolicy: 'none',
+          outputAssetIds: ['take_2', 'poster_2'],
+          error: null,
+          retryOfJobId: null,
+          retryReason: null,
+          duplicateChargeAcknowledged: false,
+          duplicateChargeAcknowledgedAt: null,
+          createdAt: current.createdAt,
+          updatedAt: current.updatedAt,
+        },
+      },
+    }));
+    await listingService.createProject(makeInput({ name: 'Script film' }));
+
+    await expect(listingService.listProjects()).resolves.toEqual([
+      {
+        id: 'rendered_project',
+        name: 'Rendered film',
+        forgeProjectId: undefined,
+        aspectRatio: '16:9',
+        targetDurationSeconds: 12,
+        resolution: '1080p',
+        sceneCount: 1,
+        selectedAssetCount: 1,
+        poster: { assetId: 'poster_2', sceneNumber: 1, takeNumber: 2 },
+        createdAt: '2026-07-30T00:00:00.000Z',
+        updatedAt: '2026-07-30T00:00:00.000Z',
+      },
+      {
+        id: 'script_project',
+        name: 'Script film',
+        forgeProjectId: undefined,
+        aspectRatio: '16:9',
+        targetDurationSeconds: 12,
+        resolution: '1080p',
+        sceneCount: 0,
+        selectedAssetCount: 0,
+        poster: null,
+        createdAt: '2026-07-30T00:00:00.000Z',
+        updatedAt: '2026-07-30T00:00:00.000Z',
+      },
+    ]);
+  });
+
   it('validates and delegates every durable generation mutation to the runtime-owned job manager', async () => {
     const job: StudioJob = {
       id: 'job_1',

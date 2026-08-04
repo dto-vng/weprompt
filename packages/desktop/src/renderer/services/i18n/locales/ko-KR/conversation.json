@@ -956,6 +956,34 @@
       "createFailed": "프로젝트를 만들 수 없습니다.",
       "deleteFailed": "프로젝트를 삭제할 수 없습니다.",
       "sceneCount": "장면 {{count}}개",
+      "composer": {
+        "label": "무엇을 만들까요?",
+        "placeholder": "이야기 아이디어를 한 문장으로 적어 주세요…",
+        "aspectRatioLabel": "화면 비율",
+        "durationLabel": "예상 길이",
+        "durationGuess": "약 {{seconds}}초",
+        "submit": "브리프 확인 →",
+        "empty": "한 문장이면 충분합니다. 무엇을 만들지 알려 주세요."
+      },
+      "shape": { "title": "구성으로 시작", "label": "{{count}}개 숏 · {{seconds}}초", "sceneTitle": "숏 {{number}}" },
+      "scriptOnly": "스크립트만",
+      "posterBadge": "숏 {{scene}} · 테이크 {{take}}",
+      "status": {
+        "partiallyRendered": "{{total}}개 숏 중 {{rendered}}개 렌더링됨",
+        "handedOff": "전달 완료 · {{seconds}}초",
+        "scriptOnly": "{{count}}개 숏 작성됨, 렌더링 없음"
+      },
+      "meta": "{{shots}} · {{seconds}}초 · {{relative}}",
+      "shotCount": "{{count}}개 숏",
+      "shotCount_other": "{{count}}개 숏",
+      "projectCount": "프로젝트 {{count}}개",
+      "projectCount_other": "프로젝트 {{count}}개",
+      "sidebar": {
+        "recents": "최근 Creative Studio 프로젝트",
+        "all": "전체",
+        "noCreditsTitle": "여기서는 미디어 크레딧을 사용하지 않음",
+        "noCreditsBody": "브리프나 작성 단계에서는 미디어 생성 크레딧을 사용하지 않습니다. 어시스턴트에게 질문하면 텍스트 모델 제공업체 요금이 발생할 수 있습니다."
+      },
       "deleteConfirm": "삭제"
     },
     "empty": {

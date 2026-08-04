@@ -192,6 +192,8 @@ const readinessActionKeys = [
 ] as const;
 
 const pluralLogicalKeys = [
+  'library.shotCount',
+  'library.projectCount',
   'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',

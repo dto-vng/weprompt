@@ -7,6 +7,8 @@ import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { blurActiveElement } from '@renderer/utils/ui/focus';
 import { useThemeContext } from '@renderer/hooks/context/ThemeContext';
+import type { StudioProjectSummary } from '@/common/types/project/creativeStudioTypes';
+import { resolveStudioEntryPhase, studioPhasePath } from '@renderer/pages/studio/studioPhaseRoute';
 import { SiderToolbar, SiderSearchEntry, SiderScheduledEntry, SiderAssistantEntry, SiderStudioEntry } from './SiderNav';
 import SiderFooter from './SiderFooter';
 import TeamSiderSection from './TeamSiderSection';
@@ -122,6 +124,18 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
     }
   };
 
+  const handleStudioProjectClick = (project: StudioProjectSummary) => {
+    cleanupSiderTooltips();
+    blurActiveElement();
+    closePreview();
+    setIsBatchMode(false);
+    const phase = resolveStudioEntryPhase(project.id, project.sceneCount);
+    Promise.resolve(navigate(studioPhasePath(project.id, phase))).catch((error) => {
+      console.error('Navigation failed:', error);
+    });
+    if (onSessionClick) onSessionClick();
+  };
+
   const handleQuickThemeToggle = () => {
     void setTheme(theme === 'dark' ? 'light' : 'dark');
   };
@@ -210,6 +224,7 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
               collapsed={collapsed}
               siderTooltipProps={siderTooltipProps}
               onClick={handleStudioClick}
+              onProjectClick={handleStudioProjectClick}
             />
             {/* Scheduled tasks nav entry - fixed above scroll */}
             <SiderScheduledEntry

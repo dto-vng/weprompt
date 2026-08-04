@@ -5,4 +5,7 @@
  */
 
 export { StudioLibrary } from './StudioLibrary';
+export { Composer, type ComposerProps } from './Composer';
+export { ProjectCard, type ProjectCardProps, formatStudioRelativeTime } from './ProjectCard';
+export { ShapeTemplates, type ShapeTemplatesProps, type StudioShape } from './ShapeTemplates';
 export { default as StudioEmptyState } from './StudioEmptyState';
