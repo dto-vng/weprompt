@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Button, Card, Input, Modal, Select, Spin } from '@arco-design/web-react';
-import { Add, Delete, Film } from '@icon-park/react';
+import { Button, Modal, Spin } from '@arco-design/web-react';
 import { ipcBridge } from '@/common';
 import type {
-  StudioAspectRatio,
+  CreateStudioProjectInput,
   StudioProjectSummary,
   StudioRendererProject,
 } from '@/common/types/project/creativeStudioTypes';
@@ -16,46 +15,29 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import StudioEmptyState from './StudioEmptyState';
+import { Composer } from './Composer';
+import { ProjectCard } from './ProjectCard';
+import { ShapeTemplates, type StudioShape } from './ShapeTemplates';
 import styles from './StudioLibrary.module.css';
 import { rememberStudioPhase, resolveStudioEntryPhase, studioPhasePath } from '../../studioPhaseRoute';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 
-const aspectRatioOptions: Array<{ value: StudioAspectRatio; key: string }> = [
-  { value: '16:9', key: 'aspectRatio16x9' },
-  { value: '9:16', key: 'aspectRatio9x16' },
-  { value: '1:1', key: 'aspectRatio1x1' },
-  { value: '4:3', key: 'aspectRatio4x3' },
-  { value: '3:4', key: 'aspectRatio3x4' },
-];
-
-const storyboardStatusKey = (hasOptions: boolean): string =>
-  hasOptions
-    ? 'conversation.creativeStudio.library.readinessReady'
-    : 'conversation.creativeStudio.library.readinessSetupRequired';
-
 const hasActiveWork = (jobs: Record<string, { status: string }>): boolean =>
   Object.values(jobs).some((job) => ACTIVE_JOB_STATUSES.has(job.status));
 
 export const StudioLibrary: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<StudioProjectSummary[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
-  const [readiness, setReadiness] = useState<boolean | null>(null);
   const [listErrorMessageKey, setListErrorMessageKey] = useState<string | null>(null);
   const [createErrorMessageKey, setCreateErrorMessageKey] = useState<string | null>(null);
   const [deleteErrorMessageKey, setDeleteErrorMessageKey] = useState<string | null>(null);
-  const [createVisible, setCreateVisible] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<StudioRendererProject | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletePreparing, setDeletePreparing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [name, setName] = useState('');
-  const [brief, setBrief] = useState('');
-  const [aspectRatio, setAspectRatio] = useState<StudioAspectRatio>('16:9');
-  const [duration, setDuration] = useState('15');
   const listRequestRef = useRef(0);
   const deletePreparationRef = useRef(0);
   const mutationBusy = creating || deletePreparing || deleting;
@@ -81,18 +63,8 @@ export const StudioLibrary: React.FC = () => {
     }
   }, []);
 
-  const refreshReadiness = useCallback(async (): Promise<void> => {
-    try {
-      const result = await ipcBridge.creativeStudio.listRoutes.invoke({});
-      setReadiness(result.ok ? result.data.storyboard.options.length > 0 : null);
-    } catch {
-      setReadiness(null);
-    }
-  }, []);
-
   useEffect(() => {
     void refreshProjects();
-    void refreshReadiness();
     const unsubscribe = ipcBridge.creativeStudio.projectUpdated.on(() => {
       void refreshProjects();
     });
@@ -101,50 +73,84 @@ export const StudioLibrary: React.FC = () => {
       deletePreparationRef.current += 1;
       unsubscribe();
     };
-  }, [refreshProjects, refreshReadiness]);
+  }, [refreshProjects]);
 
-  const openCreate = useCallback(() => {
-    setCreateErrorMessageKey(null);
-    setCreateVisible(true);
-  }, []);
-
-  const closeCreate = useCallback(() => {
-    if (!creating) {
+  const createProject = useCallback(
+    async (input: CreateStudioProjectInput): Promise<void> => {
+      setCreating(true);
       setCreateErrorMessageKey(null);
-      setCreateVisible(false);
-    }
-  }, [creating]);
-
-  const createProject = useCallback(async (): Promise<void> => {
-    const targetDurationSeconds = Number(duration);
-    if (!Number.isInteger(targetDurationSeconds) || targetDurationSeconds < 5 || targetDurationSeconds > 60) {
-      setCreateErrorMessageKey('conversation.creativeStudio.create.invalidDuration');
-      return;
-    }
-    setCreating(true);
-    setCreateErrorMessageKey(null);
-    try {
-      const result = await ipcBridge.creativeStudio.createProject.invoke({
-        name,
-        brief,
-        aspectRatio,
-        targetDurationSeconds,
-        resolution: '720p',
-      });
-      if (result.ok === false) {
-        setCreateErrorMessageKey(result.error.messageKey);
-        return;
+      try {
+        const result = await ipcBridge.creativeStudio.createProject.invoke(input);
+        if (result.ok === false) {
+          setCreateErrorMessageKey(result.error.messageKey);
+          return;
+        }
+        rememberStudioPhase(result.data.id, 'brief');
+        navigate(studioPhasePath(result.data.id, 'brief'));
+      } catch {
+        setCreateErrorMessageKey('conversation.creativeStudio.errors.storage');
+      } finally {
+        setCreating(false);
       }
-      await refreshProjects();
-      setCreateVisible(false);
-      rememberStudioPhase(result.data.id, 'brief');
-      navigate(studioPhasePath(result.data.id, 'brief'));
-    } catch {
-      setCreateErrorMessageKey('conversation.creativeStudio.errors.storage');
-    } finally {
-      setCreating(false);
-    }
-  }, [aspectRatio, brief, duration, name, navigate, refreshProjects]);
+    },
+    [navigate]
+  );
+
+  const createFromShape = useCallback(
+    async (shape: StudioShape): Promise<void> => {
+      setCreating(true);
+      setCreateErrorMessageKey(null);
+      try {
+        const name = t('conversation.creativeStudio.library.shape.label', {
+          count: shape.shotCount,
+          seconds: shape.totalSeconds,
+        });
+        const created = await ipcBridge.creativeStudio.createProject.invoke({
+          name,
+          brief: '',
+          aspectRatio: '16:9',
+          targetDurationSeconds: shape.totalSeconds,
+          resolution: '720p',
+        });
+        if (created.ok === false) {
+          setCreateErrorMessageKey(created.error.messageKey);
+          return;
+        }
+        let current = created.data;
+        const baseDuration = Math.floor(shape.totalSeconds / shape.shotCount);
+        const remainder = shape.totalSeconds % shape.shotCount;
+        for (let index = 0; index < shape.shotCount; index += 1) {
+          const updated = await ipcBridge.creativeStudio.updateScene.invoke({
+            projectId: current.id,
+            sceneId: `scene_${index + 1}`,
+            expectedRevision: current.revision,
+            scene: {
+              title: t('conversation.creativeStudio.library.shape.sceneTitle', { number: index + 1 }),
+              purpose: '',
+              visualPrompt: '',
+              narration: '',
+              onScreenText: '',
+              mediaKind: 'video',
+              durationSeconds: baseDuration + (index < remainder ? 1 : 0),
+              referenceAssetId: null,
+            },
+          });
+          if (updated.ok === false) {
+            setCreateErrorMessageKey(updated.error.messageKey);
+            return;
+          }
+          current = updated.data;
+        }
+        rememberStudioPhase(current.id, 'write');
+        navigate(studioPhasePath(current.id, 'write'));
+      } catch {
+        setCreateErrorMessageKey('conversation.creativeStudio.errors.storage');
+      } finally {
+        setCreating(false);
+      }
+    },
+    [navigate, t]
+  );
 
   const prepareDelete = useCallback(async (candidate: StudioProjectSummary): Promise<void> => {
     const request = ++deletePreparationRef.current;
@@ -204,17 +210,15 @@ export const StudioLibrary: React.FC = () => {
           <h1 className={styles.title}>{t('conversation.creativeStudio.library.title')}</h1>
           <p className={styles.subtitle}>{t('conversation.creativeStudio.library.subtitle')}</p>
         </div>
-        <Button type='primary' icon={<Add />} disabled={mutationBusy || deleteCandidate !== null} onClick={openCreate}>
-          {t('conversation.creativeStudio.library.newProject')}
-        </Button>
       </header>
 
-      {readiness !== null && (
-        <div className={styles.readiness}>
-          <span>{t('conversation.creativeStudio.library.readinessLabel')}</span>
-          <span>{t(storyboardStatusKey(readiness))}</span>
-        </div>
-      )}
+      <Composer
+        creating={creating}
+        disabled={mutationBusy || deleteCandidate !== null}
+        errorMessageKey={createErrorMessageKey}
+        onSubmit={createProject}
+      />
+      <ShapeTemplates disabled={mutationBusy || deleteCandidate !== null} onCreate={createFromShape} />
       {listErrorMessageKey && (
         <div role='alert' className={styles.alert}>
           {t(listErrorMessageKey)}
@@ -231,90 +235,23 @@ export const StudioLibrary: React.FC = () => {
           <Spin tip={t('conversation.creativeStudio.library.loading')} />
         </div>
       ) : projects.length === 0 ? (
-        <StudioEmptyState disabled={mutationBusy || deleteCandidate !== null} onCreate={openCreate} />
+        <p className={styles.emptyTitle}>{t('conversation.creativeStudio.empty.title')}</p>
       ) : (
         <div className={styles.grid}>
           {projects.map((project) => (
-            <Card key={project.id} size='small' className='min-w-0'>
-              <div className={styles.cardHeader}>
-                <Button
-                  type='text'
-                  icon={<Film />}
-                  onClick={() =>
-                    navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneCount)))
-                  }
-                >
-                  {project.name}
-                </Button>
-                <Button
-                  type='text'
-                  status='danger'
-                  icon={<Delete />}
-                  aria-label={t('conversation.creativeStudio.library.deleteProject')}
-                  disabled={createVisible || mutationBusy || deleteCandidate !== null}
-                  onClick={() => void prepareDelete(project)}
-                />
-              </div>
-              <p className={styles.sceneCount}>
-                {t('conversation.creativeStudio.library.sceneCount', { count: project.sceneCount })}
-              </p>
-            </Card>
+            <ProjectCard
+              key={project.id}
+              project={project}
+              locale={i18n.resolvedLanguage ?? i18n.language}
+              disabled={mutationBusy || deleteCandidate !== null}
+              onOpen={() =>
+                navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneCount)))
+              }
+              onDelete={() => void prepareDelete(project)}
+            />
           ))}
         </div>
       )}
-
-      <Modal
-        title={t('conversation.creativeStudio.create.title')}
-        visible={createVisible}
-        onCancel={closeCreate}
-        footer={
-          <>
-            <Button disabled={creating} onClick={closeCreate}>
-              {t('conversation.creativeStudio.create.cancel')}
-            </Button>
-            <Button type='primary' loading={creating} onClick={() => void createProject()}>
-              {t('conversation.creativeStudio.create.submit')}
-            </Button>
-          </>
-        }
-      >
-        <div className={styles.form}>
-          {createErrorMessageKey && (
-            <div role='alert' className={styles.alert}>
-              {t(createErrorMessageKey)}
-            </div>
-          )}
-          <label htmlFor='studio-project-name'>{t('conversation.creativeStudio.create.nameLabel')}</label>
-          <Input
-            id='studio-project-name'
-            value={name}
-            placeholder={t('conversation.creativeStudio.create.namePlaceholder')}
-            onChange={setName}
-          />
-          <label htmlFor='studio-project-brief'>{t('conversation.creativeStudio.create.briefLabel')}</label>
-          <Input.TextArea
-            id='studio-project-brief'
-            value={brief}
-            placeholder={t('conversation.creativeStudio.create.briefPlaceholder')}
-            onChange={setBrief}
-          />
-          <label htmlFor='studio-project-aspect'>{t('conversation.creativeStudio.create.aspectRatioLabel')}</label>
-          <Select
-            id='studio-project-aspect'
-            aria-label={t('conversation.creativeStudio.create.aspectRatioLabel')}
-            value={aspectRatio}
-            onChange={(value) => setAspectRatio(value as StudioAspectRatio)}
-          >
-            {aspectRatioOptions.map((option) => (
-              <Select.Option key={option.value} value={option.value}>
-                {t(`conversation.creativeStudio.create.${option.key}`)}
-              </Select.Option>
-            ))}
-          </Select>
-          <label htmlFor='studio-project-duration'>{t('conversation.creativeStudio.create.targetDurationLabel')}</label>
-          <Input id='studio-project-duration' type='number' value={duration} onChange={setDuration} />
-        </div>
-      </Modal>
 
       <Modal
         title={t('conversation.creativeStudio.library.deleteConfirmTitle')}

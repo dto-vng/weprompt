@@ -197,6 +197,8 @@ const readinessActionKeys = [
 const pluralLogicalKeys = [
   'export.confirmSelectedCount',
   'export.gapWarning',
+  'library.shotCount',
+  'library.projectCount',
   'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',

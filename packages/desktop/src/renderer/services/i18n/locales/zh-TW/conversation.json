@@ -960,6 +960,34 @@
       "createFailed": "無法建立專案。",
       "deleteFailed": "無法刪除專案。",
       "sceneCount": "{{count}} 個場景",
+      "composer": {
+        "label": "我們要製作什麼？",
+        "placeholder": "用一句話描述這個故事……",
+        "aspectRatioLabel": "畫面比例",
+        "durationLabel": "預計長度",
+        "durationGuess": "約 {{seconds}} 秒",
+        "submit": "閱讀我的簡報 →",
+        "empty": "一句話就夠了——說說我們要製作什麼。"
+      },
+      "shape": { "title": "從結構開始", "label": "{{count}} 個鏡頭 · {{seconds}} 秒", "sceneTitle": "鏡頭 {{number}}" },
+      "scriptOnly": "僅腳本",
+      "posterBadge": "鏡頭 {{scene}} · 版本 {{take}}",
+      "status": {
+        "partiallyRendered": "已渲染 {{rendered}}/{{total}} 個鏡頭",
+        "handedOff": "已交付 · {{seconds}} 秒",
+        "scriptOnly": "已寫 {{count}} 個鏡頭，尚未渲染"
+      },
+      "meta": "{{shots}} · {{seconds}} 秒 · {{relative}}",
+      "shotCount": "{{count}} 個鏡頭",
+      "shotCount_other": "{{count}} 個鏡頭",
+      "projectCount": "{{count}} 個專案",
+      "projectCount_other": "{{count}} 個專案",
+      "sidebar": {
+        "recents": "最近的 Creative Studio 專案",
+        "all": "全部",
+        "noCreditsTitle": "此處不消耗媒體額度",
+        "noCreditsBody": "在簡報或撰寫階段不會消耗媒體生成額度。詢問助理可能會產生文字模型供應商費用。"
+      },
       "deleteConfirm": "刪除"
     },
     "empty": {

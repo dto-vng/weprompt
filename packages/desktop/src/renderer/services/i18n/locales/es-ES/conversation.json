@@ -967,6 +967,42 @@
       "createFailed": "No se ha podido crear el proyecto.",
       "deleteFailed": "No se ha podido eliminar el proyecto.",
       "sceneCount": "{{count}} escenas",
+      "composer": {
+        "label": "¿Qué vamos a crear?",
+        "placeholder": "La idea de la historia en una frase…",
+        "aspectRatioLabel": "Relación de aspecto",
+        "durationLabel": "Duración estimada",
+        "durationGuess": "Unos {{seconds}} s",
+        "submit": "Leer mi briefing →",
+        "empty": "Una frase es suficiente: dinos qué vamos a crear."
+      },
+      "shape": {
+        "title": "Empezar con una estructura",
+        "label": "{{count}} planos · {{seconds}} s",
+        "sceneTitle": "Plano {{number}}"
+      },
+      "scriptOnly": "SOLO GUION",
+      "posterBadge": "Plano {{scene}} · Toma {{take}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} de {{total}} planos renderizados",
+        "handedOff": "Entregado · {{seconds}} s",
+        "scriptOnly": "{{count}} planos escritos, ninguno renderizado"
+      },
+      "meta": "{{shots}} · {{seconds}} s · {{relative}}",
+      "shotCount": "{{count}} planos",
+      "shotCount_one": "{{count}} plano",
+      "shotCount_many": "{{count}} planos",
+      "shotCount_other": "{{count}} planos",
+      "projectCount": "{{count}} proyectos",
+      "projectCount_one": "{{count}} proyecto",
+      "projectCount_many": "{{count}} proyectos",
+      "projectCount_other": "{{count}} proyectos",
+      "sidebar": {
+        "recents": "Proyectos recientes de Creative Studio",
+        "all": "TODOS",
+        "noCreditsTitle": "SIN CRÉDITOS DE MEDIOS AQUÍ",
+        "noCreditsBody": "En Brief y Write no se gastan créditos de generación de medios. Preguntar al asistente puede generar cargos del proveedor del modelo de texto."
+      },
       "deleteConfirm": "Eliminar"
     },
     "empty": {

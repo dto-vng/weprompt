@@ -960,6 +960,34 @@
       "createFailed": "无法创建项目。",
       "deleteFailed": "无法删除项目。",
       "sceneCount": "{{count}} 个场景",
+      "composer": {
+        "label": "我们要制作什么？",
+        "placeholder": "用一句话描述这个故事……",
+        "aspectRatioLabel": "画面比例",
+        "durationLabel": "预计时长",
+        "durationGuess": "约 {{seconds}} 秒",
+        "submit": "阅读我的简报 →",
+        "empty": "一句话就够了——说说我们要制作什么。"
+      },
+      "shape": { "title": "从结构开始", "label": "{{count}} 个镜头 · {{seconds}} 秒", "sceneTitle": "镜头 {{number}}" },
+      "scriptOnly": "仅脚本",
+      "posterBadge": "镜头 {{scene}} · 版本 {{take}}",
+      "status": {
+        "partiallyRendered": "已渲染 {{rendered}}/{{total}} 个镜头",
+        "handedOff": "已交付 · {{seconds}} 秒",
+        "scriptOnly": "已写 {{count}} 个镜头，尚未渲染"
+      },
+      "meta": "{{shots}} · {{seconds}} 秒 · {{relative}}",
+      "shotCount": "{{count}} 个镜头",
+      "shotCount_other": "{{count}} 个镜头",
+      "projectCount": "{{count}} 个项目",
+      "projectCount_other": "{{count}} 个项目",
+      "sidebar": {
+        "recents": "最近的 Creative Studio 项目",
+        "all": "全部",
+        "noCreditsTitle": "此处不消耗媒体额度",
+        "noCreditsBody": "在简报或撰写阶段不会消耗媒体生成额度。询问助手可能会产生文本模型提供商费用。"
+      },
       "deleteConfirm": "删除"
     },
     "empty": {

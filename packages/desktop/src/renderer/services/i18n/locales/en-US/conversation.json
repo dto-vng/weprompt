@@ -819,6 +819,40 @@
       "createFailed": "The project could not be created.",
       "deleteFailed": "The project could not be deleted.",
       "sceneCount": "{{count}} scenes",
+      "composer": {
+        "label": "What are we making?",
+        "placeholder": "A one-sentence idea for the story...",
+        "aspectRatioLabel": "Aspect ratio",
+        "durationLabel": "Estimated length",
+        "durationGuess": "About {{seconds}}s",
+        "submit": "Read my brief →",
+        "empty": "One sentence is enough — say what we are making."
+      },
+      "shape": {
+        "title": "Start from a shape",
+        "label": "{{count}} shots · {{seconds}}s",
+        "sceneTitle": "Shot {{number}}"
+      },
+      "scriptOnly": "SCRIPT ONLY",
+      "posterBadge": "Shot {{scene}} · Take {{take}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} of {{total}} shots rendered",
+        "handedOff": "Handed off · {{seconds}}s",
+        "scriptOnly": "{{count}} shots written, none rendered"
+      },
+      "meta": "{{shots}} · {{seconds}}s · {{relative}}",
+      "shotCount": "{{count}} shots",
+      "shotCount_one": "{{count}} shot",
+      "shotCount_other": "{{count}} shots",
+      "projectCount": "{{count}} projects",
+      "projectCount_one": "{{count}} project",
+      "projectCount_other": "{{count}} projects",
+      "sidebar": {
+        "recents": "Recent Creative Studio projects",
+        "all": "ALL",
+        "noCreditsTitle": "NO MEDIA CREDITS HERE",
+        "noCreditsBody": "No media-generation credits are spent in Brief or Write. Asking the assistant may incur text-model provider charges."
+      },
       "deleteConfirm": "Delete"
     },
     "empty": {

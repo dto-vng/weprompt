@@ -202,6 +202,12 @@ export type StudioProjectSummary = {
   targetDurationSeconds: number;
   resolution: StudioResolution;
   sceneCount: number;
+  selectedAssetCount: number;
+  poster: {
+    assetId: string;
+    sceneNumber: number;
+    takeNumber: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };

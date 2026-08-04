@@ -969,6 +969,44 @@
       "createFailed": "Не удалось создать проект.",
       "deleteFailed": "Не удалось удалить проект.",
       "sceneCount": "{{count}} сцен",
+      "composer": {
+        "label": "Что мы создаём?",
+        "placeholder": "Идея истории одним предложением…",
+        "aspectRatioLabel": "Соотношение сторон",
+        "durationLabel": "Примерная длительность",
+        "durationGuess": "Около {{seconds}} с",
+        "submit": "Прочитать мой бриф →",
+        "empty": "Одного предложения достаточно — расскажите, что мы создаём."
+      },
+      "shape": {
+        "title": "Начать со структуры",
+        "label": "{{count}} кадров · {{seconds}} с",
+        "sceneTitle": "Кадр {{number}}"
+      },
+      "scriptOnly": "ТОЛЬКО СЦЕНАРИЙ",
+      "posterBadge": "Кадр {{scene}} · Дубль {{take}}",
+      "status": {
+        "partiallyRendered": "Создано кадров: {{rendered}} из {{total}}",
+        "handedOff": "Передано · {{seconds}} с",
+        "scriptOnly": "Написано кадров: {{count}}, ничего не создано"
+      },
+      "meta": "{{shots}} · {{seconds}} с · {{relative}}",
+      "shotCount": "{{count}} кадров",
+      "shotCount_one": "{{count}} кадр",
+      "shotCount_few": "{{count}} кадра",
+      "shotCount_many": "{{count}} кадров",
+      "shotCount_other": "{{count}} кадра",
+      "projectCount": "{{count}} проектов",
+      "projectCount_one": "{{count}} проект",
+      "projectCount_few": "{{count}} проекта",
+      "projectCount_many": "{{count}} проектов",
+      "projectCount_other": "{{count}} проекта",
+      "sidebar": {
+        "recents": "Недавние проекты Creative Studio",
+        "all": "ВСЕ",
+        "noCreditsTitle": "ЗДЕСЬ НЕ НУЖНЫ МЕДИАКРЕДИТЫ",
+        "noCreditsBody": "На этапах «Бриф» и «Написание» кредиты на генерацию медиа не расходуются. Обращение к ассистенту может повлечь оплату провайдеру текстовой модели."
+      },
       "deleteConfirm": "Удалить"
     },
     "empty": {

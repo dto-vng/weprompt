@@ -963,6 +963,40 @@
       "createFailed": "پروژه ساخته نشد.",
       "deleteFailed": "پروژه حذف نشد.",
       "sceneCount": "{{count}} صحنه",
+      "composer": {
+        "label": "چه چیزی می‌سازیم؟",
+        "placeholder": "ایدهٔ داستان را در یک جمله بنویسید…",
+        "aspectRatioLabel": "نسبت تصویر",
+        "durationLabel": "زمان تقریبی",
+        "durationGuess": "حدود {{seconds}} ثانیه",
+        "submit": "خواندن بریف من →",
+        "empty": "یک جمله کافی است — بگویید چه چیزی می‌سازیم."
+      },
+      "shape": {
+        "title": "شروع از یک ساختار",
+        "label": "{{count}} نما · {{seconds}} ثانیه",
+        "sceneTitle": "نمای {{number}}"
+      },
+      "scriptOnly": "فقط فیلمنامه",
+      "posterBadge": "نمای {{scene}} · برداشت {{take}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} از {{total}} نما ساخته شده",
+        "handedOff": "تحویل شد · {{seconds}} ثانیه",
+        "scriptOnly": "{{count}} نما نوشته شده، هیچ‌کدام ساخته نشده"
+      },
+      "meta": "{{shots}} · {{seconds}} ثانیه · {{relative}}",
+      "shotCount": "{{count}} نما",
+      "shotCount_one": "{{count}} نما",
+      "shotCount_other": "{{count}} نما",
+      "projectCount": "{{count}} پروژه",
+      "projectCount_one": "{{count}} پروژه",
+      "projectCount_other": "{{count}} پروژه",
+      "sidebar": {
+        "recents": "پروژه‌های اخیر Creative Studio",
+        "all": "همه",
+        "noCreditsTitle": "اینجا اعتبار رسانه مصرف نمی‌شود",
+        "noCreditsBody": "در مراحل Brief یا Write هیچ اعتبار تولید رسانه‌ای مصرف نمی‌شود. پرسیدن از دستیار ممکن است هزینهٔ ارائه‌دهندهٔ مدل متنی داشته باشد."
+      },
       "deleteConfirm": "حذف"
     },
     "empty": {
