@@ -5,6 +5,7 @@
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { promises as nodeFs } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
@@ -130,7 +131,7 @@ const deferred = <T>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
-const waitFor = async (assertion: () => void | Promise<void>, attempts = 800): Promise<void> => {
+const waitFor = async (assertion: () => void | Promise<void>, attempts = 100): Promise<void> => {
   let latestError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -143,6 +144,22 @@ const waitFor = async (assertion: () => void | Promise<void>, attempts = 800): P
   }
   throw latestError;
 };
+
+const fsWithoutDiskBarriers = new Proxy(nodeFs, {
+  get(target, property, receiver) {
+    if (property !== 'open') return Reflect.get(target, property, receiver);
+    return async (...args: Parameters<typeof nodeFs.open>) => {
+      const handle = await nodeFs.open(...args);
+      return new Proxy(handle, {
+        get(handleTarget, handleProperty, handleReceiver) {
+          if (handleProperty === 'sync') return async (): Promise<void> => undefined;
+          const value = Reflect.get(handleTarget, handleProperty, handleReceiver) as unknown;
+          return typeof value === 'function' ? value.bind(handleTarget) : value;
+        },
+      });
+    };
+  },
+}) as typeof nodeFs;
 
 type Harness = {
   rootDir: string;
@@ -179,7 +196,7 @@ const sequence = (values: string[]): (() => string) => {
 
 const createHarness = async (adapter: GenerationProviderAdapter, options: HarnessOptions = {}): Promise<Harness> => {
   const rootDir = await mkdtemp(path.join(os.tmpdir(), 'studio-job-manager-'));
-  const store = createCreativeStudioStore({ rootDir });
+  const store = createCreativeStudioStore({ rootDir, fs: fsWithoutDiskBarriers });
   const scenes = options.scenes ?? [scene()];
   const routes = options.routes ?? [route];
   const selectedProvider = options.provider ?? provider;
@@ -997,8 +1014,10 @@ describe('StudioJobManager remote polling deadlines', () => {
 
   it('stops repeated running snapshots at the thirty-minute lifecycle deadline', async () => {
     const startedAtMs = Date.parse('2026-08-04T00:00:00.000Z');
+    const deadlineReached = deferred<void>();
     let epochMs = startedAtMs;
     let pollCount = 0;
+    let harness!: Harness;
     const poll = vi.fn(async (): Promise<ProviderJobSnapshot> => {
       pollCount += 1;
       return pollCount < 130 ? { status: 'running' } : { status: 'failed', error: { code: 'unknown' } };
@@ -1017,10 +1036,17 @@ describe('StudioJobManager remote polling deadlines', () => {
       submit: async () => ({ kind: 'remote', providerJobId: 'remote_running' }),
       poll,
     };
-    const harness = await createHarness(adapter, {
+    harness = await createHarness(adapter, {
       sleep: async (delayMs) => void (epochMs += delayMs),
       now: () => new Date(epochMs).toISOString(),
       nowEpochMs: () => epochMs,
+      onProjectUpdated: (projectId) => {
+        if (poll.mock.calls.length < 122) return;
+        void harness.store.getProject(projectId).then((project) => {
+          const job = project?.jobs.job_1;
+          if (job?.status === 'needs_attention' && job.error?.code === 'poll_deadline') deadlineReached.resolve();
+        }, deadlineReached.reject);
+      },
     });
 
     await harness.manager.submitScenes({
@@ -1031,14 +1057,13 @@ describe('StudioJobManager remote polling deadlines', () => {
       catalogVersion: 'catalog_1',
     });
 
-    await waitFor(
-      async () =>
-        expect((await harness.store.getProject(harness.project.id))?.jobs.job_1).toMatchObject({
-          status: 'needs_attention',
-          remoteStartedAt: '2026-08-04T00:00:00.000Z',
-          error: { code: 'poll_deadline' },
-        }),
-      800
+    await deadlineReached.promise;
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1).toMatchObject({
+        status: 'needs_attention',
+        remoteStartedAt: '2026-08-04T00:00:00.000Z',
+        error: { code: 'poll_deadline' },
+      })
     );
     expect(poll).toHaveBeenCalledTimes(122);
   });
