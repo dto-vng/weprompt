@@ -367,8 +367,11 @@ const cleanupResponse = (response: RemoteMediaResponse | undefined, _error: Erro
   }
   if (!destroyed) {
     try {
-      (response.body as DestroyableBody).destroy?.();
-      destroyed = true;
+      const body = response.body as DestroyableBody;
+      if (body.destroy) {
+        body.destroy();
+        destroyed = true;
+      }
     } catch {
       // Cleanup must never replace the stable remote-media error.
     }
@@ -389,7 +392,7 @@ const cleanupResponse = (response: RemoteMediaResponse | undefined, _error: Erro
 
 type RemoteMediaDeadline = {
   signal: AbortSignal;
-  run<T>(operation: () => Promise<T>): Promise<T>;
+  run<T>(operation: () => Promise<T>, onLateResolve?: (result: T) => void): Promise<T>;
   setActiveResponse(response: RemoteMediaResponse | undefined): void;
   didTimeout(): boolean;
   close(): void;
@@ -434,12 +437,26 @@ const createRemoteMediaDeadline = (deps: RemoteMediaDownloadDeps): RemoteMediaDe
 
   return {
     signal: controller.signal,
-    run: async <T>(operation: () => Promise<T>): Promise<T> => {
+    run: async <T>(operation: () => Promise<T>, onLateResolve?: (result: T) => void): Promise<T> => {
       if (controller.signal.aborted) {
         throw new RemoteMediaError(timedOut ? 'remote_timeout' : 'remote_download_failed');
       }
-      const result = await Promise.race([operation(), aborted]);
+      let lateResultHandled = false;
+      const handleLateResult = (result: T): void => {
+        if (lateResultHandled) return;
+        lateResultHandled = true;
+        onLateResolve?.(result);
+      };
+      const pending = operation().then((result) => {
+        if (controller.signal.aborted) handleLateResult(result);
+        return result;
+      });
+      // The deadline may win while an injected transport ignores AbortSignal.
+      // Keep observing that transport so a late rejection is never unhandled.
+      void pending.catch((): undefined => undefined);
+      const result = await Promise.race([pending, aborted]);
       if (controller.signal.aborted) {
+        handleLateResult(result);
         throw new RemoteMediaError(timedOut ? 'remote_timeout' : 'remote_download_failed');
       }
       return result;
@@ -490,7 +507,14 @@ export const downloadRemoteMedia = async (
       });
       let response: RemoteMediaResponse;
       try {
-        response = await deadline.run(() => deps.request(target, { signal: deadline.signal }));
+        response = await deadline.run(
+          () => deps.request(target, { signal: deadline.signal }),
+          (lateResponse) =>
+            cleanupResponse(
+              lateResponse,
+              new RemoteMediaError(deadline.didTimeout() ? 'remote_timeout' : 'remote_download_failed')
+            )
+        );
       } catch (error) {
         if (error instanceof RemoteMediaError) throw error;
         throw new RemoteMediaError(deadline.didTimeout() ? 'remote_timeout' : 'remote_download_failed');
@@ -534,9 +558,15 @@ export const downloadRemoteMedia = async (
       try {
         await deadline.run(async () => {
           for await (const chunk of response.body) {
+            if (deadline.signal.aborted) {
+              throw new RemoteMediaError(deadline.didTimeout() ? 'remote_timeout' : 'remote_download_failed');
+            }
             const buffer = Buffer.from(chunk);
             byteSize += buffer.length;
             if (byteSize > deps.maxBytes) fail('remote_too_large');
+            if (deadline.signal.aborted) {
+              throw new RemoteMediaError(deadline.didTimeout() ? 'remote_timeout' : 'remote_download_failed');
+            }
             await deps.write(buffer);
           }
         });

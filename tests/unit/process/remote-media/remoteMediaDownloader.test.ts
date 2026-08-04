@@ -8,11 +8,27 @@
 
 import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import type { RemoteMediaError } from '@process/services/remote-media/remoteMediaDownloader';
+import type { RemoteMediaError, RemoteMediaResponse } from '@process/services/remote-media/remoteMediaDownloader';
 import {
   downloadRemoteMedia,
   REMOTE_MEDIA_DEFAULT_TIMEOUT_MS,
 } from '@process/services/remote-media/remoteMediaDownloader';
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+};
+
+const deferred = <T>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
 
 describe('downloadRemoteMedia', () => {
   it('uses the resolved address as a pinned lookup and consumes only a matching peer', async () => {
@@ -317,6 +333,181 @@ describe('downloadRemoteMedia', () => {
     expect(setTimer).toHaveBeenCalledWith(expect.any(Function), REMOTE_MEDIA_DEFAULT_TIMEOUT_MS);
     triggerTimeout?.();
     await expect(download).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_timeout' });
+  });
+
+  it('keeps one extended whole-download timer across redirects and body streaming', async () => {
+    const bodyStarted = deferred<void>();
+    const releaseBody = deferred<void>();
+    const setTimer = vi.fn((_callback: () => void, _timeoutMs: number) => 'timer');
+    const clearTimer = vi.fn();
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        statusCode: 302,
+        headers: { location: 'https://redirect.example.test/output.png' },
+        remoteAddress: '8.8.8.8',
+        body: Readable.from([]),
+      })
+      .mockResolvedValueOnce({
+        statusCode: 200,
+        headers: { 'content-length': '3' },
+        remoteAddress: '8.8.8.8',
+        body: {
+          async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
+            bodyStarted.resolve(undefined);
+            await releaseBody.promise;
+            yield Buffer.from('png');
+          },
+        },
+      });
+
+    const download = downloadRemoteMedia('https://media.example.test/output.png', {
+      lookup: async () => [{ address: '8.8.8.8', family: 4 }],
+      request,
+      write: async () => undefined,
+      maxBytes: 10,
+      timeoutMs: 900_000,
+      setTimer,
+      clearTimer,
+    });
+
+    await bodyStarted.promise;
+    expect(setTimer).toHaveBeenCalledOnce();
+    expect(setTimer).toHaveBeenCalledWith(expect.any(Function), 900_000);
+    expect(clearTimer).not.toHaveBeenCalled();
+    releaseBody.resolve(undefined);
+    await expect(download).resolves.toEqual({ byteSize: 3, contentType: null });
+    expect(clearTimer).toHaveBeenCalledWith('timer');
+  });
+
+  it('reports caller abort separately from timeout and destroys the active response', async () => {
+    const controller = new AbortController();
+    const bodyStarted = deferred<void>();
+    const destroy = vi.fn();
+    const body = {
+      async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
+        bodyStarted.resolve(undefined);
+        await new Promise(() => undefined);
+        yield new Uint8Array();
+      },
+    };
+    const download = downloadRemoteMedia('https://media.example.test/output.png', {
+      lookup: async () => [{ address: '8.8.8.8', family: 4 }],
+      request: async () => ({ statusCode: 200, headers: {}, remoteAddress: '8.8.8.8', body, destroy }),
+      write: async () => undefined,
+      maxBytes: 10,
+      timeoutMs: 900_000,
+      signal: controller.signal,
+    });
+
+    await bodyStarted.promise;
+    controller.abort();
+    await expect(download).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_download_failed' });
+    expect(destroy).toHaveBeenCalledOnce();
+  });
+
+  it.each(['destroy', 'drain'] as const)('cleans up a response that resolves after timeout via %s', async (seam) => {
+    let triggerTimeout: (() => void) | undefined;
+    const requestStarted = deferred<void>();
+    const response = deferred<RemoteMediaResponse>();
+    const cleanup = vi.fn();
+    const download = downloadRemoteMedia('https://media.example.test/output.png', {
+      lookup: async () => [{ address: '8.8.8.8', family: 4 }],
+      request: async () => {
+        requestStarted.resolve(undefined);
+        return response.promise;
+      },
+      write: async () => undefined,
+      maxBytes: 10,
+      timeoutMs: 5,
+      setTimer: (callback) => {
+        triggerTimeout = callback;
+        return 'timer';
+      },
+      clearTimer: vi.fn(),
+    });
+
+    await requestStarted.promise;
+    triggerTimeout?.();
+    await expect(download).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_timeout' });
+    response.resolve({
+      statusCode: 200,
+      headers: {},
+      remoteAddress: '8.8.8.8',
+      body: { [Symbol.asyncIterator]: () => Readable.from([])[Symbol.asyncIterator]() },
+      ...(seam === 'destroy' ? { destroy: cleanup } : { drain: cleanup }),
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it('observes a request rejection that arrives after timeout', async () => {
+    let triggerTimeout: (() => void) | undefined;
+    const requestStarted = deferred<void>();
+    const response = deferred<RemoteMediaResponse>();
+    const unhandledRejection = vi.fn();
+    process.on('unhandledRejection', unhandledRejection);
+    try {
+      const download = downloadRemoteMedia('https://media.example.test/output.png', {
+        lookup: async () => [{ address: '8.8.8.8', family: 4 }],
+        request: async () => {
+          requestStarted.resolve(undefined);
+          return response.promise;
+        },
+        write: async () => undefined,
+        maxBytes: 10,
+        timeoutMs: 5,
+        setTimer: (callback) => {
+          triggerTimeout = callback;
+          return 'timer';
+        },
+        clearTimer: vi.fn(),
+      });
+
+      await requestStarted.promise;
+      triggerTimeout?.();
+      await expect(download).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_timeout' });
+      response.reject(new Error('late transport failure'));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    } finally {
+      process.removeListener('unhandledRejection', unhandledRejection);
+    }
+  });
+
+  it('destroys the active response and never starts a write after timeout', async () => {
+    let triggerTimeout: (() => void) | undefined;
+    const bodyStarted = deferred<void>();
+    const releaseBody = deferred<void>();
+    const destroy = vi.fn();
+    const write = vi.fn(async () => undefined);
+    const body = {
+      async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
+        bodyStarted.resolve(undefined);
+        await releaseBody.promise;
+        yield Buffer.from('late');
+      },
+    };
+    const download = downloadRemoteMedia('https://media.example.test/output.png', {
+      lookup: async () => [{ address: '8.8.8.8', family: 4 }],
+      request: async () => ({ statusCode: 200, headers: {}, remoteAddress: '8.8.8.8', body, destroy }),
+      write,
+      maxBytes: 10,
+      timeoutMs: 5,
+      setTimer: (callback) => {
+        triggerTimeout = callback;
+        return 'timer';
+      },
+      clearTimer: vi.fn(),
+    });
+
+    await bodyStarted.promise;
+    triggerTimeout?.();
+    await expect(download).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_timeout' });
+    expect(destroy).toHaveBeenCalledOnce();
+    releaseBody.resolve(undefined);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(write).not.toHaveBeenCalled();
   });
 
   it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(

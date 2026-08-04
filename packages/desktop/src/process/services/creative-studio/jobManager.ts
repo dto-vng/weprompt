@@ -31,6 +31,7 @@ import {
   type ResolvedStudioGenerationRequest,
 } from './adapters';
 import type { GenerationProviderAdapterRegistry } from './adapters';
+import { resolveRemoteMediaBudget, type RemoteMediaBudget } from '../remote-media/remoteMediaBudget';
 import { createNodeRemoteMediaRequest, type RemoteMediaDownloadDeps } from '../remote-media/remoteMediaDownloader';
 import { CreativeStudioMediaError, STUDIO_MEDIA_LIMITS, type StudioMediaStore } from './mediaStore';
 import type { StudioProviderResolver } from './providerResolver';
@@ -61,7 +62,8 @@ export type StudioJobManagerDeps = {
   outputDownloader?: (
     provider: TProviderWithModel,
     adapterId: StudioProviderAdapterId,
-    signal: AbortSignal
+    signal: AbortSignal,
+    budget: RemoteMediaBudget
   ) => OutputDownloaderDeps;
 };
 
@@ -204,7 +206,8 @@ const defaultJitter = (baseMs: number): number =>
 const defaultOutputDownloader = (
   provider: TProviderWithModel,
   adapterId: StudioProviderAdapterId,
-  signal: AbortSignal
+  signal: AbortSignal,
+  budget: RemoteMediaBudget
 ): OutputDownloaderDeps => {
   let trustedPrivateGatewayOrigin: string | undefined;
   if (adapterId === 'weprompt-media-gateway-v1') {
@@ -223,6 +226,7 @@ const defaultOutputDownloader = (
     },
     request: createNodeRemoteMediaRequest(120_000),
     signal,
+    timeoutMs: budget.timeoutMs,
     ...(trustedPrivateGatewayOrigin ? { trustedPrivateGatewayOrigin } : {}),
   };
 };
@@ -631,6 +635,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     const poster = posters[0]!;
     try {
       if (poster.source.kind === 'url') {
+        const budget = resolveRemoteMediaBudget({ byteSize: poster.byteSize, mediaKind: poster.mediaKind });
         await deps.mediaStore.persistProviderPosterFromUrlForJob({
           projectId: context.projectId,
           sceneId: context.sceneId,
@@ -641,7 +646,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
           ...(poster.width === undefined ? {} : { width: poster.width }),
           ...(poster.height === undefined ? {} : { height: poster.height }),
           url: poster.source.url,
-          downloader: outputDownloader(context.provider, context.adapter.id, signal),
+          downloader: outputDownloader(context.provider, context.adapter.id, signal, budget),
         });
         return true;
       }
@@ -717,6 +722,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       let primaryAssetId: string;
       if (output.source.kind === 'url') {
         if (!output.mimeType) throw new CreativeStudioMediaError('invalid_media');
+        const budget = resolveRemoteMediaBudget({ byteSize: output.byteSize, mediaKind: output.mediaKind });
         const primaryAsset = await deps.mediaStore.persistProviderOutputFromUrlForJob({
           projectId: context.projectId,
           sceneId: context.sceneId,
@@ -728,7 +734,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
           ...(output.height === undefined ? {} : { height: output.height }),
           ...(output.durationSeconds === undefined ? {} : { durationSeconds: output.durationSeconds }),
           url: output.source.url,
-          downloader: outputDownloader(context.provider, context.adapter.id, signal),
+          downloader: outputDownloader(context.provider, context.adapter.id, signal, budget),
         });
         primaryAssetId = primaryAsset.id;
       } else {

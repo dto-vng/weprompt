@@ -781,6 +781,62 @@ describe('Creative Studio provider adapters', () => {
     ).resolves.toMatchObject({ ok: true, capabilities: { cancellationPolicy: expected } });
   });
 
+  it.each(['submit', 'poll'] as const)('preserves a valid gateway byte_size on %s success', async (mode) => {
+    const body = {
+      status: 'succeeded',
+      outputs: [{ url: 'https://cdn.example/video.mp4', mime_type: 'video/mp4', byte_size: 512 * 1024 * 1024 }],
+    };
+    const adapter = createMediaGatewayAdapter({ fetch: async () => response(200, body) });
+    const gateway = provider({ base_url: 'https://gateway.example', use_model: 'open-sora' });
+
+    const result =
+      mode === 'submit'
+        ? await adapter.submit(request, gateway, new AbortController().signal)
+        : await adapter.poll?.('gateway_1', gateway, new AbortController().signal);
+
+    expect(result).toMatchObject({
+      outputs: [
+        {
+          source: { kind: 'url', url: 'https://cdn.example/video.mp4' },
+          byteSize: 512 * 1024 * 1024,
+        },
+      ],
+    });
+  });
+
+  it.each(
+    (['submit', 'poll'] as const).flatMap((mode) =>
+      [undefined, 0, -1, 1.5, '524288', Number.MAX_SAFE_INTEGER + 1].map((byteSize) => [mode, byteSize] as const)
+    )
+  )('keeps a usable %s output when optional byte_size is %s', async (mode, byteSize) => {
+    const body = {
+      status: 'succeeded',
+      outputs: [
+        {
+          url: 'https://cdn.example/video.mp4',
+          mime_type: 'video/mp4',
+          ...(byteSize === undefined ? {} : { byte_size: byteSize }),
+        },
+      ],
+    };
+    const adapter = createMediaGatewayAdapter({ fetch: async () => response(200, body) });
+    const gateway = provider({ base_url: 'https://gateway.example', use_model: 'open-sora' });
+
+    const result =
+      mode === 'submit'
+        ? await adapter.submit(request, gateway, new AbortController().signal)
+        : await adapter.poll?.('gateway_1', gateway, new AbortController().signal);
+
+    expect(result).toMatchObject({
+      outputs: [
+        {
+          source: { kind: 'url', url: 'https://cdn.example/video.mp4' },
+        },
+      ],
+    });
+    expect(result?.outputs[0]).not.toHaveProperty('byteSize');
+  });
+
   it('rejects redirects for every credentialed gateway operation', async () => {
     const fetch = vi
       .fn()

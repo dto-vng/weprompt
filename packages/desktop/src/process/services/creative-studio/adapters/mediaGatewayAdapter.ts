@@ -201,6 +201,7 @@ const outputsFrom = (value: unknown): ProviderOutput[] | null => {
     const item = record(candidate);
     const url = item?.url;
     const mimeType = item?.mime_type;
+    const byteSize = item?.byte_size;
     return typeof url === 'string' && isGatewayOutputUrl(url) && isGatewayVideoMimeType(mimeType)
       ? [
           {
@@ -208,6 +209,7 @@ const outputsFrom = (value: unknown): ProviderOutput[] | null => {
             role: 'primary' as const,
             source: { kind: 'url' as const, url },
             mimeType,
+            ...(typeof byteSize === 'number' && Number.isSafeInteger(byteSize) && byteSize > 0 ? { byteSize } : {}),
           },
         ]
       : [];

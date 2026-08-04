@@ -214,7 +214,8 @@ A gateway may complete synchronously:
   "outputs": [
     {
       "url": "https://temporary.example/video.mp4",
-      "mime_type": "video/mp4"
+      "mime_type": "video/mp4",
+      "byte_size": 536870912
     }
   ]
 }
@@ -246,7 +247,8 @@ Or it may acknowledge a remote task:
   "outputs": [
     {
       "url": "https://temporary.example/video.mp4",
-      "mime_type": "video/mp4"
+      "mime_type": "video/mp4",
+      "byte_size": 536870912
     }
   ]
 }
@@ -268,6 +270,14 @@ character, and contain only letters, numbers, `.`, `_`, `~`, or `-` after that.
 URLs, path separators, query or fragment syntax, whitespace, percent-encoded
 segments, and token-bearing query strings are rejected before persistence or
 polling.
+
+`byte_size` is optional. When present, it must be a positive safe integer and
+is treated as the exact output size in bytes. WePrompt uses accepted size
+metadata only to extend the whole-download time budget; persistence still
+rejects a stream whose byte count does not match. Missing, zero, negative,
+fractional, unsafe, or wrong-type values are ignored without rejecting an
+otherwise usable output, so the media-kind fallback budget applies. This hint
+does not relax the downstream per-file or project hard byte caps.
 
 Output URLs must be HTTP or HTTPS, contain no embedded credentials, and be at
 most 16 KiB. Public output URLs must use HTTPS. Plain HTTP is usable only at

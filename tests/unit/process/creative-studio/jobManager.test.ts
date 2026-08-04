@@ -5,14 +5,18 @@
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
-import type { IProvider } from '@/common/config/storage';
+import https from 'node:https';
+import { Readable } from 'node:stream';
+import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 import type {
   StudioCancellationPolicy,
   StudioJob,
   StudioJobStatus,
   StudioProject,
+  StudioProviderAdapterId,
   StudioRouteConstraints,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
@@ -20,15 +24,18 @@ import type { StudioGenerationRouteCatalog } from '@process/services/creative-st
 import type {
   GenerationProviderAdapter,
   ProviderJobSnapshot,
+  ProviderOutput,
   ProviderSubmitResult,
 } from '@process/services/creative-studio/adapters';
 import {
   createStudioJobManager,
   type StudioJobManager,
+  type StudioJobManagerDeps,
   type StudioResolvedSceneRouteSnapshot,
 } from '@process/services/creative-studio/jobManager';
 import { createStudioMediaStore, type StudioMediaStore } from '@process/services/creative-studio/mediaStore';
 import { createCreativeStudioStore, type CreativeStudioStore } from '@process/services/creative-studio/store';
+import type { RemoteMediaBudget } from '@process/services/remote-media';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
@@ -162,6 +169,7 @@ type HarnessOptions = {
   isGenerationRouteAvailable?: (candidate: StudioResolvedSceneRouteSnapshot) => Promise<boolean>;
   now?: () => string;
   nowEpochMs?: () => number;
+  outputDownloader?: StudioJobManagerDeps['outputDownloader'];
 };
 
 const sequence = (values: string[]): (() => string) => {
@@ -224,6 +232,7 @@ const createHarness = async (adapter: GenerationProviderAdapter, options: Harnes
     now: options.now,
     nowEpochMs: options.nowEpochMs,
     ...(options.onProjectUpdated === undefined ? {} : { onProjectUpdated: options.onProjectUpdated }),
+    ...(options.outputDownloader === undefined ? {} : { outputDownloader: options.outputDownloader }),
   });
   const harness = { rootDir, store, mediaStore, project, manager };
   harnesses.push(harness);
@@ -270,6 +279,43 @@ const seedRemoteJob = async (harness: Harness, options: SeedRemoteJobOptions = {
     next.scenes.scene_1.reviewState = status === 'needs_attention' || status === 'failed' ? 'blocked' : 'generating';
     return next;
   });
+
+const completeAdapter = (
+  id: StudioProviderAdapterId,
+  outputs: ProviderOutput[] | (() => ProviderOutput[])
+): GenerationProviderAdapter => ({
+  id,
+  validateConnection: async () => ({ ok: true }),
+  validateRequest: (request) => ({
+    ok: true,
+    normalized: {
+      aspectRatio: request.aspectRatio,
+      resolution: request.resolution,
+      durationSeconds: request.durationSeconds,
+    },
+  }),
+  submit: async () => ({ kind: 'complete', outputs: typeof outputs === 'function' ? outputs() : outputs }),
+});
+
+const createRemoteOutputDownloader = (bytes: Buffer, contentType: string) =>
+  vi.fn(
+    (
+      _provider: TProviderWithModel,
+      _adapterId: StudioProviderAdapterId,
+      signal: AbortSignal,
+      budget?: RemoteMediaBudget
+    ) => ({
+      lookup: async () => [{ address: '8.8.8.8', family: 4 as const }],
+      request: async () => ({
+        statusCode: 200,
+        headers: { 'content-length': String(bytes.length), 'content-type': contentType },
+        remoteAddress: '8.8.8.8',
+        body: Readable.from([bytes]),
+      }),
+      signal,
+      timeoutMs: budget?.timeoutMs ?? 1,
+    })
+  );
 
 afterEach(async () => {
   await Promise.all(
@@ -3702,6 +3748,284 @@ describe('StudioJobManager disposal fencing', () => {
     await expect(cancellation).rejects.toMatchObject({ code: 'invalid_request' });
     await expect(disposal).resolves.toBeUndefined();
     expect(cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe('StudioJobManager output download budgets', () => {
+  const videoProvider: IProvider = {
+    ...provider,
+    name: 'Video provider',
+    models: ['video-model'],
+  };
+  const videoRoute: StudioResolvedSceneRouteSnapshot = {
+    sceneId: 'scene_1',
+    providerId: videoProvider.id,
+    adapterId: 'weprompt-media-gateway-v1',
+    model: 'video-model',
+    kind: 'video',
+  };
+  const videoScene = (): StudioScene => scene({ mediaKind: 'video', durationSeconds: 5 });
+
+  it('passes a size-scaled budget to a known-size primary download', async () => {
+    const outputDownloader = createRemoteOutputDownloader(mp4, 'video/mp4');
+    const adapter = completeAdapter('weprompt-media-gateway-v1', () => [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'url', url: 'https://cdn.example/video.mp4' },
+        mimeType: 'video/mp4',
+        byteSize: 512 * 1024 * 1024,
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [videoRoute],
+      provider: videoProvider,
+      outputDownloader,
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [videoRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(() => expect(outputDownloader).toHaveBeenCalledOnce());
+    expect(outputDownloader.mock.calls[0]?.[3]).toEqual({ timeoutMs: 1_144_000 });
+  });
+
+  it('passes the video fallback budget to an unknown-size primary download', async () => {
+    const outputDownloader = createRemoteOutputDownloader(mp4, 'video/mp4');
+    const adapter = completeAdapter('weprompt-media-gateway-v1', () => [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'url', url: 'https://cdn.example/video.mp4' },
+        mimeType: 'video/mp4',
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [videoRoute],
+      provider: videoProvider,
+      outputDownloader,
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [videoRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.status).toBe('succeeded')
+    );
+    expect(outputDownloader.mock.calls[0]?.[3]).toEqual({ timeoutMs: 900_000 });
+  });
+
+  it('resolves a poster budget from the poster image instead of its primary video', async () => {
+    let primaryPath = '';
+    const outputDownloader = createRemoteOutputDownloader(png, 'image/png');
+    const adapter = completeAdapter('weprompt-media-gateway-v1', () => [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'file', path: primaryPath },
+        mimeType: 'video/mp4',
+      },
+      {
+        mediaKind: 'image',
+        role: 'poster',
+        source: { kind: 'url', url: 'https://cdn.example/poster.png' },
+        mimeType: 'image/png',
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [videoRoute],
+      provider: videoProvider,
+      outputDownloader,
+    });
+    primaryPath = path.join(harness.rootDir, 'primary-with-remote-poster.mp4');
+    await writeFile(primaryPath, mp4);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [videoRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(() => expect(outputDownloader).toHaveBeenCalledOnce());
+    expect(outputDownloader.mock.calls[0]?.[3]).toEqual({ timeoutMs: 120_000 });
+  });
+
+  it('passes a freshly resolved budget through retry download', async () => {
+    const outputDownloader = createRemoteOutputDownloader(png, 'image/png');
+    const poll = vi.fn(
+      async (): Promise<ProviderJobSnapshot> => ({
+        status: 'succeeded',
+        outputs: [
+          {
+            mediaKind: 'image',
+            role: 'primary',
+            source: { kind: 'url', url: 'https://cdn.example/retry.png' },
+            mimeType: 'image/png',
+            byteSize: png.length,
+          },
+        ],
+      })
+    );
+    const adapter: GenerationProviderAdapter = {
+      ...completeAdapter('weprompt-image-v1', []),
+      poll,
+    };
+    const harness = await createHarness(adapter, { outputDownloader });
+    const seeded = await harness.store.updateProject(harness.project.id, (project) => {
+      const next = structuredClone(project);
+      next.jobs.job_1 = {
+        id: 'job_1',
+        projectId: project.id,
+        sceneId: 'scene_1',
+        status: 'failed',
+        provider: {
+          providerId: route.providerId,
+          adapterId: route.adapterId,
+          model: route.model,
+        },
+        idempotencyKey: 'key_1',
+        providerJobId: 'remote_1',
+        remoteStartedAt: project.createdAt,
+        cancellationPolicy: 'none',
+        outputAssetIds: [],
+        error: {
+          code: 'download_failed',
+          messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
+        },
+        retryOfJobId: null,
+        retryReason: null,
+        duplicateChargeAcknowledged: false,
+        duplicateChargeAcknowledgedAt: null,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+      };
+      next.scenes.scene_1.jobIds.push('job_1');
+      next.scenes.scene_1.reviewState = 'blocked';
+      return next;
+    });
+
+    await expect(
+      harness.manager.retryDownload({ projectId: seeded.id, jobId: 'job_1', expectedRevision: seeded.revision })
+    ).resolves.toMatchObject({ status: 'succeeded' });
+    expect(outputDownloader.mock.calls[0]?.[3]).toEqual({ timeoutMs: 121_000 });
+  });
+
+  it('forwards the resolved whole-download budget while retaining a 120-second transport inactivity guard', async () => {
+    let capturedDownloader:
+      | Parameters<StudioMediaStore['persistProviderOutputFromUrlForJob']>[0]['downloader']
+      | undefined;
+    const adapter = completeAdapter('weprompt-media-gateway-v1', [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'url', url: 'https://cdn.example/video.mp4' },
+        mimeType: 'video/mp4',
+        byteSize: 512 * 1024 * 1024,
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [videoRoute],
+      provider: videoProvider,
+      decorateMediaStore: (mediaStore) => ({
+        ...mediaStore,
+        persistProviderOutputFromUrlForJob: async (input) => {
+          capturedDownloader = input.downloader;
+          throw new Error('stop after observing downloader');
+        },
+      }),
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [videoRoute],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(capturedDownloader).toBeDefined());
+    if (!capturedDownloader) throw new Error('downloader was not captured');
+    expect(capturedDownloader.timeoutMs).toBe(1_144_000);
+
+    const request = Object.assign(new EventEmitter(), {
+      setTimeout: vi.fn(),
+      end: vi.fn(),
+    });
+    request.end.mockImplementation(() => request.emit('error', new Error('stop transport')));
+    const requestSpy = vi
+      .spyOn(https, 'request')
+      .mockReturnValue(request as unknown as ReturnType<typeof https.request>);
+    try {
+      await expect(
+        capturedDownloader.request({
+          url: new URL('https://cdn.example/video.mp4'),
+          hostname: 'cdn.example',
+          port: 443,
+          address: '8.8.8.8',
+          family: 4,
+        })
+      ).rejects.toMatchObject({ code: 'remote_download_failed' });
+      expect(request.setTimeout).toHaveBeenCalledWith(120_000, expect.any(Function));
+    } finally {
+      requestSpy.mockRestore();
+    }
+  });
+
+  it('does not construct a downloader for local primary or poster outputs', async () => {
+    let primaryPath = '';
+    let posterPath = '';
+    const outputDownloader = createRemoteOutputDownloader(png, 'image/png');
+    const adapter = completeAdapter('weprompt-media-gateway-v1', () => [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'file', path: primaryPath },
+        mimeType: 'video/mp4',
+      },
+      {
+        mediaKind: 'image',
+        role: 'poster',
+        source: { kind: 'file', path: posterPath },
+        mimeType: 'image/png',
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [videoRoute],
+      provider: videoProvider,
+      outputDownloader,
+    });
+    primaryPath = path.join(harness.rootDir, 'local-output.mp4');
+    posterPath = path.join(harness.rootDir, 'local-poster.png');
+    await Promise.all([writeFile(primaryPath, mp4), writeFile(posterPath, png)]);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [videoRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.outputAssetIds).toHaveLength(2)
+    );
+    expect(outputDownloader).not.toHaveBeenCalled();
   });
 });
 
