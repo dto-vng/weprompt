@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  promises as nodeFs,
   readdirSync,
   readFileSync,
   rmSync,
@@ -17,7 +18,7 @@ import {
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import type {
   CreateStudioProjectInput,
   StudioAsset,
@@ -425,14 +426,106 @@ describe('creative studio project store', () => {
     expect(() => JSON.parse(readFileSync(path.join(rootDir, 'projects.json'), 'utf8'))).not.toThrow();
   });
 
+  it('lists healthy projects and reports one corrupt manifest', async () => {
+    const logError = vi.fn();
+    store = createCreativeStudioStore({
+      rootDir,
+      now: () => new Date((clock += 1_000)).toISOString(),
+      createId: () => `project_${++idCounter}`,
+      logError,
+    });
+    const healthyA = await store.createProject(makeInput({ name: 'Healthy A' }));
+    const corrupt = await store.createProject(makeInput({ name: 'Corrupt' }));
+    const healthyC = await store.createProject(makeInput({ name: 'Healthy C' }));
+    writeFileSync(path.join(rootDir, corrupt.id, 'project.json'), '{not json');
+
+    const summaries = await store.listProjects();
+
+    expect(summaries.map((summary) => summary.id).toSorted()).toEqual([healthyA.id, healthyC.id]);
+    expect(await store.listQuarantinedProjectIds()).toEqual([corrupt.id]);
+  });
+
+  it('logs one parse error and shares the manifest sweep between listing methods', async () => {
+    const logError = vi.fn();
+    const manifestReads: string[] = [];
+    const trackingFs = new Proxy(nodeFs, {
+      get(target, property, receiver) {
+        if (property !== 'readFile') return Reflect.get(target, property, receiver);
+        return async (...args: Parameters<typeof nodeFs.readFile>): ReturnType<typeof nodeFs.readFile> => {
+          const [file] = args;
+          if (String(file).endsWith('project.json')) manifestReads.push(String(file));
+          return nodeFs.readFile(...args);
+        };
+      },
+    }) as typeof nodeFs;
+    store = createCreativeStudioStore({
+      rootDir,
+      now: () => new Date((clock += 1_000)).toISOString(),
+      createId: () => `project_${++idCounter}`,
+      fs: trackingFs,
+      logError,
+    });
+    const corrupt = await store.createProject(makeInput({ name: 'Corrupt' }));
+    const corruptManifest = path.join(rootDir, corrupt.id, 'project.json');
+    writeFileSync(corruptManifest, '{not json');
+    manifestReads.length = 0;
+
+    await store.listProjects();
+    await store.listQuarantinedProjectIds();
+
+    expect(manifestReads.filter((file) => file.endsWith(path.join(corrupt.id, 'project.json')))).toHaveLength(1);
+    expect(logError).toHaveBeenCalledOnce();
+    expect(logError).toHaveBeenCalledWith(
+      `[CreativeStudio] Quarantined corrupt project manifest: ${corrupt.id}`,
+      expect.objectContaining({ message: expect.stringContaining('JSON') })
+    );
+  });
+
   it('rejects a malformed project manifest instead of silently inventing a repaired project', async () => {
     const projectDir = path.join(rootDir, 'project_broken');
     mkdirSync(projectDir);
     writeFileSync(path.join(rootDir, 'projects.json'), '{not json');
     writeFileSync(path.join(projectDir, 'project.json'), '{not json');
 
-    await expect(store.listProjects()).rejects.toMatchObject({ code: 'storage_error' });
     await expect(store.getProject('project_broken')).rejects.toMatchObject({ code: 'storage_error' });
+  });
+
+  it('syncs atomic temp files and their directories before reporting a write as complete', async () => {
+    const syncTargets: string[] = [];
+    const trackingFs = new Proxy(nodeFs, {
+      get(target, property, receiver) {
+        if (property !== 'open') return Reflect.get(target, property, receiver);
+        return async (...args: Parameters<typeof nodeFs.open>) => {
+          const file = String(args[0]);
+          const handle = await nodeFs.open(...args);
+          return new Proxy(handle, {
+            get(handleTarget, handleProperty, handleReceiver) {
+              if (handleProperty === 'sync') {
+                return async (): Promise<void> => {
+                  syncTargets.push(file);
+                  await handleTarget.sync();
+                };
+              }
+              const value = Reflect.get(handleTarget, handleProperty, handleReceiver) as unknown;
+              return typeof value === 'function' ? value.bind(handleTarget) : value;
+            },
+          });
+        };
+      },
+    }) as typeof nodeFs;
+    store = createCreativeStudioStore({
+      rootDir,
+      now: () => new Date((clock += 1_000)).toISOString(),
+      createId: () => `project_${++idCounter}`,
+      fs: trackingFs,
+    });
+    const project = await store.createProject(makeInput());
+    syncTargets.length = 0;
+
+    await store.updateProject(project.id, (current) => ({ ...current, name: 'Durable rename' }));
+
+    expect(syncTargets.some((target) => target.endsWith('.tmp'))).toBe(true);
+    expect(syncTargets.some((target) => target.endsWith(project.id))).toBe(true);
   });
 
   it('defaults Task 6 retry metadata when reading a valid pre-Task 6 schema-v1 job', async () => {

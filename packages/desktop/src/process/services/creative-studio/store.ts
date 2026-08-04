@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as nodeFs } from 'node:fs';
 import path from 'node:path';
 import type {
   CreateStudioProjectInput,
@@ -173,6 +173,7 @@ export class CreativeStudioStoreError extends Error {
 
 export type CreativeStudioStore = {
   listProjects(): Promise<StudioProjectSummary[]>;
+  listQuarantinedProjectIds(): Promise<string[]>;
   createProject(input: CreateStudioProjectInput): Promise<StudioProject>;
   getProject(projectId: string): Promise<StudioProject | null>;
   updateProject(
@@ -192,6 +193,13 @@ export type CreativeStudioStoreDeps = {
   rootDir: string;
   now?: () => string;
   createId?: () => string;
+  fs?: typeof nodeFs;
+  logError?: (message: string, error: unknown) => void;
+};
+
+type ProjectListingSweep = {
+  projects: StudioProjectSummary[];
+  quarantinedProjectIds: string[];
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -693,9 +701,14 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
   const rootDir = path.resolve(deps.rootDir);
   const now = deps.now ?? (() => new Date().toISOString());
   const createId = deps.createId ?? (() => crypto.randomUUID().replaceAll('-', '_'));
+  const fs = deps.fs ?? nodeFs;
+  const logError = deps.logError ?? ((message: string, error: unknown): void => console.error(message, error));
   const queues = new Map<string, Promise<unknown>>();
   let summaryQueue: Promise<unknown> = Promise.resolve();
   let connectionsQueue: Promise<unknown> = Promise.resolve();
+  let sharedListingSweep:
+    | { result: ProjectListingSweep; remainingConsumer: 'projects' | 'quarantinedProjectIds' }
+    | undefined;
 
   const requireSafeId = (projectId: string): void => {
     if (!isSafeId(projectId)) throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
@@ -847,10 +860,22 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     }
     await assertRegularFileOrMissing(file);
     const temporaryFile = `${file}.${process.pid}.${++temporaryFileCounter}.tmp`;
+    let temporaryHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
     try {
-      await fs.writeFile(temporaryFile, JSON.stringify(value, null, 2), { encoding: 'utf8', flag: 'wx' });
+      temporaryHandle = await fs.open(temporaryFile, 'wx');
+      await temporaryHandle.writeFile(JSON.stringify(value, null, 2), { encoding: 'utf8' });
+      await temporaryHandle.sync();
+      await temporaryHandle.close();
+      temporaryHandle = undefined;
       await fs.rename(temporaryFile, file);
+      const directoryHandle = await fs.open(parent, 'r');
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
     } catch (error) {
+      await temporaryHandle?.close().catch((): undefined => undefined);
       await fs.rm(temporaryFile, { force: true }).catch((): undefined => undefined);
       throw new CreativeStudioStoreError(
         'storage_error',
@@ -877,12 +902,14 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     }
   };
 
-  const readAllProjects = async (root: string): Promise<StudioProject[]> => {
+  const readAllProjects = async (
+    root: string
+  ): Promise<{ projects: StudioProject[]; quarantinedProjectIds: string[] }> => {
     let entries: import('node:fs').Dirent[];
     try {
       entries = await fs.readdir(root, { withFileTypes: true });
     } catch (error) {
-      if (isRecord(error) && error.code === 'ENOENT') return [];
+      if (isRecord(error) && error.code === 'ENOENT') return { projects: [], quarantinedProjectIds: [] };
       throw new CreativeStudioStoreError(
         'storage_error',
         error instanceof Error ? error.message : 'Studio storage read failed'
@@ -892,19 +919,30 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     if (unsafeProjectEntry !== undefined) {
       throw new CreativeStudioStoreError('storage_error', 'Creative Studio project directory is unsafe');
     }
-    const projects = await Promise.all(
-      entries
-        .filter((entry) => entry.isDirectory() && isSafeId(entry.name))
-        .map((entry) => readProject(root, entry.name))
-    );
-    return projects.filter((project): project is StudioProject => project !== null);
+    const projectEntries = entries
+      .filter((entry) => entry.isDirectory() && isSafeId(entry.name))
+      .toSorted((left, right) => left.name.localeCompare(right.name));
+    const settledProjects = await Promise.allSettled(projectEntries.map((entry) => readProject(root, entry.name)));
+    const projects: StudioProject[] = [];
+    const quarantinedProjectIds: string[] = [];
+    settledProjects.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        if (result.value !== null) projects.push(result.value);
+        return;
+      }
+      const projectId = projectEntries[index].name;
+      quarantinedProjectIds.push(projectId);
+      logError(`[CreativeStudio] Quarantined corrupt project manifest: ${projectId}`, result.reason);
+    });
+    return { projects, quarantinedProjectIds };
   };
 
-  const repairSummaryIndex = (): Promise<StudioProjectSummary[]> => {
-    const rebuild = async (): Promise<StudioProjectSummary[]> => {
+  const repairSummaryIndex = (): Promise<ProjectListingSweep> => {
+    const rebuild = async (): Promise<ProjectListingSweep> => {
       const root = await canonicalRoot();
       const indexFile = await summariesFile(root);
-      const summaries = (await readAllProjects(root)).map(toSummary).toSorted(compareSummaries);
+      const { projects, quarantinedProjectIds } = await readAllProjects(root);
+      const summaries = projects.map(toSummary).toSorted(compareSummaries);
       let existing: unknown = null;
       try {
         existing = JSON.parse(await fs.readFile(indexFile, 'utf8')) as unknown;
@@ -913,7 +951,7 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       }
       const next = { schemaVersion: 1, projects: summaries };
       if (!sameJson(existing, next)) await writeJsonAtomic(root, indexFile, next);
-      return summaries;
+      return { projects: summaries, quarantinedProjectIds };
     };
     const next = summaryQueue.catch((): undefined => undefined).then(() => rebuild());
     summaryQueue = next.catch((): undefined => undefined);
@@ -934,7 +972,25 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
 
   return {
     async listProjects(): Promise<StudioProjectSummary[]> {
-      return repairSummaryIndex();
+      if (sharedListingSweep?.remainingConsumer === 'projects') {
+        const { result } = sharedListingSweep;
+        sharedListingSweep = undefined;
+        return result.projects;
+      }
+      const result = await repairSummaryIndex();
+      sharedListingSweep = { result, remainingConsumer: 'quarantinedProjectIds' };
+      return result.projects;
+    },
+
+    async listQuarantinedProjectIds(): Promise<string[]> {
+      if (sharedListingSweep?.remainingConsumer === 'quarantinedProjectIds') {
+        const { result } = sharedListingSweep;
+        sharedListingSweep = undefined;
+        return result.quarantinedProjectIds;
+      }
+      const result = await repairSummaryIndex();
+      sharedListingSweep = { result, remainingConsumer: 'projects' };
+      return result.quarantinedProjectIds;
     },
 
     async createProject(input: CreateStudioProjectInput): Promise<StudioProject> {
@@ -943,6 +999,7 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       }
       const projectId = createId();
       if (!isSafeId(projectId)) throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
+      sharedListingSweep = undefined;
       return enqueue(projectId, async () => {
         const root = await canonicalRoot();
         await summariesFile(root);
@@ -979,6 +1036,7 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       if (expectedRevision !== undefined && !isIntegerInRange(expectedRevision, 1, Number.MAX_SAFE_INTEGER)) {
         throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project revision');
       }
+      sharedListingSweep = undefined;
       return enqueue(projectId, async () => {
         const root = await canonicalRoot();
         await summariesFile(root);
@@ -1013,6 +1071,7 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       if (!isIntegerInRange(expectedRevision, 1, Number.MAX_SAFE_INTEGER)) {
         throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project revision');
       }
+      sharedListingSweep = undefined;
       return enqueue(projectId, async () => {
         const root = await canonicalRoot();
         await summariesFile(root);
