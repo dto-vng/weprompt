@@ -903,7 +903,26 @@
         "addShot": "Einstellung hinzufügen",
         "addVisual": "Bild hinzufügen",
         "fitToGoal": "An Ziel anpassen",
-        "noScenes": "Füge eine Einstellung hinzu oder entwirf ein Storyboard, um zu beginnen."
+        "noScenes": "Füge eine Einstellung hinzu oder entwirf ein Storyboard, um zu beginnen.",
+        "scriptTableTitle": "Drehbuch",
+        "scriptTableHelp": "Eine Zeile pro Einstellung, um Text, Bild, Dauer und Ausgabe gemeinsam zu gestalten.",
+        "shotColumn": "Einstellung",
+        "scriptColumn": "Drehbuch",
+        "visualColumn": "Bild",
+        "outputColumn": "Ausgabe",
+        "visualPlaceholder": "Beschreibe, was wir sehen…",
+        "suggestVisual": "Bild vorschlagen",
+        "addReference": "Referenz hinzufügen",
+        "invalidTitle": "Gib vor dem Speichern einen Titel für die Einstellung ein.",
+        "placeholder": {
+          "opening": "Eröffnungseinstellung",
+          "middle": "Mittlere Einstellung",
+          "closing": "Schlusseinstellung"
+        },
+        "needsTitle": "Titel fehlt",
+        "pacingTitle": "Tempo",
+        "pacingSummary": "Insgesamt {{total}} s · Ziel {{target}} s",
+        "goalMarker": "Ziel {{seconds}} s"
       },
       "produce": {
         "title": "Produzieren",
@@ -1074,7 +1093,6 @@
       "discard": "Lokale Änderungen verwerfen"
     },
     "scene": {
-      "defaultTitle": "Unbenannte Szene",
       "accessibleName": "Szene {{number}}: {{title}}",
       "number": "Szene {{number}}",
       "status": {

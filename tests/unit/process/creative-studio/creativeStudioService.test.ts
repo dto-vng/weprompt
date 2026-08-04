@@ -1167,6 +1167,19 @@ describe('CreativeStudioService', () => {
     expect(updated.scenes.scene_1.reviewState).toBe('draft');
   });
 
+  it('persists a seeded empty title as a draft even when its visual prompt is ready', async () => {
+    const project = await service.createProject(makeInput());
+
+    const updated = await service.updateScene({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      sceneId: 'scene_1',
+      scene: { ...makeScene('scene_1'), title: '' },
+    });
+
+    expect(updated.scenes.scene_1).toMatchObject({ title: '', reviewState: 'draft' });
+  });
+
   it('rejects removing a scene whose only media is an imported reference', async () => {
     const project = await service.createProject(makeInput());
     const withScene = await service.updateScene({
@@ -2888,6 +2901,15 @@ describe('CreativeStudioService', () => {
     it('rejects a batch scene with no visual prompt before catalog or manager work even when review state says ready', async () => {
       const harness = await createVideoSubmissionHarness((project) => {
         project.scenes.scene_1.visualPrompt = '   ';
+        project.scenes.scene_1.reviewState = 'ready';
+      });
+
+      await expectBatchRejectedBeforeCatalog(harness);
+    });
+
+    it('rejects a batch scene with no title before catalog or manager work even when review state says ready', async () => {
+      const harness = await createVideoSubmissionHarness((project) => {
+        project.scenes.scene_1.title = '';
         project.scenes.scene_1.reviewState = 'ready';
       });
 

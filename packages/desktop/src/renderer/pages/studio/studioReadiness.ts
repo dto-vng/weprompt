@@ -91,7 +91,9 @@ export const deriveStudioReadiness = (project: StudioRendererProject): StudioRea
     if (selectedGenerated) selectedAssetCount += 1;
 
     let status: StudioSceneStatus;
-    if (jobs.some((job) => ACTIVE_JOB_STATUSES.has(job.status))) {
+    if (scene.title.trim().length === 0) {
+      status = 'needs_prompt';
+    } else if (jobs.some((job) => ACTIVE_JOB_STATUSES.has(job.status))) {
       status = 'generating';
     } else if (selectedGenerated) {
       status = 'generated';

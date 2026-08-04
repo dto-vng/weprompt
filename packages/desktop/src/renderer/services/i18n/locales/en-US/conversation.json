@@ -758,7 +758,26 @@
         "addShot": "Add shot",
         "addVisual": "Add visual",
         "fitToGoal": "Fit to goal",
-        "noScenes": "Add a shot or draft a storyboard to begin."
+        "noScenes": "Add a shot or draft a storyboard to begin.",
+        "scriptTableTitle": "Script",
+        "scriptTableHelp": "One row per shot. Shape the words, visuals, timing, and output together.",
+        "shotColumn": "Shot",
+        "scriptColumn": "Script",
+        "visualColumn": "Visual",
+        "outputColumn": "Output",
+        "visualPlaceholder": "Describe what we see…",
+        "suggestVisual": "Suggest a visual",
+        "addReference": "Add reference",
+        "invalidTitle": "Enter a shot title before saving.",
+        "placeholder": {
+          "opening": "Opening shot",
+          "middle": "Middle shot",
+          "closing": "Closing shot"
+        },
+        "needsTitle": "Needs title",
+        "pacingTitle": "Pacing",
+        "pacingSummary": "{{total}}s total · {{target}}s goal",
+        "goalMarker": "{{seconds}}s goal"
       },
       "produce": {
         "title": "Produce",
@@ -929,7 +948,6 @@
       "discard": "Discard local changes"
     },
     "scene": {
-      "defaultTitle": "Untitled scene",
       "accessibleName": "Scene {{number}}: {{title}}",
       "number": "Scene {{number}}",
       "status": {

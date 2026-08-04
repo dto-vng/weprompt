@@ -904,7 +904,26 @@
         "addShot": "Çekim ekle",
         "addVisual": "Görsel ekle",
         "fitToGoal": "Hedefe uydur",
-        "noScenes": "Başlamak için bir çekim ekleyin veya hikâye panosu taslağı oluşturun."
+        "noScenes": "Başlamak için bir çekim ekleyin veya hikâye panosu taslağı oluşturun.",
+        "scriptTableTitle": "Senaryo",
+        "scriptTableHelp": "Her çekim için tek satırda metni, görseli, süreyi ve çıktıyı birlikte şekillendirin.",
+        "shotColumn": "Çekim",
+        "scriptColumn": "Senaryo",
+        "visualColumn": "Görsel",
+        "outputColumn": "Çıktı",
+        "visualPlaceholder": "Ekranda ne gördüğümüzü açıklayın…",
+        "suggestVisual": "Görsel öner",
+        "addReference": "Referans ekle",
+        "invalidTitle": "Kaydetmeden önce bir çekim başlığı girin.",
+        "placeholder": {
+          "opening": "Açılış çekimi",
+          "middle": "Ortadaki çekim",
+          "closing": "Kapanış çekimi"
+        },
+        "needsTitle": "Başlık gerekli",
+        "pacingTitle": "Tempo",
+        "pacingSummary": "Toplam {{total}} sn · Hedef {{target}} sn",
+        "goalMarker": "{{seconds}} sn hedef"
       },
       "produce": {
         "title": "Üret",
@@ -1075,7 +1094,6 @@
       "discard": "Yerel değişiklikleri at"
     },
     "scene": {
-      "defaultTitle": "Adsız sahne",
       "accessibleName": "Sahne {{number}}: {{title}}",
       "number": "Sahne {{number}}",
       "status": {

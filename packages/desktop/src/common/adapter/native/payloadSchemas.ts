@@ -282,7 +282,7 @@ const studioJobRequestSchema = z
   .strict();
 const studioSceneSchema = z
   .object({
-    title: z.string().trim().min(1).max(256),
+    title: z.string().trim().min(0).max(256),
     purpose: z.string().max(256),
     visualPrompt: z.string().max(8 * 1024),
     narration: z.string().max(4 * 1024),

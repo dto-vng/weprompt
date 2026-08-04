@@ -903,7 +903,26 @@
         "addShot": "Añadir plano",
         "addVisual": "Añadir elemento visual",
         "fitToGoal": "Ajustar al objetivo",
-        "noScenes": "Añade un plano o crea un borrador del guion gráfico para empezar."
+        "noScenes": "Añade un plano o crea un borrador del guion gráfico para empezar.",
+        "scriptTableTitle": "Guion",
+        "scriptTableHelp": "Una fila por plano para ajustar juntos el texto, la imagen, la duración y la salida.",
+        "shotColumn": "Plano",
+        "scriptColumn": "Guion",
+        "visualColumn": "Imagen",
+        "outputColumn": "Salida",
+        "visualPlaceholder": "Describe lo que vemos…",
+        "suggestVisual": "Sugerir una imagen",
+        "addReference": "Añadir referencia",
+        "invalidTitle": "Escribe un título para el plano antes de guardar.",
+        "placeholder": {
+          "opening": "Plano de apertura",
+          "middle": "Plano intermedio",
+          "closing": "Plano de cierre"
+        },
+        "needsTitle": "Falta el título",
+        "pacingTitle": "Ritmo",
+        "pacingSummary": "{{total}} s en total · objetivo de {{target}} s",
+        "goalMarker": "Objetivo de {{seconds}} s"
       },
       "produce": {
         "title": "Producir",
@@ -1079,7 +1098,6 @@
       "discard": "Descartar cambios locales"
     },
     "scene": {
-      "defaultTitle": "Escena sin título",
       "accessibleName": "Escena {{number}}: {{title}}",
       "number": "Escena {{number}}",
       "status": {

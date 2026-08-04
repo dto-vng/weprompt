@@ -27,7 +27,7 @@ const bridge = vi.hoisted(() => ({
 vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => (key === 'conversation.creativeStudio.scene.defaultTitle' ? 'Untitled scene' : key),
+    t: (key: string) => key,
   }),
 }));
 
@@ -1003,6 +1003,28 @@ describe('useStoryboardEditor', () => {
     expect(result.current.sceneDraft?.title).toBe('A new opening');
   });
 
+  it('keeps a cleared title dirty instead of sending it through scene IPC', async () => {
+    vi.useFakeTimers();
+    const current = project();
+    const { result } = renderHook(() => useStoryboardEditor({ project: current, refetch: vi.fn(async () => current) }));
+
+    act(() => result.current.updateSceneDraft({ title: '' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+    });
+
+    expect(bridge.updateScene.invoke).not.toHaveBeenCalled();
+    expect(result.current.hasUnsavedSelectedSceneDraft).toBe(true);
+    expect(result.current.saveIssues).toEqual([
+      expect.objectContaining({
+        operation: 'save_scene',
+        code: 'invalid_payload',
+        messageKey: 'conversation.creativeStudio.phase.write.invalidTitle',
+        sceneId: 'scene-1',
+      }),
+    ]);
+  });
+
   it('flushes the old scene on selection change and the selected scene on unmount', async () => {
     const initial = project();
     const { result, unmount } = renderHook(() =>
@@ -1235,15 +1257,11 @@ describe('useStoryboardEditor', () => {
     await act(async () => {
       second.resolve(
         ok(
-          project(
-            9,
-            [scene('scene-1'), scene('scene-2'), scene(projectBRequest.sceneId, { title: 'Untitled scene' })],
-            {
-              id: 'project-2',
-              name: 'Second project',
-              targetDurationSeconds: 15,
-            }
-          )
+          project(9, [scene('scene-1'), scene('scene-2'), scene(projectBRequest.sceneId, { title: '' })], {
+            id: 'project-2',
+            name: 'Second project',
+            targetDurationSeconds: 15,
+          })
         )
       );
       expect(await projectBAdd).toBe(true);
@@ -1633,7 +1651,7 @@ describe('useStoryboardEditor', () => {
     const request = bridge.updateScene.invoke.mock.calls[0]?.[0];
     expect(request.sceneId).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(request.scene).toMatchObject({
-      title: 'Untitled scene',
+      title: '',
       mediaKind: 'image',
       referenceAssetId: null,
     });

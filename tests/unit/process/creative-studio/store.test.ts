@@ -189,6 +189,18 @@ describe('creative studio project store', () => {
     expect(project.routing).toEqual({ storyboard: null, image: null, video: null });
   });
 
+  it('persists and reloads a scene with an empty display title', async () => {
+    const project = await store.createProject(makeInput());
+    const edited = await store.updateProject(project.id, (current) => {
+      const next = addScene(current, 'scene_1');
+      next.scenes.scene_1.title = '';
+      return next;
+    });
+    const reloadedStore = createCreativeStudioStore({ rootDir });
+
+    await expect(reloadedStore.getProject(project.id)).resolves.toEqual(edited);
+  });
+
   it('loads a current schema-v1 manifest without a storyboard selection', async () => {
     const project = await store.createProject(makeInput());
     const file = path.join(rootDir, project.id, 'project.json');

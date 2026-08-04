@@ -902,7 +902,26 @@
         "addShot": "افزودن نما",
         "addVisual": "افزودن تصویر",
         "fitToGoal": "تطبیق با هدف",
-        "noScenes": "برای شروع یک نما اضافه کنید یا پیش‌نویس استوری‌بورد بسازید."
+        "noScenes": "برای شروع یک نما اضافه کنید یا پیش‌نویس استوری‌بورد بسازید.",
+        "scriptTableTitle": "فیلم‌نامه",
+        "scriptTableHelp": "برای هر نما یک ردیف داشته باشید و متن، تصویر، زمان‌بندی و خروجی را کنار هم تنظیم کنید.",
+        "shotColumn": "نما",
+        "scriptColumn": "فیلم‌نامه",
+        "visualColumn": "تصویر",
+        "outputColumn": "خروجی",
+        "visualPlaceholder": "آنچه می‌بینیم را توصیف کنید…",
+        "suggestVisual": "پیشنهاد تصویر",
+        "addReference": "افزودن مرجع",
+        "invalidTitle": "پیش از ذخیره، عنوان نما را وارد کنید.",
+        "placeholder": {
+          "opening": "نمای آغازین",
+          "middle": "نمای میانی",
+          "closing": "نمای پایانی"
+        },
+        "needsTitle": "عنوان لازم است",
+        "pacingTitle": "ریتم",
+        "pacingSummary": "مجموع {{total}} ثانیه · هدف {{target}} ثانیه",
+        "goalMarker": "هدف {{seconds}} ثانیه"
       },
       "produce": {
         "title": "تولید",
@@ -1073,7 +1092,6 @@
       "discard": "نادیده گرفتن تغییرات محلی"
     },
     "scene": {
-      "defaultTitle": "صحنه بدون عنوان",
       "accessibleName": "صحنه {{number}}: {{title}}",
       "number": "صحنه {{number}}",
       "status": {

@@ -711,6 +711,14 @@ const INVALID_PAYLOADS = [
   ['creative-studio.delete-project', 'traversal project id', { projectId: '../../project_1', expectedRevision: 1 }],
   [
     'creative-studio.update-scene',
+    'overlong scene title',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, title: 'x'.repeat(257) },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
     'overlong visual prompt',
     {
       ...VALID_PAYLOADS['creative-studio.update-scene'],
@@ -1020,6 +1028,17 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it('accepts an empty Studio scene title for display-only seeded placeholders', () => {
+    const payload = VALID_PAYLOADS['creative-studio.update-scene'];
+
+    expect(
+      parseNativeBridgePayload('creative-studio.update-scene', {
+        ...payload,
+        scene: { ...payload.scene, title: '' },
+      })
+    ).toMatchObject({ scene: { title: '' } });
+  });
+
   it('accepts the exact revisioned Studio video model-selection payload', () => {
     expect(
       parseNativeBridgePayload(

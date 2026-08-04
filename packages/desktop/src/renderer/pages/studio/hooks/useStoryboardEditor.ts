@@ -14,14 +14,15 @@ import type {
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
 const MAX_SCENES = 24;
 const DEFAULT_SCENE_DURATION_SECONDS = 5;
 const SCENE_SAVE_DEBOUNCE_MS = 450;
 const MAX_PROJECT_NAME_CHARS = 256;
 const MAX_PROJECT_BRIEF_CHARS = 16 * 1024;
+const MAX_SCENE_TITLE_CHARS = 256;
 const INVALID_DURATION_MESSAGE_KEY = 'conversation.creativeStudio.inspector.invalidDuration';
+const INVALID_SCENE_TITLE_MESSAGE_KEY = 'conversation.creativeStudio.phase.write.invalidTitle';
 const INVALID_PROJECT_MESSAGE_KEY = 'conversation.creativeStudio.errors.invalidPayload';
 const INVALID_PROJECT_NAME_MESSAGE_KEY = 'conversation.creativeStudio.phase.brief.invalidName';
 const INVALID_PROJECT_DURATION_MESSAGE_KEY = 'conversation.creativeStudio.create.invalidDuration';
@@ -258,7 +259,6 @@ export const useStoryboardEditor = ({
   project: parentProject,
   refetch,
 }: UseStoryboardEditorOptions): UseStoryboardEditorResult => {
-  const { t } = useTranslation();
   const [project, setProject] = useState<StudioRendererProject | null>(parentProject);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(parentProject?.sceneOrder[0] ?? null);
   const [draftVersion, setDraftVersion] = useState(0);
@@ -664,6 +664,15 @@ export const useStoryboardEditor = ({
         dirtyFields === undefined ||
         dirtyFields.size === 0
       ) {
+        return Promise.resolve(false);
+      }
+      if (dirtyFields.has('title') && (draft.title.trim().length === 0 || draft.title.length > MAX_SCENE_TITLE_CHARS)) {
+        publishIssue({
+          operation: 'save_scene',
+          code: 'invalid_payload',
+          messageKey: INVALID_SCENE_TITLE_MESSAGE_KEY,
+          sceneId,
+        });
         return Promise.resolve(false);
       }
       if (!isValidDuration(draft.durationSeconds)) {
@@ -1169,7 +1178,7 @@ export const useStoryboardEditor = ({
       current.targetDurationSeconds -
       current.sceneOrder.reduce((total, id) => total + (current.scenes[id]?.durationSeconds ?? 0), 0);
     const scene: StudioEditableScene = {
-      title: t('conversation.creativeStudio.scene.defaultTitle'),
+      title: '',
       purpose: '',
       visualPrompt: '',
       narration: '',
@@ -1197,7 +1206,7 @@ export const useStoryboardEditor = ({
         if (mountedRef.current) setSelectedSceneId(sceneId);
       },
     });
-  }, [enqueueIntent, t]);
+  }, [enqueueIntent]);
 
   const increaseTargetDuration = useCallback((): Promise<boolean> => {
     const suggestedTarget = suggestedExpandedTargetSeconds;

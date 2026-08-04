@@ -758,11 +758,13 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   const advisory: StudioPhaseControllers['advisory'] =
     shellIssueMessageKey !== null
       ? { messageKey: shellIssueMessageKey, anchor: 'shell' }
-      : activePhase === 'produce' && readiness.readySceneIds.length === 0
-        ? { messageKey: 'conversation.creativeStudio.review.noReadyScenes', anchor: 'batch' }
-        : activePhase === 'produce' && readiness.durationDeltaSeconds !== 0
-          ? { messageKey: 'conversation.creativeStudio.review.durationMismatch', anchor: 'batch' }
-          : null;
+      : activePhase === 'write' && readiness.durationDeltaSeconds !== 0
+        ? { messageKey: 'conversation.creativeStudio.review.durationMismatch', anchor: 'pacing' }
+        : activePhase === 'produce' && readiness.readySceneIds.length === 0
+          ? { messageKey: 'conversation.creativeStudio.review.noReadyScenes', anchor: 'batch' }
+          : activePhase === 'produce' && readiness.durationDeltaSeconds !== 0
+            ? { messageKey: 'conversation.creativeStudio.review.durationMismatch', anchor: 'batch' }
+            : null;
   const controller: StudioPhaseControllers = {
     project,
     readiness,

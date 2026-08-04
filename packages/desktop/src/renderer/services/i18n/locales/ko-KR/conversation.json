@@ -902,7 +902,26 @@
         "addShot": "숏 추가",
         "addVisual": "비주얼 추가",
         "fitToGoal": "목표에 맞추기",
-        "noScenes": "숏을 추가하거나 스토리보드 초안을 만들어 시작하세요."
+        "noScenes": "숏을 추가하거나 스토리보드 초안을 만들어 시작하세요.",
+        "scriptTableTitle": "대본",
+        "scriptTableHelp": "숏마다 한 줄에서 문구, 화면, 길이, 출력을 함께 다듬으세요.",
+        "shotColumn": "숏",
+        "scriptColumn": "대본",
+        "visualColumn": "화면",
+        "outputColumn": "출력",
+        "visualPlaceholder": "화면에 보이는 내용을 설명하세요…",
+        "suggestVisual": "화면 제안",
+        "addReference": "참조 이미지 추가",
+        "invalidTitle": "저장하기 전에 숏 제목을 입력하세요.",
+        "placeholder": {
+          "opening": "오프닝 숏",
+          "middle": "중간 숏",
+          "closing": "클로징 숏"
+        },
+        "needsTitle": "제목 필요",
+        "pacingTitle": "페이싱",
+        "pacingSummary": "총 {{total}}초 · 목표 {{target}}초",
+        "goalMarker": "목표 {{seconds}}초"
       },
       "produce": {
         "title": "제작",
@@ -1064,7 +1083,6 @@
       "discard": "로컬 변경 사항 버리기"
     },
     "scene": {
-      "defaultTitle": "제목 없는 장면",
       "accessibleName": "장면 {{number}}: {{title}}",
       "number": "장면 {{number}}",
       "status": {
