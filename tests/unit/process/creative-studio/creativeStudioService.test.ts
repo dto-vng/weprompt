@@ -223,6 +223,7 @@ describe('CreativeStudioService', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await rm(rootDir, { recursive: true, force: true });
   });
 
@@ -632,6 +633,50 @@ describe('CreativeStudioService', () => {
       })
     ).rejects.toMatchObject({ code: 'invalid_route' });
     expect(validateConnection).not.toHaveBeenCalled();
+  });
+
+  it('aborts connection validation and reports a provider error after the deadline', async () => {
+    vi.useFakeTimers();
+    let validationSignal: AbortSignal | undefined;
+    const connectionService = createCreativeStudioService({
+      store: createCreativeStudioStore({ rootDir }),
+      onProjectUpdated,
+      listProviders: async () => [
+        {
+          id: 'provider_1',
+          platform: 'custom',
+          name: 'Gateway',
+          base_url: 'https://gateway.example',
+          api_key: 'secret',
+          models: [],
+        },
+      ],
+      adapterRegistry: new Map([
+        [
+          'weprompt-media-gateway-v1',
+          {
+            id: 'weprompt-media-gateway-v1',
+            validateConnection: async (_input, _provider, signal) => {
+              validationSignal = signal;
+              return await new Promise<never>(() => undefined);
+            },
+            validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+            submit: async () => ({ kind: 'remote' as const, providerJobId: 'never' }),
+          },
+        ],
+      ]),
+    });
+
+    const validation = connectionService.validateConnection({
+      providerId: 'provider_1',
+      integrationId: GATEWAY_INTEGRATION_ID,
+      model: 'open-sora-manual',
+    });
+    const rejection = expect(validation).rejects.toMatchObject({ code: 'provider_error' });
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await rejection;
+    expect(validationSignal?.aborted).toBe(true);
   });
 
   it('maps resolver dependency failures to a provider error', async () => {

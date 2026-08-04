@@ -53,6 +53,7 @@ import type {
 } from '@process/services/creative-studio/providerResolver';
 import { createStudioMediaChoiceId } from '@process/services/creative-studio/providerResolver';
 import type { GenerationProviderAdapterRegistry } from '@process/services/creative-studio/adapters';
+import { ProviderDeadlineError, runWithProviderDeadline } from '@process/services/creative-studio/adapters/types';
 import type { StudioJobManager } from '@process/services/creative-studio/jobManager';
 import type { IProvider } from '@/common/config/storage';
 import { createHash, randomUUID } from 'node:crypto';
@@ -67,6 +68,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
 const RESOLUTIONS = new Set(['720p', '1080p']);
 const MEDIA_KINDS = new Set(['image', 'video']);
+const CONNECTION_VALIDATION_TIMEOUT_MS = 30_000;
 const UPDATABLE_PROJECT_FIELDS = ['name', 'brief', 'aspectRatio', 'targetDurationSeconds', 'resolution'] as const;
 type UpdatableProjectField = (typeof UPDATABLE_PROJECT_FIELDS)[number];
 const NONTERMINAL_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
@@ -778,11 +780,17 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
     }
     const adapter = deps.adapterRegistry.get(normalizedInput.adapterId);
     if (!adapter) throw new CreativeStudioServiceError('invalid_route');
-    const validation = await adapter.validateConnection(
-      { model: normalizedInput.model },
-      provider,
-      new AbortController().signal
-    );
+    let validation;
+    try {
+      validation = await runWithProviderDeadline(
+        new AbortController().signal,
+        CONNECTION_VALIDATION_TIMEOUT_MS,
+        (signal) => adapter.validateConnection({ model: normalizedInput.model }, provider, signal)
+      );
+    } catch (error) {
+      if (error instanceof ProviderDeadlineError) throw new CreativeStudioServiceError('provider_error');
+      throw error;
+    }
     if (!validation.ok) throw new CreativeStudioServiceError('provider_error');
     return {
       schemaVersion: 1,
