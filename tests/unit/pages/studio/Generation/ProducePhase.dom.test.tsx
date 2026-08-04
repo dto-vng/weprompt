@@ -146,6 +146,26 @@ const catalog = (videoSetupRequired = false): StudioRouteCatalog => {
   };
 };
 
+const disconnectedCatalog = (): StudioRouteCatalog => {
+  const imageRoute = route('image');
+  const videoRoute = route('video');
+  return {
+    ...catalog(),
+    image: {
+      status: 'selection_required',
+      selected: null,
+      selectedRoute: null,
+      options: [imageRoute],
+    },
+    video: {
+      status: 'selection_required',
+      selected: null,
+      selectedRoute: null,
+      options: [videoRoute],
+    },
+  };
+};
+
 const project = (overrides: Partial<StudioRendererProject> = {}): StudioRendererProject => {
   const opening = scene();
   const closing = scene({
@@ -288,43 +308,105 @@ describe('ProducePhase', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the three project model selectors and sends setup to Model Settings', () => {
-    const controller = createController(project(), 'scene-1', catalog(true));
+  it('shows only the connection door when no ready selected route exists', () => {
+    const controller = createController(project(), 'scene-1', disconnectedCatalog());
     const { container } = render(<ProducePhase controller={controller} />);
 
-    expect(screen.getByRole('combobox', { name: 'conversation.creativeStudio.models.storyboard' })).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'conversation.creativeStudio.models.image' })).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'conversation.creativeStudio.models.video' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'conversation.creativeStudio.phase.produce.connectEngine' })
+    ).toBeVisible();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'conversation.creativeStudio.phase.produce.activityTitle' })
+    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(0);
+  });
+
+  it('routes the connection door actions to Model Settings and the shared clipboard utility', () => {
+    const controller = createController(project(), 'scene-1', disconnectedCatalog());
+    let copiedText = '';
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: false });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn(() => {
+        copiedText = document.querySelector('textarea')?.value ?? '';
+        return true;
+      }),
+    });
+    render(<ProducePhase controller={controller} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.models.openSettings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.produce.askTeammate' }));
+
+    expect(controller.openModelSettings).toHaveBeenCalledExactlyOnceWith('/settings/model');
+    expect(copiedText).toBe('conversation.creativeStudio.phase.produce.askTeammateCopy');
+  });
+
+  it('shows facts only from ready selected routes and opens settings through Change engines', () => {
+    const imageRoute = route('image');
+    imageRoute.constraints.maxDurationSeconds = 47;
+    const controller = createController(project(), 'scene-1', {
+      ...catalog(true),
+      image: {
+        ...catalog(true).image,
+        selectedRoute: imageRoute,
+        options: [imageRoute],
+      },
+    });
+    render(<ProducePhase controller={controller} />);
+
+    expect(screen.getByText(/image-model/)).toBeVisible();
+    expect(screen.getByText(/seconds=47/)).toBeVisible();
+    expect(screen.queryByText(/video-model/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.produce.changeEngines' }));
     expect(controller.openModelSettings).toHaveBeenCalledExactlyOnceWith('/settings/model');
   });
 
-  it('renders every ordered shot with output, timing, status, and selected-take state', () => {
-    const selectedAsset = asset();
+  it('shows only canonical generated takes and opens the selected take preview from its card', () => {
+    const firstTake = asset();
+    const selectedTake = asset({ id: 'asset-2', managedAsset: { collection: 'assets', fileName: 'asset-2.png' } });
+    const imported = asset({ id: 'import-1', managedAsset: { collection: 'imports', fileName: 'import-1.png' } });
+    const thumbnail = asset({
+      id: 'thumb-1',
+      managedAsset: { collection: 'thumbnails', fileName: 'thumb-1.png' },
+    });
     const currentProject = project({
       scenes: {
-        'scene-1': scene({ selectedAssetId: selectedAsset.id, assetIds: [selectedAsset.id] }),
+        'scene-1': scene({
+          selectedAssetId: selectedTake.id,
+          assetIds: [imported.id, firstTake.id, thumbnail.id, selectedTake.id],
+        }),
         'scene-2': scene({ id: 'scene-2', title: 'Closing shot', mediaKind: 'video', visualPrompt: '' }),
       },
-      assets: { [selectedAsset.id]: selectedAsset },
+      assets: {
+        [firstTake.id]: firstTake,
+        [selectedTake.id]: selectedTake,
+        [imported.id]: imported,
+        [thumbnail.id]: thumbnail,
+      },
     });
     render(<ProducePhase controller={createController(currentProject)} />);
 
     const opening = screen.getByRole('listitem', {
       name: 'conversation.creativeStudio.scene.accessibleName:number=1,title=Opening shot',
     });
-    const closing = screen.getByRole('listitem', {
-      name: 'conversation.creativeStudio.scene.accessibleName:number=2,title=Closing shot',
-    });
-    expect(within(opening).getByText('conversation.creativeStudio.scene.image')).toBeVisible();
-    expect(within(opening).getByText('conversation.creativeStudio.preview.versionLabel:number=1')).toBeVisible();
-    expect(within(closing).getByText('conversation.creativeStudio.scene.video')).toBeVisible();
-    expect(within(closing).getByText('conversation.creativeStudio.scene.status.needs_prompt')).toBeVisible();
+    expect(
+      within(opening).getByText('conversation.creativeStudio.phase.produce.takeRatio:current=2,total=2')
+    ).toBeVisible();
+    expect(within(opening).getByRole('img', { name: 'conversation.creativeStudio.preview.imageAlt' })).toHaveAttribute(
+      'src',
+      'weprompt-studio://asset/project-1/asset-2'
+    );
+    expect(screen.queryByRole('figure', { name: 'conversation.creativeStudio.preview.title' })).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(opening).getByRole('button', {
+        name: 'conversation.creativeStudio.phase.produce.openPreview:title=Opening shot',
+      })
+    );
+    expect(screen.getByRole('figure', { name: 'conversation.creativeStudio.preview.title' })).toBeVisible();
   });
 
   it('selects a shot without opening or submitting generation', () => {
@@ -356,10 +438,10 @@ describe('ProducePhase', () => {
     });
 
     expect(
-      within(closing).queryByRole('button', { name: 'conversation.creativeStudio.review.generateScene' })
+      within(closing).queryByRole('button', { name: 'conversation.creativeStudio.phase.produce.render' })
     ).not.toBeInTheDocument();
     fireEvent.click(
-      within(closing).getByRole('button', { name: 'conversation.creativeStudio.phase.produce.addVisual' })
+      within(closing).getByRole('button', { name: 'conversation.creativeStudio.phase.produce.writeVisual' })
     );
 
     expect(controller.editor.selectScene).toHaveBeenCalledExactlyOnceWith('scene-2');
@@ -373,13 +455,68 @@ describe('ProducePhase', () => {
     const controller = createController();
     render(<ProducePhase controller={controller} />);
 
-    expect(screen.getAllByRole('button', { name: 'conversation.creativeStudio.review.generateScene' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' }));
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.produce.render' }));
 
     expect(controller.openSingleGenerationReview).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ sceneId: 'scene-1', routeStatus: 'valid' })
     );
     expect(controller.jobs.submitScenes).not.toHaveBeenCalled();
+  });
+
+  it('shows determinate progress and Cancel only for the exact displayed cancellable job', () => {
+    const olderAuthorized = job({
+      id: 'job-opening-older',
+      canCancel: true,
+      progress: 10,
+      updatedAt: '2026-08-04T01:00:00.000Z',
+    });
+    const displayedOpening = job({
+      id: 'job-opening-current',
+      canCancel: false,
+      progress: 64,
+      updatedAt: '2026-08-04T02:00:00.000Z',
+    });
+    const displayedClosing = job({
+      id: 'job-closing-current',
+      sceneId: 'scene-2',
+      provider: { choiceId: 'choice-video', providerId: 'provider-video', model: 'video-model' },
+      canCancel: true,
+      progress: 37,
+      updatedAt: '2026-08-04T03:00:00.000Z',
+    });
+    const currentProject = project({
+      scenes: {
+        'scene-1': scene({ jobIds: [olderAuthorized.id, displayedOpening.id] }),
+        'scene-2': scene({
+          id: 'scene-2',
+          title: 'Closing shot',
+          mediaKind: 'video',
+          visualPrompt: 'A final wave',
+          jobIds: [displayedClosing.id],
+        }),
+      },
+      jobs: {
+        [olderAuthorized.id]: olderAuthorized,
+        [displayedOpening.id]: displayedOpening,
+        [displayedClosing.id]: displayedClosing,
+      },
+    });
+    const controller = createController(currentProject);
+    render(<ProducePhase controller={controller} />);
+
+    const opening = screen.getByRole('listitem', {
+      name: 'conversation.creativeStudio.scene.accessibleName:number=1,title=Opening shot',
+    });
+    const closing = screen.getByRole('listitem', {
+      name: 'conversation.creativeStudio.scene.accessibleName:number=2,title=Closing shot',
+    });
+    expect(
+      within(opening).queryByRole('button', { name: 'conversation.creativeStudio.jobs.cancel' })
+    ).not.toBeInTheDocument();
+    expect(within(closing).getByText('conversation.creativeStudio.jobs.progress:percent=37')).toBeVisible();
+
+    fireEvent.click(within(closing).getByRole('button', { name: 'conversation.creativeStudio.jobs.cancel' }));
+    expect(controller.jobs.cancelJob).toHaveBeenCalledExactlyOnceWith('job-closing-current');
   });
 
   it('renders the batch advisory only when the controller routes it to the batch anchor', () => {
@@ -406,7 +543,7 @@ describe('ProducePhase', () => {
       name: 'conversation.creativeStudio.review.generateReadyScenes:count=1',
     });
     expect(batch).toBeEnabled();
-    expect(screen.getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
+    expect(screen.getAllByText('conversation.creativeStudio.review.durationMismatch')).toHaveLength(1);
     fireEvent.click(batch);
     expect(mismatch.openBatchGenerationReview).toHaveBeenCalledTimes(2);
     expect(exact.jobs.submitScenes).not.toHaveBeenCalled();

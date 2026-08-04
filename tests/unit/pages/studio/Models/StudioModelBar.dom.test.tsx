@@ -4,14 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { StudioRouteCatalog, StudioRouteCatalogEntry } from '@/common/types/project/creativeStudioTypes';
 import { StudioModelBar, type StudioModelBarProps } from '@renderer/pages/studio/components/Models/StudioModelBar';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values
+        ? `${key}:${Object.entries(values)
+            .map(([name, value]) => `${name}=${String(value)}`)
+            .join(',')}`
+        : key,
+  }),
+}));
 
 const mediaRoute = (
   kind: 'image' | 'video',
@@ -38,14 +47,7 @@ const catalog = (overrides: Partial<StudioRouteCatalog> = {}): StudioRouteCatalo
   storyboard: {
     status: 'selection_required',
     selected: null,
-    options: [
-      {
-        providerId: 'story-provider',
-        providerName: 'Story Provider',
-        model: 'story-model',
-        health: 'available',
-      },
-    ],
+    options: [],
   },
   image: { status: 'selection_required', selected: null, selectedRoute: null, options: [mediaRoute('image')] },
   video: { status: 'selection_required', selected: null, selectedRoute: null, options: [mediaRoute('video')] },
@@ -55,12 +57,7 @@ const catalog = (overrides: Partial<StudioRouteCatalog> = {}): StudioRouteCatalo
 
 const props = (overrides: Partial<StudioModelBarProps> = {}): StudioModelBarProps => ({
   catalog: catalog(),
-  loading: false,
-  errorMessageKey: null,
-  pendingRole: null,
   disabled: false,
-  onRefresh: vi.fn(),
-  onSelectionChange: vi.fn(),
   onOpenSettings: vi.fn(),
   ...overrides,
 });
@@ -68,124 +65,60 @@ const props = (overrides: Partial<StudioModelBarProps> = {}): StudioModelBarProp
 describe('StudioModelBar', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders three labeled selectors with sanitized model and provider labels', async () => {
-    render(<StudioModelBar {...props()} />);
+  it('does not turn available options into implicit project selections', () => {
+    const { container } = render(<StudioModelBar {...props()} />);
 
-    const storyboard = screen.getByLabelText('conversation.creativeStudio.models.storyboard');
-    const image = screen.getByLabelText('conversation.creativeStudio.models.image');
-    const video = screen.getByLabelText('conversation.creativeStudio.models.video');
-    expect(storyboard).toBeInTheDocument();
-    expect(image).toBeInTheDocument();
-    expect(video).toBeInTheDocument();
-    expect(storyboard.closest('label')).toBeNull();
-    expect(image.closest('label')).toBeNull();
-    expect(video.closest('label')).toBeNull();
-
-    fireEvent.click(image);
-    expect(await screen.findByText(/image-model · image Provider/)).toBeInTheDocument();
-    expect(document.body).not.toHaveTextContent('weprompt-image-v1');
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('marks a sole option as suggested without selecting it automatically', async () => {
-    render(<StudioModelBar {...props()} />);
-    const storyboard = screen.getByLabelText('conversation.creativeStudio.models.storyboard');
-
-    expect(storyboard).not.toHaveTextContent('story-model');
-    fireEvent.click(storyboard);
-    const option = (await screen.findByText(/story-model · Story Provider/)).closest('[role=option]');
-    expect(option).toHaveTextContent('conversation.creativeStudio.models.suggested');
-  });
-
-  it('keeps an unavailable persisted selection visible with a safe provider fallback', () => {
+  it('shows only real ready selected routes and their contract duration', () => {
+    const selected = mediaRoute('image', {
+      model: 'selected-image-model',
+      constraints: { ...mediaRoute('image').constraints, maxDurationSeconds: 47 },
+    });
     render(
       <StudioModelBar
         {...props({
           catalog: catalog({
-            storyboard: {
-              status: 'unavailable',
-              selected: { providerId: 'missing-provider', model: 'retired-model' },
-              options: [],
+            image: {
+              status: 'ready',
+              selected: { choiceId: selected.choiceId, providerId: selected.providerId, model: selected.model },
+              selectedRoute: selected,
+              options: [selected, mediaRoute('image', { choiceId: 'unused', model: 'unused-option' })],
             },
           }),
         })}
       />
     );
 
-    expect(screen.getByLabelText('conversation.creativeStudio.models.storyboard')).toHaveTextContent(
-      'retired-model · missing-provider'
-    );
-    expect(document.body).toHaveTextContent('conversation.creativeStudio.models.unavailable');
+    expect(screen.getByText(/model=selected-image-model/)).toBeVisible();
+    expect(screen.getByText(/seconds=47/)).toBeVisible();
+    expect(screen.queryByText(/unused-option/)).not.toBeInTheDocument();
   });
 
-  it('consolidates an all-setup-required catalog into one Settings action', () => {
+  it('opens the existing Model Settings surface from Change engines', () => {
     const onOpenSettings = vi.fn();
+    const selected = mediaRoute('video');
     render(
       <StudioModelBar
         {...props({
           catalog: catalog({
-            storyboard: { status: 'setup_required', selected: null, options: [] },
-            image: { status: 'setup_required', selected: null, options: [] },
-            video: { status: 'setup_required', selected: null, options: [] },
+            video: {
+              status: 'ready',
+              selected: { choiceId: selected.choiceId, providerId: selected.providerId, model: selected.model },
+              selectedRoute: selected,
+              options: [selected],
+            },
           }),
           onOpenSettings,
         })}
       />
     );
 
-    const settingsActions = screen.getAllByRole('button', {
-      name: 'conversation.creativeStudio.models.openSettings',
-    });
-    expect(settingsActions).toHaveLength(1);
-    expect(screen.getByLabelText('conversation.creativeStudio.models.storyboard')).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    expect(screen.getByLabelText('conversation.creativeStudio.models.image')).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByLabelText('conversation.creativeStudio.models.video')).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.produce.changeEngines' }));
 
-    fireEvent.click(settingsActions[0]!);
     expect(onOpenSettings).toHaveBeenCalledExactlyOnceWith('/settings/model');
-  });
-
-  it('keeps configured model selectors usable when another role needs setup', () => {
-    render(
-      <StudioModelBar
-        {...props({
-          catalog: catalog({
-            storyboard: { status: 'setup_required', selected: null, options: [] },
-          }),
-        })}
-      />
-    );
-
-    expect(screen.getAllByRole('button', { name: 'conversation.creativeStudio.models.openSettings' })).toHaveLength(1);
-    expect(screen.getByLabelText('conversation.creativeStudio.models.storyboard')).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    expect(screen.getByLabelText('conversation.creativeStudio.models.image')).not.toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-  });
-
-  it('emits only a role-compatible route and disables the pending role', async () => {
-    const onSelectionChange = vi.fn();
-    render(<StudioModelBar {...props({ pendingRole: 'video', onSelectionChange })} />);
-
-    expect(screen.getByLabelText('conversation.creativeStudio.models.video')).toHaveAttribute('aria-disabled', 'true');
-    fireEvent.click(screen.getByLabelText('conversation.creativeStudio.models.image'));
-    const listbox = await screen.findByRole('listbox');
-    fireEvent.click(within(listbox).getByText(/image-model · image Provider/));
-
-    expect(onSelectionChange).toHaveBeenCalledExactlyOnceWith({
-      role: 'image',
-      selection: {
-        choiceId: 'choice_image',
-      },
-    });
-    expect(onSelectionChange).not.toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'image', selection: expect.objectContaining({ model: 'video-model' }) })
-    );
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 });
