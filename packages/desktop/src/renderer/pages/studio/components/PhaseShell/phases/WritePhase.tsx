@@ -91,9 +91,20 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
       editor.selectScene(writeFocusIntent.sceneId);
       return;
     }
-    const field = document.getElementById(`studio-scene-prompt-${writeFocusIntent.sceneId}`);
-    if (field instanceof HTMLElement) field.focus();
-    clearWriteFocusIntent();
+    const focusRequestedField = (): boolean => {
+      const field = document.getElementById(`studio-scene-prompt-${writeFocusIntent.sceneId}`);
+      if (!(field instanceof HTMLElement)) return false;
+      field.focus();
+      if (document.activeElement !== field) return false;
+      clearWriteFocusIntent();
+      return true;
+    };
+    if (focusRequestedField()) return;
+    const observer = new MutationObserver(() => {
+      if (focusRequestedField()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [clearWriteFocusIntent, editor, project.scenes, writeFocusIntent]);
 
   return (

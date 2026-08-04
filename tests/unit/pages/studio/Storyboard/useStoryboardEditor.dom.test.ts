@@ -212,6 +212,39 @@ describe('useStoryboardEditor', () => {
     expect(result.current.hasUnsavedSceneDrafts).toBe(false);
   });
 
+  it('resolves a project draft flush as false when prior queued work enters conflict', async () => {
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const refreshed = project(8, [scene('scene-1', { title: 'Remote opening' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => refreshed) })
+    );
+
+    act(() => result.current.updateSceneDraft({ title: 'Local opening' }));
+    act(() => result.current.updateProjectDraft({ name: 'Local project name' }));
+    let sceneFlush!: Promise<boolean>;
+    act(() => {
+      sceneFlush = result.current.flushSceneDraft();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+
+    let projectFlushOutcome: boolean | undefined;
+    act(() => {
+      void result.current.flushProjectDraft().then((outcome) => {
+        projectFlushOutcome = outcome;
+      });
+    });
+    await act(async () => {
+      firstSave.resolve(failed('stale_project', 'conversation.creativeStudio.errors.staleProject'));
+      expect(await sceneFlush).toBe(false);
+    });
+
+    await waitFor(() => expect(result.current.conflict).toMatchObject({ operation: 'save_scene' }));
+    await waitFor(() => expect(projectFlushOutcome).toBe(false));
+    expect(bridge.updateProject.invoke).not.toHaveBeenCalled();
+    expect(result.current.projectDraft?.name).toBe('Local project name');
+  });
+
   it('flushes two dirty scenes in order and advances the canonical revision between saves', async () => {
     const first = deferred<StudioCommandResult<StudioRendererProject>>();
     const afterFirst = project(3, [scene('scene-1', { title: 'First edit' }), scene('scene-2')]);
@@ -312,6 +345,44 @@ describe('useStoryboardEditor', () => {
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
     expect(result.current.conflict).toMatchObject({ operation: 'save_scene', sceneId: 'scene-1' });
     expect(result.current.orderedScenes.find(({ id }) => id === 'scene-2')?.title).toBe('Local second');
+  });
+
+  it('clears every dirty scene timer before a slow conflict and does not save a later draft after recovery', async () => {
+    vi.useFakeTimers();
+    const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const refreshed = project(8, [scene('scene-1', { title: 'Remote first' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => refreshed) })
+    );
+
+    act(() => result.current.updateSceneDraft({ title: 'Local first' }));
+    act(() => result.current.selectScene('scene-2'));
+    act(() => result.current.updateSceneDraft({ title: 'Local second' }));
+    await act(async () => {
+      await vi.waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+    });
+
+    let flushed!: Promise<boolean>;
+    act(() => {
+      flushed = result.current.flushAllSceneDrafts();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450);
+      firstSave.resolve(failed('stale_project', 'conversation.creativeStudio.errors.staleProject'));
+      expect(await flushed).toBe(false);
+    });
+    expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      result.current.discardConflict();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
+    expect(result.current.orderedScenes.find(({ id }) => id === 'scene-2')?.title).toBe('Local second');
+    expect(result.current.hasUnsavedSceneDrafts).toBe(true);
   });
 
   it('fits through one serialized atomic intent and never emits per-scene updates', async () => {

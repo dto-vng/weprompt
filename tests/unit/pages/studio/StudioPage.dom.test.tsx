@@ -472,6 +472,49 @@ describe('StudioPage and useStudioProject', () => {
       expect(router.state.location.state).toBeNull();
     });
 
+    it('retains a valid Write focus intent until the requested field is available and focused', async () => {
+      const opening = scene();
+      const catalogLoad = deferred<StudioCommandResult<StudioRouteCatalog>>();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      bridge.listRoutes.invoke.mockReturnValueOnce(catalogLoad.promise);
+      const realGetElementById = document.getElementById.bind(document);
+      let promptAvailable = false;
+      vi.spyOn(document, 'getElementById').mockImplementation((elementId) =>
+        elementId === `studio-scene-prompt-${opening.id}` && !promptAvailable ? null : realGetElementById(elementId)
+      );
+      const writeFocus = { sceneId: opening.id, field: 'visualPrompt' as const };
+      const { router } = renderRoute({
+        pathname: '/studio/project-1/write',
+        state: { writeFocus },
+      });
+
+      const prompt = await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
+      expect(router.state.location.state).toEqual({ writeFocus });
+      expect(document.activeElement).not.toBe(prompt);
+
+      promptAvailable = true;
+      await act(async () => catalogLoad.resolve(ok(routes())));
+
+      await waitFor(() => expect(document.activeElement).toBe(prompt));
+      expect(router.state.location.state).toBeNull();
+    });
+
+    it('clears a Write focus intent immediately when its scene is not in the project', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      const { router } = renderRoute({
+        pathname: '/studio/project-1/write',
+        state: { writeFocus: { sceneId: 'missing-scene', field: 'visualPrompt' } },
+      });
+
+      await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
+      await waitFor(() => expect(router.state.location.state).toBeNull());
+    });
+
     it('replaces a legacy project route with its canonical default phase', async () => {
       const { router } = renderRoute('/studio/project-1');
 

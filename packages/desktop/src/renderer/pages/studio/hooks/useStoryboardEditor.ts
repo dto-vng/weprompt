@@ -515,7 +515,11 @@ export const useStoryboardEditor = ({
               blockingConflict.intent.operation === 'save_scene' &&
               queuedIntent.operation === 'save_scene' &&
               blockingConflict.intent.sceneId === queuedIntent.sceneId;
-            if (queuedIntent.operation === 'draft_storyboard' || supersededSameSceneSave) {
+            if (
+              queuedIntent.operation === 'draft_storyboard' ||
+              queuedIntent.operation === 'update_project' ||
+              supersededSameSceneSave
+            ) {
               resolveResult(false);
               return;
             }
@@ -704,8 +708,8 @@ export const useStoryboardEditor = ({
 
   const flushAllSceneDrafts = useCallback(async (): Promise<boolean> => {
     const dirtySceneIds = [...dirtySceneIdsRef.current];
+    for (const sceneId of dirtySceneIds) clearSaveTimer(sceneId);
     for (const sceneId of dirtySceneIds) {
-      clearSaveTimer(sceneId);
       if (internalConflictRef.current !== null) return false;
       const flushed = await flushScene(sceneId);
       if (!flushed) {
@@ -897,15 +901,19 @@ export const useStoryboardEditor = ({
   );
 
   const flushProjectDraft = useCallback(async (): Promise<boolean> => {
-    const current = projectRef.current;
-    const draft = projectDraftRef.current;
-    if (current === null) return false;
-    if (draft === null) return true;
-    const capturedVersion = projectEditVersionRef.current;
-    if (queuedProjectVersionRef.current === capturedVersion) {
+    if (projectRef.current === null) return false;
+    if (projectDraftRef.current === null) return true;
+    if (queuedProjectVersionRef.current === projectEditVersionRef.current) {
       await drainMutationQueue();
       return projectDraftRef.current === null && internalConflictRef.current === null;
     }
+
+    await drainMutationQueue();
+    if (internalConflictRef.current !== null) return false;
+    const draft = projectDraftRef.current;
+    if (projectRef.current === null) return false;
+    if (draft === null) return true;
+    const capturedVersion = projectEditVersionRef.current;
     queuedProjectVersionRef.current = capturedVersion;
     const capturedDraft = { ...draft };
     const saved = await enqueueIntent({
