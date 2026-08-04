@@ -54,7 +54,9 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller }) => {
             })}
           </span>
         </div>
-        <p className='m-0 text-12px text-t-secondary'>{t('conversation.creativeStudio.export.body')}</p>
+        <p className='m-0 text-12px text-t-secondary'>
+          {t('conversation.creativeStudio.phase.review.handoffDescription')}
+        </p>
         {readiness.selectedAssetCount === 0 && (
           <p className='m-0 text-12px text-t-secondary'>{t('conversation.creativeStudio.phase.review.noAssets')}</p>
         )}

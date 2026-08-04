@@ -335,15 +335,16 @@ describe('StudioPage and useStudioProject', () => {
         'conversation.creativeStudio.phase.produce.title',
         'conversation.creativeStudio.phase.produce.providerChargeDisclosure',
       ],
-      ['review', 'conversation.creativeStudio.phase.review.title', 'conversation.creativeStudio.export.body'],
+      [
+        'review',
+        'conversation.creativeStudio.phase.review.title',
+        'conversation.creativeStudio.phase.review.handoffDescription',
+      ],
     ])('renders the localized %s phase heading and guidance', async (phase, heading, guidance) => {
       renderRoute(`/studio/project-1/${phase}`);
 
       expect(await screen.findByRole('heading', { level: 2, name: heading })).toBeInTheDocument();
       expect(screen.getByText(guidance)).toBeInTheDocument();
-      if (phase === 'review') {
-        expect(screen.queryByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeNull();
-      }
     });
 
     it('renders a missing-asset Review slate without claiming slates are handed off', async () => {
@@ -364,7 +365,8 @@ describe('StudioPage and useStudioProject', () => {
       expect(within(preview).getByText('conversation.creativeStudio.scene.durationSeconds')).toBeVisible();
       expect(within(preview).getByText('conversation.creativeStudio.phase.review.slateDescription')).toBeVisible();
       expect(within(preview).getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
-      expect(screen.queryByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeNull();
+      expect(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription')).toBeVisible();
+      expect(screen.queryByText('conversation.creativeStudio.export.body')).toBeNull();
     });
 
     it('renders one localized four-step phase navigation with Brief current', async () => {

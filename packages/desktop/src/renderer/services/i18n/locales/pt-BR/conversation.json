@@ -931,9 +931,10 @@
         "description": "Confira a mídia selecionada, preencha as cartelas ausentes e prepare a entrega.",
         "handoff": "Preparar entrega",
         "noAssets": "Nenhuma mídia selecionada está pronta para entrega.",
+        "selectedTake": "No corte",
         "slateLabel": "Cartela",
         "slateDescription": "Uma cartela mantém a tomada na sequência quando nenhuma mídia renderizada está selecionada.",
-        "excludedFromHandoff": "Tomadas sem mídia selecionada nem cartela são excluídas da entrega.",
+        "excludedFromHandoff": "Cenas sem mídia selecionada são excluídas da entrega. As cartelas de revisão não são exportadas.",
         "renderedShots": "{{count}} tomadas renderizadas",
         "renderedShots_one": "{{count}} tomada renderizada",
         "renderedShots_many": "{{count}} tomadas renderizadas",
@@ -943,8 +944,8 @@
         "missingSlates_many": "{{count}} cartelas ausentes",
         "missingSlates_other": "{{count}} cartelas ausentes",
         "openProduce": "Abrir Produzir",
-        "handoffDescription": "A entrega inclui as mídias selecionadas e as cartelas na ordem do storyboard.",
-        "partialHandoff": "Esta entrega é parcial porque algumas tomadas não têm mídia selecionada nem cartela."
+        "handoffDescription": "A entrega contém somente o manifesto do storyboard e as mídias selecionadas. As cartelas de revisão não são exportadas.",
+        "partialHandoff": "Esta entrega é parcial porque algumas cenas não têm mídia selecionada."
       }
     },
     "library": {
@@ -1234,7 +1235,10 @@
       "cancel": "Cancelar",
       "choosing": "Escolhendo uma pasta de exportação...",
       "successTitle": "Recursos exportados",
-      "successBody": "Exportado para “{{folderName}}”.",
+      "successBody": "{{count}} cenas selecionadas foram entregues em “{{folderName}}”.",
+      "successBody_one": "{{count}} cena selecionada foi entregue em “{{folderName}}”.",
+      "successBody_many": "{{count}} cenas selecionadas foram entregues em “{{folderName}}”.",
+      "successBody_other": "{{count}} cenas selecionadas foram entregues em “{{folderName}}”.",
       "partialTitle": "Recursos exportados com cenas ausentes",
       "partialBody": "Recursos disponíveis exportados para “{{folderName}}”.",
       "missingScenes": "Cenas ausentes: {{scenes}}",

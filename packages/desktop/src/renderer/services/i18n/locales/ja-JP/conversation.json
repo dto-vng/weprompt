@@ -923,16 +923,17 @@
         "description": "選択したメディアを確認し、不足するスレートを補って引き渡しを準備します。",
         "handoff": "引き渡しを準備",
         "noAssets": "引き渡せる選択済みメディアがありません。",
+        "selectedTake": "カットに採用",
         "slateLabel": "スレート",
         "slateDescription": "レンダリング済みメディアが未選択でも、スレートによってショットをシーケンスに残せます。",
-        "excludedFromHandoff": "選択済みメディアもスレートもないショットは引き渡しから除外されます。",
+        "excludedFromHandoff": "選択したメディアがないシーンは引き渡しから除外されます。確認用スレートは書き出されません。",
         "renderedShots": "レンダリング済みショット {{count}} 件",
         "renderedShots_other": "レンダリング済みショット {{count}} 件",
         "missingSlates": "不足しているスレート {{count}} 件",
         "missingSlates_other": "不足しているスレート {{count}} 件",
         "openProduce": "生成を開く",
-        "handoffDescription": "引き渡しには、選択したメディアとスレートがストーリーボード順に含まれます。",
-        "partialHandoff": "選択済みメディアもスレートもないショットがあるため、この引き渡しは一部のみです。"
+        "handoffDescription": "引き渡しに含まれるのは、ストーリーボードのマニフェストと選択したメディアのみです。確認用スレートは書き出されません。",
+        "partialHandoff": "選択したメディアがないシーンがあるため、この引き渡しは一部のみです。"
       }
     },
     "library": {
@@ -1210,7 +1211,8 @@
       "cancel": "キャンセル",
       "choosing": "書き出し先フォルダーを選択...",
       "successTitle": "素材を書き出しました",
-      "successBody": "「{{folderName}}」に書き出しました。",
+      "successBody": "選択済みの {{count}} シーンを「{{folderName}}」に引き渡しました。",
+      "successBody_other": "選択済みの {{count}} シーンを「{{folderName}}」に引き渡しました。",
       "partialTitle": "一部のシーンを除いて素材を書き出しました",
       "partialBody": "利用可能な素材を「{{folderName}}」に書き出しました。",
       "missingScenes": "不足しているシーン：{{scenes}}",

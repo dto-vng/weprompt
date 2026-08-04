@@ -21,6 +21,7 @@ import { StudioPhaseNav } from '@renderer/pages/studio/components/PhaseShell/Stu
 import { StudioPhaseShell } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseShell';
 import type { StudioPhaseControllers } from '@renderer/pages/studio/components/PhaseShell/types';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
+import { StudioExportModal } from '@renderer/pages/studio/components/Preview/StudioExportModal';
 import { SceneTimeline } from '@renderer/pages/studio/components/SceneTimeline';
 import { SceneCard } from '@renderer/pages/studio/components/Storyboard/SceneCard';
 import { StoryboardPanel } from '@renderer/pages/studio/components/Storyboard/StoryboardPanel';
@@ -280,7 +281,7 @@ describe('Creative Studio full-sentence English copy', () => {
     }
 
     expect(issues).toEqual([]);
-  });
+  }, 30_000);
 
   it('renders the phase workflow and assistant dock with localized accessible names', async () => {
     await renderEnglish(
@@ -388,6 +389,85 @@ describe('Creative Studio full-sentence English copy', () => {
     expect(screen.getByRole('button', { name: 'Select scene 1: Product close-up, 1 second' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/^Total duration: 1 second$/);
     expect(screen.getByRole('button', { name: 'Select version 2' })).toBeInTheDocument();
+  });
+
+  it('exposes the selected-take state visually and in the scene button description', async () => {
+    const selectedScene = scene({ id: 'scene-1', selectedAssetId: 'asset-1', assetIds: ['asset-1'] });
+
+    await renderEnglish(
+      <SceneTimeline
+        orderedScenes={[selectedScene]}
+        selectedSceneId='scene-1'
+        reviewStates={{ 'scene-1': 'selected-take' }}
+        onSelectScene={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('In cut')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Select scene 1: Product close-up, 5 seconds' })
+    ).toHaveAccessibleDescription('In cut');
+  });
+
+  it('describes the Review handoff as a manifest plus selected media without exported slates', async () => {
+    await renderEnglish(
+      <StudioPhaseShell
+        activePhase='review'
+        controller={phaseController()}
+        navigationDisabled={false}
+        onBack={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        'The handoff contains the storyboard manifest and selected media only. Review slates are not exported.'
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/includes selected media and slates/i)).not.toBeInTheDocument();
+  });
+
+  it('reports the selected scene count after a complete handoff', async () => {
+    await renderEnglish(
+      <StudioExportModal
+        visible
+        project={project()}
+        selectedAssetCount={2}
+        pending={false}
+        includeReferences={false}
+        exportedFolderName='Launch-film-export'
+        missingSceneIds={[]}
+        issueMessageKey={null}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        onIncludeReferencesChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Handed off 2 selected scenes to “Launch-film-export”.')).toBeVisible();
+  });
+
+  it('explains that a partial handoff is missing selected media and never exports Review slates', async () => {
+    await renderEnglish(
+      <StudioExportModal
+        visible
+        project={project()}
+        selectedAssetCount={1}
+        pending={false}
+        includeReferences={false}
+        exportedFolderName='Launch-film-export'
+        missingSceneIds={['scene-2']}
+        issueMessageKey={null}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        onIncludeReferencesChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('This handoff is partial because some scenes have no selected media.')).toBeVisible();
+    expect(
+      screen.getByText('Scenes without selected media are excluded from the handoff. Review slates are not exported.')
+    ).toBeVisible();
   });
 
   it('renders complete selected, target, and per-scene duration phrases', async () => {

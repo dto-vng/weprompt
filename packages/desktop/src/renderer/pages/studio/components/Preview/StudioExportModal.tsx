@@ -101,12 +101,12 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
       ) : (
         <div className='flex flex-col gap-12px'>
           <p className='m-0'>
-            {t(
-              missingSceneIds.length > 0
-                ? 'conversation.creativeStudio.export.partialBody'
-                : 'conversation.creativeStudio.export.successBody',
-              { folderName: exportedFolderName }
-            )}
+            {missingSceneIds.length > 0
+              ? t('conversation.creativeStudio.export.partialBody', { folderName: exportedFolderName })
+              : t('conversation.creativeStudio.export.successBody', {
+                  folderName: exportedFolderName,
+                  count: selectedAssetCount,
+                })}
           </p>
           <dl className='m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-12px gap-y-8px rounded-8px bg-fill-1 p-12px'>
             <dt className='text-12px text-t-tertiary'>{t('conversation.creativeStudio.export.folderLabel')}</dt>
@@ -114,6 +114,7 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
           </dl>
           {missingSceneIds.length > 0 && (
             <div className='flex flex-col gap-8px rounded-8px bg-warning-light-1 p-10px text-13px text-warning'>
+              <p className='m-0'>{t('conversation.creativeStudio.phase.review.partialHandoff')}</p>
               <ul
                 aria-label={t('conversation.creativeStudio.phase.review.missingSlates', {
                   count: missingSceneIds.length,

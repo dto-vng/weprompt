@@ -201,7 +201,7 @@ describe('Studio asset export', () => {
       /path|directory|destination|file:|https?:|data:/i
     );
     expect(
-      await screen.findByText('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500')
+      await screen.findByText('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500,2')
     ).toBeInTheDocument();
     expect(screen.queryByText(/Export video/i)).not.toBeInTheDocument();
   });
@@ -267,6 +267,7 @@ describe('Studio asset export', () => {
     expect(within(missingSlates).getAllByRole('listitem')).toHaveLength(1);
     expect(within(missingSlates).getByText('scene-2')).toBeVisible();
     expect(within(missingSlates).queryByText('scene-1')).not.toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.partialHandoff')).toBeVisible();
     expect(screen.getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
 
     fireEvent.click(
@@ -294,7 +295,7 @@ describe('Studio asset export', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'conversation.creativeStudio.export.successTitle',
     });
-    expect(dialog).toHaveTextContent('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500');
+    expect(dialog).toHaveTextContent('conversation.creativeStudio.export.successBody:Launch-film-20260730-151500,2');
     expect(
       within(dialog).queryByRole('button', { name: 'conversation.creativeStudio.phase.review.openProduce' })
     ).not.toBeInTheDocument();

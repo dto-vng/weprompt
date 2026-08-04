@@ -923,16 +923,17 @@
         "description": "检查已选媒体、补充缺失的场记卡，并准备交付。",
         "handoff": "准备交付",
         "noAssets": "没有可供交付的已选媒体。",
+        "selectedTake": "已入选",
         "slateLabel": "场记卡",
         "slateDescription": "未选择渲染媒体时，场记卡可让镜头保留在序列中。",
-        "excludedFromHandoff": "既无已选媒体也无场记卡的镜头不会包含在交付中。",
+        "excludedFromHandoff": "没有已选媒体的场景不会包含在交付中。审阅场记卡不会导出。",
         "renderedShots": "{{count}} 个已渲染镜头",
         "renderedShots_other": "{{count}} 个已渲染镜头",
         "missingSlates": "缺少 {{count}} 个场记卡",
         "missingSlates_other": "缺少 {{count}} 个场记卡",
         "openProduce": "打开制作",
-        "handoffDescription": "交付内容会按故事板顺序包含已选媒体和场记卡。",
-        "partialHandoff": "部分镜头既无已选媒体也无场记卡，因此此次交付并不完整。"
+        "handoffDescription": "交付内容仅包含故事板清单和已选媒体。审阅场记卡不会导出。",
+        "partialHandoff": "部分场景没有已选媒体，因此此次交付不完整。"
       }
     },
     "library": {
@@ -1210,7 +1211,8 @@
       "cancel": "取消",
       "choosing": "选择导出文件夹...",
       "successTitle": "素材已导出",
-      "successBody": "已导出到“{{folderName}}”。",
+      "successBody": "已将 {{count}} 个已选场景交付到“{{folderName}}”。",
+      "successBody_other": "已将 {{count}} 个已选场景交付到“{{folderName}}”。",
       "partialTitle": "素材已导出，但有场景缺失",
       "partialBody": "可用素材已导出到“{{folderName}}”。",
       "missingScenes": "缺失场景：{{scenes}}",

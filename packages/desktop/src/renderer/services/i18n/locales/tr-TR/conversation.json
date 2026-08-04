@@ -926,9 +926,10 @@
         "description": "Seçilen medyayı kontrol edin, eksik slaytları tamamlayın ve devri hazırlayın.",
         "handoff": "Devri hazırla",
         "noAssets": "Devir için hazır seçilmiş medya yok.",
+        "selectedTake": "Kurguda",
         "slateLabel": "Slayt",
         "slateDescription": "İşlenmiş medya seçilmediğinde slayt, çekimin sırada kalmasını sağlar.",
-        "excludedFromHandoff": "Seçilmiş medyası veya slaytı olmayan çekimler devirden çıkarılır.",
+        "excludedFromHandoff": "Seçilmiş medyası olmayan sahneler devirden çıkarılır. İnceleme slaytları dışa aktarılmaz.",
         "renderedShots": "İşlenmiş {{count}} çekim",
         "renderedShots_one": "İşlenmiş {{count}} çekim",
         "renderedShots_other": "İşlenmiş {{count}} çekim",
@@ -936,8 +937,8 @@
         "missingSlates_one": "Eksik {{count}} slayt",
         "missingSlates_other": "Eksik {{count}} slayt",
         "openProduce": "Üretimi aç",
-        "handoffDescription": "Devir, seçilen medya ve slaytları hikâye panosu sırasıyla içerir.",
-        "partialHandoff": "Bazı çekimlerde seçilmiş medya veya slayt bulunmadığından bu devir kısmidir."
+        "handoffDescription": "Devir yalnızca hikâye panosu bildirim dosyasını ve seçilen medyayı içerir. İnceleme slaytları dışa aktarılmaz.",
+        "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir."
       }
     },
     "library": {
@@ -1221,7 +1222,9 @@
       "cancel": "İptal",
       "choosing": "Dışa aktarma klasörü seçiliyor...",
       "successTitle": "Varlıklar dışa aktarıldı",
-      "successBody": "“{{folderName}}” klasörüne dışa aktarıldı.",
+      "successBody": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
+      "successBody_one": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
+      "successBody_other": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
       "partialTitle": "Varlıklar eksik sahnelerle dışa aktarıldı",
       "partialBody": "Kullanılabilir varlıklar “{{folderName}}” klasörüne dışa aktarıldı.",
       "missingScenes": "Eksik sahneler: {{scenes}}",

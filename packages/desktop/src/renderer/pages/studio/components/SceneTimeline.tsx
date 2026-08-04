@@ -28,6 +28,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
   reviewStates,
 }) => {
   const { t } = useTranslation();
+  const timelineId = React.useId();
   const totalDurationSeconds = orderedScenes.reduce((total, scene) => total + scene.durationSeconds, 0);
 
   const selectAdjacent = (event: React.KeyboardEvent<HTMLButtonElement>, index: number): void => {
@@ -100,7 +101,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                 case 'selected-take':
                   return {
                     icon: <CheckOne aria-hidden='true' />,
-                    label: t('conversation.creativeStudio.scene.status.generated'),
+                    label: t('conversation.creativeStudio.phase.review.selectedTake'),
                   };
                 case 'missing-slate':
                   return {
@@ -121,12 +122,15 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                   return null;
               }
             })();
+            const reviewStateId =
+              reviewPresentation === null ? undefined : `${timelineId}-scene-${index + 1}-review-state`;
             return (
               <li key={scene.id} className='flex min-w-72px' style={{ flexGrow: scene.durationSeconds, flexBasis: 0 }}>
                 <Button
                   type='text'
                   long
                   aria-label={accessibleName}
+                  aria-describedby={reviewStateId}
                   aria-current={selectedSceneId === scene.id ? 'true' : undefined}
                   title={accessibleName}
                   className='h-auto min-w-0 flex-1 flex-col items-start gap-3px overflow-hidden p-8px text-left'
@@ -137,6 +141,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                   <span className='text-11px text-t-tertiary'>{durationLabel}</span>
                   {reviewState !== undefined && reviewPresentation !== null && (
                     <span
+                      id={reviewStateId}
                       data-review-state={reviewState}
                       className='flex max-w-full items-center gap-4px rounded-full bg-fill-2 px-6px py-2px text-10px text-t-secondary'
                     >

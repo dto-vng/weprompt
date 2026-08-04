@@ -926,9 +926,10 @@
         "description": "Comprueba el contenido seleccionado, completa las claquetas que faltan y prepara la entrega.",
         "handoff": "Preparar entrega",
         "noAssets": "No hay contenido seleccionado listo para entregar.",
+        "selectedTake": "En el montaje",
         "slateLabel": "Claqueta",
         "slateDescription": "Una claqueta mantiene un plano en la secuencia cuando no hay contenido renderizado seleccionado.",
-        "excludedFromHandoff": "Los planos sin contenido seleccionado ni claqueta se excluyen de la entrega.",
+        "excludedFromHandoff": "Los planos sin contenido seleccionado se excluyen de la entrega. Las claquetas de revisión no se exportan.",
         "renderedShots": "{{count}} planos renderizados",
         "renderedShots_one": "{{count}} plano renderizado",
         "renderedShots_many": "{{count}} planos renderizados",
@@ -938,8 +939,8 @@
         "missingSlates_many": "{{count}} claquetas ausentes",
         "missingSlates_other": "{{count}} claquetas ausentes",
         "openProduce": "Abrir Producir",
-        "handoffDescription": "La entrega incluye el contenido seleccionado y las claquetas en el orden del guion gráfico.",
-        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado ni claqueta."
+        "handoffDescription": "La entrega contiene únicamente el manifiesto del guion gráfico y el contenido seleccionado. Las claquetas de revisión no se exportan.",
+        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado."
       }
     },
     "library": {
@@ -1229,7 +1230,10 @@
       "cancel": "Cancelar",
       "choosing": "Eligiendo una carpeta de exportación...",
       "successTitle": "Recursos exportados",
-      "successBody": "Exportado a «{{folderName}}».",
+      "successBody": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
+      "successBody_one": "Se entregó {{count}} escena seleccionada en «{{folderName}}».",
+      "successBody_many": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
+      "successBody_other": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
       "partialTitle": "Recursos exportados con escenas ausentes",
       "partialBody": "Los recursos disponibles se han exportado a «{{folderName}}».",
       "missingScenes": "Escenas ausentes: {{scenes}}",
