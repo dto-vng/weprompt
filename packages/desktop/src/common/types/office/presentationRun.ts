@@ -187,14 +187,16 @@ export type PresentationRunPublicDto =
     })
   | (PresentationRunPublicBase & {
       dispatchStatus: 'terminal_verified';
-      artifactPhase:
-        | 'sources_extracted'
-        | 'candidate_retained'
-        | 'candidate_copied'
-        | 'structurally_valid'
-        | 'ooxml_inspected';
+      artifactPhase: 'sources_extracted';
       disposition: null;
-      retainedCandidate: RetainedCandidateDto | null;
+      retainedCandidate: null;
+      actions: { openAllowed: false; discardAllowed: false };
+    })
+  | (PresentationRunPublicBase & {
+      dispatchStatus: 'terminal_verified';
+      artifactPhase: 'candidate_retained' | 'candidate_copied' | 'structurally_valid' | 'ooxml_inspected';
+      disposition: null;
+      retainedCandidate: RetainedCandidateDto;
       actions: { openAllowed: false; discardAllowed: false };
     })
   | (PresentationRunPublicBase & {

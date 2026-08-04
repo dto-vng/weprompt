@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, relative, resolve, sep } from 'node:path';
+import ts from 'typescript';
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
 import {
@@ -15,6 +19,54 @@ import type { PresentationRunFailure, PresentationRunFailureCode } from '@/commo
 
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
 const MESSAGE_KEY = 'conversation.presentation.failure';
+const presentationRunTypeFile = resolve(process.cwd(), 'packages/desktop/src/common/types/office/presentationRun.ts');
+const presentationRunPolicyFile = resolve(
+  process.cwd(),
+  'tests/unit/process/services/presentation-template/contracts/presentationRunPolicy.test.ts'
+);
+
+const compilePolicyFixture = (source: (moduleSpecifiers: { policy: string; types: string }) => string): string => {
+  const fixtureDirectory = mkdtempSync(join(tmpdir(), 'presentation-run-policy-'));
+  const fixturePath = join(fixtureDirectory, 'fixture.ts');
+  const moduleSpecifierFor = (filePath: string): string => {
+    const relativePath = relative(fixtureDirectory, filePath).split(sep).join('/');
+    return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+  };
+
+  try {
+    writeFileSync(
+      fixturePath,
+      source({
+        policy: moduleSpecifierFor(presentationRunPolicyFile),
+        types: moduleSpecifierFor(presentationRunTypeFile),
+      }),
+      'utf8'
+    );
+    const program = ts.createProgram([fixturePath], {
+      allowImportingTsExtensions: true,
+      baseUrl: process.cwd(),
+      lib: ['lib.es2023.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      noEmit: true,
+      paths: {
+        '@/*': ['packages/desktop/src/*'],
+        zod: ['node_modules/zod/index.d.cts'],
+      },
+      skipLibCheck: true,
+      strict: true,
+      target: ts.ScriptTarget.ES2023,
+      types: ['node'],
+    });
+    return ts.formatDiagnosticsWithColorAndContext(ts.getPreEmitDiagnostics(program), {
+      getCanonicalFileName: (fileName) => fileName,
+      getCurrentDirectory: () => process.cwd(),
+      getNewLine: () => '\n',
+    });
+  } finally {
+    rmSync(fixtureDirectory, { force: true, recursive: true });
+  }
+};
 
 const failure = <Code extends PresentationRunFailureCode, Retryable extends boolean, State extends string, Details>(
   code: Code,
@@ -97,9 +149,14 @@ const strictDetails = {
   grantId: z.object({ grantId: z.string().optional() }).strict(),
 };
 
-const failureEnvelope = <Code extends z.ZodTypeAny, State extends z.ZodTypeAny, Details extends z.ZodTypeAny>(
+const failureEnvelope = <
+  Code extends z.ZodTypeAny,
+  Retryable extends boolean,
+  State extends z.ZodTypeAny,
+  Details extends z.ZodTypeAny,
+>(
   code: Code,
-  retryable: boolean,
+  retryable: Retryable,
   state: State,
   details: Details
 ) =>
@@ -114,7 +171,7 @@ const failureEnvelope = <Code extends z.ZodTypeAny, State extends z.ZodTypeAny, 
     })
     .strict();
 
-const presentationRunFailureSchema = z.union([
+export const presentationRunFailureSchema = z.union([
   failureEnvelope(
     z.enum([
       'FEATURE_DISABLED',
@@ -254,7 +311,7 @@ const discardOnlyActionsSchema = z.object({ openAllowed: z.literal(false), disca
 const retainedActionsSchema = z.object({ openAllowed: z.literal(true), discardAllowed: z.literal(true) }).strict();
 const retainedCandidateSchema = z.object({ sha256: z.string(), byteLength: z.number() }).strict();
 
-const presentationRunPublicSchema = z.union([
+export const presentationRunPublicSchema = z.union([
   runBaseSchema.extend({
     dispatchStatus: z.enum(['allocating', 'committed']),
     artifactPhase: z.enum(['none', 'sources_snapshotted', 'sources_extracted']),
@@ -271,15 +328,16 @@ const presentationRunPublicSchema = z.union([
   }),
   runBaseSchema.extend({
     dispatchStatus: z.literal('terminal_verified'),
-    artifactPhase: z.enum([
-      'sources_extracted',
-      'candidate_retained',
-      'candidate_copied',
-      'structurally_valid',
-      'ooxml_inspected',
-    ]),
+    artifactPhase: z.literal('sources_extracted'),
     disposition: z.null(),
-    retainedCandidate: retainedCandidateSchema.nullable(),
+    retainedCandidate: z.null(),
+    actions: noActionsSchema,
+  }),
+  runBaseSchema.extend({
+    dispatchStatus: z.literal('terminal_verified'),
+    artifactPhase: z.enum(['candidate_retained', 'candidate_copied', 'structurally_valid', 'ooxml_inspected']),
+    disposition: z.null(),
+    retainedCandidate: retainedCandidateSchema,
     actions: noActionsSchema,
   }),
   runBaseSchema.extend({
@@ -318,6 +376,53 @@ const presentationRunPublicSchema = z.union([
   }),
 ]);
 
+export const recoverablePresentationRunsRequestSchema = z
+  .object({
+    conversation_id: z.string().uuid(),
+    cursor: z.string().min(1).optional(),
+    limit: z
+      .number()
+      .int()
+      .min(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MIN_LIMIT)
+      .max(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MAX_LIMIT)
+      .default(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_DEFAULT_LIMIT),
+  })
+  .strict();
+
+describe('managed presentation schema type coupling', () => {
+  it('keeps failure, public-run, and recovery schemas bidirectionally equivalent to production types', () => {
+    const diagnostics = compilePolicyFixture(
+      ({ policy, types }) => `
+        import {
+          presentationRunFailureSchema,
+          presentationRunPublicSchema,
+          recoverablePresentationRunsRequestSchema,
+        } from '${policy}';
+        import type {
+          ListRecoverablePresentationRunsRequest,
+          PresentationRunFailure,
+          PresentationRunPublicDto,
+        } from '${types}';
+        import type { z } from 'zod';
+
+        type Assert<T extends true> = T;
+        type SchemaFailure = z.output<typeof presentationRunFailureSchema>;
+        type SchemaPublicRun = z.output<typeof presentationRunPublicSchema>;
+        type SchemaRecoveryRequest = z.input<typeof recoverablePresentationRunsRequestSchema>;
+
+        type FailureSchemaToProduction = Assert<SchemaFailure extends PresentationRunFailure ? true : false>;
+        type FailureProductionToSchema = Assert<PresentationRunFailure extends SchemaFailure ? true : false>;
+        type PublicSchemaToProduction = Assert<SchemaPublicRun extends PresentationRunPublicDto ? true : false>;
+        type PublicProductionToSchema = Assert<PresentationRunPublicDto extends SchemaPublicRun ? true : false>;
+        type RecoverySchemaToProduction = Assert<SchemaRecoveryRequest extends ListRecoverablePresentationRunsRequest ? true : false>;
+        type RecoveryProductionToSchema = Assert<ListRecoverablePresentationRunsRequest extends SchemaRecoveryRequest ? true : false>;
+      `
+    );
+
+    expect(diagnostics).toBe('');
+  });
+});
+
 describe('managed presentation failure policy', () => {
   it('accepts the exhaustive code-specific retryability, state, and details map', () => {
     const rejectedCodes = Object.values(PRESENTATION_RUN_FAILURE_POLICY)
@@ -353,123 +458,336 @@ describe('managed presentation public-state policy', () => {
     updatedAt: '2026-08-04T00:00:01.000Z',
   };
   const candidate = { sha256: 'a'.repeat(64), byteLength: 4_096 };
+  const noActions = { openAllowed: false, discardAllowed: false } as const;
+  const discardOnlyActions = { openAllowed: false, discardAllowed: true } as const;
+  const retainedActions = { openAllowed: true, discardAllowed: true } as const;
+  const openOnlyActions = { openAllowed: true, discardAllowed: false } as const;
+  const dispatchStatuses = [
+    'allocating',
+    'committed',
+    'dispatching',
+    'bound',
+    'terminal_verified',
+    'retained',
+    'failed_retained',
+    'dispatch_uncertain',
+    'discarded',
+  ] as const;
+  const artifactPhases = [
+    null,
+    'none',
+    'sources_snapshotted',
+    'sources_extracted',
+    'candidate_retained',
+    'candidate_copied',
+    'structurally_valid',
+    'ooxml_inspected',
+    'rendered_exact_hash',
+  ] as const;
+  const dispositions = [null, 'TRACKING_REQUIRED', 'REVIEW_REQUIRED'] as const;
+  const candidates = [null, candidate] as const;
+  const actionVariants = [noActions, discardOnlyActions, retainedActions, openOnlyActions] as const;
 
-  it('accepts every allowed dispatch, artifact, disposition, and action family', () => {
-    const allowed = [
-      {
-        ...base,
-        dispatchStatus: 'committed',
-        artifactPhase: 'sources_extracted',
-        disposition: null,
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'bound',
-        artifactPhase: 'sources_extracted',
-        disposition: null,
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-      {
-        ...base,
-        dispatchStatus: 'terminal_verified',
-        artifactPhase: 'candidate_retained',
-        disposition: null,
-        retainedCandidate: candidate,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-      {
-        ...base,
-        dispatchStatus: 'retained',
-        artifactPhase: 'rendered_exact_hash',
-        disposition: 'REVIEW_REQUIRED',
-        retainedCandidate: candidate,
-        actions: { openAllowed: true, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'failed_retained',
-        artifactPhase: 'sources_extracted',
-        disposition: 'TRACKING_REQUIRED',
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'dispatch_uncertain',
-        artifactPhase: 'sources_extracted',
-        disposition: 'TRACKING_REQUIRED',
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-      {
-        ...base,
-        dispatchStatus: 'discarded',
-        artifactPhase: null,
-        disposition: null,
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-    ];
+  type PublicState = {
+    dispatchStatus: (typeof dispatchStatuses)[number];
+    artifactPhase: (typeof artifactPhases)[number];
+    disposition: (typeof dispositions)[number];
+    retainedCandidate: (typeof candidates)[number];
+    actions: (typeof actionVariants)[number];
+  };
 
-    expect(allowed.every((run) => presentationRunPublicSchema.safeParse(run).success)).toBe(true);
+  const buildFamily = (
+    familyDispatches: readonly PublicState['dispatchStatus'][],
+    familyPhases: readonly PublicState['artifactPhase'][],
+    disposition: PublicState['disposition'],
+    retainedCandidate: PublicState['retainedCandidate'],
+    actions: PublicState['actions']
+  ): PublicState[] =>
+    familyDispatches.flatMap((dispatchStatus) =>
+      familyPhases.map((artifactPhase) => ({
+        dispatchStatus,
+        artifactPhase,
+        disposition,
+        retainedCandidate,
+        actions,
+      }))
+    );
+
+  const allowedStates: PublicState[] = [
+    ...buildFamily(
+      ['allocating', 'committed'],
+      ['none', 'sources_snapshotted', 'sources_extracted'],
+      null,
+      null,
+      discardOnlyActions
+    ),
+    ...buildFamily(
+      ['dispatching', 'bound'],
+      ['none', 'sources_snapshotted', 'sources_extracted'],
+      null,
+      null,
+      noActions
+    ),
+    ...buildFamily(['terminal_verified'], ['sources_extracted'], null, null, noActions),
+    ...buildFamily(
+      ['terminal_verified'],
+      ['candidate_retained', 'candidate_copied', 'structurally_valid', 'ooxml_inspected'],
+      null,
+      candidate,
+      noActions
+    ),
+    ...buildFamily(
+      ['retained', 'failed_retained'],
+      ['candidate_retained', 'candidate_copied', 'structurally_valid', 'ooxml_inspected', 'rendered_exact_hash'],
+      'REVIEW_REQUIRED',
+      candidate,
+      retainedActions
+    ),
+    ...buildFamily(
+      ['failed_retained'],
+      ['none', 'sources_snapshotted', 'sources_extracted'],
+      'TRACKING_REQUIRED',
+      null,
+      discardOnlyActions
+    ),
+    ...buildFamily(
+      ['retained', 'dispatch_uncertain'],
+      ['none', 'sources_snapshotted', 'sources_extracted'],
+      'TRACKING_REQUIRED',
+      null,
+      noActions
+    ),
+    ...buildFamily(['discarded'], [null], null, null, noActions),
+  ];
+
+  const stateKey = (state: PublicState): string =>
+    JSON.stringify([
+      state.dispatchStatus,
+      state.artifactPhase,
+      state.disposition,
+      state.retainedCandidate === null ? null : 'candidate',
+      state.actions.openAllowed,
+      state.actions.discardAllowed,
+    ]);
+
+  const runForState = (state: PublicState): Record<string, unknown> => ({ ...base, ...state });
+
+  it('accepts exactly the complete allowed public-state matrix and rejects every other combination', () => {
+    const allStates = dispatchStatuses.flatMap((dispatchStatus) =>
+      artifactPhases.flatMap((artifactPhase) =>
+        dispositions.flatMap((disposition) =>
+          candidates.flatMap((retainedCandidate) =>
+            actionVariants.map((actions) => ({
+              dispatchStatus,
+              artifactPhase,
+              disposition,
+              retainedCandidate,
+              actions,
+            }))
+          )
+        )
+      )
+    );
+    const expectedAllowed = new Set(allowedStates.map(stateKey));
+    const actualAllowed = new Set(
+      allStates.filter((state) => presentationRunPublicSchema.safeParse(runForState(state)).success).map(stateKey)
+    );
+
+    expect(allStates).toHaveLength(1_944);
+    expect(expectedAllowed.size).toBe(37);
+    expect(actualAllowed).toEqual(expectedAllowed);
   });
 
-  it('rejects candidates, phases, dispositions, and actions in forbidden combinations', () => {
-    const forbidden = [
-      {
-        ...base,
-        dispatchStatus: 'allocating',
-        artifactPhase: 'none',
-        disposition: null,
-        retainedCandidate: candidate,
-        actions: { openAllowed: false, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'dispatching',
-        artifactPhase: 'sources_extracted',
-        disposition: null,
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'terminal_verified',
-        artifactPhase: 'rendered_exact_hash',
-        disposition: null,
-        retainedCandidate: candidate,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-      {
-        ...base,
-        dispatchStatus: 'retained',
-        artifactPhase: 'rendered_exact_hash',
-        disposition: 'REVIEW_REQUIRED',
-        retainedCandidate: null,
-        actions: { openAllowed: true, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'dispatch_uncertain',
-        artifactPhase: 'sources_extracted',
-        disposition: 'TRACKING_REQUIRED',
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: true },
-      },
-      {
-        ...base,
-        dispatchStatus: 'discarded',
-        artifactPhase: 'none',
-        disposition: null,
-        retainedCandidate: null,
-        actions: { openAllowed: false, discardAllowed: false },
-      },
-    ];
+  it('rejects unknown and private fields at every nested public DTO layer', () => {
+    const state = buildFamily(['retained'], ['rendered_exact_hash'], 'REVIEW_REQUIRED', candidate, retainedActions)[0];
+    const validRun = runForState(state);
 
-    expect(forbidden.every((run) => !presentationRunPublicSchema.safeParse(run).success)).toBe(true);
+    expect(presentationRunPublicSchema.safeParse({ ...validRun, workspacePath: '/tmp/private' }).success).toBe(false);
+    expect(
+      presentationRunPublicSchema.safeParse({
+        ...validRun,
+        actions: { ...retainedActions, backendBody: 'private' },
+      }).success
+    ).toBe(false);
+    expect(
+      presentationRunPublicSchema.safeParse({
+        ...validRun,
+        retainedCandidate: { ...candidate, candidatePath: '/tmp/private' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts terminal verification before a candidate is retained', () => {
+    const state = buildFamily(['terminal_verified'], ['sources_extracted'], null, null, noActions)[0];
+
+    expect(presentationRunPublicSchema.safeParse(runForState(state)).success).toBe(true);
+  });
+
+  it('rejects an early terminal candidate without changing another dimension', () => {
+    const state = buildFamily(['terminal_verified'], ['sources_extracted'], null, candidate, noActions)[0];
+
+    expect(presentationRunPublicSchema.safeParse(runForState(state)).success).toBe(false);
+  });
+
+  it('accepts terminal verification after a candidate is retained', () => {
+    const state = buildFamily(['terminal_verified'], ['candidate_retained'], null, candidate, noActions)[0];
+
+    expect(presentationRunPublicSchema.safeParse(runForState(state)).success).toBe(true);
+  });
+
+  it('rejects a null candidate after retention without changing another dimension', () => {
+    const state = buildFamily(['terminal_verified'], ['candidate_retained'], null, null, noActions)[0];
+
+    expect(presentationRunPublicSchema.safeParse(runForState(state)).success).toBe(false);
+  });
+
+  it.each([
+    ['dispatch status', { dispatchStatus: 'bound' }],
+    ['artifact phase', { artifactPhase: 'rendered_exact_hash' }],
+    ['disposition', { disposition: 'TRACKING_REQUIRED' }],
+    ['actions', { actions: discardOnlyActions }],
+  ] as const)('rejects an independently invalid %s', (_dimension, mutation) => {
+    const validState = buildFamily(['terminal_verified'], ['candidate_retained'], null, candidate, noActions)[0];
+    const mutatedState = { ...validState, ...mutation } as PublicState;
+
+    expect(presentationRunPublicSchema.safeParse(runForState(mutatedState)).success).toBe(false);
+  });
+});
+
+describe('managed presentation recovery contract', () => {
+  const CONVERSATION_ID = '2be7b8fc-6af5-42b8-aed5-03644735c730';
+  const OTHER_CONVERSATION_ID = 'd9b6195d-bab0-4662-b88c-1675772bb24d';
+  const cursorPayloadSchema = z
+    .object({
+      version: z.literal(1),
+      conversationId: z.string().uuid(),
+      updatedAt: z.string().datetime(),
+      runId: z.string().uuid(),
+    })
+    .strict();
+  const items = [
+    {
+      conversationId: CONVERSATION_ID,
+      runId: '00000000-0000-4000-8000-000000000001',
+      updatedAt: '2026-08-04T00:00:02.000Z',
+    },
+    {
+      conversationId: CONVERSATION_ID,
+      runId: '00000000-0000-4000-8000-000000000002',
+      updatedAt: '2026-08-04T00:00:02.000Z',
+    },
+    {
+      conversationId: CONVERSATION_ID,
+      runId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      updatedAt: '2026-08-04T00:00:01.000Z',
+    },
+  ];
+
+  const sortRecoverable = (values: typeof items): typeof items =>
+    values.toSorted(
+      (left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.runId.localeCompare(left.runId)
+    );
+
+  const mintCursor = (item: (typeof items)[number], extra: Record<string, unknown> = {}): string =>
+    Buffer.from(
+      JSON.stringify({
+        version: 1,
+        conversationId: item.conversationId,
+        updatedAt: item.updatedAt,
+        runId: item.runId,
+        ...extra,
+      })
+    ).toString('base64url');
+
+  const resolveCursor = (
+    cursor: string,
+    conversationId: string,
+    knownItems: typeof items
+  ): { ok: true; tuple: { updatedAt: string; runId: string } } | { ok: false; code: 'INVALID_REQUEST' } => {
+    try {
+      const parsed = cursorPayloadSchema.safeParse(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')));
+      if (!parsed.success || parsed.data.conversationId !== conversationId) {
+        return { ok: false, code: 'INVALID_REQUEST' };
+      }
+      const resolvable = knownItems.some(
+        (item) => item.updatedAt === parsed.data.updatedAt && item.runId === parsed.data.runId
+      );
+      return resolvable
+        ? { ok: true, tuple: { updatedAt: parsed.data.updatedAt, runId: parsed.data.runId } }
+        : { ok: false, code: 'INVALID_REQUEST' };
+    } catch {
+      return { ok: false, code: 'INVALID_REQUEST' };
+    }
+  };
+
+  it('orders recovery by updatedAt DESC and then runId DESC', () => {
+    const orderedRunIds = sortRecoverable(items).map((item) => item.runId);
+
+    expect(orderedRunIds).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000001',
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    ]);
+    expect(orderedRunIds).not.toEqual([
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    ]);
+  });
+
+  it('defaults the limit to 20 and accepts the exact 1 and 20 boundaries', () => {
+    expect(recoverablePresentationRunsRequestSchema.parse({ conversation_id: CONVERSATION_ID }).limit).toBe(20);
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({ conversation_id: CONVERSATION_ID, limit: 1 }).success
+    ).toBe(true);
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({ conversation_id: CONVERSATION_ID, limit: 20 }).success
+    ).toBe(true);
+  });
+
+  it('rejects limit 0, limit 21, non-integers, and unknown request fields independently', () => {
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({ conversation_id: CONVERSATION_ID, limit: 0 }).success
+    ).toBe(false);
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({ conversation_id: CONVERSATION_ID, limit: 21 }).success
+    ).toBe(false);
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({ conversation_id: CONVERSATION_ID, limit: 1.5 }).success
+    ).toBe(false);
+    expect(
+      recoverablePresentationRunsRequestSchema.safeParse({
+        conversation_id: CONVERSATION_ID,
+        limit: 1,
+        workspacePath: '/tmp',
+      }).success
+    ).toBe(false);
+  });
+
+  it('treats a valid cursor as opaque input and resolves only its exact final sort tuple', () => {
+    const cursor = mintCursor(items[1]);
+    const request = recoverablePresentationRunsRequestSchema.parse({ conversation_id: CONVERSATION_ID, cursor });
+
+    expect(request.cursor).toBe(cursor);
+    expect(cursor).not.toContain(CONVERSATION_ID);
+    expect(resolveCursor(cursor, CONVERSATION_ID, items)).toEqual({
+      ok: true,
+      tuple: { updatedAt: items[1].updatedAt, runId: items[1].runId },
+    });
+  });
+
+  it('maps malformed, cross-conversation, stale, and unknown-field cursors to INVALID_REQUEST', () => {
+    const staleItem = {
+      conversationId: CONVERSATION_ID,
+      runId: '00000000-0000-4000-8000-000000000099',
+      updatedAt: '2026-08-04T00:00:03.000Z',
+    };
+    const invalid = { ok: false, code: 'INVALID_REQUEST' };
+
+    expect(resolveCursor('not-base64-json', CONVERSATION_ID, items)).toEqual(invalid);
+    expect(resolveCursor(mintCursor(items[0]), OTHER_CONVERSATION_ID, items)).toEqual(invalid);
+    expect(resolveCursor(mintCursor(staleItem), CONVERSATION_ID, items)).toEqual(invalid);
+    expect(resolveCursor(mintCursor(items[0], { workspacePath: '/tmp' }), CONVERSATION_ID, items)).toEqual(invalid);
   });
 });
 
