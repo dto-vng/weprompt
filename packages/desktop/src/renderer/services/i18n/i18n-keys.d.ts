@@ -820,6 +820,7 @@ export type I18nKey =
   | 'conversation.creativeStudio.storyboard.durationTotal'
   | 'conversation.creativeStudio.storyboard.fitToTarget'
   | 'conversation.creativeStudio.storyboard.fitUnlockedOnly'
+  | 'conversation.creativeStudio.storyboard.fitUnreachable.affectedSceneCount'
   | 'conversation.creativeStudio.storyboard.fitUnreachable.no_adjustable_scenes'
   | 'conversation.creativeStudio.storyboard.fitUnreachable.route_unavailable'
   | 'conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds'

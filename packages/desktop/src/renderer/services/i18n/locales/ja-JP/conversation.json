@@ -930,9 +930,10 @@
       "fitToTarget": "{{seconds}}秒に合わせる",
       "fitUnlockedOnly": "未レンダリングのショットのみ時間を調整します。",
       "fitUnreachable": {
-        "route_unavailable": "未レンダリングの各ショットに対応モデルを選択して、もう一度お試しください。",
-        "no_adjustable_scenes": "すべてのショットがレンダリング済みまたは処理中です。目標を変更するか、未レンダリングのショットを編集してください。",
-        "target_out_of_bounds": "目標時間が選択したモデルで対応可能な範囲外です。"
+        "route_unavailable": "次の未レンダリングのショットに対応モデルを選択してください：{{scenes}}。",
+        "affectedSceneCount": "対象ショット数：{{count}}",
+        "no_adjustable_scenes": "すべてのショットがレンダリング済みまたは処理中で、合計は {{fixedTotalSeconds}} 秒です。目標を変更するか、未レンダリングのショットを編集してください。",
+        "target_out_of_bounds": "選択したモデルに合わせて、プロジェクト全体の目標時間を {{minimumTotalSeconds}}～{{maximumTotalSeconds}} 秒に設定してください。"
       },
       "durationOver": "目標より{{seconds}}秒超過",
       "durationRemaining": "{{seconds}}秒残り",

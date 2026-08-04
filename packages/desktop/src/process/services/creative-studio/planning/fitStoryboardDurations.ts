@@ -27,13 +27,35 @@ type WorkingAllocation = FitStoryboardDurationItem & {
   durationSeconds: number;
 };
 
+const assertSafeNonnegativeInteger = (value: number, label: string): void => {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${label} must be a safe nonnegative integer`);
+  }
+};
+
 /** Allocates an integer target across independently bounded scenes. */
 export function fitStoryboardDurations(
   items: readonly FitStoryboardDurationItem[],
   targetSeconds: number
 ): FitStoryboardDurationsResult {
-  const minimumSeconds = items.reduce((total, item) => total + item.minDurationSeconds, 0);
-  const maximumSeconds = items.reduce((total, item) => total + item.maxDurationSeconds, 0);
+  assertSafeNonnegativeInteger(targetSeconds, 'targetSeconds');
+  let minimumSeconds = 0;
+  let maximumSeconds = 0;
+  let totalCurrentSeconds = 0;
+  for (const item of items) {
+    assertSafeNonnegativeInteger(item.currentDurationSeconds, 'currentDurationSeconds');
+    assertSafeNonnegativeInteger(item.minDurationSeconds, 'minDurationSeconds');
+    assertSafeNonnegativeInteger(item.maxDurationSeconds, 'maxDurationSeconds');
+    if (item.minDurationSeconds > item.maxDurationSeconds) {
+      throw new RangeError('minDurationSeconds must not exceed maxDurationSeconds');
+    }
+    minimumSeconds += item.minDurationSeconds;
+    maximumSeconds += item.maxDurationSeconds;
+    totalCurrentSeconds += item.currentDurationSeconds;
+    assertSafeNonnegativeInteger(minimumSeconds, 'combined minimum duration');
+    assertSafeNonnegativeInteger(maximumSeconds, 'combined maximum duration');
+    assertSafeNonnegativeInteger(totalCurrentSeconds, 'combined current duration');
+  }
   if (targetSeconds < minimumSeconds || targetSeconds > maximumSeconds) {
     return { status: 'unreachable', minimumSeconds, maximumSeconds };
   }
@@ -83,12 +105,30 @@ export function fitStoryboardDurations(
   const remainderOrder = [...floored].sort(
     (left, right) => right.fractionalRemainder - left.fractionalRemainder || left.index - right.index
   );
-  for (const item of remainderOrder) {
-    if (leftoverSeconds === 0) break;
-    if (item.durationSeconds < item.maxDurationSeconds) {
-      item.durationSeconds += 1;
-      leftoverSeconds -= 1;
+  while (leftoverSeconds > 0) {
+    let allocated = false;
+    for (const item of remainderOrder) {
+      if (leftoverSeconds === 0) break;
+      if (item.durationSeconds < item.maxDurationSeconds) {
+        item.durationSeconds += 1;
+        leftoverSeconds -= 1;
+        allocated = true;
+      }
     }
+    if (!allocated) throw new RangeError('Target cannot be allocated within the supplied bounds');
+  }
+
+  const exactTotal = floored.reduce((total, item) => total + item.durationSeconds, 0);
+  if (
+    exactTotal !== targetSeconds ||
+    floored.some(
+      (item) =>
+        !Number.isSafeInteger(item.durationSeconds) ||
+        item.durationSeconds < item.minDurationSeconds ||
+        item.durationSeconds > item.maxDurationSeconds
+    )
+  ) {
+    throw new RangeError('Allocation did not produce an exact bounded integer result');
   }
 
   return {

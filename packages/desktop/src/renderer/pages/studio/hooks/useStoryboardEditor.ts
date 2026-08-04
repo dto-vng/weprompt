@@ -78,6 +78,7 @@ export type UseStoryboardEditorResult = {
   increaseTargetDuration: () => Promise<boolean>;
   fitToTarget: (catalogVersion: string) => Promise<StudioFitStoryboardOutcome | null>;
   latestFitOutcome: StudioFitStoryboardOutcome | null;
+  latestFitCatalogVersion: string | null;
   clearLatestFitOutcome: () => void;
   mutationPending: boolean;
   error: StoryboardEditorIssue | null;
@@ -184,6 +185,7 @@ export const useStoryboardEditor = ({
   const [conflict, setConflict] = useState<StoryboardEditorConflict | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [latestFitOutcome, setLatestFitOutcome] = useState<StudioFitStoryboardOutcome | null>(null);
+  const [latestFitCatalogVersion, setLatestFitCatalogVersion] = useState<string | null>(null);
   const [activeSaveIntent, setActiveSaveIntent] = useState<ActiveSaveIntent | null>(null);
 
   const mountedRef = useRef(true);
@@ -261,6 +263,7 @@ export const useStoryboardEditor = ({
       setError(null);
       setDrafting(false);
       setLatestFitOutcome(null);
+      setLatestFitCatalogVersion(null);
       setActiveSaveIntent(null);
     }
   }, [discardPausedIntents]);
@@ -281,7 +284,11 @@ export const useStoryboardEditor = ({
         }
       }
       projectRef.current = candidate;
-      if (mountedRef.current) setProject(candidate);
+      if (mountedRef.current) {
+        setProject(candidate);
+        setLatestFitOutcome(null);
+        setLatestFitCatalogVersion(null);
+      }
 
       if (projectChanged) {
         startProjectSession();
@@ -833,7 +840,10 @@ export const useStoryboardEditor = ({
   const fitToTarget = useCallback(
     async (catalogVersion: string): Promise<StudioFitStoryboardOutcome | null> => {
       if (projectRef.current === null) return null;
-      if (mountedRef.current) setLatestFitOutcome(null);
+      if (mountedRef.current) {
+        setLatestFitOutcome(null);
+        setLatestFitCatalogVersion(null);
+      }
       let immediateOutcome: StudioFitStoryboardOutcome | null = null;
       const accepted = await enqueueIntent({
         operation: 'fit_duration',
@@ -845,8 +855,19 @@ export const useStoryboardEditor = ({
           });
           if (result.ok === false) return result;
           immediateOutcome = result.data;
-          if (mountedRef.current) setLatestFitOutcome(result.data);
           return { ok: true, data: result.data.project };
+        },
+        onSuccess: (canonical) => {
+          if (
+            immediateOutcome === null ||
+            immediateOutcome.project.id !== canonical.id ||
+            immediateOutcome.project.revision !== canonical.revision ||
+            !mountedRef.current
+          ) {
+            return;
+          }
+          setLatestFitOutcome(immediateOutcome);
+          setLatestFitCatalogVersion(catalogVersion);
         },
       });
       return accepted ? immediateOutcome : null;
@@ -854,7 +875,10 @@ export const useStoryboardEditor = ({
     [enqueueIntent]
   );
 
-  const clearLatestFitOutcome = useCallback(() => setLatestFitOutcome(null), []);
+  const clearLatestFitOutcome = useCallback(() => {
+    setLatestFitOutcome(null);
+    setLatestFitCatalogVersion(null);
+  }, []);
 
   const removeScene = useCallback(
     async (sceneId: string): Promise<boolean> => {
@@ -1030,6 +1054,7 @@ export const useStoryboardEditor = ({
     increaseTargetDuration,
     fitToTarget,
     latestFitOutcome,
+    latestFitCatalogVersion,
     clearLatestFitOutcome,
     mutationPending: mutationCount > 0,
     error,

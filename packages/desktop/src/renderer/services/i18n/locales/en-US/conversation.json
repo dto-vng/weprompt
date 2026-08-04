@@ -786,9 +786,10 @@
       "fitToTarget": "Fit to {{seconds}}s",
       "fitUnlockedOnly": "Retimes unrendered shots only.",
       "fitUnreachable": {
-        "route_unavailable": "Select a compatible model for every unrendered shot, then try again.",
-        "no_adjustable_scenes": "All shots are rendered or active. Change the target or edit an unrendered shot.",
-        "target_out_of_bounds": "The target is outside the supported duration range for the selected models."
+        "route_unavailable": "Select a compatible model for these unrendered shots: {{scenes}}.",
+        "affectedSceneCount": "Affected shots: {{count}}",
+        "no_adjustable_scenes": "All shots are rendered or active, totaling {{fixedTotalSeconds}} seconds. Change the target or edit an unrendered shot.",
+        "target_out_of_bounds": "Set the full project target between {{minimumTotalSeconds}} and {{maximumTotalSeconds}} seconds for the selected models."
       },
       "durationOver": "{{seconds}} seconds over target",
       "durationRemaining": "{{seconds}} seconds remaining",

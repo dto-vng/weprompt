@@ -187,6 +187,31 @@ describe('useStoryboardEditor', () => {
     expect(result.current.latestFitOutcome).toEqual(outcome);
   });
 
+  it('hides a fit outcome after an unrelated canonical revision is adopted', async () => {
+    const initial = project(2, [scene('scene-1', { durationSeconds: 18 })], { targetDurationSeconds: 15 });
+    const fitted = project(3, [scene('scene-1', { durationSeconds: 12 })], { targetDurationSeconds: 15 });
+    const outcome: StudioFitStoryboardOutcome = {
+      status: 'unreachable',
+      reason: 'target_out_of_bounds',
+      project: fitted,
+      lockedSceneIds: [],
+      minimumTotalSeconds: 4,
+      maximumTotalSeconds: 12,
+    };
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(ok(outcome));
+    const refetch = vi.fn(async () => initial);
+    const { result, rerender } = renderHook(({ canonical }) => useStoryboardEditor({ project: canonical, refetch }), {
+      initialProps: { canonical: initial },
+    });
+
+    await act(async () => void (await result.current.fitToTarget('catalog-1')));
+    expect(result.current.latestFitOutcome).toEqual(outcome);
+
+    rerender({ canonical: project(4, [scene('scene-1', { durationSeconds: 11 })], { targetDurationSeconds: 15 }) });
+
+    expect(result.current.latestFitOutcome).toBeNull();
+  });
+
   it('clears the latest structured fit explanation without changing the project', async () => {
     const initial = project();
     const outcome: StudioFitStoryboardOutcome = {

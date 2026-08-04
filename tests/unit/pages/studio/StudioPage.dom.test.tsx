@@ -757,6 +757,44 @@ describe('StudioPage and useStudioProject', () => {
     expect(lowerAction).toBeDisabled();
   });
 
+  it('hides unreachable fit feedback after the route catalog version changes', async () => {
+    const opening = scene({ durationSeconds: 18 });
+    const initial = project('project-1', {
+      targetDurationSeconds: 15,
+      sceneOrder: [opening.id],
+      scenes: { [opening.id]: opening },
+    });
+    bridge.getProject.invoke.mockResolvedValue(ok(initial));
+    bridge.listRoutes.invoke
+      .mockResolvedValueOnce(ok({ ...routesWithImage(), catalogVersion: 'catalog-1' }))
+      .mockResolvedValue(ok({ ...routesWithImage(), catalogVersion: 'catalog-2' }));
+    bridge.fitStoryboard.invoke.mockResolvedValueOnce(
+      ok<StudioFitStoryboardOutcome>({
+        status: 'unreachable',
+        reason: 'target_out_of_bounds',
+        project: initial,
+        lockedSceneIds: [],
+        minimumTotalSeconds: 1,
+        maximumTotalSeconds: 12,
+      })
+    );
+    renderRoute();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' }));
+    expect(
+      await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.models.refresh' })[0]!);
+
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
+      ).not.toBeInTheDocument()
+    );
+  });
+
   it('keeps fit disabled for the entire reference import mutation', async () => {
     const opening = scene({ durationSeconds: 10 });
     const initial = project('project-1', {

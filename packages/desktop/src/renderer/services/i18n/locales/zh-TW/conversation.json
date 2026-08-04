@@ -930,9 +930,10 @@
       "fitToTarget": "調整為 {{seconds}} 秒",
       "fitUnlockedOnly": "僅調整未算繪鏡頭的時間。",
       "fitUnreachable": {
-        "route_unavailable": "請為每個未算繪鏡頭選擇相容的模型，然後重試。",
-        "no_adjustable_scenes": "所有鏡頭均已算繪或正在處理。請變更目標，或編輯未算繪鏡頭。",
-        "target_out_of_bounds": "目標時間超出所選模型支援的範圍。"
+        "route_unavailable": "請為這些未算繪鏡頭選擇相容的模型：{{scenes}}。",
+        "affectedSceneCount": "受影響的鏡頭：{{count}} 個",
+        "no_adjustable_scenes": "所有鏡頭均已算繪或正在處理，總時間為 {{fixedTotalSeconds}} 秒。請變更目標，或編輯未算繪鏡頭。",
+        "target_out_of_bounds": "請將完整專案的目標時間設為 {{minimumTotalSeconds}} 到 {{maximumTotalSeconds}} 秒，以符合所選模型的限制。"
       },
       "durationOver": "超出目標 {{seconds}} 秒",
       "durationRemaining": "剩餘 {{seconds}} 秒",

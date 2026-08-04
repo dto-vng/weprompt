@@ -931,9 +931,10 @@
       "fitToTarget": "Auf {{seconds}} s anpassen",
       "fitUnlockedOnly": "Passt nur nicht gerenderte Einstellungen zeitlich an.",
       "fitUnreachable": {
-        "route_unavailable": "Wähle für jede nicht gerenderte Einstellung ein kompatibles Modell aus und versuche es erneut.",
-        "no_adjustable_scenes": "Alle Einstellungen sind gerendert oder aktiv. Ändere das Ziel oder bearbeite eine nicht gerenderte Einstellung.",
-        "target_out_of_bounds": "Das Ziel liegt außerhalb des unterstützten Dauerbereichs der ausgewählten Modelle."
+        "route_unavailable": "Wähle für diese nicht gerenderten Einstellungen ein kompatibles Modell aus: {{scenes}}.",
+        "affectedSceneCount": "Betroffene Einstellungen: {{count}}",
+        "no_adjustable_scenes": "Alle Einstellungen sind gerendert oder aktiv und dauern insgesamt {{fixedTotalSeconds}} Sekunden. Ändere das Ziel oder bearbeite eine nicht gerenderte Einstellung.",
+        "target_out_of_bounds": "Lege das Ziel für das gesamte Projekt passend zu den ausgewählten Modellen auf {{minimumTotalSeconds}} bis {{maximumTotalSeconds}} Sekunden fest."
       },
       "durationOver": "{{seconds}} Sekunden über dem Ziel",
       "durationRemaining": "{{seconds}} Sekunden verbleibend",

@@ -930,9 +930,10 @@
       "fitToTarget": "تنظیم روی {{seconds}} ثانیه",
       "fitUnlockedOnly": "فقط زمان نماهای رندرنشده را تنظیم می‌کند.",
       "fitUnreachable": {
-        "route_unavailable": "برای هر نمای رندرنشده یک مدل سازگار انتخاب کنید و دوباره تلاش کنید.",
-        "no_adjustable_scenes": "همه نماها رندر شده‌اند یا فعال هستند. هدف را تغییر دهید یا یک نمای رندرنشده را ویرایش کنید.",
-        "target_out_of_bounds": "هدف خارج از محدوده زمان پشتیبانی‌شده مدل‌های انتخابی است."
+        "route_unavailable": "برای این نماهای رندرنشده یک مدل سازگار انتخاب کنید: {{scenes}}.",
+        "affectedSceneCount": "نماهای تحت تأثیر: {{count}}",
+        "no_adjustable_scenes": "همه نماها رندر شده‌اند یا فعال هستند و مجموع آن‌ها {{fixedTotalSeconds}} ثانیه است. هدف را تغییر دهید یا یک نمای رندرنشده را ویرایش کنید.",
+        "target_out_of_bounds": "برای مدل‌های انتخابی، هدف کل پروژه را بین {{minimumTotalSeconds}} و {{maximumTotalSeconds}} ثانیه تنظیم کنید."
       },
       "durationOver": "{{seconds}} ثانیه بیش از زمان هدف",
       "durationRemaining": "{{seconds}} ثانیه باقی مانده",

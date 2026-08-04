@@ -932,9 +932,10 @@
       "fitToTarget": "{{seconds}} sn'ye uyarla",
       "fitUnlockedOnly": "Yalnızca işlenmemiş çekimlerin süresini değiştirir.",
       "fitUnreachable": {
-        "route_unavailable": "İşlenmemiş her çekim için uyumlu bir model seçip yeniden deneyin.",
-        "no_adjustable_scenes": "Tüm çekimler işlendi veya etkin. Hedefi değiştirin ya da işlenmemiş bir çekimi düzenleyin.",
-        "target_out_of_bounds": "Hedef, seçilen modellerin desteklediği süre aralığının dışında."
+        "route_unavailable": "İşlenmemiş şu çekimler için uyumlu bir model seçin: {{scenes}}.",
+        "affectedSceneCount": "Etkilenen çekimler: {{count}}",
+        "no_adjustable_scenes": "Tüm çekimler işlendi veya etkin ve toplam süre {{fixedTotalSeconds}} saniye. Hedefi değiştirin ya da işlenmemiş bir çekimi düzenleyin.",
+        "target_out_of_bounds": "Seçilen modeller için tam proje hedefini {{minimumTotalSeconds}} ile {{maximumTotalSeconds}} saniye arasında ayarlayın."
       },
       "durationOver": "Hedefin {{seconds}} saniye üzerindesiniz",
       "durationRemaining": "{{seconds}} saniye kaldı",

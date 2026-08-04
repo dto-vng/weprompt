@@ -188,8 +188,9 @@ describe('StoryboardPanel', () => {
         reason: 'route_unavailable',
         project: {} as never,
         lockedSceneIds: [],
-        unavailableSceneIds: ['scene-1'],
+        unavailableSceneIds: ['scene-1', 'scene-2'],
       },
+      'conversation.creativeStudio.storyboard.fitUnreachable.route_unavailable:Opening, Reveal',
     ],
     [
       'no_adjustable_scenes',
@@ -200,6 +201,7 @@ describe('StoryboardPanel', () => {
         lockedSceneIds: ['scene-1'],
         fixedTotalSeconds: 15,
       },
+      'conversation.creativeStudio.storyboard.fitUnreachable.no_adjustable_scenes:15',
     ],
     [
       'target_out_of_bounds',
@@ -211,15 +213,34 @@ describe('StoryboardPanel', () => {
         minimumTotalSeconds: 18,
         maximumTotalSeconds: 24,
       },
+      'conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds:18:24',
     ],
-  ] as const)('shows actionable %s fit feedback while leaving the mismatch visible', (_reason, fitOutcome) => {
-    const props = createProps({ fitOutcome: fitOutcome as StudioFitStoryboardOutcome });
+  ] as const)(
+    'shows actionable %s fit feedback while leaving the mismatch visible',
+    (_reason, fitOutcome, expectedFeedback) => {
+      const props = createProps({ fitOutcome: fitOutcome as StudioFitStoryboardOutcome });
+      render(<StoryboardPanel {...props} />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(expectedFeedback);
+      expect(screen.getByText('conversation.creativeStudio.storyboard.durationMismatch')).toBeInTheDocument();
+    }
+  );
+
+  it('falls back to an affected-scene count without exposing unknown scene IDs', () => {
+    const fitOutcome: StudioFitStoryboardOutcome = {
+      status: 'unreachable',
+      reason: 'route_unavailable',
+      project: {} as never,
+      lockedSceneIds: [],
+      unavailableSceneIds: ['removed-scene'],
+    };
+    const props = createProps({ fitOutcome });
     render(<StoryboardPanel {...props} />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      `conversation.creativeStudio.storyboard.fitUnreachable.${fitOutcome.reason}`
+      'conversation.creativeStudio.storyboard.fitUnreachable.route_unavailable:conversation.creativeStudio.storyboard.fitUnreachable.affectedSceneCount:1'
     );
-    expect(screen.getByText('conversation.creativeStudio.storyboard.durationMismatch')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).not.toHaveTextContent('removed-scene');
   });
 
   it('keeps Add Scene enabled while project duration remains', () => {

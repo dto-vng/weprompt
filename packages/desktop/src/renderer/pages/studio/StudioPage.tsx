@@ -221,6 +221,14 @@ const StudioProjectShell: React.FC = () => {
           }),
     [project]
   );
+  const currentFitOutcome =
+    editor.latestFitOutcome !== null &&
+    project !== null &&
+    editor.latestFitOutcome.project.id === project.id &&
+    editor.latestFitOutcome.project.revision === project.revision &&
+    editor.latestFitCatalogVersion === studioModels.catalog?.catalogVersion
+      ? editor.latestFitOutcome
+      : null;
   const readiness = useMemo(() => (project === null ? null : deriveStudioReadiness(project)), [project]);
   const modelSetupCalloutVisible =
     studioModels.catalog !== null &&
@@ -798,8 +806,8 @@ const StudioProjectShell: React.FC = () => {
           canAddScene={editor.canAddScene}
           mutationPending={canonicalMutationPending}
           fitDisabled={fitDisabled}
-          fitOutcome={editor.latestFitOutcome}
-          hasLockedScenes={hasLockedScenes || (editor.latestFitOutcome?.lockedSceneIds.length ?? 0) > 0}
+          fitOutcome={currentFitOutcome}
+          hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
           sceneStatuses={readiness?.sceneStatuses ?? {}}
           errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
           statusMessageKey={

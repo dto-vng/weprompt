@@ -122,4 +122,47 @@ describe('fitStoryboardDurations', () => {
       ],
     });
   });
+
+  it.each([
+    ['NaN target', [item('scene-1', 5, 1, 10)], Number.NaN],
+    ['positive infinite target', [item('scene-1', 5, 1, 10)], Number.POSITIVE_INFINITY],
+    ['negative infinite target', [item('scene-1', 5, 1, 10)], Number.NEGATIVE_INFINITY],
+    ['fractional target', [item('scene-1', 5, 1, 10)], 5.5],
+    ['unsafe target', [item('scene-1', 5, 1, 10)], Number.MAX_SAFE_INTEGER + 1],
+    ['negative target', [item('scene-1', 5, 1, 10)], -1],
+    ['NaN current duration', [item('scene-1', Number.NaN, 1, 10)], 5],
+    ['positive infinite current duration', [item('scene-1', Number.POSITIVE_INFINITY, 1, 10)], 5],
+    ['negative infinite current duration', [item('scene-1', Number.NEGATIVE_INFINITY, 1, 10)], 5],
+    ['fractional current duration', [item('scene-1', 5.5, 1, 10)], 5],
+    ['unsafe current duration', [item('scene-1', Number.MAX_SAFE_INTEGER + 1, 1, 10)], 5],
+    ['negative current duration', [item('scene-1', -1, 1, 10)], 5],
+    ['NaN minimum', [item('scene-1', 5, Number.NaN, 10)], 5],
+    ['infinite maximum', [item('scene-1', 5, 1, Number.POSITIVE_INFINITY)], 5],
+    ['fractional minimum', [item('scene-1', 5, 1.5, 10)], 5],
+    ['fractional maximum', [item('scene-1', 5, 1, 10.5)], 5],
+    ['unsafe minimum', [item('scene-1', 5, Number.MAX_SAFE_INTEGER + 1, Number.MAX_SAFE_INTEGER + 1)], 5],
+    ['unsafe maximum', [item('scene-1', 5, 1, Number.MAX_SAFE_INTEGER + 1)], 5],
+    ['negative minimum', [item('scene-1', 5, -1, 10)], 5],
+    ['negative maximum', [item('scene-1', 5, 0, -1)], 0],
+    ['reversed bounds', [item('scene-1', 5, 10, 1)], 5],
+  ])('rejects %s before allocation', (_case, items, targetSeconds) => {
+    expect(() => fitStoryboardDurations(items, targetSeconds)).toThrow();
+  });
+
+  it.each([
+    [6, [item('first', 0, 2, 5), item('second', 99, 1, 4)]],
+    [13, [item('first', 50, 0, 3), item('second', 1, 4, 10), item('third', 7, 2, 8)]],
+    [24, [item('first', 4, 4, 4), item('second', 12, 5, 15), item('third', 2, 1, 20)]],
+  ])('keeps every fitted allocation integral, bounded, and exact for target %s', (targetSeconds, items) => {
+    const result = fitStoryboardDurations(items, targetSeconds);
+
+    expect(result.status).toBe('fitted');
+    if (result.status !== 'fitted') return;
+    expect(result.allocations.reduce((total, allocation) => total + allocation.durationSeconds, 0)).toBe(targetSeconds);
+    for (const [index, allocation] of result.allocations.entries()) {
+      expect(Number.isInteger(allocation.durationSeconds)).toBe(true);
+      expect(allocation.durationSeconds).toBeGreaterThanOrEqual(items[index]!.minDurationSeconds);
+      expect(allocation.durationSeconds).toBeLessThanOrEqual(items[index]!.maxDurationSeconds);
+    }
+  });
 });

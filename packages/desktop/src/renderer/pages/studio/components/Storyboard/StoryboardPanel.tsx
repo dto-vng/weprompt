@@ -96,10 +96,31 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   const removeActionLabel = removeCandidate
     ? `${t('conversation.creativeStudio.storyboard.removeScene')}: ${removeCandidate.sceneLabel}`
     : t('conversation.creativeStudio.storyboard.removeScene');
-  const fitErrorMessageKey =
-    fitOutcome?.status === 'unreachable'
-      ? (`conversation.creativeStudio.storyboard.fitUnreachable.${fitOutcome.reason}` as const)
-      : null;
+  const fitErrorMessage = (() => {
+    if (fitOutcome?.status !== 'unreachable') return null;
+    if (fitOutcome.reason === 'route_unavailable') {
+      const unavailableTitles = fitOutcome.unavailableSceneIds.flatMap((sceneId) => {
+        const title = orderedScenes.find((scene) => scene.id === sceneId)?.title.trim();
+        return title ? [title] : [];
+      });
+      const scenes =
+        unavailableTitles.length === fitOutcome.unavailableSceneIds.length
+          ? unavailableTitles.join(', ')
+          : t('conversation.creativeStudio.storyboard.fitUnreachable.affectedSceneCount', {
+              count: fitOutcome.unavailableSceneIds.length,
+            });
+      return t('conversation.creativeStudio.storyboard.fitUnreachable.route_unavailable', { scenes });
+    }
+    if (fitOutcome.reason === 'no_adjustable_scenes') {
+      return t('conversation.creativeStudio.storyboard.fitUnreachable.no_adjustable_scenes', {
+        fixedTotalSeconds: fitOutcome.fixedTotalSeconds,
+      });
+    }
+    return t('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds', {
+      minimumTotalSeconds: fitOutcome.minimumTotalSeconds,
+      maximumTotalSeconds: fitOutcome.maximumTotalSeconds,
+    });
+  })();
 
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
@@ -198,9 +219,9 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
         {hasLockedScenes && !durationMatchesTarget && (
           <p className={styles.limit}>{t('conversation.creativeStudio.storyboard.fitUnlockedOnly')}</p>
         )}
-        {fitErrorMessageKey && (
+        {fitErrorMessage && (
           <div role='alert' className={`${styles.feedback} ${styles.error}`}>
-            {t(fitErrorMessageKey)}
+            {fitErrorMessage}
           </div>
         )}
         {errorMessageKey && (

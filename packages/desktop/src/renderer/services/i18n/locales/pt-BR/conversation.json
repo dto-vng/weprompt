@@ -936,9 +936,10 @@
       "fitToTarget": "Ajustar para {{seconds}} s",
       "fitUnlockedOnly": "Reajusta somente as tomadas não renderizadas.",
       "fitUnreachable": {
-        "route_unavailable": "Selecione um modelo compatível para cada tomada não renderizada e tente novamente.",
-        "no_adjustable_scenes": "Todas as tomadas estão renderizadas ou ativas. Altere o objetivo ou edite uma tomada não renderizada.",
-        "target_out_of_bounds": "O objetivo está fora do intervalo de duração aceito pelos modelos selecionados."
+        "route_unavailable": "Selecione um modelo compatível para estas tomadas não renderizadas: {{scenes}}.",
+        "affectedSceneCount": "Tomadas afetadas: {{count}}",
+        "no_adjustable_scenes": "Todas as tomadas estão renderizadas ou ativas, totalizando {{fixedTotalSeconds}} segundos. Altere o objetivo ou edite uma tomada não renderizada.",
+        "target_out_of_bounds": "Defina o objetivo do projeto completo entre {{minimumTotalSeconds}} e {{maximumTotalSeconds}} segundos para os modelos selecionados."
       },
       "durationOver": "{{seconds}} segundos acima do objetivo",
       "durationRemaining": "{{seconds}} segundos restantes",

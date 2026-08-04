@@ -930,9 +930,10 @@
       "fitToTarget": "{{seconds}}초에 맞추기",
       "fitUnlockedOnly": "렌더링되지 않은 샷의 길이만 조정합니다.",
       "fitUnreachable": {
-        "route_unavailable": "렌더링되지 않은 각 샷에 호환 모델을 선택한 후 다시 시도하세요.",
-        "no_adjustable_scenes": "모든 샷이 렌더링되었거나 활성 상태입니다. 목표를 변경하거나 렌더링되지 않은 샷을 편집하세요.",
-        "target_out_of_bounds": "목표 시간이 선택한 모델에서 지원하는 길이 범위를 벗어났습니다."
+        "route_unavailable": "다음 렌더링되지 않은 샷에 호환 모델을 선택하세요: {{scenes}}.",
+        "affectedSceneCount": "영향받는 샷: {{count}}개",
+        "no_adjustable_scenes": "모든 샷이 렌더링되었거나 활성 상태이며 총 {{fixedTotalSeconds}}초입니다. 목표를 변경하거나 렌더링되지 않은 샷을 편집하세요.",
+        "target_out_of_bounds": "선택한 모델에 맞게 전체 프로젝트 목표를 {{minimumTotalSeconds}}초에서 {{maximumTotalSeconds}}초 사이로 설정하세요."
       },
       "durationOver": "목표보다 {{seconds}}초 초과",
       "durationRemaining": "{{seconds}}초 남음",
