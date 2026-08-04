@@ -15,6 +15,7 @@ import type {
   StudioRouteCatalog,
 } from '@/common/types/project/creativeStudioTypes';
 import { StudioLibrary } from '@renderer/pages/studio/components';
+import { readLastStudioPhase } from '@renderer/pages/studio/studioPhaseRoute';
 
 const bridge = vi.hoisted(() => ({
   listProjects: { invoke: vi.fn() },
@@ -107,6 +108,7 @@ const routes = (health: 'ready' | 'setup_required' | 'unavailable' = 'ready'): S
 describe('StudioLibrary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     bridge.listProjects.invoke.mockResolvedValue(ok([]));
     bridge.createProject.invoke.mockResolvedValue(ok(project()));
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
@@ -171,7 +173,36 @@ describe('StudioLibrary', () => {
         resolution: '720p',
       })
     );
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/studio/canonical-project'));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/studio/canonical-project/brief'));
+    expect(readLastStudioPhase('canonical-project')).toBe('brief');
+  });
+
+  it('opens a zero-scene project card at Brief', async () => {
+    bridge.listProjects.invoke.mockResolvedValue(ok([summary({ sceneCount: 0 })]));
+    render(<StudioLibrary />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Launch film' }));
+
+    expect(navigate).toHaveBeenCalledWith('/studio/project-1/brief');
+  });
+
+  it('opens an existing project card at Write when no phase was saved', async () => {
+    bridge.listProjects.invoke.mockResolvedValue(ok([summary({ sceneCount: 2 })]));
+    render(<StudioLibrary />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Launch film' }));
+
+    expect(navigate).toHaveBeenCalledWith('/studio/project-1/write');
+  });
+
+  it('opens a project card at its saved phase', async () => {
+    window.localStorage.setItem('aionui:creative-studio:last-phase:project-1', 'produce');
+    bridge.listProjects.invoke.mockResolvedValue(ok([summary({ sceneCount: 2 })]));
+    render(<StudioLibrary />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Launch film' }));
+
+    expect(navigate).toHaveBeenCalledWith('/studio/project-1/produce');
   });
 
   it('gives the aspect-ratio combobox an explicit accessible name', async () => {

@@ -21,6 +21,14 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 import StudioPage from '@renderer/pages/studio/StudioPage';
 import { useStudioProject } from '@renderer/pages/studio/hooks';
+import {
+  defaultStudioPhase,
+  parseStudioPhase,
+  readLastStudioPhase,
+  rememberStudioPhase,
+  resolveStudioEntryPhase,
+  studioPhasePath,
+} from '@renderer/pages/studio/studioPhaseRoute';
 
 const bridge = vi.hoisted(() => ({
   getProject: { invoke: vi.fn() },
@@ -193,8 +201,10 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-const renderRoute = (path = '/studio/project-1') => {
-  const router = createMemoryRouter([{ path: '/studio/:id', element: <StudioPage /> }], { initialEntries: [path] });
+const renderRoute = (path = '/studio/project-1/brief') => {
+  const router = createMemoryRouter([{ path: '/studio/:id/:phase?', element: <StudioPage /> }], {
+    initialEntries: [path],
+  });
   return { router, view: render(<RouterProvider router={router} />) };
 };
 
@@ -226,6 +236,7 @@ const ProjectHookHarness: React.FC = () => {
 describe('StudioPage and useStudioProject', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
@@ -257,6 +268,73 @@ describe('StudioPage and useStudioProject', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('Studio phase routes', () => {
+    it.each(['brief', 'write', 'produce', 'review'])('accepts %s as a canonical Studio phase', (phase) => {
+      expect(parseStudioPhase(phase)).toBe(phase);
+    });
+
+    it.each([undefined, '', 'bogus', 'BRIEF'])('rejects %s as a Studio phase', (phase) => {
+      expect(parseStudioPhase(phase)).toBeNull();
+    });
+
+    it('encodes project ids in canonical phase paths', () => {
+      expect(studioPhasePath('project / 1', 'review')).toBe('/studio/project%20%2F%201/review');
+    });
+
+    it('treats unavailable storage as no saved Studio phase', () => {
+      const inaccessibleStorage = {
+        getItem: () => {
+          throw new Error('storage unavailable');
+        },
+      } as Storage;
+
+      expect(readLastStudioPhase('project-1', inaccessibleStorage)).toBeNull();
+    });
+
+    it('does not throw when remembering a Studio phase fails', () => {
+      const inaccessibleStorage = {
+        setItem: () => {
+          throw new Error('quota exceeded');
+        },
+      } as Storage;
+
+      expect(() => rememberStudioPhase('project-1', 'brief', inaccessibleStorage)).not.toThrow();
+    });
+
+    it('uses Brief as the default for projects without scenes', () => {
+      expect(defaultStudioPhase(0)).toBe('brief');
+    });
+
+    it('uses Write as the default for projects with scenes', () => {
+      expect(defaultStudioPhase(1)).toBe('write');
+    });
+
+    it('prefers the saved Studio phase over the project default', () => {
+      window.localStorage.setItem('aionui:creative-studio:last-phase:project-1', 'review');
+
+      expect(resolveStudioEntryPhase('project-1', 0)).toBe('review');
+    });
+
+    it.each(['brief', 'write', 'produce', 'review'])('renders the Studio page at the %s phase route', async (phase) => {
+      renderRoute(`/studio/project-1/${phase}`);
+
+      expect(await screen.findByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
+    });
+
+    it('replaces a legacy project route with its canonical default phase', async () => {
+      const { router } = renderRoute('/studio/project-1');
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/brief'));
+    });
+
+    it('replaces an invalid phase without falling through to Guid', async () => {
+      const { router } = renderRoute('/studio/project-1/bogus');
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/brief'));
+      expect(router.state.location.pathname).not.toBe('/guid');
+    });
   });
 
   it('shows a loading shell while the canonical project is being fetched', () => {
@@ -1488,7 +1566,7 @@ describe('StudioPage and useStudioProject', () => {
 
     await act(async () => router.navigate('/studio/project-2'));
 
-    expect(router.state.location.pathname).toBe('/studio/project-1');
+    expect(router.state.location.pathname).toBe('/studio/project-1/brief');
     expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     expect(bridge.getProject.invoke).not.toHaveBeenCalledWith({ projectId: 'project-2' });
 
@@ -1526,7 +1604,7 @@ describe('StudioPage and useStudioProject', () => {
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })).toBeInTheDocument();
 
     await act(async () => router.navigate('/studio/project-2'));
-    expect(router.state.location.pathname).toBe('/studio/project-1');
+    expect(router.state.location.pathname).toBe('/studio/project-1/brief');
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' }));
     await waitFor(() =>

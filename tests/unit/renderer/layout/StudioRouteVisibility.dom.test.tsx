@@ -38,16 +38,28 @@ describe('Creative Studio route visibility', () => {
     mocks.isElectronDesktop.mockReturnValue(true);
   });
 
-  it('redirects WebUI Studio requests before the native Studio page loads', async () => {
+  it.each([
+    '#/studio',
+    '#/studio/project_1/brief',
+    '#/studio/project_1/write',
+    '#/studio/project_1/produce',
+    '#/studio/project_1/review',
+  ])('redirects WebUI Studio request %s before the native Studio page loads', async (hash) => {
     mocks.isElectronDesktop.mockReturnValue(false);
     const nativePageLoadsBefore = mocks.nativePageLoads;
-    renderAt('#/studio');
+    renderAt(hash);
 
     await waitFor(() => expect(window.location.hash).toBe('#/guid'));
     expect(mocks.nativePageLoads).toBe(nativePageLoadsBefore);
   });
 
-  it.each(['#/studio', '#/studio/project_1'])('renders the native Studio page for desktop route %s', async (hash) => {
+  it.each([
+    '#/studio',
+    '#/studio/project_1/brief',
+    '#/studio/project_1/write',
+    '#/studio/project_1/produce',
+    '#/studio/project_1/review',
+  ])('renders the native Studio page for desktop route %s', async (hash) => {
     renderAt(hash);
 
     expect(await screen.findByRole('main')).toHaveTextContent('native Studio page');

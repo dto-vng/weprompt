@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 
 import StudioEmptyState from './StudioEmptyState';
 import styles from './StudioLibrary.module.css';
+import { rememberStudioPhase, resolveStudioEntryPhase, studioPhasePath } from '../../studioPhaseRoute';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 
@@ -136,7 +137,8 @@ export const StudioLibrary: React.FC = () => {
       }
       await refreshProjects();
       setCreateVisible(false);
-      navigate(`/studio/${result.data.id}`);
+      rememberStudioPhase(result.data.id, 'brief');
+      navigate(studioPhasePath(result.data.id, 'brief'));
     } catch {
       setCreateErrorMessageKey('conversation.creativeStudio.errors.storage');
     } finally {
@@ -235,7 +237,13 @@ export const StudioLibrary: React.FC = () => {
           {projects.map((project) => (
             <Card key={project.id} size='small' className='min-w-0'>
               <div className={styles.cardHeader}>
-                <Button type='text' icon={<Film />} onClick={() => navigate(`/studio/${project.id}`)}>
+                <Button
+                  type='text'
+                  icon={<Film />}
+                  onClick={() =>
+                    navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneCount)))
+                  }
+                >
                   {project.name}
                 </Button>
                 <Button

@@ -39,6 +39,13 @@ import {
 } from './components';
 import { useStoryboardEditor, useStudioJobs, useStudioModels, useStudioProject } from './hooks';
 import styles from './StudioPage.module.css';
+import {
+  parseStudioPhase,
+  rememberStudioPhase,
+  resolveStudioEntryPhase,
+  studioPhasePath,
+  type StudioPhase,
+} from './studioPhaseRoute';
 import { resolveSceneDurationBounds } from './studioRouteConstraints';
 import { canOpenSingleSceneReview, deriveStudioReadiness } from './studioReadiness';
 
@@ -131,7 +138,7 @@ const projectRouteSnapshot = (
       };
 };
 
-const StudioProjectShell: React.FC = () => {
+const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ routePhase }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -151,6 +158,17 @@ const StudioProjectShell: React.FC = () => {
     reconcileOnSubscribe: true,
   });
   const project = studioJobs.project ?? editor.project ?? loadedProject;
+
+  useEffect(() => {
+    if (project === null) return;
+    if (routePhase !== null) {
+      rememberStudioPhase(project.id, routePhase);
+      return;
+    }
+    navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneOrder.length)), {
+      replace: true,
+    });
+  }, [navigate, project, routePhase]);
   const studioModels = useStudioModels({
     project,
     refetch,
@@ -1121,9 +1139,14 @@ const StudioProjectShell: React.FC = () => {
 };
 
 const StudioPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, phase } = useParams<{ id: string; phase?: string }>();
+  const routePhase = parseStudioPhase(phase);
 
-  return <main className={styles.page}>{id ? <StudioProjectShell key={id} /> : <StudioLibrary />}</main>;
+  return (
+    <main className={styles.page}>
+      {id ? <StudioProjectShell key={id} routePhase={routePhase} /> : <StudioLibrary />}
+    </main>
+  );
 };
 
 export default StudioPage;
