@@ -232,6 +232,38 @@ describe('CreativeStudioService', () => {
     ).rejects.toMatchObject({ code: 'not_found' } satisfies Partial<CreativeStudioStoreError>);
   });
 
+  it('applies only schema-whitelisted fields from updateProject', async () => {
+    const project = await service.createProject(makeInput());
+
+    const updated = await service.updateProject({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      name: 'Renamed launch film',
+      routing: {
+        storyboard: null,
+        image: { providerId: 'provider_1', adapterId: 'weprompt-image-v1', model: 'image-model' },
+        video: null,
+      },
+    } as never);
+
+    expect(updated.name).toBe('Renamed launch film');
+    expect(updated.routing).toEqual(project.routing);
+  });
+
+  it('never persists unknown top-level keys from updateProject', async () => {
+    const project = await service.createProject(makeInput());
+
+    await service.updateProject({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      name: 'Renamed launch film',
+      providerMetadata: { junk: true },
+    } as never);
+
+    const raw = JSON.parse(await readFile(path.join(rootDir, project.id, 'project.json'), 'utf8')) as unknown;
+    expect(raw).not.toHaveProperty('providerMetadata');
+  });
+
   it('validates and delegates every durable generation mutation to the runtime-owned job manager', async () => {
     const job: StudioJob = {
       id: 'job_1',

@@ -67,6 +67,8 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
 const RESOLUTIONS = new Set(['720p', '1080p']);
 const MEDIA_KINDS = new Set(['image', 'video']);
+const UPDATABLE_PROJECT_FIELDS = ['name', 'brief', 'aspectRatio', 'targetDurationSeconds', 'resolution'] as const;
+type UpdatableProjectField = (typeof UPDATABLE_PROJECT_FIELDS)[number];
 const NONTERMINAL_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
   'queued_local',
   'submitting',
@@ -241,6 +243,30 @@ const assertText: (value: unknown, maximum: number, label: string, required?: bo
 
 const assertExpectedRevision: (value: unknown) => asserts value is number = (value) => {
   if (!isIntegerInRange(value, 1, Number.MAX_SAFE_INTEGER)) throw invalid('Invalid Studio project revision');
+};
+
+const applyProjectUpdateField = <Field extends UpdatableProjectField>(
+  project: StudioProject,
+  input: StudioUpdateProjectRequest,
+  field: Field
+): void => {
+  switch (field) {
+    case 'name':
+      if (input.name !== undefined) project.name = input.name;
+      break;
+    case 'brief':
+      if (input.brief !== undefined) project.brief = input.brief;
+      break;
+    case 'aspectRatio':
+      if (input.aspectRatio !== undefined) project.aspectRatio = input.aspectRatio;
+      break;
+    case 'targetDurationSeconds':
+      if (input.targetDurationSeconds !== undefined) project.targetDurationSeconds = input.targetDurationSeconds;
+      break;
+    case 'resolution':
+      if (input.resolution !== undefined) project.resolution = input.resolution;
+      break;
+  }
 };
 
 const providerIsAvailable = (provider: IProvider, model: string, requireListedModel = true): boolean =>
@@ -878,7 +904,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       }
       if (input.resolution !== undefined && !RESOLUTIONS.has(input.resolution))
         throw invalid('Invalid Studio resolution');
-      const { projectId, expectedRevision, ...update } = input;
+      const { projectId, expectedRevision } = input;
       if (input.aspectRatio !== undefined) {
         const project = await deps.store.getProject(projectId);
         if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
@@ -895,7 +921,14 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
         }
       }
       return notify(
-        await deps.store.updateProject(projectId, (project) => ({ ...project, ...update }), expectedRevision)
+        await deps.store.updateProject(
+          projectId,
+          (project) => {
+            for (const field of UPDATABLE_PROJECT_FIELDS) applyProjectUpdateField(project, input, field);
+            return project;
+          },
+          expectedRevision
+        )
       );
     },
 
