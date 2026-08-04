@@ -201,15 +201,17 @@ export type PresentationRunPublicDto =
     })
   | (PresentationRunPublicBase & {
       dispatchStatus: 'retained' | 'failed_retained';
-      artifactPhase:
-        | 'candidate_retained'
-        | 'candidate_copied'
-        | 'structurally_valid'
-        | 'ooxml_inspected'
-        | 'rendered_exact_hash';
+      artifactPhase: 'candidate_retained' | 'candidate_copied' | 'structurally_valid';
       disposition: 'REVIEW_REQUIRED';
       retainedCandidate: RetainedCandidateDto;
-      actions: { openAllowed: true; discardAllowed: true };
+      actions: { openAllowed: false; discardAllowed: true };
+    })
+  | (PresentationRunPublicBase & {
+      dispatchStatus: 'retained' | 'failed_retained';
+      artifactPhase: 'ooxml_inspected' | 'rendered_exact_hash';
+      disposition: 'REVIEW_REQUIRED';
+      retainedCandidate: RetainedCandidateDto;
+      actions: { openAllowed: false; discardAllowed: true } | { openAllowed: true; discardAllowed: true };
     })
   | (PresentationRunPublicBase & {
       dispatchStatus: 'failed_retained';

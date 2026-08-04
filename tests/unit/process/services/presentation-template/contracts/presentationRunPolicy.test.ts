@@ -311,6 +311,7 @@ const runBaseSchema = z
 const noActionsSchema = z.object({ openAllowed: z.literal(false), discardAllowed: z.literal(false) }).strict();
 const discardOnlyActionsSchema = z.object({ openAllowed: z.literal(false), discardAllowed: z.literal(true) }).strict();
 const retainedActionsSchema = z.object({ openAllowed: z.literal(true), discardAllowed: z.literal(true) }).strict();
+const safetyQualifiedActionsSchema = z.union([discardOnlyActionsSchema, retainedActionsSchema]);
 const retainedCandidateSchema = z.object({ sha256: z.string(), byteLength: z.number() }).strict();
 
 export const presentationRunPublicSchema = z.union([
@@ -344,16 +345,17 @@ export const presentationRunPublicSchema = z.union([
   }),
   runBaseSchema.extend({
     dispatchStatus: z.enum(['retained', 'failed_retained']),
-    artifactPhase: z.enum([
-      'candidate_retained',
-      'candidate_copied',
-      'structurally_valid',
-      'ooxml_inspected',
-      'rendered_exact_hash',
-    ]),
+    artifactPhase: z.enum(['candidate_retained', 'candidate_copied', 'structurally_valid']),
     disposition: z.literal('REVIEW_REQUIRED'),
     retainedCandidate: retainedCandidateSchema,
-    actions: retainedActionsSchema,
+    actions: discardOnlyActionsSchema,
+  }),
+  runBaseSchema.extend({
+    dispatchStatus: z.enum(['retained', 'failed_retained']),
+    artifactPhase: z.enum(['ooxml_inspected', 'rendered_exact_hash']),
+    disposition: z.literal('REVIEW_REQUIRED'),
+    retainedCandidate: retainedCandidateSchema,
+    actions: safetyQualifiedActionsSchema,
   }),
   runBaseSchema.extend({
     dispatchStatus: z.literal('failed_retained'),
@@ -611,7 +613,21 @@ describe('managed presentation public-state policy', () => {
     ),
     ...buildFamily(
       ['retained', 'failed_retained'],
-      ['candidate_retained', 'candidate_copied', 'structurally_valid', 'ooxml_inspected', 'rendered_exact_hash'],
+      ['candidate_retained', 'candidate_copied', 'structurally_valid'],
+      'REVIEW_REQUIRED',
+      candidate,
+      discardOnlyActions
+    ),
+    ...buildFamily(
+      ['retained', 'failed_retained'],
+      ['ooxml_inspected', 'rendered_exact_hash'],
+      'REVIEW_REQUIRED',
+      candidate,
+      discardOnlyActions
+    ),
+    ...buildFamily(
+      ['retained', 'failed_retained'],
+      ['ooxml_inspected', 'rendered_exact_hash'],
       'REVIEW_REQUIRED',
       candidate,
       retainedActions
@@ -667,9 +683,55 @@ describe('managed presentation public-state policy', () => {
     );
 
     expect(allStates).toHaveLength(1_944);
-    expect(expectedAllowed.size).toBe(37);
+    expect(expectedAllowed.size).toBe(41);
     expect(actualAllowed).toEqual(expectedAllowed);
   });
+
+  it.each(['candidate_retained', 'candidate_copied', 'structurally_valid'] as const)(
+    'permits Discard but rejects Open before safety evidence at %s',
+    (artifactPhase) => {
+      const discardOnlyState = buildFamily(
+        ['retained'],
+        [artifactPhase],
+        'REVIEW_REQUIRED',
+        candidate,
+        discardOnlyActions
+      )[0];
+      const openState = { ...discardOnlyState, actions: retainedActions };
+
+      expect(presentationRunPublicSchema.safeParse(runForState(discardOnlyState)).success).toBe(true);
+      expect(presentationRunPublicSchema.safeParse(runForState(openState)).success).toBe(false);
+    }
+  );
+
+  it.each(['ooxml_inspected', 'rendered_exact_hash'] as const)(
+    'allows Open to remain denied or become authorized after %s safety evidence',
+    (artifactPhase) => {
+      const openDenied = buildFamily(
+        ['retained'],
+        [artifactPhase],
+        'REVIEW_REQUIRED',
+        candidate,
+        discardOnlyActions
+      )[0];
+      const openAuthorized = { ...openDenied, actions: retainedActions };
+
+      expect(presentationRunPublicSchema.safeParse(runForState(openDenied)).success).toBe(true);
+      expect(presentationRunPublicSchema.safeParse(runForState(openAuthorized)).success).toBe(true);
+    }
+  );
+
+  it.each(['ooxml_inspected', 'rendered_exact_hash'] as const)(
+    'requires a retained candidate and Discard permission after %s safety evidence',
+    (artifactPhase) => {
+      const validState = buildFamily(['retained'], [artifactPhase], 'REVIEW_REQUIRED', candidate, retainedActions)[0];
+      const missingCandidate = { ...validState, retainedCandidate: null };
+      const discardDenied = { ...validState, actions: openOnlyActions };
+
+      expect(presentationRunPublicSchema.safeParse(runForState(missingCandidate)).success).toBe(false);
+      expect(presentationRunPublicSchema.safeParse(runForState(discardDenied)).success).toBe(false);
+    }
+  );
 
   it('rejects unknown and private fields at every nested public DTO layer', () => {
     const state = buildFamily(['retained'], ['rendered_exact_hash'], 'REVIEW_REQUIRED', candidate, retainedActions)[0];

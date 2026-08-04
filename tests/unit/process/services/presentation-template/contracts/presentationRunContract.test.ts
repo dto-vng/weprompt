@@ -810,12 +810,40 @@ describe('managed presentation public contract', () => {
         const openUncertain: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'dispatch_uncertain', artifactPhase: 'sources_extracted', disposition: 'TRACKING_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: true, discardAllowed: true } };
         // @ts-expect-error retained review results require a retained candidate
         const retainedWithoutCandidate: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'rendered_exact_hash', disposition: 'REVIEW_REQUIRED', retainedCandidate: null, actions: { openAllowed: true, discardAllowed: true } };
+        // @ts-expect-error candidate retention alone is not safety evidence for Open
+        const openBeforeSafetyEvidence: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'candidate_retained', disposition: 'REVIEW_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: true, discardAllowed: true } };
+        // @ts-expect-error copying a candidate alone is not safety evidence for Open
+        const openAfterCandidateCopy: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'candidate_copied', disposition: 'REVIEW_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: true, discardAllowed: true } };
+        // @ts-expect-error structural validity alone is not safety evidence for Open
+        const openAfterStructuralValidation: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'structurally_valid', disposition: 'REVIEW_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: true, discardAllowed: true } };
+        // @ts-expect-error Open authorization never removes Discard authorization
+        const openWithoutDiscard: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'ooxml_inspected', disposition: 'REVIEW_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: true, discardAllowed: false } };
         // @ts-expect-error terminal verification cannot claim rendered evidence
         const terminalRendered: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'terminal_verified', artifactPhase: 'rendered_exact_hash', disposition: null, retainedCandidate: null, actions: { openAllowed: false, discardAllowed: false } };
         // @ts-expect-error discarded DTOs clear artifact state
         const discardedWithPhase: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'discarded', artifactPhase: 'none', disposition: null, retainedCandidate: null, actions: { openAllowed: false, discardAllowed: false } };
 
-        void [pathBearingStart, pathBearingDescriptor, pathBearingRef, bothSelectors, noSelector, dropWithPath, openUncertain, retainedWithoutCandidate, terminalRendered, discardedWithPhase];
+        void [pathBearingStart, pathBearingDescriptor, pathBearingRef, bothSelectors, noSelector, dropWithPath, openUncertain, retainedWithoutCandidate, openBeforeSafetyEvidence, openAfterCandidateCopy, openAfterStructuralValidation, openWithoutDiscard, terminalRendered, discardedWithPhase];
+      `
+    );
+
+    expect(diagnostics).toBe('');
+  });
+
+  it('accepts closed early candidates and either Open decision after safety evidence at compile time', () => {
+    const diagnostics = compileFixture(
+      (moduleSpecifier) => `
+        import type { PresentationRunPublicDto } from '${moduleSpecifier}';
+
+        const retainedClosed: PresentationRunPublicDto = { runId: 'r', clientRequestId: 'q', conversationId: 'c', selectedTemplateId: 't', revision: 1, createdAt: 'now', updatedAt: 'now', dispatchStatus: 'retained', artifactPhase: 'candidate_retained', disposition: 'REVIEW_REQUIRED', retainedCandidate: { sha256: 'a', byteLength: 1 }, actions: { openAllowed: false, discardAllowed: true } };
+        const copiedClosed: PresentationRunPublicDto = { ...retainedClosed, artifactPhase: 'candidate_copied' };
+        const structurallyValidClosed: PresentationRunPublicDto = { ...retainedClosed, artifactPhase: 'structurally_valid' };
+        const inspectedClosed: PresentationRunPublicDto = { ...retainedClosed, artifactPhase: 'ooxml_inspected' };
+        const inspectedOpen: PresentationRunPublicDto = { ...inspectedClosed, actions: { openAllowed: true, discardAllowed: true } };
+        const renderedClosed: PresentationRunPublicDto = { ...retainedClosed, artifactPhase: 'rendered_exact_hash' };
+        const renderedOpen: PresentationRunPublicDto = { ...renderedClosed, actions: { openAllowed: true, discardAllowed: true } };
+
+        void [retainedClosed, copiedClosed, structurallyValidClosed, inspectedClosed, inspectedOpen, renderedClosed, renderedOpen];
       `
     );
 
