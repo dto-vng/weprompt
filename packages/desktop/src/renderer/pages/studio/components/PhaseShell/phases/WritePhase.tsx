@@ -73,8 +73,8 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
     models.pendingRole !== null;
 
   useEffect(() => {
-    if (layoutMode === 'inline') setAssistantOpen(false);
-  }, [layoutMode, project.id]);
+    setAssistantOpen(false);
+  }, [project.id]);
 
   useEffect(() => {
     if (writeFocusIntent === null) return;
@@ -181,7 +181,10 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
                 selected={editor.selectedSceneId === scene.id}
                 mutationPending={mutationPending}
                 importingReference={importingSceneId === scene.id}
-                durationBounds={resolveSceneDurationBounds(project, models.catalog, draft.mediaKind)}
+                durationBoundsByMediaKind={{
+                  image: resolveSceneDurationBounds(project, models.catalog, 'image'),
+                  video: resolveSceneDurationBounds(project, models.catalog, 'video'),
+                }}
                 onSelect={() => editor.selectScene(scene.id)}
                 onUpdate={(patch) => editor.updateSceneDraftById(scene.id, patch)}
                 onFlush={() => editor.flushSceneDraftById(scene.id)}

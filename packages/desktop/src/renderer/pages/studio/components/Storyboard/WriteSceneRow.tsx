@@ -32,7 +32,7 @@ export type WriteSceneRowProps = {
   selected: boolean;
   mutationPending: boolean;
   importingReference: boolean;
-  durationBounds: StudioSceneDurationBounds;
+  durationBoundsByMediaKind: Record<StudioMediaKind, StudioSceneDurationBounds>;
   onSelect: () => void;
   onUpdate: (patch: Partial<StudioEditableScene>) => void;
   onFlush: () => ActionResult;
@@ -60,7 +60,7 @@ export const WriteSceneRow: React.FC<WriteSceneRowProps> = ({
   selected,
   mutationPending,
   importingReference,
-  durationBounds,
+  durationBoundsByMediaKind,
   onSelect,
   onUpdate,
   onFlush,
@@ -72,6 +72,7 @@ export const WriteSceneRow: React.FC<WriteSceneRowProps> = ({
   const [durationChangeInvalid, setDurationChangeInvalid] = useState(false);
   const durationInputInvalidRef = useRef(false);
   const fieldId = (field: string): string => `studio-scene-${field}-${scene.id}`;
+  const durationBounds = durationBoundsByMediaKind[draft.mediaKind];
 
   useEffect(() => {
     durationInputInvalidRef.current = false;
@@ -118,6 +119,18 @@ export const WriteSceneRow: React.FC<WriteSceneRowProps> = ({
     durationInputInvalidRef.current = false;
     setDurationChangeInvalid(false);
     onUpdate({ durationSeconds: value });
+  };
+
+  const updateMediaKind = (mediaKind: StudioMediaKind): void => {
+    const nextBounds = durationBoundsByMediaKind[mediaKind];
+    const integerDuration = Number.isFinite(draft.durationSeconds)
+      ? Math.round(draft.durationSeconds)
+      : nextBounds.minDurationSeconds;
+    const durationSeconds = Math.min(
+      nextBounds.maxDurationSeconds,
+      Math.max(nextBounds.minDurationSeconds, integerDuration)
+    );
+    onUpdate({ mediaKind, durationSeconds });
   };
 
   return (
@@ -194,7 +207,7 @@ export const WriteSceneRow: React.FC<WriteSceneRowProps> = ({
             id={fieldId('media')}
             aria-label={t('conversation.creativeStudio.inspector.mediaKindLabel')}
             value={draft.mediaKind}
-            onChange={(mediaKind) => onUpdate({ mediaKind: mediaKind as StudioMediaKind })}
+            onChange={(mediaKind) => updateMediaKind(mediaKind as StudioMediaKind)}
             onBlur={() => void onFlush()}
           >
             <Select.Option value='image'>{t('conversation.creativeStudio.scene.image')}</Select.Option>

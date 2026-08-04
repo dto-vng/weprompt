@@ -156,6 +156,47 @@ describe('useStoryboardEditor', () => {
     expect(result.current.sceneSaveStates['scene-2']).toBe('saved');
   });
 
+  it.each([
+    { fromKind: 'image' as const, toKind: 'video' as const, fromDuration: 2, clampedDuration: 4 },
+    { fromKind: 'video' as const, toKind: 'image' as const, fromDuration: 12, clampedDuration: 8 },
+  ])(
+    'sends a $fromKind to $toKind route change and its clamped duration in one IPC scene payload',
+    async ({ fromKind, toKind, fromDuration, clampedDuration }) => {
+      const initial = project(2, [scene('scene-1', { mediaKind: fromKind, durationSeconds: fromDuration })]);
+      const saved = project(3, [scene('scene-1', { mediaKind: toKind, durationSeconds: clampedDuration })]);
+      bridge.updateScene.invoke.mockResolvedValueOnce(ok(saved));
+      const { result } = renderHook(() =>
+        useStoryboardEditor({ project: initial, refetch: vi.fn(async () => initial) })
+      );
+
+      act(() =>
+        result.current.updateSceneDraftById('scene-1', {
+          mediaKind: toKind,
+          durationSeconds: clampedDuration,
+        })
+      );
+      await act(async () => {
+        expect(await result.current.flushSceneDraftById('scene-1')).toBe(true);
+      });
+
+      expect(bridge.updateScene.invoke).toHaveBeenCalledExactlyOnceWith({
+        projectId: 'project-1',
+        sceneId: 'scene-1',
+        expectedRevision: 2,
+        scene: {
+          title: 'Scene scene-1',
+          purpose: 'Move the story forward',
+          visualPrompt: 'A cinematic wide shot',
+          narration: '',
+          onScreenText: '',
+          mediaKind: toKind,
+          durationSeconds: clampedDuration,
+          referenceAssetId: null,
+        } satisfies StudioEditableScene,
+      });
+    }
+  );
+
   it('treats an empty project and scene draft set as safe to flush', async () => {
     const { result } = renderHook(() =>
       useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })

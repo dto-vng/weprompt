@@ -33,6 +33,8 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
   const { t } = useTranslation();
   const { project, editor, mutationPending, requestTransition } = controller;
   const [startingWrite, setStartingWrite] = useState(false);
+  const projectConflict = editor.conflict?.operation === 'update_project' ? editor.conflict : null;
+  const projectIssue = projectConflict ?? (editor.error?.operation === 'update_project' ? editor.error : null);
   const draft = editor.projectDraft ?? {
     name: project.name,
     brief: project.brief,
@@ -61,7 +63,7 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
   };
 
   const startWriting = async (): Promise<void> => {
-    if (hasValidationError || mutationPending || startingWrite) return;
+    if (hasValidationError || projectConflict !== null || mutationPending || startingWrite) return;
     setStartingWrite(true);
     try {
       if (await editor.flushProjectDraft()) requestTransition({ phase: 'write' });
@@ -165,9 +167,19 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
         </div>
       </div>
 
-      {editor.error?.operation === 'update_project' && (
+      {projectIssue !== null && (
         <div role='alert' className={styles.saveError}>
-          {t(editor.error.messageKey)}
+          {t(projectIssue.messageKey)}
+        </div>
+      )}
+      {projectConflict !== null && (
+        <div className={styles.conflictActions}>
+          <Button type='primary' loading={mutationPending} onClick={() => void editor.retryConflict()}>
+            {t('conversation.creativeStudio.storyboard.retry')}
+          </Button>
+          <Button disabled={mutationPending} onClick={editor.discardConflict}>
+            {t('conversation.creativeStudio.storyboard.discard')}
+          </Button>
         </div>
       )}
       <footer className={styles.footer}>
@@ -183,7 +195,7 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller }) => {
         <Button
           type='primary'
           loading={startingWrite || editor.projectSaveState === 'saving'}
-          disabled={hasValidationError || mutationPending || startingWrite}
+          disabled={hasValidationError || projectConflict !== null || mutationPending || startingWrite}
           onClick={() => void startWriting()}
         >
           {t('conversation.creativeStudio.phase.brief.startWriting')}

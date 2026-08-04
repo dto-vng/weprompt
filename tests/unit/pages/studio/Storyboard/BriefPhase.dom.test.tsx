@@ -207,6 +207,62 @@ describe('BriefPhase', () => {
     expect(failedController.requestTransition).not.toHaveBeenCalled();
   });
 
+  it('surfaces stale project recovery and blocks Write until retry resolves the conflict', async () => {
+    const phaseEditor = editor({
+      projectDraft: { name: 'Launch film v2', brief: 'Updated', aspectRatio: '16:9', targetDurationSeconds: 15 },
+      hasUnsavedProjectDraft: true,
+      projectSaveState: 'failed',
+      conflict: {
+        operation: 'update_project',
+        code: 'stale_project',
+        messageKey: 'conversation.creativeStudio.errors.staleProject',
+      },
+      flushProjectDraft: vi.fn(async () => true),
+      retryConflict: vi.fn(async () => true),
+    });
+    const props = controller({ editor: phaseEditor });
+    const view = render(<BriefPhase controller={props} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.errors.staleProject');
+    const startWriting = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.brief.startWriting',
+    });
+    expect(startWriting).toBeDisabled();
+    fireEvent.click(startWriting);
+    expect(phaseEditor.flushProjectDraft).not.toHaveBeenCalled();
+    expect(props.requestTransition).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' }));
+    await waitFor(() => expect(phaseEditor.retryConflict).toHaveBeenCalledOnce());
+    expect(props.requestTransition).not.toHaveBeenCalled();
+
+    const resolvedEditor = editor({ flushProjectDraft: vi.fn(async () => true) });
+    view.rerender(
+      <BriefPhase controller={controller({ editor: resolvedEditor, requestTransition: props.requestTransition })} />
+    );
+    fireEvent.click(startWriting);
+    await waitFor(() => expect(resolvedEditor.flushProjectDraft).toHaveBeenCalledOnce());
+    expect(props.requestTransition).toHaveBeenCalledExactlyOnceWith({ phase: 'write' });
+  });
+
+  it('discards a stale project conflict without navigating', () => {
+    const phaseEditor = editor({
+      projectSaveState: 'failed',
+      conflict: {
+        operation: 'update_project',
+        code: 'stale_project',
+        messageKey: 'conversation.creativeStudio.errors.staleProject',
+      },
+    });
+    const props = controller({ editor: phaseEditor });
+    render(<BriefPhase controller={props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' }));
+
+    expect(phaseEditor.discardConflict).toHaveBeenCalledOnce();
+    expect(props.requestTransition).not.toHaveBeenCalled();
+  });
+
   it('locks only the aspect selector when generated output exists and explains why', () => {
     const importedProject = project({ assets: { 'asset-1': generatedAsset('imports') } });
     const view = render(<BriefPhase controller={controller({ project: importedProject })} />);

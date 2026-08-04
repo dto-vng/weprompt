@@ -284,6 +284,47 @@ describe('WritePhase', () => {
     });
   });
 
+  it.each([
+    {
+      sceneId: 'scene-1',
+      selectorIndex: 0,
+      initialDraft: editable(scene('scene-1', { durationSeconds: 2 })),
+      nextKind: 'video' as const,
+      optionLabel: 'conversation.creativeStudio.scene.video',
+      expectedDurationSeconds: 4,
+    },
+    {
+      sceneId: 'scene-2',
+      selectorIndex: 1,
+      initialDraft: editable(scene('scene-2', { mediaKind: 'video', durationSeconds: 12 })),
+      nextKind: 'image' as const,
+      optionLabel: 'conversation.creativeStudio.scene.image',
+      expectedDurationSeconds: 8,
+    },
+  ])(
+    'atomically clamps $sceneId duration when changing to the $nextKind route',
+    async ({ sceneId, selectorIndex, initialDraft, nextKind, optionLabel, expectedDurationSeconds }) => {
+      const phaseEditor = editor('scene-1', {
+        sceneDrafts: {
+          'scene-1': selectorIndex === 0 ? initialDraft : editable(scenes[0]!),
+          'scene-2': selectorIndex === 1 ? initialDraft : editable(scenes[1]!),
+        },
+      });
+      render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+      const selectors = screen.getAllByRole('combobox', {
+        name: 'conversation.creativeStudio.inspector.mediaKindLabel',
+      });
+      fireEvent.click(selectors[selectorIndex]!);
+      fireEvent.click(await screen.findByRole('option', { name: optionLabel }));
+
+      expect(phaseEditor.updateSceneDraftById).toHaveBeenCalledExactlyOnceWith(sceneId, {
+        mediaKind: nextKind,
+        durationSeconds: expectedDurationSeconds,
+      });
+    }
+  );
+
   it('shows one truthful first-frame reference per row and imports for that scene ID', async () => {
     const props = controller();
     render(<WritePhase controller={props} />);

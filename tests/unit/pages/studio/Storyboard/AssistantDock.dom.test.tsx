@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +24,26 @@ const readyStoryboard: StudioRouteCatalog['storyboard'] = {
       health: 'available',
     },
   ],
+};
+
+const ControlledCompactAssistant: React.FC<{ onDraftStoryboard?: () => void }> = ({ onDraftStoryboard }) => {
+  const [visible, setVisible] = React.useState(false);
+  return (
+    <AssistantDock
+      kind='write'
+      layoutMode='drawer'
+      drawerVisible={visible}
+      storyboard={readyStoryboard}
+      catalogLoading={false}
+      drafting={false}
+      disabled={false}
+      onOpenChange={setVisible}
+      onDraftStoryboard={() => {
+        onDraftStoryboard?.();
+        setVisible(false);
+      }}
+    />
+  );
 };
 
 describe('AssistantDock', () => {
@@ -91,6 +111,75 @@ describe('AssistantDock', () => {
     expect(
       within(drawers[0] as HTMLElement).getByText('conversation.creativeStudio.phase.write.textChargeDisclosure')
     ).toBeInTheDocument();
+  });
+
+  it('restores keyboard focus to Ask assistant after Escape closes the compact Drawer', async () => {
+    render(<ControlledCompactAssistant />);
+    const opener = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.askAssistant',
+    });
+    fireEvent.click(opener);
+    const draftAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+    });
+    draftAction.focus();
+    expect(draftAction).toHaveFocus();
+
+    const drawerWrapper = document.querySelector('.arco-drawer-wrapper');
+    expect(drawerWrapper).not.toBeNull();
+    fireEvent.keyDown(drawerWrapper!, { key: 'Escape', keyCode: 27, which: 27 });
+
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('restores focus after the draft action closes the controlled compact Drawer', async () => {
+    const onDraftStoryboard = vi.fn();
+    render(<ControlledCompactAssistant onDraftStoryboard={onDraftStoryboard} />);
+    const opener = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.askAssistant',
+    });
+    fireEvent.click(opener);
+    const draftAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+    });
+    draftAction.focus();
+    fireEvent.click(draftAction);
+
+    expect(onDraftStoryboard).toHaveBeenCalledOnce();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('closes and focuses inline content on expansion, then returns focus to the compact opener', async () => {
+    const onOpenChange = vi.fn();
+    const props = {
+      kind: 'write' as const,
+      drawerVisible: true,
+      storyboard: readyStoryboard,
+      catalogLoading: false,
+      drafting: false,
+      disabled: false,
+      onOpenChange,
+      onDraftStoryboard: vi.fn(),
+    };
+    const view = render(<AssistantDock {...props} layoutMode='drawer' />);
+    const draftAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+    });
+    draftAction.focus();
+    onOpenChange.mockClear();
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' />);
+    const inlineAssistant = screen.getByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false));
+    expect(inlineAssistant).toHaveFocus();
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' drawerVisible={false} />);
+    view.rerender(<AssistantDock {...props} layoutMode='drawer' drawerVisible={false} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })).toHaveFocus()
+    );
   });
 
   it.each(['setup_required', 'unavailable'] as const)(
