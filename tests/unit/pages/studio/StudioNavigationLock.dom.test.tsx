@@ -35,7 +35,7 @@ const Harness: React.FC = () => {
 
 const renderHarness = () =>
   render(
-    <MemoryRouter initialEntries={['/first', '/studio']} initialIndex={1}>
+    <MemoryRouter initialEntries={['/first', '/studio/project-1/write']} initialIndex={1}>
       <Routes>
         <Route path='*' element={<Harness />} />
       </Routes>
@@ -47,9 +47,9 @@ describe('StudioNavigationLock', () => {
     renderHarness();
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }));
-    expect(screen.getByText('/studio')).toBeInTheDocument();
+    expect(screen.getByText('/studio/project-1/write')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(screen.getByText('/studio')).toBeInTheDocument();
+    expect(screen.getByText('/studio/project-1/write')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Resolve draft' }));
     fireEvent.click(screen.getByRole('button', { name: 'Leave' }));

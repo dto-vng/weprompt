@@ -1,0 +1,39 @@
+.phase {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.heading {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 18px;
+}
+
+.heading:focus-visible {
+  outline: 2px solid var(--color-primary-6);
+  outline-offset: 4px;
+}
+
+.workspace {
+  display: grid;
+  min-height: min(680px, calc(100vh - 320px));
+  align-items: start;
+  grid-template-columns: minmax(380px, 1fr) minmax(320px, 420px);
+  gap: 16px;
+}
+
+.previewColumn {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .workspace {
+    min-height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

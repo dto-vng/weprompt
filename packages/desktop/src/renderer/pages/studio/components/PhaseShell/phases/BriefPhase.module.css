@@ -1,0 +1,52 @@
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--color-bg-2);
+}
+
+.heading {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 18px;
+}
+
+.heading:focus-visible {
+  outline: 2px solid var(--color-primary-6);
+  outline-offset: 4px;
+}
+
+.metadata {
+  display: grid;
+  margin: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metadataItem {
+  min-width: 0;
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--color-fill-1);
+}
+
+.metadataItem dt {
+  margin-bottom: 6px;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.metadataItem dd {
+  margin: 0;
+  color: var(--color-text-1);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +21,7 @@ import StudioPage from '@renderer/pages/studio/StudioPage';
 const bridge = vi.hoisted(() => ({
   getProject: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
+  updateProject: { invoke: vi.fn() },
   updateScene: { invoke: vi.fn() },
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
@@ -122,11 +123,11 @@ const routes = (): StudioRouteCatalog => ({
   catalogVersion: 'catalog-1',
 });
 
-const renderProject = () => {
-  const router = createMemoryRouter([{ path: '/studio/:id', element: <StudioPage /> }], {
-    initialEntries: ['/studio/project-1'],
+const renderProject = (phase: 'write' | 'review' = 'review') => {
+  const router = createMemoryRouter([{ path: '/studio/:id/:phase?', element: <StudioPage /> }], {
+    initialEntries: [`/studio/project-1/${phase}`],
   });
-  return render(<RouterProvider router={router} />);
+  return { router, view: render(<RouterProvider router={router} />) };
 };
 
 const deferred = <T,>() => {
@@ -142,6 +143,7 @@ describe('Studio asset export', () => {
     vi.clearAllMocks();
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
+    bridge.updateProject.invoke.mockResolvedValue(ok(project()));
     bridge.updateScene.invoke.mockResolvedValue(ok(project()));
     bridge.reorderScenes.invoke.mockResolvedValue(ok(project()));
     bridge.proposeStoryboard.invoke.mockResolvedValue(ok(project()));
@@ -179,6 +181,9 @@ describe('Studio asset export', () => {
       })
     );
     expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.export.body');
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+      .getAllByRole('button')
+      .forEach((button) => expect(button).toBeDisabled());
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -323,25 +328,25 @@ describe('Studio asset export', () => {
   it('cannot export stale canonical data while a scene edit is unsaved or still saving', async () => {
     const save = deferred<StudioCommandResult<StudioRendererProject>>();
     bridge.updateScene.invoke.mockReturnValueOnce(save.promise);
-    renderProject();
+    const { router } = renderProject('write');
 
     const prompt = await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
-    const exportAction = screen.getByRole('button', {
-      name: 'conversation.creativeStudio.export.action',
-    });
     fireEvent.change(prompt, { target: { value: 'A newly edited cinematic frame' } });
-
-    expect(exportAction).toBeDisabled();
-    fireEvent.blur(prompt);
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+        name: 'conversation.creativeStudio.review.title',
+      })
+    );
     await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
-    expect(exportAction).toBeDisabled();
-    fireEvent.click(exportAction);
+    expect(router.state.location.pathname).toBe('/studio/project-1/write');
+    expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.export.action' })).toBeNull();
     expect(bridge.chooseAndExportAssets.invoke).not.toHaveBeenCalled();
 
     await act(async () => {
       save.resolve(ok(project()));
       await save.promise;
     });
-    await waitFor(() => expect(exportAction).toBeEnabled());
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/review'));
+    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.export.action' })).toBeEnabled();
   });
 });

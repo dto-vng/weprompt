@@ -7,8 +7,8 @@
 export * from './Generation';
 export { StudioLibrary } from './Library';
 export { StudioModelBar } from './Models';
-export { AssetStrip, StagePreview } from './Preview';
+export * from './PhaseShell';
+export { AssetStrip, StagePreview, StudioExportModal } from './Preview';
 export { SceneTimeline } from './SceneTimeline';
 export { SceneCard, SceneInspector, StoryboardDraftModal, StoryboardPanel } from './Storyboard';
-export { StudioHeader } from './StudioHeader';
 export { StudioNavigationLock } from './StudioNavigationLock';

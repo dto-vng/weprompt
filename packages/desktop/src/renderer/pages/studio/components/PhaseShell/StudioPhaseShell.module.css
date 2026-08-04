@@ -1,0 +1,124 @@
+.shell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headerCopy {
+  min-width: 0;
+  flex: 1;
+}
+
+.breadcrumb {
+  display: flex;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.breadcrumbSeparator {
+  padding: 0 4px;
+  color: var(--color-text-4);
+}
+
+.breadcrumbProject {
+  overflow: hidden;
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectTitle {
+  overflow: hidden;
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 24px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectBrief {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: var(--color-text-2);
+  font-size: 14px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actionStack {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.actionIssue {
+  color: var(--color-warning-6);
+  font-size: 12px;
+}
+
+.phaseNavigation {
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.phaseList {
+  display: grid;
+  margin: 0;
+  padding: 0 0 10px;
+  list-style: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.phaseItem {
+  min-width: 0;
+}
+
+.phaseButton {
+  width: 100%;
+}
+
+.phaseFrame {
+  min-width: 0;
+}
+
+.assistantDock {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .phaseList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

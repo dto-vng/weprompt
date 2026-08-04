@@ -201,7 +201,7 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-const renderRoute = (path = '/studio/project-1/brief') => {
+const renderRoute = (path: string | { pathname: string; state?: unknown } = '/studio/project-1/write') => {
   const router = createMemoryRouter([{ path: '/studio/:id/:phase?', element: <StudioPage /> }], {
     initialEntries: [path],
   });
@@ -323,6 +323,155 @@ describe('StudioPage and useStudioProject', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     });
 
+    it('renders one localized four-step phase navigation with Brief current', async () => {
+      renderRoute('/studio/project-1/brief');
+
+      const phaseNavigation = await screen.findByRole('navigation', {
+        name: 'conversation.creativeStudio.nav.title',
+      });
+      const actions = within(phaseNavigation).getAllByRole('button');
+
+      expect(actions).toHaveLength(4);
+      expect(actions.map((action) => action.textContent)).toEqual([
+        'conversation.creativeStudio.project.brief',
+        'conversation.creativeStudio.storyboard.title',
+        'conversation.creativeStudio.models.title',
+        'conversation.creativeStudio.review.title',
+      ]);
+      expect(within(phaseNavigation).getByRole('button', { current: 'step' })).toHaveTextContent(
+        'conversation.creativeStudio.project.brief'
+      );
+    });
+
+    it('renders only the active phase and keeps project owners mounted across clean phase changes', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      const { router } = renderRoute('/studio/project-1/brief');
+
+      const briefHeading = await screen.findByRole('heading', {
+        level: 2,
+        name: 'conversation.creativeStudio.project.brief',
+      });
+      expect(screen.queryByRole('region', { name: 'conversation.creativeStudio.storyboard.title' })).toBeNull();
+      const loadCount = bridge.getProject.invoke.mock.calls.length;
+
+      fireEvent.click(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+          name: 'conversation.creativeStudio.storyboard.title',
+        })
+      );
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/write'));
+      const writeHeading = (
+        await screen.findAllByRole('heading', {
+          level: 2,
+          name: 'conversation.creativeStudio.storyboard.title',
+        })
+      )[0]!;
+      await waitFor(() => expect(document.activeElement).toBe(writeHeading));
+      expect(briefHeading).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'conversation.creativeStudio.storyboard.title' })).toBeVisible();
+      expect(bridge.getProject.invoke).toHaveBeenCalledTimes(loadCount);
+    });
+
+    it('flushes multiple dirty scenes in serialized order before changing phase', async () => {
+      const opening = scene({ id: 'scene-1', title: 'Opening' });
+      const closing = scene({ id: 'scene-2', title: 'Closing' });
+      const initial = project('project-1', {
+        sceneOrder: [opening.id, closing.id],
+        scenes: { [opening.id]: opening, [closing.id]: closing },
+      });
+      const afterFirst = project('project-1', {
+        revision: 3,
+        sceneOrder: [opening.id, closing.id],
+        scenes: { [opening.id]: { ...opening, title: 'Opening v2' }, [closing.id]: closing },
+      });
+      const afterSecond = project('project-1', {
+        revision: 4,
+        sceneOrder: [opening.id, closing.id],
+        scenes: {
+          [opening.id]: { ...opening, title: 'Opening v2' },
+          [closing.id]: { ...closing, title: 'Closing v2' },
+        },
+      });
+      const firstSave = deferred<StudioCommandResult<StudioRendererProject>>();
+      bridge.getProject.invoke.mockResolvedValue(ok(initial));
+      bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise).mockResolvedValueOnce(ok(afterSecond));
+      const { router } = renderRoute('/studio/project-1/write');
+
+      fireEvent.change(await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+        target: { value: 'Opening v2' },
+      });
+      fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.scene.accessibleName' })[1]!);
+      fireEvent.change(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+        target: { value: 'Closing v2' },
+      });
+      fireEvent.click(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+          name: 'conversation.creativeStudio.models.title',
+        })
+      );
+
+      await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
+      expect(router.state.location.pathname).toBe('/studio/project-1/write');
+      expect(bridge.updateScene.invoke.mock.calls[0]?.[0]).toMatchObject({
+        sceneId: 'scene-1',
+        expectedRevision: 2,
+      });
+
+      await act(async () => firstSave.resolve(ok(afterFirst)));
+      await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(2));
+      expect(bridge.updateScene.invoke.mock.calls[1]?.[0]).toMatchObject({
+        sceneId: 'scene-2',
+        expectedRevision: 3,
+      });
+      await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/produce'));
+    });
+
+    it('keeps a failed phase-transition draft recoverable and focuses its alert', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      bridge.updateScene.invoke.mockResolvedValueOnce(stale());
+      const { router } = renderRoute('/studio/project-1/write');
+      const titleInput = await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel');
+
+      fireEvent.change(titleInput, { target: { value: 'Recoverable local title' } });
+      fireEvent.click(
+        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+          name: 'conversation.creativeStudio.models.title',
+        })
+      );
+
+      expect(
+        await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/studio/project-1/write');
+      expect(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue(
+        'Recoverable local title'
+      );
+      await waitFor(() => expect(document.activeElement).toHaveAttribute('role', 'alert'));
+    });
+
+    it('focuses and clears only a valid typed Write focus intent', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(project('project-1', { sceneOrder: [opening.id], scenes: { [opening.id]: opening } }))
+      );
+      const { router } = renderRoute({
+        pathname: '/studio/project-1/write',
+        state: { writeFocus: { sceneId: opening.id, field: 'visualPrompt' } },
+      });
+
+      const prompt = await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
+      await waitFor(() => expect(document.activeElement).toBe(prompt));
+      expect(router.state.location.pathname).toBe('/studio/project-1/write');
+      expect(router.state.location.state).toBeNull();
+    });
+
     it('replaces a legacy project route with its canonical default phase', async () => {
       const { router } = renderRoute('/studio/project-1');
 
@@ -364,10 +513,20 @@ describe('StudioPage and useStudioProject', () => {
 
     renderRoute();
 
-    expect(await screen.findByText('conversation.creativeStudio.storyboard.title')).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.preview.noAssetTitle')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'conversation.creativeStudio.storyboard.title' })
+    ).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.inspector.title')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.redraftAction' })).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.preview.noAssetTitle')).toBeNull();
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+        name: 'conversation.creativeStudio.models.title',
+      })
+    );
+    expect(await screen.findByText('conversation.creativeStudio.preview.noAssetTitle')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.inspector.title')).toBeNull();
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledWith({ projectId: 'project-1' }));
     expect(
       screen.queryByRole('button', { name: 'conversation.creativeStudio.routing.connectProvider' })
@@ -408,7 +567,7 @@ describe('StudioPage and useStudioProject', () => {
     },
   ])('shows exactly one whole-screen Settings action for $setupState setup requirements', async ({ catalog }) => {
     bridge.listRoutes.invoke.mockResolvedValue(ok(catalog));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     await screen.findByText('conversation.creativeStudio.models.setupTitle');
     const routingPanel = await screen.findByRole('region', { name: 'conversation.creativeStudio.routing.title' });
@@ -509,7 +668,7 @@ describe('StudioPage and useStudioProject', () => {
       .mockResolvedValueOnce(ok(initial))
       .mockResolvedValue(ok(refreshed));
     bridge.selectAsset.invoke.mockResolvedValueOnce(ok(refreshed));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const variations = await screen.findAllByRole('button', {
       name: /conversation\.creativeStudio\.preview\.selectVersionAccessible/,
@@ -578,7 +737,7 @@ describe('StudioPage and useStudioProject', () => {
         })
       )
     );
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const video = await screen.findByLabelText('conversation.creativeStudio.preview.videoLabel');
     expect(video).not.toHaveAttribute('poster');
@@ -597,13 +756,13 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.review.generateScene',
-      })
-    );
+    const generateScene = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.review.generateScene',
+    });
+    await waitFor(() => expect(generateScene).toBeEnabled());
+    fireEvent.click(generateScene);
 
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.title');
@@ -660,7 +819,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const action = await screen.findByRole('button', {
       name:
@@ -688,7 +847,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const regenerate = await screen.findByRole('button', {
       name: 'conversation.creativeStudio.review.regenerateScene',
@@ -711,7 +870,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     fireEvent.click(
       await screen.findByRole('button', {
@@ -738,7 +897,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const { headerAction, lowerAction } = await findBatchActions();
     const routingPanel = screen.getByRole('region', { name: 'conversation.creativeStudio.routing.title' });
@@ -799,6 +958,11 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' })).toBeNull()
     );
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+        name: 'conversation.creativeStudio.models.title',
+      })
+    );
     const { headerAction, lowerAction } = await findBatchActions();
     expect(headerAction).toBeEnabled();
     expect(lowerAction).toBeEnabled();
@@ -830,6 +994,11 @@ describe('StudioPage and useStudioProject', () => {
     expect(
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' })).getByRole('button', {
+        name: 'conversation.creativeStudio.models.title',
+      })
+    );
     const { headerAction, lowerAction } = await findBatchActions();
     expect(headerAction).toBeDisabled();
     expect(lowerAction).toBeDisabled();
@@ -863,9 +1032,15 @@ describe('StudioPage and useStudioProject', () => {
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.models.refresh' })[0]!);
+    const phaseNavigation = screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' });
+    fireEvent.click(within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.models.title' }));
+    const modelBar = await screen.findByRole('region', { name: 'conversation.creativeStudio.models.title' });
+    fireEvent.click(within(modelBar).getByRole('button', { name: 'conversation.creativeStudio.models.refresh' }));
 
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(2));
+    fireEvent.click(
+      within(phaseNavigation).getByRole('button', { name: 'conversation.creativeStudio.storyboard.title' })
+    );
     await waitFor(() =>
       expect(
         screen.queryByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
@@ -923,16 +1098,25 @@ describe('StudioPage and useStudioProject', () => {
     bridge.getProject.invoke.mockResolvedValue(ok(initial));
     bridge.listRoutes.invoke.mockResolvedValue(ok(catalog));
     bridge.updateModelSelection.invoke.mockReturnValueOnce(selection.promise);
-    renderRoute();
-    const fit = await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' });
+    const { router } = renderRoute('/studio/project-1/produce');
+    const phaseNavigation = await screen.findByRole('navigation', {
+      name: 'conversation.creativeStudio.nav.title',
+    });
+    const writePhaseAction = within(phaseNavigation).getByRole('button', {
+      name: 'conversation.creativeStudio.storyboard.title',
+    });
 
     fireEvent.click(screen.getByLabelText('conversation.creativeStudio.models.image'));
     fireEvent.click(await screen.findByText(/alternate-image-model/));
     await waitFor(() => expect(bridge.updateModelSelection.invoke).toHaveBeenCalledOnce());
-    expect(fit).toBeDisabled();
+    fireEvent.click(writePhaseAction);
+    expect(router.state.location.pathname).toBe('/studio/project-1/produce');
 
     selection.resolve(ok(project('project-1', { revision: 3 })));
-    await waitFor(() => expect(fit).toBeEnabled());
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/write'));
+    expect(
+      await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.fitToTarget' })
+    ).toBeEnabled();
   });
 
   it('opens a canonical batch review from the header and submits every exact scene route only after confirmation', async () => {
@@ -948,13 +1132,16 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const { headerAction } = await findBatchActions();
     fireEvent.click(headerAction);
 
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.review.sceneCount');
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+      .getAllByRole('button')
+      .forEach((button) => expect(button).toBeDisabled());
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -997,7 +1184,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValueOnce(failure()).mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     await screen.findAllByText('conversation.creativeStudio.errors.storage');
     await act(async () => {});
@@ -1021,7 +1208,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValueOnce(ok(routesWithImage())).mockReturnValueOnce(refresh.promise);
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const preview = await screen.findByRole('region', { name: 'conversation.creativeStudio.preview.title' });
     expect(
@@ -1057,7 +1244,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     const generate = await screen.findByRole('button', {
       name: 'conversation.creativeStudio.review.generateScene',
@@ -1092,7 +1279,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     expect(
       await screen.findByRole('button', {
@@ -1110,6 +1297,13 @@ describe('StudioPage and useStudioProject', () => {
       })
     ).toBeEnabled();
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.jobs.retryChargeBody');
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.nav.title' }))
+      .getAllByRole('button')
+      .forEach((button) => expect(button).toBeDisabled());
+    expect(bridge.retryJob.invoke).not.toHaveBeenCalled();
   });
 
   it('keeps every needs-attention scene out of single and batch paid generation', async () => {
@@ -1136,7 +1330,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     expect(
       await screen.findByRole('button', {
@@ -1189,7 +1383,7 @@ describe('StudioPage and useStudioProject', () => {
       .mockResolvedValueOnce(ok(sameRouting))
       .mockResolvedValue(ok(routed));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     await screen.findByRole('heading', { level: 1, name: 'Launch film' });
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(1));
@@ -1250,17 +1444,16 @@ describe('StudioPage and useStudioProject', () => {
         catalogVersion: 'catalog-2',
       })
     );
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: 'conversation.creativeStudio.review.generateScene',
-      })
-    );
+    const generateScene = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.review.generateScene',
+    });
+    await waitFor(() => expect(generateScene).toBeEnabled());
+    fireEvent.click(generateScene);
     expect(await screen.findByRole('dialog')).toHaveTextContent('Opening');
 
     await act(async () => onUpdate?.({ projectId: 'project-1' }));
-    expect((await screen.findAllByText('Revised opening')).length).toBeGreaterThan(0);
     const routeRequestsBeforeConfirmation = bridge.listRoutes.invoke.mock.calls.length;
 
     fireEvent.click(
@@ -1271,7 +1464,7 @@ describe('StudioPage and useStudioProject', () => {
 
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledTimes(routeRequestsBeforeConfirmation + 1));
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog')).toHaveTextContent('Revised opening');
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Revised opening'));
     expect(screen.getByRole('dialog')).toHaveTextContent('New image provider');
     expect(screen.getByRole('dialog')).not.toHaveTextContent('weprompt-media-gateway-v1');
     expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.errors.staleProject');
@@ -1330,7 +1523,7 @@ describe('StudioPage and useStudioProject', () => {
       .mockResolvedValueOnce(ok(initial))
       .mockResolvedValue(ok(generating));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routesWithImage()));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     fireEvent.click(
       await screen.findByRole('button', {
@@ -1376,7 +1569,7 @@ describe('StudioPage and useStudioProject', () => {
         messageKey: 'conversation.creativeStudio.errors.invalidRoute',
       },
     });
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     fireEvent.click(
       await screen.findByRole('button', {
@@ -1429,7 +1622,7 @@ describe('StudioPage and useStudioProject', () => {
       .mockResolvedValueOnce(ok(routesWithImage()))
       .mockResolvedValue(ok({ ...routesWithImage(refreshedRoute), catalogVersion: 'catalog-2' }));
     bridge.submitScenes.invoke.mockResolvedValueOnce(stale()).mockResolvedValueOnce(ok([]));
-    renderRoute();
+    renderRoute('/studio/project-1/produce');
 
     fireEvent.click(
       await screen.findByRole('button', {
@@ -1566,7 +1759,7 @@ describe('StudioPage and useStudioProject', () => {
 
     await act(async () => router.navigate('/studio/project-2'));
 
-    expect(router.state.location.pathname).toBe('/studio/project-1/brief');
+    expect(router.state.location.pathname).toBe('/studio/project-1/write');
     expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     expect(bridge.getProject.invoke).not.toHaveBeenCalledWith({ projectId: 'project-2' });
 
@@ -1604,7 +1797,7 @@ describe('StudioPage and useStudioProject', () => {
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })).toBeInTheDocument();
 
     await act(async () => router.navigate('/studio/project-2'));
-    expect(router.state.location.pathname).toBe('/studio/project-1/brief');
+    expect(router.state.location.pathname).toBe('/studio/project-1/write');
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' }));
     await waitFor(() =>

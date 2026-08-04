@@ -33,80 +33,18 @@
   background: var(--color-danger-light-1);
 }
 
-.editorGrid {
-  display: grid;
-  min-height: min(720px, calc(100vh - 188px));
-  align-items: start;
-  grid-template-columns: minmax(250px, 320px) minmax(360px, 1fr) minmax(300px, 380px);
-  gap: 16px;
-}
-
-.previewColumn,
-.inspectorColumn {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.generationPanel {
-  border: 1px solid var(--color-border-2);
-  border-radius: 12px;
-  padding: 16px;
-  background: var(--color-bg-2);
-}
-
 @media (min-width: 1181px) and (max-height: 900px) {
   .page {
     padding: 20px 28px;
   }
 
-  .projectShell,
-  .previewColumn,
-  .inspectorColumn {
+  .projectShell {
     gap: 12px;
-  }
-
-  .modelBar > section {
-    gap: 6px;
-    padding: 10px;
-  }
-
-  .modelBar :global(.arco-select-view) {
-    min-height: 28px;
-  }
-
-  .editorGrid {
-    min-height: calc(100vh - 172px);
-    gap: 12px;
-  }
-
-  .generationPanel {
-    padding: 12px;
-  }
-}
-
-@media (max-width: 1180px) {
-  .editorGrid {
-    grid-template-columns: minmax(250px, 320px) minmax(360px, 1fr);
-  }
-
-  .inspectorColumn {
-    grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 820px) {
   .page {
     padding: 16px;
-  }
-
-  .editorGrid {
-    min-height: auto;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .inspectorColumn {
-    grid-column: auto;
   }
 }

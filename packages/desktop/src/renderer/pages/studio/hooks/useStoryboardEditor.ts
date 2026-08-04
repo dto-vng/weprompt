@@ -25,6 +25,7 @@ const STALE_PROJECT_MESSAGE_KEY = 'conversation.creativeStudio.errors.staleProje
 
 export type StoryboardEditorOperation =
   | 'save_scene'
+  | 'update_project'
   | 'add_scene'
   | 'remove_scene'
   | 'reorder_scenes'
@@ -45,6 +46,11 @@ export type StoryboardEditorConflict = StoryboardEditorIssue & {
 
 export type SelectedSceneSaveState = 'saved' | 'dirty' | 'saving' | 'failed';
 
+export type StudioProjectDraft = Pick<
+  StudioRendererProject,
+  'name' | 'brief' | 'aspectRatio' | 'targetDurationSeconds'
+>;
+
 export type UseStoryboardEditorOptions = {
   project: StudioRendererProject | null;
   refetch: () => Promise<StudioRendererProject | null>;
@@ -56,14 +62,21 @@ export type UseStoryboardEditorResult = {
   selectedSceneId: string | null;
   selectedScene: StudioScene | null;
   sceneDraft: StudioEditableScene | null;
+  projectDraft: StudioProjectDraft | null;
+  projectSaveState: SelectedSceneSaveState;
+  hasUnsavedProjectDraft: boolean;
   hasUnsavedSceneDrafts: boolean;
   hasUnsavedSelectedSceneDraft: boolean;
   selectedSceneSaveState: SelectedSceneSaveState;
   saveIssues: StoryboardEditorIssue[];
   selectScene: (sceneId: string) => void;
   updateSceneDraft: (patch: Partial<StudioEditableScene>) => void;
+  updateProjectDraft: (patch: Partial<StudioProjectDraft>) => void;
+  flushProjectDraft: () => Promise<boolean>;
+  discardProjectDraft: () => void;
   flushSceneDraft: () => Promise<boolean>;
   flushSceneDraftById: (sceneId: string) => Promise<boolean>;
+  flushAllSceneDrafts: () => Promise<boolean>;
   discardSceneDraft: () => void;
   discardSceneDraftById: (sceneId: string) => void;
   addScene: () => Promise<boolean>;
@@ -116,7 +129,8 @@ type PausedMutationIntent = {
 type ActiveSaveIntent = {
   projectId: string;
   session: number;
-  sceneId: string;
+  operation: 'save_scene' | 'update_project';
+  sceneId?: string;
 };
 
 const editableScene = (scene: StudioScene): StudioEditableScene => ({
@@ -129,6 +143,23 @@ const editableScene = (scene: StudioScene): StudioEditableScene => ({
   durationSeconds: scene.durationSeconds,
   referenceAssetId: scene.referenceAssetId,
 });
+
+const editableProject = (project: StudioRendererProject): StudioProjectDraft => ({
+  name: project.name,
+  brief: project.brief,
+  aspectRatio: project.aspectRatio,
+  targetDurationSeconds: project.targetDurationSeconds,
+});
+
+const PROJECT_DRAFT_FIELDS = [
+  'name',
+  'brief',
+  'aspectRatio',
+  'targetDurationSeconds',
+] as const satisfies readonly (keyof StudioProjectDraft)[];
+
+const projectDraftMatches = (project: StudioRendererProject, draft: StudioProjectDraft): boolean =>
+  PROJECT_DRAFT_FIELDS.every((field) => Object.is(project[field], draft[field]));
 
 const EDITABLE_SCENE_FIELDS = [
   'title',
@@ -179,6 +210,7 @@ export const useStoryboardEditor = ({
   const [project, setProject] = useState<StudioRendererProject | null>(parentProject);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(parentProject?.sceneOrder[0] ?? null);
   const [draftVersion, setDraftVersion] = useState(0);
+  const [projectDraftVersion, setProjectDraftVersion] = useState(0);
   const [saveIssueVersion, setSaveIssueVersion] = useState(0);
   const [mutationCount, setMutationCount] = useState(0);
   const [error, setError] = useState<StoryboardEditorIssue | null>(null);
@@ -192,6 +224,9 @@ export const useStoryboardEditor = ({
   const projectRef = useRef<StudioRendererProject | null>(parentProject);
   const selectedSceneIdRef = useRef<string | null>(parentProject?.sceneOrder[0] ?? null);
   const draftsRef = useRef(new Map<string, StudioEditableScene>());
+  const projectDraftRef = useRef<StudioProjectDraft | null>(null);
+  const projectEditVersionRef = useRef(0);
+  const queuedProjectVersionRef = useRef<number | null>(null);
   const dirtySceneIdsRef = useRef(new Set<string>());
   const dirtyFieldsRef = useRef(new Map<string, Set<keyof StudioEditableScene>>());
   const dirtyFieldVersionsRef = useRef(new Map<string, Map<keyof StudioEditableScene, number>>());
@@ -211,6 +246,7 @@ export const useStoryboardEditor = ({
   const flushSceneRef = useRef<(sceneId: string, allowMissingCanonical?: boolean) => Promise<boolean>>(
     async () => false
   );
+  const flushProjectRef = useRef<() => Promise<boolean>>(async () => false);
   const enqueueIntentRef = useRef<(intent: MutationIntent) => Promise<boolean>>(async () => false);
 
   refetchRef.current = refetch;
@@ -218,6 +254,17 @@ export const useStoryboardEditor = ({
   const rerenderDrafts = useCallback(() => {
     if (mountedRef.current) setDraftVersion((version) => version + 1);
   }, []);
+
+  const rerenderProjectDraft = useCallback(() => {
+    if (mountedRef.current) setProjectDraftVersion((version) => version + 1);
+  }, []);
+
+  const clearProjectDraft = useCallback(() => {
+    projectDraftRef.current = null;
+    projectEditVersionRef.current = 0;
+    queuedProjectVersionRef.current = null;
+    rerenderProjectDraft();
+  }, [rerenderProjectDraft]);
 
   const clearSaveTimer = useCallback((sceneId: string) => {
     const timer = saveTimersRef.current.get(sceneId);
@@ -257,6 +304,9 @@ export const useStoryboardEditor = ({
     discardPausedIntents();
     draftingTokenRef.current = null;
     activeSaveIntentRef.current = null;
+    projectDraftRef.current = null;
+    projectEditVersionRef.current = 0;
+    queuedProjectVersionRef.current = null;
     if (mountedRef.current) {
       setMutationCount(0);
       setConflict(null);
@@ -265,6 +315,7 @@ export const useStoryboardEditor = ({
       setLatestFitOutcome(null);
       setLatestFitCatalogVersion(null);
       setActiveSaveIntent(null);
+      setProjectDraftVersion((version) => version + 1);
     }
   }, [discardPausedIntents]);
 
@@ -274,6 +325,7 @@ export const useStoryboardEditor = ({
       if (current?.id === candidate.id && current.revision >= candidate.revision) return current;
 
       const projectChanged = current?.id !== candidate.id;
+      const localProjectDraft = projectDraftRef.current;
       if (!projectChanged) {
         for (const [sceneId, draft] of draftsRef.current) {
           const canonicalScene = candidate.scenes[sceneId];
@@ -306,9 +358,13 @@ export const useStoryboardEditor = ({
         if (mountedRef.current) setSelectedSceneId(firstSceneId);
       }
 
+      if (!projectChanged && localProjectDraft !== null && projectDraftMatches(candidate, localProjectDraft)) {
+        clearProjectDraft();
+      }
+
       return candidate;
     },
-    [clearAllDrafts, startProjectSession]
+    [clearAllDrafts, clearProjectDraft, startProjectSession]
   );
 
   const refetchCanonical = useCallback(
@@ -358,8 +414,15 @@ export const useStoryboardEditor = ({
 
       const saveIntent: ActiveSaveIntent | null =
         intent.operation === 'save_scene' && intent.sceneId !== undefined
-          ? { projectId: intent.projectId, session: intent.session, sceneId: intent.sceneId }
-          : null;
+          ? {
+              projectId: intent.projectId,
+              session: intent.session,
+              operation: 'save_scene',
+              sceneId: intent.sceneId,
+            }
+          : intent.operation === 'update_project'
+            ? { projectId: intent.projectId, session: intent.session, operation: 'update_project' }
+            : null;
       if (saveIntent !== null) {
         activeSaveIntentRef.current = saveIntent;
         if (mountedRef.current) setActiveSaveIntent(saveIntent);
@@ -471,6 +534,12 @@ export const useStoryboardEditor = ({
     [executeIntent]
   );
   enqueueIntentRef.current = enqueueIntent;
+
+  const drainMutationQueue = useCallback(async function waitForCurrentMutationQueue(): Promise<void> {
+    const observedQueue = mutationQueueRef.current;
+    await observedQueue.catch((): void => {});
+    if (observedQueue !== mutationQueueRef.current) await waitForCurrentMutationQueue();
+  }, []);
 
   const resumePausedIntents = useCallback(() => {
     const current = projectRef.current;
@@ -622,7 +691,31 @@ export const useStoryboardEditor = ({
   );
   flushSceneRef.current = flushScene;
 
-  const flushSceneDraftById = useCallback((sceneId: string): Promise<boolean> => flushScene(sceneId), [flushScene]);
+  const flushSceneDraftById = useCallback(
+    async (sceneId: string): Promise<boolean> => {
+      clearSaveTimer(sceneId);
+      if (!dirtySceneIdsRef.current.has(sceneId)) return true;
+      const flushed = await flushScene(sceneId);
+      if (!flushed) await drainMutationQueue();
+      return !dirtySceneIdsRef.current.has(sceneId) && internalConflictRef.current === null;
+    },
+    [clearSaveTimer, drainMutationQueue, flushScene]
+  );
+
+  const flushAllSceneDrafts = useCallback(async (): Promise<boolean> => {
+    const dirtySceneIds = [...dirtySceneIdsRef.current];
+    for (const sceneId of dirtySceneIds) {
+      clearSaveTimer(sceneId);
+      if (internalConflictRef.current !== null) return false;
+      const flushed = await flushScene(sceneId);
+      if (!flushed) {
+        await drainMutationQueue();
+        if (dirtySceneIdsRef.current.has(sceneId) || internalConflictRef.current !== null) return false;
+      }
+    }
+    await drainMutationQueue();
+    return dirtySceneIdsRef.current.size === 0 && internalConflictRef.current === null;
+  }, [clearSaveTimer, drainMutationQueue, flushScene]);
 
   const scheduleSceneSave = useCallback(
     (sceneId: string) => {
@@ -655,6 +748,7 @@ export const useStoryboardEditor = ({
   useEffect(
     () => () => {
       mountedRef.current = false;
+      void flushProjectRef.current();
       for (const sceneId of dirtySceneIdsRef.current) void flushSceneRef.current(sceneId);
       canonicalRefetchRequestRef.current += 1;
     },
@@ -680,11 +774,25 @@ export const useStoryboardEditor = ({
     [draftVersion, project]
   );
   const saveIssues = useMemo(() => [...saveIssuesRef.current.values()], [saveIssueVersion]);
+  const projectDraft = useMemo(() => projectDraftRef.current, [projectDraftVersion]);
+  const projectSaveState: SelectedSceneSaveState = (() => {
+    if (
+      activeSaveIntent !== null &&
+      activeSaveIntent.projectId === project?.id &&
+      activeSaveIntent.session === projectSessionRef.current &&
+      activeSaveIntent.operation === 'update_project'
+    ) {
+      return 'saving';
+    }
+    if (conflict?.operation === 'update_project' || error?.operation === 'update_project') return 'failed';
+    return projectDraft === null ? 'saved' : 'dirty';
+  })();
   const selectedSceneSaveState: SelectedSceneSaveState = (() => {
     if (selectedSceneId === null || selectedScene === null) return 'saved';
     if (
       activeSaveIntent?.projectId === project?.id &&
       activeSaveIntent.session === projectSessionRef.current &&
+      activeSaveIntent.operation === 'save_scene' &&
       activeSaveIntent.sceneId === selectedSceneId
     ) {
       return 'saving';
@@ -762,6 +870,72 @@ export const useStoryboardEditor = ({
     },
     [rerenderDrafts, scheduleSceneSave]
   );
+
+  const updateProjectDraft = useCallback(
+    (patch: Partial<StudioProjectDraft>) => {
+      const current = projectRef.current;
+      if (current === null) return;
+      const previous = projectDraftRef.current ?? editableProject(current);
+      const next = { ...previous };
+      let changed = false;
+      for (const field of PROJECT_DRAFT_FIELDS) {
+        if (!Object.hasOwn(patch, field) || patch[field] === undefined || Object.is(previous[field], patch[field])) {
+          continue;
+        }
+        Object.assign(next, { [field]: patch[field] });
+        changed = true;
+      }
+      if (!changed) return;
+      projectEditVersionRef.current += 1;
+      projectDraftRef.current = projectDraftMatches(current, next) ? null : next;
+      if (mountedRef.current) {
+        setError((currentError) => (currentError?.operation === 'update_project' ? null : currentError));
+      }
+      rerenderProjectDraft();
+    },
+    [rerenderProjectDraft]
+  );
+
+  const flushProjectDraft = useCallback(async (): Promise<boolean> => {
+    const current = projectRef.current;
+    const draft = projectDraftRef.current;
+    if (current === null) return false;
+    if (draft === null) return true;
+    const capturedVersion = projectEditVersionRef.current;
+    if (queuedProjectVersionRef.current === capturedVersion) {
+      await drainMutationQueue();
+      return projectDraftRef.current === null && internalConflictRef.current === null;
+    }
+    queuedProjectVersionRef.current = capturedVersion;
+    const capturedDraft = { ...draft };
+    const saved = await enqueueIntent({
+      operation: 'update_project',
+      invoke: (canonical) =>
+        ipcBridge.creativeStudio.updateProject.invoke({
+          projectId: canonical.id,
+          expectedRevision: canonical.revision,
+          ...capturedDraft,
+        }),
+      onSuccess: () => {
+        if (projectEditVersionRef.current === capturedVersion) {
+          projectDraftRef.current = null;
+          projectEditVersionRef.current = 0;
+        }
+        rerenderProjectDraft();
+      },
+      onDiscard: clearProjectDraft,
+    });
+    if (queuedProjectVersionRef.current === capturedVersion) queuedProjectVersionRef.current = null;
+    return saved && projectDraftRef.current === null && internalConflictRef.current === null;
+  }, [clearProjectDraft, drainMutationQueue, enqueueIntent, rerenderProjectDraft]);
+  flushProjectRef.current = flushProjectDraft;
+
+  const discardProjectDraft = useCallback(() => {
+    clearProjectDraft();
+    if (mountedRef.current) {
+      setError((currentError) => (currentError?.operation === 'update_project' ? null : currentError));
+    }
+  }, [clearProjectDraft]);
 
   const flushSceneDraft = useCallback((): Promise<boolean> => {
     const sceneId = selectedSceneIdRef.current;
@@ -943,12 +1117,6 @@ export const useStoryboardEditor = ({
 
   const clearError = useCallback(() => setError(null), []);
 
-  const drainMutationQueue = useCallback(async function waitForCurrentMutationQueue(): Promise<void> {
-    const observedQueue = mutationQueueRef.current;
-    await observedQueue.catch((): void => {});
-    if (observedQueue !== mutationQueueRef.current) await waitForCurrentMutationQueue();
-  }, []);
-
   const retryConflict = useCallback(async (): Promise<boolean> => {
     const pending = internalConflictRef.current;
     if (pending === null) return false;
@@ -1032,14 +1200,21 @@ export const useStoryboardEditor = ({
     selectedSceneId,
     selectedScene,
     sceneDraft,
+    projectDraft,
+    projectSaveState,
+    hasUnsavedProjectDraft: projectDraft !== null,
     hasUnsavedSceneDrafts: dirtySceneIdsRef.current.size > 0,
     hasUnsavedSelectedSceneDraft: selectedSceneId !== null && dirtySceneIdsRef.current.has(selectedSceneId),
     selectedSceneSaveState,
     saveIssues,
     selectScene,
     updateSceneDraft,
+    updateProjectDraft,
+    flushProjectDraft,
+    discardProjectDraft,
     flushSceneDraft,
     flushSceneDraftById,
+    flushAllSceneDrafts,
     discardSceneDraft,
     discardSceneDraftById,
     addScene,

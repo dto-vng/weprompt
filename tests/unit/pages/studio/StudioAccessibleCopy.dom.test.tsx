@@ -7,19 +7,14 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import i18next, { type i18n } from 'i18next';
 import React from 'react';
-import { I18nextProvider } from 'react-i18next';
+import { I18nextProvider, useTranslation } from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
 
-import type {
-  StudioAsset,
-  StudioRendererProject,
-  StudioRouteCatalog,
-  StudioScene,
-} from '@/common/types/project/creativeStudioTypes';
+import type { StudioAsset, StudioRendererProject, StudioScene } from '@/common/types/project/creativeStudioTypes';
 import { GenerationReviewModal } from '@renderer/pages/studio/components/Generation/GenerationReviewModal';
+import { StudioPhaseHeader } from '@renderer/pages/studio/components/PhaseShell/StudioPhaseHeader';
 import { AssetStrip } from '@renderer/pages/studio/components/Preview/AssetStrip';
 import { SceneTimeline } from '@renderer/pages/studio/components/SceneTimeline';
-import { StudioHeader } from '@renderer/pages/studio/components/StudioHeader';
 import { SceneCard } from '@renderer/pages/studio/components/Storyboard/SceneCard';
 import { StoryboardPanel } from '@renderer/pages/studio/components/Storyboard/StoryboardPanel';
 import conversation from '@renderer/services/i18n/locales/en-US/conversation.json';
@@ -117,13 +112,6 @@ const project = (): StudioRendererProject => ({
   createdAt: '2026-08-03T00:00:00.000Z',
   updatedAt: '2026-08-03T00:00:00.000Z',
 });
-
-const storyboardCatalog = (): StudioRouteCatalog['storyboard'] => ({
-  status: 'ready',
-  selected: { providerId: 'provider-1', model: 'story-model' },
-  options: [{ providerId: 'provider-1', providerName: 'Provider', model: 'story-model', health: 'available' }],
-});
-
 describe('Creative Studio full-sentence English copy', () => {
   it('renders complete scene action names and a grammatically singular duration', async () => {
     await renderEnglish(
@@ -252,39 +240,23 @@ describe('Creative Studio full-sentence English copy', () => {
   });
 
   it('renders singular and plural ready-scene actions through the logical i18next key', async () => {
-    const commonProps = {
-      project: project(),
-      storyboard: storyboardCatalog(),
-      catalogLoading: false,
-      catalogErrorMessageKey: null,
-      drafting: false,
-      onBack: vi.fn(),
-      onOpenDraft: vi.fn(),
-      onOpenGenerationReview: vi.fn(),
-    } as const;
+    const ReadyAction = ({ count }: { count: number }) => {
+      const { t } = useTranslation();
+      return (
+        <StudioPhaseHeader
+          project={project()}
+          onBack={vi.fn()}
+          actions={
+            <button type='button'>{t('conversation.creativeStudio.review.generateReadyScenes', { count })}</button>
+          }
+        />
+      );
+    };
 
     await renderEnglish(
       <>
-        <StudioHeader
-          {...commonProps}
-          readiness={{
-            sceneStatuses: {},
-            totalSceneCount: 1,
-            readySceneIds: ['scene-1'],
-            selectedAssetCount: 0,
-            durationDeltaSeconds: 0,
-          }}
-        />
-        <StudioHeader
-          {...commonProps}
-          readiness={{
-            sceneStatuses: {},
-            totalSceneCount: 2,
-            readySceneIds: ['scene-1', 'scene-2'],
-            selectedAssetCount: 0,
-            durationDeltaSeconds: 0,
-          }}
-        />
+        <ReadyAction count={1} />
+        <ReadyAction count={2} />
       </>
     );
 

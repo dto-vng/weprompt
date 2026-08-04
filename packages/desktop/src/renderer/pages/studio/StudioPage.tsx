@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Button, Checkbox, Modal, Spin } from '@arco-design/web-react';
+import { Button, Modal, Spin } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { ipcBridge } from '@/common';
 import type {
@@ -20,22 +20,17 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 
 import {
-  AssetStrip,
-  GenerationControls,
   GenerationReviewModal,
   type GenerationBatchReviewRequest,
   type GenerationReviewScene,
   type GenerationReviewRouteSnapshot,
   type GenerationSingleReviewRequest,
-  SceneTimeline,
-  SceneInspector,
-  StagePreview,
   StoryboardDraftModal,
-  StoryboardPanel,
-  StudioHeader,
+  StudioExportModal,
   StudioLibrary,
-  StudioModelBar,
   StudioNavigationLock,
+  StudioPhaseShell,
+  type StudioPhaseControllers,
 } from './components';
 import { useStoryboardEditor, useStudioJobs, useStudioModels, useStudioProject } from './hooks';
 import styles from './StudioPage.module.css';
@@ -45,8 +40,9 @@ import {
   resolveStudioEntryPhase,
   studioPhasePath,
   type StudioPhase,
+  type StudioPhaseTransition,
+  type StudioWriteFocusIntent,
 } from './studioPhaseRoute';
-import { resolveSceneDurationBounds } from './studioRouteConstraints';
 import { canOpenSingleSceneReview, deriveStudioReadiness } from './studioReadiness';
 
 type GenerationReviewState = {
@@ -138,9 +134,27 @@ const projectRouteSnapshot = (
       };
 };
 
+const newestProject = (...candidates: Array<StudioRendererProject | null>): StudioRendererProject | null =>
+  candidates.reduce<StudioRendererProject | null>(
+    (newest, candidate) =>
+      candidate !== null && (newest === null || candidate.revision > newest.revision) ? candidate : newest,
+    null
+  );
+
+const parseWriteFocusIntent = (state: unknown): StudioWriteFocusIntent | null => {
+  if (typeof state !== 'object' || state === null || !Object.hasOwn(state, 'writeFocus')) return null;
+  const writeFocus = (state as { writeFocus?: unknown }).writeFocus;
+  if (typeof writeFocus !== 'object' || writeFocus === null) return null;
+  const candidate = writeFocus as { sceneId?: unknown; field?: unknown };
+  return typeof candidate.sceneId === 'string' && candidate.sceneId.length > 0 && candidate.field === 'visualPrompt'
+    ? { sceneId: candidate.sceneId, field: candidate.field }
+    : null;
+};
+
 const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ routePhase }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const {
     project: loadedProject,
@@ -157,14 +171,11 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     refetch,
     reconcileOnSubscribe: true,
   });
-  const project = studioJobs.project ?? editor.project ?? loadedProject;
+  const project = newestProject(studioJobs.project, editor.project, loadedProject);
 
   useEffect(() => {
     if (project === null) return;
-    if (routePhase !== null) {
-      rememberStudioPhase(project.id, routePhase);
-      return;
-    }
+    if (routePhase !== null) return;
     navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneOrder.length)), {
       replace: true,
     });
@@ -174,7 +185,8 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     refetch,
     beforeMutation: async () => {
       if (editor.mutationPending) return false;
-      return editor.hasUnsavedSelectedSceneDraft ? editor.flushSceneDraft() : true;
+      if (!(await editor.flushProjectDraft())) return false;
+      return editor.flushAllSceneDrafts();
     },
   });
   const [draftModalVisible, setDraftModalVisible] = useState(false);
@@ -197,62 +209,27 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   const [exportedFolderName, setExportedFolderName] = useState<string | null>(null);
   const [exportMissingSceneIds, setExportMissingSceneIds] = useState<string[]>([]);
   const [exportIssueMessageKey, setExportIssueMessageKey] = useState<string | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<StudioPhaseTransition | null>(null);
+  const [transitionSavesComplete, setTransitionSavesComplete] = useState(false);
+  const [postModalTransition, setPostModalTransition] = useState<StudioPhaseTransition | null>(null);
   const headerBatchLoadingRef = useRef(false);
   const generationReviewRefreshingRef = useRef(false);
   const variationPendingRef = useRef(false);
   const referenceImportSceneIdRef = useRef<string | null>(null);
+  const pendingTransitionRef = useRef<StudioPhaseTransition | null>(null);
+  const editorRef = useRef(editor);
   const canonicalProjectRef = useRef<StudioRendererProject | null>(project);
   canonicalProjectRef.current = project;
+  editorRef.current = editor;
+  const writeFocusIntent = useMemo(() => parseWriteFocusIntent(location.state), [location.state]);
   const draftConflict = editor.conflict?.operation === 'draft_storyboard' ? editor.conflict : null;
-  const nonDraftConflict =
-    editor.conflict !== null && editor.conflict.operation !== 'draft_storyboard' ? editor.conflict : null;
-  const nonSaveConflict =
-    nonDraftConflict !== null && nonDraftConflict.operation !== 'save_scene' ? nonDraftConflict : null;
-  const nonDraftError =
-    editor.error !== null && editor.error.operation !== 'draft_storyboard' && editor.error.operation !== 'save_scene'
-      ? editor.error
-      : null;
-  const saveConflict = editor.conflict?.operation === 'save_scene' ? editor.conflict : null;
-  const selectedSaveIssue = editor.saveIssues.find((issue) => issue.sceneId === editor.selectedScene?.id) ?? null;
-  const sceneIssue =
-    nonSaveConflict === null ? (saveConflict ?? selectedSaveIssue ?? editor.saveIssues[0] ?? null) : null;
-  const inspectorSceneIssue =
-    sceneIssue !== null && editor.selectedScene?.id === sceneIssue.sceneId ? sceneIssue : null;
-  const panelSceneIssue = sceneIssue !== null && inspectorSceneIssue === null ? sceneIssue : null;
-  const panelConflict = panelSceneIssue?.code === 'stale_project' ? panelSceneIssue : nonSaveConflict;
-  const inspectorConflict = inspectorSceneIssue?.code === 'stale_project';
-  const inspectorRecoveryVisible = inspectorSceneIssue !== null;
-  const panelRecoveryVisible = panelConflict !== null || panelSceneIssue !== null;
   const draftErrorMessageKey =
     editor.error?.operation === 'draft_storyboard'
       ? editor.error.messageKey
       : draftConflict
         ? draftConflict.messageKey
         : studioModels.errorMessageKey;
-  const canonicalOrderedScenes = useMemo(
-    () =>
-      project === null
-        ? []
-        : project.sceneOrder.flatMap((sceneId) => {
-            const scene = project.scenes[sceneId];
-            return scene === undefined ? [] : [scene];
-          }),
-    [project]
-  );
-  const currentFitOutcome =
-    editor.latestFitOutcome !== null &&
-    project !== null &&
-    editor.latestFitOutcome.project.id === project.id &&
-    editor.latestFitOutcome.project.revision === project.revision &&
-    editor.latestFitCatalogVersion === studioModels.catalog?.catalogVersion
-      ? editor.latestFitOutcome
-      : null;
   const readiness = useMemo(() => (project === null ? null : deriveStudioReadiness(project)), [project]);
-  const modelSetupCalloutVisible =
-    studioModels.catalog !== null &&
-    (['storyboard', 'image', 'video'] as const).some(
-      (role) => studioModels.catalog?.[role].status === 'setup_required'
-    );
   const readyScenes = useMemo(
     () =>
       readiness === null || project === null
@@ -265,13 +242,6 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   );
   const selectedScene =
     project !== null && editor.selectedSceneId !== null ? (project.scenes[editor.selectedSceneId] ?? null) : null;
-  const sceneDurationBounds = useMemo(() => {
-    const mediaKind = editor.sceneDraft?.mediaKind ?? editor.selectedScene?.mediaKind;
-    if (project === null || mediaKind === undefined) {
-      return { minDurationSeconds: 1, maxDurationSeconds: 60, source: 'fallback' as const };
-    }
-    return resolveSceneDurationBounds(project, studioModels.catalog, mediaKind);
-  }, [editor.sceneDraft?.mediaKind, editor.selectedScene?.mediaKind, project, studioModels.catalog]);
   const selectedAsset =
     project !== null && selectedScene?.selectedAssetId ? (project.assets[selectedScene.selectedAssetId] ?? null) : null;
   const selectedReferenceAsset =
@@ -310,50 +280,30 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       );
     return posters.length === 1 ? posters[0]! : null;
   }, [project, selectedScene]);
-  const selectedSceneJobs = useMemo(
-    () =>
-      selectedScene === null
-        ? []
-        : studioJobs.jobs.filter((job) => job.sceneId === selectedScene.id && selectedScene.jobIds.includes(job.id)),
-    [selectedScene, studioJobs.jobs]
-  );
   const canonicalMutationPending =
-    editor.mutationPending || studioJobs.mutationPending || variationPending || headerBatchLoading;
-  const hasLockedScenes = useMemo(() => {
-    if (project === null) return false;
-    const activeStatuses = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
-    return (
-      Object.values(project.assets).some(
-        (asset) => asset.sceneId !== null && asset.managedAsset.collection === 'assets'
-      ) || Object.values(project.jobs).some((job) => activeStatuses.has(job.status))
-    );
-  }, [project]);
-  const fitDisabled =
-    editor.hasUnsavedSceneDrafts ||
-    editor.conflict !== null ||
-    studioModels.loading ||
-    studioModels.catalog === null ||
-    !studioModels.catalog.catalogVersion ||
-    canonicalMutationPending ||
+    editor.mutationPending ||
     studioModels.pendingRole !== null ||
-    referenceImportSceneId !== null ||
-    generationReviewRefreshing;
+    studioJobs.mutationPending ||
+    variationPending ||
+    headerBatchLoading;
   const generationBlocked =
     project === null ||
+    editor.hasUnsavedProjectDraft ||
     editor.hasUnsavedSceneDrafts ||
     editor.conflict !== null ||
     editor.drafting ||
     canonicalMutationPending ||
     referenceImportSceneId !== null;
   const exportBlocked = generationBlocked;
-  const generationActionIssue =
-    studioJobs.issue?.jobId !== undefined && selectedSceneJobs.some((job) => job.id === studioJobs.issue?.jobId)
-      ? {
-          jobId: studioJobs.issue.jobId,
-          code: studioJobs.issue.code,
-          messageKey: studioJobs.issue.messageKey,
-        }
-      : null;
+  const transitionBlocked = generationReview !== null || duplicateChargeJobId !== null || exportVisible;
+  const navigationLocked =
+    editor.hasUnsavedProjectDraft ||
+    editor.hasUnsavedSceneDrafts ||
+    editor.conflict !== null ||
+    editor.drafting ||
+    canonicalMutationPending ||
+    referenceImportSceneId !== null ||
+    transitionBlocked;
 
   const handleDraftStoryboard = useCallback(
     async (replaceExisting: boolean): Promise<void> => {
@@ -652,59 +602,67 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     [canonicalMutationPending, editor.conflict, editor.hasUnsavedSceneDrafts, project, refetch]
   );
 
-  const handleImportReference = useCallback(async (): Promise<void> => {
-    const sceneId = editor.selectedScene?.id;
-    if (
-      sceneId === undefined ||
-      editor.conflict !== null ||
-      editor.drafting ||
-      editor.mutationPending ||
-      studioJobs.mutationPending ||
-      variationPending ||
-      referenceImportSceneId !== null ||
-      referenceImportSceneIdRef.current !== null
-    ) {
-      return;
-    }
+  const handleImportReference = useCallback(
+    async (sceneId: string): Promise<void> => {
+      if (
+        !Object.hasOwn(editorRef.current.project?.scenes ?? {}, sceneId) ||
+        editor.conflict !== null ||
+        editor.drafting ||
+        editor.mutationPending ||
+        studioJobs.mutationPending ||
+        variationPending ||
+        referenceImportSceneId !== null ||
+        referenceImportSceneIdRef.current !== null
+      ) {
+        return;
+      }
 
-    referenceImportSceneIdRef.current = sceneId;
-    setReferenceImportSceneId(sceneId);
-    setReferenceImportIssue(null);
-    try {
-      const hadUnsavedSelectedSceneDraft = editor.hasUnsavedSelectedSceneDraft;
-      const saved = await editor.flushSceneDraft();
-      if (hadUnsavedSelectedSceneDraft && !saved) return;
-      const canonical = await refetch();
-      if (canonical === null || !Object.hasOwn(canonical.scenes, sceneId)) {
+      referenceImportSceneIdRef.current = sceneId;
+      setReferenceImportSceneId(sceneId);
+      setReferenceImportIssue(null);
+      try {
+        if (!(await editorRef.current.flushSceneDraftById(sceneId))) return;
+        const canonical = await refetch();
+        if (canonical === null || !Object.hasOwn(canonical.scenes, sceneId)) {
+          setReferenceImportIssue({
+            sceneId,
+            messageKey: 'conversation.creativeStudio.errors.storage',
+          });
+          return;
+        }
+        const result = await ipcBridge.creativeStudio.chooseAndImportReference.invoke({
+          projectId: canonical.id,
+          sceneId,
+          expectedRevision: canonical.revision,
+        });
+        if (result.ok === false) {
+          if (result.error.code === 'stale_project') await refetch();
+          setReferenceImportIssue({ sceneId, messageKey: result.error.messageKey });
+          return;
+        }
+        if (result.data.status === 'imported') await refetch();
+      } catch {
         setReferenceImportIssue({
           sceneId,
           messageKey: 'conversation.creativeStudio.errors.storage',
         });
-        return;
+      } finally {
+        if (referenceImportSceneIdRef.current === sceneId) {
+          referenceImportSceneIdRef.current = null;
+        }
+        setReferenceImportSceneId(null);
       }
-      const result = await ipcBridge.creativeStudio.chooseAndImportReference.invoke({
-        projectId: canonical.id,
-        sceneId,
-        expectedRevision: canonical.revision,
-      });
-      if (result.ok === false) {
-        if (result.error.code === 'stale_project') await refetch();
-        setReferenceImportIssue({ sceneId, messageKey: result.error.messageKey });
-        return;
-      }
-      if (result.data.status === 'imported') await refetch();
-    } catch {
-      setReferenceImportIssue({
-        sceneId,
-        messageKey: 'conversation.creativeStudio.errors.storage',
-      });
-    } finally {
-      if (referenceImportSceneIdRef.current === sceneId) {
-        referenceImportSceneIdRef.current = null;
-      }
-      setReferenceImportSceneId(null);
-    }
-  }, [editor, refetch, referenceImportSceneId, studioJobs.mutationPending, variationPending]);
+    },
+    [
+      editor.conflict,
+      editor.drafting,
+      editor.mutationPending,
+      refetch,
+      referenceImportSceneId,
+      studioJobs.mutationPending,
+      variationPending,
+    ]
+  );
 
   const handleExportAssets = useCallback(async (): Promise<void> => {
     if (exportBlocked || exportPending || project === null || readiness?.selectedAssetCount === 0) return;
@@ -729,6 +687,94 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       setExportPending(false);
     }
   }, [exportBlocked, exportIncludeReferences, exportPending, project, readiness?.selectedAssetCount]);
+
+  const openExport = useCallback((): void => {
+    if (exportBlocked || readiness?.selectedAssetCount === 0) return;
+    setExportIncludeReferences(false);
+    setExportedFolderName(null);
+    setExportMissingSceneIds([]);
+    setExportIssueMessageKey(null);
+    setExportVisible(true);
+  }, [exportBlocked, readiness?.selectedAssetCount]);
+
+  const focusRecoveryAlert = useCallback((): void => {
+    requestAnimationFrame(() => {
+      const alert = document.querySelector<HTMLElement>('[role="alert"]');
+      if (alert === null) return;
+      alert.tabIndex = -1;
+      alert.focus();
+    });
+  }, []);
+
+  const requestTransition = useCallback(
+    (transition: StudioPhaseTransition): void => {
+      if (
+        project === null ||
+        transitionBlocked ||
+        pendingTransitionRef.current !== null ||
+        (transition.phase === routePhase && transition.state === undefined)
+      ) {
+        return;
+      }
+      pendingTransitionRef.current = transition;
+      setPendingTransition(transition);
+      setTransitionSavesComplete(false);
+      void (async (): Promise<void> => {
+        const currentEditor = editorRef.current;
+        const projectSaved = await currentEditor.flushProjectDraft();
+        const scenesSaved = projectSaved ? await editorRef.current.flushAllSceneDrafts() : false;
+        if (!projectSaved || !scenesSaved || editorRef.current.conflict !== null) {
+          pendingTransitionRef.current = null;
+          setPendingTransition(null);
+          setTransitionSavesComplete(false);
+          focusRecoveryAlert();
+          return;
+        }
+        setTransitionSavesComplete(true);
+      })();
+    },
+    [focusRecoveryAlert, project, routePhase, transitionBlocked]
+  );
+
+  useEffect(() => {
+    if (project === null || pendingTransition === null || !transitionSavesComplete || navigationLocked) {
+      return;
+    }
+    const transition = pendingTransition;
+    rememberStudioPhase(project.id, transition.phase);
+    navigate(studioPhasePath(project.id, transition.phase), {
+      state: transition.state ?? null,
+    });
+    pendingTransitionRef.current = null;
+    setPendingTransition(null);
+    setTransitionSavesComplete(false);
+  }, [navigate, navigationLocked, pendingTransition, project, transitionSavesComplete]);
+
+  const clearWriteFocusIntent = useCallback((): void => {
+    if (parseWriteFocusIntent(location.state) === null) return;
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
+
+  const openModelSettings = useCallback((): void => {
+    setTimeout(() => navigate('/settings/model'), 0);
+  }, [navigate]);
+
+  const closeExportAndOpenProduce = useCallback((): void => {
+    if (exportPending) return;
+    setPostModalTransition({ phase: 'produce' });
+    setExportVisible(false);
+    setExportIncludeReferences(false);
+    setExportedFolderName(null);
+    setExportMissingSceneIds([]);
+    setExportIssueMessageKey(null);
+  }, [exportPending]);
+
+  useEffect(() => {
+    if (postModalTransition === null || exportVisible || navigationLocked) return;
+    const transition = postModalTransition;
+    setPostModalTransition(null);
+    requestTransition(transition);
+  }, [exportVisible, navigationLocked, postModalTransition, requestTransition]);
 
   if (loading) {
     return (
@@ -757,210 +803,50 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     );
   }
 
+  const controller: StudioPhaseControllers = {
+    project,
+    readiness: readiness!,
+    editor,
+    models: studioModels,
+    jobs: studioJobs,
+    selectedAsset,
+    posterAsset,
+    selectedReferenceAsset,
+    writeFocusIntent,
+    mutationPending:
+      canonicalMutationPending || referenceImportSceneId !== null || generationReviewRefreshing || exportPending,
+    requestTransition,
+    openDraftReview: () => setDraftModalVisible(true),
+    openSingleGenerationReview: openSingleReview,
+    openBatchGenerationReview: openBatchReview,
+    openReadyScenesReview: openHeaderBatchReview,
+    openExport,
+    openModelSettings,
+    importReference: handleImportReference,
+    selectVariation: handleSelectVariation,
+    clearWriteFocusIntent,
+    openDuplicateChargeConfirmation: setDuplicateChargeJobId,
+  };
+  const shellIssueMessageKey =
+    errorMessageKey ??
+    headerGenerationIssue ??
+    variationIssueMessageKey ??
+    referenceImportIssue?.messageKey ??
+    (editor.error?.operation === 'update_project' ? editor.error.messageKey : null);
+
   return (
     <section aria-label={t('conversation.creativeStudio.project.title')} className={styles.projectShell}>
-      <StudioNavigationLock
-        locked={
-          editor.hasUnsavedSceneDrafts ||
-          editor.conflict !== null ||
-          editor.drafting ||
-          canonicalMutationPending ||
-          referenceImportSceneId !== null ||
-          generationReview !== null ||
-          duplicateChargeJobId !== null ||
-          exportVisible
-        }
-      />
-      {(errorMessageKey || headerGenerationIssue) && (
+      <StudioNavigationLock locked={navigationLocked} />
+      {shellIssueMessageKey && (
         <div role='alert' className={styles.projectAlert}>
-          {t(errorMessageKey ?? headerGenerationIssue!)}
+          {t(shellIssueMessageKey)}
         </div>
       )}
-      <StudioHeader
-        project={project}
-        readiness={readiness!}
-        storyboard={studioModels.catalog?.storyboard ?? null}
-        catalogLoading={studioModels.loading}
-        catalogErrorMessageKey={draftErrorMessageKey}
-        drafting={editor.drafting}
-        draftDisabled={nonDraftConflict !== null}
-        generationDisabled={generationBlocked}
-        generationPending={headerBatchLoading || studioJobs.mutationPending}
-        exportDisabled={exportBlocked}
-        exportPending={exportPending}
+      <StudioPhaseShell
+        activePhase={routePhase ?? resolveStudioEntryPhase(project.id, project.sceneOrder.length)}
+        controller={controller}
+        navigationDisabled={transitionBlocked || pendingTransition !== null}
         onBack={() => navigate('/studio')}
-        onOpenDraft={() => setDraftModalVisible(true)}
-        onOpenGenerationReview={() => void openHeaderBatchReview()}
-        onOpenExport={() => {
-          if (exportBlocked || readiness?.selectedAssetCount === 0) return;
-          setExportIncludeReferences(false);
-          setExportedFolderName(null);
-          setExportMissingSceneIds([]);
-          setExportIssueMessageKey(null);
-          setExportVisible(true);
-        }}
-      />
-      <div className={styles.modelBar}>
-        <StudioModelBar
-          catalog={studioModels.catalog}
-          loading={studioModels.loading}
-          errorMessageKey={studioModels.errorMessageKey}
-          pendingRole={studioModels.pendingRole}
-          disabled={canonicalMutationPending || editor.drafting || studioJobs.mutationPending}
-          onRefresh={studioModels.refresh}
-          onSelectionChange={studioModels.updateSelection}
-          onOpenSettings={(path) => navigate(path)}
-        />
-      </div>
-      <div className={styles.editorGrid}>
-        <StoryboardPanel
-          orderedScenes={editor.orderedScenes}
-          selectedSceneId={editor.selectedSceneId}
-          targetDurationSeconds={project.targetDurationSeconds}
-          durationTotalSeconds={editor.durationTotalSeconds}
-          durationMatchesTarget={editor.durationMatchesTarget}
-          remainingDurationSeconds={editor.remainingDurationSeconds}
-          suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
-          canAddScene={editor.canAddScene}
-          mutationPending={canonicalMutationPending}
-          fitDisabled={fitDisabled}
-          fitOutcome={currentFitOutcome}
-          hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
-          sceneStatuses={readiness?.sceneStatuses ?? {}}
-          errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
-          statusMessageKey={
-            panelSceneIssue || nonDraftError || panelConflict
-              ? 'conversation.creativeStudio.inspector.unsavedChanges'
-              : null
-          }
-          conflict={panelRecoveryVisible}
-          onSelectScene={editor.selectScene}
-          onAddScene={editor.addScene}
-          onIncreaseTargetDuration={editor.increaseTargetDuration}
-          onFitToTarget={() => {
-            const catalogVersion = studioModels.catalog?.catalogVersion;
-            if (fitDisabled || !catalogVersion) return;
-            editor.clearLatestFitOutcome();
-            void editor.fitToTarget(catalogVersion);
-          }}
-          onRemoveScene={editor.removeScene}
-          onReorderScenes={editor.reorderScenes}
-          onMoveScene={editor.moveScene}
-          onRetryConflict={
-            panelSceneIssue !== null &&
-            panelSceneIssue.code !== 'stale_project' &&
-            panelSceneIssue.sceneId !== undefined
-              ? () => editor.flushSceneDraftById(panelSceneIssue.sceneId!)
-              : editor.retryConflict
-          }
-          onDiscardConflict={
-            panelSceneIssue !== null &&
-            panelSceneIssue.code !== 'stale_project' &&
-            panelSceneIssue.sceneId !== undefined
-              ? () => editor.discardSceneDraftById(panelSceneIssue.sceneId!)
-              : editor.discardConflict
-          }
-        />
-        <div className={styles.previewColumn}>
-          <StagePreview
-            projectId={project.id}
-            project={project}
-            catalog={studioModels.catalog}
-            catalogLoading={studioModels.loading}
-            selectedScene={selectedScene}
-            selectedAsset={selectedAsset}
-            posterAsset={posterAsset}
-            generationDisabled={generationBlocked}
-            onOpenSingleReview={openSingleReview}
-          />
-          {variationIssueMessageKey && (
-            <div role='alert' className={styles.projectAlert}>
-              {t(variationIssueMessageKey)}
-            </div>
-          )}
-          <AssetStrip
-            projectId={project.id}
-            scene={selectedScene}
-            assets={project.assets}
-            projectRevision={project.revision}
-            mutationPending={canonicalMutationPending || editor.hasUnsavedSceneDrafts}
-            onSelectAsset={handleSelectVariation}
-          />
-        </div>
-        <div className={styles.inspectorColumn}>
-          <SceneInspector
-            projectId={project.id}
-            selectedScene={editor.selectedScene}
-            referenceAsset={selectedReferenceAsset}
-            sceneDraft={editor.sceneDraft}
-            mutationPending={canonicalMutationPending}
-            errorMessageKey={
-              inspectorSceneIssue?.messageKey ??
-              (referenceImportIssue !== null && referenceImportIssue.sceneId === editor.selectedScene?.id
-                ? referenceImportIssue.messageKey
-                : null)
-            }
-            saveState={editor.selectedSceneSaveState}
-            conflict={inspectorRecoveryVisible}
-            durationBounds={sceneDurationBounds}
-            onUpdateSceneDraft={editor.updateSceneDraft}
-            onFlushSceneDraft={editor.flushSceneDraft}
-            onRetryConflict={inspectorConflict ? editor.retryConflict : editor.flushSceneDraft}
-            onDiscardConflict={inspectorConflict ? editor.discardConflict : editor.discardSceneDraft}
-            importingReference={referenceImportSceneId === editor.selectedScene?.id}
-            onImportReference={handleImportReference}
-          />
-          <div className={styles.generationPanel}>
-            <GenerationControls
-              project={project}
-              catalog={studioModels.catalog}
-              catalogLoading={studioModels.loading}
-              catalogErrorMessageKey={studioModels.errorMessageKey}
-              onRefreshCatalog={studioModels.refresh}
-              scene={
-                selectedScene === null
-                  ? null
-                  : {
-                      id: selectedScene.id,
-                      mediaKind: selectedScene.mediaKind,
-                      hasSelectedAsset: selectedScene.selectedAssetId !== null,
-                    }
-              }
-              aspectRatio={project.aspectRatio}
-              resolution={project.resolution}
-              sceneDurationSeconds={selectedScene?.durationSeconds}
-              hasReference={selectedScene?.referenceAssetId !== null}
-              batchSceneCount={readyScenes.length}
-              batchDisabled={readiness?.durationDeltaSeconds !== 0}
-              batchDisabledReasonKey={
-                readiness?.durationDeltaSeconds !== 0
-                  ? 'conversation.creativeStudio.review.disabledDurationMismatch'
-                  : null
-              }
-              disabled={generationBlocked}
-              singleDisabled={
-                selectedScene !== null &&
-                !canOpenSingleSceneReview(readiness?.sceneStatuses[selectedScene.id], selectedScene.visualPrompt)
-              }
-              showSettingsAction={!modelSetupCalloutVisible}
-              jobs={selectedSceneJobs}
-              pendingJobIds={studioJobs.mutationPending ? selectedSceneJobs.map((job) => job.id) : []}
-              actionIssue={generationActionIssue}
-              onOpenSettings={(path) => setTimeout(() => navigate(path), 0)}
-              onOpenSingleReview={openSingleReview}
-              onOpenBatchReview={openBatchReview}
-              onCancelJob={studioJobs.cancelJob}
-              onRetryJob={studioJobs.retryJob}
-              onRetryDownload={studioJobs.retryDownload}
-              onReviewUnknownSubmission={setDuplicateChargeJobId}
-            />
-          </div>
-        </div>
-      </div>
-      <SceneTimeline
-        orderedScenes={canonicalOrderedScenes}
-        selectedSceneId={editor.selectedSceneId}
-        onSelectScene={editor.selectScene}
       />
       <StoryboardDraftModal
         visible={draftModalVisible}
@@ -1010,93 +896,20 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         }}
         onConfirm={confirmGeneration}
       />
-      <Modal
+      <StudioExportModal
         visible={exportVisible}
-        title={t(
-          exportedFolderName === null
-            ? 'conversation.creativeStudio.export.title'
-            : exportMissingSceneIds.length > 0
-              ? 'conversation.creativeStudio.export.partialTitle'
-              : 'conversation.creativeStudio.export.successTitle'
-        )}
-        closable={!exportPending}
-        maskClosable={!exportPending}
-        escToExit={!exportPending}
-        onCancel={() => {
-          if (!exportPending) setExportVisible(false);
-        }}
-        footer={
-          <div className='flex flex-wrap justify-end gap-8px'>
-            <Button disabled={exportPending} onClick={() => setExportVisible(false)}>
-              {t('conversation.creativeStudio.export.cancel')}
-            </Button>
-            {exportedFolderName === null && (
-              <Button
-                type='primary'
-                loading={exportPending}
-                disabled={exportPending || readiness.selectedAssetCount === 0}
-                onClick={() => void handleExportAssets()}
-              >
-                {t('conversation.creativeStudio.export.confirm')}
-              </Button>
-            )}
-          </div>
-        }
-      >
-        {exportedFolderName === null ? (
-          <div className='flex flex-col gap-12px'>
-            <p className='m-0'>{t('conversation.creativeStudio.export.body')}</p>
-            {readiness.selectedAssetCount === 0 && (
-              <p className='m-0 text-13px text-warning'>{t('conversation.creativeStudio.export.noSelectedAssets')}</p>
-            )}
-            <Checkbox checked={exportIncludeReferences} disabled={exportPending} onChange={setExportIncludeReferences}>
-              {t('conversation.creativeStudio.export.includeReferences')}
-            </Checkbox>
-            {exportPending && (
-              <p role='status' className='m-0 text-13px text-t-secondary'>
-                {t('conversation.creativeStudio.export.choosing')}
-              </p>
-            )}
-            {exportIssueMessageKey !== null && (
-              <div role='alert' className='rounded-8px bg-danger-light-1 p-10px text-13px text-danger'>
-                <p className='m-0'>{t('conversation.creativeStudio.export.failed')}</p>
-                {exportIssueMessageKey !== 'conversation.creativeStudio.export.failed' && (
-                  <p className='mb-0 mt-4px'>{t(exportIssueMessageKey)}</p>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className='flex flex-col gap-12px'>
-            <p className='m-0'>
-              {t(
-                exportMissingSceneIds.length > 0
-                  ? 'conversation.creativeStudio.export.partialBody'
-                  : 'conversation.creativeStudio.export.successBody',
-                {
-                  folderName: exportedFolderName,
-                }
-              )}
-            </p>
-            <dl className='m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-12px gap-y-8px rounded-8px bg-fill-1 p-12px'>
-              <dt className='text-12px text-t-tertiary'>{t('conversation.creativeStudio.export.folderLabel')}</dt>
-              <dd className='m-0 break-all text-13px text-t-primary'>{exportedFolderName}</dd>
-            </dl>
-            {exportMissingSceneIds.length > 0 && (
-              <p className='m-0 text-13px text-warning'>
-                {t('conversation.creativeStudio.export.missingScenes', {
-                  scenes: exportMissingSceneIds
-                    .map((sceneId) => {
-                      const title = project.scenes[sceneId]?.title;
-                      return title === undefined ? sceneId : `${title} (${sceneId})`;
-                    })
-                    .join(', '),
-                })}
-              </p>
-            )}
-          </div>
-        )}
-      </Modal>
+        project={project}
+        selectedAssetCount={readiness.selectedAssetCount}
+        pending={exportPending}
+        includeReferences={exportIncludeReferences}
+        exportedFolderName={exportedFolderName}
+        missingSceneIds={exportMissingSceneIds}
+        issueMessageKey={exportIssueMessageKey}
+        onCancel={() => setExportVisible(false)}
+        onConfirm={() => void handleExportAssets()}
+        onIncludeReferencesChange={setExportIncludeReferences}
+        onOpenProduce={closeExportAndOpenProduce}
+      />
       <Modal
         visible={duplicateChargeJobId !== null}
         title={t('conversation.creativeStudio.jobs.retryChargeTitle')}
