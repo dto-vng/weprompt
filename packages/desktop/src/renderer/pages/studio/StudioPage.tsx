@@ -191,6 +191,14 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       const result = await editor.flushAllSceneDrafts();
       return result.failed.length === 0 && result.dirtied.length === 0;
     },
+    // An unambiguous engine may be adopted only while nothing else holds the
+    // project revision, so the automatic write never collides with an edit.
+    autoSelectSoleRoute:
+      editor.conflict === null &&
+      !editor.mutationPending &&
+      !editor.drafting &&
+      !editor.hasUnsavedProjectDraft &&
+      !editor.hasUnsavedSceneDrafts,
   });
   const [draftModalVisible, setDraftModalVisible] = useState(false);
   const [generationReview, setGenerationReview] = useState<GenerationReviewState | null>(null);

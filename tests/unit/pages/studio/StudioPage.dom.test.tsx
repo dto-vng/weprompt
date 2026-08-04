@@ -1560,6 +1560,59 @@ describe('StudioPage and useStudioProject', () => {
     expect(bridge.updateModelSelection.invoke).not.toHaveBeenCalled();
   });
 
+  it('adopts the only compatible engine so a connected workspace can render without a picker', async () => {
+    const unrouted = project('project-1', { routing: { storyboard: null, image: null, video: null } });
+    bridge.getProject.invoke.mockResolvedValueOnce(ok(unrouted)).mockResolvedValue(ok(project()));
+    bridge.listRoutes.invoke
+      .mockResolvedValueOnce(
+        ok({
+          ...routes(),
+          image: {
+            status: 'selection_required' as const,
+            selected: null,
+            selectedRoute: null,
+            options: [imageRoute()],
+          },
+        })
+      )
+      .mockResolvedValue(ok(routesWithImage()));
+    renderRoute('/studio/project-1/produce');
+
+    await waitFor(() =>
+      expect(bridge.updateModelSelection.invoke).toHaveBeenCalledWith({
+        projectId: 'project-1',
+        expectedRevision: unrouted.revision,
+        role: 'image',
+        selection: { choiceId: 'choice_image' },
+      })
+    );
+    await screen.findByRole('heading', { name: 'conversation.creativeStudio.phase.produce.renderingWith' });
+    expect(
+      screen.queryByRole('heading', { name: 'conversation.creativeStudio.phase.produce.connectEngine' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('asks for a connection instead of guessing when several engines could serve a role', async () => {
+    const unrouted = project('project-1', { routing: { storyboard: null, image: null, video: null } });
+    bridge.getProject.invoke.mockResolvedValue(ok(unrouted));
+    bridge.listRoutes.invoke.mockResolvedValue(
+      ok({
+        ...routes(),
+        image: {
+          status: 'selection_required' as const,
+          selected: null,
+          selectedRoute: null,
+          options: [imageRoute(), imageRoute({ choiceId: 'choice_image_alternate', model: 'alternate-image-model' })],
+        },
+      })
+    );
+    renderRoute('/studio/project-1/produce');
+
+    await screen.findByRole('heading', { name: 'conversation.creativeStudio.phase.produce.connectEngine' });
+    await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledWith({ projectId: 'project-1' }));
+    expect(bridge.updateModelSelection.invoke).not.toHaveBeenCalled();
+  });
+
   it('opens a canonical batch review from the batch control and submits every exact scene route only after confirmation', async () => {
     const opening = scene({ id: 'scene-1', durationSeconds: 5 });
     const closing = scene({ id: 'scene-2', title: 'Closing', durationSeconds: 10 });
