@@ -101,6 +101,81 @@ describe('createOfficeCliRunner', () => {
     );
   });
 
+  it('renders one slide to an app-owned output with a bounded shell-free command', async () => {
+    const execFile = vi.fn<OfficeCliExecFile>(
+      execFileWithStdout(JSON.stringify({ success: true, data: { output: '/private/render/slide-4.png' } }))
+    );
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await expect(
+      runner.renderSlide('/private/inspection/candidate.pptx', 4, '/private/render/slide-4.png')
+    ).resolves.toBeUndefined();
+
+    expect(execFile).toHaveBeenCalledWith(
+      '/opt/officecli',
+      [
+        'view',
+        '/private/inspection/candidate.pptx',
+        'screenshot',
+        '--page',
+        '4',
+        '-o',
+        '/private/render/slide-4.png',
+        '--json',
+      ],
+      {
+        shell: false,
+        windowsHide: true,
+        timeout: 90_000,
+        maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
+      },
+      expect.any(Function)
+    );
+  });
+
+  it('preserves a redacted render-timeout signal for readiness policy', async () => {
+    const error = Object.assign(new Error('/private/inspection/candidate.pptx'), {
+      code: null,
+      killed: true,
+      signal: 'SIGTERM' as const,
+    });
+    const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
+      callback(error, JSON.stringify({ success: true, data: {} }), '/private/inspection/candidate.pptx');
+    });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await expect(
+      runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
+    ).rejects.toMatchObject({ code: 'ETIMEDOUT', message: 'ETIMEDOUT' });
+  });
+
+  it('maps a nonzero render exit to a redacted typed failure', async () => {
+    const error = Object.assign(new Error('/private/inspection/candidate.pptx'), { code: 2 });
+    const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
+      callback(error, JSON.stringify({ success: true, data: {} }), '/private/inspection/candidate.pptx');
+    });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await expect(
+      runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
+    ).rejects.toMatchObject({ code: 'OFFICECLI_FAILED', message: 'OFFICECLI_FAILED' });
+  });
+
+  it('rejects an unsuccessful render envelope even when the process exits cleanly', async () => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(
+        JSON.stringify({
+          success: false,
+          error: { code: 'no_screenshot_backend', error: '/private/inspection/candidate.pptx' },
+        })
+      ),
+    });
+
+    await expect(
+      runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
+    ).rejects.toMatchObject({ code: 'OFFICECLI_FAILED', message: 'OFFICECLI_FAILED' });
+  });
+
   it('normalizes the observed PPTX text object without losing slide order', async () => {
     const runner = createOfficeCliRunner({
       execFile: execFileWithStdout(JSON.stringify(pptxTextFixture)),

@@ -20,7 +20,11 @@ type OfficeCliExecFileOptions = {
   maxBuffer: number;
 };
 
-type OfficeCliExecFileError = Error & { code?: string | number };
+type OfficeCliExecFileError = Error & {
+  code?: string | number | null;
+  killed?: boolean;
+  signal?: NodeJS.Signals | null;
+};
 
 type OfficeCliSpawnOptions = {
   shell: false;
@@ -82,6 +86,13 @@ export type OfficeCliRunner = {
   watch: (file: string) => Promise<OfficeCliPreviewSession>;
 };
 
+/** Narrow OfficeCLI capability used by exact-hash presentation inspection. */
+export type OfficeCliRenderRunner = {
+  renderSlide: (file: string, page: number, outputPath: string) => Promise<void>;
+};
+
+export type FullOfficeCliRunner = OfficeCliRunner & OfficeCliRenderRunner;
+
 export type OfficeCliRunnerDependencies = {
   binaryPath?: string;
   execFile?: OfficeCliExecFile;
@@ -98,6 +109,11 @@ const EXEC_OPTIONS: OfficeCliExecFileOptions = {
   windowsHide: true,
   timeout: 30_000,
   maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
+};
+
+const RENDER_EXEC_OPTIONS: OfficeCliExecFileOptions = {
+  ...EXEC_OPTIONS,
+  timeout: 90_000,
 };
 
 const WATCH_OPTIONS: OfficeCliSpawnOptions = {
@@ -161,6 +177,17 @@ function resolveOfficeCliBinary(dependencies: OfficeCliRunnerDependencies): stri
 function toOfficeArtifactError(error: unknown): OfficeArtifactError {
   const isMissingBinary = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
   return new OfficeArtifactError(isMissingBinary ? 'OFFICECLI_NOT_FOUND' : 'OFFICECLI_FAILED');
+}
+
+function toOfficeCliRenderError(error: unknown): Error {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    (('code' in error && error.code === 'ETIMEDOUT') || ('killed' in error && error.killed === true))
+  ) {
+    return Object.assign(new Error('ETIMEDOUT'), { name: 'OfficeCliRenderTimeoutError', code: 'ETIMEDOUT' as const });
+  }
+  return toOfficeArtifactError(error);
 }
 
 function textViewFailure(): never {
@@ -229,7 +256,7 @@ function parseOfficeCliTextView(output: string, format: OfficeCliTextFormat): Of
   return format === 'pptx' ? normalizePptxTextView(data) : normalizeDocxTextView(data);
 }
 
-export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies = {}): OfficeCliRunner {
+export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies = {}): FullOfficeCliRunner {
   const binaryPath = resolveOfficeCliBinary(dependencies);
   const execFile = dependencies.execFile ?? defaultExecFile;
   const spawn = dependencies.spawn ?? defaultSpawn;
@@ -237,17 +264,19 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
 
   const invoke = <T = unknown>(
     args: string[],
-    parseOutput: (output: string) => T = parseOfficeCliEnvelope<T>
+    parseOutput: (output: string) => T = parseOfficeCliEnvelope<T>,
+    options: OfficeCliExecFileOptions = EXEC_OPTIONS,
+    mapError: (error: unknown) => Error = toOfficeArtifactError
   ): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       try {
-        execFile(binaryPath, args, EXEC_OPTIONS, (error, stdout) => {
+        execFile(binaryPath, args, options, (error, stdout) => {
           if (error) {
-            reject(toOfficeArtifactError(error));
+            reject(mapError(error));
             return;
           }
 
-          if (Buffer.byteLength(stdout, 'utf8') > EXEC_OPTIONS.maxBuffer) {
+          if (Buffer.byteLength(stdout, 'utf8') > options.maxBuffer) {
             reject(new OfficeArtifactError('OFFICECLI_FAILED'));
             return;
           }
@@ -349,6 +378,14 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
     validate: (file) => invoke(['validate', file, '--json']),
     viewText: (file, format) =>
       invoke(['view', file, 'text', '--json'], (output) => parseOfficeCliTextView(output, format)),
+    renderSlide: async (file, page, outputPath) => {
+      await invoke(
+        ['view', file, 'screenshot', '--page', String(page), '-o', outputPath, '--json'],
+        parseOfficeCliEnvelope,
+        RENDER_EXEC_OPTIONS,
+        toOfficeCliRenderError
+      );
+    },
     close: (file) => invoke(['close', file, '--json']),
     watch,
   };

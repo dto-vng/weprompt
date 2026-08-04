@@ -15,7 +15,7 @@ import {
   OfficeArtifactService,
   type OfficeArtifactServiceDependencies,
   type OfficeArtifactSnapshotStoreApi,
-} from '@/process/services/office-artifact/OfficeArtifactService';
+} from '@/process/services/office-artifact/service/OfficeArtifactService';
 import { OfficeArtifactError } from '@/process/services/office-artifact/officeCliJson';
 import type { ResolvedOfficeArtifact } from '@/process/services/office-artifact/officeArtifactPath';
 import type { OfficeArtifactPendingSnapshot } from '@/process/services/office-artifact/officeArtifactSnapshots';
