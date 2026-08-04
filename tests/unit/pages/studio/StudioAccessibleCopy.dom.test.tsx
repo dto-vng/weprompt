@@ -241,7 +241,9 @@ describe('Creative Studio full-sentence English copy', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Start writing' })).toBeInTheDocument();
+    const headerActions = document.querySelector<HTMLElement>('[data-studio-phase-actions]');
+    expect(headerActions).not.toBeNull();
+    expect(within(headerActions!).getByRole('button', { name: 'Start writing' })).toBeInTheDocument();
   });
 
   it('renders every phase in every configured locale without raw visible or accessible copy', async () => {

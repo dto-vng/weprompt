@@ -330,7 +330,8 @@ describe('Studio asset export', () => {
     bridge.updateScene.invoke.mockReturnValueOnce(save.promise);
     const { router } = renderProject('write');
 
-    const prompt = await screen.findByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
+    const openingRow = await screen.findByRole('region', { name: 'Opening' });
+    const prompt = within(openingRow).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel');
     fireEvent.change(prompt, { target: { value: 'A newly edited cinematic frame' } });
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(

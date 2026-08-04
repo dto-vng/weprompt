@@ -8,9 +8,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { resolveSceneDurationBounds } from '../../../studioRouteConstraints';
+import { StoryboardPanel, WriteSceneRow } from '../../Storyboard';
 import { AssistantDock } from '../AssistantDock';
 import type { WritePhaseController } from '../types';
-import { SceneInspector, StoryboardPanel } from '../../Storyboard';
+import { useStudioLayoutMode } from '../useStudioLayoutMode';
 import styles from './WritePhase.module.css';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
@@ -26,13 +27,15 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
     readiness,
     editor,
     models,
-    selectedReferenceAsset,
     writeFocusIntent,
     mutationPending,
+    openDraftReview,
     importReference,
     clearWriteFocusIntent,
   } = controller;
+  const { containerRef, layoutMode } = useStudioLayoutMode(project.id);
   const [importingSceneId, setImportingSceneId] = useState<string | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const saveConflict = editor.conflict?.operation === 'save_scene' ? editor.conflict : null;
   const nonSaveConflict =
     editor.conflict !== null &&
@@ -44,14 +47,8 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
     editor.error !== null && editor.error.operation !== 'draft_storyboard' && editor.error.operation !== 'save_scene'
       ? editor.error
       : null;
-  const selectedSaveIssue = editor.saveIssues.find((issue) => issue.sceneId === editor.selectedScene?.id) ?? null;
-  const sceneIssue =
-    nonSaveConflict === null ? (saveConflict ?? selectedSaveIssue ?? editor.saveIssues[0] ?? null) : null;
-  const inspectorSceneIssue =
-    sceneIssue !== null && editor.selectedScene?.id === sceneIssue.sceneId ? sceneIssue : null;
-  const panelSceneIssue = sceneIssue !== null && inspectorSceneIssue === null ? sceneIssue : null;
-  const panelConflict = panelSceneIssue?.code === 'stale_project' ? panelSceneIssue : nonSaveConflict;
-  const inspectorConflict = inspectorSceneIssue?.code === 'stale_project';
+  const firstSceneIssue = saveConflict ?? editor.saveIssues[0] ?? null;
+  const panelConflict = firstSceneIssue?.code === 'stale_project' ? firstSceneIssue : nonSaveConflict;
   const currentFitOutcome =
     editor.latestFitOutcome !== null &&
     editor.latestFitOutcome.project.id === project.id &&
@@ -74,12 +71,10 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
     !models.catalog.catalogVersion ||
     mutationPending ||
     models.pendingRole !== null;
-  const sceneDurationBounds = useMemo(() => {
-    const mediaKind = editor.sceneDraft?.mediaKind ?? editor.selectedScene?.mediaKind;
-    return mediaKind === undefined
-      ? { minDurationSeconds: 1, maxDurationSeconds: 60, source: 'fallback' as const }
-      : resolveSceneDurationBounds(project, models.catalog, mediaKind);
-  }, [editor.sceneDraft?.mediaKind, editor.selectedScene?.mediaKind, models.catalog, project]);
+
+  useEffect(() => {
+    if (layoutMode === 'inline') setAssistantOpen(false);
+  }, [layoutMode, project.id]);
 
   useEffect(() => {
     if (writeFocusIntent === null) return;
@@ -108,15 +103,13 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
   }, [clearWriteFocusIntent, editor, project.scenes, writeFocusIntent]);
 
   return (
-    <section className={styles.phase} aria-labelledby='studio-write-phase-heading'>
+    <section ref={containerRef} className={styles.phase} aria-labelledby='studio-write-phase-heading'>
       <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
         {t('conversation.creativeStudio.phase.write.title')}
       </h2>
       <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.write.description')}</p>
-      <p className='m-0 text-12px text-t-tertiary'>
-        {t('conversation.creativeStudio.phase.write.textChargeDisclosure')}
-      </p>
-      <div className={styles.workspace}>
+      <p className='m-0 text-12px text-t-tertiary'>{t('conversation.creativeStudio.phase.shared.noMediaGeneration')}</p>
+      <div className={styles.workspace} data-layout={layoutMode}>
         <StoryboardPanel
           orderedScenes={editor.orderedScenes}
           selectedSceneId={editor.selectedSceneId}
@@ -131,13 +124,13 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
           fitOutcome={currentFitOutcome}
           hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
           sceneStatuses={readiness.sceneStatuses}
-          errorMessageKey={panelConflict?.messageKey ?? panelSceneIssue?.messageKey ?? nonDraftError?.messageKey}
+          errorMessageKey={panelConflict?.messageKey ?? firstSceneIssue?.messageKey ?? nonDraftError?.messageKey}
           statusMessageKey={
-            panelSceneIssue || nonDraftError || panelConflict
+            firstSceneIssue || nonDraftError || panelConflict
               ? 'conversation.creativeStudio.inspector.unsavedChanges'
               : null
           }
-          conflict={panelConflict !== null || panelSceneIssue !== null}
+          conflict={panelConflict !== null || firstSceneIssue !== null}
           onSelectScene={editor.selectScene}
           onAddScene={editor.addScene}
           onIncreaseTargetDuration={editor.increaseTargetDuration}
@@ -151,44 +144,79 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
           onReorderScenes={editor.reorderScenes}
           onMoveScene={editor.moveScene}
           onRetryConflict={
-            panelSceneIssue !== null &&
-            panelSceneIssue.code !== 'stale_project' &&
-            panelSceneIssue.sceneId !== undefined
-              ? () => editor.flushSceneDraftById(panelSceneIssue.sceneId!)
-              : editor.retryConflict
+            panelConflict !== null
+              ? editor.retryConflict
+              : firstSceneIssue?.sceneId !== undefined
+                ? () => editor.flushSceneDraftById(firstSceneIssue.sceneId!)
+                : editor.retryConflict
           }
           onDiscardConflict={
-            panelSceneIssue !== null &&
-            panelSceneIssue.code !== 'stale_project' &&
-            panelSceneIssue.sceneId !== undefined
-              ? () => editor.discardSceneDraftById(panelSceneIssue.sceneId!)
-              : editor.discardConflict
+            panelConflict !== null
+              ? editor.discardConflict
+              : firstSceneIssue?.sceneId !== undefined
+                ? () => editor.discardSceneDraftById(firstSceneIssue.sceneId!)
+                : editor.discardConflict
           }
         />
-        <AssistantDock kind='write'>
-          <SceneInspector
-            projectId={project.id}
-            selectedScene={editor.selectedScene}
-            referenceAsset={selectedReferenceAsset}
-            sceneDraft={editor.sceneDraft}
-            mutationPending={mutationPending}
-            errorMessageKey={inspectorSceneIssue?.messageKey ?? null}
-            saveState={editor.selectedSceneSaveState}
-            conflict={inspectorSceneIssue !== null}
-            durationBounds={sceneDurationBounds}
-            onUpdateSceneDraft={editor.updateSceneDraft}
-            onFlushSceneDraft={editor.flushSceneDraft}
-            onRetryConflict={inspectorConflict ? editor.retryConflict : editor.flushSceneDraft}
-            onDiscardConflict={inspectorConflict ? editor.discardConflict : editor.discardSceneDraft}
-            importingReference={importingSceneId === editor.selectedScene?.id}
-            onImportReference={() => {
-              const sceneId = editor.selectedScene?.id;
-              if (sceneId === undefined || importingSceneId !== null) return;
-              setImportingSceneId(sceneId);
-              void importReference(sceneId).finally(() => setImportingSceneId(null));
+
+        <div className={styles.sceneRows}>
+          {editor.orderedScenes.map((scene) => {
+            const draft = editor.sceneDrafts[scene.id];
+            if (draft === undefined) return null;
+            const saveIssue = editor.saveIssues.find((issue) => issue.sceneId === scene.id) ?? null;
+            const staleConflict = saveConflict?.sceneId === scene.id ? saveConflict : null;
+            const issue = staleConflict ?? saveIssue;
+            const referenceAsset =
+              scene.referenceAssetId === null ? null : (project.assets[scene.referenceAssetId] ?? null);
+            return (
+              <WriteSceneRow
+                key={scene.id}
+                projectId={project.id}
+                scene={project.scenes[scene.id] ?? scene}
+                draft={draft}
+                referenceAsset={referenceAsset}
+                saveState={editor.sceneSaveStates[scene.id] ?? 'saved'}
+                errorMessageKey={issue?.messageKey ?? null}
+                conflict={issue !== null}
+                selected={editor.selectedSceneId === scene.id}
+                mutationPending={mutationPending}
+                importingReference={importingSceneId === scene.id}
+                durationBounds={resolveSceneDurationBounds(project, models.catalog, draft.mediaKind)}
+                onSelect={() => editor.selectScene(scene.id)}
+                onUpdate={(patch) => editor.updateSceneDraftById(scene.id, patch)}
+                onFlush={() => editor.flushSceneDraftById(scene.id)}
+                onRetryConflict={
+                  staleConflict !== null ? editor.retryConflict : () => editor.flushSceneDraftById(scene.id)
+                }
+                onDiscardConflict={
+                  staleConflict !== null ? editor.discardConflict : () => editor.discardSceneDraftById(scene.id)
+                }
+                onImportReference={() => {
+                  if (importingSceneId !== null) return;
+                  setImportingSceneId(scene.id);
+                  void importReference(scene.id).finally(() => setImportingSceneId(null));
+                }}
+              />
+            );
+          })}
+        </div>
+
+        <div className={styles.assistantSlot}>
+          <AssistantDock
+            kind='write'
+            layoutMode={layoutMode}
+            drawerVisible={assistantOpen}
+            storyboard={models.catalog?.storyboard ?? null}
+            catalogLoading={models.loading}
+            drafting={editor.drafting}
+            disabled={mutationPending || models.pendingRole !== null}
+            onOpenChange={setAssistantOpen}
+            onDraftStoryboard={() => {
+              setAssistantOpen(false);
+              openDraftReview();
             }}
           />
-        </AssistantDock>
+        </div>
       </div>
     </section>
   );

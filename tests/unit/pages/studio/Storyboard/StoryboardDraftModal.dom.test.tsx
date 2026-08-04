@@ -119,6 +119,42 @@ describe('StoryboardDraftModal', () => {
     expect(props.proposeStoryboard).toHaveBeenCalledWith(true);
   });
 
+  it('keeps configured storyboard model selection in the existing draft review', () => {
+    const props = modalProps({
+      storyboard: {
+        status: 'ready',
+        selected: { providerId: 'story-provider', model: 'planner-model' },
+        options: [
+          {
+            providerId: 'story-provider',
+            providerName: 'Storyboard Provider',
+            model: 'planner-model',
+            health: 'available',
+          },
+          {
+            providerId: 'alternate-provider',
+            providerName: 'Alternate Provider',
+            model: 'alternate-model',
+            health: 'available',
+          },
+        ],
+      },
+    });
+    render(<StoryboardDraftModal {...props} />);
+
+    fireEvent.click(
+      screen.getByRole('combobox', {
+        name: 'conversation.creativeStudio.models.storyboard',
+      })
+    );
+    fireEvent.click(screen.getByText('alternate-model · Alternate Provider'));
+
+    expect(props.onSelectStoryboardModel).toHaveBeenCalledWith({
+      providerId: 'alternate-provider',
+      model: 'alternate-model',
+    });
+  });
+
   it('blocks duplicate authorization while readiness is checking or drafting is pending', () => {
     const checking = modalProps({
       storyboard: null,
