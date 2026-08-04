@@ -8,8 +8,9 @@ capabilities, and validation time.
 
 Adapters, credentials, provider responses, remote job IDs, temporary output
 URLs, and resolved local inputs stay in the main process. The renderer receives
-only sanitized route and job DTOs; job DTOs omit both the remote job ID and
-submission idempotency key.
+only sanitized route and job DTOs; job DTOs omit the remote job ID, submission
+idempotency key, adapter ID, and raw cancellation policy. The renderer receives
+only the main-derived `canCancel` decision for each job.
 
 ## BytePlus ModelArk Seedance
 
@@ -97,7 +98,8 @@ main-process-only until the job layer downloads and verifies them.
 
 Queued Seedance tasks may be deleted. Already-cancelled tasks are treated
 idempotently as cancelled. Running, succeeded, failed, and expired tasks return
-a typed cancellation refusal instead of a false success.
+a typed cancellation refusal instead of a false success. Seedance therefore
+advertises the `queued_only` cancellation policy.
 
 ## WePrompt Media Gateway v1
 
@@ -145,7 +147,7 @@ canonical response is:
     "min_duration_seconds": 2,
     "max_duration_seconds": 30,
     "supports_first_frame": true,
-    "cancellation": true
+    "cancellation_policy": "queued_and_running"
   }
 }
 ```
@@ -156,7 +158,14 @@ Studio aspect ratios shown above, 720p or 1080p, and whole-second duration
 bounds from 1 through 60. `aspect_ratios`, `resolutions`,
 `min_duration_seconds`, and `max_duration_seconds` are required so WePrompt
 never guesses broader paid-generation support than the gateway declares.
-`supports_first_frame` and `cancellation` are optional and default to false.
+`supports_first_frame` is optional and defaults to false.
+`cancellation_policy` is optional and accepts exactly `none`, `queued_only`, or
+`queued_and_running`; missing policy defaults to `none`. Invalid types or values
+reject the capability response. For schema-v1 compatibility only, a gateway may
+omit `cancellation_policy` and send legacy `cancellation: true`, which maps to
+`queued_only`; false or missing maps to `none`. A valid explicit policy wins
+when both fields are present. New gateways should emit only
+`cancellation_policy`.
 
 For compatibility, the same fields may be nested under a top-level
 `capabilities` object. New gateways should emit the canonical root shape.
@@ -270,7 +279,8 @@ rejected.
 
 ### Cancellation and errors
 
-When `video.cancellation` is true, the gateway should implement an idempotent:
+When `video.cancellation_policy` is `queued_only` or `queued_and_running`, the
+gateway should implement an idempotent:
 
 ```text
 POST /v1/generations/{id}/cancel
@@ -280,6 +290,12 @@ A successful cancellation may return `204 No Content` or another 2xx response.
 Repeated cancellation should remain successful. An unsupported, unknown, or
 non-cancellable task should return a non-2xx response; WePrompt reports a
 sanitized `cancellation_refused` result.
+
+`queued_only` authorizes cancellation only while the durable WePrompt job is
+queued at the provider. `queued_and_running` also authorizes running and
+needs-attention jobs with a known provider task ID. The policy is snapshotted on
+submission; later route selection or connection-catalog changes do not rewrite
+that job contract.
 
 WePrompt maps provider failures by HTTP status and never persists the response
 body:

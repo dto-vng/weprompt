@@ -1092,6 +1092,7 @@
         "rateLimited": "Sağlayıcının istek sınırına ulaşıldı. Daha sonra tekrar deneyin.",
         "providerUnavailable": "Oluşturma sağlayıcısı kullanılamıyor.",
         "timeout": "Sağlayıcı zamanında yanıt vermedi.",
+        "pollDeadline": "Motor ilerleme bildirmeyi durdurdu. Yeniden denemeden önce sağlayıcıyla durumu kontrol edin.",
         "noOutput": "Sağlayıcı kullanılabilir bir çıktı olmadan tamamladı.",
         "submissionUnknown": "Gönderimin sonucu bilinmiyor. Tekrar denemeden önce mükerrer ücret uyarısını gözden geçirin.",
         "downloadFailed": "Oluşturma tamamlandı ancak çıktı indirilemedi.",

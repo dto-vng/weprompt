@@ -440,6 +440,8 @@ describe('Creative Studio E2E fake gate', () => {
     expect(providers?.map((item) => item.id)).toEqual(['provider_1', STUDIO_E2E_FAKE_PROVIDER_ID]);
     expect(plannerProviders?.map((item) => item.id)).toEqual(['provider_1', STUDIO_E2E_FAKE_PROVIDER_ID]);
     expect(connections).toEqual(fakeBundle.connections);
+    expect(connections?.[0]?.capabilities).toMatchObject({ cancellationPolicy: 'queued_only' });
+    expect(connections?.[0]?.capabilities).not.toHaveProperty('cancellation');
   });
 });
 

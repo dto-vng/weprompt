@@ -1091,6 +1091,7 @@
         "rateLimited": "Das Anbieterratenlimit wurde erreicht. Versuche es später erneut.",
         "providerUnavailable": "Der Generierungsanbieter ist nicht verfügbar.",
         "timeout": "Der Anbieter hat nicht rechtzeitig geantwortet.",
+        "pollDeadline": "Die Engine meldet keinen Fortschritt mehr. Prüfen Sie den Status beim Anbieter, bevor Sie es erneut versuchen.",
         "noOutput": "Der Anbieter hat den Auftrag ohne nutzbare Ausgabe abgeschlossen.",
         "submissionUnknown": "Das Übermittlungsergebnis ist unbekannt. Prüfe vor einer Wiederholung die Warnung vor einer Doppelbelastung.",
         "downloadFailed": "Die Generierung wurde abgeschlossen, aber die Ausgabe konnte nicht heruntergeladen werden.",

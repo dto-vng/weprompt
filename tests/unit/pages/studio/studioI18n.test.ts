@@ -103,6 +103,7 @@ const stableMessageKeys = [
   'jobs.errors.rateLimited',
   'jobs.errors.providerUnavailable',
   'jobs.errors.timeout',
+  'jobs.errors.pollDeadline',
   'jobs.errors.noOutput',
   'jobs.errors.submissionUnknown',
   'jobs.errors.downloadFailed',

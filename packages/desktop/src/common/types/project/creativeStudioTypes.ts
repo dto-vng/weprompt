@@ -76,6 +76,7 @@ export type StudioJobErrorCode =
   | 'rate_limited'
   | 'provider_unavailable'
   | 'timeout'
+  | 'poll_deadline'
   | 'no_output'
   | 'submission_unknown'
   | 'download_failed'
@@ -89,6 +90,8 @@ export type StudioJobError = {
 
 export type StudioJobRetryReason = 'provider_failure' | 'submission_unknown';
 
+export type StudioCancellationPolicy = 'none' | 'queued_only' | 'queued_and_running';
+
 export type StudioJob = {
   id: string;
   projectId: string;
@@ -97,6 +100,9 @@ export type StudioJob = {
   provider: StudioProviderRef;
   idempotencyKey: string;
   providerJobId: string | null;
+  /** Set once when providerJobId becomes durable. Optional only for old schema-v1 jobs. */
+  remoteStartedAt?: string | null;
+  cancellationPolicy: StudioCancellationPolicy;
   outputAssetIds: string[];
   error: StudioJobError | null;
   progress?: number;
@@ -109,8 +115,13 @@ export type StudioJob = {
 };
 
 /** Renderer-facing job metadata. Provider task, adapter, and charge identities stay in main. */
-export type StudioRendererJob = Omit<StudioJob, 'provider' | 'idempotencyKey' | 'providerJobId'> & {
+export type StudioRendererJob = Omit<
+  StudioJob,
+  'provider' | 'idempotencyKey' | 'providerJobId' | 'remoteStartedAt' | 'cancellationPolicy'
+> & {
   provider: StudioMediaChoiceRef;
+  /** Main-derived cancellation capability; renderer code never infers it from status or provider metadata. */
+  canCancel: boolean;
   /** Main-derived recovery capability; never exposes the durable provider task identity. */
   canRetryDownload: boolean;
 };
@@ -257,6 +268,8 @@ export type StudioConnectionCapabilities = {
   minDurationSeconds?: number;
   maxDurationSeconds?: number;
   supportsFirstFrame?: boolean;
+  cancellationPolicy?: StudioCancellationPolicy;
+  /** Legacy schema-v1 ingress only. Canonical reads and new writes omit it. */
   cancellation?: boolean;
 };
 
@@ -288,13 +301,18 @@ export type StudioConnectionIntegration = {
   labelKey: StudioConnectionIntegrationLabelKey;
 };
 
+export type StudioRendererConnectionCapabilities = Omit<
+  StudioConnectionCapabilities,
+  'cancellationPolicy' | 'cancellation'
+>;
+
 export type StudioConnectionRecord = {
   bindingId: string;
   providerId: string;
   integrationId: string;
   labelKey: StudioConnectionIntegrationLabelKey;
   model: string;
-  capabilities: StudioConnectionCapabilities;
+  capabilities: StudioRendererConnectionCapabilities;
   validatedAt: string;
 };
 

@@ -41,6 +41,7 @@ const JOB_MESSAGE_KEYS: Record<StudioJobErrorCode, string> = {
   rate_limited: 'conversation.creativeStudio.jobs.errors.rateLimited',
   provider_unavailable: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
   timeout: 'conversation.creativeStudio.jobs.errors.timeout',
+  poll_deadline: 'conversation.creativeStudio.jobs.errors.pollDeadline',
   no_output: 'conversation.creativeStudio.jobs.errors.noOutput',
   submission_unknown: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
   download_failed: 'conversation.creativeStudio.jobs.errors.downloadFailed',
@@ -127,6 +128,7 @@ const sanitizeJob = (candidate: StudioRendererJob): StudioRendererJob => {
     },
     outputAssetIds: [...candidate.outputAssetIds],
     canRetryDownload: candidate.canRetryDownload === true,
+    canCancel: candidate.canCancel === true,
     error:
       candidate.error === null
         ? null
@@ -433,7 +435,7 @@ export const useStudioJobs = ({
           publishIssue(localIssue(operation, 'invalid_payload', intent.jobId));
           return false;
         }
-        if (intent.operation === 'cancel_job' && !['queued_local', 'queued_remote'].includes(currentJob.status)) {
+        if (intent.operation === 'cancel_job' && currentJob.canCancel !== true) {
           publishIssue(localIssue(operation, 'cancellation_refused', intent.jobId));
           return false;
         }

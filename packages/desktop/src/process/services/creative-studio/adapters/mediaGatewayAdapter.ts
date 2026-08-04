@@ -26,6 +26,7 @@ const FIRST_FRAME_MAX_BYTES = 30 * 1024 * 1024;
 const VALIDATION_TIMEOUT_MS = 10_000;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
 const RESOLUTIONS = new Set(['720p', '1080p']);
+const CANCELLATION_POLICIES = new Set(['none', 'queued_only', 'queued_and_running']);
 const HTTP_LOOPBACK_HOSTS = new Set(['127.0.0.1', '[::1]']);
 
 export class MediaGatewayAdapterError extends Error {
@@ -143,6 +144,7 @@ const sanitizedCapabilities = (value: unknown, model: string): Record<string, un
       : null;
   const minimum = selectedVideo.min_duration_seconds;
   const maximum = selectedVideo.max_duration_seconds;
+  const cancellationPolicy = selectedVideo.cancellation_policy;
   if (
     !aspectRatios ||
     !resolutions ||
@@ -154,7 +156,9 @@ const sanitizedCapabilities = (value: unknown, model: string): Record<string, un
     (maximum as number) > 60 ||
     (minimum as number) > (maximum as number) ||
     (selectedVideo.supports_first_frame !== undefined && typeof selectedVideo.supports_first_frame !== 'boolean') ||
-    (selectedVideo.cancellation !== undefined && typeof selectedVideo.cancellation !== 'boolean')
+    (selectedVideo.cancellation !== undefined && typeof selectedVideo.cancellation !== 'boolean') ||
+    (cancellationPolicy !== undefined &&
+      (typeof cancellationPolicy !== 'string' || !CANCELLATION_POLICIES.has(cancellationPolicy)))
   )
     return null;
   return {
@@ -165,7 +169,14 @@ const sanitizedCapabilities = (value: unknown, model: string): Record<string, un
     minDurationSeconds: minimum as number,
     maxDurationSeconds: maximum as number,
     supportsFirstFrame: selectedVideo.supports_first_frame === true,
-    cancellation: selectedVideo.cancellation === true,
+    cancellationPolicy:
+      cancellationPolicy === 'none' ||
+      cancellationPolicy === 'queued_only' ||
+      cancellationPolicy === 'queued_and_running'
+        ? cancellationPolicy
+        : selectedVideo.cancellation === true
+          ? 'queued_only'
+          : 'none',
   };
 };
 

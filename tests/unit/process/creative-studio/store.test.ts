@@ -91,6 +91,7 @@ const addSucceededJob = (project: StudioProject): StudioProject => {
     provider: { providerId: 'provider_1', adapterId: 'weprompt-image-v1', model: 'model_1' },
     idempotencyKey: 'key_1',
     providerJobId: null,
+    cancellationPolicy: 'none',
     outputAssetIds: [],
     error: null,
     retryOfJobId: null,
@@ -118,6 +119,7 @@ const makeJob = (
   provider: { providerId: 'provider_1', adapterId: 'weprompt-image-v1', model: 'model_1' },
   idempotencyKey: `key_${id}`,
   providerJobId: null,
+  cancellationPolicy: 'none',
   outputAssetIds: [],
   error: { code: 'provider_unavailable', messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable' },
   retryOfJobId: null,
@@ -456,6 +458,124 @@ describe('creative studio project store', () => {
         },
       },
     });
+  });
+
+  it('defaults a legacy schema-v1 job cancellation policy to none on read', async () => {
+    const project = await store.createProject(makeInput());
+    const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+    const manifestFile = path.join(rootDir, withJob.id, 'project.json');
+    const legacy = JSON.parse(readFileSync(manifestFile, 'utf8')) as {
+      jobs: Record<string, Record<string, unknown>>;
+    };
+    delete legacy.jobs.job_1.cancellationPolicy;
+    writeFileSync(manifestFile, JSON.stringify(legacy));
+
+    await expect(store.getProject(withJob.id)).resolves.toMatchObject({
+      jobs: { job_1: { cancellationPolicy: 'none' } },
+    });
+  });
+
+  it('accepts a legacy schema-v1 job without a remote polling anchor', async () => {
+    const project = await store.createProject(makeInput());
+    const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+    const manifestFile = path.join(rootDir, withJob.id, 'project.json');
+    const legacy = JSON.parse(readFileSync(manifestFile, 'utf8')) as {
+      jobs: Record<string, Record<string, unknown>>;
+    };
+    delete legacy.jobs.job_1.remoteStartedAt;
+    writeFileSync(manifestFile, JSON.stringify(legacy));
+
+    await expect(store.getProject(withJob.id)).resolves.toMatchObject({
+      jobs: { job_1: { id: 'job_1' } },
+    });
+  });
+
+  it.each([null, '2026-08-04T01:02:03.004Z'])(
+    'accepts the durable remote polling anchor %s',
+    async (remoteStartedAt) => {
+      const project = await store.createProject(makeInput());
+      const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+
+      await expect(
+        store.updateProject(withJob.id, (current) => {
+          const next = cloneProject(current);
+          next.jobs.job_1.providerJobId = remoteStartedAt === null ? null : 'remote_1';
+          next.jobs.job_1.remoteStartedAt = remoteStartedAt;
+          return next;
+        })
+      ).resolves.toMatchObject({
+        jobs: { job_1: { remoteStartedAt } },
+      });
+    }
+  );
+
+  it.each(['not-a-date', '2026-08-04T01:02:03Z', '999999999999999999999999'])(
+    'rejects a non-canonical durable remote polling anchor %s',
+    async (remoteStartedAt) => {
+      const project = await store.createProject(makeInput());
+      const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+
+      await expect(
+        store.updateProject(withJob.id, (current) => {
+          const next = cloneProject(current);
+          next.jobs.job_1.providerJobId = 'remote_1';
+          next.jobs.job_1.remoteStartedAt = remoteStartedAt;
+          return next;
+        })
+      ).rejects.toMatchObject({ code: 'invalid_payload' });
+    }
+  );
+
+  it.each([
+    {
+      label: 'a timestamp without a provider identity',
+      providerJobId: null,
+      remoteStartedAt: '2026-08-04T01:02:03.004Z',
+    },
+    { label: 'null with a provider identity', providerJobId: 'remote_1', remoteStartedAt: null },
+  ])('rejects $label when the remote anchor property is present', async ({ providerJobId, remoteStartedAt }) => {
+    const project = await store.createProject(makeInput());
+    const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+
+    await expect(
+      store.updateProject(withJob.id, (current) => {
+        const next = cloneProject(current);
+        next.jobs.job_1.providerJobId = providerJobId;
+        next.jobs.job_1.remoteStartedAt = remoteStartedAt;
+        return next;
+      })
+    ).rejects.toMatchObject({ code: 'invalid_payload' });
+  });
+
+  it('accepts poll_deadline as a stable durable job error code', async () => {
+    const project = await store.createProject(makeInput());
+    const withJob = await store.updateProject(project.id, (current) => {
+      const next = addSucceededJob(current);
+      next.jobs.job_1.status = 'needs_attention';
+      next.jobs.job_1.error = {
+        code: 'poll_deadline',
+        messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
+      };
+      next.scenes.scene_1.reviewState = 'blocked';
+      return next;
+    });
+
+    await expect(store.getProject(withJob.id)).resolves.toMatchObject({
+      jobs: { job_1: { error: { code: 'poll_deadline' } } },
+    });
+  });
+
+  it('rejects an invalid durable job cancellation policy instead of widening cancellation authority', async () => {
+    const project = await store.createProject(makeInput());
+    const withJob = await store.updateProject(project.id, (current) => addSucceededJob(current));
+    const manifestFile = path.join(rootDir, withJob.id, 'project.json');
+    const malformed = JSON.parse(readFileSync(manifestFile, 'utf8')) as {
+      jobs: Record<string, Record<string, unknown>>;
+    };
+    malformed.jobs.job_1.cancellationPolicy = 'always';
+    writeFileSync(manifestFile, JSON.stringify(malformed));
+
+    await expect(store.getProject(withJob.id)).rejects.toMatchObject({ code: 'storage_error' });
   });
 
   it('atomically replaces manifests instead of leaving a partial JSON document after repeated writes', async () => {
@@ -842,8 +962,10 @@ describe('creative studio renderer DTO contract', () => {
       | 'bytes'
       | 'base64'
       | 'providerJobId'
+      | 'remoteStartedAt'
       | 'idempotencyKey'
-      | 'adapterId';
+      | 'adapterId'
+      | 'cancellationPolicy';
     type KeysOfUnion<Value> = Value extends unknown ? keyof Value : never;
     type RendererDto =
       | StudioRendererProject
@@ -895,6 +1017,83 @@ describe('CreativeStudioStore connections', () => {
       const raw = readFileSync(path.join(root, 'connections.json'), 'utf8');
       expect(raw).not.toContain('api_key');
       expect(raw).not.toContain('https://');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    { legacy: true, expected: 'queued_only' },
+    { legacy: false, expected: 'none' },
+    { legacy: undefined, expected: 'none' },
+  ])(
+    'canonicalizes legacy cancellation $legacy to $expected when reading connections',
+    async ({ legacy, expected }) => {
+      const root = mkdtempSync(path.join(tmpdir(), 'creative-studio-connections-legacy-read-'));
+      const connectionStore = createCreativeStudioStore({ rootDir: root });
+      try {
+        const binding = validConnectionBinding() as StudioConnectionBinding & {
+          capabilities: StudioConnectionBinding['capabilities'] & { cancellation?: boolean };
+        };
+        if (legacy !== undefined) binding.capabilities.cancellation = legacy;
+        writeFileSync(
+          path.join(root, 'connections.json'),
+          JSON.stringify({ schemaVersion: 1, connections: [binding] })
+        );
+
+        const [loaded] = await connectionStore.listConnections();
+
+        expect(loaded?.capabilities).toMatchObject({ cancellationPolicy: expected });
+        expect(loaded?.capabilities).not.toHaveProperty('cancellation');
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('canonicalizes legacy cancellation on save and persists only cancellationPolicy', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'creative-studio-connections-legacy-save-'));
+    const connectionStore = createCreativeStudioStore({ rootDir: root });
+    try {
+      const legacy = validConnectionBinding() as StudioConnectionBinding & {
+        capabilities: StudioConnectionBinding['capabilities'] & { cancellation: boolean };
+      };
+      legacy.capabilities.cancellation = true;
+
+      const saved = await connectionStore.saveConnection(legacy);
+      const raw = readFileSync(path.join(root, 'connections.json'), 'utf8');
+
+      expect(saved.capabilities).toMatchObject({ cancellationPolicy: 'queued_only' });
+      expect(saved.capabilities).not.toHaveProperty('cancellation');
+      expect(raw).toContain('"cancellationPolicy": "queued_only"');
+      expect(raw).not.toContain('"cancellation"');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    { label: 'an invalid explicit policy', capabilities: { cancellationPolicy: 'always' } },
+    {
+      label: 'both legacy and explicit policy fields',
+      capabilities: { cancellation: true, cancellationPolicy: 'none' },
+    },
+  ])('rejects $label at connection read and write boundaries', async ({ capabilities }) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'creative-studio-connections-policy-invalid-'));
+    const connectionStore = createCreativeStudioStore({ rootDir: root });
+    const malformed = {
+      ...validConnectionBinding(),
+      capabilities: { ...validConnectionBinding().capabilities, ...capabilities },
+    };
+    try {
+      await expect(connectionStore.saveConnection(malformed as never)).rejects.toMatchObject({
+        code: 'invalid_payload',
+      });
+      writeFileSync(
+        path.join(root, 'connections.json'),
+        JSON.stringify({ schemaVersion: 1, connections: [malformed] })
+      );
+      await expect(connectionStore.listConnections()).rejects.toMatchObject({ code: 'storage_error' });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

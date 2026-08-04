@@ -27,7 +27,7 @@ const gatewayCapabilities = (overrides: Partial<StudioConnectionCapabilities> = 
   minDurationSeconds: 2,
   maxDurationSeconds: 30,
   supportsFirstFrame: false,
-  cancellation: false,
+  cancellationPolicy: 'none',
   ...overrides,
 });
 
@@ -76,6 +76,7 @@ describe('createStudioProviderResolver', () => {
           kind: 'video',
           providerId: 'provider_1',
           model: 'video-model',
+          cancellationPolicy: 'none',
         }),
       ])
     );
@@ -161,11 +162,48 @@ describe('createStudioProviderResolver', () => {
     expect(changed.generationCatalogVersion).not.toBe(first.generationCatalogVersion);
   });
 
+  it('changes the main-only generation version when cancellation policy changes', async () => {
+    const first = await resolver().listGenerationRoutes();
+    const changed = await resolver(
+      [provider({ models: ['gemini-2.5-flash-image', 'video-model'] })],
+      [
+        binding({
+          id: 'binding_image',
+          adapterId: 'weprompt-image-v1',
+          model: 'gemini-2.5-flash-image',
+          capabilities: { mediaKinds: ['image'] },
+        }),
+        binding({
+          id: 'binding_video',
+          capabilities: gatewayCapabilities({ cancellationPolicy: 'queued_and_running' }),
+        }),
+      ]
+    ).listGenerationRoutes();
+
+    expect(changed.generationCatalogVersion).not.toBe(first.generationCatalogVersion);
+  });
+
   it('deduplicates duplicate validated bindings with the same route identity', async () => {
     const duplicate = binding({ id: 'binding_duplicate' });
     const catalog = await resolver([provider()], [binding(), duplicate]).listGenerationRoutes();
 
     expect(catalog.routes).toHaveLength(1);
+  });
+
+  it.each([
+    ['permissive first', ['queued_and_running', 'queued_only', 'none']],
+    ['restrictive first', ['none', 'queued_only', 'queued_and_running']],
+  ] as const)('resolves duplicate policy conflicts least-permissively with %s', async (_label, policies) => {
+    const connections = policies.map((cancellationPolicy, index) =>
+      binding({
+        id: `binding_${index}`,
+        capabilities: gatewayCapabilities({ cancellationPolicy }),
+      })
+    );
+
+    const result = await resolver([provider()], connections).listGenerationRoutes();
+
+    expect(result.routes).toMatchObject([{ cancellationPolicy: 'none' }]);
   });
 
   it('omits routes for disabled, credentialless, or unhealthy providers', async () => {

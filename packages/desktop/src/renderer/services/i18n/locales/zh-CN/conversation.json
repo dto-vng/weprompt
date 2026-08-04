@@ -1086,6 +1086,7 @@
         "rateLimited": "已达到服务商速率限制，请稍后重试。",
         "providerUnavailable": "生成服务商当前不可用。",
         "timeout": "服务商未及时响应。",
+        "pollDeadline": "引擎已停止报告进度。重试前请先向服务商确认。",
         "noOutput": "服务商已完成任务，但未返回可用输出。",
         "submissionUnknown": "提交结果未知。重试前请查看重复扣费警告。",
         "downloadFailed": "生成已完成，但无法下载输出。",

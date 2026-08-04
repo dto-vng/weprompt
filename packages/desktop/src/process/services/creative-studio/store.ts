@@ -9,6 +9,7 @@ import path from 'node:path';
 import type {
   CreateStudioProjectInput,
   StudioAsset,
+  StudioCancellationPolicy,
   StudioConnectionBinding,
   StudioJob,
   StudioProject,
@@ -36,6 +37,7 @@ const JOB_STATUSES = new Set([
 ]);
 const NONTERMINAL_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 const JOB_RETRY_REASONS = new Set(['provider_failure', 'submission_unknown']);
+const CANCELLATION_POLICIES = new Set<StudioCancellationPolicy>(['none', 'queued_only', 'queued_and_running']);
 const ADAPTER_IDS = new Set(['weprompt-image-v1', 'byteplus-seedance-v1', 'weprompt-media-gateway-v1']);
 const JOB_ERROR_CODES = new Set([
   'invalid_request',
@@ -44,6 +46,7 @@ const JOB_ERROR_CODES = new Set([
   'rate_limited',
   'provider_unavailable',
   'timeout',
+  'poll_deadline',
   'no_output',
   'submission_unknown',
   'download_failed',
@@ -92,6 +95,8 @@ const JOB_KEYS = new Set([
   'provider',
   'idempotencyKey',
   'providerJobId',
+  'remoteStartedAt',
+  'cancellationPolicy',
   'outputAssetIds',
   'error',
   'progress',
@@ -121,7 +126,7 @@ const CONNECTION_CAPABILITY_KEYS = new Set([
   'minDurationSeconds',
   'maxDurationSeconds',
   'supportsFirstFrame',
-  'cancellation',
+  'cancellationPolicy',
 ]);
 const FORBIDDEN_CONNECTION_KEY_FRAGMENTS = [
   'authorization',
@@ -323,7 +328,8 @@ const validateConnectionBinding = (value: unknown): value is StudioConnectionBin
     optionalAspectRatios &&
     optionalResolutions &&
     (capabilities.supportsFirstFrame === undefined || typeof capabilities.supportsFirstFrame === 'boolean') &&
-    (capabilities.cancellation === undefined || typeof capabilities.cancellation === 'boolean') &&
+    isString(capabilities.cancellationPolicy) &&
+    CANCELLATION_POLICIES.has(capabilities.cancellationPolicy as StudioCancellationPolicy) &&
     (capabilities.minDurationSeconds === undefined || isIntegerInRange(capabilities.minDurationSeconds, 1, 60)) &&
     (capabilities.maxDurationSeconds === undefined || isIntegerInRange(capabilities.maxDurationSeconds, 1, 60)) &&
     (capabilities.minDurationSeconds === undefined ||
@@ -332,6 +338,33 @@ const validateConnectionBinding = (value: unknown): value is StudioConnectionBin
     isCanonicalIsoTimestamp(value.validatedAt) &&
     !containsForbiddenConnectionField(value)
   );
+};
+
+const canonicalizeConnectionBinding = (value: unknown): StudioConnectionBinding | null => {
+  if (!isRecord(value) || !isRecord(value.capabilities)) return null;
+  const capabilities = value.capabilities;
+  const hasPolicy = Object.hasOwn(capabilities, 'cancellationPolicy');
+  const hasLegacy = Object.hasOwn(capabilities, 'cancellation');
+  if (hasPolicy && hasLegacy) return null;
+
+  let cancellationPolicy: StudioCancellationPolicy;
+  if (hasPolicy) {
+    if (!isString(capabilities.cancellationPolicy)) return null;
+    cancellationPolicy = capabilities.cancellationPolicy as StudioCancellationPolicy;
+    if (!CANCELLATION_POLICIES.has(cancellationPolicy)) return null;
+  } else if (hasLegacy) {
+    if (typeof capabilities.cancellation !== 'boolean') return null;
+    cancellationPolicy = capabilities.cancellation ? 'queued_only' : 'none';
+  } else {
+    cancellationPolicy = 'none';
+  }
+
+  const { cancellation: _legacyCancellation, ...canonicalCapabilities } = capabilities;
+  const candidate = {
+    ...value,
+    capabilities: { ...canonicalCapabilities, cancellationPolicy },
+  };
+  return validateConnectionBinding(candidate) ? candidate : null;
 };
 
 const validateScene = (sceneId: string, value: unknown): value is StudioScene => {
@@ -413,6 +446,12 @@ const validateJob = (jobId: string, projectId: string, sceneIds: Set<string>, va
     validateProviderRef(value.provider) &&
     isSafeId(value.idempotencyKey) &&
     (value.providerJobId === null || (isString(value.providerJobId) && isValidProviderJobId(value.providerJobId))) &&
+    (!Object.hasOwn(value, 'remoteStartedAt') ||
+      (value.providerJobId === null
+        ? value.remoteStartedAt === null
+        : isCanonicalIsoTimestamp(value.remoteStartedAt))) &&
+    isString(value.cancellationPolicy) &&
+    CANCELLATION_POLICIES.has(value.cancellationPolicy as StudioCancellationPolicy) &&
     asArrayOfSafeIds(value.outputAssetIds) &&
     new Set(value.outputAssetIds).size === value.outputAssetIds.length &&
     errorIsValid &&
@@ -457,6 +496,10 @@ const migrateSchemaV1Project = (value: unknown): unknown => {
       }
       if (!Object.hasOwn(job, 'duplicateChargeAcknowledgedAt')) {
         job.duplicateChargeAcknowledgedAt = null;
+        changed = true;
+      }
+      if (!Object.hasOwn(job, 'cancellationPolicy')) {
+        job.cancellationPolicy = 'none';
         changed = true;
       }
       return [jobId, job];
@@ -772,10 +815,11 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       ) {
         throw new CreativeStudioStoreError('storage_error', 'Malformed Studio connection manifest');
       }
-      if (!parsed.connections.every(validateConnectionBinding)) {
+      const connections = parsed.connections.map(canonicalizeConnectionBinding);
+      if (connections.some((connection) => connection === null)) {
         throw new CreativeStudioStoreError('storage_error', 'Malformed Studio connection manifest');
       }
-      return parsed.connections.toSorted((left, right) => left.id.localeCompare(right.id));
+      return (connections as StudioConnectionBinding[]).toSorted((left, right) => left.id.localeCompare(right.id));
     } catch (error) {
       if (error instanceof CreativeStudioStoreError) throw error;
       if (isRecord(error) && error.code === 'ENOENT') return [];
@@ -1000,7 +1044,8 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     },
 
     async saveConnection(binding: StudioConnectionBinding): Promise<StudioConnectionBinding> {
-      if (!validateConnectionBinding(binding)) {
+      const canonicalBinding = canonicalizeConnectionBinding(binding);
+      if (canonicalBinding === null) {
         throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio connection binding');
       }
       return enqueueConnections(async () => {
@@ -1009,17 +1054,17 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
         const next = [
           ...current.filter(
             (connection) =>
-              connection.id !== binding.id &&
+              connection.id !== canonicalBinding.id &&
               !(
-                connection.providerId === binding.providerId &&
-                connection.adapterId === binding.adapterId &&
-                connection.model === binding.model
+                connection.providerId === canonicalBinding.providerId &&
+                connection.adapterId === canonicalBinding.adapterId &&
+                connection.model === canonicalBinding.model
               )
           ),
-          structuredClone(binding),
+          structuredClone(canonicalBinding),
         ].toSorted((left, right) => left.id.localeCompare(right.id));
         await writeJsonAtomic(root, await connectionsFile(root), { schemaVersion: 1, connections: next });
-        return structuredClone(binding);
+        return structuredClone(canonicalBinding);
       });
     },
 

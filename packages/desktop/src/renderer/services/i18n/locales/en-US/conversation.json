@@ -946,6 +946,7 @@
         "rateLimited": "The provider rate limit was reached. Try again later.",
         "providerUnavailable": "The generation provider is unavailable.",
         "timeout": "The provider did not respond in time.",
+        "pollDeadline": "The engine stopped reporting progress. Check with the provider before retrying.",
         "noOutput": "The provider completed without a usable output.",
         "submissionUnknown": "The submission outcome is unknown. Review the duplicate-charge warning before retrying.",
         "downloadFailed": "Generation completed, but the output could not be downloaded.",

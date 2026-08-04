@@ -10,6 +10,7 @@ import type {
   StudioConnectionBinding,
   StudioConnectionCandidate,
   StudioConnectionCapabilities,
+  StudioCancellationPolicy,
   StudioMediaKind,
   StudioProviderAdapterId,
   StudioProviderRef,
@@ -32,6 +33,7 @@ export type StudioGenerationRouteCatalog = {
 /** Main-only route. The renderer receives the opaque choiceId projection. */
 export type StudioGenerationRoute = StudioRouteCatalogEntry & {
   adapterId: StudioProviderAdapterId;
+  cancellationPolicy: StudioCancellationPolicy;
 };
 
 export type StudioProviderResolver = {
@@ -44,6 +46,11 @@ const IMAGE_ADAPTER: StudioProviderAdapterId = 'weprompt-image-v1';
 const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ALL_RATIOS = ['16:9', '9:16', '1:1', '4:3', '3:4'] as const;
 const ALL_RESOLUTIONS = ['720p', '1080p'] as const;
+const CANCELLATION_POLICY_RANK: Record<StudioCancellationPolicy, number> = {
+  none: 0,
+  queued_only: 1,
+  queued_and_running: 2,
+};
 
 const isUnsafeTextCharacter = (character: string): boolean => {
   const codePoint = character.codePointAt(0)!;
@@ -132,6 +139,12 @@ const bindingMediaKind = (binding: StudioConnectionBinding): StudioMediaKind | n
     : null;
 };
 
+const bindingCancellationPolicy = (capabilities: StudioConnectionCapabilities): StudioCancellationPolicy => {
+  const explicit = capabilities.cancellationPolicy;
+  if (explicit === 'none' || explicit === 'queued_only' || explicit === 'queued_and_running') return explicit;
+  return capabilities.cancellation === true ? 'queued_only' : 'none';
+};
+
 const routeIdentity = (route: StudioGenerationRoute): string =>
   `${route.adapterId}\u0000${route.providerId}\u0000${route.model}\u0000${route.kind}`;
 
@@ -176,6 +189,7 @@ const resolveBindingRoute = (
     model: binding.model,
     health: modelHealth(provider, binding.model),
     adapterId: binding.adapterId,
+    cancellationPolicy: bindingCancellationPolicy(binding.capabilities),
     kind,
     constraints,
   };
@@ -207,15 +221,22 @@ export const createStudioProviderResolver = (deps: StudioProviderResolverDeps): 
     const uniqueRoutes = new Map<string, StudioGenerationRoute>();
     for (const binding of connections) {
       const route = resolveBindingRoute(binding, providers);
-      if (route && !uniqueRoutes.has(routeIdentity(route))) {
-        uniqueRoutes.set(routeIdentity(route), route);
+      if (route) {
+        const identity = routeIdentity(route);
+        const existing = uniqueRoutes.get(identity);
+        if (
+          existing === undefined ||
+          CANCELLATION_POLICY_RANK[route.cancellationPolicy] < CANCELLATION_POLICY_RANK[existing.cancellationPolicy]
+        ) {
+          uniqueRoutes.set(identity, route);
+        }
       }
     }
     const routes = [...uniqueRoutes.values()].toSorted((left, right) =>
       routeIdentity(left).localeCompare(routeIdentity(right))
     );
     const stable = routes.map(
-      ({ choiceId, providerId, providerName, adapterId, model, health, kind, constraints }) => ({
+      ({ choiceId, providerId, providerName, adapterId, model, health, kind, constraints, cancellationPolicy }) => ({
         choiceId,
         providerId,
         providerName,
@@ -224,6 +245,7 @@ export const createStudioProviderResolver = (deps: StudioProviderResolverDeps): 
         health,
         kind,
         constraints,
+        cancellationPolicy,
       })
     );
     return {

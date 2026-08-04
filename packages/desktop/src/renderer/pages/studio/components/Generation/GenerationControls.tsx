@@ -443,8 +443,9 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
                 (job.status === 'failed' || job.status === 'needs_attention') &&
                 job.error?.code !== 'submission_unknown' &&
                 job.error?.code !== 'download_failed' &&
+                job.error?.code !== 'poll_deadline' &&
                 !recoveryBlocked;
-              const canCancel = job.status === 'queued_local' || job.status === 'queued_remote';
+              const canCancel = job.canCancel;
 
               return (
                 <li key={job.id} aria-label={job.id} className='rounded-8px border border-border-2 bg-fill-1 p-10px'>
