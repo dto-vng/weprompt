@@ -777,6 +777,7 @@
         "visualPlaceholder": "Describe what we see…",
         "suggestVisual": "Suggest a visual",
         "addReference": "Add reference",
+        "moreDetails": "More details",
         "invalidTitle": "Enter a shot title before saving.",
         "placeholder": {
           "opening": "Opening shot",

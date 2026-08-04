@@ -853,6 +853,7 @@ export type I18nKey =
   | 'conversation.creativeStudio.phase.write.goalMarker'
   | 'conversation.creativeStudio.phase.write.hideAssistant'
   | 'conversation.creativeStudio.phase.write.invalidTitle'
+  | 'conversation.creativeStudio.phase.write.moreDetails'
   | 'conversation.creativeStudio.phase.write.needsTitle'
   | 'conversation.creativeStudio.phase.write.noScenes'
   | 'conversation.creativeStudio.phase.write.outputColumn'

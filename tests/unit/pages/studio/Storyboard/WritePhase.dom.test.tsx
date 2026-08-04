@@ -5,6 +5,7 @@
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,7 +21,11 @@ import type { WritePhaseController } from '@renderer/pages/studio/components/Pha
 import type { UseStoryboardEditorResult } from '@renderer/pages/studio/hooks/useStoryboardEditor';
 import type { UseStudioModelsResult } from '@renderer/pages/studio/hooks/useStudioModels';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => (key === 'common.unit.second_short' ? 's' : key),
+  }),
+}));
 
 const observedTargets: Element[] = [];
 
@@ -267,11 +272,17 @@ describe('WritePhase', () => {
         [...row.querySelectorAll('[data-script-zone]')].map((zone) => zone.getAttribute('data-script-zone'))
       ).toEqual(['timing', 'script', 'visual', 'output']);
       expect(
-        within(row).getByRole('spinbutton', { name: 'conversation.creativeStudio.inspector.durationLabel' })
+        within(row).getByRole('combobox', { name: 'conversation.creativeStudio.inspector.durationLabel' })
       ).toBeInTheDocument();
       expect(within(row).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toBeInTheDocument();
-      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toBeInTheDocument();
-      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toBeInTheDocument();
+      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toHaveAttribute(
+        'rows',
+        '2'
+      );
+      expect(within(row).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toHaveAttribute(
+        'rows',
+        '3'
+      );
       expect(
         within(row).getByRole('combobox', { name: 'conversation.creativeStudio.inspector.mediaKindLabel' })
       ).toBeInTheDocument();
@@ -373,23 +384,112 @@ describe('WritePhase', () => {
     expect(screen.getAllByText('conversation.creativeStudio.phase.write.needsTitle')).toHaveLength(3);
   });
 
-  it('renders every scene as a by-ID editor with route-aware duration bounds', () => {
+  it('keeps secondary script details collapsed independently per row', () => {
+    render(<WritePhase controller={controller()} />);
+
+    const opening = screen.getByRole('region', { name: 'Opening' });
+    const reveal = screen.getByRole('region', { name: 'Reveal' });
+    const openingDetails = within(opening).getByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.moreDetails',
+    });
+    const revealDetails = within(reveal).getByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.moreDetails',
+    });
+
+    expect(openingDetails).toHaveAttribute('aria-expanded', 'false');
+    expect(revealDetails).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('conversation.creativeStudio.inspector.purposeLabel')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel')).not.toBeInTheDocument();
+
+    fireEvent.click(revealDetails);
+
+    expect(openingDetails).toHaveAttribute('aria-expanded', 'false');
+    expect(revealDetails).toHaveAttribute('aria-expanded', 'true');
+    expect(within(reveal).getByLabelText('conversation.creativeStudio.inspector.purposeLabel')).toHaveValue(
+      'Move the story forward'
+    );
+    expect(within(reveal).getByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel')).toHaveValue('');
+
+    fireEvent.click(revealDetails);
+    expect(
+      within(reveal).queryByLabelText('conversation.creativeStudio.inspector.purposeLabel')
+    ).not.toBeInTheDocument();
+    expect(
+      within(reveal).queryByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel')
+    ).not.toBeInTheDocument();
+  });
+
+  it('preserves by-ID editing and flushing for disclosed secondary script details', () => {
+    const phaseEditor = editor();
+    render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+    const reveal = screen.getByRole('region', { name: 'Reveal' });
+    fireEvent.click(
+      within(reveal).getByRole('button', { name: 'conversation.creativeStudio.phase.write.moreDetails' })
+    );
+    const purpose = within(reveal).getByLabelText('conversation.creativeStudio.inspector.purposeLabel');
+    const onScreenText = within(reveal).getByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel');
+
+    fireEvent.change(purpose, { target: { value: 'Land the product benefit' } });
+    expect(phaseEditor.updateSceneDraftById).toHaveBeenCalledWith('scene-2', {
+      purpose: 'Land the product benefit',
+    });
+    fireEvent.blur(purpose);
+
+    fireEvent.change(onScreenText, { target: { value: 'Built for momentum' } });
+    expect(phaseEditor.updateSceneDraftById).toHaveBeenCalledWith('scene-2', {
+      onScreenText: 'Built for momentum',
+    });
+    fireEvent.blur(onScreenText);
+
+    expect(phaseEditor.flushSceneDraftById).toHaveBeenCalledTimes(2);
+    expect(phaseEditor.flushSceneDraftById).toHaveBeenNthCalledWith(1, 'scene-2');
+    expect(phaseEditor.flushSceneDraftById).toHaveBeenNthCalledWith(2, 'scene-2');
+  });
+
+  it('renders every scene as a by-ID editor with route-aware duration options', async () => {
     const props = controller();
     render(<WritePhase controller={props} />);
 
     expect(screen.getAllByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveLength(2);
     expect(screen.getAllByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toHaveLength(2);
     expect(screen.getAllByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')).toHaveLength(2);
+    screen
+      .getAllByRole('button', { name: 'conversation.creativeStudio.phase.write.moreDetails' })
+      .forEach((button) => fireEvent.click(button));
     expect(screen.getAllByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel')).toHaveLength(2);
     expect(screen.getAllByLabelText('conversation.creativeStudio.inspector.purposeLabel')).toHaveLength(2);
 
-    const durations = screen.getAllByRole('spinbutton', {
+    const durations = screen.getAllByRole('combobox', {
       name: 'conversation.creativeStudio.inspector.durationLabel',
     });
-    expect(durations[0]).toHaveAttribute('aria-valuemin', '2');
-    expect(durations[0]).toHaveAttribute('aria-valuemax', '8');
-    expect(durations[1]).toHaveAttribute('aria-valuemin', '4');
-    expect(durations[1]).toHaveAttribute('aria-valuemax', '12');
+    expect(durations[0]).toHaveTextContent('5s');
+    expect(durations[1]).toHaveTextContent('6s');
+
+    fireEvent.click(durations[0]!);
+    const imageOptions = within(await screen.findByRole('listbox')).getAllByRole('option');
+    expect(imageOptions.map((option) => option.textContent)).toEqual(['2s', '3s', '4s', '5s', '6s', '7s', '8s']);
+    fireEvent.click(screen.getByRole('option', { name: '8s' }));
+    expect(props.editor.updateSceneDraftById).toHaveBeenCalledWith('scene-1', { durationSeconds: 8 });
+    fireEvent.blur(durations[0]!);
+    expect(props.editor.flushSceneDraftById).toHaveBeenCalledWith('scene-1');
+    await waitFor(() => expect(screen.queryByRole('listbox', { hidden: true })).not.toBeInTheDocument());
+
+    fireEvent.click(durations[1]!);
+    const videoOptions = within(await screen.findByRole('listbox')).getAllByRole('option');
+    expect(videoOptions.map((option) => option.textContent)).toEqual([
+      '4s',
+      '5s',
+      '6s',
+      '7s',
+      '8s',
+      '9s',
+      '10s',
+      '11s',
+      '12s',
+    ]);
+    fireEvent.keyDown(durations[1]!, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27 });
+    await waitFor(() => expect(screen.queryByRole('listbox', { hidden: true })).not.toBeInTheDocument());
 
     fireEvent.change(screen.getAllByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')[1]!, {
       target: { value: 'A revised reveal prompt' },
@@ -397,6 +497,52 @@ describe('WritePhase', () => {
     expect(props.editor.updateSceneDraftById).toHaveBeenCalledWith('scene-2', {
       visualPrompt: 'A revised reveal prompt',
     });
+  });
+
+  it('keeps route-invalid persisted durations visibly flagged', () => {
+    const phaseEditor = editor('scene-1', {
+      sceneDrafts: {
+        'scene-1': editable(scene('scene-1', { durationSeconds: 9 })),
+        'scene-2': editable(scene('scene-2')),
+      },
+    });
+    render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+    const opening = screen.getByRole('region', { name: 'Opening' });
+    expect(
+      within(opening).getByRole('combobox', {
+        name: 'conversation.creativeStudio.inspector.durationLabel',
+      })
+    ).toHaveAttribute('aria-invalid', 'true');
+    expect(within(opening).getByRole('alert')).toHaveTextContent(
+      'conversation.creativeStudio.inspector.invalidDuration'
+    );
+  });
+
+  it('keeps the duration chip keyboard-operable', async () => {
+    const user = userEvent.setup();
+    const phaseEditor = editor();
+    render(<WritePhase controller={controller({ editor: phaseEditor })} />);
+
+    const opening = screen.getByRole('region', { name: 'Opening' });
+    const duration = within(opening).getByRole('combobox', {
+      name: 'conversation.creativeStudio.inspector.durationLabel',
+    });
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(duration).toHaveFocus();
+
+    fireEvent.keyDown(duration, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+    await waitFor(() => expect(duration).toHaveAttribute('aria-expanded', 'true'));
+    fireEvent.keyDown(duration, { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40 });
+    fireEvent.keyDown(duration, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+
+    await waitFor(() =>
+      expect(phaseEditor.updateSceneDraftById).toHaveBeenCalledWith('scene-1', { durationSeconds: 6 })
+    );
+    await waitFor(() => expect(duration).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(screen.queryByRole('listbox', { hidden: true })).not.toBeInTheDocument());
   });
 
   it.each([

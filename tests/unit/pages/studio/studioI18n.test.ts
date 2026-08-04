@@ -83,6 +83,7 @@ const phaseKeys = [
   'phase.write.visualPlaceholder',
   'phase.write.suggestVisual',
   'phase.write.addReference',
+  'phase.write.moreDetails',
   'phase.write.invalidTitle',
   'phase.write.placeholder.opening',
   'phase.write.placeholder.middle',
