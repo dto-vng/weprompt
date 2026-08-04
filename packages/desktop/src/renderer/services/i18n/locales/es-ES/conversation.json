@@ -1068,6 +1068,7 @@
         "rateLimited": "Se ha alcanzado el límite de solicitudes del proveedor. Inténtalo más tarde.",
         "providerUnavailable": "El proveedor de generación no está disponible.",
         "timeout": "El proveedor no ha respondido a tiempo.",
+        "pollDeadline": "El motor dejó de informar el progreso. Consulte al proveedor antes de volver a intentarlo.",
         "noOutput": "El proveedor ha finalizado sin una salida utilizable.",
         "submissionUnknown": "Se desconoce el resultado del envío. Revisa la advertencia de cargo duplicado antes de reintentarlo.",
         "downloadFailed": "La generación ha finalizado, pero no se ha podido descargar la salida.",

@@ -967,6 +967,7 @@ describe('CreativeStudioService', () => {
       provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'model_1' },
       idempotencyKey: 'secret_idempotency_key',
       providerJobId: STUDIO_E2E_BOUNDARY_SENTINELS.providerJobId,
+      remoteStartedAt: '2026-07-30T00:00:00.000Z',
       cancellationPolicy: 'queued_and_running',
       outputAssetIds: [],
       error: null,
@@ -982,6 +983,7 @@ describe('CreativeStudioService', () => {
       id: 'job_without_remote_identity',
       status: 'failed',
       providerJobId: null,
+      remoteStartedAt: null,
       error: {
         code: 'download_failed',
         messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
@@ -991,6 +993,7 @@ describe('CreativeStudioService', () => {
       ...nonRetryableDownloadJob,
       id: 'job_with_remote_identity',
       providerJobId: 'secret_download_remote_id',
+      remoteStartedAt: '2026-07-30T00:00:00.000Z',
     };
     const projectStore = createCreativeStudioStore({ rootDir, createId: () => 'project_1' });
     const created = await projectStore.createProject(makeInput());
@@ -1097,6 +1100,7 @@ describe('CreativeStudioService', () => {
     ];
 
     expect(projectResult?.jobs.job_1).not.toHaveProperty('providerJobId');
+    expect(projectResult?.jobs.job_1).not.toHaveProperty('remoteStartedAt');
     expect(projectResult?.jobs.job_1).not.toHaveProperty('idempotencyKey');
     expect(projectResult?.jobs.job_1).not.toHaveProperty('cancellationPolicy');
     expect(projectResult?.jobs.job_1.canCancel).toBe(true);
@@ -1108,11 +1112,13 @@ describe('CreativeStudioService', () => {
     expect(projectResult?.assets.asset_1).not.toHaveProperty('sourcePath');
     expect(projectResult?.assets.asset_poster).not.toHaveProperty('sourceUrl');
     expect(updatedProjectResult.jobs.job_1).not.toHaveProperty('providerJobId');
+    expect(updatedProjectResult.jobs.job_1).not.toHaveProperty('remoteStartedAt');
     expect(updatedProjectResult.jobs.job_1).not.toHaveProperty('idempotencyKey');
     const sanitizedJobResults = jobResults.flat();
     expect(sanitizedJobResults.map((result) => result.canRetryDownload)).toEqual([false, false, false, true]);
     for (const result of sanitizedJobResults) {
       expect(result).not.toHaveProperty('providerJobId');
+      expect(result).not.toHaveProperty('remoteStartedAt');
       expect(result).not.toHaveProperty('idempotencyKey');
       expect(result).not.toHaveProperty('cancellationPolicy');
     }

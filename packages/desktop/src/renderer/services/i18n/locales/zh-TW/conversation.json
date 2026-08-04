@@ -1067,6 +1067,7 @@
         "rateLimited": "已達服務供應商速率限制，請稍後再試。",
         "providerUnavailable": "產生服務供應商目前無法使用。",
         "timeout": "服務供應商未及時回應。",
+        "pollDeadline": "引擎已停止回報進度。重試前請先向服務供應商確認。",
         "noOutput": "服務供應商已完成工作，但未傳回可用輸出。",
         "submissionUnknown": "提交結果不明。重試前請檢視重複收費警告。",
         "downloadFailed": "產生已完成，但無法下載輸出。",

@@ -528,6 +528,29 @@ describe('GenerationControls', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('hides retry when remote polling reached its durable lifecycle deadline', () => {
+    const props = createProps({
+      jobs: [
+        job({
+          id: 'job-poll-deadline',
+          status: 'needs_attention',
+          error: {
+            code: 'poll_deadline',
+            messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
+          },
+        }),
+      ],
+    });
+
+    render(<GenerationControls {...props} />);
+
+    expect(
+      within(screen.getByRole('listitem', { name: 'job-poll-deadline' })).queryByRole('button', {
+        name: 'conversation.creativeStudio.jobs.retry',
+      })
+    ).not.toBeInTheDocument();
+  });
+
   it('makes only the terminal retry child retryable after it fails', async () => {
     const props = createProps({
       jobs: [

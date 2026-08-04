@@ -604,10 +604,11 @@ describe('useStudioJobs', () => {
     const unsafeLocal = {
       ...job('job-local'),
       providerJobId: 'provider-secret-task',
+      remoteStartedAt: '2026-07-30T00:00:00.000Z',
       cancellationPolicy: 'queued_and_running',
       rawProviderMessage: 'API key sk-secret',
       error: {
-        code: 'provider_unavailable',
+        code: 'poll_deadline',
         messageKey: 'Provider leaked credential sk-secret',
         rawMessage: 'credential-bearing provider response',
       },
@@ -636,12 +637,13 @@ describe('useStudioJobs', () => {
         canRetryDownload: false,
         canCancel: true,
         error: {
-          code: 'provider_unavailable',
-          messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
+          code: 'poll_deadline',
+          messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
         },
       })
     );
     expect(result.current.jobs[0]).not.toHaveProperty('providerJobId');
+    expect(result.current.jobs[0]).not.toHaveProperty('remoteStartedAt');
     expect(result.current.jobs[0]).not.toHaveProperty('cancellationPolicy');
     expect(result.current.jobs[0]).not.toHaveProperty('rawProviderMessage');
     expect(result.current.jobs[0]?.error).not.toHaveProperty('rawMessage');

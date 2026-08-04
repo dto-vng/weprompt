@@ -33,6 +33,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
 const mp4 = Buffer.from('000000186674797069736f6d00000000', 'hex');
+const REMOTE_POLL_ATTEMPT_TIMEOUT_MS = 60_000;
+const REMOTE_POLL_DEADLINE_MS = 30 * 60_000;
 
 const provider: IProvider = {
   id: 'provider_1',
@@ -121,9 +123,9 @@ const deferred = <T>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
-const waitFor = async (assertion: () => void | Promise<void>): Promise<void> => {
+const waitFor = async (assertion: () => void | Promise<void>, attempts = 100): Promise<void> => {
   let latestError: unknown;
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       await assertion();
       return;
@@ -158,6 +160,8 @@ type HarnessOptions = {
   onProjectUpdated?: (projectId: string) => void;
   cancellationPolicy?: StudioCancellationPolicy;
   isGenerationRouteAvailable?: (candidate: StudioResolvedSceneRouteSnapshot) => Promise<boolean>;
+  now?: () => string;
+  nowEpochMs?: () => number;
 };
 
 const sequence = (values: string[]): (() => string) => {
@@ -217,12 +221,55 @@ const createHarness = async (adapter: GenerationProviderAdapter, options: Harnes
     createIdempotencyKey: sequence(options.idempotencyKeys ?? ['key_1']),
     sleep: options.sleep,
     jitterMs: options.jitterMs ?? ((baseMs) => baseMs),
+    now: options.now,
+    nowEpochMs: options.nowEpochMs,
     ...(options.onProjectUpdated === undefined ? {} : { onProjectUpdated: options.onProjectUpdated }),
   });
   const harness = { rootDir, store, mediaStore, project, manager };
   harnesses.push(harness);
   return harness;
 };
+
+type SeedRemoteJobOptions = {
+  status?: 'queued_remote' | 'running' | 'needs_attention' | 'failed';
+  providerJobId?: string;
+  remoteStartedAt?: string | null;
+  omitRemoteStartedAt?: boolean;
+  createdAt?: string;
+  cancellationPolicy?: StudioCancellationPolicy;
+  error?: StudioJob['error'];
+};
+
+const seedRemoteJob = async (harness: Harness, options: SeedRemoteJobOptions = {}): Promise<StudioProject> =>
+  harness.store.updateProject(harness.project.id, (project) => {
+    const next = structuredClone(project);
+    const status = options.status ?? 'queued_remote';
+    const createdAt = options.createdAt ?? project.createdAt;
+    const job: StudioJob = {
+      id: 'job_1',
+      projectId: project.id,
+      sceneId: 'scene_1',
+      status,
+      provider: selectionFor(route),
+      idempotencyKey: 'key_1',
+      providerJobId: options.providerJobId ?? 'remote_1',
+      remoteStartedAt: options.remoteStartedAt ?? createdAt,
+      cancellationPolicy: options.cancellationPolicy ?? 'queued_and_running',
+      outputAssetIds: [],
+      error: options.error ?? null,
+      retryOfJobId: null,
+      retryReason: null,
+      duplicateChargeAcknowledged: false,
+      duplicateChargeAcknowledgedAt: null,
+      createdAt,
+      updatedAt: project.updatedAt,
+    };
+    if (options.omitRemoteStartedAt) delete job.remoteStartedAt;
+    next.jobs.job_1 = job;
+    next.scenes.scene_1.jobIds = ['job_1'];
+    next.scenes.scene_1.reviewState = status === 'needs_attention' || status === 'failed' ? 'blocked' : 'generating';
+    return next;
+  });
 
 afterEach(async () => {
   await Promise.all(
@@ -358,7 +405,7 @@ describe('StudioJobManager durable submission', () => {
   });
 
   it('persists the remote identity before polling and uses the exact capped backoff schedule', async () => {
-    const observedProviderIds: Array<string | null | undefined> = [];
+    const observedRemoteIdentity: Array<Pick<StudioJob, 'providerJobId' | 'remoteStartedAt' | 'status'>> = [];
     const delays: number[] = [];
     let outputPath = '';
     let harness!: Harness;
@@ -376,7 +423,12 @@ describe('StudioJobManager durable submission', () => {
       }),
       submit: async () => ({ kind: 'remote', providerJobId: 'remote_1' }),
       poll: async () => {
-        observedProviderIds.push((await harness.store.getProject(harness.project.id))?.jobs.job_1.providerJobId);
+        const current = (await harness.store.getProject(harness.project.id))!.jobs.job_1;
+        observedRemoteIdentity.push({
+          providerJobId: current.providerJobId,
+          remoteStartedAt: current.remoteStartedAt,
+          status: current.status,
+        });
         pollCount += 1;
         if (pollCount < 5) return { status: 'queued' };
         return {
@@ -400,7 +452,7 @@ describe('StudioJobManager durable submission', () => {
     outputPath = path.join(harness.rootDir, 'generated.png');
     await writeFile(outputPath, png);
 
-    await harness.manager.submitScenes({
+    const [submitted] = await harness.manager.submitScenes({
       projectId: harness.project.id,
       expectedRevision: harness.project.revision,
       sceneIds: ['scene_1'],
@@ -408,10 +460,20 @@ describe('StudioJobManager durable submission', () => {
       catalogVersion: 'catalog_1',
     });
 
+    expect(submitted?.remoteStartedAt).toBeNull();
+
     await waitFor(async () =>
       expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.status).toBe('succeeded')
     );
-    expect(observedProviderIds).toEqual(['remote_1', 'remote_1', 'remote_1', 'remote_1', 'remote_1']);
+    expect(observedRemoteIdentity).toHaveLength(5);
+    expect(observedRemoteIdentity).toEqual(
+      observedRemoteIdentity.map(() => ({
+        providerJobId: 'remote_1',
+        remoteStartedAt: observedRemoteIdentity[0]!.remoteStartedAt,
+        status: expect.stringMatching(/queued_remote|running/),
+      }))
+    );
+    expect(observedRemoteIdentity[0]!.remoteStartedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(delays).toEqual([2_000, 4_000, 8_000, 15_000, 15_000]);
   });
 
@@ -600,6 +662,530 @@ describe('StudioJobManager durable submission', () => {
     ).rejects.toMatchObject({ code: 'provider_error' });
 
     expect((await harness.store.getProject(harness.project.id))?.jobs).toEqual({});
+  });
+});
+
+describe('StudioJobManager remote polling deadlines', () => {
+  it('bounds a poll attempt when the provider transport outlives its abort signal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T00:00:00.000Z'));
+    try {
+      const poll = vi.fn(async () => new Promise<ProviderJobSnapshot>(() => undefined));
+      const adapter: GenerationProviderAdapter = {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: (request) => ({
+          ok: true,
+          normalized: {
+            aspectRatio: request.aspectRatio,
+            resolution: request.resolution,
+            durationSeconds: request.durationSeconds,
+          },
+        }),
+        submit: async () => ({ kind: 'remote', providerJobId: 'remote_slow' }),
+        poll,
+      };
+      const harness = await createHarness(adapter, {
+        sleep: async () => undefined,
+        now: () => new Date(Date.now()).toISOString(),
+        nowEpochMs: () => Date.now(),
+      });
+
+      await harness.manager.submitScenes({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneIds: ['scene_1'],
+        routes: [route],
+        catalogVersion: 'catalog_1',
+      });
+      await vi.waitFor(() => expect(poll).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000);
+
+      await vi.waitFor(async () =>
+        expect((await harness.store.getProject(harness.project.id))?.jobs.job_1).toMatchObject({
+          status: 'needs_attention',
+          providerJobId: 'remote_slow',
+          error: { code: 'timeout' },
+        })
+      );
+      expect(poll).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a successful poll result that arrives after its attempt timeout', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T00:00:00.000Z'));
+    try {
+      let outputPath = '';
+      const poll = vi.fn(
+        async () =>
+          new Promise<ProviderJobSnapshot>((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  status: 'succeeded',
+                  outputs: [
+                    {
+                      mediaKind: 'image',
+                      role: 'primary',
+                      source: { kind: 'file', path: outputPath },
+                      mimeType: 'image/png',
+                    },
+                  ],
+                }),
+              REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000
+            );
+          })
+      );
+      const adapter: GenerationProviderAdapter = {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: (request) => ({
+          ok: true,
+          normalized: {
+            aspectRatio: request.aspectRatio,
+            resolution: request.resolution,
+            durationSeconds: request.durationSeconds,
+          },
+        }),
+        submit: async () => ({ kind: 'remote', providerJobId: 'remote_late_success' }),
+        poll,
+      };
+      const harness = await createHarness(adapter, {
+        sleep: async () => undefined,
+        now: () => new Date(Date.now()).toISOString(),
+        nowEpochMs: () => Date.now(),
+      });
+      outputPath = path.join(harness.rootDir, 'late-success.png');
+      await writeFile(outputPath, png);
+
+      await harness.manager.submitScenes({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneIds: ['scene_1'],
+        routes: [route],
+        catalogVersion: 'catalog_1',
+      });
+      await vi.waitFor(() => expect(poll).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000);
+
+      await vi.waitFor(async () => {
+        const project = await harness.store.getProject(harness.project.id);
+        expect(project?.jobs.job_1).toMatchObject({ status: 'needs_attention', error: { code: 'timeout' } });
+        expect(project?.assets).toEqual({});
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('consumes a poll rejection that arrives after its attempt timeout', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T00:00:00.000Z'));
+    try {
+      const poll = vi.fn(
+        async () =>
+          new Promise<ProviderJobSnapshot>((_resolve, reject) => {
+            setTimeout(
+              () => reject(Object.assign(new Error('late auth rejection'), { code: 'auth' })),
+              REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000
+            );
+          })
+      );
+      const adapter: GenerationProviderAdapter = {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: (request) => ({
+          ok: true,
+          normalized: {
+            aspectRatio: request.aspectRatio,
+            resolution: request.resolution,
+            durationSeconds: request.durationSeconds,
+          },
+        }),
+        submit: async () => ({ kind: 'remote', providerJobId: 'remote_late_rejection' }),
+        poll,
+      };
+      const harness = await createHarness(adapter, {
+        sleep: async () => undefined,
+        now: () => new Date(Date.now()).toISOString(),
+        nowEpochMs: () => Date.now(),
+      });
+
+      await harness.manager.submitScenes({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneIds: ['scene_1'],
+        routes: [route],
+        catalogVersion: 'catalog_1',
+      });
+      await vi.waitFor(() => expect(poll).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000);
+
+      await vi.waitFor(async () =>
+        expect((await harness.store.getProject(harness.project.id))?.jobs.job_1).toMatchObject({
+          status: 'needs_attention',
+          error: { code: 'timeout' },
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('discards a late success after the durable provider identity changes', async () => {
+    let outputPath = '';
+    const polled = deferred<ProviderJobSnapshot>();
+    const poll = vi.fn(async () => polled.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (request) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: request.aspectRatio,
+          resolution: request.resolution,
+          durationSeconds: request.durationSeconds,
+        },
+      }),
+      submit: async () => ({ kind: 'remote', providerJobId: 'remote_original' }),
+      poll,
+    };
+    const nowMs = Date.parse('2026-08-04T00:00:00.000Z');
+    const harness = await createHarness(adapter, {
+      sleep: async () => undefined,
+      now: () => new Date(nowMs).toISOString(),
+      nowEpochMs: () => nowMs,
+    });
+    outputPath = path.join(harness.rootDir, 'stale-provider-success.png');
+    await writeFile(outputPath, png);
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [route],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(poll).toHaveBeenCalledOnce());
+    await harness.store.updateProject(harness.project.id, (project) => {
+      project.jobs.job_1.providerJobId = 'remote_replacement';
+      project.jobs.job_1.remoteStartedAt = new Date(nowMs).toISOString();
+      project.jobs.job_1.status = 'running';
+      return project;
+    });
+
+    polled.resolve({
+      status: 'succeeded',
+      outputs: [
+        {
+          mediaKind: 'image',
+          role: 'primary',
+          source: { kind: 'file', path: outputPath },
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await expect(harness.store.getProject(harness.project.id)).resolves.toMatchObject({
+      jobs: { job_1: { status: 'running', providerJobId: 'remote_replacement', outputAssetIds: [] } },
+      assets: {},
+    });
+  });
+
+  it('discards a late poll error after the durable provider identity changes', async () => {
+    const polled = deferred<ProviderJobSnapshot>();
+    const poll = vi.fn(async () => polled.promise);
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (request) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: request.aspectRatio,
+          resolution: request.resolution,
+          durationSeconds: request.durationSeconds,
+        },
+      }),
+      submit: async () => ({ kind: 'remote', providerJobId: 'remote_original' }),
+      poll,
+    };
+    const nowMs = Date.parse('2026-08-04T00:00:00.000Z');
+    const harness = await createHarness(adapter, {
+      sleep: async () => undefined,
+      now: () => new Date(nowMs).toISOString(),
+      nowEpochMs: () => nowMs,
+    });
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [route],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(poll).toHaveBeenCalledOnce());
+    const replacementAnchor = new Date(nowMs).toISOString();
+    await harness.store.updateProject(harness.project.id, (project) => {
+      project.jobs.job_1.providerJobId = 'remote_replacement';
+      project.jobs.job_1.remoteStartedAt = replacementAnchor;
+      project.jobs.job_1.status = 'running';
+      return project;
+    });
+
+    polled.reject(Object.assign(new Error('stale provider error'), { code: 'auth' }));
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await expect(harness.store.getProject(harness.project.id)).resolves.toMatchObject({
+      jobs: {
+        job_1: {
+          status: 'running',
+          providerJobId: 'remote_replacement',
+          remoteStartedAt: replacementAnchor,
+          error: null,
+        },
+      },
+    });
+  });
+
+  it('stops repeated running snapshots at the thirty-minute lifecycle deadline', async () => {
+    const startedAtMs = Date.parse('2026-08-04T00:00:00.000Z');
+    let epochMs = startedAtMs;
+    let pollCount = 0;
+    const poll = vi.fn(async (): Promise<ProviderJobSnapshot> => {
+      pollCount += 1;
+      return pollCount < 130 ? { status: 'running' } : { status: 'failed', error: { code: 'unknown' } };
+    });
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (request) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: request.aspectRatio,
+          resolution: request.resolution,
+          durationSeconds: request.durationSeconds,
+        },
+      }),
+      submit: async () => ({ kind: 'remote', providerJobId: 'remote_running' }),
+      poll,
+    };
+    const harness = await createHarness(adapter, {
+      sleep: async (delayMs) => void (epochMs += delayMs),
+      now: () => new Date(epochMs).toISOString(),
+      nowEpochMs: () => epochMs,
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [route],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(
+      async () =>
+        expect((await harness.store.getProject(harness.project.id))?.jobs.job_1).toMatchObject({
+          status: 'needs_attention',
+          remoteStartedAt: '2026-08-04T00:00:00.000Z',
+          error: { code: 'poll_deadline' },
+        }),
+      400
+    );
+    expect(poll).toHaveBeenCalledTimes(122);
+  });
+
+  it('clamps pre-poll backoff to the remaining lifecycle and does not dispatch at the deadline', async () => {
+    const startedAtMs = Date.parse('2026-08-04T00:00:00.000Z');
+    let epochMs = startedAtMs + REMOTE_POLL_DEADLINE_MS - 1_000;
+    const delays: number[] = [];
+    const poll = vi.fn(
+      async (): Promise<ProviderJobSnapshot> => ({
+        status: 'failed',
+        error: { code: 'unknown' },
+      })
+    );
+    const harness = await createHarness(
+      {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+        submit: vi.fn(),
+        poll,
+      },
+      {
+        sleep: async (delayMs) => {
+          delays.push(delayMs);
+          epochMs += delayMs;
+        },
+        now: () => new Date(epochMs).toISOString(),
+        nowEpochMs: () => epochMs,
+      }
+    );
+    await seedRemoteJob(harness, { remoteStartedAt: new Date(startedAtMs).toISOString() });
+
+    await harness.manager.resumePendingJobs();
+
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.error?.code).toBe('poll_deadline')
+    );
+    expect(delays).toEqual([1_000]);
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it('polls once just before the deadline but never polls at the deadline', async () => {
+    const startedAtMs = Date.parse('2026-08-04T00:00:00.000Z');
+    for (const [offsetMs, expectedPolls, expectedCode] of [
+      [REMOTE_POLL_DEADLINE_MS - 1, 1, 'unknown'],
+      [REMOTE_POLL_DEADLINE_MS, 0, 'poll_deadline'],
+    ] as const) {
+      let epochMs = startedAtMs + offsetMs;
+      const poll = vi.fn(
+        async (): Promise<ProviderJobSnapshot> => ({
+          status: 'failed',
+          error: { code: 'unknown' },
+        })
+      );
+      const harness = await createHarness(
+        {
+          id: 'weprompt-image-v1',
+          validateConnection: async () => ({ ok: true }),
+          validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+          submit: vi.fn(),
+          poll,
+        },
+        {
+          sleep: async () => undefined,
+          now: () => new Date(epochMs).toISOString(),
+          nowEpochMs: () => epochMs,
+        }
+      );
+      await seedRemoteJob(harness, { remoteStartedAt: new Date(startedAtMs).toISOString() });
+
+      await harness.manager.resumePendingJobs();
+
+      await waitFor(async () =>
+        expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.error?.code).toBe(expectedCode)
+      );
+      expect(poll).toHaveBeenCalledTimes(expectedPolls);
+      epochMs += 1;
+    }
+  });
+
+  it.each([
+    {
+      label: 'a valid legacy createdAt',
+      createdAt: '2026-08-04T00:00:00.000Z',
+      nowMs: Date.parse('2026-08-04T00:30:00.000Z'),
+    },
+    {
+      label: 'an invalid legacy createdAt',
+      createdAt: 'invalid-created-at',
+      nowMs: Date.parse('2026-08-04T00:00:00.000Z'),
+    },
+  ])('fails closed without polling from $label', async ({ createdAt, nowMs }) => {
+    const poll = vi.fn(async (): Promise<ProviderJobSnapshot> => ({ status: 'running' }));
+    const harness = await createHarness(
+      {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+        submit: vi.fn(),
+        poll,
+      },
+      {
+        sleep: async () => undefined,
+        now: () => new Date(nowMs).toISOString(),
+        nowEpochMs: () => nowMs,
+      }
+    );
+    await seedRemoteJob(harness, { createdAt, omitRemoteStartedAt: true });
+
+    await harness.manager.resumePendingJobs();
+
+    await waitFor(async () =>
+      expect((await harness.store.getProject(harness.project.id))?.jobs.job_1.error?.code).toBe('poll_deadline')
+    );
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it('leaves an existing poll_deadline recovery row unchanged without provider I/O', async () => {
+    const nowMs = Date.parse('2026-08-04T00:05:00.000Z');
+    const poll = vi.fn(
+      async (): Promise<ProviderJobSnapshot> => ({
+        status: 'failed',
+        error: { code: 'unknown' },
+      })
+    );
+    const harness = await createHarness(
+      {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+        submit: vi.fn(),
+        poll,
+      },
+      {
+        sleep: async () => undefined,
+        now: () => new Date(nowMs).toISOString(),
+        nowEpochMs: () => nowMs,
+      }
+    );
+    const seeded = await seedRemoteJob(harness, {
+      status: 'needs_attention',
+      remoteStartedAt: '2026-08-04T00:00:00.000Z',
+      error: {
+        code: 'poll_deadline',
+        messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
+      },
+    });
+    const before = structuredClone(seeded.jobs.job_1);
+
+    await harness.manager.resumePendingJobs();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect((await harness.store.getProject(seeded.id))?.jobs.job_1).toEqual(before);
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it('does not classify disposal of a hung attempt as a polling timeout', async () => {
+    const poll = vi.fn(async () => new Promise<ProviderJobSnapshot>(() => undefined));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (request) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: request.aspectRatio,
+          resolution: request.resolution,
+          durationSeconds: request.durationSeconds,
+        },
+      }),
+      submit: async () => ({ kind: 'remote', providerJobId: 'remote_disposed' }),
+      poll,
+    };
+    const nowMs = Date.parse('2026-08-04T00:00:00.000Z');
+    const harness = await createHarness(adapter, {
+      sleep: async () => undefined,
+      now: () => new Date(nowMs).toISOString(),
+      nowEpochMs: () => nowMs,
+    });
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [route],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(poll).toHaveBeenCalledOnce());
+
+    await harness.manager.dispose();
+
+    await expect(harness.store.getProject(harness.project.id)).resolves.toMatchObject({
+      jobs: { job_1: { status: 'queued_remote', error: null } },
+    });
   });
 });
 
@@ -1393,36 +1979,43 @@ describe('StudioJobManager cancellation', () => {
     await newerAssertion;
   });
 
-  it('commits an authorized queued-only cancellation after polling uncertainty moves the same task to needs-attention', async () => {
-    const providerResult = deferred<{ kind: 'cancelled' }>();
-    const cancel = vi.fn(async () => providerResult.promise);
-    const adapter: GenerationProviderAdapter = {
-      id: 'weprompt-image-v1',
-      validateConnection: async () => ({ ok: true }),
-      validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
-      submit: vi.fn(),
-      cancel,
-    };
-    const harness = await createHarness(adapter);
-    const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
-    const cancellation = harness.manager.cancelJob({
-      projectId: seeded.id,
-      jobId: 'job_1',
-      expectedRevision: seeded.revision,
-    });
-    await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
-    await harness.store.updateProject(seeded.id, (project) => {
-      project.jobs.job_1.status = 'needs_attention';
-      project.jobs.job_1.error = {
-        code: 'timeout',
-        messageKey: 'conversation.creativeStudio.jobs.errors.timeout',
+  it.each([
+    ['timeout', 'conversation.creativeStudio.jobs.errors.timeout'],
+    ['poll_deadline', 'conversation.creativeStudio.jobs.errors.pollDeadline'],
+    ['provider_unavailable', 'conversation.creativeStudio.jobs.errors.providerUnavailable'],
+  ] as const)(
+    'commits an authorized queued-only cancellation after %s moves the same task to needs-attention',
+    async (code, messageKey) => {
+      const providerResult = deferred<{ kind: 'cancelled' }>();
+      const cancel = vi.fn(async () => providerResult.promise);
+      const adapter: GenerationProviderAdapter = {
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+        submit: vi.fn(),
+        cancel,
       };
-      return project;
-    });
-    providerResult.resolve({ kind: 'cancelled' });
+      const harness = await createHarness(adapter);
+      const seeded = await seedCancellationJob(harness, 'queued_remote', 'queued_only');
+      const cancellation = harness.manager.cancelJob({
+        projectId: seeded.id,
+        jobId: 'job_1',
+        expectedRevision: seeded.revision,
+      });
+      await waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+      await harness.store.updateProject(seeded.id, (project) => {
+        project.jobs.job_1.status = 'needs_attention';
+        project.jobs.job_1.error = {
+          code,
+          messageKey,
+        };
+        return project;
+      });
+      providerResult.resolve({ kind: 'cancelled' });
 
-    await expect(cancellation).resolves.toMatchObject({ status: 'cancelled', error: null });
-  });
+      await expect(cancellation).resolves.toMatchObject({ status: 'cancelled', error: null });
+    }
+  );
 
   it.each([
     ['terminal success', (project: StudioProject) => void (project.jobs.job_1.status = 'succeeded')],
@@ -1810,6 +2403,339 @@ describe('StudioJobManager cancellation', () => {
 });
 
 describe('StudioJobManager retries', () => {
+  it('rejects retry for poll_deadline without resetting or polling the durable task', async () => {
+    const poll = vi.fn(
+      async (): Promise<ProviderJobSnapshot> => ({
+        status: 'failed',
+        error: { code: 'unknown' },
+      })
+    );
+    const submit = vi.fn();
+    const harness = await createHarness({
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+      submit,
+      poll,
+    });
+    const seeded = await seedRemoteJob(harness, {
+      status: 'needs_attention',
+      remoteStartedAt: '2026-08-04T00:00:00.000Z',
+      error: {
+        code: 'poll_deadline',
+        messageKey: 'conversation.creativeStudio.jobs.errors.pollDeadline',
+      },
+    });
+    const before = structuredClone(seeded.jobs.job_1);
+
+    await expect(
+      harness.manager.retryJob({ projectId: seeded.id, jobId: 'job_1', expectedRevision: seeded.revision })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect((await harness.store.getProject(seeded.id))?.jobs.job_1).toEqual(before);
+    expect(submit).not.toHaveBeenCalled();
+    expect(poll).not.toHaveBeenCalled();
+  });
+
+  it('bounds retryDownload to one attempt without applying the remote lifecycle deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T00:00:00.000Z'));
+    try {
+      let outputPath = '';
+      const poll = vi.fn(
+        async () =>
+          new Promise<ProviderJobSnapshot>((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  status: 'succeeded',
+                  outputs: [
+                    {
+                      mediaKind: 'image',
+                      role: 'primary',
+                      source: { kind: 'file', path: outputPath },
+                      mimeType: 'image/png',
+                    },
+                  ],
+                }),
+              REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000
+            );
+          })
+      );
+      const harness = await createHarness({
+        id: 'weprompt-image-v1',
+        validateConnection: async () => ({ ok: true }),
+        validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+        submit: vi.fn(),
+        poll,
+      });
+      outputPath = path.join(harness.rootDir, 'late-download-retry.png');
+      await writeFile(outputPath, png);
+      const seeded = await seedRemoteJob(harness, {
+        status: 'failed',
+        remoteStartedAt: '2020-01-01T00:00:00.000Z',
+        error: {
+          code: 'download_failed',
+          messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
+        },
+      });
+
+      const operation = harness.manager.retryDownload({
+        projectId: seeded.id,
+        jobId: 'job_1',
+        expectedRevision: seeded.revision,
+      });
+      await vi.waitFor(() => expect(poll).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(REMOTE_POLL_ATTEMPT_TIMEOUT_MS + 1_000);
+
+      await expect(operation).resolves.toMatchObject({
+        status: 'failed',
+        remoteStartedAt: '2020-01-01T00:00:00.000Z',
+        error: { code: 'download_failed' },
+      });
+      expect(poll).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('restores download_failed on disposal so restart does not apply the generation lifecycle', async () => {
+    const poll = vi.fn(async () => new Promise<ProviderJobSnapshot>(() => undefined));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+      submit: vi.fn(),
+      poll,
+    };
+    const harness = await createHarness(adapter);
+    const seeded = await seedRemoteJob(harness, {
+      status: 'failed',
+      remoteStartedAt: '2020-01-01T00:00:00.000Z',
+      error: {
+        code: 'download_failed',
+        messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
+      },
+    });
+    const operation = harness.manager.retryDownload({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(poll).toHaveBeenCalledOnce());
+
+    await harness.manager.dispose();
+
+    await expect(operation).resolves.toMatchObject({
+      status: 'failed',
+      providerJobId: 'remote_1',
+      remoteStartedAt: '2020-01-01T00:00:00.000Z',
+      error: { code: 'download_failed' },
+    });
+    const recoveryPoll = vi.fn(async (): Promise<ProviderJobSnapshot> => ({ status: 'running' }));
+    harness.manager = createStudioJobManager({
+      store: harness.store,
+      mediaStore: harness.mediaStore,
+      providerResolver: {
+        listConnectionCandidates: async () => [],
+        listGenerationRoutes: async () => catalog(),
+        isGenerationRouteAvailable: async () => true,
+      },
+      adapters: new Map([[adapter.id, { ...adapter, poll: recoveryPoll }]]),
+      listProviders: async () => [provider],
+      sleep: async () => undefined,
+      now: () => '2026-08-04T00:00:00.000Z',
+      nowEpochMs: () => Date.parse('2026-08-04T00:00:00.000Z'),
+    });
+
+    await harness.manager.resumePendingJobs();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await expect(harness.store.getProject(seeded.id)).resolves.toMatchObject({
+      jobs: { job_1: { status: 'failed', error: { code: 'download_failed' } } },
+    });
+    expect(recoveryPoll).not.toHaveBeenCalled();
+  });
+
+  it('restores download_failed when disposal aborts a retry waiting for same-kind capacity', async () => {
+    const scenes = [scene(), scene({ id: 'scene_2' }), scene({ id: 'scene_3' })];
+    const routes = scenes.map(
+      (candidate): StudioResolvedSceneRouteSnapshot => ({
+        ...route,
+        sceneId: candidate.id,
+      })
+    );
+    const submit = vi.fn(
+      async (_request, _provider, signal: AbortSignal) =>
+        new Promise<ProviderSubmitResult>((_resolve, reject) => {
+          const rejectOnAbort = (): void => reject(new Error('submission aborted'));
+          signal.addEventListener('abort', rejectOnAbort, { once: true });
+          if (signal.aborted) rejectOnAbort();
+        })
+    );
+    const poll = vi.fn(async (): Promise<ProviderJobSnapshot> => ({ status: 'running' }));
+    const adapter: GenerationProviderAdapter = {
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: (request) => ({
+        ok: true,
+        normalized: {
+          aspectRatio: request.aspectRatio,
+          resolution: request.resolution,
+          durationSeconds: request.durationSeconds,
+        },
+      }),
+      submit,
+      poll,
+    };
+    const harness = await createHarness(adapter, {
+      scenes,
+      routes,
+      jobIds: ['job_1', 'job_2'],
+      idempotencyKeys: ['key_1', 'key_2'],
+    });
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1', 'scene_2'],
+      routes: routes.slice(0, 2),
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    const withFailedDownload = await harness.store.updateProject(harness.project.id, (project) => {
+      project.jobs.job_3 = {
+        id: 'job_3',
+        projectId: project.id,
+        sceneId: 'scene_3',
+        status: 'failed',
+        provider: selectionFor(routes[2]!),
+        idempotencyKey: 'key_3',
+        providerJobId: 'remote_3',
+        remoteStartedAt: '2020-01-01T00:00:00.000Z',
+        cancellationPolicy: 'none',
+        outputAssetIds: [],
+        error: {
+          code: 'download_failed',
+          messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
+        },
+        retryOfJobId: null,
+        retryReason: null,
+        duplicateChargeAcknowledged: false,
+        duplicateChargeAcknowledgedAt: null,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+      };
+      project.scenes.scene_3.jobIds = ['job_3'];
+      project.scenes.scene_3.reviewState = 'blocked';
+      return project;
+    });
+    const operation = harness.manager.retryDownload({
+      projectId: withFailedDownload.id,
+      jobId: 'job_3',
+      expectedRevision: withFailedDownload.revision,
+    });
+    await waitFor(async () =>
+      expect((await harness.store.getProject(withFailedDownload.id))?.jobs.job_3.status).toBe('running')
+    );
+    expect(poll).not.toHaveBeenCalled();
+    const operationAssertion = expect(operation).resolves.toMatchObject({
+      status: 'failed',
+      providerJobId: 'remote_3',
+      error: { code: 'download_failed' },
+    });
+
+    await harness.manager.dispose();
+    await operationAssertion;
+
+    const recoveryPoll = vi.fn(async (): Promise<ProviderJobSnapshot> => ({ status: 'running' }));
+    harness.manager = createStudioJobManager({
+      store: harness.store,
+      mediaStore: harness.mediaStore,
+      providerResolver: {
+        listConnectionCandidates: async () => [],
+        listGenerationRoutes: async () => catalog(routes),
+        isGenerationRouteAvailable: async () => true,
+      },
+      adapters: new Map([[adapter.id, { ...adapter, poll: recoveryPoll }]]),
+      listProviders: async () => [provider],
+      sleep: async () => undefined,
+      now: () => '2026-08-04T00:00:00.000Z',
+      nowEpochMs: () => Date.parse('2026-08-04T00:00:00.000Z'),
+    });
+    await harness.manager.resumePendingJobs();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await expect(harness.store.getProject(withFailedDownload.id)).resolves.toMatchObject({
+      jobs: { job_3: { status: 'failed', error: { code: 'download_failed' } } },
+    });
+    expect(recoveryPoll).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: 'succeeded work',
+      mutate: (job: StudioJob) => {
+        job.status = 'succeeded';
+        job.error = null;
+      },
+      expected: { status: 'succeeded', providerJobId: 'remote_1' },
+    },
+    {
+      label: 'failed work',
+      mutate: (job: StudioJob) => {
+        job.status = 'failed';
+        job.error = { code: 'unknown', messageKey: 'conversation.creativeStudio.jobs.errors.unknown' };
+      },
+      expected: { status: 'failed', providerJobId: 'remote_1', error: { code: 'unknown' } },
+    },
+    {
+      label: 'cancelled work',
+      mutate: (job: StudioJob) => {
+        job.status = 'cancelled';
+        job.error = null;
+      },
+      expected: { status: 'cancelled', providerJobId: 'remote_1' },
+    },
+    {
+      label: 'a replacement provider identity',
+      mutate: (job: StudioJob) => void (job.providerJobId = 'remote_replacement'),
+      expected: { status: 'running', providerJobId: 'remote_replacement' },
+    },
+  ])('does not let retryDownload disposal overwrite $label', async ({ mutate, expected }) => {
+    const poll = vi.fn(async () => new Promise<ProviderJobSnapshot>(() => undefined));
+    const harness = await createHarness({
+      id: 'weprompt-image-v1',
+      validateConnection: async () => ({ ok: true }),
+      validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+      submit: vi.fn(),
+      poll,
+    });
+    const seeded = await seedRemoteJob(harness, {
+      status: 'failed',
+      remoteStartedAt: '2026-08-04T00:00:00.000Z',
+      error: {
+        code: 'download_failed',
+        messageKey: 'conversation.creativeStudio.jobs.errors.downloadFailed',
+      },
+    });
+    const operation = harness.manager.retryDownload({
+      projectId: seeded.id,
+      jobId: 'job_1',
+      expectedRevision: seeded.revision,
+    });
+    await waitFor(() => expect(poll).toHaveBeenCalledOnce());
+    await harness.store.updateProject(seeded.id, (project) => {
+      mutate(project.jobs.job_1);
+      return project;
+    });
+
+    await harness.manager.dispose();
+
+    await expect(operation).resolves.toMatchObject(expected);
+    await expect(harness.store.getProject(seeded.id)).resolves.toMatchObject({ jobs: { job_1: expected } });
+  });
+
   it('retries with the immutable failed-job provider after the project default changes', async () => {
     const changedSelection = { ...route, model: 'image-b' };
     const adapter: GenerationProviderAdapter = {

@@ -22,11 +22,13 @@ import type {
   StudioRetryJobRequest,
   StudioSubmitScenesRequest,
 } from '@/common/types/project/creativeStudioTypes';
-import type {
-  GenerationProviderAdapter,
-  ProviderJobSnapshot,
-  ProviderOutput,
-  ResolvedStudioGenerationRequest,
+import {
+  ProviderDeadlineError,
+  runWithProviderDeadline,
+  type GenerationProviderAdapter,
+  type ProviderJobSnapshot,
+  type ProviderOutput,
+  type ResolvedStudioGenerationRequest,
 } from './adapters';
 import type { GenerationProviderAdapterRegistry } from './adapters';
 import { createNodeRemoteMediaRequest, type RemoteMediaDownloadDeps } from '../remote-media/remoteMediaDownloader';
@@ -38,6 +40,8 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const POLL_BASE_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 const MAX_POLL_DELAY_MS = 15_000;
+const REMOTE_POLL_ATTEMPT_TIMEOUT_MS = 60_000;
+const REMOTE_POLL_DEADLINE_MS = 30 * 60_000;
 
 type OutputDownloaderDeps = Omit<RemoteMediaDownloadDeps, 'write' | 'maxBytes'>;
 
@@ -51,6 +55,7 @@ export type StudioJobManagerDeps = {
   createJobId?: () => string;
   createIdempotencyKey?: () => string;
   now?: () => string;
+  nowEpochMs?: () => number;
   sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
   jitterMs?: (baseMs: number, attempt: number) => number;
   outputDownloader?: (
@@ -270,6 +275,7 @@ const errorMessageKey = (code: StudioJobErrorCode): string =>
     rate_limited: 'conversation.creativeStudio.jobs.errors.rateLimited',
     provider_unavailable: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
     timeout: 'conversation.creativeStudio.jobs.errors.timeout',
+    poll_deadline: 'conversation.creativeStudio.jobs.errors.pollDeadline',
     no_output: 'conversation.creativeStudio.jobs.errors.noOutput',
     submission_unknown: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
     download_failed: 'conversation.creativeStudio.jobs.errors.downloadFailed',
@@ -332,6 +338,7 @@ const canCancelJob = (job: StudioJob): boolean => {
 /** Creates one runtime-owned durable scheduler for all Studio projects. */
 export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobManager => {
   const now = deps.now ?? (() => new Date().toISOString());
+  const nowEpochMs = deps.nowEpochMs ?? Date.now;
   const createJobId = deps.createJobId ?? randomUUID;
   const createIdempotencyKey = deps.createIdempotencyKey ?? randomUUID;
   const sleep = deps.sleep ?? defaultSleep;
@@ -421,6 +428,42 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       job.error = jobError(code);
       delete job.progress;
       project.scenes[job.sceneId].reviewState = 'blocked';
+      return true;
+    });
+
+  const transitionRemoteFailure = async (
+    projectId: string,
+    jobId: string,
+    providerJobId: string,
+    status: 'failed' | 'needs_attention',
+    code: StudioJobErrorCode
+  ): Promise<StudioJob> =>
+    mutateJob(projectId, jobId, (project, job) => {
+      if (job.providerJobId !== providerJobId || (job.status !== 'queued_remote' && job.status !== 'running')) {
+        return false;
+      }
+      job.status = status;
+      job.error = jobError(code);
+      delete job.progress;
+      project.scenes[job.sceneId].reviewState = 'blocked';
+      return true;
+    });
+
+  const transitionPollDeadline = (projectId: string, jobId: string, providerJobId: string): Promise<StudioJob> =>
+    transitionRemoteFailure(projectId, jobId, providerJobId, 'needs_attention', 'poll_deadline');
+
+  const transitionRetryDownloadFailure = (
+    projectId: string,
+    jobId: string,
+    providerJobId: string,
+    code: StudioJobErrorCode
+  ): Promise<StudioJob> =>
+    mutateJob(projectId, jobId, (project, currentJob) => {
+      if (currentJob.status !== 'running' || currentJob.providerJobId !== providerJobId) return false;
+      currentJob.status = 'failed';
+      currentJob.error = jobError(code);
+      delete currentJob.progress;
+      project.scenes[currentJob.sceneId].reviewState = 'blocked';
       return true;
     });
 
@@ -564,15 +607,16 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     }
   };
 
-  const claimRemoteCompletion = async (context: ExecutionContext): Promise<boolean> => {
+  const claimRemoteCompletion = async (context: ExecutionContext, providerJobId: string): Promise<boolean> => {
     const job = await mutateJob(context.projectId, context.jobId, (_project, current) => {
+      if (current.providerJobId !== providerJobId) return false;
       if (current.status === 'running') return false;
       if (current.status !== 'queued_remote') return false;
       current.status = 'running';
       delete current.progress;
       return true;
     });
-    return job.status === 'running';
+    return job.status === 'running' && job.providerJobId === providerJobId;
   };
 
   const persistPosterOutput = async (
@@ -733,12 +777,15 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
 
   const handleRemoteSnapshot = async (
     context: ExecutionContext,
+    providerJobId: string,
     snapshot: ProviderJobSnapshot,
     signal: AbortSignal
   ): Promise<'continue' | 'terminal'> => {
     if (snapshot.status === 'queued' || snapshot.status === 'running') {
       await mutateJob(context.projectId, context.jobId, (_project, job) => {
+        if (job.providerJobId !== providerJobId) return false;
         if (job.status === 'cancelled' || TERMINAL_STATUSES.has(job.status)) return false;
+        if (job.status !== 'queued_remote' && job.status !== 'running') return false;
         if (snapshot.status === 'queued' && job.status === 'running') return false;
         job.status = snapshot.status === 'queued' ? 'queued_remote' : 'running';
         if (snapshot.progress === undefined) delete job.progress;
@@ -748,13 +795,15 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       return 'continue';
     }
     if (snapshot.status === 'succeeded') {
-      if (!(await claimRemoteCompletion(context))) return 'terminal';
+      if (!(await claimRemoteCompletion(context, providerJobId))) return 'terminal';
       await persistPrimaryOutput(context, snapshot.outputs, signal);
       return 'terminal';
     }
     if (snapshot.status === 'cancelled') {
       await mutateJob(context.projectId, context.jobId, (project, job) => {
+        if (job.providerJobId !== providerJobId) return false;
         if (TERMINAL_STATUSES.has(job.status)) return false;
+        if (job.status !== 'queued_remote' && job.status !== 'running') return false;
         job.status = 'cancelled';
         job.error = null;
         delete job.progress;
@@ -764,23 +813,77 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       return 'terminal';
     }
     if (!('error' in snapshot)) {
-      await transitionFailure(context.projectId, context.jobId, 'failed', 'unknown');
+      await transitionRemoteFailure(context.projectId, context.jobId, providerJobId, 'failed', 'unknown');
       return 'terminal';
     }
-    await transitionFailure(context.projectId, context.jobId, 'failed', snapshotFailureCode(snapshot));
+    await transitionRemoteFailure(
+      context.projectId,
+      context.jobId,
+      providerJobId,
+      'failed',
+      snapshotFailureCode(snapshot)
+    );
     return 'terminal';
   };
 
-  const pollRemote = async (context: ExecutionContext, providerJobId: string, signal: AbortSignal): Promise<void> => {
+  const pollRemote = async (
+    context: ExecutionContext,
+    providerJobId: string,
+    remoteStartedAt: string,
+    signal: AbortSignal
+  ): Promise<void> => {
     if (!context.adapter.poll) {
-      await transitionFailure(context.projectId, context.jobId, 'needs_attention', 'unsupported');
+      await transitionRemoteFailure(context.projectId, context.jobId, providerJobId, 'needs_attention', 'unsupported');
       return;
     }
+    const startedAtMs = Date.parse(remoteStartedAt);
+    if (!Number.isFinite(startedAtMs)) {
+      await transitionPollDeadline(context.projectId, context.jobId, providerJobId);
+      return;
+    }
+    const deadlineAtMs = startedAtMs + REMOTE_POLL_DEADLINE_MS;
     for (let attempt = 0; !signal.aborted; attempt += 1) {
+      const remainingBeforeBackoffMs = deadlineAtMs - nowEpochMs();
+      if (remainingBeforeBackoffMs <= 0) {
+        await transitionPollDeadline(context.projectId, context.jobId, providerJobId);
+        return;
+      }
       const baseDelay = pollBaseDelay(attempt);
-      await sleep(Math.min(MAX_POLL_DELAY_MS, Math.max(0, jitterMs(baseDelay, attempt))), signal);
-      const snapshot = await context.adapter.poll(providerJobId, context.provider, signal);
-      if ((await handleRemoteSnapshot(context, snapshot, signal)) === 'terminal') return;
+      const requestedDelayMs = Math.min(MAX_POLL_DELAY_MS, Math.max(0, jitterMs(baseDelay, attempt)));
+      await sleep(Math.min(requestedDelayMs, remainingBeforeBackoffMs), signal);
+      if (signal.aborted) return;
+      const remainingMs = deadlineAtMs - nowEpochMs();
+      if (remainingMs <= 0) {
+        await transitionPollDeadline(context.projectId, context.jobId, providerJobId);
+        return;
+      }
+      let snapshot: ProviderJobSnapshot;
+      try {
+        snapshot = await runWithProviderDeadline(
+          signal,
+          Math.min(REMOTE_POLL_ATTEMPT_TIMEOUT_MS, remainingMs),
+          (attemptSignal) => context.adapter.poll!(providerJobId, context.provider, attemptSignal)
+        );
+      } catch (error) {
+        if (signal.aborted) return;
+        if (error instanceof ProviderDeadlineError) {
+          if (nowEpochMs() >= deadlineAtMs) {
+            await transitionPollDeadline(context.projectId, context.jobId, providerJobId);
+          } else {
+            await transitionRemoteFailure(
+              context.projectId,
+              context.jobId,
+              providerJobId,
+              'needs_attention',
+              'timeout'
+            );
+          }
+          return;
+        }
+        throw error;
+      }
+      if (signal.aborted) return;
+      if ((await handleRemoteSnapshot(context, providerJobId, snapshot, signal)) === 'terminal') return;
     }
   };
 
@@ -862,9 +965,11 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
 
       let queued: StudioJob;
       try {
+        const remoteStartedAt = new Date(nowEpochMs()).toISOString();
         queued = await mutateJob(prepared.projectId, prepared.jobId, (_project, job) => {
           if (job.status !== 'submitting') return false;
           job.providerJobId = result.providerJobId;
+          job.remoteStartedAt = remoteStartedAt;
           job.status = 'queued_remote';
           return true;
         });
@@ -876,24 +981,46 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
         return;
       }
       if (queued.status !== 'queued_remote' || queued.providerJobId !== result.providerJobId) return;
+      const remoteStartedAt = queued.remoteStartedAt;
+      if (typeof remoteStartedAt !== 'string') {
+        await transitionPollDeadline(prepared.projectId, prepared.jobId, result.providerJobId);
+        return;
+      }
       try {
-        await pollRemote(prepared, result.providerJobId, signal);
+        await pollRemote(prepared, result.providerJobId, remoteStartedAt, signal);
       } catch (error) {
         if (signal.aborted) return;
-        await transitionFailure(prepared.projectId, prepared.jobId, 'needs_attention', pollUncertaintyCode(error));
+        await transitionRemoteFailure(
+          prepared.projectId,
+          prepared.jobId,
+          result.providerJobId,
+          'needs_attention',
+          pollUncertaintyCode(error)
+        );
       }
     } finally {
       release();
     }
   };
 
-  const runRecoveredRemote = async (context: ExecutionContext, providerJobId: string, signal: AbortSignal) => {
+  const runRecoveredRemote = async (
+    context: ExecutionContext,
+    providerJobId: string,
+    remoteStartedAt: string,
+    signal: AbortSignal
+  ) => {
     const release = await semaphores[context.mediaKind].acquire(signal);
     try {
-      await pollRemote(context, providerJobId, signal);
+      await pollRemote(context, providerJobId, remoteStartedAt, signal);
     } catch (error) {
       if (signal.aborted) return;
-      await transitionFailure(context.projectId, context.jobId, 'needs_attention', pollUncertaintyCode(error));
+      await transitionRemoteFailure(
+        context.projectId,
+        context.jobId,
+        providerJobId,
+        'needs_attention',
+        pollUncertaintyCode(error)
+      );
     } finally {
       release();
     }
@@ -948,6 +1075,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
         },
         idempotencyKey,
         providerJobId: null,
+        remoteStartedAt: null,
         cancellationPolicy: candidate.cancellationPolicy,
         outputAssetIds: [],
         error: null,
@@ -1187,7 +1315,8 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     }
     if (
       (previous.status !== 'failed' && previous.status !== 'needs_attention') ||
-      previous.error?.code === 'download_failed'
+      previous.error?.code === 'download_failed' ||
+      previous.error?.code === 'poll_deadline'
     ) {
       throw new StudioJobManagerError('invalid_request');
     }
@@ -1215,7 +1344,10 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
           input.expectedRevision
         );
         if (reclaimed.status !== 'queued_remote') throw new StudioJobManagerError('invalid_request');
-        trackRun(project.id, previous.id, (signal) => runRecoveredRemote(context, previous.providerJobId!, signal));
+        const remoteStartedAt = previous.remoteStartedAt ?? previous.createdAt;
+        trackRun(project.id, previous.id, (signal) =>
+          runRecoveredRemote(context, previous.providerJobId!, remoteStartedAt, signal)
+        );
         return reclaimed;
       } catch (error) {
         executionReservations.delete(key);
@@ -1286,20 +1418,30 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
         input.expectedRevision
       );
       if (claimed.status !== 'running') throw new StudioJobManagerError('invalid_request');
-      const release = await semaphores[context.mediaKind].acquire(controller.signal);
+      let release: (() => void) | undefined;
       try {
-        const snapshot = await context.adapter.poll!(job.providerJobId!, context.provider, controller.signal);
+        release = await semaphores[context.mediaKind].acquire(controller.signal);
+        const snapshot = await runWithProviderDeadline(
+          controller.signal,
+          REMOTE_POLL_ATTEMPT_TIMEOUT_MS,
+          (attemptSignal) => context.adapter.poll!(job.providerJobId!, context.provider, attemptSignal)
+        );
         if (snapshot.status !== 'succeeded') {
           if (snapshot.status === 'failed' || snapshot.status === 'expired' || snapshot.status === 'cancelled') {
-            return transitionFailure(project.id, job.id, 'failed', snapshotFailureCode(snapshot));
+            return transitionRetryDownloadFailure(
+              project.id,
+              job.id,
+              job.providerJobId!,
+              snapshotFailureCode(snapshot)
+            );
           }
-          return transitionFailure(project.id, job.id, 'failed', 'download_failed');
+          return transitionRetryDownloadFailure(project.id, job.id, job.providerJobId!, 'download_failed');
         }
         return persistPrimaryOutput(context, snapshot.outputs, controller.signal);
       } catch {
-        return transitionFailure(project.id, job.id, 'failed', 'download_failed');
+        return transitionRetryDownloadFailure(project.id, job.id, job.providerJobId!, 'download_failed');
       } finally {
-        release();
+        release?.();
       }
     })();
     activeRuns.add(operation);
@@ -1323,6 +1465,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
           if (disposed) return;
           try {
             if (TERMINAL_STATUSES.has(job.status)) continue;
+            if (job.status === 'needs_attention' && job.error?.code === 'poll_deadline') continue;
             const key = executionKey(project.id, job.id);
             if (controllers.has(key) || executionReservations.has(key)) continue;
             if (job.status === 'needs_attention' && !job.providerJobId) {
@@ -1343,6 +1486,16 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
             const freshProject = await deps.store.getProject(project.id);
             const freshJob = freshProject?.jobs[job.id];
             if (!freshProject || !freshJob) continue;
+            if (freshJob.status === 'needs_attention' && freshJob.error?.code === 'poll_deadline') continue;
+            const remoteStartedAt = freshJob.remoteStartedAt ?? freshJob.createdAt;
+            const remoteStartedAtMs = Date.parse(remoteStartedAt);
+            if (
+              (freshJob.status === 'queued_remote' || freshJob.status === 'running') &&
+              (!Number.isFinite(remoteStartedAtMs) || nowEpochMs() >= remoteStartedAtMs + REMOTE_POLL_DEADLINE_MS)
+            ) {
+              await transitionPollDeadline(project.id, job.id, freshJob.providerJobId!);
+              continue;
+            }
             const context = await resolveExistingContext(freshProject, freshJob);
             if (!context) {
               await transitionFailure(project.id, job.id, 'needs_attention', 'provider_unavailable');
@@ -1361,7 +1514,9 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
               if (reclaimed.status !== 'queued_remote') continue;
             }
             if (disposed) return;
-            trackRun(project.id, job.id, (signal) => runRecoveredRemote(context, job.providerJobId!, signal));
+            trackRun(project.id, job.id, (signal) =>
+              runRecoveredRemote(context, freshJob.providerJobId!, remoteStartedAt, signal)
+            );
           } catch {
             await transitionFailure(project.id, job.id, 'needs_attention', 'provider_unavailable').catch(
               (): undefined => undefined

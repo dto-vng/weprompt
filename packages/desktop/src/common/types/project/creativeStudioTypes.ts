@@ -76,6 +76,7 @@ export type StudioJobErrorCode =
   | 'rate_limited'
   | 'provider_unavailable'
   | 'timeout'
+  | 'poll_deadline'
   | 'no_output'
   | 'submission_unknown'
   | 'download_failed'
@@ -99,6 +100,8 @@ export type StudioJob = {
   provider: StudioProviderRef;
   idempotencyKey: string;
   providerJobId: string | null;
+  /** Set once when providerJobId becomes durable. Optional only for old schema-v1 jobs. */
+  remoteStartedAt?: string | null;
   cancellationPolicy: StudioCancellationPolicy;
   outputAssetIds: string[];
   error: StudioJobError | null;
@@ -114,7 +117,7 @@ export type StudioJob = {
 /** Renderer-facing job metadata. Provider task, adapter, and charge identities stay in main. */
 export type StudioRendererJob = Omit<
   StudioJob,
-  'provider' | 'idempotencyKey' | 'providerJobId' | 'cancellationPolicy'
+  'provider' | 'idempotencyKey' | 'providerJobId' | 'remoteStartedAt' | 'cancellationPolicy'
 > & {
   provider: StudioMediaChoiceRef;
   /** Main-derived cancellation capability; renderer code never infers it from status or provider metadata. */

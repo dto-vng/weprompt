@@ -672,6 +672,7 @@ export type I18nKey =
   | 'conversation.creativeStudio.jobs.errors.downloadFailed'
   | 'conversation.creativeStudio.jobs.errors.invalidRequest'
   | 'conversation.creativeStudio.jobs.errors.noOutput'
+  | 'conversation.creativeStudio.jobs.errors.pollDeadline'
   | 'conversation.creativeStudio.jobs.errors.providerUnavailable'
   | 'conversation.creativeStudio.jobs.errors.quota'
   | 'conversation.creativeStudio.jobs.errors.rateLimited'

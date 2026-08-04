@@ -1073,6 +1073,7 @@
         "rateLimited": "O limite de solicitações do provedor foi atingido. Tente novamente mais tarde.",
         "providerUnavailable": "O provedor de geração está indisponível.",
         "timeout": "O provedor não respondeu a tempo.",
+        "pollDeadline": "O mecanismo parou de informar o progresso. Consulte o provedor antes de tentar novamente.",
         "noOutput": "O provedor concluiu sem uma saída utilizável.",
         "submissionUnknown": "O resultado do envio é desconhecido. Revise o aviso de cobrança duplicada antes de tentar novamente.",
         "downloadFailed": "A geração foi concluída, mas não foi possível baixar a saída.",

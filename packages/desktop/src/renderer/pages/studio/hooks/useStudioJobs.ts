@@ -41,6 +41,7 @@ const JOB_MESSAGE_KEYS: Record<StudioJobErrorCode, string> = {
   rate_limited: 'conversation.creativeStudio.jobs.errors.rateLimited',
   provider_unavailable: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
   timeout: 'conversation.creativeStudio.jobs.errors.timeout',
+  poll_deadline: 'conversation.creativeStudio.jobs.errors.pollDeadline',
   no_output: 'conversation.creativeStudio.jobs.errors.noOutput',
   submission_unknown: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
   download_failed: 'conversation.creativeStudio.jobs.errors.downloadFailed',

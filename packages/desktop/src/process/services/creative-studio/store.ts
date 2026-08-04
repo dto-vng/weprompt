@@ -46,6 +46,7 @@ const JOB_ERROR_CODES = new Set([
   'rate_limited',
   'provider_unavailable',
   'timeout',
+  'poll_deadline',
   'no_output',
   'submission_unknown',
   'download_failed',
@@ -94,6 +95,7 @@ const JOB_KEYS = new Set([
   'provider',
   'idempotencyKey',
   'providerJobId',
+  'remoteStartedAt',
   'cancellationPolicy',
   'outputAssetIds',
   'error',
@@ -444,6 +446,10 @@ const validateJob = (jobId: string, projectId: string, sceneIds: Set<string>, va
     validateProviderRef(value.provider) &&
     isSafeId(value.idempotencyKey) &&
     (value.providerJobId === null || (isString(value.providerJobId) && isValidProviderJobId(value.providerJobId))) &&
+    (!Object.hasOwn(value, 'remoteStartedAt') ||
+      (value.providerJobId === null
+        ? value.remoteStartedAt === null
+        : isCanonicalIsoTimestamp(value.remoteStartedAt))) &&
     isString(value.cancellationPolicy) &&
     CANCELLATION_POLICIES.has(value.cancellationPolicy as StudioCancellationPolicy) &&
     asArrayOfSafeIds(value.outputAssetIds) &&
