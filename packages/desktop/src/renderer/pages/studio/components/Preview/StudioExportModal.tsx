@@ -39,7 +39,10 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
   onOpenProduce,
 }) => {
   const { t } = useTranslation();
-  void onOpenProduce;
+  const missingShotNumbers = missingSceneIds.map((sceneId) => {
+    const sceneIndex = project.sceneOrder.indexOf(sceneId);
+    return sceneIndex < 0 ? sceneId : String(sceneIndex + 1).padStart(2, '0');
+  });
 
   return (
     <Modal
@@ -80,6 +83,22 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
           <p className='m-0'>{t('conversation.creativeStudio.export.body')}</p>
           {selectedAssetCount === 0 && (
             <p className='m-0 text-13px text-warning'>{t('conversation.creativeStudio.export.noSelectedAssets')}</p>
+          )}
+          {missingSceneIds.length > 0 && (
+            <div
+              role='alert'
+              className='flex flex-col gap-4px rounded-8px bg-warning-light-1 p-10px text-13px text-warning'
+            >
+              <p className='m-0'>
+                {t('conversation.creativeStudio.export.gapWarning', {
+                  count: missingSceneIds.length,
+                  shots: missingShotNumbers.join(', '),
+                })}
+              </p>
+              <p className='m-0'>
+                {t('conversation.creativeStudio.export.confirmSelectedCount', { count: selectedAssetCount })}
+              </p>
+            </div>
           )}
           <Checkbox checked={includeReferences} disabled={pending} onChange={onIncludeReferencesChange}>
             {t('conversation.creativeStudio.export.includeReferences')}

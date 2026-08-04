@@ -421,6 +421,24 @@ describe('StudioPage and useStudioProject', () => {
       expect(screen.getByText(guidance)).toBeInTheDocument();
     });
 
+    it('skips missing scene ids instead of crashing the Studio shell', async () => {
+      const opening = scene();
+      bridge.getProject.invoke.mockResolvedValue(
+        ok(
+          project('project-1', {
+            sceneOrder: [opening.id, 'missing-scene'],
+            scenes: { [opening.id]: opening },
+          })
+        )
+      );
+
+      renderRoute('/studio/project-1/review');
+
+      expect(
+        await screen.findByRole('heading', { level: 2, name: 'conversation.creativeStudio.phase.review.title' })
+      ).toBeInTheDocument();
+    });
+
     it('renders a missing-asset Review slate without claiming slates are handed off', async () => {
       const missingScene = scene({ title: 'Missing close', durationSeconds: 7 });
       bridge.getProject.invoke.mockResolvedValue(

@@ -53,6 +53,15 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
     () =>
       Object.fromEntries(
         orderedScenes.map((scene): [string, SceneTimelineReviewState] => {
+          const selectedAsset = scene.selectedAssetId === null ? undefined : project.assets[scene.selectedAssetId];
+          const selectedTakeInCut =
+            selectedAsset?.id === scene.selectedAssetId &&
+            selectedAsset.projectId === project.id &&
+            selectedAsset.sceneId === scene.id &&
+            selectedAsset.mediaKind === scene.mediaKind &&
+            selectedAsset.managedAsset.collection === 'assets' &&
+            scene.assetIds.includes(selectedAsset.id);
+          if (selectedTakeInCut) return [scene.id, 'selected-take'];
           switch (readiness.sceneStatuses[scene.id]) {
             case 'generated':
               return [scene.id, 'selected-take'];
@@ -70,31 +79,40 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
 
   return (
     <>
-      <StagePreview
-        projectId={project.id}
-        project={project}
-        selectedScene={selectedScene}
-        selectedAsset={selectedAsset}
-        posterAsset={posterAsset}
-        presentation='review'
-        slate={
-          selectedScene === null ? null : { title: selectedScene.title, durationSeconds: selectedScene.durationSeconds }
-        }
-      />
-      <AssetStrip
-        projectId={project.id}
-        scene={selectedScene}
-        assets={project.assets}
-        projectRevision={project.revision}
-        mutationPending={mutationPending}
-        onSelectAsset={onSelectAsset}
-      />
-      <SceneTimeline
-        orderedScenes={orderedScenes}
-        selectedSceneId={selectedSceneId}
-        reviewStates={reviewStates}
-        onSelectScene={onSelectScene}
-      />
+      <div data-review-region='stage' className='min-w-0'>
+        <StagePreview
+          projectId={project.id}
+          project={project}
+          selectedScene={selectedScene}
+          selectedAsset={selectedAsset}
+          posterAsset={posterAsset}
+          presentation='review'
+          slate={
+            selectedScene === null
+              ? null
+              : { title: selectedScene.title, durationSeconds: selectedScene.durationSeconds }
+          }
+        />
+      </div>
+      <div data-review-region='takes' className='min-w-0 rounded-12px border border-border-2 bg-base p-12px'>
+        <AssetStrip
+          projectId={project.id}
+          scene={selectedScene}
+          assets={project.assets}
+          projectRevision={project.revision}
+          mutationPending={mutationPending}
+          direction='column'
+          onSelectAsset={onSelectAsset}
+        />
+      </div>
+      <div data-review-region='filmstrip' className='min-w-0'>
+        <SceneTimeline
+          orderedScenes={orderedScenes}
+          selectedSceneId={selectedSceneId}
+          reviewStates={reviewStates}
+          onSelectScene={onSelectScene}
+        />
+      </div>
     </>
   );
 };

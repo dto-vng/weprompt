@@ -1284,15 +1284,111 @@ describe('createStudioMediaStore', () => {
 
     expect(result).toEqual({
       folderName: 'Film-20260730-120000',
-      exported: [{ assetId: 'asset_3', fileName: 'scene-01.png' }],
+      exported: [{ assetId: 'asset_3', fileName: 'scene-01-opening.png' }],
       missingSceneIds: ['scene_2'],
     });
-    await expect(fs.readFile(path.join(destination, result.folderName, 'scene-01.png'))).resolves.toEqual(png);
+    await expect(fs.readFile(path.join(destination, result.folderName, 'scene-01-opening.png'))).resolves.toEqual(png);
     const storyboard = await fs.readFile(path.join(destination, result.folderName, 'storyboard.json'), 'utf8');
     for (const sentinel of Object.values(STUDIO_E2E_BOUNDARY_SENTINELS)) {
       expect(storyboard).not.toContain(sentinel);
     }
     expect(storyboard).not.toContain(rootDir);
+  });
+
+  it('slugifies export titles while scene numbers disambiguate empty, duplicate, and gapped names', async () => {
+    expect(mediaStoreModule.buildStudioSceneExportFileName(1, 'Café Déjà Vu — Launch!!!', '.mp4')).toBe(
+      'scene-01-cafe-deja-vu-launch.mp4'
+    );
+    expect(mediaStoreModule.buildStudioSceneExportFileName(2, '', '.mp4')).toBe('scene-02.mp4');
+    expect(mediaStoreModule.buildStudioSceneExportFileName(3, 'A'.repeat(80), '.mp4')).toBe(
+      `scene-03-${'a'.repeat(40)}.mp4`
+    );
+    const { store } = await makeStore();
+    const sceneDefinitions = [
+      { id: 'scene_1', title: 'Café Déjà Vu — Launch!!!' },
+      { id: 'scene_2', title: 'Untitled' },
+      { id: 'scene_3', title: 'Cold Open' },
+      { id: 'scene_4', title: 'Missing gap' },
+      { id: 'scene_5', title: 'Cold Open' },
+    ];
+    await store.updateProject(
+      'project_1',
+      (project) => ({
+        ...project,
+        sceneOrder: sceneDefinitions.map(({ id }) => id),
+        scenes: Object.fromEntries(
+          sceneDefinitions.map(({ id, title }) => [
+            id,
+            {
+              id,
+              title,
+              purpose: '',
+              visualPrompt: '',
+              narration: '',
+              onScreenText: '',
+              mediaKind: 'image' as const,
+              durationSeconds: 1,
+              referenceAssetId: null,
+              selectedAssetId: null,
+              assetIds: [],
+              jobIds: [],
+              reviewState: 'draft' as const,
+            },
+          ])
+        ),
+      }),
+      1
+    );
+    let assetNumber = 1;
+    const media = createStudioMediaStore({
+      store,
+      createId: () => `asset_${assetNumber++}`,
+    });
+    const selectedAssetByScene: Record<string, string> = {};
+    for (const sceneId of ['scene_1', 'scene_2', 'scene_3', 'scene_5']) {
+      const current = await store.getProject('project_1');
+      if (!current) throw new Error('Export source project disappeared');
+      const persisted = await media.persistProviderOutput({
+        projectId: 'project_1',
+        sceneId,
+        expectedRevision: current.revision,
+        mediaKind: 'image',
+        declaredMimeType: 'image/png',
+        body: Readable.from([png]),
+      });
+      selectedAssetByScene[sceneId] = persisted.id;
+    }
+    const withAssets = await store.getProject('project_1');
+    if (!withAssets) throw new Error('Export source project disappeared');
+    await store.updateProject(
+      'project_1',
+      (project) => {
+        const next = structuredClone(project);
+        for (const [sceneId, assetId] of Object.entries(selectedAssetByScene)) {
+          const selectedScene = next.scenes[sceneId];
+          if (selectedScene !== undefined) selectedScene.selectedAssetId = assetId;
+        }
+        return next;
+      },
+      withAssets.revision
+    );
+    const destination = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-export-slugs-'));
+    created.push(destination);
+
+    const result = await media.exportAssetsToDirectory({
+      projectId: 'project_1',
+      destinationDirectory: destination,
+      includeReferences: false,
+      timestamp: '20260730-120000',
+    });
+
+    expect(result.exported.map(({ fileName }) => fileName)).toEqual([
+      'scene-01-cafe-deja-vu-launch.png',
+      'scene-02-untitled.png',
+      'scene-03-cold-open.png',
+      'scene-05-cold-open.png',
+    ]);
+    expect(result.missingSceneIds).toEqual(['scene_4']);
   });
 
   it('rejects an export directory swapped for a symlink before writing asset bytes', async () => {

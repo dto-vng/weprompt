@@ -195,6 +195,8 @@ const readinessActionKeys = [
 ] as const;
 
 const pluralLogicalKeys = [
+  'export.confirmSelectedCount',
+  'export.gapWarning',
   'export.successBody',
   'review.generateReadyScenes',
   'scene.durationSeconds',
@@ -485,11 +487,13 @@ describe('Creative Studio localization contract', () => {
             count,
             seconds: count,
             number: 2,
+            shots: '03',
             title: 'Product close-up',
             returnDetails: true,
           });
           const expectedExactKey = `${key}${resolver.getSuffix(locale, count)}`;
-          if (typeof details.res !== 'string' || !details.res.includes(String(count))) {
+          const expectedRenderedValue = base === 'export.gapWarning' ? '03' : String(count);
+          if (typeof details.res !== 'string' || !details.res.includes(expectedRenderedValue)) {
             issues.push(`${locale}.${base} did not render count ${count}`);
           }
           if (details.res === key) issues.push(`${locale}.${base} returned the raw key for ${count}`);

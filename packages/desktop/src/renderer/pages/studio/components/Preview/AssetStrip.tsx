@@ -25,6 +25,7 @@ export type AssetStripProps = {
   assets: Readonly<Record<string, StudioAsset>>;
   projectRevision: number;
   mutationPending: boolean;
+  direction?: 'row' | 'column';
   onSelectAsset: (request: StudioSelectVariationRequest) => ActionResult;
 };
 
@@ -35,6 +36,7 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
   assets,
   projectRevision,
   mutationPending,
+  direction = 'row',
   onSelectAsset,
 }) => {
   const { t } = useTranslation();
@@ -59,20 +61,36 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
   if (generatedAssets.length === 0) return null;
 
   return (
-    <section aria-label={t('conversation.creativeStudio.preview.versions')} className='flex min-w-0 flex-col gap-8px'>
+    <section
+      aria-label={t('conversation.creativeStudio.preview.versions')}
+      data-layout={direction}
+      className='flex min-w-0 flex-col gap-8px'
+    >
       <h3 className='m-0 text-13px font-500 text-t-secondary'>{t('conversation.creativeStudio.preview.versions')}</h3>
-      <ol className='m-0 flex list-none gap-8px overflow-x-auto p-0'>
+      <ol
+        className={
+          direction === 'column'
+            ? 'm-0 flex min-w-0 list-none flex-col gap-8px p-0'
+            : 'm-0 flex list-none gap-8px overflow-x-auto p-0'
+        }
+      >
         {generatedAssets.map(({ asset, source }, index) => {
           const versionLabel = t('conversation.creativeStudio.preview.versionLabel', { number: index + 1 });
           const selectLabel = t('conversation.creativeStudio.preview.selectVersionAccessible', { number: index + 1 });
+          const selected = scene.selectedAssetId === asset.id;
           return (
-            <li key={asset.id} className='flex-none'>
+            <li key={asset.id} className={direction === 'column' ? 'min-w-0' : 'flex-none'}>
               <Button
                 type='text'
                 aria-label={selectLabel}
-                aria-current={scene.selectedAssetId === asset.id ? 'true' : undefined}
+                aria-current={selected ? 'true' : undefined}
                 title={selectLabel}
-                className='h-auto min-w-92px flex-col gap-6px p-6px'
+                long={direction === 'column'}
+                className={
+                  direction === 'column'
+                    ? 'h-auto min-w-0 flex-row justify-start gap-8px p-6px text-left'
+                    : 'h-auto min-w-92px flex-col gap-6px p-6px'
+                }
                 disabled={mutationPending}
                 onClick={() =>
                   void onSelectAsset({
@@ -90,7 +108,14 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
                     <VideoOne aria-hidden='true' />
                   )}
                 </span>
-                <span className='text-12px text-t-secondary'>{versionLabel}</span>
+                <span className='flex min-w-0 flex-col items-start gap-4px'>
+                  <span className='text-12px text-t-secondary'>{versionLabel}</span>
+                  {selected && (
+                    <span className='rounded-full bg-primary-light-1 px-6px py-2px text-10px font-500 text-primary-6'>
+                      {t('conversation.creativeStudio.phase.review.selectedTake')}
+                    </span>
+                  )}
+                </span>
               </Button>
             </li>
           );

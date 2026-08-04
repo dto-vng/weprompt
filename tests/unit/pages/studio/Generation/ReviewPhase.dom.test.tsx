@@ -200,7 +200,7 @@ describe('Review phase cut', () => {
     expect(
       Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
     ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
-    expect(screen.getByText('conversation.creativeStudio.phase.review.selectedTake')).toBeVisible();
+    expect(screen.getAllByText('conversation.creativeStudio.phase.review.selectedTake')).toHaveLength(2);
     expect(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.timeline.selectSceneAccessible:1,Selected opening,5,5',
@@ -209,6 +209,20 @@ describe('Review phase cut', () => {
     expect(screen.getByText('conversation.creativeStudio.phase.review.slateLabel')).toBeVisible();
     expect(screen.getByText('conversation.creativeStudio.scene.status.generating')).toBeVisible();
     expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
+  });
+
+  it('keeps a selected take visibly in cut while another variation renders', () => {
+    const reviewController = controller();
+    reviewController.readiness = {
+      ...reviewController.readiness,
+      sceneStatuses: { ...reviewController.readiness.sceneStatuses, 'scene-selected': 'generating' },
+    };
+    const { container } = render(<ReviewPhase controller={reviewController} />);
+
+    expect(
+      container.querySelector("[data-review-region='filmstrip'] [data-review-state='selected-take']")
+    ).not.toBeNull();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.renderedShots:1')).toBeVisible();
   });
 
   it('never exposes generation or stitched-playback actions in Review', () => {

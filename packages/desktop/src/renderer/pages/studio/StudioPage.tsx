@@ -740,6 +740,8 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     );
   }
 
+  if (readiness === null) return null;
+
   const activePhase = routePhase ?? resolveStudioEntryPhase(project.id, project.sceneOrder.length);
   const projectUpdateIssue =
     editor.conflict?.operation === 'update_project'
@@ -756,14 +758,14 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   const advisory: StudioPhaseControllers['advisory'] =
     shellIssueMessageKey !== null
       ? { messageKey: shellIssueMessageKey, anchor: 'shell' }
-      : activePhase === 'produce' && readiness!.readySceneIds.length === 0
+      : activePhase === 'produce' && readiness.readySceneIds.length === 0
         ? { messageKey: 'conversation.creativeStudio.review.noReadyScenes', anchor: 'batch' }
-        : activePhase === 'produce' && readiness!.durationDeltaSeconds !== 0
+        : activePhase === 'produce' && readiness.durationDeltaSeconds !== 0
           ? { messageKey: 'conversation.creativeStudio.review.durationMismatch', anchor: 'batch' }
           : null;
   const controller: StudioPhaseControllers = {
     project,
-    readiness: readiness!,
+    readiness,
     editor,
     models: studioModels,
     jobs: studioJobs,
@@ -822,10 +824,10 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         selectedDurationSeconds={
           generationReview?.scenes.reduce((total, scene) => total + scene.durationSeconds, 0) ?? 0
         }
-        projectDurationSeconds={project.sceneOrder.reduce(
-          (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
-          0
-        )}
+        projectDurationSeconds={project.sceneOrder.reduce((total, sceneId) => {
+          const scene = project.scenes[sceneId];
+          return scene?.id === sceneId ? total + scene.durationSeconds : total;
+        }, 0)}
         submitting={studioJobs.mutationPending || generationReviewRefreshing}
         submissionBlocked={studioJobs.issue?.operation === 'submit_scenes' && studioJobs.issue.code === 'invalid_route'}
         errorMessageKey={
