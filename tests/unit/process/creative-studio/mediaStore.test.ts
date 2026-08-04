@@ -27,6 +27,19 @@ import {
   sanitizeStudioExportFolderName,
 } from '@process/services/creative-studio/mediaStore';
 
+const { createHashSpy } = vi.hoisted(() => ({ createHashSpy: vi.fn() }));
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return {
+    ...actual,
+    createHash: (...args: Parameters<typeof actual.createHash>) => {
+      createHashSpy(...args);
+      return actual.createHash(...args);
+    },
+  };
+});
+
 const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
 const mp4 = Buffer.from('000000186674797069736f6d00000000', 'hex');
 const webm = Buffer.from('1a45dfa300000000', 'hex');
@@ -1336,6 +1349,70 @@ describe('createStudioMediaStore', () => {
     const providerInput = await media.resolveProviderInput('project_1', 'asset_1');
     await expect(providerInput.asDataUrl(png.length)).resolves.toMatch(/^data:image\/png;base64,/);
     await expect(providerInput.asDataUrl(png.length - 1)).rejects.toMatchObject({ code: 'invalid_media' });
+  });
+
+  it('verifies managed bytes once across subsequent range reads', async () => {
+    const { rootDir, store } = await makeStore();
+    const sourcePath = path.join(rootDir, 'reference.png');
+    await fs.writeFile(sourcePath, png);
+    const media = createStudioMediaStore({ store, createId: () => 'asset_1' });
+    await media.importReferenceFromPath({ projectId: 'project_1', sourcePath, expectedRevision: 1 });
+    createHashSpy.mockClear();
+
+    for (const [start, end] of [
+      [0, 7],
+      [8, 15],
+      [16, png.length - 1],
+    ] as const) {
+      const resolved = await media.resolveAsset('project_1', 'asset_1');
+      expect(resolved).not.toBeNull();
+      for await (const _chunk of await resolved!.openVerifiedStream(start, end)) {
+        // Drain each range so its verified file handle closes before the next request.
+      }
+    }
+
+    expect(createHashSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-verifies managed bytes when size or mtime changes on disk', async () => {
+    const { rootDir, store } = await makeStore();
+    const sourcePath = path.join(rootDir, 'reference.png');
+    await fs.writeFile(sourcePath, png);
+    const media = createStudioMediaStore({ store, createId: () => 'asset_1' });
+    await media.importReferenceFromPath({ projectId: 'project_1', sourcePath, expectedRevision: 1 });
+    expect(await media.resolveAsset('project_1', 'asset_1')).not.toBeNull();
+    createHashSpy.mockClear();
+
+    await fs.appendFile(path.join(rootDir, 'project_1', 'imports', 'asset_1.png'), Buffer.from([0]));
+
+    await expect(media.resolveAsset('project_1', 'asset_1')).resolves.toBeNull();
+    expect(createHashSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a cached identity before returning a newly finalized asset at the same path', async () => {
+    const { rootDir, store } = await makeStore();
+    const sourcePath = path.join(rootDir, 'reference.png');
+    await fs.writeFile(sourcePath, png);
+    const media = createStudioMediaStore({ store, createId: () => 'asset_1' });
+    await media.importReferenceFromPath({ projectId: 'project_1', sourcePath, expectedRevision: 1 });
+    const managedPath = path.join(rootDir, 'project_1', 'imports', 'asset_1.png');
+    const fixedTimestampSeconds = 1_700_000_000;
+    await fs.utimes(managedPath, fixedTimestampSeconds, fixedTimestampSeconds);
+    expect(await media.resolveAsset('project_1', 'asset_1')).not.toBeNull();
+
+    await fs.unlink(managedPath);
+    const replacement = Buffer.from(png);
+    replacement[replacement.length - 1] ^= 0xff;
+    await fs.writeFile(sourcePath, replacement);
+
+    const replacementAsset = await media.importReferenceFromPath({
+      projectId: 'project_1',
+      sourcePath,
+      expectedRevision: 2,
+    });
+    await fs.utimes(managedPath, fixedTimestampSeconds, fixedTimestampSeconds);
+
+    await expect(media.resolveAsset('project_1', replacementAsset.id)).resolves.not.toBeNull();
   });
 
   it('rejects a same-size managed-byte overwrite through resolved, provider, and export consumers', async () => {
