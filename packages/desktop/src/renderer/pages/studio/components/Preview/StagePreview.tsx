@@ -46,7 +46,7 @@ export const createManagedStudioAssetUrl = (projectId: string, assetId: string):
   return `weprompt-studio://asset/${encodeURIComponent(projectId)}/${encodeURIComponent(assetId)}`;
 };
 
-const isCanonicalSelectedAsset = (
+export const isCanonicalStudioSelectedAsset = (
   asset: StudioAsset,
   projectId: string,
   scene: StudioScene,
@@ -60,7 +60,7 @@ const isCanonicalSelectedAsset = (
   scene.assetIds.includes(asset.id) &&
   createManagedStudioAssetUrl(projectId, asset.id) !== null;
 
-const isCanonicalPosterAsset = (asset: StudioAsset, projectId: string, scene: StudioScene): boolean =>
+export const isCanonicalStudioPosterAsset = (asset: StudioAsset, projectId: string, scene: StudioScene): boolean =>
   asset.projectId === projectId &&
   asset.sceneId === scene.id &&
   asset.mediaKind === 'image' &&
@@ -191,7 +191,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   const hasCanonicalAssetIdentity =
     selectedScene?.assetIds.includes(selectedAssetId) === true &&
     (selectedAsset === undefined ||
-      (selectedAsset !== null && isCanonicalSelectedAsset(selectedAsset, projectId, selectedScene, selectedAssetId)));
+      (selectedAsset !== null &&
+        isCanonicalStudioSelectedAsset(selectedAsset, projectId, selectedScene, selectedAssetId)));
   if (source === null || !hasCanonicalSceneIdentity || !hasCanonicalAssetIdentity || failedSource === source) {
     return (
       <div
@@ -207,7 +208,7 @@ const StagePreview: React.FC<StagePreviewProps> = ({
     mediaKind === 'video' &&
     selectedScene !== null &&
     posterAsset !== null &&
-    isCanonicalPosterAsset(posterAsset, projectId, selectedScene)
+    isCanonicalStudioPosterAsset(posterAsset, projectId, selectedScene)
       ? createManagedStudioAssetUrl(projectId, posterAsset.id)
       : null;
 

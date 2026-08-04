@@ -16,7 +16,7 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 import { Alert, Button, Spin } from '@arco-design/web-react';
 import { Refresh } from '@icon-park/react';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type GenerationControlScene = {
@@ -76,6 +76,11 @@ export type BuildSingleSceneReviewRequestInput = {
   resolution?: StudioResolution;
   durationSeconds?: number;
   hasReference?: boolean;
+};
+
+export type BuildBatchGenerationReviewRequestInput = {
+  project: StudioRendererProject;
+  catalog: StudioRouteCatalog | null;
 };
 
 const copyCatalogEntry = (route: StudioRouteCatalogEntry): StudioRouteCatalogEntry => ({
@@ -190,6 +195,19 @@ export const buildSingleSceneReviewRequest = ({
   };
 };
 
+/** Builds the project-wide review snapshot with the same persisted-route validation as the legacy controls. */
+export const buildBatchGenerationReviewRequest = ({
+  project,
+  catalog,
+}: BuildBatchGenerationReviewRequestInput): GenerationBatchReviewRequest => ({
+  catalogVersion: catalog?.catalogVersion ?? null,
+  routes: {
+    image: resolvePersistedRoute(project, 'image', catalog, {}),
+    video: resolvePersistedRoute(project, 'video', catalog, {}),
+  },
+  availableRoutes: catalogRoutes(catalog),
+});
+
 /**
  * Persisted project route reviewer.
  *
@@ -217,7 +235,6 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
 }) => {
   const { t } = useTranslation();
   const kind = scene?.mediaKind ?? null;
-  const availableRoutes = useMemo(() => catalogRoutes(catalog), [catalog]);
   const routeContext = {
     ...(aspectRatio === undefined ? {} : { aspectRatio }),
     ...(resolution === undefined ? {} : { resolution }),
@@ -254,14 +271,7 @@ export const GenerationControls: React.FC<GenerationControlsProps> = ({
 
   const openBatchReview = (): void => {
     if (disabled || batchSceneCount < 1 || catalogLoading) return;
-    onOpenBatchReview({
-      catalogVersion: catalog?.catalogVersion ?? null,
-      routes: {
-        image: resolvePersistedRoute(project, 'image', catalog, {}),
-        video: resolvePersistedRoute(project, 'video', catalog, {}),
-      },
-      availableRoutes,
-    });
+    onOpenBatchReview(buildBatchGenerationReviewRequest({ project, catalog }));
   };
 
   return (
