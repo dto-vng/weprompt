@@ -11,6 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 type Item = Parameters<typeof fitStoryboardDurations>[0][number];
 
+const REVIEW_REPRODUCTION_TARGET_SECONDS = 7_611_773_375_400_180;
+
 const item = (
   sceneId: string,
   currentDurationSeconds: number,
@@ -150,7 +152,53 @@ describe('fitStoryboardDurations', () => {
   });
 
   it.each([
-    [6, [item('first', 0, 2, 5), item('second', 99, 1, 4)]],
+    ['targetSeconds', () => fitStoryboardDurations([item('scene-1', 5, 0, 60)], 61)],
+    ['currentDurationSeconds', () => fitStoryboardDurations([item('scene-1', 61, 0, 60)], 5)],
+    ['minDurationSeconds', () => fitStoryboardDurations([item('scene-1', 5, 61, 60)], 5)],
+    ['maxDurationSeconds', () => fitStoryboardDurations([item('scene-1', 5, 0, 61)], 5)],
+  ])('rejects %s above the 60-second Creative Studio limit', (label, allocate) => {
+    expect(allocate).toThrowError(new RangeError(`${label} must be an integer from 0 to 60`));
+  });
+
+  it.each([
+    [
+      'currentDurationSeconds',
+      () => fitStoryboardDurations([item('scene-1', REVIEW_REPRODUCTION_TARGET_SECONDS, 0, 60)], 5),
+    ],
+    [
+      'minDurationSeconds',
+      () => fitStoryboardDurations([item('scene-1', 5, REVIEW_REPRODUCTION_TARGET_SECONDS, 60)], 5),
+    ],
+    [
+      'maxDurationSeconds',
+      () => fitStoryboardDurations([item('scene-1', 5, 0, REVIEW_REPRODUCTION_TARGET_SECONDS)], 5),
+    ],
+  ])('rejects reproduction-scale safe-integer %s before allocation', (label, allocate) => {
+    expect(allocate).toThrowError(new RangeError(`${label} must be an integer from 0 to 60`));
+  });
+
+  it('rejects the reviewer huge-safe target at the supported-domain boundary', () => {
+    expect(() =>
+      fitStoryboardDurations(
+        [
+          item('first', REVIEW_REPRODUCTION_TARGET_SECONDS, 0, REVIEW_REPRODUCTION_TARGET_SECONDS),
+          item('second', 1, 0, REVIEW_REPRODUCTION_TARGET_SECONDS),
+        ],
+        REVIEW_REPRODUCTION_TARGET_SECONDS
+      )
+    ).toThrowError(new RangeError('targetSeconds must be an integer from 0 to 60'));
+  });
+
+  it('rejects storyboards with more than 24 items before allocation', () => {
+    const items = Array.from({ length: 25 }, (_, index) => item(`scene-${index + 1}`, 1, 0, 60));
+
+    expect(() => fitStoryboardDurations(items, 25)).toThrowError(
+      new RangeError('items must contain at most 24 scenes')
+    );
+  });
+
+  it.each([
+    [6, [item('first', 0, 2, 5), item('second', 60, 1, 4)]],
     [13, [item('first', 50, 0, 3), item('second', 1, 4, 10), item('third', 7, 2, 8)]],
     [24, [item('first', 4, 4, 4), item('second', 12, 5, 15), item('third', 2, 1, 20)]],
   ])('keeps every fitted allocation integral, bounded, and exact for target %s', (targetSeconds, items) => {

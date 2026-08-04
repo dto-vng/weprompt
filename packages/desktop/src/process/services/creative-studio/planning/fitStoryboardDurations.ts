@@ -27,25 +27,37 @@ type WorkingAllocation = FitStoryboardDurationItem & {
   durationSeconds: number;
 };
 
+const MAX_STORYBOARD_ITEMS = 24;
+const MAX_DURATION_SECONDS = 60;
+
 const assertSafeNonnegativeInteger = (value: number, label: string): void => {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new RangeError(`${label} must be a safe nonnegative integer`);
   }
 };
 
-/** Allocates an integer target across independently bounded scenes. */
+const assertDurationSeconds = (value: number, label: string): void => {
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_DURATION_SECONDS) {
+    throw new RangeError(`${label} must be an integer from 0 to ${MAX_DURATION_SECONDS}`);
+  }
+};
+
+/** Allocates a 0-60 second integer target across at most 24 independently bounded scenes. */
 export function fitStoryboardDurations(
   items: readonly FitStoryboardDurationItem[],
   targetSeconds: number
 ): FitStoryboardDurationsResult {
-  assertSafeNonnegativeInteger(targetSeconds, 'targetSeconds');
+  if (items.length > MAX_STORYBOARD_ITEMS) {
+    throw new RangeError(`items must contain at most ${MAX_STORYBOARD_ITEMS} scenes`);
+  }
+  assertDurationSeconds(targetSeconds, 'targetSeconds');
   let minimumSeconds = 0;
   let maximumSeconds = 0;
   let totalCurrentSeconds = 0;
   for (const item of items) {
-    assertSafeNonnegativeInteger(item.currentDurationSeconds, 'currentDurationSeconds');
-    assertSafeNonnegativeInteger(item.minDurationSeconds, 'minDurationSeconds');
-    assertSafeNonnegativeInteger(item.maxDurationSeconds, 'maxDurationSeconds');
+    assertDurationSeconds(item.currentDurationSeconds, 'currentDurationSeconds');
+    assertDurationSeconds(item.minDurationSeconds, 'minDurationSeconds');
+    assertDurationSeconds(item.maxDurationSeconds, 'maxDurationSeconds');
     if (item.minDurationSeconds > item.maxDurationSeconds) {
       throw new RangeError('minDurationSeconds must not exceed maxDurationSeconds');
     }
