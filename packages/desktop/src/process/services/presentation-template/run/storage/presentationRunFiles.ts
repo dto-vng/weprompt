@@ -5,16 +5,41 @@
  */
 
 import { createHash, randomUUID as createRandomUUID } from 'node:crypto';
-import { constants, type BigIntStats } from 'node:fs';
-import { lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises';
+import {
+  close as closeDescriptor,
+  constants,
+  fstat as fstatDescriptor,
+  open as openDescriptor,
+  type BigIntStats,
+} from 'node:fs';
+import { lstat, mkdir, open, readdir, realpath, rename, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
+import { TextDecoder } from 'node:util';
+import * as yauzl from 'yauzl';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
+import type { PresentationSourceDescriptor } from '@/common/types/office/presentationRun';
 import type { PresentationRunRetainedCandidate } from './presentationRunStateMachine';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CANDIDATE_NAME = 'candidate.pptx';
 const RETAINED_CANDIDATE_RELATIVE_PATH = `retained/${CANDIDATE_NAME}`;
 const COPY_BUFFER_BYTES = 1024 * 1024;
+const SOURCE_TEMP_RE = /^\.source-([0-9a-f-]+)\.tmp$/i;
+const PDF_HEADER = Buffer.from('%PDF-', 'ascii');
+const ZIP_LOCAL_FILE_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const OOXML_CONTENT_TYPES_ENTRY = '[Content_Types].xml';
+const OOXML_MAIN_PARTS = {
+  docx: 'word/document.xml',
+  xlsx: 'xl/workbook.xml',
+  pptx: 'ppt/presentation.xml',
+} as const;
+const PERMISSION_MODE_MASK = BigInt(0o7777);
+const SOURCE_FORMATS = new Set<PresentationSourceSnapshotFormat>(['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'md', 'csv']);
+const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+  let crc = value;
+  for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  return crc >>> 0;
+});
 
 type OpenHandle = Awaited<ReturnType<typeof open>>;
 type FileMetadata = BigIntStats;
@@ -30,11 +55,12 @@ export type PresentationRunEntityKind =
   | 'run'
   | 'grant'
   | 'draft'
+  | 'owner'
   | 'run-tombstone'
   | 'grant-tombstone'
   | 'draft-tombstone';
 
-export type PresentationRunFileDurableBoundary =
+type PresentationCandidateFileDurableBoundary =
   | 'before-candidate-source-open'
   | 'before-candidate-temp-create'
   | 'before-candidate-temp-write'
@@ -49,10 +75,29 @@ export type PresentationRunFileDurableBoundary =
   | 'after-candidate-promotion-directory-fsync'
   | 'before-run-cleanup';
 
-export type PresentationRunFileFailurePoint = {
-  boundary: PresentationRunFileDurableBoundary;
-  runId: string;
-};
+type PresentationSourceFileDurableBoundary =
+  | 'before-grant-source-resolution'
+  | 'before-grant-source-open'
+  | 'before-grant-temp-create'
+  | 'before-grant-temp-write'
+  | 'after-grant-temp-write'
+  | 'before-grant-temp-fsync'
+  | 'after-grant-temp-fsync'
+  | 'after-grant-ooxml-validation'
+  | 'before-grant-temp-directory-fsync'
+  | 'after-grant-temp-directory-fsync'
+  | 'before-grant-promotion-rename'
+  | 'after-grant-promotion-rename'
+  | 'before-grant-promotion-directory-fsync'
+  | 'after-grant-promotion-directory-fsync';
+
+export type PresentationRunFileDurableBoundary =
+  | PresentationCandidateFileDurableBoundary
+  | PresentationSourceFileDurableBoundary;
+
+export type PresentationRunFileFailurePoint =
+  | { boundary: PresentationCandidateFileDurableBoundary; runId: string }
+  | { boundary: PresentationSourceFileDurableBoundary; grantId: string };
 
 /** Fault-injection sentinel that models process death before stack cleanup can run. */
 export class PresentationRunSimulatedProcessCrashError extends Error {}
@@ -66,6 +111,60 @@ export type PreparedRetainedCandidate = {
   dev: string;
   ino: string;
 };
+
+export type PresentationSourceSnapshotFormat = PresentationSourceDescriptor['format'];
+
+export type PreparePresentationSourceSnapshotInput = {
+  grantId: string;
+  sourcePath: string;
+  format: PresentationSourceSnapshotFormat;
+  authorization?: PresentationSourcePathAuthorization;
+};
+
+export type PresentationSourcePathAuthorization = {
+  allowedRootPath: string;
+  allowedRootDev: string;
+  allowedRootIno: string;
+  canonicalSourcePath: string;
+  sourceDev: string;
+  sourceIno: string;
+};
+
+export type PreparedPresentationSourceSnapshot = {
+  grantId: string;
+  format: PresentationSourceSnapshotFormat;
+  temporaryRelativePath: string;
+  finalRelativePath: `source.${PresentationSourceSnapshotFormat}`;
+  sha256: string;
+  byteLength: number;
+  dev: string;
+  ino: string;
+};
+
+export type PresentationSourceSnapshotReference = {
+  grantId: string;
+  format: PresentationSourceSnapshotFormat;
+  relativePath: `source.${PresentationSourceSnapshotFormat}`;
+  sha256: string;
+  byteLength: number;
+};
+
+export type PresentationSourceSnapshotFailureCode =
+  | 'SOURCE_LIMIT_EXCEEDED'
+  | 'SOURCE_FORMAT_UNSUPPORTED'
+  | 'SOURCE_TAMPERED';
+
+/** A validation failure that the main-process source service can map without parsing messages. */
+export class PresentationSourceSnapshotError extends Error {
+  constructor(
+    readonly code: PresentationSourceSnapshotFailureCode,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = 'PresentationSourceSnapshotError';
+  }
+}
 
 export type PresentationRetainedCandidateReader = {
   byteLength: number;
@@ -81,10 +180,15 @@ export type PresentationPreparedCandidateGuard = {
   assertCurrent: () => Promise<void>;
 };
 
+export type PresentationPreparedSourceSnapshotGuard = {
+  assertCurrent: () => Promise<void>;
+};
+
 export type PresentationRunFileRoots = {
   runRoot: string;
   grantRoot: string;
   draftRoot: string;
+  ownerRoot: string;
   runTombstoneRoot: string;
   grantTombstoneRoot: string;
   draftTombstoneRoot: string;
@@ -134,6 +238,603 @@ function assertPreparedRetainedCandidate(prepared: PreparedRetainedCandidate): v
   }
 }
 
+function sourceSnapshotFailure(
+  code: PresentationSourceSnapshotFailureCode,
+  message: string,
+  cause?: unknown
+): PresentationSourceSnapshotError {
+  return new PresentationSourceSnapshotError(code, message, cause === undefined ? undefined : { cause });
+}
+
+function assertSourceSnapshotInput(input: PreparePresentationSourceSnapshotInput): void {
+  assertUuid(input.grantId, 'source grant');
+  if (!SOURCE_FORMATS.has(input.format)) {
+    throw sourceSnapshotFailure('SOURCE_FORMAT_UNSUPPORTED', 'Presentation source format is unsupported');
+  }
+  if (!path.isAbsolute(input.sourcePath) || path.resolve(input.sourcePath) !== input.sourcePath) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source path must be normalized and absolute');
+  }
+  const extension = path.extname(input.sourcePath).slice(1).toLowerCase();
+  if (extension !== input.format) {
+    throw sourceSnapshotFailure('SOURCE_FORMAT_UNSUPPORTED', 'Presentation source extension does not match its format');
+  }
+  if (input.authorization !== undefined) assertSourcePathAuthorization(input.authorization);
+}
+
+function assertSourcePathAuthorization(authorization: PresentationSourcePathAuthorization): void {
+  if (
+    !hasExactObjectKeys(authorization, [
+      'allowedRootPath',
+      'allowedRootDev',
+      'allowedRootIno',
+      'canonicalSourcePath',
+      'sourceDev',
+      'sourceIno',
+    ]) ||
+    !path.isAbsolute(authorization.allowedRootPath) ||
+    path.resolve(authorization.allowedRootPath) !== authorization.allowedRootPath ||
+    !path.isAbsolute(authorization.canonicalSourcePath) ||
+    path.resolve(authorization.canonicalSourcePath) !== authorization.canonicalSourcePath ||
+    !/^(0|[1-9][0-9]*)$/.test(authorization.allowedRootDev) ||
+    !/^[1-9][0-9]*$/.test(authorization.allowedRootIno) ||
+    !/^(0|[1-9][0-9]*)$/.test(authorization.sourceDev) ||
+    !/^[1-9][0-9]*$/.test(authorization.sourceIno)
+  ) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source authorization is invalid');
+  }
+}
+
+function hasExactObjectKeys(value: object, keys: readonly string[]): boolean {
+  const expected = [...keys].sort();
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function isWithinRoot(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+function assertPreparedSourceSnapshot(prepared: PreparedPresentationSourceSnapshot): void {
+  const temporaryName = path.basename(prepared.temporaryRelativePath);
+  const match = SOURCE_TEMP_RE.exec(temporaryName);
+  if (
+    !UUID_RE.test(prepared.grantId) ||
+    !SOURCE_FORMATS.has(prepared.format) ||
+    path.dirname(prepared.temporaryRelativePath) !== '.' ||
+    match === null ||
+    !UUID_RE.test(match[1]) ||
+    prepared.finalRelativePath !== `source.${prepared.format}` ||
+    !/^[0-9a-f]{64}$/i.test(prepared.sha256) ||
+    !Number.isSafeInteger(prepared.byteLength) ||
+    prepared.byteLength < 1 ||
+    prepared.byteLength > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
+    !/^(0|[1-9][0-9]*)$/.test(prepared.dev) ||
+    !/^[1-9][0-9]*$/.test(prepared.ino)
+  ) {
+    throw new Error('Invalid presentation source snapshot promotion');
+  }
+}
+
+function assertSourceSnapshotReference(reference: PresentationSourceSnapshotReference): void {
+  if (
+    !UUID_RE.test(reference.grantId) ||
+    !SOURCE_FORMATS.has(reference.format) ||
+    reference.relativePath !== `source.${reference.format}` ||
+    !/^[0-9a-f]{64}$/i.test(reference.sha256) ||
+    !Number.isSafeInteger(reference.byteLength) ||
+    reference.byteLength < 1 ||
+    reference.byteLength > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES
+  ) {
+    throw new Error('Invalid presentation source snapshot reference');
+  }
+}
+
+function assertStableSourceFile(metadata: FileMetadata, message: string): void {
+  if (!metadata.isFile()) throw sourceSnapshotFailure('SOURCE_TAMPERED', message);
+}
+
+function assertStableSourceDirectory(metadata: FileMetadata): void {
+  if (!metadata.isDirectory()) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source ancestor must be a real directory');
+  }
+}
+
+function sameSourceVersion(left: FileMetadata, right: FileMetadata): boolean {
+  return (
+    sameFileIdentity(left, right) &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs &&
+    left.nlink === right.nlink &&
+    left.mode === right.mode
+  );
+}
+
+async function assertPathNamesSourceFile(filePath: string, metadata: FileMetadata, message: string): Promise<void> {
+  let named: FileMetadata;
+  try {
+    named = await lstat(filePath, { bigint: true });
+  } catch (error) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', message, error);
+  }
+  if (named.isSymbolicLink() || !named.isFile() || !sameFileIdentity(named, metadata)) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', message);
+  }
+}
+
+async function openStableSourceFile(
+  filePath: string,
+  message: string
+): Promise<{ handle: OpenHandle; metadata: FileMetadata }> {
+  let handle: OpenHandle;
+  try {
+    handle = await open(filePath, constants.O_RDONLY | noFollowFlag());
+  } catch (error) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', message, error);
+  }
+  try {
+    const metadata = await handle.stat({ bigint: true });
+    assertStableSourceFile(metadata, message);
+    await assertPathNamesSourceFile(filePath, metadata, message);
+    return { handle, metadata };
+  } catch (error) {
+    await handle.close();
+    throw error;
+  }
+}
+
+type SourceAncestorLeaseEntry = {
+  directory: string;
+  handle: OpenHandle;
+  metadata: FileMetadata;
+};
+
+class SourceAncestorLease {
+  private constructor(private readonly entries: SourceAncestorLeaseEntry[]) {}
+
+  static async acquire(sourcePath: string): Promise<SourceAncestorLease> {
+    const entries: SourceAncestorLeaseEntry[] = [];
+    try {
+      for (const directory of sourceAncestorDirectories(sourcePath)) {
+        let handle: OpenHandle;
+        try {
+          handle = await open(directory, constants.O_RDONLY | noFollowFlag() | directoryOnlyFlag());
+        } catch (error) {
+          throw sourceSnapshotFailure(
+            'SOURCE_TAMPERED',
+            'Presentation source ancestor must be a real directory',
+            error
+          );
+        }
+        try {
+          const metadata = await handle.stat({ bigint: true });
+          assertStableSourceDirectory(metadata);
+          const named = await lstat(directory, { bigint: true });
+          if (named.isSymbolicLink() || !named.isDirectory() || !sameFileIdentity(named, metadata)) {
+            throw sourceSnapshotFailure(
+              'SOURCE_TAMPERED',
+              'Presentation source ancestor must be a stable real directory'
+            );
+          }
+          entries.push({ directory, handle, metadata });
+        } catch (error) {
+          await handle.close();
+          throw error;
+        }
+      }
+      const lease = new SourceAncestorLease(entries);
+      await lease.assertCurrent();
+      return lease;
+    } catch (error) {
+      await Promise.all(entries.map(({ handle }) => handle.close().catch((): undefined => undefined)));
+      throw error;
+    }
+  }
+
+  async assertCurrent(): Promise<void> {
+    for (const entry of this.entries) {
+      try {
+        const current = await entry.handle.stat({ bigint: true });
+        assertStableSourceDirectory(current);
+        const named = await lstat(entry.directory, { bigint: true });
+        if (
+          named.isSymbolicLink() ||
+          !named.isDirectory() ||
+          !sameFileIdentity(entry.metadata, current) ||
+          !sameFileIdentity(current, named)
+        ) {
+          throw new Error();
+        }
+      } catch (error) {
+        if (error instanceof PresentationSourceSnapshotError) throw error;
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source ancestor changed while reading', error);
+      }
+    }
+  }
+
+  async close(): Promise<void> {
+    await Promise.all(this.entries.map(({ handle }) => handle.close()));
+  }
+}
+
+class SourcePathAuthorizationLease {
+  private constructor(
+    private readonly authorization: PresentationSourcePathAuthorization,
+    private readonly rootHandle: OpenHandle,
+    private readonly rootMetadata: FileMetadata
+  ) {}
+
+  static async acquire(authorization: PresentationSourcePathAuthorization): Promise<SourcePathAuthorizationLease> {
+    assertSourcePathAuthorization(authorization);
+    let rootHandle: OpenHandle;
+    try {
+      rootHandle = await open(authorization.allowedRootPath, constants.O_RDONLY | noFollowFlag() | directoryOnlyFlag());
+    } catch (error) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source authorization root changed', error);
+    }
+    try {
+      const rootMetadata = await rootHandle.stat({ bigint: true });
+      assertStableSourceDirectory(rootMetadata);
+      if (
+        !hasExpectedIdentity(rootMetadata, {
+          dev: authorization.allowedRootDev,
+          ino: authorization.allowedRootIno,
+        })
+      ) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source authorization root changed');
+      }
+      const lease = new SourcePathAuthorizationLease(authorization, rootHandle, rootMetadata);
+      await lease.assertCurrent();
+      return lease;
+    } catch (error) {
+      await rootHandle.close();
+      throw error;
+    }
+  }
+
+  assertCanonicalSource(canonicalSourcePath: string, metadata: FileMetadata): void {
+    if (
+      canonicalSourcePath !== this.authorization.canonicalSourcePath ||
+      !isWithinRoot(this.authorization.allowedRootPath, canonicalSourcePath) ||
+      !hasExpectedIdentity(metadata, { dev: this.authorization.sourceDev, ino: this.authorization.sourceIno })
+    ) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source authorization no longer matches');
+    }
+  }
+
+  async assertCurrent(): Promise<void> {
+    try {
+      const current = await this.rootHandle.stat({ bigint: true });
+      assertStableSourceDirectory(current);
+      const named = await lstat(this.authorization.allowedRootPath, { bigint: true });
+      if (
+        named.isSymbolicLink() ||
+        !named.isDirectory() ||
+        !sameFileIdentity(this.rootMetadata, current) ||
+        !sameFileIdentity(current, named)
+      ) {
+        throw new Error();
+      }
+    } catch (error) {
+      if (error instanceof PresentationSourceSnapshotError) throw error;
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source authorization root changed', error);
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.rootHandle.close();
+  }
+}
+
+function sourceAncestorDirectories(sourcePath: string): string[] {
+  const parent = path.dirname(sourcePath);
+  const root = path.parse(parent).root;
+  const relative = path.relative(root, parent);
+  const directories = [root];
+  if (relative === '') return directories;
+  for (const segment of relative.split(path.sep)) directories.push(path.join(directories.at(-1)!, segment));
+  return directories;
+}
+
+type StableSourcePath = {
+  canonicalPath: string;
+  assertCurrent: () => Promise<void>;
+};
+
+async function resolveStableSourcePath(sourcePath: string): Promise<StableSourcePath> {
+  const originalParent = path.dirname(sourcePath);
+  let canonicalParent: string;
+  try {
+    canonicalParent = await realpath(originalParent);
+  } catch (error) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source parent is unavailable', error);
+  }
+  const canonicalPath = path.join(canonicalParent, path.basename(sourcePath));
+  return {
+    canonicalPath,
+    assertCurrent: async (): Promise<void> => {
+      let currentParent: string;
+      try {
+        currentParent = await realpath(originalParent);
+      } catch (error) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source parent changed while reading', error);
+      }
+      if (currentParent !== canonicalParent) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source parent changed while reading');
+      }
+    },
+  };
+}
+
+type SourceStreamValidator = {
+  update: (chunk: Buffer) => void;
+  finish: () => void;
+};
+
+function createSourceStreamValidator(format: PresentationSourceSnapshotFormat): SourceStreamValidator {
+  let prefix = Buffer.alloc(0);
+  const prefixLength = format === 'pdf' ? PDF_HEADER.length : ZIP_LOCAL_FILE_HEADER.length;
+  const decoder =
+    format === 'txt' || format === 'md' || format === 'csv' ? new TextDecoder('utf-8', { fatal: true }) : null;
+  return {
+    update: (chunk): void => {
+      if (prefix.length < prefixLength) {
+        prefix = Buffer.concat([prefix, chunk.subarray(0, prefixLength - prefix.length)]);
+      }
+      if (decoder !== null) {
+        if (chunk.includes(0)) {
+          throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation text source contains a NUL byte');
+        }
+        try {
+          decoder.decode(chunk, { stream: true });
+        } catch (error) {
+          throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation text source is not strict UTF-8', error);
+        }
+      }
+    },
+    finish: (): void => {
+      if (decoder !== null) {
+        try {
+          decoder.decode();
+        } catch (error) {
+          throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation text source is not strict UTF-8', error);
+        }
+        return;
+      }
+      const expected = format === 'pdf' ? PDF_HEADER : ZIP_LOCAL_FILE_HEADER;
+      if (!prefix.equals(expected)) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source magic does not match its extension');
+      }
+    },
+  };
+}
+
+function assertSafeZipEntry(entry: yauzl.Entry): void {
+  const name = entry.fileName;
+  const isDirectory = name.endsWith('/');
+  const segments = name.split('/');
+  if (isDirectory) segments.pop();
+  if (
+    name.length === 0 ||
+    Buffer.byteLength(name, 'utf8') > 4_096 ||
+    name.includes('\\') ||
+    name.includes('\0') ||
+    name.startsWith('/') ||
+    /^[a-z]:/i.test(name) ||
+    segments.length === 0 ||
+    segments.some((segment) => segment === '' || segment === '.' || segment === '..') ||
+    entry.isEncrypted() ||
+    (entry.compressionMethod !== 0 && entry.compressionMethod !== 8)
+  ) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package contains an unsafe entry');
+  }
+  const platform = entry.versionMadeBy >>> 8;
+  if (platform === 3) {
+    const fileType = (entry.externalFileAttributes >>> 16) & 0o170000;
+    const expectedType = isDirectory ? 0o040000 : 0o100000;
+    if (fileType !== 0 && fileType !== expectedType) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package contains a non-file entry');
+    }
+  }
+}
+
+function openRawDescriptor(filePath: string, flags: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    openDescriptor(filePath, flags, (error, descriptor) => {
+      if (error !== null) reject(error);
+      else resolve(descriptor);
+    });
+  });
+}
+
+function statRawDescriptor(descriptor: number): Promise<FileMetadata> {
+  return new Promise((resolve, reject) => {
+    fstatDescriptor(descriptor, { bigint: true }, (error, metadata) => {
+      if (error !== null) reject(error);
+      else resolve(metadata);
+    });
+  });
+}
+
+function closeRawDescriptor(descriptor: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    closeDescriptor(descriptor, (error) => {
+      if (error !== null) reject(error);
+      else resolve();
+    });
+  });
+}
+
+async function openSnapshotZip(
+  snapshotPath: string,
+  expectedIdentity: FileMetadata
+): Promise<{ zip: yauzl.ZipFile; closed: Promise<void> }> {
+  const descriptor = await openRawDescriptor(snapshotPath, constants.O_RDONLY | noFollowFlag());
+  let transferred = false;
+  try {
+    const metadata = await statRawDescriptor(descriptor);
+    assertOwnedRegularFileMode(
+      metadata,
+      PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE,
+      'Presentation OOXML snapshot is unsafe'
+    );
+    await assertPathNamesFile(snapshotPath, metadata, 'Presentation OOXML snapshot is unsafe');
+    if (!sameFileIdentity(metadata, expectedIdentity)) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML snapshot changed before validation');
+    }
+    const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+      yauzl.fromFd(
+        descriptor,
+        {
+          autoClose: true,
+          lazyEntries: true,
+          decodeStrings: true,
+          validateEntrySizes: true,
+          strictFileNames: true,
+        },
+        (error, openedZip) => {
+          if (error !== null) {
+            reject(sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package is invalid', error));
+            return;
+          }
+          transferred = true;
+          resolve(openedZip);
+        }
+      );
+    });
+    const closed = new Promise<void>((resolve) => zip.once('close', resolve));
+    return { zip, closed };
+  } finally {
+    if (!transferred) await closeRawDescriptor(descriptor).catch((): undefined => undefined);
+  }
+}
+
+function updateCrc32(crc: number, chunk: Buffer): number {
+  let next = crc;
+  for (const byte of chunk) next = CRC32_TABLE[(next ^ byte) & 0xff]! ^ (next >>> 8);
+  return next >>> 0;
+}
+
+async function validateOoxmlSnapshot(
+  snapshotPath: string,
+  expectedIdentity: FileMetadata,
+  format: Extract<PresentationSourceSnapshotFormat, 'docx' | 'xlsx' | 'pptx'>
+): Promise<void> {
+  const { zip, closed } = await openSnapshotZip(snapshotPath, expectedIdentity);
+  try {
+    if (zip.entryCount < 2 || zip.entryCount > PRESENTATION_RUN_LIMITS.MAX_ZIP_ENTRIES) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package has an invalid entry count');
+    }
+    await new Promise<void>((resolve, reject) => {
+      const exactNames = new Set<string>();
+      const foldedNames = new Set<string>();
+      let expandedBytes = 0;
+      let settled = false;
+      const finish = (error?: unknown): void => {
+        if (settled) return;
+        settled = true;
+        zip.removeListener('entry', onEntry);
+        zip.removeListener('end', onEnd);
+        zip.removeListener('error', onError);
+        if (error === undefined) resolve();
+        else if (error instanceof PresentationSourceSnapshotError) reject(error);
+        else reject(sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package is invalid', error));
+      };
+      const onEntry = (entry: yauzl.Entry): void => {
+        try {
+          assertSafeZipEntry(entry);
+          if (
+            !Number.isSafeInteger(entry.compressedSize) ||
+            !Number.isSafeInteger(entry.uncompressedSize) ||
+            entry.compressedSize < 0 ||
+            entry.uncompressedSize < 0 ||
+            entry.compressedSize > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
+            entry.uncompressedSize > PRESENTATION_RUN_LIMITS.MAX_ZIP_ENTRY_BYTES
+          ) {
+            throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package entry exceeds its limit');
+          }
+          expandedBytes += entry.uncompressedSize;
+          if (!Number.isSafeInteger(expandedBytes) || expandedBytes > PRESENTATION_RUN_LIMITS.MAX_ZIP_EXPANDED_BYTES) {
+            throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package expands beyond its limit');
+          }
+          const folded = entry.fileName.toLocaleLowerCase('en-US');
+          if (exactNames.has(entry.fileName) || foldedNames.has(folded)) {
+            throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package contains duplicate entries');
+          }
+          exactNames.add(entry.fileName);
+          foldedNames.add(folded);
+          if (entry.fileName.endsWith('/')) {
+            zip.readEntry();
+            return;
+          }
+          zip.openReadStream(entry, (error, stream) => {
+            if (error !== null) {
+              finish(error);
+              return;
+            }
+            let actualBytes = 0;
+            let crc = 0xffffffff;
+            stream.on('data', (chunk: Buffer) => {
+              actualBytes += chunk.length;
+              crc = updateCrc32(crc, chunk);
+              if (
+                !Number.isSafeInteger(actualBytes) ||
+                actualBytes > entry.uncompressedSize ||
+                actualBytes > PRESENTATION_RUN_LIMITS.MAX_ZIP_ENTRY_BYTES
+              ) {
+                stream.destroy(
+                  sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package entry exceeds its limit')
+                );
+              }
+            });
+            stream.once('error', finish);
+            stream.once('end', () => {
+              try {
+                if (actualBytes !== entry.uncompressedSize || (crc ^ 0xffffffff) >>> 0 !== entry.crc32) {
+                  throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation OOXML package entry is corrupt');
+                }
+                zip.readEntry();
+              } catch (streamError) {
+                finish(streamError);
+              }
+            });
+          });
+        } catch (error) {
+          finish(error);
+        }
+      };
+      const onEnd = (): void => {
+        try {
+          const expectedMainPart = OOXML_MAIN_PARTS[format];
+          const wrongMainParts = Object.values(OOXML_MAIN_PARTS).filter((part) => part !== expectedMainPart);
+          if (
+            !exactNames.has(OOXML_CONTENT_TYPES_ENTRY) ||
+            !exactNames.has(expectedMainPart) ||
+            wrongMainParts.some((part) => exactNames.has(part))
+          ) {
+            throw sourceSnapshotFailure(
+              'SOURCE_TAMPERED',
+              'Presentation OOXML package label does not match its extension'
+            );
+          }
+          finish();
+        } catch (error) {
+          finish(error);
+        }
+      };
+      const onError = (error: Error): void => finish(error);
+      zip.on('entry', onEntry);
+      zip.once('end', onEnd);
+      zip.once('error', onError);
+      zip.readEntry();
+    });
+  } finally {
+    zip.close();
+    await closed;
+  }
+}
+
 function noFollowFlag(): number {
   return 'O_NOFOLLOW' in constants ? constants.O_NOFOLLOW : 0;
 }
@@ -163,6 +864,11 @@ function assertOwnedRegularFile(metadata: FileMetadata, message: string): void {
   if (!metadata.isFile() || metadata.nlink !== BigInt(1) || !isOwnedByCurrentUser(metadata)) {
     throw new Error(message);
   }
+}
+
+function assertOwnedRegularFileMode(metadata: FileMetadata, expectedMode: number, message: string): void {
+  assertOwnedRegularFile(metadata, message);
+  if ((metadata.mode & PERMISSION_MODE_MASK) !== BigInt(expectedMode)) throw new Error(message);
 }
 
 function assertOwnedDirectory(metadata: FileMetadata): void {
@@ -272,10 +978,12 @@ async function verifyCandidatePath(
   filePath: string,
   expected: { sha256: string; byteLength: number },
   messages: { unsafe: string; changed: string },
-  expectedIdentity?: { dev: string; ino: string }
+  expectedIdentity?: { dev: string; ino: string },
+  expectedMode?: number
 ): Promise<FileMetadata> {
   const { handle, metadata: before } = await openOwnedRegularFile(filePath, messages.unsafe);
   try {
+    if (expectedMode !== undefined) assertOwnedRegularFileMode(before, expectedMode, messages.unsafe);
     if (
       before.size !== BigInt(expected.byteLength) ||
       (expectedIdentity && !hasExpectedIdentity(before, expectedIdentity))
@@ -284,7 +992,8 @@ async function verifyCandidatePath(
     }
     const sha256 = await hashOpenFile(handle, expected.byteLength);
     const after = await handle.stat({ bigint: true });
-    assertOwnedRegularFile(after, messages.unsafe);
+    if (expectedMode === undefined) assertOwnedRegularFile(after, messages.unsafe);
+    else assertOwnedRegularFileMode(after, expectedMode, messages.unsafe);
     if (
       !sameFileIdentity(before, after) ||
       before.size !== after.size ||
@@ -309,12 +1018,14 @@ type VerifiedCandidateLease = {
   metadata: FileMetadata;
   expected: { sha256: string; byteLength: number };
   expectedIdentity?: { dev: string; ino: string };
+  expectedMode?: number;
   messages: { unsafe: string; changed: string };
 };
 
 async function assertVerifiedCandidateLease(lease: VerifiedCandidateLease): Promise<FileMetadata> {
   const before = await lease.handle.stat({ bigint: true });
-  assertOwnedRegularFile(before, lease.messages.unsafe);
+  if (lease.expectedMode === undefined) assertOwnedRegularFile(before, lease.messages.unsafe);
+  else assertOwnedRegularFileMode(before, lease.expectedMode, lease.messages.unsafe);
   if (
     !sameFileIdentity(lease.metadata, before) ||
     before.size !== BigInt(lease.expected.byteLength) ||
@@ -324,7 +1035,8 @@ async function assertVerifiedCandidateLease(lease: VerifiedCandidateLease): Prom
   }
   const sha256 = await hashOpenFile(lease.handle, lease.expected.byteLength);
   const after = await lease.handle.stat({ bigint: true });
-  assertOwnedRegularFile(after, lease.messages.unsafe);
+  if (lease.expectedMode === undefined) assertOwnedRegularFile(after, lease.messages.unsafe);
+  else assertOwnedRegularFileMode(after, lease.expectedMode, lease.messages.unsafe);
   if (
     !sameFileIdentity(before, after) ||
     before.size !== after.size ||
@@ -343,10 +1055,11 @@ async function openVerifiedCandidateLease(
   filePath: string,
   expected: { sha256: string; byteLength: number },
   messages: { unsafe: string; changed: string },
-  expectedIdentity?: { dev: string; ino: string }
+  expectedIdentity?: { dev: string; ino: string },
+  expectedMode?: number
 ): Promise<VerifiedCandidateLease> {
   const { handle, metadata } = await openOwnedRegularFile(filePath, messages.unsafe);
-  const lease = { path: filePath, handle, metadata, expected, expectedIdentity, messages };
+  const lease = { path: filePath, handle, metadata, expected, expectedIdentity, expectedMode, messages };
   try {
     lease.metadata = await assertVerifiedCandidateLease(lease);
     return lease;
@@ -396,6 +1109,18 @@ class OwnedDirectoryLease implements PresentationOwnedDirectoryLease {
     for (const entry of this.entries) {
       if (entry.directory !== removed) await this.assertEntry(entry);
     }
+  }
+
+  async assertMode(directory: string, expectedMode: number, message: string): Promise<void> {
+    const resolved = path.resolve(directory);
+    const entry = this.entries.find((candidate) => candidate.directory === resolved);
+    if (entry === undefined) throw new Error('Presentation directory mode check escaped its active lease');
+    await this.assertEntry(entry);
+    const before = await entry.handle.stat({ bigint: true });
+    if ((before.mode & PERMISSION_MODE_MASK) !== BigInt(expectedMode)) throw new Error(message);
+    await this.assertEntry(entry);
+    const after = await entry.handle.stat({ bigint: true });
+    if ((after.mode & PERMISSION_MODE_MASK) !== BigInt(expectedMode)) throw new Error(message);
   }
 
   async sync(directory: string): Promise<void> {
@@ -475,6 +1200,7 @@ export class PresentationRunFiles {
       runRoot: path.join(userDataDir, 'presentation-runs'),
       grantRoot: path.join(userDataDir, 'presentation-source-grants'),
       draftRoot: path.join(userDataDir, 'presentation-source-drafts'),
+      ownerRoot: path.join(userDataDir, 'presentation-source-owners'),
       runTombstoneRoot: path.join(userDataDir, 'presentation-run-tombstones'),
       grantTombstoneRoot: path.join(userDataDir, 'presentation-source-grant-tombstones'),
       draftTombstoneRoot: path.join(userDataDir, 'presentation-source-draft-tombstones'),
@@ -524,6 +1250,14 @@ export class PresentationRunFiles {
     return directory;
   }
 
+  async createOwnerLayout(ownerId: string): Promise<string> {
+    assertUuid(ownerId, 'source owner');
+    await this.initialize();
+    const directory = this.ownedChild(this.roots.ownerRoot, ownerId);
+    await this.ensureOwnedDirectory(directory);
+    return directory;
+  }
+
   async createInspectionLayout(runId: string): Promise<string> {
     assertUuid(runId, 'run');
     await this.initialize();
@@ -542,7 +1276,10 @@ export class PresentationRunFiles {
       assertUuid(entityId, kind.replace('-tombstone', ''));
       return path.join(root, `${entityId}.json`);
     }
-    assertUuid(entityId, kind === 'grant' ? 'source grant' : kind === 'draft' ? 'source draft' : 'run');
+    assertUuid(
+      entityId,
+      kind === 'grant' ? 'source grant' : kind === 'draft' ? 'source draft' : kind === 'owner' ? 'source owner' : 'run'
+    );
     return path.join(this.ownedChild(root, entityId), 'manifest.json');
   }
 
@@ -661,6 +1398,685 @@ export class PresentationRunFiles {
         await Promise.all(candidates.map(({ handle }) => handle.close()));
       }
     });
+  }
+
+  async authorizeWorkspaceSourcePath(
+    workspaceRoot: string,
+    relativePath: string
+  ): Promise<PresentationSourcePathAuthorization> {
+    if (
+      !path.isAbsolute(workspaceRoot) ||
+      path.resolve(workspaceRoot) !== workspaceRoot ||
+      relativePath.length < 1 ||
+      relativePath.includes('\0') ||
+      relativePath.includes('\\') ||
+      path.isAbsolute(relativePath) ||
+      relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+    ) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace source authorization is invalid');
+    }
+    let allowedRootPath: string;
+    try {
+      allowedRootPath = await realpath(workspaceRoot);
+    } catch (error) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace root is unavailable', error);
+    }
+    const sourcePath = path.resolve(allowedRootPath, relativePath);
+    if (!isWithinRoot(allowedRootPath, sourcePath)) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace source escapes its root');
+    }
+    const stableSourcePath = await resolveStableSourcePath(sourcePath);
+    if (!isWithinRoot(allowedRootPath, stableSourcePath.canonicalPath)) {
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace source escapes its root');
+    }
+    const rootHandle = await open(allowedRootPath, constants.O_RDONLY | noFollowFlag() | directoryOnlyFlag());
+    try {
+      const allowedRootMetadata = await rootHandle.stat({ bigint: true });
+      assertStableSourceDirectory(allowedRootMetadata);
+      const namedRoot = await lstat(allowedRootPath, { bigint: true });
+      if (namedRoot.isSymbolicLink() || !namedRoot.isDirectory() || !sameFileIdentity(allowedRootMetadata, namedRoot)) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace root changed');
+      }
+      const sourceMetadata = await lstat(stableSourcePath.canonicalPath, { bigint: true });
+      if (sourceMetadata.isSymbolicLink()) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace source must be a real file');
+      }
+      assertStableSourceFile(sourceMetadata, 'Presentation workspace source must be a real file');
+      await stableSourcePath.assertCurrent();
+      const authorization: PresentationSourcePathAuthorization = {
+        allowedRootPath,
+        allowedRootDev: allowedRootMetadata.dev.toString(),
+        allowedRootIno: allowedRootMetadata.ino.toString(),
+        canonicalSourcePath: stableSourcePath.canonicalPath,
+        sourceDev: sourceMetadata.dev.toString(),
+        sourceIno: sourceMetadata.ino.toString(),
+      };
+      assertSourcePathAuthorization(authorization);
+      return authorization;
+    } catch (error) {
+      if (error instanceof PresentationSourceSnapshotError) throw error;
+      throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation workspace source authorization failed', error);
+    } finally {
+      await rootHandle.close();
+    }
+  }
+
+  async prepareSourceSnapshots(
+    inputs: readonly PreparePresentationSourceSnapshotInput[]
+  ): Promise<PreparedPresentationSourceSnapshot[]> {
+    if (inputs.length > PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN) {
+      throw sourceSnapshotFailure('SOURCE_LIMIT_EXCEEDED', 'Too many presentation sources were selected');
+    }
+    const grantIds = new Set<string>();
+    for (const input of inputs) {
+      assertSourceSnapshotInput(input);
+      if (grantIds.has(input.grantId)) {
+        throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source grant ids must be unique');
+      }
+      grantIds.add(input.grantId);
+    }
+    const prepared: PreparedPresentationSourceSnapshot[] = [];
+    let totalBytes = 0;
+    try {
+      for (const input of inputs) {
+        const snapshot = await this.prepareSourceSnapshot(input);
+        prepared.push(snapshot);
+        totalBytes += snapshot.byteLength;
+        if (!Number.isSafeInteger(totalBytes) || totalBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES) {
+          throw sourceSnapshotFailure('SOURCE_LIMIT_EXCEEDED', 'Presentation sources exceed their total limit');
+        }
+      }
+      return prepared;
+    } catch (error) {
+      if (error instanceof PresentationRunSimulatedProcessCrashError) throw error;
+      let cleanupError: unknown;
+      for (const snapshot of prepared) {
+        try {
+          await this.removePreparedSourceSnapshot(snapshot);
+        } catch (candidate) {
+          cleanupError ??= candidate;
+        }
+      }
+      if (cleanupError !== undefined) throw cleanupError;
+      throw error;
+    }
+  }
+
+  async prepareSourceSnapshot(
+    input: PreparePresentationSourceSnapshotInput
+  ): Promise<PreparedPresentationSourceSnapshot> {
+    assertSourceSnapshotInput(input);
+    const grantDirectory = await this.createGrantLayout(input.grantId);
+    const temporaryRelativePath = `.source-${this.randomUUID()}.tmp`;
+    const temporaryPath = path.join(grantDirectory, temporaryRelativePath);
+    const finalRelativePath = `source.${input.format}` as const;
+    const finalPath = path.join(grantDirectory, finalRelativePath);
+    const sourceMessage = 'Presentation source must remain one stable regular file';
+    try {
+      let authorizationLease: SourcePathAuthorizationLease | null = null;
+      let sourceLease: SourceAncestorLease | null = null;
+      try {
+        await this.inject({ boundary: 'before-grant-source-resolution', grantId: input.grantId });
+        authorizationLease =
+          input.authorization === undefined ? null : await SourcePathAuthorizationLease.acquire(input.authorization);
+        const stableSourcePath = await resolveStableSourcePath(input.sourcePath);
+        sourceLease = await SourceAncestorLease.acquire(stableSourcePath.canonicalPath);
+        return await this.withDirectoryLease(this.durableGrantDirectoryChain(input.grantId), async (directoryLease) => {
+          let source: OpenHandle | null = null;
+          let target: OpenHandle | null = null;
+          let targetIdentity: FileMetadata | null = null;
+          try {
+            await directoryLease.assertMode(
+              grantDirectory,
+              PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+              'Presentation storage directory must be private'
+            );
+            await this.inject({ boundary: 'before-grant-source-open', grantId: input.grantId });
+            await authorizationLease?.assertCurrent();
+            await stableSourcePath.assertCurrent();
+            await sourceLease.assertCurrent();
+            await directoryLease.assertCurrent();
+            await assertPathAbsent(finalPath, 'Presentation source snapshot already exists');
+            const openedSource = await openStableSourceFile(stableSourcePath.canonicalPath, sourceMessage);
+            source = openedSource.handle;
+            const sourceBefore = openedSource.metadata;
+            authorizationLease?.assertCanonicalSource(stableSourcePath.canonicalPath, sourceBefore);
+            if (
+              sourceBefore.size < BigInt(1) ||
+              sourceBefore.size > BigInt(PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES) ||
+              sourceBefore.size > BigInt(Number.MAX_SAFE_INTEGER)
+            ) {
+              throw sourceSnapshotFailure(
+                'SOURCE_LIMIT_EXCEEDED',
+                'Presentation source must be between 1 byte and 64 MiB'
+              );
+            }
+            const byteLength = Number(sourceBefore.size);
+            await this.inject({ boundary: 'before-grant-temp-create', grantId: input.grantId });
+            await authorizationLease?.assertCurrent();
+            await stableSourcePath.assertCurrent();
+            await authorizationLease?.assertCurrent();
+            await sourceLease.assertCurrent();
+            await directoryLease.assertCurrent();
+            target = await open(
+              temporaryPath,
+              constants.O_CREAT | constants.O_EXCL | constants.O_RDWR | noFollowFlag(),
+              PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+            );
+            targetIdentity = await target.stat({ bigint: true });
+            assertOwnedRegularFile(targetIdentity, 'Presentation source temporary snapshot is unsafe');
+            if ((targetIdentity.mode & PERMISSION_MODE_MASK) !== BigInt(PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE)) {
+              await target.chmod(PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE);
+              const afterChmod = await target.stat({ bigint: true });
+              if (!sameFileIdentity(targetIdentity, afterChmod)) {
+                throw new Error('Presentation source temporary snapshot changed');
+              }
+              targetIdentity = afterChmod;
+            }
+            assertOwnedRegularFileMode(
+              targetIdentity,
+              PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE,
+              'Presentation source temporary snapshot is unsafe'
+            );
+            await assertPathNamesFile(
+              temporaryPath,
+              targetIdentity,
+              'Presentation source temporary snapshot is unsafe'
+            );
+            const hash = createHash('sha256');
+            const validator = createSourceStreamValidator(input.format);
+            const buffer = Buffer.allocUnsafe(Math.min(COPY_BUFFER_BYTES, byteLength));
+            let position = 0;
+            await this.inject({ boundary: 'before-grant-temp-write', grantId: input.grantId });
+            await stableSourcePath.assertCurrent();
+            await authorizationLease?.assertCurrent();
+            await sourceLease.assertCurrent();
+            await directoryLease.assertCurrent();
+            while (position < byteLength) {
+              let bytesRead: number;
+              try {
+                ({ bytesRead } = await source.read(
+                  buffer,
+                  0,
+                  Math.min(buffer.length, byteLength - position),
+                  position
+                ));
+              } catch (error) {
+                throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source changed while reading', error);
+              }
+              if (bytesRead === 0) {
+                throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source changed while reading');
+              }
+              validator.update(buffer.subarray(0, bytesRead));
+              let chunkOffset = 0;
+              while (chunkOffset < bytesRead) {
+                const remaining = bytesRead - chunkOffset;
+                const bytesWritten = await this.writeCandidateChunk(
+                  target,
+                  buffer,
+                  chunkOffset,
+                  remaining,
+                  position + chunkOffset
+                );
+                if (!Number.isSafeInteger(bytesWritten) || bytesWritten <= 0 || bytesWritten > remaining) {
+                  throw new Error('Presentation source snapshot write was incomplete');
+                }
+                chunkOffset += bytesWritten;
+              }
+              hash.update(buffer.subarray(0, bytesRead));
+              position += bytesRead;
+            }
+            validator.finish();
+            await this.inject({ boundary: 'after-grant-temp-write', grantId: input.grantId });
+            const sourceAfter = await source.stat({ bigint: true });
+            assertStableSourceFile(sourceAfter, sourceMessage);
+            if (!sameSourceVersion(sourceBefore, sourceAfter)) {
+              throw sourceSnapshotFailure('SOURCE_TAMPERED', 'Presentation source changed while reading');
+            }
+            await assertPathNamesSourceFile(stableSourcePath.canonicalPath, sourceAfter, sourceMessage);
+            await stableSourcePath.assertCurrent();
+            await sourceLease.assertCurrent();
+            await directoryLease.assertCurrent();
+            const targetAfterWrite = await target.stat({ bigint: true });
+            assertOwnedRegularFileMode(
+              targetAfterWrite,
+              PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE,
+              'Presentation source temporary snapshot is unsafe'
+            );
+            if (
+              !sameFileIdentity(targetIdentity, targetAfterWrite) ||
+              targetAfterWrite.size !== BigInt(byteLength) ||
+              (targetAfterWrite.mode & PERMISSION_MODE_MASK) !== BigInt(PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE)
+            ) {
+              throw new Error('Presentation source temporary snapshot changed');
+            }
+            await assertPathNamesFile(
+              temporaryPath,
+              targetAfterWrite,
+              'Presentation source temporary snapshot changed'
+            );
+            await this.inject({ boundary: 'before-grant-temp-fsync', grantId: input.grantId });
+            await directoryLease.assertCurrent();
+            await target.sync();
+            await this.inject({ boundary: 'after-grant-temp-fsync', grantId: input.grantId });
+            await directoryLease.assertCurrent();
+            if (input.format === 'docx' || input.format === 'xlsx' || input.format === 'pptx') {
+              await validateOoxmlSnapshot(temporaryPath, targetAfterWrite, input.format);
+              await this.inject({ boundary: 'after-grant-ooxml-validation', grantId: input.grantId });
+            }
+            await this.inject({ boundary: 'before-grant-temp-directory-fsync', grantId: input.grantId });
+            await directoryLease.assertMode(
+              grantDirectory,
+              PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+              'Presentation storage directory must be private'
+            );
+            await directoryLease.sync(grantDirectory);
+            await this.inject({ boundary: 'after-grant-temp-directory-fsync', grantId: input.grantId });
+            await directoryLease.assertMode(
+              grantDirectory,
+              PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+              'Presentation storage directory must be private'
+            );
+            await target.close();
+            target = null;
+            const sha256 = hash.digest('hex');
+            const identity = fileIdentity(targetIdentity);
+            const verifiedTemporary = await verifyCandidatePath(
+              temporaryPath,
+              { sha256, byteLength },
+              {
+                unsafe: 'Presentation source temporary snapshot is unsafe',
+                changed: 'Presentation source temporary snapshot changed',
+              },
+              identity,
+              PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+            );
+            if (!sameFileIdentity(targetIdentity, verifiedTemporary)) {
+              throw new Error('Presentation source temporary snapshot changed');
+            }
+            return {
+              grantId: input.grantId,
+              format: input.format,
+              temporaryRelativePath,
+              finalRelativePath,
+              sha256,
+              byteLength,
+              ...identity,
+            };
+          } catch (error) {
+            if (error instanceof PresentationRunSimulatedProcessCrashError) {
+              if (target !== null) await target.close().catch((): undefined => undefined);
+              throw error;
+            }
+            if (target !== null) {
+              await target.close();
+              target = null;
+            }
+            if (targetIdentity !== null) {
+              await this.removeLeafWithExpectedIdentity(temporaryPath, targetIdentity, grantDirectory, directoryLease);
+            }
+            throw error;
+          } finally {
+            if (source !== null) await source.close();
+          }
+        });
+      } finally {
+        await sourceLease?.close();
+        await authorizationLease?.close();
+      }
+    } catch (error) {
+      if (error instanceof PresentationRunSimulatedProcessCrashError) throw error;
+      const removed = await this.removeEmptyGrantDirectory(input.grantId);
+      if (!removed) throw new Error('Presentation source cleanup left unexpected grant files', { cause: error });
+      throw error;
+    }
+  }
+
+  async withPreparedSourceSnapshotLeases<T>(
+    preparedSnapshots: readonly PreparedPresentationSourceSnapshot[],
+    operation: (guard: PresentationPreparedSourceSnapshotGuard) => Promise<T>
+  ): Promise<T> {
+    for (const prepared of preparedSnapshots) assertPreparedSourceSnapshot(prepared);
+    const directories = preparedSnapshots.flatMap((prepared) => this.durableGrantDirectoryChain(prepared.grantId));
+    const grantDirectories = [
+      ...new Set(preparedSnapshots.map((prepared) => this.ownedChild(this.roots.grantRoot, prepared.grantId))),
+    ];
+    return this.withDirectoryLease(directories, async (directoryLease) => {
+      const snapshots: VerifiedCandidateLease[] = [];
+      try {
+        for (const grantDirectory of grantDirectories) {
+          await directoryLease.assertMode(
+            grantDirectory,
+            PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+            'Presentation storage directory must be private'
+          );
+        }
+        for (const prepared of preparedSnapshots) {
+          const temporaryPath = path.join(
+            this.ownedChild(this.roots.grantRoot, prepared.grantId),
+            prepared.temporaryRelativePath
+          );
+          snapshots.push(
+            await openVerifiedCandidateLease(
+              temporaryPath,
+              prepared,
+              {
+                unsafe: 'Presentation source temporary snapshot is unsafe',
+                changed: 'Presentation source temporary snapshot changed',
+              },
+              prepared,
+              PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+            )
+          );
+        }
+        const guard: PresentationPreparedSourceSnapshotGuard = {
+          assertCurrent: async (): Promise<void> => {
+            await directoryLease.assertCurrent();
+            for (const grantDirectory of grantDirectories) {
+              await directoryLease.assertMode(
+                grantDirectory,
+                PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+                'Presentation storage directory must be private'
+              );
+            }
+            for (const snapshot of snapshots) await assertVerifiedCandidateLease(snapshot);
+            await directoryLease.assertCurrent();
+          },
+        };
+        await guard.assertCurrent();
+        const result = await operation(guard);
+        await guard.assertCurrent();
+        return result;
+      } finally {
+        await Promise.all(snapshots.map(({ handle }) => handle.close()));
+      }
+    });
+  }
+
+  async promoteSourceSnapshot(prepared: PreparedPresentationSourceSnapshot): Promise<void> {
+    assertPreparedSourceSnapshot(prepared);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, prepared.grantId);
+    const temporaryPath = path.join(grantDirectory, prepared.temporaryRelativePath);
+    const finalPath = path.join(grantDirectory, prepared.finalRelativePath);
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(prepared.grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      const snapshot = await openVerifiedCandidateLease(
+        temporaryPath,
+        prepared,
+        {
+          unsafe: 'Presentation source temporary snapshot is unsafe',
+          changed: 'Presentation source temporary snapshot changed',
+        },
+        prepared,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      try {
+        await assertPathAbsent(finalPath, 'Presentation source snapshot already exists');
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        await this.inject({ boundary: 'before-grant-promotion-rename', grantId: prepared.grantId });
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        await assertVerifiedCandidateLease(snapshot);
+        await rename(temporaryPath, finalPath);
+        snapshot.path = finalPath;
+        snapshot.messages = {
+          unsafe: 'Presentation source promotion found an unsafe final snapshot',
+          changed: 'Presentation source promotion found mismatched bytes',
+        };
+        await this.inject({ boundary: 'after-grant-promotion-rename', grantId: prepared.grantId });
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        await assertVerifiedCandidateLease(snapshot);
+        await this.inject({ boundary: 'before-grant-promotion-directory-fsync', grantId: prepared.grantId });
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        await directoryLease.sync(grantDirectory);
+        await this.inject({ boundary: 'after-grant-promotion-directory-fsync', grantId: prepared.grantId });
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        await assertVerifiedCandidateLease(snapshot);
+      } finally {
+        await snapshot.handle.close();
+      }
+    });
+  }
+
+  async verifyPreparedSourceSnapshot(prepared: PreparedPresentationSourceSnapshot): Promise<void> {
+    assertPreparedSourceSnapshot(prepared);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, prepared.grantId);
+    const temporaryPath = path.join(grantDirectory, prepared.temporaryRelativePath);
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(prepared.grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      await verifyCandidatePath(
+        temporaryPath,
+        prepared,
+        {
+          unsafe: 'Presentation source temporary snapshot is unsafe',
+          changed: 'Presentation source temporary snapshot changed',
+        },
+        prepared,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+    });
+  }
+
+  async verifySourceSnapshot(reference: PresentationSourceSnapshotReference): Promise<void> {
+    assertSourceSnapshotReference(reference);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, reference.grantId);
+    const snapshotPath = path.join(grantDirectory, reference.relativePath);
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(reference.grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      await verifyCandidatePath(
+        snapshotPath,
+        reference,
+        {
+          unsafe: 'Presentation source snapshot is unsafe',
+          changed: 'Presentation source snapshot does not match its manifest',
+        },
+        undefined,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+    });
+  }
+
+  async recoverSourceSnapshotPromotion(prepared: PreparedPresentationSourceSnapshot): Promise<void> {
+    assertPreparedSourceSnapshot(prepared);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, prepared.grantId);
+    const temporaryPath = path.join(grantDirectory, prepared.temporaryRelativePath);
+    const finalPath = path.join(grantDirectory, prepared.finalRelativePath);
+    const finalExists = await this.withDirectoryLease(
+      this.durableGrantDirectoryChain(prepared.grantId),
+      async (directoryLease) => {
+        await directoryLease.assertMode(
+          grantDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation storage directory must be private'
+        );
+        let snapshot: VerifiedCandidateLease;
+        try {
+          snapshot = await openVerifiedCandidateLease(
+            finalPath,
+            prepared,
+            {
+              unsafe: 'Presentation source recovery found mismatched bytes',
+              changed: 'Presentation source recovery found mismatched bytes',
+            },
+            prepared,
+            PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+          );
+        } catch (error) {
+          if (hasCode(error, 'ENOENT')) return false;
+          throw error;
+        }
+        try {
+          await assertPathAbsent(temporaryPath, 'Presentation source recovery found an unexpected temporary snapshot');
+          await directoryLease.assertMode(
+            grantDirectory,
+            PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+            'Presentation storage directory must be private'
+          );
+          await assertVerifiedCandidateLease(snapshot);
+          await directoryLease.sync(grantDirectory);
+          await directoryLease.assertMode(
+            grantDirectory,
+            PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+            'Presentation storage directory must be private'
+          );
+          await assertVerifiedCandidateLease(snapshot);
+          return true;
+        } finally {
+          await snapshot.handle.close();
+        }
+      }
+    );
+    if (!finalExists) await this.promoteSourceSnapshot(prepared);
+  }
+
+  async removePreparedSourceSnapshot(prepared: PreparedPresentationSourceSnapshot): Promise<void> {
+    assertPreparedSourceSnapshot(prepared);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, prepared.grantId);
+    const temporaryPath = path.join(grantDirectory, prepared.temporaryRelativePath);
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(prepared.grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      let snapshot: VerifiedCandidateLease;
+      try {
+        snapshot = await openVerifiedCandidateLease(
+          temporaryPath,
+          prepared,
+          {
+            unsafe: 'Presentation source temporary snapshot is unsafe',
+            changed: 'Presentation source temporary snapshot changed',
+          },
+          prepared,
+          PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+        );
+      } catch (error) {
+        if (hasCode(error, 'ENOENT')) {
+          await directoryLease.assertCurrent();
+          await assertPathAbsent(temporaryPath, 'Presentation cleanup target reappeared');
+          await directoryLease.assertCurrent();
+          return;
+        }
+        throw error;
+      }
+      try {
+        await directoryLease.assertCurrent();
+        await assertVerifiedCandidateLease(snapshot);
+        await rm(temporaryPath);
+        const after = await snapshot.handle.stat({ bigint: true });
+        if (!sameFileIdentity(snapshot.metadata, after)) {
+          throw new Error('Presentation source temporary snapshot changed');
+        }
+        await directoryLease.assertCurrent();
+        await assertPathAbsent(temporaryPath, 'Presentation cleanup target reappeared');
+        await directoryLease.assertCurrent();
+        await directoryLease.sync(grantDirectory);
+        await directoryLease.assertCurrent();
+        await assertPathAbsent(temporaryPath, 'Presentation cleanup target reappeared');
+        await directoryLease.assertCurrent();
+      } finally {
+        await snapshot.handle.close();
+      }
+    });
+    await this.removeEmptyGrantDirectory(prepared.grantId);
+  }
+
+  async removeUnreferencedSourceTemps(grantId: string, keepRelativePath?: string): Promise<void> {
+    assertUuid(grantId, 'source grant');
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, grantId);
+    try {
+      const opened = await openOwnedDirectory(grantDirectory);
+      await opened.handle.close();
+    } catch (error) {
+      if (hasCode(error, 'ENOENT')) return;
+      throw error;
+    }
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(grantId), async (directoryLease) => {
+      const entries = await readdir(grantDirectory);
+      const removable = entries.filter((entry) => SOURCE_TEMP_RE.test(entry) && entry !== keepRelativePath);
+      for (const entry of removable) {
+        const temporaryPath = path.join(grantDirectory, entry);
+        const opened = await openOwnedRegularFile(temporaryPath, 'Presentation source temporary snapshot is unsafe');
+        await opened.handle.close();
+        await this.removeLeafWithExpectedIdentity(temporaryPath, opened.metadata, grantDirectory, directoryLease);
+      }
+    });
+  }
+
+  async removeAbandonedPreparedSourceGrant(grantId: string): Promise<boolean> {
+    assertUuid(grantId, 'source grant');
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, grantId);
+    let removable = false;
+    await this.withDirectoryLease(this.durableGrantDirectoryChain(grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      const entries = await readdir(grantDirectory, { withFileTypes: true });
+      await directoryLease.assertCurrent();
+      if (
+        !entries.every((entry) => {
+          const match = entry.isFile() ? SOURCE_TEMP_RE.exec(entry.name) : null;
+          return match !== null && UUID_RE.test(match[1]);
+        })
+      ) {
+        return;
+      }
+      for (const entry of entries) {
+        const temporaryPath = path.join(grantDirectory, entry.name);
+        const opened = await openOwnedRegularFile(temporaryPath, 'Presentation source temporary snapshot is unsafe');
+        await opened.handle.close();
+        await this.removeLeafWithExpectedIdentity(temporaryPath, opened.metadata, grantDirectory, directoryLease);
+      }
+      removable = true;
+    });
+    if (!removable) return false;
+    const removed = await this.removeEmptyGrantDirectory(grantId);
+    if (!removed) throw new Error('Presentation source cleanup left unexpected grant files');
+    return true;
   }
 
   getStagingCandidatePath(runId: string): string {
@@ -1049,7 +2465,13 @@ export class PresentationRunFiles {
     await this.removeOwnedDirectoryTree([this.userDataDir, this.roots.draftRoot, directory], directory);
   }
 
-  async listEntityIds(kind: 'run' | 'grant' | 'draft'): Promise<string[]> {
+  async removeOwner(ownerId: string): Promise<void> {
+    assertUuid(ownerId, 'source owner');
+    const directory = this.ownedChild(this.roots.ownerRoot, ownerId);
+    await this.removeOwnedDirectoryTree([this.userDataDir, this.roots.ownerRoot, directory], directory);
+  }
+
+  async listEntityIds(kind: 'run' | 'grant' | 'draft' | 'owner'): Promise<string[]> {
     await this.initialize();
     const root = this.entityRoot(kind);
     return this.withDirectoryLease([this.userDataDir, root], async () => {
@@ -1116,8 +2538,17 @@ export class PresentationRunFiles {
   }
 
   async quarantineEntity(kind: PresentationRunEntityKind, entityId: string): Promise<string> {
-    const baseKind = kind.replace('-tombstone', '') as 'run' | 'grant' | 'draft';
-    assertUuid(entityId, baseKind === 'grant' ? 'source grant' : baseKind === 'draft' ? 'source draft' : 'run');
+    const baseKind = kind.replace('-tombstone', '') as 'run' | 'grant' | 'draft' | 'owner';
+    assertUuid(
+      entityId,
+      baseKind === 'grant'
+        ? 'source grant'
+        : baseKind === 'draft'
+          ? 'source draft'
+          : baseKind === 'owner'
+            ? 'source owner'
+            : 'run'
+    );
     await this.initialize();
     const source = kind.endsWith('-tombstone')
       ? this.getEntityManifestPath(kind, entityId)
@@ -1196,6 +2627,7 @@ export class PresentationRunFiles {
     if (kind === 'run') return this.roots.runRoot;
     if (kind === 'grant') return this.roots.grantRoot;
     if (kind === 'draft') return this.roots.draftRoot;
+    if (kind === 'owner') return this.roots.ownerRoot;
     if (kind === 'run-tombstone') return this.roots.runTombstoneRoot;
     if (kind === 'grant-tombstone') return this.roots.grantTombstoneRoot;
     return this.roots.draftTombstoneRoot;
@@ -1210,6 +2642,11 @@ export class PresentationRunFiles {
   private durableRunDirectoryChain(runId: string): string[] {
     const runDirectory = this.ownedChild(this.roots.runRoot, runId);
     return [this.userDataDir, this.roots.runRoot, runDirectory, path.join(runDirectory, 'retained')];
+  }
+
+  private durableGrantDirectoryChain(grantId: string): string[] {
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, grantId);
+    return [this.userDataDir, this.roots.grantRoot, grantDirectory];
   }
 
   private stagingCandidateDirectoryChain(runId: string): string[] {
@@ -1295,6 +2732,45 @@ export class PresentationRunFiles {
       await directoryLease.assertCurrent();
     } finally {
       await opened.handle.close();
+    }
+  }
+
+  private async removeEmptyGrantDirectory(grantId: string): Promise<boolean> {
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, grantId);
+    const parentLease = await OwnedDirectoryLease.acquire(
+      [this.userDataDir, this.roots.grantRoot],
+      this.syncOwnedDirectory.bind(this)
+    );
+    let grantLease: OwnedDirectoryLease | null = null;
+    try {
+      try {
+        grantLease = await OwnedDirectoryLease.acquire([grantDirectory], this.syncOwnedDirectory.bind(this));
+      } catch (error) {
+        await parentLease.assertCurrent();
+        if (!hasCode(error, 'ENOENT')) throw error;
+        await assertPathAbsent(grantDirectory, 'Presentation cleanup target reappeared');
+        await parentLease.assertCurrent();
+        return true;
+      }
+      await parentLease.assertCurrent();
+      await grantLease.assertCurrent();
+      const entries = await readdir(grantDirectory);
+      await grantLease.assertCurrent();
+      if (entries.length > 0) return false;
+      await parentLease.assertCurrent();
+      await grantLease.assertCurrent();
+      await rmdir(grantDirectory);
+      await parentLease.assertCurrent();
+      await assertPathAbsent(grantDirectory, 'Presentation cleanup target reappeared');
+      await parentLease.assertCurrent();
+      await parentLease.sync(this.roots.grantRoot);
+      await parentLease.assertCurrent();
+      await assertPathAbsent(grantDirectory, 'Presentation cleanup target reappeared');
+      await parentLease.assertCurrent();
+      return true;
+    } finally {
+      await grantLease?.close();
+      await parentLease.close();
     }
   }
 

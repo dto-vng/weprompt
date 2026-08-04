@@ -10,6 +10,7 @@ import {
   PRESENTATION_RUN_DISPOSITIONS,
   PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
+import type { PresentationGrantOwner, PresentationSourceDescriptor } from '@/common/types/office/presentationRun';
 
 export type PresentationRunDispatchStatus = (typeof PRESENTATION_RUN_DISPATCH_STATUSES)[number];
 export type PresentationRunArtifactPhase = (typeof PRESENTATION_RUN_ARTIFACT_PHASES)[number] | null;
@@ -369,4 +370,341 @@ export function bindPresentationRunTurn(
     now: input.now,
   });
   return { status: 'bound', manifest };
+}
+
+export type PresentationSourceFormat = PresentationSourceDescriptor['format'];
+export type PresentationSourceKind = PresentationSourceDescriptor['sourceKind'];
+
+export type PresentationSourceOwnerManifest = {
+  version: 2;
+  recordType: 'presentation-source-owner';
+  ownerId: string;
+  owner: PresentationGrantOwner;
+  principalId: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+  grantIds: string[];
+  unboundBytes: number;
+  draftClientRequestId: string | null;
+  draftLifecycle: 'active' | 'bound' | 'expired' | 'purged' | null;
+};
+
+export type PresentationSourceGrantManifest = {
+  version: 2;
+  recordType: 'presentation-source-grant';
+  grantId: string;
+  owner: PresentationGrantOwner;
+  revision: number;
+  displayName: string;
+  format: PresentationSourceFormat;
+  sourceKind: PresentationSourceKind;
+  snapshotRelativePath: `source.${PresentationSourceDescriptor['format']}`;
+  sha256: string;
+  byteLength: number;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  stateEnteredAt: string;
+  state: 'active' | 'claimed' | 'consumed' | 'revoked' | 'expired';
+  queueExtendedAt: string | null;
+  queueItemId: string | null;
+  claimedRunId: string | null;
+};
+
+export type PresentationSourceDraftManifest = {
+  version: 2;
+  recordType: 'presentation-source-draft';
+  draftId: string;
+  clientRequestId: string;
+  principalId: string;
+  revision: number;
+  state: 'active' | 'bound';
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  boundConversationId: string | null;
+  boundAt: string | null;
+};
+
+export type PresentationSourceGrantTombstone = {
+  version: 2;
+  recordType: 'presentation-source-grant-tombstone';
+  revision: 0;
+  grantId: string;
+  owner: PresentationGrantOwner;
+  terminalState: 'consumed' | 'revoked' | 'expired';
+  terminalAt: string;
+  tombstonedAt: string;
+  deleteAfter: string;
+  lastRevision: number;
+};
+
+export type PresentationSourceDraftTombstone = {
+  version: 2;
+  recordType: 'presentation-source-draft-tombstone';
+  revision: 0;
+  draftId: string;
+  clientRequestId: string;
+  principalId: string;
+  terminalState: 'bound' | 'expired';
+  terminalAt: string;
+  tombstonedAt: string;
+  deleteAfter: string;
+  lastRevision: number;
+  boundConversationId: string | null;
+};
+
+const SOURCE_FORMATS: readonly PresentationSourceFormat[] = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'md', 'csv'];
+const SOURCE_KINDS: readonly PresentationSourceKind[] = ['native-picker', 'external-drop', 'workspace-relative'];
+const SOURCE_STATES: readonly PresentationSourceGrantManifest['state'][] = [
+  'active',
+  'claimed',
+  'consumed',
+  'revoked',
+  'expired',
+];
+
+function hasExactManifestKeys(value: object, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function isGrantOwner(value: unknown): value is PresentationGrantOwner {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  if ('owner_type' in value && value.owner_type === 'draft') {
+    return (
+      hasExactManifestKeys(value, ['owner_type', 'draft_id']) &&
+      'draft_id' in value &&
+      typeof value.draft_id === 'string' &&
+      UUID_RE.test(value.draft_id)
+    );
+  }
+  return (
+    'owner_type' in value &&
+    value.owner_type === 'conversation' &&
+    hasExactManifestKeys(value, ['owner_type', 'conversation_id']) &&
+    'conversation_id' in value &&
+    typeof value.conversation_id === 'string' &&
+    UUID_RE.test(value.conversation_id)
+  );
+}
+
+function assertOrderedTimestamps(createdAt: string, updatedAt: string, ...timestamps: (string | null)[]): void {
+  if (!isIsoTimestamp(createdAt) || !isIsoTimestamp(updatedAt) || Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error('Invalid presentation source lifecycle timestamps');
+  }
+  for (const timestamp of timestamps) {
+    if (timestamp !== null && (!isIsoTimestamp(timestamp) || Date.parse(timestamp) < Date.parse(createdAt))) {
+      throw new Error('Invalid presentation source lifecycle timestamps');
+    }
+  }
+}
+
+export function assertPresentationSourceOwnerManifest(value: PresentationSourceOwnerManifest): void {
+  if (
+    !hasExactManifestKeys(value, [
+      'version',
+      'recordType',
+      'ownerId',
+      'owner',
+      'principalId',
+      'revision',
+      'createdAt',
+      'updatedAt',
+      'grantIds',
+      'unboundBytes',
+      'draftClientRequestId',
+      'draftLifecycle',
+    ]) ||
+    value.version !== 2 ||
+    value.recordType !== 'presentation-source-owner' ||
+    !UUID_RE.test(value.ownerId) ||
+    !isGrantOwner(value.owner) ||
+    !isIdentifier(value.principalId) ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision < 0 ||
+    !Array.isArray(value.grantIds) ||
+    value.grantIds.some((grantId) => !UUID_RE.test(grantId)) ||
+    new Set(value.grantIds).size !== value.grantIds.length ||
+    !Number.isSafeInteger(value.unboundBytes) ||
+    value.unboundBytes < 0 ||
+    (value.owner.owner_type === 'conversation' &&
+      (value.draftClientRequestId !== null || value.draftLifecycle !== null)) ||
+    (value.owner.owner_type === 'draft' &&
+      (!isIdentifier(value.draftClientRequestId) ||
+        !['active', 'bound', 'expired', 'purged'].includes(value.draftLifecycle ?? '')))
+  ) {
+    throw new Error('Invalid presentation source owner manifest');
+  }
+  assertOrderedTimestamps(value.createdAt, value.updatedAt);
+  if (value.draftLifecycle !== null && value.draftLifecycle !== 'active' && value.grantIds.length !== 0) {
+    throw new Error('Terminal presentation draft owner retained live grants');
+  }
+}
+
+export function assertPresentationSourceGrantManifest(value: PresentationSourceGrantManifest): void {
+  if (
+    !hasExactManifestKeys(value, [
+      'version',
+      'recordType',
+      'grantId',
+      'owner',
+      'revision',
+      'displayName',
+      'format',
+      'sourceKind',
+      'snapshotRelativePath',
+      'sha256',
+      'byteLength',
+      'createdAt',
+      'updatedAt',
+      'expiresAt',
+      'stateEnteredAt',
+      'state',
+      'queueExtendedAt',
+      'queueItemId',
+      'claimedRunId',
+    ]) ||
+    value.version !== 2 ||
+    value.recordType !== 'presentation-source-grant' ||
+    !UUID_RE.test(value.grantId) ||
+    !isGrantOwner(value.owner) ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision < 0 ||
+    !isIdentifier(value.displayName) ||
+    value.displayName.includes('/') ||
+    value.displayName.includes('\\') ||
+    !SOURCE_FORMATS.includes(value.format) ||
+    !SOURCE_KINDS.includes(value.sourceKind) ||
+    value.snapshotRelativePath !== `source.${value.format}` ||
+    !/^[0-9a-f]{64}$/.test(value.sha256) ||
+    !Number.isSafeInteger(value.byteLength) ||
+    value.byteLength < 1 ||
+    value.byteLength > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
+    !SOURCE_STATES.includes(value.state) ||
+    (value.queueExtendedAt === null) !== (value.queueItemId === null) ||
+    (value.queueItemId !== null && !isIdentifier(value.queueItemId)) ||
+    (value.state === 'claimed' || value.state === 'consumed') !== (value.claimedRunId !== null) ||
+    (value.claimedRunId !== null && !UUID_RE.test(value.claimedRunId))
+  ) {
+    throw new Error('Invalid presentation source grant manifest');
+  }
+  assertOrderedTimestamps(
+    value.createdAt,
+    value.updatedAt,
+    value.expiresAt,
+    value.stateEnteredAt,
+    value.queueExtendedAt
+  );
+  if (
+    Date.parse(value.stateEnteredAt) > Date.parse(value.updatedAt) ||
+    (value.state === 'active' && Date.parse(value.updatedAt) > Date.parse(value.expiresAt)) ||
+    (value.queueExtendedAt !== null &&
+      (Date.parse(value.queueExtendedAt) > Date.parse(value.updatedAt) ||
+        Date.parse(value.expiresAt) < Date.parse(value.queueExtendedAt)))
+  ) {
+    throw new Error('Invalid presentation source lifecycle timestamps');
+  }
+}
+
+export function assertPresentationSourceDraftManifest(value: PresentationSourceDraftManifest): void {
+  if (
+    !hasExactManifestKeys(value, [
+      'version',
+      'recordType',
+      'draftId',
+      'clientRequestId',
+      'principalId',
+      'revision',
+      'state',
+      'createdAt',
+      'updatedAt',
+      'expiresAt',
+      'boundConversationId',
+      'boundAt',
+    ]) ||
+    value.version !== 2 ||
+    value.recordType !== 'presentation-source-draft' ||
+    !UUID_RE.test(value.draftId) ||
+    !isIdentifier(value.clientRequestId) ||
+    !isIdentifier(value.principalId) ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision < 0 ||
+    !['active', 'bound'].includes(value.state) ||
+    (value.state === 'active' && (value.boundConversationId !== null || value.boundAt !== null)) ||
+    (value.state === 'bound' && (value.boundConversationId === null || value.boundAt === null)) ||
+    (value.boundConversationId !== null && !UUID_RE.test(value.boundConversationId))
+  ) {
+    throw new Error('Invalid presentation source draft manifest');
+  }
+  assertOrderedTimestamps(value.createdAt, value.updatedAt, value.expiresAt, value.boundAt);
+  if (
+    Date.parse(value.updatedAt) > Date.parse(value.expiresAt) ||
+    (value.boundAt !== null && Date.parse(value.boundAt) > Date.parse(value.updatedAt))
+  ) {
+    throw new Error('Invalid presentation source lifecycle timestamps');
+  }
+}
+
+export function assertPresentationSourceGrantTombstone(value: PresentationSourceGrantTombstone): void {
+  if (
+    !hasExactManifestKeys(value, [
+      'version',
+      'recordType',
+      'revision',
+      'grantId',
+      'owner',
+      'terminalState',
+      'terminalAt',
+      'tombstonedAt',
+      'deleteAfter',
+      'lastRevision',
+    ]) ||
+    value.version !== 2 ||
+    value.recordType !== 'presentation-source-grant-tombstone' ||
+    value.revision !== 0 ||
+    !UUID_RE.test(value.grantId) ||
+    !isGrantOwner(value.owner) ||
+    !['consumed', 'revoked', 'expired'].includes(value.terminalState) ||
+    !Number.isSafeInteger(value.lastRevision) ||
+    value.lastRevision < 0
+  ) {
+    throw new Error('Invalid presentation source grant tombstone');
+  }
+  assertOrderedTimestamps(value.terminalAt, value.tombstonedAt, value.deleteAfter);
+}
+
+export function assertPresentationSourceDraftTombstone(value: PresentationSourceDraftTombstone): void {
+  if (
+    !hasExactManifestKeys(value, [
+      'version',
+      'recordType',
+      'revision',
+      'draftId',
+      'clientRequestId',
+      'principalId',
+      'terminalState',
+      'terminalAt',
+      'tombstonedAt',
+      'deleteAfter',
+      'lastRevision',
+      'boundConversationId',
+    ]) ||
+    value.version !== 2 ||
+    value.recordType !== 'presentation-source-draft-tombstone' ||
+    value.revision !== 0 ||
+    !UUID_RE.test(value.draftId) ||
+    !isIdentifier(value.clientRequestId) ||
+    !isIdentifier(value.principalId) ||
+    !['bound', 'expired'].includes(value.terminalState) ||
+    !Number.isSafeInteger(value.lastRevision) ||
+    value.lastRevision < 0 ||
+    (value.terminalState === 'bound') !== (value.boundConversationId !== null) ||
+    (value.boundConversationId !== null && !UUID_RE.test(value.boundConversationId))
+  ) {
+    throw new Error('Invalid presentation source draft tombstone');
+  }
+  assertOrderedTimestamps(value.terminalAt, value.tombstonedAt, value.deleteAfter);
 }

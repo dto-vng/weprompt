@@ -166,6 +166,35 @@ const safeIdSchema = z
 const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
 const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
 const projectKnowledgeFolderSchema = z.object({ projectId: safeIdSchema, workspace: pathSchema }).strict();
+const presentationUuidSchema = z.string().uuid();
+const presentationRevisionSchema = z
+  .number()
+  .finite()
+  .int()
+  .nonnegative()
+  .refine((value) => Number.isSafeInteger(value));
+const presentationGrantOwnerSchema = z.discriminatedUnion('owner_type', [
+  z.object({ owner_type: z.literal('draft'), draft_id: presentationUuidSchema }).strict(),
+  z.object({ owner_type: z.literal('conversation'), conversation_id: presentationUuidSchema }).strict(),
+]);
+const presentationRelativePathSchema = z
+  .string()
+  .min(1)
+  .max(MAX_PATH_LENGTH)
+  .refine((value) => {
+    if (
+      value.includes('\0') ||
+      value.includes('\\') ||
+      value.startsWith('/') ||
+      /^[A-Za-z]:/.test(value) ||
+      value.endsWith('/')
+    ) {
+      return false;
+    }
+
+    const segments = value.split('/');
+    return segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+  });
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 
@@ -236,6 +265,32 @@ export const nativeBridgePayloadSchemas = {
     .object({ run_id: z.string().uuid(), reason: z.enum(['failed', 'interrupted']) })
     .strict(),
   'presentation-templates.scratch.discard': z.object({ run_id: z.string().uuid() }).strict(),
+  'presentation-sources.get-source-owner': z.object({ owner: presentationGrantOwnerSchema }).strict(),
+  'presentation-sources.create-draft': z.object({ client_request_id: presentationUuidSchema }).strict(),
+  'presentation-sources.bind-draft': z
+    .object({
+      draft_id: presentationUuidSchema,
+      conversation_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.pick-sources': z
+    .object({ owner: presentationGrantOwnerSchema, expected_owner_revision: presentationRevisionSchema })
+    .strict(),
+  'presentation-sources.grant-workspace-source': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      relative_path: presentationRelativePathSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.revoke': z
+    .object({
+      owner: presentationGrantOwnerSchema,
+      grant_id: presentationUuidSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,

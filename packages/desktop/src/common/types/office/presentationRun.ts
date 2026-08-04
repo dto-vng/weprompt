@@ -290,6 +290,32 @@ export type FailureFor<Code extends PresentationRunFailureCode> = PresentationRu
   code: Code;
 };
 
+export type GetPresentationSourceOwnerRequest = {
+  owner: PresentationGrantOwner;
+};
+
+export type GetPresentationSourceOwnerResult =
+  | {
+      ok: true;
+      owner: PresentationGrantOwner;
+      ownerRevision: number;
+      grants: PresentationSourceDescriptor[];
+    }
+  | FailureFor<
+      | 'FEATURE_DISABLED'
+      | 'DESKTOP_REQUIRED'
+      | 'INVALID_REQUEST'
+      | 'DRAFT_NOT_FOUND'
+      | 'DRAFT_EXPIRED'
+      | 'DRAFT_FOREIGN'
+      | 'RUN_NOT_FOUND'
+      | 'RUN_FORBIDDEN'
+      | 'SCOPE_UNAVAILABLE'
+      | 'TEAM_SCOPE_UNSUPPORTED'
+      | 'PERSISTENCE_FAILED'
+      | 'INTERNAL_ERROR'
+    >;
+
 export type CreatePresentationDraftRequest = {
   client_request_id: string;
 };

@@ -65,6 +65,8 @@ describe('managed presentation public contract', () => {
           DiscardPresentationRunResult,
           DispatchInitialPresentationRunRequest,
           DispatchInitialPresentationRunResult,
+          GetPresentationSourceOwnerRequest,
+          GetPresentationSourceOwnerResult,
           GetPresentationRunRequest,
           GetPresentationRunResult,
           GrantPresentationExternalDropRequest,
@@ -206,6 +208,15 @@ describe('managed presentation public contract', () => {
           ...createDraftResult,
           status: 'existing',
         } satisfies CreatePresentationDraftResult;
+        const getSourceOwnerRequest = {
+          owner: { owner_type: 'draft', draft_id: createDraftResult.draft.draftId },
+        } satisfies GetPresentationSourceOwnerRequest;
+        const getSourceOwnerResult = {
+          ok: true,
+          owner: getSourceOwnerRequest.owner,
+          ownerRevision: 0,
+          grants: [],
+        } satisfies GetPresentationSourceOwnerResult;
         const bindDraftRequest = {
           draft_id: createDraftResult.draft.draftId,
           conversation_id: publicBase.conversationId,
@@ -334,7 +345,8 @@ describe('managed presentation public contract', () => {
           startResult, startExtracted, getByRun, getByRequest, getResult, listRequest,
           listResult, listWithNextCursor, openRequest, openResult, discardRequest,
           discardResult, discardExisting, createDraftRequest, createDraftResult,
-          createDraftExisting, bindDraftRequest, bindDraftResult, bindDraftExisting,
+          createDraftExisting, getSourceOwnerRequest, getSourceOwnerResult,
+          bindDraftRequest, bindDraftResult, bindDraftExisting,
           pickRequest, pickCancelled, pickSelected, workspaceRequest, workspaceResult,
           revokeRequest, revokeResult, revokeExisting, dropRequest, dropResult,
           claimRequest, claimResult, claimExisting, renewRequest, renewResult,
@@ -360,6 +372,8 @@ describe('managed presentation public contract', () => {
           DiscardPresentationRunResult,
           DispatchInitialPresentationRunRequest,
           DispatchInitialPresentationRunResult,
+          GetPresentationSourceOwnerRequest,
+          GetPresentationSourceOwnerResult,
           GetPresentationRunRequest,
           GetPresentationRunResult,
           GrantPresentationExternalDropRequest,
@@ -457,6 +471,9 @@ describe('managed presentation public contract', () => {
           expected_revision: number;
         }>>;
         type CreateRequestGuard = Assert<Equal<CreatePresentationDraftRequest, { client_request_id: string }>>;
+        type GetSourceOwnerRequestGuard = Assert<Equal<GetPresentationSourceOwnerRequest, {
+          owner: PresentationGrantOwner;
+        }>>;
         type BindRequestGuard = Assert<Equal<BindPresentationDraftRequest, {
           draft_id: string;
           conversation_id: string;
@@ -529,6 +546,7 @@ describe('managed presentation public contract', () => {
           'conversation_id' | 'run_id' | 'expected_revision'
         >>;
         type CreateRequestKeys = Assert<Equal<keyof CreatePresentationDraftRequest, 'client_request_id'>>;
+        type GetSourceOwnerRequestKeys = Assert<Equal<keyof GetPresentationSourceOwnerRequest, 'owner'>>;
         type BindRequestKeys = Assert<Equal<keyof BindPresentationDraftRequest,
           'draft_id' | 'conversation_id' | 'expected_revision'
         >>;
@@ -557,6 +575,11 @@ describe('managed presentation public contract', () => {
         type CreateFailures =
           | 'FEATURE_DISABLED' | 'DESKTOP_REQUIRED' | 'DRAFT_LIMIT_EXCEEDED'
           | 'RATE_LIMITED' | 'PERSISTENCE_FAILED' | 'INTERNAL_ERROR';
+        type GetSourceOwnerFailures =
+          | 'FEATURE_DISABLED' | 'DESKTOP_REQUIRED' | 'INVALID_REQUEST'
+          | 'DRAFT_NOT_FOUND' | 'DRAFT_EXPIRED' | 'DRAFT_FOREIGN'
+          | 'RUN_NOT_FOUND' | 'RUN_FORBIDDEN' | 'SCOPE_UNAVAILABLE'
+          | 'TEAM_SCOPE_UNSUPPORTED' | 'PERSISTENCE_FAILED' | 'INTERNAL_ERROR';
         type BindFailures =
           | 'FEATURE_DISABLED' | 'DESKTOP_REQUIRED' | 'INVALID_REQUEST'
           | 'DRAFT_NOT_FOUND' | 'DRAFT_EXPIRED' | 'DRAFT_FOREIGN'
@@ -614,6 +637,10 @@ describe('managed presentation public contract', () => {
         type OpenFailureGuard = Assert<Equal<FailureCodes<OpenPresentationRunResult>, PresentationRunFailureCode>>;
         type DiscardFailureGuard = Assert<Equal<FailureCodes<DiscardPresentationRunResult>, PresentationRunFailureCode>>;
         type CreateFailureGuard = Assert<Equal<FailureCodes<CreatePresentationDraftResult>, CreateFailures>>;
+        type GetSourceOwnerFailureGuard = Assert<Equal<
+          FailureCodes<GetPresentationSourceOwnerResult>,
+          GetSourceOwnerFailures
+        >>;
         type BindFailureGuard = Assert<Equal<FailureCodes<BindPresentationDraftResult>, BindFailures>>;
         type PickFailureGuard = Assert<Equal<FailureCodes<PickPresentationSourcesResult>, PickFailures>>;
         type WorkspaceFailureGuard = Assert<Equal<FailureCodes<GrantPresentationWorkspaceSourceResult>, WorkspaceFailures>>;
@@ -657,6 +684,12 @@ describe('managed presentation public contract', () => {
           ok: true;
           status: 'created' | 'existing';
           draft: { draftId: string; revision: number; expiresAt: string; grantCount: 0 };
+        }>>;
+        type GetSourceOwnerSuccessGuard = Assert<Equal<Success<GetPresentationSourceOwnerResult>, {
+          ok: true;
+          owner: PresentationGrantOwner;
+          ownerRevision: number;
+          grants: PresentationSourceDescriptor[];
         }>>;
         type BindSuccessGuard = Assert<Equal<Success<BindPresentationDraftResult>, {
           ok: true;
@@ -725,7 +758,7 @@ describe('managed presentation public contract', () => {
         type RenewStatusGuard = Assert<Equal<Status<RenewInitialPresentationDispatchResult>, 'renewed'>>;
         type DispatchStatusGuard = Assert<Equal<Status<DispatchInitialPresentationRunResult>, 'bound' | 'already_bound'>>;
         type NoOtherStatusGuard = Assert<Equal<
-          Status<StartPresentationRunResult | GetPresentationRunResult | ListRecoverablePresentationRunsResult | OpenPresentationRunResult | DiscardPresentationRunResult>,
+          Status<StartPresentationRunResult | GetPresentationRunResult | GetPresentationSourceOwnerResult | ListRecoverablePresentationRunsResult | OpenPresentationRunResult | DiscardPresentationRunResult>,
           never
         >>;
 
@@ -735,6 +768,9 @@ describe('managed presentation public contract', () => {
         type OpenKeys = Assert<Equal<KeysOfUnion<Success<OpenPresentationRunResult>>, 'ok' | 'runId' | 'sha256'>>;
         type DiscardKeys = Assert<Equal<KeysOfUnion<Success<DiscardPresentationRunResult>>, 'ok' | 'runId' | 'discardedAt' | 'alreadyDiscarded'>>;
         type CreateKeys = Assert<Equal<KeysOfUnion<Success<CreatePresentationDraftResult>>, 'ok' | 'status' | 'draft'>>;
+        type GetSourceOwnerKeys = Assert<Equal<KeysOfUnion<Success<GetPresentationSourceOwnerResult>>,
+          'ok' | 'owner' | 'ownerRevision' | 'grants'
+        >>;
         type BindKeys = Assert<Equal<KeysOfUnion<Success<BindPresentationDraftResult>>, 'ok' | 'status' | 'draftId' | 'conversationId' | 'revision' | 'boundAt'>>;
         type PickKeys = Assert<Equal<KeysOfUnion<Success<PickPresentationSourcesResult>>, 'ok' | 'status' | 'grants' | 'ownerRevision'>>;
         type WorkspaceKeys = Assert<Equal<KeysOfUnion<Success<GrantPresentationWorkspaceSourceResult>>, 'ok' | 'status' | 'grant' | 'ownerRevision'>>;

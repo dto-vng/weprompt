@@ -1,0 +1,1053 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
+import {
+  assertPresentationSourceDraftManifest,
+  assertPresentationSourceGrantManifest,
+  PresentationRunFiles,
+  PresentationRunJournal,
+  PresentationRunSimulatedProcessCrashError,
+  PresentationRunStore,
+  presentationSourceOwnerId,
+  type PreparedPresentationSourceSnapshot,
+  type PresentationPreparedSourceSnapshotGuard,
+  type PresentationSourceStoreError,
+} from '@/process/services/presentation-template/run/storage';
+
+const PRINCIPAL_ID = 'principal-a';
+const CONVERSATION_ID = '745b7d43-a0aa-4bb7-b0cc-283f2db4873d';
+const DRAFT_ID = 'a6290e3f-fb6d-49c3-bdce-bc613c04c101';
+const GRANT_ID = 'dc3ea0c5-f54d-447d-bd93-a3329b08c531';
+const GRANT_B = '5bac9a15-bb41-4fe2-b782-d06922788c1c';
+const RUN_ID = '49f40825-4bbd-4a76-af52-fb371bf63e5d';
+const NOW = new Date('2026-08-04T00:00:00.000Z');
+
+const testUuid = (index: number): string => `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`;
+
+class QuotaAccountingFiles extends PresentationRunFiles {
+  override async withPreparedSourceSnapshotLeases<T>(
+    _preparedSnapshots: readonly PreparedPresentationSourceSnapshot[],
+    operation: (guard: PresentationPreparedSourceSnapshotGuard) => Promise<T>
+  ): Promise<T> {
+    return operation({ assertCurrent: async () => undefined });
+  }
+
+  override async recoverSourceSnapshotPromotion(_prepared: PreparedPresentationSourceSnapshot): Promise<void> {}
+}
+
+describe('PresentationRunStore source grants', () => {
+  let fixtureRoot: string;
+  let userDataDir: string;
+  let tempDir: string;
+  let files: PresentationRunFiles;
+  let journal: PresentationRunJournal;
+  let store: PresentationRunStore;
+  let clock: Date;
+
+  const createStore = (randomUUID: () => string = () => DRAFT_ID): PresentationRunStore => {
+    files = new PresentationRunFiles({ userDataDir, tempDir });
+    journal = new PresentationRunJournal({ files, now: () => clock });
+    return new PresentationRunStore({
+      files,
+      journal,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+      now: () => clock,
+      randomUUID,
+    });
+  };
+
+  const createGrant = async (
+    input: {
+      grantId?: string;
+      owner?: { owner_type: 'conversation'; conversation_id: string };
+      expectedOwnerRevision?: number;
+      content?: string;
+    } = {}
+  ) => {
+    const grantId = input.grantId ?? GRANT_ID;
+    const owner = input.owner ?? { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID };
+    const sourcePath = path.join(fixtureRoot, `${grantId}.txt`);
+    await writeFile(sourcePath, input.content ?? 'Quarterly revenue\n', { mode: 0o600 });
+    const [prepared] = await files.prepareSourceSnapshots([{ grantId, sourcePath, format: 'txt' }]);
+    const result = await store.createPresentationSourceGrants({
+      owner,
+      principalId: PRINCIPAL_ID,
+      expectedOwnerRevision: input.expectedOwnerRevision ?? 0,
+      grants: [
+        {
+          grantId,
+          displayName: 'brief.txt',
+          format: 'txt',
+          sourceKind: 'native-picker',
+          snapshotRelativePath: prepared.finalRelativePath,
+          sha256: prepared.sha256,
+          byteLength: prepared.byteLength,
+          preparedSnapshot: prepared,
+        },
+      ],
+    });
+    return { prepared, result };
+  };
+
+  const createGrantBatch = async (input: {
+    owner: { owner_type: 'conversation'; conversation_id: string };
+    expectedOwnerRevision: number;
+    grantIds: readonly string[];
+  }) => {
+    const sourcePath = path.join(fixtureRoot, `batch-${input.grantIds[0]}.txt`);
+    await writeFile(sourcePath, 'x', { mode: 0o600 });
+    const prepared = await files.prepareSourceSnapshots(
+      input.grantIds.map((grantId) => ({ grantId, sourcePath, format: 'txt' as const }))
+    );
+    return store.createPresentationSourceGrants({
+      owner: input.owner,
+      principalId: PRINCIPAL_ID,
+      expectedOwnerRevision: input.expectedOwnerRevision,
+      grants: prepared.map((snapshot, index) => ({
+        grantId: snapshot.grantId,
+        displayName: `${index}.txt`,
+        format: 'txt' as const,
+        sourceKind: 'native-picker' as const,
+        snapshotRelativePath: snapshot.finalRelativePath,
+        sha256: snapshot.sha256,
+        byteLength: snapshot.byteLength,
+        preparedSnapshot: snapshot,
+      })),
+    });
+  };
+
+  const createAccountedGrantBatch = async (input: {
+    owner: { owner_type: 'conversation'; conversation_id: string };
+    expectedOwnerRevision: number;
+    grantIds: readonly string[];
+    declaredByteLength: number;
+  }) => {
+    const prepared = input.grantIds.map<PreparedPresentationSourceSnapshot>((grantId, index) => ({
+      grantId,
+      format: 'txt',
+      temporaryRelativePath: `.source-${grantId}.tmp`,
+      finalRelativePath: 'source.txt',
+      sha256: 'a'.repeat(64),
+      byteLength: input.declaredByteLength,
+      dev: '0',
+      ino: String(index + 1),
+    }));
+    return store.createPresentationSourceGrants({
+      owner: input.owner,
+      principalId: PRINCIPAL_ID,
+      expectedOwnerRevision: input.expectedOwnerRevision,
+      grants: prepared.map((snapshot, index) => ({
+        grantId: snapshot.grantId,
+        displayName: `${index}.txt`,
+        format: 'txt' as const,
+        sourceKind: 'native-picker' as const,
+        snapshotRelativePath: snapshot.finalRelativePath,
+        sha256: snapshot.sha256,
+        byteLength: input.declaredByteLength,
+        preparedSnapshot: snapshot,
+      })),
+    });
+  };
+
+  beforeEach(async () => {
+    clock = new Date(NOW);
+    fixtureRoot = await mkdtemp(path.join(tmpdir(), 'presentation-source-store-'));
+    userDataDir = path.join(fixtureRoot, 'user-data');
+    tempDir = path.join(fixtureRoot, 'temp');
+    await Promise.all([mkdir(userDataDir), mkdir(tempDir)]);
+    store = createStore();
+  });
+
+  afterEach(async () => {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('persists a draft and replays the same principal request after restart', async () => {
+    const created = await store.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-request-1');
+
+    expect(created).toMatchObject({
+      status: 'created',
+      draft: { draftId: DRAFT_ID, revision: 0, state: 'active' },
+    });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'draft', draft_id: DRAFT_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 0, grants: [] });
+
+    const restarted = createStore();
+    await expect(restarted.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-request-1')).resolves.toMatchObject({
+      status: 'existing',
+      draft: { draftId: DRAFT_ID, revision: 0 },
+    });
+  });
+
+  it('keeps distinct draft request tuples separate when identifiers contain the old delimiter', async () => {
+    const draftIds = [testUuid(1), testUuid(2)];
+    store = createStore(() => draftIds.shift() ?? testUuid(3));
+
+    await expect(store.createPresentationSourceDraft('a', 'b\u0000c')).resolves.toMatchObject({
+      status: 'created',
+      draft: { draftId: testUuid(1) },
+    });
+    await expect(store.createPresentationSourceDraft('a\u0000b', 'c')).resolves.toMatchObject({
+      status: 'created',
+      draft: { draftId: testUuid(2) },
+    });
+
+    const restarted = createStore(() => testUuid(3));
+    await expect(restarted.createPresentationSourceDraft('a', 'b\u0000c')).resolves.toMatchObject({
+      status: 'existing',
+      draft: { draftId: testUuid(1) },
+    });
+    await expect(restarted.createPresentationSourceDraft('a\u0000b', 'c')).resolves.toMatchObject({
+      status: 'existing',
+      draft: { draftId: testUuid(2) },
+    });
+  });
+
+  it('atomically promotes one prepared source and restores its owner after restart', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    const sourcePath = path.join(fixtureRoot, 'brief.txt');
+    await writeFile(sourcePath, 'Quarterly revenue\n', { mode: 0o600 });
+    const [prepared] = await files.prepareSourceSnapshots([{ grantId: GRANT_ID, sourcePath, format: 'txt' }]);
+
+    const result = await store.createPresentationSourceGrants({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      expectedOwnerRevision: 0,
+      grants: [
+        {
+          grantId: GRANT_ID,
+          displayName: 'brief.txt',
+          format: 'txt',
+          sourceKind: 'native-picker',
+          snapshotRelativePath: prepared.finalRelativePath,
+          sha256: prepared.sha256,
+          byteLength: prepared.byteLength,
+          preparedSnapshot: prepared,
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID, state: 'active' }] });
+    await expect(readFile(path.join(files.roots.grantRoot, GRANT_ID, 'source.txt'), 'utf8')).resolves.toBe(
+      'Quarterly revenue\n'
+    );
+
+    const restarted = createStore();
+    await expect(
+      restarted.getPresentationSourceOwner(
+        { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        PRINCIPAL_ID
+      )
+    ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID, sha256: prepared.sha256 }] });
+  });
+
+  it('recovers the prepared source and complete grant batch after an intent-persisted crash', async () => {
+    let crashed = false;
+    const crashingJournal = new PresentationRunJournal({
+      files,
+      now: () => NOW,
+      failureInjector: ({ boundary }) => {
+        if (!crashed && boundary === 'before-manifest-write') {
+          crashed = true;
+          throw new PresentationRunSimulatedProcessCrashError('simulated crash');
+        }
+      },
+    });
+    const crashingStore = new PresentationRunStore({
+      files,
+      journal: crashingJournal,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+      now: () => NOW,
+    });
+    await crashingStore.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    const sourcePath = path.join(fixtureRoot, 'recover.txt');
+    await writeFile(sourcePath, 'Recover me\n', { mode: 0o600 });
+    const [prepared] = await files.prepareSourceSnapshots([{ grantId: GRANT_ID, sourcePath, format: 'txt' }]);
+
+    await expect(
+      crashingStore.createPresentationSourceGrants({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        expectedOwnerRevision: 0,
+        grants: [
+          {
+            grantId: GRANT_ID,
+            displayName: 'recover.txt',
+            format: 'txt',
+            sourceKind: 'native-picker',
+            snapshotRelativePath: prepared.finalRelativePath,
+            sha256: prepared.sha256,
+            byteLength: prepared.byteLength,
+            preparedSnapshot: prepared,
+          },
+        ],
+      })
+    ).rejects.toThrow('simulated crash');
+
+    const restarted = createStore();
+    await expect(
+      restarted.getPresentationSourceOwner(
+        { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        PRINCIPAL_ID
+      )
+    ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID }] });
+    await expect(readFile(path.join(files.roots.grantRoot, GRANT_ID, 'source.txt'), 'utf8')).resolves.toBe(
+      'Recover me\n'
+    );
+  });
+
+  it('removes a manifestless pre-intent source snapshot on restart instead of quarantining private bytes', async () => {
+    let crashed = false;
+    const crashingFiles = new PresentationRunFiles({
+      userDataDir,
+      tempDir,
+      failureInjector: ({ boundary, grantId }) => {
+        if (!crashed && boundary === 'after-grant-temp-fsync' && grantId === GRANT_ID) {
+          crashed = true;
+          throw new PresentationRunSimulatedProcessCrashError('simulated pre-intent crash');
+        }
+      },
+    });
+    const sourcePath = path.join(fixtureRoot, 'pre-intent.txt');
+    await writeFile(sourcePath, 'Uncommitted private bytes\n', { mode: 0o600 });
+
+    await expect(crashingFiles.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' })).rejects.toThrow(
+      'simulated pre-intent crash'
+    );
+    await expect(readdir(path.join(crashingFiles.roots.grantRoot, GRANT_ID))).resolves.toEqual([
+      expect.stringMatching(/^\.source-.*\.tmp$/),
+    ]);
+
+    const restarted = createStore();
+    await expect(
+      restarted.getPresentationSourceOwner(
+        { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        PRINCIPAL_ID
+      )
+    ).resolves.toMatchObject({ ownerRevision: 0, grants: [] });
+    await expect(readdir(files.roots.grantRoot)).resolves.toEqual([]);
+    await expect(readdir(files.roots.quarantineRoot)).resolves.toEqual([]);
+  });
+
+  it('binds a draft batch once and replays only the same destination tuple', async () => {
+    const sourcePath = path.join(fixtureRoot, 'notes.md');
+    await writeFile(sourcePath, '# Notes\n', { mode: 0o600 });
+    const created = await store.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-request-2');
+    const [prepared] = await files.prepareSourceSnapshots([{ grantId: GRANT_ID, sourcePath, format: 'md' }]);
+    await store.createPresentationSourceGrants({
+      owner: { owner_type: 'draft', draft_id: created.draft.draftId },
+      principalId: PRINCIPAL_ID,
+      expectedOwnerRevision: 0,
+      grants: [
+        {
+          grantId: GRANT_ID,
+          displayName: 'notes.md',
+          format: 'md',
+          sourceKind: 'external-drop',
+          snapshotRelativePath: prepared.finalRelativePath,
+          sha256: prepared.sha256,
+          byteLength: prepared.byteLength,
+          preparedSnapshot: prepared,
+        },
+      ],
+    });
+
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: created.draft.draftId,
+        conversationId: CONVERSATION_ID,
+        principalId: PRINCIPAL_ID,
+        expectedRevision: 1,
+      })
+    ).resolves.toMatchObject({ status: 'bound', revision: 2 });
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: created.draft.draftId,
+        conversationId: CONVERSATION_ID,
+        principalId: PRINCIPAL_ID,
+        expectedRevision: 1,
+      })
+    ).resolves.toMatchObject({ status: 'already_bound', conversationId: CONVERSATION_ID });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID }] });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'draft', draft_id: created.draft.draftId }, PRINCIPAL_ID)
+    ).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND' satisfies PresentationSourceStoreError['code'] });
+  });
+
+  it('claims a Task 3 grant atomically with its owner accounting and restores the claim after restart', async () => {
+    store = createStore(() => RUN_ID);
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    const { prepared } = await createGrant();
+
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: 'allocate-task-3-grant',
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      grantClaims: [{ grantId: GRANT_ID, expectedRevision: 0 }],
+    });
+
+    expect(allocated).toMatchObject({
+      ok: true,
+      status: 'created',
+      run: { runId: RUN_ID, sourceGrants: [GRANT_ID], retainedBytes: prepared.byteLength },
+    });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({
+      recordType: 'presentation-source-grant',
+      revision: 1,
+      state: 'claimed',
+      claimedRunId: RUN_ID,
+    });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [] });
+    await expect(
+      journal.readCanonical(
+        'owner',
+        presentationSourceOwnerId({ owner_type: 'conversation', conversation_id: CONVERSATION_ID })
+      )
+    ).resolves.toMatchObject({ revision: 2, grantIds: [], unboundBytes: 0 });
+
+    const restarted = createStore(() => RUN_ID);
+    await expect(restarted.getRun(RUN_ID)).resolves.toMatchObject({ sourceGrants: [GRANT_ID] });
+    await expect(
+      restarted.getPresentationSourceOwner(
+        { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        PRINCIPAL_ID
+      )
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [] });
+  });
+
+  it('consumes claimed Task 3 grants in the durable turn-binding transaction and restores them after restart', async () => {
+    store = createStore(() => RUN_ID);
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: 'bind-task-3-grant',
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'b'.repeat(64),
+      grantClaims: [{ grantId: GRANT_ID, expectedRevision: 0 }],
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+    await store.transitionRun(RUN_ID, {
+      expectedRevision: 0,
+      dispatchStatus: 'allocating',
+      artifactPhase: 'sources_snapshotted',
+      now: '2026-08-04T00:00:01.000Z',
+    });
+    await store.transitionRun(RUN_ID, {
+      expectedRevision: 1,
+      dispatchStatus: 'committed',
+      artifactPhase: 'sources_extracted',
+      now: '2026-08-04T00:00:02.000Z',
+    });
+    await store.transitionRun(RUN_ID, {
+      expectedRevision: 2,
+      dispatchStatus: 'dispatching',
+      postInvoked: true,
+      now: '2026-08-04T00:00:03.000Z',
+    });
+
+    await expect(
+      store.bindRunTurn(RUN_ID, {
+        expectedRevision: 3,
+        conversationId: CONVERSATION_ID,
+        turnId: 'turn-task-3',
+        runtime: 'aionrs',
+        now: '2026-08-04T00:00:04.000Z',
+      })
+    ).resolves.toMatchObject({ status: 'bound', manifest: { revision: 4 } });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({
+      revision: 2,
+      state: 'consumed',
+      stateEnteredAt: '2026-08-04T00:00:04.000Z',
+      claimedRunId: RUN_ID,
+    });
+
+    const restarted = createStore(() => RUN_ID);
+    await expect(restarted.getRun(RUN_ID)).resolves.toMatchObject({
+      dispatchStatus: 'bound',
+      sourceGrants: [GRANT_ID],
+    });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({ state: 'consumed' });
+  });
+
+  it('returns already_revoked for an exact revoke retry before applying owner revision CAS', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    const request = {
+      owner: { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      grantId: GRANT_ID,
+      expectedOwnerRevision: 1,
+    };
+
+    const first = await store.revokePresentationSourceGrant(request);
+    const restarted = createStore();
+    const replay = await restarted.revokePresentationSourceGrant(request);
+
+    expect(first).toMatchObject({ status: 'revoked', ownerRevision: 2 });
+    expect(replay).toEqual({
+      status: 'already_revoked',
+      grantId: GRANT_ID,
+      ownerRevision: 2,
+      revokedAt: first.revokedAt,
+    });
+  });
+
+  it('returns DRAFT_NOT_FOUND at the exact draft tombstone delete boundary without a prior sweep', async () => {
+    await store.createPresentationSourceDraft(PRINCIPAL_ID, 'expired-draft-request');
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'draft', draft_id: DRAFT_ID }, PRINCIPAL_ID)
+    ).rejects.toMatchObject({ code: 'DRAFT_EXPIRED' });
+    clock = new Date(clock.getTime() + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS - 1);
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: DRAFT_ID,
+        conversationId: CONVERSATION_ID,
+        principalId: PRINCIPAL_ID,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ code: 'DRAFT_EXPIRED' });
+    clock = new Date(clock.getTime() + 1);
+
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: DRAFT_ID,
+        conversationId: CONVERSATION_ID,
+        principalId: PRINCIPAL_ID,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ code: 'DRAFT_NOT_FOUND' });
+    await expect(store.createPresentationSourceDraft(PRINCIPAL_ID, 'expired-draft-request')).rejects.toMatchObject({
+      code: 'DRAFT_NOT_FOUND',
+    });
+  });
+
+  it('records draft expiry as a revisioned mutation in the tombstone', async () => {
+    await store.createPresentationSourceDraft(PRINCIPAL_ID, 'revisioned-expiry');
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+
+    await store.sweepExpiredPresentationSources();
+
+    await expect(journal.readCanonical('draft-tombstone', DRAFT_ID)).resolves.toMatchObject({
+      terminalState: 'expired',
+      lastRevision: 1,
+    });
+  });
+
+  it('does not attach a prepared grant to a draft at the exact draft expiry boundary', async () => {
+    await store.createPresentationSourceDraft(PRINCIPAL_ID, 'expired-draft-grant');
+    const sourcePath = path.join(fixtureRoot, 'expired-draft.txt');
+    await writeFile(sourcePath, 'too late\n', { mode: 0o600 });
+    const [prepared] = await files.prepareSourceSnapshots([{ grantId: GRANT_ID, sourcePath, format: 'txt' }]);
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+
+    await expect(
+      store.createPresentationSourceGrants({
+        owner: { owner_type: 'draft', draft_id: DRAFT_ID },
+        principalId: PRINCIPAL_ID,
+        expectedOwnerRevision: 0,
+        grants: [
+          {
+            grantId: GRANT_ID,
+            displayName: 'expired-draft.txt',
+            format: 'txt',
+            sourceKind: 'native-picker',
+            snapshotRelativePath: prepared.finalRelativePath,
+            sha256: prepared.sha256,
+            byteLength: prepared.byteLength,
+            preparedSnapshot: prepared,
+          },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'DRAFT_EXPIRED', details: { draftId: DRAFT_ID } });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toBeNull();
+  });
+
+  it('rejects active draft manifests with a partial binding tuple', () => {
+    const activeDraft = {
+      version: 2 as const,
+      recordType: 'presentation-source-draft' as const,
+      draftId: DRAFT_ID,
+      clientRequestId: 'partial-bind',
+      principalId: PRINCIPAL_ID,
+      revision: 0,
+      state: 'active' as const,
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+      expiresAt: new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS).toISOString(),
+      boundConversationId: CONVERSATION_ID,
+      boundAt: null,
+    };
+
+    expect(() => assertPresentationSourceDraftManifest(activeDraft)).toThrow(
+      'Invalid presentation source draft manifest'
+    );
+  });
+
+  it('rejects active grant manifests whose state or expiry timestamps precede updatedAt', () => {
+    const activeGrant = {
+      version: 2 as const,
+      recordType: 'presentation-source-grant' as const,
+      grantId: GRANT_ID,
+      owner: { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID },
+      revision: 0,
+      displayName: 'brief.txt',
+      format: 'txt' as const,
+      sourceKind: 'native-picker' as const,
+      snapshotRelativePath: 'source.txt' as const,
+      sha256: 'a'.repeat(64),
+      byteLength: 1,
+      createdAt: NOW.toISOString(),
+      updatedAt: '2026-08-04T00:10:00.000Z',
+      expiresAt: '2026-08-04T00:05:00.000Z',
+      stateEnteredAt: '2026-08-04T00:11:00.000Z',
+      state: 'active' as const,
+      queueExtendedAt: null,
+      queueItemId: null,
+      claimedRunId: null,
+    };
+
+    expect(() => assertPresentationSourceGrantManifest(activeGrant)).toThrow(
+      'Invalid presentation source lifecycle timestamps'
+    );
+  });
+
+  it('extends an unexpired grant once from the exact 15-minute window to the exact 24-hour queue boundary', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS - 1);
+
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        grantIds: [GRANT_ID],
+        queueItemId: 'queue-item-1',
+        expectedOwnerRevision: 1,
+      })
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [{ grantId: GRANT_ID }] });
+    const queueExpiresAt = new Date(clock.getTime() + PRESENTATION_RUN_LIMITS.QUEUED_GRANT_TTL_MS);
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({
+      revision: 1,
+      queueExtendedAt: clock.toISOString(),
+      queueItemId: 'queue-item-1',
+      expiresAt: queueExpiresAt.toISOString(),
+    });
+
+    clock = new Date(queueExpiresAt.getTime() - 1);
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [{ grantId: GRANT_ID }] });
+    clock = queueExpiresAt;
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 3, grants: [] });
+  });
+
+  it('keeps an ordinary grant at 14:59.999 and expires it in the manual sweep at exactly 15:00.000', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS - 1);
+
+    await expect(store.sweepExpiredPresentationSources()).resolves.toMatchObject({ expiredGrants: [] });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID }] });
+    clock = new Date(clock.getTime() + 1);
+    await expect(store.sweepExpiredPresentationSources()).resolves.toMatchObject({ expiredGrants: [GRANT_ID] });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [] });
+    await expect(journal.readCanonical('grant-tombstone', GRANT_ID)).resolves.toMatchObject({
+      terminalAt: clock.toISOString(),
+      deleteAfter: new Date(clock.getTime() + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS).toISOString(),
+    });
+  });
+
+  it('runs the same exact grant expiry transition during startup recovery', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+
+    const restarted = createStore();
+    await restarted.initialize();
+
+    await expect(
+      restarted.getPresentationSourceOwner(
+        { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        PRINCIPAL_ID
+      )
+    ).resolves.toMatchObject({ ownerRevision: 2, grants: [] });
+    await expect(journal.readCanonical('grant-tombstone', GRANT_ID)).resolves.toMatchObject({
+      terminalState: 'expired',
+      terminalAt: clock.toISOString(),
+    });
+  });
+
+  it('rejects queue extension at the exact original 15-minute expiry boundary', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        grantIds: [GRANT_ID],
+        queueItemId: 'queue-too-late',
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_EXPIRED', details: { grantId: GRANT_ID } });
+  });
+
+  it('rejects a second queue extension without changing the first durable expiry', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + 1_000);
+    await store.extendPresentationSourceGrantsForQueue({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      grantIds: [GRANT_ID],
+      queueItemId: 'queue-first',
+      expectedOwnerRevision: 1,
+    });
+    const first = await journal.readCanonical('grant', GRANT_ID);
+
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        grantIds: [GRANT_ID],
+        queueItemId: 'queue-second',
+        expectedOwnerRevision: 2,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_REPLAYED', details: { grantId: GRANT_ID } });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toEqual(first);
+  });
+
+  it('retains an idempotent revoke for seven days and treats the grant as invalid at deleteAfter', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    const request = {
+      owner: { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      grantId: GRANT_ID,
+      expectedOwnerRevision: 1,
+    };
+    await store.revokePresentationSourceGrant(request);
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS - 1);
+
+    await expect(store.revokePresentationSourceGrant(request)).resolves.toMatchObject({ status: 'already_revoked' });
+    clock = new Date(clock.getTime() + 1);
+    await expect(store.revokePresentationSourceGrant({ ...request, expectedOwnerRevision: 2 })).rejects.toMatchObject({
+      code: 'SOURCE_GRANT_INVALID',
+      details: { grantId: GRANT_ID },
+    });
+  });
+
+  it('expires an active grant instead of revoking it at the exact 15-minute boundary', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+
+    await expect(
+      store.revokePresentationSourceGrant({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        grantId: GRANT_ID,
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_EXPIRED', details: { grantId: GRANT_ID } });
+  });
+
+  it('leaves every Task 3 grant and owner byte unchanged when one snapshot is tampered before allocation', async () => {
+    store = createStore(() => RUN_ID);
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    const first = await createGrant({ grantId: GRANT_ID, content: 'first source\n' });
+    const second = await createGrant({
+      grantId: GRANT_B,
+      expectedOwnerRevision: 1,
+      content: 'second source\n',
+    });
+    await writeFile(path.join(files.roots.grantRoot, GRANT_B, 'source.txt'), 'tampered source\n');
+
+    await expect(
+      store.allocateRun({
+        conversationId: CONVERSATION_ID,
+        clientRequestId: 'tampered-task-3-batch',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'c'.repeat(64),
+        grantClaims: [
+          { grantId: GRANT_ID, expectedRevision: 0 },
+          { grantId: GRANT_B, expectedRevision: 0 },
+        ],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_TAMPERED',
+      details: { grantId: GRANT_B },
+    });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({ revision: 0, state: 'active' });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({
+      ownerRevision: 2,
+      grants: [{ grantId: GRANT_B }, { grantId: GRANT_ID }],
+    });
+    expect(first.prepared.byteLength + second.prepared.byteLength).toBeGreaterThan(0);
+  });
+
+  it('rejects a Task 3 grant owned by another conversation without mutating its owner', async () => {
+    const foreignConversation = testUuid(4_500);
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+
+    await expect(
+      store.allocateRun({
+        conversationId: foreignConversation,
+        clientRequestId: 'foreign-task-3-grant',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'd'.repeat(64),
+        grantClaims: [{ grantId: GRANT_ID, expectedRevision: 0 }],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_FOREIGN',
+      details: { grantId: GRANT_ID },
+    });
+    await expect(
+      store.getPresentationSourceOwner({ owner_type: 'conversation', conversation_id: CONVERSATION_ID }, PRINCIPAL_ID)
+    ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: GRANT_ID }] });
+  });
+
+  it('rejects a Task 3 grant replay after its first run claim', async () => {
+    store = createStore(() => RUN_ID);
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: 'first-task-3-claim',
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'e'.repeat(64),
+      grantClaims: [{ grantId: GRANT_ID, expectedRevision: 0 }],
+    });
+
+    await expect(
+      store.allocateRun({
+        conversationId: CONVERSATION_ID,
+        clientRequestId: 'replayed-task-3-claim',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'f'.repeat(64),
+        grantClaims: [{ grantId: GRANT_ID, expectedRevision: 1 }],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_REPLAYED',
+      details: { grantId: GRANT_ID },
+    });
+  });
+
+  it('enforces 16 grants per owner and 64 grants per app before promoting a 17th or 65th grant', async () => {
+    const owners = Array.from({ length: 5 }, (_, index) => ({
+      owner_type: 'conversation' as const,
+      conversation_id: testUuid(100 + index),
+    }));
+    const firstOwnerGrantIds = Array.from({ length: 16 }, (_, index) => testUuid(1_000 + index));
+    await store.getPresentationSourceOwner(owners[0]!, PRINCIPAL_ID);
+    await expect(
+      createGrantBatch({ owner: owners[0]!, expectedOwnerRevision: 0, grantIds: firstOwnerGrantIds })
+    ).resolves.toMatchObject({ ownerRevision: 1 });
+    const seventeenth = testUuid(2_000);
+    await expect(
+      createGrantBatch({ owner: owners[0]!, expectedOwnerRevision: 1, grantIds: [seventeenth] })
+    ).rejects.toMatchObject({ code: 'GRANT_LIMIT_EXCEEDED' });
+    await Promise.all(
+      owners.slice(1, 4).map(async (owner, ownerIndex) => {
+        await store.getPresentationSourceOwner(owner, PRINCIPAL_ID);
+        const grantIds = Array.from({ length: 16 }, (_, index) => testUuid(1_016 + ownerIndex * 16 + index));
+        await expect(createGrantBatch({ owner, expectedOwnerRevision: 0, grantIds })).resolves.toMatchObject({
+          ownerRevision: 1,
+        });
+      })
+    );
+    await store.getPresentationSourceOwner(owners[4]!, PRINCIPAL_ID);
+    const sixtyFifth = testUuid(2_001);
+
+    await expect(
+      createGrantBatch({ owner: owners[4]!, expectedOwnerRevision: 0, grantIds: [sixtyFifth] })
+    ).rejects.toMatchObject({ code: 'GRANT_LIMIT_EXCEEDED' });
+  });
+
+  it('accepts exactly 256 MiB per owner and 512 MiB per app, then rejects the next accounted byte', async () => {
+    files = new QuotaAccountingFiles({ userDataDir, tempDir });
+    journal = new PresentationRunJournal({ files, now: () => clock });
+    store = new PresentationRunStore({
+      files,
+      journal,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+      now: () => clock,
+    });
+    const ownerA = { owner_type: 'conversation' as const, conversation_id: testUuid(5_000) };
+    const ownerB = { owner_type: 'conversation' as const, conversation_id: testUuid(5_001) };
+    const ownerC = { owner_type: 'conversation' as const, conversation_id: testUuid(5_002) };
+    const fourGrantIds = (offset: number): string[] =>
+      Array.from({ length: 4 }, (_, index) => testUuid(offset + index));
+    await store.getPresentationSourceOwner(ownerA, PRINCIPAL_ID);
+
+    const ownerBoundary = await createAccountedGrantBatch({
+      owner: ownerA,
+      expectedOwnerRevision: 0,
+      grantIds: fourGrantIds(6_000),
+      declaredByteLength: PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES,
+    });
+    expect(ownerBoundary.grants.reduce((total, grant) => total + grant.byteLength, 0)).toBe(
+      PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANT_BYTES_PER_OWNER
+    );
+    await expect(
+      createAccountedGrantBatch({
+        owner: ownerA,
+        expectedOwnerRevision: 1,
+        grantIds: [testUuid(6_004)],
+        declaredByteLength: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_LIMIT_EXCEEDED' });
+
+    await store.getPresentationSourceOwner(ownerB, PRINCIPAL_ID);
+    const appBoundary = await createAccountedGrantBatch({
+      owner: ownerB,
+      expectedOwnerRevision: 0,
+      grantIds: fourGrantIds(7_000),
+      declaredByteLength: PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES,
+    });
+    expect(
+      ownerBoundary.grants.reduce((total, grant) => total + grant.byteLength, 0) +
+        appBoundary.grants.reduce((total, grant) => total + grant.byteLength, 0)
+    ).toBe(PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANT_BYTES_PER_APP);
+    await store.getPresentationSourceOwner(ownerC, PRINCIPAL_ID);
+    await expect(
+      createAccountedGrantBatch({
+        owner: ownerC,
+        expectedOwnerRevision: 0,
+        grantIds: [testUuid(8_000)],
+        declaredByteLength: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_LIMIT_EXCEEDED' });
+  });
+
+  it('holds the 17th draft slot until exact-boundary expiry is swept, then reclaims it', async () => {
+    const draftIds = Array.from({ length: 17 }, (_, index) => testUuid(3_000 + index));
+    let nextDraftId = 0;
+    store = createStore(() => draftIds[nextDraftId++]!);
+    await Promise.all(
+      Array.from({ length: 16 }, (_, index) =>
+        expect(store.createPresentationSourceDraft(PRINCIPAL_ID, `draft-cap-${index}`)).resolves.toMatchObject({
+          status: 'created',
+        })
+      )
+    );
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+    await expect(store.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-cap-16')).rejects.toMatchObject({
+      code: 'DRAFT_LIMIT_EXCEEDED',
+    });
+
+    await expect(store.sweepExpiredPresentationSources()).resolves.toMatchObject({
+      expiredDrafts: expect.arrayContaining(draftIds.slice(0, 16)),
+    });
+    await expect(store.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-cap-16')).resolves.toMatchObject({
+      status: 'created',
+      draft: { draftId: draftIds[16] },
+    });
+  });
+
+  it('rejects a foreign draft principal and a conflicting destination after the authorized bind', async () => {
+    await store.createPresentationSourceDraft(PRINCIPAL_ID, 'draft-owner-check');
+
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: DRAFT_ID,
+        conversationId: CONVERSATION_ID,
+        principalId: 'principal-b',
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ code: 'DRAFT_FOREIGN' });
+    await store.bindPresentationSourceDraft({
+      draftId: DRAFT_ID,
+      conversationId: CONVERSATION_ID,
+      principalId: PRINCIPAL_ID,
+      expectedRevision: 0,
+    });
+    const conflictingConversation = testUuid(4_000);
+
+    await expect(
+      store.bindPresentationSourceDraft({
+        draftId: DRAFT_ID,
+        conversationId: conflictingConversation,
+        principalId: PRINCIPAL_ID,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({
+      code: 'DRAFT_ALREADY_BOUND',
+      details: { draftId: DRAFT_ID, conversationId: CONVERSATION_ID },
+    });
+  });
+});

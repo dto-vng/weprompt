@@ -4,7 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { access, link, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { deflateRawSync } from 'node:zlib';
+import {
+  access,
+  chmod,
+  link,
+  lstat,
+  mkdir,
+  mkdtemp,
+  open,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,6 +32,8 @@ import {
 
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
 const GRANT_ID = '745b7d43-a0aa-4bb7-b0cc-283f2db4873d';
+const SECOND_GRANT_ID = '8a3bbfb3-141e-4cf3-8a45-a8b61585385c';
+const THIRD_GRANT_ID = '2c172e43-b45c-47a4-952d-e949093fcaf2';
 const DRAFT_ID = 'ab82a45e-f426-41d0-bdda-4e151a78a399';
 const TEMP_ID = 'd1d50dfe-3650-48f3-b98f-d7f5b2148996';
 
@@ -26,6 +44,71 @@ const exists = async (filePath: string): Promise<boolean> => {
   } catch {
     return false;
   }
+};
+
+const crc32 = (bytes: Buffer): number => {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
+const createCompressedDocx = (): { bytes: Buffer; mainPayloadOffset: number; mainPayloadLength: number } => {
+  const entries = [
+    { name: '[Content_Types].xml', bytes: Buffer.from('<Types></Types>') },
+    { name: 'word/document.xml', bytes: Buffer.from(`<w:document>${'revenue'.repeat(128)}</w:document>`) },
+  ];
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+  let mainPayloadOffset = 0;
+  let mainPayloadLength = 0;
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name);
+    const compressed = deflateRawSync(entry.bytes);
+    const checksum = crc32(entry.bytes);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(entry.bytes.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    if (entry.name === 'word/document.xml') {
+      mainPayloadOffset = localOffset + local.length + name.length;
+      mainPayloadLength = compressed.length;
+    }
+    localParts.push(local, name, compressed);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(0x0314, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(entry.bytes.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE((0o100600 << 16) >>> 0, 38);
+    central.writeUInt32LE(localOffset, 42);
+    centralParts.push(central, name);
+    localOffset += local.length + name.length + compressed.length;
+  }
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(localOffset, 16);
+  return {
+    bytes: Buffer.concat([...localParts, centralDirectory, end]),
+    mainPayloadOffset,
+    mainPayloadLength,
+  };
 };
 
 describe('PresentationRunFiles', () => {
@@ -586,6 +669,232 @@ describe('PresentationRunFiles', () => {
     await durableFiles.prepareRetainedCandidate(RUN_ID);
 
     expect(syncDirectory).toHaveBeenCalledWith(layout.retainedDirectory);
+  });
+
+  it('rejects a workspace source when its authorized parent is swapped outside before snapshotting', async () => {
+    const workspace = path.join(fixtureRoot, 'workspace');
+    const documents = path.join(workspace, 'docs');
+    const displacedDocuments = path.join(workspace, 'docs-authorized');
+    const outside = path.join(fixtureRoot, 'outside');
+    const sourcePath = path.join(documents, 'brief.txt');
+    await Promise.all([mkdir(documents, { recursive: true }), mkdir(outside)]);
+    await Promise.all([
+      writeFile(sourcePath, 'authorized bytes\n'),
+      writeFile(path.join(outside, 'brief.txt'), 'outside secret\n'),
+    ]);
+    const [allowedRoot, allowedRootStats, canonicalSource, sourceStats] = await Promise.all([
+      realpath(workspace),
+      lstat(workspace, { bigint: true }),
+      realpath(sourcePath),
+      lstat(sourcePath, { bigint: true }),
+    ]);
+    const authorization = {
+      allowedRootPath: allowedRoot,
+      allowedRootDev: allowedRootStats.dev.toString(),
+      allowedRootIno: allowedRootStats.ino.toString(),
+      canonicalSourcePath: canonicalSource,
+      sourceDev: sourceStats.dev.toString(),
+      sourceIno: sourceStats.ino.toString(),
+    };
+    await rename(documents, displacedDocuments);
+    await symlink(outside, documents);
+
+    await expect(
+      files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt', authorization } as Parameters<
+        PresentationRunFiles['prepareSourceSnapshot']
+      >[0])
+    ).rejects.toMatchObject({ code: 'SOURCE_TAMPERED' });
+    await expect(readFile(path.join(outside, 'brief.txt'), 'utf8')).resolves.toBe('outside secret\n');
+  });
+
+  it('inflates OOXML entries and rejects corrupted compressed main-part bytes', async () => {
+    const sourcePath = path.join(fixtureRoot, 'corrupt.docx');
+    const archive = createCompressedDocx();
+    archive.bytes[archive.mainPayloadOffset + Math.floor(archive.mainPayloadLength / 2)]! ^= 0xff;
+    await writeFile(sourcePath, archive.bytes);
+
+    await expect(files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'docx' })).rejects.toMatchObject({
+      code: 'SOURCE_TAMPERED',
+    });
+    await expect(files.listEntityIds('grant')).resolves.toEqual([]);
+  });
+
+  it('does not swallow a prepared-batch cleanup failure', async () => {
+    const firstValidSourcePath = path.join(fixtureRoot, 'valid-first.txt');
+    const secondValidSourcePath = path.join(fixtureRoot, 'valid-second.txt');
+    const corruptSourcePath = path.join(fixtureRoot, 'corrupt-batch.docx');
+    const archive = createCompressedDocx();
+    archive.bytes[archive.mainPayloadOffset + Math.floor(archive.mainPayloadLength / 2)]! ^= 0xff;
+    await Promise.all([
+      writeFile(firstValidSourcePath, 'first valid bytes\n'),
+      writeFile(secondValidSourcePath, 'second valid bytes\n'),
+      writeFile(corruptSourcePath, archive.bytes),
+    ]);
+    let cleaningPreparedBatch = false;
+    const durableFiles = new PresentationRunFiles({
+      userDataDir,
+      tempDir: systemTempDir,
+      randomUUID: () => TEMP_ID,
+      failureInjector: ({ boundary, grantId }) => {
+        if (boundary === 'after-grant-temp-fsync' && grantId === THIRD_GRANT_ID) cleaningPreparedBatch = true;
+      },
+      syncDirectory: async (directory) => {
+        if (cleaningPreparedBatch && directory === path.join(durableFiles.roots.grantRoot, GRANT_ID)) {
+          throw new Error('prepared batch cleanup sync failed');
+        }
+      },
+    });
+
+    await expect(
+      durableFiles.prepareSourceSnapshots([
+        { grantId: GRANT_ID, sourcePath: firstValidSourcePath, format: 'txt' },
+        { grantId: SECOND_GRANT_ID, sourcePath: secondValidSourcePath, format: 'txt' },
+        { grantId: THIRD_GRANT_ID, sourcePath: corruptSourcePath, format: 'docx' },
+      ])
+    ).rejects.toThrow('prepared batch cleanup sync failed');
+    await expect(readdir(path.join(durableFiles.roots.grantRoot, GRANT_ID))).resolves.toEqual([]);
+    await expect(exists(path.join(durableFiles.roots.grantRoot, SECOND_GRANT_ID))).resolves.toBe(false);
+    await expect(exists(path.join(durableFiles.roots.grantRoot, THIRD_GRANT_ID))).resolves.toBe(false);
+  });
+
+  it('keeps an unrelated fd open across OOXML validation and target close', async () => {
+    const sourcePath = path.join(fixtureRoot, 'valid.docx');
+    const sentinelPath = path.join(fixtureRoot, 'sentinel.txt');
+    await Promise.all([writeFile(sourcePath, createCompressedDocx().bytes), writeFile(sentinelPath, 'sentinel')]);
+    let sentinel: FileHandle | null = null;
+    let target: FileHandle | null = null;
+    let targetStayedOpen = false;
+    const instrumentedFiles = new PresentationRunFiles({
+      userDataDir,
+      tempDir: systemTempDir,
+      randomUUID: () => TEMP_ID,
+      writeCandidateChunk: async (file, buffer, offset, length, position) => {
+        target = file;
+        const { bytesWritten } = await file.write(buffer, offset, length, position);
+        return bytesWritten;
+      },
+      failureInjector: async ({ boundary }) => {
+        if ((boundary as string) !== 'after-grant-ooxml-validation') return;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+        try {
+          await target?.stat();
+          targetStayedOpen = true;
+        } catch {
+          targetStayedOpen = false;
+        }
+        sentinel = await open(sentinelPath, 'r');
+      },
+    });
+
+    await instrumentedFiles.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'docx' });
+
+    expect(targetStayedOpen).toBe(true);
+    expect(sentinel).not.toBeNull();
+    await expect(sentinel?.stat()).resolves.toMatchObject({ size: 8 });
+    await sentinel?.close();
+  });
+
+  it('fsyncs the grant directory when recovery finds an already-promoted source', async () => {
+    const syncDirectory = vi.fn<(directory: string) => Promise<void>>().mockResolvedValue(undefined);
+    const durableFiles = new PresentationRunFiles({
+      userDataDir,
+      tempDir: systemTempDir,
+      randomUUID: () => TEMP_ID,
+      syncDirectory,
+    });
+    const sourcePath = path.join(fixtureRoot, 'recover.txt');
+    await writeFile(sourcePath, 'recover bytes\n');
+    const prepared = await durableFiles.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await durableFiles.promoteSourceSnapshot(prepared);
+    syncDirectory.mockClear();
+
+    await durableFiles.recoverSourceSnapshotPromotion(prepared);
+
+    expect(syncDirectory).toHaveBeenCalledWith(path.join(durableFiles.roots.grantRoot, GRANT_ID));
+  });
+
+  it('rejects a source snapshot stored in a non-private grant directory', async () => {
+    const sourcePath = path.join(fixtureRoot, 'directory-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await files.promoteSourceSnapshot(prepared);
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID), 0o755);
+
+    await expect(
+      files.verifySourceSnapshot({
+        grantId: GRANT_ID,
+        format: 'txt',
+        relativePath: 'source.txt',
+        sha256: prepared.sha256,
+        byteLength: prepared.byteLength,
+      })
+    ).rejects.toThrow('Presentation storage directory must be private');
+  });
+
+  it('rejects a source snapshot whose file mode is not exactly private', async () => {
+    const sourcePath = path.join(fixtureRoot, 'file-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await files.promoteSourceSnapshot(prepared);
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID, 'source.txt'), 0o644);
+
+    await expect(
+      files.verifySourceSnapshot({
+        grantId: GRANT_ID,
+        format: 'txt',
+        relativePath: 'source.txt',
+        sha256: prepared.sha256,
+        byteLength: prepared.byteLength,
+      })
+    ).rejects.toThrow('Presentation source snapshot is unsafe');
+  });
+
+  it('rejects a prepared source with a relaxed file mode before promotion', async () => {
+    const sourcePath = path.join(fixtureRoot, 'promotion-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID, prepared.temporaryRelativePath), 0o644);
+
+    await expect(files.promoteSourceSnapshot(prepared)).rejects.toThrow(
+      'Presentation source temporary snapshot is unsafe'
+    );
+  });
+
+  it('rejects a prepared source in a relaxed grant directory before promotion', async () => {
+    const sourcePath = path.join(fixtureRoot, 'promotion-directory-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID), 0o755);
+
+    await expect(files.promoteSourceSnapshot(prepared)).rejects.toThrow(
+      'Presentation storage directory must be private'
+    );
+  });
+
+  it('rejects an already-promoted source with a relaxed file mode during recovery', async () => {
+    const sourcePath = path.join(fixtureRoot, 'recovery-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await files.promoteSourceSnapshot(prepared);
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID, prepared.finalRelativePath), 0o644);
+
+    await expect(files.recoverSourceSnapshotPromotion(prepared)).rejects.toThrow(
+      'Presentation source recovery found mismatched bytes'
+    );
+  });
+
+  it('rejects an already-promoted source in a relaxed grant directory during recovery', async () => {
+    const sourcePath = path.join(fixtureRoot, 'recovery-directory-mode.txt');
+    await writeFile(sourcePath, 'private bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await files.promoteSourceSnapshot(prepared);
+    await chmod(path.join(files.roots.grantRoot, GRANT_ID), 0o755);
+
+    await expect(files.recoverSourceSnapshotPromotion(prepared)).rejects.toThrow(
+      'Presentation storage directory must be private'
+    );
   });
 
   it('rejects malformed promotion metadata before resolving any candidate path', async () => {

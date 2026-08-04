@@ -5,4 +5,5 @@
  */
 
 export { ArtifactScratchService } from './ArtifactScratchService';
+export * from './service';
 export * from './storage';
