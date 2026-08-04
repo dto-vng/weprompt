@@ -1,5 +1,8 @@
 .shell {
+  box-sizing: border-box;
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   gap: 18px;
@@ -7,6 +10,7 @@
 
 .header {
   display: flex;
+  min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -19,6 +23,7 @@
 
 .breadcrumb {
   display: flex;
+  min-width: 0;
   margin-bottom: 8px;
   align-items: center;
 }
@@ -58,6 +63,8 @@
 
 .headerActions {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -66,38 +73,52 @@
 
 .actionStack {
   display: flex;
+  min-width: 0;
   align-items: flex-end;
   flex-direction: column;
   gap: 6px;
 }
 
 .actionIssue {
+  max-width: 100%;
   color: var(--color-warning-6);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .phaseNavigation {
+  min-width: 0;
+  max-width: 100%;
   border-bottom: 1px solid var(--color-border-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
 }
 
 .phaseList {
-  display: grid;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
   margin: 0;
   padding: 0 0 10px;
-  list-style: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex-wrap: nowrap;
   gap: 8px;
+  list-style: none;
 }
 
 .phaseItem {
-  min-width: 0;
+  min-width: 128px;
+  flex: 1 0 128px;
 }
 
 .phaseButton {
   width: 100%;
+  white-space: nowrap;
 }
 
 .phaseFrame {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -108,17 +129,26 @@
   gap: 16px;
 }
 
-@media (max-width: 720px) {
-  .header {
-    flex-direction: column;
-  }
+.shell[data-layout='compact'] .header {
+  flex-direction: column;
+}
 
-  .headerActions {
-    width: 100%;
-    justify-content: flex-start;
-  }
+.shell[data-layout='compact'] .headerActions {
+  width: 100%;
+  justify-content: flex-start;
+}
 
-  .phaseList {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+.shell[data-layout='compact'] .actionStack {
+  align-items: flex-start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phaseNavigation,
+  .assistantDrawer,
+  .assistantDrawer :global(.arco-drawer),
+  .assistantDrawer :global(.arco-drawer-mask) {
+    scroll-behavior: auto;
+    animation: none !important;
+    transition: none !important;
   }
 }

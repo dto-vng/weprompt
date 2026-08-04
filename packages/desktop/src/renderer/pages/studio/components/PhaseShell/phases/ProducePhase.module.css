@@ -1,5 +1,7 @@
 .phase {
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   gap: 14px;
@@ -7,8 +9,10 @@
 
 .phaseIntroduction {
   display: flex;
+  min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
@@ -16,6 +20,7 @@
   margin: 0;
   color: var(--color-text-1);
   font-size: 18px;
+  scroll-margin-block: 24px;
 }
 
 .heading:focus-visible {
@@ -29,9 +34,12 @@
 
 .shotList {
   display: grid;
+  max-width: 100%;
   margin: 0;
   padding: 0 0 4px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
   grid-auto-columns: minmax(260px, 1fr);
   grid-auto-flow: column;
   gap: 12px;
@@ -40,8 +48,9 @@
 
 .workspace {
   display: grid;
+  min-width: 0;
   align-items: start;
-  grid-template-columns: minmax(380px, 1fr) minmax(320px, 420px);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
   gap: 16px;
 }
 
@@ -52,14 +61,14 @@
   gap: 16px;
 }
 
-@media (max-width: 960px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.phase[data-layout='drawer'] .workspace {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
 }
 
-@media (max-width: 640px) {
-  .phaseIntroduction {
-    flex-direction: column;
-  }
+.phase[data-layout='compact'] .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.phase[data-layout='compact'] .phaseIntroduction {
+  flex-direction: column;
 }

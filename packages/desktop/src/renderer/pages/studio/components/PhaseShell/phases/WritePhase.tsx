@@ -11,16 +11,17 @@ import { resolveSceneDurationBounds } from '../../../studioRouteConstraints';
 import { StoryboardPanel, WriteSceneRow } from '../../Storyboard';
 import { AssistantDock } from '../AssistantDock';
 import type { WritePhaseController } from '../types';
-import { useStudioLayoutMode } from '../useStudioLayoutMode';
+import type { StudioLayoutMode } from '../useStudioLayoutMode';
 import styles from './WritePhase.module.css';
 
 const ACTIVE_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 
 export type WritePhaseProps = {
   controller: WritePhaseController;
+  layoutMode?: StudioLayoutMode;
 };
 
-export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
+export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode = 'inline' }) => {
   const { t } = useTranslation();
   const {
     project,
@@ -33,7 +34,6 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
     importReference,
     clearWriteFocusIntent,
   } = controller;
-  const { containerRef, layoutMode } = useStudioLayoutMode(project.id);
   const [importingSceneId, setImportingSceneId] = useState<string | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const saveConflict = editor.conflict?.operation === 'save_scene' ? editor.conflict : null;
@@ -103,61 +103,63 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller }) => {
   }, [clearWriteFocusIntent, editor, project.scenes, writeFocusIntent]);
 
   return (
-    <section ref={containerRef} className={styles.phase} aria-labelledby='studio-write-phase-heading'>
+    <section data-layout={layoutMode} className={styles.phase} aria-labelledby='studio-write-phase-heading'>
       <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
         {t('conversation.creativeStudio.phase.write.title')}
       </h2>
       <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.write.description')}</p>
       <p className='m-0 text-12px text-t-tertiary'>{t('conversation.creativeStudio.phase.shared.noMediaGeneration')}</p>
       <div className={styles.workspace} data-layout={layoutMode}>
-        <StoryboardPanel
-          orderedScenes={editor.orderedScenes}
-          selectedSceneId={editor.selectedSceneId}
-          targetDurationSeconds={project.targetDurationSeconds}
-          durationTotalSeconds={editor.durationTotalSeconds}
-          durationMatchesTarget={editor.durationMatchesTarget}
-          remainingDurationSeconds={editor.remainingDurationSeconds}
-          suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
-          canAddScene={editor.canAddScene}
-          mutationPending={mutationPending}
-          fitDisabled={fitDisabled}
-          fitOutcome={currentFitOutcome}
-          hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
-          sceneStatuses={readiness.sceneStatuses}
-          errorMessageKey={panelConflict?.messageKey ?? firstSceneIssue?.messageKey ?? nonDraftError?.messageKey}
-          statusMessageKey={
-            firstSceneIssue || nonDraftError || panelConflict
-              ? 'conversation.creativeStudio.inspector.unsavedChanges'
-              : null
-          }
-          conflict={panelConflict !== null || firstSceneIssue !== null}
-          onSelectScene={editor.selectScene}
-          onAddScene={editor.addScene}
-          onIncreaseTargetDuration={editor.increaseTargetDuration}
-          onFitToTarget={() => {
-            const catalogVersion = models.catalog?.catalogVersion;
-            if (fitDisabled || !catalogVersion) return;
-            editor.clearLatestFitOutcome();
-            void editor.fitToTarget(catalogVersion);
-          }}
-          onRemoveScene={editor.removeScene}
-          onReorderScenes={editor.reorderScenes}
-          onMoveScene={editor.moveScene}
-          onRetryConflict={
-            panelConflict !== null
-              ? editor.retryConflict
-              : firstSceneIssue?.sceneId !== undefined
-                ? () => editor.flushSceneDraftById(firstSceneIssue.sceneId!)
-                : editor.retryConflict
-          }
-          onDiscardConflict={
-            panelConflict !== null
-              ? editor.discardConflict
-              : firstSceneIssue?.sceneId !== undefined
-                ? () => editor.discardSceneDraftById(firstSceneIssue.sceneId!)
-                : editor.discardConflict
-          }
-        />
+        <div className={styles.storyboardSlot}>
+          <StoryboardPanel
+            orderedScenes={editor.orderedScenes}
+            selectedSceneId={editor.selectedSceneId}
+            targetDurationSeconds={project.targetDurationSeconds}
+            durationTotalSeconds={editor.durationTotalSeconds}
+            durationMatchesTarget={editor.durationMatchesTarget}
+            remainingDurationSeconds={editor.remainingDurationSeconds}
+            suggestedExpandedTargetSeconds={editor.suggestedExpandedTargetSeconds}
+            canAddScene={editor.canAddScene}
+            mutationPending={mutationPending}
+            fitDisabled={fitDisabled}
+            fitOutcome={currentFitOutcome}
+            hasLockedScenes={hasLockedScenes || (currentFitOutcome?.lockedSceneIds.length ?? 0) > 0}
+            sceneStatuses={readiness.sceneStatuses}
+            errorMessageKey={panelConflict?.messageKey ?? firstSceneIssue?.messageKey ?? nonDraftError?.messageKey}
+            statusMessageKey={
+              firstSceneIssue || nonDraftError || panelConflict
+                ? 'conversation.creativeStudio.inspector.unsavedChanges'
+                : null
+            }
+            conflict={panelConflict !== null || firstSceneIssue !== null}
+            onSelectScene={editor.selectScene}
+            onAddScene={editor.addScene}
+            onIncreaseTargetDuration={editor.increaseTargetDuration}
+            onFitToTarget={() => {
+              const catalogVersion = models.catalog?.catalogVersion;
+              if (fitDisabled || !catalogVersion) return;
+              editor.clearLatestFitOutcome();
+              void editor.fitToTarget(catalogVersion);
+            }}
+            onRemoveScene={editor.removeScene}
+            onReorderScenes={editor.reorderScenes}
+            onMoveScene={editor.moveScene}
+            onRetryConflict={
+              panelConflict !== null
+                ? editor.retryConflict
+                : firstSceneIssue?.sceneId !== undefined
+                  ? () => editor.flushSceneDraftById(firstSceneIssue.sceneId!)
+                  : editor.retryConflict
+            }
+            onDiscardConflict={
+              panelConflict !== null
+                ? editor.discardConflict
+                : firstSceneIssue?.sceneId !== undefined
+                  ? () => editor.discardSceneDraftById(firstSceneIssue.sceneId!)
+                  : editor.discardConflict
+            }
+          />
+        </div>
 
         <div className={styles.sceneRows}>
           {editor.orderedScenes.map((scene) => {

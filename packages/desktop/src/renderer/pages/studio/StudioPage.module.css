@@ -1,8 +1,11 @@
 .page {
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 100%;
   overflow: auto;
-  padding: 28px 36px;
+  padding: clamp(16px, 3vw, 28px) clamp(16px, 3.5vw, 36px);
   background: var(--color-bg-1);
 }
 
@@ -20,6 +23,8 @@
 .projectShell {
   display: flex;
   width: min(100%, 1560px);
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   flex-direction: column;
   gap: 18px;
@@ -31,20 +36,5 @@
   padding: 10px 12px;
   color: var(--color-danger-6);
   background: var(--color-danger-light-1);
-}
-
-@media (min-width: 1181px) and (max-height: 900px) {
-  .page {
-    padding: 20px 28px;
-  }
-
-  .projectShell {
-    gap: 12px;
-  }
-}
-
-@media (max-width: 820px) {
-  .page {
-    padding: 16px;
-  }
+  overflow-wrap: anywhere;
 }

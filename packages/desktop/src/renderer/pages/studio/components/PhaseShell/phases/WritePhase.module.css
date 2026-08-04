@@ -1,5 +1,7 @@
 .phase {
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   gap: 14px;
@@ -9,6 +11,7 @@
   margin: 0;
   color: var(--color-text-1);
   font-size: 18px;
+  scroll-margin-block: 24px;
 }
 
 .heading:focus-visible {
@@ -19,15 +22,22 @@
 .workspace {
   display: grid;
   min-width: 0;
-  min-height: min(720px, calc(100vh - 250px));
   align-items: start;
-  grid-template-columns: minmax(230px, 300px) minmax(420px, 1fr) minmax(250px, 320px);
+  grid-template-areas: 'storyboard scenes assistant';
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(288px, 320px);
   gap: 16px;
 }
 
 .workspace[data-layout='drawer'] {
-  min-height: auto;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-areas:
+    'storyboard scenes'
+    'assistant assistant';
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+}
+
+.storyboardSlot {
+  min-width: 0;
+  grid-area: storyboard;
 }
 
 .sceneRows {
@@ -35,26 +45,28 @@
   min-width: 0;
   flex-direction: column;
   gap: 14px;
+  grid-area: scenes;
 }
 
 .assistantSlot {
   min-width: 0;
+  grid-area: assistant;
 }
 
 .workspace[data-layout='drawer'] .assistantSlot {
   display: flex;
-  grid-column: 1 / -1;
   justify-content: flex-end;
-  grid-row: 1;
 }
 
-@media (max-width: 760px) {
-  .workspace,
-  .workspace[data-layout='drawer'] {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.workspace[data-layout='compact'] {
+  grid-template-areas:
+    'storyboard'
+    'scenes'
+    'assistant';
+  grid-template-columns: minmax(0, 1fr);
+}
 
-  .workspace[data-layout='drawer'] .assistantSlot {
-    grid-column: auto;
-  }
+.workspace[data-layout='compact'] .assistantSlot {
+  display: flex;
+  justify-content: flex-end;
 }

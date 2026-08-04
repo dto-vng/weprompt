@@ -98,6 +98,9 @@ describe('AssistantDock', () => {
     const view = render(<AssistantDock {...props} />);
 
     expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+    ).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.phase.write.askAssistant',
@@ -108,6 +111,10 @@ describe('AssistantDock', () => {
     view.rerender(<AssistantDock {...props} drawerVisible />);
     const drawers = document.querySelectorAll('.arco-drawer');
     expect(drawers).toHaveLength(1);
+    expect(drawers[0]).toHaveStyle({ width: 'min(380px, 100vw)' });
+    expect(
+      screen.getAllByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+    ).toHaveLength(1);
     expect(
       within(drawers[0] as HTMLElement).getByText('conversation.creativeStudio.phase.write.textChargeDisclosure')
     ).toBeInTheDocument();
@@ -176,10 +183,89 @@ describe('AssistantDock', () => {
     expect(inlineAssistant).toHaveFocus();
 
     view.rerender(<AssistantDock {...props} layoutMode='inline' drawerVisible={false} />);
-    view.rerender(<AssistantDock {...props} layoutMode='drawer' drawerVisible={false} />);
+    view.rerender(<AssistantDock {...props} layoutMode='compact' drawerVisible={false} />);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })).toHaveFocus()
     );
+  });
+
+  it('preserves focus when the compact Drawer crosses directly into the inline presentation', async () => {
+    const onOpenChange = vi.fn();
+    const props = {
+      kind: 'write' as const,
+      drawerVisible: true,
+      storyboard: readyStoryboard,
+      catalogLoading: false,
+      drafting: false,
+      disabled: false,
+      onOpenChange,
+      onDraftStoryboard: vi.fn(),
+    };
+    const view = render(<AssistantDock {...props} layoutMode='compact' />);
+    const draftAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+    });
+    draftAction.focus();
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' />);
+    const inlineAssistant = screen.getByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false));
+    expect(inlineAssistant).toHaveFocus();
+  });
+
+  it('moves focus from a closed compact opener into the inline assistant', async () => {
+    const props = {
+      kind: 'write' as const,
+      drawerVisible: false,
+      storyboard: readyStoryboard,
+      catalogLoading: false,
+      drafting: false,
+      disabled: false,
+      onOpenChange: vi.fn(),
+      onDraftStoryboard: vi.fn(),
+    };
+    const view = render(<AssistantDock {...props} layoutMode='compact' />);
+    screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' }).focus();
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('does not steal unrelated focus when a closed compact assistant becomes inline', async () => {
+    const props = {
+      kind: 'write' as const,
+      drawerVisible: false,
+      storyboard: readyStoryboard,
+      catalogLoading: false,
+      drafting: false,
+      disabled: false,
+      onOpenChange: vi.fn(),
+      onDraftStoryboard: vi.fn(),
+    };
+    const view = render(
+      <>
+        <button type='button'>Outside action</button>
+        <AssistantDock {...props} layoutMode='compact' />
+      </>
+    );
+    const outsideAction = screen.getByRole('button', { name: 'Outside action' });
+    outsideAction.focus();
+
+    view.rerender(
+      <>
+        <button type='button'>Outside action</button>
+        <AssistantDock {...props} layoutMode='inline' />
+      </>
+    );
+
+    await waitFor(() => expect(outsideAction).toHaveFocus());
   });
 
   it.each(['setup_required', 'unavailable'] as const)(

@@ -1,5 +1,8 @@
 .phase {
+  box-sizing: border-box;
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   gap: 18px;
@@ -30,6 +33,7 @@
   margin: 0;
   color: var(--color-text-1);
   font-size: 18px;
+  scroll-margin-block: 24px;
 }
 
 .heading:focus-visible {
@@ -48,6 +52,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 7px;
+  scroll-margin-block: 24px;
 }
 
 .field label {
@@ -104,17 +109,15 @@
   font-size: 12px;
 }
 
-@media (max-width: 720px) {
-  .form {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.phase[data-layout='compact'] .form {
+  grid-template-columns: minmax(0, 1fr);
+}
 
-  .fullWidth {
-    grid-column: auto;
-  }
+.phase[data-layout='compact'] .fullWidth {
+  grid-column: auto;
+}
 
-  .footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
+.phase[data-layout='compact'] .footer {
+  align-items: stretch;
+  flex-direction: column;
 }
