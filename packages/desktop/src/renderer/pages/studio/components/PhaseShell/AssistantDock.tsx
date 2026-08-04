@@ -68,7 +68,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
         assistantOwnsFocusRef.current = true;
       } else if (previousPresentation === 'inline' && presentation === 'drawer' && assistantOwnsFocusRef.current) {
         openerRef.current?.focus();
-        assistantOwnsFocusRef.current = false;
+        assistantOwnsFocusRef.current = openerRef.current !== null && document.activeElement === openerRef.current;
       } else if (
         previousPresentation === 'drawer' &&
         presentation === 'drawer' &&
@@ -76,7 +76,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
         !drawerVisible
       ) {
         openerRef.current?.focus();
-        assistantOwnsFocusRef.current = false;
+        assistantOwnsFocusRef.current = openerRef.current !== null && document.activeElement === openerRef.current;
       }
     }
     previousPresentationRef.current = presentation;

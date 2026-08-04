@@ -156,7 +156,7 @@ describe('AssistantDock', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it('closes and focuses inline content on expansion, then returns focus to the compact opener', async () => {
+  it('preserves focus across an inline-to-compact-to-inline presentation bounce', async () => {
     const onOpenChange = vi.fn();
     const props = {
       kind: 'write' as const,
@@ -186,6 +186,42 @@ describe('AssistantDock', () => {
     view.rerender(<AssistantDock {...props} layoutMode='compact' drawerVisible={false} />);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })).toHaveFocus()
+    );
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' drawerVisible={false} />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+      ).toHaveFocus()
+    );
+  });
+
+  it('moves focus into the inline assistant after a compact Drawer closes and the layout expands', async () => {
+    const props = {
+      kind: 'write' as const,
+      storyboard: readyStoryboard,
+      catalogLoading: false,
+      drafting: false,
+      disabled: false,
+      onOpenChange: vi.fn(),
+      onDraftStoryboard: vi.fn(),
+    };
+    const view = render(<AssistantDock {...props} layoutMode='compact' drawerVisible />);
+    const draftAction = await screen.findByRole('button', {
+      name: 'conversation.creativeStudio.phase.write.draftStoryboard',
+    });
+    draftAction.focus();
+
+    view.rerender(<AssistantDock {...props} layoutMode='compact' drawerVisible={false} />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.write.askAssistant' })).toHaveFocus()
+    );
+
+    view.rerender(<AssistantDock {...props} layoutMode='inline' drawerVisible={false} />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+      ).toHaveFocus()
     );
   });
 
