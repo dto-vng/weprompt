@@ -53,6 +53,15 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
     () =>
       Object.fromEntries(
         orderedScenes.map((scene): [string, SceneTimelineReviewState] => {
+          const selectedAsset = scene.selectedAssetId === null ? undefined : project.assets[scene.selectedAssetId];
+          const selectedTakeInCut =
+            selectedAsset?.id === scene.selectedAssetId &&
+            selectedAsset.projectId === project.id &&
+            selectedAsset.sceneId === scene.id &&
+            selectedAsset.mediaKind === scene.mediaKind &&
+            selectedAsset.managedAsset.collection === 'assets' &&
+            scene.assetIds.includes(selectedAsset.id);
+          if (selectedTakeInCut) return [scene.id, 'selected-take'];
           switch (readiness.sceneStatuses[scene.id]) {
             case 'generated':
               return [scene.id, 'selected-take'];

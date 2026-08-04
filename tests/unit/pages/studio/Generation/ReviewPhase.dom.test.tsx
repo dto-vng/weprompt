@@ -207,6 +207,20 @@ describe('Review phase cut', () => {
     expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
   });
 
+  it('keeps a selected take visibly in cut while another variation renders', () => {
+    const reviewController = controller();
+    reviewController.readiness = {
+      ...reviewController.readiness,
+      sceneStatuses: { ...reviewController.readiness.sceneStatuses, 'scene-selected': 'generating' },
+    };
+    const { container } = render(<ReviewPhase controller={reviewController} />);
+
+    expect(
+      container.querySelector("[data-review-region='filmstrip'] [data-review-state='selected-take']")
+    ).not.toBeNull();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.renderedShots:1')).toBeVisible();
+  });
+
   it('never exposes generation or stitched-playback actions in Review', () => {
     const { container } = render(<ReviewPhase controller={controller('scene-slate')} />);
 

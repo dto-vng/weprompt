@@ -230,6 +230,22 @@ export const sanitizeStudioExportFolderName = (projectName: string): string => {
   return sanitized || 'creative-studio-project';
 };
 
+const MAX_SCENE_EXPORT_SLUG_LENGTH = 40;
+
+/** Builds a portable scene filename while preserving the canonical scene-order number. */
+export const buildStudioSceneExportFileName = (sceneNumber: number, title: string, extension: string): string => {
+  const slug = title
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_SCENE_EXPORT_SLUG_LENGTH)
+    .replace(/-+$/g, '');
+  const scenePrefix = `scene-${String(sceneNumber).padStart(2, '0')}`;
+  return `${scenePrefix}${slug ? `-${slug}` : ''}${extension}`;
+};
+
 /** Creates a new directory only; a collision never causes an existing export to be reused. */
 export const acquireStudioExportDirectory = async (
   destinationDirectory: string,
@@ -1287,7 +1303,7 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
         continue;
       }
       const extension = path.extname(resolved.asset.managedAsset.fileName).toLowerCase();
-      const fileName = `scene-${String(index + 1).padStart(2, '0')}${extension}`;
+      const fileName = buildStudioSceneExportFileName(index + 1, project.scenes[sceneId].title, extension);
       await writeVerifiedExportFile(path.join(directory, fileName), verifiedExportDirectory, [], async (handle) => {
         await pipeline(
           await resolved.openVerifiedStream(),

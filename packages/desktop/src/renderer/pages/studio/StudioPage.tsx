@@ -788,9 +788,11 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     );
   }
 
+  if (readiness === null) return null;
+
   const controller: StudioPhaseControllers = {
     project,
-    readiness: readiness!,
+    readiness,
     editor,
     models: studioModels,
     jobs: studioJobs,
@@ -860,10 +862,10 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         selectedDurationSeconds={
           generationReview?.scenes.reduce((total, scene) => total + scene.durationSeconds, 0) ?? 0
         }
-        projectDurationSeconds={project.sceneOrder.reduce(
-          (total, sceneId) => total + project.scenes[sceneId]!.durationSeconds,
-          0
-        )}
+        projectDurationSeconds={project.sceneOrder.reduce((total, sceneId) => {
+          const scene = project.scenes[sceneId];
+          return scene?.id === sceneId ? total + scene.durationSeconds : total;
+        }, 0)}
         submitting={studioJobs.mutationPending || generationReviewRefreshing}
         submissionBlocked={studioJobs.issue?.operation === 'submit_scenes' && studioJobs.issue.code === 'invalid_route'}
         errorMessageKey={
