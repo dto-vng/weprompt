@@ -881,8 +881,7 @@
       },
       "shared": {
         "backToLibrary": "Proje kitaplığına dön",
-        "noMediaGeneration": "Bu adımda görüntü veya video oluşturulmaz.",
-        "providerChargesMayApply": "Yapılandırdığınız sağlayıcı model kullanımı için ücret alabilir."
+        "noMediaGeneration": "Bu adımda görüntü veya video oluşturulmaz."
       },
       "brief": {
         "title": "Özet",
@@ -896,22 +895,18 @@
         "saving": "Özet değişiklikleri kaydediliyor...",
         "unsaved": "Özet değişiklikleri henüz kaydedilmedi.",
         "invalidName": "Devam etmeden önce bir proje adı girin.",
-        "invalidDuration": "1 ile 3.600 saniye arasında bir hedef süre girin.",
         "aspectLocked": "En boy oranı kilitli",
         "aspectLockedHelp": "Oluşturulan medya eklendikten sonra en boy oranı değiştirilemez."
       },
       "write": {
         "title": "Yaz",
-        "description": "Medya oluşturmadan önce hikâye panosunu kurun ve her çekimi geliştirin.",
         "continueToProduce": "Üretime devam et",
         "askAssistant": "Asistana sor",
-        "hideAssistant": "Asistanı gizle",
         "assistantTitle": "Yazım asistanı",
         "assistantDescription": "Hikâye yapısını, çekim fikirlerini ve istemleri geliştirmek için asistanı kullanın.",
         "textChargeDisclosure": "Hikâye panosu taslağı yapılandırdığınız metin modelini kullanır. Sağlayıcınız model kullanımı için ücret alabilir.",
         "draftStoryboard": "Hikâye panosu taslağı oluştur",
         "addShot": "Çekim ekle",
-        "addVisual": "Görsel ekle",
         "fitToGoal": "Hedefe uydur",
         "noScenes": "Başlamak için bir çekim ekleyin veya hikâye panosu taslağı oluşturun.",
         "scriptTableTitle": "Senaryo",
@@ -936,7 +931,6 @@
         "goalMarker": "{{seconds}} sn hedef"
       },
       "produce": {
-        "title": "Üret",
         "connectEngine": "Bir motor bağlayın — yaklaşık bir dakika, tüm çalışma alanı için yalnızca bir kez",
         "askTeammate": "Bir ekip arkadaşına sor",
         "askTeammateCopy": "Bu çalışma alanı için WePrompt Model Ayarları'nda bir görüntü veya video motoru bağlayabilir misin?",
@@ -949,19 +943,13 @@
         "render": "İşle · yok",
         "renderAnother": "Yeniden işle · yok",
         "openPreview": "{{title}} önizlemesini aç",
-        "description": "Modelleri seçin, medya oluşturun ve her çekim için en iyi sonucu belirleyin.",
         "reviewCut": "Kurguyu incele",
-        "addVisual": "Görsel ekle",
         "modelsTitle": "Modeller",
-        "modelsHelp": "Hikâye panosu, görüntü ve video oluşturmak için kullanılacak modelleri seçin.",
-        "openModelSettings": "Model ayarlarını aç",
         "activityTitle": "Oluşturma etkinliği",
         "activityEmpty": "Çalışan bir oluşturma işi yok.",
         "jobsRunning": "{{count}} oluşturma işi çalışıyor",
         "jobsRunning_one": "{{count}} oluşturma işi çalışıyor",
-        "jobsRunning_other": "{{count}} oluşturma işi çalışıyor",
-        "batchTimingBlocker": "Hazır çekimlerin tümünü oluşturmadan önce hikâye panosu süresini hedefle eşleştirin.",
-        "providerChargeDisclosure": "Medya oluşturma, yapılandırdığınız sağlayıcıları kullanır. Sağlayıcılarınız model kullanımı için ücret alabilir."
+        "jobsRunning_other": "{{count}} oluşturma işi çalışıyor"
       },
       "review": {
         "title": "İncele",
@@ -989,23 +977,15 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Hikâyeler planlayın, her sahneyi gözden geçirin ve görsel ya da video varlıkları oluşturun.",
-      "newProject": "Yeni proje",
       "loading": "Projeler yükleniyor...",
-      "error": "Projeler yüklenemedi.",
       "retry": "Tekrar dene",
       "readinessLabel": "Taslak storyboard",
-      "readinessReady": "Hazır",
-      "readinessChecking": "Kurulum kontrol ediliyor...",
       "readinessSetupRequired": "Model kurulumu gerekli",
-      "readinessUnavailable": "Taslak oluşturma kullanılamıyor",
       "openProject": "Projeyi aç",
       "deleteProject": "Projeyi sil",
       "deleteConfirmTitle": "Bu proje silinsin mi?",
       "deleteConfirmBody": "“{{name}}” ve yerel olarak yönetilen varlıkları silinsin mi? Bu işlem geri alınamaz.",
       "deleteActiveWork": "Bu projede etkin oluşturma işleri var. Projeyi silmeden önce işleri iptal edin veya tamamlanmalarını bekleyin.",
-      "createFailed": "Proje oluşturulamadı.",
-      "deleteFailed": "Proje silinemedi.",
-      "sceneCount": "{{count}} sahne",
       "composer": {
         "label": "Ne hazırlıyoruz?",
         "placeholder": "Hikâye fikrini tek cümleyle yazın…",
@@ -1051,19 +1031,12 @@
       "title": "Creative Studio projesi oluştur",
       "nameLabel": "Proje adı",
       "namePlaceholder": "Ürün lansmanı hikâyesi",
-      "briefLabel": "Yaratıcı özet",
-      "briefPlaceholder": "Hedef kitleyi, mesajı, tonu ve görsel yönü açıklayın.",
-      "aspectRatioLabel": "En-boy oranı",
       "aspectRatio16x9": "Yatay (16:9)",
       "aspectRatio9x16": "Dikey (9:16)",
       "aspectRatio1x1": "Kare (1:1)",
       "aspectRatio4x3": "Klasik yatay (4:3)",
       "aspectRatio3x4": "Klasik dikey (3:4)",
-      "targetDurationLabel": "Saniye cinsinden hedef uzunluk",
-      "targetDurationHint": "5 ile 60 arasında bir tam sayı seçin.",
       "invalidDuration": "5 ile 60 saniye arasında bir tam sayı girin.",
-      "creating": "Proje oluşturuluyor...",
-      "submit": "Proje oluştur",
       "cancel": "İptal"
     },
     "project": {
@@ -1075,11 +1048,7 @@
       "targetDuration": "Hedef uzunluk",
       "resolution": "Çözünürlük",
       "sceneCount": "Sahneler",
-      "readiness": "Taslak oluşturma durumu",
-      "scenesReady": "{{ready}}/{{total}} sahne hazır",
-      "emptyStoryboard": "Henüz sahne yok. Sahneleri elle ekleyin veya bir storyboard taslağı oluşturun.",
-      "backToLibrary": "Creative Studio'ya dön",
-      "loadFailed": "Proje yüklenemedi."
+      "readiness": "Taslak oluşturma durumu"
     },
     "storyboard": {
       "title": "Storyboard",
@@ -1101,8 +1070,6 @@
       "durationRemaining": "{{seconds}} saniye kaldı",
       "increaseTarget": "Hedefi {{seconds}} saniyeye çıkar",
       "shortenBeforeAdding": "Başka bir sahne eklemeden önce mevcut sahneleri kısaltın.",
-      "moveUp": "Sahneyi yukarı taşı",
-      "moveDown": "Sahneyi aşağı taşı",
       "dragScene": "Yeniden sıralamak için sahneyi sürükleyin",
       "removeScene": "Sahneyi kaldır",
       "dragSceneAccessible": "{{number}}. sahneyi sürükleyin: {{title}}",
@@ -1129,13 +1096,10 @@
       "image": "Görsel",
       "video": "Video",
       "duration": "Süre",
-      "seconds": "saniye",
       "durationSeconds": "{{seconds}} saniye",
       "durationSeconds_one": "{{seconds}} saniye",
       "durationSeconds_other": "{{seconds}} saniye",
-      "selected": "Seçili sahne",
-      "draft": "Taslak",
-      "ready": "Oluşturmaya hazır"
+      "selected": "Seçili sahne"
     },
     "inspector": {
       "title": "Sahne yönlendirmesi",
@@ -1158,8 +1122,6 @@
       "unsavedChanges": "Kaydedilmemiş değişiklikleriniz korundu."
     },
     "draft": {
-      "action": "Storyboard taslağı oluştur",
-      "redraftAction": "Storyboard'u yeniden oluştur",
       "title": "Storyboard taslağı oluştur",
       "body": "WePrompt incelemeniz için sahneler, anlatım, ekran metni ve zamanlama önerecek.",
       "checking": "Seçilen hikâye panosu modeli kontrol ediliyor...",
@@ -1179,18 +1141,9 @@
     },
     "routing": {
       "title": "Oluşturma rotası",
-      "smartRoute": "Akıllı rota",
-      "imageRoute": "Görsel rotası",
-      "videoRoute": "Video rotası",
-      "providerLabel": "Sağlayıcı",
       "modelLabel": "Model",
       "missingRoute": "Uyumlu bir oluşturma rotası seçin.",
-      "invalidRoute": "Bu rota artık geçerli değil. Oluşturmadan önce gözden geçirin.",
-      "suggestionLastSuccessful": "Son başarılı rota",
-      "suggestionConfiguredImageModel": "Yapılandırılmış görsel modeli",
-      "suggestionSoleCompatible": "Tek uyumlu rota",
-      "manualRequired": "Rotayı elle seçin",
-      "noCompatibleRoute": "Kullanılabilir uyumlu rota yok"
+      "invalidRoute": "Bu rota artık geçerli değil. Oluşturmadan önce gözden geçirin."
     },
     "review": {
       "generateReadyScenes": "{{count}} hazır sahne oluştur",
@@ -1220,12 +1173,9 @@
       "chargeNotice": "Oluşturma, seçtiğiniz sağlayıcı hesabını kullanır ve ücrete tabi olabilir.",
       "confirm": "Onayla ve oluştur",
       "cancel": "İptal",
-      "submitFailed": "Oluşturma gönderilemedi.",
       "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin."
     },
     "jobs": {
-      "title": "Oluşturma işleri",
-      "noJobs": "Henüz oluşturma işi yok.",
       "progress": "%{{percent}} tamamlandı",
       "cancel": "İşi iptal et",
       "retry": "Oluşturmayı tekrar dene",
@@ -1278,8 +1228,6 @@
     },
     "timeline": {
       "title": "Sahne şeridi",
-      "sceneLabel": "Sahne {{number}}",
-      "durationLabel": "{{seconds}} saniye",
       "selectScene": "Sahneyi seç",
       "totalDuration": "Toplam storyboard süresi",
       "totalDurationFull": "Toplam süre: {{seconds}} saniye",
@@ -1291,7 +1239,6 @@
       "noScenes": "Gösterilecek sahne yok"
     },
     "export": {
-      "action": "Varlıkları dışa aktar",
       "title": "Varlıkları dışa aktar",
       "body": "Storyboard bildirim dosyasını ve her sahnenin seçili varlığını dışa aktarın.",
       "gapWarning": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
@@ -1310,10 +1257,8 @@
       "successBody_other": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
       "partialTitle": "Varlıklar eksik sahnelerle dışa aktarıldı",
       "partialBody": "Kullanılabilir varlıklar “{{folderName}}” klasörüne dışa aktarıldı.",
-      "missingScenes": "Eksik sahneler: {{scenes}}",
       "failed": "Varlıklar dışa aktarılamadı.",
       "noSelectedAssets": "Dışa aktarmaya hazır seçili sahne varlığı yok.",
-      "noAssetsToExport": "Dışa aktarmadan önce en az bir oluşturulmuş sahne varlığı seçin.",
       "folderLabel": "Dışa aktarma klasörü"
     },
     "errors": {
@@ -1330,17 +1275,9 @@
       "storage": "Creative Studio yerel verilerini güncelleyemedi."
     },
     "models": {
-      "title": "Proje modelleri",
       "storyboard": "Hikâye panosu modeli",
-      "image": "Görsel modeli",
-      "video": "Video modeli",
       "selectionRequired": "Bir model seçin",
-      "setupRequired": "Model kurulumu gerekli",
       "unavailable": "Seçilen model kullanılamıyor",
-      "suggested": "Önerilen",
-      "setupTitle": "Model kurulumunu tamamlayın",
-      "setupBody": "Sağlayıcı kimlik bilgilerini ve medya bağlamalarını Model Ayarları'nda yapılandırın.",
-      "missingRoles": "Kurulum gerekli: {{roles}}",
       "openSettings": "Model Ayarlarını Aç",
       "refresh": "Modelleri yenile",
       "loading": "Modeller yükleniyor...",

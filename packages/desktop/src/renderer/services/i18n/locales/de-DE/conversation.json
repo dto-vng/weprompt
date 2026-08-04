@@ -880,8 +880,7 @@
       },
       "shared": {
         "backToLibrary": "Zurück zur Projektbibliothek",
-        "noMediaGeneration": "In diesem Schritt werden keine Bilder oder Videos erzeugt.",
-        "providerChargesMayApply": "Der konfigurierte Anbieter kann die Modellnutzung berechnen."
+        "noMediaGeneration": "In diesem Schritt werden keine Bilder oder Videos erzeugt."
       },
       "brief": {
         "title": "Briefing",
@@ -895,22 +894,18 @@
         "saving": "Änderungen am Briefing werden gespeichert...",
         "unsaved": "Die Änderungen am Briefing sind noch nicht gespeichert.",
         "invalidName": "Gib vor dem Fortfahren einen Projektnamen ein.",
-        "invalidDuration": "Gib eine Zieldauer zwischen 1 und 3.600 Sekunden ein.",
         "aspectLocked": "Seitenverhältnis ist gesperrt",
         "aspectLockedHelp": "Nach dem Hinzufügen erzeugter Medien kann das Seitenverhältnis nicht mehr geändert werden."
       },
       "write": {
         "title": "Schreiben",
-        "description": "Erstelle das Storyboard und verfeinere jede Einstellung, bevor Medien erzeugt werden.",
         "continueToProduce": "Weiter zu Produzieren",
         "askAssistant": "Assistenten fragen",
-        "hideAssistant": "Assistenten ausblenden",
         "assistantTitle": "Schreibassistent",
         "assistantDescription": "Nutze den Assistenten für Erzählstruktur, Einstellungsideen und Prompts.",
         "textChargeDisclosure": "Der Storyboard-Entwurf verwendet dein konfiguriertes Textmodell. Der Anbieter kann die Modellnutzung berechnen.",
         "draftStoryboard": "Storyboard entwerfen",
         "addShot": "Einstellung hinzufügen",
-        "addVisual": "Bild hinzufügen",
         "fitToGoal": "An Ziel anpassen",
         "noScenes": "Füge eine Einstellung hinzu oder entwirf ein Storyboard, um zu beginnen.",
         "scriptTableTitle": "Drehbuch",
@@ -935,7 +930,6 @@
         "goalMarker": "Ziel {{seconds}} s"
       },
       "produce": {
-        "title": "Produzieren",
         "connectEngine": "Engine verbinden — etwa eine Minute, einmal für den gesamten Arbeitsbereich",
         "askTeammate": "Teammitglied fragen",
         "askTeammateCopy": "Kannst du in den WePrompt-Modelleinstellungen eine Bild- oder Video-Engine für diesen Arbeitsbereich verbinden?",
@@ -948,19 +942,13 @@
         "render": "Rendern · k. A.",
         "renderAnother": "Erneut rendern · k. A.",
         "openPreview": "Vorschau für {{title}} öffnen",
-        "description": "Wähle Modelle, erzeuge Medien und bestimme für jede Einstellung das beste Ergebnis.",
         "reviewCut": "Schnitt prüfen",
-        "addVisual": "Bild hinzufügen",
         "modelsTitle": "Modelle",
-        "modelsHelp": "Wähle die Modelle für Storyboard-, Bild- und Videoerzeugung.",
-        "openModelSettings": "Modelleinstellungen öffnen",
         "activityTitle": "Erzeugungsaktivität",
         "activityEmpty": "Es werden keine Erzeugungsaufträge ausgeführt.",
         "jobsRunning": "{{count}} Erzeugungsaufträge laufen",
         "jobsRunning_one": "{{count}} Erzeugungsauftrag läuft",
-        "jobsRunning_other": "{{count}} Erzeugungsaufträge laufen",
-        "batchTimingBlocker": "Gleiche die Storyboard-Dauer an das Ziel an, bevor alle bereiten Einstellungen erzeugt werden.",
-        "providerChargeDisclosure": "Die Medienerzeugung verwendet deine konfigurierten Anbieter. Die Anbieter können die Modellnutzung berechnen."
+        "jobsRunning_other": "{{count}} Erzeugungsaufträge laufen"
       },
       "review": {
         "title": "Prüfen",
@@ -988,23 +976,15 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Plane Geschichten, prüfe jede Szene und erstelle Bild- oder Video-Assets.",
-      "newProject": "Neues Projekt",
       "loading": "Projekte werden geladen...",
-      "error": "Projekte konnten nicht geladen werden.",
       "retry": "Erneut versuchen",
       "readinessLabel": "Storyboard-Entwurf",
-      "readinessReady": "Bereit",
-      "readinessChecking": "Einrichtung wird geprüft...",
       "readinessSetupRequired": "Modelleinrichtung erforderlich",
-      "readinessUnavailable": "Entwurf nicht verfügbar",
       "openProject": "Projekt öffnen",
       "deleteProject": "Projekt löschen",
       "deleteConfirmTitle": "Dieses Projekt löschen?",
       "deleteConfirmBody": "„{{name}}“ und die lokal verwalteten Assets löschen? Dies kann nicht rückgängig gemacht werden.",
       "deleteActiveWork": "Dieses Projekt enthält aktive Generierungsaufträge. Brich sie ab oder warte, bis sie abgeschlossen sind, bevor du das Projekt löschst.",
-      "createFailed": "Das Projekt konnte nicht erstellt werden.",
-      "deleteFailed": "Das Projekt konnte nicht gelöscht werden.",
-      "sceneCount": "{{count}} Szenen",
       "composer": {
         "label": "Was erstellen wir?",
         "placeholder": "Die Story-Idee in einem Satz…",
@@ -1050,19 +1030,12 @@
       "title": "Creative-Studio-Projekt erstellen",
       "nameLabel": "Projektname",
       "namePlaceholder": "Geschichte zur Produkteinführung",
-      "briefLabel": "Kreativbriefing",
-      "briefPlaceholder": "Beschreibe Zielgruppe, Botschaft, Tonalität und visuelle Ausrichtung.",
-      "aspectRatioLabel": "Seitenverhältnis",
       "aspectRatio16x9": "Querformat (16:9)",
       "aspectRatio9x16": "Hochformat (9:16)",
       "aspectRatio1x1": "Quadratisch (1:1)",
       "aspectRatio4x3": "Klassisches Querformat (4:3)",
       "aspectRatio3x4": "Klassisches Hochformat (3:4)",
-      "targetDurationLabel": "Ziellänge in Sekunden",
-      "targetDurationHint": "Wähle eine ganze Zahl von 5 bis 60.",
       "invalidDuration": "Gib eine ganze Zahl von 5 bis 60 Sekunden ein.",
-      "creating": "Projekt wird erstellt...",
-      "submit": "Projekt erstellen",
       "cancel": "Abbrechen"
     },
     "project": {
@@ -1074,11 +1047,7 @@
       "targetDuration": "Ziellänge",
       "resolution": "Auflösung",
       "sceneCount": "Szenen",
-      "readiness": "Entwurfsbereitschaft",
-      "scenesReady": "{{ready}}/{{total}} Szenen bereit",
-      "emptyStoryboard": "Noch keine Szenen. Füge Szenen manuell hinzu oder entwirf ein Storyboard.",
-      "backToLibrary": "Zurück zu Creative Studio",
-      "loadFailed": "Das Projekt konnte nicht geladen werden."
+      "readiness": "Entwurfsbereitschaft"
     },
     "storyboard": {
       "title": "Storyboard",
@@ -1100,8 +1069,6 @@
       "durationRemaining": "{{seconds}} Sekunden verbleibend",
       "increaseTarget": "Zieldauer auf {{seconds}} Sekunden erhöhen",
       "shortenBeforeAdding": "Kürzen Sie vorhandene Szenen, bevor Sie eine weitere hinzufügen.",
-      "moveUp": "Szene nach oben verschieben",
-      "moveDown": "Szene nach unten verschieben",
       "dragScene": "Szene zum Neuordnen ziehen",
       "removeScene": "Szene entfernen",
       "dragSceneAccessible": "Szene {{number}} „{{title}}“ ziehen",
@@ -1128,13 +1095,10 @@
       "image": "Bild",
       "video": "Video",
       "duration": "Dauer",
-      "seconds": "Sekunden",
       "durationSeconds": "{{seconds}} Sekunden",
       "durationSeconds_one": "{{seconds}} Sekunde",
       "durationSeconds_other": "{{seconds}} Sekunden",
-      "selected": "Ausgewählte Szene",
-      "draft": "Entwurf",
-      "ready": "Bereit zur Generierung"
+      "selected": "Ausgewählte Szene"
     },
     "inspector": {
       "title": "Szenenanweisung",
@@ -1157,8 +1121,6 @@
       "unsavedChanges": "Deine nicht gespeicherten Änderungen bleiben erhalten."
     },
     "draft": {
-      "action": "Storyboard entwerfen",
-      "redraftAction": "Storyboard erneut entwerfen",
       "title": "Storyboard entwerfen",
       "body": "WePrompt schlägt Szenen, Sprechertext, Bildschirmtext und Timing zur Prüfung vor.",
       "checking": "Ausgewähltes Storyboard-Modell wird geprüft...",
@@ -1178,18 +1140,9 @@
     },
     "routing": {
       "title": "Generierungsroute",
-      "smartRoute": "Intelligente Route",
-      "imageRoute": "Bildroute",
-      "videoRoute": "Videoroute",
-      "providerLabel": "Anbieter",
       "modelLabel": "Modell",
       "missingRoute": "Wähle eine kompatible Generierungsroute.",
-      "invalidRoute": "Diese Route ist nicht mehr gültig. Prüfe sie vor der Generierung.",
-      "suggestionLastSuccessful": "Zuletzt erfolgreiche Route",
-      "suggestionConfiguredImageModel": "Konfiguriertes Bildmodell",
-      "suggestionSoleCompatible": "Einzige kompatible Route",
-      "manualRequired": "Route manuell auswählen",
-      "noCompatibleRoute": "Keine kompatible Route verfügbar"
+      "invalidRoute": "Diese Route ist nicht mehr gültig. Prüfe sie vor der Generierung."
     },
     "review": {
       "generateReadyScenes": "{{count}} bereite Szenen generieren",
@@ -1219,12 +1172,9 @@
       "chargeNotice": "Die Generierung nutzt dein ausgewähltes Anbieterkonto und kann Kosten verursachen.",
       "confirm": "Bestätigen und generieren",
       "cancel": "Abbrechen",
-      "submitFailed": "Die Generierung konnte nicht übermittelt werden.",
       "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route."
     },
     "jobs": {
-      "title": "Generierungsaufträge",
-      "noJobs": "Noch keine Generierungsaufträge.",
       "progress": "{{percent}} % abgeschlossen",
       "cancel": "Auftrag abbrechen",
       "retry": "Generierung wiederholen",
@@ -1277,8 +1227,6 @@
     },
     "timeline": {
       "title": "Szenenleiste",
-      "sceneLabel": "Szene {{number}}",
-      "durationLabel": "{{seconds}} Sekunden",
       "selectScene": "Szene auswählen",
       "totalDuration": "Gesamtdauer des Storyboards",
       "totalDurationFull": "Gesamtdauer: {{seconds}} Sekunden",
@@ -1290,7 +1238,6 @@
       "noScenes": "Keine Szenen vorhanden"
     },
     "export": {
-      "action": "Assets exportieren",
       "title": "Assets exportieren",
       "body": "Exportiere das Storyboard-Manifest und das ausgewählte Asset jeder Szene.",
       "gapWarning": "Die Einstellungen {{shots}} sind noch Platzhalter und werden nicht einbezogen.",
@@ -1309,10 +1256,8 @@
       "successBody_other": "{{count}} ausgewählte Einstellungen nach „{{folderName}}“ übergeben.",
       "partialTitle": "Assets mit fehlenden Szenen exportiert",
       "partialBody": "Verfügbare Assets nach „{{folderName}}“ exportiert.",
-      "missingScenes": "Fehlende Szenen: {{scenes}}",
       "failed": "Assets konnten nicht exportiert werden.",
       "noSelectedAssets": "Keine ausgewählten Szenen-Assets sind für den Export bereit.",
-      "noAssetsToExport": "Wähle vor dem Export mindestens ein generiertes Szenen-Asset aus.",
       "folderLabel": "Exportordner"
     },
     "errors": {
@@ -1329,17 +1274,9 @@
       "storage": "Creative Studio konnte seine lokalen Daten nicht aktualisieren."
     },
     "models": {
-      "title": "Projektmodelle",
       "storyboard": "Storyboard-Modell",
-      "image": "Bildmodell",
-      "video": "Videomodell",
       "selectionRequired": "Modell auswählen",
-      "setupRequired": "Modelleinrichtung erforderlich",
       "unavailable": "Das ausgewählte Modell ist nicht verfügbar",
-      "suggested": "Empfohlen",
-      "setupTitle": "Modelleinrichtung abschließen",
-      "setupBody": "Konfiguriere Anbieter-Zugangsdaten und Medienbindungen in den Modelleinstellungen.",
-      "missingRoles": "Einrichtung erforderlich: {{roles}}",
       "openSettings": "Modelleinstellungen öffnen",
       "refresh": "Modelle aktualisieren",
       "loading": "Modelle werden geladen...",

@@ -881,8 +881,7 @@
       },
       "shared": {
         "backToLibrary": "Volver a la biblioteca de proyectos",
-        "noMediaGeneration": "Este paso no genera imágenes ni vídeos.",
-        "providerChargesMayApply": "El proveedor configurado puede cobrar por el uso del modelo."
+        "noMediaGeneration": "Este paso no genera imágenes ni vídeos."
       },
       "brief": {
         "title": "Briefing",
@@ -896,22 +895,18 @@
         "saving": "Guardando cambios del briefing...",
         "unsaved": "Los cambios del briefing aún no se han guardado.",
         "invalidName": "Introduce un nombre de proyecto antes de continuar.",
-        "invalidDuration": "Introduce una duración objetivo de entre 1 y 3.600 segundos.",
         "aspectLocked": "La relación de aspecto está bloqueada",
         "aspectLockedHelp": "La relación de aspecto no se puede cambiar después de añadir contenido generado."
       },
       "write": {
         "title": "Escribir",
-        "description": "Crea el guion gráfico y perfecciona cada plano antes de generar contenido.",
         "continueToProduce": "Continuar a Producir",
         "askAssistant": "Preguntar al asistente",
-        "hideAssistant": "Ocultar asistente",
         "assistantTitle": "Asistente de escritura",
         "assistantDescription": "Usa el asistente para desarrollar la estructura de la historia, ideas de planos y prompts.",
         "textChargeDisclosure": "El borrador del guion gráfico usa el modelo de texto configurado. El proveedor puede cobrar por el uso del modelo.",
         "draftStoryboard": "Crear borrador del guion gráfico",
         "addShot": "Añadir plano",
-        "addVisual": "Añadir elemento visual",
         "fitToGoal": "Ajustar al objetivo",
         "noScenes": "Añade un plano o crea un borrador del guion gráfico para empezar.",
         "scriptTableTitle": "Guion",
@@ -936,7 +931,6 @@
         "goalMarker": "Objetivo de {{seconds}} s"
       },
       "produce": {
-        "title": "Producir",
         "connectEngine": "Conecta un motor — aproximadamente un minuto, una sola vez para todo el espacio de trabajo",
         "askTeammate": "Pedir ayuda a un compañero",
         "askTeammateCopy": "¿Puedes conectar un motor de imagen o vídeo para este espacio de trabajo en la configuración de modelos de WePrompt?",
@@ -949,20 +943,14 @@
         "render": "Renderizar · n/d",
         "renderAnother": "Renderizar otra vez · n/d",
         "openPreview": "Abrir vista previa de {{title}}",
-        "description": "Elige modelos, genera contenido y selecciona el mejor resultado para cada plano.",
         "reviewCut": "Revisar montaje",
-        "addVisual": "Añadir elemento visual",
         "modelsTitle": "Modelos",
-        "modelsHelp": "Elige los modelos usados para generar guiones gráficos, imágenes y vídeos.",
-        "openModelSettings": "Abrir ajustes de modelos",
         "activityTitle": "Actividad de generación",
         "activityEmpty": "No hay trabajos de generación en curso.",
         "jobsRunning": "{{count}} trabajos de generación en curso",
         "jobsRunning_one": "{{count}} trabajo de generación en curso",
         "jobsRunning_many": "{{count}} trabajos de generación en curso",
-        "jobsRunning_other": "{{count}} trabajos de generación en curso",
-        "batchTimingBlocker": "Ajusta la duración del guion gráfico al objetivo antes de generar todos los planos listos.",
-        "providerChargeDisclosure": "La generación de contenido usa los proveedores configurados. Los proveedores pueden cobrar por el uso del modelo."
+        "jobsRunning_other": "{{count}} trabajos de generación en curso"
       },
       "review": {
         "title": "Revisar",
@@ -992,23 +980,15 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Planifica historias, revisa cada escena y genera recursos de imagen o vídeo.",
-      "newProject": "Nuevo proyecto",
       "loading": "Cargando proyectos...",
-      "error": "No se han podido cargar los proyectos.",
       "retry": "Intentar de nuevo",
       "readinessLabel": "Borrador del guion gráfico",
-      "readinessReady": "Listo",
-      "readinessChecking": "Comprobando la configuración...",
       "readinessSetupRequired": "Es necesario configurar el modelo",
-      "readinessUnavailable": "Borrador no disponible",
       "openProject": "Abrir proyecto",
       "deleteProject": "Eliminar proyecto",
       "deleteConfirmTitle": "¿Eliminar este proyecto?",
       "deleteConfirmBody": "¿Eliminar «{{name}}» y sus recursos gestionados localmente? Esta acción no se puede deshacer.",
       "deleteActiveWork": "Este proyecto tiene tareas de generación activas. Cancélalas o espera a que finalicen antes de eliminarlo.",
-      "createFailed": "No se ha podido crear el proyecto.",
-      "deleteFailed": "No se ha podido eliminar el proyecto.",
-      "sceneCount": "{{count}} escenas",
       "composer": {
         "label": "¿Qué vamos a crear?",
         "placeholder": "La idea de la historia en una frase…",
@@ -1056,19 +1036,12 @@
       "title": "Crear un proyecto de Creative Studio",
       "nameLabel": "Nombre del proyecto",
       "namePlaceholder": "Historia de lanzamiento de producto",
-      "briefLabel": "Briefing creativo",
-      "briefPlaceholder": "Describe el público, el mensaje, el tono y la dirección visual.",
-      "aspectRatioLabel": "Relación de aspecto",
       "aspectRatio16x9": "Horizontal (16:9)",
       "aspectRatio9x16": "Vertical (9:16)",
       "aspectRatio1x1": "Cuadrado (1:1)",
       "aspectRatio4x3": "Horizontal clásico (4:3)",
       "aspectRatio3x4": "Vertical clásico (3:4)",
-      "targetDurationLabel": "Duración objetivo en segundos",
-      "targetDurationHint": "Elige un número entero entre 5 y 60.",
       "invalidDuration": "Introduce un número entero entre 5 y 60 segundos.",
-      "creating": "Creando proyecto...",
-      "submit": "Crear proyecto",
       "cancel": "Cancelar"
     },
     "project": {
@@ -1080,11 +1053,7 @@
       "targetDuration": "Duración objetivo",
       "resolution": "Resolución",
       "sceneCount": "Escenas",
-      "readiness": "Disponibilidad del borrador",
-      "scenesReady": "{{ready}}/{{total}} escenas listas",
-      "emptyStoryboard": "Aún no hay escenas. Añádelas manualmente o crea un borrador del guion gráfico.",
-      "backToLibrary": "Volver a Creative Studio",
-      "loadFailed": "No se ha podido cargar el proyecto."
+      "readiness": "Disponibilidad del borrador"
     },
     "storyboard": {
       "title": "Guion gráfico",
@@ -1106,8 +1075,6 @@
       "durationRemaining": "{{seconds}} segundos restantes",
       "increaseTarget": "Aumentar el objetivo a {{seconds}} segundos",
       "shortenBeforeAdding": "Acorta las escenas existentes antes de añadir otra.",
-      "moveUp": "Mover escena hacia arriba",
-      "moveDown": "Mover escena hacia abajo",
       "dragScene": "Arrastra la escena para reordenarla",
       "removeScene": "Eliminar escena",
       "dragSceneAccessible": "Arrastrar escena {{number}}: {{title}}",
@@ -1134,14 +1101,11 @@
       "image": "Imagen",
       "video": "Vídeo",
       "duration": "Duración",
-      "seconds": "segundos",
       "durationSeconds": "{{seconds}} segundos",
       "durationSeconds_one": "{{seconds}} segundo",
       "durationSeconds_many": "{{seconds}} segundos",
       "durationSeconds_other": "{{seconds}} segundos",
-      "selected": "Escena seleccionada",
-      "draft": "Borrador",
-      "ready": "Lista para generar"
+      "selected": "Escena seleccionada"
     },
     "inspector": {
       "title": "Dirección de la escena",
@@ -1164,8 +1128,6 @@
       "unsavedChanges": "Tus cambios sin guardar se conservan."
     },
     "draft": {
-      "action": "Crear borrador del guion gráfico",
-      "redraftAction": "Volver a crear el guion gráfico",
       "title": "Crear un borrador del guion gráfico",
       "body": "WePrompt propondrá escenas, narración, texto en pantalla y tiempos para que los revises.",
       "checking": "Comprobando el modelo de guion gráfico seleccionado...",
@@ -1185,18 +1147,9 @@
     },
     "routing": {
       "title": "Ruta de generación",
-      "smartRoute": "Ruta inteligente",
-      "imageRoute": "Ruta de imagen",
-      "videoRoute": "Ruta de vídeo",
-      "providerLabel": "Proveedor",
       "modelLabel": "Modelo",
       "missingRoute": "Elige una ruta de generación compatible.",
-      "invalidRoute": "Esta ruta ya no es válida. Revísala antes de generar.",
-      "suggestionLastSuccessful": "Última ruta correcta",
-      "suggestionConfiguredImageModel": "Modelo de imagen configurado",
-      "suggestionSoleCompatible": "Única ruta compatible",
-      "manualRequired": "Elige una ruta manualmente",
-      "noCompatibleRoute": "No hay ninguna ruta compatible disponible"
+      "invalidRoute": "Esta ruta ya no es válida. Revísala antes de generar."
     },
     "review": {
       "generateReadyScenes": "Generar {{count}} escenas listas",
@@ -1229,12 +1182,9 @@
       "chargeNotice": "La generación usa la cuenta del proveedor seleccionado y puede generar cargos.",
       "confirm": "Confirmar y generar",
       "cancel": "Cancelar",
-      "submitFailed": "No se ha podido enviar la generación.",
       "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada."
     },
     "jobs": {
-      "title": "Tareas de generación",
-      "noJobs": "Aún no hay tareas de generación.",
       "progress": "{{percent}} % completado",
       "cancel": "Cancelar tarea",
       "retry": "Reintentar generación",
@@ -1287,8 +1237,6 @@
     },
     "timeline": {
       "title": "Tira de escenas",
-      "sceneLabel": "Escena {{number}}",
-      "durationLabel": "{{seconds}} segundos",
       "selectScene": "Seleccionar escena",
       "totalDuration": "Duración total del guion gráfico",
       "totalDurationFull": "Duración total: {{seconds}} segundos",
@@ -1302,7 +1250,6 @@
       "noScenes": "No hay escenas que mostrar"
     },
     "export": {
-      "action": "Exportar recursos",
       "title": "Exportar recursos",
       "body": "Exporta el manifiesto del guion gráfico y el recurso seleccionado de cada escena.",
       "gapWarning": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
@@ -1324,10 +1271,8 @@
       "successBody_other": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
       "partialTitle": "Recursos exportados con escenas ausentes",
       "partialBody": "Los recursos disponibles se han exportado a «{{folderName}}».",
-      "missingScenes": "Escenas ausentes: {{scenes}}",
       "failed": "No se han podido exportar los recursos.",
       "noSelectedAssets": "No hay recursos de escenas seleccionados listos para exportar.",
-      "noAssetsToExport": "Selecciona al menos un recurso de escena generado antes de exportar.",
       "folderLabel": "Carpeta de exportación"
     },
     "errors": {
@@ -1344,17 +1289,9 @@
       "storage": "Creative Studio no ha podido actualizar sus datos locales."
     },
     "models": {
-      "title": "Modelos del proyecto",
       "storyboard": "Modelo de guion gráfico",
-      "image": "Modelo de imagen",
-      "video": "Modelo de vídeo",
       "selectionRequired": "Selecciona un modelo",
-      "setupRequired": "Se requiere configurar el modelo",
       "unavailable": "El modelo seleccionado no está disponible",
-      "suggested": "Sugerido",
-      "setupTitle": "Completa la configuración de modelos",
-      "setupBody": "Configura las credenciales del proveedor y las vinculaciones de medios en Ajustes de modelos.",
-      "missingRoles": "Requiere configuración: {{roles}}",
       "openSettings": "Abrir ajustes de modelos",
       "refresh": "Actualizar modelos",
       "loading": "Cargando modelos...",

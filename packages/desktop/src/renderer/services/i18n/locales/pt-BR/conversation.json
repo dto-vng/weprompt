@@ -886,8 +886,7 @@
       },
       "shared": {
         "backToLibrary": "Voltar à biblioteca de projetos",
-        "noMediaGeneration": "Esta etapa não gera imagens nem vídeos.",
-        "providerChargesMayApply": "O provedor configurado pode cobrar pelo uso do modelo."
+        "noMediaGeneration": "Esta etapa não gera imagens nem vídeos."
       },
       "brief": {
         "title": "Briefing",
@@ -901,22 +900,18 @@
         "saving": "Salvando alterações do briefing...",
         "unsaved": "As alterações do briefing ainda não foram salvas.",
         "invalidName": "Informe um nome de projeto antes de continuar.",
-        "invalidDuration": "Informe uma duração desejada entre 1 e 3.600 segundos.",
         "aspectLocked": "A proporção está bloqueada",
         "aspectLockedHelp": "A proporção não pode ser alterada depois que uma mídia gerada for adicionada."
       },
       "write": {
         "title": "Escrever",
-        "description": "Monte o storyboard e refine cada tomada antes de gerar mídia.",
         "continueToProduce": "Continuar para Produzir",
         "askAssistant": "Perguntar ao assistente",
-        "hideAssistant": "Ocultar assistente",
         "assistantTitle": "Assistente de escrita",
         "assistantDescription": "Use o assistente para desenvolver a estrutura da história, ideias de tomadas e prompts.",
         "textChargeDisclosure": "O rascunho do storyboard usa o modelo de texto configurado. O provedor pode cobrar pelo uso do modelo.",
         "draftStoryboard": "Criar rascunho do storyboard",
         "addShot": "Adicionar tomada",
-        "addVisual": "Adicionar visual",
         "fitToGoal": "Ajustar à meta",
         "noScenes": "Adicione uma tomada ou crie um rascunho do storyboard para começar.",
         "scriptTableTitle": "Roteiro",
@@ -941,7 +936,6 @@
         "goalMarker": "Meta de {{seconds}} s"
       },
       "produce": {
-        "title": "Produzir",
         "connectEngine": "Conecte um mecanismo — cerca de um minuto, uma vez para todo o espaço de trabalho",
         "askTeammate": "Pedir a um colega",
         "askTeammateCopy": "Você pode conectar um mecanismo de imagem ou vídeo para este espaço de trabalho nas Configurações de Modelo do WePrompt?",
@@ -954,20 +948,14 @@
         "render": "Renderizar · n/d",
         "renderAnother": "Renderizar novamente · n/d",
         "openPreview": "Abrir prévia de {{title}}",
-        "description": "Escolha modelos, gere mídia e selecione o melhor resultado para cada tomada.",
         "reviewCut": "Revisar corte",
-        "addVisual": "Adicionar visual",
         "modelsTitle": "Modelos",
-        "modelsHelp": "Escolha os modelos usados para gerar storyboard, imagens e vídeos.",
-        "openModelSettings": "Abrir configurações de modelo",
         "activityTitle": "Atividade de geração",
         "activityEmpty": "Nenhum trabalho de geração está em execução.",
         "jobsRunning": "{{count}} trabalhos de geração em execução",
         "jobsRunning_one": "{{count}} trabalho de geração em execução",
         "jobsRunning_many": "{{count}} trabalhos de geração em execução",
-        "jobsRunning_other": "{{count}} trabalhos de geração em execução",
-        "batchTimingBlocker": "Ajuste a duração do storyboard à meta antes de gerar todas as tomadas prontas.",
-        "providerChargeDisclosure": "A geração de mídia usa os provedores configurados. Eles podem cobrar pelo uso do modelo."
+        "jobsRunning_other": "{{count}} trabalhos de geração em execução"
       },
       "review": {
         "title": "Revisar",
@@ -997,23 +985,15 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Planeje histórias, revise cada cena e gere recursos de imagem ou vídeo.",
-      "newProject": "Novo projeto",
       "loading": "Carregando projetos...",
-      "error": "Não foi possível carregar os projetos.",
       "retry": "Tentar novamente",
       "readinessLabel": "Rascunho do storyboard",
-      "readinessReady": "Pronto",
-      "readinessChecking": "Verificando a configuração...",
       "readinessSetupRequired": "É necessário configurar o modelo",
-      "readinessUnavailable": "Rascunho indisponível",
       "openProject": "Abrir projeto",
       "deleteProject": "Excluir projeto",
       "deleteConfirmTitle": "Excluir este projeto?",
       "deleteConfirmBody": "Excluir “{{name}}” e os recursos gerenciados localmente? Esta ação não pode ser desfeita.",
       "deleteActiveWork": "Este projeto tem trabalhos de geração ativos. Cancele-os ou aguarde a conclusão antes de excluir o projeto.",
-      "createFailed": "Não foi possível criar o projeto.",
-      "deleteFailed": "Não foi possível excluir o projeto.",
-      "sceneCount": "{{count}} cenas",
       "composer": {
         "label": "O que vamos criar?",
         "placeholder": "A ideia da história em uma frase…",
@@ -1061,19 +1041,12 @@
       "title": "Criar um projeto do Creative Studio",
       "nameLabel": "Nome do projeto",
       "namePlaceholder": "História de lançamento do produto",
-      "briefLabel": "Briefing criativo",
-      "briefPlaceholder": "Descreva o público, a mensagem, o tom e a direção visual.",
-      "aspectRatioLabel": "Proporção",
       "aspectRatio16x9": "Paisagem (16:9)",
       "aspectRatio9x16": "Retrato (9:16)",
       "aspectRatio1x1": "Quadrado (1:1)",
       "aspectRatio4x3": "Paisagem clássica (4:3)",
       "aspectRatio3x4": "Retrato clássico (3:4)",
-      "targetDurationLabel": "Duração desejada em segundos",
-      "targetDurationHint": "Escolha um número inteiro de 5 a 60.",
       "invalidDuration": "Digite um número inteiro de 5 a 60 segundos.",
-      "creating": "Criando projeto...",
-      "submit": "Criar projeto",
       "cancel": "Cancelar"
     },
     "project": {
@@ -1085,11 +1058,7 @@
       "targetDuration": "Duração desejada",
       "resolution": "Resolução",
       "sceneCount": "Cenas",
-      "readiness": "Disponibilidade do rascunho",
-      "scenesReady": "{{ready}}/{{total}} cenas prontas",
-      "emptyStoryboard": "Ainda não há cenas. Adicione cenas manualmente ou crie um rascunho do storyboard.",
-      "backToLibrary": "Voltar ao Creative Studio",
-      "loadFailed": "Não foi possível carregar o projeto."
+      "readiness": "Disponibilidade do rascunho"
     },
     "storyboard": {
       "title": "Storyboard",
@@ -1111,8 +1080,6 @@
       "durationRemaining": "{{seconds}} segundos restantes",
       "increaseTarget": "Aumentar a duração para {{seconds}} segundos",
       "shortenBeforeAdding": "Encurte as cenas existentes antes de adicionar outra.",
-      "moveUp": "Mover cena para cima",
-      "moveDown": "Mover cena para baixo",
       "dragScene": "Arraste a cena para reordenar",
       "removeScene": "Remover cena",
       "dragSceneAccessible": "Arrastar cena {{number}}: {{title}}",
@@ -1139,14 +1106,11 @@
       "image": "Imagem",
       "video": "Vídeo",
       "duration": "Duração",
-      "seconds": "segundos",
       "durationSeconds": "{{seconds}} segundos",
       "durationSeconds_one": "{{seconds}} segundo",
       "durationSeconds_many": "{{seconds}} segundos",
       "durationSeconds_other": "{{seconds}} segundos",
-      "selected": "Cena selecionada",
-      "draft": "Rascunho",
-      "ready": "Pronta para gerar"
+      "selected": "Cena selecionada"
     },
     "inspector": {
       "title": "Direção da cena",
@@ -1169,8 +1133,6 @@
       "unsavedChanges": "Suas alterações não salvas foram preservadas."
     },
     "draft": {
-      "action": "Criar rascunho do storyboard",
-      "redraftAction": "Refazer storyboard",
       "title": "Criar um rascunho do storyboard",
       "body": "O WePrompt vai propor cenas, narração, texto na tela e duração para você revisar.",
       "checking": "Verificando o modelo de storyboard selecionado...",
@@ -1190,18 +1152,9 @@
     },
     "routing": {
       "title": "Rota de geração",
-      "smartRoute": "Rota inteligente",
-      "imageRoute": "Rota de imagem",
-      "videoRoute": "Rota de vídeo",
-      "providerLabel": "Provedor",
       "modelLabel": "Modelo",
       "missingRoute": "Escolha uma rota de geração compatível.",
-      "invalidRoute": "Esta rota não é mais válida. Revise-a antes de gerar.",
-      "suggestionLastSuccessful": "Última rota bem-sucedida",
-      "suggestionConfiguredImageModel": "Modelo de imagem configurado",
-      "suggestionSoleCompatible": "Única rota compatível",
-      "manualRequired": "Escolha uma rota manualmente",
-      "noCompatibleRoute": "Nenhuma rota compatível está disponível"
+      "invalidRoute": "Esta rota não é mais válida. Revise-a antes de gerar."
     },
     "review": {
       "generateReadyScenes": "Gerar {{count}} cenas prontas",
@@ -1234,12 +1187,9 @@
       "chargeNotice": "A geração usa a conta do provedor selecionado e pode gerar cobranças.",
       "confirm": "Confirmar e gerar",
       "cancel": "Cancelar",
-      "submitFailed": "Não foi possível enviar a geração.",
       "disabledMissingRoutes": "Escolha uma rota válida para cada cena selecionada."
     },
     "jobs": {
-      "title": "Trabalhos de geração",
-      "noJobs": "Ainda não há trabalhos de geração.",
       "progress": "{{percent}}% concluído",
       "cancel": "Cancelar trabalho",
       "retry": "Tentar gerar novamente",
@@ -1292,8 +1242,6 @@
     },
     "timeline": {
       "title": "Faixa de cenas",
-      "sceneLabel": "Cena {{number}}",
-      "durationLabel": "{{seconds}} segundos",
       "selectScene": "Selecionar cena",
       "totalDuration": "Duração total do storyboard",
       "totalDurationFull": "Duração total: {{seconds}} segundos",
@@ -1307,7 +1255,6 @@
       "noScenes": "Não há cenas para mostrar"
     },
     "export": {
-      "action": "Exportar recursos",
       "title": "Exportar recursos",
       "body": "Exporte o manifesto do storyboard e o recurso selecionado de cada cena.",
       "gapWarning": "Os planos {{shots}} ainda são cartelas e não serão incluídos.",
@@ -1329,10 +1276,8 @@
       "successBody_other": "{{count}} cenas selecionadas foram entregues em “{{folderName}}”.",
       "partialTitle": "Recursos exportados com cenas ausentes",
       "partialBody": "Recursos disponíveis exportados para “{{folderName}}”.",
-      "missingScenes": "Cenas ausentes: {{scenes}}",
       "failed": "Não foi possível exportar os recursos.",
       "noSelectedAssets": "Nenhum recurso de cena selecionado está pronto para exportação.",
-      "noAssetsToExport": "Selecione pelo menos um recurso de cena gerado antes de exportar.",
       "folderLabel": "Pasta de exportação"
     },
     "errors": {
@@ -1349,17 +1294,9 @@
       "storage": "O Creative Studio não conseguiu atualizar seus dados locais."
     },
     "models": {
-      "title": "Modelos do projeto",
       "storyboard": "Modelo de storyboard",
-      "image": "Modelo de imagem",
-      "video": "Modelo de vídeo",
       "selectionRequired": "Selecione um modelo",
-      "setupRequired": "Configuração de modelo necessária",
       "unavailable": "O modelo selecionado não está disponível",
-      "suggested": "Sugerido",
-      "setupTitle": "Conclua a configuração de modelos",
-      "setupBody": "Configure as credenciais do provedor e os vínculos de mídia em Configurações de modelos.",
-      "missingRoles": "Requer configuração: {{roles}}",
       "openSettings": "Abrir configurações de modelos",
       "refresh": "Atualizar modelos",
       "loading": "Carregando modelos...",

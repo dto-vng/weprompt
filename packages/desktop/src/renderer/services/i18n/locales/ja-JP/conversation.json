@@ -878,8 +878,7 @@
       },
       "shared": {
         "backToLibrary": "プロジェクト一覧に戻る",
-        "noMediaGeneration": "この手順では画像や動画は生成されません。",
-        "providerChargesMayApply": "設定したプロバイダーからモデル利用料が請求される場合があります。"
+        "noMediaGeneration": "この手順では画像や動画は生成されません。"
       },
       "brief": {
         "title": "概要",
@@ -893,22 +892,18 @@
         "saving": "概要の変更を保存しています...",
         "unsaved": "概要の変更はまだ保存されていません。",
         "invalidName": "続行する前にプロジェクト名を入力してください。",
-        "invalidDuration": "目標尺は 1～3,600 秒で入力してください。",
         "aspectLocked": "アスペクト比は固定されています",
         "aspectLockedHelp": "生成済みメディアを追加した後はアスペクト比を変更できません。"
       },
       "write": {
         "title": "構成",
-        "description": "メディアを生成する前に、ストーリーボードを作り各ショットを調整します。",
         "continueToProduce": "生成へ進む",
         "askAssistant": "アシスタントに相談",
-        "hideAssistant": "アシスタントを隠す",
         "assistantTitle": "構成アシスタント",
         "assistantDescription": "ストーリー構成、ショット案、プロンプトの作成にアシスタントを利用できます。",
         "textChargeDisclosure": "ストーリーボードの下書きには設定済みのテキストモデルを使用します。プロバイダーから利用料が請求される場合があります。",
         "draftStoryboard": "ストーリーボードを下書き",
         "addShot": "ショットを追加",
-        "addVisual": "ビジュアルを追加",
         "fitToGoal": "目標に合わせる",
         "noScenes": "ショットを追加するか、ストーリーボードを下書きして開始します。",
         "scriptTableTitle": "台本",
@@ -933,7 +928,6 @@
         "goalMarker": "目標 {{seconds}} 秒"
       },
       "produce": {
-        "title": "生成",
         "connectEngine": "エンジンを接続 — 約1分、ワークスペース全体で一度だけ",
         "askTeammate": "チームメンバーに依頼",
         "askTeammateCopy": "このワークスペース用の画像または動画エンジンを WePrompt のモデル設定で接続してもらえますか？",
@@ -946,18 +940,12 @@
         "render": "レンダリング · 該当なし",
         "renderAnother": "もう一度レンダリング · 該当なし",
         "openPreview": "{{title}} のプレビューを開く",
-        "description": "モデルを選び、メディアを生成して、各ショットに最適な結果を選択します。",
         "reviewCut": "編集結果を確認",
-        "addVisual": "ビジュアルを追加",
         "modelsTitle": "モデル",
-        "modelsHelp": "ストーリーボード、画像、動画の生成に使うモデルを選択します。",
-        "openModelSettings": "モデル設定を開く",
         "activityTitle": "生成状況",
         "activityEmpty": "実行中の生成ジョブはありません。",
         "jobsRunning": "{{count}} 件の生成ジョブが実行中",
-        "jobsRunning_other": "{{count}} 件の生成ジョブが実行中",
-        "batchTimingBlocker": "準備済みの全ショットを生成する前に、ストーリーボードの尺を目標に合わせてください。",
-        "providerChargeDisclosure": "メディア生成には設定済みのプロバイダーを使用します。プロバイダーからモデル利用料が請求される場合があります。"
+        "jobsRunning_other": "{{count}} 件の生成ジョブが実行中"
       },
       "review": {
         "title": "確認",
@@ -983,23 +971,15 @@
     "library": {
       "title": "クリエイティブスタジオ",
       "subtitle": "物語を組み立て、各シーンを確認して、画像や動画の素材を生成します。",
-      "newProject": "新しいプロジェクト",
       "loading": "プロジェクトを読み込んでいます...",
-      "error": "プロジェクトを読み込めませんでした。",
       "retry": "もう一度試す",
       "readinessLabel": "ストーリーボード作成",
-      "readinessReady": "準備完了",
-      "readinessChecking": "設定を確認しています...",
       "readinessSetupRequired": "モデルの設定が必要です",
-      "readinessUnavailable": "下書きを利用できません",
       "openProject": "プロジェクトを開く",
       "deleteProject": "プロジェクトを削除",
       "deleteConfirmTitle": "このプロジェクトを削除しますか？",
       "deleteConfirmBody": "「{{name}}」とローカル管理されている素材を削除しますか？この操作は元に戻せません。",
       "deleteActiveWork": "このプロジェクトには進行中の生成処理があります。削除する前にキャンセルするか、完了までお待ちください。",
-      "createFailed": "プロジェクトを作成できませんでした。",
-      "deleteFailed": "プロジェクトを削除できませんでした。",
-      "sceneCount": "{{count}} シーン",
       "composer": {
         "label": "何を作りますか？",
         "placeholder": "ストーリーのアイデアを一文で…",
@@ -1043,19 +1023,12 @@
       "title": "クリエイティブスタジオのプロジェクトを作成",
       "nameLabel": "プロジェクト名",
       "namePlaceholder": "製品発表のストーリー",
-      "briefLabel": "クリエイティブ概要",
-      "briefPlaceholder": "対象者、伝えたい内容、雰囲気、ビジュアルの方向性を記述します。",
-      "aspectRatioLabel": "アスペクト比",
       "aspectRatio16x9": "横長（16:9）",
       "aspectRatio9x16": "縦長（9:16）",
       "aspectRatio1x1": "正方形（1:1）",
       "aspectRatio4x3": "標準の横長（4:3）",
       "aspectRatio3x4": "標準の縦長（3:4）",
-      "targetDurationLabel": "目標の長さ（秒）",
-      "targetDurationHint": "5 から 60 の整数を選択してください。",
       "invalidDuration": "5 秒から 60 秒までの整数を入力してください。",
-      "creating": "プロジェクトを作成しています...",
-      "submit": "プロジェクトを作成",
       "cancel": "キャンセル"
     },
     "project": {
@@ -1067,11 +1040,7 @@
       "targetDuration": "目標の長さ",
       "resolution": "解像度",
       "sceneCount": "シーン数",
-      "readiness": "下書きの準備状況",
-      "scenesReady": "{{ready}}/{{total}} シーンが準備完了",
-      "emptyStoryboard": "シーンがありません。手動で追加するか、ストーリーボードを作成してください。",
-      "backToLibrary": "クリエイティブスタジオに戻る",
-      "loadFailed": "プロジェクトを読み込めませんでした。"
+      "readiness": "下書きの準備状況"
     },
     "storyboard": {
       "title": "ストーリーボード",
@@ -1093,8 +1062,6 @@
       "durationRemaining": "{{seconds}}秒残り",
       "increaseTarget": "目標を{{seconds}}秒に延長",
       "shortenBeforeAdding": "別のシーンを追加する前に、既存のシーンを短くしてください。",
-      "moveUp": "シーンを上へ移動",
-      "moveDown": "シーンを下へ移動",
       "dragScene": "シーンをドラッグして並べ替え",
       "removeScene": "シーンを削除",
       "dragSceneAccessible": "シーン {{number}}「{{title}}」をドラッグ",
@@ -1121,12 +1088,9 @@
       "image": "画像",
       "video": "動画",
       "duration": "時間",
-      "seconds": "秒",
       "durationSeconds": "{{seconds}} 秒",
       "durationSeconds_other": "{{seconds}} 秒",
-      "selected": "選択中のシーン",
-      "draft": "下書き",
-      "ready": "生成準備完了"
+      "selected": "選択中のシーン"
     },
     "inspector": {
       "title": "シーンの演出",
@@ -1149,8 +1113,6 @@
       "unsavedChanges": "未保存の変更は保持されています。"
     },
     "draft": {
-      "action": "ストーリーボードを作成",
-      "redraftAction": "ストーリーボードを再作成",
       "title": "ストーリーボードの下書きを作成",
       "body": "WePrompt が確認用にシーン、ナレーション、画面上のテキスト、時間配分を提案します。",
       "checking": "選択したストーリーボードモデルを確認中...",
@@ -1170,18 +1132,9 @@
     },
     "routing": {
       "title": "生成ルート",
-      "smartRoute": "スマートルート",
-      "imageRoute": "画像ルート",
-      "videoRoute": "動画ルート",
-      "providerLabel": "プロバイダー",
       "modelLabel": "モデル",
       "missingRoute": "互換性のある生成ルートを選択してください。",
-      "invalidRoute": "このルートは無効になりました。生成前に確認してください。",
-      "suggestionLastSuccessful": "前回成功したルート",
-      "suggestionConfiguredImageModel": "設定済みの画像モデル",
-      "suggestionSoleCompatible": "唯一の互換ルート",
-      "manualRequired": "ルートを手動で選択",
-      "noCompatibleRoute": "利用できる互換ルートがありません"
+      "invalidRoute": "このルートは無効になりました。生成前に確認してください。"
     },
     "review": {
       "generateReadyScenes": "準備済みの{{count}}シーンを生成",
@@ -1208,12 +1161,9 @@
       "chargeNotice": "生成には選択したプロバイダーアカウントが使用され、料金が発生する場合があります。",
       "confirm": "確認して生成",
       "cancel": "キャンセル",
-      "submitFailed": "生成を送信できませんでした。",
       "disabledMissingRoutes": "選択した各シーンに有効なルートを指定してください。"
     },
     "jobs": {
-      "title": "生成ジョブ",
-      "noJobs": "生成ジョブはまだありません。",
       "progress": "{{percent}}% 完了",
       "cancel": "ジョブをキャンセル",
       "retry": "生成を再試行",
@@ -1266,8 +1216,6 @@
     },
     "timeline": {
       "title": "シーンストリップ",
-      "sceneLabel": "シーン {{number}}",
-      "durationLabel": "{{seconds}} 秒",
       "selectScene": "シーンを選択",
       "totalDuration": "ストーリーボードの合計時間",
       "totalDurationFull": "合計時間：{{seconds}} 秒",
@@ -1277,7 +1225,6 @@
       "noScenes": "表示するシーンがありません"
     },
     "export": {
-      "action": "素材を書き出す",
       "title": "素材を書き出す",
       "body": "ストーリーボードのマニフェストと各シーンで選択した素材を書き出します。",
       "gapWarning": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
@@ -1293,10 +1240,8 @@
       "successBody_other": "選択済みの {{count}} シーンを「{{folderName}}」に引き渡しました。",
       "partialTitle": "一部のシーンを除いて素材を書き出しました",
       "partialBody": "利用可能な素材を「{{folderName}}」に書き出しました。",
-      "missingScenes": "不足しているシーン：{{scenes}}",
       "failed": "素材を書き出せませんでした。",
       "noSelectedAssets": "書き出せる選択済みのシーン素材がありません。",
-      "noAssetsToExport": "書き出す前に生成済みのシーン素材を1つ以上選択してください。",
       "folderLabel": "書き出しフォルダー"
     },
     "errors": {
@@ -1313,17 +1258,9 @@
       "storage": "クリエイティブスタジオがローカルデータを更新できませんでした。"
     },
     "models": {
-      "title": "プロジェクトモデル",
       "storyboard": "ストーリーボードモデル",
-      "image": "画像モデル",
-      "video": "動画モデル",
       "selectionRequired": "モデルを選択",
-      "setupRequired": "モデルの設定が必要です",
       "unavailable": "選択したモデルは利用できません",
-      "suggested": "おすすめ",
-      "setupTitle": "モデル設定を完了",
-      "setupBody": "モデル設定でプロバイダーの認証情報とメディアの関連付けを設定してください。",
-      "missingRoles": "設定が必要: {{roles}}",
       "openSettings": "モデル設定を開く",
       "refresh": "モデルを更新",
       "loading": "モデルを読み込み中...",

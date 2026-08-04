@@ -735,8 +735,7 @@
       },
       "shared": {
         "backToLibrary": "Back to project library",
-        "noMediaGeneration": "This step does not generate images or video.",
-        "providerChargesMayApply": "Your configured provider may charge for model use."
+        "noMediaGeneration": "This step does not generate images or video."
       },
       "brief": {
         "title": "Brief",
@@ -750,22 +749,18 @@
         "saving": "Saving brief changes...",
         "unsaved": "Brief changes have not been saved.",
         "invalidName": "Enter a project name before continuing.",
-        "invalidDuration": "Enter a target duration between 1 and 3,600 seconds.",
         "aspectLocked": "Aspect ratio is locked",
         "aspectLockedHelp": "The aspect ratio cannot change after generated media has been added."
       },
       "write": {
         "title": "Write",
-        "description": "Build the storyboard and refine each shot before generating media.",
         "continueToProduce": "Continue to Produce",
         "askAssistant": "Ask assistant",
-        "hideAssistant": "Hide assistant",
         "assistantTitle": "Writing assistant",
         "assistantDescription": "Use the assistant to develop story structure, shot ideas, and prompts.",
         "textChargeDisclosure": "Drafting a storyboard uses your configured text model. Your provider may charge for model use.",
         "draftStoryboard": "Draft storyboard",
         "addShot": "Add shot",
-        "addVisual": "Add visual",
         "fitToGoal": "Fit to goal",
         "noScenes": "Add a shot or draft a storyboard to begin.",
         "scriptTableTitle": "Script",
@@ -790,7 +785,6 @@
         "goalMarker": "{{seconds}}s goal"
       },
       "produce": {
-        "title": "Produce",
         "connectEngine": "Connect an engine — about a minute, once for the whole workspace",
         "askTeammate": "Ask a teammate",
         "askTeammateCopy": "Could you connect an image or video engine in WePrompt Model Settings for this workspace?",
@@ -803,19 +797,13 @@
         "render": "Render · n/a",
         "renderAnother": "Render another · n/a",
         "openPreview": "Open {{title}} preview",
-        "description": "Choose models, generate media, and select the best result for each shot.",
         "reviewCut": "Review cut",
-        "addVisual": "Add visual",
         "modelsTitle": "Models",
-        "modelsHelp": "Choose the models used for storyboard, image, and video generation.",
-        "openModelSettings": "Open model settings",
         "activityTitle": "Generation activity",
         "activityEmpty": "No generation jobs are running.",
         "jobsRunning": "{{count}} generation jobs running",
         "jobsRunning_one": "{{count}} generation job running",
-        "jobsRunning_other": "{{count}} generation jobs running",
-        "batchTimingBlocker": "Match the storyboard duration to the target before generating all ready shots.",
-        "providerChargeDisclosure": "Generating media uses your configured providers. Your providers may charge for model use."
+        "jobsRunning_other": "{{count}} generation jobs running"
       },
       "review": {
         "title": "Review",
@@ -843,23 +831,15 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Plan stories, review every scene, and generate image or video assets.",
-      "newProject": "New project",
       "loading": "Loading projects...",
-      "error": "Projects could not be loaded.",
       "retry": "Try again",
       "readinessLabel": "Storyboard drafting",
-      "readinessReady": "Ready",
-      "readinessChecking": "Checking setup...",
       "readinessSetupRequired": "Model setup required",
-      "readinessUnavailable": "Drafting unavailable",
       "openProject": "Open project",
       "deleteProject": "Delete project",
       "deleteConfirmTitle": "Delete this project?",
       "deleteConfirmBody": "Delete “{{name}}” and its locally managed assets? This cannot be undone.",
       "deleteActiveWork": "This project has active generation work. Cancel it or wait for it to finish before deleting.",
-      "createFailed": "The project could not be created.",
-      "deleteFailed": "The project could not be deleted.",
-      "sceneCount": "{{count}} scenes",
       "composer": {
         "label": "What are we making?",
         "placeholder": "A one-sentence idea for the story...",
@@ -905,19 +885,12 @@
       "title": "Create a Creative Studio project",
       "nameLabel": "Project name",
       "namePlaceholder": "Product launch story",
-      "briefLabel": "Creative brief",
-      "briefPlaceholder": "Describe the audience, message, tone, and visual direction.",
-      "aspectRatioLabel": "Aspect ratio",
       "aspectRatio16x9": "Landscape (16:9)",
       "aspectRatio9x16": "Portrait (9:16)",
       "aspectRatio1x1": "Square (1:1)",
       "aspectRatio4x3": "Classic landscape (4:3)",
       "aspectRatio3x4": "Classic portrait (3:4)",
-      "targetDurationLabel": "Target length in seconds",
-      "targetDurationHint": "Choose a whole number from 5 to 60.",
       "invalidDuration": "Enter a whole number from 5 to 60 seconds.",
-      "creating": "Creating project...",
-      "submit": "Create project",
       "cancel": "Cancel"
     },
     "project": {
@@ -929,11 +902,7 @@
       "targetDuration": "Target length",
       "resolution": "Resolution",
       "sceneCount": "Scenes",
-      "readiness": "Drafting readiness",
-      "scenesReady": "{{ready}}/{{total}} scenes ready",
-      "emptyStoryboard": "No scenes yet. Add scenes manually or draft a storyboard.",
-      "backToLibrary": "Back to Creative Studio",
-      "loadFailed": "The project could not be loaded."
+      "readiness": "Drafting readiness"
     },
     "storyboard": {
       "title": "Storyboard",
@@ -955,8 +924,6 @@
       "durationRemaining": "{{seconds}} seconds remaining",
       "increaseTarget": "Increase target to {{seconds}} seconds",
       "shortenBeforeAdding": "Shorten existing scenes before adding another.",
-      "moveUp": "Move scene up",
-      "moveDown": "Move scene down",
       "dragScene": "Drag scene to reorder",
       "removeScene": "Remove scene",
       "dragSceneAccessible": "Drag scene {{number}}: {{title}}",
@@ -983,13 +950,10 @@
       "image": "Image",
       "video": "Video",
       "duration": "Duration",
-      "seconds": "seconds",
       "durationSeconds": "{{seconds}} seconds",
       "durationSeconds_one": "{{seconds}} second",
       "durationSeconds_other": "{{seconds}} seconds",
-      "selected": "Selected scene",
-      "draft": "Draft",
-      "ready": "Ready to generate"
+      "selected": "Selected scene"
     },
     "inspector": {
       "title": "Scene direction",
@@ -1012,8 +976,6 @@
       "unsavedChanges": "Your unsaved changes are preserved."
     },
     "draft": {
-      "action": "Draft storyboard",
-      "redraftAction": "Redraft storyboard",
       "title": "Draft a storyboard",
       "body": "WePrompt will propose scenes, narration, on-screen text, and timing for your review.",
       "checking": "Checking the selected Storyboard model...",
@@ -1033,18 +995,9 @@
     },
     "routing": {
       "title": "Generation route",
-      "smartRoute": "Smart route",
-      "imageRoute": "Image route",
-      "videoRoute": "Video route",
-      "providerLabel": "Provider",
       "modelLabel": "Model",
       "missingRoute": "Choose a compatible generation route.",
-      "invalidRoute": "This route is no longer valid. Review it before generating.",
-      "suggestionLastSuccessful": "Last successful route",
-      "suggestionConfiguredImageModel": "Configured image model",
-      "suggestionSoleCompatible": "Only compatible route",
-      "manualRequired": "Choose a route manually",
-      "noCompatibleRoute": "No compatible route is available"
+      "invalidRoute": "This route is no longer valid. Review it before generating."
     },
     "review": {
       "generateReadyScenes": "Generate {{count}} ready scenes",
@@ -1074,12 +1027,9 @@
       "chargeNotice": "Generation uses your selected provider account and may incur provider charges.",
       "confirm": "Confirm and generate",
       "cancel": "Cancel",
-      "submitFailed": "Generation could not be submitted.",
       "disabledMissingRoutes": "Choose a valid route for every selected scene."
     },
     "jobs": {
-      "title": "Generation jobs",
-      "noJobs": "No generation jobs yet.",
       "progress": "{{percent}}% complete",
       "cancel": "Cancel job",
       "retry": "Retry generation",
@@ -1132,8 +1082,6 @@
     },
     "timeline": {
       "title": "Scene strip",
-      "sceneLabel": "Scene {{number}}",
-      "durationLabel": "{{seconds}} seconds",
       "selectScene": "Select scene",
       "totalDuration": "Total storyboard duration",
       "totalDurationFull": "Total duration: {{seconds}} seconds",
@@ -1145,7 +1093,6 @@
       "noScenes": "No scenes to show"
     },
     "export": {
-      "action": "Export assets",
       "title": "Export assets",
       "body": "Export the storyboard manifest and each scene's selected asset.",
       "gapWarning": "Shots {{shots}} are still slates — they won't be included.",
@@ -1164,10 +1111,8 @@
       "successBody_other": "Handed off {{count}} selected scenes to “{{folderName}}”.",
       "partialTitle": "Assets exported with missing scenes",
       "partialBody": "Exported available assets to “{{folderName}}”.",
-      "missingScenes": "Missing scenes: {{scenes}}",
       "failed": "Assets could not be exported.",
       "noSelectedAssets": "No selected scene assets are ready to export.",
-      "noAssetsToExport": "Select at least one generated scene asset before exporting.",
       "folderLabel": "Export folder"
     },
     "errors": {
@@ -1184,17 +1129,9 @@
       "storage": "Creative Studio could not update its local data."
     },
     "models": {
-      "title": "Project models",
       "storyboard": "Storyboard model",
-      "image": "Image model",
-      "video": "Video model",
       "selectionRequired": "Select a model",
-      "setupRequired": "Model setup required",
       "unavailable": "The selected model is unavailable",
-      "suggested": "Suggested",
-      "setupTitle": "Complete model setup",
-      "setupBody": "Configure provider credentials and media bindings in Model Settings.",
-      "missingRoles": "Needs setup: {{roles}}",
       "openSettings": "Open Model Settings",
       "refresh": "Refresh models",
       "loading": "Loading models...",

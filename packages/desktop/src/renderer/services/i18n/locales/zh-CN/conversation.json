@@ -878,8 +878,7 @@
       },
       "shared": {
         "backToLibrary": "返回项目库",
-        "noMediaGeneration": "此步骤不会生成图像或视频。",
-        "providerChargesMayApply": "您配置的提供商可能会对模型使用收费。"
+        "noMediaGeneration": "此步骤不会生成图像或视频。"
       },
       "brief": {
         "title": "简报",
@@ -893,22 +892,18 @@
         "saving": "正在保存简报更改...",
         "unsaved": "简报更改尚未保存。",
         "invalidName": "请先输入项目名称再继续。",
-        "invalidDuration": "请输入 1 至 3,600 秒之间的目标时长。",
         "aspectLocked": "宽高比已锁定",
         "aspectLockedHelp": "添加生成的媒体后，无法更改宽高比。"
       },
       "write": {
         "title": "编写",
-        "description": "构建故事板并完善每个镜头，然后再生成媒体。",
         "continueToProduce": "继续制作",
         "askAssistant": "询问助手",
-        "hideAssistant": "隐藏助手",
         "assistantTitle": "编写助手",
         "assistantDescription": "使用助手完善故事结构、镜头创意和提示词。",
         "textChargeDisclosure": "起草故事板会使用您配置的文本模型。提供商可能会对模型使用收费。",
         "draftStoryboard": "起草故事板",
         "addShot": "添加镜头",
-        "addVisual": "添加视觉素材",
         "fitToGoal": "匹配目标",
         "noScenes": "添加镜头或起草故事板即可开始。",
         "scriptTableTitle": "脚本",
@@ -933,7 +928,6 @@
         "goalMarker": "目标 {{seconds}} 秒"
       },
       "produce": {
-        "title": "制作",
         "connectEngine": "连接一个引擎——大约一分钟，整个工作区只需设置一次",
         "askTeammate": "请同事帮忙",
         "askTeammateCopy": "请在 WePrompt 的模型设置中为此工作区连接一个图像或视频引擎。",
@@ -946,18 +940,12 @@
         "render": "渲染 · 暂无",
         "renderAnother": "再次渲染 · 暂无",
         "openPreview": "打开“{{title}}”预览",
-        "description": "选择模型、生成媒体，并为每个镜头选择最佳结果。",
         "reviewCut": "审阅剪辑",
-        "addVisual": "添加视觉素材",
         "modelsTitle": "模型",
-        "modelsHelp": "选择用于故事板、图像和视频生成的模型。",
-        "openModelSettings": "打开模型设置",
         "activityTitle": "生成活动",
         "activityEmpty": "当前没有正在运行的生成任务。",
         "jobsRunning": "有 {{count}} 个生成任务正在运行",
-        "jobsRunning_other": "有 {{count}} 个生成任务正在运行",
-        "batchTimingBlocker": "请先让故事板时长与目标一致，再生成所有已就绪镜头。",
-        "providerChargeDisclosure": "生成媒体会使用您配置的提供商。提供商可能会对模型使用收费。"
+        "jobsRunning_other": "有 {{count}} 个生成任务正在运行"
       },
       "review": {
         "title": "审阅",
@@ -983,23 +971,15 @@
     "library": {
       "title": "创意工作室",
       "subtitle": "规划故事、逐幕审核，并生成图像或视频素材。",
-      "newProject": "新建项目",
       "loading": "正在加载项目...",
-      "error": "无法加载项目。",
       "retry": "重试",
       "readinessLabel": "故事板起草",
-      "readinessReady": "已就绪",
-      "readinessChecking": "正在检查设置...",
       "readinessSetupRequired": "需要设置模型",
-      "readinessUnavailable": "起草功能不可用",
       "openProject": "打开项目",
       "deleteProject": "删除项目",
       "deleteConfirmTitle": "删除此项目？",
       "deleteConfirmBody": "要删除“{{name}}”及其本地托管素材吗？此操作无法撤销。",
       "deleteActiveWork": "此项目仍有正在进行的生成任务。请取消任务或等待完成后再删除。",
-      "createFailed": "无法创建项目。",
-      "deleteFailed": "无法删除项目。",
-      "sceneCount": "{{count}} 个场景",
       "composer": {
         "label": "我们要制作什么？",
         "placeholder": "用一句话描述这个故事……",
@@ -1009,7 +989,11 @@
         "submit": "阅读我的简报 →",
         "empty": "一句话就够了——说说我们要制作什么。"
       },
-      "shape": { "title": "从结构开始", "label": "{{count}} 个镜头 · {{seconds}} 秒", "sceneTitle": "镜头 {{number}}" },
+      "shape": {
+        "title": "从结构开始",
+        "label": "{{count}} 个镜头 · {{seconds}} 秒",
+        "sceneTitle": "镜头 {{number}}"
+      },
       "scriptOnly": "仅脚本",
       "posterBadge": "镜头 {{scene}} · 版本 {{take}}",
       "status": {
@@ -1039,19 +1023,12 @@
       "title": "创建创意工作室项目",
       "nameLabel": "项目名称",
       "namePlaceholder": "产品发布故事",
-      "briefLabel": "创意简报",
-      "briefPlaceholder": "描述受众、核心信息、基调和视觉方向。",
-      "aspectRatioLabel": "宽高比",
       "aspectRatio16x9": "横向画面（16:9）",
       "aspectRatio9x16": "纵向画面（9:16）",
       "aspectRatio1x1": "方形画面（1:1）",
       "aspectRatio4x3": "经典横向（4:3）",
       "aspectRatio3x4": "经典纵向（3:4）",
-      "targetDurationLabel": "目标时长（秒）",
-      "targetDurationHint": "请选择 5 到 60 之间的整数。",
       "invalidDuration": "请输入 5 到 60 秒之间的整数。",
-      "creating": "正在创建项目...",
-      "submit": "创建项目",
       "cancel": "取消"
     },
     "project": {
@@ -1063,11 +1040,7 @@
       "targetDuration": "目标时长",
       "resolution": "分辨率",
       "sceneCount": "场景数",
-      "readiness": "起草准备状态",
-      "scenesReady": "{{ready}}/{{total}} 个场景已就绪",
-      "emptyStoryboard": "尚无场景。可手动添加场景或起草故事板。",
-      "backToLibrary": "返回创意工作室",
-      "loadFailed": "无法加载项目。"
+      "readiness": "起草准备状态"
     },
     "storyboard": {
       "title": "故事板",
@@ -1089,8 +1062,6 @@
       "durationRemaining": "剩余 {{seconds}} 秒",
       "increaseTarget": "将目标时长增加到 {{seconds}} 秒",
       "shortenBeforeAdding": "添加新场景前，请先缩短现有场景。",
-      "moveUp": "上移场景",
-      "moveDown": "下移场景",
       "dragScene": "拖动场景以重新排序",
       "removeScene": "移除场景",
       "dragSceneAccessible": "拖动场景 {{number}}：{{title}}",
@@ -1117,12 +1088,9 @@
       "image": "图像",
       "video": "视频",
       "duration": "时长",
-      "seconds": "秒",
       "durationSeconds": "{{seconds}} 秒",
       "durationSeconds_other": "{{seconds}} 秒",
-      "selected": "已选场景",
-      "draft": "草稿",
-      "ready": "可生成"
+      "selected": "已选场景"
     },
     "inspector": {
       "title": "场景指导",
@@ -1145,8 +1113,6 @@
       "unsavedChanges": "未保存的更改已为你保留。"
     },
     "draft": {
-      "action": "起草故事板",
-      "redraftAction": "重新起草故事板",
       "title": "起草故事板",
       "body": "WePrompt 将提出场景、旁白、画面文字和时长，供你审核。",
       "checking": "正在检查所选分镜模型...",
@@ -1166,18 +1132,9 @@
     },
     "routing": {
       "title": "生成路线",
-      "smartRoute": "智能路线",
-      "imageRoute": "图像路线",
-      "videoRoute": "视频路线",
-      "providerLabel": "服务商",
       "modelLabel": "模型",
       "missingRoute": "请选择兼容的生成路线。",
-      "invalidRoute": "此路线已失效。请在生成前重新检查。",
-      "suggestionLastSuccessful": "上次成功的路线",
-      "suggestionConfiguredImageModel": "已配置的图像模型",
-      "suggestionSoleCompatible": "唯一兼容路线",
-      "manualRequired": "手动选择路线",
-      "noCompatibleRoute": "没有可用的兼容路线"
+      "invalidRoute": "此路线已失效。请在生成前重新检查。"
     },
     "review": {
       "generateReadyScenes": "生成 {{count}} 个已就绪场景",
@@ -1204,12 +1161,9 @@
       "chargeNotice": "生成会使用你选择的服务商账户，并可能产生服务商费用。",
       "confirm": "确认并生成",
       "cancel": "取消",
-      "submitFailed": "无法提交生成任务。",
       "disabledMissingRoutes": "请为每个所选场景选择有效路线。"
     },
     "jobs": {
-      "title": "生成任务",
-      "noJobs": "尚无生成任务。",
       "progress": "已完成 {{percent}}%",
       "cancel": "取消任务",
       "retry": "重试生成",
@@ -1262,8 +1216,6 @@
     },
     "timeline": {
       "title": "场景条",
-      "sceneLabel": "场景 {{number}}",
-      "durationLabel": "{{seconds}} 秒",
       "selectScene": "选择场景",
       "totalDuration": "故事板总时长",
       "totalDurationFull": "总时长：{{seconds}} 秒",
@@ -1273,7 +1225,6 @@
       "noScenes": "没有可显示的场景"
     },
     "export": {
-      "action": "导出素材",
       "title": "导出素材",
       "body": "导出故事板清单及每个场景选中的素材。",
       "gapWarning": "镜头 {{shots}} 仍是场记卡，将不会包含在导出中。",
@@ -1289,10 +1240,8 @@
       "successBody_other": "已将 {{count}} 个已选场景交付到“{{folderName}}”。",
       "partialTitle": "素材已导出，但有场景缺失",
       "partialBody": "可用素材已导出到“{{folderName}}”。",
-      "missingScenes": "缺失场景：{{scenes}}",
       "failed": "无法导出素材。",
       "noSelectedAssets": "没有可导出的已选场景素材。",
-      "noAssetsToExport": "导出前请至少选择一个已生成的场景素材。",
       "folderLabel": "导出文件夹"
     },
     "errors": {
@@ -1309,17 +1258,9 @@
       "storage": "创意工作室无法更新本地数据。"
     },
     "models": {
-      "title": "项目模型",
       "storyboard": "分镜模型",
-      "image": "图像模型",
-      "video": "视频模型",
       "selectionRequired": "请选择模型",
-      "setupRequired": "需要设置模型",
       "unavailable": "所选模型不可用",
-      "suggested": "推荐",
-      "setupTitle": "完成模型设置",
-      "setupBody": "请在模型设置中配置提供商凭据和媒体绑定。",
-      "missingRoles": "需要设置：{{roles}}",
       "openSettings": "打开模型设置",
       "refresh": "刷新模型",
       "loading": "正在加载模型...",
