@@ -833,6 +833,10 @@
     "importCard": "Import template (.md)",
     "empty": "No templates available",
     "chipTooltip": "This message will use the template",
+    "sources": {
+      "reselectRequired": "Reselect attached files to use them with this PPTX template.",
+      "reselectAction": "Reselect files"
+    },
     "scratch": {
       "prepareError": "Could not prepare artifact scratch space: {{error}}",
       "retained": "Temporary artifact files were kept for recovery at {{path}}.",

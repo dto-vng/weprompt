@@ -772,6 +772,10 @@
     "importCard": "テンプレートをインポート (.md)",
     "empty": "利用可能なテンプレートがありません",
     "chipTooltip": "このメッセージはテンプレートを使用します",
+    "sources": {
+      "reselectRequired": "この PPTX テンプレートで使用するには、添付ファイルを選択し直してください。",
+      "reselectAction": "ファイルを選択し直す"
+    },
     "scratch": {
       "prepareError": "成果物の一時領域を準備できませんでした: {{error}}",
       "retained": "復旧用の一時ファイルを {{path}} に保持しました。",

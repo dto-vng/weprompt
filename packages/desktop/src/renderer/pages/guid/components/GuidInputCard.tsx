@@ -6,11 +6,14 @@
 
 import FilePreview from '@/renderer/components/media/FilePreview';
 import UploadProgressBar from '@/renderer/components/media/UploadProgressBar';
+import type { PresentationSourceDescriptor } from '@/common/types/office/presentationRun';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useCompositionInput } from '@/renderer/hooks/chat/useCompositionInput';
-import { Input } from '@arco-design/web-react';
+import { Button, Input } from '@arco-design/web-react';
 import type { RefTextAreaType } from '@arco-design/web-react/es/Input';
-import React, { useEffect, useRef } from 'react';
+import { CloseOne } from '@icon-park/react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import styles from '../index.module.css';
 import GuidWorkspaceFootnote from './GuidWorkspaceFootnote';
 
@@ -36,6 +39,9 @@ type GuidInputCardProps = {
   // Files
   files: string[];
   onRemoveFile: (path: string) => void;
+  presentationSourceDescriptors?: readonly PresentationSourceDescriptor[];
+  onRevokePresentationSource?: (grantId: string) => void;
+  onManagedDrop?: (files: readonly File[]) => void | Promise<void>;
 
   // Action row
   actionRow: React.ReactNode;
@@ -43,6 +49,7 @@ type GuidInputCardProps = {
 
   // Presentation templates
   templateChip?: React.ReactNode;
+  presentationSourceNotice?: React.ReactNode;
 
   // Workspace
   workspaceDir: string;
@@ -67,15 +74,20 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   dragHandlers,
   files,
   onRemoveFile,
+  presentationSourceDescriptors = [],
+  onRevokePresentationSource,
+  onManagedDrop,
   actionRow,
   slashCommandMenu,
   templateChip,
+  presentationSourceNotice,
   workspaceDir,
   onSelectWorkspace,
   onClearWorkspace,
 }) => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
+  const { t } = useTranslation();
   const { compositionHandlers, isComposing } = useCompositionInput();
   const inputRef = useRef<RefTextAreaType | null>(null);
   const textareaAutoSize = isMobile ? { minRows: 2, maxRows: 8 } : { minRows: 2, maxRows: 20 };
@@ -91,6 +103,19 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
     onKeyDown(e);
   };
 
+  const handleManagedDrop = useCallback<React.DragEventHandler<HTMLDivElement>>(
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+      if (droppedFiles.length > 0) {
+        void onManagedDrop?.(droppedFiles);
+      }
+    },
+    [onManagedDrop]
+  );
+  const resolvedDragHandlers = onManagedDrop ? { ...dragHandlers, onDrop: handleManagedDrop } : dragHandlers;
+
   const borderColor = isFileDragging
     ? 'rgb(var(--primary-3))'
     : isInputActive
@@ -100,6 +125,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   return (
     <div
       className={`${styles.guidInputCardWrap} guid-input-card-shell relative rd-24px flex flex-col ${slashCommandMenu ? 'overflow-visible' : 'overflow-hidden'} transition-all duration-200 ${isFileDragging ? 'b b-solid border-dashed guid-input-card-shell--dragging' : ''}`}
+      data-testid='guid-input-card'
       style={{
         zIndex: 1,
         transition: 'box-shadow 0.25s ease',
@@ -116,7 +142,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
               boxShadow: isInputActive ? activeShadow : 'none',
             }),
       }}
-      {...dragHandlers}
+      {...resolvedDragHandlers}
     >
       {/* inner white card — narrower than outer wrap */}
       <div
@@ -149,6 +175,29 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
         />
         <div style={{ height: 12, flexShrink: 0 }} aria-hidden='true' />
         {templateChip}
+        {presentationSourceNotice}
+        {presentationSourceDescriptors.length > 0 && (
+          <div className='flex flex-wrap items-center gap-8px mt-12px mb-12px' data-testid='presentation-source-list'>
+            {presentationSourceDescriptors.map((descriptor) => (
+              <div
+                key={descriptor.grantId}
+                className='flex items-center gap-4px rounded-6px bg-fill-2 px-8px py-4px text-12px text-t-primary'
+              >
+                <span>{descriptor.displayName}</span>
+                {onRevokePresentationSource ? (
+                  <Button
+                    type='text'
+                    size='mini'
+                    className='!h-20px !w-20px !p-0'
+                    aria-label={`${t('common.remove')} ${descriptor.displayName}`}
+                    icon={<CloseOne theme='outline' size='12' />}
+                    onClick={() => onRevokePresentationSource(descriptor.grantId)}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
         {files.length > 0 && (
           <div className='flex flex-wrap items-center gap-8px mt-12px mb-12px'>
             {files.map((path) => (

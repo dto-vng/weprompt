@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import { buildGuidSlashCommands } from '@/common/chat/slash/guidSlashCommands';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
+import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import { resolveLocaleKey } from '@/common/utils';
 import type { AssistantDetail } from '@/common/types/agent/assistantTypes';
 
@@ -34,7 +35,8 @@ import {
   TemplateGalleryExpanded,
   usePresentationTemplates,
 } from '@/renderer/components/chat/TemplateGallery';
-import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { getPresentationRunEligibility } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
+import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hooks/file/selection';
 import { appendSpeechTranscript } from '@/renderer/hooks/system/useSpeechInput';
 import { useLiveTranscriptInsertion } from '@/renderer/hooks/system/useLiveTranscriptInsertion';
 import { Button, ConfigProvider } from '@arco-design/web-react';
@@ -148,6 +150,64 @@ const GuidPage: React.FC = () => {
     onFilesSelected: appendSelectedFiles,
   });
   const presentationTemplates = usePresentationTemplates();
+  const presentationSources = usePresentationSourceDraft();
+  const presentationDraftClientRequestIdRef = useRef<string | null>(null);
+  const [showPresentationSourceReselect, setShowPresentationSourceReselect] = useState(false);
+  const presentationRunEligible = getPresentationRunEligibility({
+    featureEnabled: PRESENTATION_RUN_V2_ENABLED,
+    isDesktop: typeof window !== 'undefined' && Boolean(window.electronAPI),
+    scope: guidInput.projectId ? 'unknown' : 'individual',
+    runtime: agentSelection.selectedAssistant?.agent?.type ?? null,
+    templateFormat: presentationTemplates.selectedTemplate?.manifest.format ?? null,
+  });
+  const presentationRunEligibleRef = useRef(presentationRunEligible);
+  presentationRunEligibleRef.current = presentationRunEligible;
+  const requiresPresentationSourceReselect = presentationRunEligible && guidInput.files.length > 0;
+
+  const ensurePresentationSourceDraft = useCallback(async (): Promise<boolean> => {
+    if (presentationSources.owner !== null) return true;
+    if (presentationDraftClientRequestIdRef.current === null) {
+      presentationDraftClientRequestIdRef.current = crypto.randomUUID();
+    }
+    const result = await presentationSources.createDraft(presentationDraftClientRequestIdRef.current);
+    return result.ok;
+  }, [presentationSources.createDraft, presentationSources.owner]);
+
+  const handlePresentationSourcePicker = useCallback(async (): Promise<void> => {
+    if (!(await ensurePresentationSourceDraft())) return;
+    if (!presentationRunEligibleRef.current) return;
+    const result = await presentationSources.pickSources();
+    if (presentationRunEligibleRef.current && result?.ok && result.status === 'selected') {
+      guidInput.setFiles([]);
+      setShowPresentationSourceReselect(false);
+    }
+  }, [ensurePresentationSourceDraft, guidInput.setFiles, presentationSources.pickSources]);
+
+  const handlePresentationSourceDrop = useCallback(
+    async (files: readonly File[]): Promise<void> => {
+      if (!(await ensurePresentationSourceDraft())) return;
+      if (!presentationRunEligibleRef.current) return;
+      const result = await presentationSources.grantExternalDrop(files);
+      if (presentationRunEligibleRef.current && result?.ok && result.status === 'granted') {
+        guidInput.setFiles([]);
+        setShowPresentationSourceReselect(false);
+      }
+    },
+    [ensurePresentationSourceDraft, guidInput.setFiles, presentationSources.grantExternalDrop]
+  );
+
+  const handlePresentationSourceRevoke = useCallback(
+    (grantId: string): void => {
+      void presentationSources.revoke(grantId);
+    },
+    [presentationSources.revoke]
+  );
+
+  useEffect(() => {
+    if (!requiresPresentationSourceReselect) {
+      setShowPresentationSourceReselect(false);
+    }
+  }, [requiresPresentationSourceReselect]);
 
   const resetMentionOpen = useCallback<React.Dispatch<React.SetStateAction<boolean>>>(() => {}, []);
   const resetMentionQuery = useCallback<React.Dispatch<React.SetStateAction<string | null>>>(() => {}, []);
@@ -231,6 +291,11 @@ const GuidPage: React.FC = () => {
         guidInput.setInput('');
         return;
       }
+      if (name === 'open' && presentationRunEligible) {
+        void handlePresentationSourcePicker();
+        guidInput.setInput('');
+        return;
+      }
       onSlashBuiltinCommand(name);
       guidInput.setInput('');
     },
@@ -285,6 +350,8 @@ const GuidPage: React.FC = () => {
 
     composePresentationSend: presentationTemplates.composeSend,
     onPresentationTemplateConsumed: presentationTemplates.clearSelection,
+    requiresPresentationSourceReselect,
+    onPresentationSourceReselectRequired: () => setShowPresentationSourceReselect(true),
 
     // Mention state reset
     setMentionOpen: resetMentionOpen,
@@ -646,12 +713,30 @@ const GuidPage: React.FC = () => {
     [guidInput.setInput]
   );
   const { handleLiveTranscript } = useLiveTranscriptInsertion(guidInput.setInput);
+  const presentationSourceNoticeNode =
+    showPresentationSourceReselect && requiresPresentationSourceReselect ? (
+      <div
+        className='mt-8px flex items-center justify-between gap-8px rounded-8px border border-warning-3 bg-warning-1 px-10px py-8px text-12px text-warning-7'
+        role='alert'
+      >
+        <span>{t('conversation.presentationTemplates.sources.reselectRequired')}</span>
+        <Button
+          type='text'
+          size='mini'
+          loading={presentationSources.pending}
+          onClick={() => void handlePresentationSourcePicker()}
+        >
+          {t('conversation.presentationTemplates.sources.reselectAction')}
+        </Button>
+      </div>
+    ) : null;
 
   // Build the action row
   const actionRowNode = (
     <GuidActionRow
       files={guidInput.files}
       onFilesUploaded={guidInput.handleFilesUploaded}
+      onManagedFilePicker={presentationRunEligible ? handlePresentationSourcePicker : undefined}
       modelSelectorNode={modelSelectorNode}
       isGeminiMode={isGeminiMode}
       modelList={modelSelection.modelList}
@@ -744,6 +829,9 @@ const GuidPage: React.FC = () => {
             dragHandlers={guidInput.dragHandlers}
             files={guidInput.files}
             onRemoveFile={guidInput.handleRemoveFile}
+            presentationSourceDescriptors={presentationRunEligible ? presentationSources.descriptors : []}
+            onRevokePresentationSource={presentationRunEligible ? handlePresentationSourceRevoke : undefined}
+            onManagedDrop={presentationRunEligible ? handlePresentationSourceDrop : undefined}
             actionRow={actionRowNode}
             slashCommandMenu={slashCommandMenuNode}
             templateChip={
@@ -756,6 +844,7 @@ const GuidPage: React.FC = () => {
                 </div>
               ) : null
             }
+            presentationSourceNotice={presentationSourceNoticeNode}
             workspaceDir={guidInput.dir}
             onSelectWorkspace={(dir) => guidInput.setDir(dir)}
             onClearWorkspace={() => guidInput.setDir('')}

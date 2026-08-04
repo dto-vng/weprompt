@@ -773,6 +773,10 @@
     "importCard": "Vorlage importieren (.md)",
     "empty": "Keine Vorlagen verfügbar",
     "chipTooltip": "Diese Nachricht verwendet die Vorlage",
+    "sources": {
+      "reselectRequired": "Wählen Sie angehängte Dateien erneut aus, um sie mit dieser PPTX-Vorlage zu verwenden.",
+      "reselectAction": "Dateien erneut auswählen"
+    },
     "scratch": {
       "prepareError": "Temporärer Arbeitsbereich konnte nicht vorbereitet werden: {{error}}",
       "retained": "Temporäre Artefaktdateien wurden zur Wiederherstellung unter {{path}} aufbewahrt.",

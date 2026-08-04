@@ -11,10 +11,36 @@ import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type {
   ArtifactScratchAllocation,
+  PresentationTemplateFormat,
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import { composePresentationSend } from './directive';
 import { useAddEventListener } from '@/renderer/utils/emitter';
+
+export type PresentationRunEligibilityInput = {
+  featureEnabled: boolean;
+  isDesktop: boolean;
+  scope: 'individual' | 'team' | 'unknown';
+  runtime: string | null;
+  templateFormat: PresentationTemplateFormat | null;
+};
+
+/**
+ * Renderer-only UX hint for the managed presentation path.
+ *
+ * Main remains authoritative for feature enablement, runtime, ownership, and
+ * source grants. Keep this helper path-free so its result cannot be mistaken
+ * for authority to start a run.
+ */
+export function getPresentationRunEligibility(input: PresentationRunEligibilityInput): boolean {
+  return (
+    input.featureEnabled &&
+    input.isDesktop &&
+    input.scope === 'individual' &&
+    (input.runtime === 'aionrs' || input.runtime === 'acp') &&
+    input.templateFormat === 'pptx'
+  );
+}
 
 /**
  * Display name + description for a template.

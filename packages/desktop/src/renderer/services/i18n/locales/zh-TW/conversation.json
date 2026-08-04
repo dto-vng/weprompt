@@ -772,6 +772,10 @@
     "importCard": "匯入範本 (.md)",
     "empty": "沒有可用的範本",
     "chipTooltip": "此訊息將使用該範本",
+    "sources": {
+      "reselectRequired": "若要將附件用於此 PPTX 範本，請重新選擇檔案。",
+      "reselectAction": "重新選擇檔案"
+    },
     "scratch": {
       "prepareError": "無法準備成果暫存空間：{{error}}",
       "retained": "暫存成果檔案已保留於 {{path}} 以便復原。",

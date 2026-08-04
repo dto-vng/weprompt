@@ -65,6 +65,7 @@ type GuidActionRowProps = {
   // File handling
   files: string[];
   onFilesUploaded: (paths: string[]) => void;
+  onManagedFilePicker?: () => void | Promise<void>;
 
   // Model selector node (rendered by parent for the desktop layout)
   modelSelectorNode: React.ReactNode;
@@ -110,6 +111,7 @@ type GuidActionRowProps = {
 const GuidActionRow: React.FC<GuidActionRowProps> = ({
   files,
   onFilesUploaded,
+  onManagedFilePicker,
   modelSelectorNode,
   isGeminiMode,
   modelList,
@@ -212,6 +214,14 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       .catch((error) => console.error('Failed to open file dialog:', error));
   }, [onFilesUploaded]);
 
+  const openDesktopFilePicker = useCallback(() => {
+    if (!isWebUI && onManagedFilePicker) {
+      void onManagedFilePicker();
+      return;
+    }
+    openHostFilePicker();
+  }, [isWebUI, onManagedFilePicker, openHostFilePicker]);
+
   // Build the mobile action sheet entries: model / thought level / permission
   // (single-select), attach (action), skills / MCP (multi-select checkboxes).
   const sheetEntries = useMemo<MobileActionSheetEntry[]>(() => {
@@ -313,7 +323,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       label: t('common.fileAttach.addFiles', { defaultValue: 'Add files' }),
       variant: 'muted',
       dividerBefore: true,
-      onClick: () => (isWebUI ? fileInputRef.current?.click() : openHostFilePicker()),
+      onClick: () => (isWebUI ? fileInputRef.current?.click() : openDesktopFilePicker()),
     });
 
     // Skills (multi-select).
@@ -394,7 +404,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
     activeSkillCount,
     activeMcpCount,
     isWebUI,
-    openHostFilePicker,
+    openDesktopFilePicker,
     t,
   ]);
 
@@ -403,16 +413,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       className='min-w-200px'
       onClickMenuItem={(key) => {
         if (key === 'file') {
-          ipcBridge.dialog.showOpen
-            .invoke({ properties: ['openFile', 'multiSelections'] })
-            .then((uploadedFiles) => {
-              if (uploadedFiles && uploadedFiles.length > 0) {
-                onFilesUploaded(uploadedFiles);
-              }
-            })
-            .catch((error) => {
-              console.error('Failed to open file dialog:', error);
-            });
+          openDesktopFilePicker();
         } else if (key === 'device') {
           fileInputRef.current?.click();
         }
