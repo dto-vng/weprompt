@@ -5,6 +5,7 @@
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
@@ -19,6 +20,7 @@ import type { PresentationRunFailure, PresentationRunFailureCode } from '@/commo
 
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
 const MESSAGE_KEY = 'conversation.presentation.failure';
+const RECOVERY_CURSOR_TEST_SECRET = 'main-owned-recovery-cursor-test-secret';
 const presentationRunTypeFile = resolve(process.cwd(), 'packages/desktop/src/common/types/office/presentationRun.ts');
 const presentationRunPolicyFile = resolve(
   process.cwd(),
@@ -401,21 +403,92 @@ describe('managed presentation schema type coupling', () => {
         import type {
           ListRecoverablePresentationRunsRequest,
           PresentationRunFailure,
+          PresentationRunFailureCode,
           PresentationRunPublicDto,
         } from '${types}';
         import type { z } from 'zod';
 
         type Assert<T extends true> = T;
-        type SchemaFailure = z.output<typeof presentationRunFailureSchema>;
-        type SchemaPublicRun = z.output<typeof presentationRunPublicSchema>;
-        type SchemaRecoveryRequest = z.input<typeof recoverablePresentationRunsRequestSchema>;
+        type Equal<Left, Right> =
+          [Left] extends [Right] ? ([Right] extends [Left] ? true : false) : false;
+        type KeysOfUnion<Value> = Value extends unknown ? keyof Value : never;
+        type SameDistributedKeys<Actual, Production> = Equal<
+          KeysOfUnion<Actual>,
+          KeysOfUnion<Production>
+        >;
+        type EveryTrue<Value> = Exclude<Value, true> extends never ? true : false;
+        type FailureForCode<Failure, Code extends PresentationRunFailureCode> =
+          Failure extends { code: infer Codes extends PresentationRunFailureCode }
+            ? Code extends Codes
+              ? Failure
+              : never
+            : never;
+        type DetailsForCode<Failure, Code extends PresentationRunFailureCode> =
+          FailureForCode<Failure, Code> extends infer Matched
+            ? Matched extends { details: infer Details }
+              ? Details
+              : never
+            : never;
+        type DetailKeyParity<SchemaFailure> = {
+          [Code in PresentationRunFailureCode]: SameDistributedKeys<
+            DetailsForCode<SchemaFailure, Code>,
+            DetailsForCode<PresentationRunFailure, Code>
+          >;
+        }[PresentationRunFailureCode];
 
-        type FailureSchemaToProduction = Assert<SchemaFailure extends PresentationRunFailure ? true : false>;
-        type FailureProductionToSchema = Assert<PresentationRunFailure extends SchemaFailure ? true : false>;
-        type PublicSchemaToProduction = Assert<SchemaPublicRun extends PresentationRunPublicDto ? true : false>;
-        type PublicProductionToSchema = Assert<PresentationRunPublicDto extends SchemaPublicRun ? true : false>;
-        type RecoverySchemaToProduction = Assert<SchemaRecoveryRequest extends ListRecoverablePresentationRunsRequest ? true : false>;
-        type RecoveryProductionToSchema = Assert<ListRecoverablePresentationRunsRequest extends SchemaRecoveryRequest ? true : false>;
+        type SchemaFailureInput = z.input<typeof presentationRunFailureSchema>;
+        type SchemaFailureOutput = z.output<typeof presentationRunFailureSchema>;
+        type SchemaPublicInput = z.input<typeof presentationRunPublicSchema>;
+        type SchemaPublicOutput = z.output<typeof presentationRunPublicSchema>;
+        type SchemaRecoveryInput = z.input<typeof recoverablePresentationRunsRequestSchema>;
+        type SchemaRecoveryOutput = z.output<typeof recoverablePresentationRunsRequestSchema>;
+
+        type FailureInputToProduction = Assert<SchemaFailureInput extends PresentationRunFailure ? true : false>;
+        type FailureProductionToInput = Assert<PresentationRunFailure extends SchemaFailureInput ? true : false>;
+        type FailureOutputToProduction = Assert<SchemaFailureOutput extends PresentationRunFailure ? true : false>;
+        type FailureProductionToOutput = Assert<PresentationRunFailure extends SchemaFailureOutput ? true : false>;
+        type PublicInputToProduction = Assert<SchemaPublicInput extends PresentationRunPublicDto ? true : false>;
+        type PublicProductionToInput = Assert<PresentationRunPublicDto extends SchemaPublicInput ? true : false>;
+        type PublicOutputToProduction = Assert<SchemaPublicOutput extends PresentationRunPublicDto ? true : false>;
+        type PublicProductionToOutput = Assert<PresentationRunPublicDto extends SchemaPublicOutput ? true : false>;
+        type RecoveryInputToProduction = Assert<SchemaRecoveryInput extends ListRecoverablePresentationRunsRequest ? true : false>;
+        type RecoveryProductionToInput = Assert<ListRecoverablePresentationRunsRequest extends SchemaRecoveryInput ? true : false>;
+
+        type FailureInputTopLevelKeys = Assert<SameDistributedKeys<SchemaFailureInput, PresentationRunFailure>>;
+        type FailureOutputTopLevelKeys = Assert<SameDistributedKeys<SchemaFailureOutput, PresentationRunFailure>>;
+        type FailureInputDetailKeys = Assert<EveryTrue<DetailKeyParity<SchemaFailureInput>>>;
+        type FailureOutputDetailKeys = Assert<EveryTrue<DetailKeyParity<SchemaFailureOutput>>>;
+        type PublicInputTopLevelKeys = Assert<SameDistributedKeys<SchemaPublicInput, PresentationRunPublicDto>>;
+        type PublicOutputTopLevelKeys = Assert<SameDistributedKeys<SchemaPublicOutput, PresentationRunPublicDto>>;
+        type PublicInputActionKeys = Assert<SameDistributedKeys<
+          SchemaPublicInput['actions'],
+          PresentationRunPublicDto['actions']
+        >>;
+        type PublicOutputActionKeys = Assert<SameDistributedKeys<
+          SchemaPublicOutput['actions'],
+          PresentationRunPublicDto['actions']
+        >>;
+        type PublicInputCandidateKeys = Assert<SameDistributedKeys<
+          Exclude<SchemaPublicInput['retainedCandidate'], null>,
+          Exclude<PresentationRunPublicDto['retainedCandidate'], null>
+        >>;
+        type PublicOutputCandidateKeys = Assert<SameDistributedKeys<
+          Exclude<SchemaPublicOutput['retainedCandidate'], null>,
+          Exclude<PresentationRunPublicDto['retainedCandidate'], null>
+        >>;
+        type RecoveryInputKeys = Assert<SameDistributedKeys<
+          SchemaRecoveryInput,
+          ListRecoverablePresentationRunsRequest
+        >>;
+        type RecoveryOutputKeys = Assert<SameDistributedKeys<
+          SchemaRecoveryOutput,
+          ListRecoverablePresentationRunsRequest
+        >>;
+
+        type OptionalSchemaOnlyKeyMutation = Assert<Equal<
+          SameDistributedKeys<{ id: string; secret?: string }, { id: string }>,
+          false
+        >>;
       `
     );
 
@@ -665,6 +738,10 @@ describe('managed presentation recovery contract', () => {
       runId: z.string().uuid(),
     })
     .strict();
+  const cursorTokenSegmentsSchema = z.tuple([
+    z.string().regex(/^[A-Za-z0-9_-]+$/),
+    z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  ]);
   const items = [
     {
       conversationId: CONVERSATION_ID,
@@ -688,8 +765,11 @@ describe('managed presentation recovery contract', () => {
       (left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.runId.localeCompare(left.runId)
     );
 
-  const mintCursor = (item: (typeof items)[number], extra: Record<string, unknown> = {}): string =>
-    Buffer.from(
+  const signCursorPayload = (payload: string): string =>
+    createHmac('sha256', RECOVERY_CURSOR_TEST_SECRET).update(payload, 'utf8').digest('base64url');
+
+  const mintCursor = (item: (typeof items)[number], extra: Record<string, unknown> = {}): string => {
+    const payload = Buffer.from(
       JSON.stringify({
         version: 1,
         conversationId: item.conversationId,
@@ -698,6 +778,8 @@ describe('managed presentation recovery contract', () => {
         ...extra,
       })
     ).toString('base64url');
+    return `${payload}.${signCursorPayload(payload)}`;
+  };
 
   const resolveCursor = (
     cursor: string,
@@ -705,12 +787,29 @@ describe('managed presentation recovery contract', () => {
     knownItems: typeof items
   ): { ok: true; tuple: { updatedAt: string; runId: string } } | { ok: false; code: 'INVALID_REQUEST' } => {
     try {
-      const parsed = cursorPayloadSchema.safeParse(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')));
+      const segments = cursorTokenSegmentsSchema.safeParse(cursor.split('.'));
+      if (!segments.success) return { ok: false, code: 'INVALID_REQUEST' };
+      const [payload, signature] = segments.data;
+      const payloadBytes = Buffer.from(payload, 'base64url');
+      const signatureBytes = Buffer.from(signature, 'base64url');
+      const expectedSignatureBytes = Buffer.from(signCursorPayload(payload), 'base64url');
+      if (
+        payloadBytes.toString('base64url') !== payload ||
+        signatureBytes.toString('base64url') !== signature ||
+        signatureBytes.length !== expectedSignatureBytes.length ||
+        !timingSafeEqual(signatureBytes, expectedSignatureBytes)
+      ) {
+        return { ok: false, code: 'INVALID_REQUEST' };
+      }
+      const parsed = cursorPayloadSchema.safeParse(JSON.parse(payloadBytes.toString('utf8')));
       if (!parsed.success || parsed.data.conversationId !== conversationId) {
         return { ok: false, code: 'INVALID_REQUEST' };
       }
       const resolvable = knownItems.some(
-        (item) => item.updatedAt === parsed.data.updatedAt && item.runId === parsed.data.runId
+        (item) =>
+          item.conversationId === conversationId &&
+          item.updatedAt === parsed.data.updatedAt &&
+          item.runId === parsed.data.runId
       );
       return resolvable
         ? { ok: true, tuple: { updatedAt: parsed.data.updatedAt, runId: parsed.data.runId } }
@@ -769,11 +868,89 @@ describe('managed presentation recovery contract', () => {
     const request = recoverablePresentationRunsRequestSchema.parse({ conversation_id: CONVERSATION_ID, cursor });
 
     expect(request.cursor).toBe(cursor);
+    expect(cursor.split('.')).toHaveLength(2);
     expect(cursor).not.toContain(CONVERSATION_ID);
     expect(resolveCursor(cursor, CONVERSATION_ID, items)).toEqual({
       ok: true,
       tuple: { updatedAt: items[1].updatedAt, runId: items[1].runId },
     });
+  });
+
+  it('rejects a cursor whose tuple belongs to a different conversation', () => {
+    const foreignItem = {
+      conversationId: OTHER_CONVERSATION_ID,
+      runId: '00000000-0000-4000-8000-000000000003',
+      updatedAt: '2026-08-04T00:00:02.000Z',
+    };
+    const cursor = mintCursor(foreignItem, { conversationId: CONVERSATION_ID });
+
+    expect(resolveCursor(cursor, CONVERSATION_ID, [...items, foreignItem])).toEqual({
+      ok: false,
+      code: 'INVALID_REQUEST',
+    });
+  });
+
+  it('rejects a structurally valid client-created cursor without a main signature', () => {
+    const unsignedCursor = Buffer.from(
+      JSON.stringify({
+        version: 1,
+        conversationId: CONVERSATION_ID,
+        updatedAt: items[0].updatedAt,
+        runId: items[0].runId,
+      })
+    ).toString('base64url');
+
+    expect(resolveCursor(unsignedCursor, CONVERSATION_ID, items)).toEqual({
+      ok: false,
+      code: 'INVALID_REQUEST',
+    });
+  });
+
+  it('rejects a well-shaped client-created cursor with a forged main signature', () => {
+    const payload = Buffer.from(
+      JSON.stringify({
+        version: 1,
+        conversationId: CONVERSATION_ID,
+        updatedAt: items[0].updatedAt,
+        runId: items[0].runId,
+      })
+    ).toString('base64url');
+    const forgedCursor = `${payload}.${'A'.repeat(43)}`;
+
+    expect(resolveCursor(forgedCursor, CONVERSATION_ID, items)).toEqual({
+      ok: false,
+      code: 'INVALID_REQUEST',
+    });
+  });
+
+  it('rejects malformed recovery token shapes and signatures', () => {
+    const [payload, signature] = mintCursor(items[0]).split('.');
+    const invalid = { ok: false, code: 'INVALID_REQUEST' };
+
+    expect(
+      [`${payload}.${signature}.extra`, `${payload}.short`, `${payload}.${'*'.repeat(43)}`, `.${signature}`].map(
+        (cursor) => resolveCursor(cursor, CONVERSATION_ID, items)
+      )
+    ).toEqual([invalid, invalid, invalid, invalid]);
+  });
+
+  it('rejects authenticated cursor payload and signature tampering', () => {
+    const [payload, signature] = mintCursor(items[0]).split('.');
+    const tamperedPayload = Buffer.from(
+      JSON.stringify({
+        version: 1,
+        conversationId: CONVERSATION_ID,
+        updatedAt: items[1].updatedAt,
+        runId: items[1].runId,
+      })
+    ).toString('base64url');
+    const tamperedSignature = `${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`;
+    const invalid = { ok: false, code: 'INVALID_REQUEST' };
+
+    expect([
+      resolveCursor(`${tamperedPayload}.${signature}`, CONVERSATION_ID, items),
+      resolveCursor(`${payload}.${tamperedSignature}`, CONVERSATION_ID, items),
+    ]).toEqual([invalid, invalid]);
   });
 
   it('maps malformed, cross-conversation, stale, and unknown-field cursors to INVALID_REQUEST', () => {
