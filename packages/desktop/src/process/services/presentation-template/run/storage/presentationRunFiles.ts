@@ -14,17 +14,33 @@ import {
 } from 'node:fs';
 import { lstat, mkdir, open, readdir, realpath, rename, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
-import { TextDecoder } from 'node:util';
+import { isDeepStrictEqual, TextDecoder } from 'node:util';
 import * as yauzl from 'yauzl';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
-import type { PresentationSourceDescriptor } from '@/common/types/office/presentationRun';
-import type { PresentationRunRetainedCandidate } from './presentationRunStateMachine';
+import type { PresentationSourceDescriptor, PresentationSourceRef } from '@/common/types/office/presentationRun';
+import {
+  assertPresentationRunPreparationRecord,
+  type PresentationRunPreparationFile,
+  type PresentationRunPreparationPayload,
+  type PresentationRunPreparationRecord,
+  type PresentationRunRetainedCandidate,
+} from './presentationRunStateMachine';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CANDIDATE_NAME = 'candidate.pptx';
+const GROUNDING_NAME = 'grounding.md';
+const PLAN_NAME = 'plan.json';
+const PREPARATION_NAME = 'preparation.json';
+const STAGING_CANDIDATE_RELATIVE_PATH = `agent/${CANDIDATE_NAME}` as const;
+const STAGING_GROUNDING_RELATIVE_PATH = `agent/${GROUNDING_NAME}` as const;
+const PREPARATION_RELATIVE_PATH = PREPARATION_NAME;
 const RETAINED_CANDIDATE_RELATIVE_PATH = `retained/${CANDIDATE_NAME}`;
 const COPY_BUFFER_BYTES = 1024 * 1024;
 const SOURCE_TEMP_RE = /^\.source-([0-9a-f-]+)\.tmp$/i;
+const RUN_AGENT_TEMP_RE =
+  /^\.(?:candidate|grounding)-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i;
+const RUN_PREPARATION_TEMP_RE =
+  /^\.preparation-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i;
 const PDF_HEADER = Buffer.from('%PDF-', 'ascii');
 const ZIP_LOCAL_FILE_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const OOXML_CONTENT_TYPES_ENTRY = '[Content_Types].xml';
@@ -112,6 +128,48 @@ export type PreparedRetainedCandidate = {
   ino: string;
 };
 
+export type PreparedPresentationRunAsset<
+  FinalRelativePath extends 'agent/candidate.pptx' | 'agent/grounding.md' | 'preparation.json' =
+    | 'agent/candidate.pptx'
+    | 'agent/grounding.md'
+    | 'preparation.json',
+> = {
+  temporaryRelativePath: string;
+  finalRelativePath: FinalRelativePath;
+  sha256: string;
+  byteLength: number;
+  dev: string;
+  ino: string;
+};
+
+export type PreparedPresentationRunAssets = {
+  runId: string;
+  record: PresentationRunPreparationRecord;
+  candidate: PreparedPresentationRunAsset<'agent/candidate.pptx'>;
+  grounding: PreparedPresentationRunAsset<'agent/grounding.md'>;
+  preparationFile: PreparedPresentationRunAsset<'preparation.json'>;
+};
+
+export type PreparePresentationRunAssetsInput = {
+  runId: string;
+  candidateBytes: Uint8Array;
+  grounding: string;
+  rawInput: string;
+  directive: string;
+  sourceRefs: readonly PresentationSourceRef[];
+  injectSkills: readonly ['officecli'];
+  template: {
+    theme: PresentationRunPreparationFile;
+    reference: PresentationRunPreparationFile;
+  };
+};
+
+export type PresentationStagingRunPaths = {
+  candidatePath: string;
+  groundingPath: string;
+  planPath: string;
+};
+
 export type PresentationSourceSnapshotFormat = PresentationSourceDescriptor['format'];
 
 export type PreparePresentationSourceSnapshotInput = {
@@ -171,6 +229,11 @@ export type PresentationRetainedCandidateReader = {
   readAt: (position: number, length: number) => Promise<Buffer>;
 };
 
+export type PresentationSourceSnapshotReader = {
+  byteLength: number;
+  readBytes: () => Promise<Buffer>;
+};
+
 export type PresentationOwnedDirectoryLease = {
   assertCurrent: () => Promise<void>;
   sync: (directory: string) => Promise<void>;
@@ -182,6 +245,17 @@ export type PresentationPreparedCandidateGuard = {
 
 export type PresentationPreparedSourceSnapshotGuard = {
   assertCurrent: () => Promise<void>;
+};
+
+export type PresentationPreparedRunAssetGuard = {
+  assertCurrent: () => Promise<void>;
+};
+
+type PreparedRunAssetEntry = {
+  asset: PreparedPresentationRunAsset;
+  filePath: string;
+  finalPath: string;
+  parentDirectory: string;
 };
 
 export type PresentationRunFileRoots = {
@@ -313,6 +387,71 @@ function assertPreparedSourceSnapshot(prepared: PreparedPresentationSourceSnapsh
     !/^[1-9][0-9]*$/.test(prepared.ino)
   ) {
     throw new Error('Invalid presentation source snapshot promotion');
+  }
+}
+
+function assertPreparedRunAsset<
+  FinalRelativePath extends 'agent/candidate.pptx' | 'agent/grounding.md' | 'preparation.json',
+>(
+  asset: PreparedPresentationRunAsset<FinalRelativePath>,
+  finalRelativePath: FinalRelativePath,
+  maximumByteLength: number
+): void {
+  const temporaryPattern =
+    finalRelativePath === STAGING_CANDIDATE_RELATIVE_PATH
+      ? new RegExp(`^agent/\\.candidate-${UUID_RE.source.slice(1, -1)}\\.tmp$`, 'i')
+      : finalRelativePath === STAGING_GROUNDING_RELATIVE_PATH
+        ? new RegExp(`^agent/\\.grounding-${UUID_RE.source.slice(1, -1)}\\.tmp$`, 'i')
+        : new RegExp(`^\\.preparation-${UUID_RE.source.slice(1, -1)}\\.tmp$`, 'i');
+  if (
+    !hasExactObjectKeys(asset, ['temporaryRelativePath', 'finalRelativePath', 'sha256', 'byteLength', 'dev', 'ino']) ||
+    asset.finalRelativePath !== finalRelativePath ||
+    !temporaryPattern.test(asset.temporaryRelativePath) ||
+    !/^[0-9a-f]{64}$/.test(asset.sha256) ||
+    !Number.isSafeInteger(asset.byteLength) ||
+    asset.byteLength < 1 ||
+    asset.byteLength > maximumByteLength ||
+    !/^(0|[1-9][0-9]*)$/.test(asset.dev) ||
+    !/^[1-9][0-9]*$/.test(asset.ino)
+  ) {
+    throw new Error('Invalid prepared presentation run assets');
+  }
+}
+
+export function assertPreparedPresentationRunAssets(prepared: PreparedPresentationRunAssets): void {
+  if (
+    !hasExactObjectKeys(prepared, ['runId', 'record', 'candidate', 'grounding', 'preparationFile']) ||
+    !UUID_RE.test(prepared.runId)
+  ) {
+    throw new Error('Invalid prepared presentation run assets');
+  }
+  assertPresentationRunPreparationRecord(prepared.record);
+  assertPreparedRunAsset(
+    prepared.candidate,
+    STAGING_CANDIDATE_RELATIVE_PATH,
+    PRESENTATION_RUN_LIMITS.MAX_CANDIDATE_COMPRESSED_BYTES
+  );
+  assertPreparedRunAsset(
+    prepared.grounding,
+    STAGING_GROUNDING_RELATIVE_PATH,
+    PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN
+  );
+  assertPreparedRunAsset(
+    prepared.preparationFile,
+    PREPARATION_RELATIVE_PATH,
+    PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN
+  );
+  if (
+    prepared.record.payload.candidate.sha256 !== prepared.candidate.sha256 ||
+    prepared.record.payload.candidate.byteLength !== prepared.candidate.byteLength ||
+    prepared.record.payload.grounding.sha256 !== prepared.grounding.sha256 ||
+    prepared.record.payload.grounding.byteLength !== prepared.grounding.byteLength ||
+    prepared.record.sha256 !== prepared.preparationFile.sha256 ||
+    prepared.record.byteLength !== prepared.preparationFile.byteLength ||
+    prepared.record.payload.template.reference.sha256 !== prepared.candidate.sha256 ||
+    prepared.record.payload.template.reference.byteLength !== prepared.candidate.byteLength
+  ) {
+    throw new Error('Invalid prepared presentation run assets');
   }
 }
 
@@ -976,6 +1115,17 @@ async function hashOpenFile(file: OpenHandle, byteLength: number): Promise<strin
   return hash.digest('hex');
 }
 
+async function readOpenFileExactly(file: OpenHandle, byteLength: number, message: string): Promise<Buffer> {
+  const bytes = Buffer.alloc(byteLength);
+  let position = 0;
+  while (position < byteLength) {
+    const { bytesRead } = await file.read(bytes, position, byteLength - position, position);
+    if (bytesRead === 0) throw new Error(message);
+    position += bytesRead;
+  }
+  return bytes;
+}
+
 async function verifyCandidatePath(
   filePath: string,
   expected: { sha256: string; byteLength: number },
@@ -1234,6 +1384,190 @@ export class PresentationRunFiles {
     await this.ensureOwnedDirectory(stagingRunDirectory);
     await this.ensureOwnedDirectory(stagingDirectory);
     return { runDirectory, retainedDirectory, stagingDirectory };
+  }
+
+  /** Writes all pre-dispatch bytes to private, fsynced temporary files without making them authoritative. */
+  async prepareRunAssets(unsafeInput: PreparePresentationRunAssetsInput): Promise<PreparedPresentationRunAssets> {
+    const input = structuredClone(unsafeInput);
+    assertUuid(input.runId, 'run');
+    const candidateBytes = Buffer.from(input.candidateBytes);
+    const groundingBytes = Buffer.from(input.grounding, 'utf8');
+    if (
+      candidateBytes.byteLength < 1 ||
+      candidateBytes.byteLength > PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES ||
+      groundingBytes.byteLength < 1
+    ) {
+      throw new Error('Invalid presentation run preparation');
+    }
+    const candidateSha256 = createHash('sha256').update(candidateBytes).digest('hex');
+    const groundingSha256 = createHash('sha256').update(groundingBytes).digest('hex');
+    const payload: PresentationRunPreparationPayload = {
+      version: 1,
+      rawInput: input.rawInput,
+      directive: input.directive,
+      sourceRefs: input.sourceRefs.map((sourceRef) => ({ ...sourceRef })),
+      injectSkills: ['officecli'],
+      template: {
+        theme: { ...input.template.theme },
+        reference: { ...input.template.reference },
+      },
+      grounding: {
+        relativePath: STAGING_GROUNDING_RELATIVE_PATH,
+        sha256: groundingSha256,
+        byteLength: groundingBytes.byteLength,
+      },
+      candidate: {
+        relativePath: STAGING_CANDIDATE_RELATIVE_PATH,
+        sha256: candidateSha256,
+        byteLength: candidateBytes.byteLength,
+      },
+    };
+    const preparationBytes = Buffer.from(`${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    const record: PresentationRunPreparationRecord = {
+      payload,
+      relativePath: PREPARATION_RELATIVE_PATH,
+      sha256: createHash('sha256').update(preparationBytes).digest('hex'),
+      byteLength: preparationBytes.byteLength,
+    };
+    assertPresentationRunPreparationRecord(record);
+    if (
+      input.injectSkills.length !== 1 ||
+      input.injectSkills[0] !== 'officecli' ||
+      payload.template.reference.sha256 !== candidateSha256 ||
+      payload.template.reference.byteLength !== candidateBytes.byteLength
+    ) {
+      throw new Error('Invalid presentation run preparation');
+    }
+    const totalBytes = candidateBytes.byteLength + groundingBytes.byteLength + preparationBytes.byteLength;
+    if (
+      !Number.isSafeInteger(totalBytes) ||
+      totalBytes > PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN
+    ) {
+      throw new Error('Presentation run preparation exceeds its write limit');
+    }
+
+    const layout = await this.createRunLayout(input.runId);
+    const candidateTemporaryRelativePath = `agent/.candidate-${this.randomUUID()}.tmp`;
+    const groundingTemporaryRelativePath = `agent/.grounding-${this.randomUUID()}.tmp`;
+    const preparationTemporaryRelativePath = `.preparation-${this.randomUUID()}.tmp`;
+    const stagingRunDirectory = this.ownedChild(this.roots.stagingRoot, input.runId);
+    const candidateTemporaryPath = path.join(stagingRunDirectory, candidateTemporaryRelativePath);
+    const groundingTemporaryPath = path.join(stagingRunDirectory, groundingTemporaryRelativePath);
+    const preparationTemporaryPath = path.join(layout.runDirectory, preparationTemporaryRelativePath);
+    const candidateFinalPath = path.join(stagingRunDirectory, STAGING_CANDIDATE_RELATIVE_PATH);
+    const groundingFinalPath = path.join(stagingRunDirectory, STAGING_GROUNDING_RELATIVE_PATH);
+    const preparationFinalPath = path.join(layout.runDirectory, PREPARATION_RELATIVE_PATH);
+    const cleanupEntries: { filePath: string; parentDirectory: string; metadata: FileMetadata }[] = [];
+    const directoryChain = [
+      ...this.stagingCandidateDirectoryChain(input.runId),
+      ...this.durableRunDirectoryChain(input.runId),
+    ];
+    return this.withDirectoryLease(directoryChain, async (directoryLease) => {
+      try {
+        await directoryLease.assertMode(
+          layout.stagingDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation staging directory must be private'
+        );
+        await directoryLease.assertMode(
+          layout.runDirectory,
+          PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+          'Presentation run directory must be private'
+        );
+        await this.removeAbandonedRunPreparationTemps(layout, directoryLease);
+        await Promise.all([
+          assertPathAbsent(candidateFinalPath, 'Presentation staging candidate already exists'),
+          assertPathAbsent(groundingFinalPath, 'Presentation staging grounding already exists'),
+          assertPathAbsent(preparationFinalPath, 'Presentation run preparation already exists'),
+        ]);
+        const candidateMetadata = await this.writePreparedRunBytes(
+          candidateTemporaryPath,
+          candidateBytes,
+          directoryLease,
+          cleanupEntries,
+          layout.stagingDirectory
+        );
+        const groundingMetadata = await this.writePreparedRunBytes(
+          groundingTemporaryPath,
+          groundingBytes,
+          directoryLease,
+          cleanupEntries,
+          layout.stagingDirectory
+        );
+        const preparationMetadata = await this.writePreparedRunBytes(
+          preparationTemporaryPath,
+          preparationBytes,
+          directoryLease,
+          cleanupEntries,
+          layout.runDirectory
+        );
+        await directoryLease.sync(layout.stagingDirectory);
+        await directoryLease.sync(layout.runDirectory);
+        const prepared: PreparedPresentationRunAssets = {
+          runId: input.runId,
+          record,
+          candidate: {
+            temporaryRelativePath: candidateTemporaryRelativePath,
+            finalRelativePath: STAGING_CANDIDATE_RELATIVE_PATH,
+            sha256: candidateSha256,
+            byteLength: candidateBytes.byteLength,
+            ...fileIdentity(candidateMetadata),
+          },
+          grounding: {
+            temporaryRelativePath: groundingTemporaryRelativePath,
+            finalRelativePath: STAGING_GROUNDING_RELATIVE_PATH,
+            sha256: groundingSha256,
+            byteLength: groundingBytes.byteLength,
+            ...fileIdentity(groundingMetadata),
+          },
+          preparationFile: {
+            temporaryRelativePath: preparationTemporaryRelativePath,
+            finalRelativePath: PREPARATION_RELATIVE_PATH,
+            sha256: record.sha256,
+            byteLength: record.byteLength,
+            ...fileIdentity(preparationMetadata),
+          },
+        };
+        assertPreparedPresentationRunAssets(prepared);
+        return prepared;
+      } catch (error) {
+        if (error instanceof PresentationRunSimulatedProcessCrashError) throw error;
+        for (const entry of cleanupEntries.toReversed()) {
+          await this.removeLeafWithExpectedIdentity(
+            entry.filePath,
+            entry.metadata,
+            entry.parentDirectory,
+            directoryLease
+          ).catch((): undefined => undefined);
+        }
+        throw error;
+      }
+    });
+  }
+
+  private async removeAbandonedRunPreparationTemps(
+    layout: { runDirectory: string; stagingDirectory: string },
+    directoryLease: OwnedDirectoryLease
+  ): Promise<void> {
+    const locations = [
+      { directory: layout.stagingDirectory, pattern: RUN_AGENT_TEMP_RE },
+      { directory: layout.runDirectory, pattern: RUN_PREPARATION_TEMP_RE },
+    ];
+    for (const { directory, pattern } of locations) {
+      await directoryLease.assertCurrent();
+      const entries = await readdir(directory, { withFileTypes: true });
+      await directoryLease.assertCurrent();
+      for (const entry of entries) {
+        if (!pattern.test(entry.name)) continue;
+        const temporaryPath = path.join(directory, entry.name);
+        const opened = await openOwnedRegularFile(
+          temporaryPath,
+          'Abandoned presentation preparation temporary file is unsafe'
+        );
+        await opened.handle.close();
+        await this.removeLeafWithExpectedIdentity(temporaryPath, opened.metadata, directory, directoryLease);
+      }
+    }
   }
 
   async createGrantLayout(grantId: string): Promise<string> {
@@ -1919,6 +2253,57 @@ export class PresentationRunFiles {
     });
   }
 
+  /** Holds the verified Task-3 snapshot open while extraction uses its main-only path capability. */
+  async withAuthorizedSourceSnapshot<T>(
+    reference: PresentationSourceSnapshotReference,
+    operation: (reader: PresentationSourceSnapshotReader) => Promise<T>
+  ): Promise<T> {
+    assertSourceSnapshotReference(reference);
+    const grantDirectory = this.ownedChild(this.roots.grantRoot, reference.grantId);
+    const sourcePath = path.join(grantDirectory, reference.relativePath);
+    return this.withDirectoryLease(this.durableGrantDirectoryChain(reference.grantId), async (directoryLease) => {
+      await directoryLease.assertMode(
+        grantDirectory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation storage directory must be private'
+      );
+      const snapshot = await openVerifiedCandidateLease(
+        sourcePath,
+        reference,
+        {
+          unsafe: 'Authorized presentation source snapshot is unavailable',
+          changed: 'Authorized presentation source snapshot changed',
+        },
+        undefined,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      try {
+        const reader: PresentationSourceSnapshotReader = Object.freeze({
+          byteLength: reference.byteLength,
+          readBytes: async (): Promise<Buffer> => {
+            await directoryLease.assertCurrent();
+            await assertVerifiedCandidateLease(snapshot);
+            const bytes = await readOpenFileExactly(
+              snapshot.handle,
+              reference.byteLength,
+              'Authorized presentation source snapshot changed'
+            );
+            await assertVerifiedCandidateLease(snapshot);
+            await directoryLease.assertCurrent();
+            return bytes;
+          },
+        });
+        const result = await operation(reader);
+        await directoryLease.assertCurrent();
+        await assertVerifiedCandidateLease(snapshot);
+        await directoryLease.assertCurrent();
+        return result;
+      } finally {
+        await snapshot.handle.close();
+      }
+    });
+  }
+
   async recoverSourceSnapshotPromotion(prepared: PreparedPresentationSourceSnapshot): Promise<void> {
     assertPreparedSourceSnapshot(prepared);
     const grantDirectory = this.ownedChild(this.roots.grantRoot, prepared.grantId);
@@ -2081,9 +2466,186 @@ export class PresentationRunFiles {
     return true;
   }
 
-  getStagingCandidatePath(runId: string): string {
+  async withPreparedRunAssetLeases<T>(
+    preparedRuns: readonly PreparedPresentationRunAssets[],
+    operation: (guard: PresentationPreparedRunAssetGuard) => Promise<T>
+  ): Promise<T> {
+    for (const prepared of preparedRuns) assertPreparedPresentationRunAssets(prepared);
+    const directories = preparedRuns.flatMap((prepared) => this.preparedRunAssetDirectoryChain(prepared.runId));
+    return this.withDirectoryLease(directories, async (directoryLease) => {
+      const assets: VerifiedCandidateLease[] = [];
+      try {
+        for (const prepared of preparedRuns) {
+          await this.assertPreparedRunDirectoryModes(prepared.runId, directoryLease);
+          for (const entry of this.preparedRunAssetEntries(prepared, false)) {
+            assets.push(
+              await openVerifiedCandidateLease(
+                entry.filePath,
+                entry.asset,
+                {
+                  unsafe: 'Prepared presentation run asset is unsafe',
+                  changed: 'Prepared presentation run asset changed',
+                },
+                entry.asset,
+                PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+              )
+            );
+          }
+        }
+        const guard: PresentationPreparedRunAssetGuard = {
+          assertCurrent: async (): Promise<void> => {
+            await directoryLease.assertCurrent();
+            for (const prepared of preparedRuns) {
+              await this.assertPreparedRunDirectoryModes(prepared.runId, directoryLease);
+            }
+            for (const asset of assets) await assertVerifiedCandidateLease(asset);
+            await directoryLease.assertCurrent();
+          },
+        };
+        await guard.assertCurrent();
+        const result = await operation(guard);
+        await guard.assertCurrent();
+        return result;
+      } finally {
+        await Promise.all(assets.map(({ handle }) => handle.close()));
+      }
+    });
+  }
+
+  /** Completes or replays the three intent-owned promotions after journal intent persistence. */
+  async recoverRunAssetPromotion(prepared: PreparedPresentationRunAssets): Promise<void> {
+    assertPreparedPresentationRunAssets(prepared);
+    await this.withDirectoryLease(this.preparedRunAssetDirectoryChain(prepared.runId), async (directoryLease) => {
+      await this.assertPreparedRunDirectoryModes(prepared.runId, directoryLease);
+      for (const entry of this.preparedRunAssetEntries(prepared, false)) {
+        await this.recoverPreparedRunAsset(entry, directoryLease);
+      }
+      await this.assertPreparedRunDirectoryModes(prepared.runId, directoryLease);
+    });
+  }
+
+  /** Removes only pre-intent temporary bytes; final assets are never cleanup targets here. */
+  async removePreparedRunAssets(prepared: PreparedPresentationRunAssets): Promise<void> {
+    assertPreparedPresentationRunAssets(prepared);
+    await this.withDirectoryLease(this.preparedRunAssetDirectoryChain(prepared.runId), async (directoryLease) => {
+      await this.assertPreparedRunDirectoryModes(prepared.runId, directoryLease);
+      for (const entry of this.preparedRunAssetEntries(prepared, false)) {
+        let opened: VerifiedCandidateLease;
+        try {
+          opened = await openVerifiedCandidateLease(
+            entry.filePath,
+            entry.asset,
+            {
+              unsafe: 'Prepared presentation run cleanup target is unsafe',
+              changed: 'Prepared presentation run cleanup target changed',
+            },
+            entry.asset,
+            PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+          );
+        } catch (error) {
+          if (hasCode(error, 'ENOENT')) {
+            await assertPathAbsent(entry.filePath, 'Prepared presentation run cleanup target reappeared');
+            continue;
+          }
+          throw error;
+        }
+        try {
+          await directoryLease.assertCurrent();
+          await assertVerifiedCandidateLease(opened);
+          await rm(entry.filePath);
+          await assertPathAbsent(entry.filePath, 'Prepared presentation run cleanup target reappeared');
+          await directoryLease.sync(entry.parentDirectory);
+          await assertPathAbsent(entry.filePath, 'Prepared presentation run cleanup target reappeared');
+        } finally {
+          await opened.handle.close();
+        }
+      }
+    });
+  }
+
+  /** Revalidates all committed pre-dispatch bytes and returns only the strict authoritative payload. */
+  async readAuthorizedRunPreparation(
+    runId: string,
+    record: PresentationRunPreparationRecord
+  ): Promise<PresentationRunPreparationPayload> {
     assertUuid(runId, 'run');
-    return path.join(this.roots.stagingRoot, runId, 'agent', CANDIDATE_NAME);
+    assertPresentationRunPreparationRecord(record);
+    const paths = this.getStagingRunPaths(runId);
+    const preparationPath = path.join(this.ownedChild(this.roots.runRoot, runId), record.relativePath);
+    return this.withDirectoryLease(this.preparedRunAssetDirectoryChain(runId), async (directoryLease) => {
+      await this.assertPreparedRunDirectoryModes(runId, directoryLease);
+      const preparation = await openVerifiedCandidateLease(
+        preparationPath,
+        record,
+        {
+          unsafe: 'Authorized presentation preparation is unavailable',
+          changed: 'Authorized presentation preparation changed',
+        },
+        undefined,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      let grounding: VerifiedCandidateLease | null = null;
+      let candidate: VerifiedCandidateLease | null = null;
+      try {
+        grounding = await openVerifiedCandidateLease(
+          paths.groundingPath,
+          record.payload.grounding,
+          {
+            unsafe: 'Authorized presentation grounding is unavailable',
+            changed: 'Authorized presentation grounding changed',
+          },
+          undefined,
+          PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+        );
+        candidate = await openVerifiedCandidateLease(
+          paths.candidatePath,
+          record.payload.candidate,
+          {
+            unsafe: 'Authorized presentation candidate is unavailable',
+            changed: 'Authorized presentation candidate changed before dispatch',
+          },
+          undefined,
+          PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+        );
+        const bytes = await readOpenFileExactly(
+          preparation.handle,
+          record.byteLength,
+          'Authorized presentation preparation changed'
+        );
+        let payload: unknown;
+        try {
+          payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown;
+        } catch (error) {
+          throw new Error('Authorized presentation preparation is invalid', { cause: error });
+        }
+        const parsedRecord = { ...record, payload };
+        assertPresentationRunPreparationRecord(parsedRecord);
+        if (!isDeepStrictEqual(payload, record.payload)) {
+          throw new Error('Authorized presentation preparation does not match its manifest');
+        }
+        await assertVerifiedCandidateLease(preparation);
+        await assertVerifiedCandidateLease(grounding);
+        await assertVerifiedCandidateLease(candidate);
+        await directoryLease.assertCurrent();
+        return structuredClone(record.payload);
+      } finally {
+        await Promise.all([preparation.handle.close(), grounding?.handle.close(), candidate?.handle.close()]);
+      }
+    });
+  }
+
+  getStagingCandidatePath(runId: string): string {
+    return this.getStagingRunPaths(runId).candidatePath;
+  }
+
+  getStagingRunPaths(runId: string): PresentationStagingRunPaths {
+    assertUuid(runId, 'run');
+    const agentDirectory = path.join(this.ownedChild(this.roots.stagingRoot, runId), 'agent');
+    return {
+      candidatePath: path.join(agentDirectory, CANDIDATE_NAME),
+      groundingPath: path.join(agentDirectory, GROUNDING_NAME),
+      planPath: path.join(agentDirectory, PLAN_NAME),
+    };
   }
 
   async getStagingCandidateByteLength(runId: string): Promise<number> {
@@ -2622,6 +3184,169 @@ export class PresentationRunFiles {
       await assertPathNamesDirectory(directory, after);
     } finally {
       await handle.close();
+    }
+  }
+
+  private preparedRunAssetDirectoryChain(runId: string): string[] {
+    return [...this.stagingCandidateDirectoryChain(runId), ...this.durableRunDirectoryChain(runId)];
+  }
+
+  private preparedRunAssetEntries(
+    prepared: PreparedPresentationRunAssets,
+    useFinalPath: boolean
+  ): PreparedRunAssetEntry[] {
+    const stagingRunDirectory = this.ownedChild(this.roots.stagingRoot, prepared.runId);
+    const runDirectory = this.ownedChild(this.roots.runRoot, prepared.runId);
+    const entry = (
+      asset: PreparedPresentationRunAsset,
+      baseDirectory: string,
+      parentDirectory: string
+    ): PreparedRunAssetEntry => ({
+      asset,
+      filePath: path.join(baseDirectory, useFinalPath ? asset.finalRelativePath : asset.temporaryRelativePath),
+      finalPath: path.join(baseDirectory, asset.finalRelativePath),
+      parentDirectory,
+    });
+    return [
+      entry(prepared.candidate, stagingRunDirectory, path.join(stagingRunDirectory, 'agent')),
+      entry(prepared.grounding, stagingRunDirectory, path.join(stagingRunDirectory, 'agent')),
+      entry(prepared.preparationFile, runDirectory, runDirectory),
+    ];
+  }
+
+  private async assertPreparedRunDirectoryModes(runId: string, directoryLease: OwnedDirectoryLease): Promise<void> {
+    const stagingRunDirectory = this.ownedChild(this.roots.stagingRoot, runId);
+    const runDirectory = this.ownedChild(this.roots.runRoot, runId);
+    for (const directory of [stagingRunDirectory, path.join(stagingRunDirectory, 'agent'), runDirectory]) {
+      await directoryLease.assertMode(
+        directory,
+        PRESENTATION_RUN_LIMITS.OWNED_DIRECTORY_MODE,
+        'Presentation run directory must be private'
+      );
+    }
+  }
+
+  private async recoverPreparedRunAsset(
+    entry: PreparedRunAssetEntry,
+    directoryLease: OwnedDirectoryLease
+  ): Promise<void> {
+    let finalAsset: VerifiedCandidateLease | null = null;
+    try {
+      finalAsset = await openVerifiedCandidateLease(
+        entry.finalPath,
+        entry.asset,
+        {
+          unsafe: 'Prepared presentation run recovery found an unsafe final asset',
+          changed: 'Prepared presentation run recovery found mismatched final bytes',
+        },
+        entry.asset,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+    } catch (error) {
+      if (!hasCode(error, 'ENOENT')) throw error;
+    }
+    if (finalAsset !== null) {
+      try {
+        await assertPathAbsent(
+          entry.filePath,
+          'Prepared presentation run recovery found an unexpected temporary asset'
+        );
+        await directoryLease.assertCurrent();
+        await assertVerifiedCandidateLease(finalAsset);
+        await directoryLease.sync(entry.parentDirectory);
+        await assertVerifiedCandidateLease(finalAsset);
+        return;
+      } finally {
+        await finalAsset.handle.close();
+      }
+    }
+
+    const temporary = await openVerifiedCandidateLease(
+      entry.filePath,
+      entry.asset,
+      {
+        unsafe: 'Prepared presentation run temporary asset is unsafe',
+        changed: 'Prepared presentation run temporary asset changed',
+      },
+      entry.asset,
+      PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+    );
+    try {
+      await assertPathAbsent(entry.finalPath, 'Prepared presentation run final asset already exists');
+      await directoryLease.assertCurrent();
+      await assertVerifiedCandidateLease(temporary);
+      await rename(entry.filePath, entry.finalPath);
+      temporary.path = entry.finalPath;
+      temporary.messages = {
+        unsafe: 'Prepared presentation run promotion found an unsafe final asset',
+        changed: 'Prepared presentation run promotion found mismatched final bytes',
+      };
+      await directoryLease.assertCurrent();
+      await assertVerifiedCandidateLease(temporary);
+      await directoryLease.sync(entry.parentDirectory);
+      await assertVerifiedCandidateLease(temporary);
+    } finally {
+      await temporary.handle.close();
+    }
+  }
+
+  private async writePreparedRunBytes(
+    filePath: string,
+    bytes: Buffer,
+    directoryLease: OwnedDirectoryLease,
+    cleanupEntries: { filePath: string; parentDirectory: string; metadata: FileMetadata }[],
+    parentDirectory: string
+  ): Promise<FileMetadata> {
+    let target: OpenHandle | null = null;
+    try {
+      await directoryLease.assertCurrent();
+      target = await open(
+        filePath,
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | noFollowFlag(),
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+      let metadata = await target.stat({ bigint: true });
+      assertOwnedRegularFile(metadata, 'Presentation run temporary asset is unsafe');
+      if ((metadata.mode & PERMISSION_MODE_MASK) !== BigInt(PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE)) {
+        await target.chmod(PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE);
+        const afterChmod = await target.stat({ bigint: true });
+        if (!sameFileIdentity(metadata, afterChmod)) throw new Error('Presentation run temporary asset changed');
+        metadata = afterChmod;
+      }
+      assertOwnedRegularFileMode(
+        metadata,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE,
+        'Presentation run temporary asset is unsafe'
+      );
+      await assertPathNamesFile(filePath, metadata, 'Presentation run temporary asset is unsafe');
+      cleanupEntries.push({ filePath, parentDirectory, metadata });
+      await target.writeFile(bytes);
+      await target.sync();
+      const afterWrite = await target.stat({ bigint: true });
+      assertOwnedRegularFileMode(
+        afterWrite,
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE,
+        'Presentation run temporary asset is unsafe'
+      );
+      if (!sameFileIdentity(metadata, afterWrite) || afterWrite.size !== BigInt(bytes.byteLength)) {
+        throw new Error('Presentation run temporary asset changed');
+      }
+      await assertPathNamesFile(filePath, afterWrite, 'Presentation run temporary asset changed');
+      await directoryLease.assertCurrent();
+      await target.close();
+      target = null;
+      return verifyCandidatePath(
+        filePath,
+        { sha256: createHash('sha256').update(bytes).digest('hex'), byteLength: bytes.byteLength },
+        {
+          unsafe: 'Presentation run temporary asset is unsafe',
+          changed: 'Presentation run temporary asset changed',
+        },
+        fileIdentity(afterWrite),
+        PRESENTATION_RUN_LIMITS.OWNED_FILE_MODE
+      );
+    } finally {
+      await target?.close().catch((): undefined => undefined);
     }
   }
 

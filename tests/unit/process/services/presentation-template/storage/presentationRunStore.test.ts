@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +21,7 @@ import {
 } from '@/process/services/presentation-template/run/storage/presentationRunJournal';
 import {
   PresentationRunStore,
+  PresentationRunStoreError,
   SortedKeyedLock,
 } from '@/process/services/presentation-template/run/storage/presentationRunStore';
 import type { PresentationRunFailure } from '@/common/types/office/presentationRun';
@@ -102,6 +104,77 @@ describe('PresentationRunStore', () => {
   let files: PresentationRunFiles;
   let journal: PresentationRunJournal;
   let store: PresentationRunStore;
+
+  const createTask3GrantBatch = async (
+    principalId: string,
+    grants: readonly { grantId: string; displayName: string; content: string }[]
+  ) => {
+    const owner = { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID };
+    await store.getPresentationSourceOwner(owner, principalId);
+    const sourcePaths = grants.map(({ grantId }) => path.join(fixtureRoot, `${grantId}.txt`));
+    await Promise.all(grants.map(({ content }, index) => writeFile(sourcePaths[index]!, content, { mode: 0o600 })));
+    const prepared = await files.prepareSourceSnapshots(
+      grants.map(({ grantId }, index) => ({ grantId, sourcePath: sourcePaths[index]!, format: 'txt' as const }))
+    );
+    const ownerSnapshot = await store.createPresentationSourceGrants({
+      owner,
+      principalId,
+      expectedOwnerRevision: 0,
+      grants: prepared.map((snapshot, index) => ({
+        grantId: snapshot.grantId,
+        displayName: grants[index]!.displayName,
+        format: 'txt' as const,
+        sourceKind: 'native-picker' as const,
+        snapshotRelativePath: snapshot.finalRelativePath,
+        sha256: snapshot.sha256,
+        byteLength: snapshot.byteLength,
+        preparedSnapshot: snapshot,
+      })),
+    });
+    return { owner, ownerSnapshot, prepared };
+  };
+
+  const allocateSnapshottedRun = async (): Promise<void> => {
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      grantClaims: [],
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+    await store.transitionRun(RUN_ID, {
+      expectedRevision: 0,
+      dispatchStatus: 'allocating',
+      artifactPhase: 'sources_snapshotted',
+      now: CREATED_AT.toISOString(),
+    });
+  };
+
+  const prepareTask5RunAssets = async () => {
+    const candidateBytes = Buffer.from('stable reference presentation bytes');
+    const themeBytes = Buffer.from('{"name":"test theme"}\n');
+    const grounding = '# Grounding\n\nVerified source evidence.\n';
+    const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+    const prepared = await files.prepareRunAssets({
+      runId: RUN_ID,
+      candidateBytes,
+      grounding,
+      rawInput: 'Prepare the quarterly business review.',
+      directive: 'Edit candidate.pptx and write plan.json.',
+      sourceRefs: [],
+      injectSkills: ['officecli'],
+      template: {
+        theme: { fileName: 'theme.json', sha256: sha256(themeBytes), byteLength: themeBytes.byteLength },
+        reference: {
+          fileName: 'reference.pptx',
+          sha256: sha256(candidateBytes),
+          byteLength: candidateBytes.byteLength,
+        },
+      },
+    });
+    return { candidateBytes, grounding, prepared };
+  };
 
   beforeEach(async () => {
     fixtureRoot = await mkdtemp(path.join(tmpdir(), 'presentation-run-store-'));
@@ -338,6 +411,175 @@ describe('PresentationRunStore', () => {
       claimedRunId: allocated.run.runId,
     });
     expect(allocated.run).toMatchObject({ sourceGrants: [GRANT_A, GRANT_B], retainedBytes: 36 });
+  });
+
+  it('rejects a same-conversation integrity claim from another principal without mutating canonical state', async () => {
+    const principalA = 'principal-a';
+    const { owner, ownerSnapshot, prepared } = await createTask3GrantBatch(principalA, [
+      { grantId: GRANT_A, displayName: 'brief.txt', content: 'Principal A evidence\n' },
+    ]);
+
+    const result = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      principalId: 'principal-b',
+      grantClaims: [
+        {
+          grantId: GRANT_A,
+          expectedByteLength: prepared[0]!.byteLength,
+          expectedSha256: prepared[0]!.sha256,
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_FOREIGN',
+      details: { grantId: GRANT_A },
+    });
+    await expect(store.getPresentationSourceOwner(owner, principalA)).resolves.toEqual(ownerSnapshot);
+    await expect(files.listEntityIds('run')).resolves.toEqual([]);
+  });
+
+  it('returns claimed source snapshots in the renderer-selected order', async () => {
+    const principalId = 'principal-a';
+    const { prepared } = await createTask3GrantBatch(principalId, [
+      { grantId: GRANT_A, displayName: 'first.txt', content: 'First source\n' },
+      { grantId: GRANT_B, displayName: 'second.txt', content: 'Second source\n' },
+    ]);
+    const byGrantId = new Map(prepared.map((snapshot) => [snapshot.grantId, snapshot]));
+    const claims = [GRANT_B, GRANT_A].map((grantId) => {
+      const snapshot = byGrantId.get(grantId);
+      if (snapshot === undefined) throw new Error('prepared source snapshot is missing');
+      return {
+        grantId,
+        expectedByteLength: snapshot.byteLength,
+        expectedSha256: snapshot.sha256,
+      };
+    });
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      principalId,
+      grantClaims: claims,
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+
+    await expect(store.getClaimedSourceSnapshots(RUN_ID)).resolves.toEqual([
+      {
+        grantId: GRANT_B,
+        displayName: 'second.txt',
+        format: 'txt',
+        sourceKind: 'native-picker',
+        byteLength: byGrantId.get(GRANT_B)!.byteLength,
+        sha256: byGrantId.get(GRANT_B)!.sha256,
+        snapshotRelativePath: 'source.txt',
+      },
+      {
+        grantId: GRANT_A,
+        displayName: 'first.txt',
+        format: 'txt',
+        sourceKind: 'native-picker',
+        byteLength: byGrantId.get(GRANT_A)!.byteLength,
+        sha256: byGrantId.get(GRANT_A)!.sha256,
+        snapshotRelativePath: 'source.txt',
+      },
+    ]);
+  });
+
+  it('retains the exact committed preparation across a fresh store and files instance', async () => {
+    await allocateSnapshottedRun();
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    if (committed.preparation === undefined || committed.preparation === null) {
+      throw new Error('committed preparation is missing');
+    }
+
+    const restartedFiles = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir });
+    const restarted = new PresentationRunStore({
+      files: restartedFiles,
+      journal: new PresentationRunJournal({ files: restartedFiles, now: () => CREATED_AT }),
+      now: () => CREATED_AT,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    await restarted.initialize();
+    const recovered = await restarted.getRun(RUN_ID);
+    if (recovered?.preparation === undefined || recovered.preparation === null) {
+      throw new Error('recovered preparation is missing');
+    }
+
+    expect(recovered.preparation).toEqual(prepared.record);
+    await expect(restartedFiles.readAuthorizedRunPreparation(RUN_ID, recovered.preparation)).resolves.toEqual(
+      prepared.record.payload
+    );
+  });
+
+  it('counts grounding, preparation JSON, and pretty canonical manifest bytes but not the staging candidate', async () => {
+    await allocateSnapshottedRun();
+    const { grounding, prepared } = await prepareTask5RunAssets();
+
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    const canonicalManifest = await readFile(files.getEntityManifestPath('run', RUN_ID));
+    const expectedRetainedBytes =
+      Buffer.byteLength(grounding, 'utf8') + prepared.record.byteLength + canonicalManifest.byteLength;
+
+    expect(canonicalManifest.toString('utf8')).toBe(`${JSON.stringify(committed, null, 2)}\n`);
+    expect(committed.retainedBytes).toBe(expectedRetainedBytes);
+    expect(committed.retainedBytes).not.toBe(expectedRetainedBytes + prepared.candidate.byteLength);
+  });
+
+  it('garbage-collects a prepared run at the retention boundary', async () => {
+    await allocateSnapshottedRun();
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    const retained = await store.transitionRun(RUN_ID, {
+      expectedRevision: committed.revision,
+      dispatchStatus: 'failed_retained',
+      disposition: 'TRACKING_REQUIRED',
+      now: CREATED_AT.toISOString(),
+    });
+    expect(retained.preparation).toEqual(prepared.record);
+
+    const retentionBoundary = new Date(CREATED_AT.getTime() + PRESENTATION_RUN_LIMITS.FAILED_OR_REVIEW_RETENTION_MS);
+    const sweepingFiles = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir });
+    const sweepingStore = new PresentationRunStore({
+      files: sweepingFiles,
+      journal: new PresentationRunJournal({ files: sweepingFiles, now: () => retentionBoundary }),
+      now: () => retentionBoundary,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+
+    await expect(sweepingStore.initialize()).resolves.toBeUndefined();
+    await expect(sweepingStore.getRun(RUN_ID)).resolves.toMatchObject({
+      dispatchStatus: 'discarded',
+      preparation: null,
+    });
+  });
+
+  it('rejects preparation growth beyond the retained-byte cap with the typed store error', async () => {
+    await journal.transaction({
+      mutations: [
+        {
+          entityKind: 'run',
+          entityId: RUN_ID,
+          expectedRevision: null,
+          nextManifest: storedRun(RUN_ID, 'allocating', {
+            artifactPhase: 'sources_snapshotted',
+            retainedBytes: PRESENTATION_RUN_LIMITS.MAX_RETAINED_BYTES_PER_CONVERSATION - 1,
+          }),
+        },
+      ],
+    });
+    const { prepared } = await prepareTask5RunAssets();
+
+    const rejection = store.commitPreparedRun(RUN_ID, 0, prepared);
+
+    await expect(rejection).rejects.toBeInstanceOf(PresentationRunStoreError);
+    await expect(rejection).rejects.toMatchObject({ code: 'RESOURCE_LIMIT_EXCEEDED' });
   });
 
   it('rejects a duplicated grant ID before mutating the canonical grant', async () => {
