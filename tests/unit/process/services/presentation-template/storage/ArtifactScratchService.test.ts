@@ -8,7 +8,7 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ArtifactScratchService } from './ArtifactScratchService';
+import { ArtifactScratchService } from '@/process/services/presentation-template/run/ArtifactScratchService';
 
 const exists = async (filePath: string): Promise<boolean> => {
   try {
