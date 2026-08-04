@@ -33,6 +33,8 @@ vi.mock('react-i18next', () => ({
       if (key === 'conversation.creativeStudio.scene.accessibleName') {
         return `${key}:${params?.number}:${params?.title}`;
       }
+      if (key === 'conversation.creativeStudio.scene.durationSeconds') return `${key}:${params?.seconds}`;
+      if (key.endsWith('Accessible')) return `${key}:${params?.number}:${params?.title}`;
       if (key === 'conversation.creativeStudio.scene.number') return `Scene ${params?.number}`;
       if (key === 'conversation.creativeStudio.scene.status.ready') return 'Ready to generate';
       return key;
@@ -81,14 +83,13 @@ describe('SceneCard accessibility', () => {
   it('gives every scene action a unique localized accessible name and matching title', () => {
     renderSceneCard();
 
-    const sceneLabel = 'conversation.creativeStudio.scene.accessibleName:2:Reveal';
     for (const action of [
-      'conversation.creativeStudio.storyboard.dragScene',
-      'conversation.creativeStudio.storyboard.moveUp',
-      'conversation.creativeStudio.storyboard.moveDown',
-      'conversation.creativeStudio.storyboard.removeScene',
+      'conversation.creativeStudio.storyboard.dragSceneAccessible',
+      'conversation.creativeStudio.storyboard.moveSceneUpAccessible',
+      'conversation.creativeStudio.storyboard.moveSceneDownAccessible',
+      'conversation.creativeStudio.storyboard.removeSceneAccessible',
     ]) {
-      const actionLabel = `${action}: ${sceneLabel}`;
+      const actionLabel = `${action}:2:Reveal`;
       expect(screen.getByRole('button', { name: actionLabel })).toHaveAttribute('title', actionLabel);
     }
   });
@@ -113,7 +114,7 @@ describe('SceneCard accessibility', () => {
     expect(screen.getByText('Scene 2')).toBeInTheDocument();
     expect(screen.getByText('Reveal')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.scene.video')).toBeInTheDocument();
-    expect(screen.getByText('6 conversation.creativeStudio.scene.seconds')).toBeInTheDocument();
+    expect(screen.getByText('conversation.creativeStudio.scene.durationSeconds:6')).toBeInTheDocument();
     expect(screen.getByText('Ready to generate')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'conversation.creativeStudio.scene.accessibleName:2:Reveal' })

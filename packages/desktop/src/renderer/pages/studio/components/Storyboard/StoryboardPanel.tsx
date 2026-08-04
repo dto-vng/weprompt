@@ -23,7 +23,8 @@ const MAX_SCENES = 24;
 
 type RemoveCandidate = {
   sceneId: string;
-  sceneLabel: string;
+  sceneNumber: number;
+  sceneTitle: string;
 };
 
 export type StoryboardPanelProps = {
@@ -94,7 +95,10 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
   const sceneOrder = orderedScenes.map((scene) => scene.id);
   const sceneLimitReached = orderedScenes.length >= MAX_SCENES;
   const removeActionLabel = removeCandidate
-    ? `${t('conversation.creativeStudio.storyboard.removeScene')}: ${removeCandidate.sceneLabel}`
+    ? t('conversation.creativeStudio.storyboard.removeSceneAccessible', {
+        number: removeCandidate.sceneNumber,
+        title: removeCandidate.sceneTitle,
+      })
     : t('conversation.creativeStudio.storyboard.removeScene');
   const fitErrorMessage = (() => {
     if (fitOutcome?.status !== 'unreachable') return null;
@@ -201,10 +205,8 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
                   onRemove={() =>
                     setRemoveCandidate({
                       sceneId: scene.id,
-                      sceneLabel: t('conversation.creativeStudio.scene.accessibleName', {
-                        number: index + 1,
-                        title: scene.title,
-                      }),
+                      sceneNumber: index + 1,
+                      sceneTitle: scene.title,
                     })
                   }
                   onMove={(direction) => void onMoveScene(scene.id, direction)}
@@ -292,7 +294,14 @@ export const StoryboardPanel: React.FC<StoryboardPanelProps> = ({
         }
       >
         <p>{t('conversation.creativeStudio.storyboard.removeConfirmBody')}</p>
-        {removeCandidate && <p>{removeCandidate.sceneLabel}</p>}
+        {removeCandidate && (
+          <p>
+            {t('conversation.creativeStudio.scene.accessibleName', {
+              number: removeCandidate.sceneNumber,
+              title: removeCandidate.sceneTitle,
+            })}
+          </p>
+        )}
       </Modal>
     </section>
   );

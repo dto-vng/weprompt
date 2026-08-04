@@ -485,7 +485,7 @@ describe('AssetStrip canonical variations', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'conversation.creativeStudio.preview.selectVersion: conversation.creativeStudio.preview.versionLabel:2',
+        name: 'conversation.creativeStudio.preview.selectVersionAccessible:2',
       })
     );
 
@@ -528,17 +528,15 @@ describe('SceneTimeline storyboard strip', () => {
     render(<SceneTimeline orderedScenes={orderedScenes} selectedSceneId='scene-2' onSelectScene={vi.fn()} />);
 
     const controls = screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.timeline\.selectScene/,
+      name: /conversation\.creativeStudio\.timeline\.selectSceneAccessible/,
     });
     expect(controls.map((control) => control.getAttribute('aria-label'))).toEqual([
-      'conversation.creativeStudio.timeline.selectScene: conversation.creativeStudio.timeline.sceneLabel:1, Opening, conversation.creativeStudio.timeline.durationLabel:5',
-      'conversation.creativeStudio.timeline.selectScene: conversation.creativeStudio.timeline.sceneLabel:2, Reveal, conversation.creativeStudio.timeline.durationLabel:3',
-      'conversation.creativeStudio.timeline.selectScene: conversation.creativeStudio.timeline.sceneLabel:3, Closing, conversation.creativeStudio.timeline.durationLabel:7',
+      'conversation.creativeStudio.timeline.selectSceneAccessible:1',
+      'conversation.creativeStudio.timeline.selectSceneAccessible:2',
+      'conversation.creativeStudio.timeline.selectSceneAccessible:3',
     ]);
     expect(controls.map((control) => control.parentElement?.style.flexGrow)).toEqual(['5', '3', '7']);
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'conversation.creativeStudio.timeline.totalDurationconversation.creativeStudio.timeline.durationLabel:15'
-    );
+    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.timeline.totalDurationFull:15');
   });
 
   it('marks selection and supports adjacent keyboard selection without reordering', () => {
@@ -549,7 +547,7 @@ describe('SceneTimeline storyboard strip', () => {
     const onSelectScene = vi.fn();
     render(<SceneTimeline orderedScenes={orderedScenes} selectedSceneId='scene-1' onSelectScene={onSelectScene} />);
     const controls = screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.timeline\.selectScene/,
+      name: /conversation\.creativeStudio\.timeline\.selectSceneAccessible/,
     });
 
     expect(controls[0]).toHaveAttribute('aria-current', 'true');

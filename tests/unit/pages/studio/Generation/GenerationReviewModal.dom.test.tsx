@@ -92,23 +92,19 @@ describe('GenerationReviewModal', () => {
     expect(within(dialog).getByText('conversation.creativeStudio.review.sceneCount:count=2')).toBeInTheDocument();
     expect(within(dialog).getByText('conversation.creativeStudio.review.videoSeconds:seconds=7')).toBeInTheDocument();
     expect(
-      within(dialog).getByText(
-        'conversation.creativeStudio.timeline.totalDuration: conversation.creativeStudio.timeline.durationLabel:seconds=12'
-      )
+      within(dialog).getByText('conversation.creativeStudio.review.selectedDurationFull:count=12,seconds=12')
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText(
-        'conversation.creativeStudio.project.targetDuration: conversation.creativeStudio.timeline.durationLabel:seconds=12'
-      )
+      within(dialog).getByText('conversation.creativeStudio.review.targetDurationFull:count=12,seconds=12')
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole('article', { name: 'Opening image' })).getByText(
-        'conversation.creativeStudio.timeline.durationLabel:seconds=5'
+        'conversation.creativeStudio.scene.durationSeconds:count=5,seconds=5'
       )
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole('article', { name: 'Product motion' })).getByText(
-        'conversation.creativeStudio.timeline.durationLabel:seconds=7'
+        'conversation.creativeStudio.scene.durationSeconds:count=7,seconds=7'
       )
     ).toBeInTheDocument();
     expect(within(dialog).getByText('16:9')).toBeInTheDocument();
@@ -148,9 +144,7 @@ describe('GenerationReviewModal', () => {
 
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.review.confirm' })).toBeEnabled();
     expect(
-      screen.getByText(
-        'conversation.creativeStudio.timeline.totalDuration: conversation.creativeStudio.timeline.durationLabel:seconds=10'
-      )
+      screen.getByText('conversation.creativeStudio.review.selectedDurationFull:count=10,seconds=10')
     ).toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.review.durationMismatch')).not.toBeInTheDocument();
   });

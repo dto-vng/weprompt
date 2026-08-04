@@ -55,11 +55,11 @@ export const SceneCard: React.FC<SceneCardProps> = ({
     number: index + 1,
     title: scene.title,
   });
-  const actionLabel = (translationKey: string) => `${t(translationKey)}: ${sceneLabel}`;
-  const dragLabel = actionLabel('conversation.creativeStudio.storyboard.dragScene');
-  const moveUpLabel = actionLabel('conversation.creativeStudio.storyboard.moveUp');
-  const moveDownLabel = actionLabel('conversation.creativeStudio.storyboard.moveDown');
-  const removeLabel = actionLabel('conversation.creativeStudio.storyboard.removeScene');
+  const actionValues = { number: index + 1, title: scene.title };
+  const dragLabel = t('conversation.creativeStudio.storyboard.dragSceneAccessible', actionValues);
+  const moveUpLabel = t('conversation.creativeStudio.storyboard.moveSceneUpAccessible', actionValues);
+  const moveDownLabel = t('conversation.creativeStudio.storyboard.moveSceneDownAccessible', actionValues);
+  const removeLabel = t('conversation.creativeStudio.storyboard.removeSceneAccessible', actionValues);
   const statusKey = `conversation.creativeStudio.scene.status.${status}` as const;
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
@@ -119,7 +119,10 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         </span>
         <span aria-hidden='true'>·</span>
         <span>
-          {scene.durationSeconds} {t('conversation.creativeStudio.scene.seconds')}
+          {t('conversation.creativeStudio.scene.durationSeconds', {
+            count: scene.durationSeconds,
+            seconds: scene.durationSeconds,
+          })}
         </span>
       </div>
 

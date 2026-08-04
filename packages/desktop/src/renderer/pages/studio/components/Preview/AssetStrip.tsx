@@ -64,7 +64,7 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
       <ol className='m-0 flex list-none gap-8px overflow-x-auto p-0'>
         {generatedAssets.map(({ asset, source }, index) => {
           const versionLabel = t('conversation.creativeStudio.preview.versionLabel', { number: index + 1 });
-          const selectLabel = `${t('conversation.creativeStudio.preview.selectVersion')}: ${versionLabel}`;
+          const selectLabel = t('conversation.creativeStudio.preview.selectVersionAccessible', { number: index + 1 });
           return (
             <li key={asset.id} className='flex-none'>
               <Button

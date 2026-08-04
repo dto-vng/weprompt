@@ -164,14 +164,14 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
           <Tag>{t('conversation.creativeStudio.review.sceneCount', { count: scenes.length })}</Tag>
           <Tag>{t('conversation.creativeStudio.review.videoSeconds', { seconds: review.videoSeconds })}</Tag>
           <Tag>
-            {t('conversation.creativeStudio.timeline.totalDuration')}:{' '}
-            {t('conversation.creativeStudio.timeline.durationLabel', {
+            {t('conversation.creativeStudio.review.selectedDurationFull', {
+              count: selectedDurationSeconds,
               seconds: selectedDurationSeconds,
             })}
           </Tag>
           <Tag>
-            {t('conversation.creativeStudio.project.targetDuration')}:{' '}
-            {t('conversation.creativeStudio.timeline.durationLabel', {
+            {t('conversation.creativeStudio.review.targetDurationFull', {
+              count: targetDurationSeconds,
               seconds: targetDurationSeconds,
             })}
           </Tag>
@@ -201,7 +201,8 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
                   )}
                 </Tag>
                 <Tag>
-                  {t('conversation.creativeStudio.timeline.durationLabel', {
+                  {t('conversation.creativeStudio.scene.durationSeconds', {
+                    count: scene.durationSeconds,
                     seconds: scene.durationSeconds,
                   })}
                 </Tag>

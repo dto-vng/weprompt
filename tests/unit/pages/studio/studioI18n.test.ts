@@ -5,6 +5,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import i18next from 'i18next';
 import { describe, expect, it } from 'vitest';
 import i18nConfig from '@/common/config/i18n-config.json';
 
@@ -118,6 +119,29 @@ const readinessActionKeys = [
   'export.noAssetsToExport',
 ] as const;
 
+const pluralLogicalKeys = [
+  'review.generateReadyScenes',
+  'scene.durationSeconds',
+  'timeline.totalDurationFull',
+  'timeline.selectSceneAccessible',
+  'review.selectedDurationFull',
+  'review.targetDurationFull',
+] as const;
+
+const streamFullSentenceKeys = [
+  'storyboard.dragSceneAccessible',
+  'storyboard.moveSceneUpAccessible',
+  'storyboard.moveSceneDownAccessible',
+  'storyboard.removeSceneAccessible',
+  'preview.selectVersionAccessible',
+  ...pluralLogicalKeys,
+] as const;
+
+type PluralResolver = {
+  getSuffix(locale: string, count: number): string;
+  getSuffixes(locale: string): string[];
+};
+
 function loadConversationLocale(locale: string): JsonObject {
   const localeUrl = new URL(`${locale}/conversation.json`, localeRoot);
   return JSON.parse(readFileSync(localeUrl, 'utf8')) as JsonObject;
@@ -146,6 +170,10 @@ function flattenStringLeaves(value: unknown, prefix = ''): Record<string, string
 
 function getPlaceholders(value: string): string[] {
   return (value.match(/{{[^{}]+}}/g) ?? []).toSorted();
+}
+
+function isPluralVariantKey(key: string): boolean {
+  return pluralLogicalKeys.some((base) => key.startsWith(`${base}_`));
 }
 
 describe('Creative Studio localization contract', () => {
@@ -190,7 +218,9 @@ describe('Creative Studio localization contract', () => {
 
     const issues: string[] = [];
     const referenceLeaves = flattenStringLeaves(reference);
-    const referenceKeys = Object.keys(referenceLeaves).toSorted();
+    const referenceKeys = Object.keys(referenceLeaves)
+      .filter((key) => !isPluralVariantKey(key))
+      .toSorted();
     const configuredLocales = i18nConfig.supportedLanguages.toSorted();
 
     for (const locale of configuredLocales) {
@@ -201,7 +231,9 @@ describe('Creative Studio localization contract', () => {
       }
 
       const localeLeaves = flattenStringLeaves(creativeStudio);
-      const localeKeys = Object.keys(localeLeaves).toSorted();
+      const localeKeys = Object.keys(localeLeaves)
+        .filter((key) => !isPluralVariantKey(key))
+        .toSorted();
       const missingKeys = referenceKeys.filter((key) => !(key in localeLeaves));
       const extraKeys = localeKeys.filter((key) => !(key in referenceLeaves));
 
@@ -230,10 +262,120 @@ describe('Creative Studio localization contract', () => {
       }
 
       if (locale !== i18nConfig.referenceLanguage) {
+        const copiedStreamKeys = streamFullSentenceKeys.filter((key) => localeLeaves[key] === referenceLeaves[key]);
+        if (copiedStreamKeys.length > 0) {
+          issues.push(`${locale} copies new English full-sentence keys: ${copiedStreamKeys.join(', ')}`);
+        }
+
         const copiedKeys = referenceKeys.filter((key) => localeLeaves[key] === referenceLeaves[key]);
         const maximumCopiedLeaves = Math.max(4, Math.floor(referenceKeys.length * 0.05));
         if (copiedKeys.length > maximumCopiedLeaves) {
           issues.push(`${locale} leaves too much English copy (${copiedKeys.length} keys): ${copiedKeys.join(', ')}`);
+        }
+      }
+    }
+
+    expect(issues).toEqual([]);
+  });
+
+  it('defines and behaviorally resolves every locale-specific plural category', async () => {
+    const issues: string[] = [];
+    const categoryCandidates = [0, 1, 2, 3, 4, 5, 10, 11, 12, 20, 21, 22, 25, 100, 1_000_000, 1.5];
+    const referenceLeaves = flattenStringLeaves(loadConversationLocale(i18nConfig.referenceLanguage).creativeStudio);
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const conversation = loadConversationLocale(locale);
+      const creativeStudio = conversation.creativeStudio;
+      if (!isJsonObject(creativeStudio)) {
+        issues.push(`${locale} is missing conversation.creativeStudio`);
+        continue;
+      }
+
+      const leaves = flattenStringLeaves(creativeStudio);
+      const instance = i18next.createInstance();
+      await instance.init({
+        lng: locale,
+        fallbackLng: false,
+        resources: { [locale]: { translation: { conversation } } },
+        interpolation: { escapeValue: false },
+      });
+      const resolver = (instance.services as unknown as { pluralResolver: PluralResolver }).pluralResolver;
+      const suffixes = resolver.getSuffixes(locale);
+      const categoryCounts = suffixes.flatMap((suffix) => {
+        const count = categoryCandidates.find((candidate) => resolver.getSuffix(locale, candidate) === suffix);
+        if (count === undefined) {
+          issues.push(`${locale} has no exercised count for ${suffix}`);
+          return [];
+        }
+        return [count];
+      });
+
+      if (locale === 'ru-RU' || locale === 'uk-UA') {
+        expect(suffixes).toEqual(['_one', '_few', '_many', '_other']);
+      }
+
+      for (const base of pluralLogicalKeys) {
+        const fallback = leaves[base];
+        if (!fallback?.trim()) {
+          issues.push(`${locale} is missing plural fallback conversation.creativeStudio.${base}`);
+          continue;
+        }
+
+        const expectedVariantKeys = suffixes.map((suffix) => `${base}${suffix}`).toSorted();
+        const actualVariantKeys = Object.keys(leaves)
+          .filter((key) => key.startsWith(`${base}_`))
+          .toSorted();
+        if (actualVariantKeys.join('\n') !== expectedVariantKeys.join('\n')) {
+          issues.push(
+            `${locale}.${base} variants ${actualVariantKeys.join(', ')} do not match ${expectedVariantKeys.join(', ')}`
+          );
+        }
+
+        const fallbackPlaceholders = getPlaceholders(fallback);
+        const referenceTemplates = Object.entries(referenceLeaves)
+          .filter(([key]) => key === base || key.startsWith(`${base}_`))
+          .map(([, value]) => value);
+        for (const variantKey of expectedVariantKeys) {
+          const variant = leaves[variantKey];
+          if (!variant?.trim()) {
+            issues.push(`${locale} is missing conversation.creativeStudio.${variantKey}`);
+            continue;
+          }
+          if (getPlaceholders(variant).join('\n') !== fallbackPlaceholders.join('\n')) {
+            issues.push(`${locale}.${variantKey} placeholders do not match ${base}`);
+          }
+          if (locale !== i18nConfig.referenceLanguage && referenceTemplates.includes(variant)) {
+            issues.push(`${locale}.${variantKey} copies the English plural text`);
+          }
+        }
+
+        const counts = [...new Set([0, 1, 2, 5, ...categoryCounts])];
+        for (const count of counts) {
+          const key = `conversation.creativeStudio.${base}`;
+          const details = instance.t(key, {
+            count,
+            seconds: count,
+            number: 2,
+            title: 'Product close-up',
+            returnDetails: true,
+          });
+          const expectedExactKey = `${key}${resolver.getSuffix(locale, count)}`;
+          if (typeof details.res !== 'string' || !details.res.includes(String(count))) {
+            issues.push(`${locale}.${base} did not render count ${count}`);
+          }
+          if (details.res === key) issues.push(`${locale}.${base} returned the raw key for ${count}`);
+          if (details.exactUsedKey !== expectedExactKey) {
+            issues.push(`${locale}.${base} used ${details.exactUsedKey} instead of ${expectedExactKey} for ${count}`);
+          }
+        }
+
+        if (locale === 'ru-RU' || locale === 'uk-UA') {
+          const normalizedTemplates = ['_one', '_few', '_many'].map((suffix) =>
+            leaves[`${base}${suffix}`]?.replaceAll('{{count}}', '{{value}}').replaceAll('{{seconds}}', '{{value}}')
+          );
+          if (new Set(normalizedTemplates).size !== 3) {
+            issues.push(`${locale}.${base} one/few/many templates must be distinct`);
+          }
         }
       }
     }

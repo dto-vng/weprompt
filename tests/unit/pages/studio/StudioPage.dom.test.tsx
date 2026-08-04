@@ -434,7 +434,7 @@ describe('StudioPage and useStudioProject', () => {
     renderRoute();
 
     const variations = await screen.findAllByRole('button', {
-      name: /conversation\.creativeStudio\.preview\.selectVersion/,
+      name: /conversation\.creativeStudio\.preview\.selectVersionAccessible/,
     });
     fireEvent.click(variations[1]!);
 
@@ -1578,7 +1578,7 @@ describe('StudioPage and useStudioProject', () => {
 
     fireEvent.click(
       screen.getAllByRole('button', {
-        name: 'conversation.creativeStudio.storyboard.moveUp: conversation.creativeStudio.scene.accessibleName',
+        name: 'conversation.creativeStudio.storyboard.moveSceneUpAccessible',
       })[1]
     );
     await waitFor(() => expect(bridge.reorderScenes.invoke).toHaveBeenCalledTimes(1));

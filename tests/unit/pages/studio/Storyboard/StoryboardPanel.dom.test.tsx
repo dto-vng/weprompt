@@ -311,17 +311,17 @@ describe('StoryboardPanel', () => {
 
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' })).toBeDisabled();
     for (const button of screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.moveUp: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.moveSceneUpAccessible/,
     })) {
       expect(button).toBeDisabled();
     }
     for (const button of screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.moveDown: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.moveSceneDownAccessible/,
     })) {
       expect(button).toBeDisabled();
     }
     for (const button of screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.dragScene: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.dragSceneAccessible/,
     })) {
       expect(button).toBeDisabled();
     }
@@ -332,10 +332,10 @@ describe('StoryboardPanel', () => {
     render(<StoryboardPanel {...props} />);
 
     const moveUpButtons = screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.moveUp: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.moveSceneUpAccessible/,
     });
     const moveDownButtons = screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.moveDown: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.moveSceneDownAccessible/,
     });
     expect(moveUpButtons[0]).toBeDisabled();
     expect(moveDownButtons[2]).toBeDisabled();
@@ -363,7 +363,7 @@ describe('StoryboardPanel', () => {
 
     fireEvent.click(
       screen.getAllByRole('button', {
-        name: /conversation\.creativeStudio\.storyboard\.removeScene: conversation\.creativeStudio\.scene\.accessibleName/,
+        name: /conversation\.creativeStudio\.storyboard\.removeSceneAccessible/,
       })[1]
     );
     const dialog = screen.getByRole('dialog');
@@ -371,7 +371,7 @@ describe('StoryboardPanel', () => {
     expect(within(dialog).getByText('conversation.creativeStudio.scene.accessibleName:2:Reveal')).toBeInTheDocument();
     fireEvent.click(
       within(dialog).getByRole('button', {
-        name: 'conversation.creativeStudio.storyboard.removeScene: conversation.creativeStudio.scene.accessibleName:2:Reveal',
+        name: 'conversation.creativeStudio.storyboard.removeSceneAccessible:2:Reveal',
       })
     );
     expect(props.onRemoveScene).toHaveBeenCalledExactlyOnceWith('scene-2');
@@ -413,7 +413,7 @@ describe('StoryboardPanel', () => {
     render(<StoryboardPanel {...props} />);
 
     const removeButtons = screen.getAllByRole('button', {
-      name: /conversation\.creativeStudio\.storyboard\.removeScene: conversation\.creativeStudio\.scene\.accessibleName/,
+      name: /conversation\.creativeStudio\.storyboard\.removeSceneAccessible/,
     });
     expect(removeButtons[0]).toBeEnabled();
     expect(removeButtons[1]).toBeDisabled();

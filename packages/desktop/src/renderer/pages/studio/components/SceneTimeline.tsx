@@ -58,9 +58,9 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, sel
         <h2 className='m-0 text-14px font-600 text-t-primary'>{t('conversation.creativeStudio.timeline.title')}</h2>
         {orderedScenes.length > 0 && (
           <div role='status' className='flex items-center gap-6px text-12px text-t-secondary'>
-            <span>{t('conversation.creativeStudio.timeline.totalDuration')}</span>
             <span>
-              {t('conversation.creativeStudio.timeline.durationLabel', {
+              {t('conversation.creativeStudio.timeline.totalDurationFull', {
+                count: totalDurationSeconds,
                 seconds: totalDurationSeconds,
               })}
             </span>
@@ -75,13 +75,16 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({ orderedScenes, sel
       ) : (
         <ol className='m-0 flex min-w-0 list-none gap-4px overflow-x-auto p-0'>
           {orderedScenes.map((scene, index) => {
-            const sceneLabel = t('conversation.creativeStudio.timeline.sceneLabel', { number: index + 1 });
-            const durationLabel = t('conversation.creativeStudio.timeline.durationLabel', {
+            const durationLabel = t('conversation.creativeStudio.scene.durationSeconds', {
+              count: scene.durationSeconds,
               seconds: scene.durationSeconds,
             });
-            const accessibleName = `${t(
-              'conversation.creativeStudio.timeline.selectScene'
-            )}: ${sceneLabel}, ${scene.title}, ${durationLabel}`;
+            const accessibleName = t('conversation.creativeStudio.timeline.selectSceneAccessible', {
+              number: index + 1,
+              title: scene.title,
+              count: scene.durationSeconds,
+              seconds: scene.durationSeconds,
+            });
             return (
               <li key={scene.id} className='flex min-w-72px' style={{ flexGrow: scene.durationSeconds, flexBasis: 0 }}>
                 <Button
