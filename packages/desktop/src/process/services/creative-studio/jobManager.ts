@@ -329,7 +329,7 @@ const snapshotFailureCode = (
 const pollBaseDelay = (attempt: number): number => POLL_BASE_DELAYS_MS[attempt] ?? MAX_POLL_DELAY_MS;
 const executionKey = (projectId: string, jobId: string): string => `${projectId}\u0000${jobId}`;
 
-const canCancelJob = (job: StudioJob): boolean => {
+export const canCancelJob = (job: StudioJob): boolean => {
   const policy = job.cancellationPolicy ?? 'none';
   if (job.status === 'queued_local') return true;
   if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;

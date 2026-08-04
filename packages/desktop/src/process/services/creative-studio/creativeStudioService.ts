@@ -54,7 +54,7 @@ import type {
 import { createStudioMediaChoiceId } from '@process/services/creative-studio/providerResolver';
 import type { GenerationProviderAdapterRegistry } from '@process/services/creative-studio/adapters';
 import { ProviderDeadlineError, runWithProviderDeadline } from '@process/services/creative-studio/adapters/types';
-import type { StudioJobManager } from '@process/services/creative-studio/jobManager';
+import { canCancelJob, type StudioJobManager } from '@process/services/creative-studio/jobManager';
 import type { IProvider } from '@/common/config/storage';
 import { createHash, randomUUID } from 'node:crypto';
 import { isImagesApiModel } from '@/common/utils/imageModelAllowlist';
@@ -462,16 +462,6 @@ const toRendererMediaChoice = (
   providerId: provider.providerId,
   model: provider.model,
 });
-
-const canCancelJob = (job: StudioJob): boolean => {
-  const policy = job.cancellationPolicy ?? 'none';
-  if (job.status === 'queued_local') return true;
-  if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;
-  if (job.status === 'running' || job.status === 'needs_attention') {
-    return policy === 'queued_and_running' && job.providerJobId !== null;
-  }
-  return false;
-};
 
 const toRendererJob = (job: StudioJob): StudioRendererJob => ({
   id: job.id,

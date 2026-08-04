@@ -32,6 +32,7 @@ import {
   type CreativeStudioService,
 } from '@process/services/creative-studio/creativeStudioService';
 import { createStudioMediaChoiceId } from '@process/services/creative-studio/providerResolver';
+import { canCancelJob } from '@process/services/creative-studio/jobManager';
 import {
   StudioStoryboardPlannerError,
   type StudioStoryboardPlanner,
@@ -363,6 +364,67 @@ describe('CreativeStudioService', () => {
     expect(retryJob).toHaveBeenCalledWith(retryInput);
     expect(retryDownload).toHaveBeenCalledWith(jobInput);
   });
+
+  it.each([
+    { status: 'queued_local', policy: 'none', expected: true },
+    { status: 'submitting', policy: 'queued_and_running', expected: false },
+    { status: 'queued_remote', policy: 'none', expected: false },
+    { status: 'queued_remote', policy: 'queued_only', expected: true },
+    { status: 'queued_remote', policy: 'queued_and_running', expected: true },
+    { status: 'running', policy: 'none', expected: false },
+    { status: 'running', policy: 'queued_only', expected: false },
+    { status: 'running', policy: 'queued_and_running', expected: true },
+    { status: 'needs_attention', policy: 'none', expected: false },
+    { status: 'needs_attention', policy: 'queued_only', expected: false },
+    { status: 'needs_attention', policy: 'queued_and_running', expected: true },
+    { status: 'succeeded', policy: 'queued_and_running', expected: false },
+    { status: 'failed', policy: 'queued_and_running', expected: false },
+    { status: 'cancelled', policy: 'queued_and_running', expected: false },
+  ] as const)(
+    'projects $status with $policy through the manager cancellation predicate',
+    async ({ status, policy, expected }) => {
+      const job: StudioJob = {
+        id: 'job_1',
+        projectId: 'project_1',
+        sceneId: 'scene_1',
+        status,
+        provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'open-sora' },
+        idempotencyKey: 'key_1',
+        providerJobId: status === 'queued_local' || status === 'submitting' ? null : 'remote_1',
+        cancellationPolicy: policy,
+        outputAssetIds: [],
+        error: null,
+        retryOfJobId: null,
+        retryReason: null,
+        duplicateChargeAcknowledged: false,
+        duplicateChargeAcknowledgedAt: null,
+        createdAt: '2026-07-30T00:00:00.000Z',
+        updatedAt: '2026-07-30T00:00:00.000Z',
+      };
+      const generationService = createCreativeStudioService({
+        store: createCreativeStudioStore({ rootDir }),
+        onProjectUpdated,
+        storyboardPlanner: makePlanner(),
+        jobManager: {
+          submitScenes: vi.fn(),
+          cancelJob: async () => job,
+          retryJob: vi.fn(),
+          retryDownload: vi.fn(),
+          resumePendingJobs: vi.fn(),
+          dispose: vi.fn(),
+        },
+      } as unknown as Parameters<typeof createCreativeStudioService>[0]);
+
+      const rendered = await generationService.cancelJob({
+        projectId: job.projectId,
+        jobId: job.id,
+        expectedRevision: 1,
+      });
+
+      expect(canCancelJob(job)).toBe(expected);
+      expect(rendered.canCancel).toBe(expected);
+    }
+  );
 
   it('rejects invalid job identities and revisions before invoking the job manager', async () => {
     const cancelJob = vi.fn();
