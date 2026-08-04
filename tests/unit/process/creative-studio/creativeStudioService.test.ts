@@ -32,6 +32,7 @@ import {
   type CreativeStudioService,
 } from '@process/services/creative-studio/creativeStudioService';
 import { createStudioMediaChoiceId } from '@process/services/creative-studio/providerResolver';
+import { canCancelJob } from '@process/services/creative-studio/jobManager';
 import {
   StudioStoryboardPlannerError,
   type StudioStoryboardPlanner,
@@ -223,6 +224,7 @@ describe('CreativeStudioService', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await rm(rootDir, { recursive: true, force: true });
   });
 
@@ -230,6 +232,38 @@ describe('CreativeStudioService', () => {
     await expect(
       service.updateProject({ projectId: 'missing_project', expectedRevision: 1, name: 'Changed' })
     ).rejects.toMatchObject({ code: 'not_found' } satisfies Partial<CreativeStudioStoreError>);
+  });
+
+  it('applies only schema-whitelisted fields from updateProject', async () => {
+    const project = await service.createProject(makeInput());
+
+    const updated = await service.updateProject({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      name: 'Renamed launch film',
+      routing: {
+        storyboard: null,
+        image: { providerId: 'provider_1', adapterId: 'weprompt-image-v1', model: 'image-model' },
+        video: null,
+      },
+    } as never);
+
+    expect(updated.name).toBe('Renamed launch film');
+    expect(updated.routing).toEqual(project.routing);
+  });
+
+  it('never persists unknown top-level keys from updateProject', async () => {
+    const project = await service.createProject(makeInput());
+
+    await service.updateProject({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      name: 'Renamed launch film',
+      providerMetadata: { junk: true },
+    } as never);
+
+    const raw = JSON.parse(await readFile(path.join(rootDir, project.id, 'project.json'), 'utf8')) as unknown;
+    expect(raw).not.toHaveProperty('providerMetadata');
   });
 
   it('validates and delegates every durable generation mutation to the runtime-owned job manager', async () => {
@@ -330,6 +364,67 @@ describe('CreativeStudioService', () => {
     expect(retryJob).toHaveBeenCalledWith(retryInput);
     expect(retryDownload).toHaveBeenCalledWith(jobInput);
   });
+
+  it.each([
+    { status: 'queued_local', policy: 'none', expected: true },
+    { status: 'submitting', policy: 'queued_and_running', expected: false },
+    { status: 'queued_remote', policy: 'none', expected: false },
+    { status: 'queued_remote', policy: 'queued_only', expected: true },
+    { status: 'queued_remote', policy: 'queued_and_running', expected: true },
+    { status: 'running', policy: 'none', expected: false },
+    { status: 'running', policy: 'queued_only', expected: false },
+    { status: 'running', policy: 'queued_and_running', expected: true },
+    { status: 'needs_attention', policy: 'none', expected: false },
+    { status: 'needs_attention', policy: 'queued_only', expected: false },
+    { status: 'needs_attention', policy: 'queued_and_running', expected: true },
+    { status: 'succeeded', policy: 'queued_and_running', expected: false },
+    { status: 'failed', policy: 'queued_and_running', expected: false },
+    { status: 'cancelled', policy: 'queued_and_running', expected: false },
+  ] as const)(
+    'projects $status with $policy through the manager cancellation predicate',
+    async ({ status, policy, expected }) => {
+      const job: StudioJob = {
+        id: 'job_1',
+        projectId: 'project_1',
+        sceneId: 'scene_1',
+        status,
+        provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'open-sora' },
+        idempotencyKey: 'key_1',
+        providerJobId: status === 'queued_local' || status === 'submitting' ? null : 'remote_1',
+        cancellationPolicy: policy,
+        outputAssetIds: [],
+        error: null,
+        retryOfJobId: null,
+        retryReason: null,
+        duplicateChargeAcknowledged: false,
+        duplicateChargeAcknowledgedAt: null,
+        createdAt: '2026-07-30T00:00:00.000Z',
+        updatedAt: '2026-07-30T00:00:00.000Z',
+      };
+      const generationService = createCreativeStudioService({
+        store: createCreativeStudioStore({ rootDir }),
+        onProjectUpdated,
+        storyboardPlanner: makePlanner(),
+        jobManager: {
+          submitScenes: vi.fn(),
+          cancelJob: async () => job,
+          retryJob: vi.fn(),
+          retryDownload: vi.fn(),
+          resumePendingJobs: vi.fn(),
+          dispose: vi.fn(),
+        },
+      } as unknown as Parameters<typeof createCreativeStudioService>[0]);
+
+      const rendered = await generationService.cancelJob({
+        projectId: job.projectId,
+        jobId: job.id,
+        expectedRevision: 1,
+      });
+
+      expect(canCancelJob(job)).toBe(expected);
+      expect(rendered.canCancel).toBe(expected);
+    }
+  );
 
   it('rejects invalid job identities and revisions before invoking the job manager', async () => {
     const cancelJob = vi.fn();
@@ -600,6 +695,92 @@ describe('CreativeStudioService', () => {
       })
     ).rejects.toMatchObject({ code: 'invalid_route' });
     expect(validateConnection).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['api_key', { api_key: undefined as never }],
+    ['base_url', { base_url: undefined as never }],
+  ] as const)('treats a provider with a skewed %s as unavailable', async (_field, overrides) => {
+    const validateConnection = vi.fn(async () => ({ ok: true as const }));
+    const connectionService = createCreativeStudioService({
+      store: createCreativeStudioStore({ rootDir }),
+      onProjectUpdated,
+      listProviders: async () => [
+        {
+          id: 'provider_1',
+          platform: 'custom',
+          name: 'Gateway',
+          base_url: 'https://gateway.example',
+          api_key: 'secret',
+          models: [],
+          ...overrides,
+        },
+      ],
+      adapterRegistry: new Map([
+        [
+          'weprompt-media-gateway-v1',
+          {
+            id: 'weprompt-media-gateway-v1',
+            validateConnection,
+            validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+            submit: async () => ({ kind: 'remote' as const, providerJobId: 'never' }),
+          },
+        ],
+      ]),
+    });
+
+    await expect(
+      connectionService.validateConnection({
+        providerId: 'provider_1',
+        integrationId: GATEWAY_INTEGRATION_ID,
+        model: 'open-sora-manual',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_route' });
+    expect(validateConnection).not.toHaveBeenCalled();
+  });
+
+  it('aborts connection validation and reports a provider error after the deadline', async () => {
+    vi.useFakeTimers();
+    let validationSignal: AbortSignal | undefined;
+    const connectionService = createCreativeStudioService({
+      store: createCreativeStudioStore({ rootDir }),
+      onProjectUpdated,
+      listProviders: async () => [
+        {
+          id: 'provider_1',
+          platform: 'custom',
+          name: 'Gateway',
+          base_url: 'https://gateway.example',
+          api_key: 'secret',
+          models: [],
+        },
+      ],
+      adapterRegistry: new Map([
+        [
+          'weprompt-media-gateway-v1',
+          {
+            id: 'weprompt-media-gateway-v1',
+            validateConnection: async (_input, _provider, signal) => {
+              validationSignal = signal;
+              return await new Promise<never>(() => undefined);
+            },
+            validateRequest: () => ({ ok: false, issues: [{ code: 'provider_unavailable' }] }),
+            submit: async () => ({ kind: 'remote' as const, providerJobId: 'never' }),
+          },
+        ],
+      ]),
+    });
+
+    const validation = connectionService.validateConnection({
+      providerId: 'provider_1',
+      integrationId: GATEWAY_INTEGRATION_ID,
+      model: 'open-sora-manual',
+    });
+    const rejection = expect(validation).rejects.toMatchObject({ code: 'provider_error' });
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await rejection;
+    expect(validationSignal?.aborted).toBe(true);
   });
 
   it('maps resolver dependency failures to a provider error', async () => {

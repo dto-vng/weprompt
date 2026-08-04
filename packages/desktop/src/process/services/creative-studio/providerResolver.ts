@@ -60,6 +60,11 @@ const isUnsafeTextCharacter = (character: string): boolean => {
 const isSafeProviderId = (value: string): boolean => SAFE_ID.test(value);
 const isSafeModel = (value: string): boolean =>
   value.length > 0 && value.length <= 256 && value === value.trim() && !Array.from(value).some(isUnsafeTextCharacter);
+const providerIsConfigured = (provider: IProvider): boolean => {
+  const apiKey = typeof provider.api_key === 'string' ? provider.api_key.trim() : '';
+  const baseUrl = typeof provider.base_url === 'string' ? provider.base_url.trim() : '';
+  return apiKey.length > 0 && baseUrl.length > 0;
+};
 
 /** Creates a stable opaque renderer choice without exposing the adapter tuple. */
 export const createStudioMediaChoiceId = (route: StudioProviderRef & { kind: StudioMediaKind }): string =>
@@ -83,7 +88,7 @@ const available = (provider: IProvider, model: string): boolean =>
   provider.enabled !== false &&
   provider.model_enabled?.[model] !== false &&
   provider.model_health?.[model]?.status !== 'unhealthy' &&
-  provider.api_key.trim().length > 0;
+  providerIsConfigured(provider);
 
 const modelHealth = (provider: IProvider, model: string): StudioGenerationRoute['health'] => {
   if (!available(provider, model)) return 'unavailable';
@@ -201,7 +206,7 @@ export const createStudioProviderResolver = (deps: StudioProviderResolverDeps): 
     const providers = await deps.listProviders();
     return providers
       .filter(
-        (provider) => isSafeProviderId(provider.id) && provider.enabled !== false && provider.api_key.trim().length > 0
+        (provider) => isSafeProviderId(provider.id) && provider.enabled !== false && providerIsConfigured(provider)
       )
       .map((provider) => ({
         providerId: provider.id,

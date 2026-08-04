@@ -53,7 +53,8 @@ import type {
 } from '@process/services/creative-studio/providerResolver';
 import { createStudioMediaChoiceId } from '@process/services/creative-studio/providerResolver';
 import type { GenerationProviderAdapterRegistry } from '@process/services/creative-studio/adapters';
-import type { StudioJobManager } from '@process/services/creative-studio/jobManager';
+import { ProviderDeadlineError, runWithProviderDeadline } from '@process/services/creative-studio/adapters/types';
+import { canCancelJob, type StudioJobManager } from '@process/services/creative-studio/jobManager';
 import type { IProvider } from '@/common/config/storage';
 import { createHash, randomUUID } from 'node:crypto';
 import { isImagesApiModel } from '@/common/utils/imageModelAllowlist';
@@ -67,6 +68,9 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
 const RESOLUTIONS = new Set(['720p', '1080p']);
 const MEDIA_KINDS = new Set(['image', 'video']);
+const CONNECTION_VALIDATION_TIMEOUT_MS = 30_000;
+const UPDATABLE_PROJECT_FIELDS = ['name', 'brief', 'aspectRatio', 'targetDurationSeconds', 'resolution'] as const;
+type UpdatableProjectField = (typeof UPDATABLE_PROJECT_FIELDS)[number];
 const NONTERMINAL_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
   'queued_local',
   'submitting',
@@ -242,11 +246,38 @@ const assertExpectedRevision: (value: unknown) => asserts value is number = (val
   if (!isIntegerInRange(value, 1, Number.MAX_SAFE_INTEGER)) throw invalid('Invalid Studio project revision');
 };
 
+const applyProjectUpdateField = <Field extends UpdatableProjectField>(
+  project: StudioProject,
+  input: StudioUpdateProjectRequest,
+  field: Field
+): void => {
+  switch (field) {
+    case 'name':
+      if (input.name !== undefined) project.name = input.name;
+      break;
+    case 'brief':
+      if (input.brief !== undefined) project.brief = input.brief;
+      break;
+    case 'aspectRatio':
+      if (input.aspectRatio !== undefined) project.aspectRatio = input.aspectRatio;
+      break;
+    case 'targetDurationSeconds':
+      if (input.targetDurationSeconds !== undefined) project.targetDurationSeconds = input.targetDurationSeconds;
+      break;
+    case 'resolution':
+      if (input.resolution !== undefined) project.resolution = input.resolution;
+      break;
+  }
+};
+
 const providerIsAvailable = (provider: IProvider, model: string, requireListedModel = true): boolean =>
   provider.enabled !== false &&
   provider.model_enabled?.[model] !== false &&
   provider.model_health?.[model]?.status !== 'unhealthy' &&
+  typeof provider.api_key === 'string' &&
   provider.api_key.trim().length > 0 &&
+  typeof provider.base_url === 'string' &&
+  provider.base_url.trim().length > 0 &&
   (!requireListedModel || provider.models.includes(model));
 
 const sanitizedCapabilities = (
@@ -430,16 +461,6 @@ const toRendererMediaChoice = (
   providerId: provider.providerId,
   model: provider.model,
 });
-
-const canCancelJob = (job: StudioJob): boolean => {
-  const policy = job.cancellationPolicy ?? 'none';
-  if (job.status === 'queued_local') return true;
-  if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;
-  if (job.status === 'running' || job.status === 'needs_attention') {
-    return policy === 'queued_and_running' && job.providerJobId !== null;
-  }
-  return false;
-};
 
 const toRendererJob = (job: StudioJob): StudioRendererJob => ({
   id: job.id,
@@ -751,11 +772,17 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
     }
     const adapter = deps.adapterRegistry.get(normalizedInput.adapterId);
     if (!adapter) throw new CreativeStudioServiceError('invalid_route');
-    const validation = await adapter.validateConnection(
-      { model: normalizedInput.model },
-      provider,
-      new AbortController().signal
-    );
+    let validation;
+    try {
+      validation = await runWithProviderDeadline(
+        new AbortController().signal,
+        CONNECTION_VALIDATION_TIMEOUT_MS,
+        (signal) => adapter.validateConnection({ model: normalizedInput.model }, provider, signal)
+      );
+    } catch (error) {
+      if (error instanceof ProviderDeadlineError) throw new CreativeStudioServiceError('provider_error');
+      throw error;
+    }
     if (!validation.ok) throw new CreativeStudioServiceError('provider_error');
     return {
       schemaVersion: 1,
@@ -877,7 +904,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       }
       if (input.resolution !== undefined && !RESOLUTIONS.has(input.resolution))
         throw invalid('Invalid Studio resolution');
-      const { projectId, expectedRevision, ...update } = input;
+      const { projectId, expectedRevision } = input;
       if (input.aspectRatio !== undefined) {
         const project = await deps.store.getProject(projectId);
         if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
@@ -894,7 +921,14 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
         }
       }
       return notify(
-        await deps.store.updateProject(projectId, (project) => ({ ...project, ...update }), expectedRevision)
+        await deps.store.updateProject(
+          projectId,
+          (project) => {
+            for (const field of UPDATABLE_PROJECT_FIELDS) applyProjectUpdateField(project, input, field);
+            return project;
+          },
+          expectedRevision
+        )
       );
     },
 

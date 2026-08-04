@@ -299,4 +299,27 @@ describe('createStudioProviderResolver', () => {
       },
     ]);
   });
+
+  it('skips version-skewed provider rows without hiding healthy candidates or routes', async () => {
+    const healthyProvider = provider({ id: 'provider_healthy', models: ['video-model'] });
+    const skewedProvider = provider({
+      id: 'provider_skewed',
+      api_key: undefined as never,
+      base_url: undefined as never,
+    });
+    const baseUrlSkewedProvider = provider({ id: 'provider_base_url_skewed', base_url: undefined as never });
+    const checked = resolver(
+      [skewedProvider, baseUrlSkewedProvider, healthyProvider],
+      [
+        binding({ id: 'binding_skewed', providerId: 'provider_skewed' }),
+        binding({ id: 'binding_base_url_skewed', providerId: 'provider_base_url_skewed' }),
+        binding({ id: 'binding_healthy', providerId: 'provider_healthy' }),
+      ]
+    );
+
+    await expect(checked.listConnectionCandidates()).resolves.toMatchObject([{ providerId: 'provider_healthy' }]);
+    await expect(checked.listGenerationRoutes()).resolves.toMatchObject({
+      routes: [{ providerId: 'provider_healthy' }],
+    });
+  });
 });
