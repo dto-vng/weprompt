@@ -660,6 +660,149 @@ describe('CreativeStudioService', () => {
     ).rejects.toMatchObject({ code: 'invalid_payload' } satisfies Partial<CreativeStudioStoreError>);
   });
 
+  const projectWithAspectSafetyState = async (mutate: (project: StudioProject) => void) => {
+    const store = createCreativeStudioStore({
+      rootDir,
+      now: () => '2026-07-30T00:00:00.000Z',
+      createId: () => 'aspect_safety_project',
+    });
+    const guardedService = createCreativeStudioService({
+      store,
+      onProjectUpdated,
+      storyboardPlanner: makePlanner(),
+    });
+    const created = await guardedService.createProject(makeInput());
+    const canonical = await store.getProject(created.id);
+    if (canonical === null) throw new Error('Aspect-ratio safety fixture was not created');
+    mutate(canonical);
+    vi.spyOn(store, 'getProject').mockResolvedValue(canonical);
+    return { created, guardedService };
+  };
+
+  it('keeps aspect ratio editable when the project contains imported references only', async () => {
+    const { created, guardedService } = await projectWithAspectSafetyState((project) => {
+      project.assets.reference_1 = {
+        id: 'reference_1',
+        projectId: project.id,
+        sceneId: null,
+        mediaKind: 'image',
+        mimeType: 'image/png',
+        managedAsset: { collection: 'imports', fileName: 'reference_1.png' },
+        byteSize: 1,
+        sha256: '1'.repeat(64),
+        createdAt: project.createdAt,
+      };
+    });
+
+    await expect(
+      guardedService.updateProject({
+        projectId: created.id,
+        expectedRevision: created.revision,
+        aspectRatio: '9:16',
+      })
+    ).resolves.toMatchObject({ aspectRatio: '9:16' });
+  });
+
+  it('rejects an aspect-ratio change after a managed generated output exists', async () => {
+    const { created, guardedService } = await projectWithAspectSafetyState((project) => {
+      project.assets.asset_1 = {
+        id: 'asset_1',
+        projectId: project.id,
+        sceneId: null,
+        mediaKind: 'image',
+        mimeType: 'image/png',
+        managedAsset: { collection: 'assets', fileName: 'asset_1.png' },
+        byteSize: 1,
+        sha256: '2'.repeat(64),
+        createdAt: project.createdAt,
+      };
+    });
+
+    await expect(
+      guardedService.updateProject({
+        projectId: created.id,
+        expectedRevision: created.revision,
+        aspectRatio: '9:16',
+      })
+    ).rejects.toMatchObject({ code: 'busy' });
+  });
+
+  it.each(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention'] as const)(
+    'rejects an aspect-ratio change while a generation job is %s',
+    async (status) => {
+      const { created, guardedService } = await projectWithAspectSafetyState((project) => {
+        project.jobs.job_1 = {
+          id: 'job_1',
+          projectId: project.id,
+          sceneId: 'scene_1',
+          status,
+          provider: { providerId: 'provider_1', adapterId: 'weprompt-media-gateway-v1', model: 'video-model' },
+          idempotencyKey: 'aspect-lock-job',
+          providerJobId: status === 'queued_local' || status === 'submitting' ? null : 'remote_1',
+          cancellationPolicy: 'queued_and_running',
+          outputAssetIds: [],
+          error:
+            status === 'needs_attention'
+              ? {
+                  code: 'submission_unknown',
+                  messageKey: 'conversation.creativeStudio.jobs.errors.submissionUnknown',
+                }
+              : null,
+          retryOfJobId: null,
+          retryReason: null,
+          duplicateChargeAcknowledged: false,
+          duplicateChargeAcknowledgedAt: null,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        };
+      });
+
+      await expect(
+        guardedService.updateProject({
+          projectId: created.id,
+          expectedRevision: created.revision,
+          aspectRatio: '9:16',
+        })
+      ).rejects.toMatchObject({ code: 'busy' });
+    }
+  );
+
+  it('allows unchanged aspect ratio and ordinary metadata updates after aspect ratio is locked', async () => {
+    const { created, guardedService } = await projectWithAspectSafetyState((project) => {
+      project.assets.asset_1 = {
+        id: 'asset_1',
+        projectId: project.id,
+        sceneId: null,
+        mediaKind: 'image',
+        mimeType: 'image/png',
+        managedAsset: { collection: 'assets', fileName: 'asset_1.png' },
+        byteSize: 1,
+        sha256: '3'.repeat(64),
+        createdAt: project.createdAt,
+      };
+    });
+
+    const unchanged = await guardedService.updateProject({
+      projectId: created.id,
+      expectedRevision: created.revision,
+      aspectRatio: '16:9',
+    });
+    await expect(
+      guardedService.updateProject({
+        projectId: unchanged.id,
+        expectedRevision: unchanged.revision,
+        name: 'Renamed after render',
+        brief: 'Metadata remains editable.',
+        targetDurationSeconds: 20,
+      })
+    ).resolves.toMatchObject({
+      name: 'Renamed after render',
+      brief: 'Metadata remains editable.',
+      targetDurationSeconds: 20,
+      aspectRatio: '16:9',
+    });
+  });
+
   it('rejects stale revisions instead of overwriting a newer project edit', async () => {
     const project = await service.createProject(makeInput());
     await service.updateProject({

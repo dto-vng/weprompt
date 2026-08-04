@@ -879,6 +879,21 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       if (input.resolution !== undefined && !RESOLUTIONS.has(input.resolution))
         throw invalid('Invalid Studio resolution');
       const { projectId, expectedRevision, ...update } = input;
+      if (input.aspectRatio !== undefined) {
+        const project = await deps.store.getProject(projectId);
+        if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+        if (project.revision !== expectedRevision) {
+          throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
+        }
+        const aspectRatioChanged = input.aspectRatio !== project.aspectRatio;
+        const hasGeneratedOutput = Object.values(project.assets).some(
+          (asset) => asset.managedAsset.collection === 'assets'
+        );
+        const hasActiveGeneration = Object.values(project.jobs).some((job) => NONTERMINAL_JOB_STATUSES.has(job.status));
+        if (aspectRatioChanged && (hasGeneratedOutput || hasActiveGeneration)) {
+          throw new CreativeStudioServiceError('busy');
+        }
+      }
       return notify(
         await deps.store.updateProject(projectId, (project) => ({ ...project, ...update }), expectedRevision)
       );

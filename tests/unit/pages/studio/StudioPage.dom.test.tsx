@@ -328,7 +328,7 @@ describe('StudioPage and useStudioProject', () => {
       [
         'write',
         'conversation.creativeStudio.phase.write.title',
-        'conversation.creativeStudio.phase.write.textChargeDisclosure',
+        'conversation.creativeStudio.phase.shared.noMediaGeneration',
       ],
       [
         'produce',
@@ -436,11 +436,11 @@ describe('StudioPage and useStudioProject', () => {
       bridge.updateScene.invoke.mockReturnValueOnce(firstSave.promise).mockResolvedValueOnce(ok(afterSecond));
       const { router } = renderRoute('/studio/project-1/write');
 
-      fireEvent.change(await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+      const titleInputs = await screen.findAllByLabelText('conversation.creativeStudio.inspector.titleLabel');
+      fireEvent.change(titleInputs[0]!, {
         target: { value: 'Opening v2' },
       });
-      fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.scene.accessibleName' })[1]!);
-      fireEvent.change(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel'), {
+      fireEvent.change(titleInputs[1]!, {
         target: { value: 'Closing v2' },
       });
       fireEvent.click(
@@ -487,11 +487,12 @@ describe('StudioPage and useStudioProject', () => {
         )
       );
 
+      const recoverableRow = await screen.findByRole('region', { name: 'Recoverable local title' });
       expect(
-        await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
+        within(recoverableRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
       ).toBeInTheDocument();
       expect(router.state.location.pathname).toBe('/studio/project-1/write');
-      expect(screen.getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue(
+      expect(within(recoverableRow).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue(
         'Recoverable local title'
       );
       await waitFor(() => expect(document.activeElement).toHaveAttribute('role', 'alert'));
@@ -600,7 +601,10 @@ describe('StudioPage and useStudioProject', () => {
     expect(
       await screen.findByRole('region', { name: 'conversation.creativeStudio.storyboard.title' })
     ).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.inspector.title')).toBeInTheDocument();
+    const openingRow = screen.getByRole('region', { name: 'Opening' });
+    expect(within(openingRow).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toHaveValue(
+      'Opening'
+    );
     expect(screen.getByRole('button', { name: 'conversation.creativeStudio.draft.redraftAction' })).toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.preview.noAssetTitle')).toBeNull();
 
@@ -613,7 +617,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
     expect(await screen.findByText('conversation.creativeStudio.preview.noAssetTitle')).toBeInTheDocument();
-    expect(screen.queryByText('conversation.creativeStudio.inspector.title')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Opening' })).toBeNull();
     await waitFor(() => expect(bridge.listRoutes.invoke).toHaveBeenCalledWith({ projectId: 'project-1' }));
     expect(
       screen.queryByRole('button', { name: 'conversation.creativeStudio.routing.connectProvider' })
@@ -1772,8 +1776,9 @@ describe('StudioPage and useStudioProject', () => {
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.addScene' }));
 
     await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1), { timeout: 5_000 });
+    const storyboard = screen.getByRole('region', { name: 'conversation.creativeStudio.storyboard.title' });
     expect(
-      await screen.findByRole(
+      await within(storyboard).findByRole(
         'button',
         {
           name: 'conversation.creativeStudio.storyboard.retry',
@@ -1852,7 +1857,12 @@ describe('StudioPage and useStudioProject', () => {
     const titleInput = await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel');
     fireEvent.change(titleInput, { target: { value: 'Keep this local title' } });
     fireEvent.blur(titleInput);
-    await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' }, { timeout: 5_000 });
+    const recoveryRow = await screen.findByRole('region', { name: 'Keep this local title' });
+    await within(recoveryRow).findByRole(
+      'button',
+      { name: 'conversation.creativeStudio.storyboard.retry' },
+      { timeout: 5_000 }
+    );
 
     await act(async () => router.navigate('/studio/project-2'));
 
@@ -1860,7 +1870,9 @@ describe('StudioPage and useStudioProject', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Launch film' })).toBeInTheDocument();
     expect(bridge.getProject.invoke).not.toHaveBeenCalledWith({ projectId: 'project-2' });
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })[0]);
+    fireEvent.click(
+      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
+    );
     await waitFor(() =>
       expect(
         screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
@@ -1888,15 +1900,20 @@ describe('StudioPage and useStudioProject', () => {
     fireEvent.change(titleInput, { target: { value: 'Unsaved typed failure' } });
     fireEvent.blur(titleInput);
 
+    const recoveryRow = await screen.findByRole('region', { name: 'Unsaved typed failure' });
     expect(
-      await screen.findByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
+      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })).toBeInTheDocument();
+    expect(
+      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
+    ).toBeInTheDocument();
 
     await act(async () => router.navigate('/studio/project-2'));
     expect(router.state.location.pathname).toBe('/studio/project-1/write');
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' }));
+    fireEvent.click(
+      within(recoveryRow).getByRole('button', { name: 'conversation.creativeStudio.storyboard.discard' })
+    );
     await waitFor(() =>
       expect(
         screen.queryByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' })
@@ -1936,13 +1953,15 @@ describe('StudioPage and useStudioProject', () => {
     );
     renderRoute();
 
-    const titleInput = await screen.findByLabelText('conversation.creativeStudio.inspector.titleLabel');
+    const openingRow = await screen.findByRole('region', { name: 'Opening' });
+    const titleInput = within(openingRow).getByLabelText('conversation.creativeStudio.inspector.titleLabel');
     fireEvent.change(titleInput, { target: { value: 'Unresolved opening edit' } });
     fireEvent.blur(titleInput);
     await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getAllByRole('button', { name: 'conversation.creativeStudio.scene.accessibleName' })[1]);
     await act(async () => firstSave.resolve(failure()));
-    expect(await screen.findByText('conversation.creativeStudio.errors.storage')).toBeInTheDocument();
+    const unresolvedOpeningRow = await screen.findByRole('region', { name: 'Unresolved opening edit' });
+    expect(within(unresolvedOpeningRow).getByText('conversation.creativeStudio.errors.storage')).toBeInTheDocument();
 
     fireEvent.click(
       screen.getAllByRole('button', {
@@ -1952,7 +1971,8 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() => expect(bridge.reorderScenes.invoke).toHaveBeenCalledTimes(1));
 
     expect(await screen.findByText('conversation.creativeStudio.errors.staleProject')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' }));
+    const storyboard = screen.getByRole('region', { name: 'conversation.creativeStudio.storyboard.title' });
+    fireEvent.click(within(storyboard).getByRole('button', { name: 'conversation.creativeStudio.storyboard.retry' }));
     await waitFor(() => expect(bridge.reorderScenes.invoke).toHaveBeenCalledTimes(2));
 
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(1);
