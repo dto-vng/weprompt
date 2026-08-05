@@ -859,7 +859,15 @@ function prepareAioncore(options) {
       console.log(`  Using local aioncore bundle: ${resolvedLocalBundleDir}`);
       return { prepared: true, dir: targetDir, sourceType: 'local-bundle' };
     }
-    console.warn(`  Local aioncore bundle is incomplete or missing: ${resolvedLocalBundleDir}`);
+    // SECURITY / CORRECTNESS: an operator who set AIONUI_BACKEND_LOCAL_BUNDLE_DIR
+    // asked for a specific locally built backend. Silently downloading a release
+    // instead would ship a different aioncore than the one requested, and the
+    // packaged app would look fine. Fail loudly instead.
+    throw new Error(
+      `AIONUI_BACKEND_LOCAL_BUNDLE_DIR was set to "${resolvedLocalBundleDir}" but that bundle is incomplete. ` +
+        `Expected "${binaryName}" and "managed-resources/" inside it. ` +
+        `Refusing to fall back to a remote download, which would silently ship a different aioncore build.`
+    );
   }
 
   let sourcePath = null;
