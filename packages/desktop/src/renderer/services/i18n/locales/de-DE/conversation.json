@@ -1181,7 +1181,8 @@
       "chargeNotice": "Die Generierung nutzt dein ausgewähltes Anbieterkonto und kann Kosten verursachen.",
       "confirm": "Bestätigen und generieren",
       "cancel": "Abbrechen",
-      "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route."
+      "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route.",
+      "audioOn": "Dieses Rendering enthält generiertes Audio; stumme Routen bleiben, sofern vorhanden, stumm."
     },
     "jobs": {
       "progress": "{{percent}} % abgeschlossen",

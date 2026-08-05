@@ -1182,7 +1182,8 @@
       "chargeNotice": "Oluşturma, seçtiğiniz sağlayıcı hesabını kullanır ve ücrete tabi olabilir.",
       "confirm": "Onayla ve oluştur",
       "cancel": "İptal",
-      "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin."
+      "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin.",
+      "audioOn": "Bu işleme oluşturulmuş ses içerir; varsa sessiz rotalar sessiz kalır."
     },
     "jobs": {
       "progress": "%{{percent}} tamamlandı",

@@ -1170,7 +1170,8 @@
       "chargeNotice": "產生內容會使用你選擇的供應商帳戶，可能產生供應商費用。",
       "confirm": "確認並產生",
       "cancel": "取消",
-      "disabledMissingRoutes": "請為每個所選場景選擇有效路線。"
+      "disabledMissingRoutes": "請為每個所選場景選擇有效路線。",
+      "audioOn": "此次算繪包含產生的音訊；靜音路線（如有）仍會保持靜音。"
     },
     "jobs": {
       "progress": "已完成 {{percent}}%",

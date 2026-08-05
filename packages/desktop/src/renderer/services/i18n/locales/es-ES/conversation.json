@@ -1191,7 +1191,8 @@
       "chargeNotice": "La generación usa la cuenta del proveedor seleccionado y puede generar cargos.",
       "confirm": "Confirmar y generar",
       "cancel": "Cancelar",
-      "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada."
+      "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada.",
+      "audioOn": "Este renderizado incluye audio generado; las rutas silenciosas, si las hay, permanecen sin sonido."
     },
     "jobs": {
       "progress": "{{percent}} % completado",

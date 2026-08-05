@@ -1036,7 +1036,8 @@
       "chargeNotice": "Generation uses your selected provider account and may incur provider charges.",
       "confirm": "Confirm and generate",
       "cancel": "Cancel",
-      "disabledMissingRoutes": "Choose a valid route for every selected scene."
+      "disabledMissingRoutes": "Choose a valid route for every selected scene.",
+      "audioOn": "This render includes generated audio; silent routes, if present, remain silent."
     },
     "jobs": {
       "progress": "{{percent}}% complete",

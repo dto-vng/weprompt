@@ -43,20 +43,26 @@ const route = (
 const imageRoute = route('scene-image', 'image', 'provider_image', 'choice_image', 'image-model-v1');
 const videoRoute = route('scene-video', 'video', 'provider_video', 'choice_video', 'seedance-1-5-pro');
 
+const validReviewRoute = (
+  snapshot: GenerationReviewRouteSnapshot,
+  providerName: string,
+  silentOutput: boolean
+): GenerationReviewScene['route'] => ({ status: 'valid', snapshot, providerName, silentOutput });
+
 const mixedScenes = (): GenerationReviewScene[] => [
   {
     id: 'scene-image',
     title: 'Opening image',
     mediaKind: 'image',
     durationSeconds: 5,
-    route: { status: 'valid', snapshot: imageRoute, providerName: 'Provider One' },
+    route: validReviewRoute(imageRoute, 'Provider One', true),
   },
   {
     id: 'scene-video',
     title: 'Product motion',
     mediaKind: 'video',
     durationSeconds: 7,
-    route: { status: 'valid', snapshot: videoRoute, providerName: 'Provider Two' },
+    route: validReviewRoute(videoRoute, 'Provider Two', false),
   },
 ];
 
@@ -111,12 +117,32 @@ describe('GenerationReviewModal', () => {
     expect(within(dialog).getByText('720p')).toBeInTheDocument();
   });
 
-  it('states the charge, watermark, and silent-output policy without inventing billing or audio controls', () => {
+  it('states that output is silent when every reviewed route disables audio', () => {
+    render(<GenerationReviewModal {...createProps({ scenes: [mixedScenes()[0]!] })} />);
+
+    expect(screen.getByText('conversation.creativeStudio.review.audioOff')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOn')).not.toBeInTheDocument();
+  });
+
+  it('does not claim silence when an audio-capable route is reviewed', () => {
+    render(<GenerationReviewModal {...createProps({ scenes: [mixedScenes()[1]!] })} />);
+
+    expect(screen.getByText('conversation.creativeStudio.review.audioOn')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOff')).not.toBeInTheDocument();
+  });
+
+  it('states that generated audio is included for a mixed silent and audio-capable batch', () => {
+    render(<GenerationReviewModal {...createProps()} />);
+
+    expect(screen.getByText('conversation.creativeStudio.review.audioOn')).toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOff')).not.toBeInTheDocument();
+  });
+
+  it('states the charge and watermark policy without inventing billing or audio controls', () => {
     render(<GenerationReviewModal {...createProps()} />);
 
     expect(screen.getByText('conversation.creativeStudio.review.chargeNotice')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.review.watermarkOff')).toBeInTheDocument();
-    expect(screen.getByText('conversation.creativeStudio.review.audioOff')).toBeInTheDocument();
     expect(screen.queryByText(/credits|estimated cost/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /audio/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /audio/i })).not.toBeInTheDocument();
@@ -191,6 +217,25 @@ describe('GenerationReviewModal', () => {
       sceneIds: ['scene-video'],
       routes: [{ sceneId: 'scene-video', choiceId: 'choice_video', kind: 'video' }],
     });
+  });
+
+  it('claims nothing about audio when no reviewed route reports a policy', () => {
+    render(
+      <GenerationReviewModal
+        {...createProps({
+          scenes: [
+            {
+              ...mixedScenes()[0]!,
+              route: { status: 'missing', snapshot: null, providerName: null },
+            },
+          ],
+        })}
+      />
+    );
+
+    // Silence is a claim too: with no known policy, assert neither message appears.
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOff')).not.toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOn')).not.toBeInTheDocument();
   });
 
   it('keeps an invalid route visible while missing or invalid routes disable confirmation', () => {

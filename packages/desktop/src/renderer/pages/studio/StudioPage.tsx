@@ -92,6 +92,7 @@ const toReviewScene = (
                 : 'valid',
             snapshot: route,
             providerName: catalogRoute?.providerName ?? null,
+            silentOutput: catalogRoute?.constraints.silentOutput ?? null,
           },
   };
 };
@@ -440,12 +441,13 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
                 {
                   ...previous,
                   route:
-                    previous.route.snapshot === null
+                    previous.route.status === 'missing'
                       ? previous.route
                       : {
                           status: 'invalid' as const,
                           snapshot: previous.route.snapshot,
                           providerName: previous.route.providerName,
+                          silentOutput: previous.route.silentOutput,
                         },
                 },
               ];

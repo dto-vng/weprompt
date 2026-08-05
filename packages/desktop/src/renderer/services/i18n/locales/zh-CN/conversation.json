@@ -1170,7 +1170,8 @@
       "chargeNotice": "生成会使用你选择的服务商账户，并可能产生服务商费用。",
       "confirm": "确认并生成",
       "cancel": "取消",
-      "disabledMissingRoutes": "请为每个所选场景选择有效路线。"
+      "disabledMissingRoutes": "请为每个所选场景选择有效路线。",
+      "audioOn": "此次渲染包含生成的音频；静音路线（如有）仍将保持静音。"
     },
     "jobs": {
       "progress": "已完成 {{percent}}%",
