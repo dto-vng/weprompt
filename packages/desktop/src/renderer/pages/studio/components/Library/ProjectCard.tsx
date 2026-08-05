@@ -88,7 +88,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, locale, disab
           onClick={onDelete}
         />
       </div>
-      <p className={styles.statusLine}>
+      <p data-status={complete ? 'complete' : partial ? 'partial' : 'script'} className={styles.statusLine}>
         <span aria-hidden='true' className={`h-7px w-7px flex-none rounded-full ${statusClass}`} />
         {t(statusKey, {
           count: project.sceneCount,

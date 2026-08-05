@@ -22,6 +22,22 @@
   letter-spacing: normal;
 }
 
+/* A card's own name is a heading, not body text: display face, bold, full ink. */
+.cardName {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  letter-spacing: normal;
+}
+
+.cardStatus {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: var(--fw-regular);
+  letter-spacing: normal;
+}
+
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 9.5px;
@@ -44,6 +60,18 @@
 .bodyTextAction:global(.arco-btn-text):focus-visible,
 .bodyTextAction:global(.arco-btn-text):active {
   color: var(--text-secondary);
+}
+
+.inkTextAction:global(.arco-btn-text),
+.inkTextAction:global(.arco-btn-text):hover,
+.inkTextAction:global(.arco-btn-text):focus,
+.inkTextAction:global(.arco-btn-text):focus-visible,
+.inkTextAction:global(.arco-btn-text):active {
+  color: var(--text-primary);
+}
+
+.inkTextAction:global(.arco-btn-text.arco-btn-disabled) {
+  color: var(--text-disabled);
 }
 
 .accentTextAction:global(.arco-btn-text),

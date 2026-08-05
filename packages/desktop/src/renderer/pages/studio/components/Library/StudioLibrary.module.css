@@ -164,7 +164,7 @@
 }
 
 .projectName {
-  composes: cardTitle bodyTextAction from '../../StudioTypography.module.css';
+  composes: cardName inkTextAction from '../../StudioTypography.module.css';
   min-width: 0;
   height: auto;
   justify-content: flex-start;
@@ -174,12 +174,23 @@
   white-space: nowrap;
 }
 
+/* The status text carries the same signal as its dot, so it takes the same
+   colour — a grey sentence next to a green dot reads as two different states. */
 .statusLine {
-  composes: cardTitle from '../../StudioTypography.module.css';
+  composes: cardStatus from '../../StudioTypography.module.css';
   display: flex;
   align-items: center;
   gap: 7px;
   margin: 10px 0 0;
+  color: var(--text-secondary);
+}
+
+.statusLine[data-status='complete'] {
+  color: var(--success);
+}
+
+.statusLine[data-status='partial'] {
+  color: var(--danger);
 }
 
 .projectMeta {
