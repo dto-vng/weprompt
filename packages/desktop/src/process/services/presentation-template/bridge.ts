@@ -10,7 +10,7 @@ import { app } from 'electron';
 import { ipcBridge } from '@/common';
 import { BUILTIN_TEMPLATE_PACKS } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
-import { ArtifactScratchService } from './ArtifactScratchService';
+import { ArtifactScratchService } from './run';
 
 let service: PresentationTemplateService | null = null;
 let artifactScratchService: ArtifactScratchService | null = null;

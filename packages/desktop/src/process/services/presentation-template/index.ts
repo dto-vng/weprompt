@@ -5,5 +5,6 @@
  */
 
 export { PresentationTemplateService } from './PresentationTemplateService';
+export * from './run';
 export { validateTemplateManifest, TEMPLATE_ID_RE } from './templateManifest';
 export { parseThemeTokens, renderThemeThumbnailSvg, svgToDataUrl } from './themeThumbnail';
