@@ -114,7 +114,13 @@ export const createNodeRemoteMediaRequest =
           headers: { Host: hostHeader(target) },
           servername: target.url.protocol === 'https:' && !targetIsIp ? target.hostname : undefined,
           signal: options?.signal,
-          lookup: (_hostname, _options, callback) => callback(null, target.address, target.family),
+          lookup: (_hostname, lookupOptions, callback) => {
+            if (lookupOptions.all) {
+              callback(null, [{ address: target.address, family: target.family }]);
+              return;
+            }
+            callback(null, target.address, target.family);
+          },
         },
         (response) => {
           if (settled) {

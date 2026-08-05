@@ -7,3 +7,4 @@
 export * from './GenerationControls';
 export * from './GenerationJobList';
 export * from './GenerationReviewModal';
+export * from './routeSupport';

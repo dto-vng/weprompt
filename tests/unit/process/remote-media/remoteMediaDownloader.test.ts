@@ -6,10 +6,14 @@
  * @vitest-environment node
  */
 
+import type { LookupAddress, LookupAllOptions, LookupOneOptions } from 'node:dns';
+import { EventEmitter } from 'node:events';
+import http from 'node:http';
 import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import type { RemoteMediaError, RemoteMediaResponse } from '@process/services/remote-media/remoteMediaDownloader';
 import {
+  createNodeRemoteMediaRequest,
   downloadRemoteMedia,
   REMOTE_MEDIA_DEFAULT_TIMEOUT_MS,
 } from '@process/services/remote-media/remoteMediaDownloader';
@@ -29,6 +33,76 @@ const deferred = <T>(): Deferred<T> => {
   });
   return { promise, resolve, reject };
 };
+
+type AllAddressLookup = (
+  hostname: string,
+  options: LookupAllOptions,
+  callback: (error: NodeJS.ErrnoException | null, addresses: LookupAddress[]) => void
+) => void;
+
+type SingleAddressLookup = (
+  hostname: string,
+  options: LookupOneOptions,
+  callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void
+) => void;
+
+const captureNodeLookup = (): {
+  lookup: NonNullable<http.RequestOptions['lookup']>;
+  finish: () => Promise<void>;
+} => {
+  let capturedLookup: http.RequestOptions['lookup'];
+  const request = Object.assign(new EventEmitter(), {
+    setTimeout: vi.fn(),
+    end: vi.fn(),
+    destroy: vi.fn(),
+  }) as unknown as http.ClientRequest;
+  const requestSpy = vi.spyOn(http, 'request').mockImplementation(((options: http.RequestOptions) => {
+    capturedLookup = options.lookup;
+    return request;
+  }) as typeof http.request);
+  const pending = createNodeRemoteMediaRequest(1_000)({
+    url: new URL('http://media.example.test/output.png'),
+    hostname: 'media.example.test',
+    port: 80,
+    address: '8.8.8.8',
+    family: 4,
+  });
+  if (capturedLookup === undefined) throw new Error('Node request did not receive a pinned lookup');
+  return {
+    lookup: capturedLookup,
+    finish: async () => {
+      request.emit('error', new Error('test transport stopped'));
+      await expect(pending).rejects.toMatchObject<Partial<RemoteMediaError>>({ code: 'remote_download_failed' });
+      requestSpy.mockRestore();
+    },
+  };
+};
+
+describe('createNodeRemoteMediaRequest', () => {
+  it('returns exactly the pinned address when Node requests all lookup results', async () => {
+    const { lookup, finish } = captureNodeLookup();
+    let callbackResult: [NodeJS.ErrnoException | null, LookupAddress[]] | undefined;
+
+    (lookup as unknown as AllAddressLookup)('media.example.test', { all: true }, (error, addresses) => {
+      callbackResult = [error, addresses];
+    });
+
+    expect(callbackResult).toEqual([null, [{ address: '8.8.8.8', family: 4 }]]);
+    await finish();
+  });
+
+  it('returns exactly the pinned address in the single-address lookup form', async () => {
+    const { lookup, finish } = captureNodeLookup();
+    let callbackResult: [NodeJS.ErrnoException | null, string, number] | undefined;
+
+    (lookup as unknown as SingleAddressLookup)('media.example.test', {}, (error, address, family) => {
+      callbackResult = [error, address, family];
+    });
+
+    expect(callbackResult).toEqual([null, '8.8.8.8', 4]);
+    await finish();
+  });
+});
 
 describe('downloadRemoteMedia', () => {
   it('uses the resolved address as a pinned lookup and consumes only a matching peer', async () => {
