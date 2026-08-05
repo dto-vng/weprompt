@@ -1,0 +1,1140 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { promises as nodeFs } from 'node:fs';
+import path from 'node:path';
+import type {
+  CreateStudioProjectInput,
+  StudioAsset,
+  StudioCancellationPolicy,
+  StudioConnectionBinding,
+  StudioJob,
+  StudioProject,
+  StudioProjectSummary,
+  StudioProviderRef,
+  StudioScene,
+  StudioTextModelRef,
+} from '@/common/types/project/creativeStudioTypes';
+import { isValidProviderJobId } from '@process/services/creative-studio/adapters/types';
+import { toStudioProjectSummary } from '@/common/types/project/creativeStudioProjectSummary';
+
+const SAFE_ID = /^[A-Za-z0-9_-]+$/;
+const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
+const RESOLUTIONS = new Set(['720p', '1080p']);
+const MEDIA_KINDS = new Set(['image', 'video']);
+const REVIEW_STATES = new Set(['draft', 'ready', 'generating', 'complete', 'blocked']);
+const JOB_STATUSES = new Set([
+  'queued_local',
+  'submitting',
+  'queued_remote',
+  'running',
+  'needs_attention',
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+const NONTERMINAL_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
+const JOB_RETRY_REASONS = new Set(['provider_failure', 'submission_unknown']);
+const CANCELLATION_POLICIES = new Set<StudioCancellationPolicy>(['none', 'queued_only', 'queued_and_running']);
+const ADAPTER_IDS = new Set([
+  'weprompt-image-v1',
+  'byteplus-seedance-v1',
+  'weprompt-media-gateway-v1',
+  'openrouter-video-v1',
+]);
+const JOB_ERROR_CODES = new Set([
+  'invalid_request',
+  'auth',
+  'quota',
+  'rate_limited',
+  'provider_unavailable',
+  'timeout',
+  'poll_deadline',
+  'no_output',
+  'submission_unknown',
+  'download_failed',
+  'unsupported',
+  'unknown',
+]);
+const PROVIDER_REF_KEYS = new Set(['providerId', 'adapterId', 'model']);
+const ROUTING_KEYS = new Set(['storyboard', 'image', 'video']);
+const TEXT_MODEL_REF_KEYS = new Set(['providerId', 'model']);
+const JOB_ERROR_KEYS = new Set(['code', 'messageKey']);
+const SCENE_KEYS = new Set([
+  'id',
+  'title',
+  'purpose',
+  'visualPrompt',
+  'narration',
+  'onScreenText',
+  'mediaKind',
+  'durationSeconds',
+  'referenceAssetId',
+  'selectedAssetId',
+  'assetIds',
+  'jobIds',
+  'reviewState',
+]);
+const ASSET_KEYS = new Set([
+  'id',
+  'projectId',
+  'sceneId',
+  'mediaKind',
+  'mimeType',
+  'managedAsset',
+  'byteSize',
+  'sha256',
+  'width',
+  'height',
+  'durationSeconds',
+  'createdAt',
+]);
+const MANAGED_ASSET_KEYS = new Set(['collection', 'fileName']);
+const JOB_KEYS = new Set([
+  'id',
+  'projectId',
+  'sceneId',
+  'status',
+  'provider',
+  'idempotencyKey',
+  'providerJobId',
+  'remoteStartedAt',
+  'cancellationPolicy',
+  'outputAssetIds',
+  'error',
+  'progress',
+  'retryOfJobId',
+  'retryReason',
+  'duplicateChargeAcknowledged',
+  'duplicateChargeAcknowledgedAt',
+  'createdAt',
+  'updatedAt',
+]);
+const ASSET_COLLECTIONS = new Set(['assets', 'imports', 'thumbnails']);
+const CONNECTION_BINDING_KEYS = new Set([
+  'schemaVersion',
+  'id',
+  'providerId',
+  'adapterId',
+  'model',
+  'capabilities',
+  'validatedAt',
+]);
+const CONNECTION_MANIFEST_KEYS = new Set(['schemaVersion', 'connections']);
+const CONNECTION_CAPABILITY_KEYS = new Set([
+  'mediaKinds',
+  'audioModes',
+  'aspectRatios',
+  'resolutions',
+  'minDurationSeconds',
+  'maxDurationSeconds',
+  'supportsFirstFrame',
+  'cancellationPolicy',
+]);
+const FORBIDDEN_CONNECTION_KEY_FRAGMENTS = [
+  'authorization',
+  'credential',
+  'token',
+  'secret',
+  'key',
+  'url',
+  'uri',
+  'path',
+  'base64',
+  'bytes',
+  'raw',
+  'metadata',
+] as const;
+const FORBIDDEN_RENDERER_FIELDS = new Set([
+  'path',
+  'filepath',
+  'sourcepath',
+  'destinationpath',
+  'url',
+  'signedurl',
+  'apikey',
+  'credential',
+  'credentials',
+  'authorization',
+  'bytes',
+  'base64',
+]);
+
+let temporaryFileCounter = 0;
+
+type StoreErrorCode = 'invalid_payload' | 'not_found' | 'stale_project' | 'busy' | 'storage_error';
+
+export class CreativeStudioStoreError extends Error {
+  readonly code: StoreErrorCode;
+
+  constructor(code: StoreErrorCode, message: string) {
+    super(message);
+    this.name = 'CreativeStudioStoreError';
+    this.code = code;
+  }
+}
+
+export type CreativeStudioStore = {
+  listProjects(): Promise<StudioProjectSummary[]>;
+  listQuarantinedProjectIds(): Promise<string[]>;
+  createProject(input: CreateStudioProjectInput): Promise<StudioProject>;
+  getProject(projectId: string): Promise<StudioProject | null>;
+  updateProject(
+    projectId: string,
+    update: (project: StudioProject) => StudioProject,
+    expectedRevision?: number
+  ): Promise<StudioProject>;
+  deleteProject(projectId: string, expectedRevision: number): Promise<boolean>;
+  listConnections(): Promise<StudioConnectionBinding[]>;
+  saveConnection(binding: StudioConnectionBinding): Promise<StudioConnectionBinding>;
+  removeConnection(connectionId: string): Promise<boolean>;
+  /** Main-process-only canonical project path; never return this through IPC. */
+  getVerifiedProjectDirectory(projectId: string): Promise<string | null>;
+};
+
+export type CreativeStudioStoreDeps = {
+  rootDir: string;
+  now?: () => string;
+  createId?: () => string;
+  fs?: typeof nodeFs;
+  logError?: (message: string, error: unknown) => void;
+};
+
+type ProjectListingSweep = {
+  projects: StudioProjectSummary[];
+  quarantinedProjectIds: string[];
+};
+
+type JsonRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const containsForbiddenRendererField = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(containsForbiddenRendererField);
+  if (!isRecord(value)) return false;
+  return Object.entries(value).some(
+    ([key, nestedValue]) =>
+      FORBIDDEN_RENDERER_FIELDS.has(key.toLowerCase()) || containsForbiddenRendererField(nestedValue)
+  );
+};
+
+const normalizeConnectionFieldKey = (key: string): string =>
+  key
+    .normalize('NFKC')
+    .replaceAll(/[^A-Za-z0-9]/g, '')
+    .toLowerCase();
+
+const containsForbiddenConnectionField = (value: unknown): boolean => {
+  if (Array.isArray(value)) return value.some(containsForbiddenConnectionField);
+  if (!isRecord(value)) return false;
+  return Object.entries(value).some(([key, nestedValue]) => {
+    const normalized = normalizeConnectionFieldKey(key);
+    return (
+      FORBIDDEN_CONNECTION_KEY_FRAGMENTS.some((fragment) => normalized.includes(fragment)) ||
+      containsForbiddenConnectionField(nestedValue)
+    );
+  });
+};
+
+const isSafeId = (value: unknown): value is string => typeof value === 'string' && SAFE_ID.test(value);
+const isSafeConnectionId = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 256 && SAFE_ID.test(value);
+
+const isIntegerInRange = (value: unknown, minimum: number, maximum: number): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= minimum && value <= maximum;
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+const isNonEmptyString = (value: unknown): value is string => isString(value) && value.trim().length > 0;
+
+const isSafeConnectionModel = (value: unknown): value is string => {
+  if (!isString(value) || value.length === 0 || value.length > 256 || value !== value.trim()) return false;
+  return !value.split('').some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+  });
+};
+
+const isSafeModel = isSafeConnectionModel;
+
+const isCanonicalIsoTimestamp = (value: unknown): value is string => {
+  if (!isString(value) || value.length !== 24) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+};
+
+const isSafeAssetFileName = (value: unknown): value is string =>
+  isNonEmptyString(value) && value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\');
+
+const asArrayOfSafeIds = (value: unknown): value is string[] => Array.isArray(value) && value.every(isSafeId);
+
+const hasExactKeys = (value: Record<string, unknown>, keys: ReadonlySet<string>): boolean =>
+  Object.keys(value).length === keys.size && Object.keys(value).every((key) => keys.has(key));
+
+const validateProviderRef = (value: unknown): value is StudioProviderRef =>
+  isRecord(value) &&
+  hasExactKeys(value, PROVIDER_REF_KEYS) &&
+  isSafeId(value.providerId) &&
+  isString(value.adapterId) &&
+  ADAPTER_IDS.has(value.adapterId) &&
+  isNonEmptyString(value.model);
+
+const validateTextModelRef = (value: unknown): value is StudioTextModelRef =>
+  isRecord(value) && hasExactKeys(value, TEXT_MODEL_REF_KEYS) && isSafeId(value.providerId) && isSafeModel(value.model);
+
+const validateConnectionBinding = (value: unknown): value is StudioConnectionBinding => {
+  if (!isRecord(value) || !isRecord(value.capabilities)) return false;
+  const capabilities = value.capabilities;
+  const mediaKinds = capabilities.mediaKinds;
+  const validKinds =
+    Array.isArray(mediaKinds) &&
+    mediaKinds.length > 0 &&
+    mediaKinds.length <= 2 &&
+    mediaKinds.every((kind) => isString(kind) && MEDIA_KINDS.has(kind)) &&
+    new Set(mediaKinds).size === mediaKinds.length;
+  const optionalAudioModes =
+    capabilities.audioModes === undefined ||
+    (Array.isArray(capabilities.audioModes) &&
+      capabilities.audioModes.length === 1 &&
+      capabilities.audioModes[0] === 'none');
+  const optionalAspectRatios =
+    capabilities.aspectRatios === undefined ||
+    (Array.isArray(capabilities.aspectRatios) &&
+      capabilities.aspectRatios.length <= 5 &&
+      capabilities.aspectRatios.every((ratio) => isString(ratio) && ASPECT_RATIOS.has(ratio)) &&
+      new Set(capabilities.aspectRatios).size === capabilities.aspectRatios.length);
+  const optionalResolutions =
+    capabilities.resolutions === undefined ||
+    (Array.isArray(capabilities.resolutions) &&
+      capabilities.resolutions.length <= 2 &&
+      capabilities.resolutions.every((resolution) => isString(resolution) && RESOLUTIONS.has(resolution)) &&
+      new Set(capabilities.resolutions).size === capabilities.resolutions.length);
+  const validAdapterCapabilities =
+    value.adapterId === 'weprompt-image-v1'
+      ? Array.isArray(mediaKinds) &&
+        mediaKinds.length === 1 &&
+        mediaKinds[0] === 'image' &&
+        capabilities.audioModes === undefined
+      : (value.adapterId === 'byteplus-seedance-v1' ||
+          value.adapterId === 'weprompt-media-gateway-v1' ||
+          value.adapterId === 'openrouter-video-v1') &&
+        Array.isArray(mediaKinds) &&
+        mediaKinds.length === 1 &&
+        mediaKinds[0] === 'video' &&
+        Array.isArray(capabilities.audioModes) &&
+        capabilities.audioModes.length === 1 &&
+        capabilities.audioModes[0] === 'none';
+  return (
+    Object.keys(value).length === CONNECTION_BINDING_KEYS.size &&
+    Object.keys(value).every((key) => CONNECTION_BINDING_KEYS.has(key)) &&
+    value.schemaVersion === 1 &&
+    isSafeConnectionId(value.id) &&
+    isSafeConnectionId(value.providerId) &&
+    isString(value.adapterId) &&
+    ADAPTER_IDS.has(value.adapterId) &&
+    isSafeConnectionModel(value.model) &&
+    Object.keys(capabilities).every((key) => CONNECTION_CAPABILITY_KEYS.has(key)) &&
+    validKinds &&
+    validAdapterCapabilities &&
+    optionalAudioModes &&
+    optionalAspectRatios &&
+    optionalResolutions &&
+    (capabilities.supportsFirstFrame === undefined || typeof capabilities.supportsFirstFrame === 'boolean') &&
+    isString(capabilities.cancellationPolicy) &&
+    CANCELLATION_POLICIES.has(capabilities.cancellationPolicy as StudioCancellationPolicy) &&
+    (capabilities.minDurationSeconds === undefined || isIntegerInRange(capabilities.minDurationSeconds, 1, 60)) &&
+    (capabilities.maxDurationSeconds === undefined || isIntegerInRange(capabilities.maxDurationSeconds, 1, 60)) &&
+    (capabilities.minDurationSeconds === undefined ||
+      capabilities.maxDurationSeconds === undefined ||
+      (capabilities.minDurationSeconds as number) <= (capabilities.maxDurationSeconds as number)) &&
+    isCanonicalIsoTimestamp(value.validatedAt) &&
+    !containsForbiddenConnectionField(value)
+  );
+};
+
+const canonicalizeConnectionBinding = (value: unknown): StudioConnectionBinding | null => {
+  if (!isRecord(value) || !isRecord(value.capabilities)) return null;
+  const capabilities = value.capabilities;
+  const hasPolicy = Object.hasOwn(capabilities, 'cancellationPolicy');
+  const hasLegacy = Object.hasOwn(capabilities, 'cancellation');
+  if (hasPolicy && hasLegacy) return null;
+
+  let cancellationPolicy: StudioCancellationPolicy;
+  if (hasPolicy) {
+    if (!isString(capabilities.cancellationPolicy)) return null;
+    cancellationPolicy = capabilities.cancellationPolicy as StudioCancellationPolicy;
+    if (!CANCELLATION_POLICIES.has(cancellationPolicy)) return null;
+  } else if (hasLegacy) {
+    if (typeof capabilities.cancellation !== 'boolean') return null;
+    cancellationPolicy = capabilities.cancellation ? 'queued_only' : 'none';
+  } else {
+    cancellationPolicy = 'none';
+  }
+
+  const { cancellation: _legacyCancellation, ...canonicalCapabilities } = capabilities;
+  const candidate = {
+    ...value,
+    capabilities: { ...canonicalCapabilities, cancellationPolicy },
+  };
+  return validateConnectionBinding(candidate) ? candidate : null;
+};
+
+const validateScene = (sceneId: string, value: unknown): value is StudioScene => {
+  if (!isRecord(value)) return false;
+  return (
+    Object.keys(value).length === SCENE_KEYS.size &&
+    Object.keys(value).every((key) => SCENE_KEYS.has(key)) &&
+    value.id === sceneId &&
+    isSafeId(sceneId) &&
+    isString(value.title) &&
+    isString(value.purpose) &&
+    isString(value.visualPrompt) &&
+    isString(value.narration) &&
+    isString(value.onScreenText) &&
+    isString(value.mediaKind) &&
+    MEDIA_KINDS.has(value.mediaKind) &&
+    isIntegerInRange(value.durationSeconds, 1, 60) &&
+    (value.referenceAssetId === null || isSafeId(value.referenceAssetId)) &&
+    (value.selectedAssetId === null || isSafeId(value.selectedAssetId)) &&
+    asArrayOfSafeIds(value.assetIds) &&
+    new Set(value.assetIds).size === value.assetIds.length &&
+    asArrayOfSafeIds(value.jobIds) &&
+    new Set(value.jobIds).size === value.jobIds.length &&
+    isString(value.reviewState) &&
+    REVIEW_STATES.has(value.reviewState)
+  );
+};
+
+const validateAsset = (
+  assetId: string,
+  projectId: string,
+  sceneIds: Set<string>,
+  value: unknown
+): value is StudioAsset => {
+  if (!isRecord(value) || !isRecord(value.managedAsset)) return false;
+  return (
+    Object.keys(value).every((key) => ASSET_KEYS.has(key)) &&
+    Object.keys(value.managedAsset).length === MANAGED_ASSET_KEYS.size &&
+    Object.keys(value.managedAsset).every((key) => MANAGED_ASSET_KEYS.has(key)) &&
+    value.id === assetId &&
+    isSafeId(assetId) &&
+    value.projectId === projectId &&
+    (value.sceneId === null || (isSafeId(value.sceneId) && sceneIds.has(value.sceneId))) &&
+    isString(value.mediaKind) &&
+    MEDIA_KINDS.has(value.mediaKind) &&
+    isNonEmptyString(value.mimeType) &&
+    isString(value.managedAsset.collection) &&
+    ASSET_COLLECTIONS.has(value.managedAsset.collection) &&
+    isSafeAssetFileName(value.managedAsset.fileName) &&
+    isIntegerInRange(value.byteSize, 0, Number.MAX_SAFE_INTEGER) &&
+    isString(value.sha256) &&
+    /^[a-f0-9]{64}$/i.test(value.sha256) &&
+    (value.width === undefined || isIntegerInRange(value.width, 1, Number.MAX_SAFE_INTEGER)) &&
+    (value.height === undefined || isIntegerInRange(value.height, 1, Number.MAX_SAFE_INTEGER)) &&
+    (value.durationSeconds === undefined || isIntegerInRange(value.durationSeconds, 1, Number.MAX_SAFE_INTEGER)) &&
+    isNonEmptyString(value.createdAt)
+  );
+};
+
+const validateJob = (jobId: string, projectId: string, sceneIds: Set<string>, value: unknown): value is StudioJob => {
+  if (!isRecord(value)) return false;
+  const errorIsValid =
+    value.error === null ||
+    (isRecord(value.error) &&
+      Object.keys(value.error).length === JOB_ERROR_KEYS.size &&
+      Object.keys(value.error).every((key) => JOB_ERROR_KEYS.has(key)) &&
+      isString(value.error.code) &&
+      JOB_ERROR_CODES.has(value.error.code) &&
+      isNonEmptyString(value.error.messageKey));
+  return (
+    Object.keys(value).every((key) => JOB_KEYS.has(key)) &&
+    value.id === jobId &&
+    isSafeId(jobId) &&
+    value.projectId === projectId &&
+    isSafeId(value.sceneId) &&
+    sceneIds.has(value.sceneId) &&
+    isString(value.status) &&
+    JOB_STATUSES.has(value.status) &&
+    validateProviderRef(value.provider) &&
+    isSafeId(value.idempotencyKey) &&
+    (value.providerJobId === null || (isString(value.providerJobId) && isValidProviderJobId(value.providerJobId))) &&
+    (!Object.hasOwn(value, 'remoteStartedAt') ||
+      (value.providerJobId === null
+        ? value.remoteStartedAt === null
+        : isCanonicalIsoTimestamp(value.remoteStartedAt))) &&
+    isString(value.cancellationPolicy) &&
+    CANCELLATION_POLICIES.has(value.cancellationPolicy as StudioCancellationPolicy) &&
+    asArrayOfSafeIds(value.outputAssetIds) &&
+    new Set(value.outputAssetIds).size === value.outputAssetIds.length &&
+    errorIsValid &&
+    (value.progress === undefined ||
+      (typeof value.progress === 'number' &&
+        Number.isFinite(value.progress) &&
+        value.progress >= 0 &&
+        value.progress <= 100)) &&
+    (value.retryOfJobId === null || isSafeId(value.retryOfJobId)) &&
+    (value.retryReason === null || (isString(value.retryReason) && JOB_RETRY_REASONS.has(value.retryReason))) &&
+    typeof value.duplicateChargeAcknowledged === 'boolean' &&
+    (value.duplicateChargeAcknowledgedAt === null || isCanonicalIsoTimestamp(value.duplicateChargeAcknowledgedAt)) &&
+    ((value.retryOfJobId === null && value.retryReason === null) ||
+      (value.retryOfJobId !== null && value.retryReason !== null)) &&
+    (value.duplicateChargeAcknowledged
+      ? value.retryReason === 'submission_unknown' && value.duplicateChargeAcknowledgedAt !== null
+      : value.duplicateChargeAcknowledgedAt === null) &&
+    isNonEmptyString(value.createdAt) &&
+    isNonEmptyString(value.updatedAt)
+  );
+};
+
+/** Defaults lineage fields added during Task 6 without weakening schema-v1 validation. */
+const migrateSchemaV1Project = (value: unknown): unknown => {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.jobs)) return value;
+  let changed = false;
+  const jobs = Object.fromEntries(
+    Object.entries(value.jobs).map(([jobId, candidate]) => {
+      if (!isRecord(candidate)) return [jobId, candidate];
+      const job = { ...candidate };
+      if (!Object.hasOwn(job, 'retryOfJobId')) {
+        job.retryOfJobId = null;
+        changed = true;
+      }
+      if (!Object.hasOwn(job, 'retryReason')) {
+        job.retryReason = null;
+        changed = true;
+      }
+      if (!Object.hasOwn(job, 'duplicateChargeAcknowledged')) {
+        job.duplicateChargeAcknowledged = false;
+        changed = true;
+      }
+      if (!Object.hasOwn(job, 'duplicateChargeAcknowledgedAt')) {
+        job.duplicateChargeAcknowledgedAt = null;
+        changed = true;
+      }
+      if (!Object.hasOwn(job, 'cancellationPolicy')) {
+        job.cancellationPolicy = 'none';
+        changed = true;
+      }
+      return [jobId, job];
+    })
+  );
+  const routing =
+    isRecord(value.routing) && !Object.hasOwn(value.routing, 'storyboard')
+      ? { ...value.routing, storyboard: null }
+      : value.routing;
+  return changed || routing !== value.routing ? { ...value, jobs, routing } : value;
+};
+
+const retryGraphHasCycle = (jobs: Record<string, StudioJob>): boolean => {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (jobId: string): boolean => {
+    if (visiting.has(jobId)) return true;
+    if (visited.has(jobId)) return false;
+    visiting.add(jobId);
+    const predecessorId = jobs[jobId]?.retryOfJobId;
+    if (predecessorId !== null && predecessorId !== undefined && Object.hasOwn(jobs, predecessorId)) {
+      if (visit(predecessorId)) return true;
+    }
+    visiting.delete(jobId);
+    visited.add(jobId);
+    return false;
+  };
+  return Object.keys(jobs).some(visit);
+};
+
+const validateProject = (value: unknown): value is StudioProject => {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.scenes) ||
+    !isRecord(value.assets) ||
+    !isRecord(value.jobs) ||
+    !isRecord(value.routing)
+  ) {
+    return false;
+  }
+  const scenes = value.scenes;
+  const assets = value.assets;
+  const jobs = value.jobs;
+  const routing = value.routing;
+  const projectId = value.id;
+  const sceneOrder = value.sceneOrder;
+  if (containsForbiddenRendererField(value)) return false;
+  if (
+    value.schemaVersion !== 1 ||
+    !isSafeId(projectId) ||
+    !isIntegerInRange(value.revision, 1, Number.MAX_SAFE_INTEGER) ||
+    !isNonEmptyString(value.name) ||
+    !isString(value.brief) ||
+    (value.forgeProjectId !== undefined && !isSafeId(value.forgeProjectId)) ||
+    !isString(value.aspectRatio) ||
+    !ASPECT_RATIOS.has(value.aspectRatio) ||
+    !isIntegerInRange(value.targetDurationSeconds, 5, 60) ||
+    !isString(value.resolution) ||
+    !RESOLUTIONS.has(value.resolution) ||
+    !asArrayOfSafeIds(sceneOrder) ||
+    !isNonEmptyString(value.createdAt) ||
+    !isNonEmptyString(value.updatedAt) ||
+    !hasExactKeys(routing, ROUTING_KEYS) ||
+    (routing.storyboard !== null && !validateTextModelRef(routing.storyboard)) ||
+    (routing.image !== null && !validateProviderRef(routing.image)) ||
+    (routing.video !== null && !validateProviderRef(routing.video))
+  ) {
+    return false;
+  }
+
+  const sceneIds = Object.keys(scenes);
+  if (
+    sceneIds.some((sceneId) => !validateScene(sceneId, scenes[sceneId])) ||
+    sceneOrder.length !== sceneIds.length ||
+    new Set(sceneOrder).size !== sceneOrder.length ||
+    sceneOrder.some((sceneId) => !Object.hasOwn(scenes, sceneId))
+  ) {
+    return false;
+  }
+
+  const sceneIdSet = new Set(sceneIds);
+  if (Object.keys(assets).some((assetId) => !validateAsset(assetId, projectId, sceneIdSet, assets[assetId]))) {
+    return false;
+  }
+  if (Object.keys(jobs).some((jobId) => !validateJob(jobId, projectId, sceneIdSet, jobs[jobId]))) {
+    return false;
+  }
+
+  const typedScenes = scenes as Record<string, StudioScene>;
+  const typedAssets = assets as Record<string, StudioAsset>;
+  const typedJobs = jobs as Record<string, StudioJob>;
+  if (retryGraphHasCycle(typedJobs)) return false;
+  const assetsHaveReverseLinks = Object.values(typedAssets).every(
+    (asset) => asset.sceneId === null || typedScenes[asset.sceneId]?.assetIds.includes(asset.id)
+  );
+  const jobsHaveReverseLinks = Object.values(typedJobs).every((job) =>
+    typedScenes[job.sceneId]?.jobIds.includes(job.id)
+  );
+  const retryLineageIsValid = Object.values(typedJobs).every((job) => {
+    if (job.retryOfJobId === null) return true;
+    const predecessor = typedJobs[job.retryOfJobId];
+    const owningScene = typedScenes[job.sceneId];
+    if (predecessor === undefined || owningScene === undefined || predecessor.sceneId !== job.sceneId) return false;
+    const predecessorIndex = owningScene.jobIds.indexOf(predecessor.id);
+    const retryIndex = owningScene.jobIds.indexOf(job.id);
+    if (predecessorIndex < 0 || retryIndex < 0 || predecessorIndex >= retryIndex) return false;
+    if (job.retryReason === 'submission_unknown') {
+      return (
+        (predecessor.status === 'needs_attention' || predecessor.status === 'failed') &&
+        predecessor.error?.code === 'submission_unknown' &&
+        job.duplicateChargeAcknowledged &&
+        job.duplicateChargeAcknowledgedAt !== null
+      );
+    }
+    return (
+      job.retryReason === 'provider_failure' &&
+      predecessor.status === 'failed' &&
+      predecessor.error?.code !== 'submission_unknown' &&
+      predecessor.error?.code !== 'download_failed' &&
+      !job.duplicateChargeAcknowledged
+    );
+  });
+  if (!assetsHaveReverseLinks || !jobsHaveReverseLinks || !retryLineageIsValid) return false;
+  return sceneIds.every((sceneId) => {
+    const scene = typedScenes[sceneId];
+    const linkedAssetsAreValid = scene.assetIds.every(
+      (assetId) => typedAssets[assetId]?.projectId === projectId && typedAssets[assetId]?.sceneId === sceneId
+    );
+    const linkedJobsAreValid = scene.jobIds.every(
+      (jobId) => typedJobs[jobId]?.projectId === projectId && typedJobs[jobId]?.sceneId === sceneId
+    );
+    const selectedAssetIsValid =
+      scene.selectedAssetId === null ||
+      (typedAssets[scene.selectedAssetId]?.projectId === projectId &&
+        typedAssets[scene.selectedAssetId]?.sceneId === sceneId);
+    const referenceAssetIsValid =
+      scene.referenceAssetId === null ||
+      (typedAssets[scene.referenceAssetId]?.projectId === projectId &&
+        typedAssets[scene.referenceAssetId]?.sceneId === sceneId);
+    const jobOutputsAreValid = scene.jobIds.every((jobId) =>
+      typedJobs[jobId].outputAssetIds.every(
+        (assetId) => typedAssets[assetId]?.projectId === projectId && typedAssets[assetId]?.sceneId === sceneId
+      )
+    );
+    return (
+      linkedAssetsAreValid && linkedJobsAreValid && selectedAssetIsValid && referenceAssetIsValid && jobOutputsAreValid
+    );
+  });
+};
+
+const toSummary = (project: StudioProject): StudioProjectSummary => toStudioProjectSummary(project);
+
+const compareSummaries = (left: StudioProjectSummary, right: StudioProjectSummary): number => {
+  const byUpdatedAt = right.updatedAt.localeCompare(left.updatedAt);
+  return byUpdatedAt !== 0 ? byUpdatedAt : left.id.localeCompare(right.id);
+};
+
+const sameJson = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const createProjectFromInput = (input: CreateStudioProjectInput, id: string, timestamp: string): StudioProject => ({
+  schemaVersion: 1,
+  revision: 1,
+  id,
+  name: input.name.trim(),
+  brief: input.brief,
+  ...(input.forgeProjectId === undefined ? {} : { forgeProjectId: input.forgeProjectId }),
+  aspectRatio: input.aspectRatio,
+  targetDurationSeconds: input.targetDurationSeconds,
+  resolution: input.resolution,
+  sceneOrder: [],
+  scenes: {},
+  assets: {},
+  jobs: {},
+  routing: { storyboard: null, image: null, video: null },
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
+/** Creates an atomic, manifest-backed store for Creative Studio projects. */
+export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): CreativeStudioStore => {
+  const rootDir = path.resolve(deps.rootDir);
+  const now = deps.now ?? (() => new Date().toISOString());
+  const createId = deps.createId ?? (() => crypto.randomUUID().replaceAll('-', '_'));
+  const fs = deps.fs ?? nodeFs;
+  const logError = deps.logError ?? ((message: string, error: unknown): void => console.error(message, error));
+  const queues = new Map<string, Promise<unknown>>();
+  let summaryQueue: Promise<unknown> = Promise.resolve();
+  let connectionsQueue: Promise<unknown> = Promise.resolve();
+  let sharedListingSweep:
+    | { result: ProjectListingSweep; remainingConsumer: 'projects' | 'quarantinedProjectIds' }
+    | undefined;
+
+  const requireSafeId = (projectId: string): void => {
+    if (!isSafeId(projectId)) throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
+  };
+
+  const isInsideRoot = (canonicalRoot: string, target: string): boolean =>
+    target === canonicalRoot || target.startsWith(canonicalRoot + path.sep);
+
+  const storageError = (error: unknown, fallback: string): CreativeStudioStoreError =>
+    new CreativeStudioStoreError('storage_error', error instanceof Error ? error.message : fallback);
+
+  const canonicalRoot = async (): Promise<string> => {
+    try {
+      await fs.mkdir(rootDir, { recursive: true });
+      const stats = await fs.lstat(rootDir);
+      if (!stats.isDirectory() || stats.isSymbolicLink()) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio root must be a directory');
+      }
+      return await fs.realpath(rootDir);
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      throw storageError(error, 'Creative Studio root is unavailable');
+    }
+  };
+
+  const resolveRootChild = (root: string, child: string): string => {
+    const resolved = path.resolve(root, child);
+    if (!isInsideRoot(root, resolved)) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio storage target escaped its root');
+    }
+    return resolved;
+  };
+
+  const assertRegularFileOrMissing = async (file: string): Promise<void> => {
+    try {
+      const stats = await fs.lstat(file);
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio storage file is not a regular file');
+      }
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      if (isRecord(error) && error.code === 'ENOENT') return;
+      throw storageError(error, 'Creative Studio storage file is unavailable');
+    }
+  };
+
+  const projectDirectory = async (
+    root: string,
+    projectId: string,
+    createIfMissing: boolean
+  ): Promise<string | null> => {
+    requireSafeId(projectId);
+    const directory = resolveRootChild(root, projectId);
+    try {
+      const stats = await fs.lstat(directory);
+      if (!stats.isDirectory() || stats.isSymbolicLink()) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio project directory is unsafe');
+      }
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      if (!isRecord(error) || error.code !== 'ENOENT')
+        throw storageError(error, 'Creative Studio project directory is unavailable');
+      if (!createIfMissing) return null;
+      try {
+        await fs.mkdir(directory);
+      } catch (mkdirError) {
+        throw storageError(mkdirError, 'Creative Studio project directory could not be created');
+      }
+      const createdStats = await fs.lstat(directory);
+      if (!createdStats.isDirectory() || createdStats.isSymbolicLink()) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio project directory is unsafe');
+      }
+    }
+
+    try {
+      const canonicalDirectory = await fs.realpath(directory);
+      if (!isInsideRoot(root, canonicalDirectory) || canonicalDirectory === root) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio project directory escaped its root');
+      }
+      return canonicalDirectory;
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      throw storageError(error, 'Creative Studio project directory is unavailable');
+    }
+  };
+
+  const projectFile = async (root: string, projectId: string, createDirectory: boolean): Promise<string | null> => {
+    const directory = await projectDirectory(root, projectId, createDirectory);
+    if (directory === null) return null;
+    const file = resolveRootChild(directory, 'project.json');
+    await assertRegularFileOrMissing(file);
+    return file;
+  };
+
+  const summariesFile = async (root: string): Promise<string> => {
+    const file = resolveRootChild(root, 'projects.json');
+    await assertRegularFileOrMissing(file);
+    return file;
+  };
+
+  const connectionsFile = async (root: string): Promise<string> => {
+    const file = resolveRootChild(root, 'connections.json');
+    await assertRegularFileOrMissing(file);
+    return file;
+  };
+
+  const readConnections = async (root: string): Promise<StudioConnectionBinding[]> => {
+    const file = await connectionsFile(root);
+    try {
+      const parsed = JSON.parse(await fs.readFile(file, 'utf8')) as unknown;
+      if (
+        !isRecord(parsed) ||
+        Object.keys(parsed).length !== CONNECTION_MANIFEST_KEYS.size ||
+        !Object.keys(parsed).every((key) => CONNECTION_MANIFEST_KEYS.has(key)) ||
+        parsed.schemaVersion !== 1 ||
+        !Array.isArray(parsed.connections)
+      ) {
+        throw new CreativeStudioStoreError('storage_error', 'Malformed Studio connection manifest');
+      }
+      const connections = parsed.connections.map(canonicalizeConnectionBinding);
+      if (connections.some((connection) => connection === null)) {
+        throw new CreativeStudioStoreError('storage_error', 'Malformed Studio connection manifest');
+      }
+      return (connections as StudioConnectionBinding[]).toSorted((left, right) => left.id.localeCompare(right.id));
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      if (isRecord(error) && error.code === 'ENOENT') return [];
+      throw new CreativeStudioStoreError(
+        'storage_error',
+        error instanceof Error ? error.message : 'Studio connection storage read failed'
+      );
+    }
+  };
+
+  const enqueueConnections = <T>(work: () => Promise<T>): Promise<T> => {
+    const next = connectionsQueue.catch((): undefined => undefined).then(work);
+    connectionsQueue = next.catch((): undefined => undefined);
+    return next;
+  };
+
+  const writeJsonAtomic = async (root: string, file: string, value: unknown): Promise<void> => {
+    const parent = path.dirname(file);
+    if (!isInsideRoot(root, parent)) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio storage target escaped its root');
+    }
+    const parentStats = await fs.lstat(parent);
+    if (!parentStats.isDirectory() || parentStats.isSymbolicLink() || (await fs.realpath(parent)) !== parent) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio storage parent is unsafe');
+    }
+    await assertRegularFileOrMissing(file);
+    const temporaryFile = `${file}.${process.pid}.${++temporaryFileCounter}.tmp`;
+    let temporaryHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
+    try {
+      temporaryHandle = await fs.open(temporaryFile, 'wx');
+      await temporaryHandle.writeFile(JSON.stringify(value, null, 2), { encoding: 'utf8' });
+      await temporaryHandle.sync();
+      await temporaryHandle.close();
+      temporaryHandle = undefined;
+      await fs.rename(temporaryFile, file);
+      const directoryHandle = await fs.open(parent, 'r');
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
+    } catch (error) {
+      await temporaryHandle?.close().catch((): undefined => undefined);
+      await fs.rm(temporaryFile, { force: true }).catch((): undefined => undefined);
+      throw new CreativeStudioStoreError(
+        'storage_error',
+        error instanceof Error ? error.message : 'Studio storage write failed'
+      );
+    }
+  };
+
+  const readProject = async (root: string, projectId: string): Promise<StudioProject | null> => {
+    try {
+      const file = await projectFile(root, projectId, false);
+      if (file === null) return null;
+      const raw = JSON.parse(await fs.readFile(file, 'utf8')) as unknown;
+      const migrated = migrateSchemaV1Project(raw);
+      if (validateProject(migrated) && migrated.id === projectId) return migrated;
+      throw new CreativeStudioStoreError('storage_error', 'Malformed Studio project manifest');
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      if (isRecord(error) && error.code === 'ENOENT') return null;
+      throw new CreativeStudioStoreError(
+        'storage_error',
+        error instanceof Error ? error.message : 'Studio storage read failed'
+      );
+    }
+  };
+
+  const readAllProjects = async (
+    root: string
+  ): Promise<{ projects: StudioProject[]; quarantinedProjectIds: string[] }> => {
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(root, { withFileTypes: true });
+    } catch (error) {
+      if (isRecord(error) && error.code === 'ENOENT') return { projects: [], quarantinedProjectIds: [] };
+      throw new CreativeStudioStoreError(
+        'storage_error',
+        error instanceof Error ? error.message : 'Studio storage read failed'
+      );
+    }
+    const unsafeProjectEntry = entries.find((entry) => isSafeId(entry.name) && entry.isSymbolicLink());
+    if (unsafeProjectEntry !== undefined) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio project directory is unsafe');
+    }
+    const projectEntries = entries
+      .filter((entry) => entry.isDirectory() && isSafeId(entry.name))
+      .toSorted((left, right) => left.name.localeCompare(right.name));
+    const settledProjects = await Promise.allSettled(projectEntries.map((entry) => readProject(root, entry.name)));
+    const projects: StudioProject[] = [];
+    const quarantinedProjectIds: string[] = [];
+    settledProjects.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        if (result.value !== null) projects.push(result.value);
+        return;
+      }
+      const projectId = projectEntries[index].name;
+      quarantinedProjectIds.push(projectId);
+      logError(`[CreativeStudio] Quarantined corrupt project manifest: ${projectId}`, result.reason);
+    });
+    return { projects, quarantinedProjectIds };
+  };
+
+  const repairSummaryIndex = (): Promise<ProjectListingSweep> => {
+    const rebuild = async (): Promise<ProjectListingSweep> => {
+      const root = await canonicalRoot();
+      const indexFile = await summariesFile(root);
+      const { projects, quarantinedProjectIds } = await readAllProjects(root);
+      const summaries = projects.map(toSummary).toSorted(compareSummaries);
+      let existing: unknown = null;
+      try {
+        existing = JSON.parse(await fs.readFile(indexFile, 'utf8')) as unknown;
+      } catch {
+        // A missing or malformed summary is repaired from the per-project source of truth below.
+      }
+      const next = { schemaVersion: 1, projects: summaries };
+      if (!sameJson(existing, next)) await writeJsonAtomic(root, indexFile, next);
+      return { projects: summaries, quarantinedProjectIds };
+    };
+    const next = summaryQueue.catch((): undefined => undefined).then(() => rebuild());
+    summaryQueue = next.catch((): undefined => undefined);
+    return next;
+  };
+
+  const enqueue = <T>(projectId: string, work: () => Promise<T>): Promise<T> => {
+    const previous = queues.get(projectId) ?? Promise.resolve();
+    const next = previous.catch((): undefined => undefined).then(() => work());
+    queues.set(projectId, next);
+    void next
+      .finally(() => {
+        if (queues.get(projectId) === next) queues.delete(projectId);
+      })
+      .catch((): undefined => undefined);
+    return next;
+  };
+
+  return {
+    async listProjects(): Promise<StudioProjectSummary[]> {
+      if (sharedListingSweep?.remainingConsumer === 'projects') {
+        const { result } = sharedListingSweep;
+        sharedListingSweep = undefined;
+        return result.projects;
+      }
+      const result = await repairSummaryIndex();
+      sharedListingSweep = { result, remainingConsumer: 'quarantinedProjectIds' };
+      return result.projects;
+    },
+
+    async listQuarantinedProjectIds(): Promise<string[]> {
+      if (sharedListingSweep?.remainingConsumer === 'quarantinedProjectIds') {
+        const { result } = sharedListingSweep;
+        sharedListingSweep = undefined;
+        return result.quarantinedProjectIds;
+      }
+      const result = await repairSummaryIndex();
+      sharedListingSweep = { result, remainingConsumer: 'projects' };
+      return result.quarantinedProjectIds;
+    },
+
+    async createProject(input: CreateStudioProjectInput): Promise<StudioProject> {
+      if (Object.hasOwn(input, 'id')) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Studio project ids are generated by the store');
+      }
+      const projectId = createId();
+      if (!isSafeId(projectId)) throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
+      sharedListingSweep = undefined;
+      return enqueue(projectId, async () => {
+        const root = await canonicalRoot();
+        await summariesFile(root);
+        const candidate = createProjectFromInput(input, projectId, now());
+        if (!validateProject(candidate))
+          throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project payload');
+        if (await readProject(root, projectId))
+          throw new CreativeStudioStoreError('invalid_payload', 'Studio project already exists');
+        const file = await projectFile(root, projectId, true);
+        if (file === null)
+          throw new CreativeStudioStoreError('storage_error', 'Creative Studio project storage is unavailable');
+        await writeJsonAtomic(root, file, candidate);
+        await repairSummaryIndex();
+        return candidate;
+      });
+    },
+
+    async getProject(projectId: string): Promise<StudioProject | null> {
+      if (!isSafeId(projectId)) return null;
+      return readProject(await canonicalRoot(), projectId);
+    },
+
+    async getVerifiedProjectDirectory(projectId: string): Promise<string | null> {
+      if (!isSafeId(projectId)) return null;
+      return projectDirectory(await canonicalRoot(), projectId, false);
+    },
+
+    async updateProject(
+      projectId: string,
+      update: (project: StudioProject) => StudioProject,
+      expectedRevision?: number
+    ): Promise<StudioProject> {
+      if (!isSafeId(projectId)) throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
+      if (expectedRevision !== undefined && !isIntegerInRange(expectedRevision, 1, Number.MAX_SAFE_INTEGER)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project revision');
+      }
+      sharedListingSweep = undefined;
+      return enqueue(projectId, async () => {
+        const root = await canonicalRoot();
+        await summariesFile(root);
+        const current = await readProject(root, projectId);
+        if (current === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+        if (expectedRevision !== undefined && expectedRevision !== current.revision) {
+          throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
+        }
+        const updated = update(structuredClone(current));
+        if (!isRecord(updated) || updated.id !== current.id || updated.createdAt !== current.createdAt) {
+          throw new CreativeStudioStoreError('invalid_payload', 'Studio project identity cannot change');
+        }
+        const next: StudioProject = {
+          ...updated,
+          schemaVersion: 1,
+          revision: current.revision + 1,
+          updatedAt: now(),
+        };
+        if (!validateProject(next))
+          throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project payload');
+        const file = await projectFile(root, projectId, false);
+        if (file === null)
+          throw new CreativeStudioStoreError('storage_error', 'Creative Studio project storage is unavailable');
+        await writeJsonAtomic(root, file, next);
+        await repairSummaryIndex();
+        return next;
+      });
+    },
+
+    async deleteProject(projectId: string, expectedRevision: number): Promise<boolean> {
+      if (!isSafeId(projectId)) return false;
+      if (!isIntegerInRange(expectedRevision, 1, Number.MAX_SAFE_INTEGER)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project revision');
+      }
+      sharedListingSweep = undefined;
+      return enqueue(projectId, async () => {
+        const root = await canonicalRoot();
+        await summariesFile(root);
+        const current = await readProject(root, projectId);
+        if (current === null) return false;
+        if (Object.values(current.jobs).some((job) => NONTERMINAL_JOB_STATUSES.has(job.status))) {
+          throw new CreativeStudioStoreError('busy', 'Studio project has active generation jobs');
+        }
+        if (current.revision !== expectedRevision) {
+          throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
+        }
+        try {
+          const targetDir = await projectDirectory(root, projectId, false);
+          if (targetDir === null) return false;
+          await fs.rm(targetDir, { recursive: true, force: false });
+        } catch (error) {
+          throw new CreativeStudioStoreError(
+            'storage_error',
+            error instanceof Error ? error.message : 'Studio project deletion failed'
+          );
+        }
+        await repairSummaryIndex();
+        return true;
+      });
+    },
+
+    async listConnections(): Promise<StudioConnectionBinding[]> {
+      return readConnections(await canonicalRoot());
+    },
+
+    async saveConnection(binding: StudioConnectionBinding): Promise<StudioConnectionBinding> {
+      const canonicalBinding = canonicalizeConnectionBinding(binding);
+      if (canonicalBinding === null) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio connection binding');
+      }
+      return enqueueConnections(async () => {
+        const root = await canonicalRoot();
+        const current = await readConnections(root);
+        const next = [
+          ...current.filter(
+            (connection) =>
+              connection.id !== canonicalBinding.id &&
+              !(
+                connection.providerId === canonicalBinding.providerId &&
+                connection.adapterId === canonicalBinding.adapterId &&
+                connection.model === canonicalBinding.model
+              )
+          ),
+          structuredClone(canonicalBinding),
+        ].toSorted((left, right) => left.id.localeCompare(right.id));
+        await writeJsonAtomic(root, await connectionsFile(root), { schemaVersion: 1, connections: next });
+        return structuredClone(canonicalBinding);
+      });
+    },
+
+    async removeConnection(connectionId: string): Promise<boolean> {
+      if (!isSafeConnectionId(connectionId)) return false;
+      return enqueueConnections(async () => {
+        const root = await canonicalRoot();
+        const current = await readConnections(root);
+        const next = current.filter((connection) => connection.id !== connectionId);
+        if (next.length === current.length) return false;
+        await writeJsonAtomic(root, await connectionsFile(root), { schemaVersion: 1, connections: next });
+        return true;
+      });
+    },
+  };
+};

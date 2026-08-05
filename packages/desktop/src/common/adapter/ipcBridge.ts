@@ -66,6 +66,40 @@ import type {
 } from '../types/platform/acpTypes';
 import type { IProjectKnowledgeListResult } from '../types/project/knowledgeTypes';
 import type {
+  CreateStudioProjectInput,
+  ProposeStudioStoryboardInput,
+  StudioCommandResult,
+  StudioChooseAndExportAssetsRequest,
+  StudioChooseAndImportReferenceRequest,
+  StudioDeleteProjectRequest,
+  StudioProjectRequest,
+  StudioProjectSummary,
+  StudioRendererProject,
+  StudioImportOutcome,
+  StudioExportOutcome,
+  StudioConnectionInventory,
+  StudioConnectionRecord,
+  StudioConnectionValidationResult,
+  StudioConnectionCandidate,
+  StudioListRoutesRequest,
+  StudioRemoveConnectionRequest,
+  StudioRouteCatalog,
+  StudioSaveConnectionRequest,
+  StudioValidateConnectionRequest,
+  StudioReorderScenesRequest,
+  StudioRendererJob,
+  StudioJobRequest,
+  StudioRetryDownloadRequest,
+  StudioRetryJobRequest,
+  StudioSelectAssetRequest,
+  StudioSubmitScenesRequest,
+  StudioFitStoryboardOutcome,
+  StudioFitStoryboardRequest,
+  StudioUpdateModelSelectionRequest,
+  StudioUpdateProjectRequest,
+  StudioUpdateSceneRequest,
+} from '../types/project/creativeStudioTypes';
+import type {
   CreateProviderRequest,
   FetchModelsAnonymousRequest,
   FetchModelsResponse,
@@ -1038,6 +1072,101 @@ export const projectKnowledge = {
     'project-knowledge.get-session-mcp-server'
   ),
   updated: bridge.buildEmitter<{ projectId: string }>('project-knowledge.updated'),
+};
+
+// ---------------------------------------------------------------------------
+// Creative Studio — native main process owns durable project manifests
+// ---------------------------------------------------------------------------
+
+export type StudioUnsavedWorkStatus = {
+  dirtySceneCount: number;
+};
+
+export type StudioFlushUnsavedWorkResult = {
+  saved: boolean;
+};
+
+export const creativeStudio = {
+  listProjects: bridge.buildProvider<StudioCommandResult<StudioProjectSummary[]>, void>(
+    'creative-studio.list-projects'
+  ),
+  createProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, CreateStudioProjectInput>(
+    'creative-studio.create-project'
+  ),
+  getProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject | null>, StudioProjectRequest>(
+    'creative-studio.get-project'
+  ),
+  proposeStoryboard: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, ProposeStudioStoryboardInput>(
+    'creative-studio.propose-storyboard'
+  ),
+  updateModelSelection: bridge.buildProvider<
+    StudioCommandResult<StudioRendererProject>,
+    StudioUpdateModelSelectionRequest
+  >('creative-studio.update-model-selection'),
+  updateProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateProjectRequest>(
+    'creative-studio.update-project'
+  ),
+  deleteProject: bridge.buildProvider<StudioCommandResult<boolean>, StudioDeleteProjectRequest>(
+    'creative-studio.delete-project'
+  ),
+  updateScene: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateSceneRequest>(
+    'creative-studio.update-scene'
+  ),
+  reorderScenes: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioReorderScenesRequest>(
+    'creative-studio.reorder-scenes'
+  ),
+  selectAsset: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioSelectAssetRequest>(
+    'creative-studio.select-asset'
+  ),
+  chooseAndImportReference: bridge.buildProvider<
+    StudioCommandResult<StudioImportOutcome>,
+    StudioChooseAndImportReferenceRequest
+  >('creative-studio.choose-and-import-reference'),
+  chooseAndExportAssets: bridge.buildProvider<
+    StudioCommandResult<StudioExportOutcome>,
+    StudioChooseAndExportAssetsRequest
+  >('creative-studio.choose-and-export-assets'),
+  fitStoryboard: bridge.buildProvider<StudioCommandResult<StudioFitStoryboardOutcome>, StudioFitStoryboardRequest>(
+    'creative-studio.fit-storyboard'
+  ),
+  submitScenes: bridge.buildProvider<StudioCommandResult<StudioRendererJob[]>, StudioSubmitScenesRequest>(
+    'creative-studio.submit-scenes'
+  ),
+  cancelJob: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioJobRequest>(
+    'creative-studio.cancel-job'
+  ),
+  retryJob: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioRetryJobRequest>(
+    'creative-studio.retry-job'
+  ),
+  retryDownload: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioRetryDownloadRequest>(
+    'creative-studio.retry-download'
+  ),
+  listConnectionCandidates: bridge.buildProvider<StudioCommandResult<StudioConnectionCandidate[]>, void>(
+    'creative-studio.list-connection-candidates'
+  ),
+  listConnections: bridge.buildProvider<StudioCommandResult<StudioConnectionInventory>, void>(
+    'creative-studio.list-connections'
+  ),
+  validateConnection: bridge.buildProvider<
+    StudioCommandResult<StudioConnectionValidationResult>,
+    StudioValidateConnectionRequest
+  >('creative-studio.validate-connection'),
+  saveConnection: bridge.buildProvider<StudioCommandResult<StudioConnectionRecord>, StudioSaveConnectionRequest>(
+    'creative-studio.save-connection'
+  ),
+  removeConnection: bridge.buildProvider<StudioCommandResult<boolean>, StudioRemoveConnectionRequest>(
+    'creative-studio.remove-connection'
+  ),
+  listRoutes: bridge.buildProvider<StudioCommandResult<StudioRouteCatalog>, StudioListRoutesRequest | undefined>(
+    'creative-studio.list-routes'
+  ),
+  hasUnsavedWork: bridge.buildRendererQuery<StudioUnsavedWorkStatus>('creative-studio.has-unsaved-work', {
+    dirtySceneCount: 24,
+  }),
+  flushUnsavedWork: bridge.buildRendererQuery<StudioFlushUnsavedWorkResult>('creative-studio.flush-unsaved-work', {
+    saved: false,
+  }),
+  projectUpdated: bridge.buildEmitter<{ projectId: string }>('studio.project-updated'),
 };
 
 // ---------------------------------------------------------------------------

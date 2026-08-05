@@ -16,13 +16,17 @@ import type {
   InstallerLastFailureMarker,
 } from '@/common/update/updateTypes';
 import { UPDATE_BRIDGE_DISABLED_CODE } from '@/common/update/updateTypes';
-import { getConfiguredUpdateBaseUrl, isUpdateUrlWithinBase } from '@/common/update/updatePolicy';
+import {
+  getConfiguredUpdateBaseUrl,
+  isUpdateFeatureEnabled,
+  isUpdateUrlWithinBase,
+} from '@/common/update/updatePolicy';
 import { uuid } from '@/common/utils';
 import { app } from 'electron';
 import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
-import { consumeInstallerLastFailure } from '../services/installerLastFailure';
+import { consumeInstallerLastFailure } from '../services/update/installerLastFailure';
 
 /** Lazily loads i18n to avoid pulling in initStorage chain at module load time */
 let _i18nCache: Promise<typeof import('../services/i18n')> | null = null;
@@ -41,10 +45,13 @@ interface AutoUpdateCheckParams {
 }
 
 const MAX_REDIRECTS = 8;
-type AutoUpdaterService = (typeof import('../services/autoUpdaterService'))['autoUpdaterService'];
+type AutoUpdaterService = (typeof import('../services/update/autoUpdaterService'))['autoUpdaterService'];
 
 const loadAutoUpdaterService = async (): Promise<AutoUpdaterService> => {
-  const { autoUpdaterService } = await import('../services/autoUpdaterService');
+  const { autoUpdaterService } = await import('../services/update/autoUpdaterService');
+  if (!autoUpdaterService.isInitialized) {
+    autoUpdaterService.initialize(createAutoUpdateStatusBroadcast());
+  }
   return autoUpdaterService;
 };
 
@@ -360,7 +367,7 @@ const startDownloadInBackground = async (
  * The ipcBridge channel broadcasts to all renderer listeners, so no window guard is needed here.
  */
 export function createAutoUpdateStatusBroadcast(): (
-  status: import('../services/autoUpdaterService').AutoUpdateStatus
+  status: import('../services/update/autoUpdaterService').AutoUpdateStatus
 ) => void {
   return (status) => {
     ipcBridge.autoUpdate.status.emit(status);
@@ -396,7 +403,7 @@ export function initUpdateBridge(): void {
   );
 
   const updateBaseUrl = getConfiguredUpdateBaseUrl();
-  if (!updateBaseUrl) {
+  if (!updateBaseUrl || !isUpdateFeatureEnabled(updateBaseUrl)) {
     registerDisabledUpdateProviders();
     return;
   }

@@ -5,6 +5,18 @@ import { NodePlatformServices } from './NodePlatformServices';
 
 let _services: IPlatformServices | null = null;
 
+/** Resolve the explicit per-run Electron profile used by isolated E2E launches. */
+export function getIsolatedE2EUserDataPath(): string | null {
+  if (process.env.AIONUI_E2E_TEST !== '1') return null;
+  const candidate = process.env.AIONUI_E2E_USER_DATA_DIR?.trim();
+  return candidate ? path.resolve(candidate) : null;
+}
+
+export function isIsolatedE2EUserDataPath(userDataPath: string): boolean {
+  const isolatedPath = getIsolatedE2EUserDataPath();
+  return isolatedPath !== null && path.resolve(userDataPath) === isolatedPath;
+}
+
 export function registerPlatformServices(services: IPlatformServices): void {
   _services = services;
 }
