@@ -38,7 +38,14 @@ That matters because the subprocess is a *separate process*, while the Studio st
 
 **Decision: tools propose; the user accepts. The main process remains the only writer.**
 
-Tools never touch the store for writing. They emit a **proposal**; the renderer presents it; accepting invokes the existing main-process mutation path, which performs the CAS write. This extends a pattern that already ships — `StoryboardDraftModal` is exactly propose-then-accept — and it keeps the single-writer invariant that the whole store design rests on.
+**The invariant is that no tool writes the *project*.** Tools do write **proposal records**, which live in a separate namespace that only the main-process accept path can promote into project state. This distinction is load-bearing and the earlier phrasing "tools never write" was too absolute to be implementable: an MCP tool's return value flows to the *model*, not to the renderer, so a proposal that exists only as tool output is invisible to the app. It has to be durably recorded to be presentable at all.
+
+So: a write tool records a proposal, and returns to the model only a confirmation that it did. The renderer observes the proposal record and presents it. Accepting invokes the existing main-process mutation path, which performs the CAS write against project state. This extends a pattern that already ships — `StoryboardDraftModal` is exactly propose-then-accept — and it keeps the single-writer invariant over *project* state that the whole store design rests on.
+
+Two consequences worth stating, because they are easy to get wrong:
+
+- **Proposal writes need their own guarded path**, separate from project mutation, with its own validation. The subprocess writing proposals is still a second process touching app storage; proposals must be append-only from the tool's side and never readable-then-rewritable in a way that races the renderer.
+- **The model must not be told a proposal was accepted.** It learns only that a proposal was recorded. Whether the user accepted is a separate turn's context, or the model will assert changes that never landed.
 
 The cost is a confirmation step during rapid refinement. Mitigations that do **not** compromise the invariant: batch a multi-shot revision into one proposal so a conversational turn yields one decision rather than many; and make accept/reject reachable from the keyboard so the loop stays fast.
 
