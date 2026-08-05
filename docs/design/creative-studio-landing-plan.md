@@ -1,7 +1,19 @@
 # Creative Studio — landing plan
 
-**Status:** agreed, rev 3 (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
+**Status:** RETARGETED — sprint2 sections stale (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `origin/creative-suite`
 **Source:** `codex/studio-integration` — archived immutably at `refs/archive/studio-integration-2026-08-05` = `20735e392`
+
+> ## ⚠️ RETARGETED 2026-08-05 — do not execute §3, §4 or §9 as written
+>
+> The product decision changed after rev 3: Creative Studio stays on its own long-lived branch, **`origin/creative-suite`**, and does **not** land in `sprint2`. Everything in this document that assumes a `sprint2` target is therefore stale — the MR sequence (§4), the merge mechanics (§3) and the parallel-execution analysis (§9) all need rewriting once the reconciliation below is decided. `TASKS.md` EPIC-005 needs the same treatment.
+>
+> **What still holds:** the defect findings and the acceptance bar. §6 (concurrency premise, the false audio claim, the cost-estimate contract) and §7 (visual acceptance, poster frames) are properties of the code, not of the target branch, and remain valid.
+>
+> **`origin/creative-suite` is not an empty landing spot.** It carries 50 commits and 79 Creative Studio paths — a parallel line of the same feature, tip `c5b879c3e` by khoapnt-vng dated 2026-08-05. A naive merge of `codex/studio-integration` into it produces **98 conflicts**, including `add/add` on `jobManager.ts`, `creativeStudioService.ts`, `mediaStore.ts`, `store.ts`, `providerResolver.ts`, `runtime.ts`, `creativeStudioTypes.ts` and every adapter.
+>
+> **Measured line similarity says these are one lineage, not two designs:** `openRouterVideoAdapter.ts` 99.7% (380 lines both sides), `providerResolver.ts` 93.1%, `creativeStudioTypes.ts` 91.4%, `jobManager.ts` 89.1%, `creativeStudioService.ts` 86.6%. Both almost certainly descend from the `creative-studio-mvp` work; git reports `add/add` only because they share no commit ancestry beyond the `sprint1` tip `54cfef7a7`.
+>
+> **Therefore:** do not treat those 98 conflicts as evidence the branches are incompatible. Recovering or synthesising the common ancestor and supplying it as a merge base should collapse most of them into an ordinary 3-way merge. Reconciliation strategy is being reviewed separately.
 
 > **Rev 2** incorporates an execution review that found four blocking defects in rev 1, two of them factual errors in the plan itself. Corrections are marked **[rev 2]** and the superseded claims are stated rather than quietly deleted, so nobody acts on a remembered version of this document.
 
