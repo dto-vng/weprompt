@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
 
 const THEME = '/Users/u/Library/Application Support/Forge/presentation-templates/business-review/THEME.md';
@@ -18,6 +19,21 @@ const DOCX_TEXT =
   'Create a Word document from the request below. officecli is a command-line program…\n\nBoard report for Q3';
 
 describe('parseTemplatedSend', () => {
+  it('parses the main-owned managed directive while separating template and user attachments', () => {
+    const result = parseTemplatedSend(`${PRESENTATION_RUN_DIRECTIVE_PREFIX} Managed rules.\n\nRaw request`, [
+      THEME,
+      REF,
+      '/user/source.xlsx',
+    ]);
+
+    expect(result).toEqual({
+      templateId: 'business-review',
+      userText: 'Raw request',
+      templateFiles: [THEME, REF],
+      userFiles: ['/user/source.xlsx'],
+    });
+  });
+
   it('parses a pptx templated send: id, user text, file split', () => {
     const r = parseTemplatedSend(PPTX_TEXT, [THEME, REF, '/user/data.xlsx']);
     expect(r).not.toBeNull();

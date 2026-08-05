@@ -5,8 +5,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
-import { composePresentationSend } from './directive';
+import { composePresentationSend, PPTX_DIRECTIVE_PREFIX } from './directive';
 
 const summary = (format: 'html' | 'pptx' | 'docx'): PresentationTemplateSummary => {
   const referenceFile = format === 'pptx' ? 'reference.pptx' : format === 'docx' ? 'reference.docx' : null;
@@ -31,6 +32,10 @@ const summary = (format: 'html' | 'pptx' | 'docx'): PresentationTemplateSummary 
 };
 
 describe('composePresentationSend', () => {
+  it('re-exports the shared managed directive prefix under the legacy parser name', () => {
+    expect(PPTX_DIRECTIVE_PREFIX).toBe(PRESENTATION_RUN_DIRECTIVE_PREFIX);
+  });
+
   it('html: prepends the html directive and attaches the theme file', () => {
     const result = composePresentationSend(summary('html'), 'Deck about the solar system', ['/user/file.png']);
     expect(result.input).toContain('THEME.md');

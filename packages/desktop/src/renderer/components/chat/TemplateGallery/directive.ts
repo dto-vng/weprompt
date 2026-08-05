@@ -8,13 +8,14 @@ import type {
   ArtifactScratchAllocation,
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
+import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 
 /**
  * First sentence of each directive. Exported so the chat renderer can detect
  * templated sends without duplicating strings that would silently drift.
  */
 export const HTML_DIRECTIVE_PREFIX = 'Create a presentation/report from the request below.';
-export const PPTX_DIRECTIVE_PREFIX = 'Create a presentation from the request below.';
+export { PRESENTATION_RUN_DIRECTIVE_PREFIX as PPTX_DIRECTIVE_PREFIX };
 export const DOCX_DIRECTIVE_PREFIX = 'Create a Word document from the request below.';
 
 const htmlDirective = (themeFile: string): string =>
@@ -58,7 +59,7 @@ const officeArtifactScratchRules = (scratch?: ArtifactScratchAllocation): string
 
 const pptxDirective = (themeFile: string, referenceFile: string, scratch?: ArtifactScratchAllocation): string =>
   [
-    PPTX_DIRECTIVE_PREFIX,
+    PRESENTATION_RUN_DIRECTIVE_PREFIX,
     `officecli is a command-line program you run through your shell/execute tool — it is not a chat tool and will never appear in your tool list.`,
     `Before concluding anything about availability, run \`officecli --version\` in the shell;`,
     `only if that command itself fails should you stop — tell the user, quoting the failing command and its output; never conclude officecli is unavailable without running it.`,
