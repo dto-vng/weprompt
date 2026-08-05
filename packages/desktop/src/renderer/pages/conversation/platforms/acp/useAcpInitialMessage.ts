@@ -6,11 +6,22 @@
 
 import { ipcBridge } from '@/common';
 import type { TMessage } from '@/common/chat/chatLib';
+import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 import type { TConversationRuntimeSummary } from '@/common/config/storage';
+import type {
+  GetPresentationSourceOwnerResult,
+  PresentationGrantOwner,
+  PresentationSourceRef,
+} from '@/common/types/office/presentationRun';
+import type {
+  PresentationSubmissionProgress,
+  PresentationSubmissionSnapshot,
+} from '@/common/types/platform/presentationSubmission';
 import { parseError, uuid } from '@/common/utils';
+import { resolveManagedPresentationInitialSend } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
 import { emitter } from '@/renderer/utils/emitter';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getConversationRuntimeWorkspaceErrorMessage } from '../../utils/conversationCreateError';
 import type { ConversationRuntimeSendFailure } from '../../runtime/conversationRuntimeViewStore';
@@ -28,7 +39,21 @@ type UseAcpInitialMessageParams = {
   markSendFailed?: (failure: ConversationRuntimeSendFailure) => void;
   checkAndUpdateTitle: (conversation_id: string, input: string) => void;
   addOrUpdateMessage: (message: TMessage, prepend?: boolean) => void;
+  managedPresentationEnabled?: boolean;
+  hydratePresentationSources?: () => Promise<GetPresentationSourceOwnerResult>;
+  enqueueManagedPresentation?: (
+    snapshot: PresentationSubmissionSnapshot,
+    sourceOwner: PresentationGrantOwner | null,
+    expectedOwnerRevision: number | null
+  ) => Promise<PresentationSubmissionProgress>;
 };
+
+const toPresentationSourceRefs = (grants: readonly { grantId: string; byteLength: number; sha256: string }[]) =>
+  grants.map<PresentationSourceRef>((grant) => ({
+    grantId: grant.grantId,
+    expectedByteLength: grant.byteLength,
+    expectedSha256: grant.sha256,
+  }));
 
 /**
  * Side-effect-only hook that checks sessionStorage for an initial message
@@ -45,14 +70,77 @@ export const useAcpInitialMessage = ({
   markSendFailed,
   checkAndUpdateTitle,
   addOrUpdateMessage,
+  managedPresentationEnabled = false,
+  hydratePresentationSources,
+  enqueueManagedPresentation,
 }: UseAcpInitialMessageParams): void => {
   const { t } = useTranslation();
+  const managedAttemptedRecordRef = useRef<string | null>(null);
 
   useEffect(() => {
     const storageKey = `acp_initial_message_${conversation_id}`;
     const storedMessage = sessionStorage.getItem(storageKey);
 
     if (!storedMessage) return;
+
+    if (managedPresentationEnabled) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(storedMessage) as unknown;
+      } catch {
+        return;
+      }
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const candidate = parsed as Record<string, unknown>;
+        const input = candidate.input;
+        const files = candidate.files;
+        if (typeof input === 'string' && input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX)) {
+          if (!Array.isArray(files) || !files.every((file) => typeof file === 'string')) return;
+          const managed = resolveManagedPresentationInitialSend(input, files, 'acp');
+          if (
+            managed === null ||
+            hydratePresentationSources === undefined ||
+            enqueueManagedPresentation === undefined
+          ) {
+            return;
+          }
+          const queueItemId = typeof candidate.queueItemId === 'string' ? candidate.queueItemId : crypto.randomUUID();
+          const clientRequestId =
+            typeof candidate.clientRequestId === 'string' ? candidate.clientRequestId : crypto.randomUUID();
+          const stableRecord = JSON.stringify({ ...candidate, queueItemId, clientRequestId });
+          if (stableRecord !== storedMessage) sessionStorage.setItem(storageKey, stableRecord);
+          if (managedAttemptedRecordRef.current === stableRecord) return;
+          managedAttemptedRecordRef.current = stableRecord;
+
+          const queueManagedInitialMessage = async (): Promise<void> => {
+            try {
+              const sourceState = await hydratePresentationSources();
+              if (!sourceState.ok) return;
+              const sources = toPresentationSourceRefs(sourceState.grants);
+              const snapshot: PresentationSubmissionSnapshot = Object.freeze({
+                queueItemId,
+                clientRequestId,
+                input: managed.input,
+                selectedTemplateId: managed.selectedTemplateId,
+                sources: Object.freeze(sources.map((source) => Object.freeze(source))),
+                capturedAt: new Date().toISOString(),
+              });
+              await enqueueManagedPresentation(
+                snapshot,
+                sources.length > 0 ? sourceState.owner : null,
+                sources.length > 0 ? sourceState.ownerRevision : null
+              );
+              sessionStorage.removeItem(storageKey);
+            } catch (error) {
+              console.error('[useAcpInitialMessage] Managed initial handoff remains pending:', error);
+            }
+          };
+
+          void queueManagedInitialMessage();
+          return;
+        }
+      }
+    }
 
     // Clear immediately to prevent duplicate sends (e.g., if component remounts while sendMessage is pending)
     sessionStorage.removeItem(storageKey);
@@ -136,6 +224,9 @@ export const useAcpInitialMessage = ({
     markSendAccepted,
     markSendFailed,
     markSendStarted,
+    managedPresentationEnabled,
+    hydratePresentationSources,
+    enqueueManagedPresentation,
     resetState,
     setAiProcessing,
     t,
