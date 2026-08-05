@@ -976,6 +976,7 @@
     "library": {
       "title": "Creative Studio",
       "subtitle": "Plane Geschichten, prüfe jede Szene und erstelle Bild- oder Video-Assets.",
+      "sectionLabel": "Oder mach dort weiter, wo du aufgehört hast",
       "loading": "Projekte werden geladen...",
       "retry": "Erneut versuchen",
       "readinessLabel": "Storyboard-Entwurf",
@@ -991,16 +992,30 @@
         "aspectRatioLabel": "Seitenverhältnis",
         "durationLabel": "Geschätzte Länge",
         "durationGuess": "Etwa {{seconds}} s",
+        "attachBrief": "Briefing-Dokument anhängen",
+        "attachBriefUnavailable": "Briefing-Dokumente können derzeit noch nicht angehängt werden.",
         "submit": "Briefing lesen →",
         "empty": "Ein Satz genügt – sag, was wir erstellen."
       },
       "shape": {
         "title": "Mit einer Struktur starten",
-        "label": "{{count}} Shots · {{seconds}} s",
-        "sceneTitle": "Shot {{number}}"
+        "label": "{{name}} · {{count}} Shots · {{seconds}} s",
+        "sceneTitle": "Shot {{number}}",
+        "productStory": {
+          "name": "Produktstory",
+          "starter": "Eine Produktstory für Menschen, die noch nie von uns gehört haben – vier Stationen mit Abschluss auf der Wortmarke."
+        },
+        "featureTeaser": {
+          "name": "Feature-Teaser",
+          "starter": "Ein kurzer Teaser für eine neue Funktion, ausgerichtet auf Kunden, die das Produkt bereits nutzen."
+        },
+        "recapReel": {
+          "name": "Quartalsrückblick",
+          "starter": "Ein Quartalsrückblick für das ganze Unternehmen, warm und ein wenig stolz."
+        }
       },
       "scriptOnly": "NUR SKRIPT",
-      "posterBadge": "Shot {{scene}} · Take {{take}}",
+      "posterBadge": "Take {{take}} · Shot {{scene}}",
       "status": {
         "partiallyRendered": "{{rendered}} von {{total}} Shots gerendert",
         "handedOff": "Übergeben · {{seconds}} s",

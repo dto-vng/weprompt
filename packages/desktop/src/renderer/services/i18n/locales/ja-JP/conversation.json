@@ -971,6 +971,7 @@
     "library": {
       "title": "クリエイティブスタジオ",
       "subtitle": "物語を組み立て、各シーンを確認して、画像や動画の素材を生成します。",
+      "sectionLabel": "または前回の続きから",
       "loading": "プロジェクトを読み込んでいます...",
       "retry": "もう一度試す",
       "readinessLabel": "ストーリーボード作成",
@@ -986,16 +987,30 @@
         "aspectRatioLabel": "アスペクト比",
         "durationLabel": "想定尺",
         "durationGuess": "約{{seconds}}秒",
+        "attachBrief": "ブリーフ文書を添付",
+        "attachBriefUnavailable": "ブリーフ文書の添付はまだ利用できません。",
         "submit": "ブリーフを確認 →",
         "empty": "一文で十分です。何を作るのか教えてください。"
       },
       "shape": {
         "title": "構成から始める",
-        "label": "{{count}}ショット · {{seconds}}秒",
-        "sceneTitle": "ショット {{number}}"
+        "label": "{{name}} · {{count}}ショット · {{seconds}}秒",
+        "sceneTitle": "ショット {{number}}",
+        "productStory": {
+          "name": "プロダクトストーリー",
+          "starter": "私たちをまだ知らない人向けのプロダクトストーリー。4つの展開で、最後はワードマークで締めます。"
+        },
+        "featureTeaser": {
+          "name": "機能ティーザー",
+          "starter": "すでに製品を利用している顧客向けに、新機能を紹介する短いティーザー。"
+        },
+        "recapReel": {
+          "name": "振り返りリール",
+          "starter": "全社向けの四半期振り返りリール。温かく、少し誇らしい雰囲気で。"
+        }
       },
       "scriptOnly": "脚本のみ",
-      "posterBadge": "ショット {{scene}} · テイク {{take}}",
+      "posterBadge": "テイク {{take}} · ショット {{scene}}",
       "status": {
         "partiallyRendered": "{{total}}ショット中{{rendered}}件を生成済み",
         "handedOff": "引き渡し済み · {{seconds}}秒",

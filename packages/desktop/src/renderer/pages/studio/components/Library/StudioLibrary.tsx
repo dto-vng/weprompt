@@ -101,13 +101,10 @@ export const StudioLibrary: React.FC = () => {
       setCreating(true);
       setCreateErrorMessageKey(null);
       try {
-        const name = t('conversation.creativeStudio.library.shape.label', {
-          count: shape.shotCount,
-          seconds: shape.totalSeconds,
-        });
+        const name = t(shape.nameKey);
         const created = await ipcBridge.creativeStudio.createProject.invoke({
           name,
-          brief: '',
+          brief: t(shape.starterKey),
           aspectRatio: '16:9',
           targetDurationSeconds: shape.totalSeconds,
           resolution: '720p',
@@ -237,19 +234,28 @@ export const StudioLibrary: React.FC = () => {
       ) : projects.length === 0 ? (
         <p className={styles.emptyTitle}>{t('conversation.creativeStudio.empty.title')}</p>
       ) : (
-        <div className={styles.grid}>
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              locale={i18n.resolvedLanguage ?? i18n.language}
-              disabled={mutationBusy || deleteCandidate !== null}
-              onOpen={() =>
-                navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneCount)))
-              }
-              onDelete={() => void prepareDelete(project)}
-            />
-          ))}
+        <div className={styles.projectsBlock}>
+          <div className={styles.projectSectionHeader}>
+            <span className={styles.projectSectionLabel}>{t('conversation.creativeStudio.library.sectionLabel')}</span>
+            <span className={styles.projectCount}>
+              {t('conversation.creativeStudio.library.projectCount', { count: projects.length })}
+            </span>
+            <span aria-hidden='true' className={styles.projectSectionHairline} />
+          </div>
+          <div className={styles.grid}>
+            {projects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                locale={i18n.resolvedLanguage ?? i18n.language}
+                disabled={mutationBusy || deleteCandidate !== null}
+                onOpen={() =>
+                  navigate(studioPhasePath(project.id, resolveStudioEntryPhase(project.id, project.sceneCount)))
+                }
+                onDelete={() => void prepareDelete(project)}
+              />
+            ))}
+          </div>
         </div>
       )}
 

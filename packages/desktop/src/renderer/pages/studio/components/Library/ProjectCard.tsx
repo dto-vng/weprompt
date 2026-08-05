@@ -67,7 +67,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, locale, disab
           {project.poster !== null && posterSource !== null && (
             <Tag className={styles.posterBadge}>
               {t('conversation.creativeStudio.library.posterBadge', {
-                scene: project.poster.sceneNumber,
+                scene: String(project.poster.sceneNumber).padStart(2, '0'),
                 take: project.poster.takeNumber,
               })}
             </Tag>
@@ -82,6 +82,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, locale, disab
         <Button
           type='text'
           status='danger'
+          className={styles.deleteButton}
           icon={<Delete />}
           aria-label={t('conversation.creativeStudio.library.deleteProject')}
           disabled={disabled}
