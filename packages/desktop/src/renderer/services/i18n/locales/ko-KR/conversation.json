@@ -1006,12 +1006,6 @@
       "shotCount_other": "{{count}}개 숏",
       "projectCount": "프로젝트 {{count}}개",
       "projectCount_other": "프로젝트 {{count}}개",
-      "sidebar": {
-        "recents": "최근 Creative Studio 프로젝트",
-        "all": "전체",
-        "noCreditsTitle": "여기서는 미디어 크레딧을 사용하지 않음",
-        "noCreditsBody": "브리프나 작성 단계에서는 미디어 생성 크레딧을 사용하지 않습니다. 어시스턴트에게 질문하면 텍스트 모델 제공업체 요금이 발생할 수 있습니다."
-      },
       "deleteConfirm": "삭제"
     },
     "empty": {

@@ -1014,12 +1014,6 @@
       "projectCount": "{{count}} proje",
       "projectCount_one": "{{count}} proje",
       "projectCount_other": "{{count}} proje",
-      "sidebar": {
-        "recents": "Son Creative Studio projeleri",
-        "all": "TÜMÜ",
-        "noCreditsTitle": "BURADA MEDYA KREDİSİ YOK",
-        "noCreditsBody": "Brief veya Write aşamasında medya üretim kredisi harcanmaz. Asistana soru sormak metin modeli sağlayıcısı ücretlerine yol açabilir."
-      },
       "deleteConfirm": "Sil"
     },
     "empty": {

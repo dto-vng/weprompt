@@ -1006,12 +1006,6 @@
       "shotCount_other": "{{count}} 个镜头",
       "projectCount": "{{count}} 个项目",
       "projectCount_other": "{{count}} 个项目",
-      "sidebar": {
-        "recents": "最近的 Creative Studio 项目",
-        "all": "全部",
-        "noCreditsTitle": "此处不消耗媒体额度",
-        "noCreditsBody": "在简报或撰写阶段不会消耗媒体生成额度。询问助手可能会产生文本模型提供商费用。"
-      },
       "deleteConfirm": "删除"
     },
     "empty": {

@@ -1024,12 +1024,6 @@
       "projectCount_few": "{{count}} проєкти",
       "projectCount_many": "{{count}} проєктів",
       "projectCount_other": "{{count}} проєкту",
-      "sidebar": {
-        "recents": "Нещодавні проєкти Creative Studio",
-        "all": "УСІ",
-        "noCreditsTitle": "ТУТ НЕ ПОТРІБНІ МЕДІАКРЕДИТИ",
-        "noCreditsBody": "На етапах Brief і Write кредити на генерацію медіа не витрачаються. Звернення до асистента може спричинити оплату провайдеру текстової моделі."
-      },
       "deleteConfirm": "Видалити"
     },
     "empty": {

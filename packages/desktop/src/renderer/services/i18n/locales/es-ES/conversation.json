@@ -1019,12 +1019,6 @@
       "projectCount_one": "{{count}} proyecto",
       "projectCount_many": "{{count}} proyectos",
       "projectCount_other": "{{count}} proyectos",
-      "sidebar": {
-        "recents": "Proyectos recientes de Creative Studio",
-        "all": "TODOS",
-        "noCreditsTitle": "SIN CRÉDITOS DE MEDIOS AQUÍ",
-        "noCreditsBody": "En Brief y Write no se gastan créditos de generación de medios. Preguntar al asistente puede generar cargos del proveedor del modelo de texto."
-      },
       "deleteConfirm": "Eliminar"
     },
     "empty": {

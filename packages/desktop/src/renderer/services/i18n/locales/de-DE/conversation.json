@@ -1013,12 +1013,6 @@
       "projectCount": "{{count}} Projekte",
       "projectCount_one": "{{count}} Projekt",
       "projectCount_other": "{{count}} Projekte",
-      "sidebar": {
-        "recents": "Letzte Creative-Studio-Projekte",
-        "all": "ALLE",
-        "noCreditsTitle": "HIER KEINE MEDIEN-CREDITS",
-        "noCreditsBody": "In Briefing und Schreiben werden keine Mediengenerierungs-Credits verbraucht. Fragen an den Assistenten können Kosten beim Textmodellanbieter verursachen."
-      },
       "deleteConfirm": "Löschen"
     },
     "empty": {

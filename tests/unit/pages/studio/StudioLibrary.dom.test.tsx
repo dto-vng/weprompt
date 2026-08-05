@@ -45,10 +45,6 @@ vi.mock('react-i18next', () => ({
         'conversation.creativeStudio.library.composer.submit': 'Read my brief →',
         'conversation.creativeStudio.library.composer.empty': 'One sentence is enough — say what we are making.',
         'conversation.creativeStudio.library.scriptOnly': 'SCRIPT ONLY',
-        'conversation.creativeStudio.library.sidebar.all': 'ALL',
-        'conversation.creativeStudio.library.sidebar.noCreditsTitle': 'NO MEDIA CREDITS HERE',
-        'conversation.creativeStudio.library.sidebar.noCreditsBody':
-          'No media-generation credits are spent in Brief or Write. Asking the assistant may incur text-model provider charges.',
       };
       if (key === 'conversation.creativeStudio.library.deleteConfirmBody') return `${key}:${params?.name}`;
       if (key === 'conversation.creativeStudio.library.shape.label') {
@@ -56,7 +52,6 @@ vi.mock('react-i18next', () => ({
       }
       if (key === 'conversation.creativeStudio.library.shape.sceneTitle') return `Shot ${params?.number}`;
       if (key === 'conversation.creativeStudio.library.shotCount') return `${params?.count} shots`;
-      if (key === 'conversation.creativeStudio.library.projectCount') return `${params?.count} projects`;
       if (key === 'conversation.creativeStudio.library.meta') {
         return `${params?.shots} · ${params?.seconds}s · ${params?.relative}`;
       }
@@ -486,7 +481,7 @@ describe('StudioLibrary', () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
-  it('shows the three most recent projects, ALL, and the no-credit note in the expanded sidebar', async () => {
+  it('keeps only the Studio library navigation entry in the expanded sidebar', () => {
     bridge.listProjects.invoke.mockResolvedValue(
       ok([
         summary({ id: 'one', name: 'One' }),
@@ -502,21 +497,18 @@ describe('StudioLibrary', () => {
         isActive
         collapsed={false}
         siderTooltipProps={{ disabled: true }}
-        onClick={vi.fn()}
-        onProjectClick={vi.fn()}
+        onClick={() => navigate('/studio')}
       />
     );
 
-    expect(await screen.findByRole('button', { name: 'One' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Two' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Three' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Four' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ALL · 4 projects' })).toBeInTheDocument();
-    expect(screen.getByText('NO MEDIA CREDITS HERE')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'No media-generation credits are spent in Brief or Write. Asking the assistant may incur text-model provider charges.'
-      )
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.nav.title' }));
+
+    expect(navigate).toHaveBeenCalledWith('/studio');
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByText('One')).not.toBeInTheDocument();
+    expect(screen.queryByText(/ALL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NO MEDIA CREDITS HERE/)).not.toBeInTheDocument();
+    expect(bridge.listProjects.invoke).not.toHaveBeenCalled();
+    expect(bridge.projectUpdated.on).not.toHaveBeenCalled();
   });
 });

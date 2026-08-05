@@ -115,6 +115,8 @@ describe('SiderStudioEntry', () => {
     renderStudioEntry();
 
     expect(screen.getByRole('button', { name: studioNavKey })).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByLabelText('conversation.creativeStudio.library.sidebar.recents')).not.toBeInTheDocument();
   });
 
   it('keeps an accessible name when collapsed', () => {

@@ -868,12 +868,6 @@
       "projectCount": "{{count}} projects",
       "projectCount_one": "{{count}} project",
       "projectCount_other": "{{count}} projects",
-      "sidebar": {
-        "recents": "Recent Creative Studio projects",
-        "all": "ALL",
-        "noCreditsTitle": "NO MEDIA CREDITS HERE",
-        "noCreditsBody": "No media-generation credits are spent in Brief or Write. Asking the assistant may incur text-model provider charges."
-      },
       "deleteConfirm": "Delete"
     },
     "empty": {

@@ -1006,12 +1006,6 @@
       "shotCount_other": "{{count}}ショット",
       "projectCount": "{{count}}件のプロジェクト",
       "projectCount_other": "{{count}}件のプロジェクト",
-      "sidebar": {
-        "recents": "最近の Creative Studio プロジェクト",
-        "all": "すべて",
-        "noCreditsTitle": "メディアクレジットは不要",
-        "noCreditsBody": "ブリーフと作成ではメディア生成クレジットを消費しません。アシスタントへの質問にはテキストモデル提供元の料金が発生する場合があります。"
-      },
       "deleteConfirm": "削除"
     },
     "empty": {

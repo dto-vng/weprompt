@@ -1006,12 +1006,6 @@
       "shotCount_other": "{{count}} 個鏡頭",
       "projectCount": "{{count}} 個專案",
       "projectCount_other": "{{count}} 個專案",
-      "sidebar": {
-        "recents": "最近的 Creative Studio 專案",
-        "all": "全部",
-        "noCreditsTitle": "此處不消耗媒體額度",
-        "noCreditsBody": "在簡報或撰寫階段不會消耗媒體生成額度。詢問助理可能會產生文字模型供應商費用。"
-      },
       "deleteConfirm": "刪除"
     },
     "empty": {

@@ -1024,12 +1024,6 @@
       "projectCount_few": "{{count}} проекта",
       "projectCount_many": "{{count}} проектов",
       "projectCount_other": "{{count}} проекта",
-      "sidebar": {
-        "recents": "Недавние проекты Creative Studio",
-        "all": "ВСЕ",
-        "noCreditsTitle": "ЗДЕСЬ НЕ НУЖНЫ МЕДИАКРЕДИТЫ",
-        "noCreditsBody": "На этапах «Бриф» и «Написание» кредиты на генерацию медиа не расходуются. Обращение к ассистенту может повлечь оплату провайдеру текстовой модели."
-      },
       "deleteConfirm": "Удалить"
     },
     "empty": {

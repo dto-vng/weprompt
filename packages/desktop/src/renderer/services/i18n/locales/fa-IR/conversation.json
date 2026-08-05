@@ -1012,12 +1012,6 @@
       "projectCount": "{{count}} پروژه",
       "projectCount_one": "{{count}} پروژه",
       "projectCount_other": "{{count}} پروژه",
-      "sidebar": {
-        "recents": "پروژه‌های اخیر Creative Studio",
-        "all": "همه",
-        "noCreditsTitle": "اینجا اعتبار رسانه مصرف نمی‌شود",
-        "noCreditsBody": "در مراحل Brief یا Write هیچ اعتبار تولید رسانه‌ای مصرف نمی‌شود. پرسیدن از دستیار ممکن است هزینهٔ ارائه‌دهندهٔ مدل متنی داشته باشد."
-      },
       "deleteConfirm": "حذف"
     },
     "empty": {
