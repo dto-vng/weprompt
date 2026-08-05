@@ -102,7 +102,10 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
                   })
                 }
               >
-                <span className='flex h-54px w-80px items-center justify-center overflow-hidden rounded-6px bg-fill-2 text-24px text-t-tertiary'>
+                <span
+                  className='flex h-54px w-80px items-center justify-center overflow-hidden rounded-6px text-24px text-t-tertiary'
+                  style={{ background: 'var(--studio-plate-surface)' }}
+                >
                   {asset.mediaKind === 'image' ? (
                     <img alt='' className='h-full w-full object-cover' src={source} />
                   ) : (

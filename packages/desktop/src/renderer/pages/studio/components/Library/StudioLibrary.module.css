@@ -141,12 +141,9 @@
 }
 
 .scriptPoster {
-  display: flex;
   width: 100%;
   height: 100%;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-fill-1);
+  background: var(--studio-slate-surface);
 }
 
 .posterBadge {
@@ -158,6 +155,12 @@
 
 .posterLabel {
   composes: eyebrow from '../../StudioTypography.module.css';
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  border-color: transparent;
+  background: var(--studio-plate-surface);
+  color: var(--studio-plate-text);
 }
 
 .projectName {

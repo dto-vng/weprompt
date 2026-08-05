@@ -22,6 +22,8 @@ import { SceneTimeline } from '@renderer/pages/studio/components/SceneTimeline';
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, params?: Record<string, string | number>) => {
+      if (key === 'conversation.creativeStudio.phase.review.slateLabel') return 'Slate';
+      if (key === 'common.unit.second_short') return 's';
       if (params?.number !== undefined) return `${key}:${params.number}`;
       if (params?.seconds !== undefined) return `${key}:${params.seconds}`;
       return key;
@@ -556,6 +558,56 @@ describe('AssetStrip canonical variations', () => {
 });
 
 describe('SceneTimeline storyboard strip', () => {
+  it('renders missing scenes as dashed slate plates and selected media as solid take plates', () => {
+    const missingScene = scene({ id: 'scene-1', title: 'Opening' });
+    const selectedScene = scene({
+      id: 'scene-2',
+      title: 'Reveal',
+      selectedAssetId: 'asset-2',
+      assetIds: ['asset-2'],
+    });
+    const { container } = render(
+      <SceneTimeline
+        orderedScenes={[missingScene, selectedScene]}
+        selectedSceneId='scene-1'
+        onSelectScene={vi.fn()}
+        reviewStates={{ 'scene-1': 'missing-slate', 'scene-2': 'selected-take' }}
+      />
+    );
+
+    const [slateControl, takeControl] = screen.getAllByRole('button', {
+      name: /conversation\.creativeStudio\.timeline\.selectSceneAccessible/,
+    });
+    expect({
+      height: slateControl.style.height,
+      background: slateControl.style.background,
+      borderWidth: slateControl.style.borderWidth,
+      borderStyle: slateControl.style.borderStyle,
+      borderColor: slateControl.style.borderColor,
+    }).toEqual({
+      height: '52px',
+      background: 'var(--studio-slate-surface)',
+      borderWidth: '1px',
+      borderStyle: 'dashed',
+      borderColor: 'var(--studio-slate-border)',
+    });
+    expect({
+      height: takeControl.style.height,
+      background: takeControl.style.background,
+      borderWidth: takeControl.style.borderWidth,
+      borderStyle: takeControl.style.borderStyle,
+      borderColor: takeControl.style.borderColor,
+    }).toEqual({
+      height: '52px',
+      background: 'var(--studio-slate-surface)',
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: 'var(--studio-take-border)',
+    });
+    expect(container.querySelector('[data-review-state="missing-slate"]')).toHaveTextContent('01 · Slate');
+    expect(container.querySelector('[data-review-state="selected-take"]')).toHaveTextContent('02 · 5s');
+  });
+
   it('renders canonical order and duration-proportional selectable segments', () => {
     const orderedScenes = [
       scene({ id: 'scene-1', title: 'Opening', durationSeconds: 5 }),

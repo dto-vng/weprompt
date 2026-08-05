@@ -5,7 +5,7 @@
  */
 
 import { Button } from '@arco-design/web-react';
-import { Attention, CheckOne, Loading, Picture } from '@icon-park/react';
+import { Attention, Loading } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -88,10 +88,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
         <ol className='m-0 flex min-w-0 list-none gap-4px overflow-x-auto p-0'>
           {orderedScenes.map((scene, index) => {
             const reviewState = reviewStates?.[scene.id];
-            const durationLabel = t('conversation.creativeStudio.scene.durationSeconds', {
-              count: scene.durationSeconds,
-              seconds: scene.durationSeconds,
-            });
+            const sceneNumber = String(index + 1).padStart(2, '0');
             const accessibleName = t('conversation.creativeStudio.timeline.selectSceneAccessible', {
               number: index + 1,
               title: scene.title,
@@ -102,12 +99,12 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
               switch (reviewState) {
                 case 'selected-take':
                   return {
-                    icon: <CheckOne aria-hidden='true' />,
+                    icon: null,
                     label: t('conversation.creativeStudio.phase.review.selectedTake'),
                   };
                 case 'missing-slate':
                   return {
-                    icon: <Picture aria-hidden='true' />,
+                    icon: null,
                     label: t('conversation.creativeStudio.phase.review.slateLabel'),
                   };
                 case 'running':
@@ -126,6 +123,19 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
             })();
             const reviewStateId =
               reviewPresentation === null ? undefined : `${timelineId}-scene-${index + 1}-review-state`;
+            const plateBorderStyle: Pick<React.CSSProperties, 'borderStyle' | 'borderColor'> =
+              reviewState === 'missing-slate'
+                ? { borderStyle: 'dashed', borderColor: 'var(--studio-slate-border)' }
+                : reviewState === 'failed'
+                  ? { borderStyle: 'solid', borderColor: 'var(--danger)' }
+                  : { borderStyle: 'solid', borderColor: 'var(--studio-take-border)' };
+            const plateLabel =
+              reviewState === 'missing-slate'
+                ? `${sceneNumber} · ${t('conversation.creativeStudio.phase.review.slateLabel')}`
+                : reviewState === 'running' || reviewState === 'failed'
+                  ? null
+                  : `${sceneNumber} · ${scene.durationSeconds}${t('common.unit.second_short')}`;
+            const reviewDescriptionIsVisible = reviewState === 'running' || reviewState === 'failed';
             return (
               <li key={scene.id} className='flex min-w-72px' style={{ flexGrow: scene.durationSeconds, flexBasis: 0 }}>
                 <Button
@@ -135,21 +145,48 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                   aria-describedby={reviewStateId}
                   aria-current={selectedSceneId === scene.id ? 'true' : undefined}
                   title={accessibleName}
-                  className='h-auto min-w-0 flex-1 flex-col items-start gap-3px overflow-hidden p-8px text-left'
+                  className='min-w-0 flex-1 flex-col items-start justify-end overflow-hidden p-8px text-left'
+                  style={{
+                    height: 52,
+                    background: 'var(--studio-slate-surface)',
+                    borderWidth: 1,
+                    ...plateBorderStyle,
+                  }}
                   onClick={() => onSelectScene(scene.id)}
                   onKeyDown={(event) => selectAdjacent(event, index)}
                 >
-                  <span className={`${studioType.cardTitle} max-w-full truncate`}>{scene.title}</span>
-                  <span className={studioType.meta}>{durationLabel}</span>
-                  {reviewState !== undefined && reviewPresentation !== null && (
-                    <span
-                      id={reviewStateId}
-                      data-review-state={reviewState}
-                      className={`${studioType.eyebrow} flex max-w-full items-center gap-4px rounded-full bg-fill-2 px-6px py-2px text-t-secondary`}
-                    >
-                      {reviewPresentation.icon}
-                      <span className='truncate'>{reviewPresentation.label}</span>
+                  {reviewPresentation !== null && !reviewDescriptionIsVisible && (
+                    <span id={reviewStateId} className='sr-only'>
+                      {reviewPresentation.label}
                     </span>
+                  )}
+                  {plateLabel !== null ? (
+                    <span
+                      aria-hidden='true'
+                      data-review-state={reviewState}
+                      className={`${studioType.eyebrow} max-w-full truncate rounded-3px px-4px py-2px`}
+                      style={
+                        reviewState === 'missing-slate'
+                          ? { color: 'var(--studio-slate-text)' }
+                          : { color: 'var(--text-white)', background: 'rgba(31, 29, 27, 0.5)' }
+                      }
+                    >
+                      {plateLabel}
+                    </span>
+                  ) : (
+                    reviewPresentation !== null && (
+                      <span
+                        data-review-state={reviewState}
+                        className={`${studioType.eyebrow} flex max-w-full items-center gap-4px truncate`}
+                        style={{ color: reviewState === 'failed' ? 'var(--danger)' : 'var(--studio-plate-text)' }}
+                      >
+                        <span>{sceneNumber} ·</span>
+                        {reviewPresentation.icon}
+                        <span id={reviewStateId} className='truncate'>
+                          {reviewPresentation.label}
+                        </span>
+                      </span>
+                    )
                   )}
                 </Button>
               </li>

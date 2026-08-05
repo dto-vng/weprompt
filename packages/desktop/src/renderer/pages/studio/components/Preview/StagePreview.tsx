@@ -20,6 +20,10 @@ import { canOpenSingleSceneReview, deriveStudioReadiness } from '../../studioRea
 import studioType from '../../StudioTypography.module.css';
 
 const SAFE_STUDIO_ID = /^[A-Za-z0-9_-]{1,256}$/;
+const SLATE_PREVIEW_STYLE = {
+  background: 'var(--studio-slate-surface)',
+  border: '1px dashed var(--studio-slate-border)',
+} satisfies React.CSSProperties;
 
 export type StagePreviewProps = {
   projectId: string;
@@ -126,7 +130,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
       return (
         <section
           aria-label={t('conversation.creativeStudio.preview.title')}
-          className='flex min-h-320px flex-col items-center justify-center gap-10px rounded-12px border border-border-2 bg-fill-1 p-24px text-center'
+          className='flex min-h-320px flex-col items-center justify-center gap-10px rounded-12px p-24px text-center'
+          style={SLATE_PREVIEW_STYLE}
         >
           <div
             role='img'
@@ -157,7 +162,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
     return (
       <section
         aria-label={t('conversation.creativeStudio.preview.title')}
-        className='flex min-h-320px flex-col items-center justify-center gap-10px rounded-12px border border-border-2 bg-fill-1 p-24px text-center'
+        className='flex min-h-320px flex-col items-center justify-center gap-10px rounded-12px p-24px text-center'
+        style={SLATE_PREVIEW_STYLE}
       >
         <div
           role='img'

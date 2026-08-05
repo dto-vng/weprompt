@@ -507,7 +507,30 @@ describe('Creative Studio full-sentence English copy', () => {
     expect(screen.getByRole('button', { name: 'Select version 2' })).toBeInTheDocument();
   });
 
-  it('exposes the selected-take state visually and in the scene button description', async () => {
+  it('keeps scene title and duration in the accessible name while arrow navigation moves selection', async () => {
+    const opening = scene({ id: 'scene-1', title: 'Opening', durationSeconds: 1 });
+    const reveal = scene({ id: 'scene-2', title: 'Product reveal', durationSeconds: 5 });
+    const onSelectScene = vi.fn();
+
+    await renderEnglish(
+      <SceneTimeline
+        orderedScenes={[opening, reveal]}
+        selectedSceneId='scene-1'
+        onSelectScene={onSelectScene}
+        reviewStates={{ 'scene-1': 'missing-slate', 'scene-2': 'selected-take' }}
+      />
+    );
+
+    const openingControl = screen.getByRole('button', { name: 'Select scene 1: Opening, 1 second' });
+    const revealControl = screen.getByRole('button', { name: 'Select scene 2: Product reveal, 5 seconds' });
+    openingControl.focus();
+    fireEvent.keyDown(openingControl, { key: 'ArrowRight' });
+
+    expect(revealControl).toHaveFocus();
+    expect(onSelectScene).toHaveBeenCalledExactlyOnceWith('scene-2');
+  });
+
+  it('keeps the selected-take state in the scene button description', async () => {
     const selectedScene = scene({ id: 'scene-1', selectedAssetId: 'asset-1', assetIds: ['asset-1'] });
 
     await renderEnglish(
@@ -519,7 +542,7 @@ describe('Creative Studio full-sentence English copy', () => {
       />
     );
 
-    expect(screen.getByText('In cut')).toBeVisible();
+    expect(screen.getByText('In cut')).toHaveClass('sr-only');
     expect(
       screen.getByRole('button', { name: 'Select scene 1: Product close-up, 5 seconds' })
     ).toHaveAccessibleDescription('In cut');
