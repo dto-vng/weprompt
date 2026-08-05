@@ -178,6 +178,47 @@ describe('presentation run state machine', () => {
     ).toThrow('Candidate retention requires terminal verification');
   });
 
+  it('rejects retained candidate metadata before the candidate phase', () => {
+    expect(() =>
+      assertPresentationRunManifestState({
+        ...allocatingRun(),
+        dispatchStatus: 'terminal_verified',
+        artifactPhase: 'sources_extracted',
+        committedAt: CREATED_AT,
+        retainedCandidate: {
+          relativePath: 'retained/candidate.pptx',
+          sha256: 'a'.repeat(64),
+          byteLength: 42,
+        },
+        binding: {
+          conversationId: allocatingRun().conversationId,
+          turnId: 'turn-1',
+          runtime: 'aionrs',
+          boundAt: CREATED_AT,
+        },
+        postInvoked: true,
+      })
+    ).toThrow('Retained candidate does not match artifact phase');
+  });
+
+  it('rejects the candidate phase when retained candidate metadata is absent', () => {
+    expect(() =>
+      assertPresentationRunManifestState({
+        ...allocatingRun(),
+        dispatchStatus: 'terminal_verified',
+        artifactPhase: 'candidate_retained',
+        committedAt: CREATED_AT,
+        binding: {
+          conversationId: allocatingRun().conversationId,
+          turnId: 'turn-1',
+          runtime: 'aionrs',
+          boundAt: CREATED_AT,
+        },
+        postInvoked: true,
+      })
+    ).toThrow('Retained candidate does not match artifact phase');
+  });
+
   it('retains a verified candidate when terminal recovery becomes review-required', () => {
     const terminalWithCandidate: PresentationRunManifest = {
       ...allocatingRun(),

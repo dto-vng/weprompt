@@ -206,7 +206,8 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
   const phaseIndex = ARTIFACT_PHASES.indexOf(run.artifactPhase);
   const candidatePhase = ARTIFACT_PHASES.indexOf('candidate_retained');
   const hasCandidate = run.retainedCandidate !== null;
-  if (phaseIndex >= candidatePhase !== hasCandidate) {
+  const isCandidatePhaseOrLater = phaseIndex >= candidatePhase;
+  if (isCandidatePhaseOrLater !== hasCandidate) {
     throw new Error('Retained candidate does not match artifact phase');
   }
   assertCandidate(run.retainedCandidate);
