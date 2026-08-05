@@ -11,14 +11,17 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioSceneStatus } from '../../../../studioReadiness';
+import { useStudioVideoPosterCapture } from '../../../../hooks/useStudioVideoPosterCapture';
 import styles from './produce.module.css';
 
 export type ShotCardProps = {
+  projectId: string;
   scene: StudioScene;
   index: number;
   status: StudioSceneStatus;
   selected: boolean;
   selectedTakeSource: string | null;
+  selectedTakeId: string | null;
   posterSource: string | null;
   takeCurrent: number;
   takeTotal: number;
@@ -35,11 +38,13 @@ export type ShotCardProps = {
 
 /** A 16:9 Produce canvas with canonical take, progress, and review actions. */
 export const ShotCard: React.FC<ShotCardProps> = ({
+  projectId,
   scene,
   index,
   status,
   selected,
   selectedTakeSource,
+  selectedTakeId,
   posterSource,
   takeCurrent,
   takeTotal,
@@ -60,6 +65,12 @@ export const ShotCard: React.FC<ShotCardProps> = ({
   });
   const hasSelectedTake = selectedTakeSource !== null;
   const previewLabel = t('conversation.creativeStudio.phase.produce.openPreview', { title: scene.title });
+  const posterCaptureState = useStudioVideoPosterCapture({
+    projectId,
+    sceneId: scene.id,
+    videoAssetId: selectedTakeId,
+    enabled: scene.mediaKind === 'video' && selectedTakeId !== null && posterSource === null,
+  });
 
   return (
     <li aria-label={sceneLabel} data-selected={selected || undefined} className={styles.shotCard}>
@@ -83,9 +94,10 @@ export const ShotCard: React.FC<ShotCardProps> = ({
                 role='img'
                 aria-label={t('conversation.creativeStudio.preview.videoLabel')}
                 className={styles.videoPlaceholder}
+                data-poster-capture={posterCaptureState}
               >
                 <VideoOne aria-hidden='true' />
-                <span>{t('conversation.creativeStudio.preview.posterUnavailable')}</span>
+                <span>{t('conversation.creativeStudio.preview.videoReady')}</span>
               </span>
             )}
           </Button>

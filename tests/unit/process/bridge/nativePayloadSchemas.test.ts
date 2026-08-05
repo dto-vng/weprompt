@@ -161,6 +161,14 @@ const VALID_PAYLOADS = {
     sceneId: 'scene_1',
     assetId: 'asset_1',
   },
+  'creative-studio.persist-captured-poster': {
+    projectId: 'project_1',
+    sceneId: 'scene_1',
+    videoAssetId: 'asset_1',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    width: 1280,
+    height: 720,
+  },
   'creative-studio.choose-and-import-reference': {
     projectId: 'project_1',
     sceneId: 'scene_1',
@@ -823,6 +831,21 @@ const INVALID_PAYLOADS = [
     'creative-studio.select-asset',
     'asset id traversal',
     { projectId: 'project_1', expectedRevision: 1, sceneId: 'scene_1', assetId: '../../asset_1' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'non-PNG data URL',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], dataUrl: 'data:image/jpeg;base64,/9j/' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'video asset traversal',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], videoAssetId: '../../asset_1' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'zero width',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], width: 0 },
   ],
   [
     'creative-studio.fit-storyboard',

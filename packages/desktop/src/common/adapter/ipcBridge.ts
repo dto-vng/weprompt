@@ -68,12 +68,14 @@ import type { IProjectKnowledgeListResult } from '../types/project/knowledgeType
 import type {
   CreateStudioProjectInput,
   ProposeStudioStoryboardInput,
+  StudioAsset,
   StudioCommandResult,
   StudioChooseAndExportAssetsRequest,
   StudioChooseAndImportReferenceRequest,
   StudioDeleteProjectRequest,
   StudioProjectRequest,
   StudioProjectSummary,
+  StudioPersistCapturedPosterRequest,
   StudioRendererProject,
   StudioImportOutcome,
   StudioExportOutcome,
@@ -1117,6 +1119,9 @@ export const creativeStudio = {
   ),
   selectAsset: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioSelectAssetRequest>(
     'creative-studio.select-asset'
+  ),
+  persistCapturedPoster: bridge.buildProvider<StudioCommandResult<StudioAsset>, StudioPersistCapturedPosterRequest>(
+    'creative-studio.persist-captured-poster'
   ),
   chooseAndImportReference: bridge.buildProvider<
     StudioCommandResult<StudioImportOutcome>,

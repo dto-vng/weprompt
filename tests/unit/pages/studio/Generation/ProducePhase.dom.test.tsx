@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +18,8 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 import { ProducePhase } from '@renderer/pages/studio/components/PhaseShell/phases/ProducePhase';
 import type { ProducePhaseController } from '@renderer/pages/studio/components/PhaseShell/types';
+import { ManagedVideoError } from '@renderer/pages/studio/components/Preview/managedVideo';
+import { managedVideo } from '@renderer/pages/studio/hooks/useManagedVideo';
 import type { UseStoryboardEditorResult } from '@renderer/pages/studio/hooks/useStoryboardEditor';
 import type { UseStudioJobsResult } from '@renderer/pages/studio/hooks/useStudioJobs';
 import type { UseStudioModelsResult } from '@renderer/pages/studio/hooks/useStudioModels';
@@ -407,6 +409,63 @@ describe('ProducePhase', () => {
       })
     );
     expect(screen.getByRole('figure', { name: 'conversation.creativeStudio.preview.title' })).toBeVisible();
+  });
+
+  it('keeps a paid video take usable and labels it ready when poster capture cannot decode it', async () => {
+    const selectedVideo = asset({
+      id: 'video-1',
+      sceneId: 'scene-2',
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'video-1.mp4' },
+    });
+    const completedJob = job({
+      id: 'job-video',
+      sceneId: 'scene-2',
+      status: 'succeeded',
+      provider: { choiceId: 'choice-video', providerId: 'provider-video', model: 'video-model' },
+      outputAssetIds: [selectedVideo.id],
+    });
+    const currentProject = project({
+      scenes: {
+        'scene-1': scene(),
+        'scene-2': scene({
+          id: 'scene-2',
+          title: 'Closing shot',
+          mediaKind: 'video',
+          visualPrompt: 'A final wave',
+          selectedAssetId: selectedVideo.id,
+          assetIds: [selectedVideo.id],
+          jobIds: [completedJob.id],
+          reviewState: 'complete',
+        }),
+      },
+      assets: { [selectedVideo.id]: selectedVideo },
+      jobs: { [completedJob.id]: completedJob },
+    });
+    const open = vi.spyOn(managedVideo, 'open').mockRejectedValue(new ManagedVideoError('decode_unsupported'));
+    const controller = createController(currentProject, 'scene-2');
+    render(<ProducePhase controller={controller} />);
+
+    await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith('project-1', 'video-1'));
+    const closing = screen.getByRole('listitem', {
+      name: 'conversation.creativeStudio.scene.accessibleName:number=2,title=Closing shot',
+    });
+    expect(within(closing).getByText('conversation.creativeStudio.preview.videoReady')).toBeVisible();
+    expect(
+      within(closing).queryByText('conversation.creativeStudio.preview.posterUnavailable')
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(closing).getByRole('button', {
+        name: 'conversation.creativeStudio.phase.produce.openPreview:title=Closing shot',
+      })
+    );
+    const preview = screen.getByRole('figure', { name: 'conversation.creativeStudio.preview.title' });
+    expect(within(preview).getByLabelText('conversation.creativeStudio.preview.videoLabel')).toHaveAttribute(
+      'controls'
+    );
+    open.mockRestore();
   });
 
   it('selects a shot without opening or submitting generation', () => {

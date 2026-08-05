@@ -18,8 +18,13 @@ import { useTranslation } from 'react-i18next';
 import { buildSingleSceneReviewRequest, type GenerationSingleReviewRequest } from '../Generation/GenerationControls';
 import { canOpenSingleSceneReview, deriveStudioReadiness } from '../../studioReadiness';
 import studioType from '../../StudioTypography.module.css';
+import {
+  createManagedStudioAssetUrl,
+  isCanonicalStudioPosterAsset,
+  isCanonicalStudioSelectedAsset,
+  isSafeStudioId,
+} from './managedStudioAssets';
 
-const SAFE_STUDIO_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const SLATE_PREVIEW_STYLE = {
   background: 'var(--studio-slate-surface)',
   border: '1px dashed var(--studio-slate-border)',
@@ -32,7 +37,7 @@ export type StagePreviewProps = {
   selectedScene: StudioScene | null;
   /** Canonical metadata for the selected generated output. Omitted only for the legacy ID-only caller. */
   selectedAsset?: StudioAsset | null;
-  /** Canonical last-frame thumbnail resolved by the controller from the selected video's job lineage. */
+  /** Canonical thumbnail resolved by the controller from the selected video's job lineage. */
   posterAsset?: StudioAsset | null;
   catalogLoading?: boolean;
   generationDisabled?: boolean;
@@ -44,34 +49,6 @@ export type StagePreviewProps = {
   } | null;
   onOpenSingleReview?: (request: GenerationSingleReviewRequest) => void;
 };
-
-/** Builds the only renderer-supported Creative Studio media URL shape. */
-export const createManagedStudioAssetUrl = (projectId: string, assetId: string): string | null => {
-  if (!SAFE_STUDIO_ID.test(projectId) || !SAFE_STUDIO_ID.test(assetId)) return null;
-  return `weprompt-studio://asset/${encodeURIComponent(projectId)}/${encodeURIComponent(assetId)}`;
-};
-
-export const isCanonicalStudioSelectedAsset = (
-  asset: StudioAsset,
-  projectId: string,
-  scene: StudioScene,
-  selectedAssetId: string
-): boolean =>
-  asset.id === selectedAssetId &&
-  asset.projectId === projectId &&
-  asset.sceneId === scene.id &&
-  asset.mediaKind === scene.mediaKind &&
-  asset.managedAsset.collection === 'assets' &&
-  scene.assetIds.includes(asset.id) &&
-  createManagedStudioAssetUrl(projectId, asset.id) !== null;
-
-export const isCanonicalStudioPosterAsset = (asset: StudioAsset, projectId: string, scene: StudioScene): boolean =>
-  asset.projectId === projectId &&
-  asset.sceneId === scene.id &&
-  asset.mediaKind === 'image' &&
-  asset.managedAsset.collection === 'thumbnails' &&
-  scene.assetIds.includes(asset.id) &&
-  createManagedStudioAssetUrl(projectId, asset.id) !== null;
 
 const StagePreview: React.FC<StagePreviewProps> = ({
   projectId,
@@ -192,7 +169,7 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   }
 
   const source = createManagedStudioAssetUrl(projectId, selectedAssetId);
-  const hasCanonicalSceneIdentity = selectedScene !== null && SAFE_STUDIO_ID.test(selectedScene.id);
+  const hasCanonicalSceneIdentity = selectedScene !== null && isSafeStudioId(selectedScene.id);
   const hasCanonicalAssetIdentity =
     selectedScene?.assetIds.includes(selectedAssetId) === true &&
     (selectedAsset === undefined ||
@@ -237,8 +214,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
           />
           {posterSource === null && (
             <div role='status' className={`${studioType.body} flex items-center gap-6px px-12px pb-12px`}>
-              <Picture aria-hidden='true' />
-              <span>{t('conversation.creativeStudio.preview.posterUnavailable')}</span>
+              <VideoOne aria-hidden='true' />
+              <span>{t('conversation.creativeStudio.preview.videoReady')}</span>
             </div>
           )}
         </>
@@ -255,3 +232,4 @@ const StagePreview: React.FC<StagePreviewProps> = ({
 };
 
 export { StagePreview };
+export { createManagedStudioAssetUrl, isCanonicalStudioPosterAsset, isCanonicalStudioSelectedAsset };

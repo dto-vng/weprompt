@@ -171,7 +171,7 @@ describe('StagePreview managed media', () => {
     expect(video).toHaveAttribute('controls');
   });
 
-  it('announces the missing-poster placeholder while keeping canonical video playback available', () => {
+  it('announces that a posterless video is ready while keeping canonical playback available', () => {
     const selectedAsset = asset({
       id: 'video-1',
       mediaKind: 'video',
@@ -190,7 +190,7 @@ describe('StagePreview managed media', () => {
       />
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.preview.posterUnavailable');
+    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.preview.videoReady');
     expect(screen.getByLabelText('conversation.creativeStudio.preview.videoLabel')).toHaveAttribute('controls');
   });
 
@@ -272,7 +272,7 @@ describe('StagePreview managed media', () => {
     );
 
     expect(screen.getByLabelText('conversation.creativeStudio.preview.videoLabel')).not.toHaveAttribute('poster');
-    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.preview.posterUnavailable');
+    expect(screen.getByRole('status')).toHaveTextContent('conversation.creativeStudio.preview.videoReady');
   });
 
   it('rejects asset metadata that does not belong to the canonical project and scene', () => {

@@ -1085,10 +1085,10 @@
       "selectVersionAccessible": "Select version {{number}}",
       "importReference": "Import first-frame image",
       "importing": "Importing reference...",
-      "posterUnavailable": "Video poster unavailable",
       "missingVisualPrompt": "Add a visual prompt before generating this scene.",
       "missingModel": "Select a compatible project model before generating this scene.",
-      "generateThisScene": "Generate this scene"
+      "generateThisScene": "Generate this scene",
+      "videoReady": "Video ready"
     },
     "timeline": {
       "title": "Scene strip",

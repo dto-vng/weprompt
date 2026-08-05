@@ -1249,10 +1249,10 @@
       "selectVersionAccessible": "Выбрать вариант {{number}}",
       "importReference": "Импортировать изображение первого кадра",
       "importing": "Импорт референса...",
-      "posterUnavailable": "Обложка видео недоступна",
       "missingVisualPrompt": "Добавьте визуальный запрос перед генерацией этой сцены.",
       "missingModel": "Выберите совместимую модель проекта перед генерацией этой сцены.",
-      "generateThisScene": "Сгенерировать эту сцену"
+      "generateThisScene": "Сгенерировать эту сцену",
+      "videoReady": "Видео готово"
     },
     "timeline": {
       "title": "Лента сцен",

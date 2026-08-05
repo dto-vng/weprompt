@@ -1249,10 +1249,10 @@
       "selectVersionAccessible": "Вибрати варіант {{number}}",
       "importReference": "Імпортувати зображення першого кадру",
       "importing": "Імпортування референсу...",
-      "posterUnavailable": "Обкладинка відео недоступна",
       "missingVisualPrompt": "Додайте візуальний запит перед генерацією цієї сцени.",
       "missingModel": "Виберіть сумісну модель проєкту перед генерацією цієї сцени.",
-      "generateThisScene": "Згенерувати цю сцену"
+      "generateThisScene": "Згенерувати цю сцену",
+      "videoReady": "Відео готове"
     },
     "timeline": {
       "title": "Стрічка сцен",

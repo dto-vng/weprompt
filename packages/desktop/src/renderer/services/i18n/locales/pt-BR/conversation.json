@@ -1245,10 +1245,10 @@
       "selectVersionAccessible": "Selecionar variação {{number}}",
       "importReference": "Importar imagem do primeiro quadro",
       "importing": "Importando referência...",
-      "posterUnavailable": "Miniatura do vídeo indisponível",
       "missingVisualPrompt": "Adicione um prompt visual antes de gerar esta cena.",
       "missingModel": "Selecione um modelo de projeto compatível antes de gerar esta cena.",
-      "generateThisScene": "Gerar esta cena"
+      "generateThisScene": "Gerar esta cena",
+      "videoReady": "Vídeo pronto"
     },
     "timeline": {
       "title": "Faixa de cenas",

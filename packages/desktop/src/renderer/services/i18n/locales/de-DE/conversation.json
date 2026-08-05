@@ -1230,10 +1230,10 @@
       "selectVersionAccessible": "Variante {{number}} auswählen",
       "importReference": "Bild für den ersten Frame importieren",
       "importing": "Referenz wird importiert...",
-      "posterUnavailable": "Videovorschaubild nicht verfügbar",
       "missingVisualPrompt": "Füge vor der Generierung dieser Szene eine visuelle Anweisung hinzu.",
       "missingModel": "Wähle vor der Generierung dieser Szene ein kompatibles Projektmodell aus.",
-      "generateThisScene": "Diese Szene generieren"
+      "generateThisScene": "Diese Szene generieren",
+      "videoReady": "Video bereit"
     },
     "timeline": {
       "title": "Szenenleiste",

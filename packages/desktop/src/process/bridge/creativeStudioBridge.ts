@@ -278,6 +278,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
     command(() => dependencies.getService().reorderScenes(input))
   );
   ipcBridge.creativeStudio.selectAsset.provider((input) => command(() => dependencies.getService().selectAsset(input)));
+  ipcBridge.creativeStudio.persistCapturedPoster.provider((input) =>
+    command(() => dependencies.getService().persistCapturedPoster(input))
+  );
   ipcBridge.creativeStudio.chooseAndImportReference.provider(async (input) => {
     try {
       const parentWindow = (dependencies.getParentWindow ?? defaultDependencies.getParentWindow!)();

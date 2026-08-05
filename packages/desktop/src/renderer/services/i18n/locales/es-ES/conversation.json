@@ -1240,10 +1240,10 @@
       "selectVersionAccessible": "Seleccionar variante {{number}}",
       "importReference": "Importar imagen del primer fotograma",
       "importing": "Importando referencia...",
-      "posterUnavailable": "Miniatura de vídeo no disponible",
       "missingVisualPrompt": "Añade una indicación visual antes de generar esta escena.",
       "missingModel": "Selecciona un modelo de proyecto compatible antes de generar esta escena.",
-      "generateThisScene": "Generar esta escena"
+      "generateThisScene": "Generar esta escena",
+      "videoReady": "Vídeo listo"
     },
     "timeline": {
       "title": "Tira de escenas",

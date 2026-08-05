@@ -65,6 +65,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'creative-studio.update-scene',
   'creative-studio.reorder-scenes',
   'creative-studio.select-asset',
+  'creative-studio.persist-captured-poster',
   'creative-studio.choose-and-import-reference',
   'creative-studio.choose-and-export-assets',
   'creative-studio.fit-storyboard',

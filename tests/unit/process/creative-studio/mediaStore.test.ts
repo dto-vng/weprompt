@@ -26,6 +26,7 @@ import {
   openVerifiedReadStream,
   sanitizeStudioExportFolderName,
 } from '@process/services/creative-studio/mediaStore';
+import { isCanonicalStudioPosterAsset } from '@renderer/pages/studio/components/Preview/managedStudioAssets';
 
 const { createHashSpy } = vi.hoisted(() => ({ createHashSpy: vi.fn() }));
 
@@ -607,6 +608,87 @@ describe('createStudioMediaStore', () => {
       })
     ).rejects.toMatchObject<Partial<CreativeStudioMediaError>>({ code: 'job_inactive' });
     expect(Object.keys((await store.getProject('project_1'))?.assets ?? {})).toHaveLength(3);
+  });
+
+  it('persists a renderer-captured poster through its own video-take lineage and canonical thumbnail path', async () => {
+    const { rootDir, store } = await makeStore();
+    await addActiveVideoJob(store);
+    const assetIds = ['asset_video_primary', 'asset_video_captured_poster'];
+    let assetIndex = 0;
+    const media = createStudioMediaStore({ store, createId: () => assetIds[assetIndex++]! });
+    const primary = await media.persistProviderOutputForJob({
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      jobId: 'job_1',
+      mediaKind: 'video',
+      declaredMimeType: 'video/mp4',
+      body: Readable.from([mp4]),
+    });
+
+    const poster = await media.persistCapturedPoster({
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      videoAssetId: primary.id,
+      width: 1280,
+      height: 720,
+      body: Readable.from([png]),
+    });
+
+    const project = await store.getProject('project_1');
+    const canonicalScene = project?.scenes.scene_1;
+    expect(canonicalScene).toBeDefined();
+    expect(isCanonicalStudioPosterAsset(poster, 'project_1', canonicalScene!)).toBe(true);
+    expect(project?.jobs.job_1.outputAssetIds).toEqual([primary.id, poster.id]);
+    await expect(
+      fs.access(path.join(rootDir, 'project_1', 'thumbnails', 'asset_video_captured_poster.png'))
+    ).resolves.toBeUndefined();
+    await expect(
+      media.persistCapturedPoster({
+        projectId: 'project_1',
+        sceneId: 'scene_1',
+        videoAssetId: primary.id,
+        width: 1280,
+        height: 720,
+        body: Readable.from([png]),
+      })
+    ).rejects.toMatchObject<Partial<CreativeStudioMediaError>>({ code: 'job_inactive' });
+  });
+
+  it('keeps provider poster lineage closed to a foreign scene', async () => {
+    const { store } = await makeStore();
+    await addActiveVideoJob(store);
+    const media = createStudioMediaStore({ store, createId: () => 'asset_video_primary' });
+    const primary = await media.persistProviderOutputForJob({
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      jobId: 'job_1',
+      mediaKind: 'video',
+      declaredMimeType: 'video/mp4',
+      body: Readable.from([mp4]),
+    });
+    await store.updateProject('project_1', (project) => {
+      const next = structuredClone(project);
+      next.sceneOrder.push('scene_2');
+      next.scenes.scene_2 = {
+        ...next.scenes.scene_1,
+        id: 'scene_2',
+        selectedAssetId: null,
+        assetIds: [],
+        jobIds: [],
+      };
+      return next;
+    });
+
+    await expect(
+      media.persistProviderPosterForJob({
+        projectId: 'project_1',
+        sceneId: 'scene_2',
+        jobId: 'job_1',
+        primaryAssetId: primary.id,
+        declaredMimeType: 'image/png',
+        body: Readable.from([png]),
+      })
+    ).rejects.toMatchObject<Partial<CreativeStudioMediaError>>({ code: 'job_inactive' });
   });
 
   it('rejects inactive, wrong-kind, and invalid-lineage poster writes', async () => {

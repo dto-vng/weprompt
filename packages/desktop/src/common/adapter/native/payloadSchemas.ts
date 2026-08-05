@@ -179,6 +179,21 @@ const studioProjectInputSchema = z
   })
   .strict();
 const studioProjectRequestSchema = z.object({ projectId: safeIdSchema }).strict();
+const studioCapturedPosterDataUrlMaxLength = Math.ceil((50 * 1024 * 1024) / 3) * 4 + 22;
+const studioCapturedPosterSchema = z
+  .object({
+    projectId: safeIdSchema,
+    sceneId: safeIdSchema,
+    videoAssetId: safeIdSchema,
+    dataUrl: z
+      .string()
+      .min(26)
+      .max(studioCapturedPosterDataUrlMaxLength)
+      .regex(/^data:image\/png;base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+    width: z.number().finite().int().min(1).max(16_384),
+    height: z.number().finite().int().min(1).max(16_384),
+  })
+  .strict();
 const isUnsafeStudioTextCharacter = (character: string): boolean => {
   const codePoint = character.codePointAt(0)!;
   return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) || (codePoint >= 0xd800 && codePoint <= 0xdfff);
@@ -454,6 +469,7 @@ export const nativeBridgePayloadSchemas = {
       assetId: safeIdSchema,
     })
     .strict(),
+  'creative-studio.persist-captured-poster': studioCapturedPosterSchema,
   'creative-studio.choose-and-import-reference': z
     .object({
       projectId: safeIdSchema,

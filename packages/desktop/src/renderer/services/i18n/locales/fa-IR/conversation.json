@@ -1229,10 +1229,10 @@
       "selectVersionAccessible": "انتخاب نسخه {{number}}",
       "importReference": "وارد کردن تصویر فریم نخست",
       "importing": "در حال وارد کردن تصویر مرجع...",
-      "posterUnavailable": "پوستر ویدیو در دسترس نیست",
       "missingVisualPrompt": "پیش از تولید این صحنه، یک دستور بصری اضافه کنید.",
       "missingModel": "پیش از تولید این صحنه، یک مدل سازگار برای پروژه انتخاب کنید.",
-      "generateThisScene": "تولید این صحنه"
+      "generateThisScene": "تولید این صحنه",
+      "videoReady": "ویدیو آماده است"
     },
     "timeline": {
       "title": "نوار صحنه‌ها",

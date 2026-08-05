@@ -1158,7 +1158,7 @@ describe('StudioPage and useStudioProject', () => {
     const preview = await screen.findByRole('figure', { name: 'conversation.creativeStudio.preview.title' });
     const video = within(preview).getByLabelText('conversation.creativeStudio.preview.videoLabel');
     expect(video).not.toHaveAttribute('poster');
-    expect(screen.getAllByText('conversation.creativeStudio.preview.posterUnavailable')).toHaveLength(2);
+    expect(screen.getAllByText('conversation.creativeStudio.preview.videoReady')).toHaveLength(2);
   });
 
   it('submits one scene only after explicit review without applying the batch duration gate', async () => {
