@@ -5,6 +5,8 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -578,34 +580,25 @@ describe('SceneTimeline storyboard strip', () => {
     const [slateControl, takeControl] = screen.getAllByRole('button', {
       name: /conversation\.creativeStudio\.timeline\.selectSceneAccessible/,
     });
-    expect({
-      height: slateControl.style.height,
-      background: slateControl.style.background,
-      borderWidth: slateControl.style.borderWidth,
-      borderStyle: slateControl.style.borderStyle,
-      borderColor: slateControl.style.borderColor,
-    }).toEqual({
-      height: '52px',
-      background: 'var(--studio-slate-surface)',
-      borderWidth: '1px',
-      borderStyle: 'dashed',
-      borderColor: 'var(--studio-slate-border)',
-    });
-    expect({
-      height: takeControl.style.height,
-      background: takeControl.style.background,
-      borderWidth: takeControl.style.borderWidth,
-      borderStyle: takeControl.style.borderStyle,
-      borderColor: takeControl.style.borderColor,
-    }).toEqual({
-      height: '52px',
-      background: 'var(--studio-slate-surface)',
-      borderWidth: '1px',
-      borderStyle: 'solid',
-      borderColor: 'var(--studio-take-border)',
-    });
+    // The plate styling lives in SceneTimeline.module.css and keys off
+    // data-plate-state, so assert that contract rather than computed CSS —
+    // jsdom does not apply the stylesheet.
+    expect(slateControl.dataset.plateState).toBe('missing-slate');
+    expect(takeControl.dataset.plateState).toBe('selected-take');
     expect(container.querySelector('[data-review-state="missing-slate"]')).toHaveTextContent('01 · Slate');
     expect(container.querySelector('[data-review-state="selected-take"]')).toHaveTextContent('02 · 5s');
+  });
+
+  it('keeps the dashed keyline that marks a slate plate as reserved rather than broken', () => {
+    // jsdom never applies the module, so guard the declaration itself: without
+    // the dashed border an empty frame reads as a rendering failure.
+    const stylesheet = readFileSync(
+      resolve(process.cwd(), 'packages/desktop/src/renderer/pages/studio/components/SceneTimeline.module.css'),
+      'utf8'
+    );
+
+    expect(stylesheet).toMatch(/\.plate\[data-plate-state='missing-slate'\]\s*\{[^}]*border-style:\s*dashed/);
+    expect(stylesheet).toMatch(/\.plate\[data-plate-state='missing-slate'\]\s*\{[^}]*var\(--studio-slate-border\)/);
   });
 
   it('renders canonical order and duration-proportional selectable segments', () => {

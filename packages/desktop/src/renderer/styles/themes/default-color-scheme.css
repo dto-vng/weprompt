@@ -35,6 +35,7 @@
   --studio-plate-surface: #e7decc;
   --studio-plate-text: #6e6553;
   --studio-take-border: #dcd3c0;
+  --studio-take-chip: rgb(31 29 27 / 50%); /* ink scrim so a take label stays legible over any frame */
   --bg-4: #d8cbb6;
   --bg-5: #d0c3ad;
   --bg-6: #8a93a1; /* ink-500 — muted / tertiary text / 禁用·次要文字 */
@@ -126,6 +127,7 @@
   --studio-plate-surface: var(--color-fill-1);
   --studio-plate-text: var(--text-secondary);
   --studio-take-border: var(--color-border-2);
+  --studio-take-chip: rgb(6 8 12 / 62%); /* deeper scrim: dark frames need more separation than the cream theme */
   --bg-4: #2a3344;
   --bg-5: #3b4658;
   --bg-6: #5e7086; /* 禁用/次要文字 */

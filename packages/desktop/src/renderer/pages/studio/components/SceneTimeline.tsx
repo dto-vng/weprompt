@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
 
 import studioType from '../StudioTypography.module.css';
+import styles from './SceneTimeline.module.css';
 
 export type SceneTimelineReviewState = 'selected-take' | 'missing-slate' | 'running' | 'failed';
 
@@ -123,12 +124,6 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
             })();
             const reviewStateId =
               reviewPresentation === null ? undefined : `${timelineId}-scene-${index + 1}-review-state`;
-            const plateBorderStyle: Pick<React.CSSProperties, 'borderStyle' | 'borderColor'> =
-              reviewState === 'missing-slate'
-                ? { borderStyle: 'dashed', borderColor: 'var(--studio-slate-border)' }
-                : reviewState === 'failed'
-                  ? { borderStyle: 'solid', borderColor: 'var(--danger)' }
-                  : { borderStyle: 'solid', borderColor: 'var(--studio-take-border)' };
             const plateLabel =
               reviewState === 'missing-slate'
                 ? `${sceneNumber} · ${t('conversation.creativeStudio.phase.review.slateLabel')}`
@@ -145,13 +140,8 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                   aria-describedby={reviewStateId}
                   aria-current={selectedSceneId === scene.id ? 'true' : undefined}
                   title={accessibleName}
-                  className='min-w-0 flex-1 flex-col items-start justify-end overflow-hidden p-8px text-left'
-                  style={{
-                    height: 52,
-                    background: 'var(--studio-slate-surface)',
-                    borderWidth: 1,
-                    ...plateBorderStyle,
-                  }}
+                  data-plate-state={reviewState}
+                  className={`${styles.plate} min-w-0 flex-1 flex-col items-start justify-end overflow-hidden p-8px text-left`}
                   onClick={() => onSelectScene(scene.id)}
                   onKeyDown={(event) => selectAdjacent(event, index)}
                 >
@@ -164,12 +154,9 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                     <span
                       aria-hidden='true'
                       data-review-state={reviewState}
-                      className={`${studioType.eyebrow} max-w-full truncate rounded-3px px-4px py-2px`}
-                      style={
-                        reviewState === 'missing-slate'
-                          ? { color: 'var(--studio-slate-text)' }
-                          : { color: 'var(--text-white)', background: 'rgba(31, 29, 27, 0.5)' }
-                      }
+                      className={`${studioType.eyebrow} max-w-full truncate ${
+                        reviewState === 'missing-slate' ? styles.slateLabel : styles.takeLabel
+                      }`}
                     >
                       {plateLabel}
                     </span>
@@ -177,8 +164,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                     reviewPresentation !== null && (
                       <span
                         data-review-state={reviewState}
-                        className={`${studioType.eyebrow} flex max-w-full items-center gap-4px truncate`}
-                        style={{ color: reviewState === 'failed' ? 'var(--danger)' : 'var(--studio-plate-text)' }}
+                        className={`${studioType.eyebrow} ${styles.stateLabel} flex max-w-full items-center gap-4px truncate`}
                       >
                         <span>{sceneNumber} ·</span>
                         {reviewPresentation.icon}
