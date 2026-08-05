@@ -1,6 +1,6 @@
 # Creative Studio — video capability spike
 
-**Status:** proposed spike · **Date:** 2026-08-05 · **Not a sprint-2 commitment**
+**Status:** proposed spike (rev 2) · **Date:** 2026-08-05 · **Not a sprint-2 commitment**
 **Blocks:** the Review editor phase · **Does not block:** EPIC-005 (see §5)
 
 ## 1. The question
@@ -49,6 +49,8 @@ Both candidates, same task, real Studio assets — not synthetic clips:
 
 Report per candidate: wall-clock time, output quality, peak memory, and behaviour when the UI is active (WebCodecs competes with the interface; ffmpeg in main does not). Include codec breadth — the canvas test proved one H.264 MP4 decodes, which says nothing about the next provider's output.
 
+**(rev 2) Audio and A/V sync are acceptance criteria, not extras.** OpenRouter video routes request generated audio, so real Studio clips have audio tracks. The benchmark must cover source-audio trim, concatenation and muxing, and assert A/V sync on the output — otherwise the render contract ships with audio unowned, which the landing plan's decision to keep audio makes unacceptable.
+
 ### 3.4 A recommendation with packaging consequences stated
 
 Including which lane the work lands in, what the after-pack gate must assert, and how a missing or mismatched binary fails.
@@ -63,7 +65,7 @@ Each gets its own spec.
 
 ## 5. Why this is out of sprint 2, and what still ships there
 
-**The poster-frame requirement does not need this spike.** EPIC-005 blocks its activation MR on video posters, because OpenRouter returns no poster and a paid render currently reads as "Video poster unavailable". The §2 canvas result shows the renderer can produce that frame today with no binary, no packaging change and no licensing answer. The poster fix therefore stays in EPIC-005 and ships in sprint 2.
+**The poster-frame requirement does not need this spike.** EPIC-005 blocks its activation MR on video posters, because OpenRouter returns no poster and a paid render currently reads as "Video poster unavailable". The §2 canvas result shows the renderer can produce that frame today with no binary, no packaging change and no licensing answer. The poster fix therefore stays with the Creative Suite activation/acceptance lane. **(Updated 2026-08-05: Creative Studio no longer lands in sprint 2 — see the landing plan's RETARGETED banner. Earlier wording here said the poster fix 'ships in sprint 2'.)**
 
 > An earlier argument for bundling ffmpeg was that it would fix posters "for free". That argument is withdrawn: posters do not need ffmpeg, and using them to justify a packaging change was reasoning backwards.
 
@@ -81,5 +83,5 @@ A time box is the user's call. As a starting point: §3.2 and §3.3 are roughly 
 
 ## 7. Open
 
-- Whether the Review editor's non-destructive model should be specced now, in parallel. It is required by both candidates, and speccing it early de-risks whichever wins.
+- ~~Whether the Review editor's non-destructive model should be specced now~~ — **decided and done**: see `creative-studio-cut-model-design.md`. It is required by both candidates and is independent of this spike's outcome.
 - Whether a bundled ffmpeg, once it exists, should also serve non-Studio needs — which would change its owning seam from Studio to shared.
