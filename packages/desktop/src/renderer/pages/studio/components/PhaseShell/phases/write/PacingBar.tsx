@@ -71,7 +71,7 @@ export const PacingBar: React.FC<PacingBarProps> = ({
       maximumTotalSeconds: fitOutcome.maximumTotalSeconds,
     });
   })();
-  const alertMessage = fitErrorMessage ?? (advisoryMessageKey === null ? null : t(advisoryMessageKey));
+  const advisoryMessage = advisoryMessageKey === null ? null : t(advisoryMessageKey);
 
   return (
     <section className={styles.pacingBar} aria-labelledby='studio-write-pacing-heading'>
@@ -153,9 +153,14 @@ export const PacingBar: React.FC<PacingBarProps> = ({
           {hasLockedScenes && !durationMatchesTarget && (
             <p>{t('conversation.creativeStudio.storyboard.fitUnlockedOnly')}</p>
           )}
-          {alertMessage !== null && (
+          {fitErrorMessage !== null && (
             <div role='alert' className={styles.errorMessage}>
-              {alertMessage}
+              {fitErrorMessage}
+            </div>
+          )}
+          {fitErrorMessage === null && advisoryMessage !== null && (
+            <div role='status' aria-live='polite' className={styles.errorMessage}>
+              {advisoryMessage}
             </div>
           )}
         </div>

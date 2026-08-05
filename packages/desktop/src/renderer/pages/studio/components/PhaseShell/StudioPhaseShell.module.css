@@ -176,6 +176,11 @@
   gap: 16px;
 }
 
+.draftButton:global(.arco-btn-primary.arco-btn-disabled),
+.draftButton :global(.arco-btn-primary.arco-btn-disabled) {
+  color: var(--color-text-1);
+}
+
 .shell[data-layout='compact'] .header {
   align-items: flex-start;
 }

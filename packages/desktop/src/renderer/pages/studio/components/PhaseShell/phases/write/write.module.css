@@ -178,6 +178,14 @@
   border-inline-start: 1px solid var(--color-border-2);
 }
 
+.compactZoneHeading {
+  display: none;
+  margin: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .timingZone {
   align-items: flex-start;
 }
@@ -599,6 +607,10 @@
 .phase[data-layout='compact'] .zone + .zone {
   border-top: 1px solid var(--color-border-2);
   border-inline-start: 0;
+}
+
+.phase[data-layout='compact'] .compactZoneHeading {
+  display: block;
 }
 
 .phase[data-layout='compact'] .rowActions,

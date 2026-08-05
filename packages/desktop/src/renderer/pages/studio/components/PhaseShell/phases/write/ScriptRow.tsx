@@ -180,6 +180,7 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
         </h3>
 
         <div data-script-zone='timing' className={`${styles.zone} ${styles.timingZone}`}>
+          <h4 className={styles.compactZoneHeading}>{t('conversation.creativeStudio.phase.write.shotColumn')}</h4>
           <div className={styles.shotIdentity}>
             <Button
               ref={setActivatorNodeRef}
@@ -259,6 +260,7 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
         </div>
 
         <div data-script-zone='script' className={styles.zone}>
+          <h4 className={styles.compactZoneHeading}>{t('conversation.creativeStudio.phase.write.scriptColumn')}</h4>
           <div className={styles.field}>
             <label htmlFor={fieldId('title')} className={styles.srOnly}>
               {t('conversation.creativeStudio.inspector.titleLabel')}
@@ -343,6 +345,7 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
         </div>
 
         <div data-script-zone='visual' className={styles.zone}>
+          <h4 className={styles.compactZoneHeading}>{t('conversation.creativeStudio.phase.write.visualColumn')}</h4>
           <div className={styles.field}>
             <label htmlFor={fieldId('prompt')} className={styles.srOnly}>
               {t('conversation.creativeStudio.inspector.visualPromptLabel')}
@@ -389,6 +392,7 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
         </div>
 
         <div data-script-zone='output' className={`${styles.zone} ${styles.outputZone}`}>
+          <h4 className={styles.compactZoneHeading}>{t('conversation.creativeStudio.phase.write.outputColumn')}</h4>
           <div className={styles.field}>
             <label htmlFor={fieldId('media')} className={styles.srOnly}>
               {t('conversation.creativeStudio.inspector.mediaKindLabel')}

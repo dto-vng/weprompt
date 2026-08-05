@@ -289,6 +289,41 @@ describe('WritePhase', () => {
     }
   });
 
+  it('shows compact zone headings while every scene field keeps its accessible name', () => {
+    render(<WritePhase controller={controller()} layoutMode='compact' />);
+
+    const opening = screen.getByRole('region', { name: 'Opening' });
+    expect(
+      within(opening)
+        .getAllByRole('heading', { level: 4 })
+        .map((heading) => heading.textContent)
+    ).toEqual([
+      'conversation.creativeStudio.phase.write.shotColumn',
+      'conversation.creativeStudio.phase.write.scriptColumn',
+      'conversation.creativeStudio.phase.write.visualColumn',
+      'conversation.creativeStudio.phase.write.outputColumn',
+    ]);
+    expect(
+      within(opening).getByRole('combobox', { name: 'conversation.creativeStudio.inspector.durationLabel' })
+    ).toBeInTheDocument();
+    expect(within(opening).getByLabelText('conversation.creativeStudio.inspector.titleLabel')).toBeInTheDocument();
+    expect(within(opening).getByLabelText('conversation.creativeStudio.inspector.narrationLabel')).toBeInTheDocument();
+    expect(
+      within(opening).getByLabelText('conversation.creativeStudio.inspector.visualPromptLabel')
+    ).toBeInTheDocument();
+    expect(
+      within(opening).getByRole('combobox', { name: 'conversation.creativeStudio.inspector.mediaKindLabel' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(opening).getByRole('button', { name: 'conversation.creativeStudio.phase.write.moreDetails' })
+    );
+    expect(within(opening).getByLabelText('conversation.creativeStudio.inspector.purposeLabel')).toBeInTheDocument();
+    expect(
+      within(opening).getByLabelText('conversation.creativeStudio.inspector.onScreenTextLabel')
+    ).toBeInTheDocument();
+  });
+
   it('offers a visual suggestion from an empty visual cell', () => {
     const emptyReveal = scene('scene-2', {
       visualPrompt: '',
@@ -637,7 +672,7 @@ describe('WritePhase', () => {
     expect(phaseEditor.selectScene).toHaveBeenCalledWith('scene-2');
   });
 
-  it('renders the Write timing advisory exactly once at the pacing bar', () => {
+  it('announces the Write timing advisory politely at the pacing bar', () => {
     render(
       <WritePhase
         controller={controller({
@@ -649,8 +684,35 @@ describe('WritePhase', () => {
       />
     );
 
-    expect(screen.getAllByRole('alert')).toHaveLength(1);
-    expect(screen.getByRole('alert')).toHaveTextContent('conversation.creativeStudio.review.durationMismatch');
+    const advisory = screen.getByText('conversation.creativeStudio.review.durationMismatch');
+    expect(advisory).toHaveAttribute('role', 'status');
+    expect(advisory).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps unreachable fit errors assertive', () => {
+    const fitOutcome = {
+      status: 'unreachable' as const,
+      reason: 'target_out_of_bounds' as const,
+      project,
+      lockedSceneIds: [],
+      minimumTotalSeconds: 18,
+      maximumTotalSeconds: 24,
+    };
+    render(
+      <WritePhase
+        controller={controller({
+          editor: editor('scene-1', {
+            latestFitOutcome: fitOutcome,
+            latestFitCatalogVersion: catalog.catalogVersion,
+          }),
+        })}
+      />
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds'
+    );
   });
 
   it('docks the assistant in the inline right column and keeps the drawer trigger for narrower layouts', () => {

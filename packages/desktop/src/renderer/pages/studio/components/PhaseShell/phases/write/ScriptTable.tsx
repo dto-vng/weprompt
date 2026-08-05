@@ -84,7 +84,7 @@ export const ScriptTable: React.FC<ScriptTableProps> = ({
       </header>
 
       <div className={styles.tableScroll}>
-        <div className={styles.tableHeader} aria-hidden='true'>
+        <div className={styles.tableHeader}>
           <span>{t('conversation.creativeStudio.phase.write.shotColumn')}</span>
           <span>{t('conversation.creativeStudio.phase.write.scriptColumn')}</span>
           <span>{t('conversation.creativeStudio.phase.write.visualColumn')}</span>

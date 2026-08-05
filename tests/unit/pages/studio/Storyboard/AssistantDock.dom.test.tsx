@@ -66,6 +66,11 @@ describe('AssistantDock', () => {
     const assistant = screen.getByRole('complementary', {
       name: 'conversation.creativeStudio.phase.write.assistantTitle',
     });
+    const title = within(assistant).getByRole('heading', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    expect(assistant).toHaveAttribute('aria-labelledby', title.id);
+    expect(screen.getAllByText('conversation.creativeStudio.phase.write.assistantTitle')).toHaveLength(1);
     expect(within(assistant).getByText('conversation.creativeStudio.draft.ready')).toBeInTheDocument();
     expect(within(assistant).getByText('Storyboard Provider')).toBeInTheDocument();
     expect(within(assistant).getByText('planner-model')).toBeInTheDocument();
@@ -112,8 +117,15 @@ describe('AssistantDock', () => {
     const drawers = document.querySelectorAll('.arco-drawer');
     expect(drawers).toHaveLength(1);
     expect(drawers[0]).toHaveStyle({ width: 'min(380px, 100vw)' });
+    const assistant = screen.getByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    const title = within(assistant).getByRole('heading', {
+      name: 'conversation.creativeStudio.phase.write.assistantTitle',
+    });
+    expect(assistant).toHaveAttribute('aria-labelledby', title.id);
     expect(
-      screen.getAllByRole('complementary', { name: 'conversation.creativeStudio.phase.write.assistantTitle' })
+      within(drawers[0] as HTMLElement).getAllByText('conversation.creativeStudio.phase.write.assistantTitle')
     ).toHaveLength(1);
     expect(
       within(drawers[0] as HTMLElement).getByText('conversation.creativeStudio.phase.write.textChargeDisclosure')

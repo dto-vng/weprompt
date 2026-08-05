@@ -7,7 +7,7 @@
 import type { StudioRouteCatalog } from '@/common/types/project/creativeStudioTypes';
 import { Button, Drawer } from '@arco-design/web-react';
 import { Magic } from '@icon-park/react';
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { StudioLayoutMode } from './useStudioLayoutMode';
@@ -46,6 +46,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
   const openerRef = useRef<HTMLButtonElement>(null);
   const assistantRegionRef = useRef<HTMLElement>(null);
   const assistantOwnsFocusRef = useRef(false);
+  const titleId = useId();
   const presentation = assistantPresentation(layoutMode);
   const previousPresentationRef = useRef(presentation);
   const previousDrawerVisibleRef = useRef(drawerVisible);
@@ -122,7 +123,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
   const content = (
     <aside
       ref={assistantRegionRef}
-      aria-label={t(labelKey)}
+      aria-labelledby={titleId}
       tabIndex={presentation === 'inline' ? -1 : undefined}
       data-assistant-presentation={presentation}
       className={
@@ -141,7 +142,9 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       }}
     >
       <div>
-        <h3 className='m-0 text-16px font-600 text-t-primary'>{t(labelKey)}</h3>
+        <h3 id={titleId} className='m-0 text-16px font-600 text-t-primary'>
+          {t(labelKey)}
+        </h3>
         <p className='mb-0 mt-6px text-13px text-t-secondary'>
           {t('conversation.creativeStudio.phase.write.assistantDescription')}
         </p>
@@ -165,6 +168,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       <Button
         type='primary'
         long
+        className={styles.draftButton}
         icon={<Magic />}
         loading={drafting}
         disabled={draftDisabled}
@@ -186,7 +190,7 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       </Button>
       <Drawer
         visible={drawerVisible}
-        title={t(labelKey)}
+        title={null}
         width='min(380px, 100vw)'
         wrapClassName={styles.assistantDrawer}
         footer={null}
