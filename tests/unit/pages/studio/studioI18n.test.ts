@@ -193,21 +193,6 @@ const readinessActionKeys = [
   'preview.generateThisScene',
 ] as const;
 
-const renderLabelsByLocale: Record<string, readonly [render: string, renderAnother: string]> = {
-  'de-DE': ['Rendern', 'Erneut rendern'],
-  'en-US': ['Render', 'Render another'],
-  'es-ES': ['Renderizar', 'Renderizar otra vez'],
-  'fa-IR': ['رندر', 'رندر دوباره'],
-  'ja-JP': ['レンダリング', 'もう一度レンダリング'],
-  'ko-KR': ['렌더링', '다시 렌더링'],
-  'pt-BR': ['Renderizar', 'Renderizar novamente'],
-  'ru-RU': ['Рендерить', 'Рендерить ещё'],
-  'tr-TR': ['İşle', 'Yeniden işle'],
-  'uk-UA': ['Рендерити', 'Рендерити ще'],
-  'zh-CN': ['渲染', '再次渲染'],
-  'zh-TW': ['算繪', '再次算繪'],
-};
-
 const pluralLogicalKeys = [
   'export.confirmSelectedCount',
   'export.gapWarning',
@@ -291,13 +276,21 @@ function isPluralVariantKey(key: string): boolean {
 }
 
 describe('Creative Studio localization contract', () => {
+  // Asserts the ABSENCE of a fabricated cost fragment rather than exact wording,
+  // so improving a translation does not fail the guard while re-adding a fake
+  // price still does.
   it.each(i18nConfig.supportedLanguages)('keeps the %s render actions free of fabricated cost fragments', (locale) => {
     const creativeStudio = loadConversationLocale(locale).creativeStudio;
     const leaves = flattenStringLeaves(creativeStudio);
 
-    expect([leaves['phase.produce.render'], leaves['phase.produce.renderAnother']]).toEqual(
-      renderLabelsByLocale[locale]
-    );
+    for (const key of ['phase.produce.render', 'phase.produce.renderAnother'] as const) {
+      const label = leaves[key];
+      expect(label, `${locale}/${key} must exist`).toBeTruthy();
+      expect(label, `${locale}/${key} must not carry a fabricated cost`).not.toMatch(
+        /n\/a|n\/d|k\.\s?A\.|不适用|該当なし|해당\s?없음|\bcr\b|credits?/i
+      );
+      expect(label, `${locale}/${key} must not end in a dangling separator`).not.toMatch(/[·:\-–—]\s*$/);
+    }
   });
 
   it('defines the complete planned group, phase-shell, and Task 7 key contract in the reference locale', () => {
