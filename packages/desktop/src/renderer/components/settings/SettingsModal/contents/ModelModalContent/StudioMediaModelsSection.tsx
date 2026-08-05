@@ -475,7 +475,7 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
         onCancel={closeEditor}
       >
         <div className='flex flex-col gap-12px'>
-          <label className='flex flex-col gap-6px text-12px text-t-secondary'>
+          <div className='flex flex-col gap-6px text-12px text-t-secondary'>
             {t('settings.mediaModels.outputType')}
             <Select
               aria-label={t('settings.mediaModels.outputType')}
@@ -486,8 +486,8 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
               <Select.Option value='image'>{t('settings.mediaModels.image')}</Select.Option>
               <Select.Option value='video'>{t('settings.mediaModels.video')}</Select.Option>
             </Select>
-          </label>
-          <label className='flex flex-col gap-6px text-12px text-t-secondary'>
+          </div>
+          <div className='flex flex-col gap-6px text-12px text-t-secondary'>
             {t('settings.mediaModels.provider')}
             <Select
               aria-label={t('settings.mediaModels.provider')}
@@ -501,8 +501,8 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
                 </Select.Option>
               ))}
             </Select>
-          </label>
-          <label className='flex flex-col gap-6px text-12px text-t-secondary'>
+          </div>
+          <div className='flex flex-col gap-6px text-12px text-t-secondary'>
             {t('settings.mediaModels.integrationLabel')}
             <Select
               aria-label={t('settings.mediaModels.integrationLabel')}
@@ -516,7 +516,7 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
                 </Select.Option>
               ))}
             </Select>
-          </label>
+          </div>
           <label className='flex flex-col gap-6px text-12px text-t-secondary'>
             {t('settings.mediaModels.model')}
             <AutoComplete
