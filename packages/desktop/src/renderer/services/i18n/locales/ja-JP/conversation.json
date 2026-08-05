@@ -630,6 +630,13 @@
       "manual": "手動送信"
     }
   },
+  "presentationSubmission": {
+    "pending": "プレゼンテーションを送信中",
+    "restore": "復元",
+    "persistenceFailure": "プレゼンテーションの送信を保存できませんでした。",
+    "queued": "プレゼンテーションをキューに追加しました",
+    "uncertainTracking": "送信状態が不明です。再送せず、既存の実行を追跡してください。"
+  },
   "contextUsage": {
     "contextUsed": "コンテキスト使用量",
     "contextWindow": "コンテキストウィンドウ",

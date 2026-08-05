@@ -211,6 +211,18 @@ const presentationSourceRefSchema = z
     expectedSha256: presentationSha256Schema,
   })
   .strict();
+const presentationQueuedSourceRefsSchema = z
+  .array(presentationSourceRefSchema)
+  .min(1)
+  .max(PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN)
+  .superRefine((sources, context) => {
+    const grantIds = new Set(sources.map(({ grantId }) => grantId.toLowerCase()));
+    const totalBytes = sources.reduce((total, source) => total + source.expectedByteLength, 0);
+    if (grantIds.size !== sources.length) context.addIssue({ code: 'custom', message: 'duplicate source grant' });
+    if (totalBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES) {
+      context.addIssue({ code: 'custom', message: 'aggregate source bytes exceeded' });
+    }
+  });
 const startPresentationRunSchema = z
   .object({
     conversation_id: presentationUuidSchema,
@@ -335,6 +347,14 @@ export const nativeBridgePayloadSchemas = {
     .object({
       owner: presentationGrantOwnerSchema,
       grant_id: presentationUuidSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.confirm-queued': z
+    .object({
+      owner: presentationGrantOwnerSchema,
+      queue_item_id: presentationUuidSchema,
+      sources: presentationQueuedSourceRefsSchema,
       expected_owner_revision: presentationRevisionSchema,
     })
     .strict(),

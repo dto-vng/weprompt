@@ -63,6 +63,8 @@ import type {
   BindPresentationDraftResult,
   ClaimInitialPresentationDispatchRequest,
   ClaimInitialPresentationDispatchResult,
+  ConfirmQueuedPresentationSourcesRequest,
+  ConfirmQueuedPresentationSourcesResult,
   CreatePresentationDraftRequest,
   CreatePresentationDraftResult,
   DiscardPresentationRunRequest,
@@ -670,6 +672,9 @@ export const presentationSources = {
   >('presentation-sources.grant-workspace-source'),
   revoke: bridge.buildProvider<RevokePresentationSourceResult, RevokePresentationSourceRequest>(
     'presentation-sources.revoke'
+  ),
+  confirmQueued: bridge.buildProvider<ConfirmQueuedPresentationSourcesResult, ConfirmQueuedPresentationSourcesRequest>(
+    'presentation-sources.confirm-queued'
   ),
 };
 

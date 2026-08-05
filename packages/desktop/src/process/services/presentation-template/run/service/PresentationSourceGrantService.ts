@@ -10,6 +10,8 @@ import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
   BindPresentationDraftRequest,
   BindPresentationDraftResult,
+  ConfirmQueuedPresentationSourcesRequest,
+  ConfirmQueuedPresentationSourcesResult,
   CreatePresentationDraftRequest,
   CreatePresentationDraftResult,
   GetPresentationSourceOwnerRequest,
@@ -23,6 +25,7 @@ import type {
   PresentationRunFailure,
   PresentationRunFailureCode,
   PresentationSourceDescriptor,
+  PresentationSourceRef,
   RevokePresentationSourceRequest,
   RevokePresentationSourceResult,
 } from '@/common/types/office/presentationRun';
@@ -55,6 +58,7 @@ type PresentationSourceOperationFailureCode = {
   grantExternalDropPaths: FailureCodeOf<GrantPresentationExternalDropResult>;
   grantWorkspaceSource: FailureCodeOf<GrantPresentationWorkspaceSourceResult>;
   revoke: FailureCodeOf<RevokePresentationSourceResult>;
+  confirmQueued: FailureCodeOf<ConfirmQueuedPresentationSourcesResult>;
 };
 
 type PresentationSourceOperation = keyof PresentationSourceOperationFailureCode;
@@ -164,6 +168,26 @@ const OPERATION_FAILURE_CODES: {
     'SOURCE_GRANT_INVALID',
     'SOURCE_GRANT_FOREIGN',
     'SOURCE_GRANT_REPLAYED',
+    'PERSISTENCE_FAILED',
+    'INTERNAL_ERROR',
+  ]),
+  confirmQueued: new Set([
+    'FEATURE_DISABLED',
+    'DESKTOP_REQUIRED',
+    'INVALID_REQUEST',
+    'DRAFT_NOT_FOUND',
+    'DRAFT_EXPIRED',
+    'DRAFT_FOREIGN',
+    'RUN_NOT_FOUND',
+    'RUN_FORBIDDEN',
+    'SCOPE_UNAVAILABLE',
+    'TEAM_SCOPE_UNSUPPORTED',
+    'SOURCE_GRANT_INVALID',
+    'SOURCE_GRANT_EXPIRED',
+    'SOURCE_GRANT_FOREIGN',
+    'SOURCE_GRANT_REPLAYED',
+    'SOURCE_TAMPERED',
+    'SOURCE_LIMIT_EXCEEDED',
     'PERSISTENCE_FAILED',
     'INTERNAL_ERROR',
   ]),
@@ -282,6 +306,11 @@ function isRevision(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && actual.every((key) => keys.includes(key));
+}
+
 function isOwner(value: unknown): value is PresentationGrantOwner {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
@@ -289,6 +318,43 @@ function isOwner(value: unknown): value is PresentationGrantOwner {
     return Object.keys(record).length === 2 && isUuid(record.draft_id);
   }
   return record.owner_type === 'conversation' && Object.keys(record).length === 2 && isUuid(record.conversation_id);
+}
+
+function isSourceRef(value: unknown): value is PresentationSourceRef {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    hasExactKeys(record, ['grantId', 'expectedByteLength', 'expectedSha256']) &&
+    isUuid(record.grantId) &&
+    Number.isSafeInteger(record.expectedByteLength) &&
+    (record.expectedByteLength as number) >= 1 &&
+    (record.expectedByteLength as number) <= PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES &&
+    typeof record.expectedSha256 === 'string' &&
+    /^[0-9a-f]{64}$/.test(record.expectedSha256)
+  );
+}
+
+function isConfirmQueuedRequest(value: unknown): value is ConfirmQueuedPresentationSourcesRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (
+    !hasExactKeys(record, ['owner', 'queue_item_id', 'sources', 'expected_owner_revision']) ||
+    !isOwner(record.owner) ||
+    !isUuid(record.queue_item_id) ||
+    !isRevision(record.expected_owner_revision) ||
+    !Array.isArray(record.sources) ||
+    record.sources.length < 1 ||
+    record.sources.length > PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN ||
+    !record.sources.every(isSourceRef)
+  ) {
+    return false;
+  }
+  const sources = record.sources;
+  return (
+    new Set(sources.map(({ grantId }) => grantId.toLowerCase())).size === sources.length &&
+    sources.reduce((total, source) => total + source.expectedByteLength, 0) <=
+      PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES
+  );
 }
 
 function isStrictRelativePath(value: unknown): value is string {
@@ -586,6 +652,43 @@ export class PresentationSourceGrantService {
       return { ok: true, ...result };
     } catch (error) {
       return constrainSourceFailure('revoke', this.mapError(error)) as RevokePresentationSourceResult;
+    }
+  }
+
+  async confirmQueued(
+    request: ConfirmQueuedPresentationSourcesRequest
+  ): Promise<ConfirmQueuedPresentationSourcesResult> {
+    const gate = this.baseGate();
+    if (gate !== null) {
+      return constrainSourceFailure('confirmQueued', gate) as ConfirmQueuedPresentationSourcesResult;
+    }
+    if (!isConfirmQueuedRequest(request)) {
+      return constrainSourceFailure(
+        'confirmQueued',
+        sourceFailure('INVALID_REQUEST')
+      ) as ConfirmQueuedPresentationSourcesResult;
+    }
+    const authorization = await this.authorizeOwner(request.owner);
+    if ('failure' in authorization) {
+      return constrainSourceFailure('confirmQueued', authorization.failure) as ConfirmQueuedPresentationSourcesResult;
+    }
+    try {
+      await this.ensureStorage();
+      const result = await this.store.extendPresentationSourceGrantsForQueue({
+        owner: request.owner,
+        principalId: authorization.value.principalId,
+        sources: request.sources,
+        queueItemId: request.queue_item_id,
+        expectedOwnerRevision: request.expected_owner_revision,
+      });
+      return {
+        ok: true,
+        status: result.status,
+        ownerRevision: result.ownerRevision,
+        expiresAt: result.expiresAt,
+      };
+    } catch (error) {
+      return constrainSourceFailure('confirmQueued', this.mapError(error)) as ConfirmQueuedPresentationSourcesResult;
     }
   }
 

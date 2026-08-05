@@ -630,6 +630,13 @@
       "manual": "ارسال دستی"
     }
   },
+  "presentationSubmission": {
+    "pending": "ارسال ارائه در انتظار است",
+    "restore": "بازیابی",
+    "persistenceFailure": "ذخیره ارسال ارائه ممکن نشد.",
+    "queued": "ارائه در صف قرار گرفت",
+    "uncertainTracking": "وضعیت ارسال نامشخص است. اجرای موجود را پیگیری کنید و دوباره ارسال نکنید."
+  },
   "contextUsage": {
     "contextUsed": "زمینه استفاده‌شده",
     "contextWindow": "پنجره زمینه",

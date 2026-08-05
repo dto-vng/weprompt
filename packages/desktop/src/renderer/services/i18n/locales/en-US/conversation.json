@@ -630,6 +630,13 @@
       "manual": "Manual send"
     }
   },
+  "presentationSubmission": {
+    "pending": "Presentation submission pending",
+    "restore": "Restore",
+    "persistenceFailure": "The presentation submission could not be saved.",
+    "queued": "Presentation queued",
+    "uncertainTracking": "Presentation submission status is uncertain. Track the existing run; do not resend."
+  },
   "contextUsage": {
     "contextUsed": "context used",
     "contextWindow": "Context window",

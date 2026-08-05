@@ -631,6 +631,13 @@
       "manual": "Envío manual"
     }
   },
+  "presentationSubmission": {
+    "pending": "Envío de presentación pendiente",
+    "restore": "Restaurar",
+    "persistenceFailure": "No se pudo guardar el envío de la presentación.",
+    "queued": "Presentación añadida a la cola",
+    "uncertainTracking": "El estado del envío es incierto. Sigue la ejecución existente; no vuelvas a enviarla."
+  },
   "contextUsage": {
     "contextUsed": "contexto usado",
     "contextWindow": "Ventana de contexto",

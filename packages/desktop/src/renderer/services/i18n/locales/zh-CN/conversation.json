@@ -630,6 +630,13 @@
       "manual": "手动发送"
     }
   },
+  "presentationSubmission": {
+    "pending": "演示文稿提交处理中",
+    "restore": "恢复",
+    "persistenceFailure": "无法保存演示文稿提交。",
+    "queued": "演示文稿已加入队列",
+    "uncertainTracking": "演示文稿提交状态不确定。请跟踪现有运行，不要重新发送。"
+  },
   "contextUsage": {
     "contextUsed": "上下文已使用",
     "contextWindow": "上下文窗口",

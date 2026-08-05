@@ -615,6 +615,13 @@
       "manual": "Elle gönder"
     }
   },
+  "presentationSubmission": {
+    "pending": "Sunum gönderimi bekliyor",
+    "restore": "Geri yükle",
+    "persistenceFailure": "Sunum gönderimi kaydedilemedi.",
+    "queued": "Sunum kuyruğa alındı",
+    "uncertainTracking": "Gönderim durumu belirsiz. Mevcut çalışmayı izleyin; yeniden göndermeyin."
+  },
   "contextUsage": {
     "contextUsed": "bağlam kullanıldı",
     "contextWindow": "Bağlam penceresi",

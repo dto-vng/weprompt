@@ -462,6 +462,41 @@ export type RevokePresentationSourceResult =
       | 'INTERNAL_ERROR'
     >;
 
+export type ConfirmQueuedPresentationSourcesRequest = {
+  owner: PresentationGrantOwner;
+  queue_item_id: string;
+  sources: PresentationSourceRef[];
+  expected_owner_revision: number;
+};
+
+export type ConfirmQueuedPresentationSourcesResult =
+  | {
+      ok: true;
+      status: 'confirmed' | 'already_confirmed';
+      ownerRevision: number;
+      expiresAt: string;
+    }
+  | FailureFor<
+      | 'FEATURE_DISABLED'
+      | 'DESKTOP_REQUIRED'
+      | 'INVALID_REQUEST'
+      | 'DRAFT_NOT_FOUND'
+      | 'DRAFT_EXPIRED'
+      | 'DRAFT_FOREIGN'
+      | 'RUN_NOT_FOUND'
+      | 'RUN_FORBIDDEN'
+      | 'SCOPE_UNAVAILABLE'
+      | 'TEAM_SCOPE_UNSUPPORTED'
+      | 'SOURCE_GRANT_INVALID'
+      | 'SOURCE_GRANT_EXPIRED'
+      | 'SOURCE_GRANT_FOREIGN'
+      | 'SOURCE_GRANT_REPLAYED'
+      | 'SOURCE_TAMPERED'
+      | 'SOURCE_LIMIT_EXCEEDED'
+      | 'PERSISTENCE_FAILED'
+      | 'INTERNAL_ERROR'
+    >;
+
 export type GrantPresentationExternalDropRequest = {
   owner: PresentationGrantOwner;
   files: readonly File[];

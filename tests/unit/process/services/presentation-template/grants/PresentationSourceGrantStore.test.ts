@@ -678,15 +678,21 @@ describe('PresentationRunStore source grants', () => {
       { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
       PRINCIPAL_ID
     );
-    await createGrant();
+    const { prepared } = await createGrant();
     clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS - 1);
 
     await expect(
       store.extendPresentationSourceGrantsForQueue({
         owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
         principalId: PRINCIPAL_ID,
-        grantIds: [GRANT_ID],
-        queueItemId: 'queue-item-1',
+        sources: [
+          {
+            grantId: GRANT_ID,
+            expectedByteLength: prepared.byteLength,
+            expectedSha256: prepared.sha256,
+          },
+        ],
+        queueItemId: '00000000-0000-4000-8000-000000000100',
         expectedOwnerRevision: 1,
       })
     ).resolves.toMatchObject({ ownerRevision: 2, grants: [{ grantId: GRANT_ID }] });
@@ -694,7 +700,7 @@ describe('PresentationRunStore source grants', () => {
     await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({
       revision: 1,
       queueExtendedAt: clock.toISOString(),
-      queueItemId: 'queue-item-1',
+      queueItemId: '00000000-0000-4000-8000-000000000100',
       expiresAt: queueExpiresAt.toISOString(),
     });
 
@@ -828,32 +834,152 @@ describe('PresentationRunStore source grants', () => {
       { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
       PRINCIPAL_ID
     );
-    await createGrant();
+    const { prepared } = await createGrant();
     clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
 
     await expect(
       store.extendPresentationSourceGrantsForQueue({
         owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
         principalId: PRINCIPAL_ID,
-        grantIds: [GRANT_ID],
-        queueItemId: 'queue-too-late',
+        sources: [
+          {
+            grantId: GRANT_ID,
+            expectedByteLength: prepared.byteLength,
+            expectedSha256: prepared.sha256,
+          },
+        ],
+        queueItemId: '00000000-0000-4000-8000-000000000104',
         expectedOwnerRevision: 1,
       })
     ).rejects.toMatchObject({ code: 'SOURCE_GRANT_EXPIRED', details: { grantId: GRANT_ID } });
   });
 
-  it('rejects a second queue extension without changing the first durable expiry', async () => {
+  it('replays the exact queue and complete ref set with the pre-mutation revision without extending TTL twice', async () => {
     await store.getPresentationSourceOwner(
       { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
       PRINCIPAL_ID
     );
-    await createGrant();
+    const { prepared } = await createGrant();
     clock = new Date(NOW.getTime() + 1_000);
     await store.extendPresentationSourceGrantsForQueue({
       owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
       principalId: PRINCIPAL_ID,
-      grantIds: [GRANT_ID],
-      queueItemId: 'queue-first',
+      sources: [
+        {
+          grantId: GRANT_ID,
+          expectedByteLength: prepared.byteLength,
+          expectedSha256: prepared.sha256,
+        },
+      ],
+      queueItemId: '00000000-0000-4000-8000-000000000105',
+      expectedOwnerRevision: 1,
+    });
+    const first = await journal.readCanonical('grant', GRANT_ID);
+
+    const replay = await store.extendPresentationSourceGrantsForQueue({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      sources: [
+        {
+          grantId: GRANT_ID,
+          expectedByteLength: prepared.byteLength,
+          expectedSha256: prepared.sha256,
+        },
+      ],
+      queueItemId: '00000000-0000-4000-8000-000000000105',
+      expectedOwnerRevision: 1,
+    });
+
+    expect(replay).toMatchObject({ status: 'already_confirmed', ownerRevision: 2 });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toEqual(first);
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        principalId: PRINCIPAL_ID,
+        sources: [
+          {
+            grantId: GRANT_ID,
+            expectedByteLength: prepared.byteLength,
+            expectedSha256: prepared.sha256,
+          },
+        ],
+        queueItemId: '00000000-0000-4000-8000-000000000105',
+        expectedOwnerRevision: 2,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_REPLAYED', details: { grantId: GRANT_ID } });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toEqual(first);
+  });
+
+  it('replays an exact queued ref after an unrelated owner mutation and restart', async () => {
+    const owner = { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID };
+    await store.getPresentationSourceOwner(owner, PRINCIPAL_ID);
+    const created = await createGrantBatch({
+      owner,
+      expectedOwnerRevision: 0,
+      grantIds: [GRANT_ID, GRANT_B],
+    });
+    const queuedGrant = created.grants.find(({ grantId }) => grantId === GRANT_ID);
+    if (queuedGrant === undefined) throw new Error('Expected the queued source grant');
+    const sources = [
+      {
+        grantId: queuedGrant.grantId,
+        expectedByteLength: queuedGrant.byteLength,
+        expectedSha256: queuedGrant.sha256,
+      },
+    ];
+    const queueItemId = '00000000-0000-4000-8000-000000000106';
+    clock = new Date(NOW.getTime() + 1_000);
+    const confirmed = await store.extendPresentationSourceGrantsForQueue({
+      owner,
+      principalId: PRINCIPAL_ID,
+      sources,
+      queueItemId,
+      expectedOwnerRevision: 1,
+    });
+    const confirmedGrant = await journal.readCanonical('grant', GRANT_ID);
+
+    clock = new Date(NOW.getTime() + 2_000);
+    await store.revokePresentationSourceGrant({
+      owner,
+      principalId: PRINCIPAL_ID,
+      grantId: GRANT_B,
+      expectedOwnerRevision: confirmed.ownerRevision,
+    });
+    const restarted = createStore();
+    const replay = await restarted.extendPresentationSourceGrantsForQueue({
+      owner,
+      principalId: PRINCIPAL_ID,
+      sources,
+      queueItemId,
+      expectedOwnerRevision: 1,
+    });
+
+    expect(replay).toMatchObject({
+      status: 'already_confirmed',
+      ownerRevision: 3,
+      expiresAt: confirmed.expiresAt,
+    });
+    await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toEqual(confirmedGrant);
+  });
+
+  it('rejects a different queue binding without changing the first durable expiry', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    const { prepared } = await createGrant();
+    clock = new Date(NOW.getTime() + 1_000);
+    await store.extendPresentationSourceGrantsForQueue({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      sources: [
+        {
+          grantId: GRANT_ID,
+          expectedByteLength: prepared.byteLength,
+          expectedSha256: prepared.sha256,
+        },
+      ],
+      queueItemId: '00000000-0000-4000-8000-000000000101',
       expectedOwnerRevision: 1,
     });
     const first = await journal.readCanonical('grant', GRANT_ID);
@@ -862,12 +988,78 @@ describe('PresentationRunStore source grants', () => {
       store.extendPresentationSourceGrantsForQueue({
         owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
         principalId: PRINCIPAL_ID,
-        grantIds: [GRANT_ID],
-        queueItemId: 'queue-second',
+        sources: [
+          {
+            grantId: GRANT_ID,
+            expectedByteLength: prepared.byteLength,
+            expectedSha256: prepared.sha256,
+          },
+        ],
+        queueItemId: '00000000-0000-4000-8000-000000000102',
         expectedOwnerRevision: 2,
       })
     ).rejects.toMatchObject({ code: 'SOURCE_GRANT_REPLAYED', details: { grantId: GRANT_ID } });
     await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toEqual(first);
+  });
+
+  it('rejects partial, superset, hash-drift, and length-drift replays of a queued grant set', async () => {
+    const owner = { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID };
+    await store.getPresentationSourceOwner(owner, PRINCIPAL_ID);
+    const created = await createGrantBatch({
+      owner,
+      expectedOwnerRevision: 0,
+      grantIds: [GRANT_ID, GRANT_B],
+    });
+    const refs = created.grants.map(({ grantId, byteLength, sha256 }) => ({
+      grantId,
+      expectedByteLength: byteLength,
+      expectedSha256: sha256,
+    }));
+    const queueItemId = '00000000-0000-4000-8000-000000000103';
+    await store.extendPresentationSourceGrantsForQueue({
+      owner,
+      principalId: PRINCIPAL_ID,
+      sources: refs,
+      queueItemId,
+      expectedOwnerRevision: 1,
+    });
+
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner,
+        principalId: PRINCIPAL_ID,
+        sources: refs.slice(0, 1),
+        queueItemId,
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_REPLAYED' });
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner,
+        principalId: PRINCIPAL_ID,
+        sources: [...refs, { ...refs[0]!, grantId: RUN_ID }],
+        queueItemId,
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_GRANT_INVALID' });
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner,
+        principalId: PRINCIPAL_ID,
+        sources: [{ ...refs[0]!, expectedSha256: 'f'.repeat(64) }, refs[1]!],
+        queueItemId,
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_TAMPERED' });
+    await expect(
+      store.extendPresentationSourceGrantsForQueue({
+        owner,
+        principalId: PRINCIPAL_ID,
+        sources: [{ ...refs[0]!, expectedByteLength: refs[0]!.expectedByteLength + 1 }, refs[1]!],
+        queueItemId,
+        expectedOwnerRevision: 1,
+      })
+    ).rejects.toMatchObject({ code: 'SOURCE_TAMPERED' });
   });
 
   it('retains an idempotent revoke for seven days and treats the grant as invalid at deleteAfter', async () => {
