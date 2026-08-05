@@ -42,6 +42,18 @@ All five provider adapters — `bytePlusSeedance`, `mediaGateway`, `image`, `ope
 
 **Therefore our branch is effectively a superset**, and the donor relationship currently runs backwards.
 
+## 3.1 Verified: their line contributes nothing ours lacks
+
+A corrective path proposed keeping the pre-redesign commits as a backup, treating `codex/studio-integration` as the UI source of truth, and *"bringing across only the newer runtime/OpenRouter/media improvements that the redesign actually lacks."* The first two are right. **The third describes an empty set**, verified:
+
+- `2002defe9 fix(creative-studio): make OpenRouter video generation work end-to-end` — its three changes are all already on our branch: the `silentOutput` exception for `openrouter-video-v1` (with a near-verbatim comment), `openrouter-video-v1` added to `ADAPTER_IDS`, and the Happy-Eyeballs `lookupOptions.all` DNS-pin fix in `remoteMediaDownloader`. Both lines converged on identical solutions.
+- Their commit subjects describe the *same* features ours has — "add OpenRouter video generation adapter", "register weprompt-studio protocol and studio runtime lifecycle", "port creative studio process service and remote-media" — i.e. parallel duplicate work, not newer work.
+- A directional diff over `creative-studio/`, `remote-media/` and `creativeStudioTypes.ts` yields 174 lines present in theirs and absent from ours, and they are **type shapes ours evolved past**, not improvements. Example: `cancellation`. Ours carries 7 cancellation-related declarations against their 2 — `cancellationPolicy`, `canCancel`, and an explicit reference to their `cancellation` flag — so ours is the superset.
+
+**Do not run a cherry-pick pass looking for that set.** Beyond wasting effort, porting their older type shapes onto our newer ones would be a regression.
+
+**Archive the pre-redesign port with a ref, not a branch.** A local branch is one `git reset --hard` from being reflog-only. Done: `refs/archive/creative-suite-sprint2-pre-redesign-2026-08-05` = `a40df852d`.
+
 ## 4. Recommendation
 
 Rebuild `creative-suite-sprint2` on **our** UI and service layer, keeping their line as the donor for anything genuinely theirs. Rationale: it matches the approved prototype, carries three completed fidelity passes, has live-verified image *and* video generation against real paid calls, brings 17 more test files, and is the codebase every next-phase spec has been verified against.
