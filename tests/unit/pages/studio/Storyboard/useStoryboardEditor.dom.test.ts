@@ -188,6 +188,82 @@ describe('useStoryboardEditor', () => {
     expect(bridge.updateScene.invoke).toHaveBeenCalledTimes(2);
   });
 
+  it('rechecks a Brief edit made while close is draining scenes before reporting saved', async () => {
+    const sceneSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const projectSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const afterScene = project(3, [scene('scene-1', { title: 'Opening v2' }), scene('scene-2')]);
+    const afterProject = project(4, [scene('scene-1', { title: 'Opening v2' }), scene('scene-2')], {
+      brief: 'Edited during close',
+    });
+    bridge.updateScene.invoke.mockReturnValueOnce(sceneSave.promise);
+    bridge.updateProject.invoke.mockReturnValueOnce(projectSave.promise);
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+    await waitFor(() => expect(flushUnsavedWorkHandler).not.toBeNull());
+    const closeHandler = flushUnsavedWorkHandler;
+    if (closeHandler === null) throw new Error('close flush provider was not registered');
+
+    act(() => result.current.updateSceneDraftById('scene-1', { title: 'Opening v2' }));
+    let closeOutcome: { saved: boolean } | undefined;
+    let closeFlush!: Promise<{ saved: boolean }>;
+    act(() => {
+      closeFlush = closeHandler().then((outcome) => {
+        closeOutcome = outcome;
+        return outcome;
+      });
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledOnce());
+
+    act(() => result.current.updateProjectDraft({ brief: 'Edited during close' }));
+    await act(async () => {
+      sceneSave.resolve(ok(afterScene));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(bridge.updateProject.invoke).toHaveBeenCalledOnce());
+    expect(bridge.updateProject.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 3, brief: 'Edited during close' })
+    );
+    expect(closeOutcome).toBeUndefined();
+
+    await act(async () => {
+      projectSave.resolve(ok(afterProject));
+      await expect(closeFlush).resolves.toEqual({ saved: true });
+    });
+  });
+
+  it('reports unsaved when a Brief edit made during close cannot be re-flushed', async () => {
+    const sceneSave = deferred<StudioCommandResult<StudioRendererProject>>();
+    const afterScene = project(3, [scene('scene-1', { title: 'Opening v2' }), scene('scene-2')]);
+    bridge.updateScene.invoke.mockReturnValueOnce(sceneSave.promise);
+    bridge.updateProject.invoke.mockResolvedValueOnce(
+      failed('provider_error', 'conversation.creativeStudio.errors.provider')
+    );
+    const { result } = renderHook(() =>
+      useStoryboardEditor({ project: project(), refetch: vi.fn(async () => project()) })
+    );
+    await waitFor(() => expect(flushUnsavedWorkHandler).not.toBeNull());
+    const closeHandler = flushUnsavedWorkHandler;
+    if (closeHandler === null) throw new Error('close flush provider was not registered');
+
+    act(() => result.current.updateSceneDraftById('scene-1', { title: 'Opening v2' }));
+    let closeFlush!: Promise<{ saved: boolean }>;
+    act(() => {
+      closeFlush = closeHandler();
+    });
+    await waitFor(() => expect(bridge.updateScene.invoke).toHaveBeenCalledOnce());
+
+    act(() => result.current.updateProjectDraft({ brief: 'Edited during close' }));
+    await act(async () => {
+      sceneSave.resolve(ok(afterScene));
+      await expect(closeFlush).resolves.toEqual({ saved: false });
+    });
+    expect(bridge.updateProject.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 3, brief: 'Edited during close' })
+    );
+  });
+
   it('keeps close providers unavailable until a persisted draft is adopted', () => {
     vi.useFakeTimers();
     bridge.updateScene.invoke.mockReturnValue(new Promise(() => {}));

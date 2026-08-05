@@ -94,6 +94,7 @@ export type CreativeStudioCloseHandshakeDependencies = {
   showMessageBox: (options: CreativeStudioCloseDialogOptions) => Promise<{ response: number }>;
   translate: (key: string, options?: { count?: number }) => string;
   closeWindow: () => void;
+  hideWindow: () => void;
   quitApp: () => void;
   onQuitCancelled: () => void;
 };
@@ -137,6 +138,7 @@ export function createCreativeStudioCloseHandshake(
     const intent = pendingIntent;
     shutdownConfirmed = true;
     if (intent === 'quit') {
+      dependencies.hideWindow();
       dependencies.quitApp();
       return;
     }

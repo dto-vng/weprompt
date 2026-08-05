@@ -745,6 +745,9 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     closeWindow: () => {
       if (!studioWindow.isDestroyed()) studioWindow.close();
     },
+    hideWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.hide();
+    },
     quitApp: () => app.quit(),
     onQuitCancelled: () => setIsQuitting(false),
   });

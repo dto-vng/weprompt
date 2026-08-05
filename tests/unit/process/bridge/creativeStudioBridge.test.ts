@@ -646,6 +646,7 @@ const createCloseHandshakeDependencies = (
   showMessageBox: vi.fn(async () => ({ response: 2 })),
   translate: (key, options) => (options?.count === undefined ? key : `${key}:${options.count}`),
   closeWindow: vi.fn(),
+  hideWindow: vi.fn(),
   quitApp: vi.fn(),
   onQuitCancelled: vi.fn(),
   ...overrides,
@@ -667,7 +668,7 @@ describe('createCreativeStudioCloseHandshake', () => {
     expect(dependencies.queryUnsavedWork).not.toHaveBeenCalled();
   });
 
-  it('prevents close synchronously and closes once when the Studio renderer is clean', async () => {
+  it('prevents close synchronously and closes without hiding when the Studio renderer is clean', async () => {
     const dependencies = createCloseHandshakeDependencies();
     const handshake = createCreativeStudioCloseHandshake(dependencies);
     const firstEvent = createCloseEvent();
@@ -680,6 +681,7 @@ describe('createCreativeStudioCloseHandshake', () => {
     expect(handshake.handleWindowClose(recursiveEvent)).toBe(false);
     expect(recursiveEvent.preventDefault).not.toHaveBeenCalled();
     expect(dependencies.queryUnsavedWork).toHaveBeenCalledExactlyOnceWith({ timeoutMs: 3_000 });
+    expect(dependencies.hideWindow).not.toHaveBeenCalled();
   });
 
   it('offers save, discard, and cancel for dirty scenes before flushing and closing', async () => {
@@ -789,19 +791,38 @@ describe('createCreativeStudioCloseHandshake', () => {
     await vi.waitFor(() => expect(dependencies.closeWindow).toHaveBeenCalledOnce());
   });
 
-  it('uses the same preflight for explicit quit and bypasses its confirmed retry', async () => {
-    const dependencies = createCloseHandshakeDependencies();
+  it('hides the Studio window before explicit quit and bypasses its confirmed retry', async () => {
+    const calls: string[] = [];
+    const dependencies = createCloseHandshakeDependencies({
+      hideWindow: vi.fn(() => calls.push('hide-window')),
+      quitApp: vi.fn(() => calls.push('quit-app')),
+    });
     const handshake = createCreativeStudioCloseHandshake(dependencies);
     const firstEvent = createCloseEvent();
 
     expect(handshake.handleBeforeQuit(firstEvent)).toBe(true);
     expect(firstEvent.preventDefault).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(dependencies.quitApp).toHaveBeenCalledOnce());
+    expect(calls).toEqual(['hide-window', 'quit-app']);
 
     const retryEvent = createCloseEvent();
     expect(handshake.handleBeforeQuit(retryEvent)).toBe(false);
     expect(retryEvent.preventDefault).not.toHaveBeenCalled();
     expect(dependencies.queryUnsavedWork).toHaveBeenCalledOnce();
+  });
+
+  it('does not hide the Studio window when explicit quit is cancelled', async () => {
+    const dependencies = createCloseHandshakeDependencies({
+      queryUnsavedWork: vi.fn(async () => ({ dirtySceneCount: 1 })),
+      showMessageBox: vi.fn(async () => ({ response: 2 })),
+    });
+    const handshake = createCreativeStudioCloseHandshake(dependencies);
+
+    handshake.handleBeforeQuit(createCloseEvent());
+
+    await vi.waitFor(() => expect(dependencies.onQuitCancelled).toHaveBeenCalledOnce());
+    expect(dependencies.hideWindow).not.toHaveBeenCalled();
+    expect(dependencies.quitApp).not.toHaveBeenCalled();
   });
 
   it('resets explicit-quit state after cancellation so a later quit can retry', async () => {

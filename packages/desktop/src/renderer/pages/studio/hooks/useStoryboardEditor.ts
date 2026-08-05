@@ -1279,12 +1279,12 @@ export const useStoryboardEditor = ({
 
   const flushUnsavedWork = useCallback(async (): Promise<{ saved: boolean }> => {
     try {
-      if (!(await flushProjectDraft()) || internalConflictRef.current !== null) return { saved: false };
-
       for (let round = 0; round < 3; round += 1) {
+        if (!(await flushProjectDraft()) || internalConflictRef.current !== null) return { saved: false };
+
         const result = await flushAllSceneDrafts();
         if (result.failed.length > 0 || internalConflictRef.current !== null) return { saved: false };
-        if (result.dirtied.length === 0) return { saved: true };
+        if (result.dirtied.length === 0 && projectDraftRef.current === null) return { saved: true };
       }
       return { saved: false };
     } catch {
