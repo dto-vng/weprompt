@@ -46,6 +46,7 @@ import type {
   StudioTextModelRef,
   StudioUpdateModelSelectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
+import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
 import { CreativeStudioStoreError, type CreativeStudioStore } from '@process/services/creative-studio/store';
 import type {
   StudioGenerationRoute,
@@ -1342,9 +1343,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             if (
               scene === undefined ||
               asset === undefined ||
-              asset.projectId !== project.id ||
-              asset.sceneId !== scene.id ||
-              asset.mediaKind !== scene.mediaKind
+              !isCanonicalStudioGeneratedTake(asset, project.id, scene)
             ) {
               throw invalid('Studio asset does not belong to its selected scene');
             }

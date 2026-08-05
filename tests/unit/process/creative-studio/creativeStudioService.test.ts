@@ -1682,11 +1682,12 @@ describe('CreativeStudioService', () => {
           id: 'asset_2',
           projectId: next.id,
           sceneId: 'scene_2',
-          mediaKind: 'image',
-          mimeType: 'image/png',
-          managedAsset: { collection: 'assets', fileName: 'asset_2.png' },
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'assets', fileName: 'asset_2.mp4' },
           byteSize: 1,
           sha256: '1'.repeat(64),
+          durationSeconds: 4,
           createdAt: next.createdAt,
         };
         next.scenes.scene_2.assetIds = ['asset_2'];
@@ -1743,6 +1744,129 @@ describe('CreativeStudioService', () => {
         assetId: 'asset_image',
       })
     ).rejects.toMatchObject({ code: 'invalid_payload' });
+  });
+
+  it('rejects selecting a scene-owned imported reference as the active take', async () => {
+    const project = await service.createProject(makeInput());
+    const withScene = await service.updateScene({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      sceneId: 'scene_1',
+      scene: makeScene('scene_1'),
+    });
+    const canonicalStore = createCreativeStudioStore({ rootDir });
+    const withImport = await canonicalStore.updateProject(
+      withScene.id,
+      (current) => {
+        const next = structuredClone(current);
+        next.assets.reference_1 = {
+          id: 'reference_1',
+          projectId: next.id,
+          sceneId: 'scene_1',
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'imports', fileName: 'reference_1.mp4' },
+          byteSize: 1,
+          sha256: '5'.repeat(64),
+          durationSeconds: 4,
+          createdAt: next.createdAt,
+        };
+        next.scenes.scene_1.assetIds = ['reference_1'];
+        return next;
+      },
+      withScene.revision
+    );
+
+    await expect(
+      service.selectAsset({
+        projectId: withImport.id,
+        expectedRevision: withImport.revision,
+        sceneId: 'scene_1',
+        assetId: 'reference_1',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_payload' } satisfies Partial<CreativeStudioStoreError>);
+  });
+
+  it('rejects selecting a scene thumbnail as the active take', async () => {
+    const project = await service.createProject(makeInput());
+    const withScene = await service.updateScene({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      sceneId: 'scene_1',
+      scene: makeScene('scene_1'),
+    });
+    const canonicalStore = createCreativeStudioStore({ rootDir });
+    const withThumbnail = await canonicalStore.updateProject(
+      withScene.id,
+      (current) => {
+        const next = structuredClone(current);
+        next.assets.poster_1 = {
+          id: 'poster_1',
+          projectId: next.id,
+          sceneId: 'scene_1',
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'thumbnails', fileName: 'poster_1.mp4' },
+          byteSize: 1,
+          sha256: '6'.repeat(64),
+          durationSeconds: 4,
+          createdAt: next.createdAt,
+        };
+        next.scenes.scene_1.assetIds = ['poster_1'];
+        return next;
+      },
+      withScene.revision
+    );
+
+    await expect(
+      service.selectAsset({
+        projectId: withThumbnail.id,
+        expectedRevision: withThumbnail.revision,
+        sceneId: 'scene_1',
+        assetId: 'poster_1',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_payload' } satisfies Partial<CreativeStudioStoreError>);
+  });
+
+  it('selects a reverse-linked generated take for its owning scene', async () => {
+    const project = await service.createProject(makeInput());
+    const withScene = await service.updateScene({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      sceneId: 'scene_1',
+      scene: makeScene('scene_1'),
+    });
+    const canonicalStore = createCreativeStudioStore({ rootDir });
+    const withGeneratedTake = await canonicalStore.updateProject(
+      withScene.id,
+      (current) => {
+        const next = structuredClone(current);
+        next.assets.take_1 = {
+          id: 'take_1',
+          projectId: next.id,
+          sceneId: 'scene_1',
+          mediaKind: 'video',
+          mimeType: 'video/mp4',
+          managedAsset: { collection: 'assets', fileName: 'take_1.mp4' },
+          byteSize: 1,
+          sha256: '7'.repeat(64),
+          durationSeconds: 4,
+          createdAt: next.createdAt,
+        };
+        next.scenes.scene_1.assetIds = ['take_1'];
+        return next;
+      },
+      withScene.revision
+    );
+
+    await expect(
+      service.selectAsset({
+        projectId: withGeneratedTake.id,
+        expectedRevision: withGeneratedTake.revision,
+        sceneId: 'scene_1',
+        assetId: 'take_1',
+      })
+    ).resolves.toMatchObject({ scenes: { scene_1: { selectedAssetId: 'take_1' } } });
   });
 
   it('serializes concurrent expected-revision edits instead of applying a stale scene change', async () => {
