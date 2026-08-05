@@ -42,6 +42,14 @@ const timingGateCopy = [
   'Scene timing must match the project target before batch generation.',
 ];
 
+// A project adopts a generation route only when exactly one compatible engine exists.
+// The unpackaged fake catalog exposes two image models but a single video model, so a
+// freshly created project arrives with the video route adopted and the image route open.
+const fakeCatalogRoutes = {
+  image: null,
+  video: expect.objectContaining({ providerId: 'weprompt_studio_e2e', model: 'weprompt-e2e-video' }),
+};
+
 type CanonicalStudioSnapshot = {
   projectId: string;
   revision: number;
@@ -254,7 +262,11 @@ async function selectStudioPhase(page: Page, projectId: string, phase: StudioPha
   await expectStudioPhase(page, projectId, phase);
 }
 
-async function expectNoGenerationSurface(page: Page, projectId: string): Promise<void> {
+/**
+ * Produce's door when the workspace has NO compatible engine: the connect card is the
+ * only content and no route can have been adopted.
+ */
+async function expectConnectEngineDoor(page: Page, projectId: string): Promise<void> {
   const connectionHeading = page.getByRole('heading', {
     level: 2,
     name: 'Connect an engine — about a minute, once for the whole workspace',
@@ -275,6 +287,29 @@ async function expectNoGenerationSurface(page: Page, projectId: string): Promise
   expect(await readCanonicalStudioSnapshot(page, projectId)).toMatchObject({
     projectId,
     routes: { image: null, video: null },
+    jobs: [],
+  });
+  await assertStudioInvariants(page);
+}
+
+/**
+ * Produce with the fake catalog's adopted video engine: the engine bar replaces the
+ * connect door, but nothing has been generated and no generation dialog is open.
+ */
+async function expectIdleProduceSurface(page: Page, projectId: string): Promise<void> {
+  await expect(page.getByRole('heading', { level: 2, name: /^Rendering with/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Change engines' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      level: 2,
+      name: 'Connect an engine — about a minute, once for the whole workspace',
+    })
+  ).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Review generation' })).toHaveCount(0);
+
+  expect(await readCanonicalStudioSnapshot(page, projectId)).toMatchObject({
+    projectId,
+    routes: fakeCatalogRoutes,
     jobs: [],
   });
   await assertStudioInvariants(page);
@@ -352,15 +387,22 @@ test.describe('Creative Studio workspace', () => {
       await expectStudioPhase(page, projectId, 'brief');
       await expect(page.getByRole('region', { name: 'Brief' }).getByLabel('Creative intent')).toHaveValue(projectBrief);
       await expect(page.locator('[data-studio-layout-root] > header [role="status"]')).toHaveText('Saved');
-      expect(await readCanonicalStudioSnapshot(page, projectId)).toMatchObject({
+      // A project adopts a route only when exactly one compatible engine exists, so the
+      // fake catalog's single video model is adopted while its two image models are not.
+      const snapshot = await readCanonicalStudioSnapshot(page, projectId);
+      expect(snapshot).toMatchObject({
         projectId,
-        routes: { image: null, video: null },
+        routes: { image: null },
         scenes: [],
         jobs: [],
       });
+      expect(snapshot.routes.video).toMatchObject({
+        providerId: 'weprompt_studio_e2e',
+        model: 'weprompt-e2e-video',
+      });
       const routeCatalog = await readStudioRouteCatalog(page, projectId);
       expect(routeCatalog.image.selected).toBeNull();
-      expect(routeCatalog.video.selected).toBeNull();
+      expect(routeCatalog.video.selected).toMatchObject({ model: 'weprompt-e2e-video' });
       expect(routeCatalog.image.options).toEqual(
         expect.arrayContaining([
           {
@@ -459,13 +501,13 @@ test.describe('Creative Studio workspace', () => {
           };
         })
         .toEqual({
-          routes: { image: null, video: null },
+          routes: fakeCatalogRoutes,
           scenes: [{ title: shotTitle, narration, visualPrompt, durationSeconds: 5 }],
           jobs: [],
         });
       await continueToProduce.click();
       await expectStudioPhase(page, projectId, 'produce');
-      await expectNoGenerationSurface(page, projectId);
+      await expectIdleProduceSurface(page, projectId);
     });
 
     await test.step('navigate every phase in both directions and recover a deep-linked reload', async () => {
@@ -474,7 +516,7 @@ test.describe('Creative Studio workspace', () => {
       await expect(page.getByRole('button', { name: 'Prepare handoff' })).toBeDisabled();
 
       await selectStudioPhase(page, projectId, 'produce');
-      await expectNoGenerationSurface(page, projectId);
+      await expectIdleProduceSurface(page, projectId);
       await selectStudioPhase(page, projectId, 'write');
       await expect(page.getByRole('heading', { level: 2, name: 'Write' })).toBeVisible();
       await selectStudioPhase(page, projectId, 'brief');
@@ -524,7 +566,7 @@ test.describe('Creative Studio workspace', () => {
       await expect(page.getByRole('region', { name: 'Pacing' }).getByRole('status')).toHaveText('15s total · 15s goal');
       await expect(page.getByText('Untitled scene', { exact: true })).toHaveCount(0);
       expect(await readCanonicalStudioSnapshot(page, shapeProjectId)).toMatchObject({
-        routes: { image: null, video: null },
+        routes: fakeCatalogRoutes,
         scenes: [
           { title: 'Shot 1', visualPrompt: '', durationSeconds: 5 },
           { title: 'Shot 2', visualPrompt: '', durationSeconds: 5 },
@@ -586,7 +628,7 @@ test.describe('Creative Studio packaged workspace', () => {
     ).toBe(false);
 
     await selectStudioPhase(page, projectId, 'produce');
-    await expectNoGenerationSurface(page, projectId);
+    await expectConnectEngineDoor(page, projectId);
     await expect(page.getByText('WePrompt Studio E2E')).toHaveCount(0);
     await expect(page.getByText('weprompt-e2e-video')).toHaveCount(0);
 
@@ -595,7 +637,7 @@ test.describe('Creative Studio packaged workspace', () => {
     await expect(page).toHaveURL(projectUrl);
     await expect(page.getByRole('heading', { level: 1, name: projectBrief })).toBeVisible();
     await expectStudioPhase(page, projectId, 'produce');
-    await expectNoGenerationSurface(page, projectId);
+    await expectConnectEngineDoor(page, projectId);
 
     await selectStudioPhase(page, projectId, 'review');
     await expect(page.getByRole('button', { name: 'Prepare handoff' })).toBeDisabled();
