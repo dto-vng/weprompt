@@ -201,6 +201,30 @@ describe('creative studio project store', () => {
     await expect(reloadedStore.getProject(project.id)).resolves.toEqual(edited);
   });
 
+  it('loads a project that retains a scene-owned imported reference as its legacy selection', async () => {
+    const project = await store.createProject(makeInput());
+    const persisted = await store.updateProject(project.id, (current) => {
+      const next = addScene(current, 'scene_1');
+      next.assets.reference_1 = {
+        id: 'reference_1',
+        projectId: next.id,
+        sceneId: 'scene_1',
+        mediaKind: 'image',
+        mimeType: 'image/png',
+        managedAsset: { collection: 'imports', fileName: 'reference_1.png' },
+        byteSize: 1,
+        sha256: '1'.repeat(64),
+        createdAt: next.createdAt,
+      };
+      next.scenes.scene_1.assetIds = ['reference_1'];
+      next.scenes.scene_1.selectedAssetId = 'reference_1';
+      return next;
+    });
+    const reloadedStore = createCreativeStudioStore({ rootDir });
+
+    await expect(reloadedStore.getProject(project.id)).resolves.toEqual(persisted);
+  });
+
   it('loads a current schema-v1 manifest without a storyboard selection', async () => {
     const project = await store.createProject(makeInput());
     const file = path.join(rootDir, project.id, 'project.json');
