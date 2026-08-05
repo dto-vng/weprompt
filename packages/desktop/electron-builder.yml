@@ -117,6 +117,9 @@ extraResources:
   # built-in presentation template reference decks
   - from: resources/presentation-templates
     to: presentation-templates
+  # vendored MCP bridge (mcp-remote) so OAuth MCP servers need no npx/PATH lookup
+  - from: resources/mcp-bundled
+    to: mcp-bundled
 win:
   target:
     - nsis

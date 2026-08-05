@@ -777,6 +777,7 @@ try {
 
   // 6. Prepare hub resources (index.json + extension zips for offline fallback)
   execSync('node scripts/prepareHubResources.js', { stdio: 'inherit', env: process.env });
+  execSync('node scripts/prepareMcpBundle.js', { stdio: 'inherit', env: process.env });
 
   // 6. 运行 electron-builder 生成分发包（DMG/ZIP/EXE等）
   // Run electron-builder to create distributables (DMG/ZIP/EXE, etc.)
