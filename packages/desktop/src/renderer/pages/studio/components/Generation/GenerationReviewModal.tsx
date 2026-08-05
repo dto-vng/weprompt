@@ -15,6 +15,8 @@ import { Alert, Button, Modal, Tag } from '@arco-design/web-react';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import studioType from '../../StudioTypography.module.css';
+
 type ActionResult = void | Promise<unknown>;
 
 export type GenerationReviewRoute =
@@ -142,6 +144,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
   return (
     <Modal
       visible={visible}
+      wrapClassName={studioType.surface}
       title={t('conversation.creativeStudio.review.title')}
       footer={footer}
       closable={!submitting}

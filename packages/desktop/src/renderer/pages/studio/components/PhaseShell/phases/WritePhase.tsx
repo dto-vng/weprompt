@@ -110,7 +110,7 @@ export const WritePhase: React.FC<WritePhaseProps> = ({ controller, layoutMode =
           <h2 id='studio-write-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
             {t('conversation.creativeStudio.phase.write.title')}
           </h2>
-          <p className='mb-0 mt-4px text-12px text-t-tertiary'>
+          <p className={`${styles.secondaryCopy} mb-0 mt-4px`}>
             {t('conversation.creativeStudio.phase.shared.noMediaGeneration')}
           </p>
         </div>

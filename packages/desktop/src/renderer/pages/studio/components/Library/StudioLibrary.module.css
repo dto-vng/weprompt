@@ -14,20 +14,20 @@
 }
 
 .title {
+  composes: pageHeading from '../../StudioTypography.module.css';
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 24px;
-  font-weight: 600;
 }
 
-.subtitle,
+.subtitle {
+  composes: body from '../../StudioTypography.module.css';
+}
+
 .emptyTitle {
-  color: var(--color-text-2);
+  composes: body from '../../StudioTypography.module.css';
 }
 
 .subtitle {
   margin: 6px 0 0;
-  font-size: 14px;
 }
 
 .composer {
@@ -42,10 +42,9 @@
 }
 
 .composerLabel {
+  composes: body from '../../StudioTypography.module.css';
   grid-column: 1 / -1;
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .composerInput {
@@ -92,12 +91,9 @@
 }
 
 .sectionTitle {
+  composes: eyebrow from '../../StudioTypography.module.css';
   margin: 0;
   color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .shapeChips {
@@ -154,37 +150,38 @@
 }
 
 .posterBadge {
+  composes: eyebrow from '../../StudioTypography.module.css';
   position: absolute;
   right: 8px;
   bottom: 8px;
 }
 
+.posterLabel {
+  composes: eyebrow from '../../StudioTypography.module.css';
+}
+
 .projectName {
+  composes: cardTitle bodyTextAction from '../../StudioTypography.module.css';
   min-width: 0;
   height: auto;
   justify-content: flex-start;
   overflow: hidden;
   padding: 0;
-  color: var(--color-text-1);
-  font-size: 15px;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .statusLine {
+  composes: cardTitle from '../../StudioTypography.module.css';
   display: flex;
   align-items: center;
   gap: 7px;
   margin: 10px 0 0;
-  color: var(--color-text-2);
-  font-size: 12px;
 }
 
 .projectMeta {
+  composes: meta from '../../StudioTypography.module.css';
   margin: 7px 0 0;
-  color: var(--color-text-3);
-  font-size: 12px;
 }
 
 .empty {
@@ -193,9 +190,15 @@
 
 .emptyTitle {
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shapeChip {
+  composes: meta from '../../StudioTypography.module.css';
+}
+
+.modalSurface {
+  composes: surface from '../../StudioTypography.module.css';
 }
 
 @media (max-width: 760px) {

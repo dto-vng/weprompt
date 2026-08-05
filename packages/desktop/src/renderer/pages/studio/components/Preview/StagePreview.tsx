@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 import { buildSingleSceneReviewRequest, type GenerationSingleReviewRequest } from '../Generation/GenerationControls';
 import { canOpenSingleSceneReview, deriveStudioReadiness } from '../../studioReadiness';
+import studioType from '../../StudioTypography.module.css';
 
 const SAFE_STUDIO_ID = /^[A-Za-z0-9_-]{1,256}$/;
 
@@ -134,20 +135,20 @@ const StagePreview: React.FC<StagePreviewProps> = ({
           >
             <PlaceholderIcon />
           </div>
-          <p className='m-0 text-12px font-600 uppercase tracking-wide text-t-tertiary'>
+          <p className={`${studioType.eyebrow} m-0 text-t-tertiary`}>
             {t('conversation.creativeStudio.phase.review.slateLabel')}
           </p>
-          <h2 className='m-0 text-18px font-600 text-t-primary'>{slate.title}</h2>
-          <p className='m-0 text-13px text-t-secondary'>
+          <h2 className={`${studioType.cardTitle} m-0`}>{slate.title}</h2>
+          <p className={`${studioType.meta} m-0`}>
             {t('conversation.creativeStudio.scene.durationSeconds', {
               count: slate.durationSeconds,
               seconds: slate.durationSeconds,
             })}
           </p>
-          <p className='m-0 max-w-480px text-13px text-t-secondary'>
+          <p className={`${studioType.body} m-0 max-w-480px`}>
             {t('conversation.creativeStudio.phase.review.slateDescription')}
           </p>
-          <p className='m-0 max-w-480px text-12px text-t-tertiary'>
+          <p className={`${studioType.body} m-0 max-w-480px`}>
             {t('conversation.creativeStudio.phase.review.excludedFromHandoff')}
           </p>
         </section>
@@ -165,10 +166,8 @@ const StagePreview: React.FC<StagePreviewProps> = ({
         >
           <PlaceholderIcon />
         </div>
-        <h2 className='m-0 text-16px font-500 text-t-primary'>
-          {t('conversation.creativeStudio.preview.noAssetTitle')}
-        </h2>
-        <p className='m-0 max-w-420px text-13px text-t-secondary'>
+        <h2 className={`${studioType.cardTitle} m-0`}>{t('conversation.creativeStudio.preview.noAssetTitle')}</h2>
+        <p className={`${studioType.body} m-0 max-w-420px`}>
           {catalogLoading
             ? t('conversation.creativeStudio.models.loading')
             : selectedScene !== null && selectedScene.visualPrompt.trim().length === 0
@@ -231,7 +230,7 @@ const StagePreview: React.FC<StagePreviewProps> = ({
             onError={() => setFailedSource(source)}
           />
           {posterSource === null && (
-            <div role='status' className='flex items-center gap-6px px-12px pb-12px text-12px text-t-secondary'>
+            <div role='status' className={`${studioType.body} flex items-center gap-6px px-12px pb-12px`}>
               <Picture aria-hidden='true' />
               <span>{t('conversation.creativeStudio.preview.posterUnavailable')}</span>
             </div>

@@ -1,0 +1,89 @@
+.pageHeading {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: var(--fw-extrabold);
+  letter-spacing: -0.52px;
+}
+
+.body {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: var(--fw-regular);
+  letter-spacing: normal;
+}
+
+.cardTitle {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--fw-regular);
+  letter-spacing: normal;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--fw-regular);
+  letter-spacing: 0.95px;
+  text-transform: uppercase;
+}
+
+.meta {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--fw-regular);
+  letter-spacing: normal;
+}
+
+.bodyTextAction:global(.arco-btn-text),
+.bodyTextAction:global(.arco-btn-text):hover,
+.bodyTextAction:global(.arco-btn-text):focus,
+.bodyTextAction:global(.arco-btn-text):focus-visible,
+.bodyTextAction:global(.arco-btn-text):active {
+  color: var(--text-secondary);
+}
+
+.accentTextAction:global(.arco-btn-text),
+.accentTextAction:global(.arco-btn-text):hover,
+.accentTextAction:global(.arco-btn-text):focus,
+.accentTextAction:global(.arco-btn-text):focus-visible,
+.accentTextAction:global(.arco-btn-text):active {
+  color: var(--primary);
+}
+
+.bodyTextAction:global(.arco-btn-text.arco-btn-disabled),
+.accentTextAction:global(.arco-btn-text.arco-btn-disabled) {
+  color: var(--text-disabled);
+}
+
+.primaryAction {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  letter-spacing: normal;
+}
+
+.primaryAction:global(.arco-btn-primary):not(:global(.arco-btn-disabled)) {
+  color: var(--text-white);
+}
+
+.surface {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: var(--fw-regular);
+}
+
+.surface :global(.arco-btn-primary) {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  letter-spacing: normal;
+}
+
+.surface :global(.arco-btn-primary:not(.arco-btn-disabled)) {
+  color: var(--text-white);
+}

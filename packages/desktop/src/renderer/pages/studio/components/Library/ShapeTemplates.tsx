@@ -37,6 +37,7 @@ export const ShapeTemplates: React.FC<ShapeTemplatesProps> = ({ disabled, onCrea
         {SHAPES.map((shape) => (
           <Button
             key={`${shape.shotCount}-${shape.totalSeconds}`}
+            className={styles.shapeChip}
             size='small'
             disabled={disabled}
             onClick={() => void onCreate(shape)}

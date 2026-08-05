@@ -14,6 +14,8 @@ import { Refresh } from '@icon-park/react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import studioType from '../../StudioTypography.module.css';
+
 export type StoryboardDraftModalProps = {
   visible: boolean;
   project: StudioRendererProject;
@@ -186,6 +188,7 @@ const StoryboardDraftModal: React.FC<StoryboardDraftModalProps> = ({
   return (
     <Modal
       visible={visible}
+      wrapClassName={studioType.surface}
       title={t('conversation.creativeStudio.draft.title')}
       footer={footer}
       closable={!mutationPending}
@@ -195,7 +198,7 @@ const StoryboardDraftModal: React.FC<StoryboardDraftModalProps> = ({
       onCancel={handleCancel}
     >
       <div className='flex flex-col gap-14px'>
-        <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.draft.body')}</p>
+        <p className={`${studioType.body} m-0`}>{t('conversation.creativeStudio.draft.body')}</p>
         {statusContent}
         {catalogErrorMessageKey && (
           <div role='alert' className='rounded-8px border border-danger-3 bg-danger-light-1 p-12px text-danger'>
@@ -205,7 +208,7 @@ const StoryboardDraftModal: React.FC<StoryboardDraftModalProps> = ({
               <Button
                 type='text'
                 disabled={mutationPending}
-                className='mt-8px'
+                className={`${studioType.bodyTextAction} ${studioType.cardTitle} mt-8px`}
                 onClick={() => void onDiscardDraftConflict()}
               >
                 {t('conversation.creativeStudio.storyboard.discard')}
@@ -216,6 +219,7 @@ const StoryboardDraftModal: React.FC<StoryboardDraftModalProps> = ({
         {canRetryCatalog && (
           <Button
             type='text'
+            className={`${studioType.bodyTextAction} ${studioType.cardTitle}`}
             icon={<Refresh />}
             disabled={mutationPending || catalogLoading}
             onClick={() => void onRefreshCatalog()}

@@ -31,22 +31,25 @@
   align-items: center;
 }
 
+.breadcrumbButton {
+  composes: body bodyTextAction from '../../StudioTypography.module.css';
+}
+
 .breadcrumbSeparator {
   padding: 0 4px;
   color: var(--color-text-4);
 }
 
 .projectTitle {
+  composes: pageHeading from '../../StudioTypography.module.css';
   overflow: hidden;
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 18px;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .aspectChip {
+  composes: meta from '../../StudioTypography.module.css';
   flex: none;
 }
 
@@ -60,8 +63,7 @@
 }
 
 .saveState {
-  color: var(--color-text-3);
-  font-size: 12px;
+  composes: meta from '../../StudioTypography.module.css';
   white-space: nowrap;
 }
 
@@ -107,6 +109,7 @@
 }
 
 .phaseButton {
+  composes: cardTitle from '../../StudioTypography.module.css';
   display: inline-flex;
   min-width: 0;
   padding-inline: 10px;
@@ -118,7 +121,22 @@
 
 .phaseButtonActive {
   color: var(--color-text-1);
-  font-weight: 600;
+}
+
+.phaseButton:global(.arco-btn-text),
+.phaseButton:global(.arco-btn-text):hover,
+.phaseButton:global(.arco-btn-text):focus,
+.phaseButton:global(.arco-btn-text):focus-visible,
+.phaseButton:global(.arco-btn-text):active {
+  color: var(--color-text-3);
+}
+
+.phaseButtonActive:global(.arco-btn-text),
+.phaseButtonActive:global(.arco-btn-text):hover,
+.phaseButtonActive:global(.arco-btn-text):focus,
+.phaseButtonActive:global(.arco-btn-text):focus-visible,
+.phaseButtonActive:global(.arco-btn-text):active {
+  color: var(--color-text-1);
 }
 
 .phaseMarker {
@@ -176,9 +194,34 @@
   gap: 16px;
 }
 
+.assistantDrawer {
+  composes: surface from '../../StudioTypography.module.css';
+}
+
+.assistantTitle {
+  composes: cardTitle from '../../StudioTypography.module.css';
+}
+
+.assistantBody {
+  composes: body from '../../StudioTypography.module.css';
+}
+
+.assistantMeta {
+  composes: meta from '../../StudioTypography.module.css';
+}
+
+.assistantValue {
+  composes: cardTitle from '../../StudioTypography.module.css';
+  color: var(--text-primary);
+}
+
 .draftButton:global(.arco-btn-primary.arco-btn-disabled),
 .draftButton :global(.arco-btn-primary.arco-btn-disabled) {
   color: var(--color-text-1);
+}
+
+.draftButton {
+  composes: primaryAction from '../../StudioTypography.module.css';
 }
 
 .shell[data-layout='compact'] .header {

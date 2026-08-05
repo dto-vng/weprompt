@@ -15,6 +15,7 @@ import type {
   StudioSelectVariationRequest,
 } from '@/common/types/project/creativeStudioTypes';
 
+import studioType from '../../StudioTypography.module.css';
 import { createManagedStudioAssetUrl } from './StagePreview';
 
 type ActionResult = void | Promise<unknown>;
@@ -66,7 +67,7 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
       data-layout={direction}
       className='flex min-w-0 flex-col gap-8px'
     >
-      <h3 className='m-0 text-13px font-500 text-t-secondary'>{t('conversation.creativeStudio.preview.versions')}</h3>
+      <h3 className={`${studioType.cardTitle} m-0`}>{t('conversation.creativeStudio.preview.versions')}</h3>
       <ol
         className={
           direction === 'column'
@@ -109,9 +110,11 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
                   )}
                 </span>
                 <span className='flex min-w-0 flex-col items-start gap-4px'>
-                  <span className='text-12px text-t-secondary'>{versionLabel}</span>
+                  <span className={studioType.meta}>{versionLabel}</span>
                   {selected && (
-                    <span className='rounded-full bg-primary-light-1 px-6px py-2px text-10px font-500 text-primary-6'>
+                    <span
+                      className={`${studioType.eyebrow} rounded-full bg-primary-light-1 px-6px py-2px text-primary-6`}
+                    >
                       {t('conversation.creativeStudio.phase.review.selectedTake')}
                     </span>
                   )}

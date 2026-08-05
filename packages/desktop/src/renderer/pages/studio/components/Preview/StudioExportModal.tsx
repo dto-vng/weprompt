@@ -9,6 +9,8 @@ import { Button, Checkbox, Modal } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import studioType from '../../StudioTypography.module.css';
+
 export type StudioExportModalProps = {
   visible: boolean;
   project: StudioRendererProject;
@@ -47,6 +49,7 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
   return (
     <Modal
       visible={visible}
+      wrapClassName={studioType.surface}
       title={t(
         exportedFolderName === null
           ? 'conversation.creativeStudio.export.title'

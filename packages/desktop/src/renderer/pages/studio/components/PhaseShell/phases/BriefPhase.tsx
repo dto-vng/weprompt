@@ -80,13 +80,15 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller, layoutMode =
         <h2 id='studio-brief-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
           {t('conversation.creativeStudio.phase.brief.title')}
         </h2>
-        <p>{t('conversation.creativeStudio.phase.brief.description')}</p>
-        <p>{t('conversation.creativeStudio.phase.shared.noMediaGeneration')}</p>
+        <p className={styles.introCopy}>{t('conversation.creativeStudio.phase.brief.description')}</p>
+        <p className={styles.secondaryCopy}>{t('conversation.creativeStudio.phase.shared.noMediaGeneration')}</p>
       </div>
 
       <div className={styles.form}>
         <div className={styles.field}>
-          <label htmlFor='studio-brief-name'>{t('conversation.creativeStudio.phase.brief.nameLabel')}</label>
+          <label htmlFor='studio-brief-name' className={styles.fieldLabel}>
+            {t('conversation.creativeStudio.phase.brief.nameLabel')}
+          </label>
           <Input
             id='studio-brief-name'
             value={draft.name}
@@ -103,7 +105,9 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller, layoutMode =
         </div>
 
         <div className={`${styles.field} ${styles.fullWidth}`}>
-          <label htmlFor='studio-brief-intent'>{t('conversation.creativeStudio.phase.brief.intentLabel')}</label>
+          <label htmlFor='studio-brief-intent' className={styles.fieldLabel}>
+            {t('conversation.creativeStudio.phase.brief.intentLabel')}
+          </label>
           <Input.TextArea
             id='studio-brief-intent'
             value={draft.brief}
@@ -121,7 +125,9 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller, layoutMode =
         </div>
 
         <div className={styles.field}>
-          <label htmlFor='studio-brief-duration'>{t('conversation.creativeStudio.phase.brief.durationLabel')}</label>
+          <label htmlFor='studio-brief-duration' className={styles.fieldLabel}>
+            {t('conversation.creativeStudio.phase.brief.durationLabel')}
+          </label>
           <InputNumber
             id='studio-brief-duration'
             aria-label={t('conversation.creativeStudio.phase.brief.durationLabel')}
@@ -145,7 +151,9 @@ export const BriefPhase: React.FC<BriefPhaseProps> = ({ controller, layoutMode =
         </div>
 
         <div className={styles.field}>
-          <label htmlFor='studio-brief-aspect'>{t('conversation.creativeStudio.phase.brief.aspectRatioLabel')}</label>
+          <label htmlFor='studio-brief-aspect' className={styles.fieldLabel}>
+            {t('conversation.creativeStudio.phase.brief.aspectRatioLabel')}
+          </label>
           <Select
             id='studio-brief-aspect'
             aria-label={t('conversation.creativeStudio.phase.brief.aspectRatioLabel')}

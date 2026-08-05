@@ -34,7 +34,7 @@ export const StudioPhaseHeader: React.FC<StudioPhaseHeaderProps> = ({ project, s
     <header className={styles.header}>
       <div className={styles.headerCopy}>
         <nav aria-label={t('conversation.creativeStudio.phase.shared.backToLibrary')} className={styles.breadcrumb}>
-          <Button type='text' size='small' icon={<Left />} onClick={onBack}>
+          <Button type='text' size='small' icon={<Left />} className={styles.breadcrumbButton} onClick={onBack}>
             {t('conversation.creativeStudio.phase.shared.backToLibrary')}
           </Button>
           <span aria-hidden='true' className={styles.breadcrumbSeparator}>

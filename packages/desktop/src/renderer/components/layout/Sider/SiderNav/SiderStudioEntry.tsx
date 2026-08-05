@@ -5,6 +5,7 @@ import classNames from 'classnames';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type { StudioProjectSummary } from '@/common/types/project/creativeStudioTypes';
+import studioType from '@renderer/pages/studio/StudioTypography.module.css';
 import { isElectronDesktop } from '@renderer/utils/platform';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
 
@@ -65,6 +66,7 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
           aria-label={collapsed ? label : undefined}
           className={classNames(
             'box-border group h-34px w-full flex items-center text-t-primary transition-all',
+            studioType.bodyTextAction,
             collapsed ? 'justify-center rd-8px' : 'justify-start gap-8px px-10px rd-0.5rem',
             isMobile && !collapsed && 'sider-action-btn-mobile',
             isActive ? 'bg-fill-3' : 'hover:bg-fill-3 active:bg-fill-4'
@@ -80,9 +82,7 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
           type='text'
           onClick={onClick}
         >
-          {!collapsed && (
-            <span className='collapsed-hidden text-t-primary text-14px font-[500] leading-24px'>{label}</span>
-          )}
+          {!collapsed && <span className={classNames('collapsed-hidden leading-24px', studioType.body)}>{label}</span>}
         </Button>
       </Tooltip>
       {!collapsed && (
@@ -92,7 +92,11 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
               <Button
                 key={project.id}
                 type='text'
-                className='h-26px w-full justify-start overflow-hidden px-4px text-12px text-t-secondary'
+                className={classNames(
+                  'h-26px w-full justify-start overflow-hidden px-4px',
+                  studioType.cardTitle,
+                  studioType.bodyTextAction
+                )}
                 onClick={() => onProjectClick(project)}
               >
                 <span className='block min-w-0 truncate'>{project.name}</span>
@@ -100,7 +104,11 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
             ))}
             <Button
               type='text'
-              className='h-26px w-full justify-start px-4px text-11px font-600 text-t-secondary'
+              className={classNames(
+                'h-26px w-full justify-start px-4px',
+                studioType.eyebrow,
+                studioType.accentTextAction
+              )}
               onClick={onClick}
             >
               {t('conversation.creativeStudio.library.sidebar.all')} ·{' '}
@@ -108,10 +116,10 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
             </Button>
           </div>
           <div className='mt-6px border-t border-border-2 pt-6px pl-24px'>
-            <p className='m-0 text-10px font-600 tracking-0.06em text-t-secondary'>
+            <p className={classNames('m-0 text-t-secondary', studioType.eyebrow)}>
               {t('conversation.creativeStudio.library.sidebar.noCreditsTitle')}
             </p>
-            <p className='m-0 mt-2px text-10px leading-14px text-t-tertiary'>
+            <p className={classNames('m-0 mt-2px leading-14px', studioType.body)}>
               {t('conversation.creativeStudio.library.sidebar.noCreditsBody')}
             </p>
           </div>

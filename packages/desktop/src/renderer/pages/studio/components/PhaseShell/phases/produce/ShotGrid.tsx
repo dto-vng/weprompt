@@ -211,6 +211,7 @@ export const ShotGrid: React.FC<ShotGridProps> = ({
 
       <Modal
         visible={previewScene !== null && previewAsset !== null}
+        wrapClassName={styles.modalSurface}
         title={previewScene?.title}
         footer={null}
         unmountOnExit

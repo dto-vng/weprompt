@@ -1,4 +1,5 @@
 .phase {
+  composes: body from '../../../../StudioTypography.module.css';
   display: flex;
   width: 100%;
   max-width: 100%;
@@ -32,9 +33,15 @@
 .connectHeading {
   margin: 0;
   color: var(--color-text-1);
-  font-size: 14px;
-  font-weight: 600;
   scroll-margin-block: 24px;
+}
+
+.engineHeading {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
+}
+
+.connectHeading {
+  composes: cardTitle from '../../../../StudioTypography.module.css';
 }
 
 .engineHeading:focus-visible,
@@ -65,11 +72,10 @@
 }
 
 .engineRoute {
+  composes: meta from '../../../../StudioTypography.module.css';
   min-width: 0;
   overflow: hidden;
   flex: 1 1 0;
-  color: var(--color-text-2);
-  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -81,6 +87,7 @@
 }
 
 .changeEnginesButton {
+  composes: cardTitle bodyTextAction from '../../../../StudioTypography.module.css';
   flex: none;
   white-space: nowrap;
 }
@@ -101,7 +108,6 @@
 
 .connectHeading {
   max-width: 560px;
-  font-size: 20px;
 }
 
 .connectActions {
@@ -185,9 +191,11 @@
 }
 
 .emptyCanvas > span {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  color: var(--color-text-3);
+}
+
+.emptyLabel {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
 }
 
 .shotBody {
@@ -220,16 +228,29 @@
 .takeRatio,
 .shotMeta,
 .progressRow {
-  color: var(--color-text-3);
-  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.shotNumber {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
+}
+
+.takeRatio {
+  composes: meta from '../../../../StudioTypography.module.css';
+}
+
+.shotMeta {
+  composes: meta from '../../../../StudioTypography.module.css';
+}
+
+.progressRow {
+  composes: meta from '../../../../StudioTypography.module.css';
 }
 
 .shotTitle {
+  composes: cardTitle from '../../../../StudioTypography.module.css';
   overflow: hidden;
   max-width: 100%;
-  color: var(--color-text-1);
-  font-size: 14px;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -335,6 +356,10 @@
 
 .previewModal :global(.arco-modal-content) {
   min-width: 0;
+}
+
+.modalSurface {
+  composes: surface from '../../../../StudioTypography.module.css';
 }
 
 .phase[data-layout='drawer'] .content {

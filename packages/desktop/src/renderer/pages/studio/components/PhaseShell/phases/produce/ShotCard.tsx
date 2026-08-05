@@ -91,7 +91,7 @@ export const ShotCard: React.FC<ShotCardProps> = ({
           </Button>
         ) : (
           <div className={styles.emptyCanvas}>
-            <span>{t('conversation.creativeStudio.phase.produce.noVisualYet')}</span>
+            <span className={styles.emptyLabel}>{t('conversation.creativeStudio.phase.produce.noVisualYet')}</span>
             <Button size='small' disabled={mutationPending} onClick={onWriteVisual}>
               {t('conversation.creativeStudio.phase.produce.writeVisual')}
             </Button>

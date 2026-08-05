@@ -27,7 +27,7 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
       <h2 id='studio-review-phase-heading' data-studio-phase-heading tabIndex={-1} className={styles.heading}>
         {t('conversation.creativeStudio.phase.review.title')}
       </h2>
-      <p className='m-0 text-14px text-t-secondary'>{t('conversation.creativeStudio.phase.review.description')}</p>
+      <p className={`${styles.description} m-0`}>{t('conversation.creativeStudio.phase.review.description')}</p>
       <div className={styles.workspace}>
         <div className={styles.previewArea}>
           <ReviewCut
@@ -42,7 +42,7 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
           />
         </div>
         <aside aria-labelledby='studio-review-handoff-heading' className={styles.handoff}>
-          <h3 id='studio-review-handoff-heading' className='m-0 text-14px font-600 text-t-primary'>
+          <h3 id='studio-review-handoff-heading' className={`${styles.handoffTitle} m-0`}>
             {t('conversation.creativeStudio.phase.review.handoff')}
           </h3>
           <div className={styles.handoffSummary}>
@@ -57,11 +57,13 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
               })}
             </span>
           </div>
-          <p className='m-0 text-12px text-t-secondary'>
+          <p className={`${styles.handoffDescription} m-0`}>
             {t('conversation.creativeStudio.phase.review.handoffDescription')}
           </p>
           {readiness.selectedAssetCount === 0 && (
-            <p className='m-0 text-12px text-t-secondary'>{t('conversation.creativeStudio.phase.review.noAssets')}</p>
+            <p className={`${styles.handoffDescription} m-0`}>
+              {t('conversation.creativeStudio.phase.review.noAssets')}
+            </p>
           )}
         </aside>
       </div>

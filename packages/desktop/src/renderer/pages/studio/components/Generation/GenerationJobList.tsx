@@ -10,6 +10,8 @@ import { Attention, CheckOne, CloseOne, Loading, Time } from '@icon-park/react';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import studioType from '../../StudioTypography.module.css';
+
 type ActionResult = void | Promise<unknown>;
 
 export type GenerationJobActionIssue = {
@@ -114,11 +116,11 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
       className='flex min-w-0 flex-col gap-10px rounded-8px border border-border-2 bg-fill-1 p-12px'
     >
       <div className='flex flex-wrap items-center justify-between gap-8px'>
-        <h3 className='m-0 text-14px font-600 text-t-primary'>
+        <h3 className={`${studioType.cardTitle} m-0`}>
           {t('conversation.creativeStudio.phase.produce.activityTitle')}
         </h3>
         {runningCount > 0 && (
-          <span role='status' className='text-12px text-t-secondary'>
+          <span role='status' className={studioType.meta}>
             {t('conversation.creativeStudio.phase.produce.jobsRunning', { count: runningCount })}
           </span>
         )}
@@ -132,7 +134,7 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
       )}
 
       {sortedJobs.length === 0 ? (
-        <p className='m-0 text-12px text-t-tertiary'>{t('conversation.creativeStudio.phase.produce.activityEmpty')}</p>
+        <p className={`${studioType.body} m-0`}>{t('conversation.creativeStudio.phase.produce.activityEmpty')}</p>
       ) : (
         <ul className='m-0 flex list-none flex-col gap-8px p-0'>
           {sortedJobs.map((candidate) => {
@@ -171,11 +173,9 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
                   <span aria-hidden='true' className='flex text-t-secondary'>
                     {statusIcon(candidate.status)}
                   </span>
-                  <span className='text-12px font-500 text-t-primary'>{t(jobStatusKey(candidate.status))}</span>
-                  <span className='text-12px text-t-secondary'>
-                    {sceneTitles[candidate.sceneId] ?? candidate.sceneId}
-                  </span>
-                  <span className='break-all text-11px text-t-tertiary'>
+                  <span className={studioType.cardTitle}>{t(jobStatusKey(candidate.status))}</span>
+                  <span className={studioType.body}>{sceneTitles[candidate.sceneId] ?? candidate.sceneId}</span>
+                  <span className={`${studioType.meta} break-all`}>
                     {candidate.provider.providerId} · {candidate.provider.model}
                   </span>
                 </div>
@@ -194,7 +194,7 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
                 {typeof candidate.progress === 'number' && (
                   <div className='mt-8px'>
                     <Progress percent={candidate.progress} size='small' showText={false} />
-                    <span className='text-11px text-t-secondary'>
+                    <span className={studioType.meta}>
                       {t('conversation.creativeStudio.jobs.progress', { percent: candidate.progress })}
                     </span>
                   </div>

@@ -845,6 +845,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
       />
       <Modal
         visible={duplicateChargeJobId !== null}
+        wrapClassName={styles.modalSurface}
         title={t('conversation.creativeStudio.jobs.retryChargeTitle')}
         closable={!studioJobs.mutationPending}
         maskClosable={!studioJobs.mutationPending}

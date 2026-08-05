@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { StudioScene } from '@/common/types/project/creativeStudioTypes';
 
+import studioType from '../StudioTypography.module.css';
+
 export type SceneTimelineReviewState = 'selected-take' | 'missing-slate' | 'running' | 'failed';
 
 export type SceneTimelineProps = {
@@ -65,9 +67,9 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
       className='flex min-w-0 flex-col gap-10px rounded-12px border border-border-2 bg-base p-14px'
     >
       <header className='flex flex-wrap items-center justify-between gap-8px'>
-        <h2 className='m-0 text-14px font-600 text-t-primary'>{t('conversation.creativeStudio.timeline.title')}</h2>
+        <h2 className={`${studioType.cardTitle} m-0`}>{t('conversation.creativeStudio.timeline.title')}</h2>
         {orderedScenes.length > 0 && (
-          <div role='status' className='flex items-center gap-6px text-12px text-t-secondary'>
+          <div role='status' className={`${studioType.meta} flex items-center gap-6px`}>
             <span>
               {t('conversation.creativeStudio.timeline.totalDurationFull', {
                 count: totalDurationSeconds,
@@ -79,7 +81,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
       </header>
 
       {orderedScenes.length === 0 ? (
-        <p className='m-0 py-12px text-center text-13px text-t-tertiary'>
+        <p className={`${studioType.body} m-0 py-12px text-center`}>
           {t('conversation.creativeStudio.timeline.noScenes')}
         </p>
       ) : (
@@ -137,13 +139,13 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({
                   onClick={() => onSelectScene(scene.id)}
                   onKeyDown={(event) => selectAdjacent(event, index)}
                 >
-                  <span className='max-w-full truncate text-12px font-500 text-t-primary'>{scene.title}</span>
-                  <span className='text-11px text-t-tertiary'>{durationLabel}</span>
+                  <span className={`${studioType.cardTitle} max-w-full truncate`}>{scene.title}</span>
+                  <span className={studioType.meta}>{durationLabel}</span>
                   {reviewState !== undefined && reviewPresentation !== null && (
                     <span
                       id={reviewStateId}
                       data-review-state={reviewState}
-                      className='flex max-w-full items-center gap-4px rounded-full bg-fill-2 px-6px py-2px text-10px text-t-secondary'
+                      className={`${studioType.eyebrow} flex max-w-full items-center gap-4px rounded-full bg-fill-2 px-6px py-2px text-t-secondary`}
                     >
                       {reviewPresentation.icon}
                       <span className='truncate'>{reviewPresentation.label}</span>

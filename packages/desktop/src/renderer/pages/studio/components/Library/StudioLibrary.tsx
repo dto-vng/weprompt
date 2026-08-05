@@ -254,6 +254,7 @@ export const StudioLibrary: React.FC = () => {
       )}
 
       <Modal
+        wrapClassName={styles.modalSurface}
         title={t('conversation.creativeStudio.library.deleteConfirmTitle')}
         visible={deleteCandidate !== null}
         onCancel={() => !deleting && setDeleteCandidate(null)}

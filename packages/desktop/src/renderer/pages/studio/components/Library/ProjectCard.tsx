@@ -59,7 +59,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, locale, disab
         <div className={styles.poster}>
           {posterSource === null ? (
             <div className={styles.scriptPoster}>
-              <Tag>{t('conversation.creativeStudio.library.scriptOnly')}</Tag>
+              <Tag className={styles.posterLabel}>{t('conversation.creativeStudio.library.scriptOnly')}</Tag>
             </div>
           ) : (
             <img className={styles.posterImage} src={posterSource} alt={project.name} />

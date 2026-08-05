@@ -142,27 +142,27 @@ export const AssistantDock: React.FC<AssistantDockProps> = ({
       }}
     >
       <div>
-        <h3 id={titleId} className='m-0 text-16px font-600 text-t-primary'>
+        <h3 id={titleId} className={`${styles.assistantTitle} m-0`}>
           {t(labelKey)}
         </h3>
-        <p className='mb-0 mt-6px text-13px text-t-secondary'>
+        <p className={`${styles.assistantBody} mb-0 mt-6px`}>
           {t('conversation.creativeStudio.phase.write.assistantDescription')}
         </p>
       </div>
       <div role='status' aria-live='polite' className='rounded-8px border border-border-2 bg-fill-1 p-12px'>
-        <p className='m-0 text-13px font-500 text-t-primary'>{t(statusKey)}</p>
+        <p className={`${styles.assistantValue} m-0`}>{t(statusKey)}</p>
         {ready && selected !== null && (
           <dl className='mb-0 mt-10px grid grid-cols-[max-content_minmax(0,1fr)] gap-x-10px gap-y-6px'>
-            <dt className='text-12px text-t-tertiary'>{t('conversation.creativeStudio.draft.providerLabel')}</dt>
-            <dd className='m-0 break-all text-13px text-t-primary'>
+            <dt className={styles.assistantMeta}>{t('conversation.creativeStudio.draft.providerLabel')}</dt>
+            <dd className={`${styles.assistantValue} m-0 break-all`}>
               {selectedOption?.providerName ?? selected.providerId}
             </dd>
-            <dt className='text-12px text-t-tertiary'>{t('conversation.creativeStudio.draft.modelLabel')}</dt>
-            <dd className='m-0 break-all text-13px text-t-primary'>{selected.model}</dd>
+            <dt className={styles.assistantMeta}>{t('conversation.creativeStudio.draft.modelLabel')}</dt>
+            <dd className={`${styles.assistantValue} m-0 break-all`}>{selected.model}</dd>
           </dl>
         )}
       </div>
-      <p className='m-0 text-12px text-t-tertiary'>
+      <p className={`${styles.assistantBody} m-0`}>
         {t('conversation.creativeStudio.phase.write.textChargeDisclosure')}
       </p>
       <Button

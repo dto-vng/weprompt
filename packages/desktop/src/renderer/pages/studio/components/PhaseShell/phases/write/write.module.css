@@ -1,4 +1,5 @@
 .phase {
+  composes: body from '../../../../StudioTypography.module.css';
   display: flex;
   width: 100%;
   max-width: 100%;
@@ -17,9 +18,9 @@
 }
 
 .heading {
+  composes: cardTitle from '../../../../StudioTypography.module.css';
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 18px;
+  color: var(--text-primary);
   scroll-margin-block: 24px;
 }
 
@@ -28,13 +29,16 @@
   outline-offset: 4px;
 }
 
+.secondaryCopy {
+  composes: body from '../../../../StudioTypography.module.css';
+}
+
 .briefLine {
+  composes: body from '../../../../StudioTypography.module.css';
   display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 8px;
-  color: var(--color-text-2);
-  font-size: 13px;
 }
 
 .briefLine strong {
@@ -101,16 +105,14 @@
 }
 
 .tableTitle {
+  composes: cardTitle from '../../../../StudioTypography.module.css';
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 16px;
-  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .tableDescription {
+  composes: body from '../../../../StudioTypography.module.css';
   margin: 4px 0 0;
-  color: var(--color-text-3);
-  font-size: 12px;
 }
 
 .tableScroll {
@@ -126,13 +128,10 @@
 }
 
 .tableHeader {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
   border-bottom: 1px solid var(--color-border-2);
   background: var(--color-fill-1);
   color: var(--color-text-3);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .tableHeader span {
@@ -179,11 +178,10 @@
 }
 
 .compactZoneHeading {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
   display: none;
   margin: 0;
   color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .timingZone {
@@ -197,10 +195,9 @@
 }
 
 .shotNumber {
+  composes: eyebrow from '../../../../StudioTypography.module.css';
   color: var(--color-text-1);
-  font-size: 18px;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
 }
 
 .rowActions {
@@ -256,6 +253,7 @@
 }
 
 .durationChip {
+  composes: meta from '../../../../StudioTypography.module.css';
   width: fit-content;
   min-width: 54px;
   max-width: 100%;
@@ -287,10 +285,14 @@
 }
 
 .detailsToggle {
+  composes: cardTitle bodyTextAction from '../../../../StudioTypography.module.css';
   width: fit-content;
   align-self: flex-start;
   padding-inline: 0;
-  color: var(--color-text-2);
+}
+
+.bodyTextAction {
+  composes: cardTitle bodyTextAction from '../../../../StudioTypography.module.css';
 }
 
 .detailsIcon {
@@ -326,6 +328,7 @@
 }
 
 .referencePreview {
+  composes: meta from '../../../../StudioTypography.module.css';
   display: flex;
   min-width: 0;
   margin: 0;
@@ -336,7 +339,6 @@
   border-radius: 8px;
   background: var(--color-fill-1);
   color: var(--color-text-2);
-  font-size: 11px;
 }
 
 .referenceImage {
@@ -373,12 +375,10 @@
 }
 
 .readiness {
+  composes: meta from '../../../../StudioTypography.module.css';
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .readinessDot {
@@ -408,8 +408,7 @@
 }
 
 .saveStatus {
-  color: var(--color-text-3);
-  font-size: 11px;
+  composes: meta from '../../../../StudioTypography.module.css';
 }
 
 .fieldError,
@@ -428,8 +427,14 @@
 .statusMessage,
 .sceneLimit {
   margin: 0;
-  color: var(--color-text-2);
-  font-size: 12px;
+}
+
+.statusMessage {
+  composes: body from '../../../../StudioTypography.module.css';
+}
+
+.sceneLimit {
+  composes: body from '../../../../StudioTypography.module.css';
 }
 
 .conflictActions {
@@ -447,11 +452,10 @@
 }
 
 .empty {
+  composes: body from '../../../../StudioTypography.module.css';
   min-width: 0;
   margin: 0;
   padding: 32px 16px;
-  color: var(--color-text-3);
-  font-size: 13px;
   text-align: center;
 }
 
@@ -474,16 +478,14 @@
 }
 
 .pacingTitle {
+  composes: cardTitle from '../../../../StudioTypography.module.css';
   margin: 0;
-  color: var(--color-text-1);
-  font-size: 14px;
-  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .pacingSummary {
+  composes: meta from '../../../../StudioTypography.module.css';
   margin: 3px 0 0;
-  color: var(--color-text-3);
-  font-size: 12px;
 }
 
 .pacingTrackWrap {
@@ -517,6 +519,7 @@
 }
 
 .pacingBlock {
+  composes: meta from '../../../../StudioTypography.module.css';
   display: flex;
   min-width: 54px;
   background: var(--color-fill-2);
@@ -534,7 +537,6 @@
   gap: 8px;
   border-radius: 0;
   color: var(--color-text-2);
-  font-size: 11px;
 }
 
 .pacingBlock :global(.arco-btn)[aria-current='true'] {
@@ -566,6 +568,7 @@
 }
 
 .pacingFeedback {
+  composes: body from '../../../../StudioTypography.module.css';
   display: flex;
   min-width: 0;
   flex: 1;
@@ -575,8 +578,6 @@
 
 .pacingFeedback p {
   margin: 0;
-  color: var(--color-text-3);
-  font-size: 12px;
 }
 
 .srOnly {
@@ -589,6 +590,10 @@
   border: 0;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.modalSurface {
+  composes: surface from '../../../../StudioTypography.module.css';
 }
 
 .phase[data-layout='compact'] .tableHeader {

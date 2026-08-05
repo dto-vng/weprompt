@@ -361,7 +361,13 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
             />
           </div>
           {draft.visualPrompt.trim().length === 0 && (
-            <Button type='text' size='small' icon={<Magic aria-hidden='true' />} onClick={onSuggestVisual}>
+            <Button
+              type='text'
+              size='small'
+              className={styles.bodyTextAction}
+              icon={<Magic aria-hidden='true' />}
+              onClick={onSuggestVisual}
+            >
               {t('conversation.creativeStudio.phase.write.suggestVisual')}
             </Button>
           )}
@@ -442,6 +448,7 @@ export const ScriptRow: React.FC<ScriptRowProps> = ({
 
       <Modal
         title={t('conversation.creativeStudio.storyboard.removeConfirmTitle')}
+        wrapClassName={styles.modalSurface}
         visible={removeConfirmVisible}
         footer={
           <>

@@ -6,7 +6,22 @@
   min-height: 100%;
   overflow: auto;
   padding: clamp(16px, 3vw, 28px) clamp(16px, 3.5vw, 36px);
-  background: var(--color-bg-1);
+  background: var(--studio-page-background);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: var(--fw-regular);
+}
+
+.page :global(.arco-btn-primary) {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  letter-spacing: normal;
+}
+
+.page :global(.arco-btn-primary:not(.arco-btn-disabled)) {
+  color: var(--text-white);
 }
 
 .centered {
@@ -37,4 +52,8 @@
   color: var(--color-danger-6);
   background: var(--color-danger-light-1);
   overflow-wrap: anywhere;
+}
+
+.modalSurface {
+  composes: surface from './StudioTypography.module.css';
 }
