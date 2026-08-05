@@ -1,17 +1,21 @@
 # Creative Studio — landing plan
 
-**Status:** agreed (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
-**Source:** `codex/studio-integration` (local, unpushed)
+**Status:** agreed, rev 2 (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
+**Source:** `codex/studio-integration` — archived immutably at `refs/archive/studio-integration-2026-08-05` = `20735e392`
+
+> **Rev 2** incorporates an execution review that found four blocking defects in rev 1, two of them factual errors in the plan itself. Corrections are marked **[rev 2]** and the superseded claims are stated rather than quietly deleted, so nobody acts on a remembered version of this document.
 
 ## 1. Problem
 
-Creative Studio is the largest body of work in the repository and it exists nowhere except one local worktree. It is not in `TASKS.md`, has no epic entry, no merge request, and no agreed acceptance definition. Its base is `sprint1`; the target is `sprint2`.
+Creative Studio is the largest body of work in the repository and it exists nowhere except one local clone. It is not in the plan of record, has no merge request, and no agreed acceptance definition. Its base is `sprint1`; the target is `sprint2`.
 
 This document defines how it lands, what must be true before it becomes user-visible, and who — or what — actually reviews it.
 
+**Clone topology.** `Projects/WePrompt` and `Documents/WePrompt` are separate clones, not worktrees of one repository. All landing work happens in **`/Users/lap16603/Documents/WePrompt`**, which holds the branch. This plan is reachable there as `refs/handoff/landing-plan`.
+
 ## 2. What is landing
 
-Measured against the merge base (`54cfef7a7`):
+Measured against the merge base (`54cfef7a7`), before reconstruction:
 
 | | |
 | --- | --- |
@@ -20,154 +24,170 @@ Measured against the merge base (`54cfef7a7`):
 | Tests | 34,500 lines across 78 files |
 | Locale JSON | 5,574 lines across 12 languages |
 | Commits (non-merge) | 102 |
-| Real merge conflicts against `origin/sprint2` | **1** |
+| Real merge conflicts against `origin/sprint2` | 1 |
 
-Test-to-source is 1.41:1. The coverage floor pinned on `sprint2` (statements 54, branches 50, functions 50, lines 55) is therefore low-risk, and `just push` runs `test`, not `test:coverage` — coverage is a manual guard, not a gate.
+**[rev 2] Test volume is not coverage.** Rev 1 argued from a 1.41:1 test-to-source line ratio that the pinned coverage floor was low-risk. That is a proxy, not a measurement — line counts say nothing about which branches execute. The floor (`statements 54, branches 50, functions 50, lines 55`) must be verified by running `bun run test:coverage` on the reconstructed branch. Note `just push` runs `test`, not `test:coverage`, so this is a deliberate manual step, not something the push gate will catch.
 
-Commit scopes: 97 of 102 are Studio (`studio`, `creative-studio`, `remote-media`). The remaining five are two structural refactors that are **not** Studio work and are treated separately in §4.
+Commit scopes: 97 of 102 are Studio. The remaining five are two structural refactors that are not Studio work and are handled separately in §4.
 
 ### Functional state
 
-Both generation paths are verified working end-to-end against OpenRouter with real paid calls: image via `google/gemini-3-pro-image`, video via `bytedance/seedance-2.0-fast` through a dedicated `openrouter-video-v1` adapter. The live Electron e2e journey passes. UI fidelity passes 1 and 2 (typography, slate placeholders, library structure) have landed on the branch.
+Both generation paths are verified end to end against OpenRouter with real paid calls: image via `google/gemini-3-pro-image`, video via `bytedance/seedance-2.0-fast` through the `openrouter-video-v1` adapter. The live Electron e2e journey passes. UI fidelity passes 1 and 2 have landed.
 
-## 3. Merge mechanics
+## 3. Merge mechanics and preconditions
 
-**The one conflict.** `packages/desktop/src/renderer/services/i18n/i18n-keys.d.ts` is modify/delete: `sprint2` stopped tracking it (`dd86d861d`), Studio kept committing it. Resolution is to accept the deletion and regenerate with `bun run i18n:types`. No Studio branch may reintroduce the tracked file.
+Run in this order. Steps 1–4 are preconditions for any merge; skipping step 3 silently degrades locale merges.
 
-**Locale merges.** `sprint2` added a key-level locale JSON merge driver (`6f914b969`). Confirm it is active locally (`git config --get merge.locale-json.driver`) before merging MR 3, which touches all 12 locale files.
+1. **Fresh fetch.** `git fetch origin` over VPN. Every measurement in this document comes from a cached ref (`origin/sprint2` = `343b725c4`, 2026-08-03). Do not use the divergent local `sprint2` in either clone — the one in `Projects` is a docs-only branch 42 commits behind, merge-base `5bb330c57`.
+2. **Fresh merge simulation.** Re-run `git merge-tree --write-tree --name-only <studio-tip> origin/sprint2` and compare against the single expected conflict below.
+3. **[rev 2] Register the locale merge driver.** `sprint2` declares `packages/desktop/src/renderer/services/i18n/locales/**/*.json merge=locale-json` in `.gitattributes`, but the driver is registered **per clone** by `just git-setup`. It is **not currently registered in the Documents clone** — verified: `git check-attr merge -- <a locale file>` returns `merge: unspecified`. Until sprint2's `justfile` is in the working tree and `just git-setup` has run, every locale merge falls back to line-based and will hand-conflict, exactly as it did through eight sprint-1 merges. Prove it with `git check-attr` and `git config --get merge.locale-json.driver` before merging MR 3.
+4. **Reserve the archive.** Already done: `refs/archive/studio-integration-2026-08-05` = `20735e392`.
 
-**A latent rename hazard.** Studio moved `services/autoUpdaterService.ts` → `services/update/`, and `services/appOperations/` → `services/app-operations/`. `sprint2` still carries the old paths, including `tests/unit/process/services/autoUpdaterService.test.ts`. Today this merges cleanly, but any `sprint2` change to a file at an old path becomes a modify/delete conflict. This is the single strongest argument for landing MR 0 first and immediately.
+**The one expected conflict.** `renderer/services/i18n/i18n-keys.d.ts` is modify/delete — `sprint2` stopped tracking it (`dd86d861d`), Studio kept committing it. Accept the deletion and regenerate with `bun run i18n:types`. No landing branch may reintroduce the tracked file.
 
-> Note for anyone who read an earlier characterisation of this as an "updater security fix": it is not. `1c6bdfded` is a pure path move with no behavioural change.
+**A latent rename hazard.** Studio moved `services/autoUpdaterService.ts` → `services/update/` and `services/appOperations/` → `services/app-operations/`. `sprint2` still carries the old paths, including `tests/unit/process/services/autoUpdaterService.test.ts`. This merges cleanly today, but any `sprint2` change at an old path becomes a modify/delete conflict — the reason MR 0 is urgent (§9).
+
+> Rev 1 described the updater move as a security fix. It is not: `1c6bdfded` is a pure path move with no behavioural change.
 
 ## 4. MR sequence
 
-Ordered so that **no user-reachable surface exists until the final MR**. Every MR must pass `bunx tsc --noEmit`, `bun run test`, and `node scripts/check-i18n.js` independently, so `git bisect` remains meaningful.
+**[rev 2] Commits are reconstructed, not preserved.** Rev 1 promised both path-partitioned MRs (§4) and that "the 102 commits land as they are" (§7). Those are mutually exclusive: sampling the first 40 commits, 14 span two or more of the proposed partitions and four span all of contract, engine, UI and locale. MR 0's commits are also non-contiguous. Reconstruct exact-path, independently-compiling commits for each MR from the archived tip. The archive ref is the record of what was actually built; the MRs are the reviewable presentation of it.
+
+**[rev 2] A default-off feature flag is required.** Rev 1 claimed reverting MR 4 would disable Studio. That is false as written: `StudioMediaModelsSection` is mounted unconditionally at `ModelModalContent/index.tsx:716`, so MR 3 alone exposes Studio's model configuration in Settings, and MR 2 starts services, registers IPC and protocol behaviour, and resumes jobs. One shared flag, default off, enforced independently in **both** the main and renderer processes — main gates service start, job resumption, IPC registration and the protocol handler; renderer gates the route, the navigation entry, and the Settings section. Only MR 4 flips it. Enforcement in one process only is not sufficient: a renderer-only flag leaves jobs resuming in the background, and a main-only flag leaves dead UI reachable.
+
+Every MR must pass `bunx tsc --noEmit`, `bun run test`, and `node scripts/check-i18n.js` independently, so `git bisect` stays meaningful.
 
 ### MR 0 — structural refactors
 
-`1c6bdfded refactor(process): group update and native modules`
-`c62a2a0e4 refactor(settings): split model settings content`
-
-14 renamed paths, no behavioural change. Lands alone and first. Verified by rename detection (`git diff -M --stat` should show renames, not add/delete pairs) plus green gates. Collapses the conflict surface described in §3 before it can bite.
+The two non-Studio refactors: `group update and native modules` and `split model settings content`. 14 renamed paths, no behavioural change. Verified by rename detection (`git diff -M --stat` shows renames, not add/delete pairs) plus green gates.
 
 ### MR 1 — contract
 
-`common/types/project/creativeStudioTypes.ts`, `common/adapter/ipcBridge.ts` bindings, `process/bridge/native/**` payload schemas, and their tests. **21 files, +3,170.**
+`common/types/project/creativeStudioTypes.ts`, `common/adapter/ipcBridge.ts` bindings, `process/bridge/native/**` payload schemas, and their tests. Compiles standalone with no behaviour. Reviewers confirm every `fs/*`-style binding has a snake_case response mapper — a recurring silent-bug class, since AionCore DTOs are snake_case.
 
-Compiles standalone with no behaviour. This is the seam every later MR depends on, so it carries the highest review value per line. Reviewers should confirm every `fs/*`-style binding has a snake_case response mapper — a recurring silent-bug class in this codebase, since AionCore DTOs are snake_case and the renderer expects camelCase.
+### MR 2 — engine (flag-gated)
 
-### MR 2 — engine
+`process/services/creative-studio/**`, `process/services/remote-media/**`, and their tests, with service start, job resumption, IPC registration and the privileged `weprompt-studio` scheme all behind the flag.
 
-`process/services/creative-studio/**`, `process/services/remote-media/**`, and their tests. **49 files, +26,119.**
+Security-critical surface: `remoteMediaDownloader.ts` (DNS pinning, host lock, private-IP blocklist, host-scoped `Authorization` re-evaluated per redirect hop); `mediaProtocol.ts` (path containment); `providerResolver.ts` and `creativeStudioService.ts` (the mirrored `silentOutput` gate and its single `openrouter-video-v1` exception); `jobManager.ts` (lifecycle, poll backoff, retry lineage, `submission_unknown` duplicate-charge protection); `store.ts` / `mediaStore.ts` (CAS/revision-guarded mutation).
 
-Includes main-process registration of the privileged `weprompt-studio` scheme from `packages/desktop/src/index.ts`. Registering the scheme without any UI is inert — nothing requests those URLs until MR 3 ships and MR 4 routes it.
+### MR 3 — UI, settings, and locales (flag-gated, unrouted)
 
-The security-critical surface lives here:
+`renderer/pages/studio/**`, the settings media-models section, all 12 locale files, and unit tests. Excludes `Router.tsx` and `Sider/**`. The Settings section must be flag-gated here, not left mounted.
 
-- `remoteMediaDownloader.ts` — DNS pinning, host lock, private-IP blocklist, host-scoped `Authorization` re-evaluated per redirect hop
-- `mediaProtocol.ts` — the protocol handler's path containment
-- `providerResolver.ts` and `creativeStudioService.ts` — the mirrored `silentOutput` gate, whose only sanctioned exception is `adapterId === 'openrouter-video-v1'`
-- `jobManager.ts` — job lifecycle, poll backoff, retry lineage, and duplicate-charge protection via `submission_unknown`
-- `store.ts` / `mediaStore.ts` — CAS/revision-guarded mutation
+Counts in this section are approximate: the partitions come from path globs that overlap slightly at the MR 3 / MR 4 boundary, and the exact split is fixed when the MRs are cut.
 
-### MR 3 — UI, settings, and locales (not routed)
+### MR 4 — guardrails and activation
 
-`renderer/pages/studio/**`, the settings media-models section, all 12 locale files, and unit tests. **~130 files, ~+34,900.**
+`Router.tsx`, `Sider/**`, the e2e specs, the §6 guardrail work, and the flag flip. Small relative to the rest, and the one reviewable change that makes Studio live. With the flag in place, reverting it fully disables the feature without unwinding the rest — the property that makes this sequence worth its overhead.
 
-Explicitly excludes `Router.tsx` and `Sider/**`, which move to MR 4. Counts in this section are approximate: they come from path globs that overlap slightly at the MR 3 / MR 4 boundary, and the exact partition is fixed when the MRs are cut.
+## 5. Review gate
 
-Nothing in this MR is reachable by a user: no route, no navigation entry. Large but low-risk by construction.
+**[rev 2] Review runs twice, not once.** Rev 1 put the whole gate before the first push, reasoning that MR boundaries gate nothing here because merge requests are merged within minutes and a Draft flag does not hold them. That reasoning stands, but it is insufficient: a review conducted before MR 0 cannot assess guardrails, pricing or activation code that does not exist yet. So:
 
-### MR 4 — activation
-
-`renderer/components/layout/Router.tsx` (the `/studio` route and its `DesktopStudioRoute` desktop guard), `Sider/index.tsx` + `SiderNav/**`, the four e2e specs, and the spend-safety work from §6. **Small.**
-
-This is the reviewable commit that says "Creative Studio is now live", and it ships its guardrails in the same change, so visibility and safety are atomic. Reverting MR 4 disables the feature without unwinding 65k lines — the property that makes this sequence worth the overhead.
-
-## 5. The review gate
-
-MR boundaries will not gate anything here: merge requests in this repository are merged within minutes and a Draft flag does not hold them. Review therefore happens **before MR 0 is pushed**, using Codex agents with **distinct lenses** rather than several generic reviewers. Findings are adversarially verified before being acted on.
+- **Pre-push, on the archived tip:** the five lenses below, over the whole body of work.
+- **Per MR, on the final diff:** a focused review of what that MR actually contains — mandatory for MR 4, which carries every guardrail.
 
 | Lens | Scope |
 | --- | --- |
-| 1. Process boundary & contract | No DOM APIs in `process/`, no Node APIs in `renderer/`, all cross-process traffic through the IPC bridge, snake_case mappers present on every binding |
-| 2. Security | Downloader SSRF defences, protocol-handler path containment, provider secret handling, the `silentOutput` gate and its single exception |
-| 3. State & concurrency | CAS/revision guards, job lifecycle transitions, duplicate-charge protection, poll backoff, cancellation |
-| 4. i18n & accessibility | 12-locale completeness, ru/uk plural forms, no hardcoded user-facing strings, keyboard reachability, no raw interactive HTML |
-| 5. **Test quality** | Do the 34,500 lines of tests assert *behaviour*, or merely *shape*? |
+| 1. Process boundary & contract | No DOM APIs in `process/`, no Node APIs in `renderer/`, cross-process traffic only through the IPC bridge, snake_case mappers on every binding |
+| 2. Security | Downloader SSRF defences, protocol-handler path containment, provider secret handling, the `silentOutput` gate and its single exception, **both halves of the feature flag** |
+| 3. State & concurrency | CAS/revision guards, job lifecycle transitions, duplicate-charge protection, poll backoff, cancellation, semaphore accounting |
+| 4. i18n & accessibility | 12-locale completeness, **real i18next plural behaviour at counts 1, 2 and 5** (not key presence), no hardcoded user-facing strings, keyboard reachability, no raw interactive HTML |
+| 5. Test-assertion strength | Do the tests assert behaviour, or shape? |
 
-Lens 5 is not padding. Two vacuous-test classes were found in this branch on 2026-08-05 alone:
+Lens 5 is required, not optional. Two vacuous-test classes were found in this branch on 2026-08-05 alone: assertions on `element.style.*` for styling that lives in a CSS module, which pass while the rendered pixel is wrong because jsdom applies no stylesheet; and `vi.spyOn(window.localStorage, …)`, which silently no-ops because `Storage` is a Proxy, so injected-failure tests pass without exercising the failure. Lens 5 samples the highest-value suites — job lifecycle, downloader, store guards — and reports which assertions would survive deliberately breaking the implementation.
 
-- assertions on `element.style.*` for styling that lives in a CSS module — jsdom applies no stylesheet, so the test passes while the rendered pixel is wrong
-- `vi.spyOn(window.localStorage, …)`, which silently no-ops because `Storage` is a Proxy, making injected-failure tests pass without exercising the failure
+### Verification checklist
 
-At a 1.41:1 test-to-source ratio, tests that do not bite are the most expensive artefact in this branch. Lens 5 samples the highest-value suites (job lifecycle, downloader, store guards) and reports which assertions would survive deliberately breaking the implementation.
+Every item is explicit because each has been skipped or assumed at least once:
+
+- [ ] `git fetch origin` over VPN; record the fresh `origin/sprint2` SHA
+- [ ] `git merge-tree` simulation re-run; only the `i18n-keys.d.ts` conflict appears
+- [ ] `just git-setup` run in this clone; `git check-attr merge` on a locale file returns `merge: locale-json`
+- [ ] `bun run i18n:types` after accepting the `i18n-keys.d.ts` deletion
+- [ ] `bunx tsc --noEmit` clean
+- [ ] `node scripts/check-i18n.js` passes
+- [ ] `bun run test` green
+- [ ] `bun run test:coverage` meets the pinned floor — the gate, not the line ratio
+- [ ] Live Studio e2e on the `sprint2` base: `AIONUI_E2E_TEST=1 AIONUI_E2E_STUDIO_FAKE=1 E2E_DEV=1 bunx playwright test tests/e2e/features/workspaces/creative-studio.e2e.ts`
+- [ ] Visual acceptance (§7) captured and reviewed
 
 ## 6. Acceptance bar for visible-on-merge
 
-Studio is user-visible the moment MR 4 merges, so the following are merge blockers, not follow-ups.
+Studio is user-visible the moment MR 4 merges, so these are merge blockers.
 
-### 6.1 Spend safety — "honest and bounded"
+### 6.1 Concurrency — correct the premise, then layer
 
-Studio makes real paid provider calls today with **no cost handling anywhere**: no price in the service, no price in the types, no estimate in the generation UI, and no cap on simultaneous jobs. `Generate N ready scenes` fires N paid calls at once.
+**[rev 2] Rev 1 was factually wrong here.** It claimed there was no cap on simultaneous jobs and that `Generate N ready scenes` fires N paid calls at once. Neither is true. `jobManager.ts:355` already holds global FIFO limits — `{ image: new FifoSemaphore(2), video: new FifoSemaphore(1) }` — and `GenerationReviewModal` is already a batch confirmation carrying an explicit charge notice. Rev 1 missed both because its search used `MAX_`/`concurren`/`limit` and the implementation uses semaphore vocabulary.
 
-Worse, the copy fabricates a cost slot. `en-US` reads literally:
+Keep the existing global limits. The per-project cap of 2 is layered on top, and needs explicit state accounting or it will either deadlock or leak capacity:
 
-```
-"render": "Render · n/a"
-"renderAnother": "Render another · n/a"
-```
+- `queued_local` does **not** consume capacity
+- `submitting`, `queued_remote` and `running` **do**
+- `submission_unknown` — potentially charged — counts **conservatively** until the user reconciles or abandons it
+- download retries are **not** paid generation and do not count
 
-That is a hardcoded `· n/a` in the label — it reads as a broken price field rather than an absent one.
+Enforced in `jobManager` in the main process. The renderer may reflect the cap; it must never be what enforces it.
 
-Required, in scope:
+### 6.2 Audio — fix the claim, keep the capability
 
-1. **Honest cost.** Show a real per-render cost when the provider reports a price. When it does not, show no cost fragment at all — remove the hardcoded `· n/a` from all 12 locales. If a price source proves unavailable (see the spike below), every render is priceless and the label simply omits cost.
-2. **Concurrency cap.** A bounded number of in-flight generation jobs, enforced in `jobManager` (main process), not in the renderer. The renderer may reflect the cap; it must not be the thing that enforces it.
-3. **Batch confirmation.** Generating more than one scene requires an explicit confirmation naming the number of renders — and the total cost when known.
+The catalog is correct: `providerResolver.ts:131` sets `silentOutput: !spec.supportsAudio`, every OpenRouter video spec declares `supportsAudio: true`, and the gate admits those routes through its documented `openrouter-video-v1` exception. The adapter then sends `generate_audio: true`.
 
-Explicitly **out** of scope: any spend ledger, persisted spend history, per-project or global totals, or user-configurable budget ceiling. Those remain a later decision.
+The defect is the copy. `conversation.creativeStudio.review.audioOff` — *"Silent output; audio generation disabled"* — renders **unconditionally** at `GenerationReviewModal.tsx:237`. A paid-action confirmation dialog asserts silence while the app requests and pays for audio.
 
-This is the only new *feature* code in the plan — everything else is landing mechanics — so it gets its own implementation plan once the spike below resolves. It is scoped here because it is a release boundary, not because it is designed here.
+**Decision: keep audio, fix the claim.** Gate the alert on `route.constraints.silentOutput` and state that audio is included when it is not. Disabling audio was considered and rejected: it would remove a capability just verified working in order to fix a copy bug. Consequence: the cost estimate in §6.3 must account for audio where a route generates it.
 
-**Spike required before implementation.** OpenRouter exposes pricing on `/api/v1/models` for chat models; whether `/api/v1/videos/models` and the image routes expose comparable pricing is unverified. Resolve this first. If pricing is unavailable for the media routes, items 2 and 3 still deliver the safety property on their own and item 1 degrades to "omit cost everywhere" — the plan does not depend on the spike's outcome.
+### 6.3 Cost — an estimate contract, not a number
 
-### 6.2 Also blocking
+Studio shows no cost today, and the copy fabricates the slot: `en-US` reads literally `"render": "Render · n/a"` and `"renderAnother": "Render another · n/a"`. That hardcoded `· n/a` presents an absent price as a broken one, in all 12 locales.
 
-- The `i18n-keys.d.ts` deletion is honoured and regenerated, not reintroduced
-- All five review lenses have run and every confirmed finding is either resolved, or accepted in writing in the relevant MR description with a reason
-- The live Electron e2e journey passes on the `sprint2` base, not only on `sprint1`
+Provider, route and result types currently carry no currency, price unit, freshness, usage or actual charge. OpenRouter exposes video pricing SKUs through its video-model API, but discovery does not preserve that information. Before any amount is displayed, define:
+
+- **"Estimated cost", never guaranteed cost** — the wording must never imply a commitment
+- **Currency and decimal representation** — explicit, no float accumulation for money
+- **Units** — per image, per second, by resolution, and whether audio is included
+- **Quote freshness and expiry** — a stale quote must not be presented as current
+- **Mixed batches** — wording when some scenes have a price and others do not
+- **Identity rules** — price metadata is excluded from stable route identity but included in the catalog-version calculation, so a price change invalidates a cached catalog without invalidating a user's selected route
+
+Until a trustworthy estimate exists, **omit the amount entirely** — remove `· n/a` from all 12 locales. The concurrency cap and the existing batch confirmation deliver the safety property on their own, so this work does not gate on pricing being available.
+
+Out of scope: any spend ledger, persisted spend history, per-project or global totals, or a user-configurable budget ceiling.
+
+### 6.4 Also blocking
+
+- Both halves of the feature flag verified: main-process gating of services, jobs, IPC and protocol; renderer gating of route, nav entry and Settings section
+- The `i18n-keys.d.ts` deletion honoured and regenerated, never reintroduced
+- Every confirmed review finding resolved, or accepted in writing in the relevant MR description with a reason
+- Live Electron e2e passing on the `sprint2` base, not only on `sprint1`
 - `Attach a brief doc` remains disabled with an explanatory tooltip, or is removed — it must not look actionable while doing nothing
 
-## 7. Non-goals
+## 7. Visual acceptance
 
-- **Fidelity pass 3** (Produce/Review polish: video poster frames, engine-bar and activity-row refinement) lands after MR 4 as ordinary follow-up
-- **No project-name migration.** Projects created before the shape-naming fix keep names like `3 shots · 15s`; only new projects are named correctly
-- **No history rewrite.** The 102 commits land as they are. The branch already survived one full authorship rewrite, it is gated green, and rewriting for narrative gains nothing that the MR split does not already provide
-- **No spend ledger** (§6.1)
-- **No audio, brand kits, batch export, or sharing** — these are candidate next-phase features, not part of landing
+**[rev 2] Rev 1 had no visual gate**, which is indefensible for work whose fidelity gap is what triggered this round. Behaviour tests prove Studio functions; they cannot prove it resembles the approved prototype.
 
-## 8. Risks
+**Blocking — video poster frames.** OpenRouter returns a video with no poster, so `ShotCard.tsx:75` renders "Video poster unavailable" for a render the user paid for. A successful paid result must not read as a failure. Ship real poster extraction, or a designed fallback that clearly reads as "video ready" rather than as an error.
 
-| Risk | Mitigation |
-| --- | --- |
-| `sprint2` touches a pre-rename path before MR 0 lands | Land MR 0 first, immediately, as its own MR |
-| A 65k-line branch merges without real review | Review gate runs *before* the first push (§5), not at MR boundaries |
-| Vacuous tests give false confidence | Lens 5 explicitly probes assertion strength |
-| Unbounded spend reaches users | §6.1 is a merge blocker, and the cap is enforced in the main process |
-| `origin` is unreachable (VNG GitLab needs VPN) | Cached refs are for measurement only; re-verify the base and re-run the merge dry-run against a freshly fetched `origin/sprint2` before pushing MR 0 |
-| Intermediate MRs leave dead code in `sprint2` | Acceptable and bounded: MRs 1–3 are unreachable, and MR 4 follows immediately |
+**Blocking — structural parity.** Screenshot acceptance for Brief, Write, Produce, Review and the library, at named viewport sizes, in both themes. The blocking assertion is structural: the expected elements are present, in the expected hierarchy, with the expected type roles and tokens.
+
+**Advisory — pixel parity.** Captured and reviewed, but exact-pixel diffs do not fail the gate. Exact-match baselines across five screens and multiple viewports churn on every legitimate change, and a gate that cries wolf gets disabled inside a month. Diffs are surfaced for human judgement instead.
+
+## 8. Non-goals
+
+- **Fidelity pass 3** (Produce/Review polish beyond §7's blocking items) lands as ordinary follow-up
+- **No project-name migration** — projects created before the shape-naming fix keep names like `3 shots · 15s`
+- **No spend ledger** (§6.3)
+- **No audio, brand kits, batch export, or sharing** — candidate next-phase features, not part of landing
+- Rev 1's "no history rewrite" non-goal is **withdrawn**; see §4
 
 ## 9. Parallel execution with sprint-2 work
 
-This epic is **EPIC-005** in `TASKS.md` and runs **in parallel** with the sprint-2 backlog.
+This epic is **EPIC-005** and runs in parallel with the sprint-2 backlog.
 
-Parallel is safe because Studio never touches the one serial resource in this repository: it adds **no database migrations and no SQL**, persisting as JSON with atomic temp-file plus rename. It therefore cannot contend with BUG-013's upgrade work or EPIC-003 G0's migration-number reservations. MRs 1–3 are almost entirely new paths no other stream edits.
+Parallel is safe because Studio never touches the one serial resource in this repository: it adds **no database migrations and no SQL**, persisting as JSON with atomic temp-file plus rename. It cannot contend with BUG-013's upgrade work or EPIC-003 G0's migration-number reservations. MRs 1–3 are almost entirely new paths no other stream edits.
 
-Parallel means **parallel merging, not parallel priority**. Studio is P2; BUG-013 is P0. Landing effort must not take hands or review attention from the P0/P1 work.
-
-The collision surface is small and known in advance:
+Parallel means **parallel merging, not parallel priority**. Studio is P2; BUG-013 is P0.
 
 | Shared path | Studio MR | Collides with | Nature |
 | --- | --- | --- | --- |
@@ -176,16 +196,32 @@ The collision surface is small and known in advance:
 | `ModelModalContent` | MR 0 (splits) | EPIC-003 R2, BUG-018 | structural |
 | `Sider/**` | MR 4 | BUG-019 | direct overlap |
 | `ipcBridge.ts` | MR 1 | BUG-015 | additive; known hotspot |
-| locale JSON ×12 | MR 3 | every stream | mitigated by the key-level merge driver |
+| locale JSON ×12 | MR 3 | every stream | mitigated **only if** §3 step 3 has run |
 
-**This is why MR 0 is urgent rather than merely first.** Renames are the only change in this plan that turns another stream's ordinary edit into a conflict, and two of the three renamed areas are ones sprint-2 work is likely to touch: `contextCompactTask.ts` sits inside the renamed directory, and EPIC-003 R2 explicitly instructs reuse of the model-selector components MR 0 splits.
+**MR 0 is urgent rather than merely first.** Renames are the only change here that turns another stream's ordinary edit into a conflict, and two of the three renamed areas are ones sprint-2 work is likely to touch: `contextCompactTask.ts` sits inside a renamed directory, and EPIC-003 R2 explicitly instructs reuse of the model selectors MR 0 splits.
 
 MR 4 and BUG-019 both change the sidebar; whoever lands second rebases. Flag it to BUG-019's owner rather than discovering it at merge time.
 
-## 10. Decisions
+## 10. Risks
 
-1. **Concurrency cap: 2 in-flight generation jobs per project**, enforced in `jobManager`. Revisit once real usage exists.
-2. **Confirm every batch of 2 or more scenes.** Each render is a paid provider call, so there is no batch size cheap enough to fire unconfirmed.
-3. **This document is tracked and committed**, matching its siblings in `docs/design/`, which are each committed as their own `docs(...)` commit.
+| Risk | Mitigation |
+| --- | --- |
+| Reconstruction drops work | Archive ref is immutable; verify by comparing the reconstructed tree to `refs/archive/studio-integration-2026-08-05` — trees must match exactly |
+| `sprint2` touches a pre-rename path before MR 0 | Land MR 0 first, immediately |
+| Locale merges hand-conflict | §3 step 3, proven with `git check-attr` |
+| A 65k-line branch merges without real review | Pre-push lenses plus per-MR final-diff review (§5) |
+| Vacuous tests give false confidence | Lens 5 probes assertion strength; coverage measured by the gate, not inferred from line counts |
+| Flag enforced in one process only | Lens 2 explicitly checks both halves |
+| Users charged for audio they were told was absent | §6.2 blocks MR 4 |
+| Paid render looks broken | §7 poster frames block MR 4 |
 
-Remaining unknown, tracked in §6.1 rather than here: whether the OpenRouter image and video endpoints expose pricing. The plan is built so the answer does not change its shape.
+## 11. Decisions
+
+1. **Concurrency:** keep the existing global FIFO limits (2 image, 1 video); layer a per-project cap of **2** with the state accounting in §6.1, enforced in `jobManager`.
+2. **Batch confirmation:** already exists via `GenerationReviewModal` with a charge notice; extend it to carry estimated cost when available. Confirm every batch of two or more.
+3. **This document is tracked and committed**, matching its siblings in `docs/design/`.
+4. **[rev 2] Commits are reconstructed** into reviewable MRs, from an immutable archive ref.
+5. **[rev 2] Structural prototype parity and video poster frames are blocking**; pixel-exact parity is advisory.
+6. **[rev 2] Audio is kept**; the false "silent output" claim is fixed instead.
+
+**Open:** whether OpenRouter's image routes expose pricing comparable to the video-model API. The plan is built so the answer does not change its shape — with no price source, the amount is simply never shown.
