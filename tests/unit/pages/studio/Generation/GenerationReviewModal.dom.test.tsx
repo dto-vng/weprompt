@@ -219,6 +219,25 @@ describe('GenerationReviewModal', () => {
     });
   });
 
+  it('claims nothing about audio when no reviewed route reports a policy', () => {
+    render(
+      <GenerationReviewModal
+        {...createProps({
+          scenes: [
+            {
+              ...mixedScenes()[0]!,
+              route: { status: 'missing', snapshot: null, providerName: null },
+            },
+          ],
+        })}
+      />
+    );
+
+    // Silence is a claim too: with no known policy, assert neither message appears.
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOff')).not.toBeInTheDocument();
+    expect(screen.queryByText('conversation.creativeStudio.review.audioOn')).not.toBeInTheDocument();
+  });
+
   it('keeps an invalid route visible while missing or invalid routes disable confirmation', () => {
     const staleRoute = route('scene-video', 'video', 'provider_stale', 'choice_stale', 'open-sora-stale');
     render(
