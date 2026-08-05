@@ -1,6 +1,6 @@
 # Creative Studio — landing plan
 
-**Status:** agreed, rev 2 (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
+**Status:** agreed, rev 3 (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
 **Source:** `codex/studio-integration` — archived immutably at `refs/archive/studio-integration-2026-08-05` = `20735e392`
 
 > **Rev 2** incorporates an execution review that found four blocking defects in rev 1, two of them factual errors in the plan itself. Corrections are marked **[rev 2]** and the superseded claims are stated rather than quietly deleted, so nobody acts on a remembered version of this document.
@@ -167,7 +167,19 @@ Out of scope: any spend ledger, persisted spend history, per-project or global t
 
 **[rev 2] Rev 1 had no visual gate**, which is indefensible for work whose fidelity gap is what triggered this round. Behaviour tests prove Studio functions; they cannot prove it resembles the approved prototype.
 
-**Blocking — video poster frames.** OpenRouter returns a video with no poster, so `ShotCard.tsx:75` renders "Video poster unavailable" for a render the user paid for. A successful paid result must not read as a failure. Ship real poster extraction, or a designed fallback that clearly reads as "video ready" rather than as an error.
+**Blocking — video poster frames.** OpenRouter returns a video with no poster, so `ShotCard.tsx:75` renders "Video poster unavailable" for a render the user paid for. A successful paid result must not read as a failure.
+
+**[rev 3] The method is settled and needs no new dependency.** The whole poster pipeline already exists: `jobManager.ts:637` filters provider `outputs` for `role === 'poster'`, `mediaStore` persists it into the `thumbnails` collection under `validateProviderPosterLineage`, and the renderer's `isCanonicalStudioPosterAsset` validates and displays it. The only reason none of it runs is that OpenRouter never returns a poster output, so `posters.length !== 1` short-circuits the branch. There is no `thumbnails` directory on disk for any project — confirmed.
+
+Verified 2026-08-05 against the real paid render (1280×720, 5.085s): the renderer loads the video from `weprompt-studio://`, seeks, draws to a `<canvas>`, and `toDataURL('image/png')` returns 883,030 bytes **with no `SecurityError`** — the privileged scheme does not taint the canvas. So Studio can produce the frame locally and feed the existing ingestion path as though the provider had returned it.
+
+Three constraints this method carries, none of them blocking:
+
+- Capture happens in the **renderer**, but ingestion is main-process and guarded by `validateProviderPosterLineage`, which exists to validate *provider* posters. Renderer-supplied bytes inverts that trust direction and needs its own equally-strict path — **do not loosen the provider lineage check to accommodate it.**
+- It needs a live renderer that can load and seek, so a poster appears when the UI first shows the shot rather than at render time. State the expectation in the UI rather than implying instant availability.
+- It decoded this H.264 MP4; another provider or codec may not. The designed "video ready" fallback stays required for that case.
+
+Bundling ffmpeg to solve posters was considered and rejected — see `docs/design/creative-studio-video-capability-spike.md` §5. Posters do not need it, and packaging changes belong in their own lane, which currently holds a P0 and a P1 defect.
 
 **Blocking — structural parity.** Screenshot acceptance for Brief, Write, Produce, Review and the library, at named viewport sizes, in both themes. The blocking assertion is structural: the expected elements are present, in the expected hierarchy, with the expected type roles and tokens.
 
