@@ -154,6 +154,92 @@ describe('PresentationRunStore', () => {
     });
   });
 
+  it.each(['toString', 'constructor', '__proto__'])(
+    'allocates and restarts safely for the prototype-named conversation ID %s',
+    async (conversationId) => {
+      const input = {
+        conversationId,
+        clientRequestId: `request-${conversationId}`,
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'a'.repeat(64),
+        grantClaims: [],
+      };
+
+      await expect(store.allocateRun(input)).resolves.toMatchObject({
+        ok: true,
+        status: 'created',
+        run: { runId: RUN_ID, conversationId },
+      });
+
+      const restarted = new PresentationRunStore({
+        files,
+        journal,
+        now: () => CREATED_AT,
+        randomUUID: () => RUN_B,
+        getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+      });
+      await expect(restarted.allocateRun(input)).resolves.toMatchObject({
+        ok: true,
+        status: 'existing',
+        run: { runId: RUN_ID, conversationId },
+      });
+    }
+  );
+
+  it('keeps distinct request tuples separate when identifiers contain the old delimiter', async () => {
+    const runIds = [RUN_ID, RUN_B];
+    const collisionStore = new PresentationRunStore({
+      files,
+      journal,
+      now: () => CREATED_AT,
+      randomUUID: () => runIds.shift() ?? RUN_C,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    const firstInput = {
+      conversationId: 'a',
+      clientRequestId: 'b\u0000c',
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      grantClaims: [],
+    };
+    const secondInput = {
+      conversationId: 'a\u0000b',
+      clientRequestId: 'c',
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'b'.repeat(64),
+      grantClaims: [],
+    };
+
+    await expect(collisionStore.allocateRun(firstInput)).resolves.toMatchObject({
+      ok: true,
+      status: 'created',
+      run: { runId: RUN_ID },
+    });
+    await expect(collisionStore.allocateRun(secondInput)).resolves.toMatchObject({
+      ok: true,
+      status: 'created',
+      run: { runId: RUN_B },
+    });
+
+    const restarted = new PresentationRunStore({
+      files,
+      journal,
+      now: () => CREATED_AT,
+      randomUUID: () => RUN_C,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    await expect(restarted.allocateRun(firstInput)).resolves.toMatchObject({
+      ok: true,
+      status: 'existing',
+      run: { runId: RUN_ID },
+    });
+    await expect(restarted.allocateRun(secondInput)).resolves.toMatchObject({
+      ok: true,
+      status: 'existing',
+      run: { runId: RUN_B },
+    });
+  });
+
   it('serializes reverse-ordered overlapping key sets without deadlock', async () => {
     const lock = new SortedKeyedLock();
     const order: string[] = [];
@@ -1168,6 +1254,50 @@ describe('PresentationRunStore', () => {
     const results = await Promise.allSettled([store.bindRunTurn(RUN_ID, binding), store.bindRunTurn(RUN_B, binding)]);
 
     expect(results.map(({ status }) => status).sort()).toEqual(['fulfilled', 'rejected']);
+  });
+
+  it('keeps distinct turn tuples separate when identifiers contain the old delimiter', async () => {
+    const dispatching = [
+      storedRun(RUN_ID, 'dispatching', { conversationId: 'a', postInvoked: true }),
+      storedRun(RUN_B, 'dispatching', { conversationId: 'a\u0000b', postInvoked: true }),
+    ];
+    await journal.transaction({
+      mutations: dispatching.map((run) => ({
+        entityKind: 'run' as const,
+        entityId: run.runId,
+        expectedRevision: null,
+        nextManifest: run,
+      })),
+    });
+    await store.initialize();
+
+    await expect(
+      store.bindRunTurn(RUN_ID, {
+        expectedRevision: 0,
+        conversationId: 'a',
+        turnId: 'b\u0000c',
+        runtime: 'aionrs',
+        now: '2026-08-04T00:00:01.000Z',
+      })
+    ).resolves.toMatchObject({ status: 'bound' });
+    await expect(
+      store.bindRunTurn(RUN_B, {
+        expectedRevision: 0,
+        conversationId: 'a\u0000b',
+        turnId: 'c',
+        runtime: 'aionrs',
+        now: '2026-08-04T00:00:01.000Z',
+      })
+    ).resolves.toMatchObject({ status: 'bound' });
+
+    const restarted = new PresentationRunStore({
+      files,
+      journal,
+      now: () => CREATED_AT,
+      randomUUID: () => RUN_C,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    await expect(restarted.initialize()).resolves.toBeUndefined();
   });
 
   it('does not let generic lifecycle transitions bypass turn ownership', async () => {
