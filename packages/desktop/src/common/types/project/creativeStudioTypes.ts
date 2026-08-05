@@ -434,6 +434,14 @@ export type StudioAssetRequest = StudioProjectRequest & {
   assetId: string;
 };
 
+export type StudioPersistCapturedPosterRequest = StudioProjectRequest & {
+  sceneId: string;
+  videoAssetId: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+};
+
 export type StudioSelectVariationRequest = StudioProjectRequest & {
   sceneId: string;
   assetId: string;
@@ -551,6 +559,7 @@ export type StudioDesktopApi = {
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   selectAsset(input: StudioSelectAssetRequest): Promise<StudioCommandResult<StudioRendererProject>>;
+  persistCapturedPoster(input: StudioPersistCapturedPosterRequest): Promise<StudioCommandResult<StudioAsset>>;
   chooseAndImportReference(
     input: StudioChooseAndImportReferenceRequest
   ): Promise<StudioCommandResult<StudioImportOutcome>>;

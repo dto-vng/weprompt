@@ -1239,7 +1239,7 @@
       "selectVersionAccessible": "Seleccionar variante {{number}}",
       "importReference": "Importar imagen del primer fotograma",
       "importing": "Importando referencia...",
-      "posterUnavailable": "Miniatura de vídeo no disponible",
+      "videoReady": "Vídeo listo",
       "missingVisualPrompt": "Añade una indicación visual antes de generar esta escena.",
       "missingModel": "Selecciona un modelo de proyecto compatible antes de generar esta escena.",
       "generateThisScene": "Generar esta escena"

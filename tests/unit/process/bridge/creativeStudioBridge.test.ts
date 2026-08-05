@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   updateSceneProvider: vi.fn(),
   reorderScenesProvider: vi.fn(),
   selectAssetProvider: vi.fn(),
+  persistCapturedPosterProvider: vi.fn(),
   chooseAndImportReferenceProvider: vi.fn(),
   chooseAndExportAssetsProvider: vi.fn(),
   submitScenesProvider: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock('@/common', () => ({
       updateScene: { provider: mocks.updateSceneProvider },
       reorderScenes: { provider: mocks.reorderScenesProvider },
       selectAsset: { provider: mocks.selectAssetProvider },
+      persistCapturedPoster: { provider: mocks.persistCapturedPosterProvider },
       chooseAndImportReference: { provider: mocks.chooseAndImportReferenceProvider },
       chooseAndExportAssets: { provider: mocks.chooseAndExportAssetsProvider },
       submitScenes: { provider: mocks.submitScenesProvider },
@@ -121,6 +123,7 @@ describe('initCreativeStudioBridge', () => {
         updateScene: vi.fn(async () => project),
         reorderScenes: vi.fn(async () => project),
         selectAsset: vi.fn(async () => project),
+        persistCapturedPoster: vi.fn(),
         importReferenceFromPath: vi.fn(),
         exportAssetsToDirectory: vi.fn(),
         submitScenes: vi.fn(async () => []),
@@ -151,6 +154,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.updateSceneProvider).toHaveBeenCalledOnce();
     expect(mocks.reorderScenesProvider).toHaveBeenCalledOnce();
     expect(mocks.selectAssetProvider).toHaveBeenCalledOnce();
+    expect(mocks.persistCapturedPosterProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndImportReferenceProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndExportAssetsProvider).toHaveBeenCalledOnce();
     expect(mocks.submitScenesProvider).toHaveBeenCalledOnce();
@@ -611,6 +615,17 @@ describe('initCreativeStudioBridge', () => {
         mocks.selectAssetProvider,
         { projectId: 'project_1', expectedRevision: 1, sceneId: 'scene_1', assetId: 'asset_1' },
       ],
+      [
+        mocks.persistCapturedPosterProvider,
+        {
+          projectId: 'project_1',
+          sceneId: 'scene_1',
+          videoAssetId: 'asset_1',
+          dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+          width: 1280,
+          height: 720,
+        },
+      ],
     ];
 
     await Promise.all(
@@ -630,6 +645,7 @@ describe('initCreativeStudioBridge', () => {
     expect(service.updateScene).toHaveBeenCalledOnce();
     expect(service.reorderScenes).toHaveBeenCalledOnce();
     expect(service.selectAsset).toHaveBeenCalledOnce();
+    expect(service.persistCapturedPoster).toHaveBeenCalledOnce();
   });
 });
 

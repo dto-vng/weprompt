@@ -1218,7 +1218,7 @@
       "selectVersionAccessible": "バリエーション {{number}} を選択",
       "importReference": "最初のフレーム画像を読み込む",
       "importing": "参照画像を読み込んでいます...",
-      "posterUnavailable": "動画ポスターを利用できません",
+      "videoReady": "動画の準備ができました",
       "missingVisualPrompt": "このシーンを生成する前にビジュアルプロンプトを追加してください。",
       "missingModel": "このシーンを生成する前に互換性のあるプロジェクトモデルを選択してください。",
       "generateThisScene": "このシーンを生成"

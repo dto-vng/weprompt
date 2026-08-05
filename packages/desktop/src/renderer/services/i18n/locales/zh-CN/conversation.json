@@ -1218,7 +1218,7 @@
       "selectVersionAccessible": "选择版本 {{number}}",
       "importReference": "导入首帧图像",
       "importing": "正在导入参考图...",
-      "posterUnavailable": "视频封面不可用",
+      "videoReady": "视频已就绪",
       "missingVisualPrompt": "请先添加视觉提示词，再生成此场景。",
       "missingModel": "请先选择兼容的项目模型，再生成此场景。",
       "generateThisScene": "生成此场景"

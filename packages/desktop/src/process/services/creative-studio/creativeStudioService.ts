@@ -10,6 +10,7 @@ import type {
   StudioEditableScene,
   StudioProject,
   StudioProjectSummary,
+  StudioPersistCapturedPosterRequest,
   StudioScene,
   StudioSelectAssetRequest,
   StudioUpdateProjectRequest,
@@ -63,6 +64,7 @@ import {
   type StudioStoryboardPlanner,
 } from '@process/services/creative-studio/planning/storyboardPlanner';
 import { fitStoryboardDurations } from '@process/services/creative-studio/planning/fitStoryboardDurations';
+import { Readable } from 'node:stream';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:3', '3:4']);
@@ -126,6 +128,7 @@ export type CreativeStudioService = {
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioRendererProject>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioRendererProject>;
   selectAsset(input: StudioSelectAssetRequest): Promise<StudioRendererProject>;
+  persistCapturedPoster(input: StudioPersistCapturedPosterRequest): Promise<StudioAsset>;
   fitStoryboard(input: StudioFitStoryboardRequest): Promise<StudioFitStoryboardOutcome>;
   submitScenes(input: StudioSubmitScenesRequest): Promise<StudioRendererJob[]>;
   cancelJob(input: StudioJobRequest): Promise<StudioRendererJob>;
@@ -174,6 +177,15 @@ export type CreativeStudioServiceDeps = {
       destinationDirectory: string;
       includeReferences: boolean;
     }): Promise<{ folderName: string; exported: StudioExportItem[]; missingSceneIds: string[] }>;
+    persistCapturedPoster?(input: {
+      projectId: string;
+      sceneId: string;
+      videoAssetId: string;
+      width: number;
+      height: number;
+      declaredByteSize: number;
+      body: AsyncIterable<Uint8Array>;
+    }): Promise<StudioAsset>;
   };
 };
 
@@ -250,6 +262,30 @@ const assertText: (value: unknown, maximum: number, label: string, required?: bo
 
 const assertExpectedRevision: (value: unknown) => asserts value is number = (value) => {
   if (!isIntegerInRange(value, 1, Number.MAX_SAFE_INTEGER)) throw invalid('Invalid Studio project revision');
+};
+
+const CAPTURED_POSTER_DATA_URL_PREFIX = 'data:image/png;base64,';
+const CAPTURED_POSTER_MAX_BYTES = 50 * 1024 * 1024;
+const CAPTURED_POSTER_MAX_BASE64_LENGTH = Math.ceil(CAPTURED_POSTER_MAX_BYTES / 3) * 4;
+
+const decodeCapturedPoster = (value: unknown): Buffer => {
+  if (typeof value !== 'string' || !value.startsWith(CAPTURED_POSTER_DATA_URL_PREFIX)) {
+    throw invalid('Invalid Studio captured poster');
+  }
+  const encoded = value.slice(CAPTURED_POSTER_DATA_URL_PREFIX.length);
+  if (
+    encoded.length < 4 ||
+    encoded.length > CAPTURED_POSTER_MAX_BASE64_LENGTH ||
+    encoded.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+  ) {
+    throw invalid('Invalid Studio captured poster');
+  }
+  const bytes = Buffer.from(encoded, 'base64');
+  if (bytes.length === 0 || bytes.length > CAPTURED_POSTER_MAX_BYTES || bytes.toString('base64') !== encoded) {
+    throw invalid('Invalid Studio captured poster');
+  }
+  return bytes;
 };
 
 const applyProjectUpdateField = <Field extends UpdatableProjectField>(
@@ -1323,6 +1359,37 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
           input.expectedRevision
         )
       );
+    },
+
+    async persistCapturedPoster(input: StudioPersistCapturedPosterRequest): Promise<StudioAsset> {
+      assertSafeId(input.projectId, 'project id');
+      assertSafeId(input.sceneId, 'scene id');
+      assertSafeId(input.videoAssetId, 'video asset id');
+      if (
+        !Number.isSafeInteger(input.width) ||
+        input.width < 1 ||
+        input.width > 16_384 ||
+        !Number.isSafeInteger(input.height) ||
+        input.height < 1 ||
+        input.height > 16_384
+      ) {
+        throw invalid('Invalid Studio captured poster dimensions');
+      }
+      const bytes = decodeCapturedPoster(input.dataUrl);
+      if (!deps.mediaStore?.persistCapturedPoster) {
+        throw new CreativeStudioStoreError('storage_error', 'Studio media storage is unavailable');
+      }
+      const poster = await deps.mediaStore.persistCapturedPoster({
+        projectId: input.projectId,
+        sceneId: input.sceneId,
+        videoAssetId: input.videoAssetId,
+        width: input.width,
+        height: input.height,
+        declaredByteSize: bytes.length,
+        body: Readable.from([bytes]),
+      });
+      deps.onProjectUpdated(input.projectId);
+      return poster;
     },
 
     async submitScenes(input: StudioSubmitScenesRequest): Promise<StudioRendererJob[]> {

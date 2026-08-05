@@ -1244,7 +1244,7 @@
       "selectVersionAccessible": "Selecionar variação {{number}}",
       "importReference": "Importar imagem do primeiro quadro",
       "importing": "Importando referência...",
-      "posterUnavailable": "Miniatura do vídeo indisponível",
+      "videoReady": "Vídeo pronto",
       "missingVisualPrompt": "Adicione um prompt visual antes de gerar esta cena.",
       "missingModel": "Selecione um modelo de projeto compatível antes de gerar esta cena.",
       "generateThisScene": "Gerar esta cena"

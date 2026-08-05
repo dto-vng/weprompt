@@ -1229,7 +1229,7 @@
       "selectVersionAccessible": "Variante {{number}} auswählen",
       "importReference": "Bild für den ersten Frame importieren",
       "importing": "Referenz wird importiert...",
-      "posterUnavailable": "Videovorschaubild nicht verfügbar",
+      "videoReady": "Video bereit",
       "missingVisualPrompt": "Füge vor der Generierung dieser Szene eine visuelle Anweisung hinzu.",
       "missingModel": "Wähle vor der Generierung dieser Szene ein kompatibles Projektmodell aus.",
       "generateThisScene": "Diese Szene generieren"

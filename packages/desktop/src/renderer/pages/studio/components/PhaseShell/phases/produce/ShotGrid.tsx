@@ -182,11 +182,13 @@ export const ShotGrid: React.FC<ShotGridProps> = ({
           return (
             <ShotCard
               key={scene.id}
+              projectId={project.id}
               scene={scene}
               index={index}
               status={status}
               selected={scene.id === selectedSceneId}
               selectedTakeSource={selectedSource}
+              selectedTakeId={selected?.id ?? null}
               posterSource={posterSource}
               takeCurrent={selectedIndex < 0 ? 0 : selectedIndex + 1}
               takeTotal={takes.length}

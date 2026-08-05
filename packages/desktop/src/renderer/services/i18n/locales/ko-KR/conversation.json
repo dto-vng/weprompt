@@ -1218,7 +1218,7 @@
       "selectVersionAccessible": "변형 {{number}} 선택",
       "importReference": "첫 프레임 이미지 가져오기",
       "importing": "참조 이미지를 가져오는 중...",
-      "posterUnavailable": "동영상 포스터를 사용할 수 없음",
+      "videoReady": "동영상 준비 완료",
       "missingVisualPrompt": "이 장면을 생성하기 전에 비주얼 프롬프트를 추가하세요.",
       "missingModel": "이 장면을 생성하기 전에 호환되는 프로젝트 모델을 선택하세요.",
       "generateThisScene": "이 장면 생성"

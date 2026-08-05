@@ -1218,7 +1218,7 @@
       "selectVersionAccessible": "選擇版本 {{number}}",
       "importReference": "匯入首格圖片",
       "importing": "正在匯入參考圖片...",
-      "posterUnavailable": "影片海報無法使用",
+      "videoReady": "影片已就緒",
       "missingVisualPrompt": "請先加入視覺提示詞，再產生此場景。",
       "missingModel": "請先選擇相容的專案模型，再產生此場景。",
       "generateThisScene": "產生此場景"

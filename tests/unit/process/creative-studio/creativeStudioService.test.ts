@@ -234,6 +234,50 @@ describe('CreativeStudioService', () => {
     ).rejects.toMatchObject({ code: 'not_found' } satisfies Partial<CreativeStudioStoreError>);
   });
 
+  it('decodes a renderer PNG and notifies only after captured-poster persistence succeeds', async () => {
+    const capturedPoster: StudioAsset = {
+      id: 'poster_1',
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      mediaKind: 'image',
+      mimeType: 'image/png',
+      managedAsset: { collection: 'thumbnails', fileName: 'poster_1.png' },
+      byteSize: 8,
+      sha256: '1'.repeat(64),
+      width: 1280,
+      height: 720,
+      createdAt: '2026-08-05T00:00:00.000Z',
+    };
+    let capturedBytes = Buffer.alloc(0);
+    const persistCapturedPoster = vi.fn(async (input: { body: AsyncIterable<Uint8Array> }) => {
+      for await (const chunk of input.body) capturedBytes = Buffer.concat([capturedBytes, chunk]);
+      return capturedPoster;
+    });
+    const posterService = createCreativeStudioService({
+      store: createCreativeStudioStore({ rootDir, createId: () => 'project_1' }),
+      onProjectUpdated,
+      storyboardPlanner: makePlanner(),
+      mediaStore: {
+        importReferenceFromPath: vi.fn(),
+        exportAssetsToDirectory: vi.fn(),
+        persistCapturedPoster,
+      },
+    });
+
+    await expect(
+      posterService.persistCapturedPoster({
+        projectId: 'project_1',
+        sceneId: 'scene_1',
+        videoAssetId: 'video_1',
+        dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+        width: 1280,
+        height: 720,
+      })
+    ).resolves.toBe(capturedPoster);
+    expect(capturedBytes.toString('hex')).toBe('89504e470d0a1a0a');
+    expect(onProjectUpdated).toHaveBeenCalledExactlyOnceWith('project_1');
+  });
+
   it('applies only schema-whitelisted fields from updateProject', async () => {
     const project = await service.createProject(makeInput());
 

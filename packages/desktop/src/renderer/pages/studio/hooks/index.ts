@@ -19,3 +19,8 @@ export {
 } from './useStudioJobs';
 export { useStudioModels, type UseStudioModelsOptions, type UseStudioModelsResult } from './useStudioModels';
 export { useStudioProject, type UseStudioProjectOptions, type UseStudioProjectResult } from './useStudioProject';
+export {
+  useStudioVideoPosterCapture,
+  type StudioVideoPosterCaptureInput,
+  type StudioVideoPosterCaptureState,
+} from './useStudioVideoPosterCapture';

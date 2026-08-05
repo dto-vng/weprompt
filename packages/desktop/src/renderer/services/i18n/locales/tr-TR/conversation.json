@@ -1230,7 +1230,7 @@
       "selectVersionAccessible": "{{number}}. varyasyonu seç",
       "importReference": "İlk kare görselini içe aktar",
       "importing": "Referans içe aktarılıyor...",
-      "posterUnavailable": "Video posteri kullanılamıyor",
+      "videoReady": "Video hazır",
       "missingVisualPrompt": "Bu sahneyi oluşturmadan önce görsel bir istem ekleyin.",
       "missingModel": "Bu sahneyi oluşturmadan önce uyumlu bir proje modeli seçin.",
       "generateThisScene": "Bu sahneyi oluştur"
