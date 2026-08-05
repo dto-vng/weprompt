@@ -8,6 +8,11 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--studio-take-border);
+}
+
+/* `.arco-btn-text:not(.arco-btn-disabled)` forces a transparent fill and
+   outranks a bare class, so the plate surface has to match its specificity. */
+.plate:global(.arco-btn-text):not(:global(.arco-btn-disabled)) {
   background: var(--studio-slate-surface);
 }
 
