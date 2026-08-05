@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "API de imagem",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "Gateway de vídeo auto-hospedado"
+      "selfHostedVideoGateway": "Gateway de vídeo auto-hospedado",
+      "openRouterVideo": "Vídeo do OpenRouter"
     }
   },
   "capabilities": "Recursos",

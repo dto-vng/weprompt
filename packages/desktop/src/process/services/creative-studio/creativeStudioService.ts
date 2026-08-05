@@ -103,11 +103,17 @@ const MEDIA_INTEGRATIONS = [
     kind: 'video',
     labelKey: 'selfHostedVideoGateway',
   },
+  {
+    integrationId: 'integration_o4R7vD2m',
+    adapterId: 'openrouter-video-v1',
+    kind: 'video',
+    labelKey: 'openRouterVideo',
+  },
 ] as const satisfies ReadonlyArray<{
   integrationId: string;
   adapterId: StudioConnectionBinding['adapterId'];
   kind: 'image' | 'video';
-  labelKey: 'imageApi' | 'bytePlusSeedance' | 'selfHostedVideoGateway';
+  labelKey: 'imageApi' | 'bytePlusSeedance' | 'selfHostedVideoGateway' | 'openRouterVideo';
 }>;
 
 export type CreativeStudioService = {
@@ -637,7 +643,10 @@ const toConnectionValidation = (binding: StudioConnectionBinding): StudioConnect
 };
 
 const routeSupportsProject = (route: StudioGenerationRoute, project: StudioProject | null): boolean => {
-  if (route.health === 'unavailable' || !route.constraints.silentOutput) return false;
+  if (route.health === 'unavailable') return false;
+  // OpenRouter video routes may declare non-silent (audio) output; every other
+  // adapter keeps the silent-only invariant. Mirrors the resolver's silent gate.
+  if (!route.constraints.silentOutput && route.adapterId !== 'openrouter-video-v1') return false;
   if (project === null) return true;
   return (
     route.constraints.aspectRatios.includes(project.aspectRatio) &&

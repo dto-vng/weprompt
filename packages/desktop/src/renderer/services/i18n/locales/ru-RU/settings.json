@@ -472,7 +472,8 @@
     "integration": {
       "imageApi": "API изображений",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "Собственный видеошлюз"
+      "selfHostedVideoGateway": "Собственный видеошлюз",
+      "openRouterVideo": "Видео OpenRouter"
     }
   },
   "webui": "WebUI",

@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "Görüntü API'si",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "Kendi barındırılan video ağ geçidi"
+      "selfHostedVideoGateway": "Kendi barındırılan video ağ geçidi",
+      "openRouterVideo": "OpenRouter videosu"
     }
   },
   "capabilities": "Yetenekler",

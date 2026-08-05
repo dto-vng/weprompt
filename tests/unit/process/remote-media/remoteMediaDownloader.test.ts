@@ -13,10 +13,26 @@ import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import type { RemoteMediaError, RemoteMediaResponse } from '@process/services/remote-media/remoteMediaDownloader';
 import {
+  authHeadersForTarget,
   createNodeRemoteMediaRequest,
   downloadRemoteMedia,
   REMOTE_MEDIA_DEFAULT_TIMEOUT_MS,
 } from '@process/services/remote-media/remoteMediaDownloader';
+
+describe('authHeadersForTarget', () => {
+  const auth = { host: 'openrouter.ai', headers: { Authorization: 'Bearer sk-or-test' } };
+
+  it('attaches credentials only to the exact authorized host', () => {
+    expect(authHeadersForTarget({ hostname: 'openrouter.ai' }, auth)).toEqual({
+      Authorization: 'Bearer sk-or-test',
+    });
+  });
+
+  it('drops credentials for a redirected or lookalike host', () => {
+    expect(authHeadersForTarget({ hostname: 'cdn.example' }, auth)).toEqual({});
+    expect(authHeadersForTarget({ hostname: 'openrouter.ai.evil.example' }, auth)).toEqual({});
+  });
+});
 
 type Deferred<T> = {
   promise: Promise<T>;

@@ -19,6 +19,7 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 import { isImageGenSupported, isImagesApiModel } from '@/common/utils/imageModelAllowlist';
 import { getBytePlusSeedanceModelSpec, isSupportedBytePlusSeedanceProvider } from './adapters/bytePlusSeedanceAdapter';
+import { getOpenRouterVideoModelSpec, isSupportedOpenRouterVideoProvider } from './adapters/openRouterVideoAdapter';
 
 export type StudioProviderResolverDeps = {
   listProviders: () => Promise<IProvider[]>;
@@ -118,6 +119,20 @@ const seedanceConstraints = (model: string): StudioRouteConstraints | null => {
     : null;
 };
 
+const openRouterConstraints = (model: string): StudioRouteConstraints | null => {
+  const spec = getOpenRouterVideoModelSpec(model);
+  return spec
+    ? {
+        aspectRatios: [...spec.ratios],
+        resolutions: [...spec.resolutions],
+        minDurationSeconds: spec.minDuration,
+        maxDurationSeconds: spec.maxDuration,
+        supportsFirstFrame: spec.supportsFirstFrame,
+        silentOutput: !spec.supportsAudio,
+      }
+    : null;
+};
+
 const bindingConstraints = (capabilities: StudioConnectionCapabilities): StudioRouteConstraints | null => {
   if (
     !capabilities.aspectRatios?.length ||
@@ -175,13 +190,21 @@ const resolveBindingRoute = (
   if (binding.adapterId === 'byteplus-seedance-v1' && !isSupportedBytePlusSeedanceProvider(provider, binding.model)) {
     return null;
   }
+  if (binding.adapterId === 'openrouter-video-v1' && !isSupportedOpenRouterVideoProvider(provider, binding.model)) {
+    return null;
+  }
   const constraints =
     binding.adapterId === IMAGE_ADAPTER
       ? imageConstraints(binding.model)
       : binding.adapterId === 'byteplus-seedance-v1'
         ? seedanceConstraints(binding.model)
-        : bindingConstraints(binding.capabilities);
-  if (!constraints || !constraints.silentOutput) return null;
+        : binding.adapterId === 'openrouter-video-v1'
+          ? openRouterConstraints(binding.model)
+          : bindingConstraints(binding.capabilities);
+  if (!constraints) return null;
+  // Only the host-locked OpenRouter adapter may surface audio-capable output;
+  // every other adapter retains the existing silent-only security invariant.
+  if (!constraints.silentOutput && binding.adapterId !== 'openrouter-video-v1') return null;
   return {
     choiceId: createStudioMediaChoiceId({
       providerId: provider.id,

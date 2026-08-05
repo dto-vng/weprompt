@@ -235,6 +235,34 @@ describe('createStudioProviderResolver', () => {
     expect((await resolver([provider()], [missingSilent, incomplete]).listGenerationRoutes()).routes).toEqual([]);
   });
 
+  it('allows non-silent output only for the trusted OpenRouter video adapter', async () => {
+    const openRouter = provider({
+      base_url: 'https://openrouter.ai/api/v1',
+      api_key: 'sk-or-test',
+      models: ['bytedance/seedance-2.0-fast'],
+    });
+    const openRouterBinding = binding({
+      id: 'binding_openrouter',
+      adapterId: 'openrouter-video-v1',
+      model: 'bytedance/seedance-2.0-fast',
+      capabilities: gatewayCapabilities({ audioModes: ['audio'] }),
+    });
+    const otherAudioBinding = binding({
+      id: 'binding_other_audio',
+      adapterId: 'weprompt-media-gateway-v1',
+      capabilities: gatewayCapabilities({ audioModes: ['audio'] }),
+    });
+
+    const catalog = await resolver([openRouter], [openRouterBinding, otherAudioBinding]).listGenerationRoutes();
+
+    expect(catalog.routes).toEqual([
+      expect.objectContaining({
+        adapterId: 'openrouter-video-v1',
+        constraints: expect.objectContaining({ silentOutput: false }),
+      }),
+    ]);
+  });
+
   it('accepts Seedance only for the exact supported provider host and model', async () => {
     const seedanceBinding = binding({
       adapterId: 'byteplus-seedance-v1',

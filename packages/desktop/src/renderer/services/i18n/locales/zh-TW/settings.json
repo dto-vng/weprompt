@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "圖片 API",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "自託管影片閘道"
+      "selfHostedVideoGateway": "自託管影片閘道",
+      "openRouterVideo": "OpenRouter 影片"
     }
   },
   "capabilities": "能力擴展",

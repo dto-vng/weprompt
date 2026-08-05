@@ -2690,6 +2690,7 @@ export type I18nKey =
   | 'settings.mediaModels.image'
   | 'settings.mediaModels.integration.bytePlusSeedance'
   | 'settings.mediaModels.integration.imageApi'
+  | 'settings.mediaModels.integration.openRouterVideo'
   | 'settings.mediaModels.integration.selfHostedVideoGateway'
   | 'settings.mediaModels.integrationLabel'
   | 'settings.mediaModels.loadFailed'

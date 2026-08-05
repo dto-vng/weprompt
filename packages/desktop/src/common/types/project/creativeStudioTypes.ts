@@ -22,7 +22,11 @@ export type StudioJobStatus =
   | 'failed'
   | 'cancelled';
 
-export type StudioProviderAdapterId = 'weprompt-image-v1' | 'byteplus-seedance-v1' | 'weprompt-media-gateway-v1';
+export type StudioProviderAdapterId =
+  | 'weprompt-image-v1'
+  | 'byteplus-seedance-v1'
+  | 'weprompt-media-gateway-v1'
+  | 'openrouter-video-v1';
 
 export type StudioProviderRef = {
   providerId: string;
@@ -299,7 +303,11 @@ export type StudioConnectionBinding = {
   validatedAt: string;
 };
 
-export type StudioConnectionIntegrationLabelKey = 'imageApi' | 'bytePlusSeedance' | 'selfHostedVideoGateway';
+export type StudioConnectionIntegrationLabelKey =
+  | 'imageApi'
+  | 'bytePlusSeedance'
+  | 'selfHostedVideoGateway'
+  | 'openRouterVideo';
 
 export type StudioConnectionIntegration = {
   integrationId: string;

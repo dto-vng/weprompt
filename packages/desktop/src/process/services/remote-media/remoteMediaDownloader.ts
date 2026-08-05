@@ -88,11 +88,22 @@ const hostHeader = (target: ValidatedRemoteMediaTarget): string => {
 };
 
 /**
+ * Returns credentials only for the already-validated authorized host. The
+ * decision is repeated for every redirect hop, so cross-host redirects never
+ * inherit a provider credential.
+ */
+export const authHeadersForTarget = (
+  target: Pick<ValidatedRemoteMediaTarget, 'hostname'>,
+  auth?: { host: string; headers: Record<string, string> }
+): Record<string, string> =>
+  auth && normalizedHost(target.hostname) === normalizedHost(auth.host) ? auth.headers : {};
+
+/**
  * Node transport with DNS pinning. The hostname remains in Host/SNI so TLS
  * certificate validation is still performed against the original URL host.
  */
 export const createNodeRemoteMediaRequest =
-  (timeoutMs: number) =>
+  (timeoutMs: number, auth?: { host: string; headers: Record<string, string> }) =>
   (target: ValidatedRemoteMediaTarget, options?: RemoteMediaRequestOptions): Promise<RemoteMediaResponse> =>
     new Promise((resolve, reject) => {
       const client = target.url.protocol === 'https:' ? https : http;
@@ -111,7 +122,7 @@ export const createNodeRemoteMediaRequest =
           port: target.port,
           path: `${target.url.pathname}${target.url.search}`,
           method: 'GET',
-          headers: { Host: hostHeader(target) },
+          headers: { Host: hostHeader(target), ...authHeadersForTarget(target, auth) },
           servername: target.url.protocol === 'https:' && !targetIsIp ? target.hostname : undefined,
           signal: options?.signal,
           lookup: (_hostname, lookupOptions, callback) => {

@@ -8,11 +8,13 @@ import type { StudioProviderAdapterId } from '@/common/types/project/creativeStu
 import { createBytePlusSeedanceAdapter, type BytePlusSeedanceAdapterDeps } from './bytePlusSeedanceAdapter';
 import { createImageGenerationAdapter, type ImageGenerationAdapterDeps } from './imageAdapter';
 import { createMediaGatewayAdapter, type MediaGatewayAdapterDeps } from './mediaGatewayAdapter';
+import { createOpenRouterVideoAdapter, type OpenRouterVideoAdapterDeps } from './openRouterVideoAdapter';
 import type { GenerationProviderAdapter } from './types';
 
 export * from './bytePlusSeedanceAdapter';
 export * from './imageAdapter';
 export * from './mediaGatewayAdapter';
+export * from './openRouterVideoAdapter';
 export * from './types';
 
 /** Main-process registry: never place this object or its providers in a renderer DTO. */
@@ -22,6 +24,7 @@ export type GenerationProviderAdapterRegistryDeps = {
   image: ImageGenerationAdapterDeps;
   bytePlusSeedance?: BytePlusSeedanceAdapterDeps;
   mediaGateway?: MediaGatewayAdapterDeps;
+  openRouter?: OpenRouterVideoAdapterDeps;
 };
 
 export const createGenerationProviderAdapterRegistry = (
@@ -31,4 +34,5 @@ export const createGenerationProviderAdapterRegistry = (
     ['weprompt-image-v1', createImageGenerationAdapter(deps.image)],
     ['byteplus-seedance-v1', createBytePlusSeedanceAdapter(deps.bytePlusSeedance)],
     ['weprompt-media-gateway-v1', createMediaGatewayAdapter(deps.mediaGateway)],
+    ['openrouter-video-v1', createOpenRouterVideoAdapter(deps.openRouter)],
   ]);

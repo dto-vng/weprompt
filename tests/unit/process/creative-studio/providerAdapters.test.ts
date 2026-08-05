@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TProviderWithModel } from '@/common/config/storage';
 import {
   createBytePlusSeedanceAdapter,
+  createGenerationProviderAdapterRegistry,
   createImageGenerationAdapter,
   createMediaGatewayAdapter,
   isValidProviderJobId,
@@ -61,6 +62,12 @@ const firstFrame = (): ResolvedProviderInput => ({
 });
 
 describe('Creative Studio provider adapters', () => {
+  it('registers the OpenRouter video adapter in the production registry', () => {
+    const registry = createGenerationProviderAdapterRegistry({ image: { workspaceDir: '/private/studio' } });
+
+    expect(registry.get('openrouter-video-v1')?.id).toBe('openrouter-video-v1');
+  });
+
   it('turns a successful image engine result into a process-only complete output', async () => {
     const executeImageGeneration = vi.fn(async () => ({
       success: true,

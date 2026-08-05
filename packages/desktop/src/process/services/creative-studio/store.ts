@@ -39,7 +39,12 @@ const JOB_STATUSES = new Set([
 const NONTERMINAL_JOB_STATUSES = new Set(['queued_local', 'submitting', 'queued_remote', 'running', 'needs_attention']);
 const JOB_RETRY_REASONS = new Set(['provider_failure', 'submission_unknown']);
 const CANCELLATION_POLICIES = new Set<StudioCancellationPolicy>(['none', 'queued_only', 'queued_and_running']);
-const ADAPTER_IDS = new Set(['weprompt-image-v1', 'byteplus-seedance-v1', 'weprompt-media-gateway-v1']);
+const ADAPTER_IDS = new Set([
+  'weprompt-image-v1',
+  'byteplus-seedance-v1',
+  'weprompt-media-gateway-v1',
+  'openrouter-video-v1',
+]);
 const JOB_ERROR_CODES = new Set([
   'invalid_request',
   'auth',
@@ -314,7 +319,9 @@ const validateConnectionBinding = (value: unknown): value is StudioConnectionBin
         mediaKinds.length === 1 &&
         mediaKinds[0] === 'image' &&
         capabilities.audioModes === undefined
-      : (value.adapterId === 'byteplus-seedance-v1' || value.adapterId === 'weprompt-media-gateway-v1') &&
+      : (value.adapterId === 'byteplus-seedance-v1' ||
+          value.adapterId === 'weprompt-media-gateway-v1' ||
+          value.adapterId === 'openrouter-video-v1') &&
         Array.isArray(mediaKinds) &&
         mediaKinds.length === 1 &&
         mediaKinds[0] === 'video' &&

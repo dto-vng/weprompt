@@ -217,6 +217,10 @@ const defaultOutputDownloader = (
       // Request validation rejects malformed gateway origins before output persistence.
     }
   }
+  const openRouterAuth =
+    adapterId === 'openrouter-video-v1' && provider.api_key.trim()
+      ? { host: 'openrouter.ai', headers: { Authorization: `Bearer ${provider.api_key}` } }
+      : undefined;
   return {
     lookup: async (hostname) => {
       const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
@@ -224,7 +228,7 @@ const defaultOutputDownloader = (
         address.family === 4 || address.family === 6 ? [{ address: address.address, family: address.family }] : []
       );
     },
-    request: createNodeRemoteMediaRequest(120_000),
+    request: createNodeRemoteMediaRequest(120_000, openRouterAuth),
     signal,
     timeoutMs: budget.timeoutMs,
     ...(trustedPrivateGatewayOrigin ? { trustedPrivateGatewayOrigin } : {}),

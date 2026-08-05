@@ -44,6 +44,7 @@ const MEDIA_MODEL_KEYS = [
   'integration.imageApi',
   'integration.bytePlusSeedance',
   'integration.selfHostedVideoGateway',
+  'integration.openRouterVideo',
 ] as const;
 
 type LocaleConfig = {
@@ -90,9 +91,19 @@ describe('Creative Studio media model settings copy', () => {
 
   it('keeps friendly integration labels distinct from private adapter IDs', () => {
     const settings = readJson<SettingsLocale>(new URL('en-US/settings.json', LOCALE_ROOT));
-    const adapterIds = ['weprompt-image-v1', 'byteplus-seedance-v1', 'weprompt-media-gateway-v1'];
+    const adapterIds = [
+      'weprompt-image-v1',
+      'byteplus-seedance-v1',
+      'weprompt-media-gateway-v1',
+      'openrouter-video-v1',
+    ];
 
-    for (const key of ['integration.imageApi', 'integration.bytePlusSeedance', 'integration.selfHostedVideoGateway']) {
+    for (const key of [
+      'integration.imageApi',
+      'integration.bytePlusSeedance',
+      'integration.selfHostedVideoGateway',
+      'integration.openRouterVideo',
+    ]) {
       expect(adapterIds).not.toContain(resolveLeaf(settings.mediaModels, key));
     }
   });

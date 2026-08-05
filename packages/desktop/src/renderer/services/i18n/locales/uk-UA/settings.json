@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "API зображень",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "Власний відеошлюз"
+      "selfHostedVideoGateway": "Власний відеошлюз",
+      "openRouterVideo": "Відео OpenRouter"
     }
   },
   "capabilities": "Можливості",

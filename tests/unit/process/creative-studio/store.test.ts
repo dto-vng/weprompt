@@ -1127,6 +1127,32 @@ describe('CreativeStudioStore connections', () => {
     }
   });
 
+  it('accepts the OpenRouter video adapter in the durable media-binding allowlist', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'creative-studio-openrouter-connection-'));
+    const connectionStore = createCreativeStudioStore({ rootDir: root });
+    try {
+      const saved = await connectionStore.saveConnection({
+        ...validConnectionBinding(),
+        adapterId: 'openrouter-video-v1',
+        model: 'bytedance/seedance-2.0-fast',
+        capabilities: {
+          mediaKinds: ['video'],
+          audioModes: ['none'],
+          aspectRatios: ['16:9'],
+          resolutions: ['720p'],
+          minDurationSeconds: 4,
+          maxDurationSeconds: 15,
+          supportsFirstFrame: true,
+          cancellationPolicy: 'none',
+        },
+      });
+
+      expect(saved.adapterId).toBe('openrouter-video-v1');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     { legacy: true, expected: 'queued_only' },
     { legacy: false, expected: 'none' },

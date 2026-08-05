@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "이미지 API",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "자체 호스팅 비디오 게이트웨이"
+      "selfHostedVideoGateway": "자체 호스팅 비디오 게이트웨이",
+      "openRouterVideo": "OpenRouter 비디오"
     }
   },
   "capabilities": "기능 확장",

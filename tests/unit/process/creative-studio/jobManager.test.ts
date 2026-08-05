@@ -4011,6 +4011,78 @@ describe('StudioJobManager output download budgets', () => {
     }
   });
 
+  it('attaches the OpenRouter bearer to its exact output host through the hardened downloader', async () => {
+    let capturedDownloader:
+      | Parameters<StudioMediaStore['persistProviderOutputFromUrlForJob']>[0]['downloader']
+      | undefined;
+    const openRouterProvider: IProvider = {
+      ...videoProvider,
+      base_url: 'https://openrouter.ai/api/v1',
+      api_key: 'sk-or-test',
+      models: ['bytedance/seedance-2.0-fast'],
+    };
+    const openRouterRoute: StudioResolvedSceneRouteSnapshot = {
+      ...videoRoute,
+      adapterId: 'openrouter-video-v1',
+      model: 'bytedance/seedance-2.0-fast',
+    };
+    const adapter = completeAdapter('openrouter-video-v1', [
+      {
+        mediaKind: 'video',
+        role: 'primary',
+        source: { kind: 'url', url: 'https://openrouter.ai/api/v1/videos/job_1/content' },
+        mimeType: 'video/mp4',
+      },
+    ]);
+    const harness = await createHarness(adapter, {
+      scenes: [videoScene()],
+      routes: [openRouterRoute],
+      provider: openRouterProvider,
+      decorateMediaStore: (mediaStore) => ({
+        ...mediaStore,
+        persistProviderOutputFromUrlForJob: async (input) => {
+          capturedDownloader = input.downloader;
+          throw new Error('stop after observing downloader');
+        },
+      }),
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: ['scene_1'],
+      routes: [openRouterRoute],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(() => expect(capturedDownloader).toBeDefined());
+    if (!capturedDownloader) throw new Error('downloader was not captured');
+
+    const request = Object.assign(new EventEmitter(), {
+      setTimeout: vi.fn(),
+      end: vi.fn(),
+    });
+    request.end.mockImplementation(() => request.emit('error', new Error('stop transport')));
+    let authorization: unknown;
+    const requestSpy = vi.spyOn(https, 'request').mockImplementation(((options: unknown) => {
+      authorization = (options as { headers?: Record<string, unknown> }).headers?.Authorization;
+      return request as unknown as ReturnType<typeof https.request>;
+    }) as typeof https.request);
+    try {
+      await expect(
+        capturedDownloader.request({
+          url: new URL('https://openrouter.ai/api/v1/videos/job_1/content'),
+          hostname: 'openrouter.ai',
+          port: 443,
+          address: '8.8.8.8',
+          family: 4,
+        })
+      ).rejects.toMatchObject({ code: 'remote_download_failed' });
+      expect(authorization).toBe('Bearer sk-or-test');
+    } finally {
+      requestSpy.mockRestore();
+    }
+  });
+
   it('does not construct a downloader for local primary or poster outputs', async () => {
     let primaryPath = '';
     let posterPath = '';

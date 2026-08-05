@@ -104,12 +104,12 @@ const routeOption = (
   kind: 'image' | 'video',
   overrides: Partial<
     StudioRouteCatalogEntry & {
-      adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1';
+      adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1' | 'openrouter-video-v1';
       cancellationPolicy: 'none' | 'queued_only' | 'queued_and_running';
     }
   > = {}
 ): StudioRouteCatalogEntry & {
-  adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1';
+  adapterId: 'weprompt-image-v1' | 'weprompt-media-gateway-v1' | 'openrouter-video-v1';
   cancellationPolicy: 'none' | 'queued_only' | 'queued_and_running';
 } => {
   const route = {
@@ -669,6 +669,11 @@ describe('CreativeStudioService', () => {
           integrationId: GATEWAY_INTEGRATION_ID,
           kind: 'video',
           labelKey: 'selfHostedVideoGateway',
+        },
+        {
+          integrationId: 'integration_o4R7vD2m',
+          kind: 'video',
+          labelKey: 'openRouterVideo',
         },
       ]),
       connections: [
@@ -2765,6 +2770,29 @@ describe('CreativeStudioService', () => {
       const catalog = await harness.service.listRoutes({ projectId: referenced.id });
 
       expect(catalog.video.options).toMatchObject([{ model: 'no-reference-model' }]);
+    });
+
+    it('keeps trusted OpenRouter audio routes while rejecting non-silent routes from every other adapter', async () => {
+      const openRouterAudio = routeOption('video', {
+        adapterId: 'openrouter-video-v1',
+        model: 'bytedance/seedance-2.0-fast',
+        constraints: { ...routeOption('video').constraints, silentOutput: false },
+      });
+      const otherAdapterAudio = routeOption('video', {
+        adapterId: 'weprompt-media-gateway-v1',
+        model: 'gateway-audio-model',
+        constraints: { ...routeOption('video').constraints, silentOutput: false },
+      });
+      const harness = await createCatalogHarness({ routes: [openRouterAudio, otherAdapterAudio] });
+
+      const catalog = await harness.service.listRoutes({ projectId: harness.project.id });
+
+      expect(catalog.video.options).toEqual([
+        expect.objectContaining({
+          model: 'bytedance/seedance-2.0-fast',
+          constraints: expect.objectContaining({ silentOutput: false }),
+        }),
+      ]);
     });
 
     it('clears a selection while preserving optimistic revision checks', async () => {

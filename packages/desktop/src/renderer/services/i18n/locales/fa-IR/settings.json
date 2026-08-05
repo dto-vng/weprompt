@@ -475,7 +475,8 @@
     "integration": {
       "imageApi": "API تصویر",
       "bytePlusSeedance": "BytePlus Seedance",
-      "selfHostedVideoGateway": "درگاه ویدیوی خودمیزبان"
+      "selfHostedVideoGateway": "درگاه ویدیوی خودمیزبان",
+      "openRouterVideo": "ویدیوی OpenRouter"
     }
   },
   "capabilities": "قابلیت‌ها",
