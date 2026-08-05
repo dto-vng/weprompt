@@ -123,5 +123,9 @@ The Review editor UI, any render pipeline, transitions, audio, text overlays, sp
 
 - Steps 1 and 2 are independent of the rest and of each other — parallelisable across agents. Steps 3–6 are sequential.
 - Gates per step: `bunx tsc --noEmit`, `bun run test`, `node scripts/check-i18n.js`, `bun run lint:fix && bun run format`.
-- Provision agent worktrees with a **full** `bun install`, not a root-only `node_modules` symlink. A root-only link leaves `packages/web-host/node_modules` missing, and `static-server.unit.test.ts` and `releasePackagingConfig.test.ts` then fail for reasons unrelated to the change — this produced two phantom failures during Checkpoint 3.
+- **Provisioning agent worktrees — two distinct traps, both seen.** A `bun install` per worktree works but is slow and costs ~1.9GB each. Symlinking is fine *if done completely*:
+  1. Link the **workspace-local** `node_modules` too — `packages/{desktop,web-host,web-cli,shared-scripts}` each have one. A root-only link leaves `serve-handler` unresolvable and `static-server.unit.test.ts` collects zero tests. That is a phantom failure.
+  2. Link from a checkout on the **same base**. Linking the main checkout's root `node_modules` (on `sprint1`) into a sprint2-based worktree gives `builder-util-runtime` **9.5.1** where sprint2 pins **9.7.0**, and `releasePackagingConfig.test.ts` fails. That one is **not** phantom — the test is correctly catching a real version mismatch. Link from `.worktrees/creative-suite-sprint2/node_modules` instead.
+
+  Verify provisioning before believing any red: `bun run test packages/web-host/src/static-server.unit.test.ts tests/unit/releasePackagingConfig.test.ts` must report 30 passing.
 - `i18n-keys.d.ts` is gitignored on this branch. Regenerate with `bun run i18n:types`; never stage it.
