@@ -1030,6 +1030,7 @@
       "resolution": "Resolution",
       "watermarkOff": "Watermark disabled",
       "audioOff": "Silent output; audio generation disabled",
+      "audioOn": "This render includes generated audio; silent routes, if present, remain silent.",
       "missingRoute": "At least one scene has no generation route.",
       "invalidRoute": "At least one selected route is invalid.",
       "durationMismatch": "Storyboard timing does not match the project target.",

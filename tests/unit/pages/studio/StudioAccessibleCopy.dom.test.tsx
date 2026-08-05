@@ -681,6 +681,7 @@ describe('Creative Studio full-sentence English copy', () => {
                 model: 'video-model',
               },
               providerName: 'Provider',
+              silentOutput: true,
             },
           },
         ]}

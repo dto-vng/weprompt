@@ -1164,6 +1164,7 @@
       "resolution": "分辨率",
       "watermarkOff": "已禁用水印",
       "audioOff": "静音输出；已禁用音频生成",
+      "audioOn": "此次渲染包含生成的音频；静音路线（如有）仍将保持静音。",
       "missingRoute": "至少有一个场景没有生成路线。",
       "invalidRoute": "至少有一条所选路线无效。",
       "durationMismatch": "故事板时长与项目目标不一致。",

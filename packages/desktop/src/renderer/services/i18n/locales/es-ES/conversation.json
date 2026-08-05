@@ -1185,6 +1185,7 @@
       "resolution": "Resolución",
       "watermarkOff": "Marca de agua desactivada",
       "audioOff": "Salida sin sonido; generación de audio desactivada",
+      "audioOn": "Este renderizado incluye audio generado; las rutas silenciosas, si las hay, permanecen sin sonido.",
       "missingRoute": "Al menos una escena no tiene ruta de generación.",
       "invalidRoute": "Al menos una ruta seleccionada no es válida.",
       "durationMismatch": "La duración del guion gráfico no coincide con el objetivo del proyecto.",

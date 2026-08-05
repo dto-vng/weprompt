@@ -1190,6 +1190,7 @@
       "resolution": "Resolução",
       "watermarkOff": "Marca-d'água desativada",
       "audioOff": "Saída sem som; geração de áudio desativada",
+      "audioOn": "Esta renderização inclui áudio gerado; rotas silenciosas, se houver, permanecem sem som.",
       "missingRoute": "Pelo menos uma cena não tem rota de geração.",
       "invalidRoute": "Pelo menos uma rota selecionada é inválida.",
       "durationMismatch": "A duração do storyboard não corresponde ao objetivo do projeto.",

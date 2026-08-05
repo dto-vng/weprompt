@@ -1164,6 +1164,7 @@
       "resolution": "解析度",
       "watermarkOff": "浮水印已停用",
       "audioOff": "靜音輸出；音訊產生已停用",
+      "audioOn": "此次算繪包含產生的音訊；靜音路線（如有）仍會保持靜音。",
       "missingRoute": "至少有一個場景沒有產生路線。",
       "invalidRoute": "至少有一條所選路線無效。",
       "durationMismatch": "分鏡時間與專案目標不符。",

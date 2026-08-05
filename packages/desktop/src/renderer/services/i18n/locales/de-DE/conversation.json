@@ -1175,6 +1175,7 @@
       "resolution": "Auflösung",
       "watermarkOff": "Wasserzeichen deaktiviert",
       "audioOff": "Stumme Ausgabe; Audiogenerierung deaktiviert",
+      "audioOn": "Dieses Rendering enthält generiertes Audio; stumme Routen bleiben, sofern vorhanden, stumm.",
       "missingRoute": "Mindestens eine Szene hat keine Generierungsroute.",
       "invalidRoute": "Mindestens eine ausgewählte Route ist ungültig.",
       "durationMismatch": "Das Storyboard-Timing entspricht nicht dem Projektziel.",

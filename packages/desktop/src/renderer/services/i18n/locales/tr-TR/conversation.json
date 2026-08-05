@@ -1176,6 +1176,7 @@
       "resolution": "Çözünürlük",
       "watermarkOff": "Filigran devre dışı",
       "audioOff": "Sessiz çıktı; ses oluşturma devre dışı",
+      "audioOn": "Bu işleme oluşturulmuş ses içerir; varsa sessiz rotalar sessiz kalır.",
       "missingRoute": "En az bir sahnenin oluşturma rotası yok.",
       "invalidRoute": "Seçilen rotalardan en az biri geçersiz.",
       "durationMismatch": "Storyboard zamanlaması proje hedefiyle eşleşmiyor.",

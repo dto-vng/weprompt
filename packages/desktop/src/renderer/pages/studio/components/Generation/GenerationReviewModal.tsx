@@ -24,6 +24,7 @@ export type GenerationReviewRoute =
       status: 'valid' | 'invalid';
       snapshot: GenerationReviewRouteSnapshot;
       providerName: string | null;
+      silentOutput: boolean | null;
     }
   | {
       status: 'missing';
@@ -103,6 +104,14 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
       .filter((scene) => scene.route.status === 'valid' && routeMatchesScene(scene))
       .map((scene) => scene.route.snapshot)
       .filter((route): route is GenerationReviewRouteSnapshot => route !== null);
+    const knownAudioPolicies = scenes.flatMap((scene) =>
+      scene.route.status !== 'missing' && scene.route.silentOutput !== null ? [scene.route.silentOutput] : []
+    );
+    const audioMessageKey = knownAudioPolicies.includes(false)
+      ? 'conversation.creativeStudio.review.audioOn'
+      : knownAudioPolicies.length > 0
+        ? 'conversation.creativeStudio.review.audioOff'
+        : null;
 
     return {
       videoSeconds,
@@ -110,6 +119,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
       invalidRoute,
       durationMismatch,
       validRoutes,
+      audioMessageKey,
       canConfirm: scenes.length > 0 && !missingRoute && !invalidRoute && validRoutes.length === scenes.length,
     };
   }, [mode, projectDurationSeconds, scenes, targetDurationSeconds]);
@@ -234,7 +244,7 @@ export const GenerationReviewModal: React.FC<GenerationReviewModalProps> = ({
 
         <div className='flex flex-col gap-8px'>
           <Alert type='info' content={t('conversation.creativeStudio.review.watermarkOff')} />
-          <Alert type='info' content={t('conversation.creativeStudio.review.audioOff')} />
+          {review.audioMessageKey && <Alert type='info' content={t(review.audioMessageKey)} />}
           <Alert type='warning' content={t('conversation.creativeStudio.review.chargeNotice')} />
         </div>
 
