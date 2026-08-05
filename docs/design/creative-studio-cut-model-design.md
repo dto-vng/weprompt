@@ -1,6 +1,6 @@
 # Creative Studio — the cut (edit-decision) model
 
-**Status:** rev 2 — revised after execution review · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
+**Status:** rev 3 — v1 filter set decided · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
 **Independent of:** the video-capability spike — this is why it can proceed now
 **Blocks:** the Review editor UI and any render pipeline
 
@@ -79,12 +79,45 @@ Consequences that must be handled explicitly rather than discovered:
 
 ```
 StudioCutFilter =
-  | { id: 'brightness'; amount: number }   // -1..1, default 0
-  | { id: 'contrast';   amount: number }   // -1..1, default 0
-  | { id: 'saturation'; amount: number }   // -1..1, default 0
+  | { id: 'exposure';    amount: number }   // -1..1, default 0
+  | { id: 'contrast';    amount: number }   // -1..1, default 0
+  | { id: 'saturation';  amount: number }   // -1..1, default 0
+  | { id: 'temperature'; amount: number }   // -1..1, default 0 (positive = warmer)
 ```
 
-The exact v1 set and its ranges remain a design decision (§11), but the *shape* must be a discriminated union before implementation, not a loose record. Each backend maps ids to its own mechanism: an ffmpeg filter chain, or a WebGL/canvas shader under WebCodecs. That mapping is **backend-private**, exactly as the adapter contract in EPIC-003 R1 keeps provider request mappings adapter-private.
+**[rev 3] The v1 set is decided — and all four compose into a single colour matrix.**
+
+Every v1 filter is a linear or affine per-pixel operation, so the four scalars derive one 4×5 colour matrix that each backend applies in a single pass. That property, not the id union alone, is what makes divergence hard to introduce:
+
+- **Canvas backend:** one SVG `feColorMatrix` referenced through `ctx.filter = 'url(#…)'`.
+- **ffmpeg backend:** one `colorchannelmixer` with offsets — a core LGPL filter, no GPL dependency.
+- **Conformance:** assert the *derived matrix* is identical across backends, then golden pixels as a second net (§9).
+- **Identity is free and testable:** all four at default produce the identity matrix, which the renderer must skip entirely.
+
+### Colour space and semantics
+
+Operations apply in **sRGB (gamma-encoded) space, not linear light**, and clamp at the 8-bit boundary. This is pinned deliberately: identical formulas evaluated in different colour spaces is precisely the silent divergence the closed union exists to prevent.
+
+The formulas below match measured Chromium `ctx.filter` behaviour, verified 2026-08-05 on pixel `(128, 64, 32)`: `brightness(1.5)` → `(192, 96, 48)` (linear multiply), `contrast(1.5)` → `(128, 32, 0)` (affine about 0.5, clamped), `saturate(0)` → `(75, 75, 75)` (Rec.709 luma). Normalised channel values `x ∈ [0,1]`, parameter `a ∈ [-1,1]`:
+
+| Filter | Formula |
+| --- | --- |
+| `exposure` | `x' = x × (1 + a)` |
+| `contrast` | `x' = (x − 0.5) × (1 + a) + 0.5` |
+| `saturation` | `x' = L + (x − L) × (1 + a)`, where `L = 0.2126R + 0.7152G + 0.0722B` |
+| `temperature` | `R' = R × (1 + 0.2a)`, `B' = B × (1 − 0.2a)`, `G` unchanged |
+
+### Composition order is fixed
+
+Matrix composition is not commutative, so order is part of the contract: **exposure → temperature → contrast → saturation**. `filters` stays an array in the schema so genuinely order-dependent effects remain possible later, but **v1 validation rejects duplicate ids** and applies the fixed order regardless of array position. Same principle as clips and cuts: general schema, constrained v1.
+
+### Deliberately excluded from v1
+
+- **Blur and sharpen.** Convolutions, not per-pixel operations. They break both the single-matrix property and golden-pixel conformance, and kernel semantics differ between backends. Excluding them is what keeps v1 verifiable.
+- **Presets** — "warm", "punchy", a named look. These are UI sugar that **store the four primitives**; a preset must never become a filter id, or its meaning drifts between backends and versions.
+- **Hue-rotate, vignette, grain, LUTs.** Additive later. LUTs additionally drag in asset management.
+
+Each backend's mapping from these formulas to its own mechanism is **backend-private**, exactly as the adapter contract in EPIC-003 R1 keeps provider request mappings adapter-private.
 
 This is the decision that keeps the model neutral. Storing `"eq=brightness=0.06:saturation=1.2"` would work today and would quietly make ffmpeg the only possible implementation. It also mirrors a rule the codebase already applies elsewhere: typed verbs compiled inside a seam, never a caller-supplied command string.
 
@@ -139,6 +172,11 @@ Once a clip is trimmed, the cut's real duration diverges from the storyboard's i
 - **[rev 2]** `toRendererProject` carries `cuts` and `activeCutId` through to the renderer.
 - **[rev 2]** Opening a pre-existing project does **not** persist a cut and does **not** bump its revision; the first real cut mutation does both.
 - **[rev 2]** A cut derived for a project whose `selectedAssetId` is an imported image is either rejected or repaired — not silently invalid.
+- **[rev 3] Filter conformance.** Two nets, both required:
+  1. **Derived-matrix equality** — the same four parameters produce an identical 4×5 matrix in every backend. This catches divergence before a single pixel is rendered.
+  2. **Golden pixels** — a fixed table of input triples through known parameters, asserted per backend. Seed it with the measured Chromium values: `(128,64,32)` at `exposure +0.5` → `(192,96,48)`; at `contrast +0.5` → `(128,32,0)`; at `saturation −1` → `(75,75,75)`. Include at least one clamping case and one identity case.
+- **[rev 3] Identity is skipped.** All four filters at default must produce no render pass at all, not a no-op matrix multiply. Assert the pass is absent.
+- **[rev 3] Duplicate filter ids are rejected**, and evaluation follows the fixed composition order regardless of array position — assert by supplying the same filters in two different array orders and requiring identical output.
 - Trim with `asset.durationSeconds` absent is accepted; with it present, out-of-range is rejected.
 - Cut mutation cannot be performed through `updateProject`.
 - No stored value contains a backend-specific expression — assert against the filter union, so that adding an ffmpeg-shaped string fails the type.
@@ -158,7 +196,7 @@ Schema room is left where noted, but none of this is built:
 
 ## 11. Open questions
 
-1. **The v1 filter set.** Which named filters, with what parameter ranges? This needs a design answer, not an engineering one, and it should be small enough that both backends can implement all of it.
+1. ~~**The v1 filter set.**~~ **[rev 3] Decided — see §5.** Four scalars (exposure, contrast, saturation, temperature), each `−1…1` default 0, composing to a single colour matrix in a fixed order, with formulas and golden pixels pinned to measured Chromium behaviour.
 2. **Divergence UX.** §4 requires divergence between storyboard order and cut order to be visible. What that looks like, and whether a user can re-sync, is a UI decision.
 3. **Trim timebase — seconds or frames.** Depends on whether a project gains a frame rate (§5). **[rev 2]** This must be resolved *before* the schema lands, not after: assets carry optional duration with no frame rate or timebase, and persisted duration metadata is currently restricted to integers (`mediaStore.ts:931`), so second-precision trim is not currently expressible end to end either.
 4. **[rev 2] Who owns the shared managed-video seam.** Poster capture (landing plan §7) and frame-accurate trim both need renderer-side video load, metadata extraction, codec-failure handling, seek completion and frame selection. Today `StagePreview` only renders a raw managed `<video>` (`StagePreview.tsx:220`). Naming one seam serves both and avoids two half-implementations; poster capture can adopt it without waiting for the render-backend spike.
