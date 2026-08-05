@@ -1,6 +1,6 @@
 # Creative Studio — the cut (edit-decision) model
 
-**Status:** rev 4 — filter set and trim timebase decided · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
+**Status:** rev 5 — filter set, trim timebase and video seam decided · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
 **Independent of:** the video-capability spike — this is why it can proceed now
 **Blocks:** the Review editor UI and any render pipeline
 
@@ -140,7 +140,7 @@ Three reasons, in order of weight:
 - `sourceIn` selects the **first frame whose presentation time is ≥ `sourceIn`** (inclusive).
 - `sourceOut` is **exclusive**: the first frame whose presentation time is ≥ `sourceOut` is *not* included.
 
-This makes output frame count deterministic for a given source, and makes concatenation gap-free. Conformance asserts **identical frame counts** for the same trim across backends, alongside the colour-matrix and golden-pixel checks in §9.
+This makes output frame count deterministic for a given source, and makes concatenation gap-free. **[rev 5] Neither backend does this natively** — Chromium's seek floors while ffmpeg's accurate seek rounds up, measured in §5.2 — so the renderer path needs an explicit forward step. That divergence is the reason this rule is stated rather than assumed. Conformance asserts **identical frame counts** for the same trim across backends, alongside the colour-matrix and golden-pixel checks in §9.
 
 **No project frame rate is added.** Rev 2 flagged the missing `frameRate` field as a gap to fill, following the review's suggestion. That is the wrong home for it: the cut model has no use for one, and a *target output* frame rate is an encoder parameter belonging to the render contract. Adding it to `StudioProject` would create a field the cut never reads and that could drift from what the encoder actually does.
 
@@ -153,6 +153,37 @@ This must be fixed before trim can work end to end, and it is a live trap indepe
 `mediaStore.ts:933` rejects a non-integer duration with `invalid_media` — it does not round it — and `store.ts:438` likewise requires `isIntegerInRange` for the asset field. Production adapters currently **omit** duration, which is the only reason this has never fired. **The moment any adapter is improved to report a true duration such as 5.085, persisting a successful paid render will throw.**
 
 Required: widen both validators to accept a finite positive number rather than a safe integer, keeping the upper bounds. Note that `StudioScene.durationSeconds` stays an integer in 1–60 (`store.ts:400`) — that is a *requested* duration driving generation and pacing, and is deliberately unaffected. The distinction to hold onto is that requested durations are integers while actual asset durations are not.
+
+### 5.2 [rev 5] The shared managed-video seam
+
+Poster capture (landing plan §7) and frame-accurate trim both need renderer-side video handling, and today `StagePreview.tsx:220` only renders a raw managed `<video>`. Two half-implementations would diverge, so this is **one owned seam** — and per `TASKS.md`, a shared seam gets a single owning merge request.
+
+**Shape.** A plain renderer-side module exposing a handle, with a thin React hook wrapper over it. Not hook-only: a trim scrubber and a poster capture routine both need it outside a component's render lifecycle.
+
+| Capability | Contract |
+| --- | --- |
+| `open(projectId, assetId)` | Resolves on metadata; typed failures `not_found \| decode_unsupported \| load_failed` |
+| `metadata` | `{ durationSeconds, width, height }` — the **authoritative** duration per §5.1 |
+| `seekTo(seconds)` | Resolves with the **actual presented `mediaTime`**, not the requested time |
+| `stepFrame(±1)` | Required — see the snapping note below |
+| `captureFrame()` | Canvas / `ImageBitmap`, for posters and thumbnail strips |
+| `close()` | Releases the element and any object URLs |
+
+**Measured facts this rests on** (verified 2026-08-05 against the real 1280×720 OpenRouter render):
+
+- `requestVideoFrameCallback` is available, and its `mediaTime` reports the true presentation time of the frame actually shown. This is the seam's most valuable capability: it lets the renderer report *which* frame it got rather than assuming it got the one requested.
+- `video.duration` is `5.085011` — fractional, consistent with §5.1.
+
+**Snapping: neither backend satisfies §5.1 natively, in opposite directions.** Seeking to `4.99` returned `mediaTime 4.958333` — frame 119 of a 24fps clip, i.e. Chromium **floors** to the frame at or before the requested time. ffmpeg's accurate `-ss` instead yields frames with presentation time **≥** the timestamp. So:
+
+- The **canvas/renderer path** must seek, read `mediaTime`, and `stepFrame(+1)` when the presented time is below `sourceIn`, to satisfy the inclusive rule.
+- The **ffmpeg path** already satisfies inclusive `sourceIn` and needs no adjustment there.
+
+This is exactly the silent one-frame divergence §5.1 exists to prevent, now with a measurement behind it rather than an assumption. Conformance asserts frame counts across backends (§9).
+
+**Constraint: this seam is foreground-only, and must not be the render substrate.** `requestVideoFrameCallback` and `requestAnimationFrame` are compositor-gated, and a hidden or backgrounded window stalls them — a hazard already observed in this codebase, where a hidden dev window killed `rAF` and made rAF-gated UI read as broken. So the seam serves **preview, poster capture and trim UI**, all of which are foreground, user-present activities. It must not become the substrate for the final render, which has to survive a backgrounded window.
+
+That is an argument for ffmpeg-in-main that is **independent of licensing**, and it belongs in the video spike's decision criteria. Verify the backgrounding behaviour explicitly rather than trusting the analogy to `rAF`.
 
 **[rev 2] Audio needs an owner.** The same render contract must state whether source audio is muxed through or muted. OpenRouter video routes request generated audio (`openRouterVideoAdapter.ts:317`), so a cut of those clips has audio whether or not this model mentions it. This document does not own the decision, but it must not leave it unassigned — see §10.
 
@@ -209,6 +240,8 @@ Once a clip is trimmed, the cut's real duration diverges from the storyboard's i
 - **[rev 4] Fractional durations persist.** A provider output reporting `5.085` seconds is stored, not rejected. This is a regression guard on the widened validators, and it fails today.
 - **[rev 4] Frame snapping is deterministic.** The same `sourceIn`/`sourceOut` on the same source yields identical frame counts across backends, with `sourceIn` inclusive and `sourceOut` exclusive. Assert frame counts, not wall-clock duration.
 - **[rev 4] Scene duration stays integral.** Widening asset duration must not relax `StudioScene.durationSeconds`, which remains an integer in 1–60.
+- **[rev 5] The seam reports the frame it actually got.** `seekTo` resolves with the presented `mediaTime`, and a request that lands below `sourceIn` is stepped forward — assert against a known off-grid time such as `4.99` on a 24fps source, which floors to `4.958333` natively.
+- **[rev 5] Typed load failures are distinguishable** — `not_found`, `decode_unsupported` and `load_failed` are separate outcomes, not one generic error. A codec the renderer cannot decode must not read as a missing asset.
 - Trim with `asset.durationSeconds` absent is accepted; with it present, out-of-range is rejected.
 - Cut mutation cannot be performed through `updateProject`.
 - No stored value contains a backend-specific expression — assert against the filter union, so that adding an ffmpeg-shaped string fails the type.
@@ -231,4 +264,4 @@ Schema room is left where noted, but none of this is built:
 1. ~~**The v1 filter set.**~~ **[rev 3] Decided — see §5.** Four scalars (exposure, contrast, saturation, temperature), each `−1…1` default 0, composing to a single colour matrix in a fixed order, with formulas and golden pixels pinned to measured Chromium behaviour.
 2. **Divergence UX.** §4 requires divergence between storyboard order and cut order to be visible. What that looks like, and whether a user can re-sync, is a UI decision.
 3. ~~**Trim timebase — seconds or frames.**~~ **[rev 4] Decided — see §5.1.** Seconds as a double, with frame snapping defined in the render contract. The cut model does not need a project frame rate.
-4. **[rev 2] Who owns the shared managed-video seam.** Poster capture (landing plan §7) and frame-accurate trim both need renderer-side video load, metadata extraction, codec-failure handling, seek completion and frame selection. Today `StagePreview` only renders a raw managed `<video>` (`StagePreview.tsx:220`). Naming one seam serves both and avoids two half-implementations; poster capture can adopt it without waiting for the render-backend spike.
+4. ~~**Who owns the shared managed-video seam.**~~ **[rev 5] Decided — see §5.2.** One owned renderer-side seam serving preview, poster capture and trim UI, with a measured snapping contract. Explicitly *not* the render substrate.

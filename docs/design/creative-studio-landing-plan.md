@@ -185,6 +185,8 @@ Out of scope: any spend ledger, persisted spend history, per-project or global t
 
 Verified 2026-08-05 against the real paid render (1280×720, 5.085s): the renderer loads the video from `weprompt-studio://`, seeks, draws to a `<canvas>`, and `toDataURL('image/png')` returns 883,030 bytes **with no `SecurityError`** — the privileged scheme does not taint the canvas. So Studio can produce the frame locally and feed the existing ingestion path as though the provider had returned it.
 
+**Use the shared managed-video seam** defined in `creative-studio-cut-model-design.md` §5.2 rather than hand-rolling a `<video>` per capture site — frame-accurate trim needs the same load, metadata, seek and capture primitives, and two implementations would diverge.
+
 Three constraints this method carries, none of them blocking:
 
 - Capture happens in the **renderer**, but ingestion is main-process and guarded by `validateProviderPosterLineage`, which exists to validate *provider* posters. Renderer-supplied bytes inverts that trust direction and needs its own equally-strict path — **do not loosen the provider lineage check to accommodate it.**

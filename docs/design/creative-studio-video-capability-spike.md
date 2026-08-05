@@ -81,6 +81,8 @@ A time box is the user's call. As a starting point: §3.2 and §3.3 are roughly 
 
 **Decision criteria, in priority order:** licensing viability first (a veto), then output correctness across the codecs providers actually return, then performance under an active UI, then installed size.
 
+**(rev 2) A non-licensing argument for ffmpeg-in-main.** The renderer-side video seam (`creative-studio-cut-model-design.md` §5.2) depends on `requestVideoFrameCallback`, which is compositor-gated — a hidden or backgrounded window stalls it, a hazard already observed in this codebase with `requestAnimationFrame`. A final render must survive a backgrounded window, so a renderer-hosted WebCodecs pipeline carries a liveness risk that ffmpeg-in-main does not. **Verify this explicitly** rather than trusting the analogy; if backgrounded WebCodecs does keep running, this argument disappears.
+
 ## 7. Open
 
 - ~~Whether the Review editor's non-destructive model should be specced now~~ — **decided and done**: see `creative-studio-cut-model-design.md`. It is required by both candidates and is independent of this spike's outcome.
