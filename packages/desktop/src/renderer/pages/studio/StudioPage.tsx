@@ -21,6 +21,7 @@ import type {
 
 import {
   GenerationReviewModal,
+  routeSupportsScene,
   type GenerationBatchReviewRequest,
   type GenerationReviewScene,
   type GenerationReviewRouteSnapshot,
@@ -57,33 +58,6 @@ const routeIdentity = (
   route: Pick<StudioRouteCatalogEntry | GenerationReviewRouteSnapshot, 'choiceId' | 'kind'>
 ): string => `${route.choiceId}\u0000${route.kind}`;
 
-const routeIsCompatible = (
-  project: StudioRendererProject,
-  scene: StudioScene,
-  route: GenerationReviewRouteSnapshot,
-  availableRoutes: readonly StudioRouteCatalogEntry[]
-): boolean => {
-  const catalogRoute = availableRoutes.find((candidate) => routeIdentity(candidate) === routeIdentity(route));
-  if (
-    catalogRoute === undefined ||
-    catalogRoute.health === 'unavailable' ||
-    route.sceneId !== scene.id ||
-    route.kind !== scene.mediaKind
-  ) {
-    return false;
-  }
-
-  const { constraints } = catalogRoute;
-  return (
-    constraints.silentOutput &&
-    constraints.aspectRatios.includes(project.aspectRatio) &&
-    constraints.resolutions.includes(project.resolution) &&
-    scene.durationSeconds >= constraints.minDurationSeconds &&
-    scene.durationSeconds <= constraints.maxDurationSeconds &&
-    (scene.referenceAssetId === null || constraints.supportsFirstFrame)
-  );
-};
-
 const toReviewScene = (
   project: StudioRendererProject,
   scene: StudioScene,
@@ -103,7 +77,17 @@ const toReviewScene = (
         ? { status: 'missing', snapshot: null, providerName: null }
         : {
             status:
-              routeStatus === 'invalid' || !routeIsCompatible(project, scene, route, availableRoutes)
+              routeStatus === 'invalid' ||
+              catalogRoute === undefined ||
+              !routeSupportsScene(catalogRoute, {
+                kind: scene.mediaKind,
+                sceneId: scene.id,
+                routeSceneId: route.sceneId,
+                aspectRatio: project.aspectRatio,
+                resolution: project.resolution,
+                durationSeconds: scene.durationSeconds,
+                hasReference: scene.referenceAssetId !== null,
+              })
                 ? 'invalid'
                 : 'valid',
             snapshot: route,

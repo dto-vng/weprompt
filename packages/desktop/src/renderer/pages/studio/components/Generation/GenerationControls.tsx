@@ -19,6 +19,8 @@ import { Refresh } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { routeSupportsScene } from './routeSupport';
+
 export type GenerationControlScene = {
   id: string;
   mediaKind: StudioMediaKind;
@@ -100,29 +102,6 @@ const copyCatalogEntry = (route: StudioRouteCatalogEntry): StudioRouteCatalogEnt
   },
 });
 
-const routeSupportsScene = (
-  route: StudioRouteCatalogEntry,
-  {
-    aspectRatio,
-    resolution,
-    durationSeconds,
-    hasReference,
-  }: {
-    aspectRatio?: StudioAspectRatio;
-    resolution?: StudioResolution;
-    durationSeconds?: number;
-    hasReference?: boolean;
-  }
-): boolean =>
-  route.health !== 'unavailable' &&
-  route.constraints.silentOutput &&
-  (aspectRatio === undefined || route.constraints.aspectRatios.includes(aspectRatio)) &&
-  (resolution === undefined || route.constraints.resolutions.includes(resolution)) &&
-  (durationSeconds === undefined ||
-    (durationSeconds >= route.constraints.minDurationSeconds &&
-      durationSeconds <= route.constraints.maxDurationSeconds)) &&
-  (hasReference !== true || route.constraints.supportsFirstFrame);
-
 const catalogRoutes = (catalog: StudioRouteCatalog | null): StudioRouteCatalogEntry[] =>
   catalog === null ? [] : [...catalog.image.options, ...catalog.video.options].map(copyCatalogEntry);
 
@@ -149,7 +128,7 @@ const resolvePersistedRoute = (
       catalog !== null &&
       catalog[kind].status === 'ready' &&
       catalogRoute !== undefined &&
-      routeSupportsScene(catalogRoute, routeContext)
+      routeSupportsScene(catalogRoute, { ...routeContext, kind })
         ? 'valid'
         : 'invalid',
   };
@@ -177,7 +156,10 @@ export const buildSingleSceneReviewRequest = ({
       candidate.providerId === selected.providerId &&
       candidate.model === selected.model
   );
-  if (route === undefined || !routeSupportsScene(route, { aspectRatio, resolution, durationSeconds, hasReference })) {
+  if (
+    route === undefined ||
+    !routeSupportsScene(route, { kind: scene.mediaKind, aspectRatio, resolution, durationSeconds, hasReference })
+  ) {
     return null;
   }
   return {

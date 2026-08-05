@@ -234,6 +234,31 @@ describe('GenerationControls', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps an otherwise compatible audio-capable route generatable', () => {
+    const audioCapableRoute = imageRoute({
+      constraints: {
+        ...imageRoute().constraints,
+        silentOutput: false,
+      },
+    });
+    const props = createProps({
+      catalog: catalog({
+        image: {
+          status: 'ready',
+          selected: project().routing.image,
+          options: [audioCapableRoute],
+        },
+      }),
+    });
+    render(<GenerationControls {...props} />);
+
+    expect(screen.queryByText('conversation.creativeStudio.routing.invalidRoute')).not.toBeInTheDocument();
+    const generate = screen.getByRole('button', { name: 'conversation.creativeStudio.review.generateScene' });
+    expect(generate).toBeEnabled();
+    fireEvent.click(generate);
+    expect(props.onOpenSingleReview).toHaveBeenCalledOnce();
+  });
+
   it.each([
     {
       name: 'aspect ratio',
@@ -259,16 +284,6 @@ describe('GenerationControls', () => {
         },
       }),
       props: { hasReference: true },
-    },
-    {
-      name: 'silent output',
-      route: imageRoute({
-        constraints: {
-          ...imageRoute().constraints,
-          silentOutput: false,
-        },
-      }),
-      props: {},
     },
     {
       name: 'provider health',
