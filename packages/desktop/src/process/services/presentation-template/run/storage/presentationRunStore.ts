@@ -146,12 +146,17 @@ type TokenBucket = {
   updatedAtMs: number;
 };
 
+const createIndexRecord = <Value>(): Record<string, Value> => Object.create(null) as Record<string, Value>;
+
+const getOwnIndexValue = <Value>(record: Record<string, Value>, key: string): Value | undefined =>
+  Object.hasOwn(record, key) ? record[key] : undefined;
+
 const createEmptyIndex = (): PresentationRunIndex => ({
   version: 1,
-  requests: {},
-  conversations: {},
-  turns: {},
-  grants: {},
+  requests: createIndexRecord<string>(),
+  conversations: createIndexRecord<string[]>(),
+  turns: createIndexRecord<string>(),
+  grants: createIndexRecord<string>(),
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -419,8 +424,12 @@ function isPresentationRunFailure(value: unknown): value is PresentationRunFailu
   );
 }
 
+const tupleIndexKey = (first: string, second: string): string => JSON.stringify([first, second]);
+
 const requestIndexKey = (conversationId: string, clientRequestId: string): string =>
-  `${conversationId}\u0000${clientRequestId}`;
+  tupleIndexKey(conversationId, clientRequestId);
+
+const turnIndexKey = (conversationId: string, turnId: string): string => tupleIndexKey(conversationId, turnId);
 
 const preflightFailure = <Code extends 'DISK_RESERVE_EXCEEDED' | 'RESOURCE_LIMIT_EXCEEDED'>(
   code: Code
@@ -811,14 +820,14 @@ export class PresentationRunStore {
         'store:health',
         `conversation:${input.conversationId}`,
         `run:${runId}`,
-        `turn:${input.conversationId}\u0000${input.turnId}`,
+        `turn:${turnIndexKey(input.conversationId, input.turnId)}`,
       ],
       async () => {
         this.assertStorageHealthy();
         const current = this.runs.get(runId);
         if (current === undefined) throw new Error('Presentation run not found');
-        const turnKey = `${input.conversationId}\u0000${input.turnId}`;
-        const owner = this.index.turns[turnKey];
+        const turnKey = turnIndexKey(input.conversationId, input.turnId);
+        const owner = getOwnIndexValue(this.index.turns, turnKey);
         if (owner !== undefined && owner !== runId) {
           throw new Error('Presentation conversation turn is already bound to another run');
         }
@@ -1027,7 +1036,7 @@ export class PresentationRunStore {
     conversationId: string,
     clientRequestId: string
   ): Promise<StoredPresentationRunManifest | null> {
-    const indexedRunId = this.index.requests[requestIndexKey(conversationId, clientRequestId)];
+    const indexedRunId = getOwnIndexValue(this.index.requests, requestIndexKey(conversationId, clientRequestId));
     if (indexedRunId !== undefined) {
       const indexed = this.runs.get(indexedRunId);
       const indexedTombstone = this.tombstones.get(indexedRunId)?.discardedRun;
@@ -1056,24 +1065,24 @@ export class PresentationRunStore {
 
   private addRunToIndex(run: StoredPresentationRunManifest, index: PresentationRunIndex = this.index): void {
     const requestKey = requestIndexKey(run.conversationId, run.clientRequestId);
-    const requestOwner = index.requests[requestKey];
+    const requestOwner = getOwnIndexValue(index.requests, requestKey);
     if (requestOwner !== undefined && requestOwner !== run.runId) {
       throw new PresentationCanonicalCorruptionError('Duplicate presentation request ownership');
     }
     index.requests[requestKey] = run.runId;
-    const runs = index.conversations[run.conversationId] ?? [];
+    const runs = getOwnIndexValue(index.conversations, run.conversationId) ?? [];
     if (!runs.includes(run.runId)) runs.push(run.runId);
     index.conversations[run.conversationId] = runs;
     if (run.binding !== null) {
-      const turnKey = `${run.binding.conversationId}\u0000${run.binding.turnId}`;
-      const turnOwner = index.turns[turnKey];
+      const turnKey = turnIndexKey(run.binding.conversationId, run.binding.turnId);
+      const turnOwner = getOwnIndexValue(index.turns, turnKey);
       if (turnOwner !== undefined && turnOwner !== run.runId) {
         throw new PresentationCanonicalCorruptionError('Duplicate presentation turn ownership');
       }
       index.turns[turnKey] = run.runId;
     }
     for (const grantId of run.sourceGrants) {
-      const grantOwner = index.grants[grantId];
+      const grantOwner = getOwnIndexValue(index.grants, grantId);
       if (grantOwner !== undefined && grantOwner !== run.runId) {
         throw new PresentationCanonicalCorruptionError('Duplicate presentation grant ownership');
       }
@@ -1186,7 +1195,8 @@ export class PresentationRunStore {
     for (const tombstone of tombstones) {
       const run = tombstone.discardedRun;
       const requestKey = requestIndexKey(run.conversationId, run.clientRequestId);
-      if (index.requests[requestKey] !== undefined && index.requests[requestKey] !== run.runId) {
+      const requestOwner = getOwnIndexValue(index.requests, requestKey);
+      if (requestOwner !== undefined && requestOwner !== run.runId) {
         throw new PresentationCanonicalCorruptionError('Duplicate presentation request ownership');
       }
       index.requests[requestKey] = run.runId;
