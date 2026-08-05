@@ -1,6 +1,6 @@
 # Creative Studio — landing plan
 
-**Status:** proposed · **Date:** 2026-08-05 · **Target branch:** `sprint2`
+**Status:** agreed (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `sprint2`
 **Source:** `codex/studio-integration` (local, unpushed)
 
 ## 1. Problem
@@ -159,15 +159,28 @@ This is the only new *feature* code in the plan — everything else is landing m
 | `origin` is unreachable (VNG GitLab needs VPN) | Cached refs are for measurement only; re-verify the base and re-run the merge dry-run against a freshly fetched `origin/sprint2` before pushing MR 0 |
 | Intermediate MRs leave dead code in `sprint2` | Acceptable and bounded: MRs 1–3 are unreachable, and MR 4 follows immediately |
 
-## 9. `TASKS.md` entry
+## 9. Parallel execution with sprint-2 work
 
-Studio needs an epic entry in the plan of record. Proposed:
+This epic is **EPIC-005** in `TASKS.md` and runs **in parallel** with the sprint-2 backlog.
 
-> **[EPIC-004][P2] Land Creative Studio into sprint2**
-> Outcome: the Creative Studio media-production workspace (brief → write → produce → review → hand off, with image and video generation through configured providers) ships user-visible on `sprint2`.
-> Delivery: five sequential MRs — structural refactors, contract, engine, UI+locales, activation — where nothing is user-reachable until the final MR. Each MR gates independently so bisect stays meaningful.
-> Release boundary: do not merge the activation MR until spend safety (honest cost, main-process concurrency cap, batch confirmation) and the five-lens review have both completed. Reverting the activation MR must fully disable the feature.
-> Evidence: `docs/design/creative-studio-landing-plan.md`
+Parallel is safe because Studio never touches the one serial resource in this repository: it adds **no database migrations and no SQL**, persisting as JSON with atomic temp-file plus rename. It therefore cannot contend with BUG-013's upgrade work or EPIC-003 G0's migration-number reservations. MRs 1–3 are almost entirely new paths no other stream edits.
+
+Parallel means **parallel merging, not parallel priority**. Studio is P2; BUG-013 is P0. Landing effort must not take hands or review attention from the P0/P1 work.
+
+The collision surface is small and known in advance:
+
+| Shared path | Studio MR | Collides with | Nature |
+| --- | --- | --- | --- |
+| `appOperations/contextCompactTask.ts` | MR 0 (renames dir) | context/compaction work, EPIC-001 | modify/delete |
+| `services/autoUpdaterService.ts` | MR 0 (renames) | BUG-013 packaging | modify/delete |
+| `ModelModalContent` | MR 0 (splits) | EPIC-003 R2, BUG-018 | structural |
+| `Sider/**` | MR 4 | BUG-019 | direct overlap |
+| `ipcBridge.ts` | MR 1 | BUG-015 | additive; known hotspot |
+| locale JSON ×12 | MR 3 | every stream | mitigated by the key-level merge driver |
+
+**This is why MR 0 is urgent rather than merely first.** Renames are the only change in this plan that turns another stream's ordinary edit into a conflict, and two of the three renamed areas are ones sprint-2 work is likely to touch: `contextCompactTask.ts` sits inside the renamed directory, and EPIC-003 R2 explicitly instructs reuse of the model-selector components MR 0 splits.
+
+MR 4 and BUG-019 both change the sidebar; whoever lands second rebases. Flag it to BUG-019's owner rather than discovering it at merge time.
 
 ## 10. Decisions
 
