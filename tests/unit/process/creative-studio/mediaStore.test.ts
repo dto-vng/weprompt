@@ -490,6 +490,47 @@ describe('createStudioMediaStore', () => {
     expect(project?.routing.image).toBeNull();
   });
 
+  it('persists a fractional provider-reported video duration', async () => {
+    const { store } = await makeStore();
+    await addActiveVideoJob(store);
+    const media = createStudioMediaStore({ store, createId: () => 'asset_video_fractional' });
+
+    const asset = await media.persistProviderOutputForJob({
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      jobId: 'job_1',
+      mediaKind: 'video',
+      declaredMimeType: 'video/mp4',
+      durationSeconds: 5.085,
+      body: Readable.from([mp4]),
+    });
+
+    expect(asset.durationSeconds).toBe(5.085);
+    expect((await store.getProject('project_1'))?.assets.asset_video_fractional?.durationSeconds).toBe(5.085);
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid provider-reported video duration %s before persistence',
+    async (durationSeconds) => {
+      const { store } = await makeStore();
+      await addActiveVideoJob(store);
+      const media = createStudioMediaStore({ store, createId: () => 'asset_video_invalid_duration' });
+
+      await expect(
+        media.persistProviderOutputForJob({
+          projectId: 'project_1',
+          sceneId: 'scene_1',
+          jobId: 'job_1',
+          mediaKind: 'video',
+          declaredMimeType: 'video/mp4',
+          durationSeconds,
+          body: Readable.from([mp4]),
+        })
+      ).rejects.toMatchObject<Partial<CreativeStudioMediaError>>({ code: 'invalid_media' });
+      expect((await store.getProject('project_1'))?.assets).toEqual({});
+    }
+  );
+
   it('attaches a completed asset without overwriting a newer project model selection', async () => {
     const { store } = await makeStore();
     await addActiveImageJob(store);

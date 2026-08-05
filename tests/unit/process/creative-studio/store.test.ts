@@ -71,6 +71,25 @@ const addScene = (project: StudioProject, id: string, durationSeconds = 1): Stud
   return next;
 };
 
+const addVideoAsset = (project: StudioProject, durationSeconds: number): StudioProject => {
+  const next = addScene(project, 'scene_1');
+  next.scenes.scene_1.mediaKind = 'video';
+  next.assets.asset_1 = {
+    id: 'asset_1',
+    projectId: next.id,
+    sceneId: 'scene_1',
+    mediaKind: 'video',
+    mimeType: 'video/mp4',
+    managedAsset: { collection: 'assets', fileName: 'asset_1.mp4' },
+    byteSize: 1,
+    sha256: '0'.repeat(64),
+    durationSeconds,
+    createdAt: next.createdAt,
+  };
+  next.scenes.scene_1.assetIds = ['asset_1'];
+  return next;
+};
+
 const addSucceededJob = (project: StudioProject): StudioProject => {
   const next = addScene(project, 'scene_1');
   next.assets.asset_1 = {
@@ -283,6 +302,35 @@ describe('creative studio project store', () => {
   });
 
   describe('project graph validation', () => {
+    it('persists a finite fractional actual asset duration', async () => {
+      const project = await store.createProject(makeInput());
+
+      await store.updateProject(project.id, (current) => addVideoAsset(current, 5.085));
+
+      await expect(store.getProject(project.id)).resolves.toMatchObject({
+        assets: { asset_1: { durationSeconds: 5.085 } },
+      });
+    });
+
+    it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+      'rejects invalid actual asset duration %s',
+      async (durationSeconds) => {
+        const project = await store.createProject(makeInput());
+
+        await expect(
+          store.updateProject(project.id, (current) => addVideoAsset(current, durationSeconds))
+        ).rejects.toMatchObject({ code: 'invalid_payload' });
+      }
+    );
+
+    it('keeps requested scene durations integral when actual asset durations are fractional', async () => {
+      const project = await store.createProject(makeInput());
+
+      await expect(
+        store.updateProject(project.id, (current) => addScene(current, 'scene_1', 5.5))
+      ).rejects.toMatchObject({ code: 'invalid_payload' });
+    });
+
     it('rejects duplicate scene-order IDs instead of allowing a scene to render twice', async () => {
       const project = await store.createProject(makeInput());
 

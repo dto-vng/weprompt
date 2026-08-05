@@ -247,6 +247,9 @@ const isSafeConnectionId = (value: unknown): value is string =>
 const isIntegerInRange = (value: unknown, minimum: number, maximum: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= minimum && value <= maximum;
 
+const isFiniteInRange = (value: unknown, minimum: number, maximum: number): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum;
+
 const isString = (value: unknown): value is string => typeof value === 'string';
 
 const isNonEmptyString = (value: unknown): value is string => isString(value) && value.trim().length > 0;
@@ -435,7 +438,8 @@ const validateAsset = (
     /^[a-f0-9]{64}$/i.test(value.sha256) &&
     (value.width === undefined || isIntegerInRange(value.width, 1, Number.MAX_SAFE_INTEGER)) &&
     (value.height === undefined || isIntegerInRange(value.height, 1, Number.MAX_SAFE_INTEGER)) &&
-    (value.durationSeconds === undefined || isIntegerInRange(value.durationSeconds, 1, Number.MAX_SAFE_INTEGER)) &&
+    (value.durationSeconds === undefined ||
+      (isFiniteInRange(value.durationSeconds, 0, Number.MAX_SAFE_INTEGER) && value.durationSeconds > 0)) &&
     isNonEmptyString(value.createdAt)
   );
 };

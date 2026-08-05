@@ -942,7 +942,9 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
       (input.width !== undefined && (!Number.isSafeInteger(input.width) || input.width < 1)) ||
       (input.height !== undefined && (!Number.isSafeInteger(input.height) || input.height < 1)) ||
       (input.durationSeconds !== undefined &&
-        (!Number.isSafeInteger(input.durationSeconds) || input.durationSeconds < 1))
+        (!Number.isFinite(input.durationSeconds) ||
+          input.durationSeconds <= 0 ||
+          input.durationSeconds > Number.MAX_SAFE_INTEGER))
     ) {
       throw new CreativeStudioMediaError('invalid_media');
     }
