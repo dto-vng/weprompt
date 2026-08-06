@@ -1,15 +1,27 @@
 # Creative Studio — landing plan
 
-**Status:** RETARGETED — sprint2 sections stale (`TASKS.md` EPIC-005) · **Date:** 2026-08-05 · **Target branch:** `origin/creative-suite`
+**Status:** SETTLED — target confirmed 2026-08-06 · **Date:** 2026-08-05, header revised 2026-08-06 · **Target branch:** `creative-suite-sprint2`, branched from `sprint2`
 **Source:** `codex/studio-integration` — archived immutably at `refs/archive/studio-integration-2026-08-05` = `20735e392`
 
-> ## ⚠️ RETARGETED 2026-08-05 — do not execute §3, §4 or §9 as written
+> ## ✅ TARGET SETTLED 2026-08-06 — `creative-suite-sprint2`, off `sprint2`
 >
-> The product decision changed after rev 3: Creative Studio stays on its own long-lived branch, **`origin/creative-suite`**, and does **not** land in `sprint2`. Everything in this document that assumes a `sprint2` target is therefore stale — the MR sequence (§4), the merge mechanics (§3) and the parallel-execution analysis (§9) all need rewriting once the reconciliation below is decided. `TASKS.md` EPIC-005 needs the same treatment.
+> Creative Studio is developed on a long-lived branch **`creative-suite-sprint2`, branched from `sprint2`** — not on `origin/creative-suite`, and not directly on `sprint2`. That branch is the Creative **Suite** line and carries:
 >
-> **What still holds:** the defect findings and the acceptance bar. §6 (concurrency premise, the false audio claim, the cost-estimate contract) and §7 (visual acceptance, poster frames) are properties of the code, not of the target branch, and remain valid.
+> ```text
+> sprint2
+>   └── creative-suite-sprint2
+>         ├── Creative Studio runtime
+>         ├── UI redesign
+>         └── later Creative Suite features
+> ```
 >
-> **`origin/creative-suite` is not an empty landing spot.** It carries 50 commits and 79 Creative Studio paths — a parallel line of the same feature, tip `c5b879c3e` by khoapnt-vng dated 2026-08-05. A naive merge of `codex/studio-integration` into it produces **98 conflicts**, including `add/add` on `jobManager.ts`, `creativeStudioService.ts`, `mediaStore.ts`, `store.ts`, `providerResolver.ts`, `runtime.ts`, `creativeStudioTypes.ts` and every adapter.
+> **Working shape:** develop on `creative-suite-sprint2`; back-merge `sprint2` periodically to stay current; land into `sprint2` when the epic's acceptance bar is met. As of 2026-08-06 the branch is 141 ahead of `origin/sprint2` and 0 behind, with the full suite green (7,286 passed).
+>
+> **What is stale in this document:** §3, §4 and §9 describe a five-MR sequence landing *directly* into `sprint2`. That is not the shape — substitute the working shape above. `TASKS.md` EPIC-005 should have its "plan-of-record conflict — merge hold" note retired, since the conflict it records is resolved.
+>
+> **What still holds:** the defect findings and the acceptance bar. §6 (concurrency premise, the false audio claim, the cost-estimate contract) and §7 (visual acceptance, poster frames) are properties of the code, not of the target branch.
+>
+> **Historical — why not `origin/creative-suite`.** Retained because the measurement was expensive and explains the choice, not because it is a live option. That branch carries 50 commits and 79 Creative Studio paths — a parallel line of the same feature, tip `c5b879c3e` by khoapnt-vng dated 2026-08-05. A naive merge of `codex/studio-integration` into it produces **98 conflicts**, including `add/add` on `jobManager.ts`, `creativeStudioService.ts`, `mediaStore.ts`, `store.ts`, `providerResolver.ts`, `runtime.ts`, `creativeStudioTypes.ts` and every adapter.
 >
 > **Measured line similarity says these are one lineage, not two designs:** `openRouterVideoAdapter.ts` 99.7% (380 lines both sides), `providerResolver.ts` 93.1%, `creativeStudioTypes.ts` 91.4%, `jobManager.ts` 89.1%, `creativeStudioService.ts` 86.6%. Both almost certainly descend from the `creative-studio-mvp` work; git reports `add/add` only because they share no commit ancestry beyond the `sprint1` tip `54cfef7a7`.
 >
