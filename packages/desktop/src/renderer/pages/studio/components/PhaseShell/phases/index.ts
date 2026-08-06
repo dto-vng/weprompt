@@ -8,3 +8,8 @@ export { BriefPhase, type BriefPhaseProps } from './BriefPhase';
 export { ProducePhase, type ProducePhaseProps } from './ProducePhase';
 export { ReviewPhase, type ReviewPhaseProps } from './ReviewPhase';
 export { WritePhase, type WritePhaseProps } from './WritePhase';
+export {
+  createStudioBriefConversation,
+  type CreateStudioBriefConversationInput,
+  type StudioBriefConversationDependencies,
+} from './studioBriefConversation';
