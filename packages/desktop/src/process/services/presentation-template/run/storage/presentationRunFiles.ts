@@ -331,7 +331,9 @@ function assertSourceSnapshotReference(reference: PresentationSourceSnapshotRefe
 }
 
 function assertStableSourceFile(metadata: FileMetadata, message: string): void {
-  if (!metadata.isFile()) throw sourceSnapshotFailure('SOURCE_TAMPERED', message);
+  if (!metadata.isFile() || metadata.nlink !== BigInt(1)) {
+    throw sourceSnapshotFailure('SOURCE_TAMPERED', message);
+  }
 }
 
 function assertStableSourceDirectory(metadata: FileMetadata): void {

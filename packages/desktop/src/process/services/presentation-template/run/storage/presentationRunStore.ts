@@ -1379,6 +1379,38 @@ export class PresentationRunStore {
       const grants: (StoredPresentationGrantManifest | StoredPresentationSourceGrantManifest)[] = [];
       let sourceBytes = 0;
       for (const claim of input.grantClaims) {
+        const tombstone = this.sourceGrantTombstones.get(claim.grantId);
+        if (tombstone !== undefined && Date.parse(tombstone.deleteAfter) > this.now().getTime()) {
+          const ownerKey = presentationSourceOwnerKey(tombstone.owner);
+          if (ownerKey !== `conversation:${input.conversationId}`) {
+            return {
+              ok: false,
+              code: 'SOURCE_GRANT_FOREIGN',
+              messageKey: 'conversation.presentationRun.SOURCE_GRANT_FOREIGN',
+              retryable: false,
+              state: 'grant_validation',
+              details: { grantId: claim.grantId },
+            };
+          }
+          if (tombstone.terminalState === 'expired') {
+            return {
+              ok: false,
+              code: 'SOURCE_GRANT_EXPIRED',
+              messageKey: 'conversation.presentationRun.SOURCE_GRANT_EXPIRED',
+              retryable: false,
+              state: 'grant_expired',
+              details: { grantId: claim.grantId },
+            };
+          }
+          return {
+            ok: false,
+            code: 'SOURCE_GRANT_REPLAYED',
+            messageKey: 'conversation.presentationRun.SOURCE_GRANT_REPLAYED',
+            retryable: false,
+            state: 'grant_validation',
+            details: { grantId: claim.grantId },
+          };
+        }
         const canonical = await this.journal.readCanonical<Record<string, unknown>>('grant', claim.grantId);
         const grant = isStructurallyValidSourceGrant(canonical, claim.grantId)
           ? canonical

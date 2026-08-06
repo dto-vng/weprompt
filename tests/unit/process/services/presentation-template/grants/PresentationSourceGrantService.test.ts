@@ -5,7 +5,7 @@
  */
 
 import { mkdirSync, mkdtempSync } from 'node:fs';
-import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { link, mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -222,6 +222,22 @@ describe('PresentationSourceGrantService grants', () => {
     ).resolves.toMatchObject({ ok: true, ownerRevision: 1, grants: [{ displayName: 'brief.txt' }] });
   });
 
+  it('rejects a native source that has another hard link', async () => {
+    const fixture = createService();
+    const sourcePath = path.join(fixture.root, 'native-source.txt');
+    const aliasPath = path.join(fixture.root, 'native-source-alias.txt');
+    await writeFile(sourcePath, 'Native source bytes\n', { mode: 0o600 });
+    await link(sourcePath, aliasPath);
+    fixture.pickNativeSourcePaths.mockResolvedValue([sourcePath]);
+
+    await expect(
+      fixture.service.pickSources({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        expected_owner_revision: 0,
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'SOURCE_TAMPERED' });
+  });
+
   it('returns an explicit cancellation without changing the owner', async () => {
     const fixture = createService();
 
@@ -422,6 +438,21 @@ describe('PresentationSourceGrantService grants', () => {
     const outside = path.join(fixture.root, 'outside.txt');
     await writeFile(outside, 'outside secret\n', { mode: 0o600 });
     await symlink(outside, path.join(fixture.workspace, 'linked.txt'));
+
+    await expect(
+      fixture.service.grantWorkspaceSource({
+        conversation_id: CONVERSATION_ID,
+        relative_path: 'linked.txt',
+        expected_owner_revision: 0,
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'SOURCE_TAMPERED' });
+  });
+
+  it('rejects a workspace source hard-linked to a file outside the authorized root', async () => {
+    const fixture = createService();
+    const outside = path.join(fixture.root, 'outside-hardlink.txt');
+    await writeFile(outside, 'outside hard-linked secret\n', { mode: 0o600 });
+    await link(outside, path.join(fixture.workspace, 'linked.txt'));
 
     await expect(
       fixture.service.grantWorkspaceSource({

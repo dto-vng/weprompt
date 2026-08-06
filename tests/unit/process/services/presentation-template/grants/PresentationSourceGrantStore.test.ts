@@ -700,6 +700,75 @@ describe('PresentationRunStore source grants', () => {
     });
   });
 
+  it('preserves an expired grant failure when allocating after the expiry sweep', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    clock = new Date(NOW.getTime() + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS);
+    await store.sweepExpiredPresentationSources();
+
+    await expect(
+      store.allocateRun({
+        conversationId: CONVERSATION_ID,
+        clientRequestId: 'expired-tombstone-allocation',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: '1'.repeat(64),
+        grantClaims: [{ grantId: GRANT_ID, expectedRevision: 1 }],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_EXPIRED',
+      state: 'grant_expired',
+      details: { grantId: GRANT_ID },
+    });
+  });
+
+  it('preserves replay and owner failures for a revoked grant tombstone after restart', async () => {
+    await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      PRINCIPAL_ID
+    );
+    await createGrant();
+    await store.revokePresentationSourceGrant({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      principalId: PRINCIPAL_ID,
+      grantId: GRANT_ID,
+      expectedOwnerRevision: 1,
+    });
+
+    const restarted = createStore(() => RUN_ID);
+    await expect(
+      restarted.allocateRun({
+        conversationId: CONVERSATION_ID,
+        clientRequestId: 'revoked-tombstone-replay',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: '2'.repeat(64),
+        grantClaims: [{ grantId: GRANT_ID, expectedRevision: 1 }],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_REPLAYED',
+      state: 'grant_validation',
+      details: { grantId: GRANT_ID },
+    });
+    await expect(
+      restarted.allocateRun({
+        conversationId: testUuid(4_501),
+        clientRequestId: 'revoked-tombstone-foreign',
+        selectedTemplateId: 'business-review',
+        requestFingerprint: '3'.repeat(64),
+        grantClaims: [{ grantId: GRANT_ID, expectedRevision: 1 }],
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_FOREIGN',
+      state: 'grant_validation',
+      details: { grantId: GRANT_ID },
+    });
+  });
+
   it('runs the same exact grant expiry transition during startup recovery', async () => {
     await store.getPresentationSourceOwner(
       { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
