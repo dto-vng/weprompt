@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { CREATIVE_STUDIO_ENABLED } from '@/common/config/constants';
 import type { IProvider } from '@/common/config/storage';
 import { supportsOpenAiApiMode } from '@/common/utils/modelCapabilities';
 import { Button, Divider, Message, Popconfirm, Collapse, Tag, Switch, Tooltip } from '@arco-design/web-react';
@@ -713,10 +714,12 @@ const ModelModalContent: React.FC = () => {
             </div>
           )}
         </div>
-        <StudioMediaModelsSection
-          providerRefreshToken={providerRefreshToken}
-          onAddProvider={() => addPlatformModalCtrl.open()}
-        />
+        {CREATIVE_STUDIO_ENABLED && (
+          <StudioMediaModelsSection
+            providerRefreshToken={providerRefreshToken}
+            onAddProvider={() => addPlatformModalCtrl.open()}
+          />
+        )}
       </AionScrollArea>
     </div>
   );

@@ -5,6 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { CREATIVE_STUDIO_ENABLED } from '@/common/config/constants';
 import type {
   StudioCommandErrorCode,
   StudioCommandResult,
@@ -23,6 +24,7 @@ import { StudioRenderRunnerError, type StudioRenderRunner } from '@process/servi
 import { BrowserWindow, dialog } from 'electron';
 
 const errorMessageKeys: Record<StudioCommandErrorCode, string> = {
+  feature_disabled: 'conversation.creativeStudio.errors.featureDisabled',
   invalid_payload: 'conversation.creativeStudio.errors.invalidPayload',
   not_found: 'conversation.creativeStudio.errors.projectNotFound',
   storyboard_exists: 'conversation.creativeStudio.errors.storyboardExists',
@@ -73,7 +75,16 @@ const toCommandError = (error: unknown): StudioCommandResult<never> => {
   return { ok: false, error: { code, messageKey: errorMessageKeys[code] } };
 };
 
-const command = async <T>(operation: () => Promise<T>): Promise<StudioCommandResult<T>> => {
+const command = async <T>(
+  isFeatureEnabled: () => boolean,
+  operation: () => Promise<T>
+): Promise<StudioCommandResult<T>> => {
+  if (!isFeatureEnabled()) {
+    return {
+      ok: false,
+      error: { code: 'feature_disabled', messageKey: errorMessageKeys.feature_disabled },
+    };
+  }
   try {
     return { ok: true, data: await operation() };
   } catch (error) {
@@ -82,6 +93,7 @@ const command = async <T>(operation: () => Promise<T>): Promise<StudioCommandRes
 };
 
 export type CreativeStudioBridgeDependencies = {
+  isFeatureEnabled?: () => boolean;
   getService: () => CreativeStudioService;
   getRenderRunner?: () => StudioRenderRunner;
   getParentWindow?: () => BrowserWindow | undefined;
@@ -273,103 +285,109 @@ const defaultDependencies: CreativeStudioBridgeDependencies = {
 
 /** Registers the typed Creative Studio IPC providers without eagerly creating storage. */
 export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDependencies = defaultDependencies): void {
+  const isFeatureEnabled = dependencies.isFeatureEnabled ?? (() => CREATIVE_STUDIO_ENABLED);
+  const runCommand = <T>(operation: () => Promise<T>): Promise<StudioCommandResult<T>> =>
+    command(isFeatureEnabled, operation);
   const getRenderRunner = dependencies.getRenderRunner ?? (() => getCreativeStudioRuntime().renderRunner);
-  ipcBridge.creativeStudio.listProjects.provider(() => command(() => dependencies.getService().listProjects()));
+  ipcBridge.creativeStudio.listProjects.provider(() => runCommand(() => dependencies.getService().listProjects()));
   ipcBridge.creativeStudio.createProject.provider((input) =>
-    command(() => dependencies.getService().createProject(input))
+    runCommand(() => dependencies.getService().createProject(input))
   );
   ipcBridge.creativeStudio.getProject.provider((input) =>
-    command(() => dependencies.getService().getProject(input.projectId))
+    runCommand(() => dependencies.getService().getProject(input.projectId))
   );
   ipcBridge.creativeStudio.listProposals.provider((input) =>
-    command(() => dependencies.getService().listProposals(input))
+    runCommand(() => dependencies.getService().listProposals(input))
   );
   ipcBridge.creativeStudio.acceptProposal.provider((input) =>
-    command(() => dependencies.getService().acceptProposal(input))
+    runCommand(() => dependencies.getService().acceptProposal(input))
   );
   ipcBridge.creativeStudio.rejectProposal.provider((input) =>
-    command(() => dependencies.getService().rejectProposal(input))
+    runCommand(() => dependencies.getService().rejectProposal(input))
   );
   ipcBridge.creativeStudio.proposeStoryboard.provider((input) =>
-    command(() => dependencies.getService().proposeStoryboard(input))
+    runCommand(() => dependencies.getService().proposeStoryboard(input))
   );
   ipcBridge.creativeStudio.updateModelSelection.provider((input: StudioUpdateModelSelectionRequest) =>
-    command(() => dependencies.getService().updateModelSelection(input))
+    runCommand(() => dependencies.getService().updateModelSelection(input))
   );
   ipcBridge.creativeStudio.updateProject.provider((input) =>
-    command(() => dependencies.getService().updateProject(input))
+    runCommand(() => dependencies.getService().updateProject(input))
   );
   ipcBridge.creativeStudio.bindBriefConversation.provider((input) =>
-    command(() => dependencies.getService().bindBriefConversation(input))
+    runCommand(() => dependencies.getService().bindBriefConversation(input))
   );
-  ipcBridge.creativeStudio.updateCut.provider((input) => command(() => dependencies.getService().updateCut(input)));
+  ipcBridge.creativeStudio.updateCut.provider((input) => runCommand(() => dependencies.getService().updateCut(input)));
   ipcBridge.creativeStudio.deleteProject.provider((input) =>
-    command(() => dependencies.getService().deleteProject(input))
+    runCommand(() => dependencies.getService().deleteProject(input))
   );
-  ipcBridge.creativeStudio.updateScene.provider((input) => command(() => dependencies.getService().updateScene(input)));
+  ipcBridge.creativeStudio.updateScene.provider((input) =>
+    runCommand(() => dependencies.getService().updateScene(input))
+  );
   ipcBridge.creativeStudio.reorderScenes.provider((input) =>
-    command(() => dependencies.getService().reorderScenes(input))
+    runCommand(() => dependencies.getService().reorderScenes(input))
   );
-  ipcBridge.creativeStudio.selectAsset.provider((input) => command(() => dependencies.getService().selectAsset(input)));
+  ipcBridge.creativeStudio.selectAsset.provider((input) =>
+    runCommand(() => dependencies.getService().selectAsset(input))
+  );
   ipcBridge.creativeStudio.persistCapturedPoster.provider((input) =>
-    command(() => dependencies.getService().persistCapturedPoster(input))
+    runCommand(() => dependencies.getService().persistCapturedPoster(input))
   );
-  ipcBridge.creativeStudio.chooseAndImportReference.provider(async (input) => {
-    try {
+  ipcBridge.creativeStudio.chooseAndImportReference.provider((input) =>
+    runCommand(async () => {
       const parentWindow = (dependencies.getParentWindow ?? defaultDependencies.getParentWindow!)();
       const picked = await (dependencies.showOpenDialog ?? defaultDependencies.showOpenDialog!)(parentWindow);
-      if (picked.canceled || !picked.filePaths[0]) return { ok: true, data: { status: 'cancelled' } };
+      if (picked.canceled || !picked.filePaths[0]) return { status: 'cancelled' as const };
       return {
-        ok: true,
-        data: {
-          status: 'imported',
-          asset: await dependencies.getService().importReferenceFromPath({ ...input, sourcePath: picked.filePaths[0] }),
-        },
+        status: 'imported' as const,
+        asset: await dependencies.getService().importReferenceFromPath({ ...input, sourcePath: picked.filePaths[0] }),
       };
-    } catch (error) {
-      return toCommandError(error);
-    }
-  });
-  ipcBridge.creativeStudio.chooseAndExportAssets.provider(async (input) => {
-    try {
+    })
+  );
+  ipcBridge.creativeStudio.chooseAndExportAssets.provider((input) =>
+    runCommand(async () => {
       const parentWindow = (dependencies.getParentWindow ?? defaultDependencies.getParentWindow!)();
       const picked = await (dependencies.showExportDialog ?? defaultDependencies.showExportDialog!)(parentWindow);
-      if (picked.canceled || !picked.filePaths[0]) return { ok: true, data: { status: 'cancelled' } };
+      if (picked.canceled || !picked.filePaths[0]) return { status: 'cancelled' as const };
       const result = await dependencies
         .getService()
         .exportAssetsToDirectory({ ...input, destinationDirectory: picked.filePaths[0] });
-      return { ok: true, data: { status: 'exported', ...result } };
-    } catch (error) {
-      return toCommandError(error);
-    }
-  });
-  ipcBridge.creativeStudio.renderCut.provider((input) => command(() => getRenderRunner().renderCut(input.projectId)));
+      return { status: 'exported' as const, ...result };
+    })
+  );
+  ipcBridge.creativeStudio.renderCut.provider((input) =>
+    runCommand(() => getRenderRunner().renderCut(input.projectId))
+  );
   ipcBridge.creativeStudio.cancelRender.provider((input) =>
-    command(async () => ({ cancelled: getRenderRunner().cancelRender(input.projectId) }))
+    runCommand(async () => ({ cancelled: getRenderRunner().cancelRender(input.projectId) }))
   );
   ipcBridge.creativeStudio.fitStoryboard.provider((input) =>
-    command(() => dependencies.getService().fitStoryboard(input))
+    runCommand(() => dependencies.getService().fitStoryboard(input))
   );
   ipcBridge.creativeStudio.submitScenes.provider((input) =>
-    command(() => dependencies.getService().submitScenes(input))
+    runCommand(() => dependencies.getService().submitScenes(input))
   );
-  ipcBridge.creativeStudio.cancelJob.provider((input) => command(() => dependencies.getService().cancelJob(input)));
-  ipcBridge.creativeStudio.retryJob.provider((input) => command(() => dependencies.getService().retryJob(input)));
+  ipcBridge.creativeStudio.cancelJob.provider((input) => runCommand(() => dependencies.getService().cancelJob(input)));
+  ipcBridge.creativeStudio.retryJob.provider((input) => runCommand(() => dependencies.getService().retryJob(input)));
   ipcBridge.creativeStudio.retryDownload.provider((input) =>
-    command(() => dependencies.getService().retryDownload(input))
+    runCommand(() => dependencies.getService().retryDownload(input))
   );
   ipcBridge.creativeStudio.listConnectionCandidates.provider(() =>
-    command(() => dependencies.getService().listConnectionCandidates())
+    runCommand(() => dependencies.getService().listConnectionCandidates())
   );
-  ipcBridge.creativeStudio.listConnections.provider(() => command(() => dependencies.getService().listConnections()));
+  ipcBridge.creativeStudio.listConnections.provider(() =>
+    runCommand(() => dependencies.getService().listConnections())
+  );
   ipcBridge.creativeStudio.validateConnection.provider((input) =>
-    command(() => dependencies.getService().validateConnection(input))
+    runCommand(() => dependencies.getService().validateConnection(input))
   );
   ipcBridge.creativeStudio.saveConnection.provider((input) =>
-    command(() => dependencies.getService().saveConnection(input))
+    runCommand(() => dependencies.getService().saveConnection(input))
   );
   ipcBridge.creativeStudio.removeConnection.provider((input) =>
-    command(() => dependencies.getService().removeConnection(input))
+    runCommand(() => dependencies.getService().removeConnection(input))
   );
-  ipcBridge.creativeStudio.listRoutes.provider((input) => command(() => dependencies.getService().listRoutes(input)));
+  ipcBridge.creativeStudio.listRoutes.provider((input) =>
+    runCommand(() => dependencies.getService().listRoutes(input))
+  );
 }

@@ -9,27 +9,44 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { IProvider } from '@/common/config/storage';
 
-const { addPlatformModalOptions, addPlatformOpenMock, appOperationsCardProps, createProviderMock, providersQueryData } =
-  vi.hoisted(() => ({
-    addPlatformModalOptions: {
-      current: undefined as { onSubmit: (platform: IProvider) => void } | undefined,
+const {
+  addPlatformModalOptions,
+  addPlatformOpenMock,
+  appOperationsCardProps,
+  createProviderMock,
+  creativeStudioEnabled,
+  providersQueryData,
+} = vi.hoisted(() => ({
+  addPlatformModalOptions: {
+    current: undefined as { onSubmit: (platform: IProvider) => void } | undefined,
+  },
+  addPlatformOpenMock: vi.fn(),
+  appOperationsCardProps: {
+    current: undefined as
+      | {
+          onAddModel: () => void;
+          persistedProvidersRevision: number;
+          providers: IProvider[];
+          providersLoading: boolean;
+        }
+      | undefined,
+  },
+  createProviderMock: vi.fn(),
+  creativeStudioEnabled: { current: true },
+  providersQueryData: {
+    current: undefined as IProvider[] | undefined,
+  },
+}));
+
+vi.mock('@/common/config/constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/common/config/constants')>();
+  return {
+    ...actual,
+    get CREATIVE_STUDIO_ENABLED() {
+      return creativeStudioEnabled.current;
     },
-    addPlatformOpenMock: vi.fn(),
-    appOperationsCardProps: {
-      current: undefined as
-        | {
-            onAddModel: () => void;
-            persistedProvidersRevision: number;
-            providers: IProvider[];
-            providersLoading: boolean;
-          }
-        | undefined,
-    },
-    createProviderMock: vi.fn(),
-    providersQueryData: {
-      current: undefined as IProvider[] | undefined,
-    },
-  }));
+  };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -94,6 +111,10 @@ vi.mock('@/renderer/components/settings/SettingsModal/AppOperationsModelCard', (
   },
 }));
 
+vi.mock('@/renderer/components/settings/SettingsModal/contents/ModelModalContent/StudioMediaModelsSection', () => ({
+  StudioMediaModelsSection: () => <section aria-label='Studio media models' />,
+}));
+
 vi.mock('@arco-design/web-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@arco-design/web-react')>();
   return {
@@ -123,6 +144,7 @@ describe('ModelModalContent', () => {
     addPlatformModalOptions.current = undefined;
     appOperationsCardProps.current = undefined;
     createProviderMock.mockResolvedValue(undefined);
+    creativeStudioEnabled.current = true;
     providersQueryData.current = [];
   });
 
@@ -191,5 +213,18 @@ describe('ModelModalContent', () => {
     await act(async () => resolveCreate?.());
 
     await waitFor(() => expect(appOperationsCardProps.current?.persistedProvidersRevision).toBe(1));
+  });
+
+  it('hides Studio media models when Creative Studio is disabled', () => {
+    creativeStudioEnabled.current = false;
+    render(<ModelModalContent />);
+
+    expect(screen.queryByRole('region', { name: 'Studio media models' })).not.toBeInTheDocument();
+  });
+
+  it('shows Studio media models when Creative Studio is enabled', () => {
+    render(<ModelModalContent />);
+
+    expect(screen.getByRole('region', { name: 'Studio media models' })).toBeInTheDocument();
   });
 });

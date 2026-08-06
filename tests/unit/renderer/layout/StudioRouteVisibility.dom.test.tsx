@@ -5,9 +5,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PanelRoute from '@/renderer/components/layout/Router';
 
 const mocks = vi.hoisted(() => ({
+  creativeStudioEnabled: { current: true },
   isElectronDesktop: vi.fn(() => true),
   nativePageLoads: 0,
 }));
+
+vi.mock('@/common/config/constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/common/config/constants')>();
+  return {
+    ...actual,
+    get CREATIVE_STUDIO_ENABLED() {
+      return mocks.creativeStudioEnabled.current;
+    },
+  };
+});
 
 vi.mock('@renderer/hooks/context/AuthContext', () => ({
   useAuth: () => ({ status: 'authenticated' }),
@@ -35,8 +46,21 @@ const renderAt = (hash: string) => {
 
 describe('Creative Studio route visibility', () => {
   beforeEach(() => {
+    mocks.creativeStudioEnabled.current = true;
     mocks.isElectronDesktop.mockReturnValue(true);
   });
+
+  it.each(['#/studio', '#/studio/project_1/produce'])(
+    'redirects disabled Studio request %s before the native Studio page loads',
+    async (hash) => {
+      mocks.creativeStudioEnabled.current = false;
+      const nativePageLoadsBefore = mocks.nativePageLoads;
+      renderAt(hash);
+
+      await waitFor(() => expect(window.location.hash).toBe('#/guid'));
+      expect(mocks.nativePageLoads).toBe(nativePageLoadsBefore);
+    }
+  );
 
   it.each([
     '#/studio',

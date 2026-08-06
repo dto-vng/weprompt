@@ -1321,6 +1321,7 @@
       "folderLabel": "Папка экспорта"
     },
     "errors": {
+      "featureDisabled": "Creative Studio отключена в этой сборке.",
       "invalidPayload": "Запрос содержит недействительные или неполные данные.",
       "projectNotFound": "Проект Creative Studio больше не существует.",
       "storyboardExists": "В этом проекте уже есть раскадровка. Подтвердите замену перед созданием нового черновика.",

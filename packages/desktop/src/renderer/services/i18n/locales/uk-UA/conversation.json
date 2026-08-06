@@ -1321,6 +1321,7 @@
       "folderLabel": "Папка експорту"
     },
     "errors": {
+      "featureDisabled": "Creative Studio вимкнено в цій збірці.",
       "invalidPayload": "Запит містить недійсні або неповні дані.",
       "projectNotFound": "Проєкт Creative Studio більше не існує.",
       "storyboardExists": "У цьому проєкті вже є розкадрування. Підтвердьте заміну перед створенням нової чернетки.",

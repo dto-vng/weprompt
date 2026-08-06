@@ -1307,6 +1307,7 @@
       "folderLabel": "Carpeta de exportación"
     },
     "errors": {
+      "featureDisabled": "Creative Studio está deshabilitado en esta compilación.",
       "invalidPayload": "La solicitud contiene información no válida o incompleta.",
       "projectNotFound": "El proyecto de Creative Studio ya no existe.",
       "storyboardExists": "Este proyecto ya tiene un guion gráfico. Confirma que deseas sustituirlo antes de crear otro borrador.",

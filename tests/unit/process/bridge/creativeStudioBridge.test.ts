@@ -85,6 +85,8 @@ vi.mock('@/common', () => ({
   },
 }));
 
+vi.mock('@/common/config/constants', () => ({ CREATIVE_STUDIO_ENABLED: true }));
+
 import {
   createCreativeStudioCloseHandshake,
   initCreativeStudioBridge,
@@ -199,6 +201,59 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.saveConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.removeConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.listRoutesProvider).toHaveBeenCalledOnce();
+  });
+
+  it('refuses direct read, mutation, and render commands before any Studio runtime work when disabled', async () => {
+    const service = dependencies.getService();
+    const runner = dependencies.getRenderRunner!();
+    const getService = vi.fn(() => service);
+    const getRenderRunner = vi.fn(() => runner);
+    initCreativeStudioBridge({
+      ...dependencies,
+      isFeatureEnabled: () => false,
+      getService,
+      getRenderRunner,
+    });
+    const getProject = mocks.getProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const updateProject = mocks.updateProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const renderCut = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const disabled = {
+      ok: false,
+      error: {
+        code: 'feature_disabled',
+        messageKey: 'conversation.creativeStudio.errors.featureDisabled',
+      },
+    };
+
+    await expect(getProject({ projectId: 'project_1' })).resolves.toEqual(disabled);
+    await expect(updateProject({ projectId: 'project_1', expectedRevision: 1, name: 'Changed' })).resolves.toEqual(
+      disabled
+    );
+    await expect(renderCut({ projectId: 'project_1' })).resolves.toEqual(disabled);
+    expect(getService).not.toHaveBeenCalled();
+    expect(getRenderRunner).not.toHaveBeenCalled();
+    expect(service.getProject).not.toHaveBeenCalled();
+    expect(service.updateProject).not.toHaveBeenCalled();
+    expect(runner.renderCut).not.toHaveBeenCalled();
+  });
+
+  it('keeps direct read, mutation, and render commands unchanged when enabled', async () => {
+    const service = dependencies.getService();
+    const runner = dependencies.getRenderRunner!();
+    initCreativeStudioBridge({ ...dependencies, getService: () => service, getRenderRunner: () => runner });
+    const getProject = mocks.getProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const updateProject = mocks.updateProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const renderCut = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
+
+    await expect(getProject({ projectId: 'project_1' })).resolves.toEqual({ ok: true, data: project });
+    await expect(updateProject({ projectId: 'project_1', expectedRevision: 1, name: 'Changed' })).resolves.toEqual({
+      ok: true,
+      data: project,
+    });
+    await expect(renderCut({ projectId: 'project_1' })).resolves.toEqual({
+      ok: true,
+      data: { assetId: 'render_1', missingSceneIds: ['scene_2'] },
+    });
   });
 
   it('delegates render start and cancellation without entering the project service', async () => {

@@ -3,6 +3,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  creativeStudioEnabled: { current: true },
   lifecycle: [] as string[],
   blurActiveElement: vi.fn(() => mocks.lifecycle.push('blur')),
   closePreview: vi.fn(() => mocks.lifecycle.push('preview')),
@@ -11,6 +12,16 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(() => mocks.lifecycle.push('navigate')),
   onSessionClick: vi.fn(() => mocks.lifecycle.push('session')),
 }));
+
+vi.mock('@/common/config/constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/common/config/constants')>();
+  return {
+    ...actual,
+    get CREATIVE_STUDIO_ENABLED() {
+      return mocks.creativeStudioEnabled.current;
+    },
+  };
+});
 
 let currentPathname = '/guid';
 let isMobile = false;
@@ -96,6 +107,7 @@ const renderStudioEntry = (overrides: Partial<React.ComponentProps<typeof SiderS
 
 describe('SiderStudioEntry', () => {
   beforeEach(() => {
+    mocks.creativeStudioEnabled.current = true;
     currentPathname = '/guid';
     isMobile = false;
     mocks.lifecycle.length = 0;
@@ -161,6 +173,13 @@ describe('SiderStudioEntry', () => {
 
   it('is absent outside Electron', () => {
     mocks.isElectronDesktop.mockReturnValue(false);
+    renderStudioEntry();
+
+    expect(screen.queryByRole('button', { name: studioNavKey })).not.toBeInTheDocument();
+  });
+
+  it('is absent when Creative Studio is disabled', () => {
+    mocks.creativeStudioEnabled.current = false;
     renderStudioEntry();
 
     expect(screen.queryByRole('button', { name: studioNavKey })).not.toBeInTheDocument();

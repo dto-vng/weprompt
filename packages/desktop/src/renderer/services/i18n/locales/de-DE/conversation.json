@@ -1292,6 +1292,7 @@
       "folderLabel": "Exportordner"
     },
     "errors": {
+      "featureDisabled": "Creative Studio ist in diesem Build deaktiviert.",
       "invalidPayload": "Die Anfrage enthält ungültige oder unvollständige Informationen.",
       "projectNotFound": "Das Creative-Studio-Projekt existiert nicht mehr.",
       "storyboardExists": "Dieses Projekt hat bereits ein Storyboard. Bestätige das Ersetzen, bevor du es erneut entwirfst.",

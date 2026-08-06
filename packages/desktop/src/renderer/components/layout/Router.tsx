@@ -4,7 +4,7 @@ import AppLoader from '@renderer/components/layout/AppLoader';
 import RouteErrorBoundary from '@renderer/components/layout/RouteErrorBoundary';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { isElectronDesktop } from '@renderer/utils/platform';
-import { DESKTOP_PET_ENABLED, TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { CREATIVE_STUDIO_ENABLED, DESKTOP_PET_ENABLED, TEAM_MODE_ENABLED } from '@/common/config/constants';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
 const AgentSettings = React.lazy(() => import('@renderer/pages/settings/AgentSettings'));
@@ -71,7 +71,7 @@ const ProtectedLayout: React.FC<{ layout: React.ReactElement }> = ({ layout }) =
 };
 
 const DesktopStudioRoute: React.FC = () => {
-  if (!isElectronDesktop()) {
+  if (!CREATIVE_STUDIO_ENABLED || !isElectronDesktop()) {
     return <Navigate to='/guid' replace />;
   }
 

@@ -1293,6 +1293,7 @@
       "folderLabel": "Dışa aktarma klasörü"
     },
     "errors": {
+      "featureDisabled": "Creative Studio bu derlemede devre dışıdır.",
       "invalidPayload": "İstek geçersiz veya eksik bilgiler içeriyor.",
       "projectNotFound": "Creative Studio projesi artık mevcut değil.",
       "storyboardExists": "Bu projede zaten bir storyboard var. Yeniden taslak oluşturmadan önce değiştirmeyi onaylayın.",

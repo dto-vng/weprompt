@@ -62,6 +62,9 @@ export const TEAM_MODE_ENABLED = true;
 
 // ===== Feature flags =====
 
+/** Creative Studio release gate. Explicitly opt in for development with AIONUI_ENABLE_CREATIVE_STUDIO=1. */
+export const CREATIVE_STUDIO_ENABLED = process.env.AIONUI_ENABLE_CREATIVE_STUDIO === '1';
+
 /** Desktop Pet feature flag: when false, the pet is hidden from all UI entry points (settings tab, route, tray menu, startup). Backend code stays dormant. */
 export const DESKTOP_PET_ENABLED = false;
 

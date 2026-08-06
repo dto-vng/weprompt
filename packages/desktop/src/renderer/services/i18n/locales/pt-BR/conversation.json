@@ -1312,6 +1312,7 @@
       "folderLabel": "Pasta de exportação"
     },
     "errors": {
+      "featureDisabled": "O Creative Studio está desativado nesta compilação.",
       "invalidPayload": "A solicitação contém informações inválidas ou incompletas.",
       "projectNotFound": "O projeto do Creative Studio não existe mais.",
       "storyboardExists": "Este projeto já tem um storyboard. Confirme a substituição antes de criar outro rascunho.",

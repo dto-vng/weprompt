@@ -1143,6 +1143,7 @@
       "folderLabel": "Export folder"
     },
     "errors": {
+      "featureDisabled": "Creative Studio is disabled in this build.",
       "invalidPayload": "The request contains invalid or incomplete information.",
       "projectNotFound": "The Creative Studio project no longer exists.",
       "storyboardExists": "This project already has a storyboard. Confirm replacement before drafting again.",

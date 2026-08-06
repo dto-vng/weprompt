@@ -3,6 +3,7 @@ import { Button, Tooltip } from '@arco-design/web-react';
 import { MovieBoard } from '@icon-park/react';
 import classNames from 'classnames';
 import { useTranslation } from 'react-i18next';
+import { CREATIVE_STUDIO_ENABLED } from '@/common/config/constants';
 import studioType from '@renderer/pages/studio/StudioTypography.module.css';
 import { isElectronDesktop } from '@renderer/utils/platform';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
@@ -25,7 +26,7 @@ const SiderStudioEntry: React.FC<SiderStudioEntryProps> = ({
   const { t } = useTranslation();
   const desktop = isElectronDesktop();
 
-  if (!desktop) return null;
+  if (!CREATIVE_STUDIO_ENABLED || !desktop) return null;
 
   const label = t('conversation.creativeStudio.nav.title');
 

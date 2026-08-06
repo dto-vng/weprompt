@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => {
   const isDevelopment = mode === 'development';
   const releaseBuildPolicy = resolveDesktopReleaseBuildPolicy(process.env, { isDevelopment });
   const { enableSentrySourceMaps } = releaseBuildPolicy;
+  const creativeStudioFeatureEnv = JSON.stringify(process.env.AIONUI_ENABLE_CREATIVE_STUDIO ?? '');
 
   const sentryPluginOptions = enableSentrySourceMaps
     ? {
@@ -162,6 +163,7 @@ export default defineConfig(({ mode }) => {
         'process.env.WEPROMPT_UPDATE_BASE_URL': JSON.stringify(releaseBuildPolicy.updateBaseUrl ?? ''),
         'process.env.FORGE_GREENNODE_API_KEY': JSON.stringify(process.env.FORGE_GREENNODE_API_KEY ?? ''),
         'process.env.FORGE_TAVILY_API_KEY': JSON.stringify(process.env.FORGE_TAVILY_API_KEY ?? ''),
+        'process.env.AIONUI_ENABLE_CREATIVE_STUDIO': creativeStudioFeatureEnv,
       },
     },
 
@@ -303,6 +305,7 @@ export default defineConfig(({ mode }) => {
         'process.env.NODE_ENV': JSON.stringify(mode),
         'process.env.env': JSON.stringify(process.env.env),
         'process.env.AIONUI_MULTI_INSTANCE': JSON.stringify(process.env.AIONUI_MULTI_INSTANCE ?? ''),
+        'process.env.AIONUI_ENABLE_CREATIVE_STUDIO': creativeStudioFeatureEnv,
         'process.env.SENTRY_DSN': JSON.stringify(releaseBuildPolicy.sentry.dsn),
         'process.env.WEPROMPT_INTERNAL_RELEASE': JSON.stringify(releaseBuildPolicy.internalRelease ? '1' : ''),
         'process.env.WEPROMPT_UPDATE_BASE_URL': JSON.stringify(releaseBuildPolicy.updateBaseUrl ?? ''),

@@ -1276,6 +1276,7 @@
       "folderLabel": "書き出しフォルダー"
     },
     "errors": {
+      "featureDisabled": "Creative Studio はこのビルドでは無効です。",
       "invalidPayload": "リクエストに無効または不完全な情報が含まれています。",
       "projectNotFound": "このクリエイティブスタジオのプロジェクトは存在しません。",
       "storyboardExists": "このプロジェクトには既にストーリーボードがあります。再作成する前に置き換えを確認してください。",

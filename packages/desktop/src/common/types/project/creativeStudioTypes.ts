@@ -437,6 +437,7 @@ export type StudioRouteCatalog = {
 };
 
 export type StudioCommandErrorCode =
+  | 'feature_disabled'
   | 'invalid_payload'
   | 'not_found'
   | 'storyboard_exists'

@@ -18,6 +18,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 const STORAGE_ERROR_MESSAGE_KEY = 'conversation.creativeStudio.errors.storage';
 
 const COMMAND_MESSAGE_KEYS: Record<StudioCommandErrorCode, string> = {
+  feature_disabled: 'conversation.creativeStudio.errors.featureDisabled',
   invalid_payload: 'conversation.creativeStudio.errors.invalidPayload',
   not_found: 'conversation.creativeStudio.errors.projectNotFound',
   storyboard_exists: 'conversation.creativeStudio.errors.storyboardExists',
