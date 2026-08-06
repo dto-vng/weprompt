@@ -146,6 +146,43 @@ const WATCH_STOP_TIMEOUT_MS = 5_000;
 const RENDER_OUTPUT_POLL_INTERVAL_MS = 25;
 const RENDER_TREE_STOP_TIMEOUT_MS = 5_000;
 const RENDER_TREE_STOP_RETRY_MS = 250;
+const WINDOWS_RENDER_TREE_REAPER_SCRIPT = String.raw`
+$ErrorActionPreference = 'Stop'
+[uint32]$targetProcessId = [uint32]$args[0]
+$rootAlreadyEnded = $args[1] -eq '1'
+$knownProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+[void]$knownProcessIds.Add($targetProcessId)
+$emptyPasses = 0
+for ($pass = 0; $pass -lt 16; $pass++) {
+  $processes = @(Get-CimInstance -ClassName Win32_Process | Select-Object ProcessId, ParentProcessId)
+  $changed = $true
+  while ($changed) {
+    $changed = $false
+    foreach ($process in $processes) {
+      [uint32]$processId = [uint32]$process.ProcessId
+      [uint32]$parentProcessId = [uint32]$process.ParentProcessId
+      if ($knownProcessIds.Contains($parentProcessId) -and $knownProcessIds.Add($processId)) {
+        $changed = $true
+      }
+    }
+  }
+  $liveProcesses = @($processes | Where-Object {
+    [uint32]$processId = [uint32]$_.ProcessId
+    $knownProcessIds.Contains($processId) -and (-not $rootAlreadyEnded -or $processId -ne $targetProcessId)
+  })
+  if ($liveProcesses.Count -eq 0) {
+    $emptyPasses += 1
+    if ($emptyPasses -ge 2) { exit 0 }
+  } else {
+    $emptyPasses = 0
+    foreach ($process in $liveProcesses) {
+      Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue
+    }
+  }
+  Start-Sleep -Milliseconds 25
+}
+exit 1
+`;
 
 const defaultExecFile: OfficeCliExecFile = (file, args, options, callback) => {
   return nodeExecFile(file, args, options, (error, stdout, stderr) => {
@@ -224,46 +261,58 @@ async function terminateRenderProcessTree(
   if (!Number.isSafeInteger(pid) || !pid || pid <= 1) return;
 
   if (platform === 'win32') {
-    let cleanupFailed = false;
-    for (;;) {
-      let taskkill: OfficeCliWatchProcess;
+    const runTreeCommand = async (file: string, args: string[]): Promise<boolean> => {
+      let helper: OfficeCliWatchProcess;
       try {
-        taskkill = processTreeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
+        helper = processTreeSpawn(file, args, {
           stdio: 'ignore',
           windowsHide: true,
         });
       } catch {
-        cleanupFailed = true;
-        await wait(RENDER_TREE_STOP_RETRY_MS);
-        continue;
+        return false;
       }
 
-      let taskkillOutcome = await waitForChildProcessEnd(taskkill);
-      const taskkillCompletedSuccessfully = taskkillOutcome.ended && taskkillOutcome.code === 0;
-      if (!taskkillOutcome.ended) {
-        cleanupFailed = true;
-        const taskkillPid = taskkill.pid;
-        if (Number.isSafeInteger(taskkillPid) && taskkillPid && taskkillPid > 1) {
+      let helperOutcome = await waitForChildProcessEnd(helper);
+      const completedSuccessfully = helperOutcome.ended && helperOutcome.code === 0;
+      if (!helperOutcome.ended) {
+        const helperPid = helper.pid;
+        if (Number.isSafeInteger(helperPid) && helperPid && helperPid > 1) {
           do {
             try {
-              taskkill.kill('SIGKILL');
+              helper.kill('SIGKILL');
             } catch {
               // Keep ownership until the cleanup helper is confirmed stopped.
             }
-            taskkillOutcome = await waitForChildProcessEnd(taskkill);
-          } while (!taskkillOutcome.ended);
+            helperOutcome = await waitForChildProcessEnd(helper);
+          } while (!helperOutcome.ended);
         }
       }
+      return completedSuccessfully;
+    };
 
-      if (taskkillCompletedSuccessfully) {
+    for (;;) {
+      const rootAlreadyEnded =
+        (child.exitCode !== undefined && child.exitCode !== null) ||
+        (child.signalCode !== undefined && child.signalCode !== null);
+      const taskkillCompletedSuccessfully =
+        !rootAlreadyEnded && (await runTreeCommand('taskkill', ['/F', '/PID', String(pid), '/T']));
+      const treeStopped =
+        taskkillCompletedSuccessfully ||
+        (await runTreeCommand('powershell.exe', [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          WINDOWS_RENDER_TREE_REAPER_SCRIPT,
+          String(pid),
+          rootAlreadyEnded ? '1' : '0',
+        ]));
+
+      if (treeStopped) {
         const renderOutcome = await waitForChildProcessEnd(child);
         if (renderOutcome.ended) {
-          if (cleanupFailed) throw new OfficeArtifactError('OFFICECLI_FAILED');
           return;
         }
-        cleanupFailed = true;
-      } else {
-        cleanupFailed = true;
       }
       await wait(RENDER_TREE_STOP_RETRY_MS);
     }

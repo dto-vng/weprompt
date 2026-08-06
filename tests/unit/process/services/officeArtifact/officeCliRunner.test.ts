@@ -294,7 +294,7 @@ describe('createOfficeCliRunner', () => {
       const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((_file, args) => {
         const taskkill = createWatchProcess();
         queueMicrotask(() => {
-          process.kill(-Number(args[2]), 'SIGKILL');
+          process.kill(-Number(args.at(-2)), 'SIGKILL');
           Object.assign(taskkill, { exitCode: 0 });
           taskkill.emit('close', 0, null);
         });
@@ -313,6 +313,17 @@ describe('createOfficeCliRunner', () => {
         expect(descendantPid).toBeGreaterThan(1);
         await expect(pending).resolves.toBeUndefined();
         expect(processTreeSpawn).toHaveBeenCalledTimes(1);
+        expect(processTreeSpawn.mock.calls[0]?.[0]).toBe('powershell.exe');
+        expect(processTreeSpawn.mock.calls[0]?.[1]).toEqual([
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          expect.stringContaining('Get-CimInstance -ClassName Win32_Process'),
+          String(renderProcess?.pid),
+          '1',
+        ]);
+        expect(processTreeSpawn.mock.calls[0]?.[2]).toEqual({ stdio: 'ignore', windowsHide: true });
         const heartbeatAtResolution = await readFile(heartbeatPath);
         await new Promise((resolve) => setTimeout(resolve, 250));
         expect(await readFile(heartbeatPath)).toEqual(heartbeatAtResolution);
@@ -344,6 +355,7 @@ describe('createOfficeCliRunner', () => {
         `#!/usr/bin/env node
           const { spawn } = require('node:child_process');
           const { writeFileSync } = require('node:fs');
+          writeFileSync(${JSON.stringify(heartbeatPath)}, '');
           const child = spawn(process.execPath, ['-e', ${JSON.stringify(heartbeatProgram)}], { stdio: 'ignore' });
           writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
           setInterval(() => undefined, 1_000);
@@ -358,7 +370,7 @@ describe('createOfficeCliRunner', () => {
         renderProcess = nodeSpawn(file, args, { ...options, detached: true });
         return renderProcess as unknown as OfficeCliWatchProcess;
       };
-      const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((_file, args) => {
+      const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((file, args) => {
         const taskkill = createWatchProcess();
         taskkillAttempt += 1;
         const attempt = taskkillAttempt;
@@ -368,7 +380,8 @@ describe('createOfficeCliRunner', () => {
             taskkill.emit('close', 1, null);
             return;
           }
-          process.kill(-Number(args[2]), 'SIGKILL');
+          const targetPid = file === 'taskkill' ? args[2] : args.at(-2);
+          process.kill(-Number(targetPid), 'SIGKILL');
           Object.assign(taskkill, { exitCode: 0 });
           taskkill.emit('close', 0, null);
         });
@@ -388,8 +401,11 @@ describe('createOfficeCliRunner', () => {
         await writeFile(outputPath, '');
         await truncate(outputPath, PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE + 1);
 
-        await expect(pending).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+        await expect(pending).rejects.toMatchObject({ code: 'EFBIG' });
         expect(processTreeSpawn).toHaveBeenCalledTimes(2);
+        expect(processTreeSpawn.mock.calls[0]?.[0]).toBe('taskkill');
+        expect(processTreeSpawn.mock.calls[1]?.[0]).toBe('powershell.exe');
+        expect(processTreeSpawn.mock.calls[1]?.[1].at(-1)).toBe('0');
         const heartbeatAtRejection = await readFile(heartbeatPath);
         await new Promise((resolve) => setTimeout(resolve, 250));
         expect(await readFile(heartbeatPath)).toEqual(heartbeatAtRejection);
