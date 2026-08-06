@@ -182,10 +182,39 @@ Stated so they could be corrected rather than inherited. **Designer response rec
 
 Net effect on scope: assumptions 2 and 3 each **added** work rather than removing it. The per-shot treatment is now in scope alongside the panel, and Write needs a model-failure state it does not have today.
 
-## Outstanding — referenced but not yet received
+## 8. Full response received and reviewed — 2026-08-06
 
-The designer response cites material not yet in hand. These are load-bearing and the panel cannot be implemented against a reference we cannot read:
+**Source:** `Creative Studio - Model & Divergence States.dc.html`, in the claude.ai/design project `WePrompt`. Three sections: **1a** answers Ask A (panel shape (1) plus the per-shot half of (3)), **1b** answers Ask C (divergence), **1c** answers Ask B (the reliability map). `support.js` is the design-doc runtime, not content.
 
-- **The screen map** — cited twice ("the map above"), and the source of the Write item in §3.3.
-- **State 7** — the named specification for the combined panel-plus-shot treatment in §3.2. We have its *shape* (both surfaces, one deliverable) but not its content.
-- **The Write entry** in that map, which determines whether the storyboard model's failure surface is new design or an existing state.
+### 8.1 What the response settles
+
+- **Ask A** — nine annotated states: four availability states (dot **plus text**, never dot alone), three collapsed cases, a German truncation spec, four expanded cases, the per-shot treatment, a grid empty state, and dark theme. `ConnectEngineCard`'s full-surface takeover is removed; its two actions move into the panel and the grid empty state, and its clipboard behaviour is preserved as a secondary action.
+- **Ask B** — the reliability map, including two answers we needed: **Produce activity tray and batch confirm are TRUST**, which closes the last open item in the [pass 3 prep](creative-studio-fidelity-pass3-prep.md) §3; and **Review is STALE by omission** — drawn as a player plus a read-only strip before the cut existed, with trim, crop, filters and per-clip selection undrawn. Model Settings has never been drawn and is now load-bearing for two repair paths.
+- **Ask C** — divergence stated once on the cut's order control, never per clip; the chip changes wording not colour (`Follows the storyboard` → `Yours · edited by hand`); re-sync is a previewed, destructive dialog that quotes a count rather than an adjective.
+
+### 8.2 Blocking — three drawn states need data the model cannot express
+
+Verified against code. Filed as **EPIC-005-G1/G2/G3** in `TASKS.md`; details there, summary here.
+
+| Gap | Blocks | Why |
+| --- | --- | --- |
+| **G1** Model-selection provenance | `CHOSEN FOR YOU` (panel state 4) | Auto-adoption writes through the same CAS command a person uses; the store cannot tell auto from deliberate |
+| **G2** Appended-clip acknowledgement | Appended-shot notice (cut state 3) | No per-clip unseen marker, and the design rightly rejects a toast — so it must persist |
+| **G3** Undo | `Undo the move` (cut state 2) | No undo exists in the Studio renderer at all |
+
+### 8.3 Scope gap — state 7 covers one cause of nine
+
+The generate button is absent today for **role status not ready** (the case state 7 addresses), and also for: `routing[kind]` null, the selected route missing from the catalog, and every `routeSupportsScene` failure — aspect ratio, resolution, **duration out of range**, a reference image on a model without first-frame support, and health `unavailable` — plus transient editor and catalog-loading states.
+
+The duration case is the sharp one: the panel advertises `UP TO 15S`, so a 20-second video shot loses its button while the model **is** configured, and `Needs a video model` would be flatly wrong. **State 7 needs a reason vocabulary, not one string.**
+
+### 8.4 Smaller corrections
+
+- **Slates have no position in a manual cut.** Cut states 1–2 render `04 SLATE` between 03 and 05. In `storyboard` mode that derives from `sceneOrder`; in `manual` mode `clipOrder` holds only clip ids and bears no relation to `sceneOrder`, so the slot is undefined. Grouping slates after the clips once the order is manual stays consistent with "absent from the cut".
+- **`5 clips` counts a slate.** Cut states 1–2 show four draggable clips plus one slate under a `5 clips` header, while the same page says a slate "holds a place without pretending to be a clip". Separately `0:24 → 0:28` on gaining a 4-second take implies the slate's duration was never in the total, though it visually occupies width. Resolve before it becomes a pluralised string in twelve locales.
+- **`--status-decide` is a new token, not an alias.** The app ships `--success`, `--warning`, `--danger`, `--brand` (rust) plus a `--studio-*` set with no status colours and no navy. Navy may exist in the design system's `tokens/colors.css`; it is not in the app. Adding one token is fine — it is just not free.
+- **"Contact your workspace admin"** (state 6, `unavailable`) assumes an admin who is not the user. Check it against how models are actually provisioned for our users before translating it.
+
+### 8.5 Recommended next step
+
+The response ends with an offer worth taking: a **30-minute pass through the running app with the prototype open**, screen by screen, if we supply a build. Every `REVISIT` in the map is explicitly unmeasured rather than known-good, and this converts the whole map into measured answers for almost nothing. It is also the cheapest way to catch the same drift on surfaces nobody has looked at yet.
