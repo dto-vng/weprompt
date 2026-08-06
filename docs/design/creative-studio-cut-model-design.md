@@ -68,7 +68,16 @@ Consequences that must be handled explicitly rather than discovered:
 - Reordering shots in the storyboard reorders the cut, **unless** the cut has diverged. Divergence must be a visible state, not an invisible one.
 - **[rev 2] "Hand-ordered" needs an explicit flag.** Structural inequality detects a *current* mismatch, but not intent: a manually reordered cut that later happens to match the storyboard is indistinguishable from one that simply follows it. Since §4 promises to preserve user intent, add **`orderMode: 'storyboard' | 'manual'`** to `StudioCut`. Manual is set the first time a user reorders the cut directly, and only the user can return it to `storyboard`.
 - Deleting a scene removes its clips.
-- **[rev 6] A scene that gains a canonical take *after* the cut went manual is appended**, without disturbing the user's hand-ordering. A cut still in `storyboard` mode places it at its `sceneOrder` position instead. Appending was chosen as the least-surprising default: a manual order is user intent, and silently inserting into the middle of it would overwrite that intent to satisfy a storyboard the user has already departed from. Confirmed 2026-08-06; the design had left this open and the implementation surfaced it.
+- ~~**[rev 6] A scene that gains a canonical take *after* the cut went manual is appended**~~ **Superseded — see rev 7 below.**
+- **[rev 7] A scene that gains a canonical take while the cut is `manual` is NOT added to the cut at all.** It is held outside it, in a derived "Not in the cut yet" group, and the user places it. A cut in `storyboard` mode is unchanged: a new take lands at its `sceneOrder` slot, with no group and no marker. Decided with the designer 2026-08-06, superseding both rev 6's append and the `NEW · WAS 04` marker drawn in the design response.
+
+  **Why it beat appending, in the designer's words:** the cut *already* does not contain every shot — a scene with no selected take renders as a hatched `SLATE`, which is a storyboard shot with no clip in the cut. Held-outside is that same fact in the one mode that has no slot to hold it, so it is not a new contract. A marker answers "why is shot 4 last"; the group means the question never arises, because shot 4 is not last — it is unplaced.
+
+  **The state that killed the marker** is the ordinary one, not an edge case: a batch finishing overnight appends three clips in storyboard sequence to the tail of a hand-made order, where they read as corruption, and a single aggregated count pointing at the first is thin cover.
+
+  **Nothing here is persisted.** The group is derived exactly while a scene has a canonical take and no clip — so there is no seen state, no expiry, and no definition of "touched the cut" to get wrong. This removes the durable per-clip acknowledgement state the marker would have required (`EPIC-005-G2`, now dissolved rather than built).
+
+  **The cost is paid at export**, deliberately: a non-blocking line — *"Export 0:24 — 3 shots are not in the cut"* — naming the shots, offering *Place them first* or *Export anyway*, derived from stored state and suppressed entirely when the group is empty.
 
 ## 5. Renderer neutrality: coordinates and filters
 
@@ -263,6 +272,10 @@ Schema room is left where noted, but none of this is built:
 ## 11. Open questions
 
 1. ~~**The v1 filter set.**~~ **[rev 3] Decided — see §5.** Four scalars (exposure, contrast, saturation, temperature), each `−1…1` default 0, composing to a single colour matrix in a fixed order, with formulas and golden pixels pinned to measured Chromium behaviour.
-2. **Divergence UX.** §4 requires divergence between storyboard order and cut order to be visible. What that looks like, and whether a user can re-sync, is a UI decision.
+2. ~~**Divergence UX.**~~ **[rev 7] Decided 2026-08-06 with the designer.** Divergence is stated once on the cut's order control and nowhere else — a chip whose *wording* changes, not its colour: `Follows the storyboard` → `Yours · edited by hand`, with `Change` reaching a previewed, destructive re-sync dialog that quotes a clip count rather than an adjective. Neutral throughout; not a warning. A one-time dismissible explanation appears at the flip, carrying the way back as a clause — *"Change above puts it back"* — rather than an action.
+
+   **No undo.** `Undo the move` is dropped and a bounded order-only undo is explicitly **not** to be built: it would imply a safety net the Studio does not have, and a partial undo restoring order but not trims is a trap. The flip is not destructive — the user gained an order and lost nothing. The re-sync note that leaned on session undo goes with it; the dialog's clip count was always doing that work. (`EPIC-005-G3` closed by deletion, not implementation.)
+
+   New scenes arriving into a manual cut are covered by §4 rev 7, not by a divergence marker.
 3. ~~**Trim timebase — seconds or frames.**~~ **[rev 4] Decided — see §5.1.** Seconds as a double, with frame snapping defined in the render contract. The cut model does not need a project frame rate.
 4. ~~**Who owns the shared managed-video seam.**~~ **[rev 5] Decided — see §5.2.** One owned renderer-side seam serving preview, poster capture and trim UI, with a measured snapping contract. Explicitly *not* the render substrate.
