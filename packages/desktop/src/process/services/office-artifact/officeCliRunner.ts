@@ -34,6 +34,11 @@ type OfficeCliSpawnOptions = {
   detached?: boolean;
 };
 
+type OfficeCliProcessTreeSpawnOptions = {
+  stdio: 'ignore';
+  windowsHide: true;
+};
+
 type OfficeCliWatchStream = {
   on: (event: 'data', listener: (chunk: Buffer | string) => void) => unknown;
 };
@@ -49,11 +54,21 @@ export type OfficeCliWatchProcess = {
     (event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
     (event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
   };
-  removeListener: (event: string, listener: (...args: never[]) => void) => unknown;
+  removeListener: {
+    (event: 'error', listener: (error: OfficeCliExecFileError) => void): unknown;
+    (event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
+    (event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
+  };
   kill: (signal: NodeJS.Signals) => boolean;
 };
 
 export type OfficeCliSpawn = (file: string, args: string[], options: OfficeCliSpawnOptions) => OfficeCliWatchProcess;
+
+export type OfficeCliProcessTreeSpawn = (
+  file: string,
+  args: string[],
+  options: OfficeCliProcessTreeSpawnOptions
+) => OfficeCliWatchProcess;
 
 export type OfficeCliPreviewSession = {
   url: string;
@@ -109,6 +124,7 @@ export type OfficeCliRunnerDependencies = {
   exists?: (path: string) => boolean;
   homeDirectory?: string;
   platform?: NodeJS.Platform;
+  processTreeSpawn?: OfficeCliProcessTreeSpawn;
 };
 
 const EXEC_OPTIONS: OfficeCliExecFileOptions = {
@@ -137,6 +153,9 @@ const defaultExecFile: OfficeCliExecFile = (file, args, options, callback) => {
 const defaultSpawn: OfficeCliSpawn = (file, args, options) =>
   nodeSpawn(file, args, options) as unknown as OfficeCliWatchProcess;
 
+const defaultProcessTreeSpawn: OfficeCliProcessTreeSpawn = (file, args, options) =>
+  nodeSpawn(file, args, options) as unknown as OfficeCliWatchProcess;
+
 function allocatePreviewPort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
@@ -160,55 +179,61 @@ function wait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
-function waitForChildProcessEnd(child: OfficeCliWatchProcess): Promise<void> {
-  if (
-    (child.exitCode !== undefined && child.exitCode !== null) ||
-    (child.signalCode !== undefined && child.signalCode !== null)
-  ) {
-    return Promise.resolve();
+type ChildProcessEndOutcome =
+  | { readonly ended: true; readonly code: number | null; readonly signal: NodeJS.Signals | null }
+  | { readonly ended: false };
+
+function waitForChildProcessEnd(child: OfficeCliWatchProcess): Promise<ChildProcessEndOutcome> {
+  if (child.exitCode !== undefined && child.exitCode !== null) {
+    return Promise.resolve({ ended: true, code: child.exitCode, signal: child.signalCode ?? null });
+  }
+  if (child.signalCode !== undefined && child.signalCode !== null) {
+    return Promise.resolve({ ended: true, code: child.exitCode ?? null, signal: child.signalCode });
   }
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (): void => {
+    const finish = (outcome: ChildProcessEndOutcome): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      child.removeListener('error', finish);
-      child.removeListener('exit', finish);
-      child.removeListener('close', finish);
-      resolve();
+      child.removeListener('error', onError);
+      child.removeListener('exit', onEnd);
+      child.removeListener('close', onEnd);
+      resolve(outcome);
     };
-    const timeout = setTimeout(finish, RENDER_TREE_STOP_TIMEOUT_MS);
-    child.once('error', finish);
-    child.once('exit', finish);
-    child.once('close', finish);
+    const onError = (): void => finish({ ended: false });
+    const onEnd = (code: number | null, signal: NodeJS.Signals | null): void => finish({ ended: true, code, signal });
+    const timeout = setTimeout(() => finish({ ended: false }), RENDER_TREE_STOP_TIMEOUT_MS);
+    child.once('error', onError);
+    child.once('exit', onEnd);
+    child.once('close', onEnd);
   });
 }
 
 async function terminateRenderProcessTree(
   child: OfficeCliWatchProcess | undefined,
-  platform: NodeJS.Platform
+  platform: NodeJS.Platform,
+  processTreeSpawn: OfficeCliProcessTreeSpawn
 ): Promise<void> {
   if (!child) return;
   const pid = child.pid;
   if (!Number.isSafeInteger(pid) || !pid || pid <= 1) return;
 
   if (platform === 'win32') {
+    let taskkill: OfficeCliWatchProcess;
     try {
-      const taskkill = nodeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
+      taskkill = processTreeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
         stdio: 'ignore',
         windowsHide: true,
-      }) as unknown as OfficeCliWatchProcess;
-      await waitForChildProcessEnd(taskkill);
+      });
     } catch {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        // The render process already exited.
-      }
+      throw new OfficeArtifactError('OFFICECLI_FAILED');
     }
-    await waitForChildProcessEnd(child);
+    const taskkillOutcome = await waitForChildProcessEnd(taskkill);
+    if (!taskkillOutcome.ended || taskkillOutcome.code !== 0) throw new OfficeArtifactError('OFFICECLI_FAILED');
+    const renderOutcome = await waitForChildProcessEnd(child);
+    if (!renderOutcome.ended) throw new OfficeArtifactError('OFFICECLI_FAILED');
     return;
   }
 
@@ -221,7 +246,8 @@ async function terminateRenderProcessTree(
       // The render process group already exited.
     }
   }
-  await waitForChildProcessEnd(child);
+  const renderOutcome = await waitForChildProcessEnd(child);
+  if (!renderOutcome.ended) throw new OfficeArtifactError('OFFICECLI_FAILED');
 }
 
 function renderLimitError(): Error & { code: 'EFBIG' } {
@@ -353,6 +379,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
   const binaryPath = resolveOfficeCliBinary(dependencies);
   const execFile = dependencies.execFile ?? defaultExecFile;
   const spawn = dependencies.spawn ?? defaultSpawn;
+  const processTreeSpawn = dependencies.processTreeSpawn ?? defaultProcessTreeSpawn;
   const allocatePort = dependencies.allocatePort ?? allocatePreviewPort;
   const platform = dependencies.platform ?? process.platform;
   const renderSpawnOptions: OfficeCliSpawnOptions = {
@@ -468,7 +495,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
         settling = true;
         clearTimers();
         void (async () => {
-          await terminateRenderProcessTree(child, platform);
+          await terminateRenderProcessTree(child, platform, processTreeSpawn);
           if (error) throw toOfficeCliRenderError(error);
           await assertRenderOutputWithinLimit(outputPath);
           if (Buffer.byteLength(stdout, 'utf8') > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {

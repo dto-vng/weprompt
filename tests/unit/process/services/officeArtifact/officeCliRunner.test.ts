@@ -18,6 +18,7 @@ import { parseOfficeCliEnvelope } from '@/process/services/office-artifact/offic
 import {
   createOfficeCliRunner,
   type OfficeCliExecFile,
+  type OfficeCliProcessTreeSpawn,
   type OfficeCliSpawn,
   type OfficeCliWatchProcess,
 } from '@/process/services/office-artifact/officeCliRunner';
@@ -70,6 +71,16 @@ function isProcessAlive(pid: number): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function readProcessId(filePath: string, attempts = 500): Promise<number> {
+  try {
+    return Number(await readFile(filePath, 'utf8'));
+  } catch {
+    if (attempts <= 1) return 0;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return readProcessId(filePath, attempts - 1);
   }
 }
 
@@ -173,6 +184,33 @@ describe('createOfficeCliRunner', () => {
     ).rejects.toMatchObject({ code: 'ETIMEDOUT', message: 'ETIMEDOUT' });
   });
 
+  it('fails closed when Windows tree termination exits unsuccessfully', async () => {
+    const renderProcess = Object.assign(createWatchProcess(), { pid: 99_999, exitCode: 0 });
+    const taskkillProcess = Object.assign(createWatchProcess(), { exitCode: 1 });
+    const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>(() => taskkillProcess);
+    const spawn = vi.fn<OfficeCliSpawn>(() => {
+      queueMicrotask(() => {
+        renderProcess.stdout.end(JSON.stringify({ success: true, data: {} }));
+        renderProcess.emit('close', 0, null);
+      });
+      return renderProcess;
+    });
+    const runner = createOfficeCliRunner({
+      binaryPath: 'C:\\officecli.exe',
+      platform: 'win32',
+      processTreeSpawn,
+      spawn,
+    });
+
+    await expect(
+      runner.renderSlide('C:\\inspection\\candidate.pptx', 1, 'C:\\render\\slide-1.png')
+    ).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+    expect(processTreeSpawn).toHaveBeenCalledWith('taskkill', ['/F', '/PID', '99999', '/T'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+  });
+
   it.runIf(process.platform !== 'win32')('kills a descendant writer before a timed-out render rejects', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'officecli-render-tree-'));
     const executable = path.join(root, 'fake-officecli');
@@ -209,14 +247,7 @@ describe('createOfficeCliRunner', () => {
 
     try {
       const pending = runner.renderSlide('/private/inspection/candidate.pptx', 1, outputPath);
-      for (let attempt = 0; attempt < 500; attempt += 1) {
-        try {
-          descendantPid = Number(await readFile(pidPath, 'utf8'));
-          break;
-        } catch {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-      }
+      descendantPid = await readProcessId(pidPath);
       expect(Number.isSafeInteger(descendantPid) && descendantPid > 1).toBe(true);
       renderProcess?.kill('SIGTERM');
       await expect(pending).rejects.toMatchObject({

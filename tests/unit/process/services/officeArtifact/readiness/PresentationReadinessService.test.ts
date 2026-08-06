@@ -31,6 +31,10 @@ const STALE_VALID_PNG = Buffer.from(
 const PNG_PREFIX = VALID_PNG.subarray(0, 8);
 const INVALID_CHUNK_LENGTH_PNG = Buffer.from(VALID_PNG);
 INVALID_CHUNK_LENGTH_PNG.writeUInt32BE(VALID_PNG.byteLength, 8);
+const PNG_WITH_TRAILING_ZLIB_INPUT = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAADElEQVR42mNk+A8AAQUBAQB29DMDAAAAAElFTkSuQmCC',
+  'base64'
+);
 
 const ooxmlInspection = (): PptxOoxmlInspection => ({
   zipEntryCount: 12,
@@ -299,6 +303,7 @@ describe('PresentationReadinessService', () => {
     ['the PNG signature alone', PNG_PREFIX],
     ['a truncated chunk', VALID_PNG.subarray(0, VALID_PNG.byteLength - 1)],
     ['a chunk whose declared length crosses the file boundary', INVALID_CHUNK_LENGTH_PNG],
+    ['trailing input inside the IDAT zlib payload', PNG_WITH_TRAILING_ZLIB_INPUT],
     ['trailing bytes after IEND', Buffer.concat([VALID_PNG, Buffer.from([0])])],
     [
       'a corrupt IDAT stream with a matching file shape',

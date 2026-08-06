@@ -210,7 +210,12 @@ function validateInflatedPng(
 
   let inflated: Buffer;
   try {
-    inflated = inflateSync(compressed, { maxOutputLength: expectedByteLength });
+    const result = inflateSync(compressed, {
+      maxOutputLength: expectedByteLength,
+      info: true,
+    }) as unknown as { readonly buffer: Buffer; readonly engine: { readonly bytesWritten: number } };
+    inflated = result.buffer;
+    if (result.engine.bytesWritten !== compressed.byteLength) return false;
   } catch {
     return false;
   }
