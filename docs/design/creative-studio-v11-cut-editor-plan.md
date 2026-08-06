@@ -1,20 +1,20 @@
 # Creative Studio v1.1 — the cut editor
 
 **Date:** 2026-08-06 · **Base:** `creative-suite-sprint2@b98c58252` (pushed, MR !71 open)
-**Design of record:** designer response §3a–3d, *Creative Studio — Review and Divergence States*
+**Design of record:** designer response §3a–3d, _Creative Studio — Review and Divergence States_
 **Goal:** the cut a user edits is the cut that renders.
 
 ## 0. The sequencing decision, and why it is not negotiable
 
 The designer's §3b is the spine of this plan:
 
-> *"scene-derived segments also means clip order is not honoured either — a user who hand-orders the cut, renders, and gets the storyboard order back has not hit a missing feature, they have hit a lie… renderCut reading the cut is the first piece of this work, not the last."*
+> _"scene-derived segments also means clip order is not honoured either — a user who hand-orders the cut, renders, and gets the storyboard order back has not hit a missing feature, they have hit a lie… renderCut reading the cut is the first piece of this work, not the last."_
 
 **Verified.** `renderService.ts:412` iterates `project.sceneOrder`; the file contains no reference to `cuts`, `activeCutId`, `clipOrder`, `sourceIn/Out`, `crop` or `filters`. It reads **one of the six things the cut holds**: the selected asset.
 
-This is worse than a missing feature and it is **already reachable** — `updateCut` is a live IPC command (`creativeStudioService.ts:1210`), so a manually-ordered cut can exist today and render would silently discard the order while the divergence chip says *"Yours · edited by hand."*
+This is worse than a missing feature and it is **already reachable** — `updateCut` is a live IPC command (`creativeStudioService.ts:1210`), so a manually-ordered cut can exist today and render would silently discard the order while the divergence chip says _"Yours · edited by hand."_
 
-So the renderer leads and the UI follows. The designer drew the honest-caveat alternative (ship the editor first, warn that edits are not in the render) and argued against it: *"it asks a marketer to hold two versions of their video in their head, and the first thing they will do is not believe either."* Agreed — **sequence it, do not caveat it.**
+So the renderer leads and the UI follows. The designer drew the honest-caveat alternative (ship the editor first, warn that edits are not in the render) and argued against it: _"it asks a marketer to hold two versions of their video in their head, and the first thing they will do is not believe either."_ Agreed — **sequence it, do not caveat it.**
 
 ## 1. Slices
 
@@ -41,7 +41,7 @@ Durations become derived: the header's played/untrimmed figures and the render l
 
 ### R3 — the cut editor — **XL**
 
-Only after R1 and R2. The designer's §3a, in one slice because it does not decompose — *"the half-built version is not a coherent screen."*
+Only after R1 and R2. The designer's §3a, in one slice because it does not decompose — _"the half-built version is not a coherent screen."_
 
 - Strip as a **timeline**: ruler, playhead, click-to-seek with the stage following, drag handles, per-clip selection, `TRIMMED`/`GRADED` neutral edit marks, clip width following trimmed duration, slate treatment for takeless shots.
 - **One inspector**, four sections — takes, trim, frame, colour — scoped to the selected clip. No edit mode.
@@ -52,7 +52,7 @@ Only after R1 and R2. The designer's §3a, in one slice because it does not deco
 
 ### R4 — render, failure and export states — **M**
 
-§3c. Five states in the cut's footer, nothing moving position between them: progress in place with percentage **and clip count**; the busy guard stated on a disabled button with an accessible reason *before* it is hit; three typed failures each naming the failure in the user's vocabulary (a clip number, not an asset id) with exactly one action; and the export dialog carrying the consequence line plus `cut.mp4` with its render time so a stale render is visible before the folder picker.
+§3c. Five states in the cut's footer, nothing moving position between them: progress in place with percentage **and clip count**; the busy guard stated on a disabled button with an accessible reason _before_ it is hit; three typed failures each naming the failure in the user's vocabulary (a clip number, not an asset id) with exactly one action; and the export dialog carrying the consequence line plus `cut.mp4` with its render time so a stale render is visible before the folder picker.
 
 ### R5 — compact, dark, and three tokens — **M**
 

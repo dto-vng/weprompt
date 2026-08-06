@@ -6,7 +6,7 @@
 
 ## The ask
 
-Draw **Review**, properly and in full. You rated it **STALE by omission** in your own reliability map — *"drawn as a player plus a read-only strip, before the cut existed as an editable projection… the rest of the surface — trim, crop, filters, per-clip selection — is undrawn and I would want to draw it before you build."* We agree, and we are not building it until you have.
+Draw **Review**, properly and in full. You rated it **STALE by omission** in your own reliability map — _"drawn as a player plus a read-only strip, before the cut existed as an editable projection… the rest of the surface — trim, crop, filters, per-clip selection — is undrawn and I would want to draw it before you build."_ We agree, and we are not building it until you have.
 
 Everything else in the remaining Creative Studio plan can proceed in parallel. This cannot, and it gates the largest single piece of unbuilt work.
 
@@ -25,12 +25,12 @@ That is live and verified: a real brief produced a real 10-second `.mp4`, correc
 
 Beyond the player and the takes rail you already drew:
 
-1. **The cut strip as an editor.** Clip order with drag *and* a keyboard path, per-clip selection, and the slate treatment for a shot with no take (hatched, dashed, occupying its intended duration — your cut state 1).
+1. **The cut strip as an editor.** Clip order with drag _and_ a keyboard path, per-clip selection, and the slate treatment for a shot with no take (hatched, dashed, occupying its intended duration — your cut state 1).
 2. **Per-clip editing: trim, crop, and the four colour filters.** Exposure, contrast, saturation, temperature — each `−1…1`, default 0. This is the undrawn half. Trim in particular needs a real interaction model; the underlying seam supports frame-accurate seeking.
-3. **The divergence states you already specified** — the order chip (`Follows the storyboard` → `Yours · edited by hand`), the one-time flip explanation with its revised line (*"Change above puts it back"*), and the previewed re-sync dialog quoting a clip count.
+3. **The divergence states you already specified** — the order chip (`Follows the storyboard` → `Yours · edited by hand`), the one-time flip explanation with its revised line (_"Change above puts it back"_), and the previewed re-sync dialog quoting a clip count.
 4. **The "Not in the cut yet" group** from your §2a — derived, manual-mode only, with `Place it…`, `Add to the end`, `Add all to the end`.
 5. **The render affordance**, wherever you decide it belongs.
-6. **The export line** — *"3 shots are not in the cut"* — non-blocking, at the moment of consequence.
+6. **The export line** — _"3 shots are not in the cut"_ — non-blocking, at the moment of consequence.
 
 ## Constraints that are real
 

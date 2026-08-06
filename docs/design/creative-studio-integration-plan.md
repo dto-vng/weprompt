@@ -4,15 +4,15 @@
 
 ## 1. Branch topology as it actually is
 
-| Ref | Base | Ahead | Studio UI files | Contents |
-| --- | --- | --- | --- | --- |
-| `origin/sprint2` | — | — | 0 | tip `343b725c4` (2026-08-03) |
-| `origin/creative-suite-sprint2` | sprint2 | **0** | 0 | **empty — a bare fork point** |
-| `creative-suite-sprint2` (local) | sprint2 | 2 | 32 | khoapnt's line ported: `c11e53354` + `a40df852d`. **Unpushed.** |
-| `codex/studio-integration` | sprint1 | 121 | **69** | the redesign + fidelity work + hardening |
-| `codex/creative-suite-studio-refresh` | sprint1 | 50 | 32 | khoapnt's line, tip `c5b879c3e` |
+| Ref                                   | Base    | Ahead | Studio UI files | Contents                                                        |
+| ------------------------------------- | ------- | ----- | --------------- | --------------------------------------------------------------- |
+| `origin/sprint2`                      | —       | —     | 0               | tip `343b725c4` (2026-08-03)                                    |
+| `origin/creative-suite-sprint2`       | sprint2 | **0** | 0               | **empty — a bare fork point**                                   |
+| `creative-suite-sprint2` (local)      | sprint2 | 2     | 32              | khoapnt's line ported: `c11e53354` + `a40df852d`. **Unpushed.** |
+| `codex/studio-integration`            | sprint1 | 121   | **69**          | the redesign + fidelity work + hardening                        |
+| `codex/creative-suite-studio-refresh` | sprint1 | 50    | 32              | khoapnt's line, tip `c5b879c3e`                                 |
 
-The agreed model is right: one long-lived isolated branch off `sprint2`, regular merges *from* `sprint2` to avoid late conflicts, one merge request into `sprint2` when stable. Nothing below changes that.
+The agreed model is right: one long-lived isolated branch off `sprint2`, regular merges _from_ `sprint2` to avoid late conflicts, one merge request into `sprint2` when stable. Nothing below changes that.
 
 ## 2. The finding that gates everything
 
@@ -44,10 +44,10 @@ All five provider adapters — `bytePlusSeedance`, `mediaGateway`, `image`, `ope
 
 ## 3.1 Verified: their line contributes nothing ours lacks
 
-A corrective path proposed keeping the pre-redesign commits as a backup, treating `codex/studio-integration` as the UI source of truth, and *"bringing across only the newer runtime/OpenRouter/media improvements that the redesign actually lacks."* The first two are right. **The third describes an empty set**, verified:
+A corrective path proposed keeping the pre-redesign commits as a backup, treating `codex/studio-integration` as the UI source of truth, and _"bringing across only the newer runtime/OpenRouter/media improvements that the redesign actually lacks."_ The first two are right. **The third describes an empty set**, verified:
 
 - `2002defe9 fix(creative-studio): make OpenRouter video generation work end-to-end` — its three changes are all already on our branch: the `silentOutput` exception for `openrouter-video-v1` (with a near-verbatim comment), `openrouter-video-v1` added to `ADAPTER_IDS`, and the Happy-Eyeballs `lookupOptions.all` DNS-pin fix in `remoteMediaDownloader`. Both lines converged on identical solutions.
-- Their commit subjects describe the *same* features ours has — "add OpenRouter video generation adapter", "register weprompt-studio protocol and studio runtime lifecycle", "port creative studio process service and remote-media" — i.e. parallel duplicate work, not newer work.
+- Their commit subjects describe the _same_ features ours has — "add OpenRouter video generation adapter", "register weprompt-studio protocol and studio runtime lifecycle", "port creative studio process service and remote-media" — i.e. parallel duplicate work, not newer work.
 - A directional diff over `creative-studio/`, `remote-media/` and `creativeStudioTypes.ts` yields 174 lines present in theirs and absent from ours, and they are **type shapes ours evolved past**, not improvements. Example: `cancellation`. Ours carries 7 cancellation-related declarations against their 2 — `cancellationPolicy`, `canCancel`, and an explicit reference to their `cancellation` flag — so ours is the superset.
 
 **Do not run a cherry-pick pass looking for that set.** Beyond wasting effort, porting their older type shapes onto our newer ones would be a regression.
@@ -56,7 +56,7 @@ A corrective path proposed keeping the pre-redesign commits as a backup, treatin
 
 ## 4. Recommendation
 
-Rebuild `creative-suite-sprint2` on **our** UI and service layer, keeping their line as the donor for anything genuinely theirs. Rationale: it matches the approved prototype, carries three completed fidelity passes, has live-verified image *and* video generation against real paid calls, brings 17 more test files, and is the codebase every next-phase spec has been verified against.
+Rebuild `creative-suite-sprint2` on **our** UI and service layer, keeping their line as the donor for anything genuinely theirs. Rationale: it matches the approved prototype, carries three completed fidelity passes, has live-verified image _and_ video generation against real paid calls, brings 17 more test files, and is the codebase every next-phase spec has been verified against.
 
 The service layers are 86–99% similar, so this is not discarding their engine work — the divergence is concentrated in the UI, where ours is the redesign.
 
@@ -64,7 +64,7 @@ The service layers are 86–99% similar, so this is not discarding their engine 
 
 Each checkpoint ends with something you can run. Gates are `bunx tsc --noEmit`, `bun run test`, `node scripts/check-i18n.js` unless stated.
 
-### Checkpoint 0 — decide the base *(no code)*
+### Checkpoint 0 — decide the base _(no code)_
 
 Confirm §4, or choose the pre-redesign base instead. If the latter, the three next-phase specs need re-verification before they can be planned from — say so and I will scope that separately.
 
@@ -100,7 +100,7 @@ Merge `sprint2` into the branch early rather than waiting. Establishes the caden
 
 **You test:** nothing visual — app still launches, gates green.
 
-### Checkpoint 5 — cut model foundation *(schema only)*
+### Checkpoint 5 — cut model foundation _(schema only)_
 
 `cuts`/`activeCutId`, validation, the widened fractional-duration validators, and the main-side canonical-take predicate. No editor UI.
 

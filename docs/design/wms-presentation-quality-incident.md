@@ -243,11 +243,11 @@ recommendations above; where they differ, the addendum is the adopted scope.
 
 ### Relationship to BUG-003 (stays closed)
 
-BUG-003 (closed by MR !47) gates the *corruption* class: malformed OOXML fails
+BUG-003 (closed by MR !47) gates the _corruption_ class: malformed OOXML fails
 `officecli validate` inside `OfficeArtifactService`, delivery fails closed, and
 staged copies protect the last valid revision. The deck in this incident is
 structurally valid, so that gate correctly passes it. This incident defines the
-*adjacent* class — grounding, composition, and rendered QA — and is a new epic,
+_adjacent_ class — grounding, composition, and rendered QA — and is a new epic,
 not a regression or reopening of BUG-003.
 
 ### Corrected framing of the routing gap
@@ -297,12 +297,12 @@ attached. The canonical router must branch:
 
 ### Adopted Sprint 2 slicing
 
-| Slice | Outcome |
-| --- | --- |
-| 2A — Immediate containment | Block failed extraction, literal escapes, unresolved placeholders, and delivery without render evidence |
-| 2B — Canonical orchestration | Route all PPTX intent through a shared artifact contract, with template and no-template branches |
-| 2C — Visual-quality loop | Render audit, named defect report, bounded repair, latency/cost controls |
-| 2D — Completion semantics | Show generated, grounded, validated, rendered, reviewed, and delivery-ready as distinct states |
+| Slice                        | Outcome                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 2A — Immediate containment   | Block failed extraction, literal escapes, unresolved placeholders, and delivery without render evidence |
+| 2B — Canonical orchestration | Route all PPTX intent through a shared artifact contract, with template and no-template branches        |
+| 2C — Visual-quality loop     | Render audit, named defect report, bounded repair, latency/cost controls                                |
+| 2D — Completion semantics    | Show generated, grounded, validated, rendered, reviewed, and delivery-ready as distinct states          |
 
 2A ships first to protect users while 2C is designed properly. The incident is
 model-agnostic — Kimi is the reproducer, not the issue definition. Backlog:

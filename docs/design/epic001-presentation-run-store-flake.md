@@ -34,10 +34,10 @@ Any future branch that grows the suite by a similar amount will hit the same wal
 
 ## Evidence
 
-| Tree | Files / tests | Result |
-| --- | --- | --- |
-| `origin/sprint2` (pristine, `07424fdfe`) | 545 / 5,373 | **green** |
-| `creative-suite-sprint2` back-merge | 601 / 6,959 | **1 failure** — this test |
+| Tree                                     | Files / tests | Result                    |
+| ---------------------------------------- | ------------- | ------------------------- |
+| `origin/sprint2` (pristine, `07424fdfe`) | 545 / 5,373   | **green**                 |
+| `creative-suite-sprint2` back-merge      | 601 / 6,959   | **1 failure** — this test |
 
 Failure output:
 
@@ -48,7 +48,7 @@ Error: ENOTEMPTY: directory not empty, rmdir
    tombstone-before-manifest-directory-fsync-1/system-temp'
 ```
 
-Reproduced twice on the merged branch. Passes in isolation on that same branch, and passes under a *smaller* suite — which is what identifies it as budget-related rather than a logic conflict with the incoming changes.
+Reproduced twice on the merged branch. Passes in isolation on that same branch, and passes under a _smaller_ suite — which is what identifies it as budget-related rather than a logic conflict with the incoming changes.
 
 ## Diagnosis
 

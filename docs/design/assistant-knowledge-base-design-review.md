@@ -3,7 +3,7 @@
 **Date:** 2026-08-05
 **Status:** approved direction; contract amendments required before implementation planning
 **Reviewed against:** `origin/sprint2` at `343b725c4f4675651a1eb61b725463cb33bd9ac0`
-**Source:** *Assistant Knowledge Base — Design Spec* dated 2026-08-04
+**Source:** _Assistant Knowledge Base — Design Spec_ dated 2026-08-04
 
 ## Verdict
 
@@ -76,9 +76,7 @@ Evidence:
 Required correction:
 
 ```ts
-type KnowledgeScope =
-  | { kind: 'project'; id: string }
-  | { kind: 'assistant'; id: string };
+type KnowledgeScope = { kind: 'project'; id: string } | { kind: 'assistant'; id: string };
 
 type KnowledgeTarget =
   | { scope: { kind: 'project'; id: string }; workspace: string }
@@ -265,13 +263,13 @@ Evidence:
 
 Required state machine:
 
-| Event | Binding | Watch and sync | Index | Documents | Existing conversations |
-| --- | --- | --- | --- | --- | --- |
-| Enable succeeds | enabled | ensure folder, catch-up sync, watch | create/update | create or retain | unchanged |
-| Enable fails | disabled/unchanged | none | retain | retain | unchanged |
-| Disable | disabled | unwatch; start no new ingestion | retain | retain | unchanged |
-| Delete assistant | remove or cleanup tombstone | unwatch | remove with retry | retain | unchanged |
-| Re-enable | enabled | one catch-up sync, then watch | resume/update | retain | unchanged |
+| Event            | Binding                     | Watch and sync                      | Index             | Documents        | Existing conversations |
+| ---------------- | --------------------------- | ----------------------------------- | ----------------- | ---------------- | ---------------------- |
+| Enable succeeds  | enabled                     | ensure folder, catch-up sync, watch | create/update     | create or retain | unchanged              |
+| Enable fails     | disabled/unchanged          | none                                | retain            | retain           | unchanged              |
+| Disable          | disabled                    | unwatch; start no new ingestion     | retain            | retain           | unchanged              |
+| Delete assistant | remove or cleanup tombstone | unwatch                             | remove with retry | retain           | unchanged              |
+| Re-enable        | enabled                     | one catch-up sync, then watch       | resume/update     | retain           | unchanged              |
 
 Main should track desired watch state or a generation token so an older sync cannot reattach a
 disabled watcher. In-flight OCR/embedding behavior must also be stated: ideally cancel it; if
@@ -282,14 +280,14 @@ cancellation is unavailable, allow the active unit to finish but start no new wo
 The implementation plan must explicitly cover every persisted assistant source and lifecycle
 state:
 
-| State or source | Required v1 behavior |
-| --- | --- |
-| Unsaved assistant | Hide or disable the KB section with “Create the assistant first” |
-| Existing user assistant | Supported |
-| Builtin assistant | Supported only after stable owner identity is guaranteed |
-| Generated CLI assistant | Explicitly support or explicitly exclude |
-| Duplicate | New assistant starts disabled; no documents or binding copied |
-| Import or share | Starts disabled; no documents or binding imported |
+| State or source               | Required v1 behavior                                              |
+| ----------------------------- | ----------------------------------------------------------------- |
+| Unsaved assistant             | Hide or disable the KB section with “Create the assistant first”  |
+| Existing user assistant       | Supported                                                         |
+| Builtin assistant             | Supported only after stable owner identity is guaranteed          |
+| Generated CLI assistant       | Explicitly support or explicitly exclude                          |
+| Duplicate                     | New assistant starts disabled; no documents or binding copied     |
+| Import or share               | Starts disabled; no documents or binding imported                 |
 | Retired/disappeared assistant | Preserve documents; remove index only through safe reconciliation |
 
 Backend assistant IDs are not yet a proven immutable filesystem identity. Imported assistants

@@ -11,7 +11,7 @@
 > - **The question — append vs hold outside: take the alternative**, scoped to `orderMode === 'manual'` only. Storyboard mode still inserts at the `sceneOrder` slot with no group and no marker.
 > - **Our objection 2 was wrong, on the designer's own drawing.** We argued hold-outside breaks the contract that the cut eventually contains every renderable shot. Cut state 1 already renders a takeless scene as a hatched `SLATE` — a storyboard shot with no clip in the cut. That contract was already gone; hold-outside is the same fact in the one mode with no slot to hold it.
 > - **What decided it against the marker** was §2a·2: a batch finishing overnight is the ordinary case, and three clips appended in storyboard sequence to the tail of a hand-made order read as corruption. One aggregated count is thin cover.
-> - **`Undo the move`: dropped, no objection**, and explicitly do *not* scope the bounded order-only undo we offered as a fallback. The flip is not destructive — the user gained an order and lost nothing — so the way back belongs in the copy, not in a control: *"Change above puts it back."*
+> - **`Undo the move`: dropped, no objection**, and explicitly do _not_ scope the bounded order-only undo we offered as a fallback. The flip is not destructive — the user gained an order and lost nothing — so the way back belongs in the copy, not in a control: _"Change above puts it back."_
 > - **`CHOSEN FOR YOU`: confirmed** as the right fix, no design change.
 >
 > Net effect: `EPIC-005-G2` dissolved and `G3` closed by deletion, both without schema. Only `G1` (provenance) remains to build.
@@ -44,7 +44,7 @@ in a "not in the cut yet" group, and the user places it.
 
 What makes this interesting is that it needs **no new stored state**. "Has a canonical take, has no
 clip in the cut" is already derivable from what we store. There is no marker to persist, nothing to
-mark seen, and no question about when the notice expires — the group *is* the notice, and it is still
+mark seen, and no question about when the notice expires — the group _is_ the notice, and it is still
 there tomorrow, and the day after.
 
 It also means a hand-ordered cut is never modified without the user, which sits well with the
@@ -69,7 +69,7 @@ Three honest reasons it is not obviously better:
 - Which would you have drawn, knowing the `NEW · WAS 04` marker costs a new persisted field and a
   mark-seen mutation, and the alternative costs nothing?
 - **If you keep the append** (entirely reasonable — the cost is real but small): should the marker
-  clear on *any* cut edit, or only on explicit acknowledgement via `Jump to it`? Your spec says "when
+  clear on _any_ cut edit, or only on explicit acknowledgement via `Jump to it`? Your spec says "when
   the user next touches the cut, or on `Jump to it`", and we want to be sure "touches" includes
   editing an unrelated clip's trim.
 
@@ -86,7 +86,7 @@ cannot tell them apart. We are adding per-role provenance so the chip can be hon
 ### Cut state 2 — `Undo the move`: we are dropping it, and would welcome an objection
 
 There is no undo anywhere in the Studio, and a partial one — restoring clip order but not trims,
-crops or filters — seemed worse than none, since an undo that restores *some* of your work is a trap.
+crops or filters — seemed worse than none, since an undo that restores _some_ of your work is a trap.
 
 So we plan to drop the `Undo the move` action and the re-sync line that leans on undo catching a
 mistake "for the length of the session". Our reasoning: a mis-drag is recovered by dragging back,

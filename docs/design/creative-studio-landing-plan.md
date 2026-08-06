@@ -17,7 +17,7 @@
 >
 > **Working shape:** develop on `creative-suite-sprint2`; back-merge `sprint2` periodically to stay current; land into `sprint2` when the epic's acceptance bar is met. As of 2026-08-06 the branch is 141 ahead of `origin/sprint2` and 0 behind, with the full suite green (7,286 passed).
 >
-> **What is stale in this document:** §3, §4 and §9 describe a five-MR sequence landing *directly* into `sprint2`. That is not the shape — substitute the working shape above. `TASKS.md` EPIC-005 should have its "plan-of-record conflict — merge hold" note retired, since the conflict it records is resolved.
+> **What is stale in this document:** §3, §4 and §9 describe a five-MR sequence landing _directly_ into `sprint2`. That is not the shape — substitute the working shape above. `TASKS.md` EPIC-005 should have its "plan-of-record conflict — merge hold" note retired, since the conflict it records is resolved.
 >
 > **What still holds:** the defect findings and the acceptance bar. §6 (concurrency premise, the false audio claim, the cost-estimate contract) and §7 (visual acceptance, poster frames) are properties of the code, not of the target branch.
 >
@@ -41,14 +41,14 @@ This document defines how it lands, what must be true before it becomes user-vis
 
 Measured against the merge base (`54cfef7a7`), before reconstruction:
 
-| | |
-| --- | --- |
-| Files changed | 241 |
-| Source, excluding locales and `.d.ts` | 24,463 lines |
-| Tests | 34,500 lines across 78 files |
-| Locale JSON | 5,574 lines across 12 languages |
-| Commits (non-merge) | 102 |
-| Real merge conflicts against `origin/sprint2` | 1 |
+|                                               |                                 |
+| --------------------------------------------- | ------------------------------- |
+| Files changed                                 | 241                             |
+| Source, excluding locales and `.d.ts`         | 24,463 lines                    |
+| Tests                                         | 34,500 lines across 78 files    |
+| Locale JSON                                   | 5,574 lines across 12 languages |
+| Commits (non-merge)                           | 102                             |
+| Real merge conflicts against `origin/sprint2` | 1                               |
 
 **[rev 2] Test volume is not coverage.** Rev 1 argued from a 1.41:1 test-to-source line ratio that the pinned coverage floor was low-risk. That is a proxy, not a measurement — line counts say nothing about which branches execute. The floor (`statements 54, branches 50, functions 50, lines 55`) must be verified by running `bun run test:coverage` on the reconstructed branch. Note `just push` runs `test`, not `test:coverage`, so this is a deliberate manual step, not something the push gate will catch.
 
@@ -112,13 +112,13 @@ Counts in this section are approximate: the partitions come from path globs that
 - **Pre-push, on the archived tip:** the five lenses below, over the whole body of work.
 - **Per MR, on the final diff:** a focused review of what that MR actually contains — mandatory for MR 4, which carries every guardrail.
 
-| Lens | Scope |
-| --- | --- |
-| 1. Process boundary & contract | No DOM APIs in `process/`, no Node APIs in `renderer/`, cross-process traffic only through the IPC bridge, snake_case mappers on every binding |
-| 2. Security | Downloader SSRF defences, protocol-handler path containment, provider secret handling, the `silentOutput` gate and its single exception, **both halves of the feature flag** |
-| 3. State & concurrency | CAS/revision guards, job lifecycle transitions, duplicate-charge protection, poll backoff, cancellation, semaphore accounting |
-| 4. i18n & accessibility | 12-locale completeness, **real i18next plural behaviour at counts 1, 2 and 5** (not key presence), no hardcoded user-facing strings, keyboard reachability, no raw interactive HTML |
-| 5. Test-assertion strength | Do the tests assert behaviour, or shape? |
+| Lens                           | Scope                                                                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Process boundary & contract | No DOM APIs in `process/`, no Node APIs in `renderer/`, cross-process traffic only through the IPC bridge, snake_case mappers on every binding                                      |
+| 2. Security                    | Downloader SSRF defences, protocol-handler path containment, provider secret handling, the `silentOutput` gate and its single exception, **both halves of the feature flag**        |
+| 3. State & concurrency         | CAS/revision guards, job lifecycle transitions, duplicate-charge protection, poll backoff, cancellation, semaphore accounting                                                       |
+| 4. i18n & accessibility        | 12-locale completeness, **real i18next plural behaviour at counts 1, 2 and 5** (not key presence), no hardcoded user-facing strings, keyboard reachability, no raw interactive HTML |
+| 5. Test-assertion strength     | Do the tests assert behaviour, or shape?                                                                                                                                            |
 
 Lens 5 is required, not optional. Two vacuous-test classes were found in this branch on 2026-08-05 alone: assertions on `element.style.*` for styling that lives in a CSS module, which pass while the rendered pixel is wrong because jsdom applies no stylesheet; and `vi.spyOn(window.localStorage, …)`, which silently no-ops because `Storage` is a Proxy, so injected-failure tests pass without exercising the failure. Lens 5 samples the highest-value suites — job lifecycle, downloader, store guards — and reports which assertions would survive deliberately breaking the implementation.
 
@@ -158,7 +158,7 @@ Enforced in `jobManager` in the main process. The renderer may reflect the cap; 
 
 The catalog is correct: `providerResolver.ts:131` sets `silentOutput: !spec.supportsAudio`, every OpenRouter video spec declares `supportsAudio: true`, and the gate admits those routes through its documented `openrouter-video-v1` exception. The adapter then sends `generate_audio: true`.
 
-The defect is the copy. `conversation.creativeStudio.review.audioOff` — *"Silent output; audio generation disabled"* — renders **unconditionally** at `GenerationReviewModal.tsx:237`. A paid-action confirmation dialog asserts silence while the app requests and pays for audio.
+The defect is the copy. `conversation.creativeStudio.review.audioOff` — _"Silent output; audio generation disabled"_ — renders **unconditionally** at `GenerationReviewModal.tsx:237`. A paid-action confirmation dialog asserts silence while the app requests and pays for audio.
 
 **Decision: keep audio, fix the claim.** Gate the alert on `route.constraints.silentOutput` and state that audio is included when it is not. Disabling audio was considered and rejected: it would remove a capability just verified working in order to fix a copy bug. Consequence: the cost estimate in §6.3 must account for audio where a route generates it.
 
@@ -201,7 +201,7 @@ Verified 2026-08-05 against the real paid render (1280×720, 5.085s): the render
 
 Three constraints this method carries, none of them blocking:
 
-- Capture happens in the **renderer**, but ingestion is main-process and guarded by `validateProviderPosterLineage`, which exists to validate *provider* posters. Renderer-supplied bytes inverts that trust direction and needs its own equally-strict path — **do not loosen the provider lineage check to accommodate it.**
+- Capture happens in the **renderer**, but ingestion is main-process and guarded by `validateProviderPosterLineage`, which exists to validate _provider_ posters. Renderer-supplied bytes inverts that trust direction and needs its own equally-strict path — **do not loosen the provider lineage check to accommodate it.**
 - It needs a live renderer that can load and seek, so a poster appears when the UI first shows the shot rather than at render time. State the expectation in the UI rather than implying instant availability.
 - It decoded this H.264 MP4; another provider or codec may not. The designed "video ready" fallback stays required for that case.
 
@@ -227,14 +227,14 @@ Parallel is safe because Studio never touches the one serial resource in this re
 
 Parallel means **parallel merging, not parallel priority**. Studio is P2; BUG-013 is P0.
 
-| Shared path | Studio MR | Collides with | Nature |
-| --- | --- | --- | --- |
-| `appOperations/contextCompactTask.ts` | MR 0 (renames dir) | context/compaction work, EPIC-001 | modify/delete |
-| `services/autoUpdaterService.ts` | MR 0 (renames) | BUG-013 packaging | modify/delete |
-| `ModelModalContent` | MR 0 (splits) | EPIC-003 R2, BUG-018 | structural |
-| `Sider/**` | MR 4 | BUG-019 | direct overlap |
-| `ipcBridge.ts` | MR 1 | BUG-015 | additive; known hotspot |
-| locale JSON ×12 | MR 3 | every stream | mitigated **only if** §3 step 3 has run |
+| Shared path                           | Studio MR          | Collides with                     | Nature                                  |
+| ------------------------------------- | ------------------ | --------------------------------- | --------------------------------------- |
+| `appOperations/contextCompactTask.ts` | MR 0 (renames dir) | context/compaction work, EPIC-001 | modify/delete                           |
+| `services/autoUpdaterService.ts`      | MR 0 (renames)     | BUG-013 packaging                 | modify/delete                           |
+| `ModelModalContent`                   | MR 0 (splits)      | EPIC-003 R2, BUG-018              | structural                              |
+| `Sider/**`                            | MR 4               | BUG-019                           | direct overlap                          |
+| `ipcBridge.ts`                        | MR 1               | BUG-015                           | additive; known hotspot                 |
+| locale JSON ×12                       | MR 3               | every stream                      | mitigated **only if** §3 step 3 has run |
 
 **MR 0 is urgent rather than merely first.** Renames are the only change here that turns another stream's ordinary edit into a conflict, and two of the three renamed areas are ones sprint-2 work is likely to touch: `contextCompactTask.ts` sits inside a renamed directory, and EPIC-003 R2 explicitly instructs reuse of the model selectors MR 0 splits.
 
@@ -242,16 +242,16 @@ MR 4 and BUG-019 both change the sidebar; whoever lands second rebases. Flag it 
 
 ## 10. Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Reconstruction drops work | Archive ref is immutable; verify by comparing the reconstructed tree to `refs/archive/studio-integration-2026-08-05` — trees must match exactly |
-| `sprint2` touches a pre-rename path before MR 0 | Land MR 0 first, immediately |
-| Locale merges hand-conflict | §3 step 3, proven with `git check-attr` |
-| A 65k-line branch merges without real review | Pre-push lenses plus per-MR final-diff review (§5) |
-| Vacuous tests give false confidence | Lens 5 probes assertion strength; coverage measured by the gate, not inferred from line counts |
-| Flag enforced in one process only | Lens 2 explicitly checks both halves |
-| Users charged for audio they were told was absent | §6.2 blocks MR 4 |
-| Paid render looks broken | §7 poster frames block MR 4 |
+| Risk                                              | Mitigation                                                                                                                                      |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reconstruction drops work                         | Archive ref is immutable; verify by comparing the reconstructed tree to `refs/archive/studio-integration-2026-08-05` — trees must match exactly |
+| `sprint2` touches a pre-rename path before MR 0   | Land MR 0 first, immediately                                                                                                                    |
+| Locale merges hand-conflict                       | §3 step 3, proven with `git check-attr`                                                                                                         |
+| A 65k-line branch merges without real review      | Pre-push lenses plus per-MR final-diff review (§5)                                                                                              |
+| Vacuous tests give false confidence               | Lens 5 probes assertion strength; coverage measured by the gate, not inferred from line counts                                                  |
+| Flag enforced in one process only                 | Lens 2 explicitly checks both halves                                                                                                            |
+| Users charged for audio they were told was absent | §6.2 blocks MR 4                                                                                                                                |
+| Paid render looks broken                          | §7 poster frames block MR 4                                                                                                                     |
 
 ## 11. Decisions
 

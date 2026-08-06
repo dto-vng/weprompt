@@ -8,7 +8,7 @@
 
 ## 1. Why this exists before the renderer
 
-The product decision is that a finished Studio project produces a playable video, which needs crop, trim, concat, filter and encode. *How* that render happens is unresolved: `docs/design/creative-studio-video-capability-spike.md` weighs a bundled ffmpeg against WebCodecs, gated on a licensing answer that can veto the leading candidate.
+The product decision is that a finished Studio project produces a playable video, which needs crop, trim, concat, filter and encode. _How_ that render happens is unresolved: `docs/design/creative-studio-video-capability-spike.md` weighs a bundled ffmpeg against WebCodecs, gated on a licensing answer that can veto the leading candidate.
 
 The edit decisions themselves are required by **every** candidate. Crop rectangles, filter parameters, clip order and in/out points have to be stored as non-destructive project metadata no matter who consumes them. So this model can be designed and built now, and it is the one part of the Review editor that cannot become wasted work.
 
@@ -20,7 +20,7 @@ The project holds `sceneOrder: string[]` and `scenes: Record<string, StudioScene
 
 Review offers `StagePreview`, `AssetStrip` for choosing a take, and `SceneTimeline` for order and duration. Nothing is editable beyond take selection.
 
-**[rev 2] Hand-off is richer than rev 1 claimed.** Rev 1 said it writes loose `{ assetId, fileName }` pairs with no ordering or timing. The renderer *result* is indeed those pairs (`creativeStudioTypes.ts:536`), but the exported folder is not bare: assets are traversed in `sceneOrder` with filenames encoding scene position (`mediaStore.ts:1296`), a `storyboard.json` carries `sceneOrder`, every scene's `durationSeconds`, aspect ratio, resolution and brief (`mediaStore.ts:1340`), and references are exported alongside. What it lacks is **non-destructive crop/trim/filter edit decisions** — which is still exactly the gap this model fills, but implementers should start from the correct baseline.
+**[rev 2] Hand-off is richer than rev 1 claimed.** Rev 1 said it writes loose `{ assetId, fileName }` pairs with no ordering or timing. The renderer _result_ is indeed those pairs (`creativeStudioTypes.ts:536`), but the exported folder is not bare: assets are traversed in `sceneOrder` with filenames encoding scene position (`mediaStore.ts:1296`), a `storyboard.json` carries `sceneOrder`, every scene's `durationSeconds`, aspect ratio, resolution and brief (`mediaStore.ts:1340`), and references are exported alongside. What it lacks is **non-destructive crop/trim/filter edit decisions** — which is still exactly the gap this model fills, but implementers should start from the correct baseline.
 
 `StudioAsset` carries optional `width`, `height` and `durationSeconds` — populated from provider-reported metadata, so present sometimes and absent others.
 
@@ -50,7 +50,7 @@ StudioCutClip: {
 }
 ```
 
-**The schema permits N clips per scene from the first commit; the v1 UI creates exactly one.** This is deliberate. Splitting a shot, or using one take twice, is a plausible near-future request, and allowing it in the schema now costs nothing while retrofitting it later would be a migration. Constraining the *UI* to 1:1 keeps v1 honest and simple.
+**The schema permits N clips per scene from the first commit; the v1 UI creates exactly one.** This is deliberate. Splitting a shot, or using one take twice, is a plausible near-future request, and allowing it in the schema now costs nothing while retrofitting it later would be a migration. Constraining the _UI_ to 1:1 keeps v1 honest and simple.
 
 **The same principle applies one level up: the schema holds a map of cuts, and v1 creates exactly one.** Alternate versions of a cut are a plausible ask, and a singular `cut` field would foreclose them behind a migration. A map plus `activeCutId` costs one indirection now. The v1 UI never surfaces cut management — there is always one cut, named by default — but the shape does not have to change when it does.
 
@@ -58,26 +58,26 @@ StudioCutClip: {
 
 ## 4. Relationship to the storyboard
 
-**The storyboard stays authoritative for structure.** Shots, their intent, and their intended durations are what the user writes and what generation consumes. The cut is a *projection* of it: initialised one-to-one from `sceneOrder` and each scene's `selectedAssetId`, then independently editable.
+**The storyboard stays authoritative for structure.** Shots, their intent, and their intended durations are what the user writes and what generation consumes. The cut is a _projection_ of it: initialised one-to-one from `sceneOrder` and each scene's `selectedAssetId`, then independently editable.
 
 Consequences that must be handled explicitly rather than discovered:
 
 - A scene with no selected take produces **no clip**. It appears in the storyboard and in Review's slate treatment, and is simply absent from the cut — consistent with today's export behaviour, where unrendered scenes are reported as `missingSceneIds`.
 - Changing a scene's selected take updates the corresponding clip's `assetId` and **preserves crop and filters**, because those express the user's framing intent rather than a property of the take.
-- **[rev 2] Trim cannot simply be preserved.** Rev 1 required preserving trim across a take change *and* rejecting trim beyond a known asset duration — impossible when the replacement take is shorter. **Resolution: clamp.** When the new asset's `durationSeconds` is known, clamp `sourceOut` to it; if `sourceIn` itself exceeds the new duration, reset the trim to the full clip rather than producing an empty one. When duration is unknown, keep the trim and clamp at render time (§8).
+- **[rev 2] Trim cannot simply be preserved.** Rev 1 required preserving trim across a take change _and_ rejecting trim beyond a known asset duration — impossible when the replacement take is shorter. **Resolution: clamp.** When the new asset's `durationSeconds` is known, clamp `sourceOut` to it; if `sourceIn` itself exceeds the new duration, reset the trim to the full clip rather than producing an empty one. When duration is unknown, keep the trim and clamp at render time (§8).
 - Reordering shots in the storyboard reorders the cut, **unless** the cut has diverged. Divergence must be a visible state, not an invisible one.
-- **[rev 2] "Hand-ordered" needs an explicit flag.** Structural inequality detects a *current* mismatch, but not intent: a manually reordered cut that later happens to match the storyboard is indistinguishable from one that simply follows it. Since §4 promises to preserve user intent, add **`orderMode: 'storyboard' | 'manual'`** to `StudioCut`. Manual is set the first time a user reorders the cut directly, and only the user can return it to `storyboard`.
+- **[rev 2] "Hand-ordered" needs an explicit flag.** Structural inequality detects a _current_ mismatch, but not intent: a manually reordered cut that later happens to match the storyboard is indistinguishable from one that simply follows it. Since §4 promises to preserve user intent, add **`orderMode: 'storyboard' | 'manual'`** to `StudioCut`. Manual is set the first time a user reorders the cut directly, and only the user can return it to `storyboard`.
 - Deleting a scene removes its clips.
-- ~~**[rev 6] A scene that gains a canonical take *after* the cut went manual is appended**~~ **Superseded — see rev 7 below.**
+- ~~**[rev 6] A scene that gains a canonical take _after_ the cut went manual is appended**~~ **Superseded — see rev 7 below.**
 - **[rev 7] A scene that gains a canonical take while the cut is `manual` is NOT added to the cut at all.** It is held outside it, in a derived "Not in the cut yet" group, and the user places it. A cut in `storyboard` mode is unchanged: a new take lands at its `sceneOrder` slot, with no group and no marker. Decided with the designer 2026-08-06, superseding both rev 6's append and the `NEW · WAS 04` marker drawn in the design response.
 
-  **Why it beat appending, in the designer's words:** the cut *already* does not contain every shot — a scene with no selected take renders as a hatched `SLATE`, which is a storyboard shot with no clip in the cut. Held-outside is that same fact in the one mode that has no slot to hold it, so it is not a new contract. A marker answers "why is shot 4 last"; the group means the question never arises, because shot 4 is not last — it is unplaced.
+  **Why it beat appending, in the designer's words:** the cut _already_ does not contain every shot — a scene with no selected take renders as a hatched `SLATE`, which is a storyboard shot with no clip in the cut. Held-outside is that same fact in the one mode that has no slot to hold it, so it is not a new contract. A marker answers "why is shot 4 last"; the group means the question never arises, because shot 4 is not last — it is unplaced.
 
   **The state that killed the marker** is the ordinary one, not an edge case: a batch finishing overnight appends three clips in storyboard sequence to the tail of a hand-made order, where they read as corruption, and a single aggregated count pointing at the first is thin cover.
 
   **Nothing here is persisted.** The group is derived exactly while a scene has a canonical take and no clip — so there is no seen state, no expiry, and no definition of "touched the cut" to get wrong. This removes the durable per-clip acknowledgement state the marker would have required (`EPIC-005-G2`, now dissolved rather than built).
 
-  **The cost is paid at export**, deliberately: a non-blocking line — *"Export 0:24 — 3 shots are not in the cut"* — naming the shots, offering *Place them first* or *Export anyway*, derived from stored state and suppressed entirely when the group is empty.
+  **The cost is paid at export**, deliberately: a non-blocking line — _"Export 0:24 — 3 shots are not in the cut"_ — naming the shots, offering _Place them first_ or _Export anyway_, derived from stored state and suppressed entirely when the group is empty.
 
 ## 5. Renderer neutrality: coordinates and filters
 
@@ -101,7 +101,7 @@ Every v1 filter is a linear or affine per-pixel operation, so the four scalars d
 
 - **Canvas backend:** one SVG `feColorMatrix` referenced through `ctx.filter = 'url(#…)'`.
 - **ffmpeg backend:** one `colorchannelmixer` with offsets — a core LGPL filter, no GPL dependency.
-- **Conformance:** assert the *derived matrix* is identical across backends, then golden pixels as a second net (§9).
+- **Conformance:** assert the _derived matrix_ is identical across backends, then golden pixels as a second net (§9).
 - **Identity is free and testable:** all four at default produce the identity matrix, which the renderer must skip entirely.
 
 ### Colour space and semantics
@@ -110,12 +110,12 @@ Operations apply in **sRGB (gamma-encoded) space, not linear light**, and clamp 
 
 The formulas below match measured Chromium `ctx.filter` behaviour, verified 2026-08-05 on pixel `(128, 64, 32)`: `brightness(1.5)` → `(192, 96, 48)` (linear multiply), `contrast(1.5)` → `(128, 32, 0)` (affine about 0.5, clamped), `saturate(0)` → `(75, 75, 75)` (Rec.709 luma). Normalised channel values `x ∈ [0,1]`, parameter `a ∈ [-1,1]`:
 
-| Filter | Formula |
-| --- | --- |
-| `exposure` | `x' = x × (1 + a)` |
-| `contrast` | `x' = (x − 0.5) × (1 + a) + 0.5` |
-| `saturation` | `x' = L + (x − L) × (1 + a)`, where `L = 0.2126R + 0.7152G + 0.0722B` |
-| `temperature` | `R' = R × (1 + 0.2a)`, `B' = B × (1 − 0.2a)`, `G` unchanged |
+| Filter        | Formula                                                               |
+| ------------- | --------------------------------------------------------------------- |
+| `exposure`    | `x' = x × (1 + a)`                                                    |
+| `contrast`    | `x' = (x − 0.5) × (1 + a) + 0.5`                                      |
+| `saturation`  | `x' = L + (x − L) × (1 + a)`, where `L = 0.2126R + 0.7152G + 0.0722B` |
+| `temperature` | `R' = R × (1 + 0.2a)`, `B' = B × (1 − 0.2a)`, `G` unchanged           |
 
 ### Composition order is fixed
 
@@ -148,11 +148,11 @@ Three reasons, in order of weight:
 **Frame snapping is pinned in the render contract, not left to each backend.** Unspecified rounding is the same class of trap as unspecified colour space, and would produce clips that differ by a frame between backends:
 
 - `sourceIn` selects the **first frame whose presentation time is ≥ `sourceIn`** (inclusive).
-- `sourceOut` is **exclusive**: the first frame whose presentation time is ≥ `sourceOut` is *not* included.
+- `sourceOut` is **exclusive**: the first frame whose presentation time is ≥ `sourceOut` is _not_ included.
 
 This makes output frame count deterministic for a given source, and makes concatenation gap-free. **[rev 5] Neither backend does this natively** — Chromium's seek floors while ffmpeg's accurate seek rounds up, measured in §5.2 — so the renderer path needs an explicit forward step. That divergence is the reason this rule is stated rather than assumed. Conformance asserts **identical frame counts** for the same trim across backends, alongside the colour-matrix and golden-pixel checks in §9.
 
-**No project frame rate is added.** Rev 2 flagged the missing `frameRate` field as a gap to fill, following the review's suggestion. That is the wrong home for it: the cut model has no use for one, and a *target output* frame rate is an encoder parameter belonging to the render contract. Adding it to `StudioProject` would create a field the cut never reads and that could drift from what the encoder actually does.
+**No project frame rate is added.** Rev 2 flagged the missing `frameRate` field as a gap to fill, following the review's suggestion. That is the wrong home for it: the cut model has no use for one, and a _target output_ frame rate is an encoder parameter belonging to the render contract. Adding it to `StudioProject` would create a field the cut never reads and that could drift from what the encoder actually does.
 
 **Decoded duration is authoritative; persisted duration is advisory.** Trim bounds are clamped at render time against the decoded duration. Stored `asset.durationSeconds` is a hint for UI and pre-validation only, never the arbiter.
 
@@ -162,7 +162,7 @@ This must be fixed before trim can work end to end, and it is a live trap indepe
 
 `mediaStore.ts:933` rejects a non-integer duration with `invalid_media` — it does not round it — and `store.ts:438` likewise requires `isIntegerInRange` for the asset field. Production adapters currently **omit** duration, which is the only reason this has never fired. **The moment any adapter is improved to report a true duration such as 5.085, persisting a successful paid render will throw.**
 
-Required: widen both validators to accept a finite positive number rather than a safe integer, keeping the upper bounds. Note that `StudioScene.durationSeconds` stays an integer in 1–60 (`store.ts:400`) — that is a *requested* duration driving generation and pacing, and is deliberately unaffected. The distinction to hold onto is that requested durations are integers while actual asset durations are not.
+Required: widen both validators to accept a finite positive number rather than a safe integer, keeping the upper bounds. Note that `StudioScene.durationSeconds` stays an integer in 1–60 (`store.ts:400`) — that is a _requested_ duration driving generation and pacing, and is deliberately unaffected. The distinction to hold onto is that requested durations are integers while actual asset durations are not.
 
 ### 5.2 [rev 5] The shared managed-video seam
 
@@ -170,18 +170,18 @@ Poster capture (landing plan §7) and frame-accurate trim both need renderer-sid
 
 **Shape.** A plain renderer-side module exposing a handle, with a thin React hook wrapper over it. Not hook-only: a trim scrubber and a poster capture routine both need it outside a component's render lifecycle.
 
-| Capability | Contract |
-| --- | --- |
+| Capability                 | Contract                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------- |
 | `open(projectId, assetId)` | Resolves on metadata; typed failures `not_found \| decode_unsupported \| load_failed` |
-| `metadata` | `{ durationSeconds, width, height }` — the **authoritative** duration per §5.1 |
-| `seekTo(seconds)` | Resolves with the **actual presented `mediaTime`**, not the requested time |
-| `stepFrame(±1)` | Required — see the snapping note below |
-| `captureFrame()` | Canvas / `ImageBitmap`, for posters and thumbnail strips |
-| `close()` | Releases the element and any object URLs |
+| `metadata`                 | `{ durationSeconds, width, height }` — the **authoritative** duration per §5.1        |
+| `seekTo(seconds)`          | Resolves with the **actual presented `mediaTime`**, not the requested time            |
+| `stepFrame(±1)`            | Required — see the snapping note below                                                |
+| `captureFrame()`           | Canvas / `ImageBitmap`, for posters and thumbnail strips                              |
+| `close()`                  | Releases the element and any object URLs                                              |
 
 **Measured facts this rests on** (verified 2026-08-05 against the real 1280×720 OpenRouter render):
 
-- `requestVideoFrameCallback` is available, and its `mediaTime` reports the true presentation time of the frame actually shown. This is the seam's most valuable capability: it lets the renderer report *which* frame it got rather than assuming it got the one requested.
+- `requestVideoFrameCallback` is available, and its `mediaTime` reports the true presentation time of the frame actually shown. This is the seam's most valuable capability: it lets the renderer report _which_ frame it got rather than assuming it got the one requested.
 - `video.duration` is `5.085011` — fractional, consistent with §5.1.
 
 **Snapping: neither backend satisfies §5.1 natively, in opposite directions.** Seeking to `4.99` returned `mediaTime 4.958333` — frame 119 of a 24fps clip, i.e. Chromium **floors** to the frame at or before the requested time. ffmpeg's accurate `-ss` instead yields frames with presentation time **≥** the timestamp. So:
@@ -203,7 +203,7 @@ That is an argument for ffmpeg-in-main that is **independent of licensing**, and
 
 **[rev 2] But there is no project-key allow-list, and rev 1's mechanism was wrong.** `validateProject` does not enumerate `Object.keys` at the project root — the exact-key sets apply to scenes, routing, assets, jobs and connections (`store.ts:216`, `:389`). Rev 1 mistook the **job** key set for a project one. Two consequences:
 
-- Optional fields *can* avoid a version bump, but **not** because a list needs extending. Nothing currently rejects a malformed `cuts` structure at the top level, so **dedicated cut validation is mandatory, not optional**, along with paired-presence rules for `cuts`/`activeCutId`.
+- Optional fields _can_ avoid a version bump, but **not** because a list needs extending. Nothing currently rejects a malformed `cuts` structure at the top level, so **dedicated cut validation is mandatory, not optional**, along with paired-presence rules for `cuts`/`activeCutId`.
 - The renderer projection is explicit (`creativeStudioService.ts:526`) and would **silently omit** a new optional field. `toRendererProject` needs explicit handling. Store mutations otherwise preserve extra fields by cloning (`store.ts:1046`).
 
 **[rev 2] Do not materialise a cut on first open.** Rev 1 said older projects "derive one on first entry to the editor" — that is a lazy migration and would bump the project revision just for opening a screen. Instead treat an absent cut as an **implicit pristine cut**, derived in memory, and persist it only on the first real cut mutation.
@@ -225,7 +225,7 @@ Once a clip is trimmed, the cut's real duration diverges from the storyboard's i
 ## 8. Validation
 
 - Every clip's `assetId` must be canonical for its `sceneId`. A clip may not reference a thumbnail, an import, or another scene's take.
-- **[rev 2] The predicate must be main-side, and existing selection is weaker than this rule.** `isCanonicalStudioSelectedAsset` is a **renderer** helper (`StagePreview.tsx:54`) and must not be depended on for a store invariant. Worse, main's `selectAsset` checks project, scene and media kind but **not** `managedAsset.collection === 'assets'` (`creativeStudioService.ts:1304`) — so a scene-owned *imported* image can already become `selectedAssetId`, which the cut rule forbids. Build **one main-safe canonical-take predicate** and use it for both `selectAsset` and cut validation, or the derived cut will be invalid for projects that exist today.
+- **[rev 2] The predicate must be main-side, and existing selection is weaker than this rule.** `isCanonicalStudioSelectedAsset` is a **renderer** helper (`StagePreview.tsx:54`) and must not be depended on for a store invariant. Worse, main's `selectAsset` checks project, scene and media kind but **not** `managedAsset.collection === 'assets'` (`creativeStudioService.ts:1304`) — so a scene-owned _imported_ image can already become `selectedAssetId`, which the cut rule forbids. Build **one main-safe canonical-take predicate** and use it for both `selectAsset` and cut validation, or the derived cut will be invalid for projects that exist today.
 - `clipOrder` must be a permutation of the keys of `clips`, with no duplicates and no dangling ids.
 - Crop rects must be within 0–1 with positive width and height.
 - Filter ids must be in the closed union; unknown ids are rejected before storage, not tolerated and skipped.
@@ -272,10 +272,11 @@ Schema room is left where noted, but none of this is built:
 ## 11. Open questions
 
 1. ~~**The v1 filter set.**~~ **[rev 3] Decided — see §5.** Four scalars (exposure, contrast, saturation, temperature), each `−1…1` default 0, composing to a single colour matrix in a fixed order, with formulas and golden pixels pinned to measured Chromium behaviour.
-2. ~~**Divergence UX.**~~ **[rev 7] Decided 2026-08-06 with the designer.** Divergence is stated once on the cut's order control and nowhere else — a chip whose *wording* changes, not its colour: `Follows the storyboard` → `Yours · edited by hand`, with `Change` reaching a previewed, destructive re-sync dialog that quotes a clip count rather than an adjective. Neutral throughout; not a warning. A one-time dismissible explanation appears at the flip, carrying the way back as a clause — *"Change above puts it back"* — rather than an action.
+2. ~~**Divergence UX.**~~ **[rev 7] Decided 2026-08-06 with the designer.** Divergence is stated once on the cut's order control and nowhere else — a chip whose _wording_ changes, not its colour: `Follows the storyboard` → `Yours · edited by hand`, with `Change` reaching a previewed, destructive re-sync dialog that quotes a clip count rather than an adjective. Neutral throughout; not a warning. A one-time dismissible explanation appears at the flip, carrying the way back as a clause — _"Change above puts it back"_ — rather than an action.
 
    **No undo.** `Undo the move` is dropped and a bounded order-only undo is explicitly **not** to be built: it would imply a safety net the Studio does not have, and a partial undo restoring order but not trims is a trap. The flip is not destructive — the user gained an order and lost nothing. The re-sync note that leaned on session undo goes with it; the dialog's clip count was always doing that work. (`EPIC-005-G3` closed by deletion, not implementation.)
 
    New scenes arriving into a manual cut are covered by §4 rev 7, not by a divergence marker.
+
 3. ~~**Trim timebase — seconds or frames.**~~ **[rev 4] Decided — see §5.1.** Seconds as a double, with frame snapping defined in the render contract. The cut model does not need a project frame rate.
-4. ~~**Who owns the shared managed-video seam.**~~ **[rev 5] Decided — see §5.2.** One owned renderer-side seam serving preview, poster capture and trim UI, with a measured snapping contract. Explicitly *not* the render substrate.
+4. ~~**Who owns the shared managed-video seam.**~~ **[rev 5] Decided — see §5.2.** One owned renderer-side seam serving preview, poster capture and trim UI, with a measured snapping contract. Explicitly _not_ the render substrate.

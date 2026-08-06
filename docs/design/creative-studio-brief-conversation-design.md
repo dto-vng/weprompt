@@ -11,7 +11,7 @@
 
 Brief is a form: project name, a one-sentence intent, target duration, aspect ratio. No conversation, no model.
 
-Script generation happens once, later, from Write: `planning/storyboardPlanner.ts` sends a single strict-JSON request — *"Return exactly one JSON object, without Markdown fences or commentary"* — and the result populates the shot table.
+Script generation happens once, later, from Write: `planning/storyboardPlanner.ts` sends a single strict-JSON request — _"Return exactly one JSON object, without Markdown fences or commentary"_ — and the result populates the shot table.
 
 The goal is for Brief to be where a user lands, talks to an assistant, and builds a script section by section, with the assistant able to read attached material and reference images rather than only writing from one sentence.
 
@@ -33,7 +33,7 @@ This is **P0 and a prerequisite**, not an implementation detail:
 
 ### 2.2 [rev 2] The server is a session descriptor, not a globally seeded builtin
 
-Rev 1 said Studio would be "a fifth builtin MCP server … seeded through `initStorage.ts`". Wrong on the mechanism: `initStorage.ts:381` explicitly *skips* MCP config initialisation. ImageGen, IDP and Vision are seeded through backend migrations (`runBackendMigrations.ts:356`), while **knowledge is constructed as a per-conversation session server** (`projectKnowledgeService.ts:921`).
+Rev 1 said Studio would be "a fifth builtin MCP server … seeded through `initStorage.ts`". Wrong on the mechanism: `initStorage.ts:381` explicitly _skips_ MCP config initialisation. ImageGen, IDP and Vision are seeded through backend migrations (`runBackendMigrations.ts:356`), while **knowledge is constructed as a per-conversation session server** (`projectKnowledgeService.ts:921`).
 
 Model Studio after **knowledge**, not after the globally seeded three: a session-only descriptor created during conversation creation. It also needs an explicit entry in the MCP bundle allow-list (`scripts/build-mcp-servers.js:28`) and packaged/unpacked entries — bundling is an allow-list, not automatic.
 
@@ -41,17 +41,17 @@ Scoping copies knowledge exactly: `KB_ENV` defines project/store/embedding keys 
 
 ## 3. The writer problem
 
-**[rev 2] The read-only claim was wrong.** Rev 1 said all four existing builtin servers are strictly read-only with zero writes. **imageGen writes** — its tool calls `executeImageGeneration` in `imageGenCore`, which persists generated files. Rev 1 measured the *server files* with a grep instead of following the call graph, which is why it missed this.
+**[rev 2] The read-only claim was wrong.** Rev 1 said all four existing builtin servers are strictly read-only with zero writes. **imageGen writes** — its tool calls `executeImageGeneration` in `imageGenCore`, which persists generated files. Rev 1 measured the _server files_ with a grep instead of following the call graph, which is why it missed this.
 
 The narrower claim that is actually true, and which still motivates the design: **no builtin MCP server mutates a CAS/revision-guarded project store.** That is the invariant worth protecting, because the Studio store is written by the main process on the renderer's behalf and two writers with no shared lock is a read-modify-write race — atomic temp-file-plus-rename gives atomicity, not mutual exclusion.
 
 **Decision, unchanged: tools propose; the user accepts; the main process is the only writer of project state.**
 
-**[rev 2] `StoryboardDraftModal` is not the precedent rev 1 claimed.** Rev 1 cited it twice as "exactly propose-then-accept". It is **confirm-then-generate-and-commit**: its confirmation calls `proposeStoryboard` immediately (`StoryboardDraftModal.tsx:91`) and the service CAS-writes the generated scenes straight into the project (`creativeStudioService.ts:891`). No generated draft is ever held for later acceptance. The modal is a useful pattern for *preflight confirmation and styling*; durable proposal cards and post-generation acceptance are **new behaviour** with no existing precedent in this codebase. Plan accordingly.
+**[rev 2] `StoryboardDraftModal` is not the precedent rev 1 claimed.** Rev 1 cited it twice as "exactly propose-then-accept". It is **confirm-then-generate-and-commit**: its confirmation calls `proposeStoryboard` immediately (`StoryboardDraftModal.tsx:91`) and the service CAS-writes the generated scenes straight into the project (`creativeStudioService.ts:891`). No generated draft is ever held for later acceptance. The modal is a useful pattern for _preflight confirmation and styling_; durable proposal cards and post-generation acceptance are **new behaviour** with no existing precedent in this codebase. Plan accordingly.
 
 ### 3.1 [rev 2] Proposal storage is feasible; observation is entirely new plumbing
 
-The invariant: **no tool writes the project.** Tools write **proposal records** in a separate namespace that only the main-process accept path can promote. An MCP tool's return value flows to the *model*, not the renderer, so a proposal existing only as tool output is invisible to the app and must be durably recorded to be presentable.
+The invariant: **no tool writes the project.** Tools write **proposal records** in a separate namespace that only the main-process accept path can promote. An MCP tool's return value flows to the _model_, not the renderer, so a proposal existing only as tool output is invisible to the app and must be durably recorded to be presentable.
 
 A subprocess can mechanically write files — imageGen already does — but the surrounding lifecycle does not exist. The store exposes only projects and connections (`store.ts:180`), and the renderer observes only `projectUpdated` (`useStudioProject.ts:113`), emitted by main-process mutations (`runtime.ts:273`). **A proposal written by the subprocess emits nothing.** Required:
 
@@ -83,7 +83,7 @@ Every proposal is a complete replacement for the region it names, never a diff �
 
 Rev 1 stated that generating media is not a Studio tool and concluded the assistant therefore cannot cause a paid call. **That conclusion was false**, because the conversation does not only contain Studio's tools.
 
-`useGuidSend.ts:160` force-attaches the enabled image-generation builtin to ordinary conversations — its own comment says *"Always attach the enabled hidden servers so the agent can invoke them without the user selecting them per conversation"* — and this behaviour is explicitly tested (`useGuidSend.dom.test.ts:286`). That tool invokes `executeImageGeneration` (`imageGenServer.ts:101`), which reaches the Images API (`imageGenCore.ts:304`) and persists output (`imageGenCore.ts:127`), **bypassing Studio's `GenerationReviewModal` and job manager entirely.**
+`useGuidSend.ts:160` force-attaches the enabled image-generation builtin to ordinary conversations — its own comment says _"Always attach the enabled hidden servers so the agent can invoke them without the user selecting them per conversation"_ — and this behaviour is explicitly tested (`useGuidSend.dom.test.ts:286`). That tool invokes `executeImageGeneration` (`imageGenServer.ts:101`), which reaches the Images API (`imageGenCore.ts:304`) and persists output (`imageGenCore.ts:127`), **bypassing Studio's `GenerationReviewModal` and job manager entirely.**
 
 So omitting generation tools from the Studio server is **insufficient**, and rev 1's prescribed verification — assert against the Studio job manager — **would have passed while the hole was open.**
 
@@ -96,10 +96,10 @@ Required:
 
 Measured against the branch on 2026-08-06. Rev 2 named a single server to exclude; the code attaches six without user selection, by **two independent mechanisms**:
 
-| Mechanism | Servers | Notes |
-| --- | --- | --- |
-| `hiddenAutoAttachServers` (`useGuidSend.ts:165-172`) | `builtin-image-gen`, `builtin-idp` (GreenNode), `builtin-vision` (image analysis) | Force-attached whenever enabled, appended to both `assistantOverrideMcpIds` and the session server list if missing |
-| `mergeCommodityMcpServerIds` (`builtinCapabilities.ts:228`) | `builtin-chrome-devtools`, `builtin-memory`, `builtin-tavily` | Auto-attached on the default (no explicit user selection) path |
+| Mechanism                                                   | Servers                                                                           | Notes                                                                                                              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `hiddenAutoAttachServers` (`useGuidSend.ts:165-172`)        | `builtin-image-gen`, `builtin-idp` (GreenNode), `builtin-vision` (image analysis) | Force-attached whenever enabled, appended to both `assistantOverrideMcpIds` and the session server list if missing |
+| `mergeCommodityMcpServerIds` (`builtinCapabilities.ts:228`) | `builtin-chrome-devtools`, `builtin-memory`, `builtin-tavily`                     | Auto-attached on the default (no explicit user selection) path                                                     |
 
 At least two beyond image-gen reach keyed, metered APIs. **A deny-list naming `builtin-image-gen` would leave five other servers attached**, and rev 2's prescribed verification would have passed while that hole was open — the same failure mode rev 2 itself identified in rev 1.
 
@@ -113,7 +113,7 @@ The rule stands — an assistant may propose what to generate and never cause a 
 
 ## 5. Conversation lifecycle
 
-**The MCP set is immutable after conversation creation**, enforced by aioncore: `TASKS.md` BUG-001 records `PATCH /api/conversations/<id>` returning `400 BAD_REQUEST` — *"extra.skills and MCP snapshots are immutable post-creation"* — and the types label MCP ids, names and session descriptors as creation snapshots (`storage.ts:479`). The observed response supports this lifecycle conclusion, though strictly it does not prove the absence of every hypothetical endpoint.
+**The MCP set is immutable after conversation creation**, enforced by aioncore: `TASKS.md` BUG-001 records `PATCH /api/conversations/<id>` returning `400 BAD_REQUEST` — _"extra.skills and MCP snapshots are immutable post-creation"_ — and the types label MCP ids, names and session descriptors as creation snapshots (`storage.ts:479`). The observed response supports this lifecycle conclusion, though strictly it does not prove the absence of every hypothetical endpoint.
 
 Consequences:
 
@@ -124,7 +124,7 @@ Consequences:
 
 ## 6. What Brief keeps from the form
 
-The conversation replaces the *intent sentence*, not the whole form. Aspect ratio and target duration stay explicit controls — constraints the user sets rather than things to negotiate in prose, and `aspectLocked` behaviour depends on them. The assistant reads them and may propose a different duration; it does not silently change them.
+The conversation replaces the _intent sentence_, not the whole form. Aspect ratio and target duration stay explicit controls — constraints the user sets rather than things to negotiate in prose, and `aspectLocked` behaviour depends on them. The assistant reads them and may propose a different duration; it does not silently change them.
 
 ## 7. Relationship to the existing planner
 
@@ -135,7 +135,7 @@ The conversation replaces the *intent sentence*, not the whole form. Aspect rati
 ## 8. Verification
 
 - **Persisted MCP snapshot** excludes `builtin-image-gen` and every unreviewed paid-generation capability. Assert on the stored snapshot, not on intent.
-- **No paid call reachable** — instrument the image-generation client *and* the Studio job manager. A job-manager-only assertion is explicitly insufficient (§4.1).
+- **No paid call reachable** — instrument the image-generation client _and_ the Studio job manager. A job-manager-only assertion is explicitly insufficient (§4.1).
 - **Project↔conversation binding**: creation, deletion, recreation and stale references all behave as specified (§2.1).
 - **Tool contract:** each write tool records a proposal and performs no project write. Assert by giving the subprocess a store directory and proving project state is unchanged.
 - **Proposal observation:** a proposal written by the subprocess becomes visible to the renderer without a manual refresh, and survives a restart.
@@ -166,4 +166,4 @@ Assertion strength matters specifically here: a mock-heavy suite around a propos
 
 Binding Brief to the app's conversation stack couples Creative Studio to aioncore conversations. Studio currently touches no conversation storage and adds no migrations, and that independence is what made it safe to develop in parallel. On a long-lived `creative-suite` branch, every mainline change to conversation creation, MCP snapshotting or the message pipeline becomes a potential merge conflict.
 
-**[rev 2]** The review makes this cost larger than rev 1 assumed: the curated MCP snapshot (§4.1) means Studio now depends on the *details* of how conversations assemble their tool set — `useGuidSend`'s force-attach behaviour in particular. A mainline change there could silently reopen the paid-call hole. That dependency needs a test that fails loudly on the mainline side, not only in Studio's own suite.
+**[rev 2]** The review makes this cost larger than rev 1 assumed: the curated MCP snapshot (§4.1) means Studio now depends on the _details_ of how conversations assemble their tool set — `useGuidSend`'s force-attach behaviour in particular. A mainline change there could silently reopen the paid-call hole. That dependency needs a test that fails loudly on the mainline side, not only in Studio's own suite.

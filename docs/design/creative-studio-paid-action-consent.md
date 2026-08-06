@@ -8,7 +8,7 @@
 > The bar was briefly adopted, then reversed on a cost/benefit read. Four reasons, recorded so this is a decision rather than an omission:
 >
 > 1. **The threat model is our own first-party renderer** — already sender-authorised and schema-validated — not untrusted input. The reviewer's scenario is a stale or buggy renderer, i.e. a bug. A renderer buggy enough to fire spurious paid IPC could equally corrupt a cut or delete a project, and no token protocol guards those either.
-> 2. **It would not close the finding as stated.** The reviewer wants proof the user consented. This mechanism proves *main issued a token*; a buggy renderer can acquire one and use it immediately. Only main owning the pixels closes it literally, and that costs the designed review modal.
+> 2. **It would not close the finding as stated.** The reviewer wants proof the user consented. This mechanism proves _main issued a token_; a buggy renderer can acquire one and use it immediately. Only main owning the pixels closes it literally, and that costs the designed review modal.
 > 3. **The blast radius is already bounded three ways** — the release gate, the main-side duplicate-charge refusal, and the per-project in-flight cap. Worst realistic case is one unintended generation.
 > 4. **The cost lands in the worst place.** The substantive half is refactoring the paid path so main computes review facts — the exact code where a mistake bills a user. That adds real risk to spend-safety code to improve spend-safety posture.
 >
@@ -20,11 +20,11 @@
 
 ## The property we are buying — stated honestly
 
-The reviewer's finding: *"sender authorization and schema validation establish which window sent a well-formed request; they do not establish user consent."* True. Three paid commands — `submitScenes`, `retryJob`, `proposeStoryboard` — accept a well-formed payload and reach a provider with no evidence a confirmation was ever shown.
+The reviewer's finding: _"sender authorization and schema validation establish which window sent a well-formed request; they do not establish user consent."_ True. Three paid commands — `submitScenes`, `retryJob`, `proposeStoryboard` — accept a well-formed payload and reach a provider with no evidence a confirmation was ever shown.
 
 **What is achievable, and what is not.** Main cannot prove a human's eyes saw a dialog without owning the pixels — which would mean replacing the designed review modal with a native `dialog.showMessageBox` and losing the scene list, provider, model, duration and timing advisory that make the confirmation worth showing. That trade is not worth it.
 
-What *is* achievable, and is the real bar:
+What _is_ achievable, and is the real bar:
 
 > **No paid action proceeds unless main previously issued a single-use consent token for that exact operation, and main — not the renderer — computed the facts the confirmation displayed.**
 
@@ -52,12 +52,12 @@ Moving that computation to main makes main the source of truth for **what the us
 
 Retry is where the review found it, but a mechanism that covers one entry point and not the others is worse than none: it implies a guarantee the system does not have.
 
-| Entry point | Today | After |
-| --- | --- | --- |
-| `submitScenes` | Renderer-computed review, renderer-only confirmation | Main-computed facts, token required |
-| `retryJob` (ordinary) | Renderer modal added in `9d30e7aa9`, renderer-only | Token required |
+| Entry point                       | Today                                                       | After                                                                                                                                                                                                              |
+| --------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `submitScenes`                    | Renderer-computed review, renderer-only confirmation        | Main-computed facts, token required                                                                                                                                                                                |
+| `retryJob` (ordinary)             | Renderer modal added in `9d30e7aa9`, renderer-only          | Token required                                                                                                                                                                                                     |
 | `retryJob` (`submission_unknown`) | **Main already refuses without acknowledgement** — verified | Keep the existing main-side refusal **and** require a token. The acknowledgement boolean stays; it means something different (the user accepted a possible double charge) and must not be collapsed into the token |
-| `proposeStoryboard` | Renderer modal, renderer-only | Token required |
+| `proposeStoryboard`               | Renderer modal, renderer-only                               | Token required                                                                                                                                                                                                     |
 
 `renderCut` is **local and free** and must not require consent — adding it would train users to click through a dialog that guards nothing.
 

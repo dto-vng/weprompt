@@ -107,12 +107,12 @@ the Template Gallery.
 Implement from a fresh `origin/sprint1` base. Directory-limit facts (measured in the
 local checkout 2026-08-04 — re-verify on the fresh base, the checkouts diverge):
 
-| Directory | Children | Consequence |
-| --- | --- | --- |
-| `process/services/presentation-template/` | 8 | Adding `templateStaging.ts` + test reaches exactly 10 — compliant as direct children; factoring optional |
-| `renderer/components/chat/TemplateGallery/` | 10 | At the limit — no new direct children |
-| `renderer/utils/chat/` | 13 | Already over — the marker parser must land in a factored submodule |
-| `renderer/pages/conversation/Messages/components/` | 21 | Already over — the proposal card must land in a factored submodule |
+| Directory                                          | Children | Consequence                                                                                              |
+| -------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| `process/services/presentation-template/`          | 8        | Adding `templateStaging.ts` + test reaches exactly 10 — compliant as direct children; factoring optional |
+| `renderer/components/chat/TemplateGallery/`        | 10       | At the limit — no new direct children                                                                    |
+| `renderer/utils/chat/`                             | 13       | Already over — the marker parser must land in a factored submodule                                       |
+| `renderer/pages/conversation/Messages/components/` | 21       | Already over — the proposal card must land in a factored submodule                                       |
 
 ## Open confirmations (resolve during T0)
 

@@ -96,14 +96,14 @@ All three verified still open today. None is large; none touches A's files.
 
 Deferred, not dropped — each has a settled design waiting:
 
-| Item | Why deferred |
-| --- | --- |
-| Cut editor UI (trim/crop/filters/reorder) | Review must be drawn first; pristine-cut render doesn't need it |
-| Hold-outside group + export line | Only meaningful once manual ordering exists |
-| Project models panel, BUG-024 reason vocabulary, G1 provenance | Panel slice; brief for G1 already written |
-| Brief-as-conversation + Studio MCP server | Prereqs landed; server is its own slice |
-| ffmpeg bundling + the two legal-desk items | Pre-release, not pre-demo |
-| Transitions, audio editing, speed, overlays | Cut-model non-goals, unchanged |
+| Item                                                           | Why deferred                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------- |
+| Cut editor UI (trim/crop/filters/reorder)                      | Review must be drawn first; pristine-cut render doesn't need it |
+| Hold-outside group + export line                               | Only meaningful once manual ordering exists                     |
+| Project models panel, BUG-024 reason vocabulary, G1 provenance | Panel slice; brief for G1 already written                       |
+| Brief-as-conversation + Studio MCP server                      | Prereqs landed; server is its own slice                         |
+| ffmpeg bundling + the two legal-desk items                     | Pre-release, not pre-demo                                       |
+| Transitions, audio editing, speed, overlays                    | Cut-model non-goals, unchanged                                  |
 
 ## 6. Execution shape
 

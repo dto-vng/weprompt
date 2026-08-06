@@ -4,7 +4,7 @@
 **Depends on:** `creative-studio-brief-conversation-design.md` (rev 2 — inherits its conversation, binding and writer model)
 **Independent of:** the video-capability spike
 
-> **Rev 2** incorporates a verification review whose verdict on rev 1 was: *do not plan implementation from this spec unchanged.* Three P0 defects and two factual errors. Corrections are marked **[rev 2]** and superseded claims are stated rather than deleted.
+> **Rev 2** incorporates a verification review whose verdict on rev 1 was: _do not plan implementation from this spec unchanged._ Three P0 defects and two factual errors. Corrections are marked **[rev 2]** and superseded claims are stated rather than deleted.
 
 ## 1. Today
 
@@ -12,9 +12,9 @@ Write is a shot table. Each row edits `title`, `purpose`, `narration`, `prompt` 
 
 **There is one model-backed affordance, and the assistant surface overstates itself.** `AssistantDock` is exactly 204 lines: a description, the storyboard provider and model, a charge disclosure, and a single **Draft storyboard** button, rendered inline or in a drawer. No input field, no conversation. Both entry points lead there — **Ask assistant** opens the drawer, and **Suggest a visual** selects the shot and opens the same drawer, making no model call (`WritePhase.tsx:197`).
 
-The copy reads *"Use the assistant to develop story structure, shot ideas, and prompts"* (`en-US/conversation.json:760`), while the only capability is regenerating the whole storyboard. **All 11 other locales make the equivalent promise.** This overpromise is a defect of the same class as the false audio claim, and this design fixes it or the copy must change.
+The copy reads _"Use the assistant to develop story structure, shot ideas, and prompts"_ (`en-US/conversation.json:760`), while the only capability is regenerating the whole storyboard. **All 11 other locales make the equivalent promise.** This overpromise is a defect of the same class as the false audio claim, and this design fixes it or the copy must change.
 
-**[rev 2] On reference images, rev 1 was too absolute.** `chooseAndImportReference` is the only *creation-and-attachment UX*, and no generated-reference job exists — but `updateScene` accepts an editable scene containing `referenceAssetId` and will attach any eligible same-project, same-scene image (`creativeStudioService.ts:1184`).
+**[rev 2] On reference images, rev 1 was too absolute.** `chooseAndImportReference` is the only _creation-and-attachment UX_, and no generated-reference job exists — but `updateScene` accepts an editable scene containing `referenceAssetId` and will attach any eligible same-project, same-scene image (`creativeStudioService.ts:1184`).
 
 ## 2. Shape: one conversation, a second surface
 
@@ -28,7 +28,7 @@ The review confirms the economy survives, with a hard constraint rev 1 did not s
 
 **Two simultaneous mounts are unsafe:**
 
-- Conversation prefill supports only one consumer — a newer listener *replaces* the previous one (`useSendBoxDraft.ts:47`, and `useConversationSendBoxPrefill.dom.test.ts:98` asserts it).
+- Conversation prefill supports only one consumer — a newer listener _replaces_ the previous one (`useSendBoxDraft.ts:47`, and `useConversationSendBoxPrefill.dom.test.ts:98` asserts it).
 - Message rendering uses global DOM ids via `document.getElementById` (`MessageList.tsx:651`), which collide across duplicate mounts.
 
 Therefore: **exactly one mounted conversation body at a time.** This is a requirement, not a preference.
@@ -45,7 +45,7 @@ When a shot is selected, the surface attaches that focus to the turn rather than
 
 ## 3. Writer model: inherited
 
-Tools propose; the user accepts; the main process is the only writer of project state. Proposals are durable records carrying the revision they were computed against, and accepting a stale one fails closed. See the Brief design §3–§3.1 — including that proposal *observation* is entirely new plumbing, and that `StoryboardDraftModal` is **not** the propose-then-accept precedent rev 1 claimed.
+Tools propose; the user accepts; the main process is the only writer of project state. Proposals are durable records carrying the revision they were computed against, and accepting a stale one fails closed. See the Brief design §3–§3.1 — including that proposal _observation_ is entirely new plumbing, and that `StoryboardDraftModal` is **not** the propose-then-accept precedent rev 1 claimed.
 
 ### 3.1 [rev 2] Draft loss is a PRESENT bug, not a future risk
 
@@ -79,8 +79,8 @@ Rev 1 described this as "a main-process path parallel to `chooseAndImportReferen
 
 - The job manager derives media kind and route from `scene.mediaKind` (`jobManager.ts:526`), so a **video scene cannot request an image route** for its first-frame reference.
 - Provider output must match the scene's media kind (`mediaStore.ts:964`), so an image generated for a video scene is **rejected**.
-- Successful output is *always* appended as a take, selected, and marks the scene complete (`mediaStore.ts:1134`).
-- Collections distinguish generated assets from imports but not generated *references* from takes.
+- Successful output is _always_ appended as a take, selected, and marks the scene complete (`mediaStore.ts:1134`).
+- Collections distinguish generated assets from imports but not generated _references_ from takes.
 - The reference preview currently assumes references come from `imports` (`ScriptRow.tsx:125`).
 
 **Required:** an explicit paid-generation purpose — `take | reference` — threaded through the review confirmation, the submit request, the durable job, and the completion path. A reference job must always use the image route; attach its result as `referenceAssetId` atomically **without** changing `selectedAssetId` or marking a take complete; retain job lineage identifying it as generated; and pass through the same confirmation and capacity controls as any other paid generation. Reference preview handling needs updating too.
@@ -89,7 +89,7 @@ Rev 1 described this as "a main-process path parallel to `chooseAndImportReferen
 
 Rev 1 said generated references consume "the global FIFO semaphores plus the per-project cap" — present tense. **Only the global limits exist** (`jobManager.ts:132`, `:346`: image 2, video 1). Submission enforces a 24-scene batch maximum and prevents duplicate active jobs per scene (`jobManager.ts:1140`, `:1186`), but there is **no project-wide active-job cap.**
 
-The cap is *proposed* in the landing plan, not built. Until it exists, this spec must promise only per-scene exclusion plus global FIFO capacity. If the cap is built, its accounting must cover reference jobs — and note the landing plan's accounting is itself not yet representable: `submission_unknown` is an error code rather than a job status, other possibly-charged jobs land in `needs_attention`, and a download retry sets the same durable job to `running`, which state alone cannot distinguish from paid generation. Durable generation-purpose and execution-phase state are needed to reconstruct permits after a restart.
+The cap is _proposed_ in the landing plan, not built. Until it exists, this spec must promise only per-scene exclusion plus global FIFO capacity. If the cap is built, its accounting must cover reference jobs — and note the landing plan's accounting is itself not yet representable: `submission_unknown` is an error code rather than a job status, other possibly-charged jobs land in `needs_attention`, and a download retry sets the same durable job to `running`, which state alone cannot distinguish from paid generation. Durable generation-purpose and execution-phase state are needed to reconstruct permits after a restart.
 
 ## 5. Copy honesty
 

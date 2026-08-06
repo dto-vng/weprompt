@@ -22,18 +22,18 @@ Read before writing; each one shapes a step below.
 
 Each step compiles and its tests pass on its own, so `git bisect` stays meaningful and a step can be reviewed alone.
 
-### Step 1 — widen the duration validators *(independent, ship first)*
+### Step 1 — widen the duration validators _(independent, ship first)_
 
 This is a live trap unrelated to the cut: production adapters omit `durationSeconds`, which is the only reason the integer rejection has never fired. The moment one reports a true `5.085`, persisting a **successful paid render** throws.
 
 - Add `isFiniteInRange(value, min, max)` beside `isIntegerInRange` in `store.ts`.
 - `validateAsset`: `durationSeconds` becomes `isFiniteInRange(value, 0, Number.MAX_SAFE_INTEGER)` with a strictly positive lower bound.
 - `mediaStore.ts:933`: replace `!Number.isSafeInteger(input.durationSeconds)` with a finite-positive check, keeping the upper bound.
-- **Do not touch `StudioScene.durationSeconds`** (`store.ts:400`, integer 1–60). A *requested* duration is not an *actual* one; conflating them is the mistake this step exists to prevent.
+- **Do not touch `StudioScene.durationSeconds`** (`store.ts:400`, integer 1–60). A _requested_ duration is not an _actual_ one; conflating them is the mistake this step exists to prevent.
 
 Tests: an asset with `durationSeconds: 5.085` validates and persists; `0`, negative, `NaN` and `Infinity` are rejected; a scene duration of `5.5` is still rejected.
 
-### Step 2 — the canonical-take predicate *(independent)*
+### Step 2 — the canonical-take predicate _(independent)_
 
 One main-side predicate, used by both `selectAsset` and later cut validation. Ownership + `mediaKind` match + `managedAsset.collection === 'assets'` + reverse linkage through `scene.assetIds`.
 
@@ -117,15 +117,16 @@ Assert on observable store state, not mocks. A suite that stubs the mutation pat
 
 ## 3. Not in this checkpoint
 
-The Review editor UI, any render pipeline, transitions, audio, text overlays, speed changes, multi-track, LUTs, and export changes. Divergence **UX** is a design question still open; this plan only makes divergence *representable* via `orderMode`.
+The Review editor UI, any render pipeline, transitions, audio, text overlays, speed changes, multi-track, LUTs, and export changes. Divergence **UX** is a design question still open; this plan only makes divergence _representable_ via `orderMode`.
 
 ## 4. Execution notes
 
 - Steps 1 and 2 are independent of the rest and of each other — parallelisable across agents. Steps 3–6 are sequential.
 - Gates per step: `bunx tsc --noEmit`, `bun run test`, `node scripts/check-i18n.js`, `bun run lint:fix && bun run format`.
-- **Provisioning agent worktrees — two distinct traps, both seen.** A `bun install` per worktree works but is slow and costs ~1.9GB each. Symlinking is fine *if done completely*:
+- **Provisioning agent worktrees — two distinct traps, both seen.** A `bun install` per worktree works but is slow and costs ~1.9GB each. Symlinking is fine _if done completely_:
   1. Link the **workspace-local** `node_modules` too — `packages/{desktop,web-host,web-cli,shared-scripts}` each have one. A root-only link leaves `serve-handler` unresolvable and `static-server.unit.test.ts` collects zero tests. That is a phantom failure.
   2. Link from a checkout on the **same base**. Linking the main checkout's root `node_modules` (on `sprint1`) into a sprint2-based worktree gives `builder-util-runtime` **9.5.1** where sprint2 pins **9.7.0**, and `releasePackagingConfig.test.ts` fails. That one is **not** phantom — the test is correctly catching a real version mismatch. Link from `.worktrees/creative-suite-sprint2/node_modules` instead.
 
   Verify provisioning before believing any red: `bun run test packages/web-host/src/static-server.unit.test.ts tests/unit/releasePackagingConfig.test.ts` must report 30 passing.
+
 - `i18n-keys.d.ts` is gitignored on this branch. Regenerate with `bun run i18n:types`; never stage it.

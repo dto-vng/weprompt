@@ -13,20 +13,20 @@ the repository** — ask their author if you need them.
 
 Work is organised into **slices**. Slice 1 is designed and reviewed; later slices carry scope and
 preserved findings but no design. Each brainstorming round appends to the decision log, and either
-refines Slice 1 or promotes something out of a later slice. Anything under *Decisions (settled)* or
-*Closed by decision* has been argued and verified — reopen only with new evidence, and name it.
+refines Slice 1 or promotes something out of a later slice. Anything under _Decisions (settled)_ or
+_Closed by decision_ has been argued and verified — reopen only with new evidence, and name it.
 
 ### Decision log
 
-| Date | Round | Outcome |
-| --- | --- | --- |
-| 2026-08-04 | Initial brainstorm | Personal-only KB; WP-managed per-assistant folder; two search tools; local binding; generalize the KB service to an owner scope |
-| 2026-08-05 | Design review (round 1) | 9 claims verified, 6 original statements corrected: sibling storage roots, scope/target split, manifest V1→V2, citation identity, privacy disclosure, surface list, lifecycle state machine, directory placement |
-| 2026-08-05 | Decisions on review-open items | Bounded `read_assistant_knowledge_source`; user + builtin assistants supported |
-| 2026-08-05 | Id-stability spike | **Passed** — builtin slugs and user ids both stable; builtin support confirmed; global orphan-recovery UI deferred |
-| 2026-08-05 | Design review (round 2) | 5 contract amendments + 3 factual corrections, all verified; status → 🟡 |
-| 2026-08-05 | **Rescope into slices** | Slice 1 = add local files + Q&A + review + create-via-Template-Gallery. **Gallery owns form, KB owns substance.** Materialize-to-workspace, external/shared folders, and other conversation surfaces demoted to later slices |
-| 2026-08-05 | Slice 2 design round | Grounding evidence designed: evidence already exists in persisted `tool_call` messages + `turn_id`; report always / gate conditionally on an explicit per-assistant flag; two-tier turn scoping; user-facing deliver-anyway; renderer-side pure evaluator; compaction/`hidden` trap identified |
+| Date       | Round                          | Outcome                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-04 | Initial brainstorm             | Personal-only KB; WP-managed per-assistant folder; two search tools; local binding; generalize the KB service to an owner scope                                                                                                                                                                |
+| 2026-08-05 | Design review (round 1)        | 9 claims verified, 6 original statements corrected: sibling storage roots, scope/target split, manifest V1→V2, citation identity, privacy disclosure, surface list, lifecycle state machine, directory placement                                                                               |
+| 2026-08-05 | Decisions on review-open items | Bounded `read_assistant_knowledge_source`; user + builtin assistants supported                                                                                                                                                                                                                 |
+| 2026-08-05 | Id-stability spike             | **Passed** — builtin slugs and user ids both stable; builtin support confirmed; global orphan-recovery UI deferred                                                                                                                                                                             |
+| 2026-08-05 | Design review (round 2)        | 5 contract amendments + 3 factual corrections, all verified; status → 🟡                                                                                                                                                                                                                       |
+| 2026-08-05 | **Rescope into slices**        | Slice 1 = add local files + Q&A + review + create-via-Template-Gallery. **Gallery owns form, KB owns substance.** Materialize-to-workspace, external/shared folders, and other conversation surfaces demoted to later slices                                                                   |
+| 2026-08-05 | Slice 2 design round           | Grounding evidence designed: evidence already exists in persisted `tool_call` messages + `turn_id`; report always / gate conditionally on an explicit per-assistant flag; two-tier turn scoping; user-facing deliver-anyway; renderer-side pure evaluator; compaction/`hidden` trap identified |
 
 ## Product intent
 
@@ -42,13 +42,13 @@ shared, duplicated, exported, or imported.
 
 ## Slice map
 
-| Slice | Outcome | Status |
-| --- | --- | --- |
-| **1** | Add local files as an assistant KB; grounded Q&A; review a draft against the KB; create artifacts via the Template Gallery with the KB supplying substance | **Designed + reviewed.** Blocked only on the 5 entry criteria |
-| **2** | Grounding evidence — verify the KB was actually consulted before an artifact is delivered | **Designed.** Report always, gate conditionally; renderer-side evaluator |
-| **3** | Shared / team corpora via an external synced folder | Parked mid-round; findings preserved |
-| **4** | Assistant KB on other conversation surfaces (team, scheduled, channel-created) | Scoped, not designed |
-| — | Backlog: cost guardrails, KB UI design, discovery, duplicate documents across scopes, multi-folder | Unsliced |
+| Slice | Outcome                                                                                                                                                    | Status                                                                   |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **1** | Add local files as an assistant KB; grounded Q&A; review a draft against the KB; create artifacts via the Template Gallery with the KB supplying substance | **Designed + reviewed.** Blocked only on the 5 entry criteria            |
+| **2** | Grounding evidence — verify the KB was actually consulted before an artifact is delivered                                                                  | **Designed.** Report always, gate conditionally; renderer-side evaluator |
+| **3** | Shared / team corpora via an external synced folder                                                                                                        | Parked mid-round; findings preserved                                     |
+| **4** | Assistant KB on other conversation surfaces (team, scheduled, channel-created)                                                                             | Scoped, not designed                                                     |
+| —     | Backlog: cost guardrails, KB UI design, discovery, duplicate documents across scopes, multi-folder                                                         | Unsliced                                                                 |
 
 ---
 
@@ -68,10 +68,10 @@ cross-store ranking; any conversation surface beyond Guid and Project New Chat.
 
 ## The form/substance boundary
 
-| | Owns | Machinery |
-| --- | --- | --- |
-| **Template Gallery** | *Form* — structure, styling, delivery gates | `reference.docx` clone + `THEME.md` + officecli validate/issues/render gates |
-| **Assistant KB** | *Substance* — the standard, criteria, precedent documents | index + `search` + bounded `read`, auto-attached |
+|                      | Owns                                                      | Machinery                                                                    |
+| -------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Template Gallery** | _Form_ — structure, styling, delivery gates               | `reference.docx` clone + `THEME.md` + officecli validate/issues/render gates |
+| **Assistant KB**     | _Substance_ — the standard, criteria, precedent documents | index + `search` + bounded `read`, auto-attached                             |
 
 The three PMO verbs land on this boundary: **answer** → search; **review** → user attaches the
 draft, assistant reads the standard; **create** → the user picks the BC template from the gallery
@@ -99,8 +99,8 @@ Two prompt surfaces are available, neither requiring new machinery:
   for standards-bearing KBs it must also state that those documents are authoritative for content
   decisions.
 - **The assistant's own rules/prompts** — `AssistantRules`/`AssistantPrompts` already exist. The
-  PMO assistant's instructions carry the binding: *"When creating or reviewing a Business Case,
-  ground structure and criteria in your knowledge base; cite the standard for each judgement."*
+  PMO assistant's instructions carry the binding: _"When creating or reviewing a Business Case,
+  ground structure and criteria in your knowledge base; cite the standard for each judgement."_
 
 Slice 1's deliverable here is therefore a **documented instruction pattern plus a tool-description
 rule**, not code. Verification that grounding actually happened is Slice 2.
@@ -127,9 +127,7 @@ recorded in the manifest so the store is self-describing.
 ### Scope vs target
 
 ```typescript
-type KnowledgeScope =
-  | { kind: 'project'; id: string }
-  | { kind: 'assistant'; id: string };
+type KnowledgeScope = { kind: 'project'; id: string } | { kind: 'assistant'; id: string };
 
 type KnowledgeTarget =
   | { scope: { kind: 'project'; id: string }; workspace: string }
@@ -144,8 +142,8 @@ derives every assistant path; the renderer never supplies one. Update events car
 ### Manifest compatibility
 
 ```typescript
-type KnowledgeManifestV1 = { schemaVersion: 1; projectId: string; /* existing */ };
-type KnowledgeManifestV2 = { schemaVersion: 2; scope: KnowledgeScope; /* existing */ };
+type KnowledgeManifestV1 = { schemaVersion: 1; projectId: string /* existing */ };
+type KnowledgeManifestV2 = { schemaVersion: 2; scope: KnowledgeScope /* existing */ };
 ```
 
 A V1 manifest loads **only** when the expected scope is `project` **and**
@@ -158,10 +156,10 @@ rebuilding BM25, or repeating embedding calls.
 Per-scope identity driven by a new `KB_ENV.scopeKind`, with `KB_ENV.projectId` renamed to `scopeId`
 (atomic: main process and bundled server ship in one build).
 
-| Scope | Search | Whole-document |
-| --- | --- | --- |
-| project | `search_project_knowledge` | existing: workspace-relative file reads |
-| assistant | `search_assistant_knowledge` | `read_assistant_knowledge_source` |
+| Scope     | Search                       | Whole-document                          |
+| --------- | ---------------------------- | --------------------------------------- |
+| project   | `search_project_knowledge`   | existing: workspace-relative file reads |
+| assistant | `search_assistant_knowledge` | `read_assistant_knowledge_source`       |
 
 ```typescript
 read_assistant_knowledge_source({
@@ -235,39 +233,39 @@ Persisted states, not a boolean: `enabled | disabled | cleanupPending | orphaned
 `cleanupPending` survives a crash mid-delete and is retried; `orphaned` marks a binding whose
 assistant is gone but whose documents are retained pending explicit recovery.
 
-| Event | Binding | Watch and sync | Index | Documents | Existing conversations |
-| --- | --- | --- | --- | --- | --- |
-| Enable succeeds | enabled | ensure folder, catch-up sync, watch | create/update | create or retain | unchanged |
-| Enable fails | unchanged | none | retain | retain | unchanged |
-| Disable | disabled | unwatch; no new ingestion | retain | retain | unchanged |
-| Delete assistant | cleanupPending → removed | unwatch | remove with retry | **retain** | unchanged |
-| Re-enable | enabled | one catch-up sync, then watch | resume/update | retain | unchanged |
+| Event            | Binding                  | Watch and sync                      | Index             | Documents        | Existing conversations |
+| ---------------- | ------------------------ | ----------------------------------- | ----------------- | ---------------- | ---------------------- |
+| Enable succeeds  | enabled                  | ensure folder, catch-up sync, watch | create/update     | create or retain | unchanged              |
+| Enable fails     | unchanged                | none                                | retain            | retain           | unchanged              |
+| Disable          | disabled                 | unwatch; no new ingestion           | retain            | retain           | unchanged              |
+| Delete assistant | cleanupPending → removed | unwatch                             | remove with retry | **retain**       | unchanged              |
+| Re-enable        | enabled                  | one catch-up sync, then watch       | resume/update     | retain           | unchanged              |
 
 **The generation token is checked before every new ingestion unit** (each source, OCR call, embedding
 batch) — not only before watcher reattachment. `syncAndWatch` re-registers the watcher in `finally`
 (`projectKnowledgeBridge.ts:60`), and checking only at reattach would let an in-flight loop keep
 embedding after disable.
 
-**Transactional binding.** `configService.set()` does `cache.set()` → `notify()` → *then*
+**Transactional binding.** `configService.set()` does `cache.set()` → `notify()` → _then_
 `await fetchJson('PUT', …)` (`configService.ts:97`), so a failed persist leaves the new value cached
 and listeners already fired — breaking "enable failure leaves the binding unchanged." Persist first,
 then update cache and notify; roll back on failure.
 
 ## Identity and source support
 
-| State or source | Slice 1 behavior |
-| --- | --- |
-| Unsaved assistant (create form) | KB section hidden/disabled — "Create the assistant first" |
-| Existing user assistant | Supported |
-| Builtin assistant | **Supported** — id-stability spike passed |
-| Generated CLI assistant | Excluded |
-| Duplicate | New assistant starts disabled; no documents or binding copied |
-| Import or share | Starts disabled; no documents or binding imported |
-| Retired/disappeared assistant | Preserve documents; remove index only via safe reconciliation |
+| State or source                 | Slice 1 behavior                                              |
+| ------------------------------- | ------------------------------------------------------------- |
+| Unsaved assistant (create form) | KB section hidden/disabled — "Create the assistant first"     |
+| Existing user assistant         | Supported                                                     |
+| Builtin assistant               | **Supported** — id-stability spike passed                     |
+| Generated CLI assistant         | Excluded                                                      |
+| Duplicate                       | New assistant starts disabled; no documents or binding copied |
+| Import or share                 | Starts disabled; no documents or binding imported             |
+| Retired/disappeared assistant   | Preserve documents; remove index only via safe reconciliation |
 
 An assistant whose id reuses an orphaned key must never auto-enable or silently consume the former
 assistant's documents — surface an explicit recovery choice when local documents exist. This path is
-real: AionCore's `create` accepts a caller-supplied `req.id`, and while duplicate *live* ids are
+real: AionCore's `create` accepts a caller-supplied `req.id`, and while duplicate _live_ ids are
 rejected, a deleted assistant's id is reusable.
 
 ## Components
@@ -298,8 +296,8 @@ rejected, a deleted assistant's id is reusable.
 
 ### Renderer
 
-The architecture reference is explicit — *"Used by multiple pages → `renderer/components/`,
-`renderer/hooks/`"* — so shared Project-Home + Assistant-Settings code cannot live under a page
+The architecture reference is explicit — _"Used by multiple pages → `renderer/components/`,
+`renderer/hooks/`"_ — so shared Project-Home + Assistant-Settings code cannot live under a page
 directory. Final placement:
 
 ```text
@@ -312,15 +310,14 @@ remain under `pages/conversation/knowledge/`.
 
 Both roots sit at 10 children, so slots are freed narrowly, in separate mechanical commits:
 
-| Root | Action | Result |
-| --- | --- | --- |
-| `components/` | Delete `IconParkHOC.tsx` and `ShimmerText.tsx` — **verified zero references** across `src` and `tests` | 10 → 8, then `knowledge/` → 9 |
-| `hooks/` | Move the lone loose `useLocalTokenUsage.ts` into an existing category dir | 10 → 9, then `knowledge/` → 10 |
+| Root          | Action                                                                                                 | Result                         |
+| ------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| `components/` | Delete `IconParkHOC.tsx` and `ShimmerText.tsx` — **verified zero references** across `src` and `tests` | 10 → 8, then `knowledge/` → 9  |
+| `hooks/`      | Move the lone loose `useLocalTokenUsage.ts` into an existing category dir                              | 10 → 9, then `knowledge/` → 10 |
 
 Confirm the deletion with `bunx tsc --noEmit` plus a full test run before relying on it.
 
-Also: extracting the shared card/preview/anchor out of `pages/project/components/` takes it from 10 →
-7. `AssistantSettings/editor/KnowledgeSection.tsx` takes that directory 6 → 7 — the section holds the
+Also: extracting the shared card/preview/anchor out of `pages/project/components/` takes it from 10 → 7. `AssistantSettings/editor/KnowledgeSection.tsx` takes that directory 6 → 7 — the section holds the
 shared card, enable toggle, disclosure, and a **"Show knowledge folder"** action (platform-neutral
 copy, not "Reveal in Finder"). `useGuidSend.ts` merges a list of scope descriptors, and one scope
 failing must still attach the other and still create the conversation. An app-shell owner registers
@@ -342,7 +339,7 @@ retries; orphan cleanup runs only after a successful assistant-list fetch.
 
 **Conversation attachment** — project-only, assistant-only, both, neither, disabled; both servers
 survive merge on AionRS and ACP with distinct ids and names; one descriptor failure still attaches the
-other; team/scheduled/channel/existing paths asserted as *excluded*; frozen-session semantics tested.
+other; team/scheduled/channel/existing paths asserted as _excluded_; frozen-session semantics tested.
 
 **Citations and reads** — assistant tool output labeled, recognized, clickable, routed to the
 assistant store; the same filename in both scopes opens the correct source per tool output; ambiguous
@@ -350,7 +347,7 @@ filename-only prose stays unlinked; links round-trip scope/sourceId/fileName/anc
 paginates by character cursor, terminates with `next_cursor: null`, and rejects unknown source ids;
 citation resolution works from frozen descriptors after the KB is disabled.
 
-**Composition (new for Slice 1)** — with a template directive *and* KB tools attached, the documented
+**Composition (new for Slice 1)** — with a template directive _and_ KB tools attached, the documented
 instruction pattern produces at least one KB consultation; and a review request against a KB standard
 reads the whole standard rather than a single passage.
 
@@ -362,7 +359,7 @@ confirms no modified directory exceeds ten direct children.
 **Acceptance criterion (not a verifiable property today):** the binding and documents do not travel
 through share/export — no export path exists to test against, though the import half is testable.
 
-**Regression** — project KB *behavior* unchanged. Behavior, not literally unchanged test files:
+**Regression** — project KB _behavior_ unchanged. Behavior, not literally unchanged test files:
 strict IPC payloads and scope-wide types require minimal test updates.
 
 ## Slice 1 entry criteria
@@ -381,24 +378,24 @@ The five round-2 amendments are folded into the contracts above and must be hono
 
 ## Slice 2 — Grounding evidence · DESIGNED (2026-08-05)
 
-Nothing in Slice 1 *verifies* that the KB was consulted before an artifact is delivered — the
+Nothing in Slice 1 _verifies_ that the KB was consulted before an artifact is delivered — the
 form-without-substance failure. Slice 2 closes that, and pairs with the artifact-quality epic's
 completion-states work (`docs/design/artifact-quality-epic-plan.md`, 2D).
 
 **Feasibility finding: the evidence already exists in persisted data.** `messages` rows carry
 `type='tool_call'` with content `{call_id, name, status, input, output}`, and a `turn_id` column
-groups messages within a turn. So this is a *read* problem, not a plumbing problem — no new
+groups messages within a turn. So this is a _read_ problem, not a plumbing problem — no new
 instrumentation.
 
 ### Decisions
 
-| Question | Decision |
-| --- | --- |
-| Gate or report | **Report always; gate conditionally.** Grounding is a distinct completion state; delivery is withheld only when the assistant declares its KB authoritative |
-| Evidence scope | **Two-tier** — `this turn` vs `earlier in this chat`, so the common multi-turn pattern (retrieve the standard, generate after feedback) is not a false negative |
-| Coverage | **Office artifacts only** (where a delivery moment already exists); gate fires on an **explicit per-assistant flag**, never inferred from instruction prose |
-| Escape hatch | **Blocking state with an explicit "deliver anyway"**, recorded. Model-attested exemption rejected: a model that skipped the KB will happily attest it wasn't needed |
-| Where it runs | **Renderer-side evaluator + renderer gate.** Evidence is already in loaded messages, the verdict is presentational, and the escape hatch is inherently a human interaction |
+| Question       | Decision                                                                                                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate or report | **Report always; gate conditionally.** Grounding is a distinct completion state; delivery is withheld only when the assistant declares its KB authoritative                |
+| Evidence scope | **Two-tier** — `this turn` vs `earlier in this chat`, so the common multi-turn pattern (retrieve the standard, generate after feedback) is not a false negative            |
+| Coverage       | **Office artifacts only** (where a delivery moment already exists); gate fires on an **explicit per-assistant flag**, never inferred from instruction prose                |
+| Escape hatch   | **Blocking state with an explicit "deliver anyway"**, recorded. Model-attested exemption rejected: a model that skipped the KB will happily attest it wasn't needed        |
+| Where it runs  | **Renderer-side evaluator + renderer gate.** Evidence is already in loaded messages, the verdict is presentational, and the escape hatch is inherently a human interaction |
 
 ### Verdict model
 
@@ -407,7 +404,7 @@ type GroundingVerdict =
   | { kind: 'grounded_turn'; sources: KnowledgeCitationTarget[] }
   | { kind: 'grounded_earlier'; sources: KnowledgeCitationTarget[]; turnsAgo: number }
   | { kind: 'none' }
-  | { kind: 'not_applicable' };   // conversation has no KB scopes in its frozen descriptors
+  | { kind: 'not_applicable' }; // conversation has no KB scopes in its frozen descriptors
 ```
 
 `not_applicable` is a required fourth state: a conversation with no KB attached must not report
@@ -415,20 +412,20 @@ type GroundingVerdict =
 
 **Evidence** = a `tool_call` whose `name` is `search_project_knowledge`,
 `search_assistant_knowledge`, or `read_assistant_knowledge_source`, whose `status` indicates
-success, and whose output is non-empty. A full read is *stronger* grounding than a search, so all
+success, and whose output is non-empty. A full read is _stronger_ grounding than a search, so all
 three qualify. A search returning `searchCore`'s "No relevant passages found" literal does **not**
 count — a checkable string, not a judgement.
 
 **Gate condition** — all three: binding flagged authoritative **and** verdict `none` **and** the
 artifact is an office artifact. Effect: withhold automatic delivery, render the state plus a
-*deliver anyway* action, record the override with the completion state.
+_deliver anyway_ action, record the override with the completion state.
 
 ### Components
 
 - `common/knowledge/grounding.ts` — pure `evaluateGrounding({ messages, artifactTurnId, sessionScopes })`.
   No IO, no DB.
 - Slice 1's binding record gains `authoritative?: boolean`. Local — **no backend migration**.
-- `KnowledgeSection` gains one checkbox: *"Require grounding in these documents before delivering documents."*
+- `KnowledgeSection` gains one checkbox: _"Require grounding in these documents before delivering documents."_
 - The artifact completion surface renders the grounding state and owns the deliver-anyway action.
 - **`OfficeArtifactService` is unchanged.** Main answers "is this file valid" (BUG-003's fail-closed
   corruption gate); the renderer answers "is this artifact grounded." The gates stay separated.

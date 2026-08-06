@@ -7,8 +7,8 @@
 
 ## Framing (do not re-litigate)
 
-- BUG-003 (closed by !47) gates the *corruption* class; this epic is the adjacent
-  *quality/grounding* class. A structurally valid deck passes the existing gate by design.
+- BUG-003 (closed by !47) gates the _corruption_ class; this epic is the adjacent
+  _quality/grounding_ class. A structurally valid deck passes the existing gate by design.
   This is not a regression or a reopening.
 - The incident is model-agnostic. Kimi was the reproducer, not the definition. Stronger
   models (Fable/Opus) raise **compliance**, not the **contract** — specs and gates must be
@@ -19,12 +19,12 @@
 
 ## Where the quality contract lives today
 
-| Surface | Coverage |
-| --- | --- |
-| Template Gallery directives (`packages/desktop/src/renderer/components/chat/TemplateGallery/directive.ts`) | Strong contract, but only for template-selected sends |
-| Per-template THEME.md specs (`packages/desktop/src/process/resources/presentation-templates/*/THEME.md`) | 12 packs: 4 HTML / 4 PPTX / 4 DOCX; quality varies by family (see Track 0) |
-| `skills/presentation-maker/` | Opt-in via Skills Hub import — not guaranteed |
-| Plain-chat PPTX request | **No contract at all** (the 2B gap) |
+| Surface                                                                                                    | Coverage                                                                   |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Template Gallery directives (`packages/desktop/src/renderer/components/chat/TemplateGallery/directive.ts`) | Strong contract, but only for template-selected sends                      |
+| Per-template THEME.md specs (`packages/desktop/src/process/resources/presentation-templates/*/THEME.md`)   | 12 packs: 4 HTML / 4 PPTX / 4 DOCX; quality varies by family (see Track 0) |
+| `skills/presentation-maker/`                                                                               | Opt-in via Skills Hub import — not guaranteed                              |
+| Plain-chat PPTX request                                                                                    | **No contract at all** (the 2B gap)                                        |
 
 ---
 
@@ -34,27 +34,27 @@ Pure THEME.md + directive edits. A manifest `version` bump re-syncs each pack to
 user at next launch (`PresentationTemplateService.syncBuiltins`), so this ships user-facing
 protection with zero product code. Ships **before** 2A.
 
-| # | Item | Files | Notes |
-| --- | --- | --- | --- |
-| 0.1 | Fail-closed extraction rule | all 8 office THEME.md (workflow step) + pptx/docx directives in `directive.ts` | "If `officecli view <file> text` returns empty or unusable content, STOP and ask the user — never proceed to build." This is the incident's root cause; currently uncovered everywhere. Editing directive first sentences is forbidden — `templatedSendParser` matches the exported prefixes with `startsWith`. |
-| 0.2 | Literal `\n` escape check | pptx gate 3, docx gates | The incident's headline mechanical defect; one grep line per spec. |
-| 0.3 | Fix false-positive leftover-token greps | business-review, project-kickoff, connected-ops (monthly-steerco mostly fine) | Remove generic vocabulary: `warehouse`, `operator shifts` (project-kickoff — a real WMS deck trips this on correct content), `emea`, `nrr`, `cac payback` (business-review — standard QBR vocabulary), `connected sites` (connected-ops). Keep uniquely-sample tokens (`jordan lee`, `northwind`, `meridian`). Soften "any hit is a leftover" → "verify each hit is not reference sample content." |
-| 0.4 | Speaker-notes delivery gate | 4 pptx specs | Workflow step 5 requires notes on every slide; no gate verifies them. Add a notes check to the delivery gates (conditional policy — this workflow declares notes required). |
-| 0.5 | DOCX gate parity | 4 docx specs | Give docx gate 3 executable greps (like pptx) and add reference-sample-token scans; today leftover reference.docx prose is caught only by the visual pass. Drift evidence for 6/2B. |
-| 0.6 | Interim completion evidence | all 8 office specs | One line in the delivery-gates section: the reply must report extracted / validated / rendered / reviewed as distinct statements. Cheap 2D preview. |
-| 0.7 | Trim editorial-field-report §8 "Response pattern" | editorial-field-report | Drifts against the directive, references a possibly-nonexistent `frontend-design SKILL.md`, hardcodes an English default. Shrink to avoid two drifting instruction surfaces. |
-| 0.8 | HTML QA story decision | 4 HTML specs | They have zero gates today. Minimum: a self-check list per spec; real fix arrives with 2C. Decide scope here, don't over-build. |
+| #   | Item                                              | Files                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                                              |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1 | Fail-closed extraction rule                       | all 8 office THEME.md (workflow step) + pptx/docx directives in `directive.ts` | "If `officecli view <file> text` returns empty or unusable content, STOP and ask the user — never proceed to build." This is the incident's root cause; currently uncovered everywhere. Editing directive first sentences is forbidden — `templatedSendParser` matches the exported prefixes with `startsWith`.                                                                                    |
+| 0.2 | Literal `\n` escape check                         | pptx gate 3, docx gates                                                        | The incident's headline mechanical defect; one grep line per spec.                                                                                                                                                                                                                                                                                                                                 |
+| 0.3 | Fix false-positive leftover-token greps           | business-review, project-kickoff, connected-ops (monthly-steerco mostly fine)  | Remove generic vocabulary: `warehouse`, `operator shifts` (project-kickoff — a real WMS deck trips this on correct content), `emea`, `nrr`, `cac payback` (business-review — standard QBR vocabulary), `connected sites` (connected-ops). Keep uniquely-sample tokens (`jordan lee`, `northwind`, `meridian`). Soften "any hit is a leftover" → "verify each hit is not reference sample content." |
+| 0.4 | Speaker-notes delivery gate                       | 4 pptx specs                                                                   | Workflow step 5 requires notes on every slide; no gate verifies them. Add a notes check to the delivery gates (conditional policy — this workflow declares notes required).                                                                                                                                                                                                                        |
+| 0.5 | DOCX gate parity                                  | 4 docx specs                                                                   | Give docx gate 3 executable greps (like pptx) and add reference-sample-token scans; today leftover reference.docx prose is caught only by the visual pass. Drift evidence for 6/2B.                                                                                                                                                                                                                |
+| 0.6 | Interim completion evidence                       | all 8 office specs                                                             | One line in the delivery-gates section: the reply must report extracted / validated / rendered / reviewed as distinct statements. Cheap 2D preview.                                                                                                                                                                                                                                                |
+| 0.7 | Trim editorial-field-report §8 "Response pattern" | editorial-field-report                                                         | Drifts against the directive, references a possibly-nonexistent `frontend-design SKILL.md`, hardcodes an English default. Shrink to avoid two drifting instruction surfaces.                                                                                                                                                                                                                       |
+| 0.8 | HTML QA story decision                            | 4 HTML specs                                                                   | They have zero gates today. Minimum: a self-check list per spec; real fix arrives with 2C. Decide scope here, don't over-build.                                                                                                                                                                                                                                                                    |
 
 Every touched pack: bump manifest `version`; update `index.test.ts` / directive tests.
 
 ## Track V — Verification spikes (short; they shape 2A–2C design)
 
-| # | Spike | Question | Why it matters |
-| --- | --- | --- | --- |
-| V.1 | aioncore vision loop | Do rendered slide screenshots reach the model **as images** on the aionrs path? (ACP/Claude Code reads PNGs natively.) | If not, gate 4 is dead letter for every model on that path; 2C must degrade honestly instead of pretending the audit ran. |
-| V.2 | officecli on ACP PATH | `injectSkills` is deliberately dropped on ACP (`AcpSendBox.tsx:436`); does the in-band `officecli load_skill` path work end-to-end with a Claude model? | Confirms template parity for Claude-family routing. |
-| V.3 | Queued-send skill drop | aionrs queued sends drop `injectSkills` (`AionrsSendBox.tsx:436`); does directive-only naming suffice? | Known commented trade-off — verify, don't assume. |
-| V.4 | Model × template eval matrix | Same source doc + template across routed models, scored mechanically against the delivery gates. | Turns "is Fable better here" into data; becomes the regression harness once 2A gates ship. |
+| #   | Spike                        | Question                                                                                                                                                | Why it matters                                                                                                            |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| V.1 | aioncore vision loop         | Do rendered slide screenshots reach the model **as images** on the aionrs path? (ACP/Claude Code reads PNGs natively.)                                  | If not, gate 4 is dead letter for every model on that path; 2C must degrade honestly instead of pretending the audit ran. |
+| V.2 | officecli on ACP PATH        | `injectSkills` is deliberately dropped on ACP (`AcpSendBox.tsx:436`); does the in-band `officecli load_skill` path work end-to-end with a Claude model? | Confirms template parity for Claude-family routing.                                                                       |
+| V.3 | Queued-send skill drop       | aionrs queued sends drop `injectSkills` (`AionrsSendBox.tsx:436`); does directive-only naming suffice?                                                  | Known commented trade-off — verify, don't assume.                                                                         |
+| V.4 | Model × template eval matrix | Same source doc + template across routed models, scored mechanically against the delivery gates.                                                        | Turns "is Fable better here" into data; becomes the regression harness once 2A gates ship.                                |
 
 ## 2A — Mechanical containment (product gates)
 
@@ -78,7 +78,7 @@ Every touched pack: bump manifest `version`; update `index.test.ts` / directive 
 - Factor the duplicated contract: workflow / delivery-gates / follow-up-edits sections are
   ~60% copy-pasted across the 8 office specs and already drifting (see 0.5). Invariants
   move into the canonical layer; THEME.md slims to visual system + layout catalog + voice
-  + unique sample tokens.
+  - unique sample tokens.
 
 ## 2C — Visual-quality loop
 

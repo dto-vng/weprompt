@@ -19,29 +19,29 @@ So the product's stated goal — a playable video out of WePrompt — is the lea
 
 ## 2. What exists, measured
 
-| Area | State |
-| --- | --- |
-| Main process | 19 files, 10,345 lines |
-| Renderer | 64 files, 10,619 lines |
-| Studio tests | 49 files |
-| Phases | Brief, Write, Produce, Review — all four present |
-| Generation | Image **and** video verified working live through OpenRouter |
-| Concurrency | FIFO semaphores, 2 image / 1 video, **global not per-project** |
-| Store | CAS/revision-guarded, JSON, main-owned |
-| Spend safety | Batch paid-generation review modal |
-| Export | Assets + `storyboard.json` + `missingSceneIds` |
-| Write assistant | `AssistantDock` shell wired into `WritePhase` |
-| Proposal ledger | Landed 2026-08-06, guarded, fail-closed on stale |
-| Curated MCP snapshot | Landed 2026-08-06 — mechanism only, **no caller** |
-| Cut model | Main: types + service (55 refs) + store (36 refs). Renderer: **0 files** |
-| Render pipeline | **Does not exist** |
+| Area                 | State                                                                    |
+| -------------------- | ------------------------------------------------------------------------ |
+| Main process         | 19 files, 10,345 lines                                                   |
+| Renderer             | 64 files, 10,619 lines                                                   |
+| Studio tests         | 49 files                                                                 |
+| Phases               | Brief, Write, Produce, Review — all four present                         |
+| Generation           | Image **and** video verified working live through OpenRouter             |
+| Concurrency          | FIFO semaphores, 2 image / 1 video, **global not per-project**           |
+| Store                | CAS/revision-guarded, JSON, main-owned                                   |
+| Spend safety         | Batch paid-generation review modal                                       |
+| Export               | Assets + `storyboard.json` + `missingSceneIds`                           |
+| Write assistant      | `AssistantDock` shell wired into `WritePhase`                            |
+| Proposal ledger      | Landed 2026-08-06, guarded, fail-closed on stale                         |
+| Curated MCP snapshot | Landed 2026-08-06 — mechanism only, **no caller**                        |
+| Cut model            | Main: types + service (55 refs) + store (36 refs). Renderer: **0 files** |
+| Render pipeline      | **Does not exist**                                                       |
 
 ## 3. Designed but not built
 
 Ordered by how much each blocks a shippable product.
 
 1. **Render pipeline.** Nothing exists. Without it the cut model is a description with no renderer,
-   and the product cannot deliver its core artifact. ffmpeg is validated as *feasible* (1.02s for 12s
+   and the product cannot deliver its core artifact. ffmpeg is validated as _feasible_ (1.02s for 12s
    of 720p, audio in sync, on the shippable VideoToolbox encoder) but nothing is wired.
 2. **Cut editor UI.** The data layer is complete and unreachable. Review is also the one screen the
    designer rates **STALE by omission** — drawn as a player plus a read-only strip before the cut
@@ -74,12 +74,12 @@ carry revisions that corrected measured errors rather than accumulating assertio
 
 **But the design surface has outrun the build**, and doc status lines have drifted from reality:
 
-| Doc | Says | Actually |
-| --- | --- | --- |
-| `cut-model-implementation-plan` | "ready to execute" | Main executed, renderer untouched |
-| `video-capability-spike` | "proposed spike (rev 3)" | Spike done; licensing cleared; nothing wired |
-| `integration-plan` | "awaiting Checkpoint 0 decision" | Superseded by the settled landing target |
-| `landing-plan` | SETTLED (fixed today) | §3/§4/§9 still describe a five-MR route not taken |
+| Doc                             | Says                             | Actually                                          |
+| ------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `cut-model-implementation-plan` | "ready to execute"               | Main executed, renderer untouched                 |
+| `video-capability-spike`        | "proposed spike (rev 3)"         | Spike done; licensing cleared; nothing wired      |
+| `integration-plan`              | "awaiting Checkpoint 0 decision" | Superseded by the settled landing target          |
+| `landing-plan`                  | SETTLED (fixed today)            | §3/§4/§9 still describe a five-MR route not taken |
 
 This is the main planning risk: a reader cannot tell from status lines what is real. Three of four
 above would mislead someone picking up the work cold.
