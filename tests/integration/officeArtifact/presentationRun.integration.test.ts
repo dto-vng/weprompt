@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -19,6 +20,7 @@ import type {
 
 import {
   createManagedPresentationIntegrationContext,
+  createSyntheticPptxBytes,
   createSyntheticPresentationSourceBytes,
   verifySyntheticCandidateCrashRecovery,
   verifySyntheticJournalCrashRecovery,
@@ -33,6 +35,7 @@ const SECOND_REQUEST_ID = '88888888-8888-4888-8888-888888888888';
 const THIRD_REQUEST_ID = '99999999-9999-4999-8999-999999999999';
 const LEGACY_RUN_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const FORGED_TURN_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const FAULT_RUN_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const JOURNAL_BOUNDARIES = [
   'before-intent-append',
   'after-intent-append',
@@ -108,6 +111,8 @@ describe('managed presentation synthetic lifecycle integration', () => {
 
   it('retains exact inspected bytes for review and discovers hash-bound recovery after restart', async () => {
     context = await createManagedPresentationIntegrationContext();
+    const candidateBytes = createSyntheticPptxBytes();
+    const candidateSha256 = createHash('sha256').update(candidateBytes).digest('hex');
     const sourcePath = context.workspacePath('board-notes.txt');
     await writeFile(sourcePath, 'Revenue grew 12 percent.\n', { mode: 0o600 });
 
@@ -118,16 +123,34 @@ describe('managed presentation synthetic lifecycle integration', () => {
     });
     if (!granted.ok) throw new Error(`Synthetic source grant failed: ${granted.code}`);
 
-    const started = await context.runs.start(
-      context.startRequest([
-        {
-          grantId: granted.grant.grantId,
-          expectedByteLength: granted.grant.byteLength,
-          expectedSha256: granted.grant.sha256,
-        },
-      ])
-    );
+    const startRequest = context.startRequest([
+      {
+        grantId: granted.grant.grantId,
+        expectedByteLength: granted.grant.byteLength,
+        expectedSha256: granted.grant.sha256,
+      },
+    ]);
+    const started = await context.runs.start(startRequest);
     if (!started.ok) throw new Error(`Synthetic run start failed: ${started.code}`);
+    const startedInternal = await context.store.getRun(started.run.runId);
+    if (startedInternal === null) throw new Error('Synthetic committed run was not stored');
+    expect(started).toEqual({
+      ok: true,
+      run: {
+        runId: started.run.runId,
+        clientRequestId: startRequest.client_request_id,
+        conversationId: startRequest.conversation_id,
+        selectedTemplateId: startRequest.selected_template_id,
+        revision: startedInternal.revision,
+        createdAt: startedInternal.createdAt,
+        updatedAt: startedInternal.updatedAt,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_extracted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: true },
+      },
+    });
 
     await context.lifecycle.backendReady(context.backendCredentials);
     const claimed = await context.runs.claimInitialDispatch({
@@ -168,32 +191,98 @@ describe('managed presentation synthetic lifecycle integration', () => {
       conversation_id: context.conversationId,
       run_id: started.run.runId,
     });
-    expect(retained).toMatchObject({
-      ok: true,
-      run: {
-        dispatchStatus: 'retained',
-        artifactPhase: 'rendered_exact_hash',
-        disposition: 'REVIEW_REQUIRED',
-        actions: { openAllowed: false, discardAllowed: true },
-      },
+    const retainedInternal = await context.store.getRun(started.run.runId);
+    if (retainedInternal === null || retainedInternal.retainedCandidate === null) {
+      throw new Error('Synthetic retained run was not stored');
+    }
+    const retainedBytes = await context.files.withAuthorizedRetainedCandidate(
+      started.run.runId,
+      retainedInternal.retainedCandidate,
+      async (reader) => reader.readAt(0, reader.byteLength)
+    );
+    expect(retainedBytes).toEqual(candidateBytes);
+    expect(retainedInternal.retainedCandidate).toEqual({
+      relativePath: 'retained/candidate.pptx',
+      sha256: candidateSha256,
+      byteLength: candidateBytes.byteLength,
     });
+    if (retainedInternal.readiness?.status !== 'passed') throw new Error('Synthetic readiness did not pass');
+    expect(retainedInternal.readiness.evidence.candidate).toEqual({
+      sha256: candidateSha256,
+      byteLength: candidateBytes.byteLength,
+    });
+    expect(retainedInternal.readiness.evidence.hashChain).toEqual({
+      stagingBeforeRetain: candidateSha256,
+      retainedTemp: candidateSha256,
+      stagingAfterRetain: candidateSha256,
+      manifestRetained: candidateSha256,
+      inspectionCopy: candidateSha256,
+      retainedAfterStructuralValidation: candidateSha256,
+      retainedAfterOoxmlInspection: candidateSha256,
+      retainedAfterEachSlideRender: [candidateSha256],
+    });
+    expect(retainedInternal.readiness.evidence.renders.map(({ candidateSha256: hash }) => hash)).toEqual([
+      candidateSha256,
+    ]);
+    const expectedPublicRun = {
+      runId: started.run.runId,
+      clientRequestId: retainedInternal.clientRequestId,
+      conversationId: retainedInternal.conversationId,
+      selectedTemplateId: retainedInternal.selectedTemplateId,
+      revision: retainedInternal.revision,
+      createdAt: retainedInternal.createdAt,
+      updatedAt: retainedInternal.updatedAt,
+      dispatchStatus: 'retained',
+      artifactPhase: 'rendered_exact_hash',
+      disposition: 'REVIEW_REQUIRED',
+      retainedCandidate: { sha256: candidateSha256, byteLength: candidateBytes.byteLength },
+      actions: { openAllowed: false, discardAllowed: true },
+    } as const;
+    expect(retained).toEqual({
+      ok: true,
+      run: expectedPublicRun,
+    });
+    const matchingOpen = await context.traceOpenRecoveryHashGuard({
+      conversation_id: context.conversationId,
+      run_id: started.run.runId,
+      expected_sha256: candidateSha256,
+    });
+    const mismatchingOpen = await context.traceOpenRecoveryHashGuard({
+      conversation_id: context.conversationId,
+      run_id: started.run.runId,
+      expected_sha256: 'f'.repeat(64),
+    });
+    const unsafeOpen = {
+      ok: false,
+      code: 'UNSAFE_TO_OPEN',
+      messageKey: 'conversation.presentationRun.UNSAFE_TO_OPEN',
+      retryable: false,
+      state: 'retained',
+      details: { runId: started.run.runId },
+    } as const;
+    expect(matchingOpen.result).toEqual(unsafeOpen);
+    expect(mismatchingOpen).toEqual({ candidateHashReads: 1, result: unsafeOpen });
+    expect(matchingOpen.candidateHashReads).toBeGreaterThan(mismatchingOpen.candidateHashReads);
     expect(context.backendPosts).toHaveLength(1);
     expect(context.validationPaths).toHaveLength(1);
     expect(context.inspectionPaths).toEqual(context.validationPaths);
+    expect(context.renderInputPaths).toEqual(context.validationPaths);
+    expect(context.validationPaths[0]).not.toBe(context.files.getStagingCandidatePath(started.run.runId));
+    expect(context.validationPaths[0]).not.toBe(
+      join(context.files.roots.runRoot, started.run.runId, 'retained', 'candidate.pptx')
+    );
+    expect(context.validationPaths[0]?.startsWith(context.files.roots.inspectionRoot)).toBe(true);
+    expect(context.validationCandidateHashes).toEqual([candidateSha256]);
+    expect(context.inspectionCandidateHashes).toEqual([candidateSha256]);
+    expect(context.renderCandidateHashes).toEqual([candidateSha256]);
     expect(context.renderedSlides).toEqual([1]);
 
     const restarted = await context.restart();
     const discovered = await restarted.runs.listRecoverable({ conversation_id: context.conversationId });
-    expect(discovered).toMatchObject({
+    expect(discovered).toEqual({
       ok: true,
-      items: [
-        {
-          runId: started.run.runId,
-          dispatchStatus: 'retained',
-          artifactPhase: 'rendered_exact_hash',
-          disposition: 'REVIEW_REQUIRED',
-        },
-      ],
+      items: [expectedPublicRun],
+      nextCursor: null,
     });
     if (!discovered.ok || discovered.items[0]?.retainedCandidate === null || discovered.items[0] === undefined) {
       throw new Error('Synthetic retained candidate was not recovered');
@@ -340,24 +429,33 @@ describe('managed presentation synthetic lifecycle integration', () => {
     ).resolves.toMatchObject({ ownerRevision: 1, grants: [{ grantId: picked.grants[0]!.grantId }] });
   });
 
-  it('fails closed for the production false flag and authoritative team or unavailable scope before dispatch', async () => {
+  it('keeps the production presentation flag false', () => {
     expect(PRESENTATION_RUN_V2_ENABLED).toBe(false);
-    context = await createManagedPresentationIntegrationContext({ featureEnabled: false });
-    await expect(context.runs.start(context.startRequest())).resolves.toMatchObject({
-      ok: false,
-      code: 'FEATURE_DISABLED',
-    });
-    expect(context.backendPosts).toEqual([]);
   });
 
   it.each([
-    ['team', 'TEAM_SCOPE_UNSUPPORTED'],
-    ['unavailable', 'SCOPE_UNAVAILABLE'],
-  ] as const)('rejects authoritative %s scope before allocation', async (scope, code) => {
-    context = await createManagedPresentationIntegrationContext({ scope });
+    ['false flag', { featureEnabled: false, scope: 'individual' as const }, 'FEATURE_DISABLED'],
+    ['team scope', { featureEnabled: true, scope: 'team' as const }, 'TEAM_SCOPE_UNSUPPORTED'],
+    ['unavailable scope', { featureEnabled: true, scope: 'unavailable' as const }, 'SCOPE_UNAVAILABLE'],
+  ] as const)('rejects %s without any allocation or policy mutation', async (_label, options, code) => {
+    context = await createManagedPresentationIntegrationContext(options);
+    const request = context.startRequest();
+    const before = await context.captureAllocationState(request);
 
-    await expect(context.runs.start(context.startRequest())).resolves.toMatchObject({ ok: false, code });
+    await expect(context.runs.start(request)).resolves.toEqual({
+      ok: false,
+      code,
+      messageKey: `conversation.presentationRun.${code}`,
+      retryable: false,
+      state: 'preflight',
+      details: null,
+    });
+    await expect(context.captureAllocationState(request)).resolves.toEqual(before);
     expect(context.backendPosts).toEqual([]);
+    context.setFeatureEnabled(true);
+    context.setScope('individual');
+    const permitted = await context.runs.start(request);
+    if (!permitted.ok) throw new Error(`Synthetic policy release unexpectedly failed: ${permitted.code}`);
   });
 
   it.each(['aionrs', 'acp'] as const)(
@@ -556,25 +654,72 @@ describe('managed presentation synthetic lifecycle integration', () => {
 
   it.each(JOURNAL_BOUNDARIES)('recovers canonical store and dispatch state after %s', async (boundary) => {
     expect(JOURNAL_BOUNDARIES_EXHAUSTIVE).toBe(true);
-    await expect(verifySyntheticJournalCrashRecovery(boundary)).resolves.toEqual({
-      injected: true,
-      recovered: true,
-    });
+    const expectedRun = boundary === 'before-intent-append' ? null : FAULT_RUN_ID;
+    await expect(verifySyntheticJournalCrashRecovery(boundary)).resolves.toEqual(
+      boundary.includes('index')
+        ? {
+            injected: true,
+            outcome: 'index-rebuilt',
+            canonical: { runId: FAULT_RUN_ID, dispatchStatus: 'allocating', revision: 0 },
+            index: {
+              requestRunId: FAULT_RUN_ID,
+              conversationRunIds: [FAULT_RUN_ID],
+              directoryEntries: ['index.json'],
+            },
+          }
+        : {
+            injected: true,
+            outcome: expectedRun === null ? 'canonical-absent' : 'canonical-recovered',
+            canonical: expectedRun === null ? null : { runId: FAULT_RUN_ID, dispatchStatus: 'allocating', revision: 0 },
+            index: {
+              requestRunId: expectedRun,
+              conversationRunIds: expectedRun === null ? [] : [FAULT_RUN_ID],
+              directoryEntries: ['index.json'],
+            },
+          }
+    );
   });
 
   it.each(SOURCE_FILE_BOUNDARIES)('recovers or safely removes a grant snapshot after %s', async (boundary) => {
     expect(FILE_BOUNDARIES_EXHAUSTIVE).toBe(true);
+    const sourceBytes = createSyntheticPptxBytes();
+    const promoted = boundary.includes('promotion');
     await expect(verifySyntheticSourceCrashRecovery(boundary)).resolves.toEqual({
       injected: true,
-      recovered: true,
+      outcome: promoted ? 'source-promoted' : 'source-abandoned-removed',
+      source: {
+        sha256: promoted ? createHash('sha256').update(sourceBytes).digest('hex') : null,
+        byteLength: promoted ? sourceBytes.byteLength : null,
+        grantDirectoryPresent: promoted,
+        directoryEntries: promoted ? ['source.pptx'] : [],
+        temporaryPresent: false,
+        finalPresent: promoted,
+      },
     });
   });
 
   it.each(CANDIDATE_FILE_BOUNDARIES)('recovers or safely removes retained bytes after %s', async (boundary) => {
     expect(FILE_BOUNDARIES_EXHAUSTIVE).toBe(true);
+    const candidateBytes = createSyntheticPptxBytes();
+    const promoted = boundary.includes('promotion');
     await expect(verifySyntheticCandidateCrashRecovery(boundary)).resolves.toEqual({
       injected: true,
-      recovered: true,
+      outcome: promoted
+        ? 'candidate-promoted'
+        : boundary === 'before-run-cleanup'
+          ? 'run-removed'
+          : 'candidate-abandoned-removed',
+      candidate: {
+        sha256: promoted ? createHash('sha256').update(candidateBytes).digest('hex') : null,
+        byteLength: promoted ? candidateBytes.byteLength : null,
+        runDirectoryPresent: promoted,
+        stagingDirectoryPresent: promoted,
+        retainedDirectoryEntries: promoted ? ['candidate.pptx'] : [],
+        stagingDirectoryEntries: promoted ? ['candidate.pptx'] : [],
+        inspectionDirectoryPresent: false,
+        temporaryPresent: false,
+        finalPresent: promoted,
+      },
     });
   });
 });

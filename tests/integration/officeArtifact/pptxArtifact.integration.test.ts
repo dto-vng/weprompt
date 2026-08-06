@@ -272,9 +272,13 @@ describe('managed presentation synthetic PPTX inspection integration', () => {
       },
     });
 
-    expect(new Set(evidence.blockers.map(({ code }) => code))).toEqual(
-      new Set(['LITERAL_ESCAPE_TOKEN', 'REQUIRED_NOTES_MISSING', 'CONTENT_VISUAL_ANCHOR_MISSING'])
-    );
-    expect(evidence.blockers).toHaveLength(31);
+    expect(evidence.blockers).toEqual([
+      { code: 'LITERAL_ESCAPE_TOKEN', slideNumber: 1 },
+      ...Array.from({ length: 10 }, (_value, index) => [
+        { code: 'CONTENT_VISUAL_ANCHOR_MISSING' as const, slideNumber: index + 2 },
+        { code: 'LITERAL_ESCAPE_TOKEN' as const, slideNumber: index + 2 },
+        { code: 'REQUIRED_NOTES_MISSING' as const, slideNumber: index + 2 },
+      ]).flat(),
+    ]);
   });
 });

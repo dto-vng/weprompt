@@ -6,13 +6,18 @@
 
 import { createHash } from 'node:crypto';
 import { accessSync, constants, statSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, isAbsolute, join } from 'node:path';
+import { delimiter, isAbsolute, join, relative } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 
 import type { OfficeArtifactMutationResult } from '@/common/types/office/artifactEditor';
-import type { PresentationSourceRef, StartPresentationRunRequest } from '@/common/types/office/presentationRun';
+import type {
+  OpenPresentationRunRequest,
+  OpenPresentationRunResult,
+  PresentationSourceRef,
+  StartPresentationRunRequest,
+} from '@/common/types/office/presentationRun';
 import { OfficeArtifactService } from '@/process/services/office-artifact/service/OfficeArtifactService';
 import { PresentationReadinessService } from '@/process/services/office-artifact/service/PresentationReadinessService';
 import { inspectPptxOoxml } from '@/process/services/office-artifact/service/pptxOoxmlInspector';
@@ -82,6 +87,17 @@ export type ManagedPresentationIntegrationOptions = {
   observeRuntime?: () => Promise<unknown>;
 };
 
+export type ManagedPresentationAllocationState = {
+  requestRunId: string | null;
+  runIds: string[];
+  grantIds: string[];
+  draftIds: string[];
+  ownerIds: string[];
+  sourceOwner: { revision: number; grantIds: string[] };
+  userDataTree: Array<{ path: string; type: 'directory' | 'file'; sha256: string | null; byteLength: number | null }>;
+  systemTempTree: Array<{ path: string; type: 'directory' | 'file'; sha256: string | null; byteLength: number | null }>;
+};
+
 export type ManagedPresentationRestartContext = {
   store: PresentationRunStore;
   runs: PresentationRunService;
@@ -106,7 +122,11 @@ export type ManagedPresentationIntegrationContext = {
     injectSkills: ['officecli'];
   }>;
   validationPaths: string[];
+  validationCandidateHashes: string[];
   inspectionPaths: string[];
+  inspectionCandidateHashes: string[];
+  renderInputPaths: string[];
+  renderCandidateHashes: string[];
   renderedSlides: number[];
   terminalAuthority: {
     signal: AbortSignal;
@@ -116,9 +136,14 @@ export type ManagedPresentationIntegrationContext = {
   now: () => Date;
   setNow: (value: Date) => void;
   setFeatureEnabled: (enabled: boolean) => void;
+  setScope: (scope: NonNullable<ManagedPresentationIntegrationOptions['scope']>) => void;
   setNativeSourcePaths: (paths: readonly string[] | null) => void;
   workspacePath: (relativePath: string) => string;
   startRequest: (sources?: readonly PresentationSourceRef[]) => StartPresentationRunRequest;
+  captureAllocationState: (request: StartPresentationRunRequest) => Promise<ManagedPresentationAllocationState>;
+  traceOpenRecoveryHashGuard: (
+    request: OpenPresentationRunRequest
+  ) => Promise<{ candidateHashReads: number; result: OpenPresentationRunResult }>;
   restart: () => Promise<ManagedPresentationRestartContext>;
   cleanup: () => Promise<void>;
 };
@@ -268,10 +293,103 @@ export function createSyntheticPresentationSourceBytes(format: PresentationSourc
   ]);
 }
 
-type SyntheticCrashRecoveryResult = {
+type SyntheticJournalCrashRecoveryResult = {
   injected: boolean;
-  recovered: boolean;
+  outcome: 'canonical-absent' | 'canonical-recovered' | 'index-rebuilt';
+  canonical: { runId: string; dispatchStatus: 'allocating'; revision: 0 } | null;
+  index: { requestRunId: string | null; conversationRunIds: string[]; directoryEntries: string[] };
 };
+
+type SyntheticSourceCrashRecoveryResult = {
+  injected: boolean;
+  outcome: 'source-promoted' | 'source-abandoned-removed';
+  source: {
+    sha256: string | null;
+    byteLength: number | null;
+    grantDirectoryPresent: boolean;
+    directoryEntries: string[];
+    temporaryPresent: boolean;
+    finalPresent: boolean;
+  };
+};
+
+type SyntheticCandidateCrashRecoveryResult = {
+  injected: boolean;
+  outcome: 'candidate-promoted' | 'candidate-abandoned-removed' | 'run-removed';
+  candidate: {
+    sha256: string | null;
+    byteLength: number | null;
+    runDirectoryPresent: boolean;
+    stagingDirectoryPresent: boolean;
+    retainedDirectoryEntries: string[];
+    stagingDirectoryEntries: string[];
+    inspectionDirectoryPresent: boolean;
+    temporaryPresent: boolean;
+    finalPresent: boolean;
+  };
+};
+
+function isMissingPathError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+async function pathPresent(filePath: string): Promise<boolean> {
+  try {
+    await lstat(filePath);
+    return true;
+  } catch (error) {
+    if (isMissingPathError(error)) return false;
+    throw error;
+  }
+}
+
+async function sortedDirectoryEntries(directory: string): Promise<string[]> {
+  try {
+    return (await readdir(directory)).toSorted();
+  } catch (error) {
+    if (isMissingPathError(error)) return [];
+    throw error;
+  }
+}
+
+async function hashFile(filePath: string): Promise<string> {
+  return createHash('sha256')
+    .update(await readFile(filePath))
+    .digest('hex');
+}
+
+async function captureSyntheticTree(root: string): Promise<ManagedPresentationAllocationState['userDataTree']> {
+  const visit = async (directory: string): Promise<ManagedPresentationAllocationState['userDataTree']> => {
+    const entries = (await readdir(directory, { withFileTypes: true })).toSorted((left, right) =>
+      left.name.localeCompare(right.name)
+    );
+    const captured = await Promise.all(
+      entries.map(async (entry) => {
+        const entryPath = join(directory, entry.name);
+        const relativePath = relative(root, entryPath);
+        if (entry.isDirectory()) {
+          return {
+            entry: { path: relativePath, type: 'directory' as const, sha256: null, byteLength: null },
+            descendants: await visit(entryPath),
+          };
+        }
+        if (!entry.isFile()) throw new Error('Synthetic managed state contains a non-file entry');
+        const bytes = await readFile(entryPath);
+        return {
+          entry: {
+            path: relativePath,
+            type: 'file' as const,
+            sha256: createHash('sha256').update(bytes).digest('hex'),
+            byteLength: bytes.byteLength,
+          },
+          descendants: [],
+        };
+      })
+    );
+    return captured.flatMap(({ entry, descendants }) => [entry].concat(descendants));
+  };
+  return visit(root);
+}
 
 const SOURCE_PROMOTION_BOUNDARIES = new Set<PresentationRunFileDurableBoundary>([
   'before-grant-promotion-rename',
@@ -301,16 +419,24 @@ async function createSyntheticFaultRoots(prefix: string): Promise<{
 /** Exercise and restart every write-ahead journal or derived-index durable boundary. */
 export async function verifySyntheticJournalCrashRecovery(
   boundary: PresentationRunDurableBoundary
-): Promise<SyntheticCrashRecoveryResult> {
+): Promise<SyntheticJournalCrashRecoveryResult> {
   const roots = await createSyntheticFaultRoots('forge-presentation-journal-crash-');
   let armed = false;
   let injected = false;
   try {
     const files = new PresentationRunFiles({ userDataDir: roots.userDataDir, tempDir: roots.systemTempDir });
-    const seed = new PresentationRunJournal({ files, now: () => new Date(SYNTHETIC_NOW) });
+    const now = (): Date => new Date(SYNTHETIC_NOW);
+    const createStore = (journal: PresentationRunJournal): PresentationRunStore =>
+      new PresentationRunStore({
+        files,
+        journal,
+        now,
+        randomUUID: () => SYNTHETIC_FAULT_RUN_ID,
+        getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+      });
     const crashing = new PresentationRunJournal({
       files,
-      now: () => new Date(SYNTHETIC_NOW),
+      now,
       failureInjector: (point) => {
         if (!armed || injected || point.boundary !== boundary) return;
         injected = true;
@@ -319,53 +445,74 @@ export async function verifySyntheticJournalCrashRecovery(
     });
 
     if (boundary.includes('index')) {
-      await seed.writeDerivedIndex({ version: 1, state: 'seed' });
+      const seedStore = createStore(new PresentationRunJournal({ files, now }));
+      const allocated = await seedStore.allocateRun({
+        conversationId: SYNTHETIC_CONVERSATION_ID,
+        clientRequestId: SYNTHETIC_REQUEST_ID,
+        selectedTemplateId: SYNTHETIC_TEMPLATE_ID,
+        requestFingerprint: 'a'.repeat(64),
+        grantClaims: [],
+      });
+      if (!allocated.ok) throw new Error(`Synthetic index seed failed: ${allocated.code}`);
       armed = true;
-      await crashing.writeDerivedIndex({ version: 1, state: 'dispatch' }).catch((): undefined => undefined);
-      const restarted = new PresentationRunJournal({ files, now: () => new Date(SYNTHETIC_NOW) });
-      await restarted.writeDerivedIndex({ version: 1, state: 'recovered' });
-      const recovered = JSON.parse(await readFile(files.getIndexPath(), 'utf8')) as unknown;
-      return {
-        injected,
-        recovered:
-          typeof recovered === 'object' &&
-          recovered !== null &&
-          'state' in recovered &&
-          recovered.state === 'recovered',
-      };
+      await crashing
+        .writeDerivedIndex({
+          version: 1,
+          requests: {},
+          conversations: {},
+          turns: {},
+          grants: {},
+          sourceOwners: {},
+          draftRequests: {},
+        })
+        .catch((): undefined => undefined);
+    } else {
+      const crashingStore = createStore(crashing);
+      await crashingStore.initialize();
+      armed = true;
+      await crashingStore
+        .allocateRun({
+          conversationId: SYNTHETIC_CONVERSATION_ID,
+          clientRequestId: SYNTHETIC_REQUEST_ID,
+          selectedTemplateId: SYNTHETIC_TEMPLATE_ID,
+          requestFingerprint: 'a'.repeat(64),
+          grantClaims: [],
+        })
+        .catch((): undefined => undefined);
     }
 
-    const allocated = { version: 1, revision: 0, phase: 'store-allocated' };
-    const dispatching = { version: 1, revision: 1, phase: 'dispatch-committed' };
-    await seed.transaction({
-      mutations: [
-        {
-          entityKind: 'run',
-          entityId: SYNTHETIC_FAULT_RUN_ID,
-          expectedRevision: null,
-          nextManifest: allocated,
-        },
-      ],
-    });
-    armed = true;
-    await crashing
-      .transaction({
-        mutations: [
-          {
-            entityKind: 'run',
-            entityId: SYNTHETIC_FAULT_RUN_ID,
-            expectedRevision: 0,
-            nextManifest: dispatching,
-          },
-        ],
-      })
-      .catch((): undefined => undefined);
-    const restarted = new PresentationRunJournal({ files, now: () => new Date(SYNTHETIC_NOW) });
-    await restarted.recover();
-    const canonical = await restarted.readCanonical<{ revision: number; phase: string }>('run', SYNTHETIC_FAULT_RUN_ID);
-    const expected = boundary === 'before-intent-append' ? allocated : dispatching;
-    await restarted.recover();
-    return { injected, recovered: JSON.stringify(canonical) === JSON.stringify(expected) };
+    const restartedJournal = new PresentationRunJournal({ files, now });
+    const restartedStore = createStore(restartedJournal);
+    await restartedStore.initialize();
+    const canonical = await restartedStore.getRun(SYNTHETIC_FAULT_RUN_ID);
+    const index = await restartedJournal.readDerivedIndex<{
+      version: 1;
+      requests: Record<string, string>;
+      conversations: Record<string, string[]>;
+    }>();
+    if (index === null) throw new Error('Synthetic restarted store did not rebuild its derived index');
+    if (canonical !== null && (canonical.dispatchStatus !== 'allocating' || canonical.revision !== 0)) {
+      throw new Error('Synthetic restarted canonical run has an unexpected state');
+    }
+    const requestRunIds = Object.values(index.requests);
+    if (requestRunIds.length > 1) throw new Error('Synthetic restarted index has multiple request mappings');
+    return {
+      injected,
+      outcome: boundary.includes('index')
+        ? 'index-rebuilt'
+        : canonical === null
+          ? 'canonical-absent'
+          : 'canonical-recovered',
+      canonical:
+        canonical === null
+          ? null
+          : { runId: canonical.runId, dispatchStatus: canonical.dispatchStatus, revision: canonical.revision },
+      index: {
+        requestRunId: requestRunIds[0] ?? null,
+        conversationRunIds: [...(index.conversations[SYNTHETIC_CONVERSATION_ID] ?? [])],
+        directoryEntries: await sortedDirectoryEntries(files.roots.indexRoot),
+      },
+    };
   } finally {
     await rm(roots.root, { recursive: true, force: true });
   }
@@ -374,7 +521,7 @@ export async function verifySyntheticJournalCrashRecovery(
 /** Exercise every source-snapshot file boundary and prove restart cleanup or promotion. */
 export async function verifySyntheticSourceCrashRecovery(
   boundary: PresentationRunFileDurableBoundary
-): Promise<SyntheticCrashRecoveryResult> {
+): Promise<SyntheticSourceCrashRecoveryResult> {
   const roots = await createSyntheticFaultRoots('forge-presentation-source-crash-');
   const sourcePath = join(roots.root, 'source.pptx');
   await writeFile(sourcePath, createSyntheticPptxBytes(), { mode: 0o600 });
@@ -407,28 +554,86 @@ export async function verifySyntheticSourceCrashRecovery(
     }
 
     const restarted = new PresentationRunFiles({ userDataDir: roots.userDataDir, tempDir: roots.systemTempDir });
+    const grantDirectory = join(restarted.roots.grantRoot, SYNTHETIC_FAULT_GRANT_ID);
     if (prepared === undefined) {
       await restarted.removeAbandonedPreparedSourceGrant(SYNTHETIC_FAULT_GRANT_ID);
-      return { injected, recovered: true };
+      return {
+        injected,
+        outcome: 'source-abandoned-removed',
+        source: {
+          sha256: null,
+          byteLength: null,
+          grantDirectoryPresent: await pathPresent(grantDirectory),
+          directoryEntries: await sortedDirectoryEntries(grantDirectory),
+          temporaryPresent: false,
+          finalPresent: false,
+        },
+      };
     }
     await restarted.recoverSourceSnapshotPromotion(prepared);
-    await restarted.verifySourceSnapshot({
+    const reference = {
       grantId: prepared.grantId,
       format: prepared.format,
       relativePath: prepared.finalRelativePath,
       sha256: prepared.sha256,
       byteLength: prepared.byteLength,
-    });
-    return { injected, recovered: true };
+    } as const;
+    await restarted.verifySourceSnapshot(reference);
+    const exact = await restarted.withAuthorizedSourceSnapshot(reference, async (reader) => reader.readBytes());
+    const temporaryPath = join(grantDirectory, prepared.temporaryRelativePath);
+    const finalPath = join(grantDirectory, prepared.finalRelativePath);
+    return {
+      injected,
+      outcome: 'source-promoted',
+      source: {
+        sha256: createHash('sha256').update(exact).digest('hex'),
+        byteLength: exact.byteLength,
+        grantDirectoryPresent: await pathPresent(grantDirectory),
+        directoryEntries: await sortedDirectoryEntries(grantDirectory),
+        temporaryPresent: await pathPresent(temporaryPath),
+        finalPresent: await pathPresent(finalPath),
+      },
+    };
   } finally {
     await rm(roots.root, { recursive: true, force: true });
   }
 }
 
 /** Exercise every retained-candidate file boundary and prove restart cleanup or exact promotion. */
+async function syntheticCandidateCrashState(
+  files: PresentationRunFiles,
+  outcome: SyntheticCandidateCrashRecoveryResult['outcome'],
+  injected: boolean,
+  prepared?: PreparedRetainedCandidate,
+  exact?: Buffer
+): Promise<SyntheticCandidateCrashRecoveryResult> {
+  const runDirectory = join(files.roots.runRoot, SYNTHETIC_FAULT_RUN_ID);
+  const retainedDirectory = join(runDirectory, 'retained');
+  const stagingRunDirectory = join(files.roots.stagingRoot, SYNTHETIC_FAULT_RUN_ID);
+  const stagingDirectory = join(stagingRunDirectory, 'agent');
+  const inspectionDirectory = join(files.roots.inspectionRoot, SYNTHETIC_FAULT_RUN_ID);
+  const temporaryPath = prepared === undefined ? '' : join(runDirectory, prepared.temporaryRelativePath);
+  const finalPath = join(retainedDirectory, 'candidate.pptx');
+  return {
+    injected,
+    outcome,
+    candidate: {
+      sha256: exact === undefined ? null : createHash('sha256').update(exact).digest('hex'),
+      byteLength: exact?.byteLength ?? null,
+      runDirectoryPresent: await pathPresent(runDirectory),
+      stagingDirectoryPresent: await pathPresent(stagingRunDirectory),
+      retainedDirectoryEntries: await sortedDirectoryEntries(retainedDirectory),
+      stagingDirectoryEntries: await sortedDirectoryEntries(stagingDirectory),
+      inspectionDirectoryPresent: await pathPresent(inspectionDirectory),
+      temporaryPresent: prepared === undefined ? false : await pathPresent(temporaryPath),
+      finalPresent: await pathPresent(finalPath),
+    },
+  };
+}
+
 export async function verifySyntheticCandidateCrashRecovery(
   boundary: PresentationRunFileDurableBoundary
-): Promise<SyntheticCrashRecoveryResult> {
+): Promise<SyntheticCandidateCrashRecoveryResult> {
   const roots = await createSyntheticFaultRoots('forge-presentation-candidate-crash-');
   const candidateBytes = createSyntheticPptxBytes();
   let armed = false;
@@ -451,7 +656,7 @@ export async function verifySyntheticCandidateCrashRecovery(
       await files.removeRun(SYNTHETIC_FAULT_RUN_ID).catch((): undefined => undefined);
       const restarted = new PresentationRunFiles({ userDataDir: roots.userDataDir, tempDir: roots.systemTempDir });
       await restarted.removeRun(SYNTHETIC_FAULT_RUN_ID);
-      return { injected, recovered: true };
+      return syntheticCandidateCrashState(restarted, 'run-removed', injected);
     }
     if (CANDIDATE_PROMOTION_BOUNDARIES.has(boundary)) {
       prepared = await files.prepareRetainedCandidate(SYNTHETIC_FAULT_RUN_ID);
@@ -465,7 +670,7 @@ export async function verifySyntheticCandidateCrashRecovery(
     const restarted = new PresentationRunFiles({ userDataDir: roots.userDataDir, tempDir: roots.systemTempDir });
     if (prepared === undefined) {
       await restarted.removeRun(SYNTHETIC_FAULT_RUN_ID);
-      return { injected, recovered: true };
+      return syntheticCandidateCrashState(restarted, 'candidate-abandoned-removed', injected);
     }
     await restarted.recoverRetainedCandidatePromotion(prepared);
     const exact = await restarted.withAuthorizedRetainedCandidate(
@@ -477,7 +682,8 @@ export async function verifySyntheticCandidateCrashRecovery(
       },
       async (reader) => reader.readAt(0, reader.byteLength)
     );
-    return { injected, recovered: exact?.equals(candidateBytes) === true };
+    if (exact === null) throw new Error('Synthetic retained candidate disappeared after recovery');
+    return syntheticCandidateCrashState(restarted, 'candidate-promoted', injected, prepared, exact);
   } finally {
     await rm(roots.root, { recursive: true, force: true });
   }
@@ -578,7 +784,7 @@ export async function createManagedPresentationIntegrationContext(
       getFreeDiskBytes: async () => options.freeDiskBytes ?? 8 * 1_024 * 1_024 * 1_024,
     });
   const store = createStore(journal);
-  const scope = options.scope ?? 'individual';
+  let scope = options.scope ?? 'individual';
   const runtime = options.runtime ?? 'aionrs';
   const principalId = 'synthetic-local-principal';
   const resolveAuthority = async (): Promise<PresentationRunAuthorityResolution> => {
@@ -604,7 +810,11 @@ export async function createManagedPresentationIntegrationContext(
   };
   const backendPosts: ManagedPresentationIntegrationContext['backendPosts'] = [];
   const validationPaths: string[] = [];
+  const validationCandidateHashes: string[] = [];
   const inspectionPaths: string[] = [];
+  const inspectionCandidateHashes: string[] = [];
+  const renderInputPaths: string[] = [];
+  const renderCandidateHashes: string[] = [];
   const renderedSlides: number[] = [];
   const eventClient = {
     connect: (): void => undefined,
@@ -645,15 +855,19 @@ export async function createManagedPresentationIntegrationContext(
         runner: {
           validate: async (filePath) => {
             validationPaths.push(filePath);
+            validationCandidateHashes.push(await hashFile(filePath));
             return {};
           },
-          renderSlide: async (_filePath, slideNumber, outputPath) => {
+          renderSlide: async (filePath, slideNumber, outputPath) => {
+            renderInputPaths.push(filePath);
+            renderCandidateHashes.push(await hashFile(filePath));
             renderedSlides.push(slideNumber);
             await writeFile(outputPath, SYNTHETIC_VALID_PNG, { mode: 0o600 });
           },
         },
         inspectOoxml: async (filePath) => {
           inspectionPaths.push(filePath);
+          inspectionCandidateHashes.push(await hashFile(filePath));
           return inspectPptxOoxml(filePath);
         },
         createInspectionWorkspace: async () => inspectionWorkspace,
@@ -677,6 +891,62 @@ export async function createManagedPresentationIntegrationContext(
     });
   runs = createRunService(store);
   const terminalController = new AbortController();
+  const captureAllocationState = async (
+    request: StartPresentationRunRequest
+  ): Promise<ManagedPresentationAllocationState> => {
+    const requestRun = await store.getByRequest(request.conversation_id, request.client_request_id);
+    const owner = await store.getPresentationSourceOwner(
+      { owner_type: 'conversation', conversation_id: request.conversation_id },
+      principalId
+    );
+    const [runIds, grantIds, draftIds, ownerIds, userDataTree, systemTempTree] = await Promise.all([
+      files.listEntityIds('run'),
+      files.listEntityIds('grant'),
+      files.listEntityIds('draft'),
+      files.listEntityIds('owner'),
+      captureSyntheticTree(userDataDir),
+      captureSyntheticTree(systemTempDir),
+    ]);
+    return {
+      requestRunId: requestRun?.runId ?? null,
+      runIds: runIds.toSorted(),
+      grantIds: grantIds.toSorted(),
+      draftIds: draftIds.toSorted(),
+      ownerIds: ownerIds.toSorted(),
+      sourceOwner: { revision: owner.ownerRevision, grantIds: owner.grants.map(({ grantId }) => grantId).toSorted() },
+      userDataTree,
+      systemTempTree,
+    };
+  };
+  const traceOpenRecoveryHashGuard = async (
+    request: OpenPresentationRunRequest
+  ): Promise<{ candidateHashReads: number; result: OpenPresentationRunResult }> => {
+    let candidateHashReads = 0;
+    const tracingStore = new Proxy(store, {
+      get(target, property) {
+        if (property === 'getRun') {
+          return async (runId: string) => {
+            const run = await target.getRun(runId);
+            if (run?.retainedCandidate === null || run === null) return run;
+            const sha256 = run.retainedCandidate.sha256;
+            const retainedCandidate = { ...run.retainedCandidate };
+            Object.defineProperty(retainedCandidate, 'sha256', {
+              enumerable: true,
+              get: () => {
+                candidateHashReads += 1;
+                return sha256;
+              },
+            });
+            return { ...run, retainedCandidate };
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const result = await createRunService(tracingStore).openRecovery(request);
+    return { candidateHashReads, result };
+  };
 
   return {
     root,
@@ -692,7 +962,11 @@ export async function createManagedPresentationIntegrationContext(
     lifecycle,
     backendPosts,
     validationPaths,
+    validationCandidateHashes,
     inspectionPaths,
+    inspectionCandidateHashes,
+    renderInputPaths,
+    renderCandidateHashes,
     renderedSlides,
     terminalAuthority: {
       signal: terminalController.signal,
@@ -706,6 +980,9 @@ export async function createManagedPresentationIntegrationContext(
     setFeatureEnabled: (enabled) => {
       featureEnabled = enabled;
     },
+    setScope: (value) => {
+      scope = value;
+    },
     setNativeSourcePaths: (paths) => {
       nativeSourcePaths = paths;
     },
@@ -717,6 +994,8 @@ export async function createManagedPresentationIntegrationContext(
       selected_template_id: SYNTHETIC_TEMPLATE_ID,
       sources: [...sources],
     }),
+    captureAllocationState,
+    traceOpenRecoveryHashGuard,
     restart: async () => {
       const restartedStore = createStore(new PresentationRunJournal({ files, now }));
       await restartedStore.initialize();
