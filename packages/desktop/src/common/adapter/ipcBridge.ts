@@ -82,6 +82,7 @@ import type { IProjectKnowledgeListResult } from '../types/project/knowledgeType
 import type {
   CreateStudioProjectInput,
   ProposeStudioStoryboardInput,
+  StudioBindBriefConversationRequest,
   StudioAsset,
   StudioCommandResult,
   StudioChooseAndExportAssetsRequest,
@@ -1145,6 +1146,10 @@ export const creativeStudio = {
   updateProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateProjectRequest>(
     'creative-studio.update-project'
   ),
+  bindBriefConversation: bridge.buildProvider<
+    StudioCommandResult<StudioRendererProject>,
+    StudioBindBriefConversationRequest
+  >('creative-studio.bind-brief-conversation'),
   updateCut: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateCutRequest>(
     'creative-studio.update-cut'
   ),

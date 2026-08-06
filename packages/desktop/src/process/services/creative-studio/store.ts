@@ -801,6 +801,9 @@ const validateProject = (value: unknown): value is StudioProject => {
     !isNonEmptyString(value.name) ||
     !isString(value.brief) ||
     (value.forgeProjectId !== undefined && !isSafeId(value.forgeProjectId)) ||
+    (value.briefConversationId !== undefined &&
+      value.briefConversationId !== null &&
+      !isSafeId(value.briefConversationId)) ||
     !isString(value.aspectRatio) ||
     !ASPECT_RATIOS.has(value.aspectRatio) ||
     !isIntegerInRange(value.targetDurationSeconds, 5, 60) ||
@@ -923,6 +926,7 @@ const createProjectFromInput = (input: CreateStudioProjectInput, id: string, tim
   name: input.name.trim(),
   brief: input.brief,
   ...(input.forgeProjectId === undefined ? {} : { forgeProjectId: input.forgeProjectId }),
+  briefConversationId: null,
   aspectRatio: input.aspectRatio,
   targetDurationSeconds: input.targetDurationSeconds,
   resolution: input.resolution,

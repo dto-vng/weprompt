@@ -277,6 +277,54 @@ describe('CreativeStudioService', () => {
     ).rejects.toMatchObject({ code: 'not_found' } satisfies Partial<CreativeStudioStoreError>);
   });
 
+  it('persists the Brief conversation binding and returns it through the renderer projection', async () => {
+    const project = await service.createProject(makeInput());
+
+    const bound = await service.bindBriefConversation({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      conversationId: 'conversation_brief',
+    });
+
+    expect(bound.briefConversationId).toBe('conversation_brief');
+    await expect(service.getProject(project.id)).resolves.toMatchObject({
+      briefConversationId: 'conversation_brief',
+    });
+  });
+
+  it('rejects a stale Brief binding revision without replacing the persisted conversation id', async () => {
+    const project = await service.createProject(makeInput());
+    await service.bindBriefConversation({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      conversationId: 'conversation_first',
+    });
+
+    await expect(
+      service.bindBriefConversation({
+        projectId: project.id,
+        expectedRevision: project.revision,
+        conversationId: 'conversation_stale',
+      })
+    ).rejects.toMatchObject({ code: 'stale_project' } satisfies Partial<CreativeStudioStoreError>);
+    await expect(service.getProject(project.id)).resolves.toMatchObject({
+      briefConversationId: 'conversation_first',
+    });
+  });
+
+  it('does not accept the Brief binding through the scalar project update whitelist', async () => {
+    const project = await service.createProject(makeInput());
+
+    const updated = await service.updateProject({
+      projectId: project.id,
+      expectedRevision: project.revision,
+      name: 'Renamed launch film',
+      briefConversationId: 'conversation_injected',
+    } as never);
+
+    expect(updated.briefConversationId).toBeNull();
+  });
+
   it('decodes a renderer PNG and notifies only after captured-poster persistence succeeds', async () => {
     const capturedPoster: StudioAsset = {
       id: 'poster_1',

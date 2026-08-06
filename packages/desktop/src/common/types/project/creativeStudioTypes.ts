@@ -213,6 +213,7 @@ export type StudioProject = {
   name: string;
   brief: string;
   forgeProjectId?: string;
+  briefConversationId?: string | null;
   aspectRatio: StudioAspectRatio;
   targetDurationSeconds: number;
   resolution: StudioResolution;
@@ -444,6 +445,11 @@ export type StudioUpdateProjectRequest = StudioProjectRequest & {
   resolution?: StudioResolution;
 };
 
+export type StudioBindBriefConversationRequest = StudioProjectRequest & {
+  expectedRevision: number;
+  conversationId: string | null;
+};
+
 export type StudioUpdateCutRequest = StudioProjectRequest & {
   expectedRevision: number;
   cutId: string;
@@ -602,6 +608,7 @@ export type StudioDesktopApi = {
   proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioCommandResult<StudioRendererProject>>;
   updateModelSelection(input: StudioUpdateModelSelectionRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioCommandResult<StudioRendererProject>>;
+  bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   updateCut(input: StudioUpdateCutRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<StudioCommandResult<boolean>>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioCommandResult<StudioRendererProject>>;

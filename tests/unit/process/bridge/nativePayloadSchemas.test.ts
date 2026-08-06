@@ -161,6 +161,11 @@ const VALID_PAYLOADS = {
     selection: { choiceId: 'binding_1' },
   },
   'creative-studio.update-project': { projectId: 'project_1', expectedRevision: 1, name: 'Changed launch film' },
+  'creative-studio.bind-brief-conversation': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    conversationId: 'conversation_brief',
+  },
   'creative-studio.update-cut': {
     projectId: 'project_1',
     expectedRevision: 1,
@@ -1182,6 +1187,25 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it('guards the dedicated Brief conversation binding command', () => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.bind-brief-conversation'];
+
+    expect(
+      schema.safeParse({
+        projectId: 'studio_1',
+        expectedRevision: 2,
+        conversationId: 'conversation_brief',
+      }).success
+    ).toBe(true);
+    expect(
+      schema.safeParse({
+        projectId: 'studio_1',
+        expectedRevision: 0,
+        conversationId: '../conversation',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts an empty Studio scene title for display-only seeded placeholders', () => {
     const payload = VALID_PAYLOADS['creative-studio.update-scene'];
 

@@ -7,6 +7,7 @@
 import type {
   CreateStudioProjectInput,
   ProposeStudioStoryboardInput,
+  StudioBindBriefConversationRequest,
   StudioCut,
   StudioEditableCut,
   StudioEditableScene,
@@ -138,6 +139,7 @@ export type CreativeStudioService = {
   getProject(projectId: string): Promise<StudioRendererProject | null>;
   proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioRendererProject>;
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioRendererProject>;
+  bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioRendererProject>;
   updateCut(input: StudioUpdateCutRequest): Promise<StudioRendererProject>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<boolean>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioRendererProject>;
@@ -677,6 +679,7 @@ const toRendererProject = (project: StudioProject): StudioRendererProject => {
     name: project.name,
     brief: project.brief,
     ...(project.forgeProjectId === undefined ? {} : { forgeProjectId: project.forgeProjectId }),
+    briefConversationId: project.briefConversationId ?? null,
     aspectRatio: project.aspectRatio,
     targetDurationSeconds: project.targetDurationSeconds,
     resolution: project.resolution,
@@ -1092,6 +1095,19 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             return project;
           },
           expectedRevision
+        )
+      );
+    },
+
+    async bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioRendererProject> {
+      assertSafeId(input.projectId, 'project id');
+      assertExpectedRevision(input.expectedRevision);
+      if (input.conversationId !== null) assertSafeId(input.conversationId, 'conversation id');
+      return notify(
+        await deps.store.updateProject(
+          input.projectId,
+          (project) => ({ ...project, briefConversationId: input.conversationId }),
+          input.expectedRevision
         )
       );
     },

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   proposeStoryboardProvider: vi.fn(),
   updateModelSelectionProvider: vi.fn(),
   updateProjectProvider: vi.fn(),
+  bindBriefConversationProvider: vi.fn(),
   updateCutProvider: vi.fn(),
   fitStoryboardProvider: vi.fn(),
   deleteProjectProvider: vi.fn(),
@@ -49,6 +50,7 @@ vi.mock('@/common', () => ({
       proposeStoryboard: { provider: mocks.proposeStoryboardProvider },
       updateModelSelection: { provider: mocks.updateModelSelectionProvider },
       updateProject: { provider: mocks.updateProjectProvider },
+      bindBriefConversation: { provider: mocks.bindBriefConversationProvider },
       updateCut: { provider: mocks.updateCutProvider },
       fitStoryboard: { provider: mocks.fitStoryboardProvider },
       deleteProject: { provider: mocks.deleteProjectProvider },
@@ -115,6 +117,7 @@ describe('initCreativeStudioBridge', () => {
         proposeStoryboard: vi.fn(async () => project),
         updateModelSelection: vi.fn(async () => project),
         updateProject: vi.fn(async () => project),
+        bindBriefConversation: vi.fn(async () => project),
         updateCut: vi.fn(async () => project),
         fitStoryboard: vi.fn(async () => ({
           status: 'already_matches' as const,
@@ -152,6 +155,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.proposeStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.updateModelSelectionProvider).toHaveBeenCalledOnce();
     expect(mocks.updateProjectProvider).toHaveBeenCalledOnce();
+    expect(mocks.bindBriefConversationProvider).toHaveBeenCalledOnce();
     expect(mocks.updateCutProvider).toHaveBeenCalledOnce();
     expect(mocks.fitStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.deleteProjectProvider).toHaveBeenCalledOnce();
@@ -640,6 +644,10 @@ describe('initCreativeStudioBridge', () => {
       ],
       [mocks.updateProjectProvider, { projectId: 'project_1', expectedRevision: 1, name: 'Changed' }],
       [
+        mocks.bindBriefConversationProvider,
+        { projectId: 'project_1', expectedRevision: 1, conversationId: 'conversation_brief' },
+      ],
+      [
         mocks.updateCutProvider,
         {
           projectId: 'project_1',
@@ -681,6 +689,8 @@ describe('initCreativeStudioBridge', () => {
     expect(service.proposeStoryboard).toHaveBeenCalledOnce();
     expect(service.updateModelSelection).toHaveBeenCalledOnce();
     expect(service.updateProject).toHaveBeenCalledOnce();
+    expect(service.bindBriefConversation).toHaveBeenCalledOnce();
+    expect(service.updateCut).toHaveBeenCalledOnce();
     expect(service.deleteProject).toHaveBeenCalledOnce();
     expect(service.updateScene).toHaveBeenCalledOnce();
     expect(service.reorderScenes).toHaveBeenCalledOnce();

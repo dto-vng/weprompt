@@ -543,6 +543,13 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'creative-studio.update-model-selection': studioUpdateModelSelectionSchema,
   'creative-studio.update-project': studioUpdateProjectSchema,
+  'creative-studio.bind-brief-conversation': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      conversationId: safeIdSchema.nullable(),
+    })
+    .strict(),
   'creative-studio.update-cut': studioUpdateCutSchema,
   'creative-studio.delete-project': z
     .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
