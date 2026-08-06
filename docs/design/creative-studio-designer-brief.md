@@ -72,7 +72,9 @@ Measured type/colour specs are in the [pass 3 prep doc](creative-studio-fidelity
 
 Today they are mutually exclusive, and crudely so. `ConnectEngineCard` replaces the *entire* Produce surface — but only when **no** role is ready. There is no design for partial readiness, and the current behaviour is bad:
 
-> **Verified:** with the image model ready and the video model not, the shot grid renders normally, the engine bar names only the image model, and every **video** shot loses its generate button entirely — it is conditionally rendered, so it does not appear at all. No disabled state, no tooltip, no explanation. The shot simply has no action and nothing says why.
+> **Measured, not theorised:** with the image model ready and the video model not, the shot grid renders normally, the engine bar names only the image model, and every **video** shot loses its generate button entirely — it is conditionally rendered, so it does not appear at all. No disabled state, no tooltip, no explanation. The shot simply has no action and nothing says why.
+>
+> Confirmed 2026-08-06 against the real renderer modules in a running build: an image shot in the same project kept its button, and flipping only the video role's status back to ready restored it — so role status is the sole cause. Recorded as **BUG-024**; it is a defect on its own and does not wait on this brief.
 
 The per-role panel is the natural place to fix this, because it already shows one row per role. Three candidate shapes, for you to pick between or replace:
 
