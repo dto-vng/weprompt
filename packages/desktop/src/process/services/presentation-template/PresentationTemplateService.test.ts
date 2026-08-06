@@ -4,10 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { renameSync } from 'node:fs';
+import { mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
+import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
 import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
 
@@ -29,6 +33,46 @@ const pack = (id: string, version = 1): BuiltinTemplatePack => ({
   previewSvg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
 });
 
+const sha256 = (bytes: Buffer | string): string => createHash('sha256').update(bytes).digest('hex');
+
+async function createPptxPack(
+  rootDir: string,
+  id = 'business-review'
+): Promise<{
+  manifest: PresentationTemplateManifest;
+  directory: string;
+  themePath: string;
+  referencePath: string;
+  themeBytes: Buffer;
+  referenceBytes: Buffer;
+}> {
+  const directory = path.join(rootDir, id);
+  const themePath = path.join(directory, 'THEME.md');
+  const referencePath = path.join(directory, 'reference.pptx');
+  const themeBytes = Buffer.from('# Business Review\nUse a restrained executive style.\n', 'utf-8');
+  const referenceBytes = Buffer.from('PK\u0003\u0004bounded-test-reference', 'binary');
+  const manifest: PresentationTemplateManifest = {
+    id,
+    name: 'Business Review',
+    description: 'A bounded PPTX template fixture',
+    format: 'pptx',
+    kind: 'deck',
+    source: 'builtin',
+    themeFile: 'THEME.md',
+    referenceFile: 'reference.pptx',
+    preview: 'preview.svg',
+    version: 1,
+    createdAt: '2026-07-22T00:00:00Z',
+  };
+  await mkdir(directory, { recursive: true });
+  await Promise.all([
+    writeFile(path.join(directory, 'template.json'), JSON.stringify(manifest), 'utf-8'),
+    writeFile(themePath, themeBytes),
+    writeFile(referencePath, referenceBytes),
+  ]);
+  return { manifest, directory, themePath, referencePath, themeBytes, referenceBytes };
+}
+
 describe('PresentationTemplateService', () => {
   let rootDir: string;
 
@@ -47,6 +91,48 @@ describe('PresentationTemplateService', () => {
     expect(list.map((s) => s.manifest.id)).toEqual(['alpha', 'beta']);
     expect(list[0].themePath).toBe(path.join(rootDir, 'alpha', 'THEME.md'));
     expect(list[0].previewDataUrl.startsWith('data:image/svg+xml;base64,')).toBe(true);
+  });
+
+  it('rejects a symlinked template root before syncing a nonempty builtin pack', async () => {
+    const outsideRoot = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-root-'));
+    const sentinelPath = path.join(outsideRoot, 'sentinel.txt');
+    await writeFile(sentinelPath, 'unchanged', 'utf-8');
+    await rm(rootDir, { recursive: true, force: true });
+    await symlink(outsideRoot, rootDir, 'dir');
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [pack('alpha')] });
+
+    try {
+      await expect(service.ensureInitialized()).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+      expect(await readdir(outsideRoot)).toEqual(['sentinel.txt']);
+      expect(await readFile(sentinelPath, 'utf-8')).toBe('unchanged');
+    } finally {
+      await rm(rootDir, { force: true });
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('skips a symlinked builtin pack without changing its external target', async () => {
+    const outsidePack = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-pack-'));
+    const sentinelPath = path.join(outsidePack, 'sentinel.txt');
+    await writeFile(sentinelPath, 'unchanged', 'utf-8');
+    await symlink(outsidePack, path.join(rootDir, 'alpha'), 'dir');
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [pack('alpha'), pack('beta')] });
+
+    try {
+      await expect(service.ensureInitialized()).resolves.toBeUndefined();
+      expect(await readdir(outsidePack)).toEqual(['sentinel.txt']);
+      expect(await readFile(sentinelPath, 'utf-8')).toBe('unchanged');
+      expect((await service.list()).map((summary) => summary.manifest.id)).toEqual(['beta']);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[PresentationTemplates] failed to sync builtin pack',
+        'alpha',
+        expect.anything()
+      );
+    } finally {
+      warnSpy.mockRestore();
+      await rm(outsidePack, { recursive: true, force: true });
+    }
   });
 
   it('re-syncs a builtin only when the bundled version is newer', async () => {
@@ -150,10 +236,168 @@ describe('PresentationTemplateService', () => {
     await service.ensureInitialized();
     const badDir = path.join(rootDir, 'corrupt');
     await writeFile(path.join(rootDir, 'stray-file.txt'), 'not a dir entry', 'utf-8').catch(() => {});
-    const { mkdir } = await import('node:fs/promises');
     await mkdir(badDir, { recursive: true });
     await writeFile(path.join(badDir, 'template.json'), '{ not json', 'utf-8');
     const list = await service.list();
     expect(list.map((s) => s.manifest.id)).toEqual(['alpha']);
+  });
+
+  it('resolves a PPTX template to stable bounded bytes and hashes without returning paths', async () => {
+    const fixture = await createPptxPack(rootDir);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    const resolved = await service.getById(fixture.manifest.id);
+
+    expect(resolved).toEqual({
+      manifest: fixture.manifest,
+      theme: {
+        fileName: fixture.manifest.themeFile,
+        bytes: fixture.themeBytes,
+        byteLength: fixture.themeBytes.byteLength,
+        sha256: sha256(fixture.themeBytes),
+      },
+      reference: {
+        fileName: fixture.manifest.referenceFile,
+        bytes: fixture.referenceBytes,
+        byteLength: fixture.referenceBytes.byteLength,
+        sha256: sha256(fixture.referenceBytes),
+      },
+    });
+    expect(JSON.stringify(resolved)).not.toContain(rootDir);
+  });
+
+  it('returns null for an invalid or missing template id', async () => {
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await expect(service.getById('../escape')).resolves.toBeNull();
+    await expect(service.getById('missing-template')).resolves.toBeNull();
+  });
+
+  it('rejects a present pack whose manifest is missing', async () => {
+    const fixture = await createPptxPack(rootDir);
+    await rm(path.join(fixture.directory, 'template.json'));
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+  });
+
+  it('rejects a symlinked template root', async () => {
+    const linkedRoot = await mkdtemp(path.join(tmpdir(), 'ptpl-linked-'));
+    const fixture = await createPptxPack(linkedRoot);
+    await rm(rootDir, { recursive: true, force: true });
+    await symlink(linkedRoot, rootDir, 'dir');
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    try {
+      await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+    } finally {
+      await rm(rootDir, { force: true });
+      await rm(linkedRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects an ancestor ABA swap even when the original pack path is restored', async () => {
+    const fixture = await createPptxPack(rootDir);
+    const replacementRoot = await mkdtemp(path.join(tmpdir(), 'ptpl-replacement-'));
+    const replacement = await createPptxPack(replacementRoot, fixture.manifest.id);
+    await writeFile(replacement.themePath, '# Replacement generation\n', 'utf-8');
+    const heldRoot = `${rootDir}-held`;
+    const probe = await open(fixture.themePath, 'r');
+    const eventEmitterPrototype = Object.getPrototypeOf(Object.getPrototypeOf(probe)) as {
+      emit: (eventName: string | symbol, ...args: unknown[]) => boolean;
+    };
+    await probe.close();
+    const originalEmit = eventEmitterPrototype.emit;
+    let closedFiles = 0;
+    let rootIsSwapped = false;
+    const emitSpy = vi.spyOn(eventEmitterPrototype, 'emit').mockImplementation(function (
+      this: object,
+      eventName,
+      ...args
+    ) {
+      const emitted = originalEmit.call(this, eventName, ...args);
+      if (eventName !== 'close') return emitted;
+      closedFiles += 1;
+      if (closedFiles === 1) {
+        renameSync(rootDir, heldRoot);
+        renameSync(replacementRoot, rootDir);
+        rootIsSwapped = true;
+      } else if (closedFiles === 2) {
+        renameSync(rootDir, replacementRoot);
+        renameSync(heldRoot, rootDir);
+        rootIsSwapped = false;
+      }
+      return emitted;
+    });
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    try {
+      await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+    } finally {
+      emitSpy.mockRestore();
+      if (rootIsSwapped) {
+        await rename(rootDir, replacementRoot);
+        await rename(heldRoot, rootDir);
+      }
+      await rm(replacementRoot, { recursive: true, force: true });
+      await rm(heldRoot, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['theme', 'reference'] as const)('rejects a symlinked %s file', async (target) => {
+    const fixture = await createPptxPack(rootDir);
+    const targetPath = target === 'theme' ? fixture.themePath : fixture.referencePath;
+    const outsidePath = path.join(rootDir, `outside-${target}`);
+    await writeFile(outsidePath, target === 'theme' ? '# Outside' : 'outside');
+    await rm(targetPath);
+    await symlink(outsidePath, targetPath);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+  });
+
+  it('rejects a nonregular or missing declared reference file', async () => {
+    const fixture = await createPptxPack(rootDir);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+    await rm(fixture.referencePath);
+    await mkdir(fixture.referencePath);
+
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+
+    await rm(fixture.referencePath, { recursive: true });
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
+  });
+
+  it.each([
+    ['theme', PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES],
+    ['reference', PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES],
+  ] as const)('rejects a %s file over its declared byte limit', async (target, limit) => {
+    const fixture = await createPptxPack(rootDir);
+    await truncate(target === 'theme' ? fixture.themePath : fixture.referencePath, limit + 1);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'RESOURCE_LIMIT_EXCEEDED' });
+  });
+
+  it.each([
+    ['theme', PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES],
+    ['reference', PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES],
+  ] as const)('accepts a %s file at its exact declared byte limit', async (target, limit) => {
+    const fixture = await createPptxPack(rootDir);
+    await truncate(target === 'theme' ? fixture.themePath : fixture.referencePath, limit);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    const resolved = await service.getById(fixture.manifest.id);
+    const resolvedFile = target === 'theme' ? resolved?.theme : resolved?.reference;
+
+    expect(resolvedFile?.byteLength).toBe(limit);
+  });
+
+  it.each(['theme', 'reference'] as const)('rejects an empty %s file', async (target) => {
+    const fixture = await createPptxPack(rootDir);
+    await truncate(target === 'theme' ? fixture.themePath : fixture.referencePath, 0);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await expect(service.getById(fixture.manifest.id)).rejects.toMatchObject({ code: 'TEMPLATE_UNSUPPORTED' });
   });
 });

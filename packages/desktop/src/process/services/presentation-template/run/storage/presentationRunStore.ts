@@ -14,6 +14,7 @@ import type {
 } from '@/common/types/office/presentationRun';
 import {
   PresentationRunSimulatedProcessCrashError,
+  type PreparedPresentationRunAssets,
   type PreparedPresentationSourceSnapshot,
   type PresentationRunFiles,
 } from './presentationRunFiles';
@@ -25,6 +26,7 @@ import {
 } from './presentationRunJournal';
 import {
   assertPresentationRunManifestState,
+  assertPresentationRunPreparationRecord,
   assertPresentationSourceDraftManifest,
   assertPresentationSourceDraftTombstone,
   assertPresentationSourceGrantManifest,
@@ -163,6 +165,13 @@ export class PresentationSourceStoreError extends Error {
   }
 }
 
+export class PresentationRunStoreError extends Error {
+  constructor(readonly code: 'RESOURCE_LIMIT_EXCEEDED') {
+    super(code);
+    this.name = 'PresentationRunStoreError';
+  }
+}
+
 export type PresentationSourceOwnerSnapshot = {
   owner: PresentationGrantOwner;
   ownerRevision: number;
@@ -200,12 +209,32 @@ export type PresentationSourceSweepResult = {
   purgedGrantTombstones: string[];
 };
 
+export type PresentationRunGrantClaim =
+  | {
+      grantId: string;
+      expectedRevision: number;
+    }
+  | {
+      grantId: string;
+      expectedByteLength: number;
+      expectedSha256: string;
+    };
+
+export type ClaimedPresentationSourceSnapshot = Pick<
+  PresentationSourceDescriptor,
+  'grantId' | 'displayName' | 'format' | 'sourceKind' | 'byteLength' | 'sha256'
+> & {
+  snapshotRelativePath: `source.${PresentationSourceDescriptor['format']}`;
+};
+
 export type AllocatePresentationRunInput = {
   conversationId: string;
   clientRequestId: string;
   selectedTemplateId: string;
   requestFingerprint: string;
-  grantClaims: readonly { grantId: string; expectedRevision: number }[];
+  /** Required by the public hash/length claim path to bind grants to current authority. */
+  principalId?: string;
+  grantClaims: readonly PresentationRunGrantClaim[];
 };
 
 export type AllocatePresentationRunResult =
@@ -271,6 +300,39 @@ const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): 
   const actual = Object.keys(value).sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 };
+
+function isLegacyPresentationRunGrantClaim(
+  value: unknown
+): value is Extract<PresentationRunGrantClaim, { expectedRevision: number }> {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['grantId', 'expectedRevision']) &&
+    typeof value.grantId === 'string' &&
+    UUID_RE.test(value.grantId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    (value.expectedRevision as number) >= 0
+  );
+}
+
+function isIntegrityPresentationRunGrantClaim(
+  value: unknown
+): value is Extract<PresentationRunGrantClaim, { expectedByteLength: number }> {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['grantId', 'expectedByteLength', 'expectedSha256']) &&
+    typeof value.grantId === 'string' &&
+    UUID_RE.test(value.grantId) &&
+    Number.isSafeInteger(value.expectedByteLength) &&
+    (value.expectedByteLength as number) >= 1 &&
+    (value.expectedByteLength as number) <= PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES &&
+    typeof value.expectedSha256 === 'string' &&
+    /^[0-9a-f]{64}$/.test(value.expectedSha256)
+  );
+}
+
+function isPresentationRunGrantClaim(value: unknown): value is PresentationRunGrantClaim {
+  return isLegacyPresentationRunGrantClaim(value) || isIntegrityPresentationRunGrantClaim(value);
+}
 
 const isNonnegativeInteger = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
 
@@ -1378,7 +1440,20 @@ export class PresentationRunStore {
       }
       const grants: (StoredPresentationGrantManifest | StoredPresentationSourceGrantManifest)[] = [];
       let sourceBytes = 0;
-      for (const claim of input.grantClaims) {
+      for (const unsafeClaim of input.grantClaims as readonly unknown[]) {
+        if (!isPresentationRunGrantClaim(unsafeClaim)) {
+          return {
+            ok: false,
+            code: 'SOURCE_GRANT_INVALID',
+            messageKey: 'conversation.presentationRun.SOURCE_GRANT_INVALID',
+            retryable: false,
+            state: 'grant_validation',
+            details: {
+              grantId: isRecord(unsafeClaim) && typeof unsafeClaim.grantId === 'string' ? unsafeClaim.grantId : '',
+            },
+          };
+        }
+        const claim = unsafeClaim;
         const tombstone = this.sourceGrantTombstones.get(claim.grantId);
         if (tombstone !== undefined && Date.parse(tombstone.deleteAfter) > this.now().getTime()) {
           const ownerKey = presentationSourceOwnerKey(tombstone.owner);
@@ -1458,7 +1533,10 @@ export class PresentationRunStore {
             details: { grantId: claim.grantId },
           };
         }
-        if (grant.state !== 'active' || grant.revision !== claim.expectedRevision) {
+        if (
+          grant.state !== 'active' ||
+          (isLegacyPresentationRunGrantClaim(claim) && grant.revision !== claim.expectedRevision)
+        ) {
           return {
             ok: false,
             code: 'SOURCE_GRANT_INVALID',
@@ -1467,6 +1545,28 @@ export class PresentationRunStore {
             state: 'grant_validation',
             details: { grantId: claim.grantId },
           };
+        }
+        if (isIntegrityPresentationRunGrantClaim(claim)) {
+          if (!isStoredPresentationSourceGrantManifest(grant)) {
+            return {
+              ok: false,
+              code: 'SOURCE_GRANT_INVALID',
+              messageKey: 'conversation.presentationRun.SOURCE_GRANT_INVALID',
+              retryable: false,
+              state: 'grant_validation',
+              details: { grantId: claim.grantId },
+            };
+          }
+          if (grant.byteLength !== claim.expectedByteLength || grant.sha256 !== claim.expectedSha256) {
+            return {
+              ok: false,
+              code: 'SOURCE_TAMPERED',
+              messageKey: 'conversation.presentationRun.SOURCE_TAMPERED',
+              retryable: false,
+              state: 'grant_validation',
+              details: { grantId: claim.grantId },
+            };
+          }
         }
         sourceBytes += grant.byteLength;
         if (
@@ -1498,6 +1598,25 @@ export class PresentationRunStore {
         };
       }
       const task3Grants = grants.filter(isStoredPresentationSourceGrantManifest);
+      const usesIntegrityClaims = input.grantClaims.some(isIntegrityPresentationRunGrantClaim);
+      const currentSourceOwner = task3Grants.length === 0 ? undefined : this.sourceOwners.get(sourceOwnerId);
+      if (
+        usesIntegrityClaims &&
+        task3Grants.length > 0 &&
+        (typeof input.principalId !== 'string' ||
+          input.principalId.length < 1 ||
+          input.principalId.length > 256 ||
+          currentSourceOwner?.principalId !== input.principalId)
+      ) {
+        return {
+          ok: false,
+          code: 'SOURCE_GRANT_FOREIGN',
+          messageKey: 'conversation.presentationRun.SOURCE_GRANT_FOREIGN',
+          retryable: false,
+          state: 'grant_validation',
+          details: { grantId: task3Grants[0]?.grantId },
+        };
+      }
       for (const grant of task3Grants) {
         try {
           await this.files.verifySourceSnapshot({
@@ -1531,7 +1650,6 @@ export class PresentationRunStore {
         throw new Error('Presentation run allocator produced a colliding id');
       }
       const task3Bytes = task3Grants.reduce((total, grant) => total + grant.byteLength, 0);
-      const currentSourceOwner = task3Grants.length === 0 ? undefined : this.sourceOwners.get(sourceOwnerId);
       if (
         task3Grants.length > 0 &&
         (currentSourceOwner === undefined ||
@@ -1669,6 +1787,100 @@ export class PresentationRunStore {
     });
   }
 
+  /** Atomically publishes staged inputs and commits the exact restart-safe preparation record. */
+  async commitPreparedRun(
+    runId: string,
+    expectedRevision: number,
+    unsafePrepared: PreparedPresentationRunAssets
+  ): Promise<StoredPresentationRunManifest> {
+    const prepared = frozenSnapshot(unsafePrepared);
+    let handedToJournal = false;
+    try {
+      await this.initialize();
+      this.assertStorageHealthy();
+      const currentForLock = this.runs.get(runId);
+      if (currentForLock === undefined) throw new Error('Presentation run not found');
+      return await this.lock.runExclusive(
+        ['store:health', `run:${runId}`, ...currentForLock.sourceGrants.map((grantId) => `grant:${grantId}`)],
+        async () => {
+          this.assertStorageHealthy();
+          const current = this.runs.get(runId);
+          if (current === undefined) throw new Error('Presentation run not found');
+          if (prepared.runId !== runId) throw new Error('Prepared presentation run id does not match');
+          if (current.revision !== expectedRevision) throw new Error('Presentation run revision conflict');
+          if (
+            current.dispatchStatus !== 'allocating' ||
+            current.artifactPhase !== 'sources_snapshotted' ||
+            current.postAllocationFailure !== null ||
+            (current.preparation !== undefined && current.preparation !== null)
+          ) {
+            throw new Error('Presentation run is not ready to commit');
+          }
+          if (
+            prepared.record.payload.sourceRefs.length !== current.sourceGrants.length ||
+            prepared.record.payload.sourceRefs.some((sourceRef, index) => {
+              const grantId = current.sourceGrants[index];
+              const grant = grantId === undefined ? undefined : this.sourceGrants.get(grantId);
+              return (
+                grant === undefined ||
+                grant.state !== 'claimed' ||
+                grant.claimedRunId !== runId ||
+                sourceRef.grantId !== grantId ||
+                sourceRef.expectedByteLength !== grant.byteLength ||
+                sourceRef.expectedSha256 !== grant.sha256
+              );
+            })
+          ) {
+            throw new Error('Prepared presentation sources do not match the claimed run');
+          }
+          const transitioned = transitionPresentationRunState(current, {
+            expectedRevision,
+            dispatchStatus: 'committed',
+            artifactPhase: 'sources_extracted',
+            now: this.now().toISOString(),
+          }) as StoredPresentationRunManifest;
+          let next: StoredPresentationRunManifest = {
+            ...transitioned,
+            retainedBytes: current.retainedBytes + prepared.grounding.byteLength + prepared.record.byteLength,
+            preparation: structuredClone(prepared.record),
+          };
+          for (;;) {
+            const canonicalManifestBytes = Buffer.byteLength(`${JSON.stringify(next, null, 2)}\n`, 'utf8');
+            const retainedBytes =
+              current.retainedBytes +
+              prepared.grounding.byteLength +
+              prepared.record.byteLength +
+              canonicalManifestBytes;
+            if (retainedBytes === next.retainedBytes) break;
+            next = { ...next, retainedBytes };
+          }
+          const additionalRetainedBytes = next.retainedBytes - current.retainedBytes;
+          if (this.wouldExceedRetainedBytes(current.conversationId, additionalRetainedBytes)) {
+            throw new PresentationRunStoreError('RESOURCE_LIMIT_EXCEEDED');
+          }
+          this.assertStoredRun(next, runId);
+          handedToJournal = true;
+          await this.runCanonicalTransaction(
+            {
+              preparedRunAssetPromotions: [prepared],
+              mutations: [
+                { entityKind: 'run', entityId: runId, expectedRevision: current.revision, nextManifest: next },
+              ],
+            },
+            () => this.files.removePreparedRunAssets(prepared)
+          );
+          const cached = this.cacheRun(next);
+          this.index = this.buildIndex();
+          await this.persistDerivedIndexBestEffort();
+          return this.snapshotRun(cached);
+        }
+      );
+    } catch (error) {
+      if (!handedToJournal) await this.files.removePreparedRunAssets(prepared);
+      throw error;
+    }
+  }
+
   async retainCandidate(runId: string, expectedRevision: number): Promise<StoredPresentationRunManifest> {
     await this.initialize();
     this.assertStorageHealthy();
@@ -1728,6 +1940,51 @@ export class PresentationRunStore {
       const run = this.runs.get(runId) ?? this.tombstones.get(runId)?.discardedRun;
       return run === undefined ? null : this.snapshotRun(run);
     });
+  }
+
+  /** Returns verified Task-3 snapshots in the exact renderer-selected order recorded on the run. */
+  async getClaimedSourceSnapshots(runId: string): Promise<ClaimedPresentationSourceSnapshot[]> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    if (!UUID_RE.test(runId)) throw new Error('Invalid presentation run id');
+    const currentForLock = this.runs.get(runId);
+    if (currentForLock === undefined) throw new Error('Presentation run not found');
+    return this.lock.runExclusive(
+      ['store:health', `run:${runId}`, ...currentForLock.sourceGrants.map((grantId) => `grant:${grantId}`)],
+      async () => {
+        this.assertStorageHealthy();
+        const current = this.runs.get(runId);
+        if (current === undefined) throw new Error('Presentation run not found');
+        const snapshots: ClaimedPresentationSourceSnapshot[] = [];
+        for (const grantId of current.sourceGrants) {
+          const grant = this.sourceGrants.get(grantId);
+          if (grant === undefined || grant.state !== 'claimed' || grant.claimedRunId !== runId) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId });
+          }
+          try {
+            await this.files.verifySourceSnapshot({
+              grantId,
+              format: grant.format,
+              relativePath: grant.snapshotRelativePath,
+              sha256: grant.sha256,
+              byteLength: grant.byteLength,
+            });
+          } catch (error) {
+            throw new PresentationSourceStoreError('SOURCE_TAMPERED', { grantId }, { cause: error });
+          }
+          snapshots.push({
+            grantId,
+            displayName: grant.displayName,
+            format: grant.format,
+            sourceKind: grant.sourceKind,
+            byteLength: grant.byteLength,
+            sha256: grant.sha256,
+            snapshotRelativePath: grant.snapshotRelativePath,
+          });
+        }
+        return frozenSnapshot(snapshots);
+      }
+    );
   }
 
   async getByRequest(conversationId: string, clientRequestId: string): Promise<StoredPresentationRunManifest | null> {
@@ -2640,6 +2897,7 @@ export class PresentationRunStore {
       artifactPhase: null,
       disposition: null,
       retainedCandidate: null,
+      preparation: null,
       binding: null,
       retainedBytes: 0,
     };
@@ -2694,31 +2952,32 @@ export class PresentationRunStore {
   }
 
   private assertStoredRun(run: StoredPresentationRunManifest, expectedRunId: string): void {
+    const canonicalKeys = [
+      'version',
+      'runId',
+      'clientRequestId',
+      'conversationId',
+      'selectedTemplateId',
+      'requestFingerprint',
+      'postAllocationFailure',
+      'revision',
+      'createdAt',
+      'updatedAt',
+      'statusEnteredAt',
+      'committedAt',
+      'retainedAt',
+      'dispatchStatus',
+      'artifactPhase',
+      'disposition',
+      'retainedCandidate',
+      'sourceGrants',
+      'binding',
+      'postInvoked',
+      'retainedBytes',
+    ];
     if (
       !isRecord(run) ||
-      !hasExactKeys(run, [
-        'version',
-        'runId',
-        'clientRequestId',
-        'conversationId',
-        'selectedTemplateId',
-        'requestFingerprint',
-        'postAllocationFailure',
-        'revision',
-        'createdAt',
-        'updatedAt',
-        'statusEnteredAt',
-        'committedAt',
-        'retainedAt',
-        'dispatchStatus',
-        'artifactPhase',
-        'disposition',
-        'retainedCandidate',
-        'sourceGrants',
-        'binding',
-        'postInvoked',
-        'retainedBytes',
-      ]) ||
+      (!hasExactKeys(run, canonicalKeys) && !hasExactKeys(run, [...canonicalKeys, 'preparation'])) ||
       run.version !== 2 ||
       run.runId !== expectedRunId ||
       !REQUEST_FINGERPRINT_RE.test(run.requestFingerprint) ||
@@ -2741,6 +3000,9 @@ export class PresentationRunStore {
       throw new PresentationCanonicalCorruptionError('Presentation canonical run manifest is corrupt');
     }
     try {
+      if (run.preparation !== undefined && run.preparation !== null) {
+        assertPresentationRunPreparationRecord(run.preparation);
+      }
       assertPresentationRunManifestState(run);
     } catch (error) {
       throw new PresentationCanonicalCorruptionError('Presentation canonical run manifest is corrupt', {

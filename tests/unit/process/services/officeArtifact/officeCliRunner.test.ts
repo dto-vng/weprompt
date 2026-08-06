@@ -9,6 +9,7 @@ import { PassThrough } from 'node:stream';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import { parseOfficeCliEnvelope } from '@/process/services/office-artifact/officeCliJson';
 import {
   createOfficeCliRunner,
@@ -16,6 +17,17 @@ import {
   type OfficeCliSpawn,
   type OfficeCliWatchProcess,
 } from '@/process/services/office-artifact/officeCliRunner';
+
+import docxTextFixture from './fixtures/officecli-docx-text.json';
+import pptxTextFixture from './fixtures/officecli-pptx-text.json';
+
+function execFileWithStdout(stdout: string): OfficeCliExecFile {
+  return (_file, _args, _options, callback) => callback(null, stdout, '');
+}
+
+function padToUtf8Bytes(output: string, byteLength: number): string {
+  return `${output}${' '.repeat(byteLength - Buffer.byteLength(output, 'utf8'))}`;
+}
 
 function createWatchProcess(): OfficeCliWatchProcess & { emit: EventEmitter['emit'] } {
   const emitter = new EventEmitter();
@@ -68,6 +80,202 @@ describe('createOfficeCliRunner', () => {
       ['validate', '/workspace/a.docx', '--json'],
       ['close', '/workspace/a.docx', '--json'],
     ]);
+  });
+
+  it('invokes bounded text inspection without a shell', async () => {
+    const execFile = vi.fn<OfficeCliExecFile>(execFileWithStdout(JSON.stringify(pptxTextFixture)));
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+
+    await runner.viewText('/workspace/business-review.pptx', 'pptx');
+
+    expect(execFile).toHaveBeenCalledWith(
+      '/opt/officecli',
+      ['view', '/workspace/business-review.pptx', 'text', '--json'],
+      {
+        shell: false,
+        windowsHide: true,
+        timeout: 30_000,
+        maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
+      },
+      expect.any(Function)
+    );
+  });
+
+  it('normalizes the observed PPTX text object without losing slide order', async () => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(JSON.stringify(pptxTextFixture)),
+    });
+
+    const result = await runner.viewText('/workspace/business-review.pptx', 'pptx');
+
+    expect(result).toMatchObject({ totalItems: 8, returnedItems: 8 });
+    expect(result.textItems).toHaveLength(64);
+    expect([result.textItems[0], result.textItems.at(-1)]).toEqual([
+      'Q3',
+      'Prepared by Finance — data as of 30 September',
+    ]);
+  });
+
+  it('normalizes the observed DOCX object with tables and blank paragraphs intact', async () => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(JSON.stringify(docxTextFixture)),
+    });
+
+    const result = await runner.viewText('/workspace/business-report.docx', 'docx');
+
+    expect(result).toMatchObject({ totalItems: 39, returnedItems: 38 });
+    expect(result.textItems.slice(5, 8)).toEqual(['Author: Strategy and Planning', '', 'Contents']);
+    expect(result.textItems).toContain('[Table: 5 rows]');
+  });
+
+  it('accepts a structurally valid empty Office text object for caller-level empty handling', async () => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(JSON.stringify({ success: true, data: { totalElements: 0, elements: [] } })),
+    });
+
+    await expect(runner.viewText('/workspace/empty.docx', 'docx')).resolves.toEqual({
+      totalItems: 0,
+      returnedItems: 0,
+      textItems: [],
+    });
+  });
+
+  it.each([
+    ['plain text', 'Heading\nBody'],
+    ['an unenveloped object', JSON.stringify(pptxTextFixture.data)],
+    ['string envelope data', JSON.stringify({ success: true, data: 'Heading\nBody' })],
+    ['the other format schema', JSON.stringify(docxTextFixture)],
+  ])('rejects %s instead of guessing a PPTX text schema', async (_label, stdout) => {
+    const runner = createOfficeCliRunner({ execFile: execFileWithStdout(stdout) });
+
+    await expect(runner.viewText('/workspace/business-review.pptx', 'pptx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+    });
+  });
+
+  it.each([
+    ['a non-integer count', { totalSlides: 1.5, slides: [] }],
+    ['more slides than reported', { totalSlides: 0, slides: [{ index: 1, path: '/slide[1]', texts: [] }] }],
+    ['a missing trailing slide', { totalSlides: 2, slides: [{ index: 1, path: '/slide[1]', texts: ['Title'] }] }],
+    ['an invalid slide index', { totalSlides: 1, slides: [{ index: 0, path: '/slide[1]', texts: [] }] }],
+    [
+      'duplicate slide indexes',
+      {
+        totalSlides: 2,
+        slides: [
+          { index: 1, path: '/slide[1]', texts: [] },
+          { index: 1, path: '/slide[1]', texts: [] },
+        ],
+      },
+    ],
+    [
+      'reordered slide indexes',
+      {
+        totalSlides: 2,
+        slides: [
+          { index: 2, path: '/slide[2]', texts: [] },
+          { index: 1, path: '/slide[1]', texts: [] },
+        ],
+      },
+    ],
+    [
+      'a gap in slide indexes',
+      {
+        totalSlides: 3,
+        slides: [
+          { index: 1, path: '/slide[1]', texts: [] },
+          { index: 3, path: '/slide[3]', texts: [] },
+        ],
+      },
+    ],
+    ['a non-string slide path', { totalSlides: 1, slides: [{ index: 1, path: null, texts: [] }] }],
+    ['a non-string text item', { totalSlides: 1, slides: [{ index: 1, path: '/slide[1]', texts: [1] }] }],
+  ])('rejects a PPTX object with %s', async (_label, data) => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(JSON.stringify({ success: true, data })),
+    });
+
+    await expect(runner.viewText('/workspace/business-review.pptx', 'pptx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+    });
+  });
+
+  it.each([
+    ['a negative count', { totalElements: -1, elements: [] }],
+    ['a non-array collection', { totalElements: 1, elements: {} }],
+    ['a non-string element path', { totalElements: 1, elements: [{ path: null, type: 'paragraph', text: '' }] }],
+    ['a non-string element type', { totalElements: 1, elements: [{ path: '/body/p[1]', type: 1, text: '' }] }],
+    [
+      'a non-string element text',
+      { totalElements: 1, elements: [{ path: '/body/p[1]', type: 'paragraph', text: null }] },
+    ],
+  ])('rejects a DOCX object with %s', async (_label, data) => {
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(JSON.stringify({ success: true, data })),
+    });
+
+    await expect(runner.viewText('/workspace/business-report.docx', 'docx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+    });
+  });
+
+  it('accepts OfficeCLI stdout at the exact byte ceiling', async () => {
+    const output = JSON.stringify({ success: true, data: { totalElements: 0, elements: [] } });
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(padToUtf8Bytes(output, PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES)),
+    });
+
+    await expect(runner.viewText('/workspace/empty.docx', 'docx')).resolves.toMatchObject({
+      totalItems: 0,
+    });
+  });
+
+  it('rejects OfficeCLI stdout one byte above the ceiling', async () => {
+    const output = JSON.stringify({ success: true, data: { totalElements: 0, elements: [] } });
+    const runner = createOfficeCliRunner({
+      execFile: execFileWithStdout(padToUtf8Bytes(output, PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES + 1)),
+    });
+
+    await expect(runner.viewText('/workspace/empty.docx', 'docx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+    });
+  });
+
+  it('measures the stdout ceiling in UTF-8 bytes rather than JavaScript characters', async () => {
+    const output = JSON.stringify({
+      success: true,
+      data: {
+        totalElements: 1,
+        elements: [
+          {
+            path: '/body/p[1]',
+            type: 'paragraph',
+            text: 'é'.repeat(PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES / 2),
+          },
+        ],
+      },
+    });
+    const runner = createOfficeCliRunner({ execFile: execFileWithStdout(output) });
+
+    expect(output.length).toBeLessThan(PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES);
+    await expect(runner.viewText('/workspace/large.docx', 'docx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+    });
+  });
+
+  it.each([
+    ['a timeout', Object.assign(new Error('/private/source.docx'), { code: 'ETIMEDOUT' })],
+    ['a nonzero exit', Object.assign(new Error('/private/source.docx'), { code: 2 })],
+  ])('maps %s to a redacted typed text-view failure', async (_label, error) => {
+    const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
+      callback(error, JSON.stringify(docxTextFixture), '/private/source.docx');
+    });
+    const runner = createOfficeCliRunner({ execFile });
+
+    await expect(runner.viewText('/private/source.docx', 'docx')).rejects.toMatchObject({
+      code: 'OFFICECLI_FAILED',
+      message: 'OFFICECLI_FAILED',
+    });
   });
 
   it('rejects malformed or unsuccessful OfficeCLI JSON', () => {

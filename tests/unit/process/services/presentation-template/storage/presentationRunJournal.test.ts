@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { appendFile, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -24,6 +25,36 @@ const manifest = (revision: number, state: string): Record<string, unknown> => (
   revision,
   state,
 });
+
+const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+
+async function prepareRunAssets(files: PresentationRunFiles) {
+  const candidateBytes = Buffer.from('prepared reference candidate');
+  const grounding = '# Grounding\n\nVerified source evidence.';
+  const themeBytes = Buffer.from('{"name":"journal-test-theme"}');
+  const prepared = await files.prepareRunAssets({
+    runId: RUN_ID,
+    candidateBytes,
+    grounding,
+    rawInput: 'Prepare the quarterly review.',
+    directive: 'Edit the prepared candidate and write plan.json.',
+    sourceRefs: [],
+    injectSkills: ['officecli'],
+    template: {
+      theme: {
+        fileName: 'theme.json',
+        sha256: sha256(themeBytes),
+        byteLength: themeBytes.byteLength,
+      },
+      reference: {
+        fileName: 'reference.pptx',
+        sha256: sha256(candidateBytes),
+        byteLength: candidateBytes.byteLength,
+      },
+    },
+  });
+  return { candidateBytes, grounding, prepared };
+}
 
 describe('PresentationRunJournal', () => {
   let fixtureRoot: string;
@@ -60,6 +91,53 @@ describe('PresentationRunJournal', () => {
 
     expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect((await journal.readCanonical<Record<string, unknown>>('run', RUN_ID))?.revision).toBe(1);
+  });
+
+  it('compacts a successful prepared-run transaction so raw payloads do not accumulate', async () => {
+    const { prepared } = await prepareRunAssets(files);
+    const journal = new PresentationRunJournal({ files });
+    const nextManifest = {
+      version: 2,
+      runId: RUN_ID,
+      revision: 0,
+      dispatchStatus: 'committed',
+      artifactPhase: 'sources_extracted',
+      preparation: prepared.record,
+    };
+
+    await journal.transaction({
+      preparedRunAssetPromotions: [prepared],
+      mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest }],
+    });
+
+    await expect(journal.readCanonical('run', RUN_ID)).resolves.toEqual(nextManifest);
+    await expect(readFile(files.getJournalPath(), 'utf8')).resolves.toBe('');
+  });
+
+  it('compacts a crash-durable commit during recovery', async () => {
+    let injected = false;
+    const crashing = new PresentationRunJournal({
+      files,
+      failureInjector: ({ boundary }) => {
+        if (injected || boundary !== 'after-commit-fsync') return;
+        injected = true;
+        throw new Error('crash after durable commit');
+      },
+    });
+    const nextManifest = manifest(0, 'allocated');
+
+    await expect(
+      crashing.transaction({
+        mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest }],
+      })
+    ).rejects.toThrow('crash after durable commit');
+    await expect(readFile(files.getJournalPath(), 'utf8')).resolves.toContain('"type":"commit"');
+
+    const restarted = new PresentationRunJournal({ files });
+    await restarted.recover();
+
+    await expect(restarted.readCanonical('run', RUN_ID)).resolves.toEqual(nextManifest);
+    await expect(readFile(files.getJournalPath(), 'utf8')).resolves.toBe('');
   });
 
   it('reads an absent canonical record without creating its entity layout', async () => {
@@ -162,6 +240,90 @@ describe('PresentationRunJournal', () => {
     await expect(restarted.recover()).resolves.toBeUndefined();
 
     await expect(lstat(temporaryPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(restarted.readCanonical('run', RUN_ID)).resolves.toEqual(nextManifest);
+  });
+
+  it('rejects committed source extraction without the matching prepared-run promotion', async () => {
+    const { prepared } = await prepareRunAssets(files);
+    const journal = new PresentationRunJournal({ files });
+    const nextManifest = {
+      version: 2,
+      runId: RUN_ID,
+      revision: 0,
+      dispatchStatus: 'committed',
+      artifactPhase: 'sources_extracted',
+      preparation: prepared.record,
+    };
+
+    await expect(
+      journal.transaction({
+        mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest }],
+      })
+    ).rejects.toThrow('Presentation run journal is corrupt');
+    await expect(
+      journal.transaction({
+        preparedRunAssetPromotions: [prepared],
+        mutations: [
+          {
+            entityKind: 'run',
+            entityId: RUN_ID,
+            expectedRevision: null,
+            nextManifest: {
+              ...nextManifest,
+              preparation: { ...prepared.record, sha256: '0'.repeat(64) },
+            },
+          },
+        ],
+      })
+    ).rejects.toThrow('Presentation run journal is corrupt');
+    await expect(journal.readCanonical('run', RUN_ID)).resolves.toBeNull();
+  });
+
+  it('recovers and publishes prepared-run assets after a post-intent crash', async () => {
+    const { candidateBytes, grounding, prepared } = await prepareRunAssets(files);
+    const nextManifest = {
+      version: 2,
+      runId: RUN_ID,
+      revision: 0,
+      dispatchStatus: 'committed',
+      artifactPhase: 'sources_extracted',
+      preparation: prepared.record,
+    };
+    let injected = false;
+    const crashing = new PresentationRunJournal({
+      files,
+      failureInjector: ({ boundary }) => {
+        if (injected || boundary !== 'after-intent-fsync') return;
+        injected = true;
+        throw new Error('post-intent crash');
+      },
+    });
+
+    await expect(
+      crashing.transaction({
+        preparedRunAssetPromotions: [prepared],
+        mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest }],
+      })
+    ).rejects.toThrow('post-intent crash');
+
+    const restarted = new PresentationRunJournal({ files });
+    await restarted.recover();
+    const paths = files.getStagingRunPaths(RUN_ID);
+    const [publishedCandidate, publishedGrounding, publishedPreparation] = await Promise.all([
+      readFile(paths.candidatePath),
+      readFile(paths.groundingPath, 'utf8'),
+      readFile(path.join(files.roots.runRoot, RUN_ID, prepared.record.relativePath), 'utf8'),
+    ]);
+
+    expect({
+      candidate: publishedCandidate,
+      grounding: publishedGrounding,
+      preparation: JSON.parse(publishedPreparation),
+    }).toEqual({
+      candidate: candidateBytes,
+      grounding,
+      preparation: prepared.record.payload,
+    });
     await expect(restarted.readCanonical('run', RUN_ID)).resolves.toEqual(nextManifest);
   });
 
@@ -799,7 +961,7 @@ describe('PresentationRunJournal', () => {
       mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: 0, nextManifest: manifest(1, 'committed') }],
     });
 
-    expect(await readFile(files.getJournalPath(), 'utf8')).toMatch(/\n$/);
+    expect(await readFile(files.getJournalPath(), 'utf8')).toBe('');
     await expect(new PresentationRunJournal({ files }).recover()).resolves.toBeUndefined();
     expect(await journal.readCanonical('run', RUN_ID)).toEqual(manifest(1, 'committed'));
   });

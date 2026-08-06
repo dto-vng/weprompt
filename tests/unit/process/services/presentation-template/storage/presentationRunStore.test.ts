@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +21,7 @@ import {
 } from '@/process/services/presentation-template/run/storage/presentationRunJournal';
 import {
   PresentationRunStore,
+  PresentationRunStoreError,
   SortedKeyedLock,
 } from '@/process/services/presentation-template/run/storage/presentationRunStore';
 import type { PresentationRunFailure } from '@/common/types/office/presentationRun';
@@ -102,6 +104,77 @@ describe('PresentationRunStore', () => {
   let files: PresentationRunFiles;
   let journal: PresentationRunJournal;
   let store: PresentationRunStore;
+
+  const createTask3GrantBatch = async (
+    principalId: string,
+    grants: readonly { grantId: string; displayName: string; content: string }[]
+  ) => {
+    const owner = { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID };
+    await store.getPresentationSourceOwner(owner, principalId);
+    const sourcePaths = grants.map(({ grantId }) => path.join(fixtureRoot, `${grantId}.txt`));
+    await Promise.all(grants.map(({ content }, index) => writeFile(sourcePaths[index]!, content, { mode: 0o600 })));
+    const prepared = await files.prepareSourceSnapshots(
+      grants.map(({ grantId }, index) => ({ grantId, sourcePath: sourcePaths[index]!, format: 'txt' as const }))
+    );
+    const ownerSnapshot = await store.createPresentationSourceGrants({
+      owner,
+      principalId,
+      expectedOwnerRevision: 0,
+      grants: prepared.map((snapshot, index) => ({
+        grantId: snapshot.grantId,
+        displayName: grants[index]!.displayName,
+        format: 'txt' as const,
+        sourceKind: 'native-picker' as const,
+        snapshotRelativePath: snapshot.finalRelativePath,
+        sha256: snapshot.sha256,
+        byteLength: snapshot.byteLength,
+        preparedSnapshot: snapshot,
+      })),
+    });
+    return { owner, ownerSnapshot, prepared };
+  };
+
+  const allocateSnapshottedRun = async (): Promise<void> => {
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      grantClaims: [],
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+    await store.transitionRun(RUN_ID, {
+      expectedRevision: 0,
+      dispatchStatus: 'allocating',
+      artifactPhase: 'sources_snapshotted',
+      now: CREATED_AT.toISOString(),
+    });
+  };
+
+  const prepareTask5RunAssets = async () => {
+    const candidateBytes = Buffer.from('stable reference presentation bytes');
+    const themeBytes = Buffer.from('{"name":"test theme"}\n');
+    const grounding = '# Grounding\n\nVerified source evidence.\n';
+    const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+    const prepared = await files.prepareRunAssets({
+      runId: RUN_ID,
+      candidateBytes,
+      grounding,
+      rawInput: 'Prepare the quarterly business review.',
+      directive: 'Edit candidate.pptx and write plan.json.',
+      sourceRefs: [],
+      injectSkills: ['officecli'],
+      template: {
+        theme: { fileName: 'theme.json', sha256: sha256(themeBytes), byteLength: themeBytes.byteLength },
+        reference: {
+          fileName: 'reference.pptx',
+          sha256: sha256(candidateBytes),
+          byteLength: candidateBytes.byteLength,
+        },
+      },
+    });
+    return { candidateBytes, grounding, prepared };
+  };
 
   beforeEach(async () => {
     fixtureRoot = await mkdtemp(path.join(tmpdir(), 'presentation-run-store-'));
@@ -338,6 +411,175 @@ describe('PresentationRunStore', () => {
       claimedRunId: allocated.run.runId,
     });
     expect(allocated.run).toMatchObject({ sourceGrants: [GRANT_A, GRANT_B], retainedBytes: 36 });
+  });
+
+  it('rejects a same-conversation integrity claim from another principal without mutating canonical state', async () => {
+    const principalA = 'principal-a';
+    const { owner, ownerSnapshot, prepared } = await createTask3GrantBatch(principalA, [
+      { grantId: GRANT_A, displayName: 'brief.txt', content: 'Principal A evidence\n' },
+    ]);
+
+    const result = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      principalId: 'principal-b',
+      grantClaims: [
+        {
+          grantId: GRANT_A,
+          expectedByteLength: prepared[0]!.byteLength,
+          expectedSha256: prepared[0]!.sha256,
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'SOURCE_GRANT_FOREIGN',
+      details: { grantId: GRANT_A },
+    });
+    await expect(store.getPresentationSourceOwner(owner, principalA)).resolves.toEqual(ownerSnapshot);
+    await expect(files.listEntityIds('run')).resolves.toEqual([]);
+  });
+
+  it('returns claimed source snapshots in the renderer-selected order', async () => {
+    const principalId = 'principal-a';
+    const { prepared } = await createTask3GrantBatch(principalId, [
+      { grantId: GRANT_A, displayName: 'first.txt', content: 'First source\n' },
+      { grantId: GRANT_B, displayName: 'second.txt', content: 'Second source\n' },
+    ]);
+    const byGrantId = new Map(prepared.map((snapshot) => [snapshot.grantId, snapshot]));
+    const claims = [GRANT_B, GRANT_A].map((grantId) => {
+      const snapshot = byGrantId.get(grantId);
+      if (snapshot === undefined) throw new Error('prepared source snapshot is missing');
+      return {
+        grantId,
+        expectedByteLength: snapshot.byteLength,
+        expectedSha256: snapshot.sha256,
+      };
+    });
+    const allocated = await store.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      principalId,
+      grantClaims: claims,
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+
+    await expect(store.getClaimedSourceSnapshots(RUN_ID)).resolves.toEqual([
+      {
+        grantId: GRANT_B,
+        displayName: 'second.txt',
+        format: 'txt',
+        sourceKind: 'native-picker',
+        byteLength: byGrantId.get(GRANT_B)!.byteLength,
+        sha256: byGrantId.get(GRANT_B)!.sha256,
+        snapshotRelativePath: 'source.txt',
+      },
+      {
+        grantId: GRANT_A,
+        displayName: 'first.txt',
+        format: 'txt',
+        sourceKind: 'native-picker',
+        byteLength: byGrantId.get(GRANT_A)!.byteLength,
+        sha256: byGrantId.get(GRANT_A)!.sha256,
+        snapshotRelativePath: 'source.txt',
+      },
+    ]);
+  });
+
+  it('retains the exact committed preparation across a fresh store and files instance', async () => {
+    await allocateSnapshottedRun();
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    if (committed.preparation === undefined || committed.preparation === null) {
+      throw new Error('committed preparation is missing');
+    }
+
+    const restartedFiles = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir });
+    const restarted = new PresentationRunStore({
+      files: restartedFiles,
+      journal: new PresentationRunJournal({ files: restartedFiles, now: () => CREATED_AT }),
+      now: () => CREATED_AT,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    await restarted.initialize();
+    const recovered = await restarted.getRun(RUN_ID);
+    if (recovered?.preparation === undefined || recovered.preparation === null) {
+      throw new Error('recovered preparation is missing');
+    }
+
+    expect(recovered.preparation).toEqual(prepared.record);
+    await expect(restartedFiles.readAuthorizedRunPreparation(RUN_ID, recovered.preparation)).resolves.toEqual(
+      prepared.record.payload
+    );
+  });
+
+  it('counts grounding, preparation JSON, and pretty canonical manifest bytes but not the staging candidate', async () => {
+    await allocateSnapshottedRun();
+    const { grounding, prepared } = await prepareTask5RunAssets();
+
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    const canonicalManifest = await readFile(files.getEntityManifestPath('run', RUN_ID));
+    const expectedRetainedBytes =
+      Buffer.byteLength(grounding, 'utf8') + prepared.record.byteLength + canonicalManifest.byteLength;
+
+    expect(canonicalManifest.toString('utf8')).toBe(`${JSON.stringify(committed, null, 2)}\n`);
+    expect(committed.retainedBytes).toBe(expectedRetainedBytes);
+    expect(committed.retainedBytes).not.toBe(expectedRetainedBytes + prepared.candidate.byteLength);
+  });
+
+  it('garbage-collects a prepared run at the retention boundary', async () => {
+    await allocateSnapshottedRun();
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
+    const retained = await store.transitionRun(RUN_ID, {
+      expectedRevision: committed.revision,
+      dispatchStatus: 'failed_retained',
+      disposition: 'TRACKING_REQUIRED',
+      now: CREATED_AT.toISOString(),
+    });
+    expect(retained.preparation).toEqual(prepared.record);
+
+    const retentionBoundary = new Date(CREATED_AT.getTime() + PRESENTATION_RUN_LIMITS.FAILED_OR_REVIEW_RETENTION_MS);
+    const sweepingFiles = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir });
+    const sweepingStore = new PresentationRunStore({
+      files: sweepingFiles,
+      journal: new PresentationRunJournal({ files: sweepingFiles, now: () => retentionBoundary }),
+      now: () => retentionBoundary,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+
+    await expect(sweepingStore.initialize()).resolves.toBeUndefined();
+    await expect(sweepingStore.getRun(RUN_ID)).resolves.toMatchObject({
+      dispatchStatus: 'discarded',
+      preparation: null,
+    });
+  });
+
+  it('rejects preparation growth beyond the retained-byte cap with the typed store error', async () => {
+    await journal.transaction({
+      mutations: [
+        {
+          entityKind: 'run',
+          entityId: RUN_ID,
+          expectedRevision: null,
+          nextManifest: storedRun(RUN_ID, 'allocating', {
+            artifactPhase: 'sources_snapshotted',
+            retainedBytes: PRESENTATION_RUN_LIMITS.MAX_RETAINED_BYTES_PER_CONVERSATION - 1,
+          }),
+        },
+      ],
+    });
+    const { prepared } = await prepareTask5RunAssets();
+
+    const rejection = store.commitPreparedRun(RUN_ID, 0, prepared);
+
+    await expect(rejection).rejects.toBeInstanceOf(PresentationRunStoreError);
+    await expect(rejection).rejects.toMatchObject({ code: 'RESOURCE_LIMIT_EXCEEDED' });
   });
 
   it('rejects a duplicated grant ID before mutating the canonical grant', async () => {
@@ -771,35 +1013,38 @@ describe('PresentationRunStore', () => {
     });
   });
 
-  it('cleans or recovers candidate retention at every file durability boundary after restart', async () => {
-    const preparationBoundaries: PresentationRunFileDurableBoundary[] = [
-      'before-candidate-temp-write',
-      'after-candidate-temp-write',
-      'before-candidate-temp-fsync',
-      'after-candidate-temp-fsync',
-      'before-candidate-temp-directory-fsync',
-      'after-candidate-temp-directory-fsync',
-    ];
-    const promotionBoundaries: PresentationRunFileDurableBoundary[] = [
-      'before-candidate-promotion-rename',
-      'after-candidate-promotion-rename',
-      'before-candidate-promotion-directory-fsync',
-      'after-candidate-promotion-directory-fsync',
-    ];
-    const terminal = storedRun(RUN_ID, 'terminal_verified', {
-      clientRequestId: REQUEST_ID,
-      requestFingerprint: 'a'.repeat(64),
-      artifactPhase: 'sources_extracted',
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-1',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
-    });
+  const candidateRetentionDurabilityCases: {
+    boundary: PresentationRunFileDurableBoundary;
+    phase: 'preparation' | 'promotion';
+  }[] = [
+    { boundary: 'before-candidate-temp-write', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-write', phase: 'preparation' },
+    { boundary: 'before-candidate-temp-fsync', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-fsync', phase: 'preparation' },
+    { boundary: 'before-candidate-temp-directory-fsync', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-directory-fsync', phase: 'preparation' },
+    { boundary: 'before-candidate-promotion-rename', phase: 'promotion' },
+    { boundary: 'after-candidate-promotion-rename', phase: 'promotion' },
+    { boundary: 'before-candidate-promotion-directory-fsync', phase: 'promotion' },
+    { boundary: 'after-candidate-promotion-directory-fsync', phase: 'promotion' },
+  ];
 
-    for (const boundary of [...preparationBoundaries, ...promotionBoundaries]) {
+  it.each(candidateRetentionDurabilityCases)(
+    'cleans or recovers candidate retention after the $boundary durability boundary',
+    async ({ boundary, phase }) => {
+      const terminal = storedRun(RUN_ID, 'terminal_verified', {
+        clientRequestId: REQUEST_ID,
+        requestFingerprint: 'a'.repeat(64),
+        artifactPhase: 'sources_extracted',
+        binding: {
+          conversationId: CONVERSATION_ID,
+          turnId: 'turn-1',
+          runtime: 'aionrs',
+          boundAt: CREATED_AT.toISOString(),
+        },
+        postInvoked: true,
+      });
+
       const boundaryRoot = path.join(fixtureRoot, `candidate-${boundary}`);
       const boundaryUserData = path.join(boundaryRoot, 'user-data');
       const boundaryTemp = path.join(boundaryRoot, 'system-temp');
@@ -818,7 +1063,7 @@ describe('PresentationRunStore', () => {
       });
       const layout = await boundaryFiles.createRunLayout(RUN_ID);
       await writeFile(path.join(layout.stagingDirectory, 'candidate.pptx'), 'stable candidate');
-      if (preparationBoundaries.includes(boundary)) {
+      if (phase === 'preparation') {
         enabled = true;
         await expect(boundaryFiles.prepareRetainedCandidate(RUN_ID)).rejects.toThrow(boundary);
         const orphaned = await readdir(layout.retainedDirectory);
@@ -857,7 +1102,7 @@ describe('PresentationRunStore', () => {
       });
       await restarted.initialize();
       const recovered = await restarted.getRun(RUN_ID);
-      if (preparationBoundaries.includes(boundary)) {
+      if (phase === 'preparation') {
         expect(recovered).toMatchObject({
           revision: 0,
           artifactPhase: 'sources_extracted',
@@ -875,7 +1120,7 @@ describe('PresentationRunStore', () => {
         await expect(readdir(layout.retainedDirectory)).resolves.toEqual(['candidate.pptx']);
       }
     }
-  });
+  );
 
   it('rebuilds a missing derived index and quarantines a corrupt canonical run', async () => {
     const input = {
@@ -1919,36 +2164,45 @@ describe('PresentationRunStore', () => {
     await expect(files.listEntityIds('run')).resolves.toEqual([]);
   });
 
-  it('recovers atomic run tombstones after every journal and two-manifest durability boundary', async () => {
-    const intentAndCommitCases: {
-      boundary: PresentationRunDurableBoundary;
-      expectedOutcome: 'old' | 'new' | 'either';
-    }[] = [
-      { boundary: 'before-intent-append', expectedOutcome: 'old' },
-      { boundary: 'after-intent-append', expectedOutcome: 'either' },
-      { boundary: 'before-intent-fsync', expectedOutcome: 'either' },
-      { boundary: 'after-intent-fsync', expectedOutcome: 'new' },
-      { boundary: 'before-commit-append', expectedOutcome: 'new' },
-      { boundary: 'after-commit-append', expectedOutcome: 'new' },
-      { boundary: 'before-commit-fsync', expectedOutcome: 'new' },
-      { boundary: 'after-commit-fsync', expectedOutcome: 'new' },
-    ];
-    const manifestBoundaries: PresentationRunDurableBoundary[] = [
-      'before-manifest-write',
-      'after-manifest-write',
-      'before-manifest-fsync',
-      'after-manifest-fsync',
-      'before-manifest-rename',
-      'after-manifest-rename',
-      'before-manifest-directory-fsync',
-      'after-manifest-directory-fsync',
-    ];
-    const manifestCases = manifestBoundaries.flatMap((boundary) =>
-      [0, 1].map((mutationIndex) => ({ boundary, mutationIndex, expectedOutcome: 'new' as const }))
-    );
+  const tombstoneDurabilityCases: {
+    boundary: PresentationRunDurableBoundary;
+    expectedOutcome: 'old' | 'new' | 'either';
+    mutationIndex?: number;
+    suffix: string;
+  }[] = [
+    { boundary: 'before-intent-append', expectedOutcome: 'old', suffix: 'before-intent-append-journal' },
+    { boundary: 'after-intent-append', expectedOutcome: 'either', suffix: 'after-intent-append-journal' },
+    { boundary: 'before-intent-fsync', expectedOutcome: 'either', suffix: 'before-intent-fsync-journal' },
+    { boundary: 'after-intent-fsync', expectedOutcome: 'new', suffix: 'after-intent-fsync-journal' },
+    { boundary: 'before-commit-append', expectedOutcome: 'new', suffix: 'before-commit-append-journal' },
+    { boundary: 'after-commit-append', expectedOutcome: 'new', suffix: 'after-commit-append-journal' },
+    { boundary: 'before-commit-fsync', expectedOutcome: 'new', suffix: 'before-commit-fsync-journal' },
+    { boundary: 'after-commit-fsync', expectedOutcome: 'new', suffix: 'after-commit-fsync-journal' },
+    ...(
+      [
+        'before-manifest-write',
+        'after-manifest-write',
+        'before-manifest-fsync',
+        'after-manifest-fsync',
+        'before-manifest-rename',
+        'after-manifest-rename',
+        'before-manifest-directory-fsync',
+        'after-manifest-directory-fsync',
+      ] satisfies PresentationRunDurableBoundary[]
+    ).flatMap((boundary) =>
+      [0, 1].map((mutationIndex) => ({
+        boundary,
+        mutationIndex,
+        expectedOutcome: 'new' as const,
+        suffix: `${boundary}-${mutationIndex}`,
+      }))
+    ),
+  ];
 
-    for (const boundaryCase of [...intentAndCommitCases, ...manifestCases]) {
-      const suffix = `${boundaryCase.boundary}-${'mutationIndex' in boundaryCase ? boundaryCase.mutationIndex : 'journal'}`;
+  it.each(tombstoneDurabilityCases)(
+    'recovers an atomic run tombstone after the $suffix durability boundary',
+    async (boundaryCase) => {
+      const { suffix } = boundaryCase;
       const boundaryRoot = path.join(fixtureRoot, `tombstone-${suffix}`);
       const boundaryUserData = path.join(boundaryRoot, 'user-data');
       const boundaryTemp = path.join(boundaryRoot, 'system-temp');
@@ -1959,7 +2213,8 @@ describe('PresentationRunStore', () => {
         files: boundaryFiles,
         now: () => CREATED_AT,
         failureInjector: ({ boundary, mutationIndex }) => {
-          const mutationMatches = !('mutationIndex' in boundaryCase) || boundaryCase.mutationIndex === mutationIndex;
+          const mutationMatches =
+            boundaryCase.mutationIndex === undefined || boundaryCase.mutationIndex === mutationIndex;
           if (enabled && boundary === boundaryCase.boundary && mutationMatches) {
             throw new PresentationRunSimulatedProcessCrashError(`tombstone crash:${suffix}`);
           }
@@ -2015,7 +2270,7 @@ describe('PresentationRunStore', () => {
         expect(recoveredRunIds).toEqual([RUN_ID]);
       }
     }
-  });
+  );
 
   it('never allows direct discard or TTL pressure deletion of dispatch-uncertain state', async () => {
     let clock = new Date('2026-10-10T00:00:00.000Z');
@@ -2327,17 +2582,14 @@ describe('PresentationRunStore', () => {
   });
 
   it.each([
-    { scope: 'conversation', retainedCount: 9, allowed: true },
-    { scope: 'conversation', retainedCount: 10, allowed: false },
-    { scope: 'app', retainedCount: 99, allowed: true },
-    { scope: 'app', retainedCount: 100, allowed: false },
-  ] as const)('reserves retained slots at the $scope boundary with $retainedCount existing', async (testCase) => {
+    { scope: 'conversation', retainedCount: 9 },
+    { scope: 'app', retainedCount: 99 },
+  ] as const)('reserves the final retained $scope slot and rejects the next allocation', async (testCase) => {
     const boundaryRoot = path.join(fixtureRoot, `retained-${testCase.scope}-${testCase.retainedCount}`);
     const boundaryUserData = path.join(boundaryRoot, 'user-data');
     const boundaryTemp = path.join(boundaryRoot, 'system-temp');
     await Promise.all([mkdir(boundaryUserData, { recursive: true }), mkdir(boundaryTemp, { recursive: true })]);
     const boundaryFiles = new PresentationRunFiles({ userDataDir: boundaryUserData, tempDir: boundaryTemp });
-    const boundaryJournal = new PresentationRunJournal({ files: boundaryFiles, now: () => CREATED_AT });
     const idFor = (prefix: string, index: number): string =>
       `${prefix}0000000-0000-4000-8000-${index.toString().padStart(12, '0')}`;
     const retained = Array.from({ length: testCase.retainedCount }, (_, index) => {
@@ -2356,14 +2608,14 @@ describe('PresentationRunStore', () => {
         },
       });
     });
-    await boundaryJournal.transaction({
-      mutations: retained.map((run) => ({
-        entityKind: 'run' as const,
-        entityId: run.runId,
-        expectedRevision: null,
-        nextManifest: run,
-      })),
-    });
+    await boundaryFiles.initialize();
+    await Promise.all(
+      retained.map(async (run) => {
+        const manifestPath = boundaryFiles.getEntityManifestPath('run', run.runId);
+        await mkdir(path.dirname(manifestPath), { recursive: true, mode: 0o700 });
+        await writeFile(manifestPath, `${JSON.stringify(run, null, 2)}\n`, { mode: 0o600 });
+      })
+    );
     const clock = new Date(CREATED_AT.getTime() + 60_000);
     const ids = [RUN_K, RUN_L];
     const boundaryStore = new PresentationRunStore({
@@ -2381,21 +2633,16 @@ describe('PresentationRunStore', () => {
       grantClaims: [],
     });
 
-    expect(result.ok).toBe(testCase.allowed);
-    if (testCase.allowed) {
-      expect(result).toMatchObject({ status: 'created' });
-      await expect(
-        boundaryStore.allocateRun({
-          conversationId: testCase.scope === 'conversation' ? CONVERSATION_ID : CONVERSATION_C,
-          clientRequestId: RUN_L,
-          selectedTemplateId: 'business-review',
-          requestFingerprint: 'b'.repeat(64),
-          grantClaims: [],
-        })
-      ).resolves.toMatchObject({ ok: false, code: 'RESOURCE_LIMIT_EXCEEDED' });
-    } else {
-      expect(result).toMatchObject({ code: 'RESOURCE_LIMIT_EXCEEDED' });
-    }
+    expect(result).toMatchObject({ ok: true, status: 'created' });
+    await expect(
+      boundaryStore.allocateRun({
+        conversationId: testCase.scope === 'conversation' ? CONVERSATION_ID : CONVERSATION_C,
+        clientRequestId: RUN_L,
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'b'.repeat(64),
+        grantClaims: [],
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'RESOURCE_LIMIT_EXCEEDED' });
   });
 
   it.each([

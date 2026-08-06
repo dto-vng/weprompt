@@ -10,6 +10,7 @@ import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import { OfficeArtifactError, parseOfficeCliEnvelope, parseOfficeCliMatchedEnvelope } from './officeCliJson';
 
 type OfficeCliExecFileOptions = {
@@ -48,6 +49,14 @@ export type OfficeCliPreviewSession = {
   stop: () => Promise<void>;
 };
 
+export type OfficeCliTextFormat = 'docx' | 'pptx';
+
+export type OfficeCliTextView = {
+  totalItems: number;
+  returnedItems: number;
+  textItems: string[];
+};
+
 export type OfficeCliExecFile = (
   file: string,
   args: string[],
@@ -68,6 +77,7 @@ export type OfficeCliRunner = {
   ) => Promise<unknown>;
   setCell: (file: string, path: string, input: string) => Promise<unknown>;
   validate: (file: string) => Promise<unknown>;
+  viewText: (file: string, format: OfficeCliTextFormat) => Promise<OfficeCliTextView>;
   close: (file: string) => Promise<unknown>;
   watch: (file: string) => Promise<OfficeCliPreviewSession>;
 };
@@ -87,7 +97,7 @@ const EXEC_OPTIONS: OfficeCliExecFileOptions = {
   shell: false,
   windowsHide: true,
   timeout: 30_000,
-  maxBuffer: 8 * 1024 * 1024,
+  maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
 };
 
 const WATCH_OPTIONS: OfficeCliSpawnOptions = {
@@ -153,21 +163,92 @@ function toOfficeArtifactError(error: unknown): OfficeArtifactError {
   return new OfficeArtifactError(isMissingBinary ? 'OFFICECLI_NOT_FOUND' : 'OFFICECLI_FAILED');
 }
 
+function textViewFailure(): never {
+  throw new OfficeArtifactError('OFFICECLI_FAILED');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function normalizePptxTextView(data: unknown): OfficeCliTextView {
+  if (!isRecord(data) || !isNonNegativeSafeInteger(data.totalSlides) || !Array.isArray(data.slides)) {
+    return textViewFailure();
+  }
+  if (data.slides.length !== data.totalSlides) return textViewFailure();
+
+  const textItems: string[] = [];
+  for (const [position, slide] of data.slides.entries()) {
+    if (
+      !isRecord(slide) ||
+      typeof slide.index !== 'number' ||
+      !Number.isSafeInteger(slide.index) ||
+      slide.index < 1 ||
+      slide.index > data.totalSlides ||
+      slide.index !== position + 1 ||
+      typeof slide.path !== 'string' ||
+      !Array.isArray(slide.texts) ||
+      !slide.texts.every((text) => typeof text === 'string')
+    ) {
+      return textViewFailure();
+    }
+    textItems.push(...slide.texts);
+  }
+
+  return { totalItems: data.totalSlides, returnedItems: data.slides.length, textItems };
+}
+
+function normalizeDocxTextView(data: unknown): OfficeCliTextView {
+  if (!isRecord(data) || !isNonNegativeSafeInteger(data.totalElements) || !Array.isArray(data.elements)) {
+    return textViewFailure();
+  }
+  if (data.elements.length > data.totalElements) return textViewFailure();
+
+  const textItems: string[] = [];
+  for (const element of data.elements) {
+    if (
+      !isRecord(element) ||
+      typeof element.path !== 'string' ||
+      typeof element.type !== 'string' ||
+      typeof element.text !== 'string'
+    ) {
+      return textViewFailure();
+    }
+    textItems.push(element.text);
+  }
+
+  return { totalItems: data.totalElements, returnedItems: data.elements.length, textItems };
+}
+
+function parseOfficeCliTextView(output: string, format: OfficeCliTextFormat): OfficeCliTextView {
+  const data = parseOfficeCliEnvelope<unknown>(output);
+  return format === 'pptx' ? normalizePptxTextView(data) : normalizeDocxTextView(data);
+}
+
 export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies = {}): OfficeCliRunner {
   const binaryPath = resolveOfficeCliBinary(dependencies);
   const execFile = dependencies.execFile ?? defaultExecFile;
   const spawn = dependencies.spawn ?? defaultSpawn;
   const allocatePort = dependencies.allocatePort ?? allocatePreviewPort;
 
-  const invoke = (
+  const invoke = <T = unknown>(
     args: string[],
-    parseOutput: (output: string) => unknown = parseOfficeCliEnvelope
-  ): Promise<unknown> =>
-    new Promise((resolve, reject) => {
+    parseOutput: (output: string) => T = parseOfficeCliEnvelope<T>
+  ): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
       try {
         execFile(binaryPath, args, EXEC_OPTIONS, (error, stdout) => {
           if (error) {
             reject(toOfficeArtifactError(error));
+            return;
+          }
+
+          if (Buffer.byteLength(stdout, 'utf8') > EXEC_OPTIONS.maxBuffer) {
+            reject(new OfficeArtifactError('OFFICECLI_FAILED'));
             return;
           }
 
@@ -266,6 +347,8 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
         '--json',
       ]),
     validate: (file) => invoke(['validate', file, '--json']),
+    viewText: (file, format) =>
+      invoke(['view', file, 'text', '--json'], (output) => parseOfficeCliTextView(output, format)),
     close: (file) => invoke(['close', file, '--json']),
     watch,
   };

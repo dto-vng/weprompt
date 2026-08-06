@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 import {
   access,
@@ -25,9 +26,11 @@ import type { FileHandle } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import {
   PresentationRunFiles,
   syncPosixDirectory,
+  type PreparePresentationRunAssetsInput,
 } from '@/process/services/presentation-template/run/storage/presentationRunFiles';
 
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
@@ -36,6 +39,27 @@ const SECOND_GRANT_ID = '8a3bbfb3-141e-4cf3-8a45-a8b61585385c';
 const THIRD_GRANT_ID = '2c172e43-b45c-47a4-952d-e949093fcaf2';
 const DRAFT_ID = 'ab82a45e-f426-41d0-bdda-4e151a78a399';
 const TEMP_ID = 'd1d50dfe-3650-48f3-b98f-d7f5b2148996';
+
+const createRunPreparationInput = (): PreparePresentationRunAssetsInput => {
+  const candidateBytes = Buffer.from('selected reference deck');
+  return {
+    runId: RUN_ID,
+    candidateBytes,
+    grounding: '# Grounding\n\nVerified source content.\n',
+    rawInput: 'Prepare the quarterly review.',
+    directive: 'Edit only the managed candidate and write the provenance plan.',
+    sourceRefs: [{ grantId: GRANT_ID, expectedByteLength: 24, expectedSha256: 'a'.repeat(64) }],
+    injectSkills: ['officecli'],
+    template: {
+      theme: { fileName: 'theme.json', sha256: 'b'.repeat(64), byteLength: 128 },
+      reference: {
+        fileName: 'reference.pptx',
+        sha256: createHash('sha256').update(candidateBytes).digest('hex'),
+        byteLength: candidateBytes.byteLength,
+      },
+    },
+  };
+};
 
 const exists = async (filePath: string): Promise<boolean> => {
   try {
@@ -147,6 +171,132 @@ describe('PresentationRunFiles', () => {
     for (const directory of [run.runDirectory, run.retainedDirectory, run.stagingDirectory, grant, draft, inspection]) {
       expect((await lstat(directory)).mode & 0o777).toBe(0o700);
     }
+  });
+
+  it('prepares exactly three private, bounded pre-dispatch assets', async () => {
+    const prepared = await files.prepareRunAssets(createRunPreparationInput());
+    const assets = [
+      {
+        metadata: prepared.candidate,
+        filePath: path.join(files.roots.stagingRoot, RUN_ID, prepared.candidate.temporaryRelativePath),
+        maximumByteLength: PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES,
+      },
+      {
+        metadata: prepared.grounding,
+        filePath: path.join(files.roots.stagingRoot, RUN_ID, prepared.grounding.temporaryRelativePath),
+        maximumByteLength: PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN,
+      },
+      {
+        metadata: prepared.preparationFile,
+        filePath: path.join(files.roots.runRoot, RUN_ID, prepared.preparationFile.temporaryRelativePath),
+        maximumByteLength: PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN,
+      },
+    ];
+
+    expect(assets).toHaveLength(3);
+    for (const { metadata, filePath, maximumByteLength } of assets) {
+      const stats = await lstat(filePath);
+      expect(stats.mode & 0o777).toBe(0o600);
+      expect(stats.size).toBe(metadata.byteLength);
+      expect(metadata.byteLength).toBeGreaterThan(0);
+      expect(metadata.byteLength).toBeLessThanOrEqual(maximumByteLength);
+    }
+  });
+
+  it('removes an abandoned pre-intent asset set before retrying without accumulating temp files', async () => {
+    const randomUUID = vi
+      .fn<() => string>()
+      .mockReturnValueOnce(GRANT_ID)
+      .mockReturnValueOnce(SECOND_GRANT_ID)
+      .mockReturnValueOnce(THIRD_GRANT_ID)
+      .mockReturnValue(TEMP_ID);
+    const retryFiles = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir, randomUUID });
+    const abandoned = await retryFiles.prepareRunAssets(createRunPreparationInput());
+    const retried = await retryFiles.prepareRunAssets(createRunPreparationInput());
+
+    for (const abandonedAsset of [abandoned.candidate, abandoned.grounding]) {
+      await expect(
+        exists(path.join(retryFiles.roots.stagingRoot, RUN_ID, abandonedAsset.temporaryRelativePath))
+      ).resolves.toBe(false);
+    }
+    await expect(
+      exists(path.join(retryFiles.roots.runRoot, RUN_ID, abandoned.preparationFile.temporaryRelativePath))
+    ).resolves.toBe(false);
+    await expect(readdir(path.join(retryFiles.roots.stagingRoot, RUN_ID, 'agent'))).resolves.toEqual(
+      [
+        path.basename(retried.candidate.temporaryRelativePath),
+        path.basename(retried.grounding.temporaryRelativePath),
+      ].sort()
+    );
+    await expect(readdir(path.join(retryFiles.roots.runRoot, RUN_ID))).resolves.toEqual(
+      [path.basename(retried.preparationFile.temporaryRelativePath), 'retained'].sort()
+    );
+  });
+
+  it('returns only the strict authoritative payload after verifying committed preparation assets', async () => {
+    const prepared = await files.prepareRunAssets(createRunPreparationInput());
+    await files.recoverRunAssetPromotion(prepared);
+
+    const payload = await files.readAuthorizedRunPreparation(RUN_ID, prepared.record);
+
+    expect(payload).toStrictEqual(prepared.record.payload);
+    expect(payload).not.toBe(prepared.record.payload);
+    expect(Object.keys(payload)).toEqual([
+      'version',
+      'rawInput',
+      'directive',
+      'sourceRefs',
+      'injectSkills',
+      'template',
+      'grounding',
+      'candidate',
+    ]);
+  });
+
+  it.each(['candidate', 'grounding', 'preparation'] as const)(
+    'rejects an authorized read when the committed %s asset changes',
+    async (asset) => {
+      const prepared = await files.prepareRunAssets(createRunPreparationInput());
+      await files.recoverRunAssetPromotion(prepared);
+      const paths = files.getStagingRunPaths(RUN_ID);
+      const assetPath =
+        asset === 'candidate'
+          ? paths.candidatePath
+          : asset === 'grounding'
+            ? paths.groundingPath
+            : path.join(files.roots.runRoot, RUN_ID, prepared.record.relativePath);
+      await writeFile(assetPath, 'tampered', { mode: 0o600 });
+
+      await expect(files.readAuthorizedRunPreparation(RUN_ID, prepared.record)).rejects.toThrow(/changed/);
+    }
+  );
+
+  it('authorizes source bytes without exposing the snapshot path capability', async () => {
+    const sourcePath = path.join(fixtureRoot, 'authorized.txt');
+    await writeFile(sourcePath, 'authorized source bytes\n');
+    const prepared = await files.prepareSourceSnapshot({ grantId: GRANT_ID, sourcePath, format: 'txt' });
+    await files.promoteSourceSnapshot(prepared);
+
+    const observed = await files.withAuthorizedSourceSnapshot(
+      {
+        grantId: prepared.grantId,
+        format: prepared.format,
+        relativePath: prepared.finalRelativePath,
+        sha256: prepared.sha256,
+        byteLength: prepared.byteLength,
+      },
+      async (reader) => ({
+        keys: Object.keys(reader).sort(),
+        hasSourcePath: 'sourcePath' in reader,
+        text: (await reader.readBytes()).toString('utf8'),
+      })
+    );
+
+    expect(observed).toEqual({
+      keys: ['byteLength', 'readBytes'],
+      hasSourcePath: false,
+      text: 'authorized source bytes\n',
+    });
   });
 
   it('copies the exact stable staging candidate into a private retained file', async () => {

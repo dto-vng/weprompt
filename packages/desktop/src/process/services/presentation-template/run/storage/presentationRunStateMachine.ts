@@ -10,7 +10,11 @@ import {
   PRESENTATION_RUN_DISPOSITIONS,
   PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
-import type { PresentationGrantOwner, PresentationSourceDescriptor } from '@/common/types/office/presentationRun';
+import type {
+  PresentationGrantOwner,
+  PresentationSourceDescriptor,
+  PresentationSourceRef,
+} from '@/common/types/office/presentationRun';
 
 export type PresentationRunDispatchStatus = (typeof PRESENTATION_RUN_DISPATCH_STATUSES)[number];
 export type PresentationRunArtifactPhase = (typeof PRESENTATION_RUN_ARTIFACT_PHASES)[number] | null;
@@ -27,6 +31,42 @@ export type PresentationRunBinding = {
   turnId: string;
   runtime: 'aionrs' | 'acp' | null;
   boundAt: string;
+};
+
+export type PresentationRunPreparationFile = {
+  fileName: string;
+  sha256: string;
+  byteLength: number;
+};
+
+export type PresentationRunPreparationPayload = {
+  version: 1;
+  rawInput: string;
+  directive: string;
+  sourceRefs: PresentationSourceRef[];
+  injectSkills: ['officecli'];
+  template: {
+    theme: PresentationRunPreparationFile;
+    reference: PresentationRunPreparationFile;
+  };
+  grounding: {
+    relativePath: 'agent/grounding.md';
+    sha256: string;
+    byteLength: number;
+  };
+  candidate: {
+    relativePath: 'agent/candidate.pptx';
+    sha256: string;
+    byteLength: number;
+  };
+};
+
+/** Durable proof for the authoritative preparation.json payload and its staged inputs. */
+export type PresentationRunPreparationRecord = {
+  payload: PresentationRunPreparationPayload;
+  relativePath: 'preparation.json';
+  sha256: string;
+  byteLength: number;
 };
 
 export type PresentationRunManifest = {
@@ -49,6 +89,8 @@ export type PresentationRunManifest = {
   binding: PresentationRunBinding | null;
   postInvoked: boolean;
   retainedBytes: number;
+  /** Optional only for canonical manifests written before the preparation schema existed. */
+  preparation?: PresentationRunPreparationRecord | null;
 };
 
 export type PresentationRunTransition = {
@@ -132,6 +174,117 @@ function assertCandidate(candidate: PresentationRunRetainedCandidate | null): vo
   }
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertHashAndLength(
+  value: unknown,
+  maximumByteLength: number,
+  allowEmpty = false
+): asserts value is Record<string, unknown> & { sha256: string; byteLength: number } {
+  if (
+    !isPlainRecord(value) ||
+    typeof value.sha256 !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(value.sha256) ||
+    !Number.isSafeInteger(value.byteLength) ||
+    (value.byteLength as number) < (allowEmpty ? 0 : 1) ||
+    (value.byteLength as number) > maximumByteLength
+  ) {
+    throw new Error('Invalid presentation run preparation');
+  }
+}
+
+/** Validates the exact restart-safe preparation schema before it enters canonical storage. */
+export function assertPresentationRunPreparationRecord(
+  value: unknown
+): asserts value is PresentationRunPreparationRecord {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactManifestKeys(value, ['payload', 'relativePath', 'sha256', 'byteLength']) ||
+    value.relativePath !== 'preparation.json'
+  ) {
+    throw new Error('Invalid presentation run preparation');
+  }
+  assertHashAndLength(value, PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN);
+  const payload = value.payload;
+  if (
+    !isPlainRecord(payload) ||
+    !hasExactManifestKeys(payload, [
+      'version',
+      'rawInput',
+      'directive',
+      'sourceRefs',
+      'injectSkills',
+      'template',
+      'grounding',
+      'candidate',
+    ]) ||
+    payload.version !== 1 ||
+    typeof payload.rawInput !== 'string' ||
+    payload.rawInput.length < 1 ||
+    typeof payload.directive !== 'string' ||
+    payload.directive.length < 1 ||
+    !Array.isArray(payload.sourceRefs) ||
+    payload.sourceRefs.length > PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN ||
+    !Array.isArray(payload.injectSkills) ||
+    payload.injectSkills.length !== 1 ||
+    payload.injectSkills[0] !== 'officecli' ||
+    !isPlainRecord(payload.template) ||
+    !hasExactManifestKeys(payload.template, ['theme', 'reference']) ||
+    !isPlainRecord(payload.grounding) ||
+    !hasExactManifestKeys(payload.grounding, ['relativePath', 'sha256', 'byteLength']) ||
+    payload.grounding.relativePath !== 'agent/grounding.md' ||
+    !isPlainRecord(payload.candidate) ||
+    !hasExactManifestKeys(payload.candidate, ['relativePath', 'sha256', 'byteLength']) ||
+    payload.candidate.relativePath !== 'agent/candidate.pptx'
+  ) {
+    throw new Error('Invalid presentation run preparation');
+  }
+  const sourceGrantIds = new Set<string>();
+  for (const sourceRef of payload.sourceRefs) {
+    if (
+      !isPlainRecord(sourceRef) ||
+      !hasExactManifestKeys(sourceRef, ['grantId', 'expectedByteLength', 'expectedSha256']) ||
+      typeof sourceRef.grantId !== 'string' ||
+      !UUID_RE.test(sourceRef.grantId) ||
+      !Number.isSafeInteger(sourceRef.expectedByteLength) ||
+      (sourceRef.expectedByteLength as number) < 1 ||
+      (sourceRef.expectedByteLength as number) > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
+      typeof sourceRef.expectedSha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(sourceRef.expectedSha256) ||
+      sourceGrantIds.has(sourceRef.grantId)
+    ) {
+      throw new Error('Invalid presentation run preparation');
+    }
+    sourceGrantIds.add(sourceRef.grantId);
+  }
+  const theme = payload.template.theme;
+  const reference = payload.template.reference;
+  if (
+    !isPlainRecord(theme) ||
+    !hasExactManifestKeys(theme, ['fileName', 'sha256', 'byteLength']) ||
+    typeof theme.fileName !== 'string' ||
+    theme.fileName.length < 1 ||
+    theme.fileName.length > 256 ||
+    theme.fileName.includes('/') ||
+    theme.fileName.includes('\\') ||
+    !isPlainRecord(reference) ||
+    !hasExactManifestKeys(reference, ['fileName', 'sha256', 'byteLength']) ||
+    typeof reference.fileName !== 'string' ||
+    reference.fileName.length < 1 ||
+    reference.fileName.length > 256 ||
+    reference.fileName.includes('/') ||
+    reference.fileName.includes('\\')
+  ) {
+    throw new Error('Invalid presentation run preparation');
+  }
+  assertHashAndLength(theme, PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES);
+  assertHashAndLength(reference, PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES);
+  assertHashAndLength(payload.grounding, PRESENTATION_RUN_LIMITS.MAX_NON_RENDER_COPY_WRITE_BYTES_PER_RUN);
+  assertHashAndLength(payload.candidate, PRESENTATION_RUN_LIMITS.MAX_CANDIDATE_COMPRESSED_BYTES);
+}
+
 export function assertPresentationRunManifestState(run: PresentationRunManifest): void {
   if (
     run.version !== 2 ||
@@ -158,6 +311,9 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
     run.retainedBytes < 0
   ) {
     throw new Error('Invalid presentation run manifest');
+  }
+  if (run.preparation !== undefined && run.preparation !== null) {
+    assertPresentationRunPreparationRecord(run.preparation);
   }
   const createdAt = Date.parse(run.createdAt);
   const updatedAt = Date.parse(run.updatedAt);
@@ -197,7 +353,12 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
     throw new Error('Invalid presentation run manifest');
   }
   if (run.dispatchStatus === 'discarded') {
-    if (run.artifactPhase !== null || run.disposition !== null || run.retainedCandidate !== null) {
+    if (
+      run.artifactPhase !== null ||
+      run.disposition !== null ||
+      run.retainedCandidate !== null ||
+      (run.preparation !== undefined && run.preparation !== null)
+    ) {
       throw new Error('Invalid discarded presentation run state');
     }
     return;
@@ -206,12 +367,16 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
   if (run.artifactPhase === null) throw new Error('Invalid presentation run artifact phase');
   const phaseIndex = ARTIFACT_PHASES.indexOf(run.artifactPhase);
   const candidatePhase = ARTIFACT_PHASES.indexOf('candidate_retained');
+  const preparedPhase = ARTIFACT_PHASES.indexOf('sources_extracted');
   const hasCandidate = run.retainedCandidate !== null;
   const isCandidatePhaseOrLater = phaseIndex >= candidatePhase;
   if (isCandidatePhaseOrLater !== hasCandidate) {
     throw new Error('Retained candidate does not match artifact phase');
   }
   assertCandidate(run.retainedCandidate);
+  if (phaseIndex < preparedPhase && run.preparation !== undefined && run.preparation !== null) {
+    throw new Error('Preparation does not match artifact phase');
+  }
 
   if (run.dispatchStatus === 'allocating' || run.dispatchStatus === 'committed') {
     if (run.postInvoked || run.binding !== null || run.disposition !== null || phaseIndex > 2) {
@@ -300,6 +465,7 @@ export function transitionPresentationRunState(
       retainedCandidate: null,
       binding: null,
       retainedBytes: 0,
+      ...(current.preparation === undefined ? {} : { preparation: null }),
     };
   }
 
