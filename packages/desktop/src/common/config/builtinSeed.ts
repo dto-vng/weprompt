@@ -71,9 +71,9 @@ export const BUILTIN_HTTP_MCP_SERVERS = [
     url: 'https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4',
   },
   {
-    name: 'outlook-advanced',
-    description: 'Outlook Advanced MCP for email, calendar and meeting rooms. Click Login to sign in on first use.',
-    url: 'https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp',
+    name: 'atlassian',
+    description: 'Atlassian Jira and Confluence MCP. Click Login to sign in on first use.',
+    url: 'https://mcp.atlassian.com/v1/mcp',
   },
 ] as const;
 

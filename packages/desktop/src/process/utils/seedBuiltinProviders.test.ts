@@ -178,10 +178,25 @@ describe('buildBuiltinHttpMcpServers', () => {
     }
   });
 
-  it('seeds the TSE Datahub and Outlook Advanced endpoints', () => {
-    const urls = BUILTIN_HTTP_MCP_SERVERS.map((seed) => seed.url);
-    expect(urls).toContain('https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4');
-    expect(urls).toContain('https://send-email-mcp.thankfulhill-292d9583.southeastasia.azurecontainerapps.io/mcp');
+  it('seeds tse-datahub and atlassian, and never outlook-advanced', () => {
+    const names = buildBuiltinHttpMcpServers().map((server) => server.name);
+    expect(names).toContain('tse-datahub');
+    expect(names).toContain('atlassian');
+    expect(names).not.toContain('outlook-advanced');
+  });
+
+  it('points atlassian at the official remote MCP endpoint over http', () => {
+    const atlassian = buildBuiltinHttpMcpServers().find((server) => server.name === 'atlassian');
+    expect(atlassian).toBeDefined();
+    expect(atlassian?.enabled).toBe(true);
+    expect(atlassian?.builtin).toBe(true);
+    expect(atlassian?.transport).toEqual({ type: 'http', url: 'https://mcp.atlassian.com/v1/mcp' });
+  });
+
+  it('seeds no server that needs a local mcp-remote binary or an npx lookup', () => {
+    for (const server of buildBuiltinHttpMcpServers()) {
+      expect(server.transport.type, server.name).toBe('http');
+    }
   });
 });
 
