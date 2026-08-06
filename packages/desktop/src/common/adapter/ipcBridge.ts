@@ -61,10 +61,14 @@ import type {
 import type {
   BindPresentationDraftRequest,
   BindPresentationDraftResult,
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
   CreatePresentationDraftRequest,
   CreatePresentationDraftResult,
   DiscardPresentationRunRequest,
   DiscardPresentationRunResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
   GetPresentationRunRequest,
   GetPresentationRunResult,
   GetPresentationSourceOwnerRequest,
@@ -79,6 +83,8 @@ import type {
   PickPresentationSourcesResult,
   RevokePresentationSourceRequest,
   RevokePresentationSourceResult,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
   StartPresentationRunRequest,
   StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
@@ -678,6 +684,17 @@ export const presentationRuns = {
   ),
   discard: bridge.buildProvider<DiscardPresentationRunResult, DiscardPresentationRunRequest>(
     'presentation-runs.discard'
+  ),
+  claimInitialDispatch: bridge.buildProvider<
+    ClaimInitialPresentationDispatchResult,
+    ClaimInitialPresentationDispatchRequest
+  >('presentation-runs.claim-initial-dispatch'),
+  renewInitialDispatch: bridge.buildProvider<
+    RenewInitialPresentationDispatchResult,
+    RenewInitialPresentationDispatchRequest
+  >('presentation-runs.renew-initial-dispatch'),
+  dispatch: bridge.buildProvider<DispatchInitialPresentationRunResult, DispatchInitialPresentationRunRequest>(
+    'presentation-runs.dispatch'
   ),
 };
 

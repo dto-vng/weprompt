@@ -6,6 +6,8 @@
 
 export * from './PresentationSourceGrantService';
 export * from './PresentationRunService';
+export * from './PresentationRunLifecycleCoordinator';
+export * from './PresentationRuntimeEventClient';
 export * from './PresentationScopeResolver';
 export * from './presentationRunDirective';
 export * from './presentationSourceExtractor';

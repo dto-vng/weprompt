@@ -5,12 +5,19 @@
  */
 
 import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
+  ClaimInitialPresentationDispatchRequest,
+  DispatchInitialPresentationRunRequest,
   GetPresentationRunRequest,
   OpenPresentationRunRequest,
+  RenewInitialPresentationDispatchRequest,
   StartPresentationRunRequest,
 } from '@/common/types/office/presentationRun';
 import {
@@ -24,8 +31,10 @@ import {
 } from '@/process/services/presentation-template/run/service/PresentationScopeResolver';
 import {
   PresentationJournalTransactionError,
+  PresentationRunFiles,
   PresentationRunSimulatedProcessCrashError,
   PresentationRunStoreError,
+  assertPresentationRunManifestState,
 } from '@/process/services/presentation-template/run/storage';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -36,6 +45,8 @@ const FOREIGN_CONVERSATION_ID = '55555555-5555-4555-8555-555555555555';
 const SECOND_RUN_ID = '66666666-6666-4666-8666-666666666666';
 const NOW = '2026-08-04T00:00:00.000Z';
 const CANDIDATE_SHA256 = 'd'.repeat(64);
+const HOLDER_ID = '88888888-8888-4888-8888-888888888888';
+const LEASE_TOKEN = '99999999-9999-4999-8999-999999999999';
 const RUN_NOT_FOUND_FAILURE = {
   ok: false,
   code: 'RUN_NOT_FOUND',
@@ -44,6 +55,55 @@ const RUN_NOT_FOUND_FAILURE = {
   state: 'lookup',
   details: null,
 } as const;
+
+const readinessEvidence = (candidateSha256 = CANDIDATE_SHA256, candidateByteLength = 4) => ({
+  version: 1 as const,
+  candidate: { sha256: candidateSha256, byteLength: candidateByteLength },
+  plan: { sha256: 'a'.repeat(64), byteLength: 2 },
+  hashChain: {
+    stagingBeforeRetain: candidateSha256,
+    retainedTemp: candidateSha256,
+    stagingAfterRetain: candidateSha256,
+    manifestRetained: candidateSha256,
+    inspectionCopy: candidateSha256,
+    retainedAfterStructuralValidation: candidateSha256,
+    retainedAfterOoxmlInspection: candidateSha256,
+    retainedAfterEachSlideRender: [candidateSha256],
+  },
+  structure: { officeCliValidated: true as const },
+  ooxml: {
+    zipEntryCount: 1,
+    expandedByteLength: 4,
+    xmlByteLength: 1,
+    slideCount: 1,
+    totalTextChars: 1,
+    slides: [
+      {
+        slideNumber: 1,
+        shapeCount: 1,
+        textCharCount: 1,
+        textOnlyShapeCount: 0,
+        notesTextCharCount: 1,
+        visualAnchorKinds: ['chart' as const],
+      },
+    ],
+  },
+  policy: {
+    version: 1 as const,
+    plan: { valid: true, slideCount: 1, sourceRefCount: 0 },
+    slides: [
+      {
+        slideNumber: 1,
+        role: 'content' as const,
+        sourceRefs: [],
+        requiresNotes: true,
+        requiresVisualAnchor: true,
+      },
+    ],
+    blockers: [],
+  },
+  renders: [{ slideNumber: 1, candidateSha256, sha256: 'b'.repeat(64), byteLength: 8 }],
+});
 
 const request = (sources: StartPresentationRunRequest['sources'] = []): StartPresentationRunRequest => ({
   conversation_id: CONVERSATION_ID,
@@ -161,6 +221,43 @@ function recoveryManifest(
   };
 }
 
+function exactReadyManifest(candidateSha256 = CANDIDATE_SHA256, candidateByteLength = 4) {
+  const evidence = readinessEvidence(candidateSha256, candidateByteLength);
+  return {
+    ...recoveryManifest({
+      retainedCandidate: {
+        relativePath: 'retained/candidate.pptx',
+        sha256: candidateSha256,
+        byteLength: candidateByteLength,
+      },
+    }),
+    initialDispatchLease: null,
+    terminalEvidence: {
+      conversationId: CONVERSATION_ID,
+      turnId: REQUEST_ID,
+      eventObservedAt: NOW,
+      runtimeObservedAt: NOW,
+      runtime: {
+        state: 'idle' as const,
+        can_send_message: true as const,
+        has_task: false as const,
+        task_status: 'finished' as const,
+        is_processing: false as const,
+        pending_confirmations: 0 as const,
+        turn_id: null,
+      },
+    },
+    runtimeReleaseObservations: [],
+    retentionProof: {
+      stagingBeforeRetain: candidateSha256,
+      retainedTemp: candidateSha256,
+      stagingAfterRetain: candidateSha256,
+    },
+    readiness: { status: 'passed' as const, recordedAt: NOW, evidence },
+    binding: { conversationId: CONVERSATION_ID, turnId: REQUEST_ID, runtime: 'aionrs' as const, boundAt: NOW },
+  };
+}
+
 function createHarness() {
   const prepared = {
     runId: RUN_ID,
@@ -193,11 +290,6 @@ function createHarness() {
     prepareRunAssets: vi.fn(async () => prepared),
     withAuthorizedSourceSnapshot: vi.fn(),
     readAuthorizedRunPreparation: vi.fn(async () => preparationPayload()),
-    withAuthorizedRetainedCandidate: vi.fn(async (_runId, candidate, callback) =>
-      candidate === null
-        ? null
-        : callback({ byteLength: candidate.byteLength, readAt: async () => Buffer.from([0x50, 0x4b, 0x03, 0x04]) })
-    ),
   };
   const templates = {
     getById: vi.fn(async () => ({
@@ -235,7 +327,33 @@ function createHarness() {
     runtime: 'aionrs' as const,
   }));
   const extractSources = vi.fn(async () => []);
-  const openRetainedCandidate = vi.fn(async () => '');
+  const lifecycle = {
+    claimInitialDispatch: vi.fn(async () => ({
+      ok: true as const,
+      status: 'claimed' as const,
+      runId: RUN_ID,
+      leaseToken: LEASE_TOKEN,
+      revision: 3,
+      expiresAt: '2026-08-04T00:00:30.000Z',
+      renewAfterMs: 10_000 as const,
+    })),
+    renewInitialDispatch: vi.fn(async () => ({
+      ok: true as const,
+      status: 'renewed' as const,
+      runId: RUN_ID,
+      revision: 4,
+      expiresAt: '2026-08-04T00:00:40.000Z',
+      renewAfterMs: 10_000 as const,
+    })),
+    dispatch: vi.fn(async () => ({
+      ok: true as const,
+      status: 'bound' as const,
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      revision: 5,
+      dispatchStatus: 'bound' as const,
+    })),
+  };
   const options = {
     files,
     store,
@@ -244,7 +362,7 @@ function createHarness() {
     isDesktopRuntime: () => true,
     resolveAuthority,
     extractSources,
-    openRetainedCandidate,
+    lifecycle,
     recoveryCursorSecret: Buffer.alloc(32, 7),
     now: () => new Date(NOW),
   } as unknown as PresentationRunServiceOptions;
@@ -256,12 +374,115 @@ function createHarness() {
     templates,
     resolveAuthority,
     extractSources,
-    openRetainedCandidate,
+    lifecycle,
   };
 }
 
 describe('PresentationRunService', () => {
   beforeEach(() => vi.restoreAllMocks());
+
+  it('strictly validates and authorizes direct claim, renewal, and dispatch before lifecycle mutation', async () => {
+    const claim: ClaimInitialPresentationDispatchRequest = {
+      conversation_id: CONVERSATION_ID,
+      run_id: RUN_ID,
+      holder_id: HOLDER_ID,
+      expected_revision: 2,
+    };
+    const renew: RenewInitialPresentationDispatchRequest = {
+      conversation_id: CONVERSATION_ID,
+      run_id: RUN_ID,
+      lease_token: LEASE_TOKEN,
+      expected_revision: 3,
+    };
+    const dispatch: DispatchInitialPresentationRunRequest = {
+      conversation_id: CONVERSATION_ID,
+      run_id: RUN_ID,
+      lease_token: LEASE_TOKEN,
+      expected_revision: 3,
+    };
+    const harness = createHarness();
+
+    await expect(harness.service.claimInitialDispatch(claim)).resolves.toMatchObject({ ok: true, status: 'claimed' });
+    await expect(harness.service.renewInitialDispatch(renew)).resolves.toMatchObject({ ok: true, status: 'renewed' });
+    await expect(harness.service.dispatch(dispatch)).resolves.toMatchObject({ ok: true, status: 'bound' });
+    expect(harness.lifecycle.claimInitialDispatch).toHaveBeenCalledWith(claim);
+    expect(harness.lifecycle.renewInitialDispatch).toHaveBeenCalledWith(renew);
+    expect(harness.lifecycle.dispatch).toHaveBeenCalledWith(dispatch, 'aionrs');
+
+    const invalidHarness = createHarness();
+    await expect(
+      invalidHarness.service.claimInitialDispatch({ ...claim, holder_id: 'renderer-holder' })
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_REQUEST' });
+    await expect(
+      invalidHarness.service.renewInitialDispatch({ ...renew, lease_token: '/private/lease' })
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_REQUEST' });
+    await expect(
+      invalidHarness.service.dispatch({ ...dispatch, expected_revision: Number.MAX_SAFE_INTEGER + 1 })
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_REQUEST' });
+    expect(invalidHarness.resolveAuthority).not.toHaveBeenCalled();
+    expect(invalidHarness.lifecycle.claimInitialDispatch).not.toHaveBeenCalled();
+    expect(invalidHarness.lifecycle.renewInitialDispatch).not.toHaveBeenCalled();
+    expect(invalidHarness.lifecycle.dispatch).not.toHaveBeenCalled();
+  });
+
+  it.each(['claim', 'renew', 'dispatch'] as const)(
+    'repeats feature, desktop, scope, and runtime gates for direct %s',
+    async (operation) => {
+      const requestByOperation = {
+        claim: {
+          conversation_id: CONVERSATION_ID,
+          run_id: RUN_ID,
+          holder_id: HOLDER_ID,
+          expected_revision: 2,
+        },
+        renew: {
+          conversation_id: CONVERSATION_ID,
+          run_id: RUN_ID,
+          lease_token: LEASE_TOKEN,
+          expected_revision: 3,
+        },
+        dispatch: {
+          conversation_id: CONVERSATION_ID,
+          run_id: RUN_ID,
+          lease_token: LEASE_TOKEN,
+          expected_revision: 3,
+        },
+      } as const;
+      const invoke = (service: PresentationRunService) => {
+        if (operation === 'claim') return service.claimInitialDispatch(requestByOperation.claim);
+        if (operation === 'renew') return service.renewInitialDispatch(requestByOperation.renew);
+        return service.dispatch(requestByOperation.dispatch);
+      };
+
+      const disabledHarness = createHarness();
+      const disabled = new PresentationRunService({ ...disabledHarness.options, isFeatureEnabled: () => false });
+      await expect(invoke(disabled)).resolves.toMatchObject({ ok: false, code: 'FEATURE_DISABLED' });
+      expect(disabledHarness.resolveAuthority).not.toHaveBeenCalled();
+
+      const browserHarness = createHarness();
+      const browser = new PresentationRunService({ ...browserHarness.options, isDesktopRuntime: () => false });
+      await expect(invoke(browser)).resolves.toMatchObject({ ok: false, code: 'DESKTOP_REQUIRED' });
+      expect(browserHarness.resolveAuthority).not.toHaveBeenCalled();
+
+      const teamHarness = createHarness();
+      teamHarness.resolveAuthority.mockResolvedValueOnce({
+        ok: true,
+        principalId: 'desktop-local-principal',
+        scope: 'team',
+        runtime: 'aionrs',
+      });
+      await expect(invoke(teamHarness.service)).resolves.toMatchObject({ ok: false, code: 'TEAM_SCOPE_UNSUPPORTED' });
+
+      const runtimeHarness = createHarness();
+      runtimeHarness.resolveAuthority.mockResolvedValueOnce({
+        ok: true,
+        principalId: 'desktop-local-principal',
+        scope: 'individual',
+        runtime: 'codex',
+      });
+      await expect(invoke(runtimeHarness.service)).resolves.toMatchObject({ ok: false, code: 'RUNTIME_UNSUPPORTED' });
+    }
+  );
 
   it('rejects feature, desktop, invalid, team, and unsupported-runtime requests before later dependencies', async () => {
     const base = createHarness();
@@ -776,7 +997,6 @@ describe('PresentationRunService', () => {
       expect(harness.store.getByRequest).not.toHaveBeenCalled();
       expect(harness.store.listPublicRecoverable).not.toHaveBeenCalled();
       expect(harness.store.discardRun).not.toHaveBeenCalled();
-      expect(harness.files.withAuthorizedRetainedCandidate).not.toHaveBeenCalled();
     }
   });
 
@@ -933,8 +1153,221 @@ describe('PresentationRunService', () => {
       state: 'retained',
       details: { runId: RUN_ID },
     });
-    expect(harness.files.withAuthorizedRetainedCandidate).not.toHaveBeenCalled();
-    expect(harness.openRetainedCandidate).not.toHaveBeenCalled();
+  });
+
+  it('keeps Open fail-closed even with an exact retained candidate and passed readiness evidence', async () => {
+    const harness = createHarness();
+    harness.store.getRun.mockResolvedValue(exactReadyManifest() as never);
+
+    await expect(
+      harness.service.openRecovery({
+        conversation_id: CONVERSATION_ID,
+        run_id: RUN_ID,
+        expected_sha256: CANDIDATE_SHA256,
+      })
+    ).resolves.toEqual({
+      ok: false,
+      code: 'UNSAFE_TO_OPEN',
+      messageKey: 'conversation.presentationRun.UNSAFE_TO_OPEN',
+      retryable: false,
+      state: 'retained',
+      details: { runId: RUN_ID },
+    });
+  });
+
+  it('never invokes a pathname opener that can transiently swap and restore retained bytes', async () => {
+    const fixtureRoot = await mkdtemp(path.join(tmpdir(), 'presentation-safe-open-'));
+    try {
+      const userDataDir = path.join(fixtureRoot, 'user-data');
+      const systemTempDir = path.join(fixtureRoot, 'system-temp');
+      await Promise.all([mkdir(userDataDir, { mode: 0o700 }), mkdir(systemTempDir, { mode: 0o700 })]);
+      const files = new PresentationRunFiles({ userDataDir, tempDir: systemTempDir });
+      const layout = await files.createRunLayout(RUN_ID);
+      const candidatePath = path.join(layout.retainedDirectory, 'candidate.pptx');
+      const safeBytes = Buffer.from('safe retained presentation');
+      const hostileBytes = Buffer.from('different pathname bytes');
+      const candidateSha256 = createHash('sha256').update(safeBytes).digest('hex');
+      await writeFile(candidatePath, safeBytes, { mode: 0o600 });
+
+      const harness = createHarness();
+      harness.store.getRun.mockResolvedValue(exactReadyManifest(candidateSha256, safeBytes.byteLength) as never);
+      const resolvedByPath: Buffer[] = [];
+      const poisonOpener = vi.fn(async (absolutePath: string) => {
+        const backupPath = `${absolutePath}.verified`;
+        await rename(absolutePath, backupPath);
+        try {
+          await writeFile(absolutePath, hostileBytes, { mode: 0o600 });
+          resolvedByPath.push(await readFile(absolutePath));
+          await rm(absolutePath);
+        } finally {
+          await rename(backupPath, absolutePath);
+        }
+        return '';
+      });
+      const unsafePathOptions = {
+        ...harness.options,
+        files,
+        openRetainedCandidate: poisonOpener,
+      };
+      const service = new PresentationRunService(unsafePathOptions);
+
+      await expect(
+        service.openRecovery({
+          conversation_id: CONVERSATION_ID,
+          run_id: RUN_ID,
+          expected_sha256: candidateSha256,
+        })
+      ).resolves.toMatchObject({ ok: false, code: 'UNSAFE_TO_OPEN' });
+      expect(poisonOpener).not.toHaveBeenCalled();
+      expect(resolvedByPath).toEqual([]);
+      await expect(readFile(candidatePath)).resolves.toEqual(safeBytes);
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('advertises Open as unavailable whenever callable authority is fail-closed', async () => {
+    const harness = createHarness();
+    harness.store.getRun.mockResolvedValue(exactReadyManifest() as never);
+
+    await expect(harness.service.get({ conversation_id: CONVERSATION_ID, run_id: RUN_ID })).resolves.toMatchObject({
+      ok: true,
+      run: { actions: { openAllowed: false } },
+    });
+  });
+
+  it.each([
+    [
+      'staging pre-retention candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.stagingBeforeRetain = 'e'.repeat(64);
+      },
+    ],
+    [
+      'retained temporary candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.retainedTemp = 'e'.repeat(64);
+      },
+    ],
+    [
+      'staging post-retention candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.stagingAfterRetain = 'e'.repeat(64);
+      },
+    ],
+    [
+      'manifest retained candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.manifestRetained = 'e'.repeat(64);
+      },
+    ],
+    [
+      'inspection copy',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.inspectionCopy = 'e'.repeat(64);
+      },
+    ],
+    [
+      'post-structural candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.retainedAfterStructuralValidation = 'e'.repeat(64);
+      },
+    ],
+    [
+      'post-OOXML candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.retainedAfterOoxmlInspection = 'e'.repeat(64);
+      },
+    ],
+    [
+      'post-render candidate',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.hashChain.retainedAfterEachSlideRender[0] = 'e'.repeat(64);
+      },
+    ],
+    [
+      'render candidate binding',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.renders[0]!.candidateSha256 = 'e'.repeat(64);
+      },
+    ],
+  ])('rejects current passed readiness with stale %s evidence', (_label, mutate) => {
+    const manifest = structuredClone(exactReadyManifest());
+    mutate(manifest);
+
+    expect(() => assertPresentationRunManifestState(manifest as never)).toThrow(
+      'Invalid presentation readiness evidence'
+    );
+  });
+
+  it.each([
+    [
+      'an unknown top-level field',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        Object.assign(manifest.readiness.evidence, { unknown: true });
+      },
+    ],
+    [
+      'an unknown nested candidate field',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        Object.assign(manifest.readiness.evidence.candidate, { path: '/tmp/candidate.pptx' });
+      },
+    ],
+    [
+      'an OOXML slide cardinality mismatch',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.ooxml.slides = [];
+      },
+    ],
+    [
+      'an invalid policy result',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.policy.plan.valid = false;
+      },
+    ],
+    [
+      'a passed policy with a blocker',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.policy.blockers.push({ code: 'PLAN_INVALID', slideNumber: null });
+      },
+    ],
+    [
+      'an oversized render',
+      (manifest: ReturnType<typeof exactReadyManifest>) => {
+        manifest.readiness.evidence.renders[0]!.byteLength = PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE + 1;
+      },
+    ],
+  ])('rejects current passed readiness with %s', (_label, mutate) => {
+    const manifest = structuredClone(exactReadyManifest());
+    mutate(manifest);
+
+    expect(() => assertPresentationRunManifestState(manifest as never)).toThrow(
+      'Invalid presentation readiness evidence'
+    );
+  });
+
+  it('accepts exact legacy advanced records for reading but rejects current terminal_verified without exact proof', () => {
+    const legacy = {
+      ...runManifest('committed'),
+      revision: 5,
+      dispatchStatus: 'terminal_verified' as const,
+      binding: { conversationId: CONVERSATION_ID, turnId: REQUEST_ID, runtime: 'aionrs' as const, boundAt: NOW },
+      postInvoked: true,
+    };
+    const currentWithoutProof = {
+      ...legacy,
+      initialDispatchLease: null,
+      terminalEvidence: null,
+      runtimeReleaseObservations: [],
+      retentionProof: null,
+      readiness: null,
+    };
+
+    expect(() => assertPresentationRunManifestState(legacy)).not.toThrow();
+    expect(() => assertPresentationRunManifestState(currentWithoutProof)).toThrow(
+      'Invalid presentation terminal evidence'
+    );
+    expect(() => assertPresentationRunManifestState(exactReadyManifest() as never)).not.toThrow();
   });
 
   it.each([
@@ -967,8 +1400,6 @@ describe('PresentationRunService', () => {
         expected_sha256: expectedSha256,
       })
     ).resolves.toMatchObject({ ok: false, code });
-    expect(harness.files.withAuthorizedRetainedCandidate).not.toHaveBeenCalled();
-    expect(harness.openRetainedCandidate).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1013,10 +1444,6 @@ describe('PresentationRunService', () => {
 
     expect(foreign).toEqual(RUN_NOT_FOUND_FAILURE);
     expect(absent).toEqual(RUN_NOT_FOUND_FAILURE);
-    expect(foreignHarness.files.withAuthorizedRetainedCandidate).not.toHaveBeenCalled();
-    expect(foreignHarness.openRetainedCandidate).not.toHaveBeenCalled();
-    expect(absentHarness.files.withAuthorizedRetainedCandidate).not.toHaveBeenCalled();
-    expect(absentHarness.openRetainedCandidate).not.toHaveBeenCalled();
   });
 
   it('discards only safety-qualified exact-revision runs and keeps tombstone replay idempotent', async () => {
@@ -1260,6 +1687,9 @@ describe('presentation run native provider policy', () => {
       listRecoverable: vi.fn(),
       openRecovery: vi.fn(),
       discard: vi.fn(),
+      claimInitialDispatch: vi.fn(async () => ({ ok: false, code: 'INTERNAL_ERROR' })),
+      renewInitialDispatch: vi.fn(async () => ({ ok: false, code: 'INTERNAL_ERROR' })),
+      dispatch: vi.fn(async () => ({ ok: false, code: 'INTERNAL_ERROR' })),
     };
     const sourceService = {
       bindDraft: vi.fn(),
@@ -1283,12 +1713,13 @@ describe('presentation run native provider policy', () => {
       retainScratch: provider('templateRetain'),
     };
 
+    const shellOpenPath = vi.fn(async () => '');
     vi.resetModules();
     vi.doMock('electron', () => ({
       app: { getPath: vi.fn(() => '/tmp/weprompt-task7') },
       dialog: { showOpenDialog: vi.fn() },
       ipcMain: { handle: vi.fn() },
-      shell: { openPath: vi.fn(async () => '') },
+      shell: { openPath: shellOpenPath },
     }));
     vi.doMock('@/common', () => ({
       ipcBridge: {
@@ -1309,6 +1740,9 @@ describe('presentation run native provider policy', () => {
           listRecoverable: provider('runList'),
           openRecovery: provider('runOpen'),
           discard: provider('runDiscard'),
+          claimInitialDispatch: provider('runClaim'),
+          renewInitialDispatch: provider('runRenew'),
+          dispatch: provider('runDispatch'),
         },
       },
     }));
@@ -1391,8 +1825,14 @@ describe('presentation run native provider policy', () => {
       initPresentationTemplateBridge();
       const startProvider = providers.get('runStart');
       const getProvider = providers.get('runGet');
+      const claimProvider = providers.get('runClaim');
+      const renewProvider = providers.get('runRenew');
+      const dispatchProvider = providers.get('runDispatch');
       expect(startProvider).toBeTypeOf('function');
       expect(getProvider).toBeTypeOf('function');
+      expect(claimProvider).toBeTypeOf('function');
+      expect(renewProvider).toBeTypeOf('function');
+      expect(dispatchProvider).toBeTypeOf('function');
 
       await expect(startProvider?.(request() as never)).resolves.toMatchObject({
         ok: false,
@@ -1402,6 +1842,32 @@ describe('presentation run native provider policy', () => {
       expect(runService.start).not.toHaveBeenCalled();
       expect(conversationGet).not.toHaveBeenCalled();
       expect(rawTeamRequest).not.toHaveBeenCalled();
+      const claimRequest = {
+        conversation_id: CONVERSATION_ID,
+        run_id: RUN_ID,
+        holder_id: HOLDER_ID,
+        expected_revision: 2,
+      };
+      const renewRequest = {
+        conversation_id: CONVERSATION_ID,
+        run_id: RUN_ID,
+        lease_token: LEASE_TOKEN,
+        expected_revision: 3,
+      };
+      const dispatchRequest = { ...renewRequest };
+      await expect(claimProvider?.(claimRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'FEATURE_DISABLED',
+      });
+      await expect(renewProvider?.(renewRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'FEATURE_DISABLED',
+      });
+      await expect(dispatchProvider?.(dispatchRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'FEATURE_DISABLED',
+      });
+      expect(construction).not.toHaveBeenCalled();
 
       policy.enabled = true;
       const authorityCases = [
@@ -1449,6 +1915,22 @@ describe('presentation run native provider policy', () => {
       expect(rawTeamRequest).toHaveBeenCalledWith('GET', '/api/teams?user_id=system_default_user');
       expect(teamList).not.toHaveBeenCalled();
 
+      await expect(claimProvider?.(claimRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'INTERNAL_ERROR',
+      });
+      await expect(renewProvider?.(renewRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'INTERNAL_ERROR',
+      });
+      await expect(dispatchProvider?.(dispatchRequest as never)).resolves.toMatchObject({
+        ok: false,
+        code: 'INTERNAL_ERROR',
+      });
+      expect(runService.claimInitialDispatch).toHaveBeenCalledWith(claimRequest);
+      expect(runService.renewInitialDispatch).toHaveBeenCalledWith(renewRequest);
+      expect(runService.dispatch).toHaveBeenCalledWith(dispatchRequest);
+
       policy.enabled = false;
       await expect(getProvider?.({ conversation_id: CONVERSATION_ID, run_id: RUN_ID } as never)).resolves.toMatchObject(
         { ok: false, code: 'RUN_NOT_FOUND' }
@@ -1463,6 +1945,8 @@ describe('presentation run native provider policy', () => {
       const capturedRunOptions = runServiceOptions as {
         resolveAuthority: (input: { conversationId: string; principalId: string }) => Promise<unknown>;
       };
+      expect(Object.hasOwn(capturedRunOptions, 'openRetainedCandidate')).toBe(false);
+      expect(shellOpenPath).not.toHaveBeenCalled();
       await expect(
         capturedRunOptions.resolveAuthority({
           conversationId: CONVERSATION_ID,

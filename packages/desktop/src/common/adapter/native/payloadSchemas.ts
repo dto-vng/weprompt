@@ -367,6 +367,38 @@ export const nativeBridgePayloadSchemas = {
       expected_revision: presentationRevisionSchema,
     })
     .strict(),
+  'presentation-runs.claim-initial-dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      holder_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.renew-initial-dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      lease_token: z
+        .string()
+        .min(32)
+        .max(256)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      lease_token: z
+        .string()
+        .min(32)
+        .max(256)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
   'app-operations.context-compact': appOperationsContextCompactSchema,
   'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
   'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,

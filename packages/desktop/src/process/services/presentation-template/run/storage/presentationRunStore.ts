@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createHash, randomUUID as createRandomUUID } from 'node:crypto';
+import { createHash, randomUUID as createRandomUUID, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { PRESENTATION_RUN_DISPATCH_STATUSES, PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
+import type { PresentationReadinessEvidence } from '@/common/types/office/artifactReadiness';
 import type {
   PresentationGrantOwner,
   PresentationRunFailure,
@@ -33,8 +34,12 @@ import {
   assertPresentationSourceGrantTombstone,
   assertPresentationSourceOwnerManifest,
   bindPresentationRunTurn,
+  hasExactPresentationTerminalEvidence,
   transitionPresentationRunState,
   type BindPresentationRunTurnInput,
+  type PresentationInitialDispatchLease,
+  type PresentationRunReadiness,
+  type PresentationRunTerminalEvidence,
   type PresentationRunManifest,
   type PresentationRunTransition,
   type PresentationSourceDraftManifest,
@@ -166,7 +171,14 @@ export class PresentationSourceStoreError extends Error {
 }
 
 export class PresentationRunStoreError extends Error {
-  constructor(readonly code: 'RESOURCE_LIMIT_EXCEEDED') {
+  constructor(
+    readonly code:
+      | 'RESOURCE_LIMIT_EXCEEDED'
+      | 'RUN_STATE_CONFLICT'
+      | 'LEASE_CONFLICT'
+      | 'LEASE_EXPIRED'
+      | 'LEASE_FOREIGN'
+  ) {
     super(code);
     this.name = 'PresentationRunStoreError';
   }
@@ -241,6 +253,22 @@ export type AllocatePresentationRunResult =
   | { ok: true; status: 'created' | 'existing'; run: StoredPresentationRunManifest }
   | PresentationRunFailure;
 
+export type ClaimInitialPresentationDispatchInput = {
+  runId: string;
+  conversationId: string;
+  holderId: string;
+  expectedRevision: number;
+};
+
+export type RenewInitialPresentationDispatchInput = {
+  runId: string;
+  conversationId: string;
+  leaseToken: string;
+  expectedRevision: number;
+};
+
+export type MatchInitialPresentationDispatchLeaseInput = RenewInitialPresentationDispatchInput;
+
 type PresentationRunIndex = {
   version: 1;
   requests: Record<string, string>;
@@ -291,6 +319,15 @@ const LIVE_GENERATION_STATUSES = new Set<StoredPresentationRunManifest['dispatch
   'dispatch_uncertain',
 ]);
 const RETAINED_STATUSES = new Set<StoredPresentationRunManifest['dispatchStatus']>(['retained', 'failed_retained']);
+const INITIAL_DISPATCH_LEASE_MS = 30_000;
+const RUNTIME_RELEASE_CONFIRMATION_MS = 30_000;
+const CURRENT_LIFECYCLE_KEYS = [
+  'initialDispatchLease',
+  'terminalEvidence',
+  'runtimeReleaseObservations',
+  'retentionProof',
+  'readiness',
+] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -300,6 +337,43 @@ const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): 
   const actual = Object.keys(value).sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 };
+
+function currentLifecycleManifest(run: StoredPresentationRunManifest): StoredPresentationRunManifest {
+  return {
+    ...run,
+    preparation: run.preparation ?? null,
+    initialDispatchLease: run.initialDispatchLease ?? null,
+    terminalEvidence: run.terminalEvidence ?? null,
+    runtimeReleaseObservations: [...(run.runtimeReleaseObservations ?? [])],
+    retentionProof: run.retentionProof ?? null,
+    readiness: run.readiness ?? null,
+  };
+}
+
+function hasExactLegacyNullableBinding(run: StoredPresentationRunManifest): boolean {
+  return run.binding?.runtime === null && CURRENT_LIFECYCLE_KEYS.every((key) => !Object.hasOwn(run, key));
+}
+
+function isLegacyRuntimeReleaseFallback(run: StoredPresentationRunManifest): boolean {
+  return (
+    run.dispatchStatus === 'dispatch_uncertain' &&
+    run.disposition === 'TRACKING_REQUIRED' &&
+    run.binding === null &&
+    run.retainedCandidate === null &&
+    run.initialDispatchLease === null &&
+    run.terminalEvidence === null &&
+    run.runtimeReleaseObservations?.length === 1 &&
+    run.retentionProof === null &&
+    run.readiness === null &&
+    CURRENT_LIFECYCLE_KEYS.every((key) => Object.hasOwn(run, key))
+  );
+}
+
+function sameCapability(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left);
+  const rightBytes = Buffer.from(right);
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
+}
 
 function isLegacyPresentationRunGrantClaim(
   value: unknown
@@ -1715,6 +1789,12 @@ export class PresentationRunStore {
         binding: null,
         postInvoked: false,
         retainedBytes: sourceBytes,
+        preparation: null,
+        initialDispatchLease: null,
+        terminalEvidence: null,
+        runtimeReleaseObservations: [],
+        retentionProof: null,
+        readiness: null,
       };
       this.assertStoredRun(run, runId);
       await this.runCanonicalTransaction({
@@ -1892,7 +1972,8 @@ export class PresentationRunStore {
       if (
         current.dispatchStatus !== 'terminal_verified' ||
         current.artifactPhase !== 'sources_extracted' ||
-        current.retainedCandidate !== null
+        current.retainedCandidate !== null ||
+        !hasExactPresentationTerminalEvidence(current)
       ) {
         throw new Error('Candidate retention requires terminal verification');
       }
@@ -1905,7 +1986,13 @@ export class PresentationRunStore {
         await this.files.removePreparedRetainedCandidate(prepared);
         throw new Error('Presentation retained resource limit exceeded');
       }
-      const next = transitionPresentationRunState(current, {
+      const normalized = currentLifecycleManifest(current);
+      const retentionProof = {
+        stagingBeforeRetain: prepared.stagingBeforeRetain ?? prepared.sha256,
+        retainedTemp: prepared.retainedTemp ?? prepared.sha256,
+        stagingAfterRetain: prepared.stagingAfterRetain ?? prepared.sha256,
+      };
+      const next = transitionPresentationRunState(normalized, {
         expectedRevision,
         dispatchStatus: 'terminal_verified',
         artifactPhase: 'candidate_retained',
@@ -1914,6 +2001,7 @@ export class PresentationRunStore {
           sha256: prepared.sha256,
           byteLength: prepared.byteLength,
         },
+        retentionProof,
         now: this.now().toISOString(),
       }) as StoredPresentationRunManifest;
       next.retainedBytes = current.retainedBytes + prepared.byteLength;
@@ -1996,6 +2084,414 @@ export class PresentationRunStore {
     });
   }
 
+  async claimInitialDispatch(unsafeInput: ClaimInitialPresentationDispatchInput): Promise<{
+    status: 'claimed' | 'already_claimed';
+    manifest: StoredPresentationRunManifest;
+    leaseToken: string;
+  }> {
+    const input = frozenSnapshot(unsafeInput);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${input.runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(input.runId);
+      if (current === undefined || current.conversationId !== input.conversationId) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      if (current.dispatchStatus !== 'committed' || current.postInvoked) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const now = this.now();
+      const currentLease = current.initialDispatchLease ?? null;
+      if (currentLease !== null && Date.parse(currentLease.expiresAt) > now.getTime()) {
+        if (currentLease.holderId !== input.holderId) throw new PresentationRunStoreError('LEASE_CONFLICT');
+        return {
+          status: 'already_claimed',
+          manifest: this.snapshotRun(current),
+          leaseToken: currentLease.leaseToken,
+        };
+      }
+      if (current.revision !== input.expectedRevision) throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      const claimedAt = now.toISOString();
+      const lease: PresentationInitialDispatchLease = {
+        holderId: input.holderId,
+        leaseToken: this.randomUUID(),
+        claimedAt,
+        expiresAt: new Date(now.getTime() + INITIAL_DISPATCH_LEASE_MS).toISOString(),
+      };
+      const normalized = currentLifecycleManifest(current);
+      const next: StoredPresentationRunManifest = {
+        ...normalized,
+        revision: normalized.revision + 1,
+        updatedAt: claimedAt,
+        initialDispatchLease: lease,
+      };
+      this.assertStoredRun(next, input.runId);
+      await this.commitRunMutation(current, next);
+      return { status: 'claimed', manifest: this.snapshotRun(next), leaseToken: lease.leaseToken };
+    });
+  }
+
+  async renewInitialDispatch(
+    unsafeInput: RenewInitialPresentationDispatchInput
+  ): Promise<{ status: 'renewed'; manifest: StoredPresentationRunManifest }> {
+    const input = frozenSnapshot(unsafeInput);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${input.runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(input.runId);
+      if (
+        current === undefined ||
+        current.conversationId !== input.conversationId ||
+        current.dispatchStatus !== 'committed' ||
+        current.postInvoked
+      ) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      if (current.revision !== input.expectedRevision) throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      const lease = current.initialDispatchLease ?? null;
+      if (lease === null || !sameCapability(lease.leaseToken, input.leaseToken)) {
+        throw new PresentationRunStoreError('LEASE_FOREIGN');
+      }
+      const now = this.now();
+      if (Date.parse(lease.expiresAt) <= now.getTime()) throw new PresentationRunStoreError('LEASE_EXPIRED');
+      const next: StoredPresentationRunManifest = {
+        ...currentLifecycleManifest(current),
+        revision: current.revision + 1,
+        updatedAt: now.toISOString(),
+        initialDispatchLease: {
+          ...lease,
+          expiresAt: new Date(now.getTime() + INITIAL_DISPATCH_LEASE_MS).toISOString(),
+        },
+      };
+      this.assertStoredRun(next, input.runId);
+      await this.commitRunMutation(current, next);
+      return { status: 'renewed', manifest: this.snapshotRun(next) };
+    });
+  }
+
+  async matchesInitialDispatchLease(unsafeInput: MatchInitialPresentationDispatchLeaseInput): Promise<boolean> {
+    const input = frozenSnapshot(unsafeInput);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health'], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(input.runId);
+      if (current === undefined || current.conversationId !== input.conversationId) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const lease = current?.initialDispatchLease ?? null;
+      if (current.dispatchStatus === 'committed' && current.revision !== input.expectedRevision) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      if (lease === null || !sameCapability(lease.leaseToken, input.leaseToken)) {
+        throw new PresentationRunStoreError('LEASE_FOREIGN');
+      }
+      if (!current.postInvoked && Date.parse(lease.expiresAt) <= this.now().getTime()) {
+        throw new PresentationRunStoreError('LEASE_EXPIRED');
+      }
+      const leaseIsUsable = current.postInvoked === true || Date.parse(lease.expiresAt) > this.now().getTime();
+      return leaseIsUsable;
+    });
+  }
+
+  async beginInitialDispatch(
+    unsafeInput: MatchInitialPresentationDispatchLeaseInput
+  ): Promise<StoredPresentationRunManifest> {
+    const input = frozenSnapshot(unsafeInput);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', 'policy:app', `run:${input.runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(input.runId);
+      if (current === undefined || current.conversationId !== input.conversationId) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      if (current.revision !== input.expectedRevision || current.dispatchStatus !== 'committed') {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const lease = current.initialDispatchLease ?? null;
+      if (lease === null || !sameCapability(lease.leaseToken, input.leaseToken)) {
+        throw new PresentationRunStoreError('LEASE_FOREIGN');
+      }
+      if (Date.parse(lease.expiresAt) <= this.now().getTime()) throw new PresentationRunStoreError('LEASE_EXPIRED');
+      const next = transitionPresentationRunState(currentLifecycleManifest(current), {
+        expectedRevision: current.revision,
+        dispatchStatus: 'dispatching',
+        postInvoked: true,
+        now: this.now().toISOString(),
+      }) as StoredPresentationRunManifest;
+      this.assertLiveGenerationCapacity(current.conversationId);
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
+  async settleDispatchUncertain(runId: string, expectedRevision: number): Promise<StoredPresentationRunManifest> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      if (current === undefined) throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      if (current.dispatchStatus === 'dispatch_uncertain') return this.snapshotRun(current);
+      if (current.revision !== expectedRevision || current.dispatchStatus !== 'dispatching') {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const next = transitionPresentationRunState(currentLifecycleManifest(current), {
+        expectedRevision,
+        dispatchStatus: 'dispatch_uncertain',
+        disposition: 'TRACKING_REQUIRED',
+        now: this.now().toISOString(),
+      }) as StoredPresentationRunManifest;
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
+  async settleCommittedPreflightFailure(
+    runId: string,
+    expectedRevision: number
+  ): Promise<StoredPresentationRunManifest> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      if (current === undefined || current.revision !== expectedRevision || current.dispatchStatus !== 'committed') {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const next = transitionPresentationRunState(currentLifecycleManifest(current), {
+        expectedRevision,
+        dispatchStatus: 'failed_retained',
+        disposition: 'TRACKING_REQUIRED',
+        now: this.now().toISOString(),
+      }) as StoredPresentationRunManifest;
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
+  async getRunByTurn(conversationId: string, turnId: string): Promise<StoredPresentationRunManifest | null> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health'], async () => {
+      this.assertStorageHealthy();
+      const runId = this.index.turns[`${conversationId}\u0000${turnId}`];
+      if (runId === undefined) return null;
+      const run = this.runs.get(runId);
+      return run === undefined ? null : this.snapshotRun(run);
+    });
+  }
+
+  async recordTerminalProof(
+    runId: string,
+    expectedRevision: number,
+    unsafeEvidence: PresentationRunTerminalEvidence
+  ): Promise<StoredPresentationRunManifest> {
+    const evidence = frozenSnapshot(unsafeEvidence);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      if (current === undefined) throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      if (current.terminalEvidence !== undefined && current.terminalEvidence !== null) {
+        if (isDeepStrictEqual(current.terminalEvidence, evidence)) return this.snapshotRun(current);
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      if (current.revision !== expectedRevision || current.dispatchStatus !== 'bound') {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const now = this.now().toISOString();
+      const next: StoredPresentationRunManifest = {
+        ...currentLifecycleManifest(current),
+        revision: current.revision + 1,
+        updatedAt: now,
+        statusEnteredAt: now,
+        dispatchStatus: 'terminal_verified',
+        terminalEvidence: evidence,
+      };
+      this.assertStoredRun(next, runId);
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
+  async recordRuntimeReleaseObservation(
+    runId: string,
+    expectedRevision: number,
+    observedAt: string
+  ): Promise<{ status: 'observed' | 'tracking_required'; manifest: StoredPresentationRunManifest }> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      const legacyNullableBound =
+        current !== undefined && current.dispatchStatus === 'bound' && hasExactLegacyNullableBinding(current);
+      const legacyFallback = current !== undefined && isLegacyRuntimeReleaseFallback(current);
+      if (
+        current === undefined ||
+        current.revision !== expectedRevision ||
+        (current.dispatchStatus !== 'bound' && !legacyFallback)
+      ) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const observations = current.runtimeReleaseObservations ?? [];
+      const first = observations[0];
+      if (first === undefined || Date.parse(observedAt) - Date.parse(first) < RUNTIME_RELEASE_CONFIRMATION_MS) {
+        const next: StoredPresentationRunManifest = legacyNullableBound
+          ? {
+              ...currentLifecycleManifest(current),
+              revision: current.revision + 1,
+              updatedAt: observedAt,
+              statusEnteredAt: observedAt,
+              dispatchStatus: 'dispatch_uncertain',
+              disposition: 'TRACKING_REQUIRED',
+              binding: null,
+              runtimeReleaseObservations: [observedAt],
+            }
+          : {
+              ...currentLifecycleManifest(current),
+              revision: current.revision + 1,
+              updatedAt: observedAt,
+              runtimeReleaseObservations: first === undefined ? [observedAt] : [first],
+            };
+        this.assertStoredRun(next, runId);
+        await this.commitRunMutation(current, next);
+        return { status: 'observed', manifest: this.snapshotRun(next) };
+      }
+      const next: StoredPresentationRunManifest = legacyFallback
+        ? {
+            ...current,
+            revision: current.revision + 1,
+            updatedAt: observedAt,
+            statusEnteredAt: observedAt,
+            retainedAt: observedAt,
+            dispatchStatus: 'retained',
+            disposition: 'TRACKING_REQUIRED',
+            binding: null,
+            runtimeReleaseObservations: [first, observedAt],
+          }
+        : (transitionPresentationRunState(currentLifecycleManifest(current), {
+            expectedRevision,
+            dispatchStatus: 'retained',
+            disposition: 'TRACKING_REQUIRED',
+            now: observedAt,
+          }) as StoredPresentationRunManifest);
+      if (!legacyFallback) next.runtimeReleaseObservations = [first, observedAt];
+      this.assertStoredRun(next, runId);
+      await this.commitRunMutation(current, next);
+      return { status: 'tracking_required', manifest: this.snapshotRun(next) };
+    });
+  }
+
+  async settleReadinessSuccess(
+    runId: string,
+    expectedRevision: number,
+    evidence: PresentationReadinessEvidence
+  ): Promise<StoredPresentationRunManifest> {
+    return this.settleReadiness(runId, expectedRevision, {
+      status: 'passed',
+      recordedAt: this.now().toISOString(),
+      evidence,
+    });
+  }
+
+  async settleReadinessFailure(
+    runId: string,
+    expectedRevision: number,
+    readiness: Extract<PresentationRunReadiness, { status: 'blocked' | 'error' }>
+  ): Promise<StoredPresentationRunManifest> {
+    return this.settleReadiness(runId, expectedRevision, readiness);
+  }
+
+  async settleTerminalFailure(
+    runId: string,
+    expectedRevision: number,
+    code: 'TERMINAL_PROOF_MISSING' | 'RETENTION_FAILED'
+  ): Promise<StoredPresentationRunManifest> {
+    if (code !== 'TERMINAL_PROOF_MISSING' && code !== 'RETENTION_FAILED') {
+      throw new Error('Invalid presentation terminal failure code');
+    }
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      if (current === undefined) throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      if (current.dispatchStatus === 'failed_retained' && current.disposition === 'TRACKING_REQUIRED') {
+        return this.snapshotRun(current);
+      }
+      if (current.revision !== expectedRevision || current.dispatchStatus !== 'terminal_verified') {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const now = this.now().toISOString();
+      const terminalProofMissing = code === 'TERMINAL_PROOF_MISSING';
+      const hasCandidate = current.retainedCandidate !== null;
+      const binding = hasExactLegacyNullableBinding(current) ? null : current.binding;
+      const next: StoredPresentationRunManifest = {
+        ...currentLifecycleManifest(current),
+        revision: current.revision + 1,
+        updatedAt: now,
+        statusEnteredAt: now,
+        retainedAt: now,
+        dispatchStatus: 'failed_retained',
+        artifactPhase: terminalProofMissing && hasCandidate ? 'sources_extracted' : current.artifactPhase,
+        disposition: terminalProofMissing || !hasCandidate ? 'TRACKING_REQUIRED' : 'REVIEW_REQUIRED',
+        retainedCandidate: terminalProofMissing ? null : current.retainedCandidate,
+        retentionProof: terminalProofMissing ? null : current.retentionProof,
+        binding,
+        readiness: code === 'RETENTION_FAILED' ? { status: 'error', recordedAt: now, code } : null,
+      };
+      this.assertStoredRun(next, runId);
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
+  private async settleReadiness(
+    runId: string,
+    expectedRevision: number,
+    readiness: PresentationRunReadiness
+  ): Promise<StoredPresentationRunManifest> {
+    const snapshot = frozenSnapshot(readiness);
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
+      this.assertStorageHealthy();
+      const current = this.runs.get(runId);
+      if (
+        current === undefined ||
+        current.revision !== expectedRevision ||
+        current.dispatchStatus !== 'terminal_verified' ||
+        current.artifactPhase !== 'candidate_retained' ||
+        current.retainedCandidate === null ||
+        !hasExactPresentationTerminalEvidence(current)
+      ) {
+        throw new PresentationRunStoreError('RUN_STATE_CONFLICT');
+      }
+      const now = snapshot.recordedAt;
+      const passed = snapshot.status === 'passed';
+      const next: StoredPresentationRunManifest = {
+        ...currentLifecycleManifest(current),
+        revision: current.revision + 1,
+        updatedAt: now,
+        statusEnteredAt: now,
+        retainedAt: now,
+        dispatchStatus: passed ? 'retained' : 'failed_retained',
+        artifactPhase: passed ? 'rendered_exact_hash' : 'candidate_retained',
+        disposition: 'REVIEW_REQUIRED',
+        readiness: snapshot,
+      };
+      this.assertStoredRun(next, runId);
+      await this.commitRunMutation(current, next);
+      return this.snapshotRun(next);
+    });
+  }
+
   async transitionRun(
     runId: string,
     unsafeTransition: PresentationRunTransition
@@ -2003,29 +2499,27 @@ export class PresentationRunStore {
     const transition = frozenSnapshot(unsafeTransition);
     await this.initialize();
     this.assertStorageHealthy();
-    if (transition.dispatchStatus === 'bound' || transition.binding !== undefined) {
-      throw new Error('Presentation run binding requires bindRunTurn');
-    }
-    if (transition.dispatchStatus === 'discarded') {
-      throw new Error('Presentation discard requires discardRun');
-    }
-    if (transition.artifactPhase === 'candidate_retained' || transition.retainedCandidate !== undefined) {
-      throw new Error('Presentation candidate retention requires retainCandidate');
-    }
     const currentForLock = this.runs.get(runId);
     if (currentForLock === undefined) throw new Error('Presentation run not found');
-    const lockKeys = ['store:health', `run:${runId}`];
-    if (transition.dispatchStatus === 'dispatching') {
-      lockKeys.push('policy:app', `conversation:${currentForLock.conversationId}`);
+    const isSafePredispatchPhaseMutation =
+      currentForLock.dispatchStatus === 'allocating' &&
+      transition.dispatchStatus === 'allocating' &&
+      (transition.artifactPhase === undefined ||
+        transition.artifactPhase === 'none' ||
+        transition.artifactPhase === 'sources_snapshotted') &&
+      transition.disposition === undefined &&
+      transition.retainedCandidate === undefined &&
+      transition.retentionProof === undefined &&
+      transition.binding === undefined &&
+      transition.postInvoked === undefined;
+    if (!isSafePredispatchPhaseMutation) {
+      throw new Error('Presentation lifecycle mutation requires a dedicated store method');
     }
-    return this.lock.runExclusive(lockKeys, async () => {
+    return this.lock.runExclusive(['store:health', `run:${runId}`], async () => {
       this.assertStorageHealthy();
       const current = this.runs.get(runId);
       if (current === undefined) throw new Error('Presentation run not found');
       const next = transitionPresentationRunState(current, transition) as StoredPresentationRunManifest;
-      if (!LIVE_GENERATION_STATUSES.has(current.dispatchStatus) && LIVE_GENERATION_STATUSES.has(next.dispatchStatus)) {
-        this.assertLiveGenerationCapacity(current.conversationId);
-      }
       await this.commitRunMutation(current, next);
       return this.snapshotRun(next);
     });
@@ -2057,7 +2551,7 @@ export class PresentationRunStore {
         if (owner !== undefined && owner !== runId) {
           throw new Error('Presentation conversation turn is already bound to another run');
         }
-        const result = bindPresentationRunTurn(current, input);
+        const result = bindPresentationRunTurn(currentLifecycleManifest(current), input);
         if (result.status === 'already_bound') {
           return { status: result.status, manifest: this.snapshotRun(current) };
         }
@@ -2122,7 +2616,10 @@ export class PresentationRunStore {
     this.assertStorageHealthy();
     return this.lock.runExclusive(['store:health'], async () => {
       this.assertStorageHealthy();
-      return this.sortedRuns((run) => run.dispatchStatus === 'dispatching' || run.dispatchStatus === 'bound');
+      return this.sortedRuns(
+        (run) =>
+          run.dispatchStatus === 'dispatching' || run.dispatchStatus === 'bound' || isLegacyRuntimeReleaseFallback(run)
+      );
     });
   }
 
@@ -2132,6 +2629,20 @@ export class PresentationRunStore {
     return this.lock.runExclusive(['store:health'], async () => {
       this.assertStorageHealthy();
       return this.sortedRuns((run) => run.dispatchStatus === 'terminal_verified');
+    });
+  }
+
+  async listSettledInspectionCleanup(): Promise<string[]> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health'], async () => {
+      this.assertStorageHealthy();
+      return this.sortedRuns(
+        (run) =>
+          (run.dispatchStatus === 'retained' || run.dispatchStatus === 'failed_retained') &&
+          run.readiness !== undefined &&
+          run.readiness !== null
+      ).map(({ runId }) => runId);
     });
   }
 
@@ -2900,6 +3411,11 @@ export class PresentationRunStore {
       preparation: null,
       binding: null,
       retainedBytes: 0,
+      initialDispatchLease: null,
+      terminalEvidence: null,
+      runtimeReleaseObservations: [],
+      retentionProof: null,
+      readiness: null,
     };
     this.assertStoredRun(discarded, current.runId);
     return discarded;
@@ -2975,9 +3491,20 @@ export class PresentationRunStore {
       'postInvoked',
       'retainedBytes',
     ];
+    const currentLifecycleKeys = [
+      ...canonicalKeys,
+      'preparation',
+      'initialDispatchLease',
+      'terminalEvidence',
+      'runtimeReleaseObservations',
+      'retentionProof',
+      'readiness',
+    ];
     if (
       !isRecord(run) ||
-      (!hasExactKeys(run, canonicalKeys) && !hasExactKeys(run, [...canonicalKeys, 'preparation'])) ||
+      (!hasExactKeys(run, canonicalKeys) &&
+        !hasExactKeys(run, [...canonicalKeys, 'preparation']) &&
+        !hasExactKeys(run, currentLifecycleKeys)) ||
       run.version !== 2 ||
       run.runId !== expectedRunId ||
       !REQUEST_FINGERPRINT_RE.test(run.requestFingerprint) ||

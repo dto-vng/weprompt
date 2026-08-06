@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -444,7 +445,7 @@ describe('PresentationRunStore source grants', () => {
       { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
       PRINCIPAL_ID
     );
-    await createGrant();
+    const { prepared: sourceSnapshot } = await createGrant();
     const allocated = await store.allocateRun({
       conversationId: CONVERSATION_ID,
       clientRequestId: 'bind-task-3-grant',
@@ -459,28 +460,58 @@ describe('PresentationRunStore source grants', () => {
       artifactPhase: 'sources_snapshotted',
       now: '2026-08-04T00:00:01.000Z',
     });
-    await store.transitionRun(RUN_ID, {
-      expectedRevision: 1,
-      dispatchStatus: 'committed',
-      artifactPhase: 'sources_extracted',
-      now: '2026-08-04T00:00:02.000Z',
+    clock = new Date('2026-08-04T00:00:02.000Z');
+    const candidateBytes = Buffer.from('stable presentation candidate');
+    const themeBytes = Buffer.from('{"name":"test theme"}\n');
+    const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+    const preparedRun = await files.prepareRunAssets({
+      runId: RUN_ID,
+      candidateBytes,
+      grounding: '# Grounding\n\nVerified source evidence.\n',
+      rawInput: 'Prepare the quarterly business review.',
+      directive: 'Edit candidate.pptx and write plan.json.',
+      sourceRefs: [
+        {
+          grantId: GRANT_ID,
+          expectedByteLength: sourceSnapshot.byteLength,
+          expectedSha256: sourceSnapshot.sha256,
+        },
+      ],
+      injectSkills: ['officecli'],
+      template: {
+        theme: { fileName: 'theme.json', sha256: sha256(themeBytes), byteLength: themeBytes.byteLength },
+        reference: {
+          fileName: 'reference.pptx',
+          sha256: sha256(candidateBytes),
+          byteLength: candidateBytes.byteLength,
+        },
+      },
     });
-    await store.transitionRun(RUN_ID, {
-      expectedRevision: 2,
-      dispatchStatus: 'dispatching',
-      postInvoked: true,
-      now: '2026-08-04T00:00:03.000Z',
+    const committed = await store.commitPreparedRun(RUN_ID, 1, preparedRun);
+    clock = new Date('2026-08-04T00:00:03.000Z');
+    const claimed = await store.claimInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      holderId: DRAFT_ID,
+      expectedRevision: committed.revision,
+    });
+    const dispatching = await store.beginInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      leaseToken: claimed.leaseToken,
+      expectedRevision: claimed.manifest.revision,
     });
 
+    clock = new Date('2026-08-04T00:00:04.000Z');
     await expect(
       store.bindRunTurn(RUN_ID, {
-        expectedRevision: 3,
+        expectedRevision: dispatching.revision,
         conversationId: CONVERSATION_ID,
         turnId: 'turn-task-3',
         runtime: 'aionrs',
         now: '2026-08-04T00:00:04.000Z',
       })
-    ).resolves.toMatchObject({ status: 'bound', manifest: { revision: 4 } });
+    ).resolves.toMatchObject({ status: 'bound', manifest: { revision: 5 } });
     await expect(journal.readCanonical('grant', GRANT_ID)).resolves.toMatchObject({
       revision: 2,
       state: 'consumed',

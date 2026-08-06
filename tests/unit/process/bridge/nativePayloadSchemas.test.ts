@@ -144,6 +144,24 @@ const VALID_PAYLOADS = {
     run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
     expected_revision: 2,
   },
+  'presentation-runs.claim-initial-dispatch': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    holder_id: '9fa2d54d-95e5-4e06-84e4-a0aeeb434601',
+    expected_revision: 2,
+  },
+  'presentation-runs.renew-initial-dispatch': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    lease_token: '18dc56da-f415-4b42-89f1-717fb24a6fe8',
+    expected_revision: 3,
+  },
+  'presentation-runs.dispatch': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    lease_token: '18dc56da-f415-4b42-89f1-717fb24a6fe8',
+    expected_revision: 3,
+  },
   'project-knowledge.list-sources': { projectId: 'project-1' },
   'project-knowledge.add-sources': {
     projectId: 'project-1',
@@ -647,6 +665,26 @@ const INVALID_PAYLOADS = [
     { ...VALID_PAYLOADS['presentation-runs.discard'], expected_revision: Number.MAX_SAFE_INTEGER + 1 },
   ],
   [
+    'presentation-runs.claim-initial-dispatch',
+    'malformed holder UUID',
+    { ...VALID_PAYLOADS['presentation-runs.claim-initial-dispatch'], holder_id: 'renderer-holder' },
+  ],
+  [
+    'presentation-runs.claim-initial-dispatch',
+    'path-shaped run UUID',
+    { ...VALID_PAYLOADS['presentation-runs.claim-initial-dispatch'], run_id: '../run' },
+  ],
+  [
+    'presentation-runs.renew-initial-dispatch',
+    'malformed lease token',
+    { ...VALID_PAYLOADS['presentation-runs.renew-initial-dispatch'], lease_token: 'lease-token' },
+  ],
+  [
+    'presentation-runs.dispatch',
+    'unsafe expected revision',
+    { ...VALID_PAYLOADS['presentation-runs.dispatch'], expected_revision: Number.MAX_SAFE_INTEGER + 1 },
+  ],
+  [
     'app-operations.context-compact',
     'renderer-supplied model selection',
     {
@@ -809,7 +847,7 @@ describe('native bridge payload schemas', () => {
     expect(policyImports).toEqual(['../../types/office/presentationRunPolicy']);
   });
 
-  it('exposes only the five approved renderer run operations', async () => {
+  it('exposes only the eight approved renderer run operations', async () => {
     const adapter = await import('@/common/adapter/ipcBridge');
 
     expect(Object.keys(Reflect.get(adapter, 'presentationRuns') ?? {})).toEqual([
@@ -818,6 +856,9 @@ describe('native bridge payload schemas', () => {
       'listRecoverable',
       'openRecovery',
       'discard',
+      'claimInitialDispatch',
+      'renewInitialDispatch',
+      'dispatch',
     ]);
   });
 
