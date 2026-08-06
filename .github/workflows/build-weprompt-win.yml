@@ -58,7 +58,18 @@ jobs:
           CARGO_TERM_COLOR: always
           CARGO_HTTP_TIMEOUT: '600'
           CARGO_NET_RETRY: '10'
-        run: cargo build --release --target "$RUST_TARGET" -p aionui-app
+          # rusqlite's `bundled-sqlcipher-vendored-openssl` feature builds OpenSSL from
+          # source, and OpenSSL's ./Configure needs a Perl with Locale::Maketext::Simple.
+          # Under `shell: bash` the Git-for-Windows MSYS perl wins the PATH and lacks it,
+          # so point openssl-src at the runner's Strawberry Perl explicitly.
+          OPENSSL_SRC_PERL: C:/Strawberry/perl/bin/perl.exe
+        run: |
+          set -euo pipefail
+          test -f "/c/Strawberry/perl/bin/perl.exe" || {
+            echo "::error::Strawberry Perl not found at C:/Strawberry/perl/bin/perl.exe — OpenSSL cannot be configured"
+            exit 1
+          }
+          cargo build --release --target "$RUST_TARGET" -p aionui-app
 
       - name: Assemble the backend bundle
         shell: bash
