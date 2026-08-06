@@ -7,6 +7,8 @@
 import type {
   CreateStudioProjectInput,
   ProposeStudioStoryboardInput,
+  StudioCut,
+  StudioEditableCut,
   StudioEditableScene,
   StudioProject,
   StudioProjectSummary,
@@ -14,6 +16,7 @@ import type {
   StudioScene,
   StudioSelectAssetRequest,
   StudioUpdateProjectRequest,
+  StudioUpdateCutRequest,
   StudioUpdateSceneRequest,
   StudioReorderScenesRequest,
   StudioDeleteProjectRequest,
@@ -47,7 +50,12 @@ import type {
   StudioUpdateModelSelectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
 import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
-import { CreativeStudioStoreError, type CreativeStudioStore } from '@process/services/creative-studio/store';
+import {
+  CreativeStudioStoreError,
+  reconcilePersistedStudioCuts,
+  resolveStudioCutState,
+  type CreativeStudioStore,
+} from '@process/services/creative-studio/store';
 import type {
   StudioGenerationRoute,
   StudioGenerationRouteCatalog,
@@ -74,6 +82,11 @@ const MEDIA_KINDS = new Set(['image', 'video']);
 const CONNECTION_VALIDATION_TIMEOUT_MS = 30_000;
 const UPDATABLE_PROJECT_FIELDS = ['name', 'brief', 'aspectRatio', 'targetDurationSeconds', 'resolution'] as const;
 type UpdatableProjectField = (typeof UPDATABLE_PROJECT_FIELDS)[number];
+const EDITABLE_CUT_KEYS = new Set(['orderMode', 'clipOrder', 'clips']);
+const EDITABLE_CUT_CLIP_KEYS = new Set(['sourceInSeconds', 'sourceOutSeconds', 'crop', 'filters']);
+const NORMALISED_RECT_KEYS = new Set(['x', 'y', 'width', 'height']);
+const CUT_FILTER_KEYS = new Set(['id', 'amount']);
+const CUT_FILTER_IDS = new Set(['exposure', 'contrast', 'saturation', 'temperature']);
 const NONTERMINAL_JOB_STATUSES: ReadonlySet<StudioJob['status']> = new Set([
   'queued_local',
   'submitting',
@@ -125,6 +138,7 @@ export type CreativeStudioService = {
   getProject(projectId: string): Promise<StudioRendererProject | null>;
   proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioRendererProject>;
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioRendererProject>;
+  updateCut(input: StudioUpdateCutRequest): Promise<StudioRendererProject>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<boolean>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioRendererProject>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioRendererProject>;
@@ -498,6 +512,79 @@ const assertScene = (scene: StudioEditableScene): void => {
   if (scene.referenceAssetId !== null) assertSafeId(scene.referenceAssetId, 'reference asset id');
 };
 
+type JsonRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const hasExactKeys = (value: JsonRecord, keys: ReadonlySet<string>): boolean =>
+  Object.keys(value).length === keys.size && Object.keys(value).every((key) => keys.has(key));
+
+const isFiniteInRange = (value: unknown, minimum: number, maximum: number): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum;
+
+const trimPointIsValid = (value: unknown): value is number | null =>
+  value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+
+const assertEditableCut: (value: unknown) => asserts value is StudioEditableCut = (value) => {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.clips) ||
+    !hasExactKeys(value, EDITABLE_CUT_KEYS) ||
+    (value.orderMode !== 'storyboard' && value.orderMode !== 'manual') ||
+    !Array.isArray(value.clipOrder) ||
+    value.clipOrder.some((clipId) => !isSafeId(clipId)) ||
+    new Set(value.clipOrder).size !== value.clipOrder.length
+  ) {
+    throw invalid('Invalid Studio cut edit');
+  }
+  for (const [clipId, candidate] of Object.entries(value.clips)) {
+    if (!isSafeId(clipId) || !isRecord(candidate) || !hasExactKeys(candidate, EDITABLE_CUT_CLIP_KEYS)) {
+      throw invalid('Invalid Studio cut clip edit');
+    }
+    const sourceIn = candidate.sourceInSeconds;
+    const sourceOut = candidate.sourceOutSeconds;
+    if (
+      !trimPointIsValid(sourceIn) ||
+      !trimPointIsValid(sourceOut) ||
+      (sourceIn !== null && sourceOut !== null && sourceIn >= sourceOut)
+    ) {
+      throw invalid('Invalid Studio cut trim');
+    }
+    if (candidate.crop !== null) {
+      if (
+        !isRecord(candidate.crop) ||
+        !hasExactKeys(candidate.crop, NORMALISED_RECT_KEYS) ||
+        !isFiniteInRange(candidate.crop.x, 0, 1) ||
+        !isFiniteInRange(candidate.crop.y, 0, 1) ||
+        !isFiniteInRange(candidate.crop.width, 0, 1) ||
+        candidate.crop.width <= 0 ||
+        !isFiniteInRange(candidate.crop.height, 0, 1) ||
+        candidate.crop.height <= 0 ||
+        candidate.crop.x + candidate.crop.width > 1 ||
+        candidate.crop.y + candidate.crop.height > 1
+      ) {
+        throw invalid('Invalid Studio cut crop');
+      }
+    }
+    if (!Array.isArray(candidate.filters)) throw invalid('Invalid Studio cut filters');
+    const filterIds: string[] = [];
+    for (const filter of candidate.filters) {
+      if (
+        !isRecord(filter) ||
+        !hasExactKeys(filter, CUT_FILTER_KEYS) ||
+        typeof filter.id !== 'string' ||
+        !CUT_FILTER_IDS.has(filter.id) ||
+        !isFiniteInRange(filter.amount, -1, 1)
+      ) {
+        throw invalid('Invalid Studio cut filter');
+      }
+      filterIds.push(filter.id);
+    }
+    if (new Set(filterIds).size !== filterIds.length) throw invalid('Duplicate Studio cut filter');
+  }
+};
+
 const mediaKindForProviderRef = (provider: StudioProviderRef): 'image' | 'video' =>
   provider.adapterId === 'weprompt-image-v1' ? 'image' : 'video';
 
@@ -560,32 +647,58 @@ const toRendererAsset = (asset: StudioAsset): StudioAsset => ({
   createdAt: asset.createdAt,
 });
 
-const toRendererProject = (project: StudioProject): StudioRendererProject => ({
-  schemaVersion: project.schemaVersion,
-  revision: project.revision,
-  id: project.id,
-  name: project.name,
-  brief: project.brief,
-  ...(project.forgeProjectId === undefined ? {} : { forgeProjectId: project.forgeProjectId }),
-  aspectRatio: project.aspectRatio,
-  targetDurationSeconds: project.targetDurationSeconds,
-  resolution: project.resolution,
-  sceneOrder: [...project.sceneOrder],
-  scenes: Object.fromEntries(
-    Object.entries(project.scenes).map(([sceneId, scene]) => [sceneId, toRendererScene(scene)])
+const toRendererCut = (cut: StudioCut): StudioCut => ({
+  id: cut.id,
+  name: cut.name,
+  orderMode: cut.orderMode,
+  clipOrder: [...cut.clipOrder],
+  clips: Object.fromEntries(
+    Object.entries(cut.clips).map(([clipId, clip]) => [
+      clipId,
+      {
+        id: clip.id,
+        sceneId: clip.sceneId,
+        assetId: clip.assetId,
+        sourceInSeconds: clip.sourceInSeconds,
+        sourceOutSeconds: clip.sourceOutSeconds,
+        crop: clip.crop === null ? null : { ...clip.crop },
+        filters: clip.filters.map((filter) => ({ ...filter })),
+      },
+    ])
   ),
-  assets: Object.fromEntries(
-    Object.entries(project.assets).map(([assetId, asset]) => [assetId, toRendererAsset(asset)])
-  ),
-  jobs: Object.fromEntries(Object.entries(project.jobs).map(([jobId, job]) => [jobId, toRendererJob(job)])),
-  routing: {
-    storyboard: project.routing.storyboard === null ? null : { ...project.routing.storyboard },
-    image: project.routing.image === null ? null : toRendererMediaChoice(project.routing.image, 'image'),
-    video: project.routing.video === null ? null : toRendererMediaChoice(project.routing.video, 'video'),
-  },
-  createdAt: project.createdAt,
-  updatedAt: project.updatedAt,
 });
+
+const toRendererProject = (project: StudioProject): StudioRendererProject => {
+  const cutState = resolveStudioCutState(project);
+  return {
+    schemaVersion: project.schemaVersion,
+    revision: project.revision,
+    id: project.id,
+    name: project.name,
+    brief: project.brief,
+    ...(project.forgeProjectId === undefined ? {} : { forgeProjectId: project.forgeProjectId }),
+    aspectRatio: project.aspectRatio,
+    targetDurationSeconds: project.targetDurationSeconds,
+    resolution: project.resolution,
+    sceneOrder: [...project.sceneOrder],
+    scenes: Object.fromEntries(
+      Object.entries(project.scenes).map(([sceneId, scene]) => [sceneId, toRendererScene(scene)])
+    ),
+    cuts: Object.fromEntries(Object.entries(cutState.cuts).map(([cutId, cut]) => [cutId, toRendererCut(cut)])),
+    activeCutId: cutState.activeCutId,
+    assets: Object.fromEntries(
+      Object.entries(project.assets).map(([assetId, asset]) => [assetId, toRendererAsset(asset)])
+    ),
+    jobs: Object.fromEntries(Object.entries(project.jobs).map(([jobId, job]) => [jobId, toRendererJob(job)])),
+    routing: {
+      storyboard: project.routing.storyboard === null ? null : { ...project.routing.storyboard },
+      image: project.routing.image === null ? null : toRendererMediaChoice(project.routing.image, 'image'),
+      video: project.routing.video === null ? null : toRendererMediaChoice(project.routing.video, 'video'),
+    },
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+};
 
 const modelStatus = (
   selected: unknown | null,
@@ -928,7 +1041,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       return notify(
         await deps.store.updateProject(
           project.id,
-          (current) => ({ ...current, scenes, sceneOrder: [...sceneIds] }),
+          (current) => reconcilePersistedStudioCuts({ ...current, scenes, sceneOrder: [...sceneIds] }),
           project.revision
         )
       );
@@ -979,6 +1092,74 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             return project;
           },
           expectedRevision
+        )
+      );
+    },
+
+    async updateCut(input: StudioUpdateCutRequest): Promise<StudioRendererProject> {
+      assertSafeId(input.projectId, 'project id');
+      assertSafeId(input.cutId, 'cut id');
+      assertExpectedRevision(input.expectedRevision);
+      assertEditableCut(input.cut);
+      return notify(
+        await deps.store.updateProject(
+          input.projectId,
+          (project) => {
+            const cutState = resolveStudioCutState(project);
+            const currentCut = cutState.cuts[input.cutId];
+            if (currentCut === undefined) throw invalid('Studio cut not found');
+            const currentClipIds = Object.keys(currentCut.clips);
+            const editedClipIds = Object.keys(input.cut.clips);
+            if (
+              editedClipIds.length !== currentClipIds.length ||
+              editedClipIds.some((clipId) => !Object.hasOwn(currentCut.clips, clipId)) ||
+              input.cut.clipOrder.length !== currentClipIds.length ||
+              input.cut.clipOrder.some((clipId) => !Object.hasOwn(currentCut.clips, clipId))
+            ) {
+              throw invalid('Studio cut edit must retain every clip identity');
+            }
+            const orderChanged =
+              input.cut.clipOrder.some((clipId, index) => clipId !== currentCut.clipOrder[index]) ||
+              input.cut.clipOrder.length !== currentCut.clipOrder.length;
+            const orderMode =
+              currentCut.orderMode === 'manual'
+                ? input.cut.orderMode === 'storyboard'
+                  ? 'storyboard'
+                  : 'manual'
+                : orderChanged
+                  ? 'manual'
+                  : 'storyboard';
+            const editedCut: StudioCut = {
+              ...currentCut,
+              orderMode,
+              clipOrder: [...input.cut.clipOrder],
+              clips: Object.fromEntries(
+                currentClipIds.map((clipId) => {
+                  const currentClip = currentCut.clips[clipId]!;
+                  const edit = input.cut.clips[clipId]!;
+                  return [
+                    clipId,
+                    {
+                      ...currentClip,
+                      sourceInSeconds: edit.sourceInSeconds,
+                      sourceOutSeconds: edit.sourceOutSeconds,
+                      crop: edit.crop === null ? null : { ...edit.crop },
+                      filters: edit.filters.map((filter) => ({ ...filter })),
+                    },
+                  ];
+                })
+              ),
+            };
+            return reconcilePersistedStudioCuts({
+              ...project,
+              cuts: {
+                ...structuredClone(cutState.cuts),
+                [input.cutId]: editedCut,
+              },
+              activeCutId: cutState.activeCutId,
+            });
+          },
+          input.expectedRevision
         )
       );
     },
@@ -1237,7 +1418,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
               }
               delete next.scenes[input.sceneId];
               next.sceneOrder = next.sceneOrder.filter((sceneId) => sceneId !== input.sceneId);
-              return next;
+              return reconcilePersistedStudioCuts(next);
             }
             if (!Object.hasOwn(next.scenes, input.sceneId) && next.sceneOrder.length >= 24) {
               throw invalid('Studio project has too many scenes');
@@ -1293,7 +1474,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
               };
             }
             if (!next.sceneOrder.includes(input.sceneId)) next.sceneOrder.push(input.sceneId);
-            return next;
+            return reconcilePersistedStudioCuts(next);
           },
           input.expectedRevision
         )
@@ -1322,7 +1503,7 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             ) {
               throw invalid('Studio scene order must be an exact permutation');
             }
-            return { ...project, sceneOrder: [...input.sceneOrder] };
+            return reconcilePersistedStudioCuts({ ...project, sceneOrder: [...input.sceneOrder] });
           },
           input.expectedRevision
         )
@@ -1347,13 +1528,13 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             ) {
               throw invalid('Studio asset does not belong to its selected scene');
             }
-            return {
+            return reconcilePersistedStudioCuts({
               ...project,
               scenes: {
                 ...project.scenes,
                 [input.sceneId]: { ...scene, selectedAssetId: input.assetId },
               },
-            };
+            });
           },
           input.expectedRevision
         )

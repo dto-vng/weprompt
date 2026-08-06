@@ -322,6 +322,55 @@ const studioUpdateProjectSchema = z
   })
   .strict()
   .refine((input) => Object.keys(input).some((key) => key !== 'projectId' && key !== 'expectedRevision'));
+const studioNormalisedRectSchema = z
+  .object({
+    x: z.number().finite().min(0).max(1),
+    y: z.number().finite().min(0).max(1),
+    width: z.number().finite().positive().max(1),
+    height: z.number().finite().positive().max(1),
+  })
+  .strict()
+  .refine((rect) => rect.x + rect.width <= 1 && rect.y + rect.height <= 1);
+const studioCutFilterSchema = z
+  .object({
+    id: z.enum(['exposure', 'contrast', 'saturation', 'temperature']),
+    amount: z.number().finite().min(-1).max(1),
+  })
+  .strict();
+const studioEditableCutClipSchema = z
+  .object({
+    sourceInSeconds: z.number().finite().nonnegative().nullable(),
+    sourceOutSeconds: z.number().finite().nonnegative().nullable(),
+    crop: studioNormalisedRectSchema.nullable(),
+    filters: z
+      .array(studioCutFilterSchema)
+      .refine((filters) => new Set(filters.map((filter) => filter.id)).size === filters.length),
+  })
+  .strict()
+  .refine(
+    (clip) =>
+      clip.sourceInSeconds === null || clip.sourceOutSeconds === null || clip.sourceInSeconds < clip.sourceOutSeconds
+  );
+const studioEditableCutSchema = z
+  .object({
+    orderMode: z.enum(['storyboard', 'manual']),
+    clipOrder: z.array(safeIdSchema).refine((ids) => new Set(ids).size === ids.length),
+    clips: z.record(safeIdSchema, studioEditableCutClipSchema),
+  })
+  .strict()
+  .refine(
+    (cut) =>
+      cut.clipOrder.length === Object.keys(cut.clips).length &&
+      cut.clipOrder.every((clipId) => Object.hasOwn(cut.clips, clipId))
+  );
+const studioUpdateCutSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    cutId: safeIdSchema,
+    cut: studioEditableCutSchema,
+  })
+  .strict();
 
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
 export const INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE =
@@ -439,6 +488,7 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'creative-studio.update-model-selection': studioUpdateModelSelectionSchema,
   'creative-studio.update-project': studioUpdateProjectSchema,
+  'creative-studio.update-cut': studioUpdateCutSchema,
   'creative-studio.delete-project': z
     .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
     .strict(),

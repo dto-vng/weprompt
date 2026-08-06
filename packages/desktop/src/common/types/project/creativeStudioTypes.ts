@@ -161,6 +161,45 @@ export type StudioEditableScene = Pick<
   | 'referenceAssetId'
 >;
 
+export type StudioNormalisedRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type StudioCutFilter =
+  | { id: 'exposure'; amount: number }
+  | { id: 'contrast'; amount: number }
+  | { id: 'saturation'; amount: number }
+  | { id: 'temperature'; amount: number };
+
+export type StudioCutClip = {
+  id: string;
+  sceneId: string;
+  assetId: string;
+  sourceInSeconds: number | null;
+  sourceOutSeconds: number | null;
+  crop: StudioNormalisedRect | null;
+  filters: StudioCutFilter[];
+};
+
+export type StudioCut = {
+  id: string;
+  name: string;
+  orderMode: 'storyboard' | 'manual';
+  clipOrder: string[];
+  clips: Record<string, StudioCutClip>;
+};
+
+/** Non-destructive clip decisions the renderer may supply; provenance remains main-owned. */
+export type StudioEditableCutClip = Pick<StudioCutClip, 'sourceInSeconds' | 'sourceOutSeconds' | 'crop' | 'filters'>;
+
+/** Cut intent the renderer may supply; cut and clip identities remain main-owned. */
+export type StudioEditableCut = Pick<StudioCut, 'orderMode' | 'clipOrder'> & {
+  clips: Record<string, StudioEditableCutClip>;
+};
+
 export type StudioRoutingPreferences = {
   storyboard: StudioTextModelRef | null;
   image: StudioProviderRef | null;
@@ -179,6 +218,8 @@ export type StudioProject = {
   resolution: StudioResolution;
   sceneOrder: string[];
   scenes: Record<string, StudioScene>;
+  cuts?: Record<string, StudioCut>;
+  activeCutId?: string | null;
   assets: Record<string, StudioAsset>;
   jobs: Record<string, StudioJob>;
   routing: StudioRoutingPreferences;
@@ -403,6 +444,12 @@ export type StudioUpdateProjectRequest = StudioProjectRequest & {
   resolution?: StudioResolution;
 };
 
+export type StudioUpdateCutRequest = StudioProjectRequest & {
+  expectedRevision: number;
+  cutId: string;
+  cut: StudioEditableCut;
+};
+
 export type StudioModelSelectionChange =
   | {
       role: 'storyboard';
@@ -555,6 +602,7 @@ export type StudioDesktopApi = {
   proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioCommandResult<StudioRendererProject>>;
   updateModelSelection(input: StudioUpdateModelSelectionRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioCommandResult<StudioRendererProject>>;
+  updateCut(input: StudioUpdateCutRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<StudioCommandResult<boolean>>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioCommandResult<StudioRendererProject>>;

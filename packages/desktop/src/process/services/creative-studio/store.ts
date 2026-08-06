@@ -11,6 +11,9 @@ import type {
   StudioAsset,
   StudioCancellationPolicy,
   StudioConnectionBinding,
+  StudioCut,
+  StudioCutClip,
+  StudioCutFilter,
   StudioJob,
   StudioProject,
   StudioProjectSummary,
@@ -18,6 +21,7 @@ import type {
   StudioScene,
   StudioTextModelRef,
 } from '@/common/types/project/creativeStudioTypes';
+import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
 import { isValidProviderJobId } from '@process/services/creative-studio/adapters/types';
 import { toStudioProjectSummary } from '@/common/types/project/creativeStudioProjectSummary';
 
@@ -93,6 +97,11 @@ const ASSET_KEYS = new Set([
   'createdAt',
 ]);
 const MANAGED_ASSET_KEYS = new Set(['collection', 'fileName']);
+const CUT_KEYS = new Set(['id', 'name', 'orderMode', 'clipOrder', 'clips']);
+const CUT_CLIP_KEYS = new Set(['id', 'sceneId', 'assetId', 'sourceInSeconds', 'sourceOutSeconds', 'crop', 'filters']);
+const NORMALISED_RECT_KEYS = new Set(['x', 'y', 'width', 'height']);
+const CUT_FILTER_KEYS = new Set(['id', 'amount']);
+const CUT_FILTER_IDS = new Set(['exposure', 'contrast', 'saturation', 'temperature']);
 const JOB_KEYS = new Set([
   'id',
   'projectId',
@@ -444,6 +453,222 @@ const validateAsset = (
   );
 };
 
+const validateNormalisedRect = (value: unknown): boolean => {
+  if (!isRecord(value) || !hasExactKeys(value, NORMALISED_RECT_KEYS)) return false;
+  return (
+    isFiniteInRange(value.x, 0, 1) &&
+    isFiniteInRange(value.y, 0, 1) &&
+    isFiniteInRange(value.width, 0, 1) &&
+    value.width > 0 &&
+    isFiniteInRange(value.height, 0, 1) &&
+    value.height > 0 &&
+    value.x + value.width <= 1 &&
+    value.y + value.height <= 1
+  );
+};
+
+const validateCutFilter = (value: unknown): value is StudioCutFilter =>
+  isRecord(value) &&
+  hasExactKeys(value, CUT_FILTER_KEYS) &&
+  isString(value.id) &&
+  CUT_FILTER_IDS.has(value.id) &&
+  isFiniteInRange(value.amount, -1, 1);
+
+const validateTrimPoint = (value: unknown): value is number | null =>
+  value === null || isFiniteInRange(value, 0, Number.MAX_VALUE);
+
+const validateCutClip = (
+  clipId: string,
+  projectId: string,
+  scenes: Record<string, StudioScene>,
+  assets: Record<string, StudioAsset>,
+  value: unknown
+): value is StudioCutClip => {
+  if (!isRecord(value) || !hasExactKeys(value, CUT_CLIP_KEYS)) return false;
+  const scene = isSafeId(value.sceneId) ? scenes[value.sceneId] : undefined;
+  const asset = isSafeId(value.assetId) ? assets[value.assetId] : undefined;
+  if (
+    value.id !== clipId ||
+    !isSafeId(clipId) ||
+    scene === undefined ||
+    asset === undefined ||
+    !isCanonicalStudioGeneratedTake(asset, projectId, scene) ||
+    !validateTrimPoint(value.sourceInSeconds) ||
+    !validateTrimPoint(value.sourceOutSeconds) ||
+    (value.sourceInSeconds !== null &&
+      value.sourceOutSeconds !== null &&
+      value.sourceInSeconds >= value.sourceOutSeconds) ||
+    (value.crop !== null && !validateNormalisedRect(value.crop)) ||
+    !Array.isArray(value.filters) ||
+    !value.filters.every(validateCutFilter)
+  ) {
+    return false;
+  }
+  const filterIds = value.filters.map((filter) => filter.id);
+  if (new Set(filterIds).size !== filterIds.length) return false;
+  if (asset.durationSeconds === undefined) return true;
+  return (
+    (value.sourceInSeconds === null || value.sourceInSeconds <= asset.durationSeconds) &&
+    (value.sourceOutSeconds === null || value.sourceOutSeconds <= asset.durationSeconds)
+  );
+};
+
+const validateCut = (
+  cutId: string,
+  projectId: string,
+  scenes: Record<string, StudioScene>,
+  assets: Record<string, StudioAsset>,
+  value: unknown
+): value is StudioCut => {
+  if (!isRecord(value) || !isRecord(value.clips) || !hasExactKeys(value, CUT_KEYS)) return false;
+  const clips = value.clips;
+  const clipIds = Object.keys(clips);
+  return (
+    value.id === cutId &&
+    isSafeId(cutId) &&
+    isString(value.name) &&
+    (value.orderMode === 'storyboard' || value.orderMode === 'manual') &&
+    asArrayOfSafeIds(value.clipOrder) &&
+    value.clipOrder.length === clipIds.length &&
+    new Set(value.clipOrder).size === value.clipOrder.length &&
+    value.clipOrder.every((clipId) => Object.hasOwn(clips, clipId)) &&
+    clipIds.every((clipId) => validateCutClip(clipId, projectId, scenes, assets, clips[clipId]))
+  );
+};
+
+const validateCuts = (
+  cuts: Record<string, unknown>,
+  projectId: string,
+  scenes: Record<string, StudioScene>,
+  assets: Record<string, StudioAsset>
+): cuts is Record<string, StudioCut> =>
+  Object.keys(cuts).every((cutId) => validateCut(cutId, projectId, scenes, assets, cuts[cutId]));
+
+const IMPLICIT_CUT_ID = 'cut_1';
+
+export type ResolvedStudioCutState = {
+  cuts: Record<string, StudioCut>;
+  activeCutId: string | null;
+};
+
+const selectedTake = (project: StudioProject, scene: StudioScene): StudioAsset | null => {
+  if (scene.selectedAssetId === null) return null;
+  const asset = project.assets[scene.selectedAssetId];
+  return asset !== undefined && isCanonicalStudioGeneratedTake(asset, project.id, scene) ? asset : null;
+};
+
+const implicitClipIdBase = (sceneId: string, suffix = ''): string =>
+  `clip_${sceneId}`.slice(0, 256 - suffix.length) + suffix;
+
+const allocateClipId = (sceneId: string, occupied: ReadonlySet<string>): string => {
+  const base = implicitClipIdBase(sceneId);
+  if (!occupied.has(base)) return base;
+  let suffix = 2;
+  while (occupied.has(implicitClipIdBase(sceneId, `_${suffix}`))) suffix += 1;
+  return implicitClipIdBase(sceneId, `_${suffix}`);
+};
+
+const pristineClip = (scene: StudioScene, asset: StudioAsset, id: string): StudioCutClip => ({
+  id,
+  sceneId: scene.id,
+  assetId: asset.id,
+  sourceInSeconds: null,
+  sourceOutSeconds: null,
+  crop: null,
+  filters: [],
+});
+
+const deriveImplicitCut = (project: StudioProject): StudioCut => {
+  const clips: Record<string, StudioCutClip> = {};
+  const clipOrder: string[] = [];
+  const occupied = new Set<string>();
+  for (const sceneId of project.sceneOrder) {
+    const scene = project.scenes[sceneId];
+    if (scene === undefined) continue;
+    const asset = selectedTake(project, scene);
+    if (asset === null) continue;
+    const clipId = allocateClipId(scene.id, occupied);
+    occupied.add(clipId);
+    clips[clipId] = pristineClip(scene, asset, clipId);
+    clipOrder.push(clipId);
+  }
+  return {
+    id: IMPLICIT_CUT_ID,
+    name: project.name,
+    orderMode: 'storyboard',
+    clipOrder,
+    clips,
+  };
+};
+
+/** Resolves legacy projects to a pristine in-memory cut without mutating or persisting them. */
+export const resolveStudioCutState = (project: StudioProject): ResolvedStudioCutState => {
+  if (project.cuts !== undefined && project.activeCutId !== undefined) {
+    return { cuts: project.cuts, activeCutId: project.activeCutId };
+  }
+  const cut = deriveImplicitCut(project);
+  return { cuts: { [cut.id]: cut }, activeCutId: cut.id };
+};
+
+const clampClipToAsset = (clip: StudioCutClip, asset: StudioAsset): StudioCutClip => {
+  if (asset.durationSeconds === undefined) return { ...clip, assetId: asset.id };
+  if (clip.sourceInSeconds !== null && clip.sourceInSeconds >= asset.durationSeconds) {
+    return { ...clip, assetId: asset.id, sourceInSeconds: null, sourceOutSeconds: null };
+  }
+  return {
+    ...clip,
+    assetId: asset.id,
+    sourceOutSeconds: clip.sourceOutSeconds === null ? null : Math.min(clip.sourceOutSeconds, asset.durationSeconds),
+  };
+};
+
+const reconcileCut = (project: StudioProject, cut: StudioCut): StudioCut => {
+  const clips: Record<string, StudioCutClip> = {};
+  const priorOrder = [...cut.clipOrder];
+  const orderedExistingIds = [
+    ...priorOrder,
+    ...Object.keys(cut.clips).filter((clipId) => !priorOrder.includes(clipId)),
+  ];
+  for (const clipId of orderedExistingIds) {
+    const clip = cut.clips[clipId];
+    const scene = clip === undefined ? undefined : project.scenes[clip.sceneId];
+    const asset = scene === undefined ? null : selectedTake(project, scene);
+    if (clip === undefined || asset === null) continue;
+    clips[clipId] = clampClipToAsset(clip, asset);
+  }
+
+  const occupied = new Set(Object.keys(clips));
+  const addedIds: string[] = [];
+  for (const sceneId of project.sceneOrder) {
+    const scene = project.scenes[sceneId];
+    if (scene === undefined || Object.values(clips).some((clip) => clip.sceneId === sceneId)) continue;
+    const asset = selectedTake(project, scene);
+    if (asset === null) continue;
+    const clipId = allocateClipId(sceneId, occupied);
+    occupied.add(clipId);
+    addedIds.push(clipId);
+    clips[clipId] = pristineClip(scene, asset, clipId);
+  }
+
+  const retainedPriorOrder = priorOrder.filter((clipId) => Object.hasOwn(clips, clipId));
+  const clipOrder =
+    cut.orderMode === 'manual'
+      ? [...retainedPriorOrder, ...addedIds]
+      : project.sceneOrder.flatMap((sceneId) =>
+          [...retainedPriorOrder, ...addedIds].filter((clipId) => clips[clipId]?.sceneId === sceneId)
+        );
+  return { ...cut, clipOrder, clips };
+};
+
+/** Keeps already-persisted cuts aligned with canonical selection and storyboard changes. */
+export const reconcilePersistedStudioCuts = (project: StudioProject): StudioProject => {
+  if (project.cuts === undefined || project.activeCutId === undefined) return project;
+  return {
+    ...project,
+    cuts: Object.fromEntries(Object.entries(project.cuts).map(([cutId, cut]) => [cutId, reconcileCut(project, cut)])),
+  };
+};
+
 const validateJob = (jobId: string, projectId: string, sceneIds: Set<string>, value: unknown): value is StudioJob => {
   if (!isRecord(value)) return false;
   const errorIsValid =
@@ -566,6 +791,8 @@ const validateProject = (value: unknown): value is StudioProject => {
   const routing = value.routing;
   const projectId = value.id;
   const sceneOrder = value.sceneOrder;
+  const cutsPresent = Object.hasOwn(value, 'cuts');
+  const activeCutIdPresent = Object.hasOwn(value, 'activeCutId');
   if (containsForbiddenRendererField(value)) return false;
   if (
     value.schemaVersion !== 1 ||
@@ -580,6 +807,7 @@ const validateProject = (value: unknown): value is StudioProject => {
     !isString(value.resolution) ||
     !RESOLUTIONS.has(value.resolution) ||
     !asArrayOfSafeIds(sceneOrder) ||
+    cutsPresent !== activeCutIdPresent ||
     !isNonEmptyString(value.createdAt) ||
     !isNonEmptyString(value.updatedAt) ||
     !hasExactKeys(routing, ROUTING_KEYS) ||
@@ -611,6 +839,15 @@ const validateProject = (value: unknown): value is StudioProject => {
   const typedScenes = scenes as Record<string, StudioScene>;
   const typedAssets = assets as Record<string, StudioAsset>;
   const typedJobs = jobs as Record<string, StudioJob>;
+  if (cutsPresent) {
+    if (!isRecord(value.cuts)) return false;
+    const cuts = value.cuts;
+    const activeCutId = value.activeCutId;
+    if (activeCutId !== null) {
+      if (!isSafeId(activeCutId) || !Object.hasOwn(cuts, activeCutId)) return false;
+    }
+    if (!validateCuts(cuts, projectId, typedScenes, typedAssets)) return false;
+  }
   if (retryGraphHasCycle(typedJobs)) return false;
   const assetsHaveReverseLinks = Object.values(typedAssets).every(
     (asset) => asset.sceneId === null || typedScenes[asset.sceneId]?.assetIds.includes(asset.id)

@@ -138,6 +138,23 @@ const VALID_PAYLOADS = {
     selection: { choiceId: 'binding_1' },
   },
   'creative-studio.update-project': { projectId: 'project_1', expectedRevision: 1, name: 'Changed launch film' },
+  'creative-studio.update-cut': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    cutId: 'cut_1',
+    cut: {
+      orderMode: 'storyboard',
+      clipOrder: ['clip_1'],
+      clips: {
+        clip_1: {
+          sourceInSeconds: 0.5,
+          sourceOutSeconds: 4.5,
+          crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+          filters: [{ id: 'contrast', amount: 0.25 }],
+        },
+      },
+    },
+  },
   'creative-studio.delete-project': { projectId: 'project_1', expectedRevision: 1 },
   'creative-studio.update-scene': {
     projectId: 'project_1',
@@ -1089,6 +1106,98 @@ describe('native bridge payload schemas', () => {
         VALID_PAYLOADS['creative-studio.update-model-selection']
       )
     ).toEqual(VALID_PAYLOADS['creative-studio.update-model-selection']);
+  });
+
+  it('accepts only renderer-owned edit decisions in a cut mutation payload', () => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.update-cut' as NativeBridgeProviderKey];
+    const payload = VALID_PAYLOADS['creative-studio.update-cut'];
+
+    expect(schema?.safeParse(payload).success).toBe(true);
+    expect(
+      schema?.safeParse({
+        ...payload,
+        cut: {
+          ...payload.cut,
+          clips: {
+            clip_1: {
+              ...payload.cut.clips.clip_1,
+              assetId: 'renderer_must_not_supply_this',
+            },
+          },
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    [
+      'unknown filter',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              filters: [{ id: 'blur', amount: 0.25 }],
+            },
+          },
+        },
+      },
+    ],
+    [
+      'duplicate filter',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              filters: [
+                { id: 'contrast', amount: 0.1 },
+                { id: 'contrast', amount: 0.2 },
+              ],
+            },
+          },
+        },
+      },
+    ],
+    [
+      'out-of-frame crop',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              crop: { x: 0.5, y: 0, width: 0.75, height: 1 },
+            },
+          },
+        },
+      },
+    ],
+    [
+      'non-increasing trim',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              sourceInSeconds: 4.5,
+              sourceOutSeconds: 4.5,
+            },
+          },
+        },
+      },
+    ],
+  ] as const)('rejects a cut mutation with %s', (_case, payload) => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.update-cut' as NativeBridgeProviderKey];
+
+    expect(schema?.safeParse(payload).success).toBe(false);
   });
 
   it('keeps the native manifest equal to adapter provider string literals', () => {

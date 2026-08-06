@@ -28,7 +28,11 @@ import type {
   StudioConnectionRecord,
   StudioConnectionValidationResult,
   StudioCommandResult,
+  StudioCut,
+  StudioCutFilter,
   StudioDesktopApi,
+  StudioEditableCut,
+  StudioEditableCutClip,
   StudioJob,
   StudioProject,
   StudioProjectSummary,
@@ -87,6 +91,33 @@ const addVideoAsset = (project: StudioProject, durationSeconds: number): StudioP
     createdAt: next.createdAt,
   };
   next.scenes.scene_1.assetIds = ['asset_1'];
+  return next;
+};
+
+const addCut = (project: StudioProject, durationSeconds: number | null = 5.085): StudioProject => {
+  const next = addVideoAsset(project, durationSeconds ?? 5.085);
+  if (durationSeconds === null) delete next.assets.asset_1.durationSeconds;
+  next.scenes.scene_1.selectedAssetId = 'asset_1';
+  next.cuts = {
+    cut_1: {
+      id: 'cut_1',
+      name: next.name,
+      orderMode: 'storyboard',
+      clipOrder: ['clip_1'],
+      clips: {
+        clip_1: {
+          id: 'clip_1',
+          sceneId: 'scene_1',
+          assetId: 'asset_1',
+          sourceInSeconds: 0.25,
+          sourceOutSeconds: 4.5,
+          crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+          filters: [{ id: 'temperature', amount: 0.25 }],
+        },
+      },
+    },
+  };
+  next.activeCutId = 'cut_1';
   return next;
 };
 
@@ -242,6 +273,232 @@ describe('creative studio project store', () => {
     const reloadedStore = createCreativeStudioStore({ rootDir });
 
     await expect(reloadedStore.getProject(project.id)).resolves.toEqual(persisted);
+  });
+
+  it('persists a valid cut with fractional trim and the closed filter union', async () => {
+    const project = await store.createProject(makeInput());
+
+    const persisted = await store.updateProject(project.id, addCut, project.revision);
+
+    expect(await store.getProject(project.id)).toEqual(persisted);
+    expect(persisted.cuts?.cut_1.clips.clip_1).toMatchObject({
+      sourceInSeconds: 0.25,
+      sourceOutSeconds: 4.5,
+      filters: [{ id: 'temperature', amount: 0.25 }],
+    });
+  });
+
+  it('accepts trim bounds when provider metadata omits asset duration', async () => {
+    const project = await store.createProject(makeInput());
+
+    const persisted = await store.updateProject(
+      project.id,
+      (current) => {
+        const next = addCut(current, null);
+        next.cuts!.cut_1.clips.clip_1.sourceOutSeconds = 9_999.25;
+        return next;
+      },
+      project.revision
+    );
+
+    expect(persisted.cuts?.cut_1.clips.clip_1.sourceOutSeconds).toBe(9_999.25);
+  });
+
+  it.each([
+    [
+      'cuts without activeCutId',
+      (project: StudioProject) => {
+        delete project.activeCutId;
+      },
+    ],
+    [
+      'activeCutId without cuts',
+      (project: StudioProject) => {
+        delete project.cuts;
+      },
+    ],
+    [
+      'an active id absent from cuts',
+      (project: StudioProject) => {
+        project.activeCutId = 'cut_missing';
+      },
+    ],
+    [
+      'a malformed cuts collection',
+      (project: StudioProject) => {
+        project.cuts = [] as never;
+      },
+    ],
+    [
+      'a cut id that differs from its map key',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.id = 'cut_2';
+      },
+    ],
+    [
+      'a clip id that differs from its map key',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.id = 'clip_2';
+      },
+    ],
+    [
+      'an unknown order mode',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.orderMode = 'automatic' as never;
+      },
+    ],
+    [
+      'an extra cut field',
+      (project: StudioProject) => {
+        Object.assign(project.cuts!.cut_1, { outputHash: 'renderer-owned' });
+      },
+    ],
+    [
+      'an extra clip field',
+      (project: StudioProject) => {
+        Object.assign(project.cuts!.cut_1.clips.clip_1, { resolvedDurationSeconds: 4.25 });
+      },
+    ],
+    [
+      'an extra crop field',
+      (project: StudioProject) => {
+        Object.assign(project.cuts!.cut_1.clips.clip_1.crop!, { unit: 'pixels' });
+      },
+    ],
+    [
+      'an extra filter field',
+      (project: StudioProject) => {
+        Object.assign(project.cuts!.cut_1.clips.clip_1.filters[0]!, { expression: 'eq=contrast=1.5' });
+      },
+    ],
+    [
+      'duplicate clip ids in clipOrder',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clipOrder = ['clip_1', 'clip_1'];
+      },
+    ],
+    [
+      'a dangling clip id in clipOrder',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clipOrder = ['clip_missing'];
+      },
+    ],
+    [
+      'a clip omitted from clipOrder',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clipOrder = [];
+      },
+    ],
+    [
+      'a missing clip scene',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sceneId = 'scene_missing';
+      },
+    ],
+    [
+      'a non-canonical imported clip asset',
+      (project: StudioProject) => {
+        project.assets.asset_1.managedAsset.collection = 'imports';
+      },
+    ],
+    [
+      'a crop extending beyond the source frame',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.crop = { x: 0.4, y: 0.1, width: 0.7, height: 0.8 };
+      },
+    ],
+    [
+      'a zero-width crop',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.crop = { x: 0, y: 0, width: 0, height: 1 };
+      },
+    ],
+    [
+      'a non-finite crop coordinate',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.crop = { x: Number.NaN, y: 0, width: 1, height: 1 };
+      },
+    ],
+    [
+      'an unknown filter id',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.filters = [{ id: 'blur', amount: 0.25 } as never];
+      },
+    ],
+    [
+      'a duplicate filter id',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.filters = [
+          { id: 'contrast', amount: 0.1 },
+          { id: 'contrast', amount: 0.2 },
+        ];
+      },
+    ],
+    [
+      'an out-of-range filter amount',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.filters = [{ id: 'exposure', amount: 1.01 }];
+      },
+    ],
+    [
+      'a non-finite filter amount',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.filters = [{ id: 'exposure', amount: Number.NaN }];
+      },
+    ],
+    [
+      'a backend filter expression',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.filters = ['eq=brightness=0.06:saturation=1.2' as never];
+      },
+    ],
+    [
+      'a negative source in',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sourceInSeconds = -0.01;
+      },
+    ],
+    [
+      'a non-finite source out',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sourceOutSeconds = Number.POSITIVE_INFINITY;
+      },
+    ],
+    [
+      'non-increasing trim bounds',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sourceInSeconds = 4.5;
+        project.cuts!.cut_1.clips.clip_1.sourceOutSeconds = 4.5;
+      },
+    ],
+    [
+      'trim beyond a known asset duration',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sourceOutSeconds = 5.086;
+      },
+    ],
+    [
+      'source in beyond a known asset duration',
+      (project: StudioProject) => {
+        project.cuts!.cut_1.clips.clip_1.sourceInSeconds = 5.086;
+        project.cuts!.cut_1.clips.clip_1.sourceOutSeconds = null;
+      },
+    ],
+  ] as const)('rejects cut data with %s without changing durable state', async (_case, mutate) => {
+    const project = await store.createProject(makeInput());
+
+    await expect(
+      store.updateProject(
+        project.id,
+        (current) => {
+          const next = addCut(current);
+          mutate(next);
+          return next;
+        },
+        project.revision
+      )
+    ).rejects.toMatchObject({ code: 'invalid_payload' });
+    expect(await store.getProject(project.id)).toEqual(project);
   });
 
   it('loads a current schema-v1 manifest without a storyboard selection', async () => {
@@ -1128,6 +1385,33 @@ describe('creative studio project store', () => {
 });
 
 describe('creative studio renderer DTO contract', () => {
+  it('limits renderer cut edits to non-destructive edit decisions', () => {
+    type EditableCutKeys = keyof StudioEditableCut;
+    type EditableClipKeys = keyof StudioEditableCutClip;
+    const filter = { id: 'temperature', amount: 0.25 } as const satisfies StudioCutFilter;
+    const cut: StudioCut = {
+      id: 'cut_1',
+      name: 'Launch film',
+      orderMode: 'storyboard',
+      clipOrder: ['clip_1'],
+      clips: {
+        clip_1: {
+          id: 'clip_1',
+          sceneId: 'scene_1',
+          assetId: 'asset_1',
+          sourceInSeconds: null,
+          sourceOutSeconds: null,
+          crop: null,
+          filters: [filter],
+        },
+      },
+    };
+
+    expectTypeOf<EditableCutKeys>().toEqualTypeOf<'orderMode' | 'clipOrder' | 'clips'>();
+    expectTypeOf<EditableClipKeys>().toEqualTypeOf<'sourceInSeconds' | 'sourceOutSeconds' | 'crop' | 'filters'>();
+    expect(cut.clips.clip_1?.filters).toEqual([{ id: 'temperature', amount: 0.25 }]);
+  });
+
   it('keeps command responses free of filesystem paths, credentials, signed URLs, and media bytes', () => {
     type ForbiddenRendererField =
       | 'path'

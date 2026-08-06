@@ -10,7 +10,7 @@ import path from 'node:path';
 import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { StudioAsset, StudioProject } from '@/common/types/project/creativeStudioTypes';
-import { CreativeStudioStoreError, type CreativeStudioStore } from './store';
+import { CreativeStudioStoreError, reconcilePersistedStudioCuts, type CreativeStudioStore } from './store';
 import { downloadRemoteMedia, type RemoteMediaDownloadDeps } from '../remote-media/remoteMediaDownloader';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
@@ -1241,7 +1241,7 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
       job.error = null;
       delete job.progress;
       job.updatedAt = now();
-      return current;
+      return reconcilePersistedStudioCuts(current);
     });
   };
 

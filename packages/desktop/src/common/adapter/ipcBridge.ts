@@ -98,6 +98,7 @@ import type {
   StudioFitStoryboardOutcome,
   StudioFitStoryboardRequest,
   StudioUpdateModelSelectionRequest,
+  StudioUpdateCutRequest,
   StudioUpdateProjectRequest,
   StudioUpdateSceneRequest,
 } from '../types/project/creativeStudioTypes';
@@ -1107,6 +1108,9 @@ export const creativeStudio = {
   >('creative-studio.update-model-selection'),
   updateProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateProjectRequest>(
     'creative-studio.update-project'
+  ),
+  updateCut: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateCutRequest>(
+    'creative-studio.update-cut'
   ),
   deleteProject: bridge.buildProvider<StudioCommandResult<boolean>, StudioDeleteProjectRequest>(
     'creative-studio.delete-project'

@@ -270,6 +270,7 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
   ipcBridge.creativeStudio.updateProject.provider((input) =>
     command(() => dependencies.getService().updateProject(input))
   );
+  ipcBridge.creativeStudio.updateCut.provider((input) => command(() => dependencies.getService().updateCut(input)));
   ipcBridge.creativeStudio.deleteProject.provider((input) =>
     command(() => dependencies.getService().deleteProject(input))
   );

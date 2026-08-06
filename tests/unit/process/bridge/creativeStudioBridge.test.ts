@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   proposeStoryboardProvider: vi.fn(),
   updateModelSelectionProvider: vi.fn(),
   updateProjectProvider: vi.fn(),
+  updateCutProvider: vi.fn(),
   fitStoryboardProvider: vi.fn(),
   deleteProjectProvider: vi.fn(),
   updateSceneProvider: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock('@/common', () => ({
       proposeStoryboard: { provider: mocks.proposeStoryboardProvider },
       updateModelSelection: { provider: mocks.updateModelSelectionProvider },
       updateProject: { provider: mocks.updateProjectProvider },
+      updateCut: { provider: mocks.updateCutProvider },
       fitStoryboard: { provider: mocks.fitStoryboardProvider },
       deleteProject: { provider: mocks.deleteProjectProvider },
       updateScene: { provider: mocks.updateSceneProvider },
@@ -113,6 +115,7 @@ describe('initCreativeStudioBridge', () => {
         proposeStoryboard: vi.fn(async () => project),
         updateModelSelection: vi.fn(async () => project),
         updateProject: vi.fn(async () => project),
+        updateCut: vi.fn(async () => project),
         fitStoryboard: vi.fn(async () => ({
           status: 'already_matches' as const,
           project,
@@ -149,6 +152,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.proposeStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.updateModelSelectionProvider).toHaveBeenCalledOnce();
     expect(mocks.updateProjectProvider).toHaveBeenCalledOnce();
+    expect(mocks.updateCutProvider).toHaveBeenCalledOnce();
     expect(mocks.fitStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.deleteProjectProvider).toHaveBeenCalledOnce();
     expect(mocks.updateSceneProvider).toHaveBeenCalledOnce();
@@ -183,6 +187,32 @@ describe('initCreativeStudioBridge', () => {
     await handler(input);
 
     expect(service.updateModelSelection).toHaveBeenCalledExactlyOnceWith(input);
+  });
+
+  it('delegates one exact cut mutation through its dedicated provider', async () => {
+    const service = dependencies.getService();
+    initCreativeStudioBridge({ getService: () => service });
+    const handler = mocks.updateCutProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const input = {
+      projectId: 'project_1',
+      expectedRevision: 4,
+      cutId: 'cut_1',
+      cut: {
+        orderMode: 'storyboard' as const,
+        clipOrder: ['clip_1'],
+        clips: {
+          clip_1: {
+            sourceInSeconds: 0.5,
+            sourceOutSeconds: 4.5,
+            crop: null,
+            filters: [{ id: 'contrast' as const, amount: 0.25 }],
+          },
+        },
+      },
+    };
+
+    await expect(handler(input)).resolves.toEqual({ ok: true, data: project });
+    expect(service.updateCut).toHaveBeenCalledExactlyOnceWith(input);
   });
 
   it.each([
@@ -486,6 +516,7 @@ describe('initCreativeStudioBridge', () => {
         getProject: vi.fn(),
         proposeStoryboard: vi.fn(),
         updateProject: vi.fn(),
+        updateCut: vi.fn(),
         deleteProject: vi.fn(),
         updateScene: vi.fn(),
         reorderScenes: vi.fn(),
@@ -608,6 +639,15 @@ describe('initCreativeStudioBridge', () => {
         },
       ],
       [mocks.updateProjectProvider, { projectId: 'project_1', expectedRevision: 1, name: 'Changed' }],
+      [
+        mocks.updateCutProvider,
+        {
+          projectId: 'project_1',
+          expectedRevision: 1,
+          cutId: 'cut_1',
+          cut: { orderMode: 'storyboard', clipOrder: [], clips: {} },
+        },
+      ],
       [mocks.deleteProjectProvider, { projectId: 'project_1', expectedRevision: 1 }],
       [mocks.updateSceneProvider, sceneInput],
       [mocks.reorderScenesProvider, { projectId: 'project_1', expectedRevision: 1, sceneOrder: ['scene_1'] }],

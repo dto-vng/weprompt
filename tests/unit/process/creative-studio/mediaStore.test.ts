@@ -509,6 +509,68 @@ describe('createStudioMediaStore', () => {
     expect((await store.getProject('project_1'))?.assets.asset_video_fractional?.durationSeconds).toBe(5.085);
   });
 
+  it('reconciles a persisted cut when a completed provider job selects a new take', async () => {
+    const { store } = await makeStore();
+    await addActiveVideoJob(store);
+    await store.updateProject('project_1', (project) => {
+      const next = structuredClone(project);
+      next.assets.asset_video_old = {
+        id: 'asset_video_old',
+        projectId: project.id,
+        sceneId: 'scene_1',
+        mediaKind: 'video',
+        mimeType: 'video/mp4',
+        managedAsset: { collection: 'assets', fileName: 'asset_video_old.mp4' },
+        byteSize: 1,
+        sha256: '0'.repeat(64),
+        durationSeconds: 5.085,
+        createdAt: project.createdAt,
+      };
+      next.scenes.scene_1.assetIds.push('asset_video_old');
+      next.scenes.scene_1.selectedAssetId = 'asset_video_old';
+      next.cuts = {
+        cut_1: {
+          id: 'cut_1',
+          name: project.name,
+          orderMode: 'storyboard',
+          clipOrder: ['clip_scene_1'],
+          clips: {
+            clip_scene_1: {
+              id: 'clip_scene_1',
+              sceneId: 'scene_1',
+              assetId: 'asset_video_old',
+              sourceInSeconds: 0.5,
+              sourceOutSeconds: 4.5,
+              crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+              filters: [{ id: 'contrast', amount: 0.25 }],
+            },
+          },
+        },
+      };
+      next.activeCutId = 'cut_1';
+      return next;
+    });
+    const media = createStudioMediaStore({ store, createId: () => 'asset_video_new' });
+
+    await media.persistProviderOutputForJob({
+      projectId: 'project_1',
+      sceneId: 'scene_1',
+      jobId: 'job_1',
+      mediaKind: 'video',
+      declaredMimeType: 'video/mp4',
+      durationSeconds: 3,
+      body: Readable.from([mp4]),
+    });
+
+    expect((await store.getProject('project_1'))?.cuts?.cut_1?.clips.clip_scene_1).toMatchObject({
+      assetId: 'asset_video_new',
+      sourceInSeconds: 0.5,
+      sourceOutSeconds: 3,
+      crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      filters: [{ id: 'contrast', amount: 0.25 }],
+    });
+  });
+
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid provider-reported video duration %s before persistence',
     async (durationSeconds) => {

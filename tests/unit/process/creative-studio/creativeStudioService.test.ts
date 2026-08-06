@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CreateStudioProjectInput,
   StudioAsset,
+  StudioCut,
+  StudioEditableCut,
   StudioEditableScene,
   StudioJob,
   StudioProject,
@@ -56,6 +58,47 @@ const makeScene = (id: string, durationSeconds = 4): StudioEditableScene => ({
   mediaKind: 'video',
   durationSeconds,
   referenceAssetId: null,
+});
+
+const addTake = (
+  project: StudioProject,
+  sceneId: string,
+  assetId: string,
+  durationSeconds: number | undefined,
+  selected = true,
+  collection: StudioAsset['managedAsset']['collection'] = 'assets'
+): void => {
+  const scene = project.scenes[sceneId]!;
+  project.assets[assetId] = {
+    id: assetId,
+    projectId: project.id,
+    sceneId,
+    mediaKind: scene.mediaKind,
+    mimeType: scene.mediaKind === 'video' ? 'video/mp4' : 'image/png',
+    managedAsset: { collection, fileName: `${assetId}.${scene.mediaKind === 'video' ? 'mp4' : 'png'}` },
+    byteSize: 1,
+    sha256: 'a'.repeat(64),
+    ...(durationSeconds === undefined ? {} : { durationSeconds }),
+    createdAt: project.createdAt,
+  };
+  scene.assetIds.push(assetId);
+  if (selected) scene.selectedAssetId = assetId;
+};
+
+const editableCut = (cut: StudioCut): StudioEditableCut => ({
+  orderMode: cut.orderMode,
+  clipOrder: [...cut.clipOrder],
+  clips: Object.fromEntries(
+    Object.entries(cut.clips).map(([clipId, clip]) => [
+      clipId,
+      {
+        sourceInSeconds: clip.sourceInSeconds,
+        sourceOutSeconds: clip.sourceOutSeconds,
+        crop: clip.crop === null ? null : { ...clip.crop },
+        filters: clip.filters.map((filter) => ({ ...filter })),
+      },
+    ])
+  ),
 });
 
 const storyboardProposal = {
@@ -308,6 +351,352 @@ describe('CreativeStudioService', () => {
 
     const raw = JSON.parse(await readFile(path.join(rootDir, project.id, 'project.json'), 'utf8')) as unknown;
     expect(raw).not.toHaveProperty('providerMetadata');
+  });
+
+  describe('cut derivation and guarded persistence', () => {
+    const createCutHarness = async () => {
+      const store = createCreativeStudioStore({
+        rootDir,
+        now: () => '2026-08-05T00:00:00.000Z',
+        createId: () => 'project_1',
+      });
+      const cutService = createCreativeStudioService({
+        store,
+        onProjectUpdated,
+        storyboardPlanner: makePlanner(),
+      });
+      const project = await cutService.createProject(makeInput());
+      const firstScene = await cutService.updateScene({
+        projectId: project.id,
+        expectedRevision: project.revision,
+        sceneId: 'scene_1',
+        scene: makeScene('scene_1'),
+      });
+      const secondScene = await cutService.updateScene({
+        projectId: project.id,
+        expectedRevision: firstScene.revision,
+        sceneId: 'scene_2',
+        scene: makeScene('scene_2'),
+      });
+      return { store, service: cutService, project: secondScene };
+    };
+
+    it('opens an implicit one-to-one cut without persisting it or changing revision', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5.085);
+        addTake(next, 'scene_2', 'take_2', 4.25);
+        return next;
+      });
+
+      const opened = await harness.service.getProject(seeded.id);
+      const activeCut = opened?.activeCutId === null ? undefined : opened?.cuts?.[opened?.activeCutId ?? ''];
+
+      expect(opened?.revision).toBe(seeded.revision);
+      expect(activeCut?.orderMode).toBe('storyboard');
+      expect(activeCut?.clipOrder.map((clipId) => activeCut.clips[clipId])).toMatchObject([
+        { sceneId: 'scene_1', assetId: 'take_1', sourceInSeconds: null, sourceOutSeconds: null },
+        { sceneId: 'scene_2', assetId: 'take_2', sourceInSeconds: null, sourceOutSeconds: null },
+      ]);
+      expect(await harness.store.getProject(seeded.id)).toEqual(seeded);
+      expect(seeded).not.toHaveProperty('cuts');
+      expect(seeded).not.toHaveProperty('activeCutId');
+    });
+
+    it('omits scenes without a canonical selected take from the implicit cut', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5.085);
+        addTake(next, 'scene_2', 'reference_2', undefined, true, 'imports');
+        return next;
+      });
+
+      const opened = await harness.service.getProject(seeded.id);
+      const activeCut = opened?.activeCutId === null ? undefined : opened?.cuts?.[opened?.activeCutId ?? ''];
+
+      expect(activeCut?.clipOrder.map((clipId) => activeCut.clips[clipId]?.sceneId)).toEqual(['scene_1']);
+      expect(await harness.store.getProject(seeded.id)).toEqual(seeded);
+    });
+
+    it('materialises the implicit cut only on the first real cut mutation', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5.085);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const cut = opened.cuts![cutId]!;
+      const edit = editableCut(cut);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = {
+        ...edit.clips[clipId]!,
+        sourceInSeconds: 0.5,
+        sourceOutSeconds: 4.5,
+        crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        filters: [{ id: 'contrast', amount: 0.25 }],
+      };
+
+      const updated = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+      const stored = await harness.store.getProject(seeded.id);
+
+      expect(updated.revision).toBe(seeded.revision + 1);
+      expect(stored?.cuts?.[cutId]?.clips[clipId]).toMatchObject(edit.clips[clipId]!);
+      expect(stored?.activeCutId).toBe(cutId);
+    });
+
+    it('projects persisted cuts with deep-cloned orders, crops, and filters', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5.085);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = {
+        ...edit.clips[clipId]!,
+        crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        filters: [{ id: 'exposure', amount: 0.5 }],
+      };
+      await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+      const stored = (await harness.store.getProject(seeded.id))!;
+      vi.spyOn(harness.store, 'getProject').mockResolvedValue(stored);
+
+      const projected = (await harness.service.getProject(seeded.id))!;
+      projected.cuts![cutId]!.clipOrder.push('renderer_only');
+      projected.cuts![cutId]!.clips[clipId]!.crop!.x = 0.2;
+      projected.cuts![cutId]!.clips[clipId]!.filters[0]!.amount = -0.5;
+
+      expect(stored.cuts?.[cutId]?.clipOrder).toEqual([clipId]);
+      expect(stored.cuts?.[cutId]?.clips[clipId]?.crop?.x).toBe(0.1);
+      expect(stored.cuts?.[cutId]?.clips[clipId]?.filters[0]?.amount).toBe(0.5);
+    });
+
+    it('preserves crop and filters while clamping trim for a shorter selected take', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_long', 8);
+        addTake(next, 'scene_1', 'take_short', 3, false);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const cut = opened.cuts![cutId]!;
+      const edit = editableCut(cut);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = {
+        sourceInSeconds: 1,
+        sourceOutSeconds: 6,
+        crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        filters: [{ id: 'saturation', amount: 0.4 }],
+      };
+      const edited = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+
+      await harness.service.selectAsset({
+        projectId: seeded.id,
+        expectedRevision: edited.revision,
+        sceneId: 'scene_1',
+        assetId: 'take_short',
+      });
+      const storedClip = (await harness.store.getProject(seeded.id))?.cuts?.[cutId]?.clips[clipId];
+
+      expect(storedClip).toMatchObject({
+        assetId: 'take_short',
+        sourceInSeconds: 1,
+        sourceOutSeconds: 3,
+        crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        filters: [{ id: 'saturation', amount: 0.4 }],
+      });
+    });
+
+    it('resets trim when source in would make a shorter selected take empty', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_long', 8);
+        addTake(next, 'scene_1', 'take_short', 3, false);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = { ...edit.clips[clipId]!, sourceInSeconds: 4, sourceOutSeconds: 6 };
+      const edited = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+
+      await harness.service.selectAsset({
+        projectId: seeded.id,
+        expectedRevision: edited.revision,
+        sceneId: 'scene_1',
+        assetId: 'take_short',
+      });
+
+      expect((await harness.store.getProject(seeded.id))?.cuts?.[cutId]?.clips[clipId]).toMatchObject({
+        sourceInSeconds: null,
+        sourceOutSeconds: null,
+      });
+    });
+
+    it('propagates storyboard order until a direct cut reorder marks the cut manual and the user restores it', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        addTake(next, 'scene_2', 'take_2', 5);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const initialCut = opened.cuts![cutId]!;
+      const persisted = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: editableCut(initialCut),
+      });
+      const reorderedStoryboard = await harness.service.reorderScenes({
+        projectId: seeded.id,
+        expectedRevision: persisted.revision,
+        sceneOrder: ['scene_2', 'scene_1'],
+      });
+      const storyboardCut = reorderedStoryboard.cuts![cutId]!;
+
+      expect(storyboardCut.clipOrder.map((clipId) => storyboardCut.clips[clipId]?.sceneId)).toEqual([
+        'scene_2',
+        'scene_1',
+      ]);
+      const manualEdit = editableCut(storyboardCut);
+      manualEdit.clipOrder.reverse();
+      const manual = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: reorderedStoryboard.revision,
+        cutId,
+        cut: manualEdit,
+      });
+      expect(manual.cuts?.[cutId]?.orderMode).toBe('manual');
+
+      const reorderedAgain = await harness.service.reorderScenes({
+        projectId: seeded.id,
+        expectedRevision: manual.revision,
+        sceneOrder: ['scene_1', 'scene_2'],
+      });
+      const restoredStoryboard = await harness.service.reorderScenes({
+        projectId: seeded.id,
+        expectedRevision: reorderedAgain.revision,
+        sceneOrder: ['scene_2', 'scene_1'],
+      });
+
+      expect(restoredStoryboard.cuts?.[cutId]?.orderMode).toBe('manual');
+      expect(
+        restoredStoryboard.cuts?.[cutId]?.clipOrder.map((id) => restoredStoryboard.cuts![cutId]!.clips[id]?.sceneId)
+      ).toEqual(['scene_1', 'scene_2']);
+
+      const restoreEdit = editableCut(restoredStoryboard.cuts![cutId]!);
+      restoreEdit.orderMode = 'storyboard';
+      const restored = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: restoredStoryboard.revision,
+        cutId,
+        cut: restoreEdit,
+      });
+
+      expect(restored.cuts?.[cutId]?.orderMode).toBe('storyboard');
+      expect(restored.cuts?.[cutId]?.clipOrder.map((id) => restored.cuts![cutId]!.clips[id]?.sceneId)).toEqual([
+        'scene_2',
+        'scene_1',
+      ]);
+    });
+
+    it('does not mark an untouched storyboard cut manual without a direct reorder', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      edit.orderMode = 'manual';
+
+      const updated = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+
+      expect(updated.cuts?.[cutId]?.orderMode).toBe('storyboard');
+    });
+
+    it('passes the caller revision through the guarded cut path and rejects stale writes closed', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      await harness.service.updateProject({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        brief: 'Concurrent edit',
+      });
+
+      await expect(
+        harness.service.updateCut({ projectId: seeded.id, expectedRevision: seeded.revision, cutId, cut: edit })
+      ).rejects.toMatchObject({ code: 'stale_project' });
+      const stored = await harness.store.getProject(seeded.id);
+      expect(stored?.brief).toBe('Concurrent edit');
+      expect(stored).not.toHaveProperty('cuts');
+    });
+
+    it('does not let the scalar updateProject path persist cut data', async () => {
+      const harness = await createCutHarness();
+      const opened = (await harness.service.getProject(harness.project.id))!;
+
+      await harness.service.updateProject({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        name: 'Renamed launch film',
+        cuts: opened.cuts,
+        activeCutId: opened.activeCutId,
+      } as never);
+
+      const stored = await harness.store.getProject(harness.project.id);
+      expect(stored?.name).toBe('Renamed launch film');
+      expect(stored).not.toHaveProperty('cuts');
+      expect(stored).not.toHaveProperty('activeCutId');
+    });
   });
 
   it('lists field-by-field project cards with a canonical poster or no poster', async () => {
