@@ -46,8 +46,9 @@ export const useManagedVideo = (projectId: string, assetId: string | null): Mana
       setState({ status: 'idle', handle: null, failure: null });
       return;
     }
+    const controller = new AbortController();
     setState({ status: 'loading', handle: null, failure: null });
-    void managedVideo.open(projectId, assetId).then(
+    void managedVideo.open(projectId, assetId, controller.signal).then(
       (handle) => {
         opened = handle;
         if (cancelled) {
@@ -68,6 +69,7 @@ export const useManagedVideo = (projectId: string, assetId: string | null): Mana
     );
     return () => {
       cancelled = true;
+      controller.abort();
       opened?.close();
       if (handleRef.current === opened) handleRef.current = null;
     };

@@ -156,6 +156,37 @@ describe('managed video', () => {
 });
 
 describe('useManagedVideo', () => {
+  it('releases an unresolved managed video open when its consumer unmounts', async () => {
+    const { video } = prepareVideo();
+    const service = createManagedVideo({
+      lookupAsset: async () => 'available',
+      createVideoElement: () => video,
+      createCanvasElement: () => document.createElement('canvas'),
+    });
+    let openingState: 'pending' | 'settled' = 'pending';
+    vi.spyOn(managedVideo, 'open').mockImplementation((projectId, assetId, signal) => {
+      const opening = service.open(projectId, assetId, signal);
+      void opening.then(
+        () => {
+          openingState = 'settled';
+        },
+        () => {
+          openingState = 'settled';
+        }
+      );
+      return opening;
+    });
+
+    const view = renderHook(() => useManagedVideo('project-1', 'video-1'));
+    await waitFor(() => expect(video.isConnected).toBe(true));
+
+    act(() => view.unmount());
+    await act(async () => Promise.resolve());
+
+    expect.soft(document.body).not.toContainElement(video);
+    expect.soft(openingState).toBe('settled');
+  });
+
   it('owns the handle lifecycle for a React caller', async () => {
     const close = vi.fn();
     const handle = {

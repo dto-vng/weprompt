@@ -41,7 +41,7 @@ export type ManagedVideoHandle = {
 };
 
 export type ManagedVideoService = {
-  open(projectId: string, assetId: string): Promise<ManagedVideoHandle>;
+  open(projectId: string, assetId: string, signal?: AbortSignal): Promise<ManagedVideoHandle>;
 };
 
 export type ManagedVideoAssetAvailability = 'available' | 'not_found' | 'decode_unsupported';
@@ -106,7 +106,7 @@ const releaseVideoElement = (video: HTMLVideoElement): void => {
 
 /** Creates a foreground-only managed-video owner for metadata, seeking, and frame capture. */
 export const createManagedVideo = (deps: ManagedVideoDependencies = defaultDependencies): ManagedVideoService => ({
-  async open(projectId, assetId) {
+  async open(projectId, assetId, signal) {
     const source = createManagedStudioAssetUrl(projectId, assetId);
     if (source === null) throw new ManagedVideoError('not_found');
     let availability: ManagedVideoAssetAvailability;
@@ -117,6 +117,7 @@ export const createManagedVideo = (deps: ManagedVideoDependencies = defaultDepen
       throw new ManagedVideoError('load_failed');
     }
     if (availability !== 'available') throw new ManagedVideoError(availability);
+    if (signal?.aborted === true) throw new ManagedVideoError('load_failed');
 
     const video = deps.createVideoElement();
     video.className = styles.mediaElement;
@@ -127,6 +128,7 @@ export const createManagedVideo = (deps: ManagedVideoDependencies = defaultDepen
       const cleanup = (): void => {
         video.removeEventListener('loadedmetadata', onMetadata);
         video.removeEventListener('error', onError);
+        signal?.removeEventListener('abort', onAbort);
       };
       const onMetadata = (): void => {
         cleanup();
@@ -144,8 +146,14 @@ export const createManagedVideo = (deps: ManagedVideoDependencies = defaultDepen
         releaseVideoElement(video);
         reject(failure);
       };
+      const onAbort = (): void => {
+        cleanup();
+        releaseVideoElement(video);
+        reject(new ManagedVideoError('load_failed'));
+      };
       video.addEventListener('loadedmetadata', onMetadata, { once: true });
       video.addEventListener('error', onError, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
       video.preload = 'metadata';
       video.muted = true;
       video.playsInline = true;
