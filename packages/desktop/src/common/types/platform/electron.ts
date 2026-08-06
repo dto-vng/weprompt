@@ -1,3 +1,8 @@
+import type {
+  GrantPresentationExternalDropRequest,
+  GrantPresentationExternalDropResult,
+} from '../office/presentationRun';
+
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
   running: boolean;
@@ -35,6 +40,9 @@ export interface ElectronBridgeAPI {
   on: (callback: (event: { value: string }) => void) => void;
   // 获取拖拽文件/目录的绝对路径 / Get absolute path for dragged file/directory
   getPathForFile?: (file: File) => string;
+  presentationSources?: {
+    grantExternalDrop: (request: GrantPresentationExternalDropRequest) => Promise<GrantPresentationExternalDropResult>;
+  };
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
   // Export a local diagnostic archive selected by the user. The user description

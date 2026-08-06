@@ -99,6 +99,29 @@ const VALID_PAYLOADS = {
     reason: 'interrupted',
   },
   'presentation-templates.scratch.discard': { run_id: '5a68fccc-7b90-49b4-88f9-d78bb88255ed' },
+  'presentation-sources.get-source-owner': {
+    owner: { owner_type: 'conversation', conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730' },
+  },
+  'presentation-sources.create-draft': { client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8' },
+  'presentation-sources.bind-draft': {
+    draft_id: 'd9b6195d-bab0-4662-b88c-1675772bb24d',
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    expected_revision: 0,
+  },
+  'presentation-sources.pick-sources': {
+    owner: { owner_type: 'draft', draft_id: 'd9b6195d-bab0-4662-b88c-1675772bb24d' },
+    expected_owner_revision: 0,
+  },
+  'presentation-sources.grant-workspace-source': {
+    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    relative_path: 'sources/source.pdf',
+    expected_owner_revision: 1,
+  },
+  'presentation-sources.revoke': {
+    owner: { owner_type: 'conversation', conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730' },
+    grant_id: '229ca31e-1150-4ad1-ad62-1c3368330adc',
+    expected_owner_revision: 2,
+  },
   'project-knowledge.list-sources': { projectId: 'project-1' },
   'project-knowledge.add-sources': {
     projectId: 'project-1',
@@ -490,6 +513,77 @@ const INVALID_PAYLOADS = [
   ['presentation-templates.remove', 'omitted required identifier', {}],
   ['presentation-templates.remove', 'non-string identifier', { id: 1 }],
   ['presentation-templates.remove', 'empty identifier', { id: '' }],
+  ['presentation-sources.get-source-owner', 'omitted owner', {}],
+  [
+    'presentation-sources.get-source-owner',
+    'owner with both union identifiers',
+    {
+      owner: {
+        owner_type: 'draft',
+        draft_id: 'd9b6195d-bab0-4662-b88c-1675772bb24d',
+        conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+      },
+    },
+  ],
+  [
+    'presentation-sources.get-source-owner',
+    'malformed owner UUID',
+    { owner: { owner_type: 'conversation', conversation_id: 'conversation-1' } },
+  ],
+  [
+    'presentation-sources.get-source-owner',
+    'unknown nested owner field',
+    {
+      owner: {
+        owner_type: 'draft',
+        draft_id: 'd9b6195d-bab0-4662-b88c-1675772bb24d',
+        native_path: '/private/source.pdf',
+      },
+    },
+  ],
+  ['presentation-sources.create-draft', 'malformed client request UUID', { client_request_id: 'request-1' }],
+  [
+    'presentation-sources.bind-draft',
+    'negative expected revision',
+    { ...VALID_PAYLOADS['presentation-sources.bind-draft'], expected_revision: -1 },
+  ],
+  [
+    'presentation-sources.bind-draft',
+    'fractional expected revision',
+    { ...VALID_PAYLOADS['presentation-sources.bind-draft'], expected_revision: 0.5 },
+  ],
+  [
+    'presentation-sources.pick-sources',
+    'unsafe expected owner revision',
+    { ...VALID_PAYLOADS['presentation-sources.pick-sources'], expected_owner_revision: Number.MAX_SAFE_INTEGER + 1 },
+  ],
+  ...[
+    '',
+    '/absolute/source.pdf',
+    'C:/absolute/source.pdf',
+    '\\\\server\\share\\source.pdf',
+    'sources\\source.pdf',
+    'sources/source.pdf\0',
+    '.',
+    './source.pdf',
+    'sources/../source.pdf',
+    '../source.pdf',
+    'sources//source.pdf',
+    'sources/',
+    'x'.repeat(4097),
+  ].map(
+    (relative_path) =>
+      [
+        'presentation-sources.grant-workspace-source',
+        `unsafe relative path ${JSON.stringify(relative_path)}`,
+        { ...VALID_PAYLOADS['presentation-sources.grant-workspace-source'], relative_path },
+      ] as const
+  ),
+  [
+    'presentation-sources.revoke',
+    'malformed grant UUID',
+    { ...VALID_PAYLOADS['presentation-sources.revoke'], grant_id: 'grant-1' },
+  ],
   [
     'app-operations.context-compact',
     'renderer-supplied model selection',
