@@ -1887,6 +1887,8 @@ export interface ICreateConversationParams {
   };
   extra: {
     project_id?: string;
+    /** Creative Studio project that owns this Brief conversation. */
+    studio_project_id?: string;
     workspace?: string;
     custom_workspace?: boolean;
     default_files?: string[];

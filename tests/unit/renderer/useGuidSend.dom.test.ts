@@ -265,12 +265,17 @@ describe('useGuidSend', () => {
     expect(payload.extra.backend).toBeUndefined();
   });
 
-  it('auto-attaches enabled commodity builtin servers when no explicit selection is made', async () => {
+  it('keeps all six enabled auto-attach servers on ordinary conversations', async () => {
     const deps = createDeps();
     deps.selectedMcpServerIds = undefined;
     deps.assistantDefaultMcpIds = [];
     deps.availableMcpServers = [
+      { id: 'builtin-image-gen', name: 'aionui-image-generation', enabled: true, builtin: true } as IMcpServer,
+      { id: 'builtin-idp', name: 'greennode-idp', enabled: true, builtin: true } as IMcpServer,
+      { id: 'builtin-vision', name: 'aionui-image-analysis', enabled: true, builtin: true } as IMcpServer,
+      { id: 'builtin-chrome-devtools', name: 'chrome-devtools', enabled: true, builtin: true } as IMcpServer,
       { id: 'builtin-memory', name: 'aionui-memory', enabled: true, builtin: true } as IMcpServer,
+      { id: 'builtin-tavily', name: 'aionui-web-search', enabled: true, builtin: true } as IMcpServer,
     ];
 
     const { result } = renderHook(() => useGuidSend(deps));
@@ -280,7 +285,16 @@ describe('useGuidSend', () => {
     });
 
     const payload = createConversationInvokeMock.mock.calls[0][0];
-    expect(payload.extra.selected_session_mcp_servers).toEqual([expect.objectContaining({ id: 'builtin-memory' })]);
+    const expectedIds = [
+      'builtin-image-gen',
+      'builtin-idp',
+      'builtin-vision',
+      'builtin-chrome-devtools',
+      'builtin-memory',
+      'builtin-tavily',
+    ];
+    expect(payload.assistant?.conversation_overrides?.mcp_ids).toEqual(expectedIds);
+    expect(payload.extra.selected_session_mcp_servers?.map((server: IMcpServer) => server.id)).toEqual(expectedIds);
   });
 
   it('force-attaches an enabled image-gen builtin server on the explicit MCP selection path', async () => {
