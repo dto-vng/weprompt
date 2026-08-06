@@ -14,6 +14,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type {
   StudioAsset,
+  StudioCut,
   StudioMediaKind,
   StudioRenderProgressEvent,
   StudioScene,
@@ -222,6 +223,73 @@ const createHarness = async (
   };
 };
 
+const setActiveCut = async (
+  harness: RenderHarness,
+  input: {
+    orderMode: StudioCut['orderMode'];
+    clipSceneIds: string[];
+    clipOrderSceneIds?: string[];
+  }
+): Promise<void> => {
+  const project = await harness.store.getProject('project_1');
+  if (project === null) throw new Error('Missing render fixture project');
+  const clips: StudioCut['clips'] = {};
+  for (const sceneId of input.clipSceneIds) {
+    const scene = project.scenes[sceneId];
+    const assetId = scene?.selectedAssetId;
+    if (!scene || !assetId) throw new Error(`Missing cut fixture for ${sceneId}`);
+    const clipId = `clip_${sceneId}`;
+    clips[clipId] = {
+      id: clipId,
+      sceneId,
+      assetId,
+      sourceInSeconds: null,
+      sourceOutSeconds: null,
+      crop: null,
+      filters: [],
+    };
+  }
+  const cut: StudioCut = {
+    id: 'cut_1',
+    name: 'Fixture cut',
+    orderMode: input.orderMode,
+    clipOrder: (input.clipOrderSceneIds ?? input.clipSceneIds).map((sceneId) => `clip_${sceneId}`),
+    clips,
+  };
+  await harness.store.updateProject('project_1', (current) => ({
+    ...current,
+    cuts: { [cut.id]: cut },
+    activeCutId: cut.id,
+  }));
+};
+
+const storeWithNonCanonicalClipAssets = async (
+  harness: RenderHarness,
+  sceneIds: string[]
+): Promise<Pick<CreativeStudioStore, 'getProject'>> => {
+  const project = structuredClone(await harness.store.getProject('project_1'));
+  if (project === null || project.activeCutId === null || project.activeCutId === undefined) {
+    throw new Error('Missing active cut fixture');
+  }
+  const cut = project.cuts?.[project.activeCutId];
+  if (cut === undefined) throw new Error('Missing active cut fixture');
+  for (const sceneId of sceneIds) {
+    const scene = project.scenes[sceneId];
+    const selected = scene?.selectedAssetId === null ? undefined : project.assets[scene?.selectedAssetId ?? ''];
+    const clip = cut.clips[`clip_${sceneId}`];
+    if (!scene || !selected || !clip) throw new Error(`Missing cut fixture for ${sceneId}`);
+    const assetId = `import_${sceneId}`;
+    project.assets[assetId] = {
+      ...selected,
+      id: assetId,
+      managedAsset: { collection: 'imports', fileName: `${assetId}${path.extname(selected.managedAsset.fileName)}` },
+    };
+    scene.assetIds.push(assetId);
+    clip.assetId = assetId;
+  }
+  return { getProject: async (projectId) => (projectId === project.id ? project : null) };
+};
+
 const probe = async (
   filePath: string
 ): Promise<{
@@ -267,6 +335,26 @@ const probe = async (
     }>;
     format: { duration: string };
   };
+};
+
+const probeVideoKeyframeTimes = async (filePath: string): Promise<number[]> => {
+  const { stdout } = await run(ffprobePath, [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_packets',
+    '-show_entries',
+    'packet=pts_time,flags',
+    '-of',
+    'json',
+    filePath,
+  ]);
+  const result = JSON.parse(stdout) as { packets: Array<{ pts_time?: string; flags?: string }> };
+  return result.packets
+    .filter((packet) => packet.flags?.includes('K'))
+    .map((packet) => Number(packet.pts_time))
+    .filter(Number.isFinite);
 };
 
 beforeAll(async () => {
@@ -393,6 +481,121 @@ describe('Studio render runner', () => {
 });
 
 describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () => {
+  it('renders a manual cut in clip order instead of scene order', async () => {
+    const harness = await createHarness([
+      { id: 'scene_short', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+      { id: 'scene_long', mediaKind: 'image', durationSeconds: 2, fixture: 'image' },
+    ]);
+    await setActiveCut(harness, {
+      orderMode: 'manual',
+      clipSceneIds: ['scene_short', 'scene_long'],
+      clipOrderSceneIds: ['scene_long', 'scene_short'],
+    });
+
+    const result = await renderCut('project_1', {
+      store: harness.store,
+      mediaStore: harness.mediaStore,
+      environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+      temporaryRoot: harness.temporaryRoot,
+    }).result;
+
+    expect(result).toEqual({ status: 'rendered', assetId: 'render_asset', missingSceneIds: [] });
+    const keyframeTimes = await probeVideoKeyframeTimes(harness.outputPath);
+    // The second segment starts at 2s only when the two-second clip renders first; scene order starts it at 1s.
+    expect(keyframeTimes[1]).toBeCloseTo(2, 1);
+  }, 60_000);
+
+  it('renders a storyboard cut identically to the legacy no-cut project', async () => {
+    const inputs: SceneInput[] = [
+      { id: 'scene_short', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+      { id: 'scene_long', mediaKind: 'image', durationSeconds: 2, fixture: 'image' },
+    ];
+    const legacyHarness = await createHarness(inputs);
+    const storyboardHarness = await createHarness(inputs);
+    await setActiveCut(storyboardHarness, {
+      orderMode: 'storyboard',
+      clipSceneIds: ['scene_short', 'scene_long'],
+    });
+
+    const [legacyResult, storyboardResult] = await Promise.all(
+      [legacyHarness, storyboardHarness].map(
+        (harness) =>
+          renderCut('project_1', {
+            store: harness.store,
+            mediaStore: harness.mediaStore,
+            environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+            temporaryRoot: harness.temporaryRoot,
+          }).result
+      )
+    );
+
+    expect(storyboardResult).toEqual(legacyResult);
+    expect(await probe(storyboardHarness.outputPath)).toEqual(await probe(legacyHarness.outputPath));
+    const legacyKeyframes = await probeVideoKeyframeTimes(legacyHarness.outputPath);
+    expect(await probeVideoKeyframeTimes(storyboardHarness.outputPath)).toEqual(legacyKeyframes);
+    expect(legacyKeyframes[1]).toBeCloseTo(1, 1);
+  }, 60_000);
+
+  it('drops a non-canonical clip asset and reports it with scenes that have no clip', async () => {
+    const harness = await createHarness([
+      { id: 'scene_valid', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+      { id: 'scene_invalid', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+      { id: 'scene_without_clip', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+    ]);
+    await setActiveCut(harness, {
+      orderMode: 'manual',
+      clipSceneIds: ['scene_valid', 'scene_invalid'],
+    });
+    const store = await storeWithNonCanonicalClipAssets(harness, ['scene_invalid']);
+
+    const result = await renderCut('project_1', {
+      store,
+      mediaStore: harness.mediaStore,
+      environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+      temporaryRoot: harness.temporaryRoot,
+    }).result;
+
+    // The selected take stays canonical so this fails if render ignores clip.assetId.
+    expect(result).toEqual({
+      status: 'rendered',
+      assetId: 'render_asset',
+      missingSceneIds: ['scene_invalid', 'scene_without_clip'],
+    });
+    expect(Number((await probe(harness.outputPath)).format.duration)).toBeCloseTo(1, 1);
+  }, 60_000);
+
+  it('returns no_renderable_scenes when every active-cut clip asset is non-canonical', async () => {
+    const harness = await createHarness([
+      { id: 'scene_one', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+      { id: 'scene_two', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+    ]);
+    await setActiveCut(harness, {
+      orderMode: 'manual',
+      clipSceneIds: ['scene_one', 'scene_two'],
+    });
+    const store = await storeWithNonCanonicalClipAssets(harness, ['scene_one', 'scene_two']);
+    let spawnCount = 0;
+    const spawnProcess: StudioRenderSpawn = (command, args, options) => {
+      spawnCount += 1;
+      return spawn(command, args, options);
+    };
+
+    const result = await renderCut('project_1', {
+      store,
+      mediaStore: harness.mediaStore,
+      spawnProcess,
+      environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+      temporaryRoot: harness.temporaryRoot,
+    }).result;
+
+    expect(result).toEqual({
+      status: 'no_renderable_scenes',
+      missingSceneIds: ['scene_one', 'scene_two'],
+    });
+    expect(spawnCount).toBe(0);
+    await expect(fs.access(harness.outputPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('renders an image and video into a revision-neutral 720p cut and reports a missing scene', async () => {
     const harness = await createHarness([
       { id: 'scene_image', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },

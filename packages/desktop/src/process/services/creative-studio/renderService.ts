@@ -409,24 +409,42 @@ const readSegments = async (
 ): Promise<{ segments: RenderSegment[]; missingSceneIds: string[] }> => {
   const segments: RenderSegment[] = [];
   const missingSceneIds: string[] = [];
-  for (const sceneId of project.sceneOrder) {
+  const missingSceneIdSet = new Set<string>();
+  const reportMissingScene = (sceneId: string): void => {
+    if (missingSceneIdSet.has(sceneId)) return;
+    missingSceneIdSet.add(sceneId);
+    missingSceneIds.push(sceneId);
+  };
+  const activeCut =
+    project.activeCutId === null || project.activeCutId === undefined ? undefined : project.cuts?.[project.activeCutId];
+  const candidates: Array<{ sceneId: string; assetId: string | null }> =
+    activeCut === undefined
+      ? project.sceneOrder.map((sceneId) => ({
+          sceneId,
+          assetId: project.scenes[sceneId]?.selectedAssetId ?? null,
+        }))
+      : activeCut.clipOrder.flatMap((clipId) => {
+          const clip = activeCut.clips[clipId];
+          return clip === undefined ? [] : [{ sceneId: clip.sceneId, assetId: clip.assetId }];
+        });
+  const clippedSceneIds = activeCut === undefined ? null : new Set(candidates.map(({ sceneId }) => sceneId));
+  for (const candidate of candidates) {
     if (state.cancelled) throw new RenderCancelledError();
-    const scene = project.scenes[sceneId];
-    const selected =
-      scene?.selectedAssetId === null || scene === undefined ? undefined : project.assets[scene.selectedAssetId];
-    if (!scene || !selected || !isCanonicalStudioGeneratedTake(selected, project.id, scene)) {
-      missingSceneIds.push(sceneId);
+    const scene = project.scenes[candidate.sceneId];
+    const asset = candidate.assetId === null ? undefined : project.assets[candidate.assetId];
+    if (!scene || !asset || !isCanonicalStudioGeneratedTake(asset, project.id, scene)) {
+      reportMissingScene(candidate.sceneId);
       continue;
     }
     // Selection and verification stay ordered so cancellation never leaves parallel reads alive.
     // eslint-disable-next-line no-await-in-loop
-    const resolved = await mediaStore.resolveAsset(project.id, selected.id);
+    const resolved = await mediaStore.resolveAsset(project.id, asset.id);
     if (
       !resolved ||
-      resolved.asset.id !== selected.id ||
+      resolved.asset.id !== asset.id ||
       !isCanonicalStudioGeneratedTake(resolved.asset, project.id, scene)
     ) {
-      missingSceneIds.push(sceneId);
+      reportMissingScene(candidate.sceneId);
       continue;
     }
     segments.push({
@@ -434,6 +452,12 @@ const readSegments = async (
       asset: resolved.asset,
       openVerifiedStream: resolved.openVerifiedStream,
     });
+  }
+  if (clippedSceneIds !== null) {
+    for (const sceneId of project.sceneOrder) {
+      if (state.cancelled) throw new RenderCancelledError();
+      if (!clippedSceneIds.has(sceneId)) reportMissingScene(sceneId);
+    }
   }
   return { segments, missingSceneIds };
 };
@@ -540,7 +564,7 @@ const executeRender = async (
   }
 };
 
-/** Starts a pristine-cut render without entering the project's serialized mutation queue. */
+/** Starts an active-cut render without entering the project's serialized mutation queue. */
 export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRenderOperation => {
   const state: RenderState = { cancelled: false, activeProcess: null, activeStream: null };
   let lastProgress = 0;
