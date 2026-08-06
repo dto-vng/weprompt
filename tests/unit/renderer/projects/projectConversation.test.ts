@@ -68,6 +68,17 @@ describe('projectConversation', () => {
     expect(resolveStudioProjectBriefConversation(authoritativeProject, [staleConversation])).toBeNull();
   });
 
+  it('rejects a conversation whose project exists but points at a different conversation', () => {
+    // The sibling test's conversation names a project absent from the list, so it
+    // short-circuits at the lookup and never exercises the authority rule. Here the
+    // project IS found, and only the back-reference check can reject it.
+    const project: StudioBindingProject = { id: 'studio_a', briefConversationId: 'conv-other' };
+    const claimant = studioConversation('conv-brief', 'studio_a');
+
+    expect(project.id).toBe(claimant.extra.studio_project_id);
+    expect(resolveConversationStudioProject(claimant, [project])).toBeNull();
+  });
+
   it('keeps a deleted project conversation while resolving its back-reference to null', () => {
     const keptConversation = studioConversation('conv-brief', 'studio_deleted');
 
