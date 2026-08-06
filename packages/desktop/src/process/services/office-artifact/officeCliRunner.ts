@@ -177,6 +177,7 @@ function Test-KnownProcessIdentity {
   )
 }
 $knownCreationTicks = [System.Collections.Generic.Dictionary[uint32,long]]::new()
+$knownStopCutoffTicks = [System.Collections.Generic.Dictionary[uint32,long]]::new()
 $treeSeeded = $false
 $emptyPasses = 0
 for ($pass = 0; $pass -lt 16; $pass++) {
@@ -188,6 +189,7 @@ for ($pass = 0; $pass -lt 16; $pass++) {
   foreach ($process in $processes) {
     $processById[[uint32]$process.ProcessId] = $process
   }
+  $scanAmbiguous = $false
   if (-not $treeSeeded) {
     $rootProcess = $processById[$targetProcessId]
     $rootCreationTicks = Get-ProcessCreationTicks $rootProcess
@@ -216,9 +218,27 @@ for ($pass = 0; $pass -lt 16; $pass++) {
       [uint32]$parentProcessId = [uint32]$process.ParentProcessId
       if ($knownCreationTicks.ContainsKey($processId)) { continue }
       $parentProcess = $processById[$parentProcessId]
-      if (
+      $processCreationTicks = Get-ProcessCreationTicks $process
+      $parentMatchesKnownIdentity = (
         $null -ne $parentProcess -and
-        (Test-KnownProcessIdentity $parentProcess) -and
+        (Test-KnownProcessIdentity $parentProcess)
+      )
+      $parentExitUnconfirmed = (
+        $null -eq $parentProcess -and
+        $null -ne $processCreationTicks -and
+        $processCreationTicks -ge $treeCreationFloorTicks -and
+        $knownCreationTicks.ContainsKey($parentProcessId) -and
+        -not $knownStopCutoffTicks.ContainsKey($parentProcessId)
+      )
+      if ($parentExitUnconfirmed) { $scanAmbiguous = $true }
+      $parentStoppedAfterChildCreation = (
+        $null -eq $parentProcess -and
+        $null -ne $processCreationTicks -and
+        $knownStopCutoffTicks.ContainsKey($parentProcessId) -and
+        $processCreationTicks -le $knownStopCutoffTicks[$parentProcessId]
+      )
+      if (
+        ($parentMatchesKnownIdentity -or $parentStoppedAfterChildCreation) -and
         (Add-KnownProcessIdentity $process)
       ) {
         $changed = $true
@@ -227,15 +247,25 @@ for ($pass = 0; $pass -lt 16; $pass++) {
   }
   $liveProcesses = @($processes | Where-Object { Test-KnownProcessIdentity $_ })
   if ($liveProcesses.Count -eq 0) {
-    $emptyPasses += 1
-    if ($emptyPasses -ge 2) { exit 0 }
+    if ($scanAmbiguous) {
+      $emptyPasses = 0
+    } else {
+      $emptyPasses += 1
+      if ($emptyPasses -ge 2) { exit 0 }
+    }
   } else {
     $emptyPasses = 0
     foreach ($process in $liveProcesses) {
       [uint32]$processId = [uint32]$process.ProcessId
       $currentProcess = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $processId" | Select-Object ProcessId, ParentProcessId, CreationDate -First 1
       if ($null -ne $currentProcess -and (Test-KnownProcessIdentity $currentProcess)) {
-        Stop-Process -Id ([int]$processId) -Force -ErrorAction SilentlyContinue
+        try {
+          $stoppedProcess = Stop-Process -Id ([int]$processId) -Force -PassThru -ErrorAction Stop
+          $stoppedProcess | Wait-Process -ErrorAction Stop
+          $knownStopCutoffTicks[$processId] = $stoppedProcess.ExitTime.ToUniversalTime().Ticks
+        } catch {
+          # A failed stop must not authorize discovery through an absent parent.
+        }
       }
     }
   }

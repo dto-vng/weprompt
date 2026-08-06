@@ -259,7 +259,7 @@ describe('createOfficeCliRunner', () => {
       '$null -eq $rootProcess -or\n            ($null -ne $rootCreationTicks -and $processCreationTicks -lt $rootCreationTicks)'
     );
     expect(command).toContain(
-      'Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $processId" | Select-Object ProcessId, ParentProcessId, CreationDate -First 1\n      if ($null -ne $currentProcess -and (Test-KnownProcessIdentity $currentProcess)) {\n        Stop-Process'
+      'Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $processId" | Select-Object ProcessId, ParentProcessId, CreationDate -First 1\n      if ($null -ne $currentProcess -and (Test-KnownProcessIdentity $currentProcess)) {\n        try {\n          $stoppedProcess = Stop-Process'
     );
   });
 
@@ -275,6 +275,30 @@ describe('createOfficeCliRunner', () => {
     } finally {
       now.mockRestore();
     }
+  });
+
+  it('retains a stopped parent exit cutoff for descendants first observed after the parent disappears', async () => {
+    const [, args] = await captureCompletedWindowsReaperInvocation();
+    const command = args[4] ?? '';
+
+    expect(command).toContain(
+      '$null -eq $parentProcess -and\n        $null -ne $processCreationTicks -and\n        $knownStopCutoffTicks.ContainsKey($parentProcessId) -and\n        $processCreationTicks -le $knownStopCutoffTicks[$parentProcessId]'
+    );
+    expect(command).toContain(
+      '$stoppedProcess = Stop-Process -Id ([int]$processId) -Force -PassThru -ErrorAction Stop\n          $stoppedProcess | Wait-Process -ErrorAction Stop\n          $knownStopCutoffTicks[$processId] = $stoppedProcess.ExitTime.ToUniversalTime().Ticks'
+    );
+  });
+
+  it('keeps empty-pass success disabled for a descendant whose absent parent has no stop cutoff', async () => {
+    const [, args] = await captureCompletedWindowsReaperInvocation();
+    const command = args[4] ?? '';
+
+    expect(command).toContain(
+      '$parentExitUnconfirmed = (\n        $null -eq $parentProcess -and\n        $null -ne $processCreationTicks -and\n        $processCreationTicks -ge $treeCreationFloorTicks -and\n        $knownCreationTicks.ContainsKey($parentProcessId) -and\n        -not $knownStopCutoffTicks.ContainsKey($parentProcessId)\n      )\n      if ($parentExitUnconfirmed) { $scanAmbiguous = $true }'
+    );
+    expect(command).toContain(
+      'if ($liveProcesses.Count -eq 0) {\n    if ($scanAmbiguous) {\n      $emptyPasses = 0\n    } else {\n      $emptyPasses += 1'
+    );
   });
 
   it.runIf(process.platform === 'win32')(
@@ -344,9 +368,17 @@ function Get-CimInstance {
   ) | Where-Object { -not $script:stopped.Contains([uint32]$_.ProcessId) }
 }
 function Stop-Process {
-  param([int]$Id, [switch]$Force, [object]$ErrorAction)
+  param([int]$Id, [switch]$Force, [switch]$PassThru, [object]$ErrorAction)
   [Console]::Out.Write([string]$Id)
   [void]$script:stopped.Add([uint32]$Id)
+  return [pscustomobject]@{
+    Id = $Id
+    ExitTime = [datetime]'2026-08-06T00:00:15Z'
+  }
+}
+function Wait-Process {
+  param([Parameter(ValueFromPipeline = $true)]$InputObject, [object]$ErrorAction)
+  process {}
 }
 function Start-Sleep { param([int]$Milliseconds) }
 $args = @('99999', '1')
@@ -354,6 +386,127 @@ ${command}
 `;
 
       await expect(runPowerShell(harness)).resolves.toEqual({ code: 0, stdout: '500' });
+    }
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'stops a child first observed after its parent exits but rejects a child newer than that exit',
+    async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-06T00:00:05.000Z'));
+      const [, args] = await captureCompletedWindowsReaperInvocation().finally(() => now.mockRestore());
+      const command = args[4] ?? '';
+      const harness = String.raw`
+$script:fullScan = 0
+$script:stopped = [System.Collections.Generic.HashSet[uint32]]::new()
+function Get-CimInstance {
+  param([string]$ClassName, [string]$Filter)
+  if ($Filter) {
+    [uint32]$processId = [uint32]($Filter -replace '[^0-9]', '')
+    if ($script:stopped.Contains($processId)) { return $null }
+    return [pscustomobject]@{
+      ProcessId = $processId
+      ParentProcessId = $(if ($processId -eq 600) { 99999 } else { 600 })
+      CreationDate = $(switch ($processId) {
+        600 { [datetime]'2026-08-06T00:00:10Z' }
+        700 { [datetime]'2026-08-06T00:00:20Z' }
+        800 { [datetime]'2026-08-06T00:00:40Z' }
+      })
+    }
+  }
+  $script:fullScan += 1
+  if ($script:fullScan -eq 1) {
+    return [pscustomobject]@{
+      ProcessId = 600
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:10Z'
+    }
+  }
+  return @(
+    [pscustomobject]@{
+      ProcessId = 700
+      ParentProcessId = 600
+      CreationDate = [datetime]'2026-08-06T00:00:20Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 800
+      ParentProcessId = 600
+      CreationDate = [datetime]'2026-08-06T00:00:40Z'
+    }
+  ) | Where-Object { -not $script:stopped.Contains([uint32]$_.ProcessId) }
+}
+function Stop-Process {
+  param([int]$Id, [switch]$Force, [switch]$PassThru, [object]$ErrorAction)
+  [Console]::Out.Write([string]$Id)
+  [void]$script:stopped.Add([uint32]$Id)
+  return [pscustomobject]@{
+    Id = $Id
+    ExitTime = $(if ($Id -eq 600) {
+      [datetime]'2026-08-06T00:00:30Z'
+    } else {
+      [datetime]'2026-08-06T00:00:50Z'
+    })
+  }
+}
+function Wait-Process {
+  param([Parameter(ValueFromPipeline = $true)]$InputObject, [object]$ErrorAction)
+  process {}
+}
+function Start-Sleep { param([int]$Milliseconds) }
+${command}
+`;
+
+      await expect(runPowerShell(harness)).resolves.toEqual({ code: 0, stdout: '600700' });
+    }
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'fails closed when a child appears after its known parent exits without a confirmed stop cutoff',
+    async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-06T00:00:05.000Z'));
+      const [, args] = await captureCompletedWindowsReaperInvocation().finally(() => now.mockRestore());
+      const command = args[4] ?? '';
+      const harness = String.raw`
+$script:fullScan = 0
+$script:stopped = [System.Collections.Generic.HashSet[uint32]]::new()
+function Get-CimInstance {
+  param([string]$ClassName, [string]$Filter)
+  if ($Filter) {
+    [uint32]$processId = [uint32]($Filter -replace '[^0-9]', '')
+    if ($script:stopped.Contains($processId)) { return $null }
+    return [pscustomobject]@{
+      ProcessId = $processId
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:10Z'
+    }
+  }
+  $script:fullScan += 1
+  if ($script:fullScan -eq 1) {
+    return [pscustomobject]@{
+      ProcessId = 600
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:10Z'
+    }
+  }
+  return [pscustomobject]@{
+    ProcessId = 700
+    ParentProcessId = 600
+    CreationDate = [datetime]'2026-08-06T00:00:20Z'
+  }
+}
+function Stop-Process {
+  param([int]$Id, [switch]$Force, [switch]$PassThru, [object]$ErrorAction)
+  [void]$script:stopped.Add([uint32]$Id)
+  throw 'Process exited before its stop cutoff was captured'
+}
+function Wait-Process {
+  param([Parameter(ValueFromPipeline = $true)]$InputObject, [object]$ErrorAction)
+  process {}
+}
+function Start-Sleep { param([int]$Milliseconds) }
+${command}
+`;
+
+      await expect(runPowerShell(harness)).resolves.toEqual({ code: 1, stdout: '' });
     }
   );
 
