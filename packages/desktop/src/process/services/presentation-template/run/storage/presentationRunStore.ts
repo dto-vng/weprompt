@@ -4,11 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { randomUUID as createRandomUUID } from 'node:crypto';
+import { createHash, randomUUID as createRandomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { PRESENTATION_RUN_DISPATCH_STATUSES, PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
-import type { PresentationRunFailure } from '@/common/types/office/presentationRun';
-import { PresentationRunSimulatedProcessCrashError, type PresentationRunFiles } from './presentationRunFiles';
+import type {
+  PresentationGrantOwner,
+  PresentationRunFailure,
+  PresentationSourceDescriptor,
+} from '@/common/types/office/presentationRun';
+import {
+  PresentationRunSimulatedProcessCrashError,
+  type PreparedPresentationSourceSnapshot,
+  type PresentationRunFiles,
+} from './presentationRunFiles';
 import {
   PresentationCanonicalCorruptionError,
   PresentationJournalRecoveryRequiredError,
@@ -17,11 +25,21 @@ import {
 } from './presentationRunJournal';
 import {
   assertPresentationRunManifestState,
+  assertPresentationSourceDraftManifest,
+  assertPresentationSourceDraftTombstone,
+  assertPresentationSourceGrantManifest,
+  assertPresentationSourceGrantTombstone,
+  assertPresentationSourceOwnerManifest,
   bindPresentationRunTurn,
   transitionPresentationRunState,
   type BindPresentationRunTurnInput,
   type PresentationRunManifest,
   type PresentationRunTransition,
+  type PresentationSourceDraftManifest,
+  type PresentationSourceDraftTombstone,
+  type PresentationSourceGrantManifest,
+  type PresentationSourceGrantTombstone,
+  type PresentationSourceOwnerManifest,
 } from './presentationRunStateMachine';
 
 type LockWaiter = { resolve: (release: () => void) => void };
@@ -112,6 +130,76 @@ export type StoredPresentationGrantManifest = {
   claimedRunId: string | null;
 };
 
+export type StoredPresentationSourceOwnerManifest = PresentationSourceOwnerManifest;
+export type StoredPresentationSourceGrantManifest = PresentationSourceGrantManifest;
+export type StoredPresentationSourceDraftManifest = PresentationSourceDraftManifest;
+export type StoredPresentationSourceGrantTombstone = PresentationSourceGrantTombstone;
+export type StoredPresentationSourceDraftTombstone = PresentationSourceDraftTombstone;
+
+export type PresentationSourceStoreFailureCode =
+  | 'INVALID_REQUEST'
+  | 'RUN_FORBIDDEN'
+  | 'DRAFT_NOT_FOUND'
+  | 'DRAFT_EXPIRED'
+  | 'DRAFT_FOREIGN'
+  | 'DRAFT_ALREADY_BOUND'
+  | 'DRAFT_LIMIT_EXCEEDED'
+  | 'GRANT_LIMIT_EXCEEDED'
+  | 'SOURCE_GRANT_INVALID'
+  | 'SOURCE_GRANT_EXPIRED'
+  | 'SOURCE_GRANT_FOREIGN'
+  | 'SOURCE_GRANT_REPLAYED'
+  | 'SOURCE_TAMPERED'
+  | 'SOURCE_LIMIT_EXCEEDED'
+  | 'PERSISTENCE_FAILED';
+
+export class PresentationSourceStoreError extends Error {
+  constructor(
+    readonly code: PresentationSourceStoreFailureCode,
+    readonly details: { draftId?: string; conversationId?: string; grantId?: string } = {},
+    options?: ErrorOptions
+  ) {
+    super(code, options);
+  }
+}
+
+export type PresentationSourceOwnerSnapshot = {
+  owner: PresentationGrantOwner;
+  ownerRevision: number;
+  grants: StoredPresentationSourceGrantManifest[];
+};
+
+export type CreatePresentationSourceDraftStoreResult = {
+  status: 'created' | 'existing';
+  draft: StoredPresentationSourceDraftManifest;
+};
+
+export type BindPresentationSourceDraftStoreResult = {
+  status: 'bound' | 'already_bound';
+  draftId: string;
+  conversationId: string;
+  revision: number;
+  boundAt: string;
+};
+
+export type PresentationSourceGrantCreateInput = {
+  grantId: string;
+  displayName: string;
+  format: PresentationSourceDescriptor['format'];
+  sourceKind: PresentationSourceDescriptor['sourceKind'];
+  snapshotRelativePath: `source.${PresentationSourceDescriptor['format']}`;
+  sha256: string;
+  byteLength: number;
+  preparedSnapshot: PreparedPresentationSourceSnapshot;
+};
+
+export type PresentationSourceSweepResult = {
+  expiredDrafts: string[];
+  expiredGrants: string[];
+  purgedDraftTombstones: string[];
+  purgedGrantTombstones: string[];
+};
+
 export type AllocatePresentationRunInput = {
   conversationId: string;
   clientRequestId: string;
@@ -130,6 +218,8 @@ type PresentationRunIndex = {
   conversations: Record<string, string[]>;
   turns: Record<string, string>;
   grants: Record<string, string>;
+  sourceOwners: Record<string, string>;
+  draftRequests: Record<string, string>;
 };
 
 type PresentationRunStoreOptions = {
@@ -157,6 +247,8 @@ const createEmptyIndex = (): PresentationRunIndex => ({
   conversations: createIndexRecord<string[]>(),
   turns: createIndexRecord<string>(),
   grants: createIndexRecord<string>(),
+  sourceOwners: createIndexRecord<string>(),
+  draftRequests: createIndexRecord<string>(),
 });
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -236,6 +328,27 @@ function isStructurallyValidGrant(value: unknown, expectedGrantId: string): valu
   if (grant.state === 'active') return grant.claimedRunId === null;
   if (grant.state === 'claimed' || grant.state === 'consumed') return grant.claimedRunId !== null;
   return true;
+}
+
+function isStructurallyValidSourceGrant(
+  value: unknown,
+  expectedGrantId: string
+): value is StoredPresentationSourceGrantManifest {
+  if (!isRecord(value) || value.grantId !== expectedGrantId || value.recordType !== 'presentation-source-grant') {
+    return false;
+  }
+  try {
+    assertPresentationSourceGrantManifest(value as StoredPresentationSourceGrantManifest);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isStoredPresentationSourceGrantManifest(
+  value: StoredPresentationGrantManifest | StoredPresentationSourceGrantManifest
+): value is StoredPresentationSourceGrantManifest {
+  return 'recordType' in value && value.recordType === 'presentation-source-grant';
 }
 
 function deepFreeze<T>(value: T): T {
@@ -431,6 +544,26 @@ const requestIndexKey = (conversationId: string, clientRequestId: string): strin
 
 const turnIndexKey = (conversationId: string, turnId: string): string => tupleIndexKey(conversationId, turnId);
 
+const draftRequestIndexKey = (principalId: string, clientRequestId: string): string =>
+  tupleIndexKey(principalId, clientRequestId);
+
+export function presentationSourceOwnerKey(owner: PresentationGrantOwner): string {
+  return owner.owner_type === 'conversation' ? `conversation:${owner.conversation_id}` : `draft:${owner.draft_id}`;
+}
+
+/** Produces a stable UUID-shaped canonical entity id without exposing an owner path. */
+export function presentationSourceOwnerId(owner: PresentationGrantOwner): string {
+  const hex = createHash('sha256')
+    .update(`aionui:presentation-source-owner:${presentationSourceOwnerKey(owner)}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  hex[12] = '5';
+  hex[16] = '8';
+  const value = hex.join('');
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+}
+
 const preflightFailure = <Code extends 'DISK_RESERVE_EXCEEDED' | 'RESOURCE_LIMIT_EXCEEDED'>(
   code: Code
 ): Extract<PresentationRunFailure, { code: Code }> =>
@@ -464,6 +597,11 @@ export class PresentationRunStore {
   private index: PresentationRunIndex = createEmptyIndex();
   private readonly runs = new Map<string, StoredPresentationRunManifest>();
   private readonly tombstones = new Map<string, StoredPresentationRunTombstone>();
+  private readonly sourceOwners = new Map<string, StoredPresentationSourceOwnerManifest>();
+  private readonly sourceGrants = new Map<string, StoredPresentationSourceGrantManifest>();
+  private readonly sourceGrantTombstones = new Map<string, StoredPresentationSourceGrantTombstone>();
+  private readonly sourceDrafts = new Map<string, StoredPresentationSourceDraftManifest>();
+  private readonly sourceDraftTombstones = new Map<string, StoredPresentationSourceDraftTombstone>();
   private readonly conversationStartBuckets = new Map<string, TokenBucket>();
   private appStartBucket: TokenBucket | null = null;
   private storageHealthy = true;
@@ -483,6 +621,715 @@ export class PresentationRunStore {
     return this.initialization;
   }
 
+  async getPresentationSourceOwner(
+    owner: PresentationGrantOwner,
+    principalId: string
+  ): Promise<PresentationSourceOwnerSnapshot> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    await this.expirePresentationSourceOwnerIfNeeded(owner);
+    const ownerId = presentationSourceOwnerId(owner);
+    return this.lock.runExclusive(['store:health', `owner:${ownerId}`], async () => {
+      this.assertStorageHealthy();
+      const manifest = this.sourceOwners.get(ownerId);
+      if (manifest === undefined) {
+        if (owner.owner_type === 'conversation') return { owner, ownerRevision: 0, grants: [] };
+        this.throwDraftLookupFailure(owner.draft_id, principalId);
+      }
+      if (manifest.principalId !== principalId) {
+        throw new PresentationSourceStoreError(owner.owner_type === 'draft' ? 'DRAFT_FOREIGN' : 'RUN_FORBIDDEN');
+      }
+      if (owner.owner_type === 'draft') {
+        if (manifest.draftLifecycle === 'expired') {
+          throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: owner.draft_id });
+        }
+        if (manifest.draftLifecycle !== 'active') {
+          throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+        }
+      }
+      const grants = manifest.grantIds.map((grantId) => {
+        const grant = this.sourceGrants.get(grantId);
+        if (
+          grant === undefined ||
+          grant.state !== 'active' ||
+          presentationSourceOwnerKey(grant.owner) !== presentationSourceOwnerKey(owner)
+        ) {
+          throw new PresentationCanonicalCorruptionError('Presentation source owner references an invalid grant');
+        }
+        return frozenSnapshot(grant);
+      });
+      return { owner: structuredClone(owner), ownerRevision: manifest.revision, grants };
+    });
+  }
+
+  async createPresentationSourceDraft(
+    principalId: string,
+    clientRequestId: string
+  ): Promise<CreatePresentationSourceDraftStoreResult> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    const requestKey = draftRequestIndexKey(principalId, clientRequestId);
+    return this.lock.runExclusive(['store:health', 'policy:app', `draft-request:${requestKey}`], async () => {
+      this.assertStorageHealthy();
+      const existingOwnerId = getOwnIndexValue(this.index.draftRequests, requestKey);
+      if (existingOwnerId !== undefined) {
+        const history = this.sourceOwners.get(existingOwnerId);
+        if (history === undefined || history.owner.owner_type !== 'draft') {
+          throw new PresentationCanonicalCorruptionError('Presentation draft request history is corrupt');
+        }
+        if (history.draftLifecycle === 'expired') {
+          const tombstone = this.sourceDraftTombstones.get(history.owner.draft_id);
+          if (tombstone !== undefined && Date.parse(tombstone.deleteAfter) > this.now().getTime()) {
+            throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: history.owner.draft_id });
+          }
+          throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+        }
+        if (history.draftLifecycle !== 'active') throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+        const existing = this.sourceDrafts.get(history.owner.draft_id);
+        if (existing === undefined) {
+          throw new PresentationCanonicalCorruptionError('Presentation draft history has no canonical draft');
+        }
+        if (Date.parse(existing.expiresAt) <= this.now().getTime()) {
+          await this.expireDraftLocked(existing, history);
+          throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: existing.draftId });
+        }
+        return { status: 'existing', draft: frozenSnapshot(existing) };
+      }
+      const liveDraftCount = Array.from(this.sourceDrafts.values()).filter((draft) => draft.state === 'active').length;
+      if (liveDraftCount >= PRESENTATION_RUN_LIMITS.MAX_LIVE_GUID_DRAFTS_PER_APP) {
+        throw new PresentationSourceStoreError('DRAFT_LIMIT_EXCEEDED');
+      }
+      const draftId = this.randomUUID();
+      if (!UUID_RE.test(draftId) || this.sourceDrafts.has(draftId)) {
+        throw new Error('Presentation source draft allocator produced a colliding id');
+      }
+      const owner: PresentationGrantOwner = { owner_type: 'draft', draft_id: draftId };
+      const ownerId = presentationSourceOwnerId(owner);
+      const now = this.now().toISOString();
+      const expiresAt = new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS).toISOString();
+      const draft: StoredPresentationSourceDraftManifest = {
+        version: 2,
+        recordType: 'presentation-source-draft',
+        draftId,
+        clientRequestId,
+        principalId,
+        revision: 0,
+        state: 'active',
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
+        boundConversationId: null,
+        boundAt: null,
+      };
+      const ownerManifest: StoredPresentationSourceOwnerManifest = {
+        version: 2,
+        recordType: 'presentation-source-owner',
+        ownerId,
+        owner,
+        principalId,
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+        grantIds: [],
+        unboundBytes: 0,
+        draftClientRequestId: clientRequestId,
+        draftLifecycle: 'active',
+      };
+      assertPresentationSourceDraftManifest(draft);
+      assertPresentationSourceOwnerManifest(ownerManifest);
+      await this.runCanonicalTransaction({
+        mutations: [
+          { entityKind: 'draft', entityId: draftId, expectedRevision: null, nextManifest: draft },
+          { entityKind: 'owner', entityId: ownerId, expectedRevision: null, nextManifest: ownerManifest },
+        ],
+      });
+      this.sourceDrafts.set(draftId, frozenSnapshot(draft));
+      this.sourceOwners.set(ownerId, frozenSnapshot(ownerManifest));
+      this.index = this.buildIndex();
+      await this.persistDerivedIndexBestEffort();
+      return { status: 'created', draft: frozenSnapshot(draft) };
+    });
+  }
+
+  async createPresentationSourceGrants(input: {
+    owner: PresentationGrantOwner;
+    principalId: string;
+    expectedOwnerRevision: number;
+    grants: readonly PresentationSourceGrantCreateInput[];
+  }): Promise<PresentationSourceOwnerSnapshot> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    await this.expirePresentationSourceOwnerIfNeeded(input.owner);
+    const ownerId = presentationSourceOwnerId(input.owner);
+    const grantLockKeys = input.grants.map(({ grantId }) => `grant:${grantId}`);
+    return this.lock.runExclusive(['store:health', 'policy:app', `owner:${ownerId}`, ...grantLockKeys], async () => {
+      this.assertStorageHealthy();
+      const currentOwner = this.requireMutableSourceOwner(input.owner, input.principalId, input.expectedOwnerRevision);
+      if (input.grants.length === 0) throw new PresentationSourceStoreError('INVALID_REQUEST');
+      if (new Set(input.grants.map(({ grantId }) => grantId)).size !== input.grants.length) {
+        throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID');
+      }
+      const batchBytes = input.grants.reduce((total, grant) => total + grant.byteLength, 0);
+      const appGrants = Array.from(this.sourceGrants.values()).filter((grant) => grant.state === 'active');
+      const appBytes = appGrants.reduce((total, grant) => total + grant.byteLength, 0);
+      if (
+        currentOwner.grantIds.length + input.grants.length > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANTS_PER_OWNER ||
+        appGrants.length + input.grants.length > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANTS_PER_APP
+      ) {
+        throw new PresentationSourceStoreError('GRANT_LIMIT_EXCEEDED');
+      }
+      if (
+        batchBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES ||
+        currentOwner.unboundBytes + batchBytes > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANT_BYTES_PER_OWNER ||
+        appBytes + batchBytes > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANT_BYTES_PER_APP
+      ) {
+        throw new PresentationSourceStoreError('SOURCE_LIMIT_EXCEEDED');
+      }
+      const now = this.now().toISOString();
+      const expiresAt = new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.GRANT_TTL_MS).toISOString();
+      const grants = input.grants.map<StoredPresentationSourceGrantManifest>((grant) => ({
+        version: 2,
+        recordType: 'presentation-source-grant',
+        grantId: grant.grantId,
+        owner: structuredClone(input.owner),
+        revision: 0,
+        displayName: grant.displayName,
+        format: grant.format,
+        sourceKind: grant.sourceKind,
+        snapshotRelativePath: grant.snapshotRelativePath,
+        sha256: grant.sha256.toLowerCase(),
+        byteLength: grant.byteLength,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt,
+        stateEnteredAt: now,
+        state: 'active',
+        queueExtendedAt: null,
+        queueItemId: null,
+        claimedRunId: null,
+      }));
+      for (const grant of grants) {
+        if (this.sourceGrants.has(grant.grantId) || this.sourceGrantTombstones.has(grant.grantId)) {
+          throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId: grant.grantId });
+        }
+        assertPresentationSourceGrantManifest(grant);
+      }
+      const nextOwner: StoredPresentationSourceOwnerManifest = {
+        ...currentOwner,
+        revision: currentOwner.revision + 1,
+        createdAt: currentOwner.createdAt === '' ? now : currentOwner.createdAt,
+        updatedAt: now,
+        grantIds: [...currentOwner.grantIds, ...grants.map(({ grantId }) => grantId)].sort(),
+        unboundBytes: currentOwner.unboundBytes + batchBytes,
+      };
+      assertPresentationSourceOwnerManifest(nextOwner);
+      const draft = input.owner.owner_type === 'draft' ? this.sourceDrafts.get(input.owner.draft_id) : undefined;
+      const nextDraft =
+        draft === undefined
+          ? undefined
+          : ({
+              ...draft,
+              revision: draft.revision + 1,
+              updatedAt: now,
+            } satisfies StoredPresentationSourceDraftManifest);
+      if (nextDraft !== undefined) assertPresentationSourceDraftManifest(nextDraft);
+      await this.runCanonicalTransaction(
+        {
+          sourceSnapshotPromotions: input.grants.map(({ preparedSnapshot }) => preparedSnapshot),
+          mutations: [
+            {
+              entityKind: 'owner',
+              entityId: ownerId,
+              expectedRevision:
+                currentOwner.revision === 0 && currentOwner.createdAt === '' ? null : currentOwner.revision,
+              nextManifest: nextOwner,
+            },
+            ...grants.map((grant) => ({
+              entityKind: 'grant' as const,
+              entityId: grant.grantId,
+              expectedRevision: null as null,
+              nextManifest: grant,
+            })),
+            ...(nextDraft === undefined
+              ? []
+              : [
+                  {
+                    entityKind: 'draft' as const,
+                    entityId: nextDraft.draftId,
+                    expectedRevision: draft?.revision ?? null,
+                    nextManifest: nextDraft,
+                  },
+                ]),
+          ],
+        },
+        async () => {
+          for (const grant of input.grants) await this.files.removePreparedSourceSnapshot(grant.preparedSnapshot);
+        }
+      );
+      this.sourceOwners.set(ownerId, frozenSnapshot(nextOwner));
+      for (const grant of grants) this.sourceGrants.set(grant.grantId, frozenSnapshot(grant));
+      if (nextDraft !== undefined) this.sourceDrafts.set(nextDraft.draftId, frozenSnapshot(nextDraft));
+      this.index = this.buildIndex();
+      await this.persistDerivedIndexBestEffort();
+      return {
+        owner: structuredClone(input.owner),
+        ownerRevision: nextOwner.revision,
+        grants: grants.map(frozenSnapshot),
+      };
+    });
+  }
+
+  async extendPresentationSourceGrantsForQueue(input: {
+    owner: PresentationGrantOwner;
+    principalId: string;
+    grantIds: readonly string[];
+    queueItemId: string;
+    expectedOwnerRevision: number;
+  }): Promise<PresentationSourceOwnerSnapshot> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    await this.expirePresentationSourceOwnerIfNeeded(input.owner);
+    const ownerId = presentationSourceOwnerId(input.owner);
+    return this.lock.runExclusive(
+      ['store:health', 'policy:app', `owner:${ownerId}`, ...input.grantIds.map((grantId) => `grant:${grantId}`)],
+      async () => {
+        this.assertStorageHealthy();
+        if (
+          input.grantIds.length === 0 ||
+          input.grantIds.length > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANTS_PER_OWNER ||
+          new Set(input.grantIds).size !== input.grantIds.length ||
+          typeof input.queueItemId !== 'string' ||
+          input.queueItemId.length === 0 ||
+          input.queueItemId.length > 256
+        ) {
+          throw new PresentationSourceStoreError('INVALID_REQUEST');
+        }
+        for (const grantId of input.grantIds) {
+          const tombstone = this.sourceGrantTombstones.get(grantId);
+          if (tombstone === undefined) continue;
+          if (presentationSourceOwnerKey(tombstone.owner) !== presentationSourceOwnerKey(input.owner)) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId });
+          }
+          throw new PresentationSourceStoreError(
+            tombstone.terminalState === 'expired' ? 'SOURCE_GRANT_EXPIRED' : 'SOURCE_GRANT_REPLAYED',
+            { grantId }
+          );
+        }
+        const owner = this.requireMutableSourceOwner(input.owner, input.principalId, input.expectedOwnerRevision);
+        const grants = input.grantIds.map((grantId) => {
+          const grant = this.sourceGrants.get(grantId);
+          if (grant === undefined || !owner.grantIds.includes(grantId)) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId });
+          }
+          if (presentationSourceOwnerKey(grant.owner) !== presentationSourceOwnerKey(input.owner)) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId });
+          }
+          if (grant.state !== 'active' || grant.queueExtendedAt !== null || grant.queueItemId !== null) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_REPLAYED', { grantId });
+          }
+          return grant;
+        });
+        const now = this.now().toISOString();
+        const expiresAt = new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.QUEUED_GRANT_TTL_MS).toISOString();
+        const nextGrants = grants.map<StoredPresentationSourceGrantManifest>((grant) => ({
+          ...grant,
+          revision: grant.revision + 1,
+          updatedAt: now,
+          expiresAt,
+          queueExtendedAt: now,
+          queueItemId: input.queueItemId,
+        }));
+        const nextOwner: StoredPresentationSourceOwnerManifest = {
+          ...owner,
+          revision: owner.revision + 1,
+          updatedAt: now,
+        };
+        const draft = input.owner.owner_type === 'draft' ? this.sourceDrafts.get(input.owner.draft_id) : undefined;
+        const nextDraft = draft === undefined ? undefined : { ...draft, revision: draft.revision + 1, updatedAt: now };
+        for (const grant of nextGrants) assertPresentationSourceGrantManifest(grant);
+        assertPresentationSourceOwnerManifest(nextOwner);
+        if (nextDraft !== undefined) assertPresentationSourceDraftManifest(nextDraft);
+        await this.runCanonicalTransaction({
+          mutations: [
+            { entityKind: 'owner', entityId: ownerId, expectedRevision: owner.revision, nextManifest: nextOwner },
+            ...nextGrants.map((grant, index) => ({
+              entityKind: 'grant' as const,
+              entityId: grant.grantId,
+              expectedRevision: grants[index]?.revision ?? null,
+              nextManifest: grant,
+            })),
+            ...(nextDraft === undefined
+              ? []
+              : [
+                  {
+                    entityKind: 'draft' as const,
+                    entityId: nextDraft.draftId,
+                    expectedRevision: draft?.revision ?? null,
+                    nextManifest: nextDraft,
+                  },
+                ]),
+          ],
+        });
+        this.sourceOwners.set(ownerId, frozenSnapshot(nextOwner));
+        for (const grant of nextGrants) this.sourceGrants.set(grant.grantId, frozenSnapshot(grant));
+        if (nextDraft !== undefined) this.sourceDrafts.set(nextDraft.draftId, frozenSnapshot(nextDraft));
+        this.index = this.buildIndex();
+        await this.persistDerivedIndexBestEffort();
+        return {
+          owner: structuredClone(input.owner),
+          ownerRevision: nextOwner.revision,
+          grants: nextOwner.grantIds.map((grantId) => {
+            const grant = this.sourceGrants.get(grantId);
+            if (grant === undefined) {
+              throw new PresentationCanonicalCorruptionError('Presentation source owner references a missing grant');
+            }
+            return frozenSnapshot(grant);
+          }),
+        };
+      }
+    );
+  }
+
+  async bindPresentationSourceDraft(input: {
+    draftId: string;
+    conversationId: string;
+    principalId: string;
+    expectedRevision: number;
+  }): Promise<BindPresentationSourceDraftStoreResult> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    const draftOwner: PresentationGrantOwner = { owner_type: 'draft', draft_id: input.draftId };
+    const destinationOwner: PresentationGrantOwner = {
+      owner_type: 'conversation',
+      conversation_id: input.conversationId,
+    };
+    const draftOwnerId = presentationSourceOwnerId(draftOwner);
+    const destinationOwnerId = presentationSourceOwnerId(destinationOwner);
+    const knownGrantIds = this.sourceOwners.get(draftOwnerId)?.grantIds ?? [];
+    return this.lock.runExclusive(
+      [
+        'store:health',
+        'policy:app',
+        `draft:${input.draftId}`,
+        `owner:${draftOwnerId}`,
+        `owner:${destinationOwnerId}`,
+        ...knownGrantIds.map((grantId) => `grant:${grantId}`),
+      ],
+      async () => {
+        this.assertStorageHealthy();
+        const terminal = this.sourceDraftTombstones.get(input.draftId);
+        if (terminal !== undefined) {
+          if (Date.parse(terminal.deleteAfter) <= this.now().getTime()) {
+            throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+          }
+          if (terminal.principalId !== input.principalId) throw new PresentationSourceStoreError('DRAFT_FOREIGN');
+          if (terminal.terminalState === 'expired') {
+            throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: input.draftId });
+          }
+          if (terminal.boundConversationId === input.conversationId) {
+            return {
+              status: 'already_bound',
+              draftId: terminal.draftId,
+              conversationId: input.conversationId,
+              revision: terminal.lastRevision,
+              boundAt: terminal.terminalAt,
+            };
+          }
+          throw new PresentationSourceStoreError('DRAFT_ALREADY_BOUND', {
+            draftId: input.draftId,
+            conversationId: terminal.boundConversationId ?? undefined,
+          });
+        }
+        const draft = this.sourceDrafts.get(input.draftId);
+        const currentDraftOwner = this.sourceOwners.get(draftOwnerId);
+        if (draft === undefined || currentDraftOwner === undefined) {
+          this.throwDraftLookupFailure(input.draftId, input.principalId);
+        }
+        if (draft.principalId !== input.principalId || currentDraftOwner.principalId !== input.principalId) {
+          throw new PresentationSourceStoreError('DRAFT_FOREIGN');
+        }
+        if (Date.parse(draft.expiresAt) <= this.now().getTime()) {
+          await this.expireDraftLocked(draft, currentDraftOwner);
+          throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: draft.draftId });
+        }
+        if (draft.state === 'bound') {
+          if (draft.boundConversationId === input.conversationId && draft.boundAt !== null) {
+            return {
+              status: 'already_bound',
+              draftId: draft.draftId,
+              conversationId: input.conversationId,
+              revision: draft.revision,
+              boundAt: draft.boundAt,
+            };
+          }
+          throw new PresentationSourceStoreError('DRAFT_ALREADY_BOUND', {
+            draftId: draft.draftId,
+            conversationId: draft.boundConversationId ?? undefined,
+          });
+        }
+        if (draft.revision !== input.expectedRevision || currentDraftOwner.revision !== input.expectedRevision) {
+          throw new PresentationSourceStoreError('INVALID_REQUEST');
+        }
+        const grants = currentDraftOwner.grantIds.map((grantId) => {
+          const grant = this.sourceGrants.get(grantId);
+          if (grant === undefined || grant.state !== 'active') {
+            throw new PresentationCanonicalCorruptionError('Presentation draft references an invalid grant');
+          }
+          return grant;
+        });
+        if (new Set(knownGrantIds).size !== new Set(currentDraftOwner.grantIds).size) {
+          throw new PresentationSourceStoreError('INVALID_REQUEST');
+        }
+        const existingDestination = this.sourceOwners.get(destinationOwnerId);
+        if (existingDestination !== undefined && existingDestination.principalId !== input.principalId) {
+          throw new PresentationSourceStoreError('RUN_FORBIDDEN');
+        }
+        const destinationCount = existingDestination?.grantIds.length ?? 0;
+        const destinationBytes = existingDestination?.unboundBytes ?? 0;
+        if (destinationCount + grants.length > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANTS_PER_OWNER) {
+          throw new PresentationSourceStoreError('GRANT_LIMIT_EXCEEDED');
+        }
+        if (
+          destinationBytes + currentDraftOwner.unboundBytes >
+          PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANT_BYTES_PER_OWNER
+        ) {
+          throw new PresentationSourceStoreError('SOURCE_LIMIT_EXCEEDED');
+        }
+        const now = this.now().toISOString();
+        const nextDraft: StoredPresentationSourceDraftManifest = {
+          ...draft,
+          revision: draft.revision + 1,
+          state: 'bound',
+          updatedAt: now,
+          boundConversationId: input.conversationId,
+          boundAt: now,
+        };
+        const nextDraftOwner: StoredPresentationSourceOwnerManifest = {
+          ...currentDraftOwner,
+          revision: currentDraftOwner.revision + 1,
+          updatedAt: now,
+          grantIds: [],
+          unboundBytes: 0,
+          draftLifecycle: 'bound',
+        };
+        const nextDestination: StoredPresentationSourceOwnerManifest =
+          existingDestination === undefined
+            ? {
+                version: 2,
+                recordType: 'presentation-source-owner',
+                ownerId: destinationOwnerId,
+                owner: destinationOwner,
+                principalId: input.principalId,
+                revision: 1,
+                createdAt: now,
+                updatedAt: now,
+                grantIds: grants.map(({ grantId }) => grantId).sort(),
+                unboundBytes: currentDraftOwner.unboundBytes,
+                draftClientRequestId: null,
+                draftLifecycle: null,
+              }
+            : {
+                ...existingDestination,
+                revision: existingDestination.revision + 1,
+                updatedAt: now,
+                grantIds: [...existingDestination.grantIds, ...grants.map(({ grantId }) => grantId)].sort(),
+                unboundBytes: existingDestination.unboundBytes + currentDraftOwner.unboundBytes,
+              };
+        const migratedGrants = grants.map<StoredPresentationSourceGrantManifest>((grant) => ({
+          ...grant,
+          owner: destinationOwner,
+          revision: grant.revision + 1,
+          updatedAt: now,
+        }));
+        const tombstone: StoredPresentationSourceDraftTombstone = {
+          version: 2,
+          recordType: 'presentation-source-draft-tombstone',
+          revision: 0,
+          draftId: draft.draftId,
+          clientRequestId: draft.clientRequestId,
+          principalId: draft.principalId,
+          terminalState: 'bound',
+          terminalAt: now,
+          tombstonedAt: now,
+          deleteAfter: new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS).toISOString(),
+          lastRevision: nextDraft.revision,
+          boundConversationId: input.conversationId,
+        };
+        assertPresentationSourceDraftManifest(nextDraft);
+        assertPresentationSourceOwnerManifest(nextDraftOwner);
+        assertPresentationSourceOwnerManifest(nextDestination);
+        assertPresentationSourceDraftTombstone(tombstone);
+        for (const grant of migratedGrants) assertPresentationSourceGrantManifest(grant);
+        await this.runCanonicalTransaction({
+          mutations: [
+            {
+              entityKind: 'draft',
+              entityId: draft.draftId,
+              expectedRevision: draft.revision,
+              nextManifest: nextDraft,
+            },
+            {
+              entityKind: 'draft-tombstone',
+              entityId: draft.draftId,
+              expectedRevision: null,
+              nextManifest: tombstone,
+            },
+            {
+              entityKind: 'owner',
+              entityId: draftOwnerId,
+              expectedRevision: currentDraftOwner.revision,
+              nextManifest: nextDraftOwner,
+            },
+            {
+              entityKind: 'owner',
+              entityId: destinationOwnerId,
+              expectedRevision: existingDestination?.revision ?? null,
+              nextManifest: nextDestination,
+            },
+            ...migratedGrants.map((grant, index) => ({
+              entityKind: 'grant' as const,
+              entityId: grant.grantId,
+              expectedRevision: grants[index]?.revision ?? null,
+              nextManifest: grant,
+            })),
+          ],
+        });
+        this.sourceDrafts.delete(draft.draftId);
+        this.sourceDraftTombstones.set(draft.draftId, frozenSnapshot(tombstone));
+        this.sourceOwners.set(draftOwnerId, frozenSnapshot(nextDraftOwner));
+        this.sourceOwners.set(destinationOwnerId, frozenSnapshot(nextDestination));
+        for (const grant of migratedGrants) this.sourceGrants.set(grant.grantId, frozenSnapshot(grant));
+        this.index = this.buildIndex();
+        await this.persistDerivedIndexBestEffort();
+        await this.files.removeDraft(draft.draftId);
+        return {
+          status: 'bound',
+          draftId: draft.draftId,
+          conversationId: input.conversationId,
+          revision: nextDraft.revision,
+          boundAt: now,
+        };
+      }
+    );
+  }
+
+  async revokePresentationSourceGrant(input: {
+    owner: PresentationGrantOwner;
+    principalId: string;
+    grantId: string;
+    expectedOwnerRevision: number;
+  }): Promise<{ status: 'revoked' | 'already_revoked'; grantId: string; ownerRevision: number; revokedAt: string }> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    await this.expirePresentationSourceOwnerIfNeeded(input.owner);
+    const ownerId = presentationSourceOwnerId(input.owner);
+    return this.lock.runExclusive(
+      ['store:health', 'policy:app', `owner:${ownerId}`, `grant:${input.grantId}`],
+      async () => {
+        this.assertStorageHealthy();
+        const existingTombstone = this.sourceGrantTombstones.get(input.grantId);
+        if (existingTombstone !== undefined && Date.parse(existingTombstone.deleteAfter) > this.now().getTime()) {
+          if (!Number.isSafeInteger(input.expectedOwnerRevision) || input.expectedOwnerRevision < 0) {
+            throw new PresentationSourceStoreError('INVALID_REQUEST');
+          }
+          if (presentationSourceOwnerKey(existingTombstone.owner) !== presentationSourceOwnerKey(input.owner)) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId: input.grantId });
+          }
+          const currentOwner = this.sourceOwners.get(ownerId);
+          if (currentOwner === undefined) {
+            if (input.owner.owner_type === 'draft') {
+              this.throwDraftLookupFailure(input.owner.draft_id, input.principalId);
+            }
+            throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId: input.grantId });
+          }
+          if (currentOwner.principalId !== input.principalId) {
+            throw new PresentationSourceStoreError(
+              input.owner.owner_type === 'draft' ? 'DRAFT_FOREIGN' : 'RUN_FORBIDDEN'
+            );
+          }
+          if (existingTombstone.terminalState === 'revoked') {
+            return {
+              status: 'already_revoked',
+              grantId: input.grantId,
+              ownerRevision: currentOwner.revision,
+              revokedAt: existingTombstone.terminalAt,
+            };
+          }
+          throw new PresentationSourceStoreError(
+            existingTombstone.terminalState === 'expired' ? 'SOURCE_GRANT_EXPIRED' : 'SOURCE_GRANT_REPLAYED',
+            { grantId: input.grantId }
+          );
+        }
+        const owner = this.requireMutableSourceOwner(input.owner, input.principalId, input.expectedOwnerRevision);
+        const grant = this.sourceGrants.get(input.grantId);
+        if (grant === undefined)
+          throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId: input.grantId });
+        if (presentationSourceOwnerKey(grant.owner) !== presentationSourceOwnerKey(input.owner)) {
+          throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId: input.grantId });
+        }
+        if (grant.state !== 'active') {
+          throw new PresentationSourceStoreError(
+            grant.state === 'expired' ? 'SOURCE_GRANT_EXPIRED' : 'SOURCE_GRANT_REPLAYED',
+            { grantId: input.grantId }
+          );
+        }
+        const now = this.now().toISOString();
+        const nextGrant: StoredPresentationSourceGrantManifest = {
+          ...grant,
+          revision: grant.revision + 1,
+          updatedAt: now,
+          stateEnteredAt: now,
+          state: 'revoked',
+        };
+        const nextOwner: StoredPresentationSourceOwnerManifest = {
+          ...owner,
+          revision: owner.revision + 1,
+          updatedAt: now,
+          grantIds: owner.grantIds.filter((grantId) => grantId !== input.grantId),
+          unboundBytes: owner.unboundBytes - grant.byteLength,
+        };
+        const tombstone = this.createGrantTombstone(nextGrant, 'revoked', now);
+        const draft = input.owner.owner_type === 'draft' ? this.sourceDrafts.get(input.owner.draft_id) : undefined;
+        const nextDraft = draft === undefined ? undefined : { ...draft, revision: draft.revision + 1, updatedAt: now };
+        await this.runCanonicalTransaction({
+          mutations: [
+            {
+              entityKind: 'grant',
+              entityId: grant.grantId,
+              expectedRevision: grant.revision,
+              nextManifest: nextGrant,
+            },
+            {
+              entityKind: 'grant-tombstone',
+              entityId: grant.grantId,
+              expectedRevision: null,
+              nextManifest: tombstone,
+            },
+            { entityKind: 'owner', entityId: ownerId, expectedRevision: owner.revision, nextManifest: nextOwner },
+            ...(nextDraft === undefined
+              ? []
+              : [
+                  {
+                    entityKind: 'draft' as const,
+                    entityId: nextDraft.draftId,
+                    expectedRevision: draft?.revision ?? null,
+                    nextManifest: nextDraft,
+                  },
+                ]),
+          ],
+        });
+        this.sourceGrants.delete(grant.grantId);
+        this.sourceGrantTombstones.set(grant.grantId, frozenSnapshot(tombstone));
+        this.sourceOwners.set(ownerId, frozenSnapshot(nextOwner));
+        if (nextDraft !== undefined) this.sourceDrafts.set(nextDraft.draftId, frozenSnapshot(nextDraft));
+        this.index = this.buildIndex();
+        await this.persistDerivedIndexBestEffort();
+        await this.files.removeGrant(grant.grantId);
+        return { status: 'revoked', grantId: grant.grantId, ownerRevision: nextOwner.revision, revokedAt: now };
+      }
+    );
+  }
+
   async allocateRun(unsafeInput: AllocatePresentationRunInput): Promise<AllocatePresentationRunResult> {
     const input = structuredClone(unsafeInput);
     if (typeof input.requestFingerprint === 'string' && REQUEST_FINGERPRINT_INPUT_RE.test(input.requestFingerprint)) {
@@ -492,10 +1339,16 @@ export class PresentationRunStore {
     await this.initialize();
     this.assertStorageHealthy();
     const requestKey = requestIndexKey(input.conversationId, input.clientRequestId);
+    const sourceOwner: PresentationGrantOwner = {
+      owner_type: 'conversation',
+      conversation_id: input.conversationId,
+    };
+    const sourceOwnerId = presentationSourceOwnerId(sourceOwner);
     const lockKeys = [
       'store:health',
       `conversation:${input.conversationId}`,
       ...input.grantClaims.map(({ grantId }) => `grant:${grantId}`),
+      `owner:${sourceOwnerId}`,
       'policy:app',
       `request:${requestKey}`,
     ];
@@ -523,11 +1376,48 @@ export class PresentationRunStore {
           details: { grantId: duplicate },
         };
       }
-      const grants: StoredPresentationGrantManifest[] = [];
+      const grants: (StoredPresentationGrantManifest | StoredPresentationSourceGrantManifest)[] = [];
       let sourceBytes = 0;
       for (const claim of input.grantClaims) {
+        const tombstone = this.sourceGrantTombstones.get(claim.grantId);
+        if (tombstone !== undefined && Date.parse(tombstone.deleteAfter) > this.now().getTime()) {
+          const ownerKey = presentationSourceOwnerKey(tombstone.owner);
+          if (ownerKey !== `conversation:${input.conversationId}`) {
+            return {
+              ok: false,
+              code: 'SOURCE_GRANT_FOREIGN',
+              messageKey: 'conversation.presentationRun.SOURCE_GRANT_FOREIGN',
+              retryable: false,
+              state: 'grant_validation',
+              details: { grantId: claim.grantId },
+            };
+          }
+          if (tombstone.terminalState === 'expired') {
+            return {
+              ok: false,
+              code: 'SOURCE_GRANT_EXPIRED',
+              messageKey: 'conversation.presentationRun.SOURCE_GRANT_EXPIRED',
+              retryable: false,
+              state: 'grant_expired',
+              details: { grantId: claim.grantId },
+            };
+          }
+          return {
+            ok: false,
+            code: 'SOURCE_GRANT_REPLAYED',
+            messageKey: 'conversation.presentationRun.SOURCE_GRANT_REPLAYED',
+            retryable: false,
+            state: 'grant_validation',
+            details: { grantId: claim.grantId },
+          };
+        }
         const canonical = await this.journal.readCanonical<Record<string, unknown>>('grant', claim.grantId);
-        if (!isStructurallyValidGrant(canonical, claim.grantId)) {
+        const grant = isStructurallyValidSourceGrant(canonical, claim.grantId)
+          ? canonical
+          : isStructurallyValidGrant(canonical, claim.grantId)
+            ? canonical
+            : null;
+        if (grant === null) {
           return {
             ok: false,
             code: 'SOURCE_GRANT_INVALID',
@@ -537,8 +1427,8 @@ export class PresentationRunStore {
             details: { grantId: claim.grantId },
           };
         }
-        const grant = canonical;
-        if (grant.ownerKey !== `conversation:${input.conversationId}`) {
+        const ownerKey = 'recordType' in grant ? presentationSourceOwnerKey(grant.owner) : grant.ownerKey;
+        if (ownerKey !== `conversation:${input.conversationId}`) {
           return {
             ok: false,
             code: 'SOURCE_GRANT_FOREIGN',
@@ -607,6 +1497,27 @@ export class PresentationRunStore {
           details: { grantId: expiredGrant.grantId },
         };
       }
+      const task3Grants = grants.filter(isStoredPresentationSourceGrantManifest);
+      for (const grant of task3Grants) {
+        try {
+          await this.files.verifySourceSnapshot({
+            grantId: grant.grantId,
+            format: grant.format,
+            relativePath: grant.snapshotRelativePath,
+            sha256: grant.sha256,
+            byteLength: grant.byteLength,
+          });
+        } catch {
+          return {
+            ok: false,
+            code: 'SOURCE_TAMPERED',
+            messageKey: 'conversation.presentationRun.SOURCE_TAMPERED',
+            retryable: false,
+            state: 'grant_validation',
+            details: { grantId: grant.grantId },
+          };
+        }
+      }
       const capacityFailure = this.getCapacityFailure(input.conversationId, freeBytes);
       if (capacityFailure !== null) return capacityFailure;
       if (this.wouldExceedRetainedBytes(input.conversationId, sourceBytes)) {
@@ -619,6 +1530,51 @@ export class PresentationRunStore {
       if (!UUID_RE.test(runId) || this.runs.has(runId) || this.tombstones.has(runId)) {
         throw new Error('Presentation run allocator produced a colliding id');
       }
+      const task3Bytes = task3Grants.reduce((total, grant) => total + grant.byteLength, 0);
+      const currentSourceOwner = task3Grants.length === 0 ? undefined : this.sourceOwners.get(sourceOwnerId);
+      if (
+        task3Grants.length > 0 &&
+        (currentSourceOwner === undefined ||
+          presentationSourceOwnerKey(currentSourceOwner.owner) !== presentationSourceOwnerKey(sourceOwner) ||
+          task3Grants.some((grant) => !currentSourceOwner.grantIds.includes(grant.grantId)) ||
+          currentSourceOwner.unboundBytes < task3Bytes)
+      ) {
+        throw new PresentationCanonicalCorruptionError('Presentation source owner claim accounting is corrupt');
+      }
+      const nextSourceOwner =
+        currentSourceOwner === undefined
+          ? undefined
+          : ({
+              ...currentSourceOwner,
+              revision: currentSourceOwner.revision + 1,
+              updatedAt: now,
+              grantIds: currentSourceOwner.grantIds.filter(
+                (grantId) => !task3Grants.some((grant) => grant.grantId === grantId)
+              ),
+              unboundBytes: currentSourceOwner.unboundBytes - task3Bytes,
+            } satisfies StoredPresentationSourceOwnerManifest);
+      const claimedGrants = grants.map((grant) =>
+        isStoredPresentationSourceGrantManifest(grant)
+          ? ({
+              ...grant,
+              revision: grant.revision + 1,
+              updatedAt: now,
+              stateEnteredAt: now,
+              state: 'claimed' as const,
+              claimedRunId: runId,
+            } satisfies StoredPresentationSourceGrantManifest)
+          : ({
+              ...grant,
+              revision: grant.revision + 1,
+              updatedAt: now,
+              state: 'claimed' as const,
+              claimedRunId: runId,
+            } satisfies StoredPresentationGrantManifest)
+      );
+      for (const grant of claimedGrants) {
+        if (isStoredPresentationSourceGrantManifest(grant)) assertPresentationSourceGrantManifest(grant);
+      }
+      if (nextSourceOwner !== undefined) assertPresentationSourceOwnerManifest(nextSourceOwner);
       const run: StoredPresentationRunManifest = {
         version: 2,
         runId,
@@ -646,22 +1602,32 @@ export class PresentationRunStore {
       await this.runCanonicalTransaction({
         mutations: [
           { entityKind: 'run', entityId: runId, expectedRevision: null, nextManifest: run },
-          ...grants.map((grant) => ({
+          ...(nextSourceOwner === undefined || currentSourceOwner === undefined
+            ? []
+            : [
+                {
+                  entityKind: 'owner' as const,
+                  entityId: sourceOwnerId,
+                  expectedRevision: currentSourceOwner.revision,
+                  nextManifest: nextSourceOwner,
+                },
+              ]),
+          ...claimedGrants.map((grant, index) => ({
             entityKind: 'grant' as const,
             entityId: grant.grantId,
-            expectedRevision: grant.revision,
-            nextManifest: {
-              ...grant,
-              revision: grant.revision + 1,
-              updatedAt: now,
-              state: 'claimed' as const,
-              claimedRunId: runId,
-            },
+            expectedRevision: grants[index]?.revision ?? null,
+            nextManifest: grant,
           })),
         ],
       });
       const cached = this.cacheRun(run);
-      this.addRunToIndex(cached);
+      if (nextSourceOwner !== undefined) this.sourceOwners.set(sourceOwnerId, frozenSnapshot(nextSourceOwner));
+      for (const grant of claimedGrants) {
+        if (isStoredPresentationSourceGrantManifest(grant)) {
+          this.sourceGrants.set(grant.grantId, frozenSnapshot(grant));
+        }
+      }
+      this.index = this.buildIndex();
       this.consumeStartTokens(input.conversationId, allocationTime.getTime());
       await this.persistDerivedIndexBestEffort();
       return { ok: true, status: 'created', run: this.snapshotRun(cached) };
@@ -815,10 +1781,13 @@ export class PresentationRunStore {
     const input = frozenSnapshot(unsafeInput);
     await this.initialize();
     this.assertStorageHealthy();
+    const currentForLock = this.runs.get(runId);
+    if (currentForLock === undefined) throw new Error('Presentation run not found');
     return this.lock.runExclusive(
       [
         'store:health',
         `conversation:${input.conversationId}`,
+        ...currentForLock.sourceGrants.map((grantId) => `grant:${grantId}`),
         `run:${runId}`,
         `turn:${turnIndexKey(input.conversationId, input.turnId)}`,
       ],
@@ -836,7 +1805,46 @@ export class PresentationRunStore {
           return { status: result.status, manifest: this.snapshotRun(current) };
         }
         const next = result.manifest as StoredPresentationRunManifest;
-        await this.commitRunMutation(current, next);
+        const claimedGrants = current.sourceGrants.flatMap((grantId) => {
+          const grant = this.sourceGrants.get(grantId);
+          if (grant === undefined) return [];
+          if (grant.state !== 'claimed' || grant.claimedRunId !== runId) {
+            throw new PresentationCanonicalCorruptionError('Presentation run references an invalid claimed grant');
+          }
+          const consumed: StoredPresentationSourceGrantManifest = {
+            ...grant,
+            revision: grant.revision + 1,
+            updatedAt: input.now,
+            stateEnteredAt: input.now,
+            state: 'consumed',
+          };
+          assertPresentationSourceGrantManifest(consumed);
+          return [consumed];
+        });
+        if (!isDeepStrictEqual(current.postAllocationFailure, next.postAllocationFailure)) {
+          throw new Error('Presentation post-allocation failure is immutable');
+        }
+        this.assertStoredRun(next, current.runId);
+        await this.runCanonicalTransaction({
+          mutations: [
+            {
+              entityKind: 'run',
+              entityId: current.runId,
+              expectedRevision: current.revision,
+              nextManifest: next,
+            },
+            ...claimedGrants.map((grant) => ({
+              entityKind: 'grant' as const,
+              entityId: grant.grantId,
+              expectedRevision: grant.revision - 1,
+              nextManifest: grant,
+            })),
+          ],
+        });
+        this.cacheRun(next);
+        for (const grant of claimedGrants) this.sourceGrants.set(grant.grantId, frozenSnapshot(grant));
+        this.index = this.buildIndex();
+        await this.persistDerivedIndexBestEffort();
         return { status: result.status, manifest: this.snapshotRun(next) };
       }
     );
@@ -909,11 +1917,21 @@ export class PresentationRunStore {
     });
   }
 
+  async sweepExpiredPresentationSources(): Promise<PresentationSourceSweepResult> {
+    await this.initialize();
+    this.assertStorageHealthy();
+    return this.lock.runExclusive(['store:health', 'policy:app'], async () => {
+      this.assertStorageHealthy();
+      return this.sweepPresentationSources(this.now());
+    });
+  }
+
   private async initializeOnce(): Promise<void> {
     await this.files.initialize();
     await this.journal.recover();
     await this.reloadCanonicalState();
     await this.sweepCanonicalState(this.now());
+    await this.sweepPresentationSources(this.now());
   }
 
   private async sweepCanonicalState(now: Date): Promise<PresentationRunSweepResult> {
@@ -989,6 +2007,119 @@ export class PresentationRunStore {
   private async reloadCanonicalState(): Promise<void> {
     const scannedRuns = new Map<string, StoredPresentationRunManifest>();
     const scannedTombstones = new Map<string, StoredPresentationRunTombstone>();
+    const scannedOwners = new Map<string, StoredPresentationSourceOwnerManifest>();
+    const scannedGrants = new Map<string, StoredPresentationSourceGrantManifest>();
+    const scannedGrantTombstones = new Map<string, StoredPresentationSourceGrantTombstone>();
+    const scannedDrafts = new Map<string, StoredPresentationSourceDraftManifest>();
+    const scannedDraftTombstones = new Map<string, StoredPresentationSourceDraftTombstone>();
+    for (const grantId of (await this.files.listTombstoneIds('grant')).sort()) {
+      try {
+        const tombstone = await this.journal.readCanonical<StoredPresentationSourceGrantTombstone>(
+          'grant-tombstone',
+          grantId
+        );
+        if (tombstone === null) throw new PresentationCanonicalCorruptionError('Source grant tombstone is missing');
+        assertPresentationSourceGrantTombstone(tombstone);
+        await this.files.removeGrant(grantId);
+        scannedGrantTombstones.set(grantId, frozenSnapshot(tombstone));
+      } catch (error) {
+        if (
+          !(error instanceof PresentationCanonicalCorruptionError) &&
+          !(error instanceof Error && error.message.startsWith('Invalid presentation source'))
+        )
+          throw error;
+        await this.files.quarantineEntity('grant-tombstone', grantId);
+      }
+    }
+    for (const draftId of (await this.files.listTombstoneIds('draft')).sort()) {
+      try {
+        const tombstone = await this.journal.readCanonical<StoredPresentationSourceDraftTombstone>(
+          'draft-tombstone',
+          draftId
+        );
+        if (tombstone === null) throw new PresentationCanonicalCorruptionError('Source draft tombstone is missing');
+        assertPresentationSourceDraftTombstone(tombstone);
+        await this.files.removeDraft(draftId);
+        scannedDraftTombstones.set(draftId, frozenSnapshot(tombstone));
+      } catch (error) {
+        if (
+          !(error instanceof PresentationCanonicalCorruptionError) &&
+          !(error instanceof Error && error.message.startsWith('Invalid presentation source'))
+        )
+          throw error;
+        await this.files.quarantineEntity('draft-tombstone', draftId);
+      }
+    }
+    for (const ownerId of (await this.files.listEntityIds('owner')).sort()) {
+      try {
+        const owner = await this.journal.readCanonical<StoredPresentationSourceOwnerManifest>('owner', ownerId);
+        if (owner === null) throw new PresentationCanonicalCorruptionError('Source owner manifest is missing');
+        assertPresentationSourceOwnerManifest(owner);
+        if (owner.ownerId !== ownerId || presentationSourceOwnerId(owner.owner) !== ownerId) {
+          throw new PresentationCanonicalCorruptionError('Source owner manifest id is corrupt');
+        }
+        scannedOwners.set(ownerId, frozenSnapshot(owner));
+      } catch (error) {
+        if (
+          !(error instanceof PresentationCanonicalCorruptionError) &&
+          !(error instanceof Error && error.message.startsWith('Invalid presentation source'))
+        )
+          throw error;
+        await this.files.quarantineEntity('owner', ownerId);
+      }
+    }
+    for (const grantId of (await this.files.listEntityIds('grant')).sort()) {
+      if (scannedGrantTombstones.has(grantId)) continue;
+      try {
+        const value = await this.journal.readCanonical<Record<string, unknown>>('grant', grantId);
+        if (value === null) {
+          if (await this.files.removeAbandonedPreparedSourceGrant(grantId)) continue;
+          throw new PresentationCanonicalCorruptionError('Source grant manifest is missing');
+        }
+        if (value.recordType !== 'presentation-source-grant') {
+          if (!isStructurallyValidGrant(value, grantId)) {
+            throw new PresentationCanonicalCorruptionError('Source grant manifest is corrupt');
+          }
+          continue;
+        }
+        const grant = value as StoredPresentationSourceGrantManifest;
+        assertPresentationSourceGrantManifest(grant);
+        await this.files.verifySourceSnapshot({
+          grantId,
+          format: grant.format,
+          relativePath: grant.snapshotRelativePath,
+          sha256: grant.sha256,
+          byteLength: grant.byteLength,
+        });
+        await this.files.removeUnreferencedSourceTemps(grantId);
+        scannedGrants.set(grantId, frozenSnapshot(grant));
+      } catch (error) {
+        if (
+          !(error instanceof PresentationCanonicalCorruptionError) &&
+          !(error instanceof Error && error.message.startsWith('Invalid presentation source'))
+        ) {
+          throw error;
+        }
+        await this.files.quarantineEntity('grant', grantId);
+      }
+    }
+    for (const draftId of (await this.files.listEntityIds('draft')).sort()) {
+      if (scannedDraftTombstones.has(draftId)) continue;
+      try {
+        const draft = await this.journal.readCanonical<StoredPresentationSourceDraftManifest>('draft', draftId);
+        if (draft === null) throw new PresentationCanonicalCorruptionError('Source draft manifest is missing');
+        assertPresentationSourceDraftManifest(draft);
+        if (draft.draftId !== draftId) throw new PresentationCanonicalCorruptionError('Source draft id is corrupt');
+        scannedDrafts.set(draftId, frozenSnapshot(draft));
+      } catch (error) {
+        if (
+          !(error instanceof PresentationCanonicalCorruptionError) &&
+          !(error instanceof Error && error.message.startsWith('Invalid presentation source'))
+        )
+          throw error;
+        await this.files.quarantineEntity('draft', draftId);
+      }
+    }
     for (const runId of (await this.files.listTombstoneIds('run')).sort()) {
       let tombstone: StoredPresentationRunTombstone | null;
       try {
@@ -1022,14 +2153,356 @@ export class PresentationRunStore {
       const cached = frozenSnapshot(run);
       scannedRuns.set(cached.runId, cached);
     }
-    const scannedIndex = this.buildIndex(scannedRuns.values(), scannedTombstones.values());
     this.runs.clear();
     for (const [runId, run] of scannedRuns) this.runs.set(runId, run);
     this.tombstones.clear();
     for (const [runId, tombstone] of scannedTombstones) this.tombstones.set(runId, tombstone);
-    this.index = scannedIndex;
+    this.sourceOwners.clear();
+    for (const [ownerId, owner] of scannedOwners) this.sourceOwners.set(ownerId, owner);
+    this.sourceGrants.clear();
+    for (const [grantId, grant] of scannedGrants) this.sourceGrants.set(grantId, grant);
+    this.sourceGrantTombstones.clear();
+    for (const [grantId, tombstone] of scannedGrantTombstones) this.sourceGrantTombstones.set(grantId, tombstone);
+    this.sourceDrafts.clear();
+    for (const [draftId, draft] of scannedDrafts) this.sourceDrafts.set(draftId, draft);
+    this.sourceDraftTombstones.clear();
+    for (const [draftId, tombstone] of scannedDraftTombstones) this.sourceDraftTombstones.set(draftId, tombstone);
+    this.assertSourceCanonicalReferences();
+    this.index = this.buildIndex();
     this.rebuildRateBuckets();
     await this.persistDerivedIndexBestEffort();
+  }
+
+  private async sweepPresentationSources(now: Date): Promise<PresentationSourceSweepResult> {
+    const result: PresentationSourceSweepResult = {
+      expiredDrafts: [],
+      expiredGrants: [],
+      purgedDraftTombstones: [],
+      purgedGrantTombstones: [],
+    };
+    for (const draft of Array.from(this.sourceDrafts.values())) {
+      if (draft.state !== 'active' || Date.parse(draft.expiresAt) > now.getTime()) continue;
+      const owner = this.sourceOwners.get(presentationSourceOwnerId({ owner_type: 'draft', draft_id: draft.draftId }));
+      if (owner === undefined) throw new PresentationCanonicalCorruptionError('Presentation draft owner is missing');
+      await this.expireDraftLocked(draft, owner, now.toISOString());
+      result.expiredDrafts.push(draft.draftId);
+    }
+    for (const grant of Array.from(this.sourceGrants.values())) {
+      if (grant.state !== 'active' || Date.parse(grant.expiresAt) > now.getTime()) continue;
+      await this.expireGrantLocked(grant, now.toISOString());
+      result.expiredGrants.push(grant.grantId);
+    }
+    for (const tombstone of Array.from(this.sourceGrantTombstones.values())) {
+      await this.files.removeGrant(tombstone.grantId);
+      if (Date.parse(tombstone.deleteAfter) > now.getTime()) continue;
+      await this.files.removeTombstone('grant', tombstone.grantId);
+      this.sourceGrantTombstones.delete(tombstone.grantId);
+      result.purgedGrantTombstones.push(tombstone.grantId);
+    }
+    for (const tombstone of Array.from(this.sourceDraftTombstones.values())) {
+      await this.files.removeDraft(tombstone.draftId);
+      if (Date.parse(tombstone.deleteAfter) > now.getTime()) continue;
+      const ownerKey: PresentationGrantOwner = { owner_type: 'draft', draft_id: tombstone.draftId };
+      const ownerId = presentationSourceOwnerId(ownerKey);
+      const owner = this.sourceOwners.get(ownerId);
+      if (owner !== undefined && owner.draftLifecycle !== 'purged') {
+        const nextOwner: StoredPresentationSourceOwnerManifest = {
+          ...owner,
+          revision: owner.revision + 1,
+          updatedAt: now.toISOString(),
+          draftLifecycle: 'purged',
+        };
+        assertPresentationSourceOwnerManifest(nextOwner);
+        await this.runCanonicalTransaction({
+          mutations: [
+            {
+              entityKind: 'owner',
+              entityId: ownerId,
+              expectedRevision: owner.revision,
+              nextManifest: nextOwner,
+            },
+          ],
+        });
+        this.sourceOwners.set(ownerId, frozenSnapshot(nextOwner));
+      }
+      await this.files.removeTombstone('draft', tombstone.draftId);
+      this.sourceDraftTombstones.delete(tombstone.draftId);
+      result.purgedDraftTombstones.push(tombstone.draftId);
+    }
+    if (
+      result.expiredDrafts.length > 0 ||
+      result.expiredGrants.length > 0 ||
+      result.purgedDraftTombstones.length > 0 ||
+      result.purgedGrantTombstones.length > 0
+    ) {
+      this.index = this.buildIndex();
+      await this.persistDerivedIndexBestEffort();
+    }
+    return result;
+  }
+
+  private async expirePresentationSourceOwnerIfNeeded(_owner: PresentationGrantOwner): Promise<void> {
+    await this.sweepExpiredPresentationSources();
+  }
+
+  private requireMutableSourceOwner(
+    owner: PresentationGrantOwner,
+    principalId: string,
+    expectedRevision: number
+  ): StoredPresentationSourceOwnerManifest {
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+      throw new PresentationSourceStoreError('INVALID_REQUEST');
+    }
+    const ownerId = presentationSourceOwnerId(owner);
+    const existing = this.sourceOwners.get(ownerId);
+    if (existing === undefined) {
+      if (owner.owner_type === 'draft') this.throwDraftLookupFailure(owner.draft_id, principalId);
+      if (expectedRevision !== 0) throw new PresentationSourceStoreError('INVALID_REQUEST');
+      return {
+        version: 2,
+        recordType: 'presentation-source-owner',
+        ownerId,
+        owner: structuredClone(owner),
+        principalId,
+        revision: 0,
+        createdAt: '',
+        updatedAt: '',
+        grantIds: [],
+        unboundBytes: 0,
+        draftClientRequestId: null,
+        draftLifecycle: null,
+      };
+    }
+    if (existing.principalId !== principalId) {
+      throw new PresentationSourceStoreError(owner.owner_type === 'draft' ? 'DRAFT_FOREIGN' : 'RUN_FORBIDDEN');
+    }
+    if (owner.owner_type === 'draft') {
+      if (existing.draftLifecycle === 'expired') {
+        throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: owner.draft_id });
+      }
+      if (existing.draftLifecycle !== 'active') throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+    }
+    if (existing.revision !== expectedRevision) throw new PresentationSourceStoreError('INVALID_REQUEST');
+    return frozenSnapshot(existing);
+  }
+
+  private throwDraftLookupFailure(draftId: string, principalId: string): never {
+    const tombstone = this.sourceDraftTombstones.get(draftId);
+    if (tombstone !== undefined) {
+      if (Date.parse(tombstone.deleteAfter) <= this.now().getTime()) {
+        throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+      }
+      if (tombstone.principalId !== principalId) throw new PresentationSourceStoreError('DRAFT_FOREIGN');
+      if (tombstone.terminalState === 'expired') {
+        throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId });
+      }
+    }
+    throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+  }
+
+  private createGrantTombstone(
+    grant: StoredPresentationSourceGrantManifest,
+    terminalState: StoredPresentationSourceGrantTombstone['terminalState'],
+    now: string
+  ): StoredPresentationSourceGrantTombstone {
+    const tombstone: StoredPresentationSourceGrantTombstone = {
+      version: 2,
+      recordType: 'presentation-source-grant-tombstone',
+      revision: 0,
+      grantId: grant.grantId,
+      owner: structuredClone(grant.owner),
+      terminalState,
+      terminalAt: now,
+      tombstonedAt: now,
+      deleteAfter: new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS).toISOString(),
+      lastRevision: grant.revision,
+    };
+    assertPresentationSourceGrantTombstone(tombstone);
+    return tombstone;
+  }
+
+  private async expireGrantLocked(grant: StoredPresentationSourceGrantManifest, now: string): Promise<void> {
+    const ownerId = presentationSourceOwnerId(grant.owner);
+    const owner = this.sourceOwners.get(ownerId);
+    if (owner === undefined) throw new PresentationCanonicalCorruptionError('Presentation source owner is missing');
+    const nextGrant: StoredPresentationSourceGrantManifest = {
+      ...grant,
+      revision: grant.revision + 1,
+      updatedAt: now,
+      stateEnteredAt: now,
+      state: 'expired',
+    };
+    const nextOwner: StoredPresentationSourceOwnerManifest = {
+      ...owner,
+      revision: owner.revision + 1,
+      updatedAt: now,
+      grantIds: owner.grantIds.filter((grantId) => grantId !== grant.grantId),
+      unboundBytes: owner.unboundBytes - grant.byteLength,
+    };
+    const tombstone = this.createGrantTombstone(nextGrant, 'expired', now);
+    await this.runCanonicalTransaction({
+      mutations: [
+        {
+          entityKind: 'grant',
+          entityId: grant.grantId,
+          expectedRevision: grant.revision,
+          nextManifest: nextGrant,
+        },
+        {
+          entityKind: 'grant-tombstone',
+          entityId: grant.grantId,
+          expectedRevision: null,
+          nextManifest: tombstone,
+        },
+        { entityKind: 'owner', entityId: ownerId, expectedRevision: owner.revision, nextManifest: nextOwner },
+      ],
+    });
+    this.sourceGrants.delete(grant.grantId);
+    this.sourceGrantTombstones.set(grant.grantId, frozenSnapshot(tombstone));
+    this.sourceOwners.set(ownerId, frozenSnapshot(nextOwner));
+    await this.files.removeGrant(grant.grantId);
+  }
+
+  private async expireDraftLocked(
+    draft: StoredPresentationSourceDraftManifest,
+    owner: StoredPresentationSourceOwnerManifest,
+    timestamp = this.now().toISOString()
+  ): Promise<void> {
+    const grants = owner.grantIds.map((grantId) => {
+      const grant = this.sourceGrants.get(grantId);
+      if (grant === undefined || grant.state !== 'active') {
+        throw new PresentationCanonicalCorruptionError('Presentation draft references an invalid grant');
+      }
+      return grant;
+    });
+    const nextOwner: StoredPresentationSourceOwnerManifest = {
+      ...owner,
+      revision: owner.revision + 1,
+      updatedAt: timestamp,
+      grantIds: [],
+      unboundBytes: 0,
+      draftLifecycle: 'expired',
+    };
+    const nextDraft: StoredPresentationSourceDraftManifest = {
+      ...draft,
+      revision: draft.revision + 1,
+    };
+    const draftTombstone: StoredPresentationSourceDraftTombstone = {
+      version: 2,
+      recordType: 'presentation-source-draft-tombstone',
+      revision: 0,
+      draftId: draft.draftId,
+      clientRequestId: draft.clientRequestId,
+      principalId: draft.principalId,
+      terminalState: 'expired',
+      terminalAt: timestamp,
+      tombstonedAt: timestamp,
+      deleteAfter: new Date(Date.parse(timestamp) + PRESENTATION_RUN_LIMITS.TOMBSTONE_RETENTION_MS).toISOString(),
+      lastRevision: nextDraft.revision,
+      boundConversationId: null,
+    };
+    const expiredGrants = grants.map<StoredPresentationSourceGrantManifest>((grant) => ({
+      ...grant,
+      revision: grant.revision + 1,
+      updatedAt: timestamp,
+      stateEnteredAt: timestamp,
+      state: 'expired',
+    }));
+    const grantTombstones = expiredGrants.map((grant) => this.createGrantTombstone(grant, 'expired', timestamp));
+    assertPresentationSourceDraftManifest(nextDraft);
+    await this.runCanonicalTransaction({
+      mutations: [
+        {
+          entityKind: 'draft',
+          entityId: draft.draftId,
+          expectedRevision: draft.revision,
+          nextManifest: nextDraft,
+        },
+        { entityKind: 'owner', entityId: owner.ownerId, expectedRevision: owner.revision, nextManifest: nextOwner },
+        {
+          entityKind: 'draft-tombstone',
+          entityId: draft.draftId,
+          expectedRevision: null,
+          nextManifest: draftTombstone,
+        },
+        ...expiredGrants.flatMap((grant, index) => [
+          {
+            entityKind: 'grant' as const,
+            entityId: grant.grantId,
+            expectedRevision: grants[index]?.revision ?? null,
+            nextManifest: grant,
+          },
+          {
+            entityKind: 'grant-tombstone' as const,
+            entityId: grant.grantId,
+            expectedRevision: null as null,
+            nextManifest: grantTombstones[index] as StoredPresentationSourceGrantTombstone,
+          },
+        ]),
+      ],
+    });
+    this.sourceDrafts.delete(draft.draftId);
+    this.sourceDraftTombstones.set(draft.draftId, frozenSnapshot(draftTombstone));
+    this.sourceOwners.set(owner.ownerId, frozenSnapshot(nextOwner));
+    for (const [index, grant] of expiredGrants.entries()) {
+      this.sourceGrants.delete(grant.grantId);
+      this.sourceGrantTombstones.set(
+        grant.grantId,
+        frozenSnapshot(grantTombstones[index] as StoredPresentationSourceGrantTombstone)
+      );
+      await this.files.removeGrant(grant.grantId);
+    }
+    await this.files.removeDraft(draft.draftId);
+  }
+
+  private assertSourceCanonicalReferences(): void {
+    for (const owner of this.sourceOwners.values()) {
+      let bytes = 0;
+      for (const grantId of owner.grantIds) {
+        const grant = this.sourceGrants.get(grantId);
+        if (
+          grant === undefined ||
+          grant.state !== 'active' ||
+          presentationSourceOwnerKey(grant.owner) !== presentationSourceOwnerKey(owner.owner)
+        ) {
+          throw new PresentationCanonicalCorruptionError('Presentation source ownership is corrupt');
+        }
+        bytes += grant.byteLength;
+      }
+      if (bytes !== owner.unboundBytes) {
+        throw new PresentationCanonicalCorruptionError('Presentation source owner byte accounting is corrupt');
+      }
+      if (owner.owner.owner_type === 'draft' && owner.draftLifecycle === 'active') {
+        const draft = this.sourceDrafts.get(owner.owner.draft_id);
+        if (draft === undefined || draft.principalId !== owner.principalId || draft.revision !== owner.revision) {
+          throw new PresentationCanonicalCorruptionError('Presentation source draft ownership is corrupt');
+        }
+      }
+    }
+    for (const grant of this.sourceGrants.values()) {
+      const owner = this.sourceOwners.get(presentationSourceOwnerId(grant.owner));
+      if (grant.state === 'active') {
+        if (owner === undefined || !owner.grantIds.includes(grant.grantId)) {
+          throw new PresentationCanonicalCorruptionError('Active presentation source grant has no owner accounting');
+        }
+        continue;
+      }
+      if (grant.state === 'claimed' || grant.state === 'consumed') {
+        const run =
+          grant.claimedRunId === null
+            ? undefined
+            : (this.runs.get(grant.claimedRunId) ?? this.tombstones.get(grant.claimedRunId)?.discardedRun);
+        if (
+          owner?.grantIds.includes(grant.grantId) === true ||
+          run === undefined ||
+          !run.sourceGrants.includes(grant.grantId)
+        ) {
+          throw new PresentationCanonicalCorruptionError('Claimed presentation source grant has no run accounting');
+        }
+        continue;
+      }
+      throw new PresentationCanonicalCorruptionError('Terminal presentation source grant has no tombstone');
+    }
   }
 
   private async findByRequest(
@@ -1200,6 +2673,22 @@ export class PresentationRunStore {
         throw new PresentationCanonicalCorruptionError('Duplicate presentation request ownership');
       }
       index.requests[requestKey] = run.runId;
+    }
+    for (const owner of this.sourceOwners.values()) {
+      const key = presentationSourceOwnerKey(owner.owner);
+      const indexedOwner = getOwnIndexValue(index.sourceOwners, key);
+      if (indexedOwner !== undefined && indexedOwner !== owner.ownerId) {
+        throw new PresentationCanonicalCorruptionError('Duplicate presentation source owner');
+      }
+      index.sourceOwners[key] = owner.ownerId;
+      if (owner.owner.owner_type === 'draft' && owner.draftClientRequestId !== null) {
+        const requestKey = draftRequestIndexKey(owner.principalId, owner.draftClientRequestId);
+        const requestOwner = getOwnIndexValue(index.draftRequests, requestKey);
+        if (requestOwner !== undefined && requestOwner !== owner.ownerId) {
+          throw new PresentationCanonicalCorruptionError('Duplicate presentation draft request ownership');
+        }
+        index.draftRequests[requestKey] = owner.ownerId;
+      }
     }
     return index;
   }

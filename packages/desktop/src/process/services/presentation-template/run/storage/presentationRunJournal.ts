@@ -10,6 +10,7 @@ import { lstat, open, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
+  PreparedPresentationSourceSnapshot,
   PreparedRetainedCandidate,
   PresentationOwnedDirectoryLease,
   PresentationPreparedCandidateGuard,
@@ -61,6 +62,7 @@ export type PresentationRunJournalMutation = {
 export type PresentationRunJournalTransaction = {
   mutations: PresentationRunJournalMutation[];
   retainedCandidatePromotions?: PreparedRetainedCandidate[];
+  sourceSnapshotPromotions?: PreparedPresentationSourceSnapshot[];
 };
 
 type IntentRecord = {
@@ -70,6 +72,7 @@ type IntentRecord = {
   createdAt: string;
   mutations: PresentationRunJournalMutation[];
   retainedCandidatePromotions: PreparedRetainedCandidate[];
+  sourceSnapshotPromotions: PreparedPresentationSourceSnapshot[];
 };
 
 type CommitRecord = {
@@ -106,6 +109,7 @@ const ENTITY_KINDS: readonly PresentationRunEntityKind[] = [
   'run',
   'grant',
   'draft',
+  'owner',
   'run-tombstone',
   'grant-tombstone',
   'draft-tombstone',
@@ -197,9 +201,46 @@ function parsePromotion(value: unknown): PreparedRetainedCandidate {
   return value as PreparedRetainedCandidate;
 }
 
+function parseSourcePromotion(value: unknown): PreparedPresentationSourceSnapshot {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      'grantId',
+      'format',
+      'temporaryRelativePath',
+      'finalRelativePath',
+      'sha256',
+      'byteLength',
+      'dev',
+      'ino',
+    ]) ||
+    typeof value.grantId !== 'string' ||
+    !UUID_RE.test(value.grantId) ||
+    !['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'md', 'csv'].includes(value.format as string) ||
+    typeof value.temporaryRelativePath !== 'string' ||
+    !/^\.source-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/i.test(
+      value.temporaryRelativePath
+    ) ||
+    value.finalRelativePath !== `source.${value.format as string}` ||
+    typeof value.sha256 !== 'string' ||
+    !/^[0-9a-f]{64}$/i.test(value.sha256) ||
+    !Number.isSafeInteger(value.byteLength) ||
+    (value.byteLength as number) < 1 ||
+    (value.byteLength as number) > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
+    typeof value.dev !== 'string' ||
+    !/^(0|[1-9][0-9]*)$/.test(value.dev) ||
+    typeof value.ino !== 'string' ||
+    !/^[1-9][0-9]*$/.test(value.ino)
+  ) {
+    journalCorrupt();
+  }
+  return value as PreparedPresentationSourceSnapshot;
+}
+
 function validateIntentParticipants(
   mutations: PresentationRunJournalMutation[],
-  promotions: PreparedRetainedCandidate[]
+  promotions: PreparedRetainedCandidate[],
+  sourcePromotions: PreparedPresentationSourceSnapshot[]
 ): void {
   const participantKeys = mutations.map(({ entityKind, entityId }) => `${entityKind}:${entityId}`);
   if (new Set(participantKeys).size !== participantKeys.length) journalCorrupt();
@@ -232,6 +273,38 @@ function validateIntentParticipants(
       journalCorrupt();
     }
   }
+  const promotedGrants = new Set<string>();
+  for (const promotion of sourcePromotions) {
+    if (promotedGrants.has(promotion.grantId)) journalCorrupt();
+    promotedGrants.add(promotion.grantId);
+    const mutation = mutations.find(
+      ({ entityKind, entityId }) => entityKind === 'grant' && entityId === promotion.grantId
+    );
+    if (
+      mutation === undefined ||
+      mutation.expectedRevision !== null ||
+      mutation.nextManifest.recordType !== 'presentation-source-grant' ||
+      mutation.nextManifest.grantId !== promotion.grantId ||
+      mutation.nextManifest.state !== 'active' ||
+      mutation.nextManifest.format !== promotion.format ||
+      mutation.nextManifest.snapshotRelativePath !== promotion.finalRelativePath ||
+      mutation.nextManifest.sha256 !== promotion.sha256 ||
+      mutation.nextManifest.byteLength !== promotion.byteLength
+    ) {
+      journalCorrupt();
+    }
+  }
+  for (const mutation of mutations) {
+    if (
+      mutation.entityKind === 'grant' &&
+      mutation.expectedRevision === null &&
+      mutation.nextManifest.recordType === 'presentation-source-grant' &&
+      mutation.nextManifest.state === 'active' &&
+      !promotedGrants.has(mutation.entityId)
+    ) {
+      journalCorrupt();
+    }
+  }
 }
 
 function validateTransaction(input: PresentationRunJournalTransaction): void {
@@ -243,7 +316,11 @@ function validateTransaction(input: PresentationRunJournalTransaction): void {
     journalCorrupt();
   }
   const promotions = (input.retainedCandidatePromotions ?? []).map(parsePromotion);
-  validateIntentParticipants(mutations, promotions);
+  if (input.sourceSnapshotPromotions !== undefined && !Array.isArray(input.sourceSnapshotPromotions)) {
+    journalCorrupt();
+  }
+  const sourcePromotions = (input.sourceSnapshotPromotions ?? []).map(parseSourcePromotion);
+  validateIntentParticipants(mutations, promotions, sourcePromotions);
 }
 
 function parseJournalRecord(line: string): JournalRecord {
@@ -262,26 +339,30 @@ function parseJournalRecord(line: string): JournalRecord {
     journalCorrupt();
   }
   if (value.type === 'intent') {
+    const legacyKeys = ['version', 'type', 'transactionId', 'createdAt', 'mutations', 'retainedCandidatePromotions'];
+    const currentKeys = [...legacyKeys, 'sourceSnapshotPromotions'];
     if (
-      !hasExactKeys(value, [
-        'version',
-        'type',
-        'transactionId',
-        'createdAt',
-        'mutations',
-        'retainedCandidatePromotions',
-      ]) ||
+      (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, currentKeys)) ||
       !UUID_RE.test(value.transactionId) ||
       !isIsoTimestamp(value.createdAt) ||
       !Array.isArray(value.mutations) ||
-      !Array.isArray(value.retainedCandidatePromotions)
+      !Array.isArray(value.retainedCandidatePromotions) ||
+      (value.sourceSnapshotPromotions !== undefined && !Array.isArray(value.sourceSnapshotPromotions))
     ) {
       journalCorrupt();
     }
     const mutations = value.mutations.map(parseMutation);
     const retainedCandidatePromotions = value.retainedCandidatePromotions.map(parsePromotion);
-    validateIntentParticipants(mutations, retainedCandidatePromotions);
-    return { ...(value as IntentRecord), mutations, retainedCandidatePromotions };
+    const sourceSnapshotPromotions = (
+      Array.isArray(value.sourceSnapshotPromotions) ? value.sourceSnapshotPromotions : []
+    ).map(parseSourcePromotion);
+    validateIntentParticipants(mutations, retainedCandidatePromotions, sourceSnapshotPromotions);
+    return {
+      ...(value as Omit<IntentRecord, 'sourceSnapshotPromotions'>),
+      mutations,
+      retainedCandidatePromotions,
+      sourceSnapshotPromotions,
+    };
   }
   if (
     !hasExactKeys(value, ['version', 'type', 'transactionId', 'committedAt']) ||
@@ -523,22 +604,30 @@ export class PresentationRunJournal {
           createdAt: this.now().toISOString(),
           mutations: inputSnapshot.mutations,
           retainedCandidatePromotions: inputSnapshot.retainedCandidatePromotions ?? [],
+          sourceSnapshotPromotions: inputSnapshot.sourceSnapshotPromotions ?? [],
         };
         await this.files.withJournalDirectoryLease(async (journalLease) => {
           const journalPath = this.files.getJournalPath();
           const journalIdentityBeforeIntent = await inspectOwnedFileIdentityIfPresent(journalPath, journalLease);
           const journalIdentity = await this.files.withPreparedRetainedCandidateLeases(
             intent.retainedCandidatePromotions,
-            async (prePersistGuard) =>
-              this.appendRecord(intent, {
-                journalLease,
-                expectedJournalIdentity: journalIdentityBeforeIntent,
-                prePersistGuard,
-                onAppendMayPersist: () => {
-                  this.recoveryRequired = true;
-                  intentMayExist = true;
-                },
-              })
+            async (retainedGuard) =>
+              this.files.withPreparedSourceSnapshotLeases(intent.sourceSnapshotPromotions, async (sourceGuard) =>
+                this.appendRecord(intent, {
+                  journalLease,
+                  expectedJournalIdentity: journalIdentityBeforeIntent,
+                  prePersistGuard: {
+                    assertCurrent: async () => {
+                      await retainedGuard.assertCurrent();
+                      await sourceGuard.assertCurrent();
+                    },
+                  },
+                  onAppendMayPersist: () => {
+                    this.recoveryRequired = true;
+                    intentMayExist = true;
+                  },
+                })
+              )
           );
           await this.applyIntent(intent);
           await this.appendRecord(
@@ -765,6 +854,9 @@ export class PresentationRunJournal {
     for (const promotion of intent.retainedCandidatePromotions) {
       await this.files.recoverRetainedCandidatePromotion(promotion);
     }
+    for (const promotion of intent.sourceSnapshotPromotions) {
+      await this.files.recoverSourceSnapshotPromotion(promotion);
+    }
     for (const [mutationIndex, mutation] of intent.mutations.entries()) {
       if (recovering && (await this.isMutationApplied(mutation))) continue;
       if (recovering) await this.assertExpectedRevision(mutation);
@@ -876,7 +968,16 @@ export class PresentationRunJournal {
     if (revision !== mutation.expectedRevision) throw new Error('Presentation canonical revision conflict');
     const nextRevision = manifestRevision(mutation.nextManifest);
     const expectedNext = mutation.expectedRevision === null ? 0 : mutation.expectedRevision + 1;
-    if (nextRevision !== expectedNext) throw new Error('Presentation canonical revision must increase by one');
+    const isFirstConversationOwnerMutation =
+      mutation.entityKind === 'owner' &&
+      mutation.expectedRevision === null &&
+      nextRevision === 1 &&
+      mutation.nextManifest.recordType === 'presentation-source-owner' &&
+      isRecord(mutation.nextManifest.owner) &&
+      mutation.nextManifest.owner.owner_type === 'conversation';
+    if (nextRevision !== expectedNext && !isFirstConversationOwnerMutation) {
+      throw new Error('Presentation canonical revision must increase by one');
+    }
   }
 
   private async isMutationApplied(mutation: PresentationRunJournalMutation): Promise<boolean> {
@@ -891,6 +992,8 @@ export class PresentationRunJournal {
       await this.files.createGrantLayout(entityId);
     } else if (kind === 'draft') {
       await this.files.createDraftLayout(entityId);
+    } else if (kind === 'owner') {
+      await this.files.createOwnerLayout(entityId);
     } else {
       await this.files.initialize();
     }

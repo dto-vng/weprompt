@@ -59,6 +59,20 @@ import type {
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import type {
+  BindPresentationDraftRequest,
+  BindPresentationDraftResult,
+  CreatePresentationDraftRequest,
+  CreatePresentationDraftResult,
+  GetPresentationSourceOwnerRequest,
+  GetPresentationSourceOwnerResult,
+  GrantPresentationWorkspaceSourceRequest,
+  GrantPresentationWorkspaceSourceResult,
+  PickPresentationSourcesRequest,
+  PickPresentationSourcesResult,
+  RevokePresentationSourceRequest,
+  RevokePresentationSourceResult,
+} from '@/common/types/office/presentationRun';
+import type {
   EnsureConversationRuntimeResponse,
   GetConfigOptionsResponse,
   SetConfigOptionRequest,
@@ -618,6 +632,28 @@ export const presentationTemplates = {
   ),
   discardScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
     'presentation-templates.scratch.discard'
+  ),
+};
+
+export const presentationSources = {
+  getSourceOwner: bridge.buildProvider<GetPresentationSourceOwnerResult, GetPresentationSourceOwnerRequest>(
+    'presentation-sources.get-source-owner'
+  ),
+  createDraft: bridge.buildProvider<CreatePresentationDraftResult, CreatePresentationDraftRequest>(
+    'presentation-sources.create-draft'
+  ),
+  bindDraft: bridge.buildProvider<BindPresentationDraftResult, BindPresentationDraftRequest>(
+    'presentation-sources.bind-draft'
+  ),
+  pickSources: bridge.buildProvider<PickPresentationSourcesResult, PickPresentationSourcesRequest>(
+    'presentation-sources.pick-sources'
+  ),
+  grantWorkspaceSource: bridge.buildProvider<
+    GrantPresentationWorkspaceSourceResult,
+    GrantPresentationWorkspaceSourceRequest
+  >('presentation-sources.grant-workspace-source'),
+  revoke: bridge.buildProvider<RevokePresentationSourceResult, RevokePresentationSourceRequest>(
+    'presentation-sources.revoke'
   ),
 };
 
