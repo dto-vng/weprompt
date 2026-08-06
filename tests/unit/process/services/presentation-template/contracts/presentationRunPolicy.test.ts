@@ -5,6 +5,7 @@
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
@@ -14,14 +15,19 @@ import { describe, expect, it } from 'vitest';
 import {
   PRESENTATION_RUN_ARTIFACT_PHASES,
   PRESENTATION_RUN_DISPATCH_STATUSES,
-  PRESENTATION_RUN_LIMITS,
+  PRESENTATION_RUN_LIMITS as LEGACY_PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
+import { PRESENTATION_RUN_LIMITS } from '@/common/types/office/presentationRunPolicy';
 import type { PresentationRunFailure, PresentationRunFailureCode } from '@/common/types/office/presentationRun';
 
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
 const MESSAGE_KEY = 'conversation.presentation.failure';
 const RECOVERY_CURSOR_TEST_SECRET = 'main-owned-recovery-cursor-test-secret';
 const presentationRunTypeFile = resolve(process.cwd(), 'packages/desktop/src/common/types/office/presentationRun.ts');
+const presentationRunLimitsFile = resolve(
+  process.cwd(),
+  'packages/desktop/src/common/types/office/presentationRunPolicy.ts'
+);
 const presentationRunPolicyFile = resolve(
   process.cwd(),
   'tests/unit/process/services/presentation-template/contracts/presentationRunPolicy.test.ts'
@@ -1036,6 +1042,47 @@ describe('managed presentation fixed resource policy', () => {
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
+
+  it('keeps the legacy and side-effect-free policy exports identical', () => {
+    expect(PRESENTATION_RUN_LIMITS).toBe(LEGACY_PRESENTATION_RUN_LIMITS);
+  });
+
+  it('evaluates the pure policy module without reading environment-backed configuration', () => {
+    const script = `
+      const [{ readFile }, { stripTypeScriptTypes }, { SourceTextModule, createContext }] = await Promise.all([
+        import('node:fs/promises'),
+        import('node:module'),
+        import('node:vm'),
+      ]);
+      const source = await readFile(${JSON.stringify(presentationRunLimitsFile)}, 'utf8');
+      const guardedProcess = {};
+      Object.defineProperty(guardedProcess, 'env', {
+        get() { throw new Error('pure policy evaluated process.env'); },
+      });
+      const module = new SourceTextModule(stripTypeScriptTypes(source, { mode: 'strip' }), {
+        context: createContext({ process: guardedProcess }),
+        identifier: 'presentationRunPolicy.ts',
+      });
+      await module.link((specifier) => {
+        throw new Error('pure policy imported dependency: ' + specifier);
+      });
+      await module.evaluate();
+      if (!Object.hasOwn(module.namespace, 'PRESENTATION_RUN_LIMITS')) {
+        throw new Error('pure policy export is missing');
+      }
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--experimental-vm-modules', '--no-warnings', '--input-type=module', '--eval', script],
+      { encoding: 'utf8' }
+    );
+
+    expect({ signal: result.signal, status: result.status, stderr: result.stderr }).toEqual({
+      signal: null,
+      status: 0,
+      stderr: '',
+    });
+  });
 
   it('keeps source, grant, extraction, and template limits fixed', () => {
     expect(PRESENTATION_RUN_LIMITS).toMatchObject({
