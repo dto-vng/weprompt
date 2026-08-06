@@ -6,13 +6,11 @@
 
 import { ipcBridge } from '@/common';
 import { parseContextCommand, type ContextCommandInvalidCode } from '@/common/chat/slash/contextCommands';
-import { PRESENTATION_RUN_DIRECTIVE_PREFIX, PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
+import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import type {
   DispatchInitialPresentationRunResult,
   PresentationGrantOwner,
-  PresentationSourceDescriptor,
-  PresentationSourceRef,
 } from '@/common/types/office/presentationRun';
 import type { PresentationCommandQueueItem } from '@/common/types/platform/presentationCommandQueue';
 import type {
@@ -38,7 +36,6 @@ import {
   usePresentationTemplates,
 } from '@/renderer/components/chat/TemplateGallery';
 import { getPresentationRunEligibility } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
-import { resolveManagedPresentationInitialSend } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -118,13 +115,6 @@ const useAionrsSendBoxDraft = getSendBoxDraftHook('aionrs', {
 
 const EMPTY_AT_PATH: Array<string | FileOrFolderItem> = [];
 const EMPTY_UPLOAD_FILES: string[] = [];
-
-const toPresentationSourceRefs = (descriptors: readonly PresentationSourceDescriptor[]): PresentationSourceRef[] =>
-  descriptors.map((descriptor) => ({
-    grantId: descriptor.grantId,
-    expectedByteLength: descriptor.byteLength,
-    expectedSha256: descriptor.sha256,
-  }));
 
 const toPresentationSubmissionProgress = (item: PresentationCommandQueueItem): PresentationSubmissionProgress => {
   const { execution } = item;
@@ -260,7 +250,6 @@ const AionrsSendBox: React.FC<{
     controller: PresentationCommandQueueController;
   } | null>(null);
   const managedPresentationDrainRef = useRef(false);
-  const managedInitialSubmissionRef = useRef<string | null>(null);
   const presentationConversationIdRef = useLatestRef(conversation_id);
   const managedPresentationEligibleRef = useLatestRef(managedPresentationEligible);
 
@@ -1013,61 +1002,6 @@ const AionrsSendBox: React.FC<{
       const storedMessage = sessionStorage.getItem(storageKey);
       if (!storedMessage) return;
 
-      if (managedPresentationPlatformEligible) {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(storedMessage) as unknown;
-        } catch {
-          return;
-        }
-        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const candidate = parsed as Record<string, unknown>;
-          const input = candidate.input;
-          const files = candidate.files;
-          if (
-            typeof input === 'string' &&
-            input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX) &&
-            (files === undefined || (Array.isArray(files) && files.every((file) => typeof file === 'string')))
-          ) {
-            if (managedInitialSubmissionRef.current === storageKey) return;
-            const managed = resolveManagedPresentationInitialSend(input, (files as string[] | undefined) ?? []);
-            if (managed === null) return;
-            managedInitialSubmissionRef.current = storageKey;
-            const queueItemId = typeof candidate.queueItemId === 'string' ? candidate.queueItemId : crypto.randomUUID();
-            const clientRequestId =
-              typeof candidate.clientRequestId === 'string' ? candidate.clientRequestId : crypto.randomUUID();
-            sessionStorage.setItem(storageKey, JSON.stringify({ ...candidate, queueItemId, clientRequestId }));
-            try {
-              const sourceState = await presentationSourceDraft.hydrate({
-                owner_type: 'conversation',
-                conversation_id,
-              });
-              if (!sourceState.ok) return;
-              const sources = toPresentationSourceRefs(sourceState.grants);
-              const snapshot: PresentationSubmissionSnapshot = Object.freeze({
-                queueItemId,
-                clientRequestId,
-                input: managed.input,
-                selectedTemplateId: managed.selectedTemplateId,
-                sources: Object.freeze(sources.map((source) => Object.freeze(source))),
-                capturedAt: new Date().toISOString(),
-              });
-              await enqueueManagedPresentation(
-                snapshot,
-                sources.length > 0 ? sourceState.owner : null,
-                sources.length > 0 ? sourceState.ownerRevision : null,
-                false
-              );
-              sessionStorage.setItem(processedKey, '1');
-              sessionStorage.removeItem(storageKey);
-              return;
-            } finally {
-              managedInitialSubmissionRef.current = null;
-            }
-          }
-        }
-      }
-
       sessionStorage.setItem(processedKey, '1');
       sessionStorage.removeItem(storageKey);
 
@@ -1081,14 +1015,7 @@ const AionrsSendBox: React.FC<{
     };
 
     void processInitialMessage();
-  }, [
-    conversation_id,
-    current_model?.use_model,
-    enqueueManagedPresentation,
-    executeCommand,
-    managedPresentationPlatformEligible,
-    presentationSourceDraft.hydrate,
-  ]);
+  }, [conversation_id, current_model?.use_model, executeCommand]);
 
   const onSendHandler = async (message: string) => {
     if (managedPresentationEligible && managedPresentationSubmission === undefined) {
