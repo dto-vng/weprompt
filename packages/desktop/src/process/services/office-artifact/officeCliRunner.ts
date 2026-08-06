@@ -147,42 +147,115 @@ const RENDER_OUTPUT_POLL_INTERVAL_MS = 25;
 const RENDER_TREE_STOP_TIMEOUT_MS = 5_000;
 const RENDER_TREE_STOP_RETRY_MS = 250;
 const WINDOWS_RENDER_TREE_REAPER_SCRIPT = String.raw`
-$ErrorActionPreference = 'Stop'
-[uint32]$targetProcessId = [uint32]$args[0]
-$rootAlreadyEnded = $args[1] -eq '1'
-$knownProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
-[void]$knownProcessIds.Add($targetProcessId)
+function Get-ProcessCreationTicks {
+  param([object]$Process)
+  if ($null -eq $Process -or $null -eq $Process.CreationDate) { return $null }
+  return ([datetime]$Process.CreationDate).ToUniversalTime().Ticks
+}
+function Add-KnownProcessIdentity {
+  param([object]$Process)
+  if ($null -eq $Process) { return $false }
+  [uint32]$processId = [uint32]$Process.ProcessId
+  $creationTicks = Get-ProcessCreationTicks $Process
+  if (
+    $null -eq $creationTicks -or
+    $creationTicks -lt $treeCreationFloorTicks -or
+    $knownCreationTicks.ContainsKey($processId)
+  ) { return $false }
+  $knownCreationTicks.Add($processId, [long]$creationTicks)
+  return $true
+}
+function Test-KnownProcessIdentity {
+  param([object]$Process)
+  if ($null -eq $Process) { return $false }
+  [uint32]$processId = [uint32]$Process.ProcessId
+  $creationTicks = Get-ProcessCreationTicks $Process
+  return (
+    $null -ne $creationTicks -and
+    $knownCreationTicks.ContainsKey($processId) -and
+    $knownCreationTicks[$processId] -eq [long]$creationTicks
+  )
+}
+$knownCreationTicks = [System.Collections.Generic.Dictionary[uint32,long]]::new()
+$treeSeeded = $false
 $emptyPasses = 0
 for ($pass = 0; $pass -lt 16; $pass++) {
-  $processes = @(Get-CimInstance -ClassName Win32_Process | Select-Object ProcessId, ParentProcessId)
+  $processes = @(
+    Get-CimInstance -ClassName Win32_Process |
+      Select-Object ProcessId, ParentProcessId, CreationDate
+  )
+  $processById = @{}
+  foreach ($process in $processes) {
+    $processById[[uint32]$process.ProcessId] = $process
+  }
+  if (-not $treeSeeded) {
+    $rootProcess = $processById[$targetProcessId]
+    $rootCreationTicks = Get-ProcessCreationTicks $rootProcess
+    if (-not $rootAlreadyEnded -and $null -ne $rootCreationTicks) {
+      [void](Add-KnownProcessIdentity $rootProcess)
+    } else {
+      foreach ($process in $processes) {
+        if ([uint32]$process.ParentProcessId -ne $targetProcessId) { continue }
+        $processCreationTicks = Get-ProcessCreationTicks $process
+        if (
+          $null -ne $processCreationTicks -and
+          ($null -eq $rootProcess -or
+            ($null -ne $rootCreationTicks -and $processCreationTicks -lt $rootCreationTicks))
+        ) {
+          [void](Add-KnownProcessIdentity $process)
+        }
+      }
+    }
+    $treeSeeded = $true
+  }
   $changed = $true
   while ($changed) {
     $changed = $false
     foreach ($process in $processes) {
       [uint32]$processId = [uint32]$process.ProcessId
       [uint32]$parentProcessId = [uint32]$process.ParentProcessId
-      if ($knownProcessIds.Contains($parentProcessId) -and $knownProcessIds.Add($processId)) {
+      if ($knownCreationTicks.ContainsKey($processId)) { continue }
+      $parentProcess = $processById[$parentProcessId]
+      if (
+        $null -ne $parentProcess -and
+        (Test-KnownProcessIdentity $parentProcess) -and
+        (Add-KnownProcessIdentity $process)
+      ) {
         $changed = $true
       }
     }
   }
-  $liveProcesses = @($processes | Where-Object {
-    [uint32]$processId = [uint32]$_.ProcessId
-    $knownProcessIds.Contains($processId) -and (-not $rootAlreadyEnded -or $processId -ne $targetProcessId)
-  })
+  $liveProcesses = @($processes | Where-Object { Test-KnownProcessIdentity $_ })
   if ($liveProcesses.Count -eq 0) {
     $emptyPasses += 1
     if ($emptyPasses -ge 2) { exit 0 }
   } else {
     $emptyPasses = 0
     foreach ($process in $liveProcesses) {
-      Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue
+      [uint32]$processId = [uint32]$process.ProcessId
+      $currentProcess = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $processId" | Select-Object ProcessId, ParentProcessId, CreationDate -First 1
+      if ($null -ne $currentProcess -and (Test-KnownProcessIdentity $currentProcess)) {
+        Stop-Process -Id ([int]$processId) -Force -ErrorAction SilentlyContinue
+      }
     }
   }
   Start-Sleep -Milliseconds 25
 }
 exit 1
 `;
+
+function buildWindowsRenderTreeReaperCommand(
+  targetProcessId: number,
+  rootAlreadyEnded: boolean,
+  treeCreationFloorUnixMilliseconds: number
+): string {
+  return String.raw`$ErrorActionPreference = 'Stop'
+[uint32]$targetProcessId = ${targetProcessId}
+[bool]$rootAlreadyEnded = ${rootAlreadyEnded ? '$true' : '$false'}
+[long]$treeCreationFloorUnixMilliseconds = ${treeCreationFloorUnixMilliseconds}
+[long]$treeCreationFloorTicks = 621355968000000000 + ($treeCreationFloorUnixMilliseconds * 10000)
+${WINDOWS_RENDER_TREE_REAPER_SCRIPT}`;
+}
 
 const defaultExecFile: OfficeCliExecFile = (file, args, options, callback) => {
   return nodeExecFile(file, args, options, (error, stdout, stderr) => {
@@ -254,7 +327,8 @@ function waitForChildProcessEnd(child: OfficeCliWatchProcess): Promise<ChildProc
 async function terminateRenderProcessTree(
   child: OfficeCliWatchProcess | undefined,
   platform: NodeJS.Platform,
-  processTreeSpawn: OfficeCliProcessTreeSpawn
+  processTreeSpawn: OfficeCliProcessTreeSpawn,
+  treeCreationFloorUnixMilliseconds: number
 ): Promise<void> {
   if (!child) return;
   const pid = child.pid;
@@ -296,6 +370,9 @@ async function terminateRenderProcessTree(
         (child.signalCode !== undefined && child.signalCode !== null);
       const taskkillCompletedSuccessfully =
         !rootAlreadyEnded && (await runTreeCommand('taskkill', ['/F', '/PID', String(pid), '/T']));
+      const rootEndedBeforeReaper =
+        (child.exitCode !== undefined && child.exitCode !== null) ||
+        (child.signalCode !== undefined && child.signalCode !== null);
       const treeStopped =
         taskkillCompletedSuccessfully ||
         (await runTreeCommand('powershell.exe', [
@@ -303,9 +380,7 @@ async function terminateRenderProcessTree(
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          WINDOWS_RENDER_TREE_REAPER_SCRIPT,
-          String(pid),
-          rootAlreadyEnded ? '1' : '0',
+          buildWindowsRenderTreeReaperCommand(pid, rootEndedBeforeReaper, treeCreationFloorUnixMilliseconds),
         ]));
 
       if (treeStopped) {
@@ -566,6 +641,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
       let cleanupFinished = false;
       let stdoutByteLength = 0;
       const stdoutChunks: Buffer[] = [];
+      const renderStartedAt = Date.now();
 
       const clearTimers = (): void => {
         if (monitorTimer) clearTimeout(monitorTimer);
@@ -578,7 +654,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
         if (timeoutTimer) clearTimeout(timeoutTimer);
         void (async () => {
           try {
-            await terminateRenderProcessTree(child, platform, processTreeSpawn);
+            await terminateRenderProcessTree(child, platform, processTreeSpawn, renderStartedAt);
             if (error) throw toOfficeCliRenderError(error);
             await assertRenderOutputWithinLimit(outputPath);
             if (Buffer.byteLength(stdout, 'utf8') > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {

@@ -84,6 +84,52 @@ async function readProcessId(filePath: string, attempts = 500): Promise<number> 
   }
 }
 
+async function captureCompletedWindowsReaperInvocation(pid = 99_999): Promise<Parameters<OfficeCliProcessTreeSpawn>> {
+  const renderProcess = Object.assign(createWatchProcess(), { pid });
+  let invocation: Parameters<OfficeCliProcessTreeSpawn> | undefined;
+  const processTreeSpawn: OfficeCliProcessTreeSpawn = (file, args, options) => {
+    invocation = [file, args, options];
+    return Object.assign(createWatchProcess(), { exitCode: 0 });
+  };
+  const runner = createOfficeCliRunner({
+    binaryPath: 'C:\\officecli.exe',
+    platform: 'win32',
+    processTreeSpawn,
+    spawn: () => {
+      queueMicrotask(() => {
+        Object.assign(renderProcess, { exitCode: 0 });
+        renderProcess.stdout.write(JSON.stringify({ success: true, data: {} }));
+        renderProcess.emit('close', 0, null);
+      });
+      return renderProcess;
+    },
+  });
+
+  await runner.renderSlide('C:\\inspection\\candidate.pptx', 1, 'C:\\render\\slide-1.png');
+  if (!invocation) throw new Error('Expected the Windows render reaper to start');
+  return invocation;
+}
+
+function runPowerShell(command: string): Promise<{ code: number | null; stdout: string }> {
+  return new Promise((resolve, reject) => {
+    const child = nodeSpawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command], {
+      windowsHide: true,
+    });
+    const stdoutChunks: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.once('error', reject);
+    child.once('close', (code) => resolve({ code, stdout: Buffer.concat(stdoutChunks).toString('utf8') }));
+  });
+}
+
+function readBoundPowerShellTargetPid(args: string[]): number {
+  const commandIndex = args.indexOf('-Command');
+  const command = commandIndex >= 0 ? args[commandIndex + 1] : undefined;
+  const match = /^\[uint32\]\$targetProcessId = ([1-9]\d*)$/m.exec(command ?? '');
+  if (!match) throw new Error('Expected an explicitly bound PowerShell target PID');
+  return Number(match[1]);
+}
+
 describe('createOfficeCliRunner', () => {
   it('invokes an allowlisted command without a shell', async () => {
     const execFile = vi.fn<OfficeCliExecFile>((_file, _args, options, callback) => {
@@ -183,6 +229,133 @@ describe('createOfficeCliRunner', () => {
       runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
     ).rejects.toMatchObject({ code: 'ETIMEDOUT', message: 'ETIMEDOUT' });
   });
+
+  it('binds the completed Windows render PID and state inside one PowerShell command', async () => {
+    const invocation = await captureCompletedWindowsReaperInvocation();
+
+    expect(invocation).toEqual([
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        expect.stringContaining('[uint32]$targetProcessId = 99999\n[bool]$rootAlreadyEnded = $true'),
+      ],
+      { stdio: 'ignore', windowsHide: true },
+    ]);
+    expect(invocation[1][4]).not.toContain('$args');
+  });
+
+  it('keys completed Windows render cleanup by creation identity before seeding or stopping a PID', async () => {
+    const [, args] = await captureCompletedWindowsReaperInvocation();
+    const command = args[4] ?? '';
+
+    expect(command).toContain('Select-Object ProcessId, ParentProcessId, CreationDate');
+    expect(command).toContain(
+      'return (\n    $null -ne $creationTicks -and\n    $knownCreationTicks.ContainsKey($processId) -and\n    $knownCreationTicks[$processId] -eq [long]$creationTicks\n  )'
+    );
+    expect(command).toContain(
+      '$null -eq $rootProcess -or\n            ($null -ne $rootCreationTicks -and $processCreationTicks -lt $rootCreationTicks)'
+    );
+    expect(command).toContain(
+      'Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $processId" | Select-Object ProcessId, ParentProcessId, CreationDate -First 1\n      if ($null -ne $currentProcess -and (Test-KnownProcessIdentity $currentProcess)) {\n        Stop-Process'
+    );
+  });
+
+  it('rejects completed-root seed candidates created before the current render began', async () => {
+    const renderStartedAt = Date.parse('2026-08-06T00:00:05.000Z');
+    const now = vi.spyOn(Date, 'now').mockReturnValue(renderStartedAt);
+    try {
+      const [, args] = await captureCompletedWindowsReaperInvocation();
+      const command = args[4] ?? '';
+
+      expect(command).toContain(`[long]$treeCreationFloorUnixMilliseconds = ${renderStartedAt}`);
+      expect(command).toContain('$creationTicks -lt $treeCreationFloorTicks');
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it.runIf(process.platform === 'win32')(
+    'does not stop a reused descendant PID or the unrelated tree of a reused completed root PID',
+    async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-06T00:00:05.000Z'));
+      const [, args] = await captureCompletedWindowsReaperInvocation().finally(() => now.mockRestore());
+      const command = args[4] ?? '';
+      const harness = String.raw`
+$script:fullScan = 0
+$script:stopped = [System.Collections.Generic.HashSet[uint32]]::new()
+function Get-CimInstance {
+  param([string]$ClassName, [string]$Filter)
+  if ($Filter) {
+    if ($Filter -eq 'ProcessId = 400') {
+      return [pscustomobject]@{
+        ProcessId = 400
+        ParentProcessId = 99999
+        CreationDate = [datetime]'2026-08-06T00:00:01Z'
+      }
+    }
+    if ($Filter -eq 'ProcessId = 500') {
+      if ($script:stopped.Contains(500)) { return $null }
+      return [pscustomobject]@{
+        ProcessId = 500
+        ParentProcessId = 99999
+        CreationDate = [datetime]'2026-08-06T00:00:12Z'
+      }
+    }
+    return [pscustomobject]@{
+      ProcessId = 300
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:40Z'
+    }
+  }
+  $script:fullScan += 1
+  return @(
+    [pscustomobject]@{
+      ProcessId = 99999
+      ParentProcessId = 1
+      CreationDate = [datetime]'2026-08-06T00:00:20Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 200
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:30Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 300
+      ParentProcessId = 99999
+      CreationDate = $(if ($script:fullScan -eq 1) {
+        [datetime]'2026-08-06T00:00:10Z'
+      } else {
+        [datetime]'2026-08-06T00:00:40Z'
+      })
+    },
+    [pscustomobject]@{
+      ProcessId = 400
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:01Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 500
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:12Z'
+    }
+  ) | Where-Object { -not $script:stopped.Contains([uint32]$_.ProcessId) }
+}
+function Stop-Process {
+  param([int]$Id, [switch]$Force, [object]$ErrorAction)
+  [Console]::Out.Write([string]$Id)
+  [void]$script:stopped.Add([uint32]$Id)
+}
+function Start-Sleep { param([int]$Milliseconds) }
+$args = @('99999', '1')
+${command}
+`;
+
+      await expect(runPowerShell(harness)).resolves.toEqual({ code: 0, stdout: '500' });
+    }
+  );
 
   it('fails closed when Windows tree termination exits unsuccessfully', async () => {
     const renderProcess = Object.assign(createWatchProcess(), { pid: 99_999 });
@@ -293,8 +466,9 @@ describe('createOfficeCliRunner', () => {
       };
       const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((_file, args) => {
         const taskkill = createWatchProcess();
+        const targetPid = readBoundPowerShellTargetPid(args);
         queueMicrotask(() => {
-          process.kill(-Number(args.at(-2)), 'SIGKILL');
+          process.kill(-targetPid, 'SIGKILL');
           Object.assign(taskkill, { exitCode: 0 });
           taskkill.emit('close', 0, null);
         });
@@ -319,9 +493,9 @@ describe('createOfficeCliRunner', () => {
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          expect.stringContaining('Get-CimInstance -ClassName Win32_Process'),
-          String(renderProcess?.pid),
-          '1',
+          expect.stringContaining(
+            `[uint32]$targetProcessId = ${String(renderProcess?.pid)}\n[bool]$rootAlreadyEnded = $true`
+          ),
         ]);
         expect(processTreeSpawn.mock.calls[0]?.[2]).toEqual({ stdio: 'ignore', windowsHide: true });
         const heartbeatAtResolution = await readFile(heartbeatPath);
@@ -374,14 +548,14 @@ describe('createOfficeCliRunner', () => {
         const taskkill = createWatchProcess();
         taskkillAttempt += 1;
         const attempt = taskkillAttempt;
+        const targetPid = file === 'taskkill' ? Number(args[2]) : readBoundPowerShellTargetPid(args);
         queueMicrotask(() => {
           if (attempt === 1) {
             Object.assign(taskkill, { exitCode: 1 });
             taskkill.emit('close', 1, null);
             return;
           }
-          const targetPid = file === 'taskkill' ? args[2] : args.at(-2);
-          process.kill(-Number(targetPid), 'SIGKILL');
+          process.kill(-targetPid, 'SIGKILL');
           Object.assign(taskkill, { exitCode: 0 });
           taskkill.emit('close', 0, null);
         });
@@ -405,7 +579,15 @@ describe('createOfficeCliRunner', () => {
         expect(processTreeSpawn).toHaveBeenCalledTimes(2);
         expect(processTreeSpawn.mock.calls[0]?.[0]).toBe('taskkill');
         expect(processTreeSpawn.mock.calls[1]?.[0]).toBe('powershell.exe');
-        expect(processTreeSpawn.mock.calls[1]?.[1].at(-1)).toBe('0');
+        expect(processTreeSpawn.mock.calls[1]?.[1]).toEqual([
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          expect.stringContaining(
+            `[uint32]$targetProcessId = ${String(renderProcess?.pid)}\n[bool]$rootAlreadyEnded = $false`
+          ),
+        ]);
         const heartbeatAtRejection = await readFile(heartbeatPath);
         await new Promise((resolve) => setTimeout(resolve, 250));
         expect(await readFile(heartbeatPath)).toEqual(heartbeatAtRejection);
