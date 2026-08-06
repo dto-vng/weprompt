@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { chmod, mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -29,7 +33,13 @@ function padToUtf8Bytes(output: string, byteLength: number): string {
   return `${output}${' '.repeat(byteLength - Buffer.byteLength(output, 'utf8'))}`;
 }
 
-function createWatchProcess(): OfficeCliWatchProcess & { emit: EventEmitter['emit'] } {
+type TestWatchProcess = OfficeCliWatchProcess & {
+  emit: EventEmitter['emit'];
+  stdout: PassThrough;
+  stderr: PassThrough;
+};
+
+function createWatchProcess(): TestWatchProcess {
   const emitter = new EventEmitter();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -41,6 +51,26 @@ function createWatchProcess(): OfficeCliWatchProcess & { emit: EventEmitter['emi
       return true;
     }),
   });
+}
+
+function spawnWithResult(stdout: string, code: number | null, signal: NodeJS.Signals | null = null): OfficeCliSpawn {
+  return () => {
+    const child = createWatchProcess();
+    queueMicrotask(() => {
+      child.stdout.end(stdout);
+      child.emit('close', code, signal);
+    });
+    return child;
+  };
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 describe('createOfficeCliRunner', () => {
@@ -102,16 +132,16 @@ describe('createOfficeCliRunner', () => {
   });
 
   it('renders one slide to an app-owned output with a bounded shell-free command', async () => {
-    const execFile = vi.fn<OfficeCliExecFile>(
-      execFileWithStdout(JSON.stringify({ success: true, data: { output: '/private/render/slide-4.png' } }))
+    const spawn = vi.fn<OfficeCliSpawn>(
+      spawnWithResult(JSON.stringify({ success: true, data: { output: '/private/render/slide-4.png' } }), 0)
     );
-    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', spawn });
 
     await expect(
       runner.renderSlide('/private/inspection/candidate.pptx', 4, '/private/render/slide-4.png')
     ).resolves.toBeUndefined();
 
-    expect(execFile).toHaveBeenCalledWith(
+    expect(spawn).toHaveBeenCalledWith(
       '/opt/officecli',
       [
         'view',
@@ -124,37 +154,112 @@ describe('createOfficeCliRunner', () => {
         '--json',
       ],
       {
+        detached: process.platform !== 'win32',
         shell: false,
         windowsHide: true,
-        timeout: 90_000,
-        maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
-      },
-      expect.any(Function)
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
     );
   });
 
   it('preserves a redacted render-timeout signal for readiness policy', async () => {
-    const error = Object.assign(new Error('/private/inspection/candidate.pptx'), {
-      code: null,
-      killed: true,
-      signal: 'SIGTERM' as const,
+    const runner = createOfficeCliRunner({
+      binaryPath: '/opt/officecli',
+      spawn: spawnWithResult('', null, 'SIGTERM'),
     });
-    const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
-      callback(error, JSON.stringify({ success: true, data: {} }), '/private/inspection/candidate.pptx');
-    });
-    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
 
     await expect(
       runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
     ).rejects.toMatchObject({ code: 'ETIMEDOUT', message: 'ETIMEDOUT' });
   });
 
+  it.runIf(process.platform !== 'win32')('kills a descendant writer before a timed-out render rejects', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'officecli-render-tree-'));
+    const executable = path.join(root, 'fake-officecli');
+    const outputPath = path.join(root, 'slide-1.png');
+    const pidPath = `${outputPath}.pid`;
+    const heartbeatPath = `${outputPath}.heartbeat`;
+    const heartbeatProgram = `
+      const { appendFileSync } = require('node:fs');
+      const heartbeatPath = ${JSON.stringify(heartbeatPath)};
+      appendFileSync(heartbeatPath, 'x');
+      setInterval(() => appendFileSync(heartbeatPath, 'x'), 10);
+    `;
+    await writeFile(
+      executable,
+      `#!/usr/bin/env node
+        const { spawn } = require('node:child_process');
+        const { writeFileSync } = require('node:fs');
+        const pidPath = ${JSON.stringify(pidPath)};
+        writeFileSync(${JSON.stringify(heartbeatPath)}, '');
+        const child = spawn(process.execPath, ['-e', ${JSON.stringify(heartbeatProgram)}], { stdio: 'ignore' });
+        writeFileSync(pidPath, String(child.pid));
+        setInterval(() => undefined, 1_000);
+      `,
+      { mode: 0o700 }
+    );
+    await chmod(executable, 0o700);
+    let renderProcess: ChildProcess | undefined;
+    const spawn: OfficeCliSpawn = (file, args, options) => {
+      renderProcess = nodeSpawn(file, args, options);
+      return renderProcess as unknown as OfficeCliWatchProcess;
+    };
+    const runner = createOfficeCliRunner({ binaryPath: executable, spawn });
+    let descendantPid = 0;
+
+    try {
+      const pending = runner.renderSlide('/private/inspection/candidate.pptx', 1, outputPath);
+      for (let attempt = 0; attempt < 500; attempt += 1) {
+        try {
+          descendantPid = Number(await readFile(pidPath, 'utf8'));
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      }
+      expect(Number.isSafeInteger(descendantPid) && descendantPid > 1).toBe(true);
+      renderProcess?.kill('SIGTERM');
+      await expect(pending).rejects.toMatchObject({
+        code: 'ETIMEDOUT',
+      });
+      const heartbeatAtRejection = await readFile(heartbeatPath);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(await readFile(heartbeatPath)).toEqual(heartbeatAtRejection);
+    } finally {
+      if (descendantPid > 1 && isProcessAlive(descendantPid)) process.kill(descendantPid, 'SIGKILL');
+      if (renderProcess?.pid && isProcessAlive(renderProcess.pid)) renderProcess.kill('SIGKILL');
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects while an in-flight render output grows beyond the byte ceiling', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'officecli-render-limit-'));
+    const outputPath = path.join(root, 'slide-1.png');
+    const spawn = vi.fn<OfficeCliSpawn>(() => createWatchProcess());
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', spawn });
+
+    try {
+      const pending = runner.renderSlide('/private/inspection/candidate.pptx', 1, outputPath);
+      await writeFile(outputPath, '');
+      await truncate(outputPath, PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE + 1);
+      const outcome = await Promise.race([
+        pending.then(
+          () => ({ status: 'resolved' as const, error: null }),
+          (error: unknown) => ({ status: 'rejected' as const, error })
+        ),
+        new Promise<{ status: 'pending'; error: null }>((resolve) =>
+          setTimeout(() => resolve({ status: 'pending', error: null }), 250)
+        ),
+      ]);
+
+      expect(outcome).toMatchObject({ status: 'rejected', error: { code: 'EFBIG' } });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('maps a nonzero render exit to a redacted typed failure', async () => {
-    const error = Object.assign(new Error('/private/inspection/candidate.pptx'), { code: 2 });
-    const execFile = vi.fn<OfficeCliExecFile>((_file, _args, _options, callback) => {
-      callback(error, JSON.stringify({ success: true, data: {} }), '/private/inspection/candidate.pptx');
-    });
-    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', execFile });
+    const runner = createOfficeCliRunner({ binaryPath: '/opt/officecli', spawn: spawnWithResult('', 2) });
 
     await expect(
       runner.renderSlide('/private/inspection/candidate.pptx', 1, '/private/render/slide-1.png')
@@ -163,11 +268,12 @@ describe('createOfficeCliRunner', () => {
 
   it('rejects an unsuccessful render envelope even when the process exits cleanly', async () => {
     const runner = createOfficeCliRunner({
-      execFile: execFileWithStdout(
+      spawn: spawnWithResult(
         JSON.stringify({
           success: false,
           error: { code: 'no_screenshot_backend', error: '/private/inspection/candidate.pptx' },
-        })
+        }),
+        0
       ),
     });
 

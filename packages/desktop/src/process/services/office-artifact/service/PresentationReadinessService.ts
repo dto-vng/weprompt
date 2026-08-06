@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { chmod, lstat, open } from 'node:fs/promises';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
 
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
@@ -81,7 +82,22 @@ type ReadinessFailureOptions = {
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_IHDR_BYTE_LENGTH = 13;
+const PNG_MAX_DIMENSION = 32_768;
+const PNG_MAX_INFLATED_BYTES = 128 * 1_024 * 1_024;
 const DEFAULT_COPY_CHUNK_BYTES = 1024 * 1024;
+
+const PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = (value & 1) !== 0 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
 
 let renderQueueTail = Promise.resolve();
 
@@ -128,6 +144,167 @@ function hashBytes(bytes: Uint8Array): PresentationArtifactIdentity {
 
 function isSafeLength(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0;
+}
+
+function pngCrc32(type: Buffer, data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const bytes of [type, data]) {
+    for (const byte of bytes) crc = PNG_CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngBitsPerPixel(bitDepth: number, colorType: number): number | null {
+  if (colorType === 0 && [1, 2, 4, 8, 16].includes(bitDepth)) return bitDepth;
+  if (colorType === 2 && [8, 16].includes(bitDepth)) return bitDepth * 3;
+  if (colorType === 3 && [1, 2, 4, 8].includes(bitDepth)) return bitDepth;
+  if (colorType === 4 && [8, 16].includes(bitDepth)) return bitDepth * 2;
+  if (colorType === 6 && [8, 16].includes(bitDepth)) return bitDepth * 4;
+  return null;
+}
+
+type PngPass = readonly [startX: number, startY: number, stepX: number, stepY: number];
+
+function pngPasses(interlace: number): readonly PngPass[] {
+  if (interlace === 0) return [[0, 0, 1, 1]];
+  return [
+    [0, 0, 8, 8],
+    [4, 0, 8, 8],
+    [0, 4, 4, 8],
+    [2, 0, 4, 4],
+    [0, 2, 2, 4],
+    [1, 0, 2, 2],
+    [0, 1, 1, 2],
+  ];
+}
+
+function passLength(size: number, start: number, step: number): number {
+  return size <= start ? 0 : Math.ceil((size - start) / step);
+}
+
+function validateInflatedPng(
+  compressed: Buffer,
+  width: number,
+  height: number,
+  bitsPerPixel: number,
+  interlace: number,
+  maximumFileBytes: number
+): boolean {
+  const rows: Array<{ count: number; byteLength: number }> = [];
+  let expectedByteLength = 0;
+  const maximumInflatedBytes = Math.min(PNG_MAX_INFLATED_BYTES, maximumFileBytes * 4);
+
+  for (const [startX, startY, stepX, stepY] of pngPasses(interlace)) {
+    const passWidth = passLength(width, startX, stepX);
+    const passHeight = passLength(height, startY, stepY);
+    if (passWidth === 0 || passHeight === 0) continue;
+    const rowByteLength = Math.ceil((passWidth * bitsPerPixel) / 8);
+    const passByteLength = passHeight * (rowByteLength + 1);
+    if (!Number.isSafeInteger(passByteLength) || expectedByteLength + passByteLength > maximumInflatedBytes) {
+      return false;
+    }
+    rows.push({ count: passHeight, byteLength: rowByteLength });
+    expectedByteLength += passByteLength;
+  }
+  if (expectedByteLength <= 0) return false;
+
+  let inflated: Buffer;
+  try {
+    inflated = inflateSync(compressed, { maxOutputLength: expectedByteLength });
+  } catch {
+    return false;
+  }
+  if (inflated.byteLength !== expectedByteLength) return false;
+
+  let position = 0;
+  for (const row of rows) {
+    for (let index = 0; index < row.count; index += 1) {
+      if (inflated[position] === undefined || inflated[position]! > 4) return false;
+      position += row.byteLength + 1;
+    }
+  }
+  return position === inflated.byteLength;
+}
+
+function isCompletePng(bytes: Buffer, maximumFileBytes: number): boolean {
+  if (
+    bytes.byteLength < PNG_SIGNATURE.byteLength ||
+    !bytes.subarray(0, PNG_SIGNATURE.byteLength).equals(PNG_SIGNATURE)
+  ) {
+    return false;
+  }
+
+  let position = PNG_SIGNATURE.byteLength;
+  let width = 0;
+  let height = 0;
+  let bitsPerPixel: number | null = null;
+  let colorType = -1;
+  let interlace = -1;
+  let sawHeader = false;
+  let sawPalette = false;
+  let sawImageData = false;
+  let imageDataClosed = false;
+  let sawEnd = false;
+  const imageData: Buffer[] = [];
+
+  while (position < bytes.byteLength) {
+    if (bytes.byteLength - position < 12) return false;
+    const chunkLength = bytes.readUInt32BE(position);
+    const typeStart = position + 4;
+    const dataStart = typeStart + 4;
+    const dataEnd = dataStart + chunkLength;
+    const chunkEnd = dataEnd + 4;
+    if (!Number.isSafeInteger(chunkEnd) || chunkEnd > bytes.byteLength) return false;
+
+    const typeBytes = bytes.subarray(typeStart, dataStart);
+    const type = typeBytes.toString('ascii');
+    if (!/^[A-Za-z]{4}$/.test(type)) return false;
+    const data = bytes.subarray(dataStart, dataEnd);
+    if (pngCrc32(typeBytes, data) !== bytes.readUInt32BE(dataEnd)) return false;
+    if (sawImageData && type !== 'IDAT') imageDataClosed = true;
+
+    if (type === 'IHDR') {
+      if (sawHeader || position !== PNG_SIGNATURE.byteLength || chunkLength !== PNG_IHDR_BYTE_LENGTH) return false;
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      const bitDepth = data[8]!;
+      colorType = data[9]!;
+      bitsPerPixel = pngBitsPerPixel(bitDepth, colorType);
+      interlace = data[12]!;
+      if (
+        width <= 0 ||
+        height <= 0 ||
+        width > PNG_MAX_DIMENSION ||
+        height > PNG_MAX_DIMENSION ||
+        bitsPerPixel === null ||
+        data[10] !== 0 ||
+        data[11] !== 0 ||
+        (interlace !== 0 && interlace !== 1)
+      ) {
+        return false;
+      }
+      sawHeader = true;
+    } else if (type === 'PLTE') {
+      if (!sawHeader || sawPalette || sawImageData || chunkLength === 0 || chunkLength > 768 || chunkLength % 3 !== 0) {
+        return false;
+      }
+      sawPalette = true;
+    } else if (type === 'IDAT') {
+      if (!sawHeader || imageDataClosed || chunkLength === 0) return false;
+      sawImageData = true;
+      imageData.push(data);
+    } else if (type === 'IEND') {
+      if (!sawHeader || !sawImageData || sawEnd || chunkLength !== 0 || chunkEnd !== bytes.byteLength) return false;
+      sawEnd = true;
+    } else if ((typeBytes[0]! & 0x20) === 0) {
+      return false;
+    }
+
+    position = chunkEnd;
+  }
+
+  if (!sawEnd || bitsPerPixel === null || (colorType === 3 && !sawPalette)) return false;
+  return validateInflatedPng(Buffer.concat(imageData), width, height, bitsPerPixel, interlace, maximumFileBytes);
 }
 
 function resolveLimit(value: number | undefined, fallback: number): number {
@@ -293,6 +470,13 @@ async function inspectRegularFile(
   }
 
   try {
+    if (requirePng) {
+      try {
+        await handle.chmod(0o600);
+      } catch {
+        return fail(missingCode, slideNumber);
+      }
+    }
     const before = await handle.stat({ bigint: true });
     if (!before.isFile() || before.nlink !== BigInt(1) || !sameOpenFile(linked, before)) {
       fail(missingCode, slideNumber);
@@ -301,10 +485,9 @@ async function inspectRegularFile(
     if (before.size > BigInt(Number.MAX_SAFE_INTEGER)) fail(missingCode, slideNumber);
 
     const hash = createHash('sha256');
-    const prefix = Buffer.alloc(PNG_SIGNATURE.byteLength);
-    let prefixLength = 0;
     let position = 0;
     const byteLength = Number(before.size);
+    const pngBytes = requirePng ? Buffer.allocUnsafe(byteLength) : null;
     const buffer = Buffer.allocUnsafe(Math.min(DEFAULT_COPY_CHUNK_BYTES, Math.max(byteLength, 1)));
     while (position < byteLength) {
       const length = Math.min(buffer.byteLength, byteLength - position);
@@ -312,11 +495,7 @@ async function inspectRegularFile(
       if (bytesRead <= 0) fail(missingCode, slideNumber);
       const chunk = buffer.subarray(0, bytesRead);
       hash.update(chunk);
-      if (prefixLength < prefix.byteLength) {
-        const copied = Math.min(prefix.byteLength - prefixLength, chunk.byteLength);
-        chunk.copy(prefix, prefixLength, 0, copied);
-        prefixLength += copied;
-      }
+      if (pngBytes) chunk.copy(pngBytes, position);
       position += bytesRead;
     }
 
@@ -330,7 +509,7 @@ async function inspectRegularFile(
     ) {
       fail('HASH_MISMATCH', slideNumber);
     }
-    if (requirePng && (prefixLength !== PNG_SIGNATURE.byteLength || !prefix.equals(PNG_SIGNATURE))) {
+    if (pngBytes && !isCompletePng(pngBytes, maximumBytes)) {
       fail('RENDER_MISSING', slideNumber);
     }
 
@@ -490,7 +669,13 @@ export class PresentationReadinessService {
           try {
             await this.dependencies.runner.renderSlide(inspectionCopyPath, slideNumber, outputPath);
           } catch (error) {
-            fail(isTimedOut(error) ? 'RENDER_TIMEOUT' : 'RENDER_MISSING', slideNumber);
+            const renderCode =
+              typeof error === 'object' && error !== null && 'code' in error && error.code === 'EFBIG'
+                ? 'RENDER_LIMIT_EXCEEDED'
+                : isTimedOut(error)
+                  ? 'RENDER_TIMEOUT'
+                  : 'RENDER_MISSING';
+            fail(renderCode, slideNumber);
           }
 
           const render = await inspectRegularFile(
@@ -500,7 +685,6 @@ export class PresentationReadinessService {
             this.limits.maxRenderBytesPerSlide,
             true
           );
-          await chmod(outputPath, 0o600);
           renderedBytes += render.byteLength;
           if (renderedBytes > this.limits.maxRenderBytesTotal) fail('RENDER_LIMIT_EXCEEDED', slideNumber);
           renders.push({

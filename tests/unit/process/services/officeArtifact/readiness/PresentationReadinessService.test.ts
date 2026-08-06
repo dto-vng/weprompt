@@ -20,7 +20,17 @@ import type { PptxOoxmlInspection } from '@/process/services/office-artifact/ser
 const RUN_ID = '434393ce-dd45-44fe-a51c-262b2b181cc5';
 const CANDIDATE = Buffer.from('stable retained presentation bytes');
 const CANDIDATE_SHA256 = createHash('sha256').update(CANDIDATE).digest('hex');
-const PNG_PREFIX = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const VALID_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64'
+);
+const STALE_VALID_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
+  'base64'
+);
+const PNG_PREFIX = VALID_PNG.subarray(0, 8);
+const INVALID_CHUNK_LENGTH_PNG = Buffer.from(VALID_PNG);
+INVALID_CHUNK_LENGTH_PNG.writeUInt32BE(VALID_PNG.byteLength, 8);
 
 const ooxmlInspection = (): PptxOoxmlInspection => ({
   zipEntryCount: 12,
@@ -84,7 +94,7 @@ describe('PresentationReadinessService', () => {
     runner = {
       validate: vi.fn(async () => ({})),
       renderSlide: vi.fn(async (_file, page, outputPath) => {
-        await writeFile(outputPath, Buffer.concat([PNG_PREFIX, Buffer.from(`slide-${page}`)]), { mode: 0o600 });
+        await writeFile(outputPath, VALID_PNG, { mode: 0o600 });
       }),
     };
     inspectOoxml = vi.fn(async () => ooxmlInspection());
@@ -275,10 +285,38 @@ describe('PresentationReadinessService', () => {
       ok: false,
       blockers: [{ code: 'RENDER_TIMEOUT', slideNumber: 1 }],
     });
+
+    runner.renderSlide = vi.fn(async () => {
+      throw Object.assign(new Error('render output limit exceeded'), { code: 'EFBIG' });
+    });
+    await expect(createService().inspect(request)).resolves.toEqual({
+      ok: false,
+      blockers: [{ code: 'RENDER_LIMIT_EXCEEDED', slideNumber: 1 }],
+    });
+  });
+
+  it.each([
+    ['the PNG signature alone', PNG_PREFIX],
+    ['a truncated chunk', VALID_PNG.subarray(0, VALID_PNG.byteLength - 1)],
+    ['a chunk whose declared length crosses the file boundary', INVALID_CHUNK_LENGTH_PNG],
+    ['trailing bytes after IEND', Buffer.concat([VALID_PNG, Buffer.from([0])])],
+    [
+      'a corrupt IDAT stream with a matching file shape',
+      Buffer.from(VALID_PNG.map((byte, index) => (index === 47 ? byte ^ 1 : byte))),
+    ],
+  ])('rejects %s as incomplete render evidence', async (_label, bytes) => {
+    runner.renderSlide = vi.fn(async (_file, _page, outputPath) => {
+      await writeFile(outputPath, bytes);
+    });
+
+    await expect(createService().inspect(request)).resolves.toEqual({
+      ok: false,
+      blockers: [{ code: 'RENDER_MISSING', slideNumber: 1 }],
+    });
   });
 
   it('rejects the slide that exceeds the total render-byte limit', async () => {
-    const oneRenderBytes = PNG_PREFIX.byteLength + Buffer.byteLength('slide-1');
+    const oneRenderBytes = VALID_PNG.byteLength;
 
     await expect(createService({ limits: { maxRenderBytesTotal: oneRenderBytes } }).inspect(request)).resolves.toEqual({
       ok: false,
@@ -291,8 +329,8 @@ describe('PresentationReadinessService', () => {
     let firstRenderPath = '';
     runner.renderSlide = vi.fn(async (_file, page, outputPath) => {
       if (page === 1) firstRenderPath = outputPath;
-      if (page === 2) await writeFile(firstRenderPath, Buffer.concat([PNG_PREFIX, Buffer.from('changed')]));
-      await writeFile(outputPath, Buffer.concat([PNG_PREFIX, Buffer.from(`slide-${page}`)]));
+      if (page === 2) await writeFile(firstRenderPath, STALE_VALID_PNG);
+      await writeFile(outputPath, VALID_PNG);
     });
 
     await expect(createService().inspect(request)).resolves.toEqual({
@@ -308,7 +346,7 @@ describe('PresentationReadinessService', () => {
       active += 1;
       maximumActive = Math.max(maximumActive, active);
       await new Promise((resolve) => setTimeout(resolve, 5));
-      await writeFile(outputPath, Buffer.concat([PNG_PREFIX, Buffer.from(`slide-${page}`)]));
+      await writeFile(outputPath, VALID_PNG);
       active -= 1;
     });
 

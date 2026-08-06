@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execFile as nodeExecFile, spawn as nodeSpawn } from 'node:child_process';
+import { execFile as nodeExecFile, spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { lstat } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
@@ -30,6 +31,7 @@ type OfficeCliSpawnOptions = {
   shell: false;
   windowsHide: true;
   stdio: ['ignore', 'pipe', 'pipe'];
+  detached?: boolean;
 };
 
 type OfficeCliWatchStream = {
@@ -37,12 +39,17 @@ type OfficeCliWatchStream = {
 };
 
 export type OfficeCliWatchProcess = {
+  pid?: number;
+  exitCode?: number | null;
+  signalCode?: NodeJS.Signals | null;
   stdout: OfficeCliWatchStream;
   stderr: OfficeCliWatchStream;
   once: {
     (event: 'error', listener: (error: OfficeCliExecFileError) => void): unknown;
     (event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
+    (event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
   };
+  removeListener: (event: string, listener: (...args: never[]) => void) => unknown;
   kill: (signal: NodeJS.Signals) => boolean;
 };
 
@@ -66,7 +73,7 @@ export type OfficeCliExecFile = (
   args: string[],
   options: OfficeCliExecFileOptions,
   callback: (error: OfficeCliExecFileError | null, stdout: string, stderr: string) => void
-) => unknown;
+) => ChildProcess | void;
 
 export type OfficeCliRunner = {
   get: (file: string, path: string) => Promise<unknown>;
@@ -111,11 +118,6 @@ const EXEC_OPTIONS: OfficeCliExecFileOptions = {
   maxBuffer: PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES,
 };
 
-const RENDER_EXEC_OPTIONS: OfficeCliExecFileOptions = {
-  ...EXEC_OPTIONS,
-  timeout: 90_000,
-};
-
 const WATCH_OPTIONS: OfficeCliSpawnOptions = {
   shell: false,
   windowsHide: true,
@@ -123,9 +125,11 @@ const WATCH_OPTIONS: OfficeCliSpawnOptions = {
 };
 const WATCH_READY_TIMEOUT_MS = 60_000;
 const WATCH_STOP_TIMEOUT_MS = 5_000;
+const RENDER_OUTPUT_POLL_INTERVAL_MS = 25;
+const RENDER_TREE_STOP_TIMEOUT_MS = 5_000;
 
 const defaultExecFile: OfficeCliExecFile = (file, args, options, callback) => {
-  nodeExecFile(file, args, options, (error, stdout, stderr) => {
+  return nodeExecFile(file, args, options, (error, stdout, stderr) => {
     callback(error, stdout.toString(), stderr.toString());
   });
 };
@@ -156,6 +160,92 @@ function wait(delayMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
+function waitForChildProcessEnd(child: OfficeCliWatchProcess): Promise<void> {
+  if (
+    (child.exitCode !== undefined && child.exitCode !== null) ||
+    (child.signalCode !== undefined && child.signalCode !== null)
+  ) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.removeListener('error', finish);
+      child.removeListener('exit', finish);
+      child.removeListener('close', finish);
+      resolve();
+    };
+    const timeout = setTimeout(finish, RENDER_TREE_STOP_TIMEOUT_MS);
+    child.once('error', finish);
+    child.once('exit', finish);
+    child.once('close', finish);
+  });
+}
+
+async function terminateRenderProcessTree(
+  child: OfficeCliWatchProcess | undefined,
+  platform: NodeJS.Platform
+): Promise<void> {
+  if (!child) return;
+  const pid = child.pid;
+  if (!Number.isSafeInteger(pid) || !pid || pid <= 1) return;
+
+  if (platform === 'win32') {
+    try {
+      const taskkill = nodeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      }) as unknown as OfficeCliWatchProcess;
+      await waitForChildProcessEnd(taskkill);
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // The render process already exited.
+      }
+    }
+    await waitForChildProcessEnd(child);
+    return;
+  }
+
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // The render process group already exited.
+    }
+  }
+  await waitForChildProcessEnd(child);
+}
+
+function renderLimitError(): Error & { code: 'EFBIG' } {
+  return Object.assign(new Error('EFBIG'), { name: 'OfficeCliRenderLimitError', code: 'EFBIG' as const });
+}
+
+function renderTimeoutError(): Error & { code: 'ETIMEDOUT' } {
+  return Object.assign(new Error('ETIMEDOUT'), { name: 'OfficeCliRenderTimeoutError', code: 'ETIMEDOUT' as const });
+}
+
+function isNotFound(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+async function assertRenderOutputWithinLimit(outputPath: string): Promise<void> {
+  try {
+    const output = await lstat(outputPath);
+    if (!output.isFile() || output.isSymbolicLink()) throw new OfficeArtifactError('OFFICECLI_FAILED');
+    if (output.size > PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE) throw renderLimitError();
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+}
+
 function resolveOfficeCliBinary(dependencies: OfficeCliRunnerDependencies): string {
   if (dependencies.binaryPath) return dependencies.binaryPath;
 
@@ -180,12 +270,15 @@ function toOfficeArtifactError(error: unknown): OfficeArtifactError {
 }
 
 function toOfficeCliRenderError(error: unknown): Error {
+  if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'EFBIG') {
+    return renderLimitError();
+  }
   if (
     typeof error === 'object' &&
     error !== null &&
     (('code' in error && error.code === 'ETIMEDOUT') || ('killed' in error && error.killed === true))
   ) {
-    return Object.assign(new Error('ETIMEDOUT'), { name: 'OfficeCliRenderTimeoutError', code: 'ETIMEDOUT' as const });
+    return renderTimeoutError();
   }
   return toOfficeArtifactError(error);
 }
@@ -261,6 +354,11 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
   const execFile = dependencies.execFile ?? defaultExecFile;
   const spawn = dependencies.spawn ?? defaultSpawn;
   const allocatePort = dependencies.allocatePort ?? allocatePreviewPort;
+  const platform = dependencies.platform ?? process.platform;
+  const renderSpawnOptions: OfficeCliSpawnOptions = {
+    ...WATCH_OPTIONS,
+    detached: platform !== 'win32',
+  };
 
   const invoke = <T = unknown>(
     args: string[],
@@ -351,6 +449,83 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
     });
   };
 
+  const renderSlide = (file: string, page: number, outputPath: string): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      let child: OfficeCliWatchProcess | undefined;
+      let monitorTimer: NodeJS.Timeout | undefined;
+      let timeoutTimer: NodeJS.Timeout | undefined;
+      let settling = false;
+      let stdoutByteLength = 0;
+      const stdoutChunks: Buffer[] = [];
+
+      const clearTimers = (): void => {
+        if (monitorTimer) clearTimeout(monitorTimer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+      };
+
+      const settle = (error: unknown, stdout = ''): void => {
+        if (settling) return;
+        settling = true;
+        clearTimers();
+        void (async () => {
+          await terminateRenderProcessTree(child, platform);
+          if (error) throw toOfficeCliRenderError(error);
+          await assertRenderOutputWithinLimit(outputPath);
+          if (Buffer.byteLength(stdout, 'utf8') > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {
+            throw new OfficeArtifactError('OFFICECLI_FAILED');
+          }
+          parseOfficeCliEnvelope(stdout);
+        })().then(
+          () => resolve(),
+          (settleError: unknown) => reject(settleError)
+        );
+      };
+
+      const monitorOutput = async (): Promise<void> => {
+        if (settling) return;
+        try {
+          await assertRenderOutputWithinLimit(outputPath);
+        } catch (error) {
+          settle(error);
+          return;
+        }
+        if (!settling) {
+          monitorTimer = setTimeout(() => void monitorOutput(), RENDER_OUTPUT_POLL_INTERVAL_MS);
+        }
+      };
+
+      try {
+        child = spawn(
+          binaryPath,
+          ['view', file, 'screenshot', '--page', String(page), '-o', outputPath, '--json'],
+          renderSpawnOptions
+        );
+        child.stderr.on('data', () => undefined);
+        child.stdout.on('data', (chunk) => {
+          if (settling) return;
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          stdoutByteLength += bytes.byteLength;
+          if (stdoutByteLength > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {
+            settle(new OfficeArtifactError('OFFICECLI_FAILED'));
+            return;
+          }
+          stdoutChunks.push(bytes);
+        });
+        child.once('error', (error) => settle(error));
+        child.once('close', (code, signal) => {
+          if (code === 0) {
+            settle(null, Buffer.concat(stdoutChunks, stdoutByteLength).toString('utf8'));
+            return;
+          }
+          settle(Object.assign(new Error('OFFICECLI_FAILED'), { code, killed: signal !== null, signal }));
+        });
+        timeoutTimer = setTimeout(() => settle(renderTimeoutError()), PRESENTATION_RUN_LIMITS.RENDER_TIMEOUT_MS);
+        monitorTimer = setTimeout(() => void monitorOutput(), RENDER_OUTPUT_POLL_INTERVAL_MS);
+      } catch (error) {
+        settle(error);
+      }
+    });
+
   return {
     get: (file, path) => invoke(['get', file, path, '--json']),
     replaceText: (file, path, find, replace) =>
@@ -378,14 +553,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
     validate: (file) => invoke(['validate', file, '--json']),
     viewText: (file, format) =>
       invoke(['view', file, 'text', '--json'], (output) => parseOfficeCliTextView(output, format)),
-    renderSlide: async (file, page, outputPath) => {
-      await invoke(
-        ['view', file, 'screenshot', '--page', String(page), '-o', outputPath, '--json'],
-        parseOfficeCliEnvelope,
-        RENDER_EXEC_OPTIONS,
-        toOfficeCliRenderError
-      );
-    },
+    renderSlide,
     close: (file) => invoke(['close', file, '--json']),
     watch,
   };
