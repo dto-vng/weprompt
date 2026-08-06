@@ -804,7 +804,7 @@
       },
       "loadError": "無法載入簡報復原狀態。",
       "invalidResponse": "無法驗證簡報復原狀態。",
-      "openError": "無法開啟目前的簡報候選檔案。",
+      "openError": "無法確認目前的簡報候選檔案是否已開啟。",
       "discardError": "無法確認簡報記錄已捨棄。"
     },
     "importSuccess": "範本已匯入",

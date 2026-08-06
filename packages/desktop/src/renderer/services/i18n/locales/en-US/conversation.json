@@ -865,7 +865,7 @@
       },
       "loadError": "Could not load presentation recovery status.",
       "invalidResponse": "Presentation recovery status could not be verified.",
-      "openError": "Could not open the current presentation candidate.",
+      "openError": "Could not confirm whether the current presentation candidate opened.",
       "discardError": "Could not confirm that the presentation record was discarded."
     },
     "importSuccess": "Template imported",

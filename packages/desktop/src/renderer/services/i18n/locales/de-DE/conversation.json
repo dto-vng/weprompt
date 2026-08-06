@@ -805,7 +805,7 @@
       },
       "loadError": "Der Wiederherstellungsstatus der Präsentation konnte nicht geladen werden.",
       "invalidResponse": "Der Wiederherstellungsstatus der Präsentation konnte nicht bestätigt werden.",
-      "openError": "Der aktuelle Präsentationskandidat konnte nicht geöffnet werden.",
+      "openError": "Es konnte nicht bestätigt werden, ob der aktuelle Präsentationskandidat geöffnet wurde.",
       "discardError": "Das Verwerfen des Präsentationseintrags konnte nicht bestätigt werden."
     },
     "importSuccess": "Vorlage importiert",

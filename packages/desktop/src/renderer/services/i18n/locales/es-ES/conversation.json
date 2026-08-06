@@ -805,7 +805,7 @@
       },
       "loadError": "No se pudo cargar el estado de recuperación de la presentación.",
       "invalidResponse": "No se pudo verificar el estado de recuperación de la presentación.",
-      "openError": "No se pudo abrir el candidato de presentación actual.",
+      "openError": "No se pudo confirmar si se abrió el candidato de presentación actual.",
       "discardError": "No se pudo confirmar que se descartó el registro de la presentación."
     },
     "importSuccess": "Plantilla importada",

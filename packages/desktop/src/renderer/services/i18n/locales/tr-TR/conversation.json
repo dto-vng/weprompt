@@ -806,7 +806,7 @@
       },
       "loadError": "Sunum kurtarma durumu yüklenemedi.",
       "invalidResponse": "Sunum kurtarma durumu doğrulanamadı.",
-      "openError": "Geçerli sunum adayı açılamadı.",
+      "openError": "Geçerli sunum adayının açılıp açılmadığı doğrulanamadı.",
       "discardError": "Sunum kaydının silindiği doğrulanamadı."
     },
     "importSuccess": "Şablon içe aktarıldı",

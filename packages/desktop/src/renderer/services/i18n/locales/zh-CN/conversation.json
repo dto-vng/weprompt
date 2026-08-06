@@ -804,7 +804,7 @@
       },
       "loadError": "无法加载演示文稿恢复状态。",
       "invalidResponse": "无法验证演示文稿恢复状态。",
-      "openError": "无法打开当前演示文稿候选文件。",
+      "openError": "无法确认当前演示文稿候选文件是否已打开。",
       "discardError": "无法确认演示文稿记录已丢弃。"
     },
     "importSuccess": "模板已导入",

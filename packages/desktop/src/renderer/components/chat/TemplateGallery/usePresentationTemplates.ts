@@ -115,6 +115,7 @@ export function usePresentationTemplates(conversationId?: string) {
   const [selectedTemplate, setSelectedTemplate] = useState<PresentationTemplateSummary | null>(null);
   const [recoverableRuns, setRecoverableRuns] = useState<PresentationRunPublicDto[]>([]);
   const scratchRunByTurnRef = useRef(new Map<string, string>());
+  const recoveryMessageCloseByIdRef = useRef(new Map<string, () => void>());
   const recoveryRequestRef = useRef(0);
   const recoveryLifecycleEpochRef = useRef(0);
   const currentConversationIdRef = useRef(conversationId);
@@ -359,6 +360,14 @@ export function usePresentationTemplates(conversationId?: string) {
   }, [conversationId]);
 
   useEffect(() => {
+    const closeById = recoveryMessageCloseByIdRef.current;
+    return () => {
+      for (const closeMessage of closeById.values()) closeMessage();
+      closeById.clear();
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
     void refreshRecoverableRuns();
     return () => {
       recoveryRequestRef.current += 1;
@@ -367,70 +376,75 @@ export function usePresentationTemplates(conversationId?: string) {
 
   useEffect(() => {
     const translate = recoveryTranslationRef.current;
-    const closeMessages = recoverableRuns
-      .filter((run) => run.conversationId === conversationId)
-      .map((run) => {
-        const isUncertain = run.dispatchStatus === 'dispatch_uncertain';
-        const statusKey = isUncertain
-          ? 'conversation.presentationTemplates.recovery.status.dispatchUncertain'
-          : run.disposition === 'REVIEW_REQUIRED'
-            ? run.dispatchStatus === 'failed_retained'
-              ? 'conversation.presentationTemplates.recovery.status.reviewRequiredAfterFailure'
-              : 'conversation.presentationTemplates.recovery.status.reviewRequired'
-            : 'conversation.presentationTemplates.recovery.status.trackingRequired';
-        const status = translate(statusKey);
-        const sha256 = run.retainedCandidate?.sha256;
-        const canOpen = !isUncertain && run.actions.openAllowed && Boolean(sha256);
-        const canDiscard = !isUncertain && run.actions.discardAllowed;
+    const closeById = recoveryMessageCloseByIdRef.current;
+    const nextMessageIds = new Set<string>();
+    for (const run of recoverableRuns.filter((candidate) => candidate.conversationId === conversationId)) {
+      const messageId = `presentation-recovery-${conversationId}-${run.runId}`;
+      nextMessageIds.add(messageId);
+      const isUncertain = run.dispatchStatus === 'dispatch_uncertain';
+      const statusKey = isUncertain
+        ? 'conversation.presentationTemplates.recovery.status.dispatchUncertain'
+        : run.disposition === 'REVIEW_REQUIRED'
+          ? run.dispatchStatus === 'failed_retained'
+            ? 'conversation.presentationTemplates.recovery.status.reviewRequiredAfterFailure'
+            : 'conversation.presentationTemplates.recovery.status.reviewRequired'
+          : 'conversation.presentationTemplates.recovery.status.trackingRequired';
+      const status = translate(statusKey);
+      const sha256 = run.retainedCandidate?.sha256;
+      const canOpen = !isUncertain && run.actions.openAllowed && Boolean(sha256);
+      const canDiscard = !isUncertain && run.actions.discardAllowed;
 
-        return Message.warning({
-          id: `presentation-recovery-${conversationId}-${run.runId}`,
-          duration: 0,
-          closable: true,
-          content: createElement(
-            'span',
-            { role: 'status', 'aria-label': status },
-            createElement('span', null, status),
-            sha256
-              ? createElement(
-                  'span',
-                  { className: 'ml-8px' },
-                  translate('conversation.presentationTemplates.recovery.hash', { sha256 })
-                )
-              : null,
-            canOpen
-              ? createElement(
-                  Button,
-                  {
-                    size: 'mini',
-                    type: 'text',
-                    className: 'ml-8px',
-                    'aria-label': translate('conversation.presentationTemplates.recovery.actions.open'),
-                    onClick: () => void openRecovery(run),
-                  },
-                  translate('conversation.presentationTemplates.recovery.actions.open')
-                )
-              : null,
-            canDiscard
-              ? createElement(
-                  Button,
-                  {
-                    size: 'mini',
-                    type: 'text',
-                    className: 'ml-8px',
-                    'aria-label': translate('conversation.presentationTemplates.recovery.actions.discard'),
-                    onClick: () => void discardRecovery(run),
-                  },
-                  translate('conversation.presentationTemplates.recovery.actions.discard')
-                )
-              : null
-          ),
-        });
+      const closeMessage = Message.warning({
+        id: messageId,
+        duration: 0,
+        closable: true,
+        content: createElement(
+          'span',
+          { role: 'status', 'aria-label': status },
+          createElement('span', null, status),
+          sha256
+            ? createElement(
+                'span',
+                { className: 'ml-8px' },
+                translate('conversation.presentationTemplates.recovery.hash', { sha256 })
+              )
+            : null,
+          canOpen
+            ? createElement(
+                Button,
+                {
+                  size: 'mini',
+                  type: 'text',
+                  className: 'ml-8px',
+                  'aria-label': translate('conversation.presentationTemplates.recovery.actions.open'),
+                  onClick: () => void openRecovery(run),
+                },
+                translate('conversation.presentationTemplates.recovery.actions.open')
+              )
+            : null,
+          canDiscard
+            ? createElement(
+                Button,
+                {
+                  size: 'mini',
+                  type: 'text',
+                  className: 'ml-8px',
+                  'aria-label': translate('conversation.presentationTemplates.recovery.actions.discard'),
+                  onClick: () => void discardRecovery(run),
+                },
+                translate('conversation.presentationTemplates.recovery.actions.discard')
+              )
+            : null
+        ),
       });
+      if (closeMessage) closeById.set(messageId, closeMessage);
+    }
 
-    return () => {
-      for (const closeMessage of closeMessages) closeMessage?.();
-    };
+    for (const [messageId, closeMessage] of closeById) {
+      if (nextMessageIds.has(messageId)) continue;
+      closeMessage();
+      closeById.delete(messageId);
+    }
   }, [conversationId, discardRecovery, openRecovery, recoverableRuns]);
 
   const showRetainedScratch = useCallback(

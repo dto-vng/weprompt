@@ -810,7 +810,7 @@
       },
       "loadError": "Não foi possível carregar o status de recuperação da apresentação.",
       "invalidResponse": "Não foi possível verificar o status de recuperação da apresentação.",
-      "openError": "Não foi possível abrir o candidato de apresentação atual.",
+      "openError": "Não foi possível confirmar se o candidato de apresentação atual foi aberto.",
       "discardError": "Não foi possível confirmar o descarte do registro da apresentação."
     },
     "importSuccess": "Modelo importado",

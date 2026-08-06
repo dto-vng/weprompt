@@ -28,6 +28,7 @@ import enUSConversation from '@/renderer/services/i18n/locales/en-US/conversatio
 
 const {
   allocateScratchInvokeMock,
+  activeRecoveryNoticeIds,
   completeScratchInvokeMock,
   discardPresentationRunInvokeMock,
   discardScratchInvokeMock,
@@ -36,9 +37,11 @@ const {
   messageSuccessMock,
   messageWarningMock,
   openRecoveryInvokeMock,
+  pendingRecoveryNoticeCloses,
   retainScratchInvokeMock,
 } = vi.hoisted(() => ({
   allocateScratchInvokeMock: vi.fn(),
+  activeRecoveryNoticeIds: new Set<string>(),
   completeScratchInvokeMock: vi.fn(),
   discardPresentationRunInvokeMock: vi.fn(),
   discardScratchInvokeMock: vi.fn(),
@@ -47,6 +50,7 @@ const {
   messageSuccessMock: vi.fn(),
   messageWarningMock: vi.fn(),
   openRecoveryInvokeMock: vi.fn(),
+  pendingRecoveryNoticeCloses: [] as Array<() => void>,
   retainScratchInvokeMock: vi.fn(),
 }));
 
@@ -186,8 +190,24 @@ function renderRecoveryMessage(index = 0) {
   return render(createElement('div', null, config.content));
 }
 
+async function flushPendingRecoveryNoticeCloses(): Promise<void> {
+  await act(async () => {
+    for (const close of pendingRecoveryNoticeCloses.splice(0)) close();
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  activeRecoveryNoticeIds.clear();
+  pendingRecoveryNoticeCloses.splice(0);
+  messageWarningMock.mockImplementation((config?: { id?: string }) => {
+    if (!config?.id) return undefined;
+    const id = config.id;
+    activeRecoveryNoticeIds.add(id);
+    return () => {
+      pendingRecoveryNoticeCloses.push(() => activeRecoveryNoticeIds.delete(id));
+    };
+  });
   listRecoverableInvokeMock.mockResolvedValue(successfulRecoveryList([]));
   openRecoveryInvokeMock.mockResolvedValue({
     ok: true,
@@ -678,6 +698,71 @@ describe('usePresentationTemplates managed run recovery', () => {
     expect(messageSuccessMock).not.toHaveBeenCalled();
     expect(messageErrorMock).toHaveBeenCalledWith('conversation.presentationTemplates.recovery.openError');
     expect(enUSConversation.presentationTemplates.recovery.openError).not.toMatch(/refresh|updated|reconciled/i);
+  });
+
+  it.each(['stale hash', 'lost discard reply', 'manual refresh'] as const)(
+    'keeps an unchanged authoritative recovery notice visible after %s',
+    async (refreshReason) => {
+      const run = makeReviewRun();
+      const noticeId = `presentation-recovery-conversation-1-${run.runId}`;
+      listRecoverableInvokeMock
+        .mockResolvedValueOnce(successfulRecoveryList([run]))
+        .mockResolvedValueOnce(successfulRecoveryList([run]));
+      if (refreshReason === 'stale hash') {
+        openRecoveryInvokeMock.mockResolvedValue({
+          ok: false,
+          code: 'HASH_MISMATCH',
+          messageKey: 'presentationRun.hashMismatch',
+          retryable: false,
+          state: 'retained',
+          details: { runId: run.runId },
+        });
+      } else if (refreshReason === 'lost discard reply') {
+        discardPresentationRunInvokeMock.mockRejectedValue(new Error('reply lost'));
+      }
+
+      const hook = renderHook(() => usePresentationTemplates('conversation-1'));
+      await waitFor(() => expect(messageWarningMock).toHaveBeenCalledTimes(1));
+      expect(activeRecoveryNoticeIds).toContain(noticeId);
+
+      if (refreshReason === 'manual refresh') {
+        await act(async () => {
+          await hook.result.current.refreshRecoverableRuns();
+        });
+      } else {
+        renderRecoveryMessage()
+          .getByRole('button', {
+            name:
+              refreshReason === 'stale hash'
+                ? 'conversation.presentationTemplates.recovery.actions.open'
+                : 'conversation.presentationTemplates.recovery.actions.discard',
+          })
+          .click();
+      }
+
+      await waitFor(() => expect(messageWarningMock).toHaveBeenCalledTimes(2));
+      expect(listRecoverableInvokeMock).toHaveBeenCalledTimes(2);
+      expect(pendingRecoveryNoticeCloses).toHaveLength(0);
+      await flushPendingRecoveryNoticeCloses();
+      expect(activeRecoveryNoticeIds).toContain(noticeId);
+    }
+  );
+
+  it('uses uncertainty copy when the Open reply is lost', async () => {
+    listRecoverableInvokeMock
+      .mockResolvedValueOnce(successfulRecoveryList([makeReviewRun()]))
+      .mockResolvedValueOnce(successfulRecoveryList([makeReviewRun()]));
+    openRecoveryInvokeMock.mockRejectedValue(new Error('reply lost'));
+    renderHook(() => usePresentationTemplates('conversation-1'));
+    await waitFor(() => expect(messageWarningMock).toHaveBeenCalledTimes(1));
+
+    renderRecoveryMessage()
+      .getByRole('button', { name: 'conversation.presentationTemplates.recovery.actions.open' })
+      .click();
+
+    await waitFor(() => expect(listRecoverableInvokeMock).toHaveBeenCalledTimes(2));
+    expect(messageErrorMock).toHaveBeenCalledWith('conversation.presentationTemplates.recovery.openError');
+    expect(enUSConversation.presentationTemplates.recovery.openError).toMatch(/confirm whether.+opened/i);
   });
 
   it('refreshes after an idempotent discard success using the exact current revision', async () => {
