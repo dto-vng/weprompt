@@ -1,7 +1,22 @@
 # Main-verifiable consent for paid actions
 
-**Date:** 2026-08-06 · **Status:** design, agreed to build · **Base:** `creative-suite-sprint2@b98c58252`
-**Origin:** MR !71 review finding P1-C, re-adjudicated **PARTIALLY CLOSED** after the renderer fix. Decision taken: adopt the bar rather than record renderer-only confirmation as acceptable.
+**Date:** 2026-08-06 · **Status:** **DESIGNED AND DEFERRED — do not build without revisiting §Why deferred** · **Base:** `creative-suite-sprint2@b98c58252`
+**Origin:** MR !71 review finding P1-C, re-adjudicated **PARTIALLY CLOSED** after the renderer fix.
+
+> ## Why this is deferred, decided 2026-08-06
+>
+> The bar was briefly adopted, then reversed on a cost/benefit read. Four reasons, recorded so this is a decision rather than an omission:
+>
+> 1. **The threat model is our own first-party renderer** — already sender-authorised and schema-validated — not untrusted input. The reviewer's scenario is a stale or buggy renderer, i.e. a bug. A renderer buggy enough to fire spurious paid IPC could equally corrupt a cut or delete a project, and no token protocol guards those either.
+> 2. **It would not close the finding as stated.** The reviewer wants proof the user consented. This mechanism proves *main issued a token*; a buggy renderer can acquire one and use it immediately. Only main owning the pixels closes it literally, and that costs the designed review modal.
+> 3. **The blast radius is already bounded three ways** — the release gate, the main-side duplicate-charge refusal, and the per-project in-flight cap. Worst realistic case is one unintended generation.
+> 4. **The cost lands in the worst place.** The substantive half is refactoring the paid path so main computes review facts — the exact code where a mistake bills a user. That adds real risk to spend-safety code to improve spend-safety posture.
+>
+> **Revisit when any of these change:** Studio gains more paid entry points; spend per action stops being small and bounded; the app ships to users outside the team; or a real incident traces to renderer-side consent.
+>
+> **The good half is separable.** Moving review-fact computation into main is defensible on its own merits — main is the source of truth for everything else in Studio — and is smaller than the token protocol. Worth doing as ordinary design improvement, not as security ceremony, and it would make a future token trivial.
+>
+> Recorded instead as: confirmation is renderer-side; main independently enforces the release gate and duplicate-charge refusal.
 
 ## The property we are buying — stated honestly
 
