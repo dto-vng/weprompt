@@ -772,6 +772,10 @@
     "importCard": "템플릿 가져오기 (.md)",
     "empty": "사용 가능한 템플릿이 없습니다",
     "chipTooltip": "이 메시지는 템플릿을 사용합니다",
+    "sources": {
+      "reselectRequired": "이 PPTX 템플릿에서 사용하려면 첨부 파일을 다시 선택하세요.",
+      "reselectAction": "파일 다시 선택"
+    },
     "scratch": {
       "prepareError": "아티팩트 임시 공간을 준비하지 못했습니다: {{error}}",
       "retained": "복구를 위해 임시 아티팩트 파일을 {{path}}에 보관했습니다.",

@@ -13,11 +13,17 @@ import { isSupportedFile, FileService } from '@renderer/services/FileService';
 export interface UseDragUploadOptions {
   supportedExts?: string[];
   onFilesAdded?: (files: FileMetadata[]) => void;
+  onManagedDrop?: (files: readonly File[]) => Promise<void> | void;
   /** Conversation ID for WebUI file uploads */
   conversation_id?: string;
 }
 
-export const useDragUpload = ({ supportedExts = [], onFilesAdded, conversation_id }: UseDragUploadOptions) => {
+export const useDragUpload = ({
+  supportedExts = [],
+  onFilesAdded,
+  onManagedDrop,
+  conversation_id,
+}: UseDragUploadOptions) => {
   const { t } = useTranslation();
   const [isFileDragging, setIsFileDragging] = useState(false);
 
@@ -66,7 +72,7 @@ export const useDragUpload = ({ supportedExts = [], onFilesAdded, conversation_i
       dragCounter.current = 0;
       setIsFileDragging(false);
 
-      if (!onFilesAdded) return;
+      if (!onFilesAdded && !onManagedDrop) return;
 
       try {
         const droppedFiles = e.nativeEvent.dataTransfer!.files;
@@ -84,6 +90,11 @@ export const useDragUpload = ({ supportedExts = [], onFilesAdded, conversation_i
 
         // 第二步：只处理校验通过的文件
         if (validFiles.length > 0) {
+          if (onManagedDrop) {
+            await onManagedDrop(validFiles);
+            return;
+          }
+
           // 创建 FileList 对象给 processDroppedFiles
           const validFileList = Object.assign(validFiles, {
             length: validFiles.length,
@@ -100,7 +111,7 @@ export const useDragUpload = ({ supportedExts = [], onFilesAdded, conversation_i
         Message.error(t('conversation.workspace.dragFailed', 'Failed to process dropped files'));
       }
     },
-    [conversation_id, onFilesAdded, supportedExts, t]
+    [conversation_id, onFilesAdded, onManagedDrop, supportedExts, t]
   );
 
   const dragHandlers = {

@@ -774,6 +774,10 @@
     "importCard": "Şablon içe aktar (.md)",
     "empty": "Kullanılabilir şablon yok",
     "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "sources": {
+      "reselectRequired": "Ekli dosyaları bu PPTX şablonuyla kullanmak için yeniden seçin.",
+      "reselectAction": "Dosyaları yeniden seç"
+    },
     "scratch": {
       "prepareError": "Geçici çıktı alanı hazırlanamadı: {{error}}",
       "retained": "Geçici çıktı dosyaları kurtarma için {{path}} konumunda tutuldu.",

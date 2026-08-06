@@ -778,6 +778,10 @@
     "importCard": "Importar modelo (.md)",
     "empty": "Nenhum modelo disponível",
     "chipTooltip": "Esta mensagem usará o modelo",
+    "sources": {
+      "reselectRequired": "Selecione novamente os arquivos anexados para usá-los com este modelo PPTX.",
+      "reselectAction": "Selecionar arquivos novamente"
+    },
     "scratch": {
       "prepareError": "Não foi possível preparar o espaço temporário do artefato: {{error}}",
       "retained": "Os arquivos temporários do artefato foram mantidos para recuperação em {{path}}.",

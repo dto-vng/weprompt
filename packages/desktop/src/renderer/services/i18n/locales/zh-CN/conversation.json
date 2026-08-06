@@ -772,6 +772,10 @@
     "importCard": "导入模板 (.md)",
     "empty": "暂无可用模板",
     "chipTooltip": "此消息将使用该模板",
+    "sources": {
+      "reselectRequired": "要将附件用于此 PPTX 模板，请重新选择文件。",
+      "reselectAction": "重新选择文件"
+    },
     "scratch": {
       "prepareError": "无法准备产物临时空间：{{error}}",
       "retained": "临时产物文件已保留在 {{path}} 以便恢复。",

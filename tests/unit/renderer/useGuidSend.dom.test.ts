@@ -439,6 +439,41 @@ describe('useGuidSend', () => {
     expect(createConversationInvokeMock).not.toHaveBeenCalled();
   });
 
+  it('requests managed source re-selection before entering the loading state', () => {
+    const deps = createDeps();
+    const onPresentationSourceReselectRequired = vi.fn();
+    deps.files = ['/legacy/revenue.xlsx'];
+    deps.requiresPresentationSourceReselect = true;
+    deps.onPresentationSourceReselectRequired = onPresentationSourceReselectRequired;
+
+    const { result } = renderHook(() => useGuidSend(deps));
+    act(() => result.current.sendMessageHandler());
+
+    expect(onPresentationSourceReselectRequired).toHaveBeenCalledTimes(1);
+    expect(deps.setLoading).not.toHaveBeenCalled();
+    expect(createConversationInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves the prompt, files, and selected template when managed source re-selection is required', async () => {
+    const deps = createDeps();
+    const onPresentationSourceReselectRequired = vi.fn();
+    deps.files = ['/legacy/revenue.xlsx'];
+    deps.requiresPresentationSourceReselect = true;
+    deps.onPresentationSourceReselectRequired = onPresentationSourceReselectRequired;
+    deps.onPresentationTemplateConsumed = vi.fn();
+
+    const { result } = renderHook(() => useGuidSend(deps));
+    await act(async () => {
+      result.current.sendMessageHandler();
+      await Promise.resolve();
+    });
+
+    expect(onPresentationSourceReselectRequired).toHaveBeenCalledTimes(1);
+    expect(
+      [deps.setInput, deps.setFiles, deps.onPresentationTemplateConsumed].map((spy) => spy.mock.calls.length)
+    ).toEqual([0, 0, 0]);
+  });
+
   // Nested (not a sibling describe) so these tests run under the outer
   // beforeEach above — it resets createConversationInvokeMock and
   // kbGetSessionMcpServerMock before every test, keeping `.mock.calls[0][0]`

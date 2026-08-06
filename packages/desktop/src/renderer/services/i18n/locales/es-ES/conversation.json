@@ -773,6 +773,10 @@
     "importCard": "Importar plantilla (.md)",
     "empty": "No hay plantillas disponibles",
     "chipTooltip": "Este mensaje usará la plantilla",
+    "sources": {
+      "reselectRequired": "Vuelve a seleccionar los archivos adjuntos para usarlos con esta plantilla PPTX.",
+      "reselectAction": "Volver a seleccionar archivos"
+    },
     "scratch": {
       "prepareError": "No se pudo preparar el espacio temporal del artefacto: {{error}}",
       "retained": "Los archivos temporales del artefacto se conservaron para recuperación en {{path}}.",
