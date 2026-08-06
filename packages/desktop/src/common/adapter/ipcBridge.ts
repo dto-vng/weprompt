@@ -63,14 +63,24 @@ import type {
   BindPresentationDraftResult,
   CreatePresentationDraftRequest,
   CreatePresentationDraftResult,
+  DiscardPresentationRunRequest,
+  DiscardPresentationRunResult,
+  GetPresentationRunRequest,
+  GetPresentationRunResult,
   GetPresentationSourceOwnerRequest,
   GetPresentationSourceOwnerResult,
   GrantPresentationWorkspaceSourceRequest,
   GrantPresentationWorkspaceSourceResult,
+  ListRecoverablePresentationRunsRequest,
+  ListRecoverablePresentationRunsResult,
+  OpenPresentationRunRequest,
+  OpenPresentationRunResult,
   PickPresentationSourcesRequest,
   PickPresentationSourcesResult,
   RevokePresentationSourceRequest,
   RevokePresentationSourceResult,
+  StartPresentationRunRequest,
+  StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
 import type {
   EnsureConversationRuntimeResponse,
@@ -654,6 +664,20 @@ export const presentationSources = {
   >('presentation-sources.grant-workspace-source'),
   revoke: bridge.buildProvider<RevokePresentationSourceResult, RevokePresentationSourceRequest>(
     'presentation-sources.revoke'
+  ),
+};
+
+export const presentationRuns = {
+  start: bridge.buildProvider<StartPresentationRunResult, StartPresentationRunRequest>('presentation-runs.start'),
+  get: bridge.buildProvider<GetPresentationRunResult, GetPresentationRunRequest>('presentation-runs.get'),
+  listRecoverable: bridge.buildProvider<ListRecoverablePresentationRunsResult, ListRecoverablePresentationRunsRequest>(
+    'presentation-runs.list-recoverable'
+  ),
+  openRecovery: bridge.buildProvider<OpenPresentationRunResult, OpenPresentationRunRequest>(
+    'presentation-runs.open-recovery'
+  ),
+  discard: bridge.buildProvider<DiscardPresentationRunResult, DiscardPresentationRunRequest>(
+    'presentation-runs.discard'
   ),
 };
 

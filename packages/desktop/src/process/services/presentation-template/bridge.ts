@@ -9,19 +9,31 @@ import { tmpdir } from 'node:os';
 import { statfs } from 'node:fs/promises';
 import { app, dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent, type OpenDialogOptions } from 'electron';
 import { ipcBridge } from '@/common';
-import { isBackendHttpError } from '@/common/adapter/httpBridge';
+import { httpRequest, isBackendHttpError } from '@/common/adapter/httpBridge';
 import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import type {
   FailureFor,
   GrantPresentationExternalDropResult,
   PresentationGrantOwner,
+  StartPresentationRunRequest,
+  StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
 import { BUILTIN_TEMPLATE_PACKS } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
-import { ArtifactScratchService, createPresentationSourceGrantService } from './run';
+import {
+  ArtifactScratchService,
+  createPresentationSourceGrantService,
+  type PresentationConversationOwnerResolution,
+  type PresentationRunAuthorityResolution,
+  type PresentationRunService,
+  type PresentationScopeResolver,
+  type PresentationScopeResolverOptions,
+} from './run';
+import * as presentationRunModule from './run';
 
 const PRESENTATION_EXTERNAL_DROP_CHANNEL = 'presentation-sources:grant-external-drop';
 const PRESENTATION_PRINCIPAL_ID = 'desktop-local-principal';
+const PRESENTATION_TEAM_USER_ID = 'system_default_user';
 const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const isPresentationDesktopRuntime = (): boolean => process.type === 'browser';
 
@@ -31,11 +43,16 @@ type PresentationExternalDropPathRequest = {
   expected_owner_revision: number;
 };
 
-type PresentationSourceGrantService = ReturnType<typeof createPresentationSourceGrantService>;
+type PresentationSourceGrantServiceInstance = ReturnType<typeof createPresentationSourceGrantService>;
+type PresentationRunServices = {
+  source: PresentationSourceGrantServiceInstance;
+  run: PresentationRunService | null;
+};
 
 let service: PresentationTemplateService | null = null;
 let artifactScratchService: ArtifactScratchService | null = null;
-let presentationSourceGrantService: PresentationSourceGrantService | null = null;
+let presentationRunServices: PresentationRunServices | null = null;
+let presentationScopeResolver: PresentationScopeResolver | null = null;
 let presentationSourceMainWindow: BrowserWindow | null = null;
 let presentationExternalDropHandlerRegistered = false;
 
@@ -60,26 +77,69 @@ const getFreeDiskBytes = async (directory: string): Promise<number> => {
   return availableBytes > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(availableBytes);
 };
 
-const resolveConversationOwner = async ({
-  conversationId,
-  principalId: _principalId,
-}: {
+const classifyConversationLookupError: PresentationScopeResolverOptions['classifyLookupError'] = (error) => {
+  if (isBackendHttpError(error) && (error.status === 401 || error.status === 403)) return 'RUN_FORBIDDEN';
+  if (isBackendHttpError(error) && error.status === 404) return 'RUN_NOT_FOUND';
+  return null;
+};
+
+const getPresentationScopeResolver = (): PresentationScopeResolver | null => {
+  if (!Object.prototype.hasOwnProperty.call(presentationRunModule, 'PresentationScopeResolver')) return null;
+  const ScopeResolver = presentationRunModule.PresentationScopeResolver;
+  if (typeof ScopeResolver !== 'function') return null;
+  presentationScopeResolver ??= new ScopeResolver({
+    getConversation: ({ conversationId }) => ipcBridge.conversation.get.invoke({ id: conversationId }),
+    listTeams: ({ userId }) => httpRequest<unknown>('GET', `/api/teams?user_id=${encodeURIComponent(userId)}`),
+    classifyLookupError: classifyConversationLookupError,
+    teamUserId: PRESENTATION_TEAM_USER_ID,
+  });
+  return presentationScopeResolver;
+};
+
+const resolvePresentationScope = async (input: {
   conversationId: string;
   principalId: string;
-}) => {
-  try {
-    await ipcBridge.conversation.get.invoke({ id: conversationId });
-  } catch (error) {
-    if (isBackendHttpError(error) && (error.status === 401 || error.status === 403)) {
-      return { ok: false as const, code: 'RUN_FORBIDDEN' as const };
-    }
-    if (isBackendHttpError(error) && error.status === 404) {
-      return { ok: false as const, code: 'RUN_NOT_FOUND' as const };
-    }
-    return { ok: false as const, code: 'SCOPE_UNAVAILABLE' as const };
-  }
+}): Promise<Awaited<ReturnType<PresentationScopeResolver['resolve']>>> => {
+  const resolver = getPresentationScopeResolver();
+  if (resolver !== null) return resolver.resolve(input);
 
+  // Compatibility for older isolated bridge tests that mock the Task-3 run barrel.
+  try {
+    await ipcBridge.conversation.get.invoke({ id: input.conversationId });
+  } catch (error) {
+    return { ok: false as const, code: classifyConversationLookupError(error) ?? 'SCOPE_UNAVAILABLE' };
+  }
   return { ok: false as const, code: 'SCOPE_UNAVAILABLE' as const };
+};
+
+const resolveConversationOwner = async (input: {
+  conversationId: string;
+  principalId: string;
+}): Promise<PresentationConversationOwnerResolution> => {
+  const resolution = await resolvePresentationScope(input);
+  if (resolution.ok === false) return resolution;
+  if (resolution.workspace === null) return { ok: false, code: 'SCOPE_UNAVAILABLE' };
+  return {
+    ok: true,
+    conversationId: resolution.conversationId,
+    principalId: resolution.principalId,
+    scope: resolution.scope,
+    workspace: resolution.workspace,
+  };
+};
+
+const resolveRunAuthority = async (input: { conversationId: string }): Promise<PresentationRunAuthorityResolution> => {
+  const resolution = await resolvePresentationScope({
+    conversationId: input.conversationId,
+    principalId: PRESENTATION_PRINCIPAL_ID,
+  });
+  if (resolution.ok === false) return resolution;
+  return {
+    ok: true,
+    principalId: resolution.principalId,
+    scope: resolution.scope,
+    runtime: resolution.runtime,
+  };
 };
 
 const pickNativeSourcePaths = async (): Promise<readonly string[] | null> => {
@@ -94,30 +154,109 @@ const pickNativeSourcePaths = async (): Promise<readonly string[] | null> => {
   return result.canceled ? null : result.filePaths;
 };
 
-const getPresentationSourceGrantService = (): PresentationSourceGrantService => {
+const getPresentationRunServices = (): PresentationRunServices => {
+  if (presentationRunServices !== null) return presentationRunServices;
   const userDataDir = app.getPath('userData');
-  presentationSourceGrantService ??= createPresentationSourceGrantService({
-    userDataDir,
-    tempDir: tmpdir(),
+  const tempDir = tmpdir();
+  const sourceOptions = {
     getFreeDiskBytes: () => getFreeDiskBytes(userDataDir),
     isFeatureEnabled: () => PRESENTATION_RUN_V2_ENABLED,
     isDesktopRuntime: isPresentationDesktopRuntime,
     getPrincipalId: async () => PRESENTATION_PRINCIPAL_ID,
     resolveConversationOwner,
     pickNativeSourcePaths,
+  };
+  const sharedExportNames = [
+    'PresentationRunFiles',
+    'PresentationRunJournal',
+    'PresentationRunStore',
+    'PresentationSourceGrantService',
+    'PresentationRunService',
+    'PresentationScopeResolver',
+  ] as const;
+  const sharedStorageAvailable = sharedExportNames.every((name) =>
+    Object.prototype.hasOwnProperty.call(presentationRunModule, name)
+  );
+  if (!sharedStorageAvailable) {
+    presentationRunServices = {
+      source: createPresentationSourceGrantService({ userDataDir, tempDir, ...sourceOptions }),
+      run: null,
+    };
+    return presentationRunServices;
+  }
+
+  const {
+    PresentationRunFiles,
+    PresentationRunJournal,
+    PresentationRunStore,
+    PresentationSourceGrantService: PresentationSourceGrantServiceClass,
+    PresentationRunService,
+    PresentationScopeResolver,
+  } = presentationRunModule;
+  const sharedConstructorsAvailable =
+    typeof PresentationRunFiles === 'function' &&
+    typeof PresentationRunJournal === 'function' &&
+    typeof PresentationRunStore === 'function' &&
+    typeof PresentationSourceGrantServiceClass === 'function' &&
+    typeof PresentationRunService === 'function' &&
+    typeof PresentationRunService.prototype.get === 'function' &&
+    typeof PresentationScopeResolver === 'function' &&
+    typeof PresentationScopeResolver.prototype.resolve === 'function';
+  if (!sharedConstructorsAvailable) {
+    presentationRunServices = {
+      source: createPresentationSourceGrantService({ userDataDir, tempDir, ...sourceOptions }),
+      run: null,
+    };
+    return presentationRunServices;
+  }
+
+  const files = new PresentationRunFiles({ userDataDir, tempDir });
+  const journal = new PresentationRunJournal({ files });
+  const store = new PresentationRunStore({
+    files,
+    journal,
+    getFreeDiskBytes: () => getFreeDiskBytes(userDataDir),
   });
-  return presentationSourceGrantService;
+  const source = new PresentationSourceGrantServiceClass({ ...sourceOptions, files, store });
+  const run = new PresentationRunService({
+    files,
+    store,
+    templates: { getById: (id) => getService().getById(id) },
+    isFeatureEnabled: () => PRESENTATION_RUN_V2_ENABLED,
+    isDesktopRuntime: isPresentationDesktopRuntime,
+    resolveAuthority: resolveRunAuthority,
+  });
+  presentationRunServices = { source, run };
+  return presentationRunServices;
 };
 
-const sourceFailure = <Code extends 'FEATURE_DISABLED' | 'DESKTOP_REQUIRED' | 'INVALID_REQUEST' | 'INTERNAL_ERROR'>(
-  code: Code
-): FailureFor<Code> =>
+const getPresentationSourceGrantService = (): PresentationSourceGrantServiceInstance =>
+  getPresentationRunServices().source;
+
+const getPresentationRunService = (): PresentationRunService => {
+  const run = getPresentationRunServices().run;
+  if (run === null) throw new Error('Presentation run service is unavailable');
+  return run;
+};
+
+type PresentationBoundaryFailureCode =
+  | 'FEATURE_DISABLED'
+  | 'DESKTOP_REQUIRED'
+  | 'INVALID_REQUEST'
+  | 'RUN_NOT_FOUND'
+  | 'RUN_FORBIDDEN'
+  | 'SCOPE_UNAVAILABLE'
+  | 'TEAM_SCOPE_UNSUPPORTED'
+  | 'RUNTIME_UNSUPPORTED'
+  | 'INTERNAL_ERROR';
+
+const sourceFailure = <Code extends PresentationBoundaryFailureCode>(code: Code): FailureFor<Code> =>
   ({
     ok: false,
     code,
     messageKey: `conversation.presentationRun.${code}`,
     retryable: false,
-    state: 'preflight',
+    state: code === 'RUN_NOT_FOUND' || code === 'RUN_FORBIDDEN' ? 'lookup' : 'preflight',
     details: null,
   }) as FailureFor<Code>;
 
@@ -133,6 +272,33 @@ const callPresentationSourceProvider = <Result>(operation: () => Promise<Result>
   if (!PRESENTATION_RUN_V2_ENABLED) {
     return Promise.resolve(sourceFailure('FEATURE_DISABLED') as Result);
   }
+  if (!isPresentationDesktopRuntime()) {
+    return Promise.resolve(sourceFailure('DESKTOP_REQUIRED') as Result);
+  }
+  return callPresentationSourceService(operation);
+};
+
+const callPresentationStartProvider = async (
+  request: StartPresentationRunRequest
+): Promise<StartPresentationRunResult> => {
+  if (!PRESENTATION_RUN_V2_ENABLED) return sourceFailure('FEATURE_DISABLED');
+  if (!isPresentationDesktopRuntime()) return sourceFailure('DESKTOP_REQUIRED');
+
+  let authority: PresentationRunAuthorityResolution;
+  try {
+    authority = await resolveRunAuthority({ conversationId: request.conversation_id });
+  } catch {
+    return sourceFailure('SCOPE_UNAVAILABLE');
+  }
+  if (authority.ok === false) return sourceFailure(authority.code);
+  if (authority.scope !== 'individual') return sourceFailure('TEAM_SCOPE_UNSUPPORTED');
+  if (authority.runtime !== 'aionrs' && authority.runtime !== 'acp') {
+    return sourceFailure('RUNTIME_UNSUPPORTED');
+  }
+  return callPresentationSourceService(() => getPresentationRunService().start(request));
+};
+
+const callPresentationRecoveryProvider = <Result>(operation: () => Promise<Result>): Promise<Result> => {
   if (!isPresentationDesktopRuntime()) {
     return Promise.resolve(sourceFailure('DESKTOP_REQUIRED') as Result);
   }
@@ -268,6 +434,21 @@ export function initPresentationTemplateBridge(): void {
   );
   ipcBridge.presentationSources.revoke.provider((request) =>
     callPresentationSourceProvider(() => getPresentationSourceGrantService().revoke(request))
+  );
+  const runProviders = (ipcBridge as typeof ipcBridge & { presentationRuns?: typeof ipcBridge.presentationRuns })
+    .presentationRuns;
+  runProviders?.start.provider(callPresentationStartProvider);
+  runProviders?.get.provider((request) =>
+    callPresentationRecoveryProvider(() => getPresentationRunService().get(request))
+  );
+  runProviders?.listRecoverable.provider((request) =>
+    callPresentationRecoveryProvider(() => getPresentationRunService().listRecoverable(request))
+  );
+  runProviders?.openRecovery.provider((request) =>
+    callPresentationRecoveryProvider(() => getPresentationRunService().openRecovery(request))
+  );
+  runProviders?.discard.provider((request) =>
+    callPresentationRecoveryProvider(() => getPresentationRunService().discard(request))
   );
   registerPresentationExternalDropHandler();
 }
