@@ -1850,7 +1850,9 @@ describe('StudioPage and useStudioProject', () => {
     expect(bridge.submitScenes.invoke).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('conversation.creativeStudio.jobs.retryChargeBody');
+    const duplicateChargeDialog = await screen.findByRole('dialog');
+    expect(duplicateChargeDialog).toHaveTextContent('conversation.creativeStudio.jobs.retryChargeBody');
+    expect(duplicateChargeDialog).not.toHaveTextContent('conversation.creativeStudio.jobs.retryConfirmationBody');
     within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' }))
       .getAllByRole('button')
       .forEach((button) => expect(button).toBeDisabled());
