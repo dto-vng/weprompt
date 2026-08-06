@@ -43,6 +43,8 @@ const bridge = vi.hoisted(() => ({
   reorderScenes: { invoke: vi.fn() },
   proposeStoryboard: { invoke: vi.fn() },
   chooseAndImportReference: { invoke: vi.fn() },
+  renderCut: { invoke: vi.fn() },
+  cancelRender: { invoke: vi.fn() },
   fitStoryboard: { invoke: vi.fn() },
   submitScenes: { invoke: vi.fn() },
   cancelJob: { invoke: vi.fn() },
@@ -56,6 +58,7 @@ const bridge = vi.hoisted(() => ({
   removeConnection: { invoke: vi.fn() },
   projectUpdated: { on: vi.fn() },
   proposalUpdated: { on: vi.fn() },
+  renderProgress: { on: vi.fn() },
   turnCompleted: { on: vi.fn() },
 }));
 
@@ -345,6 +348,8 @@ describe('StudioPage and useStudioProject', () => {
     bridge.reorderScenes.invoke.mockImplementation(async () => ok(project()));
     bridge.proposeStoryboard.invoke.mockImplementation(async () => ok(project()));
     bridge.chooseAndImportReference.invoke.mockResolvedValue(ok({ status: 'cancelled' }));
+    bridge.renderCut.invoke.mockResolvedValue(ok({ assetId: 'render-1', missingSceneIds: [] }));
+    bridge.cancelRender.invoke.mockResolvedValue(ok({ cancelled: true }));
     bridge.fitStoryboard.invoke.mockResolvedValue(
       ok<StudioFitStoryboardOutcome>({
         status: 'already_matches',
@@ -365,6 +370,7 @@ describe('StudioPage and useStudioProject', () => {
     bridge.removeConnection.invoke.mockResolvedValue(failure());
     bridge.projectUpdated.on.mockReturnValue(() => {});
     bridge.proposalUpdated.on.mockReturnValue(() => {});
+    bridge.renderProgress.on.mockReturnValue(() => {});
     bridge.turnCompleted.on.mockReturnValue(() => {});
     bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
     bridge.flushUnsavedWork.provider.mockReturnValue(() => {});

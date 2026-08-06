@@ -84,6 +84,7 @@ import type {
   ProposeStudioStoryboardInput,
   StudioBindBriefConversationRequest,
   StudioAsset,
+  StudioCancelRenderResult,
   StudioCommandResult,
   StudioChooseAndExportAssetsRequest,
   StudioChooseAndImportReferenceRequest,
@@ -95,6 +96,8 @@ import type {
   StudioProposalRequest,
   StudioPersistCapturedPosterRequest,
   StudioRendererProject,
+  StudioRenderCutResult,
+  StudioRenderProgressEvent,
   StudioImportOutcome,
   StudioExportOutcome,
   StudioConnectionInventory,
@@ -1188,6 +1191,12 @@ export const creativeStudio = {
     StudioCommandResult<StudioExportOutcome>,
     StudioChooseAndExportAssetsRequest
   >('creative-studio.choose-and-export-assets'),
+  renderCut: bridge.buildProvider<StudioCommandResult<StudioRenderCutResult>, StudioProjectRequest>(
+    'creative-studio.render-cut'
+  ),
+  cancelRender: bridge.buildProvider<StudioCommandResult<StudioCancelRenderResult>, StudioProjectRequest>(
+    'creative-studio.cancel-render'
+  ),
   fitStoryboard: bridge.buildProvider<StudioCommandResult<StudioFitStoryboardOutcome>, StudioFitStoryboardRequest>(
     'creative-studio.fit-storyboard'
   ),
@@ -1230,6 +1239,7 @@ export const creativeStudio = {
   }),
   projectUpdated: bridge.buildEmitter<{ projectId: string }>('studio.project-updated'),
   proposalUpdated: bridge.buildEmitter<{ projectId: string; proposalId: string }>('studio.proposal-updated'),
+  renderProgress: bridge.buildEmitter<StudioRenderProgressEvent>('studio.render-progress'),
 };
 
 // ---------------------------------------------------------------------------

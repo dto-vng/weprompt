@@ -975,7 +975,23 @@
         "missingSlates_other": "{{count}} claquetas ausentes",
         "openProduce": "Abrir Producir",
         "handoffDescription": "La entrega contiene únicamente el manifiesto del guion gráfico y el contenido seleccionado. Las claquetas de revisión no se exportan.",
-        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado."
+        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado.",
+        "render": {
+          "action": "Renderizar vídeo",
+          "progress": "Renderizando vídeo… {{percent}}%",
+          "cancel": "Cancelar renderizado",
+          "missingScenes": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
+          "missingScenes_one": "{{count}} escena no tiene toma y no aparecerá en el vídeo.",
+          "missingScenes_other": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
+          "resultLabel": "Vídeo renderizado",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg no está instalado. Instala FFmpeg para renderizar el vídeo.",
+            "busy": "Este proyecto ya se está renderizando.",
+            "noRenderableScenes": "Ninguna escena tiene una toma para renderizar.",
+            "failed": "No se pudo renderizar el vídeo.",
+            "cancelled": "Renderizado de vídeo cancelado."
+          }
+        }
       }
     },
     "transition": {

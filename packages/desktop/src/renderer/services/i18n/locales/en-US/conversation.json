@@ -822,7 +822,23 @@
         "missingSlates_other": "{{count}} missing slates",
         "openProduce": "Open Produce",
         "handoffDescription": "The handoff contains the storyboard manifest and selected media only. Review slates are not exported.",
-        "partialHandoff": "This handoff is partial because some scenes have no selected media."
+        "partialHandoff": "This handoff is partial because some scenes have no selected media.",
+        "render": {
+          "action": "Render video",
+          "progress": "Rendering video… {{percent}}%",
+          "cancel": "Cancel render",
+          "missingScenes": "{{count}} scenes have no take and will not be in the video.",
+          "missingScenes_one": "{{count}} scene has no take and will not be in the video.",
+          "missingScenes_other": "{{count}} scenes have no take and will not be in the video.",
+          "resultLabel": "Rendered video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg is not installed. Install FFmpeg to render video.",
+            "busy": "This project is already rendering.",
+            "noRenderableScenes": "No scenes have a take to render.",
+            "failed": "The video could not be rendered.",
+            "cancelled": "Video render cancelled."
+          }
+        }
       }
     },
     "transition": {

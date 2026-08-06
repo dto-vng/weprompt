@@ -447,6 +447,10 @@ export type StudioCommandErrorCode =
   | 'duplicate_charge_acknowledgement_required'
   | 'unsupported'
   | 'busy'
+  | 'ffmpeg_unavailable'
+  | 'render_failed'
+  | 'no_renderable_scenes'
+  | 'cancelled'
   | 'provider_error'
   | 'storage_error';
 
@@ -463,6 +467,29 @@ export type StudioCommandResult<T> =
 export type StudioProjectRequest = {
   projectId: string;
 };
+
+export type StudioRenderErrorCode =
+  | 'busy'
+  | 'ffmpeg_unavailable'
+  | 'render_failed'
+  | 'no_renderable_scenes'
+  | 'cancelled';
+
+export type StudioRenderCutResult = { assetId: string; missingSceneIds: string[] };
+
+export type StudioCancelRenderResult = { cancelled: boolean };
+
+export type StudioRenderProgressEvent =
+  | { projectId: string; status: 'running'; progress: number }
+  | (StudioRenderCutResult & { projectId: string; status: 'succeeded'; progress: 1 })
+  | {
+      projectId: string;
+      status: 'failed';
+      progress: number;
+      errorCode: Exclude<StudioRenderErrorCode, 'busy' | 'cancelled'>;
+      missingSceneIds?: string[];
+    }
+  | { projectId: string; status: 'cancelled'; progress: number; missingSceneIds: string[] };
 
 export type ProposeStudioStoryboardInput = StudioProjectRequest & {
   expectedRevision: number;
@@ -662,6 +689,8 @@ export type StudioDesktopApi = {
   retryJob(input: StudioRetryJobRequest): Promise<StudioCommandResult<StudioRendererJob>>;
   retryDownload(input: StudioRetryDownloadRequest): Promise<StudioCommandResult<StudioRendererJob>>;
   chooseAndExportAssets(input: StudioChooseAndExportAssetsRequest): Promise<StudioCommandResult<StudioExportOutcome>>;
+  renderCut(input: StudioProjectRequest): Promise<StudioCommandResult<StudioRenderCutResult>>;
+  cancelRender(input: StudioProjectRequest): Promise<StudioCommandResult<StudioCancelRenderResult>>;
   listConnectionCandidates(): Promise<StudioCommandResult<StudioConnectionCandidate[]>>;
   listConnections(): Promise<StudioCommandResult<StudioConnectionInventory>>;
   validateConnection(

@@ -4,14 +4,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { StudioAsset, StudioRendererProject, StudioScene } from '@/common/types/project/creativeStudioTypes';
 import { ReviewPhase } from '@renderer/pages/studio/components/PhaseShell/phases/ReviewPhase';
 import type { ReviewPhaseController } from '@renderer/pages/studio/components/PhaseShell/types';
 import type { UseStoryboardEditorResult } from '@renderer/pages/studio/hooks/useStoryboardEditor';
+
+type RenderProgressEvent =
+  | { projectId: string; status: 'running'; progress: number }
+  | {
+      projectId: string;
+      status: 'succeeded';
+      progress: 1;
+      assetId: string;
+      missingSceneIds: string[];
+    }
+  | {
+      projectId: string;
+      status: 'failed';
+      progress: number;
+      errorCode: 'ffmpeg_unavailable' | 'render_failed' | 'no_renderable_scenes';
+      missingSceneIds?: string[];
+    }
+  | { projectId: string; status: 'cancelled'; progress: number; missingSceneIds: string[] };
+
+const bridge = vi.hoisted(() => ({
+  renderCut: { invoke: vi.fn() },
+  cancelRender: { invoke: vi.fn() },
+  renderProgress: { on: vi.fn() },
+}));
+
+let renderProgressListener: ((event: RenderProgressEvent) => void) | undefined;
+
+vi.mock('@/common', () => ({
+  ipcBridge: { creativeStudio: bridge },
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -19,6 +49,14 @@ vi.mock('react-i18next', () => ({
       values === undefined ? key : `${key}:${Object.values(values).join(',')}`,
   }),
 }));
+
+const deferred = <T,>(): { promise: Promise<T>; resolve: (value: T) => void } => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
 
 const scene = (id: string, overrides: Partial<StudioScene> = {}): StudioScene => ({
   id,
@@ -163,6 +201,22 @@ const controller = (selectedSceneId = 'scene-selected'): ReviewPhaseController =
   };
 };
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  renderProgressListener = undefined;
+  bridge.renderProgress.on.mockImplementation((listener: (event: RenderProgressEvent) => void) => {
+    renderProgressListener = listener;
+    return () => {
+      if (renderProgressListener === listener) renderProgressListener = undefined;
+    };
+  });
+  bridge.renderCut.invoke.mockResolvedValue({
+    ok: true,
+    data: { assetId: 'render-default', missingSceneIds: [] },
+  });
+  bridge.cancelRender.invoke.mockResolvedValue({ ok: true, data: { cancelled: true } });
+});
+
 describe('Review phase cut', () => {
   it('shows the selected take and changes variations with the canonical project revision', () => {
     const reviewController = controller();
@@ -225,14 +279,13 @@ describe('Review phase cut', () => {
     expect(screen.getByText('conversation.creativeStudio.phase.review.renderedShots:1')).toBeVisible();
   });
 
-  it('never exposes generation or stitched-playback actions in Review', () => {
-    const { container } = render(<ReviewPhase controller={controller('scene-slate')} />);
+  it('never exposes generation actions in Review', () => {
+    render(<ReviewPhase controller={controller('scene-slate')} />);
 
     expect(
       screen.queryByRole('button', { name: 'conversation.creativeStudio.preview.generateThisScene' })
     ).not.toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.review.generateScene')).not.toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/stitched|final movie|play all/i);
   });
 
   it('exposes the handoff summary as a complementary region beside the review workspace', () => {
@@ -242,5 +295,87 @@ describe('Review phase cut', () => {
       name: 'conversation.creativeStudio.phase.review.handoff',
     });
     expect(handoff).toContainElement(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription'));
+  });
+
+  it('shows the render action and a non-blocking missing-take count', () => {
+    bridge.renderCut.invoke.mockReturnValueOnce(new Promise(() => {}));
+    render(<ReviewPhase controller={controller()} />);
+
+    const action = screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' });
+    expect(action).toBeEnabled();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.render.missingScenes:3')).toBeVisible();
+
+    fireEvent.click(action);
+    expect(bridge.renderCut.invoke).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1' });
+  });
+
+  it('disables the action and updates its percentage from render progress events', async () => {
+    const pending = deferred<{
+      ok: false;
+      error: { code: 'cancelled'; messageKey: string };
+    }>();
+    bridge.renderCut.invoke.mockReturnValueOnce(pending.promise);
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' }));
+
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progress:0' })
+    ).toBeDisabled();
+    act(() => renderProgressListener?.({ projectId: 'project-1', status: 'running', progress: 0.42 }));
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progress:42' })
+    ).toBeDisabled();
+
+    pending.resolve({
+      ok: false,
+      error: {
+        code: 'cancelled',
+        messageKey: 'conversation.creativeStudio.phase.review.render.errors.cancelled',
+      },
+    });
+    await screen.findByText('conversation.creativeStudio.phase.review.render.errors.cancelled');
+  });
+
+  it.each([
+    ['ffmpeg_unavailable', 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable'],
+    ['busy', 'conversation.creativeStudio.phase.review.render.errors.busy'],
+    ['no_renderable_scenes', 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes'],
+    ['render_failed', 'conversation.creativeStudio.phase.review.render.errors.failed'],
+    ['cancelled', 'conversation.creativeStudio.phase.review.render.errors.cancelled'],
+  ] as const)('shows the distinct %s render failure', async (code, messageKey) => {
+    bridge.renderCut.invoke.mockResolvedValueOnce({ ok: false, error: { code, messageKey: 'generic-error' } });
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' }));
+
+    expect(await screen.findByText(messageKey)).toBeVisible();
+  });
+
+  it('exposes the playable result from the terminal event without polling', async () => {
+    const pending = deferred<{
+      ok: true;
+      data: { assetId: string; missingSceneIds: string[] };
+    }>();
+    bridge.renderCut.invoke.mockReturnValueOnce(pending.promise);
+    render(<ReviewPhase controller={controller()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' }));
+
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'succeeded',
+        progress: 1,
+        assetId: 'render-1',
+        missingSceneIds: ['scene-slate'],
+      })
+    );
+
+    expect(screen.getByLabelText('conversation.creativeStudio.phase.review.render.resultLabel')).toHaveAttribute(
+      'src',
+      'weprompt-studio://asset/project-1/render-1'
+    );
+    pending.resolve({ ok: true, data: { assetId: 'render-1', missingSceneIds: ['scene-slate'] } });
+    await waitFor(() => expect(bridge.renderCut.invoke).toHaveBeenCalledOnce());
   });
 });

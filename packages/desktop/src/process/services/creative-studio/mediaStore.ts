@@ -862,6 +862,21 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     }
   };
 
+  const listProjectOutputAssets = async (projectDir: string, projectId: string): Promise<StudioAsset[]> => {
+    const assetsDir = path.join(projectDir, 'assets');
+    const outputMetadata = await fs.readdir(assetsDir).catch((error: NodeJS.ErrnoException): string[] => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const outputAssets = await Promise.all(
+      outputMetadata.flatMap((fileName) => {
+        const match = /^([A-Za-z0-9_-]{1,256})\.render\.json$/.exec(fileName);
+        return match ? [readProjectOutputAsset(projectDir, projectId, match[1]!)] : [];
+      })
+    );
+    return outputAssets.filter((asset): asset is StudioAsset => asset !== null);
+  };
+
   const resolveAsset = async (
     projectId: string,
     assetId: string
@@ -1336,17 +1351,7 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
       deps.store.getProject(input.projectId),
     ]);
     if (!projectDir || !project) throw new CreativeStudioMediaError('not_found');
-    const assetsDir = path.join(projectDir, 'assets');
-    const outputMetadata = await fs.readdir(assetsDir).catch((error: NodeJS.ErrnoException): string[] => {
-      if (error.code === 'ENOENT') return [];
-      throw error;
-    });
-    const outputAssets = await Promise.all(
-      outputMetadata.flatMap((fileName) => {
-        const match = /^([A-Za-z0-9_-]{1,256})\.render\.json$/.exec(fileName);
-        return match ? [readProjectOutputAsset(projectDir, input.projectId, match[1]!)] : [];
-      })
-    );
+    const outputAssets = await listProjectOutputAssets(projectDir, input.projectId);
     const outputBytes = outputAssets.reduce((total, asset) => total + (asset?.byteSize ?? 0), 0);
     return {
       projectDir,
@@ -1583,6 +1588,25 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
         );
       });
       exported.push({ assetId: resolved.asset.id, fileName });
+    }
+    const projectDir = await deps.store.getVerifiedProjectDirectory(input.projectId);
+    if (projectDir === null) throw new CreativeStudioMediaError('not_found');
+    const renderedCuts = (await listProjectOutputAssets(projectDir, input.projectId)).toSorted(
+      (left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
+    );
+    for (const renderedCut of renderedCuts) {
+      // Resolve through the sidecar-aware verifier before any rendered bytes leave managed storage.
+      // eslint-disable-next-line no-await-in-loop
+      const resolved = await resolveAsset(input.projectId, renderedCut.id);
+      if (resolved === null) continue;
+      await writeVerifiedExportFile(path.join(directory, 'cut.mp4'), verifiedExportDirectory, [], async (handle) => {
+        await pipeline(
+          await resolved.openVerifiedStream(),
+          createWriteStream(path.join(directory, 'cut.mp4'), { fd: handle.fd, autoClose: false })
+        );
+      });
+      exported.push({ assetId: resolved.asset.id, fileName: 'cut.mp4' });
+      break;
     }
     if (input.includeReferences) {
       const verifiedReferenceDirectory = await createVerifiedExportSubdirectory(verifiedExportDirectory, 'references');

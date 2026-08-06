@@ -29,6 +29,10 @@ const COMMAND_MESSAGE_KEYS: Record<StudioCommandErrorCode, string> = {
     'conversation.creativeStudio.errors.duplicateChargeAcknowledgementRequired',
   unsupported: 'conversation.creativeStudio.jobs.errors.unsupported',
   busy: 'conversation.creativeStudio.errors.busy',
+  ffmpeg_unavailable: 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable',
+  render_failed: 'conversation.creativeStudio.phase.review.render.errors.failed',
+  no_renderable_scenes: 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes',
+  cancelled: 'conversation.creativeStudio.phase.review.render.errors.cancelled',
   provider_error: 'conversation.creativeStudio.errors.provider',
   storage_error: STORAGE_ERROR_MESSAGE_KEY,
 };

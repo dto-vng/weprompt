@@ -966,7 +966,23 @@
         "missingSlates_other": "누락된 슬레이트 {{count}}개",
         "openProduce": "제작 열기",
         "handoffDescription": "전달에는 스토리보드 매니페스트와 선택된 미디어만 포함됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
-        "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다."
+        "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다.",
+        "render": {
+          "action": "동영상 렌더링",
+          "progress": "동영상 렌더링 중… {{percent}}%",
+          "cancel": "렌더링 취소",
+          "missingScenes": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "missingScenes_one": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "missingScenes_other": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "resultLabel": "렌더링된 동영상",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg가 설치되어 있지 않습니다. 동영상을 렌더링하려면 FFmpeg를 설치하세요.",
+            "busy": "이 프로젝트는 이미 렌더링 중입니다.",
+            "noRenderableScenes": "렌더링할 테이크가 있는 장면이 없습니다.",
+            "failed": "동영상을 렌더링하지 못했습니다.",
+            "cancelled": "동영상 렌더링을 취소했습니다."
+          }
+        }
       }
     },
     "transition": {

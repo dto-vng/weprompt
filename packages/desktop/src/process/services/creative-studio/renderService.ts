@@ -14,6 +14,9 @@ import type {
   StudioAspectRatio,
   StudioAsset,
   StudioProject,
+  StudioRenderCutResult,
+  StudioRenderErrorCode,
+  StudioRenderProgressEvent,
   StudioResolution,
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
@@ -561,4 +564,119 @@ export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRend
     },
   };
   return operation;
+};
+
+export type StudioRenderRunner = {
+  renderCut(projectId: string): Promise<StudioRenderCutResult>;
+  cancelRender(projectId: string): boolean;
+  getState(projectId: string): StudioRenderProgressEvent | null;
+};
+
+export type StudioRenderRunnerDeps = {
+  startOperation(projectId: string, onProgress: (progress: number) => void): StudioRenderOperation;
+  onStateChanged(state: StudioRenderProgressEvent): void;
+};
+
+export class StudioRenderRunnerError extends Error {
+  readonly code: StudioRenderErrorCode;
+
+  constructor(code: StudioRenderErrorCode) {
+    super(code);
+    this.name = 'StudioRenderRunnerError';
+    this.code = code;
+  }
+}
+
+const cloneRenderState = (state: StudioRenderProgressEvent): StudioRenderProgressEvent => {
+  switch (state.status) {
+    case 'succeeded':
+      return { ...state, missingSceneIds: [...state.missingSceneIds] };
+    case 'failed':
+      return state.missingSceneIds === undefined
+        ? { ...state }
+        : { ...state, missingSceneIds: [...state.missingSceneIds] };
+    case 'cancelled':
+      return { ...state, missingSceneIds: [...state.missingSceneIds] };
+    default:
+      return { ...state };
+  }
+};
+
+/** Owns local render concurrency and observable terminal state without using provider jobs. */
+export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRenderRunner => {
+  const activeOperations = new Map<string, StudioRenderOperation>();
+  const states = new Map<string, StudioRenderProgressEvent>();
+
+  const publish = (state: StudioRenderProgressEvent): void => {
+    const snapshot = cloneRenderState(state);
+    states.set(state.projectId, snapshot);
+    try {
+      deps.onStateChanged(cloneRenderState(snapshot));
+    } catch {
+      // A renderer relay cannot invalidate a local render.
+    }
+  };
+
+  const start = async (projectId: string): Promise<StudioRenderCutResult> => {
+    if (activeOperations.has(projectId)) throw new StudioRenderRunnerError('busy');
+    let progress = 0;
+    let operation: StudioRenderOperation | null = null;
+    publish({ projectId, status: 'running', progress });
+    try {
+      operation = deps.startOperation(projectId, (reportedProgress) => {
+        if (!Number.isFinite(reportedProgress)) return;
+        const next = Math.max(progress, Math.min(1, Math.max(0, reportedProgress)));
+        if (next === progress) return;
+        progress = next;
+        publish({ projectId, status: 'running', progress });
+      });
+      activeOperations.set(projectId, operation);
+      const result = await operation.result;
+      if (result.status === 'rendered') {
+        const rendered = { assetId: result.assetId, missingSceneIds: [...result.missingSceneIds] };
+        publish({ projectId, status: 'succeeded', progress: 1, ...rendered });
+        return rendered;
+      }
+      if (result.status === 'cancelled') {
+        publish({
+          projectId,
+          status: 'cancelled',
+          progress,
+          missingSceneIds: [...result.missingSceneIds],
+        });
+        throw new StudioRenderRunnerError('cancelled');
+      }
+      publish({
+        projectId,
+        status: 'failed',
+        progress,
+        errorCode: 'no_renderable_scenes',
+        missingSceneIds: [...result.missingSceneIds],
+      });
+      throw new StudioRenderRunnerError('no_renderable_scenes');
+    } catch (error) {
+      if (error instanceof StudioRenderRunnerError) throw error;
+      const code = error instanceof CreativeStudioRenderError ? error.code : 'render_failed';
+      publish({ projectId, status: 'failed', progress, errorCode: code });
+      throw new StudioRenderRunnerError(code);
+    } finally {
+      if (operation !== null && activeOperations.get(projectId) === operation) {
+        activeOperations.delete(projectId);
+      }
+    }
+  };
+
+  return {
+    renderCut: start,
+    cancelRender(projectId): boolean {
+      const operation = activeOperations.get(projectId);
+      if (operation === undefined) return false;
+      operation.cancel();
+      return true;
+    },
+    getState(projectId): StudioRenderProgressEvent | null {
+      const state = states.get(projectId);
+      return state === undefined ? null : cloneRenderState(state);
+    },
+  };
 };

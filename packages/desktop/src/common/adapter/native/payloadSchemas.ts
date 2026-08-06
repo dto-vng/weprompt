@@ -595,6 +595,8 @@ export const nativeBridgePayloadSchemas = {
   'creative-studio.choose-and-export-assets': z
     .object({ projectId: safeIdSchema, includeReferences: z.boolean() })
     .strict(),
+  'creative-studio.render-cut': studioProjectRequestSchema,
+  'creative-studio.cancel-render': studioProjectRequestSchema,
   'creative-studio.fit-storyboard': studioFitStoryboardSchema,
   'creative-studio.submit-scenes': studioSubmitScenesSchema,
   'creative-studio.cancel-job': studioJobRequestSchema,

@@ -972,7 +972,23 @@
         "missingSlates_other": "Eksik {{count}} slayt",
         "openProduce": "Üretimi aç",
         "handoffDescription": "Devir yalnızca hikâye panosu bildirim dosyasını ve seçilen medyayı içerir. İnceleme slaytları dışa aktarılmaz.",
-        "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir."
+        "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir.",
+        "render": {
+          "action": "Videoyu işle",
+          "progress": "Video işleniyor… {{percent}}%",
+          "cancel": "İşlemeyi iptal et",
+          "missingScenes": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "missingScenes_one": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "missingScenes_other": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "resultLabel": "İşlenmiş video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg yüklü değil. Videoyu işlemek için FFmpeg'i yükleyin.",
+            "busy": "Bu proje zaten işleniyor.",
+            "noRenderableScenes": "İşlenecek çekimi olan sahne yok.",
+            "failed": "Video işlenemedi.",
+            "cancelled": "Video işleme iptal edildi."
+          }
+        }
       }
     },
     "transition": {

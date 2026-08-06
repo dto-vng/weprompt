@@ -30,6 +30,8 @@ const bridge = vi.hoisted(() => ({
   proposeStoryboard: { invoke: vi.fn() },
   chooseAndImportReference: { invoke: vi.fn() },
   chooseAndExportAssets: { invoke: vi.fn() },
+  renderCut: { invoke: vi.fn() },
+  cancelRender: { invoke: vi.fn() },
   submitScenes: { invoke: vi.fn() },
   cancelJob: { invoke: vi.fn() },
   retryJob: { invoke: vi.fn() },
@@ -42,6 +44,7 @@ const bridge = vi.hoisted(() => ({
   removeConnection: { invoke: vi.fn() },
   projectUpdated: { on: vi.fn() },
   proposalUpdated: { on: vi.fn() },
+  renderProgress: { on: vi.fn() },
   turnCompleted: { on: vi.fn() },
 }));
 
@@ -172,6 +175,8 @@ describe('Studio asset export', () => {
       })
     );
     bridge.submitScenes.invoke.mockResolvedValue(ok([]));
+    bridge.renderCut.invoke.mockResolvedValue(ok({ assetId: 'render-1', missingSceneIds: [] }));
+    bridge.cancelRender.invoke.mockResolvedValue(ok({ cancelled: true }));
     bridge.cancelJob.invoke.mockResolvedValue(ok(null));
     bridge.retryJob.invoke.mockResolvedValue(ok(null));
     bridge.retryDownload.invoke.mockResolvedValue(ok(null));
@@ -183,6 +188,7 @@ describe('Studio asset export', () => {
     bridge.removeConnection.invoke.mockResolvedValue(ok(false));
     bridge.projectUpdated.on.mockReturnValue(() => {});
     bridge.proposalUpdated.on.mockReturnValue(() => {});
+    bridge.renderProgress.on.mockReturnValue(() => {});
     bridge.turnCompleted.on.mockReturnValue(() => {});
     bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
     bridge.flushUnsavedWork.provider.mockReturnValue(() => {});

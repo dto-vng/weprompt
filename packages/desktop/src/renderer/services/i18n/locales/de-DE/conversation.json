@@ -971,7 +971,23 @@
         "missingSlates_other": "{{count}} fehlende Platzhalter",
         "openProduce": "Produzieren öffnen",
         "handoffDescription": "Die Übergabe enthält nur das Storyboard-Manifest und ausgewählte Medien. Platzhalter aus der Prüfung werden nicht exportiert.",
-        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt."
+        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt.",
+        "render": {
+          "action": "Video rendern",
+          "progress": "Video wird gerendert… {{percent}}%",
+          "cancel": "Rendern abbrechen",
+          "missingScenes": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
+          "missingScenes_one": "{{count}} Szene hat keinen Take und erscheint nicht im Video.",
+          "missingScenes_other": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
+          "resultLabel": "Gerendertes Video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg ist nicht installiert. Installiere FFmpeg, um das Video zu rendern.",
+            "busy": "Dieses Projekt wird bereits gerendert.",
+            "noRenderableScenes": "Keine Szene hat einen Take zum Rendern.",
+            "failed": "Das Video konnte nicht gerendert werden.",
+            "cancelled": "Video-Rendering abgebrochen."
+          }
+        }
       }
     },
     "transition": {

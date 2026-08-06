@@ -7,6 +7,7 @@
 import { ipcBridge } from '@/common';
 import { httpRequest } from '@/common/adapter/httpBridge';
 import type { IProvider } from '@/common/config/storage';
+import type { StudioRenderProgressEvent } from '@/common/types/project/creativeStudioTypes';
 import { app, protocol } from 'electron';
 import {
   createCreativeStudioService,
@@ -34,6 +35,7 @@ import {
   type StudioStoryboardPlanner,
   type StudioStoryboardPlannerDeps,
 } from './planning/storyboardPlanner';
+import { createStudioRenderRunner, renderCut, type StudioRenderRunner } from './renderService';
 
 type RuntimeEnvironment = {
   AIONUI_E2E_TEST?: string;
@@ -68,6 +70,7 @@ export type CreativeStudioRuntimeDeps = {
   listProviders(): Promise<IProvider[]>;
   onProjectUpdated(projectId: string): void;
   onProposalUpdated(projectId: string, proposalId: string): void;
+  onRenderProgress?(event: StudioRenderProgressEvent): void;
   protocol: CreativeStudioRuntimeProtocol;
 };
 
@@ -78,6 +81,7 @@ export type CreativeStudioRuntime = {
   readonly storyboardPlanner: StudioStoryboardPlanner;
   readonly providerResolver: StudioProviderResolver;
   readonly jobManager: StudioJobManager;
+  readonly renderRunner: StudioRenderRunner;
   readonly service: CreativeStudioService;
   start(): Promise<void>;
   onBackendReady(): Promise<void>;
@@ -162,6 +166,10 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
     jobManager,
     storyboardPlanner,
     onProjectUpdated: deps.onProjectUpdated,
+  });
+  const renderRunner = createStudioRenderRunner({
+    startOperation: (projectId, onProgress) => renderCut(projectId, { store, mediaStore, onProgress }),
+    onStateChanged: (state) => deps.onRenderProgress?.(state),
   });
 
   let startPromise: Promise<void> | null = null;
@@ -264,6 +272,7 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
     storyboardPlanner,
     providerResolver,
     jobManager,
+    renderRunner,
     service,
     start,
     onBackendReady,
@@ -297,6 +306,7 @@ export const getCreativeStudioRuntime = (): CreativeStudioRuntime => {
     onProjectUpdated: (projectId) => ipcBridge.creativeStudio.projectUpdated.emit({ projectId }),
     onProposalUpdated: (projectId, proposalId) =>
       ipcBridge.creativeStudio.proposalUpdated.emit({ projectId, proposalId }),
+    onRenderProgress: (event) => ipcBridge.creativeStudio.renderProgress.emit(event),
     protocol: {
       install: (resolver) => installCreativeStudioProtocol(protocol, resolver),
       uninstall: async (installation) => {

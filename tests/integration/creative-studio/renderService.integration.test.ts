@@ -12,16 +12,24 @@ import { createReadStream, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { StudioAsset, StudioMediaKind, StudioScene } from '@/common/types/project/creativeStudioTypes';
+import type {
+  StudioAsset,
+  StudioMediaKind,
+  StudioRenderProgressEvent,
+  StudioScene,
+} from '@/common/types/project/creativeStudioTypes';
 import { createStudioMediaStore } from '@process/services/creative-studio/mediaStore';
-import type { CreativeStudioRenderError } from '@process/services/creative-studio/renderService';
 import {
+  createStudioRenderRunner,
+  CreativeStudioRenderError,
   renderCut,
   resolveStudioRenderDimensions,
+  type StudioRenderOperation,
   type StudioRenderSpawn,
+  type StudioRenderResult,
 } from '@process/services/creative-studio/renderService';
 import { createCreativeStudioStore, type CreativeStudioStore } from '@process/services/creative-studio/store';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const execFile = promisify(execFileCallback);
 const ffmpegPath = process.env.FFMPEG_PATH ?? 'ffmpeg';
@@ -57,6 +65,16 @@ type RenderHarness = {
 let fixtureRoot = '';
 let fixtures: FixturePaths;
 const createdRoots: string[] = [];
+
+const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: unknown) => void } => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
 
 const run = async (command: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
   const result = await execFile(command, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
@@ -277,6 +295,100 @@ describe('resolveStudioRenderDimensions', () => {
     ['1080p', '3:4', 1080, 1440],
   ] as const)('maps %s %s to an even %sx%s frame', (resolution, aspectRatio, width, height) => {
     expect(resolveStudioRenderDimensions(resolution, aspectRatio)).toEqual({ width, height });
+  });
+});
+
+describe('Studio render runner', () => {
+  it('rejects a second render for the same project without starting another operation', async () => {
+    const pending = deferred<StudioRenderResult>();
+    const startOperation = vi.fn(() => ({ result: pending.promise, cancel: vi.fn() }));
+    const runner = createStudioRenderRunner({ startOperation, onStateChanged: vi.fn() });
+
+    const first = runner.renderCut('project_1');
+
+    await expect(runner.renderCut('project_1')).rejects.toMatchObject({ code: 'busy' });
+    expect(startOperation).toHaveBeenCalledOnce();
+    expect(runner.getState('project_1')).toMatchObject({ status: 'running', progress: 0 });
+
+    pending.resolve({ status: 'rendered', assetId: 'render_1', missingSceneIds: [] });
+    await expect(first).resolves.toEqual({ assetId: 'render_1', missingSceneIds: [] });
+  });
+
+  it('relays monotonic progress and exposes the succeeded terminal state', async () => {
+    const pending = deferred<StudioRenderResult>();
+    let reportProgress: ((progress: number) => void) | undefined;
+    const states: StudioRenderProgressEvent[] = [];
+    const runner = createStudioRenderRunner({
+      startOperation: (_projectId, onProgress) => {
+        reportProgress = onProgress;
+        return { result: pending.promise, cancel: vi.fn() };
+      },
+      onStateChanged: (state) => states.push(state),
+    });
+
+    const result = runner.renderCut('project_1');
+    reportProgress?.(0.45);
+    reportProgress?.(0.2);
+    pending.resolve({ status: 'rendered', assetId: 'render_1', missingSceneIds: ['scene_2'] });
+
+    await expect(result).resolves.toEqual({ assetId: 'render_1', missingSceneIds: ['scene_2'] });
+    expect(states.map(({ status, progress }) => [status, progress])).toEqual([
+      ['running', 0],
+      ['running', 0.45],
+      ['succeeded', 1],
+    ]);
+    expect(runner.getState('project_1')).toEqual({
+      projectId: 'project_1',
+      status: 'succeeded',
+      progress: 1,
+      assetId: 'render_1',
+      missingSceneIds: ['scene_2'],
+    });
+  });
+
+  it('cancels the active operation and exposes cancellation only after it terminates', async () => {
+    const pending = deferred<StudioRenderResult>();
+    const cancel = vi.fn(() => pending.resolve({ status: 'cancelled', missingSceneIds: ['scene_2'] }));
+    const runner = createStudioRenderRunner({
+      startOperation: (): StudioRenderOperation => ({ result: pending.promise, cancel }),
+      onStateChanged: vi.fn(),
+    });
+
+    const result = runner.renderCut('project_1');
+
+    expect(runner.cancelRender('project_1')).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
+    await expect(result).rejects.toMatchObject({ code: 'cancelled' });
+    expect(runner.getState('project_1')).toEqual({
+      projectId: 'project_1',
+      status: 'cancelled',
+      progress: 0,
+      missingSceneIds: ['scene_2'],
+    });
+  });
+
+  it.each([
+    [
+      () => Promise.resolve<StudioRenderResult>({ status: 'no_renderable_scenes', missingSceneIds: ['scene_1'] }),
+      'no_renderable_scenes',
+      ['scene_1'],
+    ],
+    [() => Promise.reject(new CreativeStudioRenderError('ffmpeg_unavailable')), 'ffmpeg_unavailable', undefined],
+    [() => Promise.reject(new CreativeStudioRenderError('render_failed')), 'render_failed', undefined],
+  ] as const)('exposes a failed terminal state for %s', async (createResult, code, missingSceneIds) => {
+    const runner = createStudioRenderRunner({
+      startOperation: () => ({ result: createResult(), cancel: vi.fn() }),
+      onStateChanged: vi.fn(),
+    });
+
+    await expect(runner.renderCut('project_1')).rejects.toMatchObject({ code });
+    expect(runner.getState('project_1')).toEqual({
+      projectId: 'project_1',
+      status: 'failed',
+      progress: 0,
+      errorCode: code,
+      ...(missingSceneIds === undefined ? {} : { missingSceneIds }),
+    });
   });
 });
 

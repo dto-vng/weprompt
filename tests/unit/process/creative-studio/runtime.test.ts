@@ -9,7 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
-import type { CreateStudioProjectInput, StudioConnectionBinding } from '@/common/types/project/creativeStudioTypes';
+import type {
+  CreateStudioProjectInput,
+  StudioConnectionBinding,
+  StudioRenderProgressEvent,
+} from '@/common/types/project/creativeStudioTypes';
 import {
   createCreativeStudioRuntime,
   shouldEnableStudioE2EFakeAdapter,
@@ -100,6 +104,7 @@ const createHarness = (
     createE2EFakeBundle?: CreativeStudioRuntimeFactories['createE2EFakeBundle'];
     store?: CreativeStudioStore;
     onProposalUpdated?: (projectId: string, proposalId: string) => void;
+    onRenderProgress?: (event: StudioRenderProgressEvent) => void;
   } = {}
 ): RuntimeHarness => {
   const calls: string[] = [];
@@ -178,6 +183,7 @@ const createHarness = (
     listProviders: async () => [provider()],
     onProjectUpdated: vi.fn(),
     onProposalUpdated: overrides.onProposalUpdated ?? vi.fn(),
+    onRenderProgress: overrides.onRenderProgress,
     protocol: {
       install:
         overrides.installProtocol ??
@@ -194,6 +200,18 @@ const createHarness = (
 };
 
 describe('Creative Studio runtime identity and lifecycle', () => {
+  it('relays local render progress and terminal state through the runtime boundary', async () => {
+    const events: StudioRenderProgressEvent[] = [];
+    const { runtime } = createHarness({}, { onRenderProgress: (event) => events.push(event) });
+
+    await expect(runtime.renderRunner.renderCut('project_1')).rejects.toMatchObject({ code: 'render_failed' });
+
+    expect(events).toEqual([
+      { projectId: 'project_1', status: 'running', progress: 0 },
+      { projectId: 'project_1', status: 'failed', progress: 0, errorCode: 'render_failed' },
+    ]);
+  });
+
   it('observes an externally recorded proposal without a manual refresh and reloads it after restart', async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), 'studio-proposal-runtime-'));
     temporaryDirectories.push(rootDir);

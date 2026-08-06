@@ -966,7 +966,23 @@
         "missingSlates_other": "不足しているスレート {{count}} 件",
         "openProduce": "生成を開く",
         "handoffDescription": "引き渡しに含まれるのは、ストーリーボードのマニフェストと選択したメディアのみです。確認用スレートは書き出されません。",
-        "partialHandoff": "選択したメディアがないシーンがあるため、この引き渡しは一部のみです。"
+        "partialHandoff": "選択したメディアがないシーンがあるため、この引き渡しは一部のみです。",
+        "render": {
+          "action": "動画をレンダリング",
+          "progress": "動画をレンダリング中… {{percent}}%",
+          "cancel": "レンダリングをキャンセル",
+          "missingScenes": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "missingScenes_one": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "missingScenes_other": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "resultLabel": "レンダリング済み動画",
+          "errors": {
+            "ffmpegUnavailable": "FFmpegがインストールされていません。動画をレンダリングするにはFFmpegをインストールしてください。",
+            "busy": "このプロジェクトはすでにレンダリング中です。",
+            "noRenderableScenes": "レンダリングできるテイクがあるシーンはありません。",
+            "failed": "動画をレンダリングできませんでした。",
+            "cancelled": "動画のレンダリングをキャンセルしました。"
+          }
+        }
       }
     },
     "transition": {

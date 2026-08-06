@@ -31,6 +31,8 @@ const mocks = vi.hoisted(() => ({
   persistCapturedPosterProvider: vi.fn(),
   chooseAndImportReferenceProvider: vi.fn(),
   chooseAndExportAssetsProvider: vi.fn(),
+  renderCutProvider: vi.fn(),
+  cancelRenderProvider: vi.fn(),
   submitScenesProvider: vi.fn(),
   cancelJobProvider: vi.fn(),
   retryJobProvider: vi.fn(),
@@ -66,6 +68,8 @@ vi.mock('@/common', () => ({
       persistCapturedPoster: { provider: mocks.persistCapturedPosterProvider },
       chooseAndImportReference: { provider: mocks.chooseAndImportReferenceProvider },
       chooseAndExportAssets: { provider: mocks.chooseAndExportAssetsProvider },
+      renderCut: { provider: mocks.renderCutProvider },
+      cancelRender: { provider: mocks.cancelRenderProvider },
       submitScenes: { provider: mocks.submitScenesProvider },
       cancelJob: { provider: mocks.cancelJobProvider },
       retryJob: { provider: mocks.retryJobProvider },
@@ -89,6 +93,7 @@ import {
 } from '@process/bridge/creativeStudioBridge';
 import { CreativeStudioServiceError } from '@process/services/creative-studio/creativeStudioService';
 import { StudioJobManagerError } from '@process/services/creative-studio/jobManager';
+import { StudioRenderRunnerError } from '@process/services/creative-studio/renderService';
 
 const project: StudioProject = {
   schemaVersion: 1,
@@ -152,6 +157,11 @@ describe('initCreativeStudioBridge', () => {
         removeConnection: vi.fn(),
         listRoutes: vi.fn(),
       }),
+      getRenderRunner: () => ({
+        renderCut: vi.fn(async () => ({ assetId: 'render_1', missingSceneIds: ['scene_2'] })),
+        cancelRender: vi.fn(() => true),
+        getState: vi.fn(() => null),
+      }),
     };
   });
 
@@ -177,6 +187,8 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.persistCapturedPosterProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndImportReferenceProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndExportAssetsProvider).toHaveBeenCalledOnce();
+    expect(mocks.renderCutProvider).toHaveBeenCalledOnce();
+    expect(mocks.cancelRenderProvider).toHaveBeenCalledOnce();
     expect(mocks.submitScenesProvider).toHaveBeenCalledOnce();
     expect(mocks.cancelJobProvider).toHaveBeenCalledOnce();
     expect(mocks.retryJobProvider).toHaveBeenCalledOnce();
@@ -187,6 +199,47 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.saveConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.removeConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.listRoutesProvider).toHaveBeenCalledOnce();
+  });
+
+  it('delegates render start and cancellation without entering the project service', async () => {
+    const runner = dependencies.getRenderRunner!();
+    initCreativeStudioBridge({ ...dependencies, getRenderRunner: () => runner });
+    const render = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const cancel = mocks.cancelRenderProvider.mock.calls[0]?.[0] as ProviderHandler;
+
+    await expect(render({ projectId: 'project_1' })).resolves.toEqual({
+      ok: true,
+      data: { assetId: 'render_1', missingSceneIds: ['scene_2'] },
+    });
+    await expect(cancel({ projectId: 'project_1' })).resolves.toEqual({
+      ok: true,
+      data: { cancelled: true },
+    });
+    expect(runner.renderCut).toHaveBeenCalledExactlyOnceWith('project_1');
+    expect(runner.cancelRender).toHaveBeenCalledExactlyOnceWith('project_1');
+  });
+
+  it.each([
+    ['busy', 'conversation.creativeStudio.phase.review.render.errors.busy'],
+    ['ffmpeg_unavailable', 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable'],
+    ['render_failed', 'conversation.creativeStudio.phase.review.render.errors.failed'],
+    ['no_renderable_scenes', 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes'],
+    ['cancelled', 'conversation.creativeStudio.phase.review.render.errors.cancelled'],
+  ] as const)('maps the %s render failure to its dedicated message', async (code, messageKey) => {
+    const runner = {
+      renderCut: vi.fn(async () => {
+        throw new StudioRenderRunnerError(code);
+      }),
+      cancelRender: vi.fn(() => false),
+      getState: vi.fn(() => null),
+    };
+    initCreativeStudioBridge({ ...dependencies, getRenderRunner: () => runner });
+    const render = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
+
+    await expect(render({ projectId: 'project_1' })).resolves.toEqual({
+      ok: false,
+      error: { code, messageKey },
+    });
   });
 
   it('delegates proposal listing, acceptance, and rejection through dedicated providers', async () => {

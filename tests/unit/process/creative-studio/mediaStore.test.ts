@@ -1478,6 +1478,51 @@ describe('createStudioMediaStore', () => {
       expect(storyboard).not.toContain(sentinel);
     }
     expect(storyboard).not.toContain(rootDir);
+    await expect(fs.access(path.join(destination, result.folderName, 'cut.mp4'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  it('exports the newest verified rendered cut as cut.mp4', async () => {
+    const { store } = await makeStore();
+    const timestamps = ['2026-08-06T01:00:00.000Z', '2026-08-06T02:00:00.000Z'];
+    const assetIds = ['render_old', 'render_new'];
+    const oldCut = Buffer.concat([mp4, Buffer.from('old')]);
+    const newCut = Buffer.concat([mp4, Buffer.from('newest')]);
+    const media = createStudioMediaStore({
+      store,
+      createId: () => assetIds.shift()!,
+      now: () => timestamps.shift()!,
+    });
+    await media.persistProjectOutput({
+      projectId: 'project_1',
+      declaredMimeType: 'video/mp4',
+      declaredByteSize: oldCut.length,
+      width: 1280,
+      height: 720,
+      body: Readable.from([oldCut]),
+    });
+    await media.persistProjectOutput({
+      projectId: 'project_1',
+      declaredMimeType: 'video/mp4',
+      declaredByteSize: newCut.length,
+      width: 1280,
+      height: 720,
+      body: Readable.from([newCut]),
+    });
+    const destination = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-export-rendered-cut-'));
+    created.push(destination);
+
+    const result = await media.exportAssetsToDirectory({
+      projectId: 'project_1',
+      destinationDirectory: destination,
+      includeReferences: false,
+      timestamp: '20260806-120000',
+    });
+
+    expect(result.exported).toEqual([{ assetId: 'render_new', fileName: 'cut.mp4' }]);
+    await expect(fs.readFile(path.join(destination, result.folderName, 'cut.mp4'))).resolves.toEqual(newCut);
+    await expect(fs.access(path.join(destination, result.folderName, 'storyboard.json'))).resolves.toBeUndefined();
   });
 
   it('slugifies export titles while scene numbers disambiguate empty, duplicate, and gapped names', async () => {

@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import type {
   StudioCommandErrorCode,
   StudioCommandResult,
+  StudioRenderErrorCode,
   StudioUpdateModelSelectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
 import {
@@ -16,8 +17,9 @@ import {
 } from '@process/services/creative-studio/creativeStudioService';
 import { CreativeStudioStoreError } from '@process/services/creative-studio/store';
 import { CreativeStudioMediaError } from '@process/services/creative-studio/mediaStore';
-import { getCreativeStudioService } from '@process/services/creative-studio/runtime';
+import { getCreativeStudioRuntime, getCreativeStudioService } from '@process/services/creative-studio/runtime';
 import { StudioJobManagerError } from '@process/services/creative-studio/jobManager';
+import { StudioRenderRunnerError, type StudioRenderRunner } from '@process/services/creative-studio/renderService';
 import { BrowserWindow, dialog } from 'electron';
 
 const errorMessageKeys: Record<StudioCommandErrorCode, string> = {
@@ -32,11 +34,26 @@ const errorMessageKeys: Record<StudioCommandErrorCode, string> = {
     'conversation.creativeStudio.errors.duplicateChargeAcknowledgementRequired',
   unsupported: 'conversation.creativeStudio.jobs.errors.unsupported',
   busy: 'conversation.creativeStudio.errors.busy',
+  ffmpeg_unavailable: 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable',
+  render_failed: 'conversation.creativeStudio.phase.review.render.errors.failed',
+  no_renderable_scenes: 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes',
+  cancelled: 'conversation.creativeStudio.phase.review.render.errors.cancelled',
   provider_error: 'conversation.creativeStudio.errors.provider',
   storage_error: 'conversation.creativeStudio.errors.storage',
 };
 
+const renderErrorMessageKeys: Record<StudioRenderErrorCode, string> = {
+  busy: 'conversation.creativeStudio.phase.review.render.errors.busy',
+  ffmpeg_unavailable: 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable',
+  render_failed: 'conversation.creativeStudio.phase.review.render.errors.failed',
+  no_renderable_scenes: 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes',
+  cancelled: 'conversation.creativeStudio.phase.review.render.errors.cancelled',
+};
+
 const toCommandError = (error: unknown): StudioCommandResult<never> => {
+  if (error instanceof StudioRenderRunnerError) {
+    return { ok: false, error: { code: error.code, messageKey: renderErrorMessageKeys[error.code] } };
+  }
   const code: StudioCommandErrorCode =
     error instanceof CreativeStudioStoreError || error instanceof CreativeStudioServiceError
       ? error.code
@@ -66,6 +83,7 @@ const command = async <T>(operation: () => Promise<T>): Promise<StudioCommandRes
 
 export type CreativeStudioBridgeDependencies = {
   getService: () => CreativeStudioService;
+  getRenderRunner?: () => StudioRenderRunner;
   getParentWindow?: () => BrowserWindow | undefined;
   showOpenDialog?: (window: BrowserWindow | undefined) => Promise<{ canceled: boolean; filePaths: string[] }>;
   showExportDialog?: (window: BrowserWindow | undefined) => Promise<{ canceled: boolean; filePaths: string[] }>;
@@ -240,6 +258,7 @@ export function createCreativeStudioCloseHandshake(
 
 const defaultDependencies: CreativeStudioBridgeDependencies = {
   getService: getCreativeStudioService,
+  getRenderRunner: () => getCreativeStudioRuntime().renderRunner,
   getParentWindow: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0],
   showOpenDialog: (window) =>
     dialog.showOpenDialog(window ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0], {
@@ -254,6 +273,7 @@ const defaultDependencies: CreativeStudioBridgeDependencies = {
 
 /** Registers the typed Creative Studio IPC providers without eagerly creating storage. */
 export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDependencies = defaultDependencies): void {
+  const getRenderRunner = dependencies.getRenderRunner ?? (() => getCreativeStudioRuntime().renderRunner);
   ipcBridge.creativeStudio.listProjects.provider(() => command(() => dependencies.getService().listProjects()));
   ipcBridge.creativeStudio.createProject.provider((input) =>
     command(() => dependencies.getService().createProject(input))
@@ -323,6 +343,10 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
       return toCommandError(error);
     }
   });
+  ipcBridge.creativeStudio.renderCut.provider((input) => command(() => getRenderRunner().renderCut(input.projectId)));
+  ipcBridge.creativeStudio.cancelRender.provider((input) =>
+    command(async () => ({ cancelled: getRenderRunner().cancelRender(input.projectId) }))
+  );
   ipcBridge.creativeStudio.fitStoryboard.provider((input) =>
     command(() => dependencies.getService().fitStoryboard(input))
   );

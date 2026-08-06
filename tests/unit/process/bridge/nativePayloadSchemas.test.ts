@@ -223,6 +223,8 @@ const VALID_PAYLOADS = {
     expectedRevision: 1,
   },
   'creative-studio.choose-and-export-assets': { projectId: 'project_1', includeReferences: true },
+  'creative-studio.render-cut': { projectId: 'project_1' },
+  'creative-studio.cancel-render': { projectId: 'project_1' },
   'creative-studio.fit-storyboard': {
     projectId: 'project_1',
     expectedRevision: 1,
@@ -1190,6 +1192,19 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it.each(['creative-studio.render-cut', 'creative-studio.cancel-render'])(
+    'defines a strict project request schema for %s',
+    (providerKey) => {
+      const schema = (
+        nativeBridgePayloadSchemas as Record<string, { safeParse(value: unknown): { success: boolean } }>
+      )[providerKey];
+
+      expect(schema).toBeDefined();
+      expect(schema?.safeParse({ projectId: 'project_1' }).success).toBe(true);
+      expect(schema?.safeParse({ projectId: 'project_1', injected: true }).success).toBe(false);
+    }
+  );
+
   it.each([
     ['creative-studio.list-proposals', { projectId: 'project_1' }],
     ['creative-studio.accept-proposal', { projectId: 'project_1', proposalId: 'proposal_1' }],
