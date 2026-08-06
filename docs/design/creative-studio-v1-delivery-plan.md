@@ -107,11 +107,14 @@ Deferred, not dropped — each has a settled design waiting:
 
 ## 6. Execution shape
 
-- **Track 0 — first, small, blocking the gates themselves: fix BUG-025.** `StudioPage.dom.test.tsx`'s
-  batch-action test is order-dependent — it failed on the pushed tree in a clean window (load 7.8,
-  zero competing vitest) and passes in isolation, with a leaked body-root `<video>` in the failure
-  DOM. Until it is deterministic, every `just push` in this plan fails at random and every gate
-  result needs relitigating. **S**, and worth doing before A1 lands its first slice.
+- **Track 0 — ran 2026-08-06, outcome: investigation, a split-out fix, and a gate policy.** BUG-025
+  did **not** reproduce in 35 targeted executions (seeds, repetition, one-worker, full DOM project) —
+  both observed failures were full cross-project runs, so targeted reproduction may be impossible by
+  construction. Correctly, no speculative fix was made. The leaked body-root `<video>` was convicted
+  as a **separate** production cleanup defect (BUG-026, deterministic reproduction, fix in flight) and
+  exonerated as BUG-025's cause. **Gate policy** until BUG-025 reproduces under logging: an
+  exactly-this-test gate failure → rerun the file in isolation; green → record the log against
+  BUG-025 and proceed. Gates are no longer blocked on it.
 - Worktrees off `creative-suite-sprint2`, one agent per slice, launched with the corrected sandbox
   notes (no socket-binding gates; provisioning verified from outside before launch).
 - **Order: Track 0 → A1 → (A2 ∥ B1) → (A3 ∥ B2 ∥ B3).** A1 is the long pole and starts alone; B-track
