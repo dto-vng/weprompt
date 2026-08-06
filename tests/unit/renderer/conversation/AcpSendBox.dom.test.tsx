@@ -447,6 +447,9 @@ vi.mock('@/renderer/utils/file/fileSelection', () => ({
 vi.mock('@/renderer/utils/file/messageFiles', () => ({
   buildDisplayMessage: (input: string) => input,
 }));
+vi.mock('@/renderer/pages/conversation/platforms/acp/useAcpInitialMessage', () => ({
+  useAcpInitialMessage: vi.fn(),
+}));
 vi.mock('@arco-design/web-react', () => ({
   Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
     <button type='button' onClick={onClick}>
@@ -571,7 +574,6 @@ const makeMessageState = (overrides: Partial<UseAcpMessageReturn> = {}): UseAcpM
 describe('AcpSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
     isMobileMock.current = false;
     mobileActionSheetEntries.current = [];
     contextUsageIndicatorProps.current = null;
@@ -1294,102 +1296,6 @@ describe('AcpSendBox', () => {
     ]);
     expect(presentationStartInvokeMock).toHaveBeenCalledTimes(2);
     expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(2);
-  });
-
-  it.each([
-    { state: 'queued', execution: { state: 'queued' } },
-    {
-      state: 'dispatch_uncertain',
-      execution: {
-        state: 'dispatch_uncertain',
-        runId: '33333333-3333-4333-8333-333333333333',
-        revision: 6,
-      },
-    },
-  ])('accepts an exact durable $state initial replay without enqueueing or redispatching', async ({ execution }) => {
-    featureEnabledState.current = true;
-    runtimeViewState.current = {
-      ...runtimeViewState.current,
-      canSendMessage: false,
-      isProcessing: true,
-      state: 'running',
-    };
-    const queueItemId = '11111111-1111-4111-8111-111111111111';
-    const clientRequestId = '22222222-2222-4222-8222-222222222222';
-    presentationQueueItemsState.current = [
-      {
-        ...presentationQueueItem(queueItemId, clientRequestId, execution),
-        input: 'Initial deck',
-      },
-    ];
-    sessionStorage.setItem(
-      'acp_initial_message_conv-1',
-      JSON.stringify({
-        input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
-        files: [
-          '/private/presentation-templates/business-review/THEME.md',
-          '/private/presentation-templates/business-review/reference.pptx',
-        ],
-        queueItemId,
-        clientRequestId,
-      })
-    );
-
-    const { rerender } = render(
-      <AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />
-    );
-
-    await waitFor(() => expect(sessionStorage.getItem('acp_initial_message_conv-1')).toBeNull());
-    rerender(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
-    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
-    expect(presentationQueueItemsState.current).toHaveLength(1);
-    expect(presentationQueueItemsState.current[0]).toMatchObject({ queueItemId, clientRequestId, execution });
-    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
-    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
-    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
-    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
-    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
-  });
-
-  it('fails closed on a mismatched durable initial identity collision and preserves the handoff', async () => {
-    featureEnabledState.current = true;
-    runtimeViewState.current = {
-      ...runtimeViewState.current,
-      canSendMessage: false,
-      isProcessing: true,
-      state: 'running',
-    };
-    const queueItemId = '11111111-1111-4111-8111-111111111111';
-    const clientRequestId = '22222222-2222-4222-8222-222222222222';
-    presentationQueueItemsState.current = [
-      {
-        ...presentationQueueItem(queueItemId, clientRequestId, { state: 'queued' }),
-        input: 'Different durable prompt',
-      },
-    ];
-    const serialized = JSON.stringify({
-      input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
-      files: [
-        '/private/presentation-templates/business-review/THEME.md',
-        '/private/presentation-templates/business-review/reference.pptx',
-      ],
-      queueItemId,
-      clientRequestId,
-    });
-    sessionStorage.setItem('acp_initial_message_conv-1', serialized);
-
-    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
-
-    await waitFor(() => expect(hydrateSourceOwnerMock).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(sessionStorage.getItem('acp_initial_message_conv-1')).toBe(serialized);
-    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
-    expect(presentationQueueItemsState.current).toHaveLength(1);
-    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
-    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
-    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
-    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
-    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
   it('keeps the raw legacy send when the managed feature flag is false', async () => {

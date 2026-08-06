@@ -925,19 +925,6 @@ const AcpSendBox: React.FC<{
     []
   );
 
-  const hydrateInitialPresentationSources = useCallback(
-    () => presentationSourceDraft.hydrate({ owner_type: 'conversation', conversation_id }),
-    [conversation_id, presentationSourceDraft.hydrate]
-  );
-  const enqueueInitialManagedPresentation = useCallback(
-    (
-      snapshot: PresentationSubmissionSnapshot,
-      sourceOwner: PresentationGrantOwner | null,
-      expectedOwnerRevision: number | null
-    ) => enqueueManagedPresentation(snapshot, sourceOwner, expectedOwnerRevision, false),
-    [enqueueManagedPresentation]
-  );
-
   // Check for and send initial message from guid page
   useAcpInitialMessage({
     conversation_id: conversation_id,
@@ -950,9 +937,6 @@ const AcpSendBox: React.FC<{
     markSendFailed,
     checkAndUpdateTitle,
     addOrUpdateMessage: addOrUpdateMessageRef.current,
-    managedPresentationEnabled: managedPresentationPlatformEligible,
-    hydratePresentationSources: hydrateInitialPresentationSources,
-    enqueueManagedPresentation: enqueueInitialManagedPresentation,
   });
 
   const executeCommand = useCallback(
