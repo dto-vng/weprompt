@@ -25,14 +25,14 @@ import type {
   OfficeArtifactUndoRequest,
 } from '@/common/types/office/artifactEditor';
 
-import { inspectDocxSelection, mutateDocxSelection } from './docxArtifactStrategy';
-import type { hashOfficeArtifact, resolveOfficeArtifactPath, ResolvedOfficeArtifact } from './officeArtifactPath';
-import type { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
-import type { OfficeArtifactWorkingFilesApi } from './officeArtifactWorkingFiles';
-import { OfficeArtifactError } from './officeCliJson';
-import type { OfficeCliPreviewSession, OfficeCliRunner } from './officeCliRunner';
-import type { RetainedOfficePreviewOrigin } from './officePreviewSession';
-import { inspectXlsxSelection, mutateXlsxSelection } from './xlsxArtifactStrategy';
+import { inspectDocxSelection, mutateDocxSelection } from '../docxArtifactStrategy';
+import type { hashOfficeArtifact, resolveOfficeArtifactPath, ResolvedOfficeArtifact } from '../officeArtifactPath';
+import type { OfficeArtifactSnapshotStore } from '../officeArtifactSnapshots';
+import type { OfficeArtifactWorkingFilesApi } from '../officeArtifactWorkingFiles';
+import { OfficeArtifactError } from '../officeCliJson';
+import type { OfficeCliPreviewSession, OfficeCliRunner } from '../officeCliRunner';
+import type { RetainedOfficePreviewOrigin } from '../officePreviewSession';
+import { inspectXlsxSelection, mutateXlsxSelection } from '../xlsxArtifactStrategy';
 
 export type OfficeArtifactSnapshotStoreApi = Pick<
   OfficeArtifactSnapshotStore,
