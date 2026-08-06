@@ -131,6 +131,12 @@ const deferred = <T>(): Deferred<T> => {
   return { promise, resolve, reject };
 };
 
+const rejectDeferredOnAbort = <T>(gate: Deferred<T>, signal: AbortSignal): void => {
+  signal.addEventListener('abort', () => gate.reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), {
+    once: true,
+  });
+};
+
 const waitFor = async (assertion: () => void | Promise<void>, attempts = 100): Promise<void> => {
   let latestError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -175,6 +181,7 @@ type HarnessOptions = {
   scenes?: StudioScene[];
   routes?: StudioResolvedSceneRouteSnapshot[];
   provider?: IProvider;
+  additionalAdapters?: GenerationProviderAdapter[];
   jobIds?: string[];
   idempotencyKeys?: string[];
   sleep?: (delayMs: number, signal: AbortSignal) => Promise<void>;
@@ -240,7 +247,7 @@ const createHarness = async (adapter: GenerationProviderAdapter, options: Harnes
               available.kind === candidate.kind
           )),
     },
-    adapters: new Map([[adapter.id, adapter]]),
+    adapters: new Map([adapter, ...(options.additionalAdapters ?? [])].map((candidate) => [candidate.id, candidate])),
     listProviders: async () => [selectedProvider],
     createJobId: sequence(options.jobIds ?? ['job_1']),
     createIdempotencyKey: sequence(options.idempotencyKeys ?? ['key_1']),
@@ -254,6 +261,68 @@ const createHarness = async (adapter: GenerationProviderAdapter, options: Harnes
   const harness = { rootDir, store, mediaStore, project, manager };
   harnesses.push(harness);
   return harness;
+};
+
+const createProjectFixture = async (
+  store: CreativeStudioStore,
+  name: string,
+  scenes: StudioScene[],
+  routes: StudioResolvedSceneRouteSnapshot[]
+): Promise<StudioProject> => {
+  const selectedRoute = (kind: StudioResolvedSceneRouteSnapshot['kind']) => {
+    const candidate = routes.find((routeCandidate) => routeCandidate.kind === kind);
+    return candidate ? selectionFor(candidate) : null;
+  };
+  const created = await store.createProject({
+    name,
+    brief: '',
+    aspectRatio: '16:9',
+    targetDurationSeconds: Math.max(
+      5,
+      scenes.reduce((total, candidate) => total + candidate.durationSeconds, 0)
+    ),
+    resolution: '720p',
+  });
+  return store.updateProject(created.id, (project) => ({
+    ...project,
+    sceneOrder: scenes.map((candidate) => candidate.id),
+    scenes: Object.fromEntries(scenes.map((candidate) => [candidate.id, candidate])),
+    routing: {
+      storyboard: selectedRoute('storyboard'),
+      image: selectedRoute('image'),
+      video: selectedRoute('video'),
+    },
+  }));
+};
+
+const waitForProjectWrites = async (store: CreativeStudioStore, projectId: string): Promise<void> => {
+  await store.updateProject(projectId, (project) => project);
+};
+
+const mixedSchedulingFixture = () => {
+  const selectedProvider: IProvider = {
+    ...provider,
+    models: ['image-model', 'video-model'],
+  };
+  const scenes = [
+    scene({
+      id: 'scene_video',
+      title: 'Video',
+      visualPrompt: 'video_prompt',
+      mediaKind: 'video',
+      durationSeconds: 4,
+    }),
+    scene({ id: 'scene_image_first', title: 'First image', visualPrompt: 'image_prompt_first' }),
+    scene({ id: 'scene_image_waiting', title: 'Waiting image', visualPrompt: 'image_prompt_waiting' }),
+  ];
+  const routes: StudioResolvedSceneRouteSnapshot[] = scenes.map((candidate) => ({
+    sceneId: candidate.id,
+    providerId: selectedProvider.id,
+    adapterId: candidate.mediaKind === 'video' ? 'weprompt-media-gateway-v1' : 'weprompt-image-v1',
+    model: `${candidate.mediaKind}-model`,
+    kind: candidate.mediaKind,
+  }));
+  return { selectedProvider, scenes, routes };
 };
 
 type SeedRemoteJobOptions = {
@@ -312,6 +381,23 @@ const completeAdapter = (
     },
   }),
   submit: async () => ({ kind: 'complete', outputs: typeof outputs === 'function' ? outputs() : outputs }),
+});
+
+const controllableAdapter = (
+  id: StudioProviderAdapterId,
+  methods: Pick<GenerationProviderAdapter, 'submit'> & Partial<Pick<GenerationProviderAdapter, 'poll' | 'cancel'>>
+): GenerationProviderAdapter => ({
+  id,
+  validateConnection: async () => ({ ok: true }),
+  validateRequest: (request) => ({
+    ok: true,
+    normalized: {
+      aspectRatio: request.aspectRatio,
+      resolution: request.resolution,
+      durationSeconds: request.durationSeconds,
+    },
+  }),
+  ...methods,
 });
 
 const createRemoteOutputDownloader = (bytes: Buffer, contentType: string) =>
@@ -1646,6 +1732,488 @@ describe('StudioJobManager scheduling', () => {
     await waitFor(async () => {
       const current = await harness.store.getProject(harness.project.id);
       expect(Object.values(current?.jobs ?? {}).every((job) => job.status === 'failed')).toBe(true);
+    });
+  });
+
+  it('admits another project while two mixed-media jobs occupy the first project cap', async () => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const started: string[] = [];
+    const gates: Array<{ prompt: string; gate: Deferred<ProviderSubmitResult> }> = [];
+    const submit: GenerationProviderAdapter['submit'] = async (request, _provider, signal) => {
+      started.push(request.prompt);
+      const gate = deferred<ProviderSubmitResult>();
+      rejectDeferredOnAbort(gate, signal);
+      gates.push({ prompt: request.prompt, gate });
+      return gate.promise;
+    };
+    const imageAdapter = controllableAdapter('weprompt-image-v1', { submit });
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', { submit });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      jobIds: ['job_1', 'job_2', 'job_3', 'job_4'],
+      idempotencyKeys: ['key_1', 'key_2', 'key_3', 'key_4'],
+    });
+    const projectBScene = scene({
+      id: 'scene_project_b',
+      title: 'Project B image',
+      visualPrompt: 'project_b_image_prompt',
+    });
+    const projectBRoute: StudioResolvedSceneRouteSnapshot = {
+      ...routes[1]!,
+      sceneId: projectBScene.id,
+    };
+    const projectB = await createProjectFixture(harness.store, 'Project B', [projectBScene], [projectBRoute]);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: scenes.map((candidate) => candidate.id),
+      routes,
+      catalogVersion: 'catalog_1',
+    });
+    await waitForProjectWrites(harness.store, harness.project.id);
+    await waitFor(async () => {
+      const projectA = await harness.store.getProject(harness.project.id);
+      expect(started).toEqual(['video_prompt', 'image_prompt_first']);
+      expect(projectA?.jobs).toMatchObject({
+        job_1: { status: 'submitting' },
+        job_2: { status: 'submitting' },
+        job_3: { status: 'queued_local' },
+      });
+    });
+
+    await harness.manager.submitScenes({
+      projectId: projectB.id,
+      expectedRevision: projectB.revision,
+      sceneIds: [projectBScene.id],
+      routes: [projectBRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(async () => {
+      const [projectA, currentProjectB] = await Promise.all([
+        harness.store.getProject(harness.project.id),
+        harness.store.getProject(projectB.id),
+      ]);
+      expect(started).toEqual(['video_prompt', 'image_prompt_first', 'project_b_image_prompt']);
+      expect(projectA?.jobs.job_3.status).toBe('queued_local');
+      expect(currentProjectB?.jobs.job_4.status).toBe('submitting');
+    });
+
+    for (const { gate } of gates) {
+      gate.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    }
+    await waitFor(() => expect(gates).toHaveLength(4));
+    gates[3]!.gate.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    await waitFor(async () => {
+      const [projectA, currentProjectB] = await Promise.all([
+        harness.store.getProject(harness.project.id),
+        harness.store.getProject(projectB.id),
+      ]);
+      expect(Object.values(projectA?.jobs ?? {}).every((job) => job.status === 'failed')).toBe(true);
+      expect(Object.values(currentProjectB?.jobs ?? {}).every((job) => job.status === 'failed')).toBe(true);
+    });
+  });
+
+  it('admits the waiting project job after a successful mixed-media job reaches terminal state', async () => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const videoGate = deferred<ProviderSubmitResult>();
+    const imageGates: Array<Deferred<ProviderSubmitResult>> = [];
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', {
+      submit: async (_request, _provider, signal) => {
+        rejectDeferredOnAbort(videoGate, signal);
+        return videoGate.promise;
+      },
+    });
+    const imageAdapter = controllableAdapter('weprompt-image-v1', {
+      submit: async (_request, _provider, signal) => {
+        const gate = deferred<ProviderSubmitResult>();
+        rejectDeferredOnAbort(gate, signal);
+        imageGates.push(gate);
+        return gate.promise;
+      },
+    });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      jobIds: ['job_1', 'job_2', 'job_3'],
+      idempotencyKeys: ['key_1', 'key_2', 'key_3'],
+    });
+    const outputPath = path.join(harness.rootDir, 'successful-release.png');
+    await writeFile(outputPath, png);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: scenes.map((candidate) => candidate.id),
+      routes,
+      catalogVersion: 'catalog_1',
+    });
+    await waitForProjectWrites(harness.store, harness.project.id);
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(imageGates).toHaveLength(1);
+      expect(project?.jobs.job_3.status).toBe('queued_local');
+    });
+
+    imageGates[0]!.resolve({
+      kind: 'complete',
+      outputs: [
+        {
+          mediaKind: 'image',
+          role: 'primary',
+          source: { kind: 'file', path: outputPath },
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs.job_2.status).toBe('succeeded');
+      expect(project?.jobs.job_3.status).toBe('submitting');
+      expect(imageGates).toHaveLength(2);
+    });
+    videoGate.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    imageGates[1]!.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs).toMatchObject({
+        job_1: { status: 'failed' },
+        job_2: { status: 'succeeded' },
+        job_3: { status: 'failed' },
+      });
+    });
+  });
+
+  it.each([
+    { code: 'no_output' as const, expectedStatus: 'failed' as const },
+    { code: 'unknown' as const, expectedStatus: 'needs_attention' as const },
+  ])('reuses the project slot after provider $expectedStatus', async ({ code, expectedStatus }) => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const videoGate = deferred<ProviderSubmitResult>();
+    const imageGates: Array<Deferred<ProviderSubmitResult>> = [];
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', {
+      submit: async (_request, _provider, signal) => {
+        rejectDeferredOnAbort(videoGate, signal);
+        return videoGate.promise;
+      },
+    });
+    const imageAdapter = controllableAdapter('weprompt-image-v1', {
+      submit: async (_request, _provider, signal) => {
+        const gate = deferred<ProviderSubmitResult>();
+        rejectDeferredOnAbort(gate, signal);
+        imageGates.push(gate);
+        return gate.promise;
+      },
+    });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      jobIds: ['job_1', 'job_2', 'job_3'],
+      idempotencyKeys: ['key_1', 'key_2', 'key_3'],
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: scenes.map((candidate) => candidate.id),
+      routes,
+      catalogVersion: 'catalog_1',
+    });
+    await waitForProjectWrites(harness.store, harness.project.id);
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(imageGates).toHaveLength(1);
+      expect(project?.jobs.job_3.status).toBe('queued_local');
+    });
+
+    imageGates[0]!.reject(Object.assign(new Error('provider failed'), { code }));
+
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs.job_2.status).toBe(expectedStatus);
+      expect(project?.jobs.job_3.status).toBe('submitting');
+      expect(imageGates).toHaveLength(2);
+    });
+    videoGate.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    imageGates[1]!.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs.job_1.status).toBe('failed');
+      expect(project?.jobs.job_3.status).toBe('failed');
+    });
+  });
+
+  it('reuses the project slot after confirmed remote cancellation', async () => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const videoGate = deferred<ProviderSubmitResult>();
+    const imageSubmissions: string[] = [];
+    const pollGates = new Map<string, Deferred<ProviderJobSnapshot>>();
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', {
+      submit: async (_request, _provider, signal) => {
+        rejectDeferredOnAbort(videoGate, signal);
+        return videoGate.promise;
+      },
+    });
+    const imageAdapter = controllableAdapter('weprompt-image-v1', {
+      submit: async (request) => {
+        imageSubmissions.push(request.prompt);
+        return { kind: 'remote', providerJobId: `remote_${request.prompt}` };
+      },
+      poll: async (providerJobId, _provider, signal) => {
+        const gate = deferred<ProviderJobSnapshot>();
+        rejectDeferredOnAbort(gate, signal);
+        pollGates.set(providerJobId, gate);
+        return gate.promise;
+      },
+      cancel: async () => ({ kind: 'cancelled' }),
+    });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      jobIds: ['job_1', 'job_2', 'job_3'],
+      idempotencyKeys: ['key_1', 'key_2', 'key_3'],
+      sleep: async () => undefined,
+      cancellationPolicy: 'queued_and_running',
+    });
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: scenes.map((candidate) => candidate.id),
+      routes,
+      catalogVersion: 'catalog_1',
+    });
+    await waitForProjectWrites(harness.store, harness.project.id);
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(imageSubmissions).toEqual(['image_prompt_first']);
+      expect(project?.jobs.job_2.status).toBe('queued_remote');
+      expect(project?.jobs.job_3.status).toBe('queued_local');
+    });
+    const beforeCancel = (await harness.store.getProject(harness.project.id))!;
+
+    await expect(
+      harness.manager.cancelJob({
+        projectId: beforeCancel.id,
+        jobId: 'job_2',
+        expectedRevision: beforeCancel.revision,
+      })
+    ).resolves.toMatchObject({ status: 'cancelled' });
+
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(imageSubmissions).toEqual(['image_prompt_first', 'image_prompt_waiting']);
+      expect(project?.jobs.job_2.status).toBe('cancelled');
+      expect(project?.jobs.job_3.status).toBe('queued_remote');
+      expect(pollGates.has('remote_image_prompt_waiting')).toBe(true);
+    });
+    videoGate.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    pollGates.get('remote_image_prompt_waiting')!.resolve({
+      status: 'failed',
+      error: { code: 'no_output' },
+    });
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs.job_1.status).toBe('failed');
+      expect(project?.jobs.job_3.status).toBe('failed');
+    });
+  });
+
+  it('keeps the global video capacity at one across different projects', async () => {
+    const selectedProvider = { ...provider, models: ['video-model'] };
+    const projectAScene = scene({
+      id: 'scene_project_a',
+      visualPrompt: 'project_a_video',
+      mediaKind: 'video',
+      durationSeconds: 5,
+    });
+    const projectARoute: StudioResolvedSceneRouteSnapshot = {
+      sceneId: projectAScene.id,
+      providerId: selectedProvider.id,
+      adapterId: 'weprompt-media-gateway-v1',
+      model: 'video-model',
+      kind: 'video',
+    };
+    const gates: Array<Deferred<ProviderSubmitResult>> = [];
+    const started: string[] = [];
+    const adapter = controllableAdapter('weprompt-media-gateway-v1', {
+      submit: async (request, _provider, signal) => {
+        started.push(request.prompt);
+        const gate = deferred<ProviderSubmitResult>();
+        rejectDeferredOnAbort(gate, signal);
+        gates.push(gate);
+        return gate.promise;
+      },
+    });
+    const harness = await createHarness(adapter, {
+      scenes: [projectAScene],
+      routes: [projectARoute],
+      provider: selectedProvider,
+      jobIds: ['job_1', 'job_2'],
+      idempotencyKeys: ['key_1', 'key_2'],
+    });
+    const projectBScene = scene({
+      id: 'scene_project_b',
+      visualPrompt: 'project_b_video',
+      mediaKind: 'video',
+      durationSeconds: 5,
+    });
+    const projectBRoute = { ...projectARoute, sceneId: projectBScene.id };
+    const projectB = await createProjectFixture(harness.store, 'Project B', [projectBScene], [projectBRoute]);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: [projectAScene.id],
+      routes: [projectARoute],
+      catalogVersion: 'catalog_1',
+    });
+    await harness.manager.submitScenes({
+      projectId: projectB.id,
+      expectedRevision: projectB.revision,
+      sceneIds: [projectBScene.id],
+      routes: [projectBRoute],
+      catalogVersion: 'catalog_1',
+    });
+
+    await waitFor(async () => {
+      const [projectA, currentProjectB] = await Promise.all([
+        harness.store.getProject(harness.project.id),
+        harness.store.getProject(projectB.id),
+      ]);
+      expect(started).toEqual(['project_a_video']);
+      expect(projectA?.jobs.job_1.status).toBe('submitting');
+      expect(currentProjectB?.jobs.job_2.status).toBe('queued_local');
+    });
+    gates[0]!.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    await waitFor(async () => {
+      const currentProjectB = await harness.store.getProject(projectB.id);
+      expect(started).toEqual(['project_a_video', 'project_b_video']);
+      expect(currentProjectB?.jobs.job_2.status).toBe('submitting');
+    });
+    gates[1]!.reject(Object.assign(new Error('provider failed'), { code: 'no_output' }));
+    await waitFor(async () => {
+      const [projectA, currentProjectB] = await Promise.all([
+        harness.store.getProject(harness.project.id),
+        harness.store.getProject(projectB.id),
+      ]);
+      expect(projectA?.jobs.job_1.status).toBe('failed');
+      expect(currentProjectB?.jobs.job_2.status).toBe('failed');
+    });
+  });
+
+  it('reuses a recovered project slot after restart reconciliation reaches terminal state', async () => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const pollCounts = new Map<string, number>();
+    const pollGates = new Map(
+      ['remote_1', 'remote_2', 'remote_3'].map((providerJobId) => [providerJobId, deferred<ProviderJobSnapshot>()])
+    );
+    const poll: NonNullable<GenerationProviderAdapter['poll']> = async (providerJobId, _provider, signal) => {
+      const count = (pollCounts.get(providerJobId) ?? 0) + 1;
+      pollCounts.set(providerJobId, count);
+      if (count === 1) return { status: 'running' };
+      const gate = pollGates.get(providerJobId)!;
+      rejectDeferredOnAbort(gate, signal);
+      return gate.promise;
+    };
+    const unexpectedSubmit: GenerationProviderAdapter['submit'] = async () => {
+      throw new Error('recovery must not submit generation again');
+    };
+    const imageAdapter = controllableAdapter('weprompt-image-v1', { submit: unexpectedSubmit, poll });
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', { submit: unexpectedSubmit, poll });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      sleep: async () => undefined,
+    });
+    await harness.store.updateProject(harness.project.id, (project) => {
+      const next = structuredClone(project);
+      next.jobs = {};
+      scenes.forEach((candidate, index) => {
+        const jobId = `job_${index + 1}`;
+        const candidateRoute = routes[index]!;
+        next.jobs[jobId] = {
+          id: jobId,
+          projectId: project.id,
+          sceneId: candidate.id,
+          status: 'queued_remote',
+          provider: selectionFor(candidateRoute),
+          idempotencyKey: `key_${index + 1}`,
+          providerJobId: `remote_${index + 1}`,
+          remoteStartedAt: project.createdAt,
+          cancellationPolicy: 'queued_and_running',
+          outputAssetIds: [],
+          error: null,
+          retryOfJobId: null,
+          retryReason: null,
+          duplicateChargeAcknowledged: false,
+          duplicateChargeAcknowledgedAt: null,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        };
+        next.scenes[candidate.id].jobIds = [jobId];
+        next.scenes[candidate.id].reviewState = 'generating';
+      });
+      return next;
+    });
+    const outputPath = path.join(harness.rootDir, 'recovered-release.png');
+    await writeFile(outputPath, png);
+
+    await harness.manager.resumePendingJobs();
+    await waitFor(() => {
+      expect(pollCounts.get('remote_1')).toBe(2);
+      expect(pollCounts.get('remote_2')).toBe(2);
+    });
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs).toMatchObject({
+        job_1: { status: 'running' },
+        job_2: { status: 'running' },
+        job_3: { status: 'queued_remote' },
+      });
+      expect(pollCounts.has('remote_3')).toBe(false);
+    });
+
+    pollGates.get('remote_2')!.resolve({
+      status: 'succeeded',
+      outputs: [
+        {
+          mediaKind: 'image',
+          role: 'primary',
+          source: { kind: 'file', path: outputPath },
+          mimeType: 'image/png',
+        },
+      ],
+    });
+
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs.job_2.status).toBe('succeeded');
+      expect(project?.jobs.job_3.status).toBe('running');
+      expect(pollCounts.has('remote_3')).toBe(true);
+    });
+    pollGates.get('remote_1')!.resolve({ status: 'failed', error: { code: 'no_output' } });
+    pollGates.get('remote_3')!.resolve({ status: 'failed', error: { code: 'no_output' } });
+    await waitFor(async () => {
+      const project = await harness.store.getProject(harness.project.id);
+      expect(project?.jobs).toMatchObject({
+        job_1: { status: 'failed' },
+        job_2: { status: 'succeeded' },
+        job_3: { status: 'failed' },
+      });
     });
   });
 

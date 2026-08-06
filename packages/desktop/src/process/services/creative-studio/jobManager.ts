@@ -43,6 +43,7 @@ const POLL_BASE_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 const MAX_POLL_DELAY_MS = 15_000;
 const REMOTE_POLL_ATTEMPT_TIMEOUT_MS = 60_000;
 const REMOTE_POLL_DEADLINE_MS = 30 * 60_000;
+const MAX_IN_FLIGHT_PAID_JOBS_PER_PROJECT = 2;
 
 type OutputDownloaderDeps = Omit<RemoteMediaDownloadDeps, 'write' | 'maxBytes'>;
 
@@ -353,6 +354,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
   const jitterMs = deps.jitterMs ?? defaultJitter;
   const outputDownloader = deps.outputDownloader ?? defaultOutputDownloader;
   const semaphores = { image: new FifoSemaphore(2), video: new FifoSemaphore(1) };
+  const projectSemaphores = new Map<string, FifoSemaphore>();
   const controllers = new Map<string, AbortController>();
   const executionReservations = new Set<string>();
   const operationControllers = new Set<AbortController>();
@@ -363,6 +365,32 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
   let disposed = false;
   let recoveryPromise: Promise<void> | null = null;
   let disposePromise: Promise<void> | null = null;
+
+  const acquireJobSlot = async (
+    projectId: string,
+    mediaKind: StudioMediaKind,
+    signal: AbortSignal
+  ): Promise<() => void> => {
+    let projectSemaphore = projectSemaphores.get(projectId);
+    if (!projectSemaphore) {
+      projectSemaphore = new FifoSemaphore(MAX_IN_FLIGHT_PAID_JOBS_PER_PROJECT);
+      projectSemaphores.set(projectId, projectSemaphore);
+    }
+    const releaseProject = await projectSemaphore.acquire(signal);
+    try {
+      const releaseGlobal = await semaphores[mediaKind].acquire(signal);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        releaseGlobal();
+        releaseProject();
+      };
+    } catch (error) {
+      releaseProject();
+      throw error;
+    }
+  };
 
   const admitOperation = <T>(operation: () => Promise<T>): Promise<T> => {
     if (disposed) return Promise.reject(new StudioJobManagerError('invalid_request'));
@@ -937,7 +965,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
   };
 
   const runSubmission = async (prepared: PreparedSubmission, signal: AbortSignal): Promise<void> => {
-    const release = await semaphores[prepared.mediaKind].acquire(signal);
+    const release = await acquireJobSlot(prepared.projectId, prepared.mediaKind, signal);
     try {
       const submitting = await mutateJob(prepared.projectId, prepared.jobId, (_project, job) => {
         if (job.status !== 'queued_local') return false;
@@ -1019,7 +1047,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
     remoteStartedAt: string,
     signal: AbortSignal
   ) => {
-    const release = await semaphores[context.mediaKind].acquire(signal);
+    const release = await acquireJobSlot(context.projectId, context.mediaKind, signal);
     try {
       await pollRemote(context, providerJobId, remoteStartedAt, signal);
     } catch (error) {
@@ -1430,7 +1458,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       if (claimed.status !== 'running') throw new StudioJobManagerError('invalid_request');
       let release: (() => void) | undefined;
       try {
-        release = await semaphores[context.mediaKind].acquire(controller.signal);
+        release = await acquireJobSlot(context.projectId, context.mediaKind, controller.signal);
         const snapshot = await runWithProviderDeadline(
           controller.signal,
           REMOTE_POLL_ATTEMPT_TIMEOUT_MS,
@@ -1551,6 +1579,7 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       operationControllers.clear();
       cancellationFlights.clear();
       activeRunByKey.clear();
+      projectSemaphores.clear();
     })();
     return disposePromise;
   };
