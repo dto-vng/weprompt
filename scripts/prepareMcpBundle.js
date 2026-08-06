@@ -56,7 +56,15 @@ function ensureDir(dir) {
 function prepareMcpBundle() {
   if ((process.env.AIONUI_MCP_BUNDLE_SKIP || '').trim() === '1') {
     console.log('[mcp-bundle] AIONUI_MCP_BUNDLE_SKIP=1 — skipping');
-    return { prepared: false };
+    // electron-builder.yml lists resources/mcp-bundled as an extraResources entry
+    // unconditionally, so packaging fails if the directory doesn't exist. Create it
+    // (with a manifest that records no bridge was vendored) so a skipped build still
+    // packages cleanly.
+    fs.rmSync(BUNDLE_DIR, { recursive: true, force: true });
+    ensureDir(BUNDLE_DIR);
+    const manifest = { mcpRemote: null };
+    fs.writeFileSync(path.join(BUNDLE_DIR, MCP_BUNDLE_MANIFEST_NAME), `${JSON.stringify(manifest, null, 2)}\n`);
+    return { prepared: false, manifest };
   }
 
   fs.rmSync(BUNDLE_DIR, { recursive: true, force: true });
@@ -66,7 +74,17 @@ function prepareMcpBundle() {
   console.log(`[mcp-bundle] Installing ${spec} into ${path.relative(PROJECT_ROOT, BUNDLE_DIR)}`);
   execFileSync(
     'npm',
-    ['install', spec, '--prefix', BUNDLE_DIR, '--no-audit', '--no-fund', '--omit=dev', '--loglevel=error'],
+    [
+      'install',
+      spec,
+      '--prefix',
+      BUNDLE_DIR,
+      '--no-audit',
+      '--no-fund',
+      '--omit=dev',
+      '--ignore-scripts',
+      '--loglevel=error',
+    ],
     { stdio: 'inherit', shell: process.platform === 'win32' }
   );
 

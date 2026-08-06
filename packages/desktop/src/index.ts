@@ -690,11 +690,15 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
         autoUpdaterService.setBeforeQuitAndInstall(async () => {
           await backendManager.stop();
         });
-        // Check for updates after 3 seconds delay
-        // 3秒后检查更新
-        setTimeout(() => {
-          void autoUpdaterService.checkForUpdatesAndNotify();
-        }, 3000);
+        // Automatic update check is intentionally disabled for this pilot build: the update
+        // feed points at upstream's CDN, and an automatic check could silently move a pilot
+        // install onto an upstream release carrying upstream's backend instead of this
+        // project's hardened one. The service is still initialized so its IPC surface (manual
+        // check, install-on-quit, etc.) keeps working; only the automatic 3s-after-launch
+        // check is removed.
+        // 本次试点构建有意禁用自动检查更新：更新源指向上游 CDN，自动检查可能会将试点安装
+        // 静默切换到携带上游后端的上游发行版，而非本项目加固后的后端。服务仍会正常初始化，
+        // 以保留其 IPC 能力（手动检查、退出时安装等）；仅移除启动 3 秒后的自动检查。
       })
       .catch((error) => {
         console.error('[App] Failed to initialize autoUpdaterService:', error);

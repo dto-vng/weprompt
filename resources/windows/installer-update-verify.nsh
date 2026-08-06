@@ -25,12 +25,12 @@ Var /GLOBAL AionUiActiveMarkerResult
     nsExec::Exec `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "& { \
       $$ErrorActionPreference = 'SilentlyContinue'; \
       $$deadline = (Get-Date).AddSeconds(10); \
-      $$target = [System.IO.Path]::GetFullPath((Join-Path '$INSTDIR' '${AIONUI_APP_EXECUTABLE_FILENAME}')); \
+      $$target = [System.IO.Path]::GetFullPath((Join-Path '$INSTDIR' '${APP_EXECUTABLE_FILENAME}')); \
       do { \
         $$hits = @(Get-CimInstance -ClassName Win32_Process | Where-Object { \
           $$path = $$_.ExecutablePath; \
           if (-not $$path) { $$path = $$_.Path } \
-          $$_.Name -ieq '${AIONUI_APP_EXECUTABLE_FILENAME}' -and $$path -and \
+          $$_.Name -ieq '${APP_EXECUTABLE_FILENAME}' -and $$path -and \
           [string]::Equals([System.IO.Path]::GetFullPath($$path), $$target, [System.StringComparison]::CurrentCultureIgnoreCase) \
         }); \
         if ($$hits.Count -eq 0) { exit 0 }; \
@@ -170,7 +170,7 @@ Var /GLOBAL AionUiActiveMarkerResult
 
 !macro AIONUI_VERIFY_CORE_APP_FILES
   !insertmacro AIONUI_LOG_EVENT "verify-install start instDir=$INSTDIR"
-  !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\AionUi.exe" "AionUi.exe"
+  !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "${APP_EXECUTABLE_FILENAME}"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\ffmpeg.dll" "ffmpeg.dll"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\libEGL.dll" "libEGL.dll"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\libGLESv2.dll" "libGLESv2.dll"

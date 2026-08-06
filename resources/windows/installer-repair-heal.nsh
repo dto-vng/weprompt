@@ -127,7 +127,7 @@ Var /GLOBAL AionUiInnerFailureReadResult
     !insertmacro AIONUI_LOG_EVENT "event=registry-heal phase=missing-install-location uninstallString=$AionUiRegUninstallString"
     !insertmacro AIONUI_CLEAR_INSTALL_REGISTRY "missing-install-location"
   ${Else}
-    StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_APP_EXECUTABLE_FILENAME}"
+    StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${APP_EXECUTABLE_FILENAME}"
     ${If} ${FileExists} "$AionUiRegInstallExe"
       StrCpy $INSTDIR "$AionUiRegInstallLocation"
       StrCpy $AionUiRegistryInstallIsValid "1"
