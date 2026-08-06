@@ -27,7 +27,7 @@ import type {
 import type { IProvider } from '@/common/config/storage';
 import type { GenerationProviderAdapter } from '@process/services/creative-studio/adapters';
 import { STUDIO_E2E_BOUNDARY_SENTINELS } from '@process/services/creative-studio/adapters/e2eFakeAdapter';
-import type { CreativeStudioStoreError } from '@process/services/creative-studio/store';
+import type { CreativeStudioStore, CreativeStudioStoreError } from '@process/services/creative-studio/store';
 import { createCreativeStudioStore } from '@process/services/creative-studio/store';
 import {
   createCreativeStudioService,
@@ -249,18 +249,20 @@ type StoryboardService = CreativeStudioService & {
 
 describe('CreativeStudioService', () => {
   let rootDir = '';
+  let store: CreativeStudioStore;
   let service: CreativeStudioService;
   let onProjectUpdated: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), 'creative-studio-service-'));
     onProjectUpdated = vi.fn();
+    store = createCreativeStudioStore({
+      rootDir,
+      now: () => '2026-07-30T00:00:00.000Z',
+      createId: () => 'project_1',
+    });
     service = createCreativeStudioService({
-      store: createCreativeStudioStore({
-        rootDir,
-        now: () => '2026-07-30T00:00:00.000Z',
-        createId: () => 'project_1',
-      }),
+      store,
       onProjectUpdated,
       storyboardPlanner: makePlanner(),
     });
@@ -323,6 +325,79 @@ describe('CreativeStudioService', () => {
     } as never);
 
     expect(updated.briefConversationId).toBeNull();
+  });
+
+  describe('proposal acceptance', () => {
+    const payload = {
+      kind: 'replace_storyboard' as const,
+      sceneOrder: ['scene_proposed'],
+      scenes: { scene_proposed: makeScene('scene_proposed') },
+    };
+
+    it('accepts a current proposal through its stored base revision exactly once', async () => {
+      const project = await service.createProject(makeInput());
+      await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_1',
+        baseRevision: project.revision,
+        payload,
+      });
+      onProjectUpdated.mockClear();
+
+      const first = await service.acceptProposal({ projectId: project.id, proposalId: 'proposal_1' });
+      const second = await service.acceptProposal({ projectId: project.id, proposalId: 'proposal_1' });
+
+      expect(first.project).toMatchObject({
+        revision: project.revision + 1,
+        sceneOrder: ['scene_proposed'],
+        scenes: { scene_proposed: expect.objectContaining({ title: 'Scene scene_proposed' }) },
+      });
+      expect(second).toEqual(first);
+      await expect(service.getProject(project.id)).resolves.toEqual(first.project);
+      expect(onProjectUpdated).toHaveBeenCalledExactlyOnceWith(project.id);
+    });
+
+    it('fails closed on a stale proposal and leaves the project manifest byte-for-byte unchanged', async () => {
+      const project = await service.createProject(makeInput());
+      await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_stale',
+        baseRevision: project.revision,
+        payload,
+      });
+      await service.updateProject({
+        projectId: project.id,
+        expectedRevision: project.revision,
+        name: 'User edit while proposal was drafting',
+      });
+      const projectPath = path.join(rootDir, project.id, 'project.json');
+      const before = await readFile(projectPath);
+
+      await expect(
+        service.acceptProposal({ projectId: project.id, proposalId: 'proposal_stale' })
+      ).rejects.toMatchObject({ code: 'stale_project' });
+
+      expect(await readFile(projectPath)).toEqual(before);
+      await expect(service.listProposals({ projectId: project.id })).resolves.toMatchObject([
+        { id: 'proposal_stale', status: 'pending' },
+      ]);
+    });
+
+    it('rejects without changing the project and keeps the proposal as durable rejected history', async () => {
+      const project = await service.createProject(makeInput());
+      await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_rejected',
+        baseRevision: project.revision,
+        payload,
+      });
+
+      const rejected = await service.rejectProposal({ projectId: project.id, proposalId: 'proposal_rejected' });
+
+      expect(rejected.status).toBe('rejected');
+      await expect(service.getProject(project.id)).resolves.toEqual(project);
+      await expect(service.listProposals({ projectId: project.id })).resolves.toEqual([rejected]);
+    });
   });
 
   it('decodes a renderer PNG and notifies only after captured-poster persistence succeeds', async () => {

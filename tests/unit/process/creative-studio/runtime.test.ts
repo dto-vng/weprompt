@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
-import type { StudioConnectionBinding } from '@/common/types/project/creativeStudioTypes';
+import type { CreateStudioProjectInput, StudioConnectionBinding } from '@/common/types/project/creativeStudioTypes';
 import {
   createCreativeStudioRuntime,
   shouldEnableStudioE2EFakeAdapter,
@@ -30,6 +30,7 @@ import type { StudioMediaStore } from '@process/services/creative-studio/mediaSt
 import type { StudioProviderResolver } from '@process/services/creative-studio/providerResolver';
 import type { CreativeStudioService } from '@process/services/creative-studio/creativeStudioService';
 import type { CreativeStudioStore } from '@process/services/creative-studio/store';
+import { createCreativeStudioStore } from '@process/services/creative-studio/store';
 import type { StudioStoryboardPlanner } from '@process/services/creative-studio/planning/storyboardPlanner';
 
 const temporaryDirectories: string[] = [];
@@ -97,13 +98,19 @@ const createHarness = (
     rootDir?: string;
     isPackaged?: boolean;
     createE2EFakeBundle?: CreativeStudioRuntimeFactories['createE2EFakeBundle'];
+    store?: CreativeStudioStore;
+    onProposalUpdated?: (projectId: string, proposalId: string) => void;
   } = {}
 ): RuntimeHarness => {
   const calls: string[] = [];
   const captures: RuntimeHarness['captures'] = {};
-  const store = {
-    listConnections: async () => [],
-  } as unknown as CreativeStudioStore;
+  const store =
+    overrides.store ??
+    ({
+      listConnections: async () => [],
+      reapAbandonedProposals: async () => {},
+      watchProposals: async () => async () => {},
+    } as unknown as CreativeStudioStore);
   const mediaStore = {
     cleanupOrphanParts: async () => {
       calls.push('cleanup-parts');
@@ -170,6 +177,7 @@ const createHarness = (
     factories,
     listProviders: async () => [provider()],
     onProjectUpdated: vi.fn(),
+    onProposalUpdated: overrides.onProposalUpdated ?? vi.fn(),
     protocol: {
       install:
         overrides.installProtocol ??
@@ -186,6 +194,77 @@ const createHarness = (
 };
 
 describe('Creative Studio runtime identity and lifecycle', () => {
+  it('observes an externally recorded proposal without a manual refresh and reloads it after restart', async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'studio-proposal-runtime-'));
+    temporaryDirectories.push(rootDir);
+    const now = () => '2026-08-06T00:00:00.000Z';
+    const projectInput: CreateStudioProjectInput = {
+      name: 'Observed film',
+      brief: 'Watch the durable proposal inbox',
+      aspectRatio: '16:9',
+      targetDurationSeconds: 15,
+      resolution: '1080p',
+    };
+    let emitProposalFile: ((relativeFile: string) => void) | undefined;
+    const logError = vi.fn();
+    const runtimeStore = createCreativeStudioStore({
+      rootDir,
+      now,
+      createId: () => 'project_observed',
+      logError,
+      watchProposalTree: ({ onChange }) => {
+        emitProposalFile = onChange;
+        return { close: () => {} };
+      },
+    });
+    const project = await runtimeStore.createProject(projectInput);
+    const onProposalUpdated = vi.fn();
+    const { runtime } = createHarness({}, { rootDir, store: runtimeStore, onProposalUpdated });
+    await runtime.start();
+    const subprocessWriter = createCreativeStudioStore({ rootDir, now });
+
+    await subprocessWriter.recordProposal({
+      projectId: project.id,
+      proposalId: 'proposal_external',
+      baseRevision: project.revision,
+      payload: {
+        kind: 'replace_storyboard',
+        sceneOrder: ['scene_external'],
+        scenes: {
+          scene_external: {
+            title: 'External scene',
+            purpose: 'Prove filesystem observation',
+            visualPrompt: 'A proposal appears without turn completion',
+            narration: '',
+            onScreenText: '',
+            mediaKind: 'image',
+            durationSeconds: 5,
+            referenceAssetId: null,
+          },
+        },
+      },
+    });
+    emitProposalFile?.(path.join(project.id, 'proposals', 'pending', 'proposal_external.json'));
+
+    await vi.waitFor(() => {
+      expect(onProposalUpdated).toHaveBeenCalledWith(project.id, 'proposal_external');
+    });
+    onProposalUpdated.mockClear();
+    await writeFile(
+      path.join(rootDir, project.id, 'proposals', 'pending', 'proposal_invalid.json'),
+      JSON.stringify({ status: 'pending' })
+    );
+    emitProposalFile?.(path.join(project.id, 'proposals', 'pending', 'proposal_invalid.json'));
+    await vi.waitFor(() => expect(logError).toHaveBeenCalled());
+    expect(onProposalUpdated).not.toHaveBeenCalled();
+    await runtime.dispose();
+
+    const restartedStore = createCreativeStudioStore({ rootDir, now });
+    await expect(restartedStore.listProposals(project.id)).resolves.toMatchObject([
+      { id: 'proposal_external', status: 'pending' },
+    ]);
+  });
+
   it('assembles one shared store, media store, resolver, adapter registry, manager, and service graph', async () => {
     const { runtime, captures } = createHarness();
 
@@ -279,6 +358,10 @@ describe('Creative Studio runtime identity and lifecycle', () => {
 
   it('waits for an in-flight protocol install and removes the handler before disposal completes', async () => {
     let releaseInstall: (() => void) | undefined;
+    let markInstallStarted: (() => void) | undefined;
+    const installStarted = new Promise<void>((resolve) => {
+      markInstallStarted = resolve;
+    });
     const calls: string[] = [];
     const { runtime, uninstallProtocol } = createHarness(
       {},
@@ -286,14 +369,14 @@ describe('Creative Studio runtime identity and lifecycle', () => {
         installProtocol: () =>
           new Promise<CreativeStudioProtocolInstallation>((resolve) => {
             calls.push('install-protocol-start');
+            markInstallStarted?.();
             releaseInstall = () => resolve({ dispose: async () => {} });
           }),
       }
     );
 
     const start = runtime.start();
-    await Promise.resolve();
-    await Promise.resolve();
+    await installStarted;
     const dispose = runtime.dispose();
     await Promise.resolve();
 

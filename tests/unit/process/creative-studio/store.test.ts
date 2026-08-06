@@ -204,6 +204,23 @@ const validConnectionBinding = (): StudioConnectionBinding => ({
   validatedAt: '2026-07-30T00:00:00.000Z',
 });
 
+const proposalPayload = (title = 'Proposed opening') => ({
+  kind: 'replace_storyboard' as const,
+  sceneOrder: ['scene_proposed'],
+  scenes: {
+    scene_proposed: {
+      title,
+      purpose: 'Open the story',
+      visualPrompt: 'A bounded proposal payload',
+      narration: '',
+      onScreenText: '',
+      mediaKind: 'image' as const,
+      durationSeconds: 5,
+      referenceAssetId: null,
+    },
+  },
+});
+
 describe('creative studio project store', () => {
   let rootDir: string;
   let store: CreativeStudioStore;
@@ -231,6 +248,174 @@ describe('creative studio project store', () => {
     expect(project.revision).toBe(1);
     expect(project.schemaVersion).toBe(1);
     expect(await store.getProject(project.id)).toEqual(project);
+  });
+
+  describe('proposal ledger', () => {
+    it('records one immutable project-scoped proposal and reloads it after restart', async () => {
+      const project = await store.createProject(makeInput());
+      const recorded = await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_1',
+        baseRevision: project.revision,
+        payload: proposalPayload(),
+      });
+      const reloadedStore = createCreativeStudioStore({
+        rootDir,
+        now: () => new Date((clock += 1_000)).toISOString(),
+      });
+
+      await expect(reloadedStore.listProposals(project.id)).resolves.toEqual([recorded]);
+      expect(recorded).toMatchObject({
+        schemaVersion: 1,
+        id: 'proposal_1',
+        projectId: project.id,
+        status: 'pending',
+        baseRevision: project.revision,
+      });
+      expect(
+        JSON.parse(readFileSync(path.join(rootDir, project.id, 'proposals', 'pending', 'proposal_1.json'), 'utf8'))
+      ).toEqual(recorded);
+    });
+
+    it('marks a rejection with an immutable decision while retaining the original pending record', async () => {
+      const project = await store.createProject(makeInput());
+      await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_1',
+        baseRevision: project.revision,
+        payload: proposalPayload(),
+      });
+      const originalPath = path.join(rootDir, project.id, 'proposals', 'pending', 'proposal_1.json');
+      const originalBytes = readFileSync(originalPath);
+
+      const rejected = await store.rejectProposal(project.id, 'proposal_1');
+
+      expect(rejected.status).toBe('rejected');
+      expect(readFileSync(originalPath)).toEqual(originalBytes);
+      expect(
+        JSON.parse(readFileSync(path.join(rootDir, project.id, 'proposals', 'decisions', 'proposal_1.json'), 'utf8'))
+      ).toMatchObject({ proposalId: 'proposal_1', status: 'rejected' });
+      await expect(store.listProposals(project.id)).resolves.toEqual([rejected]);
+    });
+
+    it('rejects a proposal whose serialized record exceeds 256 KiB without creating it', async () => {
+      const project = await store.createProject(makeInput());
+      const sceneOrder = Array.from({ length: 24 }, (_, index) => `scene_${index + 1}`);
+      const scenes = Object.fromEntries(
+        sceneOrder.map((sceneId) => [
+          sceneId,
+          {
+            ...proposalPayload().scenes.scene_proposed,
+            visualPrompt: 'v'.repeat(8 * 1024),
+            narration: 'n'.repeat(4 * 1024),
+            onScreenText: 'o'.repeat(1024),
+          },
+        ])
+      );
+
+      await expect(
+        store.recordProposal({
+          projectId: project.id,
+          proposalId: 'proposal_too_large',
+          baseRevision: project.revision,
+          payload: { kind: 'replace_storyboard', sceneOrder, scenes },
+        })
+      ).rejects.toMatchObject({ code: 'invalid_payload' });
+      await expect(store.listProposals(project.id)).resolves.toEqual([]);
+      expect(existsSync(path.join(rootDir, project.id, 'proposals', 'pending', 'proposal_too_large.json'))).toBe(false);
+    });
+
+    it('rejects an overlong opaque proposal id before constructing a filesystem path', async () => {
+      const project = await store.createProject(makeInput());
+
+      await expect(
+        store.recordProposal({
+          projectId: project.id,
+          proposalId: 'p'.repeat(257),
+          baseRevision: project.revision,
+          payload: proposalPayload(),
+        })
+      ).rejects.toMatchObject({ code: 'invalid_payload' });
+      await expect(store.listProposals(project.id)).resolves.toEqual([]);
+    });
+
+    it('admits at most 50 concurrent pending proposals and writes nothing for the overflow', async () => {
+      const project = await store.createProject(makeInput());
+      const results = await Promise.allSettled(
+        Array.from({ length: 51 }, (_, index) =>
+          store.recordProposal({
+            projectId: project.id,
+            proposalId: `proposal_${index + 1}`,
+            baseRevision: project.revision,
+            payload: proposalPayload(`Proposal ${index + 1}`),
+          })
+        )
+      );
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(50);
+      expect(results.filter((result) => result.status === 'rejected')).toEqual([
+        expect.objectContaining({ reason: expect.objectContaining({ code: 'busy' }) }),
+      ]);
+      await expect(store.listProposals(project.id)).resolves.toHaveLength(50);
+      expect(readdirSync(path.join(rootDir, project.id, 'proposals', 'pending'))).toHaveLength(50);
+    });
+
+    it('enforces the pending bound across independent writers racing for the final slot', async () => {
+      const project = await store.createProject(makeInput());
+      for (let index = 0; index < 49; index += 1) {
+        // Populate the ledger serially so the assertion isolates only the final cross-writer race.
+        // eslint-disable-next-line no-await-in-loop
+        await store.recordProposal({
+          projectId: project.id,
+          proposalId: `proposal_${index + 1}`,
+          baseRevision: project.revision,
+          payload: proposalPayload(`Proposal ${index + 1}`),
+        });
+      }
+      const secondWriter = createCreativeStudioStore({
+        rootDir,
+        now: () => new Date((clock += 1_000)).toISOString(),
+      });
+
+      const results = await Promise.allSettled([
+        store.recordProposal({
+          projectId: project.id,
+          proposalId: 'proposal_50_a',
+          baseRevision: project.revision,
+          payload: proposalPayload('Proposal 50 A'),
+        }),
+        secondWriter.recordProposal({
+          projectId: project.id,
+          proposalId: 'proposal_50_b',
+          baseRevision: project.revision,
+          payload: proposalPayload('Proposal 50 B'),
+        }),
+      ]);
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      await expect(store.listProposals(project.id)).resolves.toHaveLength(50);
+    });
+
+    it('reaps abandoned pending proposals by appending an expiry decision before listing', async () => {
+      const project = await store.createProject(makeInput());
+      await store.recordProposal({
+        projectId: project.id,
+        proposalId: 'proposal_abandoned',
+        baseRevision: project.revision,
+        payload: proposalPayload(),
+      });
+      clock += 8 * 24 * 60 * 60 * 1_000;
+
+      await expect(store.listProposals(project.id)).resolves.toMatchObject([
+        { id: 'proposal_abandoned', status: 'expired' },
+      ]);
+      expect(
+        JSON.parse(
+          readFileSync(path.join(rootDir, project.id, 'proposals', 'decisions', 'proposal_abandoned.json'), 'utf8')
+        )
+      ).toMatchObject({ proposalId: 'proposal_abandoned', status: 'expired' });
+    });
   });
 
   it('creates three empty project model selections', async () => {

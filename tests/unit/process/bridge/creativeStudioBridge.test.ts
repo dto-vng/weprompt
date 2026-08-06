@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   listProjectsProvider: vi.fn(),
   createProjectProvider: vi.fn(),
   getProjectProvider: vi.fn(),
+  listProposalsProvider: vi.fn(),
+  acceptProposalProvider: vi.fn(),
+  rejectProposalProvider: vi.fn(),
   proposeStoryboardProvider: vi.fn(),
   updateModelSelectionProvider: vi.fn(),
   updateProjectProvider: vi.fn(),
@@ -47,6 +50,9 @@ vi.mock('@/common', () => ({
       listProjects: { provider: mocks.listProjectsProvider },
       createProject: { provider: mocks.createProjectProvider },
       getProject: { provider: mocks.getProjectProvider },
+      listProposals: { provider: mocks.listProposalsProvider },
+      acceptProposal: { provider: mocks.acceptProposalProvider },
+      rejectProposal: { provider: mocks.rejectProposalProvider },
       proposeStoryboard: { provider: mocks.proposeStoryboardProvider },
       updateModelSelection: { provider: mocks.updateModelSelectionProvider },
       updateProject: { provider: mocks.updateProjectProvider },
@@ -114,6 +120,9 @@ describe('initCreativeStudioBridge', () => {
         listProjects: vi.fn(async () => []),
         createProject: vi.fn(async () => project),
         getProject: vi.fn(async () => project),
+        listProposals: vi.fn(async () => []),
+        acceptProposal: vi.fn(),
+        rejectProposal: vi.fn(),
         proposeStoryboard: vi.fn(async () => project),
         updateModelSelection: vi.fn(async () => project),
         updateProject: vi.fn(async () => project),
@@ -152,6 +161,9 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.listProjectsProvider).toHaveBeenCalledOnce();
     expect(mocks.createProjectProvider).toHaveBeenCalledOnce();
     expect(mocks.getProjectProvider).toHaveBeenCalledOnce();
+    expect(mocks.listProposalsProvider).toHaveBeenCalledOnce();
+    expect(mocks.acceptProposalProvider).toHaveBeenCalledOnce();
+    expect(mocks.rejectProposalProvider).toHaveBeenCalledOnce();
     expect(mocks.proposeStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.updateModelSelectionProvider).toHaveBeenCalledOnce();
     expect(mocks.updateProjectProvider).toHaveBeenCalledOnce();
@@ -175,6 +187,24 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.saveConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.removeConnectionProvider).toHaveBeenCalledOnce();
     expect(mocks.listRoutesProvider).toHaveBeenCalledOnce();
+  });
+
+  it('delegates proposal listing, acceptance, and rejection through dedicated providers', async () => {
+    const service = dependencies.getService();
+    initCreativeStudioBridge({ getService: () => service });
+    const list = mocks.listProposalsProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const accept = mocks.acceptProposalProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const reject = mocks.rejectProposalProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const projectInput = { projectId: 'project_1' };
+    const proposalInput = { ...projectInput, proposalId: 'proposal_1' };
+
+    await list(projectInput);
+    await accept(proposalInput);
+    await reject(proposalInput);
+
+    expect(service.listProposals).toHaveBeenCalledExactlyOnceWith(projectInput);
+    expect(service.acceptProposal).toHaveBeenCalledExactlyOnceWith(proposalInput);
+    expect(service.rejectProposal).toHaveBeenCalledExactlyOnceWith(proposalInput);
   });
 
   it('delegates one exact model-selection mutation', async () => {

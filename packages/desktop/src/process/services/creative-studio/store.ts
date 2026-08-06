@@ -5,6 +5,7 @@
  */
 
 import { promises as nodeFs } from 'node:fs';
+import { watch as watchFileSystem } from 'node:fs';
 import path from 'node:path';
 import type {
   CreateStudioProjectInput,
@@ -17,6 +18,9 @@ import type {
   StudioJob,
   StudioProject,
   StudioProjectSummary,
+  StudioProposal,
+  StudioProposalPayload,
+  StudioRecordProposalInput,
   StudioProviderRef,
   StudioScene,
   StudioTextModelRef,
@@ -171,6 +175,35 @@ const FORBIDDEN_RENDERER_FIELDS = new Set([
   'bytes',
   'base64',
 ]);
+const PROPOSAL_RECORD_KEYS = new Set([
+  'schemaVersion',
+  'id',
+  'projectId',
+  'status',
+  'baseRevision',
+  'payload',
+  'createdAt',
+  'decidedAt',
+]);
+const PROPOSAL_PAYLOAD_KEYS = new Set(['kind', 'sceneOrder', 'scenes']);
+const PROPOSAL_SCENE_KEYS = new Set([
+  'title',
+  'purpose',
+  'visualPrompt',
+  'narration',
+  'onScreenText',
+  'mediaKind',
+  'durationSeconds',
+  'referenceAssetId',
+]);
+const PROPOSAL_DECISION_KEYS = new Set(['schemaVersion', 'proposalId', 'status', 'decidedAt']);
+const PROPOSAL_SLOT_KEYS = new Set(['schemaVersion', 'proposalId', 'reservedAt']);
+const PROPOSAL_DECISION_STATUSES = new Set(['accepted', 'rejected', 'expired']);
+
+export const STUDIO_PROPOSAL_MAX_RECORD_BYTES = 256 * 1024;
+export const STUDIO_PROPOSAL_MAX_PENDING_PER_PROJECT = 50;
+export const STUDIO_PROPOSAL_PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+const STUDIO_PROPOSAL_STALE_SLOT_MS = 60 * 1_000;
 
 let temporaryFileCounter = 0;
 
@@ -200,6 +233,16 @@ export type CreativeStudioStore = {
   listConnections(): Promise<StudioConnectionBinding[]>;
   saveConnection(binding: StudioConnectionBinding): Promise<StudioConnectionBinding>;
   removeConnection(connectionId: string): Promise<boolean>;
+  recordProposal(input: StudioRecordProposalInput): Promise<StudioProposal>;
+  listProposals(projectId: string): Promise<StudioProposal[]>;
+  acceptProposal(
+    projectId: string,
+    proposalId: string,
+    update: (project: StudioProject, payload: StudioProposalPayload) => StudioProject
+  ): Promise<{ proposal: StudioProposal; project: StudioProject; applied: boolean }>;
+  rejectProposal(projectId: string, proposalId: string): Promise<StudioProposal>;
+  reapAbandonedProposals(): Promise<void>;
+  watchProposals(listener: (projectId: string, proposalId: string) => void): Promise<() => Promise<void>>;
   /** Main-process-only canonical project path; never return this through IPC. */
   getVerifiedProjectDirectory(projectId: string): Promise<string | null>;
 };
@@ -210,6 +253,11 @@ export type CreativeStudioStoreDeps = {
   createId?: () => string;
   fs?: typeof nodeFs;
   logError?: (message: string, error: unknown) => void;
+  watchProposalTree?: (input: {
+    rootDir: string;
+    onChange: (relativeFile: string) => void;
+    onError: (error: Error) => void;
+  }) => { close(): void };
 };
 
 type ProjectListingSweep = {
@@ -218,6 +266,19 @@ type ProjectListingSweep = {
 };
 
 type JsonRecord = Record<string, unknown>;
+
+type StudioProposalDecision = {
+  schemaVersion: 1;
+  proposalId: string;
+  status: Exclude<StudioProposal['status'], 'pending'>;
+  decidedAt: string;
+};
+
+type StudioProposalSlot = {
+  schemaVersion: 1;
+  proposalId: string;
+  reservedAt: string;
+};
 
 const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -250,6 +311,8 @@ const containsForbiddenConnectionField = (value: unknown): boolean => {
 };
 
 const isSafeId = (value: unknown): value is string => typeof value === 'string' && SAFE_ID.test(value);
+const isSafeProposalId = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 256 && SAFE_ID.test(value);
 const isSafeConnectionId = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= 256 && SAFE_ID.test(value);
 
@@ -286,6 +349,71 @@ const asArrayOfSafeIds = (value: unknown): value is string[] => Array.isArray(va
 
 const hasExactKeys = (value: Record<string, unknown>, keys: ReadonlySet<string>): boolean =>
   Object.keys(value).length === keys.size && Object.keys(value).every((key) => keys.has(key));
+
+const validateProposalScene = (value: unknown): boolean =>
+  isRecord(value) &&
+  hasExactKeys(value, PROPOSAL_SCENE_KEYS) &&
+  isString(value.title) &&
+  value.title.length <= 256 &&
+  isString(value.purpose) &&
+  value.purpose.length <= 256 &&
+  isString(value.visualPrompt) &&
+  value.visualPrompt.length <= 8 * 1024 &&
+  isString(value.narration) &&
+  value.narration.length <= 4 * 1024 &&
+  isString(value.onScreenText) &&
+  value.onScreenText.length <= 1024 &&
+  isString(value.mediaKind) &&
+  MEDIA_KINDS.has(value.mediaKind) &&
+  isIntegerInRange(value.durationSeconds, 1, 60) &&
+  (value.referenceAssetId === null || isSafeId(value.referenceAssetId));
+
+const validateProposalPayload = (value: unknown): value is StudioProposalPayload => {
+  if (!isRecord(value) || !isRecord(value.scenes) || !hasExactKeys(value, PROPOSAL_PAYLOAD_KEYS)) return false;
+  const scenes = value.scenes;
+  const sceneOrder = value.sceneOrder;
+  if (!asArrayOfSafeIds(sceneOrder)) return false;
+  const sceneIds = Object.keys(scenes);
+  return (
+    value.kind === 'replace_storyboard' &&
+    sceneOrder.length > 0 &&
+    sceneOrder.length <= 24 &&
+    new Set(sceneOrder).size === sceneOrder.length &&
+    sceneIds.length === sceneOrder.length &&
+    sceneIds.every((sceneId) => sceneOrder.includes(sceneId) && validateProposalScene(scenes[sceneId])) &&
+    !containsForbiddenRendererField(value)
+  );
+};
+
+const validateProposalRecord = (projectId: string, proposalId: string, value: unknown): value is StudioProposal =>
+  isRecord(value) &&
+  hasExactKeys(value, PROPOSAL_RECORD_KEYS) &&
+  value.schemaVersion === 1 &&
+  value.id === proposalId &&
+  isSafeProposalId(value.id) &&
+  value.projectId === projectId &&
+  value.status === 'pending' &&
+  isIntegerInRange(value.baseRevision, 1, Number.MAX_SAFE_INTEGER) &&
+  validateProposalPayload(value.payload) &&
+  isCanonicalIsoTimestamp(value.createdAt) &&
+  value.decidedAt === null;
+
+const validateProposalDecision = (proposalId: string, value: unknown): value is StudioProposalDecision =>
+  isRecord(value) &&
+  hasExactKeys(value, PROPOSAL_DECISION_KEYS) &&
+  value.schemaVersion === 1 &&
+  value.proposalId === proposalId &&
+  isSafeProposalId(value.proposalId) &&
+  isString(value.status) &&
+  PROPOSAL_DECISION_STATUSES.has(value.status) &&
+  isCanonicalIsoTimestamp(value.decidedAt);
+
+const validateProposalSlot = (value: unknown): value is StudioProposalSlot =>
+  isRecord(value) &&
+  hasExactKeys(value, PROPOSAL_SLOT_KEYS) &&
+  value.schemaVersion === 1 &&
+  isSafeProposalId(value.proposalId) &&
+  isCanonicalIsoTimestamp(value.reservedAt);
 
 const validateProviderRef = (value: unknown): value is StudioProviderRef =>
   isRecord(value) &&
@@ -946,7 +1074,21 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
   const createId = deps.createId ?? (() => crypto.randomUUID().replaceAll('-', '_'));
   const fs = deps.fs ?? nodeFs;
   const logError = deps.logError ?? ((message: string, error: unknown): void => console.error(message, error));
+  const watchProposalTree =
+    deps.watchProposalTree ??
+    ((input: {
+      rootDir: string;
+      onChange: (relativeFile: string) => void;
+      onError: (error: Error) => void;
+    }): { close(): void } => {
+      const watcher = watchFileSystem(input.rootDir, { recursive: true, encoding: 'utf8' }, (_eventType, fileName) => {
+        if (fileName !== null) input.onChange(fileName);
+      });
+      watcher.on('error', input.onError);
+      return { close: () => watcher.close() };
+    });
   const queues = new Map<string, Promise<unknown>>();
+  const proposalReapedAt = new Map<string, number>();
   let summaryQueue: Promise<unknown> = Promise.resolve();
   let connectionsQueue: Promise<unknown> = Promise.resolve();
   let sharedListingSweep:
@@ -1058,6 +1200,64 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     return file;
   };
 
+  const safeNestedDirectory = async (
+    root: string,
+    parent: string,
+    name: string,
+    createIfMissing: boolean
+  ): Promise<string | null> => {
+    const directory = resolveRootChild(parent, name);
+    if (!isInsideRoot(root, directory)) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal directory escaped its root');
+    }
+    try {
+      const stats = await fs.lstat(directory);
+      if (!stats.isDirectory() || stats.isSymbolicLink()) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal directory is unsafe');
+      }
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      if (!isRecord(error) || error.code !== 'ENOENT') {
+        throw storageError(error, 'Creative Studio proposal directory is unavailable');
+      }
+      if (!createIfMissing) return null;
+      try {
+        await fs.mkdir(directory);
+      } catch (mkdirError) {
+        throw storageError(mkdirError, 'Creative Studio proposal directory could not be created');
+      }
+    }
+    try {
+      const canonicalDirectory = await fs.realpath(directory);
+      if (canonicalDirectory !== directory || !isInsideRoot(root, canonicalDirectory)) {
+        throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal directory is unsafe');
+      }
+      return canonicalDirectory;
+    } catch (error) {
+      if (error instanceof CreativeStudioStoreError) throw error;
+      throw storageError(error, 'Creative Studio proposal directory is unavailable');
+    }
+  };
+
+  const proposalDirectories = async (
+    root: string,
+    projectId: string,
+    createIfMissing: boolean
+  ): Promise<{ root: string; pending: string; decisions: string; slots: string } | null> => {
+    const project = await projectDirectory(root, projectId, false);
+    if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+    const proposalRoot = await safeNestedDirectory(root, project, 'proposals', createIfMissing);
+    if (proposalRoot === null) return null;
+    const pending = await safeNestedDirectory(root, proposalRoot, 'pending', createIfMissing);
+    const decisions = await safeNestedDirectory(root, proposalRoot, 'decisions', createIfMissing);
+    if (pending === null || decisions === null) return null;
+    const slots = await safeNestedDirectory(root, proposalRoot, 'slots', true);
+    if (slots === null) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal slots are unavailable');
+    }
+    return { root: proposalRoot, pending, decisions, slots };
+  };
+
   const readConnections = async (root: string): Promise<StudioConnectionBinding[]> => {
     const file = await connectionsFile(root);
     try {
@@ -1125,6 +1325,269 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
         error instanceof Error ? error.message : 'Studio storage write failed'
       );
     }
+  };
+
+  const writeJsonExclusiveAtomic = async (root: string, file: string, serialized: string): Promise<void> => {
+    const parent = path.dirname(file);
+    if (!isInsideRoot(root, parent)) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal target escaped its root');
+    }
+    const parentStats = await fs.lstat(parent);
+    if (!parentStats.isDirectory() || parentStats.isSymbolicLink() || (await fs.realpath(parent)) !== parent) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal parent is unsafe');
+    }
+    const temporaryFile = `${file}.${process.pid}.${++temporaryFileCounter}.tmp`;
+    let temporaryHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
+    try {
+      temporaryHandle = await fs.open(temporaryFile, 'wx');
+      await temporaryHandle.writeFile(serialized, { encoding: 'utf8' });
+      await temporaryHandle.sync();
+      await temporaryHandle.close();
+      temporaryHandle = undefined;
+      await fs.link(temporaryFile, file);
+      await fs.rm(temporaryFile);
+      const directoryHandle = await fs.open(parent, 'r');
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
+    } catch (error) {
+      await temporaryHandle?.close().catch((): undefined => undefined);
+      await fs.rm(temporaryFile, { force: true }).catch((): undefined => undefined);
+      if (isRecord(error) && error.code === 'EEXIST') {
+        throw new CreativeStudioStoreError('invalid_payload', 'Studio proposal already exists');
+      }
+      throw new CreativeStudioStoreError(
+        'storage_error',
+        error instanceof Error ? error.message : 'Studio proposal write failed'
+      );
+    }
+  };
+
+  const proposalFileEntries = async (directory: string): Promise<import('node:fs').Dirent[]> => {
+    try {
+      return await fs.readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      throw storageError(error, 'Creative Studio proposal directory could not be read');
+    }
+  };
+
+  const readBoundedProposalJson = async (file: string): Promise<unknown> => {
+    const stats = await fs.lstat(file);
+    if (stats.isSymbolicLink() || !stats.isFile() || stats.size > STUDIO_PROPOSAL_MAX_RECORD_BYTES) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal record is unsafe');
+    }
+    return JSON.parse(await fs.readFile(file, 'utf8')) as unknown;
+  };
+
+  const readProposalRecords = async (
+    projectId: string,
+    directories: { pending: string }
+  ): Promise<StudioProposal[]> => {
+    const entries = await proposalFileEntries(directories.pending);
+    const proposals: StudioProposal[] = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      const proposalId = entry.name.slice(0, -'.json'.length);
+      if (!isSafeProposalId(proposalId)) continue;
+      try {
+        const value = await readBoundedProposalJson(path.join(directories.pending, entry.name));
+        if (validateProposalRecord(projectId, proposalId, value)) proposals.push(value);
+        else logError('[CreativeStudio] Ignoring malformed proposal record', new Error('InvalidProposalRecord'));
+      } catch (error) {
+        logError('[CreativeStudio] Ignoring unreadable proposal record', error);
+      }
+    }
+    return proposals;
+  };
+
+  const readProposalDecisions = async (directories: {
+    decisions: string;
+  }): Promise<Map<string, StudioProposalDecision>> => {
+    const entries = await proposalFileEntries(directories.decisions);
+    const decisions = new Map<string, StudioProposalDecision>();
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      const proposalId = entry.name.slice(0, -'.json'.length);
+      if (!isSafeProposalId(proposalId)) continue;
+      try {
+        const value = await readBoundedProposalJson(path.join(directories.decisions, entry.name));
+        if (validateProposalDecision(proposalId, value)) decisions.set(proposalId, value);
+        else logError('[CreativeStudio] Ignoring malformed proposal decision', new Error('InvalidProposalDecision'));
+      } catch (error) {
+        logError('[CreativeStudio] Ignoring unreadable proposal decision', error);
+      }
+    }
+    return decisions;
+  };
+
+  const effectiveProposal = (proposal: StudioProposal, decision: StudioProposalDecision | undefined): StudioProposal =>
+    decision === undefined
+      ? proposal
+      : {
+          ...proposal,
+          status: decision.status,
+          decidedAt: decision.decidedAt,
+        };
+
+  const reserveProposalSlot = async (slotsDirectory: string, proposalId: string): Promise<string> => {
+    const reservation: StudioProposalSlot = {
+      schemaVersion: 1,
+      proposalId,
+      reservedAt: now(),
+    };
+    for (let index = 0; index < STUDIO_PROPOSAL_MAX_PENDING_PER_PROJECT; index += 1) {
+      const file = path.join(slotsDirectory, `${index}.slot`);
+      let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
+      try {
+        // Slot creation is the cross-process pending-capacity compare-and-set.
+        // eslint-disable-next-line no-await-in-loop
+        handle = await fs.open(file, 'wx');
+        // eslint-disable-next-line no-await-in-loop
+        await handle.writeFile(JSON.stringify(reservation), { encoding: 'utf8' });
+        // eslint-disable-next-line no-await-in-loop
+        await handle.sync();
+        // eslint-disable-next-line no-await-in-loop
+        await handle.close();
+        handle = undefined;
+        return file;
+      } catch (error) {
+        await handle?.close().catch((): undefined => undefined);
+        if (isRecord(error) && error.code === 'EEXIST') continue;
+        await fs.rm(file, { force: true }).catch((): undefined => undefined);
+        throw storageError(error, 'Studio proposal capacity could not be reserved');
+      }
+    }
+    throw new CreativeStudioStoreError('busy', 'Studio proposal inbox is full');
+  };
+
+  const releaseProposalSlotFile = async (file: string): Promise<void> => {
+    await fs.rm(file, { force: true });
+  };
+
+  const cleanupProposalSlots = async (directories: { slots: string }, proposals: StudioProposal[]): Promise<void> => {
+    const liveProposalIds = new Set(
+      proposals.filter((proposal) => proposal.status === 'pending').map((proposal) => proposal.id)
+    );
+    const entries = await proposalFileEntries(directories.slots);
+    const retainedProposalIds = new Set<string>();
+    const cutoff = Date.parse(now()) - STUDIO_PROPOSAL_STALE_SLOT_MS;
+    for (const entry of entries) {
+      if (!entry.isFile() || !/^\d+\.slot$/.test(entry.name)) continue;
+      const file = path.join(directories.slots, entry.name);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const value = await readBoundedProposalJson(file);
+        const retain =
+          validateProposalSlot(value) &&
+          liveProposalIds.has(value.proposalId) &&
+          !retainedProposalIds.has(value.proposalId);
+        if (retain) {
+          retainedProposalIds.add(value.proposalId);
+          continue;
+        }
+        const activeReservation =
+          validateProposalSlot(value) &&
+          !liveProposalIds.has(value.proposalId) &&
+          Date.parse(value.reservedAt) > cutoff;
+        if (activeReservation) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await releaseProposalSlotFile(file);
+      } catch (error) {
+        logError('[CreativeStudio] Proposal slot cleanup failed', error);
+      }
+    }
+  };
+
+  const releaseProposalSlot = async (directories: { slots: string }, proposalId: string): Promise<void> => {
+    const entries = await proposalFileEntries(directories.slots);
+    for (const entry of entries) {
+      if (!entry.isFile() || !/^\d+\.slot$/.test(entry.name)) continue;
+      const file = path.join(directories.slots, entry.name);
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const value = await readBoundedProposalJson(file);
+        if (!validateProposalSlot(value) || value.proposalId !== proposalId) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await releaseProposalSlotFile(file);
+      } catch (error) {
+        logError('[CreativeStudio] Proposal slot release failed', error);
+      }
+    }
+  };
+
+  const appendProposalDecision = async (
+    root: string,
+    decisionsDirectory: string,
+    proposalId: string,
+    status: StudioProposalDecision['status']
+  ): Promise<StudioProposalDecision> => {
+    const decision: StudioProposalDecision = {
+      schemaVersion: 1,
+      proposalId,
+      status,
+      decidedAt: now(),
+    };
+    await writeJsonExclusiveAtomic(root, path.join(decisionsDirectory, `${proposalId}.json`), JSON.stringify(decision));
+    return decision;
+  };
+
+  const reapPendingProposals = async (
+    root: string,
+    directories: { pending: string; decisions: string; slots: string }
+  ): Promise<void> => {
+    const [proposals, decisions] = await Promise.all([
+      readProposalRecords(path.basename(path.dirname(path.dirname(directories.pending))), directories),
+      readProposalDecisions(directories),
+    ]);
+    const cutoff = Date.parse(now()) - STUDIO_PROPOSAL_PENDING_TTL_MS;
+    for (const proposal of proposals) {
+      if (decisions.has(proposal.id) || Date.parse(proposal.createdAt) > cutoff) continue;
+      try {
+        // A bounded project ledger has at most 50 live pending records.
+        // eslint-disable-next-line no-await-in-loop
+        const decision = await appendProposalDecision(root, directories.decisions, proposal.id, 'expired');
+        decisions.set(proposal.id, decision);
+        // eslint-disable-next-line no-await-in-loop
+        await releaseProposalSlot(directories, proposal.id);
+      } catch (error) {
+        if (!(error instanceof CreativeStudioStoreError) || error.code !== 'invalid_payload') throw error;
+      }
+    }
+    await cleanupProposalSlots(
+      directories,
+      proposals.map((proposal) => effectiveProposal(proposal, decisions.get(proposal.id)))
+    );
+  };
+
+  const reapPendingProposalsBeforeWrite = async (
+    root: string,
+    projectId: string,
+    directories: { pending: string; decisions: string; slots: string }
+  ): Promise<void> => {
+    const currentTime = Date.parse(now());
+    const lastReapedAt = proposalReapedAt.get(projectId);
+    if (lastReapedAt !== undefined && currentTime - lastReapedAt < STUDIO_PROPOSAL_STALE_SLOT_MS) return;
+    await reapPendingProposals(root, directories);
+    proposalReapedAt.set(projectId, currentTime);
+  };
+
+  const listProjectProposals = async (
+    root: string,
+    projectId: string,
+    directories: { pending: string; decisions: string; slots: string }
+  ): Promise<StudioProposal[]> => {
+    await reapPendingProposals(root, directories);
+    const [proposals, decisions] = await Promise.all([
+      readProposalRecords(projectId, directories),
+      readProposalDecisions(directories),
+    ]);
+    const effective = proposals
+      .map((proposal) => effectiveProposal(proposal, decisions.get(proposal.id)))
+      .toSorted((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+    await cleanupProposalSlots(directories, effective);
+    return effective;
   };
 
   const readProject = async (root: string, projectId: string): Promise<StudioProject | null> => {
@@ -1213,6 +1676,49 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
     return next;
   };
 
+  const updateProjectInsideQueue = async (
+    root: string,
+    projectId: string,
+    update: (project: StudioProject) => StudioProject,
+    expectedRevision?: number
+  ): Promise<StudioProject> => {
+    await summariesFile(root);
+    const current = await readProject(root, projectId);
+    if (current === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+    if (expectedRevision !== undefined && expectedRevision !== current.revision) {
+      throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
+    }
+    const updated = update(structuredClone(current));
+    if (!isRecord(updated) || updated.id !== current.id || updated.createdAt !== current.createdAt) {
+      throw new CreativeStudioStoreError('invalid_payload', 'Studio project identity cannot change');
+    }
+    const next: StudioProject = {
+      ...updated,
+      schemaVersion: 1,
+      revision: current.revision + 1,
+      updatedAt: now(),
+    };
+    if (!validateProject(next)) {
+      throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project payload');
+    }
+    const file = await projectFile(root, projectId, false);
+    if (file === null) {
+      throw new CreativeStudioStoreError('storage_error', 'Creative Studio project storage is unavailable');
+    }
+    await writeJsonAtomic(root, file, next);
+    await repairSummaryIndex();
+    return next;
+  };
+
+  const listProposalsThroughQueue = (projectId: string): Promise<StudioProposal[]> =>
+    enqueue(projectId, async (): Promise<StudioProposal[]> => {
+      const root = await canonicalRoot();
+      const project = await readProject(root, projectId);
+      if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+      const directories = await proposalDirectories(root, projectId, false);
+      return directories === null ? [] : listProjectProposals(root, projectId, directories);
+    });
+
   return {
     async listProjects(): Promise<StudioProjectSummary[]> {
       if (sharedListingSweep?.remainingConsumer === 'projects') {
@@ -1270,6 +1776,183 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       return projectDirectory(await canonicalRoot(), projectId, false);
     },
 
+    async recordProposal(input: StudioRecordProposalInput): Promise<StudioProposal> {
+      if (!isSafeId(input.projectId) || !isSafeProposalId(input.proposalId)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio proposal identity');
+      }
+      if (!isIntegerInRange(input.baseRevision, 1, Number.MAX_SAFE_INTEGER)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio proposal revision');
+      }
+      return enqueue(input.projectId, async () => {
+        const root = await canonicalRoot();
+        const project = await readProject(root, input.projectId);
+        if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+        const candidate: StudioProposal = {
+          schemaVersion: 1,
+          id: input.proposalId,
+          projectId: input.projectId,
+          status: 'pending',
+          baseRevision: input.baseRevision,
+          payload: structuredClone(input.payload),
+          createdAt: now(),
+          decidedAt: null,
+        };
+        if (!validateProposalRecord(input.projectId, input.proposalId, candidate)) {
+          throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio proposal record');
+        }
+        const serialized = JSON.stringify(candidate);
+        if (Buffer.byteLength(serialized, 'utf8') > STUDIO_PROPOSAL_MAX_RECORD_BYTES) {
+          throw new CreativeStudioStoreError('invalid_payload', 'Studio proposal record is too large');
+        }
+        const directories = await proposalDirectories(root, input.projectId, true);
+        if (directories === null) {
+          throw new CreativeStudioStoreError('storage_error', 'Creative Studio proposal storage is unavailable');
+        }
+        await reapPendingProposalsBeforeWrite(root, input.projectId, directories);
+        const slot = await reserveProposalSlot(directories.slots, input.proposalId);
+        try {
+          await writeJsonExclusiveAtomic(root, path.join(directories.pending, `${input.proposalId}.json`), serialized);
+        } catch (error) {
+          await releaseProposalSlotFile(slot).catch((): undefined => undefined);
+          throw error;
+        }
+        return candidate;
+      });
+    },
+
+    async listProposals(projectId: string): Promise<StudioProposal[]> {
+      if (!isSafeId(projectId)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project id');
+      }
+      return listProposalsThroughQueue(projectId);
+    },
+
+    async rejectProposal(projectId: string, proposalId: string): Promise<StudioProposal> {
+      if (!isSafeId(projectId) || !isSafeProposalId(proposalId)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio proposal identity');
+      }
+      return enqueue(projectId, async () => {
+        const root = await canonicalRoot();
+        const project = await readProject(root, projectId);
+        if (project === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+        const directories = await proposalDirectories(root, projectId, false);
+        if (directories === null) throw new CreativeStudioStoreError('not_found', 'Studio proposal not found');
+        const proposal = (await listProjectProposals(root, projectId, directories)).find(
+          (candidate) => candidate.id === proposalId
+        );
+        if (proposal === undefined) throw new CreativeStudioStoreError('not_found', 'Studio proposal not found');
+        if (proposal.status === 'rejected') return proposal;
+        if (proposal.status !== 'pending') {
+          throw new CreativeStudioStoreError('invalid_payload', 'Studio proposal is no longer pending');
+        }
+        const decision = await appendProposalDecision(root, directories.decisions, proposalId, 'rejected');
+        await releaseProposalSlot(directories, proposalId);
+        return effectiveProposal(proposal, decision);
+      });
+    },
+
+    async reapAbandonedProposals(): Promise<void> {
+      const root = await canonicalRoot();
+      const { projects } = await readAllProjects(root);
+      await Promise.all(
+        projects.map((project) =>
+          enqueue(project.id, async () => {
+            const directories = await proposalDirectories(root, project.id, false);
+            if (directories !== null) {
+              await reapPendingProposals(root, directories);
+              proposalReapedAt.set(project.id, Date.parse(now()));
+            }
+          })
+        )
+      );
+    },
+
+    async watchProposals(listener: (projectId: string, proposalId: string) => void): Promise<() => Promise<void>> {
+      const root = await canonicalRoot();
+      let closed = false;
+      const observedStatuses = new Map<string, StudioProposal['status']>();
+      const validateAndNotify = async (relativeFile: string): Promise<void> => {
+        const segments = path.normalize(relativeFile).split(path.sep);
+        if (
+          segments.length !== 4 ||
+          !isSafeId(segments[0]) ||
+          segments[1] !== 'proposals' ||
+          (segments[2] !== 'pending' && segments[2] !== 'decisions') ||
+          !segments[3].endsWith('.json')
+        ) {
+          return;
+        }
+        const projectId = segments[0];
+        const proposalId = segments[3].slice(0, -'.json'.length);
+        if (!isSafeProposalId(proposalId)) return;
+        try {
+          const proposal = (await listProposalsThroughQueue(projectId)).find(
+            (candidate) => candidate.id === proposalId
+          );
+          if (closed || proposal === undefined) return;
+          const key = `${projectId}:${proposalId}`;
+          if (observedStatuses.get(key) === proposal.status) return;
+          observedStatuses.set(key, proposal.status);
+          listener(projectId, proposalId);
+        } catch (error) {
+          if (!closed) logError('[CreativeStudio] Proposal watcher ignored an invalid record', error);
+        }
+      };
+      let watcher: { close(): void };
+      try {
+        watcher = watchProposalTree({
+          rootDir: root,
+          onChange: (relativeFile) => {
+            if (!closed) void validateAndNotify(relativeFile);
+          },
+          onError: (error) => {
+            if (!closed) logError('[CreativeStudio] Proposal watcher failed', error);
+          },
+        });
+      } catch (error) {
+        throw storageError(error, 'Creative Studio proposal watcher could not start');
+      }
+      return async () => {
+        if (closed) return;
+        closed = true;
+        watcher.close();
+      };
+    },
+
+    async acceptProposal(
+      projectId: string,
+      proposalId: string,
+      update: (project: StudioProject, payload: StudioProposalPayload) => StudioProject
+    ): Promise<{ proposal: StudioProposal; project: StudioProject; applied: boolean }> {
+      if (!isSafeId(projectId) || !isSafeProposalId(proposalId)) {
+        throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio proposal identity');
+      }
+      return enqueue(projectId, async () => {
+        const root = await canonicalRoot();
+        const current = await readProject(root, projectId);
+        if (current === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
+        const directories = await proposalDirectories(root, projectId, false);
+        if (directories === null) throw new CreativeStudioStoreError('not_found', 'Studio proposal not found');
+        const proposal = (await listProjectProposals(root, projectId, directories)).find(
+          (candidate) => candidate.id === proposalId
+        );
+        if (proposal === undefined) throw new CreativeStudioStoreError('not_found', 'Studio proposal not found');
+        if (proposal.status === 'accepted') return { proposal, project: current, applied: false };
+        if (proposal.status !== 'pending') {
+          throw new CreativeStudioStoreError('invalid_payload', 'Studio proposal is no longer pending');
+        }
+        const project = await updateProjectInsideQueue(
+          root,
+          projectId,
+          (candidate) => update(candidate, structuredClone(proposal.payload)),
+          proposal.baseRevision
+        );
+        const decision = await appendProposalDecision(root, directories.decisions, proposalId, 'accepted');
+        await releaseProposalSlot(directories, proposalId);
+        return { proposal: effectiveProposal(proposal, decision), project, applied: true };
+      });
+    },
+
     async updateProject(
       projectId: string,
       update: (project: StudioProject) => StudioProject,
@@ -1282,30 +1965,7 @@ export const createCreativeStudioStore = (deps: CreativeStudioStoreDeps): Creati
       sharedListingSweep = undefined;
       return enqueue(projectId, async () => {
         const root = await canonicalRoot();
-        await summariesFile(root);
-        const current = await readProject(root, projectId);
-        if (current === null) throw new CreativeStudioStoreError('not_found', 'Studio project not found');
-        if (expectedRevision !== undefined && expectedRevision !== current.revision) {
-          throw new CreativeStudioStoreError('stale_project', 'Studio project has changed');
-        }
-        const updated = update(structuredClone(current));
-        if (!isRecord(updated) || updated.id !== current.id || updated.createdAt !== current.createdAt) {
-          throw new CreativeStudioStoreError('invalid_payload', 'Studio project identity cannot change');
-        }
-        const next: StudioProject = {
-          ...updated,
-          schemaVersion: 1,
-          revision: current.revision + 1,
-          updatedAt: now(),
-        };
-        if (!validateProject(next))
-          throw new CreativeStudioStoreError('invalid_payload', 'Invalid Studio project payload');
-        const file = await projectFile(root, projectId, false);
-        if (file === null)
-          throw new CreativeStudioStoreError('storage_error', 'Creative Studio project storage is unavailable');
-        await writeJsonAtomic(root, file, next);
-        await repairSummaryIndex();
-        return next;
+        return updateProjectInsideQueue(root, projectId, update, expectedRevision);
       });
     },
 

@@ -153,6 +153,9 @@ const VALID_PAYLOADS = {
     resolution: '1080p',
   },
   'creative-studio.get-project': { projectId: 'project_1' },
+  'creative-studio.list-proposals': { projectId: 'project_1' },
+  'creative-studio.accept-proposal': { projectId: 'project_1', proposalId: 'proposal_1' },
+  'creative-studio.reject-proposal': { projectId: 'project_1', proposalId: 'proposal_1' },
   'creative-studio.propose-storyboard': { projectId: 'project_1', expectedRevision: 1, replaceExisting: false },
   'creative-studio.update-model-selection': {
     projectId: 'project_1',
@@ -1187,6 +1190,20 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it.each([
+    ['creative-studio.list-proposals', { projectId: 'project_1' }],
+    ['creative-studio.accept-proposal', { projectId: 'project_1', proposalId: 'proposal_1' }],
+    ['creative-studio.reject-proposal', { projectId: 'project_1', proposalId: 'proposal_1' }],
+  ])('defines a strict native schema for %s', (providerKey, payload) => {
+    const schema = (nativeBridgePayloadSchemas as Record<string, { safeParse(value: unknown): { success: boolean } }>)[
+      providerKey
+    ];
+
+    expect(schema).toBeDefined();
+    expect(schema?.safeParse(payload).success).toBe(true);
+    expect(schema?.safeParse({ ...payload, injected: true }).success).toBe(false);
+  });
+
   it('guards the dedicated Brief conversation binding command', () => {
     const schema = nativeBridgePayloadSchemas['creative-studio.bind-brief-conversation'];
 

@@ -90,6 +90,9 @@ import type {
   StudioDeleteProjectRequest,
   StudioProjectRequest,
   StudioProjectSummary,
+  StudioProposal,
+  StudioProposalAcceptance,
+  StudioProposalRequest,
   StudioPersistCapturedPosterRequest,
   StudioRendererProject,
   StudioImportOutcome,
@@ -1136,6 +1139,15 @@ export const creativeStudio = {
   getProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject | null>, StudioProjectRequest>(
     'creative-studio.get-project'
   ),
+  listProposals: bridge.buildProvider<StudioCommandResult<StudioProposal[]>, StudioProjectRequest>(
+    'creative-studio.list-proposals'
+  ),
+  acceptProposal: bridge.buildProvider<StudioCommandResult<StudioProposalAcceptance>, StudioProposalRequest>(
+    'creative-studio.accept-proposal'
+  ),
+  rejectProposal: bridge.buildProvider<StudioCommandResult<StudioProposal>, StudioProposalRequest>(
+    'creative-studio.reject-proposal'
+  ),
   proposeStoryboard: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, ProposeStudioStoryboardInput>(
     'creative-studio.propose-storyboard'
   ),
@@ -1217,6 +1229,7 @@ export const creativeStudio = {
     saved: false,
   }),
   projectUpdated: bridge.buildEmitter<{ projectId: string }>('studio.project-updated'),
+  proposalUpdated: bridge.buildEmitter<{ projectId: string; proposalId: string }>('studio.proposal-updated'),
 };
 
 // ---------------------------------------------------------------------------

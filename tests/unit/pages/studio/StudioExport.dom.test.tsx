@@ -22,6 +22,7 @@ const bridge = vi.hoisted(() => ({
   hasUnsavedWork: { provider: vi.fn() },
   flushUnsavedWork: { provider: vi.fn() },
   getProject: { invoke: vi.fn() },
+  listProposals: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
   updateProject: { invoke: vi.fn() },
   updateScene: { invoke: vi.fn() },
@@ -40,9 +41,16 @@ const bridge = vi.hoisted(() => ({
   saveConnection: { invoke: vi.fn() },
   removeConnection: { invoke: vi.fn() },
   projectUpdated: { on: vi.fn() },
+  proposalUpdated: { on: vi.fn() },
+  turnCompleted: { on: vi.fn() },
 }));
 
-vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
+vi.mock('@/common', () => ({
+  ipcBridge: {
+    creativeStudio: bridge,
+    conversation: { turnCompleted: bridge.turnCompleted },
+  },
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
@@ -145,6 +153,7 @@ describe('Studio asset export', () => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
+    bridge.listProposals.invoke.mockResolvedValue(ok([]));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
     bridge.updateProject.invoke.mockResolvedValue(ok(project()));
     bridge.updateScene.invoke.mockResolvedValue(ok(project()));
@@ -173,6 +182,8 @@ describe('Studio asset export', () => {
     bridge.saveConnection.invoke.mockResolvedValue(ok(null));
     bridge.removeConnection.invoke.mockResolvedValue(ok(false));
     bridge.projectUpdated.on.mockReturnValue(() => {});
+    bridge.proposalUpdated.on.mockReturnValue(() => {});
+    bridge.turnCompleted.on.mockReturnValue(() => {});
     bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
     bridge.flushUnsavedWork.provider.mockReturnValue(() => {});
   });

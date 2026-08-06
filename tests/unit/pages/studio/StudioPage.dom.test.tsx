@@ -13,6 +13,7 @@ import type {
   StudioAsset,
   StudioCommandResult,
   StudioFitStoryboardOutcome,
+  StudioProposal,
   StudioRendererJob,
   StudioRendererProject,
   StudioRouteCatalog,
@@ -34,6 +35,7 @@ const bridge = vi.hoisted(() => ({
   hasUnsavedWork: { provider: vi.fn() },
   flushUnsavedWork: { provider: vi.fn() },
   getProject: { invoke: vi.fn() },
+  listProposals: { invoke: vi.fn() },
   listRoutes: { invoke: vi.fn() },
   updateModelSelection: { invoke: vi.fn() },
   updateProject: { invoke: vi.fn() },
@@ -53,9 +55,16 @@ const bridge = vi.hoisted(() => ({
   saveConnection: { invoke: vi.fn() },
   removeConnection: { invoke: vi.fn() },
   projectUpdated: { on: vi.fn() },
+  proposalUpdated: { on: vi.fn() },
+  turnCompleted: { on: vi.fn() },
 }));
 
-vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
+vi.mock('@/common', () => ({
+  ipcBridge: {
+    creativeStudio: bridge,
+    conversation: { turnCompleted: bridge.turnCompleted },
+  },
+}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 const ok = <T,>(data: T): StudioCommandResult<T> => ({ ok: true, data });
@@ -162,6 +171,32 @@ const routes = (): StudioRouteCatalog => ({
   image: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
   video: { status: 'setup_required', selected: null, selectedRoute: null, options: [] },
   catalogVersion: 'catalog-1',
+});
+
+const proposal = (): StudioProposal => ({
+  schemaVersion: 1,
+  id: 'proposal_1',
+  projectId: 'project-1',
+  status: 'pending',
+  baseRevision: 2,
+  payload: {
+    kind: 'replace_storyboard',
+    sceneOrder: ['scene-proposed'],
+    scenes: {
+      'scene-proposed': {
+        title: 'Observed proposal',
+        purpose: 'Prove renderer observation',
+        visualPrompt: 'A durable proposal appears',
+        narration: '',
+        onScreenText: '',
+        mediaKind: 'image',
+        durationSeconds: 5,
+        referenceAssetId: null,
+      },
+    },
+  },
+  createdAt: '2026-08-06T00:00:00.000Z',
+  decidedAt: null,
 });
 
 const imageRoute = (overrides: Partial<StudioRouteCatalogEntry> = {}): StudioRouteCatalogEntry => ({
@@ -282,11 +317,12 @@ const findBatchAction = async (): Promise<{ batchAction: HTMLElement; activityPa
 };
 
 const ProjectHookHarness: React.FC = () => {
-  const { project: currentProject, refetch } = useStudioProject('project-1');
+  const { project: currentProject, proposals, refetch } = useStudioProject('project-1');
 
   return (
     <>
       <span>{currentProject?.name}</span>
+      <span>{proposals.map((candidate) => candidate.payload.scenes[candidate.payload.sceneOrder[0]!]?.title)}</span>
       <button type='button' onClick={() => void refetch()}>
         Refetch project
       </button>
@@ -301,6 +337,7 @@ describe('StudioPage and useStudioProject', () => {
     window.sessionStorage.clear();
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
     bridge.getProject.invoke.mockResolvedValue(ok(project()));
+    bridge.listProposals.invoke.mockResolvedValue(ok([]));
     bridge.listRoutes.invoke.mockResolvedValue(ok(routes()));
     bridge.updateModelSelection.invoke.mockResolvedValue(ok(project()));
     bridge.updateProject.invoke.mockImplementation(async () => ok(project()));
@@ -327,6 +364,8 @@ describe('StudioPage and useStudioProject', () => {
     bridge.saveConnection.invoke.mockResolvedValue(failure());
     bridge.removeConnection.invoke.mockResolvedValue(failure());
     bridge.projectUpdated.on.mockReturnValue(() => {});
+    bridge.proposalUpdated.on.mockReturnValue(() => {});
+    bridge.turnCompleted.on.mockReturnValue(() => {});
     bridge.hasUnsavedWork.provider.mockReturnValue(() => {});
     bridge.flushUnsavedWork.provider.mockReturnValue(() => {});
   });
@@ -2393,6 +2432,48 @@ describe('StudioPage and useStudioProject', () => {
     await act(async () => router.navigate('/studio/project-2'));
 
     await waitFor(() => expect(bridge.getProject.invoke).toHaveBeenLastCalledWith({ projectId: 'project-2' }));
+  });
+
+  it('queries durable proposals on mount and observes a matching proposal event without manual refresh', async () => {
+    let onProposal: ((event: { projectId: string; proposalId: string }) => void) | undefined;
+    bridge.proposalUpdated.on.mockImplementation(
+      (listener: (event: { projectId: string; proposalId: string }) => void) => {
+        onProposal = listener;
+        return () => {};
+      }
+    );
+    bridge.listProposals.invoke.mockResolvedValueOnce(ok([])).mockResolvedValueOnce(ok([proposal()]));
+    render(<ProjectHookHarness />);
+
+    await waitFor(() =>
+      expect(bridge.listProposals.invoke).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1' })
+    );
+    await act(async () => onProposal?.({ projectId: 'other-project', proposalId: 'proposal_1' }));
+    expect(bridge.listProposals.invoke).toHaveBeenCalledTimes(1);
+
+    await act(async () => onProposal?.({ projectId: 'project-1', proposalId: 'proposal_1' }));
+
+    expect(await screen.findByText('Observed proposal')).toBeInTheDocument();
+    expect(bridge.listProposals.invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses matching turn completion only as an additional durable-ledger refetch signal', async () => {
+    let onTurnCompleted: ((event: { session_id: string }) => void) | undefined;
+    bridge.getProject.invoke.mockResolvedValue(ok(project('project-1', { briefConversationId: 'conversation_brief' })));
+    bridge.turnCompleted.on.mockImplementation((listener: (event: { session_id: string }) => void) => {
+      onTurnCompleted = listener;
+      return () => {};
+    });
+    bridge.listProposals.invoke.mockResolvedValueOnce(ok([])).mockResolvedValueOnce(ok([proposal()]));
+    render(<ProjectHookHarness />);
+    await screen.findByText('Launch film');
+
+    await act(async () => onTurnCompleted?.({ session_id: 'conversation_other' }));
+    expect(bridge.listProposals.invoke).toHaveBeenCalledTimes(1);
+    await act(async () => onTurnCompleted?.({ session_id: 'conversation_brief' }));
+
+    expect(await screen.findByText('Observed proposal')).toBeInTheDocument();
+    expect(bridge.listProposals.invoke).toHaveBeenCalledTimes(2);
   });
 
   it('flushes a dirty scene draft before switching to another project route', async () => {

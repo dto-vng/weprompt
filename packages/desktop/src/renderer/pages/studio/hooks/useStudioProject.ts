@@ -5,19 +5,21 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { StudioRendererProject } from '@/common/types/project/creativeStudioTypes';
+import type { StudioProposal, StudioRendererProject } from '@/common/types/project/creativeStudioTypes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type UseStudioProjectResult = {
   project: StudioRendererProject | null;
+  proposals: StudioProposal[];
   loading: boolean;
   notFound: boolean;
   errorMessageKey: string | null;
+  proposalErrorMessageKey: string | null;
   refetch: () => Promise<StudioRendererProject | null>;
 };
 
 export type UseStudioProjectOptions = {
-  /** Let a higher-level owner subscribe when it coordinates project jobs and refreshes. */
+  /** Let a higher-level owner subscribe to project mutations when it coordinates job refreshes. */
   subscribeToUpdates?: boolean;
 };
 
@@ -27,14 +29,17 @@ export const useStudioProject = (
   { subscribeToUpdates = true }: UseStudioProjectOptions = {}
 ): UseStudioProjectResult => {
   const [project, setProject] = useState<StudioRendererProject | null>(null);
+  const [proposals, setProposals] = useState<StudioProposal[]>([]);
   const [loading, setLoading] = useState(Boolean(projectId));
   const [notFound, setNotFound] = useState(false);
   const [errorMessageKey, setErrorMessageKey] = useState<string | null>(null);
+  const [proposalErrorMessageKey, setProposalErrorMessageKey] = useState<string | null>(null);
   const [resolvedProjectId, setResolvedProjectId] = useState<string | undefined>();
   const generationRef = useRef(0);
   const latestRequestRef = useRef(0);
   const authoritativeAbsenceRequestRef = useRef(0);
   const authoritativePresenceRequestRef = useRef(0);
+  const latestProposalRequestRef = useRef(0);
   const projectRef = useRef<StudioRendererProject | null>(null);
 
   const loadProject = useCallback(
@@ -96,6 +101,24 @@ export const useStudioProject = (
     []
   );
 
+  const loadProposals = useCallback(async (requestedProjectId: string, generation: number): Promise<void> => {
+    const request = ++latestProposalRequestRef.current;
+    try {
+      const result = await ipcBridge.creativeStudio.listProposals.invoke({ projectId: requestedProjectId });
+      if (generationRef.current !== generation || latestProposalRequestRef.current !== request) return;
+      if (result.ok === false) {
+        setProposalErrorMessageKey(result.error.messageKey);
+        return;
+      }
+      setProposals(result.data);
+      setProposalErrorMessageKey(null);
+    } catch {
+      if (generationRef.current === generation && latestProposalRequestRef.current === request) {
+        setProposalErrorMessageKey('conversation.creativeStudio.errors.storage');
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const generation = generationRef.current + 1;
     generationRef.current = generation;
@@ -103,39 +126,62 @@ export const useStudioProject = (
     if (!projectId) {
       projectRef.current = null;
       setProject(null);
+      setProposals([]);
       setLoading(false);
       setNotFound(false);
       setErrorMessageKey(null);
+      setProposalErrorMessageKey(null);
       setResolvedProjectId(undefined);
       return;
     }
+
+    setProposals([]);
+    setProposalErrorMessageKey(null);
 
     const unsubscribe = subscribeToUpdates
       ? ipcBridge.creativeStudio.projectUpdated.on(({ projectId: updatedProjectId }) => {
           if (updatedProjectId === projectId) void loadProject(projectId, generation, false);
         })
       : () => {};
+    const unsubscribeProposals = ipcBridge.creativeStudio.proposalUpdated.on(({ projectId: updatedProjectId }) => {
+      if (updatedProjectId === projectId) void loadProposals(projectId, generation);
+    });
+    const unsubscribeTurnCompleted = ipcBridge.conversation.turnCompleted.on(({ session_id: conversationId }) => {
+      if (projectRef.current?.briefConversationId === conversationId) {
+        void loadProposals(projectId, generation);
+      }
+    });
     void loadProject(projectId, generation, true);
+    void loadProposals(projectId, generation);
 
     return () => {
       if (generationRef.current === generation) generationRef.current += 1;
       unsubscribe();
+      unsubscribeProposals();
+      unsubscribeTurnCompleted();
     };
-  }, [loadProject, projectId, subscribeToUpdates]);
+  }, [loadProject, loadProposals, projectId, subscribeToUpdates]);
 
   const refetch = useCallback(async (): Promise<StudioRendererProject | null> => {
     if (!projectId) return null;
-    return loadProject(projectId, generationRef.current, false);
-  }, [loadProject, projectId]);
+    const generation = generationRef.current;
+    const [refetchedProject] = await Promise.all([
+      loadProject(projectId, generation, false),
+      loadProposals(projectId, generation),
+    ]);
+    return refetchedProject;
+  }, [loadProject, loadProposals, projectId]);
 
   const resolvedForCurrentProject = resolvedProjectId === projectId;
   const currentProject = project?.id === projectId ? project : null;
 
   return {
     project: currentProject,
+    proposals,
     loading: Boolean(projectId) && (loading || !resolvedForCurrentProject),
     notFound: resolvedForCurrentProject && notFound,
     errorMessageKey,
+    proposalErrorMessageKey,
     refetch,
   };
 };

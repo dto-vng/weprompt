@@ -261,6 +261,15 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
   ipcBridge.creativeStudio.getProject.provider((input) =>
     command(() => dependencies.getService().getProject(input.projectId))
   );
+  ipcBridge.creativeStudio.listProposals.provider((input) =>
+    command(() => dependencies.getService().listProposals(input))
+  );
+  ipcBridge.creativeStudio.acceptProposal.provider((input) =>
+    command(() => dependencies.getService().acceptProposal(input))
+  );
+  ipcBridge.creativeStudio.rejectProposal.provider((input) =>
+    command(() => dependencies.getService().rejectProposal(input))
+  );
   ipcBridge.creativeStudio.proposeStoryboard.provider((input) =>
     command(() => dependencies.getService().proposeStoryboard(input))
   );

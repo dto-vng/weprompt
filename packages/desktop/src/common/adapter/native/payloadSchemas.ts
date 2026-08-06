@@ -534,6 +534,9 @@ export const nativeBridgePayloadSchemas = {
   'creative-studio.list-projects': voidPayloadSchema,
   'creative-studio.create-project': studioProjectInputSchema,
   'creative-studio.get-project': studioProjectRequestSchema,
+  'creative-studio.list-proposals': studioProjectRequestSchema,
+  'creative-studio.accept-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
+  'creative-studio.reject-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
   'creative-studio.propose-storyboard': z
     .object({
       projectId: safeIdSchema,

@@ -13,6 +13,11 @@ import type {
   StudioEditableScene,
   StudioProject,
   StudioProjectSummary,
+  StudioProposal,
+  StudioProposalAcceptance,
+  StudioProposalPayload,
+  StudioProposalRequest,
+  StudioProjectRequest,
   StudioPersistCapturedPosterRequest,
   StudioScene,
   StudioSelectAssetRequest,
@@ -137,6 +142,9 @@ export type CreativeStudioService = {
   listProjects(): Promise<StudioProjectSummary[]>;
   createProject(input: CreateStudioProjectInput): Promise<StudioRendererProject>;
   getProject(projectId: string): Promise<StudioRendererProject | null>;
+  listProposals(input: StudioProjectRequest): Promise<StudioProposal[]>;
+  acceptProposal(input: StudioProposalRequest): Promise<StudioProposalAcceptance>;
+  rejectProposal(input: StudioProposalRequest): Promise<StudioProposal>;
   proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioRendererProject>;
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioRendererProject>;
   bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioRendererProject>;
@@ -703,6 +711,71 @@ const toRendererProject = (project: StudioProject): StudioRendererProject => {
   };
 };
 
+const toRendererProposal = (proposal: StudioProposal): StudioProposal => ({
+  schemaVersion: proposal.schemaVersion,
+  id: proposal.id,
+  projectId: proposal.projectId,
+  status: proposal.status,
+  baseRevision: proposal.baseRevision,
+  payload: {
+    kind: proposal.payload.kind,
+    sceneOrder: [...proposal.payload.sceneOrder],
+    scenes: Object.fromEntries(
+      Object.entries(proposal.payload.scenes).map(([sceneId, scene]) => [
+        sceneId,
+        {
+          title: scene.title,
+          purpose: scene.purpose,
+          visualPrompt: scene.visualPrompt,
+          narration: scene.narration,
+          onScreenText: scene.onScreenText,
+          mediaKind: scene.mediaKind,
+          durationSeconds: scene.durationSeconds,
+          referenceAssetId: scene.referenceAssetId,
+        },
+      ])
+    ),
+  },
+  createdAt: proposal.createdAt,
+  decidedAt: proposal.decidedAt,
+});
+
+const applyProposalPayload = (project: StudioProject, payload: StudioProposalPayload): StudioProject => {
+  const proposedIds = new Set(payload.sceneOrder);
+  for (const scene of Object.values(project.scenes)) {
+    if (!proposedIds.has(scene.id) && (scene.assetIds.length > 0 || scene.jobIds.length > 0)) {
+      throw invalid('Studio proposal cannot remove a scene with generated state');
+    }
+  }
+  const scenes = Object.fromEntries(
+    payload.sceneOrder.map((sceneId) => {
+      const editable = payload.scenes[sceneId]!;
+      const existing = project.scenes[sceneId];
+      if (
+        existing !== undefined &&
+        existing.mediaKind !== editable.mediaKind &&
+        (existing.assetIds.length > 0 || existing.jobIds.length > 0)
+      ) {
+        throw invalid('Studio proposal cannot change media kind for a scene with generated state');
+      }
+      const scene: StudioScene = {
+        ...(existing ?? {
+          id: sceneId,
+          selectedAssetId: null,
+          assetIds: [],
+          jobIds: [],
+          reviewState: 'draft' as const,
+        }),
+        ...editable,
+        id: sceneId,
+        reviewState: 'draft',
+      };
+      return [sceneId, scene];
+    })
+  );
+  return reconcilePersistedStudioCuts({ ...project, sceneOrder: [...payload.sceneOrder], scenes });
+};
+
 const modelStatus = (
   selected: unknown | null,
   optionsLength: number,
@@ -974,6 +1047,28 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       assertSafeId(projectId, 'project id');
       const project = await deps.store.getProject(projectId);
       return project === null ? null : toRendererProject(project);
+    },
+
+    async listProposals(input: StudioProjectRequest): Promise<StudioProposal[]> {
+      assertSafeId(input.projectId, 'project id');
+      return (await deps.store.listProposals(input.projectId)).map(toRendererProposal);
+    },
+
+    async acceptProposal(input: StudioProposalRequest): Promise<StudioProposalAcceptance> {
+      assertSafeId(input.projectId, 'project id');
+      assertSafeId(input.proposalId, 'proposal id');
+      const accepted = await deps.store.acceptProposal(input.projectId, input.proposalId, applyProposalPayload);
+      if (accepted.applied) deps.onProjectUpdated(accepted.project.id);
+      return {
+        proposal: toRendererProposal(accepted.proposal),
+        project: toRendererProject(accepted.project),
+      };
+    },
+
+    async rejectProposal(input: StudioProposalRequest): Promise<StudioProposal> {
+      assertSafeId(input.projectId, 'project id');
+      assertSafeId(input.proposalId, 'proposal id');
+      return toRendererProposal(await deps.store.rejectProposal(input.projectId, input.proposalId));
     },
 
     async proposeStoryboard(input: ProposeStudioStoryboardInput): Promise<StudioRendererProject> {

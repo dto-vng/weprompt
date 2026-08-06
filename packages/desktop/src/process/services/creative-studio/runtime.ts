@@ -67,6 +67,7 @@ export type CreativeStudioRuntimeDeps = {
   factories?: CreativeStudioRuntimeFactories;
   listProviders(): Promise<IProvider[]>;
   onProjectUpdated(projectId: string): void;
+  onProposalUpdated(projectId: string, proposalId: string): void;
   protocol: CreativeStudioRuntimeProtocol;
 };
 
@@ -169,6 +170,7 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
   let protocolInstallAttempted = false;
   let protocolInstalled = false;
   let protocolInstallation: CreativeStudioProtocolInstallation | null = null;
+  let disposeProposalWatcher: (() => Promise<void>) | null = null;
   let disposed = false;
 
   const start = (): Promise<void> => {
@@ -176,6 +178,14 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
       if (disposed) return;
       await mediaStore.cleanupOrphanParts();
       if (disposed) return;
+      await store.reapAbandonedProposals();
+      if (disposed) return;
+      disposeProposalWatcher = await store.watchProposals(deps.onProposalUpdated);
+      if (disposed) {
+        await disposeProposalWatcher();
+        disposeProposalWatcher = null;
+        return;
+      }
       protocolInstallAttempted = true;
       protocolInstallation = await deps.protocol.install(mediaStore);
       protocolInstalled = true;
@@ -195,6 +205,14 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
     disposePromise ??= (async () => {
       disposed = true;
       const errors: unknown[] = [];
+      if (disposeProposalWatcher !== null) {
+        try {
+          await disposeProposalWatcher();
+        } catch (error) {
+          errors.push(error);
+        }
+        disposeProposalWatcher = null;
+      }
       for (const disposeBoundary of [storyboardPlanner.dispose, jobManager.dispose]) {
         try {
           // Cleanup boundaries are intentionally attempted in deterministic order.
@@ -277,6 +295,8 @@ export const getCreativeStudioRuntime = (): CreativeStudioRuntime => {
     isPackaged: app.isPackaged,
     listProviders: () => httpRequest<IProvider[]>('GET', '/api/providers'),
     onProjectUpdated: (projectId) => ipcBridge.creativeStudio.projectUpdated.emit({ projectId }),
+    onProposalUpdated: (projectId, proposalId) =>
+      ipcBridge.creativeStudio.proposalUpdated.emit({ projectId, proposalId }),
     protocol: {
       install: (resolver) => installCreativeStudioProtocol(protocol, resolver),
       uninstall: async (installation) => {

@@ -240,6 +240,43 @@ export type StudioRendererProject = Omit<StudioProject, 'jobs' | 'routing'> & {
   routing: StudioRendererRoutingPreferences;
 };
 
+export type StudioProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
+
+/** A complete replacement for the editable storyboard region named by a proposal. */
+export type StudioProposalPayload = {
+  kind: 'replace_storyboard';
+  sceneOrder: string[];
+  scenes: Record<string, StudioEditableScene>;
+};
+
+/** Renderer-safe durable proposal state derived from an immutable record and optional decision marker. */
+export type StudioProposal = {
+  schemaVersion: 1;
+  id: string;
+  projectId: string;
+  status: StudioProposalStatus;
+  baseRevision: number;
+  payload: StudioProposalPayload;
+  createdAt: string;
+  decidedAt: string | null;
+};
+
+export type StudioRecordProposalInput = {
+  projectId: string;
+  proposalId: string;
+  baseRevision: number;
+  payload: StudioProposalPayload;
+};
+
+export type StudioProposalRequest = StudioProjectRequest & {
+  proposalId: string;
+};
+
+export type StudioProposalAcceptance = {
+  proposal: StudioProposal;
+  project: StudioRendererProject;
+};
+
 export type StudioProjectSummary = {
   id: string;
   name: string;
