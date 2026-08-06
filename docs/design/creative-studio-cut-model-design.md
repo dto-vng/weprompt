@@ -1,6 +1,6 @@
 # Creative Studio — the cut (edit-decision) model
 
-**Status:** rev 5 — filter set, trim timebase and video seam decided · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
+**Status:** rev 6 — implementation-surfaced defaults recorded · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
 **Independent of:** the video-capability spike — this is why it can proceed now
 **Blocks:** the Review editor UI and any render pipeline
 
@@ -68,6 +68,7 @@ Consequences that must be handled explicitly rather than discovered:
 - Reordering shots in the storyboard reorders the cut, **unless** the cut has diverged. Divergence must be a visible state, not an invisible one.
 - **[rev 2] "Hand-ordered" needs an explicit flag.** Structural inequality detects a *current* mismatch, but not intent: a manually reordered cut that later happens to match the storyboard is indistinguishable from one that simply follows it. Since §4 promises to preserve user intent, add **`orderMode: 'storyboard' | 'manual'`** to `StudioCut`. Manual is set the first time a user reorders the cut directly, and only the user can return it to `storyboard`.
 - Deleting a scene removes its clips.
+- **[rev 6] A scene that gains a canonical take *after* the cut went manual is appended**, without disturbing the user's hand-ordering. A cut still in `storyboard` mode places it at its `sceneOrder` position instead. Appending was chosen as the least-surprising default: a manual order is user intent, and silently inserting into the middle of it would overwrite that intent to satisfy a storyboard the user has already departed from. Confirmed 2026-08-06; the design had left this open and the implementation surfaced it.
 
 ## 5. Renderer neutrality: coordinates and filters
 
