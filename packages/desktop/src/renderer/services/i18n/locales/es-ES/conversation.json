@@ -1100,6 +1100,7 @@
       "accessibleName": "Escena {{number}}: {{title}}",
       "number": "Escena {{number}}",
       "status": {
+        "needs_title": "Falta el título",
         "needs_prompt": "Falta el prompt",
         "ready": "Lista para generar",
         "generating": "Generando",

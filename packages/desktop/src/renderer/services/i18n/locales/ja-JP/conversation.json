@@ -1087,6 +1087,7 @@
       "accessibleName": "シーン {{number}}：{{title}}",
       "number": "シーン {{number}}",
       "status": {
+        "needs_title": "タイトルが必要",
         "needs_prompt": "プロンプトが必要",
         "ready": "生成準備完了",
         "generating": "生成中",

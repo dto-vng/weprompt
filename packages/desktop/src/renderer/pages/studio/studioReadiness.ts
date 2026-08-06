@@ -12,6 +12,7 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 
 export type StudioSceneStatus =
+  | 'needs_title'
   | 'needs_prompt'
   | 'ready'
   | 'generating'
@@ -92,7 +93,10 @@ export const deriveStudioReadiness = (project: StudioRendererProject): StudioRea
 
     let status: StudioSceneStatus;
     if (scene.title.trim().length === 0) {
-      status = 'needs_prompt';
+      // A missing title blocks generation exactly as a missing prompt does
+      // (see batchSceneIsReady), but it is a different gap and must say so —
+      // reporting `needs_prompt` sends the user to a field that is already filled.
+      status = 'needs_title';
     } else if (jobs.some((job) => ACTIVE_JOB_STATUSES.has(job.status))) {
       status = 'generating';
     } else if (selectedGenerated) {

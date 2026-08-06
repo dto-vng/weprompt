@@ -1087,6 +1087,7 @@
       "accessibleName": "場景 {{number}}：{{title}}",
       "number": "場景 {{number}}",
       "status": {
+        "needs_title": "需要標題",
         "needs_prompt": "需要提示詞",
         "ready": "可開始產生",
         "generating": "正在產生",

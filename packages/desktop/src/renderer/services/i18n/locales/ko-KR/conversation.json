@@ -1087,6 +1087,7 @@
       "accessibleName": "장면 {{number}}: {{title}}",
       "number": "장면 {{number}}",
       "status": {
+        "needs_title": "제목 필요",
         "needs_prompt": "프롬프트 필요",
         "ready": "생성 준비 완료",
         "generating": "생성 중",

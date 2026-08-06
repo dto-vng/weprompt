@@ -949,6 +949,7 @@
       "accessibleName": "Scene {{number}}: {{title}}",
       "number": "Scene {{number}}",
       "status": {
+        "needs_title": "Needs title",
         "needs_prompt": "Needs prompt",
         "ready": "Ready to generate",
         "generating": "Generating",

@@ -1095,6 +1095,7 @@
       "accessibleName": "Sahne {{number}}: {{title}}",
       "number": "Sahne {{number}}",
       "status": {
+        "needs_title": "Başlık gerekli",
         "needs_prompt": "İstem gerekiyor",
         "ready": "Oluşturmaya hazır",
         "generating": "Oluşturuluyor",

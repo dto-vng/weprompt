@@ -1094,6 +1094,7 @@
       "accessibleName": "Szene {{number}}: {{title}}",
       "number": "Szene {{number}}",
       "status": {
+        "needs_title": "Titel fehlt",
         "needs_prompt": "Prompt erforderlich",
         "ready": "Bereit zur Generierung",
         "generating": "Wird generiert",

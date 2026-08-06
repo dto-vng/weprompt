@@ -1105,6 +1105,7 @@
       "accessibleName": "Сцена {{number}}: {{title}}",
       "number": "Сцена {{number}}",
       "status": {
+        "needs_title": "Нужно название",
         "needs_prompt": "Нужен промпт",
         "ready": "Готово к генерации",
         "generating": "Генерация",

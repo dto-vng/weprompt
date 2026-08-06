@@ -1105,6 +1105,7 @@
       "accessibleName": "Cena {{number}}: {{title}}",
       "number": "Cena {{number}}",
       "status": {
+        "needs_title": "Precisa de título",
         "needs_prompt": "Precisa de prompt",
         "ready": "Pronta para gerar",
         "generating": "Gerando",

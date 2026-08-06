@@ -116,11 +116,22 @@ describe('deriveStudioReadiness', () => {
     expect(summary.selectedAssetCount).toBe(1);
   });
 
-  it('treats an empty scene title as needing a prompt even when the visual is ready', () => {
+  it('reports a missing title as needing a title, not a prompt, when the visual is already written', () => {
     const missingTitle = scene('missing-title', { title: '   ' });
     const summary = deriveStudioReadiness(project([missingTitle]));
 
-    expect(summary.sceneStatuses[missingTitle.id]).toBe('needs_prompt');
+    // The scene factory supplies a visual prompt, so `needs_prompt` here would
+    // send the user to a field that is already filled — the defect this guards.
+    expect(missingTitle.visualPrompt.trim().length).toBeGreaterThan(0);
+    expect(summary.sceneStatuses[missingTitle.id]).toBe('needs_title');
+    expect(summary.readySceneIds).toEqual([]);
+  });
+
+  it('still reports a missing prompt as needing a prompt when the title is present', () => {
+    const missingPrompt = scene('missing-prompt', { visualPrompt: '  ' });
+    const summary = deriveStudioReadiness(project([missingPrompt]));
+
+    expect(summary.sceneStatuses[missingPrompt.id]).toBe('needs_prompt');
     expect(summary.readySceneIds).toEqual([]);
   });
 
@@ -143,8 +154,8 @@ describe('deriveStudioReadiness', () => {
     );
 
     expect(summary.sceneStatuses).toEqual({
-      'active-missing-title': 'needs_prompt',
-      'generated-missing-title': 'needs_prompt',
+      'active-missing-title': 'needs_title',
+      'generated-missing-title': 'needs_title',
     });
     expect(summary.readySceneIds).toEqual([]);
     expect(summary.selectedAssetCount).toBe(1);

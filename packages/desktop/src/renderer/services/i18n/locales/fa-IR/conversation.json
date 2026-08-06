@@ -1093,6 +1093,7 @@
       "accessibleName": "صحنه {{number}}: {{title}}",
       "number": "صحنه {{number}}",
       "status": {
+        "needs_title": "عنوان لازم است",
         "needs_prompt": "به دستور نیاز دارد",
         "ready": "آماده تولید",
         "generating": "در حال تولید",
