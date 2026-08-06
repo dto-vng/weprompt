@@ -255,6 +255,9 @@ const createFreshRuntimeHarness = (
   };
   const runtime = createCreativeStudioRuntime({
     rootDir,
+    // Pending-job recovery is gated on the Studio release flag, which is off by
+    // default. This suite exercises recovery itself, so it opts in explicitly.
+    enabled: true,
     environment: { AIONUI_E2E_TEST: '1', AIONUI_E2E_STUDIO_FAKE: '1' },
     isPackaged: false,
     factories,
