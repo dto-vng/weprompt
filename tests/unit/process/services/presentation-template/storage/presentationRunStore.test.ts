@@ -1013,35 +1013,38 @@ describe('PresentationRunStore', () => {
     });
   });
 
-  it('cleans or recovers candidate retention at every file durability boundary after restart', async () => {
-    const preparationBoundaries: PresentationRunFileDurableBoundary[] = [
-      'before-candidate-temp-write',
-      'after-candidate-temp-write',
-      'before-candidate-temp-fsync',
-      'after-candidate-temp-fsync',
-      'before-candidate-temp-directory-fsync',
-      'after-candidate-temp-directory-fsync',
-    ];
-    const promotionBoundaries: PresentationRunFileDurableBoundary[] = [
-      'before-candidate-promotion-rename',
-      'after-candidate-promotion-rename',
-      'before-candidate-promotion-directory-fsync',
-      'after-candidate-promotion-directory-fsync',
-    ];
-    const terminal = storedRun(RUN_ID, 'terminal_verified', {
-      clientRequestId: REQUEST_ID,
-      requestFingerprint: 'a'.repeat(64),
-      artifactPhase: 'sources_extracted',
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-1',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
-    });
+  const candidateRetentionDurabilityCases: {
+    boundary: PresentationRunFileDurableBoundary;
+    phase: 'preparation' | 'promotion';
+  }[] = [
+    { boundary: 'before-candidate-temp-write', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-write', phase: 'preparation' },
+    { boundary: 'before-candidate-temp-fsync', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-fsync', phase: 'preparation' },
+    { boundary: 'before-candidate-temp-directory-fsync', phase: 'preparation' },
+    { boundary: 'after-candidate-temp-directory-fsync', phase: 'preparation' },
+    { boundary: 'before-candidate-promotion-rename', phase: 'promotion' },
+    { boundary: 'after-candidate-promotion-rename', phase: 'promotion' },
+    { boundary: 'before-candidate-promotion-directory-fsync', phase: 'promotion' },
+    { boundary: 'after-candidate-promotion-directory-fsync', phase: 'promotion' },
+  ];
 
-    for (const boundary of [...preparationBoundaries, ...promotionBoundaries]) {
+  it.each(candidateRetentionDurabilityCases)(
+    'cleans or recovers candidate retention after the $boundary durability boundary',
+    async ({ boundary, phase }) => {
+      const terminal = storedRun(RUN_ID, 'terminal_verified', {
+        clientRequestId: REQUEST_ID,
+        requestFingerprint: 'a'.repeat(64),
+        artifactPhase: 'sources_extracted',
+        binding: {
+          conversationId: CONVERSATION_ID,
+          turnId: 'turn-1',
+          runtime: 'aionrs',
+          boundAt: CREATED_AT.toISOString(),
+        },
+        postInvoked: true,
+      });
+
       const boundaryRoot = path.join(fixtureRoot, `candidate-${boundary}`);
       const boundaryUserData = path.join(boundaryRoot, 'user-data');
       const boundaryTemp = path.join(boundaryRoot, 'system-temp');
@@ -1060,7 +1063,7 @@ describe('PresentationRunStore', () => {
       });
       const layout = await boundaryFiles.createRunLayout(RUN_ID);
       await writeFile(path.join(layout.stagingDirectory, 'candidate.pptx'), 'stable candidate');
-      if (preparationBoundaries.includes(boundary)) {
+      if (phase === 'preparation') {
         enabled = true;
         await expect(boundaryFiles.prepareRetainedCandidate(RUN_ID)).rejects.toThrow(boundary);
         const orphaned = await readdir(layout.retainedDirectory);
@@ -1099,7 +1102,7 @@ describe('PresentationRunStore', () => {
       });
       await restarted.initialize();
       const recovered = await restarted.getRun(RUN_ID);
-      if (preparationBoundaries.includes(boundary)) {
+      if (phase === 'preparation') {
         expect(recovered).toMatchObject({
           revision: 0,
           artifactPhase: 'sources_extracted',
@@ -1117,7 +1120,7 @@ describe('PresentationRunStore', () => {
         await expect(readdir(layout.retainedDirectory)).resolves.toEqual(['candidate.pptx']);
       }
     }
-  });
+  );
 
   it('rebuilds a missing derived index and quarantines a corrupt canonical run', async () => {
     const input = {
@@ -2161,36 +2164,45 @@ describe('PresentationRunStore', () => {
     await expect(files.listEntityIds('run')).resolves.toEqual([]);
   });
 
-  it('recovers atomic run tombstones after every journal and two-manifest durability boundary', async () => {
-    const intentAndCommitCases: {
-      boundary: PresentationRunDurableBoundary;
-      expectedOutcome: 'old' | 'new' | 'either';
-    }[] = [
-      { boundary: 'before-intent-append', expectedOutcome: 'old' },
-      { boundary: 'after-intent-append', expectedOutcome: 'either' },
-      { boundary: 'before-intent-fsync', expectedOutcome: 'either' },
-      { boundary: 'after-intent-fsync', expectedOutcome: 'new' },
-      { boundary: 'before-commit-append', expectedOutcome: 'new' },
-      { boundary: 'after-commit-append', expectedOutcome: 'new' },
-      { boundary: 'before-commit-fsync', expectedOutcome: 'new' },
-      { boundary: 'after-commit-fsync', expectedOutcome: 'new' },
-    ];
-    const manifestBoundaries: PresentationRunDurableBoundary[] = [
-      'before-manifest-write',
-      'after-manifest-write',
-      'before-manifest-fsync',
-      'after-manifest-fsync',
-      'before-manifest-rename',
-      'after-manifest-rename',
-      'before-manifest-directory-fsync',
-      'after-manifest-directory-fsync',
-    ];
-    const manifestCases = manifestBoundaries.flatMap((boundary) =>
-      [0, 1].map((mutationIndex) => ({ boundary, mutationIndex, expectedOutcome: 'new' as const }))
-    );
+  const tombstoneDurabilityCases: {
+    boundary: PresentationRunDurableBoundary;
+    expectedOutcome: 'old' | 'new' | 'either';
+    mutationIndex?: number;
+    suffix: string;
+  }[] = [
+    { boundary: 'before-intent-append', expectedOutcome: 'old', suffix: 'before-intent-append-journal' },
+    { boundary: 'after-intent-append', expectedOutcome: 'either', suffix: 'after-intent-append-journal' },
+    { boundary: 'before-intent-fsync', expectedOutcome: 'either', suffix: 'before-intent-fsync-journal' },
+    { boundary: 'after-intent-fsync', expectedOutcome: 'new', suffix: 'after-intent-fsync-journal' },
+    { boundary: 'before-commit-append', expectedOutcome: 'new', suffix: 'before-commit-append-journal' },
+    { boundary: 'after-commit-append', expectedOutcome: 'new', suffix: 'after-commit-append-journal' },
+    { boundary: 'before-commit-fsync', expectedOutcome: 'new', suffix: 'before-commit-fsync-journal' },
+    { boundary: 'after-commit-fsync', expectedOutcome: 'new', suffix: 'after-commit-fsync-journal' },
+    ...(
+      [
+        'before-manifest-write',
+        'after-manifest-write',
+        'before-manifest-fsync',
+        'after-manifest-fsync',
+        'before-manifest-rename',
+        'after-manifest-rename',
+        'before-manifest-directory-fsync',
+        'after-manifest-directory-fsync',
+      ] satisfies PresentationRunDurableBoundary[]
+    ).flatMap((boundary) =>
+      [0, 1].map((mutationIndex) => ({
+        boundary,
+        mutationIndex,
+        expectedOutcome: 'new' as const,
+        suffix: `${boundary}-${mutationIndex}`,
+      }))
+    ),
+  ];
 
-    for (const boundaryCase of [...intentAndCommitCases, ...manifestCases]) {
-      const suffix = `${boundaryCase.boundary}-${'mutationIndex' in boundaryCase ? boundaryCase.mutationIndex : 'journal'}`;
+  it.each(tombstoneDurabilityCases)(
+    'recovers an atomic run tombstone after the $suffix durability boundary',
+    async (boundaryCase) => {
+      const { suffix } = boundaryCase;
       const boundaryRoot = path.join(fixtureRoot, `tombstone-${suffix}`);
       const boundaryUserData = path.join(boundaryRoot, 'user-data');
       const boundaryTemp = path.join(boundaryRoot, 'system-temp');
@@ -2201,7 +2213,8 @@ describe('PresentationRunStore', () => {
         files: boundaryFiles,
         now: () => CREATED_AT,
         failureInjector: ({ boundary, mutationIndex }) => {
-          const mutationMatches = !('mutationIndex' in boundaryCase) || boundaryCase.mutationIndex === mutationIndex;
+          const mutationMatches =
+            boundaryCase.mutationIndex === undefined || boundaryCase.mutationIndex === mutationIndex;
           if (enabled && boundary === boundaryCase.boundary && mutationMatches) {
             throw new PresentationRunSimulatedProcessCrashError(`tombstone crash:${suffix}`);
           }
@@ -2257,7 +2270,7 @@ describe('PresentationRunStore', () => {
         expect(recoveredRunIds).toEqual([RUN_ID]);
       }
     }
-  });
+  );
 
   it('never allows direct discard or TTL pressure deletion of dispatch-uncertain state', async () => {
     let clock = new Date('2026-10-10T00:00:00.000Z');
@@ -2569,17 +2582,14 @@ describe('PresentationRunStore', () => {
   });
 
   it.each([
-    { scope: 'conversation', retainedCount: 9, allowed: true },
-    { scope: 'conversation', retainedCount: 10, allowed: false },
-    { scope: 'app', retainedCount: 99, allowed: true },
-    { scope: 'app', retainedCount: 100, allowed: false },
-  ] as const)('reserves retained slots at the $scope boundary with $retainedCount existing', async (testCase) => {
+    { scope: 'conversation', retainedCount: 9 },
+    { scope: 'app', retainedCount: 99 },
+  ] as const)('reserves the final retained $scope slot and rejects the next allocation', async (testCase) => {
     const boundaryRoot = path.join(fixtureRoot, `retained-${testCase.scope}-${testCase.retainedCount}`);
     const boundaryUserData = path.join(boundaryRoot, 'user-data');
     const boundaryTemp = path.join(boundaryRoot, 'system-temp');
     await Promise.all([mkdir(boundaryUserData, { recursive: true }), mkdir(boundaryTemp, { recursive: true })]);
     const boundaryFiles = new PresentationRunFiles({ userDataDir: boundaryUserData, tempDir: boundaryTemp });
-    const boundaryJournal = new PresentationRunJournal({ files: boundaryFiles, now: () => CREATED_AT });
     const idFor = (prefix: string, index: number): string =>
       `${prefix}0000000-0000-4000-8000-${index.toString().padStart(12, '0')}`;
     const retained = Array.from({ length: testCase.retainedCount }, (_, index) => {
@@ -2598,14 +2608,14 @@ describe('PresentationRunStore', () => {
         },
       });
     });
-    await boundaryJournal.transaction({
-      mutations: retained.map((run) => ({
-        entityKind: 'run' as const,
-        entityId: run.runId,
-        expectedRevision: null,
-        nextManifest: run,
-      })),
-    });
+    await boundaryFiles.initialize();
+    await Promise.all(
+      retained.map(async (run) => {
+        const manifestPath = boundaryFiles.getEntityManifestPath('run', run.runId);
+        await mkdir(path.dirname(manifestPath), { recursive: true, mode: 0o700 });
+        await writeFile(manifestPath, `${JSON.stringify(run, null, 2)}\n`, { mode: 0o600 });
+      })
+    );
     const clock = new Date(CREATED_AT.getTime() + 60_000);
     const ids = [RUN_K, RUN_L];
     const boundaryStore = new PresentationRunStore({
@@ -2623,21 +2633,16 @@ describe('PresentationRunStore', () => {
       grantClaims: [],
     });
 
-    expect(result.ok).toBe(testCase.allowed);
-    if (testCase.allowed) {
-      expect(result).toMatchObject({ status: 'created' });
-      await expect(
-        boundaryStore.allocateRun({
-          conversationId: testCase.scope === 'conversation' ? CONVERSATION_ID : CONVERSATION_C,
-          clientRequestId: RUN_L,
-          selectedTemplateId: 'business-review',
-          requestFingerprint: 'b'.repeat(64),
-          grantClaims: [],
-        })
-      ).resolves.toMatchObject({ ok: false, code: 'RESOURCE_LIMIT_EXCEEDED' });
-    } else {
-      expect(result).toMatchObject({ code: 'RESOURCE_LIMIT_EXCEEDED' });
-    }
+    expect(result).toMatchObject({ ok: true, status: 'created' });
+    await expect(
+      boundaryStore.allocateRun({
+        conversationId: testCase.scope === 'conversation' ? CONVERSATION_ID : CONVERSATION_C,
+        clientRequestId: RUN_L,
+        selectedTemplateId: 'business-review',
+        requestFingerprint: 'b'.repeat(64),
+        grantClaims: [],
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'RESOURCE_LIMIT_EXCEEDED' });
   });
 
   it.each([
