@@ -447,7 +447,8 @@ describe('ProducePhase', () => {
     const controller = createController(currentProject, 'scene-2');
     render(<ProducePhase controller={controller} />);
 
-    await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith('project-1', 'video-1'));
+    // The third argument is the cancellation signal added by the BUG-026 leak fix.
+    await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith('project-1', 'video-1', expect.any(AbortSignal)));
     const closing = screen.getByRole('listitem', {
       name: 'conversation.creativeStudio.scene.accessibleName:number=2,title=Closing shot',
     });
