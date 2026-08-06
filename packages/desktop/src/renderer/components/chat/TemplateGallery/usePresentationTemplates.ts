@@ -30,30 +30,26 @@ export type PresentationRunEligibilityInput = {
 export type ManagedPresentationInitialSend = {
   input: string;
   selectedTemplateId: string;
-  injectSkills?: ['officecli'];
+  injectSkills: ['officecli'];
 };
 
 /**
  * Recovers the raw prompt from the legacy Guid handoff without returning any
  * template or user paths. A raw user attachment makes the handoff ineligible
- * for managed dispatch. AionRS keeps the legacy `injectSkills` handoff
- * metadata; ACP relies on the directive's explicit OfficeCLI loading rule and
- * does not consume that metadata.
+ * for managed dispatch; AionRS keeps it blocked for explicit source reselect.
  */
 export function resolveManagedPresentationInitialSend(
   input: string,
-  files: string[],
-  runtime: 'aionrs' | 'acp' = 'aionrs'
+  files: string[]
 ): ManagedPresentationInitialSend | null {
   if (!input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX)) return null;
   const parsed = parseTemplatedSend(input, files);
   if (parsed === null || parsed.userFiles.length > 0) return null;
-  const resolved: ManagedPresentationInitialSend = {
+  return {
     input: parsed.userText,
     selectedTemplateId: parsed.templateId,
+    injectSkills: ['officecli'],
   };
-  if (runtime === 'aionrs') resolved.injectSkills = ['officecli'];
-  return resolved;
 }
 
 /**
