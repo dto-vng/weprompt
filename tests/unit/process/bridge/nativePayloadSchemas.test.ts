@@ -10,11 +10,20 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { NATIVE_BRIDGE_PROVIDER_KEYS, type NativeBridgeProviderKey } from '@/common/adapter/native/constants';
+import {
+  NATIVE_BRIDGE_PROVIDER_KEYS,
+  RENDERER_BRIDGE_QUERY_KEYS,
+  type NativeBridgeProviderKey,
+  type RendererBridgeQueryKey,
+} from '@/common/adapter/native/constants';
 import {
   INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE,
+  INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE,
   nativeBridgePayloadSchemas,
   parseNativeBridgePayload,
+  parseRendererBridgeQueryRequest,
+  parseRendererBridgeQueryResponse,
+  rendererBridgeQuerySchemas,
 } from '@/common/adapter/native/payloadSchemas';
 
 const VALID_PAYLOADS = {
@@ -196,6 +205,128 @@ const VALID_PAYLOADS = {
   'project-knowledge.unwatch-folder': { projectId: 'project-1' },
   'project-knowledge.remove-store': { projectId: 'project-1' },
   'project-knowledge.get-session-mcp-server': { projectId: 'project-1' },
+  'creative-studio.list-projects': undefined,
+  'creative-studio.create-project': {
+    name: 'Launch film',
+    brief: 'A short launch story',
+    aspectRatio: '16:9',
+    targetDurationSeconds: 12,
+    resolution: '1080p',
+  },
+  'creative-studio.get-project': { projectId: 'project_1' },
+  'creative-studio.list-proposals': { projectId: 'project_1' },
+  'creative-studio.accept-proposal': { projectId: 'project_1', proposalId: 'proposal_1' },
+  'creative-studio.reject-proposal': { projectId: 'project_1', proposalId: 'proposal_1' },
+  'creative-studio.propose-storyboard': { projectId: 'project_1', expectedRevision: 1, replaceExisting: false },
+  'creative-studio.update-model-selection': {
+    projectId: 'project_1',
+    expectedRevision: 2,
+    role: 'video',
+    selection: { choiceId: 'binding_1' },
+  },
+  'creative-studio.update-project': { projectId: 'project_1', expectedRevision: 1, name: 'Changed launch film' },
+  'creative-studio.bind-brief-conversation': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    conversationId: 'conversation_brief',
+  },
+  'creative-studio.update-cut': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    cutId: 'cut_1',
+    cut: {
+      orderMode: 'storyboard',
+      clipOrder: ['clip_1'],
+      clips: {
+        clip_1: {
+          sourceInSeconds: 0.5,
+          sourceOutSeconds: 4.5,
+          crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+          filters: [{ id: 'contrast', amount: 0.25 }],
+        },
+      },
+    },
+  },
+  'creative-studio.delete-project': { projectId: 'project_1', expectedRevision: 1 },
+  'creative-studio.update-scene': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    sceneId: 'scene_1',
+    scene: {
+      title: 'Opening',
+      purpose: 'Introduce the product',
+      visualPrompt: 'A cinematic product reveal',
+      narration: 'Meet the future.',
+      onScreenText: 'Meet the future',
+      mediaKind: 'video',
+      durationSeconds: 4,
+      referenceAssetId: null,
+    },
+  },
+  'creative-studio.reorder-scenes': { projectId: 'project_1', expectedRevision: 1, sceneOrder: ['scene_1'] },
+  'creative-studio.select-asset': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    sceneId: 'scene_1',
+    assetId: 'asset_1',
+  },
+  'creative-studio.persist-captured-poster': {
+    projectId: 'project_1',
+    sceneId: 'scene_1',
+    videoAssetId: 'asset_1',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    width: 1280,
+    height: 720,
+  },
+  'creative-studio.choose-and-import-reference': {
+    projectId: 'project_1',
+    sceneId: 'scene_1',
+    expectedRevision: 1,
+  },
+  'creative-studio.choose-and-export-assets': { projectId: 'project_1', includeReferences: true },
+  'creative-studio.render-cut': { projectId: 'project_1' },
+  'creative-studio.cancel-render': { projectId: 'project_1' },
+  'creative-studio.fit-storyboard': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    catalogVersion: '0123456789abcdef',
+  },
+  'creative-studio.submit-scenes': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    mode: 'single',
+    sceneIds: ['scene_1'],
+    catalogVersion: '0123456789abcdef',
+    routes: [
+      {
+        sceneId: 'scene_1',
+        choiceId: 'binding_1',
+        kind: 'video',
+      },
+    ],
+  },
+  'creative-studio.cancel-job': { projectId: 'project_1', jobId: 'job_1', expectedRevision: 1 },
+  'creative-studio.retry-job': {
+    projectId: 'project_1',
+    jobId: 'job_1',
+    expectedRevision: 1,
+    acknowledgePossibleDuplicateCharge: true,
+  },
+  'creative-studio.retry-download': { projectId: 'project_1', jobId: 'job_1', expectedRevision: 1 },
+  'creative-studio.list-connection-candidates': undefined,
+  'creative-studio.list-connections': undefined,
+  'creative-studio.validate-connection': {
+    providerId: 'provider_1',
+    integrationId: 'integration_x5T8cW1h',
+    model: 'open-sora',
+  },
+  'creative-studio.save-connection': {
+    providerId: 'provider_1',
+    integrationId: 'integration_x5T8cW1h',
+    model: 'open-sora',
+  },
+  'creative-studio.remove-connection': { bindingId: 'binding_1' },
+  'creative-studio.list-routes': { projectId: 'project_1' },
   'app-operations.cancel': { operation_id: 'operation-1' },
   'office-artifact.get-state': {
     conversationId: 'conversation-1',
@@ -302,6 +433,8 @@ const VOID_PROVIDER_KEYS = [
   'system-settings:get-pet-size',
   'system-settings:get-pet-dnd',
   'system-settings:get-pet-confirm-enabled',
+  'creative-studio.list-connection-candidates',
+  'creative-studio.list-connections',
   'webui.get-status',
   'webui.stop',
 ] as const satisfies ReadonlyArray<NativeBridgeProviderKey>;
@@ -314,7 +447,7 @@ const NATIVE_PAYLOAD_SCHEMAS_PATH = resolve(
   'packages/desktop/src/common/adapter/native/payloadSchemas.ts'
 );
 
-function collectBridgeBuildProviderKeys(source: string): string[] {
+function collectBridgeBuilderKeys(source: string, builderName: 'buildProvider' | 'buildRendererQuery'): string[] {
   const sourceFile = ts.createSourceFile(IPC_BRIDGE_PATH, source, ts.ScriptTarget.Latest, true);
   const providerKeys: string[] = [];
 
@@ -324,11 +457,11 @@ function collectBridgeBuildProviderKeys(source: string): string[] {
       ts.isPropertyAccessExpression(node.expression) &&
       ts.isIdentifier(node.expression.expression) &&
       node.expression.expression.text === 'bridge' &&
-      node.expression.name.text === 'buildProvider'
+      node.expression.name.text === builderName
     ) {
       const [providerKey] = node.arguments;
       if (providerKey === undefined || !ts.isStringLiteral(providerKey)) {
-        throw new Error('bridge.buildProvider provider key must be a string literal');
+        throw new Error(`bridge.${builderName} provider key must be a string literal`);
       }
       providerKeys.push(providerKey.text);
     }
@@ -338,6 +471,14 @@ function collectBridgeBuildProviderKeys(source: string): string[] {
 
   visit(sourceFile);
   return providerKeys;
+}
+
+function collectBridgeBuildProviderKeys(source: string): string[] {
+  return collectBridgeBuilderKeys(source, 'buildProvider');
+}
+
+function collectBridgeBuildRendererQueryKeys(source: string): string[] {
+  return collectBridgeBuilderKeys(source, 'buildRendererQuery');
 }
 
 function collectNamedImportSources(source: string, importedName: string): string[] {
@@ -786,6 +927,450 @@ const INVALID_PAYLOADS = [
   ['project-knowledge.retry-source', 'omitted workspace', { projectId: 'project-1', sourceId: 'a1b2c3d4e5f6' }],
   ['project-knowledge.remove-store', 'empty project identifier', { projectId: '' }],
   ['project-knowledge.get-session-mcp-server', 'omitted required project identifier', {}],
+  [
+    'creative-studio.create-project',
+    'renderer supplied internal project id',
+    { ...VALID_PAYLOADS['creative-studio.create-project'], id: 'project_1' },
+  ],
+  [
+    'creative-studio.create-project',
+    'overlong project name',
+    { ...VALID_PAYLOADS['creative-studio.create-project'], name: 'x'.repeat(257) },
+  ],
+  [
+    'creative-studio.create-project',
+    'overlong brief',
+    { ...VALID_PAYLOADS['creative-studio.create-project'], brief: 'x'.repeat(16 * 1024 + 1) },
+  ],
+  [
+    'creative-studio.create-project',
+    'fractional project target',
+    { ...VALID_PAYLOADS['creative-studio.create-project'], targetDurationSeconds: 12.5 },
+  ],
+  [
+    'creative-studio.create-project',
+    'non-finite project target',
+    { ...VALID_PAYLOADS['creative-studio.create-project'], targetDurationSeconds: Number.POSITIVE_INFINITY },
+  ],
+  ['creative-studio.get-project', 'project id traversal', { projectId: '../project_1' }],
+  ['creative-studio.choose-and-import-reference', 'missing expected revision', { projectId: 'project_1' }],
+  [
+    'creative-studio.choose-and-import-reference',
+    'attempted source path',
+    { projectId: 'project_1', expectedRevision: 1, sourcePath: '/tmp/reference.png' },
+  ],
+  [
+    'creative-studio.choose-and-import-reference',
+    'scene traversal',
+    { projectId: 'project_1', sceneId: '../scene_1', expectedRevision: 1 },
+  ],
+  [
+    'creative-studio.choose-and-export-assets',
+    'wrong include references boolean',
+    { projectId: 'project_1', includeReferences: 'yes' },
+  ],
+  [
+    'creative-studio.validate-connection',
+    'provider id traversal',
+    { providerId: '../provider', integrationId: 'integration_g7Q2mB4p', model: 'image' },
+  ],
+  [
+    'creative-studio.validate-connection',
+    'renderer supplied adapter identity',
+    {
+      providerId: 'provider_1',
+      integrationId: 'integration_g7Q2mB4p',
+      adapterId: 'weprompt-image-v1',
+      model: 'image',
+    },
+  ],
+  [
+    'creative-studio.validate-connection',
+    'renderer supplied provider URL',
+    {
+      providerId: 'provider_1',
+      integrationId: 'integration_g7Q2mB4p',
+      model: 'image',
+      baseUrl: 'https://secret.invalid',
+    },
+  ],
+  [
+    'creative-studio.save-connection',
+    'renderer supplied credential',
+    { providerId: 'provider_1', integrationId: 'integration_g7Q2mB4p', model: 'image', apiKey: 'secret' },
+  ],
+  ['creative-studio.remove-connection', 'connection traversal', { bindingId: '../binding_1' }],
+  ['creative-studio.list-routes', 'project traversal', { projectId: '../project_1' }],
+  [
+    'creative-studio.propose-storyboard',
+    'project id traversal',
+    { projectId: '../project_1', expectedRevision: 1, replaceExisting: false },
+  ],
+  [
+    'creative-studio.propose-storyboard',
+    'zero expected revision',
+    { projectId: 'project_1', expectedRevision: 0, replaceExisting: false },
+  ],
+  [
+    'creative-studio.propose-storyboard',
+    'fractional expected revision',
+    { projectId: 'project_1', expectedRevision: 1.5, replaceExisting: false },
+  ],
+  [
+    'creative-studio.propose-storyboard',
+    'infinite expected revision',
+    { projectId: 'project_1', expectedRevision: Number.POSITIVE_INFINITY, replaceExisting: false },
+  ],
+  ['creative-studio.propose-storyboard', 'missing replace option', { projectId: 'project_1', expectedRevision: 1 }],
+  [
+    'creative-studio.propose-storyboard',
+    'renderer supplied provider choice',
+    { projectId: 'project_1', expectedRevision: 1, replaceExisting: false, providerId: 'provider_1' },
+  ],
+  [
+    'creative-studio.propose-storyboard',
+    'renderer supplied model choice',
+    { projectId: 'project_1', expectedRevision: 1, replaceExisting: false, model: 'model_1' },
+  ],
+  [
+    'creative-studio.propose-storyboard',
+    'renderer supplied prompt',
+    { projectId: 'project_1', expectedRevision: 1, replaceExisting: false, prompt: 'override' },
+  ],
+  [
+    'creative-studio.update-project',
+    'missing expected revision',
+    { projectId: 'project_1', name: 'Changed launch film' },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'project id traversal',
+    { ...VALID_PAYLOADS['creative-studio.update-model-selection'], projectId: '../project_1' },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'choice id traversal',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-model-selection'],
+      selection: { choiceId: '../binding_1' },
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'missing expected revision',
+    { ...VALID_PAYLOADS['creative-studio.update-model-selection'], expectedRevision: undefined },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'zero expected revision',
+    { ...VALID_PAYLOADS['creative-studio.update-model-selection'], expectedRevision: 0 },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'fractional expected revision',
+    { ...VALID_PAYLOADS['creative-studio.update-model-selection'], expectedRevision: 1.5 },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'storyboard adapter',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'storyboard',
+      selection: {
+        providerId: 'provider_1',
+        adapterId: 'weprompt-media-gateway-v1',
+        model: 'gpt-4o',
+      },
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'media selection without opaque choice',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'video',
+      selection: {},
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'media selection with adapter identity',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'image',
+      selection: {
+        choiceId: 'binding_1',
+        adapterId: 'weprompt-media-gateway-v1',
+      },
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'media selection with provider and model override',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'video',
+      selection: {
+        choiceId: 'binding_1',
+        providerId: 'provider_1',
+        model: 'video-model',
+      },
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'overlong model',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'storyboard',
+      selection: { providerId: 'provider_1', model: 'x'.repeat(257) },
+    },
+  ],
+  [
+    'creative-studio.update-model-selection',
+    'control character in model',
+    {
+      projectId: 'project_1',
+      expectedRevision: 2,
+      role: 'storyboard',
+      selection: { providerId: 'provider_1', model: 'open\u0000sora' },
+    },
+  ],
+  [
+    'creative-studio.update-project',
+    'non-positive expected revision',
+    { projectId: 'project_1', expectedRevision: 0, name: 'Changed launch film' },
+  ],
+  ['creative-studio.delete-project', 'missing expected revision', { projectId: 'project_1' }],
+  ['creative-studio.delete-project', 'traversal project id', { projectId: '../../project_1', expectedRevision: 1 }],
+  [
+    'creative-studio.update-scene',
+    'overlong scene title',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, title: 'x'.repeat(257) },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
+    'overlong visual prompt',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, visualPrompt: 'x'.repeat(8 * 1024 + 1) },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
+    'overlong narration',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, narration: 'x'.repeat(4 * 1024 + 1) },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
+    'overlong on-screen text',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, onScreenText: 'x'.repeat(1024 + 1) },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
+    'fractional scene duration',
+    {
+      ...VALID_PAYLOADS['creative-studio.update-scene'],
+      scene: { ...VALID_PAYLOADS['creative-studio.update-scene'].scene, durationSeconds: 1.5 },
+    },
+  ],
+  [
+    'creative-studio.update-scene',
+    'scene id traversal',
+    { ...VALID_PAYLOADS['creative-studio.update-scene'], sceneId: '../scene_1' },
+  ],
+  ...(['id', 'selectedAssetId', 'assetIds', 'jobIds', 'reviewState'] as const).map(
+    (field) =>
+      [
+        'creative-studio.update-scene',
+        `renderer supplied operational scene field ${field}`,
+        {
+          ...VALID_PAYLOADS['creative-studio.update-scene'],
+          scene: {
+            ...VALID_PAYLOADS['creative-studio.update-scene'].scene,
+            [field]:
+              field === 'id'
+                ? 'scene_1'
+                : field === 'selectedAssetId'
+                  ? null
+                  : field === 'reviewState'
+                    ? 'complete'
+                    : [],
+          },
+        },
+      ] as const
+  ),
+  [
+    'creative-studio.reorder-scenes',
+    'duplicate scene ids',
+    { projectId: 'project_1', expectedRevision: 1, sceneOrder: ['scene_1', 'scene_1'] },
+  ],
+  [
+    'creative-studio.reorder-scenes',
+    'empty scene ids',
+    { projectId: 'project_1', expectedRevision: 1, sceneOrder: [] },
+  ],
+  [
+    'creative-studio.reorder-scenes',
+    'too many scene ids',
+    {
+      projectId: 'project_1',
+      expectedRevision: 1,
+      sceneOrder: Array.from({ length: 25 }, (_, index) => `scene_${index}`),
+    },
+  ],
+  [
+    'creative-studio.select-asset',
+    'missing expected revision',
+    { projectId: 'project_1', sceneId: 'scene_1', assetId: 'asset_1' },
+  ],
+  [
+    'creative-studio.select-asset',
+    'asset id traversal',
+    { projectId: 'project_1', expectedRevision: 1, sceneId: 'scene_1', assetId: '../../asset_1' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'non-PNG data URL',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], dataUrl: 'data:image/jpeg;base64,/9j/' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'video asset traversal',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], videoAssetId: '../../asset_1' },
+  ],
+  [
+    'creative-studio.persist-captured-poster',
+    'zero width',
+    { ...VALID_PAYLOADS['creative-studio.persist-captured-poster'], width: 0 },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'uppercase catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'ABCDEF0123456789' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'wrong-length catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'abcdef012345678' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'non-hex catalog version',
+    { projectId: 'project_1', expectedRevision: 1, catalogVersion: 'gggggggggggggggg' },
+  ],
+  [
+    'creative-studio.fit-storyboard',
+    'non-positive expected revision',
+    { projectId: 'project_1', expectedRevision: 0, catalogVersion: '0123456789abcdef' },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'missing catalog version',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      catalogVersion: undefined,
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'missing required generation mode',
+    { ...VALID_PAYLOADS['creative-studio.submit-scenes'], mode: undefined },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'unknown generation mode',
+    { ...VALID_PAYLOADS['creative-studio.submit-scenes'], mode: 'all' },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'single mode with multiple scene and route selections',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      sceneIds: ['scene_1', 'scene_2'],
+      routes: [
+        ...VALID_PAYLOADS['creative-studio.submit-scenes'].routes,
+        { sceneId: 'scene_2', choiceId: 'binding_2', kind: 'video' },
+      ],
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'duplicate scene ids',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      sceneIds: ['scene_1', 'scene_1'],
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'route set does not match selected scenes',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      routes: [
+        {
+          ...VALID_PAYLOADS['creative-studio.submit-scenes'].routes[0],
+          sceneId: 'scene_2',
+        },
+      ],
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'renderer supplied adapter identity',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      routes: [
+        {
+          ...VALID_PAYLOADS['creative-studio.submit-scenes'].routes[0],
+          adapterId: 'weprompt-media-gateway-v1',
+        },
+      ],
+    },
+  ],
+  [
+    'creative-studio.submit-scenes',
+    'renderer supplied provider URL',
+    {
+      ...VALID_PAYLOADS['creative-studio.submit-scenes'],
+      routes: [
+        {
+          ...VALID_PAYLOADS['creative-studio.submit-scenes'].routes[0],
+          baseUrl: 'https://signed.invalid/output',
+        },
+      ],
+    },
+  ],
+  ['creative-studio.cancel-job', 'missing expected revision', { projectId: 'project_1', jobId: 'job_1' }],
+  [
+    'creative-studio.retry-job',
+    'non-boolean duplicate charge acknowledgement',
+    {
+      projectId: 'project_1',
+      jobId: 'job_1',
+      expectedRevision: 1,
+      acknowledgePossibleDuplicateCharge: 'yes',
+    },
+  ],
+  [
+    'creative-studio.retry-download',
+    'non-positive expected revision',
+    { projectId: 'project_1', jobId: 'job_1', expectedRevision: 0 },
+  ],
   ['app-operations.cancel', 'omitted operation identifier', {}],
   ['office-artifact.get-state', 'omitted workspace', { filePath: '/tmp/work/report.docx' }],
   ['office-artifact.prepare-preview', 'omitted file path', { workspace: '/tmp/work' }],
@@ -897,6 +1482,164 @@ const INVALID_PAYLOADS = [
 ] satisfies ReadonlyArray<InvalidPayloadCase>;
 
 describe('native bridge payload schemas', () => {
+  it.each(['creative-studio.render-cut', 'creative-studio.cancel-render'])(
+    'defines a strict project request schema for %s',
+    (providerKey) => {
+      const schema = (
+        nativeBridgePayloadSchemas as Record<string, { safeParse(value: unknown): { success: boolean } }>
+      )[providerKey];
+
+      expect(schema).toBeDefined();
+      expect(schema?.safeParse({ projectId: 'project_1' }).success).toBe(true);
+      expect(schema?.safeParse({ projectId: 'project_1', injected: true }).success).toBe(false);
+    }
+  );
+
+  it.each([
+    ['creative-studio.list-proposals', { projectId: 'project_1' }],
+    ['creative-studio.accept-proposal', { projectId: 'project_1', proposalId: 'proposal_1' }],
+    ['creative-studio.reject-proposal', { projectId: 'project_1', proposalId: 'proposal_1' }],
+  ])('defines a strict native schema for %s', (providerKey, payload) => {
+    const schema = (nativeBridgePayloadSchemas as Record<string, { safeParse(value: unknown): { success: boolean } }>)[
+      providerKey
+    ];
+
+    expect(schema).toBeDefined();
+    expect(schema?.safeParse(payload).success).toBe(true);
+    expect(schema?.safeParse({ ...payload, injected: true }).success).toBe(false);
+  });
+
+  it('guards the dedicated Brief conversation binding command', () => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.bind-brief-conversation'];
+
+    expect(
+      schema.safeParse({
+        projectId: 'studio_1',
+        expectedRevision: 2,
+        conversationId: 'conversation_brief',
+      }).success
+    ).toBe(true);
+    expect(
+      schema.safeParse({
+        projectId: 'studio_1',
+        expectedRevision: 0,
+        conversationId: '../conversation',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts an empty Studio scene title for display-only seeded placeholders', () => {
+    const payload = VALID_PAYLOADS['creative-studio.update-scene'];
+
+    expect(
+      parseNativeBridgePayload('creative-studio.update-scene', {
+        ...payload,
+        scene: { ...payload.scene, title: '' },
+      })
+    ).toMatchObject({ scene: { title: '' } });
+  });
+
+  it('accepts the exact revisioned Studio video model-selection payload', () => {
+    expect(
+      parseNativeBridgePayload(
+        'creative-studio.update-model-selection',
+        VALID_PAYLOADS['creative-studio.update-model-selection']
+      )
+    ).toEqual(VALID_PAYLOADS['creative-studio.update-model-selection']);
+  });
+
+  it('accepts only renderer-owned edit decisions in a cut mutation payload', () => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.update-cut' as NativeBridgeProviderKey];
+    const payload = VALID_PAYLOADS['creative-studio.update-cut'];
+
+    expect(schema?.safeParse(payload).success).toBe(true);
+    expect(
+      schema?.safeParse({
+        ...payload,
+        cut: {
+          ...payload.cut,
+          clips: {
+            clip_1: {
+              ...payload.cut.clips.clip_1,
+              assetId: 'renderer_must_not_supply_this',
+            },
+          },
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    [
+      'unknown filter',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              filters: [{ id: 'blur', amount: 0.25 }],
+            },
+          },
+        },
+      },
+    ],
+    [
+      'duplicate filter',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              filters: [
+                { id: 'contrast', amount: 0.1 },
+                { id: 'contrast', amount: 0.2 },
+              ],
+            },
+          },
+        },
+      },
+    ],
+    [
+      'out-of-frame crop',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              crop: { x: 0.5, y: 0, width: 0.75, height: 1 },
+            },
+          },
+        },
+      },
+    ],
+    [
+      'non-increasing trim',
+      {
+        ...VALID_PAYLOADS['creative-studio.update-cut'],
+        cut: {
+          ...VALID_PAYLOADS['creative-studio.update-cut'].cut,
+          clips: {
+            clip_1: {
+              ...VALID_PAYLOADS['creative-studio.update-cut'].cut.clips.clip_1,
+              sourceInSeconds: 4.5,
+              sourceOutSeconds: 4.5,
+            },
+          },
+        },
+      },
+    ],
+  ] as const)('rejects a cut mutation with %s', (_case, payload) => {
+    const schema = nativeBridgePayloadSchemas['creative-studio.update-cut' as NativeBridgeProviderKey];
+
+    expect(schema?.safeParse(payload).success).toBe(false);
+  });
+
   it('loads presentation limits through the side-effect-free common policy boundary', () => {
     const policyImports = collectNamedImportSources(
       readFileSync(NATIVE_PAYLOAD_SCHEMAS_PATH, 'utf8'),
@@ -927,15 +1670,70 @@ describe('native bridge payload schemas', () => {
     expect(providerKeys).toEqual(NATIVE_BRIDGE_PROVIDER_KEYS);
   });
 
+  it('keeps renderer-owned query declarations equal to their separate manifest', () => {
+    const queryKeys = collectBridgeBuildRendererQueryKeys(readFileSync(IPC_BRIDGE_PATH, 'utf8'));
+
+    expect(queryKeys).toEqual(RENDERER_BRIDGE_QUERY_KEYS);
+    expect(queryKeys.some((key) => NATIVE_BRIDGE_PROVIDER_KEYS.includes(key as NativeBridgeProviderKey))).toBe(false);
+  });
+
   it('rejects non-literal native provider declarations in the inventory', () => {
     expect(() => collectBridgeBuildProviderKeys("const key = 'provider'; bridge.buildProvider(key);")).toThrow(
       /provider key must be a string literal/i
     );
   });
 
+  it('rejects non-literal renderer query declarations in the inventory', () => {
+    expect(() =>
+      collectBridgeBuildRendererQueryKeys("const key = 'query'; bridge.buildRendererQuery(key, {});")
+    ).toThrow(/provider key must be a string literal/i);
+  });
+
   it('has exactly one schema for every manifested native provider', () => {
     expect(Object.keys(nativeBridgePayloadSchemas)).toEqual(NATIVE_BRIDGE_PROVIDER_KEYS);
   });
+
+  it('has exactly one request and response schema for every renderer-owned query', () => {
+    expect(Object.keys(rendererBridgeQuerySchemas)).toEqual(RENDERER_BRIDGE_QUERY_KEYS);
+    expect(
+      Object.values(rendererBridgeQuerySchemas).every(
+        (schemas) => schemas.request !== undefined && schemas.response !== undefined
+      )
+    ).toBe(true);
+  });
+
+  it.each(RENDERER_BRIDGE_QUERY_KEYS)('accepts only a void request for renderer-owned query %s', (queryKey) => {
+    expect(parseRendererBridgeQueryRequest(queryKey, undefined)).toBeUndefined();
+    expect(() => parseRendererBridgeQueryRequest(queryKey, {})).toThrow(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
+  });
+
+  it.each([
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 0 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 24 }],
+    ['creative-studio.flush-unsaved-work', { saved: true }],
+    ['creative-studio.flush-unsaved-work', { saved: false }],
+  ] as const satisfies ReadonlyArray<readonly [RendererBridgeQueryKey, unknown]>)(
+    'accepts a strict response for renderer-owned query %s',
+    (queryKey, response) => {
+      expect(parseRendererBridgeQueryResponse(queryKey, response)).toEqual(response);
+    }
+  );
+
+  it.each([
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: -1 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 25 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 1.5 }],
+    ['creative-studio.has-unsaved-work', { dirtySceneCount: 1, unexpected: true }],
+    ['creative-studio.flush-unsaved-work', { saved: 'yes' }],
+    ['creative-studio.flush-unsaved-work', { saved: false, unexpected: true }],
+  ] as const satisfies ReadonlyArray<readonly [RendererBridgeQueryKey, unknown]>)(
+    'rejects an invalid response for renderer-owned query %s',
+    (queryKey, response) => {
+      expect(() => parseRendererBridgeQueryResponse(queryKey, response)).toThrow(
+        INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE
+      );
+    }
+  );
 
   it.each(NATIVE_BRIDGE_PROVIDER_KEYS)('accepts the current payload shape for %s', (providerKey) => {
     expect(() => parseNativeBridgePayload(providerKey, VALID_PAYLOADS[providerKey])).not.toThrow();

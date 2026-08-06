@@ -13,17 +13,23 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, powerMonitor, protocol, session, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
 import WebSocket from 'ws';
 import { MainBackendHttpError, mainHttpRequest, withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
-import { DESKTOP_PET_ENABLED, PRESENTATION_RUN_V2_ENABLED } from './common/config/constants';
+import { CREATIVE_STUDIO_ENABLED, DESKTOP_PET_ENABLED, PRESENTATION_RUN_V2_ENABLED } from './common/config/constants';
 import { isUpdateFeatureEnabled } from './common/update/updatePolicy';
 import { ipcBridge } from './common';
 import { initializeProcess } from './process';
+import { registerCreativeStudioScheme } from './process/services/creative-studio/mediaProtocol';
+import {
+  disposeCreativeStudioRuntime,
+  getCreativeStudioRuntime,
+  resumeCreativeStudioAfterBackendReady,
+} from './process/services/creative-studio/runtime';
 import { startBackendOrExit } from './process/startup/backendStartup';
 import { assertStartupArchitectureCompatible } from './process/startup/architectureCompatibility';
 import { classifyBackendStartupFailure } from './process/startup/backendStartupFailure';
@@ -40,10 +46,14 @@ import { registerWindowMaximizeListeners } from '@process/bridge';
 import { BackendLifecycleManager } from '@aionui/web-host';
 import { resolveBinaryPath } from '@process/backend';
 import { initializeFeedbackBridge } from './process/bridge/feedbackBridge';
+import {
+  createCreativeStudioCloseHandshake,
+  type CreativeStudioCloseHandshake,
+} from './process/bridge/creativeStudioBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
-import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
-import { setInitialLanguage } from '@process/services/i18n';
-import { appOperationsBroker } from '@process/services/appOperations';
+import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
+import i18n, { setInitialLanguage } from '@process/services/i18n';
+import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
 import {
   createOfficeCliRunner,
@@ -101,6 +111,9 @@ import {
 import { readCloseToTraySetting } from './process/utils/closeToTraySetting';
 // @ts-expect-error - electron-squirrel-startup doesn't have types
 import electronSquirrelStartup from 'electron-squirrel-startup';
+
+// Privileges are accepted only before Electron reaches its ready lifecycle.
+registerCreativeStudioScheme(protocol);
 
 const rendererDirectory = path.join(__dirname, '../renderer');
 const fallbackRendererFile = path.join(rendererDirectory, 'index.html');
@@ -226,6 +239,7 @@ let isExplicitQuit = false;
 let appReadyDone = false;
 
 let mainWindow: BrowserWindow;
+let creativeStudioCloseHandshake: CreativeStudioCloseHandshake | null = null;
 const backendManager = new BackendLifecycleManager(
   {
     version: app.getVersion(),
@@ -540,6 +554,12 @@ function markBackendReady(backendPort: number, source: string): void {
   void presentationRuntimeLifecycleOwner
     .backendReady({ port: backendPort, token: backendManager.localToken })
     .catch(() => console.warn('[AionUi][presentation-runtime] LIFECYCLE_START_FAILED'));
+  // Runs on every backend-ready, like the presentation lifecycle above, so an
+  // interrupted job resumes after a reconnect and not only on first start. Gated:
+  // with Creative Studio disabled this must not resume paid provider work.
+  if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
+    resumeCreativeStudioAfterBackendReady(getCreativeStudioRuntime());
+  }
   if (backendStartedOk) return;
   registerCronResumeBridge(backendPort);
   backendStartedOk = true;
@@ -730,7 +750,8 @@ const CSP_DIRECTIVES = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: weprompt-studio:",
+  "media-src 'self' weprompt-studio:",
   "font-src 'self' data:",
   "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
   "worker-src 'self' blob:",
@@ -846,6 +867,24 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   const rendererUrl = rendererDocumentPolicy.developmentRendererUrl;
 
   initMainAdapterWithWindow(mainWindow);
+  const studioWindow = mainWindow;
+  const closeHandshake = createCreativeStudioCloseHandshake({
+    getCurrentUrl: () =>
+      studioWindow.isDestroyed() || studioWindow.webContents.isDestroyed() ? '' : studioWindow.webContents.getURL(),
+    queryUnsavedWork: (options) => ipcBridge.creativeStudio.hasUnsavedWork.invoke(options),
+    flushUnsavedWork: (options) => ipcBridge.creativeStudio.flushUnsavedWork.invoke(options),
+    showMessageBox: (options) => dialog.showMessageBox(studioWindow, options),
+    translate: (key, options) => i18n.t(key, options ?? {}),
+    closeWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.close();
+    },
+    hideWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.hide();
+    },
+    quitApp: () => app.quit(),
+    onQuitCancelled: () => setIsQuitting(false),
+  });
+  creativeStudioCloseHandshake = closeHandshake;
   bindMainWindowReferences(mainWindow);
   initializeFeedbackBridge(mainWindow, rendererDocumentPolicy.mainWindowDocuments);
 
@@ -857,14 +896,8 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
 
   // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI)
   // 初始化自动更新服务（通过环境变量禁用时跳过，例如 E2E / CI 场景）
-  const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
-  const disableAutoUpdater =
-    !isUpdateFeatureEnabled() ||
-    process.env.AIONUI_DISABLE_AUTO_UPDATE === '1' ||
-    process.env.AIONUI_E2E_TEST === '1' ||
-    isCiRuntime;
-  if (!disableAutoUpdater) {
-    Promise.all([import('./process/services/autoUpdaterService'), import('./process/bridge/updateBridge')])
+  if (isUpdateFeatureEnabled()) {
+    Promise.all([import('./process/services/update/autoUpdaterService'), import('./process/bridge/updateBridge')])
       .then(([{ autoUpdaterService }, { createAutoUpdateStatusBroadcast }]) => {
         // Create status broadcast callback that emits via ipcBridge (pure emitter, no window binding)
         const statusBroadcast = createAutoUpdateStatusBroadcast();
@@ -932,6 +965,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
 
   mainWindow.on('closed', () => {
     console.log('[AionUi] Main window closed');
+    if (creativeStudioCloseHandshake === closeHandshake) creativeStudioCloseHandshake = null;
   });
 
   // DevTools is no longer auto-opened at startup.
@@ -953,7 +987,9 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     if (getCloseToTrayEnabled() && !getIsQuitting()) {
       event.preventDefault();
       mainWindow.hide();
+      return;
     }
+    closeHandshake.handleWindowClose(event);
   });
 };
 
@@ -1006,6 +1042,9 @@ const handleAppReady = async (): Promise<void> => {
 
   try {
     await initializeProcess();
+    if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
+      await getCreativeStudioRuntime().start();
+    }
     rendererInitialLanguage = ProcessConfig.getSync('language') ?? null;
     mark('initializeProcess');
   } catch (error) {
@@ -1364,6 +1403,7 @@ app.on('activate', () => {
 
 installQuitCleanup({
   onBeforeQuit: (handler) => app.on('before-quit', (event) => handler(event)),
+  beforeCleanup: (event) => creativeStudioCloseHandshake?.handleBeforeQuit(event) ?? false,
   quitApp: () => app.quit(),
   setIsQuitting,
   markExplicitQuit: () => {
@@ -1375,6 +1415,7 @@ installQuitCleanup({
     disposeCronResumeListener = null;
   },
   cancelAppOperations: () => appOperationsBroker.cancelAll(),
+  disposeCreativeStudio: disposeCreativeStudioRuntime,
   disposeOfficeArtifacts: disposeOfficeArtifactService,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).

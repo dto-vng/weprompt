@@ -20,6 +20,10 @@ vi.mock('@/common/platform/bridge', () => ({
         _getHandler: () => handlerMap.get('handler'),
       };
     }),
+    buildRendererQuery: vi.fn(() => ({
+      provider: vi.fn(),
+      invoke: vi.fn(),
+    })),
     buildEmitter: vi.fn(() => ({
       emit: vi.fn(),
       on: vi.fn(),

@@ -8,22 +8,17 @@ import type { BrowserWindow, IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
 import { bridge } from '@/common/platform/bridge';
-import { ADAPTER_BRIDGE_EVENT_KEY, getNativeBridgeProviderKey } from './native/constants';
-import { parseNativeBridgePayload } from './native/payloadSchemas';
+import {
+  ADAPTER_BRIDGE_EVENT_KEY,
+  getNativeBridgeProviderKey,
+  getRendererBridgeQueryResponseKey,
+} from './native/constants';
+import { parseNativeBridgePayload, parseRendererBridgeQueryResponse } from './native/payloadSchemas';
 import { registerWebSocketBroadcaster, getBridgeEmitter, setBridgeEmitter, broadcastToAll } from './registry';
-
-/**
- * Bridge event data structure for IPC communication
- * IPC 通信的桥接事件数据结构
- */
-type BridgeInvocationData = {
-  id: string;
-  data?: unknown;
-};
 
 type BridgeEventData = {
   name: string;
-  data: BridgeInvocationData;
+  data: unknown;
 };
 
 const adapterWindowList: Array<BrowserWindow> = [];
@@ -63,7 +58,26 @@ function parseBridgeEventData(info: unknown): BridgeEventData {
     throw new Error('[adapter] Native IPC request rejected: malformed JSON');
   }
 
-  if (!isRecord(parsed) || typeof parsed.name !== 'string' || !isRecord(parsed.data)) {
+  if (!isRecord(parsed) || typeof parsed.name !== 'string') {
+    throw new Error('[adapter] Native IPC request rejected: invalid envelope');
+  }
+
+  const rendererQueryKey = getRendererBridgeQueryResponseKey(parsed.name);
+  if (rendererQueryKey) {
+    if (!bridge.hasListener(parsed.name)) {
+      throw new Error('[adapter] Native IPC request rejected: operation is not allowed');
+    }
+    return {
+      name: parsed.name,
+      data: parseRendererBridgeQueryResponse(rendererQueryKey, parsed.data),
+    };
+  }
+
+  if (parsed.name.startsWith('subscribe.callback-')) {
+    throw new Error('[adapter] Native IPC request rejected: operation is not allowed');
+  }
+
+  if (!isRecord(parsed.data)) {
     throw new Error('[adapter] Native IPC request rejected: invalid envelope');
   }
   if (typeof parsed.data.id !== 'string' || parsed.data.id.length === 0 || parsed.data.id.length > 256) {

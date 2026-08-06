@@ -5,16 +5,17 @@
  */
 
 import { initApplicationBridge } from './applicationBridge';
-import { initDialogBridge } from './dialogBridge';
+import { initDialogBridge } from './native/dialogBridge';
 import { initUpdateBridge } from './updateBridge';
-import { initSystemSettingsBridge } from './systemSettingsBridge';
-import { initWindowControlsBridge } from './windowControlsBridge';
-import { initNotificationBridge } from './notificationBridge';
+import { initSystemSettingsBridge } from './native/systemSettingsBridge';
+import { initWindowControlsBridge } from './native/windowControlsBridge';
+import { initNotificationBridge } from './native/notificationBridge';
 import { initWebuiBridge } from './webuiBridge';
-import { initThemeBridge } from './themeBridge';
+import { initThemeBridge } from './native/themeBridge';
 import { initProjectKnowledgeBridge } from './projectKnowledgeBridge';
+import { initCreativeStudioBridge } from './creativeStudioBridge';
 import { ipcBridge } from '@/common';
-import { runContextCompact } from '@process/services/appOperations';
+import { runContextCompact } from '@process/services/app-operations';
 import { initPresentationTemplateBridge } from '@process/services/presentation-template/bridge';
 
 type AppOperationsBridgeDependencies = {
@@ -60,11 +61,13 @@ export function initAllBridges(_deps: BridgeDependencies = {}): void {
   initWebuiBridge();
   initThemeBridge();
   initProjectKnowledgeBridge();
+  initCreativeStudioBridge();
   initAppOperationsBridge();
 }
 
 export {
   initApplicationBridge,
+  initCreativeStudioBridge,
   initDialogBridge,
   initNotificationBridge,
   initProjectKnowledgeBridge,
@@ -74,5 +77,5 @@ export {
   initWindowControlsBridge,
   initWebuiBridge,
 };
-export { registerWindowMaximizeListeners } from './windowControlsBridge';
+export { registerWindowMaximizeListeners } from './native/windowControlsBridge';
 export const disposeAllTeamSessions = (): Promise<void> => Promise.resolve();

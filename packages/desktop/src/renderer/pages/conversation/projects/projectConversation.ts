@@ -6,6 +6,7 @@
 
 import type { TChatConversation } from '@/common/config/storage';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
+import type { StudioProject } from '@/common/types/project/creativeStudioTypes';
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 
 import { findProjectByWorkspace, readProjects } from './projectStorage';
@@ -23,6 +24,30 @@ export const resolveConversationProject = (
   }
   const workspace = conversation?.extra?.workspace;
   return workspace ? findProjectByWorkspace(workspace, projects) : null;
+};
+
+type StudioBindingProject = Pick<StudioProject, 'id' | 'briefConversationId'>;
+
+/** Resolves a conversation's Studio project only when the project authority points back to it. */
+export const resolveConversationStudioProject = <Project extends StudioBindingProject>(
+  conversation: Pick<TChatConversation, 'id' | 'extra'> | null | undefined,
+  projects: Project[]
+): Project | null => {
+  const projectId = conversation?.extra?.studio_project_id;
+  if (!projectId || !conversation) return null;
+  const project = projects.find((candidate) => candidate.id === projectId);
+  return project?.briefConversationId === conversation.id ? project : null;
+};
+
+/** Resolves a project's Brief conversation only when its mutable back-reference still agrees. */
+export const resolveStudioProjectBriefConversation = <Conversation extends Pick<TChatConversation, 'id' | 'extra'>>(
+  project: StudioBindingProject | null | undefined,
+  conversations: Conversation[]
+): Conversation | null => {
+  const conversationId = project?.briefConversationId;
+  if (!conversationId || !project) return null;
+  const conversation = conversations.find((candidate) => candidate.id === conversationId);
+  return conversation?.extra?.studio_project_id === project.id ? conversation : null;
 };
 
 export type DetachedProjectExtraPatch = {

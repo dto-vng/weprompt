@@ -630,13 +630,6 @@
       "manual": "手動送信"
     }
   },
-  "presentationSubmission": {
-    "pending": "プレゼンテーションを送信中",
-    "restore": "復元",
-    "persistenceFailure": "プレゼンテーションの送信を保存できませんでした。",
-    "queued": "プレゼンテーションをキューに追加しました",
-    "uncertainTracking": "送信状態が不明です。再送せず、既存の実行を追跡してください。"
-  },
   "contextUsage": {
     "contextUsed": "コンテキスト使用量",
     "contextWindow": "コンテキストウィンドウ",
@@ -779,16 +772,21 @@
     "importCard": "テンプレートをインポート (.md)",
     "empty": "利用可能なテンプレートがありません",
     "chipTooltip": "このメッセージはテンプレートを使用します",
-    "sources": {
-      "reselectRequired": "この PPTX テンプレートで使用するには、添付ファイルを選択し直してください。",
-      "reselectAction": "ファイルを選択し直す"
-    },
     "scratch": {
       "prepareError": "成果物の一時領域を準備できませんでした: {{error}}",
       "retained": "復旧用の一時ファイルを {{path}} に保持しました。",
       "cleanup": "クリーンアップ",
       "cleanupSuccess": "一時ファイルを削除しました",
       "cleanupError": "クリーンアップに失敗しました: {{error}}"
+    },
+    "importSuccess": "テンプレートをインポートしました",
+    "importError": "インポートに失敗しました: {{error}}",
+    "removeError": "削除に失敗しました: {{error}}",
+    "deleteTooltip": "テンプレートを削除",
+    "deleteConfirm": "このテンプレートを削除しますか？",
+    "sources": {
+      "reselectRequired": "この PPTX テンプレートで使用するには、添付ファイルを選択し直してください。",
+      "reselectAction": "ファイルを選択し直す"
     },
     "recovery": {
       "status": {
@@ -806,12 +804,7 @@
       "invalidResponse": "プレゼンテーションの復旧状態を確認できませんでした。",
       "openError": "現在のプレゼンテーション候補が開いたかどうかを確認できませんでした。",
       "discardError": "プレゼンテーション記録の破棄を確認できませんでした。"
-    },
-    "importSuccess": "テンプレートをインポートしました",
-    "importError": "インポートに失敗しました: {{error}}",
-    "removeError": "削除に失敗しました: {{error}}",
-    "deleteTooltip": "テンプレートを削除",
-    "deleteConfirm": "このテンプレートを削除しますか？"
+    }
   },
   "status": {
     "waitingApproval": "承認待ちです",
@@ -882,6 +875,450 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "クリエイティブスタジオ"
+    },
+    "close": {
+      "saveAndClose": "保存して閉じる",
+      "discard": "変更を破棄して閉じる",
+      "cancel": "キャンセル",
+      "unsavedMessage": "{{count}} 件のシーンに未保存の編集があります。保存してから閉じますか？",
+      "unsavedMessage_other": "{{count}} 件のシーンに未保存の編集があります。保存してから閉じますか？",
+      "unavailableMessage": "クリエイティブスタジオが応答していません。今すぐ閉じると、未保存のシーン編集が失われる可能性があります。"
+    },
+    "phase": {
+      "nav": {
+        "label": "制作ワークフロー",
+        "brief": "概要",
+        "write": "構成",
+        "produce": "生成",
+        "review": "確認",
+        "saved": "保存済み",
+        "saving": "変更を保存しています..."
+      },
+      "shared": {
+        "backToLibrary": "プロジェクト一覧に戻る",
+        "noMediaGeneration": "この手順では画像や動画は生成されません。"
+      },
+      "brief": {
+        "title": "概要",
+        "description": "構成を始める前に、プロジェクトの目的、形式、尺を決めます。",
+        "nameLabel": "プロジェクト名",
+        "intentLabel": "制作意図",
+        "durationLabel": "目標尺",
+        "aspectRatioLabel": "アスペクト比",
+        "startWriting": "構成を始める",
+        "saved": "概要の変更はすべて保存されています。",
+        "saving": "概要の変更を保存しています...",
+        "unsaved": "概要の変更はまだ保存されていません。",
+        "invalidName": "続行する前にプロジェクト名を入力してください。",
+        "aspectLocked": "アスペクト比は固定されています",
+        "aspectLockedHelp": "生成済みメディアを追加した後はアスペクト比を変更できません。"
+      },
+      "write": {
+        "title": "構成",
+        "continueToProduce": "生成へ進む",
+        "askAssistant": "アシスタントに相談",
+        "assistantTitle": "構成アシスタント",
+        "assistantDescription": "ストーリー構成、ショット案、プロンプトの作成にアシスタントを利用できます。",
+        "textChargeDisclosure": "ストーリーボードの下書きには設定済みのテキストモデルを使用します。プロバイダーから利用料が請求される場合があります。",
+        "draftStoryboard": "ストーリーボードを下書き",
+        "addShot": "ショットを追加",
+        "fitToGoal": "目標に合わせる",
+        "noScenes": "ショットを追加するか、ストーリーボードを下書きして開始します。",
+        "scriptTableTitle": "台本",
+        "scriptTableHelp": "1ショットにつき1行で、言葉、映像、尺、出力をまとめて整えます。",
+        "shotColumn": "ショット",
+        "scriptColumn": "台本",
+        "visualColumn": "映像",
+        "outputColumn": "出力",
+        "visualPlaceholder": "画面に映るものを説明…",
+        "suggestVisual": "映像を提案",
+        "addReference": "参照画像を追加",
+        "moreDetails": "詳細を表示",
+        "invalidTitle": "保存する前にショット名を入力してください。",
+        "placeholder": {
+          "opening": "冒頭ショット",
+          "middle": "中間ショット",
+          "closing": "締めのショット"
+        },
+        "needsTitle": "タイトルが必要",
+        "pacingTitle": "ペース",
+        "pacingSummary": "合計 {{total}} 秒 · 目標 {{target}} 秒",
+        "goalMarker": "目標 {{seconds}} 秒"
+      },
+      "produce": {
+        "connectEngine": "エンジンを接続 — 約1分、ワークスペース全体で一度だけ",
+        "askTeammate": "チームメンバーに依頼",
+        "askTeammateCopy": "このワークスペース用の画像または動画エンジンを WePrompt のモデル設定で接続してもらえますか？",
+        "renderingWith": "レンダリングに使用 —",
+        "engineSummary": "{{model}} · {{kind}} · 最大{{seconds}}秒",
+        "changeEngines": "エンジンを変更",
+        "takeRatio": "テイク {{current}} / {{total}}",
+        "noVisualYet": "ビジュアルはまだありません",
+        "writeVisual": "ビジュアルを書く",
+        "render": "レンダリング",
+        "renderAnother": "もう一度レンダリング",
+        "openPreview": "{{title}} のプレビューを開く",
+        "reviewCut": "編集結果を確認",
+        "modelsTitle": "モデル",
+        "activityTitle": "生成状況",
+        "activityEmpty": "実行中の生成ジョブはありません。",
+        "jobsRunning": "{{count}} 件の生成ジョブが実行中",
+        "jobsRunning_other": "{{count}} 件の生成ジョブが実行中"
+      },
+      "review": {
+        "title": "確認",
+        "description": "選択したメディアを確認し、不足するスレートを補って引き渡しを準備します。",
+        "handoff": "引き渡しを準備",
+        "noAssets": "引き渡せる選択済みメディアがありません。",
+        "selectedTake": "カットに採用",
+        "slateLabel": "スレート",
+        "slateDescription": "レンダリング済みメディアが未選択でも、スレートによってショットをシーケンスに残せます。",
+        "excludedFromHandoff": "選択したメディアがないシーンは引き渡しから除外されます。確認用スレートは書き出されません。",
+        "renderedShots": "レンダリング済みショット {{count}} 件",
+        "renderedShots_other": "レンダリング済みショット {{count}} 件",
+        "missingSlates": "不足しているスレート {{count}} 件",
+        "missingSlates_other": "不足しているスレート {{count}} 件",
+        "openProduce": "生成を開く",
+        "handoffDescription": "引き渡しに含まれるのは、ストーリーボードのマニフェストと選択したメディアのみです。確認用スレートは書き出されません。",
+        "partialHandoff": "選択したメディアがないシーンがあるため、この引き渡しは一部のみです。",
+        "render": {
+          "action": "動画をレンダリング",
+          "progress": "動画をレンダリング中… {{percent}}%",
+          "cancel": "レンダリングをキャンセル",
+          "missingScenes": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "missingScenes_one": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "missingScenes_other": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
+          "resultLabel": "レンダリング済み動画",
+          "errors": {
+            "ffmpegUnavailable": "FFmpegがインストールされていません。動画をレンダリングするにはFFmpegをインストールしてください。",
+            "busy": "このプロジェクトはすでにレンダリング中です。",
+            "noRenderableScenes": "レンダリングできるテイクがあるシーンはありません。",
+            "failed": "動画をレンダリングできませんでした。",
+            "cancelled": "動画のレンダリングをキャンセルしました。"
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "編集内容を保存しています。しばらくしてからもう一度お試しください。"
+    },
+    "library": {
+      "title": "クリエイティブスタジオ",
+      "subtitle": "物語を組み立て、各シーンを確認して、画像や動画の素材を生成します。",
+      "sectionLabel": "または前回の続きから",
+      "loading": "プロジェクトを読み込んでいます...",
+      "retry": "もう一度試す",
+      "readinessLabel": "ストーリーボード作成",
+      "readinessSetupRequired": "モデルの設定が必要です",
+      "openProject": "プロジェクトを開く",
+      "deleteProject": "プロジェクトを削除",
+      "deleteConfirmTitle": "このプロジェクトを削除しますか？",
+      "deleteConfirmBody": "「{{name}}」とローカル管理されている素材を削除しますか？この操作は元に戻せません。",
+      "deleteActiveWork": "このプロジェクトには進行中の生成処理があります。削除する前にキャンセルするか、完了までお待ちください。",
+      "composer": {
+        "label": "何を作りますか？",
+        "placeholder": "ストーリーのアイデアを一文で…",
+        "aspectRatioLabel": "アスペクト比",
+        "durationLabel": "想定尺",
+        "durationGuess": "約{{seconds}}秒",
+        "attachBrief": "ブリーフ文書を添付",
+        "attachBriefUnavailable": "ブリーフ文書の添付はまだ利用できません。",
+        "submit": "ブリーフを確認 →",
+        "empty": "一文で十分です。何を作るのか教えてください。"
+      },
+      "shape": {
+        "title": "構成から始める",
+        "label": "{{name}} · {{count}}ショット · {{seconds}}秒",
+        "sceneTitle": "ショット {{number}}",
+        "productStory": {
+          "name": "プロダクトストーリー",
+          "starter": "私たちをまだ知らない人向けのプロダクトストーリー。4つの展開で、最後はワードマークで締めます。"
+        },
+        "featureTeaser": {
+          "name": "機能ティーザー",
+          "starter": "すでに製品を利用している顧客向けに、新機能を紹介する短いティーザー。"
+        },
+        "recapReel": {
+          "name": "振り返りリール",
+          "starter": "全社向けの四半期振り返りリール。温かく、少し誇らしい雰囲気で。"
+        }
+      },
+      "scriptOnly": "脚本のみ",
+      "posterBadge": "テイク {{take}} · ショット {{scene}}",
+      "status": {
+        "partiallyRendered": "{{total}}ショット中{{rendered}}件を生成済み",
+        "handedOff": "引き渡し済み · {{seconds}}秒",
+        "scriptOnly": "{{count}}ショット執筆済み、生成なし"
+      },
+      "meta": "{{shots}} · {{seconds}}秒 · {{relative}}",
+      "shotCount": "{{count}}ショット",
+      "shotCount_other": "{{count}}ショット",
+      "projectCount": "{{count}}件のプロジェクト",
+      "projectCount_other": "{{count}}件のプロジェクト",
+      "deleteConfirm": "削除"
+    },
+    "empty": {
+      "title": "最初の物語を作成しましょう",
+      "body": "概要から始め、有料の生成を開始する前にストーリーボードを整えます。",
+      "create": "プロジェクトを作成"
+    },
+    "create": {
+      "title": "クリエイティブスタジオのプロジェクトを作成",
+      "nameLabel": "プロジェクト名",
+      "namePlaceholder": "製品発表のストーリー",
+      "aspectRatio16x9": "横長（16:9）",
+      "aspectRatio9x16": "縦長（9:16）",
+      "aspectRatio1x1": "正方形（1:1）",
+      "aspectRatio4x3": "標準の横長（4:3）",
+      "aspectRatio3x4": "標準の縦長（3:4）",
+      "invalidDuration": "5 秒から 60 秒までの整数を入力してください。",
+      "cancel": "キャンセル"
+    },
+    "project": {
+      "loading": "プロジェクトを読み込んでいます...",
+      "notFound": "このクリエイティブスタジオのプロジェクトは見つかりませんでした。",
+      "title": "プロジェクト概要",
+      "brief": "概要",
+      "aspectRatio": "アスペクト比",
+      "targetDuration": "目標の長さ",
+      "resolution": "解像度",
+      "sceneCount": "シーン数",
+      "readiness": "下書きの準備状況"
+    },
+    "storyboard": {
+      "title": "ストーリーボード",
+      "addScene": "シーンを追加",
+      "noScenes": "シーンを追加して物語を組み立てましょう。",
+      "sceneLimit": "ストーリーボードには最大 24 シーンを追加できます。",
+      "durationTotal": "ストーリーボードの時間：{{total}} / {{target}} 秒",
+      "durationMatches": "シーンの合計時間がプロジェクトの目標と一致しています。",
+      "durationMismatch": "一括生成するには、シーンの合計時間をプロジェクトの目標に合わせてください。",
+      "fitToTarget": "{{seconds}}秒に合わせる",
+      "fitUnlockedOnly": "未レンダリングのショットのみ時間を調整します。",
+      "fitUnreachable": {
+        "route_unavailable": "次の未レンダリングのショットに対応モデルを選択してください：{{scenes}}。",
+        "affectedSceneCount": "対象ショット数：{{count}}",
+        "no_adjustable_scenes": "すべてのショットがレンダリング済みまたは処理中で、合計は {{fixedTotalSeconds}} 秒です。目標を変更するか、未レンダリングのショットを編集してください。",
+        "target_out_of_bounds": "選択したモデルに合わせて、プロジェクト全体の目標時間を {{minimumTotalSeconds}}～{{maximumTotalSeconds}} 秒に設定してください。"
+      },
+      "durationOver": "目標より{{seconds}}秒超過",
+      "durationRemaining": "{{seconds}}秒残り",
+      "increaseTarget": "目標を{{seconds}}秒に延長",
+      "shortenBeforeAdding": "別のシーンを追加する前に、既存のシーンを短くしてください。",
+      "dragScene": "シーンをドラッグして並べ替え",
+      "removeScene": "シーンを削除",
+      "dragSceneAccessible": "シーン {{number}}「{{title}}」をドラッグ",
+      "moveSceneUpAccessible": "シーン {{number}}「{{title}}」を上へ移動",
+      "moveSceneDownAccessible": "シーン {{number}}「{{title}}」を下へ移動",
+      "removeSceneAccessible": "シーン {{number}}「{{title}}」を削除",
+      "removeConfirmTitle": "このシーンを削除しますか？",
+      "removeConfirmBody": "インポート済みまたは生成済みのメディア、あるいは生成履歴があるシーンは削除できません。",
+      "removeBlocked": "インポート済みまたは生成済みのメディア、あるいは生成履歴があるシーンは削除できません。",
+      "retry": "変更を再試行",
+      "discard": "ローカルの変更を破棄"
+    },
+    "scene": {
+      "accessibleName": "シーン {{number}}：{{title}}",
+      "number": "シーン {{number}}",
+      "status": {
+        "needs_title": "タイトルが必要",
+        "needs_prompt": "プロンプトが必要",
+        "ready": "生成準備完了",
+        "generating": "生成中",
+        "needs_selection": "バリエーションを選択",
+        "generated": "生成済み",
+        "needs_attention": "要対応"
+      },
+      "image": "画像",
+      "video": "動画",
+      "duration": "時間",
+      "durationSeconds": "{{seconds}} 秒",
+      "durationSeconds_other": "{{seconds}} 秒",
+      "selected": "選択中のシーン"
+    },
+    "inspector": {
+      "title": "シーンの演出",
+      "sectionsLabel": "シーン編集セクション",
+      "directionTab": "ビジュアル",
+      "scriptTab": "スクリプト",
+      "titleLabel": "シーンのタイトル",
+      "purposeLabel": "シーンの目的",
+      "purposePlaceholder": "このシーンで何を達成しますか？",
+      "visualPromptLabel": "ビジュアルプロンプト",
+      "visualPromptPlaceholder": "ショット、被写体、設定、照明、動きを説明してください。",
+      "narrationLabel": "ナレーション",
+      "onScreenTextLabel": "画面上のテキスト",
+      "mediaKindLabel": "出力形式",
+      "durationLabel": "シーンの長さ（秒）",
+      "invalidDuration": "1 秒から 60 秒までの整数を入力してください。",
+      "saving": "シーンを保存しています...",
+      "saved": "シーンを保存しました",
+      "saveFailed": "シーンを保存できませんでした。",
+      "unsavedChanges": "未保存の変更は保持されています。"
+    },
+    "draft": {
+      "title": "ストーリーボードの下書きを作成",
+      "body": "WePrompt が確認用にシーン、ナレーション、画面上のテキスト、時間配分を提案します。",
+      "checking": "選択したストーリーボードモデルを確認中...",
+      "ready": "下書きの準備完了",
+      "setupRequired": "AIで下書きするにはストーリーボードモデルを選択して設定してください。",
+      "unavailable": "現在ストーリーボードを作成できません。",
+      "providerLabel": "ストーリーボードプロバイダー",
+      "modelLabel": "ストーリーボードモデル",
+      "chargeNotice": "下書きにはプロジェクトで選択したモデルを使用し、プロバイダー料金が発生する場合があります。",
+      "replaceTitle": "既存のストーリーボードを置き換えますか？",
+      "replaceBody": "再作成では、有効な提案が返された後にのみ現在のすべてのシーンが置き換えられます。",
+      "confirm": "ストーリーボードを作成",
+      "cancel": "キャンセル",
+      "configureModel": "モデル設定を開く",
+      "manualFallback": "手動編集を続ける",
+      "failed": "ストーリーボードを作成できませんでした。現在のシーンは変更されていません。"
+    },
+    "routing": {
+      "title": "生成ルート",
+      "modelLabel": "モデル",
+      "missingRoute": "互換性のある生成ルートを選択してください。",
+      "invalidRoute": "このルートは無効になりました。生成前に確認してください。"
+    },
+    "review": {
+      "generateReadyScenes": "準備済みの{{count}}シーンを生成",
+      "generateReadyScenes_other": "準備済みの{{count}}シーンを生成",
+      "noReadyScenes": "生成準備ができたシーンはありません。",
+      "generateScene": "シーンを生成",
+      "regenerateScene": "別のバリエーションを生成",
+      "title": "生成内容を確認",
+      "sceneCount": "選択中：{{count}} シーン",
+      "videoSeconds": "要求する動画時間：{{seconds}} 秒",
+      "selectedDurationFull": "選択した時間：{{seconds}} 秒",
+      "selectedDurationFull_other": "選択した時間：{{seconds}} 秒",
+      "targetDurationFull": "目標時間：{{seconds}} 秒",
+      "targetDurationFull_other": "目標時間：{{seconds}} 秒",
+      "providerLabel": "プロバイダー",
+      "modelLabel": "モデル",
+      "aspectRatio": "アスペクト比",
+      "resolution": "解像度",
+      "watermarkOff": "ウォーターマーク無効",
+      "audioOff": "無音出力：音声生成は無効",
+      "missingRoute": "生成ルートがないシーンが少なくとも 1 つあります。",
+      "invalidRoute": "選択したルートの少なくとも 1 つが無効です。",
+      "durationMismatch": "ストーリーボードの時間がプロジェクトの目標と一致していません。",
+      "chargeNotice": "生成には選択したプロバイダーアカウントが使用され、料金が発生する場合があります。",
+      "confirm": "確認して生成",
+      "cancel": "キャンセル",
+      "disabledMissingRoutes": "選択した各シーンに有効なルートを指定してください。",
+      "audioOn": "このレンダーには生成音声が含まれます。無音ルートがある場合、その出力は無音のままです。"
+    },
+    "jobs": {
+      "progress": "{{percent}}% 完了",
+      "cancel": "ジョブをキャンセル",
+      "retry": "生成を再試行",
+      "retryConfirmationTitle": "生成を再試行しますか？",
+      "retryConfirmationBody": "再試行すると、この生成がプロバイダーに再送信され、プロバイダー料金が発生する場合があります。",
+      "retryConfirmationConfirm": "確認して再試行",
+      "retryDownload": "ダウンロードを再試行",
+      "retryChargeTitle": "重複料金の可能性を承知して再試行しますか？",
+      "retryChargeBody": "前回の送信結果は不明です。再試行するとプロバイダー料金が再度発生する場合があります。",
+      "retryChargeConfirm": "了承して再試行",
+      "status": {
+        "queuedLocal": "送信待ち",
+        "submitting": "送信中",
+        "queuedRemote": "プロバイダー側で待機中",
+        "running": "生成中",
+        "needsAttention": "確認が必要",
+        "succeeded": "完了",
+        "failed": "失敗",
+        "cancelled": "キャンセル済み"
+      },
+      "errors": {
+        "invalidRequest": "生成リクエストが無効です。",
+        "auth": "プロバイダーが認証情報を拒否しました。",
+        "quota": "プロバイダーアカウントの利用枠が不足しています。",
+        "rateLimited": "プロバイダーのレート制限に達しました。後でもう一度お試しください。",
+        "providerUnavailable": "生成プロバイダーを利用できません。",
+        "timeout": "プロバイダーが時間内に応答しませんでした。",
+        "pollDeadline": "エンジンから進捗が報告されなくなりました。再試行する前にプロバイダーへ確認してください。",
+        "noOutput": "プロバイダーは処理を完了しましたが、使用可能な出力がありません。",
+        "submissionUnknown": "送信結果は不明です。再試行前に重複料金の警告を確認してください。",
+        "downloadFailed": "生成は完了しましたが、出力をダウンロードできませんでした。",
+        "unsupported": "このプロバイダーは要求された操作に対応していません。",
+        "unknown": "不明な理由で生成ジョブが失敗しました。"
+      }
+    },
+    "preview": {
+      "title": "プレビュー",
+      "noAssetTitle": "生成済み素材が選択されていません",
+      "noAssetBody": "シーンを生成するか、既存のバリエーションを選択してプレビューします。",
+      "imageAlt": "生成されたシーン画像",
+      "videoLabel": "生成されたシーン動画",
+      "loadFailed": "この管理対象素材を読み込めませんでした。",
+      "versions": "バリエーション",
+      "versionLabel": "バリエーション {{number}}",
+      "selectVersion": "このバリエーションを選択",
+      "selectVersionAccessible": "バリエーション {{number}} を選択",
+      "importReference": "最初のフレーム画像を読み込む",
+      "importing": "参照画像を読み込んでいます...",
+      "missingVisualPrompt": "このシーンを生成する前にビジュアルプロンプトを追加してください。",
+      "missingModel": "このシーンを生成する前に互換性のあるプロジェクトモデルを選択してください。",
+      "generateThisScene": "このシーンを生成",
+      "videoReady": "動画の準備ができました"
+    },
+    "timeline": {
+      "title": "シーンストリップ",
+      "selectScene": "シーンを選択",
+      "totalDuration": "ストーリーボードの合計時間",
+      "totalDurationFull": "合計時間：{{seconds}} 秒",
+      "totalDurationFull_other": "合計時間：{{seconds}} 秒",
+      "selectSceneAccessible": "シーン {{number}}「{{title}}」を選択、{{seconds}} 秒",
+      "selectSceneAccessible_other": "シーン {{number}}「{{title}}」を選択、{{seconds}} 秒",
+      "noScenes": "表示するシーンがありません"
+    },
+    "export": {
+      "title": "素材を書き出す",
+      "body": "ストーリーボードのマニフェストと各シーンで選択した素材を書き出します。",
+      "gapWarning": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
+      "gapWarning_other": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
+      "confirmSelectedCount": "{{count}} ショットを書き出しますか？",
+      "confirmSelectedCount_other": "{{count}} ショットを書き出しますか？",
+      "includeReferences": "読み込んだ参照画像を含める",
+      "confirm": "素材を書き出す",
+      "cancel": "キャンセル",
+      "choosing": "書き出し先フォルダーを選択...",
+      "successTitle": "素材を書き出しました",
+      "successBody": "選択済みの {{count}} シーンを「{{folderName}}」に引き渡しました。",
+      "successBody_other": "選択済みの {{count}} シーンを「{{folderName}}」に引き渡しました。",
+      "partialTitle": "一部のシーンを除いて素材を書き出しました",
+      "partialBody": "利用可能な素材を「{{folderName}}」に書き出しました。",
+      "failed": "素材を書き出せませんでした。",
+      "noSelectedAssets": "書き出せる選択済みのシーン素材がありません。",
+      "folderLabel": "書き出しフォルダー"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio はこのビルドでは無効です。",
+      "invalidPayload": "リクエストに無効または不完全な情報が含まれています。",
+      "projectNotFound": "このクリエイティブスタジオのプロジェクトは存在しません。",
+      "storyboardExists": "このプロジェクトには既にストーリーボードがあります。再作成する前に置き換えを確認してください。",
+      "staleProject": "プロジェクトが別の場所で変更されました。更新してから再試行してください。",
+      "planningUnavailable": "ストーリーボードを作成できません。手動編集は続けられます。",
+      "invalidRoute": "選択した生成ルートは無効または利用できません。",
+      "cancellationRefused": "プロバイダーは実行中のこのジョブをキャンセルできません。",
+      "duplicateChargeAcknowledgementRequired": "再試行前にプロバイダー料金が重複する可能性を了承してください。",
+      "busy": "このプロジェクトには進行中の生成処理があります。",
+      "provider": "プロバイダーがリクエストを完了できませんでした。",
+      "storage": "クリエイティブスタジオがローカルデータを更新できませんでした。"
+    },
+    "models": {
+      "storyboard": "ストーリーボードモデル",
+      "selectionRequired": "モデルを選択",
+      "unavailable": "選択したモデルは利用できません",
+      "openSettings": "モデル設定を開く",
+      "refresh": "モデルを更新",
+      "loading": "モデルを読み込み中...",
+      "updateFailed": "プロジェクトのモデル選択を更新できませんでした。"
+    }
+  },
   "artifact": {
     "emptyTitle": "開いているアーティファクトはありません",
     "emptyHint": "生成されたファイルやドキュメントはここで開きます。"
@@ -899,5 +1336,12 @@
     "body": "このチャットはプロジェクトのナレッジベースを検索できません。ファイルが追加される前に開始されたためです。",
     "action": "新しいチャットを開始"
   },
-  "emptyChat": "メッセージを送信して始めましょう。"
+  "emptyChat": "メッセージを送信して始めましょう。",
+  "presentationSubmission": {
+    "pending": "プレゼンテーションを送信中",
+    "restore": "復元",
+    "persistenceFailure": "プレゼンテーションの送信を保存できませんでした。",
+    "queued": "プレゼンテーションをキューに追加しました",
+    "uncertainTracking": "送信状態が不明です。再送せず、既存の実行を追跡してください。"
+  }
 }

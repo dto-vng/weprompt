@@ -5,11 +5,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BackendHttpError } from '@/common/adapter/httpBridge';
 import type { TChatConversation } from '@/common/config/storage';
+import type { StudioProject } from '@/common/types/project/creativeStudioTypes';
 import {
   buildDetachedProjectExtra,
   detachAndRemoveProject,
   resolveConversationProject,
+  resolveConversationStudioProject,
+  resolveStudioProjectBriefConversation,
 } from '@/renderer/pages/conversation/projects/projectConversation';
+
+type StudioBindingProject = Pick<StudioProject, 'id' | 'briefConversationId'>;
 
 const conversation = (): TChatConversation =>
   ({
@@ -31,7 +36,69 @@ const conversation = (): TChatConversation =>
     },
   }) as TChatConversation;
 
+const studioConversation = (id: string, studioProjectId?: string): TChatConversation => {
+  const item = conversation();
+  return {
+    ...item,
+    id,
+    extra: {
+      ...item.extra,
+      ...(studioProjectId === undefined ? {} : { studio_project_id: studioProjectId }),
+    },
+  } as TChatConversation;
+};
+
 describe('projectConversation', () => {
+  it('resolves a consistent Studio binding in both directions', () => {
+    const project: StudioBindingProject = { id: 'studio_1', briefConversationId: 'conv-brief' };
+    const brief = studioConversation('conv-brief', project.id);
+
+    expect(resolveConversationStudioProject(brief, [project])).toBe(project);
+    expect(resolveStudioProjectBriefConversation(project, [brief])).toBe(brief);
+  });
+
+  it('treats a conversation as stale when its Studio back-reference disagrees with the project', () => {
+    const authoritativeProject: StudioBindingProject = {
+      id: 'studio_authoritative',
+      briefConversationId: 'conv-brief',
+    };
+    const staleConversation = studioConversation('conv-brief', 'studio_other');
+
+    expect(resolveConversationStudioProject(staleConversation, [authoritativeProject])).toBeNull();
+    expect(resolveStudioProjectBriefConversation(authoritativeProject, [staleConversation])).toBeNull();
+  });
+
+  it('rejects a conversation whose project exists but points at a different conversation', () => {
+    // The sibling test's conversation names a project absent from the list, so it
+    // short-circuits at the lookup and never exercises the authority rule. Here the
+    // project IS found, and only the back-reference check can reject it.
+    const project: StudioBindingProject = { id: 'studio_a', briefConversationId: 'conv-other' };
+    const claimant = studioConversation('conv-brief', 'studio_a');
+
+    expect(project.id).toBe(claimant.extra.studio_project_id);
+    expect(resolveConversationStudioProject(claimant, [project])).toBeNull();
+  });
+
+  it('keeps a deleted project conversation while resolving its back-reference to null', () => {
+    const keptConversation = studioConversation('conv-brief', 'studio_deleted');
+
+    expect(resolveConversationStudioProject(keptConversation, [])).toBeNull();
+    expect(keptConversation.id).toBe('conv-brief');
+    expect(keptConversation.extra.studio_project_id).toBe('studio_deleted');
+  });
+
+  it('returns null for a deleted conversation without clearing the dangling project id', () => {
+    const project: StudioBindingProject = { id: 'studio_1', briefConversationId: 'conv-deleted' };
+
+    expect(resolveStudioProjectBriefConversation(project, [])).toBeNull();
+    expect(project.briefConversationId).toBe('conv-deleted');
+  });
+
+  it('returns null for an unbound Studio project and an ordinary conversation', () => {
+    expect(resolveConversationStudioProject(studioConversation('conv-ordinary'), [])).toBeNull();
+    expect(resolveStudioProjectBriefConversation({ id: 'studio_1', briefConversationId: null }, [])).toBeNull();
+  });
+
   it('builds a minimal detach patch without protected runtime snapshots', () => {
     expect(buildDetachedProjectExtra(conversation())).toEqual({
       project_id: null,

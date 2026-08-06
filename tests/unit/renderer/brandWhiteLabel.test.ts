@@ -194,7 +194,7 @@ describe('WePrompt white-label branding', () => {
 
   it('uses localized upstream attribution rather than hardcoded product copy in retained setup guides', () => {
     const sourceFiles = [
-      'packages/desktop/src/renderer/components/settings/SettingsModal/contents/ModelModalContent.tsx',
+      'packages/desktop/src/renderer/components/settings/SettingsModal/contents/ModelModalContent/index.tsx',
       'packages/desktop/src/renderer/components/settings/SettingsModal/contents/ToolsModalContent.tsx',
       'packages/desktop/src/renderer/pages/settings/AgentSettings/LocalAgents.tsx',
       'packages/desktop/src/renderer/components/settings/SettingsModal/contents/channels/DingTalkConfigForm.tsx',

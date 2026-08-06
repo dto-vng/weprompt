@@ -631,13 +631,6 @@
       "manual": "Manuell senden"
     }
   },
-  "presentationSubmission": {
-    "pending": "Präsentationsübermittlung ausstehend",
-    "restore": "Wiederherstellen",
-    "persistenceFailure": "Die Präsentationsübermittlung konnte nicht gespeichert werden.",
-    "queued": "Präsentation zur Warteschlange hinzugefügt",
-    "uncertainTracking": "Der Übermittlungsstatus ist ungewiss. Verfolgen Sie den bestehenden Lauf und senden Sie nicht erneut."
-  },
   "contextUsage": {
     "contextUsed": "Kontext verwendet",
     "contextWindow": "Kontextfenster",
@@ -780,16 +773,21 @@
     "importCard": "Vorlage importieren (.md)",
     "empty": "Keine Vorlagen verfügbar",
     "chipTooltip": "Diese Nachricht verwendet die Vorlage",
-    "sources": {
-      "reselectRequired": "Wählen Sie angehängte Dateien erneut aus, um sie mit dieser PPTX-Vorlage zu verwenden.",
-      "reselectAction": "Dateien erneut auswählen"
-    },
     "scratch": {
       "prepareError": "Temporärer Arbeitsbereich konnte nicht vorbereitet werden: {{error}}",
       "retained": "Temporäre Artefaktdateien wurden zur Wiederherstellung unter {{path}} aufbewahrt.",
       "cleanup": "Bereinigen",
       "cleanupSuccess": "Temporäre Artefaktdateien entfernt",
       "cleanupError": "Bereinigung fehlgeschlagen: {{error}}"
+    },
+    "importSuccess": "Vorlage importiert",
+    "importError": "Import fehlgeschlagen: {{error}}",
+    "removeError": "Löschen fehlgeschlagen: {{error}}",
+    "deleteTooltip": "Vorlage löschen",
+    "deleteConfirm": "Diese Vorlage löschen?",
+    "sources": {
+      "reselectRequired": "Wählen Sie angehängte Dateien erneut aus, um sie mit dieser PPTX-Vorlage zu verwenden.",
+      "reselectAction": "Dateien erneut auswählen"
     },
     "recovery": {
       "status": {
@@ -807,12 +805,7 @@
       "invalidResponse": "Der Wiederherstellungsstatus der Präsentation konnte nicht bestätigt werden.",
       "openError": "Es konnte nicht bestätigt werden, ob der aktuelle Präsentationskandidat geöffnet wurde.",
       "discardError": "Das Verwerfen des Präsentationseintrags konnte nicht bestätigt werden."
-    },
-    "importSuccess": "Vorlage importiert",
-    "importError": "Import fehlgeschlagen: {{error}}",
-    "removeError": "Löschen fehlgeschlagen: {{error}}",
-    "deleteTooltip": "Vorlage löschen",
-    "deleteConfirm": "Diese Vorlage löschen?"
+    }
   },
   "status": {
     "waitingApproval": "Wartet auf deine Freigabe",
@@ -883,6 +876,465 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Speichern und schließen",
+      "discard": "Verwerfen und schließen",
+      "cancel": "Abbrechen",
+      "unsavedMessage": "{{count}} Szenen enthalten ungespeicherte Änderungen. Vor dem Schließen speichern?",
+      "unsavedMessage_one": "{{count}} Szene enthält ungespeicherte Änderungen. Vor dem Schließen speichern?",
+      "unsavedMessage_other": "{{count}} Szenen enthalten ungespeicherte Änderungen. Vor dem Schließen speichern?",
+      "unavailableMessage": "Creative Studio antwortet nicht. Beim Schließen können ungespeicherte Szenenänderungen verloren gehen."
+    },
+    "phase": {
+      "nav": {
+        "label": "Kreativer Ablauf",
+        "brief": "Briefing",
+        "write": "Schreiben",
+        "produce": "Produzieren",
+        "review": "Prüfen",
+        "saved": "Gespeichert",
+        "saving": "Änderungen werden gespeichert..."
+      },
+      "shared": {
+        "backToLibrary": "Zurück zur Projektbibliothek",
+        "noMediaGeneration": "In diesem Schritt werden keine Bilder oder Videos erzeugt."
+      },
+      "brief": {
+        "title": "Briefing",
+        "description": "Lege vor dem Schreiben Projektziel, Format und Dauer fest.",
+        "nameLabel": "Projektname",
+        "intentLabel": "Kreative Absicht",
+        "durationLabel": "Zieldauer",
+        "aspectRatioLabel": "Seitenverhältnis",
+        "startWriting": "Mit dem Schreiben beginnen",
+        "saved": "Alle Änderungen am Briefing sind gespeichert.",
+        "saving": "Änderungen am Briefing werden gespeichert...",
+        "unsaved": "Die Änderungen am Briefing sind noch nicht gespeichert.",
+        "invalidName": "Gib vor dem Fortfahren einen Projektnamen ein.",
+        "aspectLocked": "Seitenverhältnis ist gesperrt",
+        "aspectLockedHelp": "Nach dem Hinzufügen erzeugter Medien kann das Seitenverhältnis nicht mehr geändert werden."
+      },
+      "write": {
+        "title": "Schreiben",
+        "continueToProduce": "Weiter zu Produzieren",
+        "askAssistant": "Assistenten fragen",
+        "assistantTitle": "Schreibassistent",
+        "assistantDescription": "Nutze den Assistenten für Erzählstruktur, Einstellungsideen und Prompts.",
+        "textChargeDisclosure": "Der Storyboard-Entwurf verwendet dein konfiguriertes Textmodell. Der Anbieter kann die Modellnutzung berechnen.",
+        "draftStoryboard": "Storyboard entwerfen",
+        "addShot": "Einstellung hinzufügen",
+        "fitToGoal": "An Ziel anpassen",
+        "noScenes": "Füge eine Einstellung hinzu oder entwirf ein Storyboard, um zu beginnen.",
+        "scriptTableTitle": "Drehbuch",
+        "scriptTableHelp": "Eine Zeile pro Einstellung, um Text, Bild, Dauer und Ausgabe gemeinsam zu gestalten.",
+        "shotColumn": "Einstellung",
+        "scriptColumn": "Drehbuch",
+        "visualColumn": "Bild",
+        "outputColumn": "Ausgabe",
+        "visualPlaceholder": "Beschreibe, was wir sehen…",
+        "suggestVisual": "Bild vorschlagen",
+        "addReference": "Referenz hinzufügen",
+        "moreDetails": "Weitere Details",
+        "invalidTitle": "Gib vor dem Speichern einen Titel für die Einstellung ein.",
+        "placeholder": {
+          "opening": "Eröffnungseinstellung",
+          "middle": "Mittlere Einstellung",
+          "closing": "Schlusseinstellung"
+        },
+        "needsTitle": "Titel fehlt",
+        "pacingTitle": "Tempo",
+        "pacingSummary": "Insgesamt {{total}} s · Ziel {{target}} s",
+        "goalMarker": "Ziel {{seconds}} s"
+      },
+      "produce": {
+        "connectEngine": "Engine verbinden — etwa eine Minute, einmal für den gesamten Arbeitsbereich",
+        "askTeammate": "Teammitglied fragen",
+        "askTeammateCopy": "Kannst du in den WePrompt-Modelleinstellungen eine Bild- oder Video-Engine für diesen Arbeitsbereich verbinden?",
+        "renderingWith": "Rendering mit —",
+        "engineSummary": "{{model}} · {{kind}} · bis zu {{seconds}} s",
+        "changeEngines": "Engines ändern",
+        "takeRatio": "Take {{current}} / {{total}}",
+        "noVisualYet": "NOCH KEIN VISUAL",
+        "writeVisual": "Visual beschreiben",
+        "render": "Rendern",
+        "renderAnother": "Erneut rendern",
+        "openPreview": "Vorschau für {{title}} öffnen",
+        "reviewCut": "Schnitt prüfen",
+        "modelsTitle": "Modelle",
+        "activityTitle": "Erzeugungsaktivität",
+        "activityEmpty": "Es werden keine Erzeugungsaufträge ausgeführt.",
+        "jobsRunning": "{{count}} Erzeugungsaufträge laufen",
+        "jobsRunning_one": "{{count}} Erzeugungsauftrag läuft",
+        "jobsRunning_other": "{{count}} Erzeugungsaufträge laufen"
+      },
+      "review": {
+        "title": "Prüfen",
+        "description": "Prüfe ausgewählte Medien, ergänze fehlende Platzhalter und bereite die Übergabe vor.",
+        "handoff": "Übergabe vorbereiten",
+        "noAssets": "Keine ausgewählten Medien sind für die Übergabe bereit.",
+        "selectedTake": "Im Schnitt",
+        "slateLabel": "Platzhalter",
+        "slateDescription": "Ein Platzhalter hält eine Einstellung in der Abfolge, wenn kein gerendertes Medium ausgewählt ist.",
+        "excludedFromHandoff": "Einstellungen ohne ausgewähltes Medium werden von der Übergabe ausgeschlossen. Platzhalter aus der Prüfung werden nicht exportiert.",
+        "renderedShots": "{{count}} gerenderte Einstellungen",
+        "renderedShots_one": "{{count}} gerenderte Einstellung",
+        "renderedShots_other": "{{count}} gerenderte Einstellungen",
+        "missingSlates": "{{count}} fehlende Platzhalter",
+        "missingSlates_one": "{{count}} fehlender Platzhalter",
+        "missingSlates_other": "{{count}} fehlende Platzhalter",
+        "openProduce": "Produzieren öffnen",
+        "handoffDescription": "Die Übergabe enthält nur das Storyboard-Manifest und ausgewählte Medien. Platzhalter aus der Prüfung werden nicht exportiert.",
+        "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt.",
+        "render": {
+          "action": "Video rendern",
+          "progress": "Video wird gerendert… {{percent}}%",
+          "cancel": "Rendern abbrechen",
+          "missingScenes": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
+          "missingScenes_one": "{{count}} Szene hat keinen Take und erscheint nicht im Video.",
+          "missingScenes_other": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
+          "resultLabel": "Gerendertes Video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg ist nicht installiert. Installiere FFmpeg, um das Video zu rendern.",
+            "busy": "Dieses Projekt wird bereits gerendert.",
+            "noRenderableScenes": "Keine Szene hat einen Take zum Rendern.",
+            "failed": "Das Video konnte nicht gerendert werden.",
+            "cancelled": "Video-Rendering abgebrochen."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Deine Änderungen werden noch gespeichert — versuche es gleich noch einmal."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Plane Geschichten, prüfe jede Szene und erstelle Bild- oder Video-Assets.",
+      "sectionLabel": "Oder mach dort weiter, wo du aufgehört hast",
+      "loading": "Projekte werden geladen...",
+      "retry": "Erneut versuchen",
+      "readinessLabel": "Storyboard-Entwurf",
+      "readinessSetupRequired": "Modelleinrichtung erforderlich",
+      "openProject": "Projekt öffnen",
+      "deleteProject": "Projekt löschen",
+      "deleteConfirmTitle": "Dieses Projekt löschen?",
+      "deleteConfirmBody": "„{{name}}“ und die lokal verwalteten Assets löschen? Dies kann nicht rückgängig gemacht werden.",
+      "deleteActiveWork": "Dieses Projekt enthält aktive Generierungsaufträge. Brich sie ab oder warte, bis sie abgeschlossen sind, bevor du das Projekt löschst.",
+      "composer": {
+        "label": "Was erstellen wir?",
+        "placeholder": "Die Story-Idee in einem Satz…",
+        "aspectRatioLabel": "Seitenverhältnis",
+        "durationLabel": "Geschätzte Länge",
+        "durationGuess": "Etwa {{seconds}} s",
+        "attachBrief": "Briefing-Dokument anhängen",
+        "attachBriefUnavailable": "Briefing-Dokumente können derzeit noch nicht angehängt werden.",
+        "submit": "Briefing lesen →",
+        "empty": "Ein Satz genügt – sag, was wir erstellen."
+      },
+      "shape": {
+        "title": "Mit einer Struktur starten",
+        "label": "{{name}} · {{count}} Shots · {{seconds}} s",
+        "sceneTitle": "Shot {{number}}",
+        "productStory": {
+          "name": "Produktstory",
+          "starter": "Eine Produktstory für Menschen, die noch nie von uns gehört haben – vier Stationen mit Abschluss auf der Wortmarke."
+        },
+        "featureTeaser": {
+          "name": "Feature-Teaser",
+          "starter": "Ein kurzer Teaser für eine neue Funktion, ausgerichtet auf Kunden, die das Produkt bereits nutzen."
+        },
+        "recapReel": {
+          "name": "Quartalsrückblick",
+          "starter": "Ein Quartalsrückblick für das ganze Unternehmen, warm und ein wenig stolz."
+        }
+      },
+      "scriptOnly": "NUR SKRIPT",
+      "posterBadge": "Take {{take}} · Shot {{scene}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} von {{total}} Shots gerendert",
+        "handedOff": "Übergeben · {{seconds}} s",
+        "scriptOnly": "{{count}} Shots geschrieben, keiner gerendert"
+      },
+      "meta": "{{shots}} · {{seconds}} s · {{relative}}",
+      "shotCount": "{{count}} Shots",
+      "shotCount_one": "{{count}} Shot",
+      "shotCount_other": "{{count}} Shots",
+      "projectCount": "{{count}} Projekte",
+      "projectCount_one": "{{count}} Projekt",
+      "projectCount_other": "{{count}} Projekte",
+      "deleteConfirm": "Löschen"
+    },
+    "empty": {
+      "title": "Erstelle deine erste Geschichte",
+      "body": "Beginne mit einem Briefing und gestalte dann das Storyboard, bevor eine kostenpflichtige Generierung startet.",
+      "create": "Projekt erstellen"
+    },
+    "create": {
+      "title": "Creative-Studio-Projekt erstellen",
+      "nameLabel": "Projektname",
+      "namePlaceholder": "Geschichte zur Produkteinführung",
+      "aspectRatio16x9": "Querformat (16:9)",
+      "aspectRatio9x16": "Hochformat (9:16)",
+      "aspectRatio1x1": "Quadratisch (1:1)",
+      "aspectRatio4x3": "Klassisches Querformat (4:3)",
+      "aspectRatio3x4": "Klassisches Hochformat (3:4)",
+      "invalidDuration": "Gib eine ganze Zahl von 5 bis 60 Sekunden ein.",
+      "cancel": "Abbrechen"
+    },
+    "project": {
+      "loading": "Projekt wird geladen...",
+      "notFound": "Dieses Creative-Studio-Projekt wurde nicht gefunden.",
+      "title": "Projektübersicht",
+      "brief": "Briefing",
+      "aspectRatio": "Seitenverhältnis",
+      "targetDuration": "Ziellänge",
+      "resolution": "Auflösung",
+      "sceneCount": "Szenen",
+      "readiness": "Entwurfsbereitschaft"
+    },
+    "storyboard": {
+      "title": "Storyboard",
+      "addScene": "Szene hinzufügen",
+      "noScenes": "Füge eine Szene hinzu, um diese Geschichte zu gestalten.",
+      "sceneLimit": "Ein Storyboard kann bis zu 24 Szenen enthalten.",
+      "durationTotal": "Storyboard-Timing: {{total}} von {{target}} Sekunden",
+      "durationMatches": "Das Szenen-Timing entspricht dem Projektziel.",
+      "durationMismatch": "Das Szenen-Timing muss vor der Stapelgenerierung dem Projektziel entsprechen.",
+      "fitToTarget": "Auf {{seconds}} s anpassen",
+      "fitUnlockedOnly": "Passt nur nicht gerenderte Einstellungen zeitlich an.",
+      "fitUnreachable": {
+        "route_unavailable": "Wähle für diese nicht gerenderten Einstellungen ein kompatibles Modell aus: {{scenes}}.",
+        "affectedSceneCount": "Betroffene Einstellungen: {{count}}",
+        "no_adjustable_scenes": "Alle Einstellungen sind gerendert oder aktiv und dauern insgesamt {{fixedTotalSeconds}} Sekunden. Ändere das Ziel oder bearbeite eine nicht gerenderte Einstellung.",
+        "target_out_of_bounds": "Lege das Ziel für das gesamte Projekt passend zu den ausgewählten Modellen auf {{minimumTotalSeconds}} bis {{maximumTotalSeconds}} Sekunden fest."
+      },
+      "durationOver": "{{seconds}} Sekunden über dem Ziel",
+      "durationRemaining": "{{seconds}} Sekunden verbleibend",
+      "increaseTarget": "Zieldauer auf {{seconds}} Sekunden erhöhen",
+      "shortenBeforeAdding": "Kürzen Sie vorhandene Szenen, bevor Sie eine weitere hinzufügen.",
+      "dragScene": "Szene zum Neuordnen ziehen",
+      "removeScene": "Szene entfernen",
+      "dragSceneAccessible": "Szene {{number}} „{{title}}“ ziehen",
+      "moveSceneUpAccessible": "Szene {{number}} „{{title}}“ nach oben verschieben",
+      "moveSceneDownAccessible": "Szene {{number}} „{{title}}“ nach unten verschieben",
+      "removeSceneAccessible": "Szene {{number}} „{{title}}“ entfernen",
+      "removeConfirmTitle": "Diese Szene entfernen?",
+      "removeConfirmBody": "Szenen mit importierten oder generierten Medien oder einer Generierungshistorie können nicht entfernt werden.",
+      "removeBlocked": "Szenen mit importierten oder generierten Medien oder einer Generierungshistorie können nicht entfernt werden.",
+      "retry": "Änderung erneut versuchen",
+      "discard": "Lokale Änderungen verwerfen"
+    },
+    "scene": {
+      "accessibleName": "Szene {{number}}: {{title}}",
+      "number": "Szene {{number}}",
+      "status": {
+        "needs_title": "Titel fehlt",
+        "needs_prompt": "Prompt erforderlich",
+        "ready": "Bereit zur Generierung",
+        "generating": "Wird generiert",
+        "needs_selection": "Variation auswählen",
+        "generated": "Generiert",
+        "needs_attention": "Aufmerksamkeit erforderlich"
+      },
+      "image": "Bild",
+      "video": "Video",
+      "duration": "Dauer",
+      "durationSeconds": "{{seconds}} Sekunden",
+      "durationSeconds_one": "{{seconds}} Sekunde",
+      "durationSeconds_other": "{{seconds}} Sekunden",
+      "selected": "Ausgewählte Szene"
+    },
+    "inspector": {
+      "title": "Szenenanweisung",
+      "sectionsLabel": "Bereiche zur Szenenbearbeitung",
+      "directionTab": "Visuell",
+      "scriptTab": "Skript",
+      "titleLabel": "Szenentitel",
+      "purposeLabel": "Szenenziel",
+      "purposePlaceholder": "Was soll diese Szene erreichen?",
+      "visualPromptLabel": "Visueller Prompt",
+      "visualPromptPlaceholder": "Beschreibe Einstellung, Motiv, Umgebung, Licht und Bewegung.",
+      "narrationLabel": "Sprechertext",
+      "onScreenTextLabel": "Bildschirmtext",
+      "mediaKindLabel": "Ausgabetyp",
+      "durationLabel": "Szenendauer in Sekunden",
+      "invalidDuration": "Gib eine ganze Zahl von 1 bis 60 Sekunden ein.",
+      "saving": "Szene wird gespeichert...",
+      "saved": "Szene gespeichert",
+      "saveFailed": "Die Szene konnte nicht gespeichert werden.",
+      "unsavedChanges": "Deine nicht gespeicherten Änderungen bleiben erhalten."
+    },
+    "draft": {
+      "title": "Storyboard entwerfen",
+      "body": "WePrompt schlägt Szenen, Sprechertext, Bildschirmtext und Timing zur Prüfung vor.",
+      "checking": "Ausgewähltes Storyboard-Modell wird geprüft...",
+      "ready": "Bereit zum Entwerfen",
+      "setupRequired": "Wähle und konfiguriere ein Storyboard-Modell für den KI-Entwurf.",
+      "unavailable": "Der Storyboard-Entwurf ist derzeit nicht verfügbar.",
+      "providerLabel": "Storyboard-Anbieter",
+      "modelLabel": "Storyboard-Modell",
+      "chargeNotice": "Der Entwurf nutzt das im Projekt ausgewählte Modell und kann Anbietergebühren verursachen.",
+      "replaceTitle": "Vorhandenes Storyboard ersetzen?",
+      "replaceBody": "Ein neuer Entwurf ersetzt alle aktuellen Szenen erst, nachdem ein gültiger Vorschlag zurückgegeben wurde.",
+      "confirm": "Storyboard entwerfen",
+      "cancel": "Abbrechen",
+      "configureModel": "Modelleinstellungen öffnen",
+      "manualFallback": "Mit manueller Bearbeitung fortfahren",
+      "failed": "Es konnte kein Storyboard entworfen werden. Deine aktuellen Szenen wurden nicht geändert."
+    },
+    "routing": {
+      "title": "Generierungsroute",
+      "modelLabel": "Modell",
+      "missingRoute": "Wähle eine kompatible Generierungsroute.",
+      "invalidRoute": "Diese Route ist nicht mehr gültig. Prüfe sie vor der Generierung."
+    },
+    "review": {
+      "generateReadyScenes": "{{count}} bereite Szenen generieren",
+      "generateReadyScenes_one": "{{count}} bereite Szene generieren",
+      "generateReadyScenes_other": "{{count}} bereite Szenen generieren",
+      "noReadyScenes": "Keine Szene ist bereit zur Generierung.",
+      "generateScene": "Szene generieren",
+      "regenerateScene": "Weitere Variante generieren",
+      "title": "Generierung prüfen",
+      "sceneCount": "{{count}} ausgewählte Szenen",
+      "videoSeconds": "{{seconds}} angeforderte Videosekunden",
+      "selectedDurationFull": "Ausgewählte Dauer: {{seconds}} Sekunden",
+      "selectedDurationFull_one": "Ausgewählte Dauer: {{seconds}} Sekunde",
+      "selectedDurationFull_other": "Ausgewählte Dauer: {{seconds}} Sekunden",
+      "targetDurationFull": "Zieldauer: {{seconds}} Sekunden",
+      "targetDurationFull_one": "Zieldauer: {{seconds}} Sekunde",
+      "targetDurationFull_other": "Zieldauer: {{seconds}} Sekunden",
+      "providerLabel": "Anbieter",
+      "modelLabel": "Modell",
+      "aspectRatio": "Seitenverhältnis",
+      "resolution": "Auflösung",
+      "watermarkOff": "Wasserzeichen deaktiviert",
+      "audioOff": "Stumme Ausgabe; Audiogenerierung deaktiviert",
+      "missingRoute": "Mindestens eine Szene hat keine Generierungsroute.",
+      "invalidRoute": "Mindestens eine ausgewählte Route ist ungültig.",
+      "durationMismatch": "Das Storyboard-Timing entspricht nicht dem Projektziel.",
+      "chargeNotice": "Die Generierung nutzt dein ausgewähltes Anbieterkonto und kann Kosten verursachen.",
+      "confirm": "Bestätigen und generieren",
+      "cancel": "Abbrechen",
+      "disabledMissingRoutes": "Wähle für jede ausgewählte Szene eine gültige Route.",
+      "audioOn": "Dieses Rendering enthält generiertes Audio; stumme Routen bleiben, sofern vorhanden, stumm."
+    },
+    "jobs": {
+      "progress": "{{percent}} % abgeschlossen",
+      "cancel": "Auftrag abbrechen",
+      "retry": "Generierung wiederholen",
+      "retryConfirmationTitle": "Generierung wiederholen?",
+      "retryConfirmationBody": "Beim erneuten Versuch wird diese Generierung erneut an den Anbieter gesendet und kann Anbietergebühren verursachen.",
+      "retryConfirmationConfirm": "Bestätigen und wiederholen",
+      "retryDownload": "Download wiederholen",
+      "retryChargeTitle": "Mit möglicher Doppelbelastung wiederholen?",
+      "retryChargeBody": "Das Ergebnis der vorherigen Übermittlung ist unbekannt. Eine Wiederholung kann eine weitere Anbietergebühr verursachen.",
+      "retryChargeConfirm": "Bestätigen und wiederholen",
+      "status": {
+        "queuedLocal": "Wartet auf Übermittlung",
+        "submitting": "Wird übermittelt",
+        "queuedRemote": "Beim Anbieter eingereiht",
+        "running": "Wird generiert",
+        "needsAttention": "Aktion erforderlich",
+        "succeeded": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "errors": {
+        "invalidRequest": "Die Generierungsanfrage ist ungültig.",
+        "auth": "Der Anbieter hat die Anmeldedaten abgelehnt.",
+        "quota": "Das Anbieterkonto verfügt über kein ausreichendes Kontingent.",
+        "rateLimited": "Das Anbieterratenlimit wurde erreicht. Versuche es später erneut.",
+        "providerUnavailable": "Der Generierungsanbieter ist nicht verfügbar.",
+        "timeout": "Der Anbieter hat nicht rechtzeitig geantwortet.",
+        "pollDeadline": "Die Engine meldet keinen Fortschritt mehr. Prüfen Sie den Status beim Anbieter, bevor Sie es erneut versuchen.",
+        "noOutput": "Der Anbieter hat den Auftrag ohne nutzbare Ausgabe abgeschlossen.",
+        "submissionUnknown": "Das Übermittlungsergebnis ist unbekannt. Prüfe vor einer Wiederholung die Warnung vor einer Doppelbelastung.",
+        "downloadFailed": "Die Generierung wurde abgeschlossen, aber die Ausgabe konnte nicht heruntergeladen werden.",
+        "unsupported": "Der Anbieter unterstützt den angeforderten Vorgang nicht.",
+        "unknown": "Der Generierungsauftrag ist aus unbekanntem Grund fehlgeschlagen."
+      }
+    },
+    "preview": {
+      "title": "Vorschau",
+      "noAssetTitle": "Kein generiertes Asset ausgewählt",
+      "noAssetBody": "Generiere eine Szene oder wähle eine vorhandene Variante zur Vorschau aus.",
+      "imageAlt": "Generiertes Szenenbild",
+      "videoLabel": "Generiertes Szenenvideo",
+      "loadFailed": "Dieses verwaltete Asset konnte nicht geladen werden.",
+      "versions": "Varianten",
+      "versionLabel": "Variante {{number}}",
+      "selectVersion": "Diese Variante auswählen",
+      "selectVersionAccessible": "Variante {{number}} auswählen",
+      "importReference": "Bild für den ersten Frame importieren",
+      "importing": "Referenz wird importiert...",
+      "missingVisualPrompt": "Füge vor der Generierung dieser Szene eine visuelle Anweisung hinzu.",
+      "missingModel": "Wähle vor der Generierung dieser Szene ein kompatibles Projektmodell aus.",
+      "generateThisScene": "Diese Szene generieren",
+      "videoReady": "Video bereit"
+    },
+    "timeline": {
+      "title": "Szenenleiste",
+      "selectScene": "Szene auswählen",
+      "totalDuration": "Gesamtdauer des Storyboards",
+      "totalDurationFull": "Gesamtdauer: {{seconds}} Sekunden",
+      "totalDurationFull_one": "Gesamtdauer: {{seconds}} Sekunde",
+      "totalDurationFull_other": "Gesamtdauer: {{seconds}} Sekunden",
+      "selectSceneAccessible": "Szene {{number}} auswählen: {{title}}, {{seconds}} Sekunden",
+      "selectSceneAccessible_one": "Szene {{number}} auswählen: {{title}}, {{seconds}} Sekunde",
+      "selectSceneAccessible_other": "Szene {{number}} auswählen: {{title}}, {{seconds}} Sekunden",
+      "noScenes": "Keine Szenen vorhanden"
+    },
+    "export": {
+      "title": "Assets exportieren",
+      "body": "Exportiere das Storyboard-Manifest und das ausgewählte Asset jeder Szene.",
+      "gapWarning": "Die Einstellungen {{shots}} sind noch Platzhalter und werden nicht einbezogen.",
+      "gapWarning_one": "Einstellung {{shots}} ist noch ein Platzhalter und wird nicht einbezogen.",
+      "gapWarning_other": "Die Einstellungen {{shots}} sind noch Platzhalter und werden nicht einbezogen.",
+      "confirmSelectedCount": "{{count}} Einstellungen exportieren?",
+      "confirmSelectedCount_one": "{{count}} Einstellung exportieren?",
+      "confirmSelectedCount_other": "{{count}} Einstellungen exportieren?",
+      "includeReferences": "Importierte Referenzbilder einschließen",
+      "confirm": "Assets exportieren",
+      "cancel": "Abbrechen",
+      "choosing": "Exportordner auswählen...",
+      "successTitle": "Assets exportiert",
+      "successBody": "{{count}} ausgewählte Einstellungen nach „{{folderName}}“ übergeben.",
+      "successBody_one": "{{count}} ausgewählte Einstellung nach „{{folderName}}“ übergeben.",
+      "successBody_other": "{{count}} ausgewählte Einstellungen nach „{{folderName}}“ übergeben.",
+      "partialTitle": "Assets mit fehlenden Szenen exportiert",
+      "partialBody": "Verfügbare Assets nach „{{folderName}}“ exportiert.",
+      "failed": "Assets konnten nicht exportiert werden.",
+      "noSelectedAssets": "Keine ausgewählten Szenen-Assets sind für den Export bereit.",
+      "folderLabel": "Exportordner"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio ist in diesem Build deaktiviert.",
+      "invalidPayload": "Die Anfrage enthält ungültige oder unvollständige Informationen.",
+      "projectNotFound": "Das Creative-Studio-Projekt existiert nicht mehr.",
+      "storyboardExists": "Dieses Projekt hat bereits ein Storyboard. Bestätige das Ersetzen, bevor du es erneut entwirfst.",
+      "staleProject": "Das Projekt wurde an anderer Stelle geändert. Aktualisiere es vor einem erneuten Versuch.",
+      "planningUnavailable": "Der Storyboard-Entwurf ist nicht verfügbar. Du kannst die Bearbeitung manuell fortsetzen.",
+      "invalidRoute": "Die ausgewählte Generierungsroute ist ungültig oder nicht verfügbar.",
+      "cancellationRefused": "Der Anbieter kann diesen laufenden Auftrag nicht mehr abbrechen.",
+      "duplicateChargeAcknowledgementRequired": "Bestätige die mögliche doppelte Anbietergebühr, bevor du es erneut versuchst.",
+      "busy": "Dieses Projekt enthält aktive Generierungsaufträge.",
+      "provider": "Der Anbieter konnte die Anfrage nicht abschließen.",
+      "storage": "Creative Studio konnte seine lokalen Daten nicht aktualisieren."
+    },
+    "models": {
+      "storyboard": "Storyboard-Modell",
+      "selectionRequired": "Modell auswählen",
+      "unavailable": "Das ausgewählte Modell ist nicht verfügbar",
+      "openSettings": "Modelleinstellungen öffnen",
+      "refresh": "Modelle aktualisieren",
+      "loading": "Modelle werden geladen...",
+      "updateFailed": "Die Modellauswahl des Projekts konnte nicht aktualisiert werden."
+    }
+  },
   "artifact": {
     "emptyTitle": "Kein Artefakt geöffnet",
     "emptyHint": "Generierte Dateien und Dokumente werden hier geöffnet."
@@ -900,5 +1352,12 @@
     "body": "Dieser Chat kann die Wissensdatenbank des Projekts nicht durchsuchen – er wurde begonnen, bevor Dateien hinzugefügt wurden.",
     "action": "Neuen Chat starten"
   },
-  "emptyChat": "Sende eine Nachricht, um zu beginnen."
+  "emptyChat": "Sende eine Nachricht, um zu beginnen.",
+  "presentationSubmission": {
+    "pending": "Präsentationsübermittlung ausstehend",
+    "restore": "Wiederherstellen",
+    "persistenceFailure": "Die Präsentationsübermittlung konnte nicht gespeichert werden.",
+    "queued": "Präsentation zur Warteschlange hinzugefügt",
+    "uncertainTracking": "Der Übermittlungsstatus ist ungewiss. Verfolgen Sie den bestehenden Lauf und senden Sie nicht erneut."
+  }
 }

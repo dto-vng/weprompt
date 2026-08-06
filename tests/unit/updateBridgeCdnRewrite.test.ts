@@ -19,6 +19,10 @@ vi.mock('@/common/platform/bridge', () => ({
         _getHandler: () => handlerMap.get('handler'),
       };
     }),
+    buildRendererQuery: vi.fn(() => ({
+      provider: vi.fn(),
+      invoke: vi.fn(),
+    })),
     buildEmitter: vi.fn(() => ({
       emit: vi.fn(),
       on: vi.fn(),
@@ -77,14 +81,14 @@ afterEach(() => {
   else process.env.WEPROMPT_UPDATE_BASE_URL = originalUpdateBaseUrl;
 });
 
-const getCheckHandler = async () => {
+const getCheckHandler = async ({ initialize = true }: { initialize?: boolean } = {}) => {
   vi.resetModules();
-  const { autoUpdaterService } = await import('@process/services/autoUpdaterService');
+  const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
   const { initUpdateBridge } = await import('@process/bridge/updateBridge');
   const { ipcBridge } = await import('@/common');
 
   autoUpdaterService.resetForTest();
-  autoUpdaterService.initialize();
+  if (initialize) autoUpdaterService.initialize();
   initUpdateBridge();
 
   const provider = vi.mocked(ipcBridge.update.check.provider);
@@ -153,6 +157,27 @@ describe('updateBridge configured feed checks', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('initializes the updater service before the first configured feed check', async () => {
+    const handler = await getCheckHandler({ initialize: false });
+    const { autoUpdater } = await import('electron-updater');
+    const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
+    vi.mocked(autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: false,
+      updateInfo: {
+        version: '1.0.0',
+        files: [],
+        path: '',
+        sha512: '',
+      },
+    });
+
+    await expect(handler({})).resolves.toMatchObject({
+      success: true,
+      data: { currentVersion: '1.0.0', updateAvailable: false },
+    });
+    expect(autoUpdaterService.isInitialized).toBe(true);
   });
 });
 
@@ -252,7 +277,7 @@ describe('autoUpdate quitAndInstall lifecycle', () => {
 
   it('waits for the pre-install cleanup before starting the installer', async () => {
     const cleanup = makeDeferred();
-    const { autoUpdaterService } = await import('@process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
     const { autoUpdater } = await import('electron-updater');
 
     autoUpdaterService.resetForTest();
@@ -271,7 +296,7 @@ describe('autoUpdate quitAndInstall lifecycle', () => {
 
   it('does not start the installer when the pre-install cleanup fails', async () => {
     const cleanupError = new Error('backend did not stop');
-    const { autoUpdaterService } = await import('@process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
     const { autoUpdater } = await import('electron-updater');
 
     autoUpdaterService.resetForTest();
@@ -285,7 +310,7 @@ describe('autoUpdate quitAndInstall lifecycle', () => {
 
   it('keeps the IPC request pending until quitAndInstall cleanup completes', async () => {
     const cleanup = makeDeferred();
-    const { autoUpdaterService } = await import('@process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
 
     autoUpdaterService.resetForTest();
     autoUpdaterService.setBeforeQuitAndInstall(async () => cleanup.promise);
@@ -308,7 +333,7 @@ describe('autoUpdate quitAndInstall lifecycle', () => {
 
   it('propagates quitAndInstall failures through IPC', async () => {
     const cleanupError = new Error('native readiness failed');
-    const { autoUpdaterService } = await import('@process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@process/services/update/autoUpdaterService');
 
     autoUpdaterService.resetForTest();
     autoUpdaterService.setBeforeQuitAndInstall(async () => {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveDesktopReleaseBuildPolicy, resolveUpdateBaseUrl } from '@/common/update/updatePolicy';
+import {
+  isUpdateFeatureEnabled,
+  resolveDesktopReleaseBuildPolicy,
+  resolveUpdateBaseUrl,
+} from '@/common/update/updatePolicy';
 
 describe('desktop release update policy', () => {
   it('keeps updates disabled when no product-owned feed is configured', () => {
@@ -11,6 +15,16 @@ describe('desktop release update policy', () => {
     expect(resolveUpdateBaseUrl(' https://updates.weprompt.test/releases/ ')).toBe(
       'https://updates.weprompt.test/releases'
     );
+  });
+
+  it.each([
+    { AIONUI_DISABLE_AUTO_UPDATE: '1' },
+    { AIONUI_E2E_TEST: '1' },
+    { CI: '1' },
+    { CI: 'true' },
+    { GITHUB_ACTIONS: 'true' },
+  ])('keeps the runtime update feature disabled under guard %#', (environment) => {
+    expect(isUpdateFeatureEnabled('https://updates.weprompt.test/releases', environment)).toBe(false);
   });
 
   it.each([

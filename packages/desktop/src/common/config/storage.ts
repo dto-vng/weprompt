@@ -239,11 +239,16 @@ export type TContextHandoffExtra = {
 
 export type TConversationContextHandoffExtra = TContextHandoffExtra;
 
+type StudioConversationBindingExtra = {
+  /** Back-reference validated against the Studio project's authoritative Brief conversation id. */
+  studio_project_id?: string;
+};
+
 export type TChatConversation =
   | Omit<
       IChatConversation<
         'acp',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           backend: string;
@@ -300,7 +305,7 @@ export type TChatConversation =
   | Omit<
       IChatConversation<
         'codex',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           cli_path?: string;
@@ -333,7 +338,7 @@ export type TChatConversation =
   | Omit<
       IChatConversation<
         'openclaw-gateway',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           backend?: string;
@@ -389,7 +394,7 @@ export type TChatConversation =
   | Omit<
       IChatConversation<
         'gemini',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
@@ -411,7 +416,7 @@ export type TChatConversation =
   | Omit<
       IChatConversation<
         'nanobot',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
@@ -437,7 +442,7 @@ export type TChatConversation =
   | Omit<
       IChatConversation<
         'remote',
-        {
+        StudioConversationBindingExtra & {
           project_id?: string;
           workspace?: string;
           custom_workspace?: boolean;
@@ -466,7 +471,7 @@ export type TChatConversation =
     >
   | IChatConversation<
       'aionrs',
-      {
+      StudioConversationBindingExtra & {
         project_id?: string;
         workspace: string;
         custom_workspace?: boolean;

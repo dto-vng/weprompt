@@ -10,7 +10,7 @@ import {
   OFFICE_ARTIFACT_MAX_SELECTION_MESSAGE_BYTES,
 } from '../../types/office/artifactEditor';
 import { PRESENTATION_RUN_LIMITS } from '../../types/office/presentationRunPolicy';
-import type { NativeBridgeProviderKey } from './constants';
+import type { NativeBridgeProviderKey, RendererBridgeQueryKey } from './constants';
 
 const MAX_PATH_LENGTH = 4096;
 const MAX_IDENTIFIER_LENGTH = 256;
@@ -255,7 +255,225 @@ const presentationRecoveryCursorSchema = z
   .max(2048)
   .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
 
+const studioExpectedRevisionSchema = z.number().finite().int().positive();
+const studioProjectInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(256),
+    brief: z.string().max(16 * 1024),
+    forgeProjectId: safeIdSchema.optional(),
+    aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:3', '3:4']),
+    targetDurationSeconds: z.number().finite().int().min(5).max(60),
+    resolution: z.enum(['720p', '1080p']),
+  })
+  .strict();
+const studioProjectRequestSchema = z.object({ projectId: safeIdSchema }).strict();
+const studioCapturedPosterDataUrlMaxLength = Math.ceil((50 * 1024 * 1024) / 3) * 4 + 22;
+const studioCapturedPosterSchema = z
+  .object({
+    projectId: safeIdSchema,
+    sceneId: safeIdSchema,
+    videoAssetId: safeIdSchema,
+    dataUrl: z
+      .string()
+      .min(26)
+      .max(studioCapturedPosterDataUrlMaxLength)
+      .regex(/^data:image\/png;base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+    width: z.number().finite().int().min(1).max(16_384),
+    height: z.number().finite().int().min(1).max(16_384),
+  })
+  .strict();
+const isUnsafeStudioTextCharacter = (character: string): boolean => {
+  const codePoint = character.codePointAt(0)!;
+  return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) || (codePoint >= 0xd800 && codePoint <= 0xdfff);
+};
+const studioModelSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => value === value.trim() && !Array.from(value).some(isUnsafeStudioTextCharacter));
+const studioTextModelSelectionSchema = z
+  .object({
+    providerId: safeIdSchema,
+    model: studioModelSchema,
+  })
+  .strict();
+const studioMediaModelSelectionSchema = z.object({ choiceId: safeIdSchema }).strict();
+const storyboardSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('storyboard'),
+    selection: studioTextModelSelectionSchema.nullable(),
+  })
+  .strict();
+const imageSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('image'),
+    selection: studioMediaModelSelectionSchema.nullable(),
+  })
+  .strict();
+const videoSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('video'),
+    selection: studioMediaModelSelectionSchema.nullable(),
+  })
+  .strict();
+const studioUpdateModelSelectionSchema = z.discriminatedUnion('role', [
+  storyboardSelectionSchema,
+  imageSelectionSchema,
+  videoSelectionSchema,
+]);
+const studioConnectionSchema = z
+  .object({
+    providerId: safeIdSchema,
+    integrationId: safeIdSchema,
+    model: z.string().trim().min(1).max(256),
+  })
+  .strict();
+const studioSceneRouteSnapshotSchema = z
+  .object({
+    sceneId: safeIdSchema,
+    choiceId: safeIdSchema,
+    kind: z.enum(['image', 'video']),
+  })
+  .strict();
+const studioSubmitScenesSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    mode: z.enum(['single', 'batch']),
+    sceneIds: z
+      .array(safeIdSchema)
+      .min(1)
+      .max(24)
+      .refine((ids) => new Set(ids).size === ids.length),
+    catalogVersion: z.string().regex(/^[a-f0-9]{16}$/),
+    routes: z.array(studioSceneRouteSnapshotSchema).min(1).max(24),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.mode === 'single' && input.sceneIds.length !== 1) {
+      context.addIssue({ code: 'custom', message: 'single mode requires exactly one scene', path: ['sceneIds'] });
+    }
+    const routeSceneIds = input.routes.map((route) => route.sceneId);
+    const selectedSceneIds = new Set(input.sceneIds);
+    if (
+      new Set(routeSceneIds).size !== routeSceneIds.length ||
+      routeSceneIds.length !== input.sceneIds.length ||
+      routeSceneIds.some((sceneId) => !selectedSceneIds.has(sceneId))
+    ) {
+      context.addIssue({ code: 'custom', message: 'routes must exactly match sceneIds', path: ['routes'] });
+    }
+  });
+const studioFitStoryboardSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    catalogVersion: z.string().regex(/^[a-f0-9]{16}$/),
+  })
+  .strict();
+const studioJobRequestSchema = z
+  .object({
+    projectId: safeIdSchema,
+    jobId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+  })
+  .strict();
+const studioSceneSchema = z
+  .object({
+    title: z.string().trim().min(0).max(256),
+    purpose: z.string().max(256),
+    visualPrompt: z.string().max(8 * 1024),
+    narration: z.string().max(4 * 1024),
+    onScreenText: z.string().max(1024),
+    mediaKind: z.enum(['image', 'video']),
+    durationSeconds: z.number().finite().int().min(1).max(60),
+    referenceAssetId: safeIdSchema.nullable(),
+  })
+  .strict();
+const studioUpdateProjectSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    name: z.string().trim().min(1).max(256).optional(),
+    brief: z
+      .string()
+      .max(16 * 1024)
+      .optional(),
+    aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:3', '3:4']).optional(),
+    targetDurationSeconds: z.number().finite().int().min(5).max(60).optional(),
+    resolution: z.enum(['720p', '1080p']).optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input).some((key) => key !== 'projectId' && key !== 'expectedRevision'));
+const studioNormalisedRectSchema = z
+  .object({
+    x: z.number().finite().min(0).max(1),
+    y: z.number().finite().min(0).max(1),
+    width: z.number().finite().positive().max(1),
+    height: z.number().finite().positive().max(1),
+  })
+  .strict()
+  .refine((rect) => rect.x + rect.width <= 1 && rect.y + rect.height <= 1);
+const studioCutFilterSchema = z
+  .object({
+    id: z.enum(['exposure', 'contrast', 'saturation', 'temperature']),
+    amount: z.number().finite().min(-1).max(1),
+  })
+  .strict();
+const studioEditableCutClipSchema = z
+  .object({
+    sourceInSeconds: z.number().finite().nonnegative().nullable(),
+    sourceOutSeconds: z.number().finite().nonnegative().nullable(),
+    crop: studioNormalisedRectSchema.nullable(),
+    filters: z
+      .array(studioCutFilterSchema)
+      .refine((filters) => new Set(filters.map((filter) => filter.id)).size === filters.length),
+  })
+  .strict()
+  .refine(
+    (clip) =>
+      clip.sourceInSeconds === null || clip.sourceOutSeconds === null || clip.sourceInSeconds < clip.sourceOutSeconds
+  );
+const studioEditableCutSchema = z
+  .object({
+    orderMode: z.enum(['storyboard', 'manual']),
+    clipOrder: z.array(safeIdSchema).refine((ids) => new Set(ids).size === ids.length),
+    clips: z.record(safeIdSchema, studioEditableCutClipSchema),
+  })
+  .strict()
+  .refine(
+    (cut) =>
+      cut.clipOrder.length === Object.keys(cut.clips).length &&
+      cut.clipOrder.every((clipId) => Object.hasOwn(cut.clips, clipId))
+  );
+const studioUpdateCutSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    cutId: safeIdSchema,
+    cut: studioEditableCutSchema,
+  })
+  .strict();
+
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
+export const INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE =
+  '[adapter] Renderer IPC query rejected: invalid operation payload';
+
+export const rendererBridgeQuerySchemas = {
+  'creative-studio.has-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ dirtySceneCount: z.number().finite().int().min(0).max(24) }).strict(),
+  },
+  'creative-studio.flush-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ saved: z.boolean() }).strict(),
+  },
+} satisfies Record<RendererBridgeQueryKey, { request: z.ZodTypeAny; response: z.ZodTypeAny }>;
 
 export const nativeBridgePayloadSchemas = {
   'restart-app': voidPayloadSchema,
@@ -441,6 +659,85 @@ export const nativeBridgePayloadSchemas = {
   'project-knowledge.unwatch-folder': projectKnowledgeProjectIdSchema,
   'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
   'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
+  'creative-studio.list-projects': voidPayloadSchema,
+  'creative-studio.create-project': studioProjectInputSchema,
+  'creative-studio.get-project': studioProjectRequestSchema,
+  'creative-studio.list-proposals': studioProjectRequestSchema,
+  'creative-studio.accept-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
+  'creative-studio.reject-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
+  'creative-studio.propose-storyboard': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      replaceExisting: z.boolean(),
+    })
+    .strict(),
+  'creative-studio.update-model-selection': studioUpdateModelSelectionSchema,
+  'creative-studio.update-project': studioUpdateProjectSchema,
+  'creative-studio.bind-brief-conversation': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      conversationId: safeIdSchema.nullable(),
+    })
+    .strict(),
+  'creative-studio.update-cut': studioUpdateCutSchema,
+  'creative-studio.delete-project': z
+    .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
+    .strict(),
+  'creative-studio.update-scene': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneId: safeIdSchema,
+      scene: studioSceneSchema.nullable(),
+    })
+    .strict(),
+  'creative-studio.reorder-scenes': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneOrder: z
+        .array(safeIdSchema)
+        .min(1)
+        .max(24)
+        .refine((ids) => new Set(ids).size === ids.length),
+    })
+    .strict(),
+  'creative-studio.select-asset': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneId: safeIdSchema,
+      assetId: safeIdSchema,
+    })
+    .strict(),
+  'creative-studio.persist-captured-poster': studioCapturedPosterSchema,
+  'creative-studio.choose-and-import-reference': z
+    .object({
+      projectId: safeIdSchema,
+      sceneId: safeIdSchema.optional(),
+      expectedRevision: studioExpectedRevisionSchema,
+    })
+    .strict(),
+  'creative-studio.choose-and-export-assets': z
+    .object({ projectId: safeIdSchema, includeReferences: z.boolean() })
+    .strict(),
+  'creative-studio.render-cut': studioProjectRequestSchema,
+  'creative-studio.cancel-render': studioProjectRequestSchema,
+  'creative-studio.fit-storyboard': studioFitStoryboardSchema,
+  'creative-studio.submit-scenes': studioSubmitScenesSchema,
+  'creative-studio.cancel-job': studioJobRequestSchema,
+  'creative-studio.retry-job': studioJobRequestSchema
+    .extend({ acknowledgePossibleDuplicateCharge: z.boolean().optional() })
+    .strict(),
+  'creative-studio.retry-download': studioJobRequestSchema,
+  'creative-studio.list-connection-candidates': voidPayloadSchema,
+  'creative-studio.list-connections': voidPayloadSchema,
+  'creative-studio.validate-connection': studioConnectionSchema,
+  'creative-studio.save-connection': studioConnectionSchema,
+  'creative-studio.remove-connection': z.object({ bindingId: safeIdSchema }).strict(),
+  'creative-studio.list-routes': z.object({ projectId: safeIdSchema.optional() }).strict().optional(),
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.prepare-preview': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.start-preview': z.object({ leaseId: identifierSchema, url: urlSchema.optional() }).strict(),
@@ -491,6 +788,22 @@ export function parseNativeBridgePayload(providerKey: NativeBridgeProviderKey, p
   const result = nativeBridgePayloadSchemas[providerKey].safeParse(payload);
   if (!result.success) {
     throw new Error(INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryRequest(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].request.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryResponse(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].response.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
   }
   return result.data;
 }

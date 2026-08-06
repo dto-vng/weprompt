@@ -17,8 +17,8 @@ import {
   CdnGenericProvider,
   ContainedElectronHttpExecutor,
   requestOptionsToUpdateUrl,
-} from '@/process/services/cdnGenericProvider';
-import { buildCdnFeedOptions } from '@/process/services/updateFeed';
+} from '@/process/services/update/cdnGenericProvider';
+import { buildCdnFeedOptions } from '@/process/services/update/updateFeed';
 
 const makeRuntimeOptions = (): ProviderRuntimeOptions => ({
   isUseMultipleRangeRequest: true,
