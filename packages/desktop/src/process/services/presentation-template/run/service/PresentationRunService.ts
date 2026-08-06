@@ -8,8 +8,12 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
   DiscardPresentationRunRequest,
   DiscardPresentationRunResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
   GetPresentationRunRequest,
   GetPresentationRunResult,
   ListRecoverablePresentationRunsRequest,
@@ -20,6 +24,8 @@ import type {
   PresentationRunFailureCode,
   PresentationRunPublicDto,
   PresentationSourceRef,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
   StartPresentationRunRequest,
   StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
@@ -43,6 +49,8 @@ import {
   type PresentationRunStore,
   type PresentationSourceSnapshotReader,
   type StoredPresentationRunManifest,
+  hasExactPassedPresentationReadiness,
+  hasExactPresentationTerminalEvidence,
 } from '../storage';
 import { buildPresentationRunDirective } from './presentationRunDirective';
 import {
@@ -52,9 +60,11 @@ import {
   type ExtractedPresentationSource,
   type PresentationSourceExtractionInput,
 } from './presentationSourceExtractor';
+import type { PresentationRunLifecycleCoordinator } from './PresentationRunLifecycleCoordinator';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^[0-9a-f]{64}$/;
+const LEASE_TOKEN_RE = /^[A-Za-z0-9_-]{32,256}$/;
 
 export type PresentationRunAuthorityResolution =
   | {
@@ -83,6 +93,7 @@ export type PresentationRunServiceOptions = {
     | 'discardRun'
   >;
   templates: Pick<PresentationTemplateService, 'getById'>;
+  lifecycle: Pick<PresentationRunLifecycleCoordinator, 'claimInitialDispatch' | 'renewInitialDispatch' | 'dispatch'>;
   isFeatureEnabled: () => boolean;
   isDesktopRuntime: () => boolean;
   resolveAuthority: (input: { conversationId: string }) => Promise<PresentationRunAuthorityResolution>;
@@ -336,10 +347,75 @@ function normalizeDiscardRequest(value: unknown): DiscardPresentationRunRequest 
   };
 }
 
+function normalizeClaimRequest(value: unknown): ClaimInitialPresentationDispatchRequest | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'holder_id', 'expected_revision']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    typeof value.holder_id !== 'string' ||
+    !UUID_RE.test(value.holder_id) ||
+    !Number.isSafeInteger(value.expected_revision) ||
+    (value.expected_revision as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    holder_id: value.holder_id.toLowerCase(),
+    expected_revision: value.expected_revision as number,
+  };
+}
+
+function normalizeLeaseRequest<
+  T extends RenewInitialPresentationDispatchRequest | DispatchInitialPresentationRunRequest,
+>(value: unknown): T | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'lease_token', 'expected_revision']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    typeof value.lease_token !== 'string' ||
+    !LEASE_TOKEN_RE.test(value.lease_token) ||
+    !Number.isSafeInteger(value.expected_revision) ||
+    (value.expected_revision as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    lease_token: value.lease_token,
+    expected_revision: value.expected_revision as number,
+  } as T;
+}
+
 function isDiscardQualified(run: StoredPresentationRunManifest): boolean {
   if ((run.dispatchStatus === 'allocating' || run.dispatchStatus === 'committed') && !run.postInvoked) return true;
   if (run.dispatchStatus === 'failed_retained') return true;
   return run.dispatchStatus === 'retained' && run.disposition === 'REVIEW_REQUIRED';
+}
+
+// Electron exposes external Office applications only through a mutable path.
+// There is no exact-byte handle transfer available on every supported desktop.
+const EXACT_BYTE_SYSTEM_OPEN_AVAILABLE = false;
+
+function canOpenRecovery(run: StoredPresentationRunManifest): boolean {
+  const hasExactEvidence = hasExactPassedPresentationReadiness(run);
+  const hasExactTerminalProof = hasExactPresentationTerminalEvidence(run);
+  return (
+    EXACT_BYTE_SYSTEM_OPEN_AVAILABLE &&
+    run.dispatchStatus === 'retained' &&
+    run.artifactPhase === 'rendered_exact_hash' &&
+    run.disposition === 'REVIEW_REQUIRED' &&
+    hasExactTerminalProof &&
+    hasExactEvidence
+  );
 }
 
 function toPublicRun(run: StoredPresentationRunManifest): PresentationRunPublicDto {
@@ -376,7 +452,7 @@ function toPublicRun(run: StoredPresentationRunManifest): PresentationRunPublicD
         ? null
         : { sha256: run.retainedCandidate.sha256, byteLength: run.retainedCandidate.byteLength },
     actions: {
-      openAllowed: false,
+      openAllowed: canOpenRecovery(run),
       discardAllowed: isDiscardQualified(run),
     },
   } as PresentationRunPublicDto;
@@ -626,6 +702,44 @@ export class PresentationRunService {
     return pending;
   }
 
+  async claimInitialDispatch(
+    unsafeRequest: ClaimInitialPresentationDispatchRequest
+  ): Promise<ClaimInitialPresentationDispatchResult> {
+    if (!this.options.isFeatureEnabled())
+      return runFailure('FEATURE_DISABLED') as ClaimInitialPresentationDispatchResult;
+    if (!this.options.isDesktopRuntime())
+      return runFailure('DESKTOP_REQUIRED') as ClaimInitialPresentationDispatchResult;
+    const request = normalizeClaimRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as ClaimInitialPresentationDispatchResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as ClaimInitialPresentationDispatchResult;
+    return this.options.lifecycle.claimInitialDispatch(request);
+  }
+
+  async renewInitialDispatch(
+    unsafeRequest: RenewInitialPresentationDispatchRequest
+  ): Promise<RenewInitialPresentationDispatchResult> {
+    if (!this.options.isFeatureEnabled())
+      return runFailure('FEATURE_DISABLED') as RenewInitialPresentationDispatchResult;
+    if (!this.options.isDesktopRuntime())
+      return runFailure('DESKTOP_REQUIRED') as RenewInitialPresentationDispatchResult;
+    const request = normalizeLeaseRequest<RenewInitialPresentationDispatchRequest>(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as RenewInitialPresentationDispatchResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as RenewInitialPresentationDispatchResult;
+    return this.options.lifecycle.renewInitialDispatch(request);
+  }
+
+  async dispatch(unsafeRequest: DispatchInitialPresentationRunRequest): Promise<DispatchInitialPresentationRunResult> {
+    if (!this.options.isFeatureEnabled()) return runFailure('FEATURE_DISABLED') as DispatchInitialPresentationRunResult;
+    if (!this.options.isDesktopRuntime()) return runFailure('DESKTOP_REQUIRED') as DispatchInitialPresentationRunResult;
+    const request = normalizeLeaseRequest<DispatchInitialPresentationRunRequest>(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as DispatchInitialPresentationRunResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as DispatchInitialPresentationRunResult;
+    return this.options.lifecycle.dispatch(request, authorization.value.runtime as 'aionrs' | 'acp');
+  }
+
   /** Returns an authorized, path-free projection for an existing durable run. */
   async get(unsafeRequest: GetPresentationRunRequest): Promise<GetPresentationRunResult> {
     const request = normalizeGetRequest(unsafeRequest);
@@ -695,7 +809,7 @@ export class PresentationRunService {
     }
   }
 
-  /** Keeps Open fail-closed until Task 8 persists exact readiness evidence and a safe open seam. */
+  /** Keeps Open fail-closed until the desktop can transfer exact bytes instead of a mutable path. */
   async openRecovery(unsafeRequest: OpenPresentationRunRequest): Promise<OpenPresentationRunResult> {
     const request = normalizeOpenRequest(unsafeRequest);
     if (request === null) return runFailure('INVALID_REQUEST');
@@ -708,6 +822,10 @@ export class PresentationRunService {
       return runFailure('PERSISTENCE_FAILED');
     }
     if (run === null || run.conversationId !== request.conversation_id) return runFailure('RUN_NOT_FOUND');
+    const candidate = run.retainedCandidate;
+    if (candidate === null || candidate.sha256 !== request.expected_sha256 || !canOpenRecovery(run)) {
+      return recoveryDenialFailure('UNSAFE_TO_OPEN', run.runId, run.dispatchStatus);
+    }
     return recoveryDenialFailure('UNSAFE_TO_OPEN', run.runId, run.dispatchStatus);
   }
 

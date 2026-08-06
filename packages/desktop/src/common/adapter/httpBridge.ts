@@ -209,6 +209,82 @@ export type HttpRequestOptions = {
   signal?: AbortSignal;
 };
 
+export type MainHttpRequestOptions = {
+  port: number;
+  token: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  body?: unknown;
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
+};
+
+/** Body-free error for main-owned lifecycle calls where request details are sensitive. */
+export class MainBackendHttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string) {
+    super(`Main backend request failed (${status})`);
+    this.name = 'MainBackendHttpError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function assertMainHttpRequestOptions(options: MainHttpRequestOptions): void {
+  if (
+    !Number.isSafeInteger(options.port) ||
+    options.port < 1 ||
+    options.port > 65_535 ||
+    typeof options.token !== 'string' ||
+    options.token.length < 1 ||
+    options.token.length > 4_096 ||
+    options.token.includes('\u0000') ||
+    typeof options.path !== 'string' ||
+    !options.path.startsWith('/') ||
+    options.path.startsWith('//') ||
+    options.path.includes('\u0000')
+  ) {
+    throw new Error('Invalid main backend request configuration');
+  }
+}
+
+/**
+ * Main-process-only HTTP seam with explicit lifecycle credentials.
+ *
+ * Deliberately does not use globals, fallback ports, or logging. Error bodies
+ * are consumed only to retain a bounded machine code and are never exposed.
+ */
+export async function mainHttpRequest<T>(options: MainHttpRequestOptions): Promise<T> {
+  assertMainHttpRequestOptions(options);
+  const headers: Record<string, string> = { [LOCAL_TOKEN_HEADER]: options.token };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const response = await (options.fetchImpl ?? fetch)(`http://127.0.0.1:${options.port}${options.path}`, {
+    method: options.method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    let code = '';
+    try {
+      const body: unknown = await response.json();
+      if (body !== null && typeof body === 'object' && 'code' in body) {
+        const candidate = (body as { code?: unknown }).code;
+        if (typeof candidate === 'string' && candidate.length <= 128) code = candidate;
+      }
+    } catch {
+      // A body is not required for the body-free error contract.
+    }
+    throw new MainBackendHttpError(response.status, code);
+  }
+  if (!response.headers.get('Content-Type')?.includes('application/json')) return undefined as T;
+  const json: unknown = await response.json();
+  if (json !== null && typeof json === 'object' && 'data' in json) return (json as { data: T }).data;
+  return json as T;
+}
+
 const SENSITIVE_LOG_KEY_PATTERN = /api[_-]?key|authorization|auth[_-]?token|access[_-]?token|refresh[_-]?token|secret/i;
 
 function redactForLog(value: unknown, depth = 0): unknown {

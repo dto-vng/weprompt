@@ -173,17 +173,11 @@ function parseMutation(value: unknown): PresentationRunJournalMutation {
 }
 
 function parsePromotion(value: unknown): PreparedRetainedCandidate {
+  const legacyKeys = ['runId', 'temporaryRelativePath', 'finalRelativePath', 'sha256', 'byteLength', 'dev', 'ino'];
+  const currentKeys = [...legacyKeys, 'stagingBeforeRetain', 'retainedTemp', 'stagingAfterRetain'];
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'runId',
-      'temporaryRelativePath',
-      'finalRelativePath',
-      'sha256',
-      'byteLength',
-      'dev',
-      'ino',
-    ]) ||
+    (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, currentKeys)) ||
     typeof value.runId !== 'string' ||
     !UUID_RE.test(value.runId) ||
     typeof value.temporaryRelativePath !== 'string' ||
@@ -199,7 +193,14 @@ function parsePromotion(value: unknown): PreparedRetainedCandidate {
     typeof value.dev !== 'string' ||
     !/^(0|[1-9][0-9]*)$/.test(value.dev) ||
     typeof value.ino !== 'string' ||
-    !/^[1-9][0-9]*$/.test(value.ino)
+    !/^[1-9][0-9]*$/.test(value.ino) ||
+    (hasExactKeys(value, currentKeys) &&
+      (typeof value.stagingBeforeRetain !== 'string' ||
+        value.stagingBeforeRetain !== value.sha256 ||
+        typeof value.retainedTemp !== 'string' ||
+        value.retainedTemp !== value.sha256 ||
+        typeof value.stagingAfterRetain !== 'string' ||
+        value.stagingAfterRetain !== value.sha256))
   ) {
     journalCorrupt();
   }
@@ -329,6 +330,7 @@ function validateIntentParticipants(
   for (const mutation of mutations) {
     if (
       mutation.entityKind === 'run' &&
+      mutation.expectedRevision === null &&
       mutation.nextManifest.dispatchStatus === 'committed' &&
       mutation.nextManifest.artifactPhase === 'sources_extracted' &&
       mutation.nextManifest.preparation != null &&
@@ -652,6 +654,7 @@ export class PresentationRunJournal {
         validateTransaction(inputSnapshot);
         await this.files.initialize();
         for (const mutation of inputSnapshot.mutations) await this.assertExpectedRevision(mutation);
+        await this.assertPreparedRunContinuity(inputSnapshot);
         const intent: IntentRecord = {
           version: 1,
           type: 'intent',
@@ -1064,6 +1067,25 @@ export class PresentationRunJournal {
     if (nextRevision !== expectedNext && !isFirstConversationOwnerMutation) {
       throw new Error('Presentation canonical revision must increase by one');
     }
+  }
+
+  private async assertPreparedRunContinuity(input: PresentationRunJournalTransaction): Promise<void> {
+    const promotedRunIds = new Set((input.preparedRunAssetPromotions ?? []).map(({ runId }) => runId));
+    await Promise.all(
+      input.mutations.map(async (mutation): Promise<void> => {
+        if (
+          mutation.entityKind !== 'run' ||
+          mutation.nextManifest.preparation == null ||
+          promotedRunIds.has(mutation.entityId)
+        ) {
+          return;
+        }
+        const current = await this.readCanonical<Record<string, unknown>>(mutation.entityKind, mutation.entityId);
+        if (current === null || !isDeepStrictEqual(current.preparation, mutation.nextManifest.preparation)) {
+          throw new Error('Presentation prepared run assets require an exact promotion or immutable preservation');
+        }
+      })
+    );
   }
 
   private async isMutationApplied(mutation: PresentationRunJournalMutation): Promise<boolean> {

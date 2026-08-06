@@ -97,6 +97,36 @@ const storedGrant = (
   ...overrides,
 });
 
+const exactTerminalLifecycle = (turnId = REQUEST_ID) => ({
+  preparation: null,
+  initialDispatchLease: null,
+  terminalEvidence: {
+    conversationId: CONVERSATION_ID,
+    turnId,
+    eventObservedAt: CREATED_AT.toISOString(),
+    runtimeObservedAt: CREATED_AT.toISOString(),
+    runtime: {
+      state: 'idle' as const,
+      can_send_message: true as const,
+      has_task: false as const,
+      task_status: 'finished' as const,
+      is_processing: false as const,
+      pending_confirmations: 0 as const,
+      turn_id: null,
+    },
+  },
+  runtimeReleaseObservations: [],
+  retentionProof: null,
+  readiness: null,
+  binding: {
+    conversationId: CONVERSATION_ID,
+    turnId,
+    runtime: 'aionrs' as const,
+    boundAt: CREATED_AT.toISOString(),
+  },
+  postInvoked: true,
+});
+
 describe('PresentationRunStore', () => {
   let fixtureRoot: string;
   let userDataDir: string;
@@ -536,12 +566,7 @@ describe('PresentationRunStore', () => {
     await allocateSnapshottedRun();
     const { prepared } = await prepareTask5RunAssets();
     const committed = await store.commitPreparedRun(RUN_ID, 1, prepared);
-    const retained = await store.transitionRun(RUN_ID, {
-      expectedRevision: committed.revision,
-      dispatchStatus: 'failed_retained',
-      disposition: 'TRACKING_REQUIRED',
-      now: CREATED_AT.toISOString(),
-    });
+    const retained = await store.settleCommittedPreflightFailure(RUN_ID, committed.revision);
     expect(retained.preparation).toEqual(prepared.record);
 
     const retentionBoundary = new Date(CREATED_AT.getTime() + PRESENTATION_RUN_LIMITS.FAILED_OR_REVIEW_RETENTION_MS);
@@ -957,13 +982,7 @@ describe('PresentationRunStore', () => {
       disposition: null,
       retainedCandidate: null,
       sourceGrants: [],
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-1',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
+      ...exactTerminalLifecycle(),
       retainedBytes: 0,
     };
     await journal.transaction({
@@ -1033,16 +1052,10 @@ describe('PresentationRunStore', () => {
     'cleans or recovers candidate retention after the $boundary durability boundary',
     async ({ boundary, phase }) => {
       const terminal = storedRun(RUN_ID, 'terminal_verified', {
+        ...exactTerminalLifecycle(),
         clientRequestId: REQUEST_ID,
         requestFingerprint: 'a'.repeat(64),
         artifactPhase: 'sources_extracted',
-        binding: {
-          conversationId: CONVERSATION_ID,
-          turnId: 'turn-1',
-          runtime: 'aionrs',
-          boundAt: CREATED_AT.toISOString(),
-        },
-        postInvoked: true,
       });
 
       const boundaryRoot = path.join(fixtureRoot, `candidate-${boundary}`);
@@ -1079,6 +1092,11 @@ describe('PresentationRunStore', () => {
             relativePath: prepared.finalRelativePath,
             sha256: prepared.sha256,
             byteLength: prepared.byteLength,
+          },
+          retentionProof: {
+            stagingBeforeRetain: prepared.stagingBeforeRetain ?? prepared.sha256,
+            retainedTemp: prepared.retainedTemp ?? prepared.sha256,
+            stagingAfterRetain: prepared.stagingAfterRetain ?? prepared.sha256,
           },
           retainedBytes: prepared.byteLength,
         };
@@ -1153,7 +1171,7 @@ describe('PresentationRunStore', () => {
     expect(await readdir(files.roots.quarantineRoot)).toEqual([expect.stringMatching(new RegExp(`^run-${RUN_ID}-`))]);
   });
 
-  it('persists lifecycle CAS and exact turn binding while keeping exact replays idempotent', async () => {
+  it('keeps generic transitions pre-dispatch and requires dedicated dispatch and terminal methods', async () => {
     const allocated = await store.allocateRun({
       conversationId: CONVERSATION_ID,
       clientRequestId: REQUEST_ID,
@@ -1162,78 +1180,327 @@ describe('PresentationRunStore', () => {
       grantClaims: [],
     });
     if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+
+    await expect(
+      store.transitionRun(RUN_ID, {
+        expectedRevision: allocated.run.revision,
+        dispatchStatus: 'failed_retained',
+        disposition: 'TRACKING_REQUIRED',
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
+
     const snapshotted = await store.transitionRun(RUN_ID, {
-      expectedRevision: 0,
+      expectedRevision: allocated.run.revision,
       dispatchStatus: 'allocating',
       artifactPhase: 'sources_snapshotted',
-      now: '2026-08-04T00:00:01.000Z',
-    });
-    const committed = await store.transitionRun(RUN_ID, {
-      expectedRevision: 1,
-      dispatchStatus: 'committed',
-      artifactPhase: 'sources_extracted',
-      now: '2026-08-04T00:00:02.000Z',
-    });
-    const dispatching = await store.transitionRun(RUN_ID, {
-      expectedRevision: 2,
-      dispatchStatus: 'dispatching',
-      postInvoked: true,
-      now: '2026-08-04T00:00:03.000Z',
-    });
-    const first = await store.bindRunTurn(RUN_ID, {
-      expectedRevision: 3,
-      conversationId: CONVERSATION_ID,
-      turnId: 'turn-1',
-      runtime: 'aionrs',
-      now: '2026-08-04T00:00:04.000Z',
-    });
-    const replay = await store.bindRunTurn(RUN_ID, {
-      expectedRevision: 3,
-      conversationId: CONVERSATION_ID,
-      turnId: 'turn-1',
-      runtime: 'aionrs',
-      now: '2026-08-04T00:00:05.000Z',
+      now: CREATED_AT.toISOString(),
     });
 
-    expect([snapshotted.revision, committed.revision, dispatching.revision]).toEqual([1, 2, 3]);
-    expect(first).toMatchObject({ status: 'bound', manifest: { revision: 4, dispatchStatus: 'bound' } });
+    await expect(
+      store.transitionRun(RUN_ID, {
+        expectedRevision: snapshotted.revision,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_extracted',
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
+
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, snapshotted.revision, prepared);
+    await expect(
+      store.transitionRun(RUN_ID, {
+        expectedRevision: committed.revision,
+        dispatchStatus: 'dispatching',
+        postInvoked: true,
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
+
+    const claimed = await store.claimInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      holderId: RUN_B,
+      expectedRevision: committed.revision,
+    });
+    const dispatching = await store.beginInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      leaseToken: claimed.leaseToken,
+      expectedRevision: claimed.manifest.revision,
+    });
+    await expect(
+      store.bindRunTurn(RUN_ID, {
+        expectedRevision: dispatching.revision,
+        conversationId: CONVERSATION_ID,
+        turnId: RUN_C,
+        runtime: null as never,
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Invalid presentation binding runtime');
+    const first = await store.bindRunTurn(RUN_ID, {
+      expectedRevision: dispatching.revision,
+      conversationId: CONVERSATION_ID,
+      turnId: RUN_C,
+      runtime: 'aionrs',
+      now: CREATED_AT.toISOString(),
+    });
+    const replay = await store.bindRunTurn(RUN_ID, {
+      expectedRevision: dispatching.revision,
+      conversationId: CONVERSATION_ID,
+      turnId: RUN_C,
+      runtime: 'aionrs',
+      now: CREATED_AT.toISOString(),
+    });
+
+    expect(first).toMatchObject({ status: 'bound', manifest: { dispatchStatus: 'bound' } });
     expect(replay).toEqual({ status: 'already_bound', manifest: first.manifest });
-    const terminal = await store.transitionRun(RUN_ID, {
-      expectedRevision: 4,
-      dispatchStatus: 'terminal_verified',
-      now: '2026-08-04T00:00:05.000Z',
+
+    await expect(
+      store.transitionRun(RUN_ID, {
+        expectedRevision: first.manifest.revision,
+        dispatchStatus: 'terminal_verified',
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
+    await expect(
+      store.transitionRun(RUN_ID, {
+        expectedRevision: first.manifest.revision,
+        dispatchStatus: 'retained',
+        disposition: 'TRACKING_REQUIRED',
+        now: CREATED_AT.toISOString(),
+      })
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
+
+    const terminal = await store.recordTerminalProof(RUN_ID, first.manifest.revision, {
+      conversationId: CONVERSATION_ID,
+      turnId: RUN_C,
+      eventObservedAt: CREATED_AT.toISOString(),
+      runtimeObservedAt: CREATED_AT.toISOString(),
+      runtime: {
+        state: 'idle',
+        can_send_message: true,
+        has_task: false,
+        task_status: 'finished',
+        is_processing: false,
+        pending_confirmations: 0,
+        turn_id: null,
+      },
     });
     const advancedReplay = await store.bindRunTurn(RUN_ID, {
-      expectedRevision: 3,
+      expectedRevision: dispatching.revision,
       conversationId: CONVERSATION_ID,
-      turnId: 'turn-1',
+      turnId: RUN_C,
       runtime: 'aionrs',
-      now: '2026-08-04T00:00:06.000Z',
+      now: CREATED_AT.toISOString(),
     });
     expect(advancedReplay).toEqual({ status: 'already_bound', manifest: terminal });
     await expect(
       store.bindRunTurn(RUN_ID, {
         expectedRevision: terminal.revision,
         conversationId: CONVERSATION_ID,
-        turnId: 'turn-2',
+        turnId: RUN_D,
         runtime: 'aionrs',
-        now: '2026-08-04T00:00:06.000Z',
+        now: CREATED_AT.toISOString(),
       })
     ).rejects.toThrow('Presentation run is already bound to another turn');
   });
 
+  it('accepts a buffered terminal event observed before binding only after exact binding and released-runtime proof', async () => {
+    let clock = CREATED_AT;
+    const timedStore = new PresentationRunStore({
+      files,
+      journal: new PresentationRunJournal({ files, now: () => clock }),
+      now: () => clock,
+      randomUUID: () => RUN_ID,
+      getFreeDiskBytes: async () => 8 * 1_024 * 1_024 * 1_024,
+    });
+    const allocated = await timedStore.allocateRun({
+      conversationId: CONVERSATION_ID,
+      clientRequestId: REQUEST_ID,
+      selectedTemplateId: 'business-review',
+      requestFingerprint: 'a'.repeat(64),
+      grantClaims: [],
+    });
+    if (!allocated.ok) throw new Error('allocation unexpectedly failed');
+    const snapshotted = await timedStore.transitionRun(RUN_ID, {
+      expectedRevision: allocated.run.revision,
+      dispatchStatus: 'allocating',
+      artifactPhase: 'sources_snapshotted',
+      now: clock.toISOString(),
+    });
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await timedStore.commitPreparedRun(RUN_ID, snapshotted.revision, prepared);
+    const claimed = await timedStore.claimInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      holderId: RUN_B,
+      expectedRevision: committed.revision,
+    });
+    const dispatching = await timedStore.beginInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      leaseToken: claimed.leaseToken,
+      expectedRevision: claimed.manifest.revision,
+    });
+    const eventObservedAt = new Date(CREATED_AT.getTime() + 1_000).toISOString();
+    const releasedEvidence = {
+      conversationId: CONVERSATION_ID,
+      turnId: RUN_C,
+      eventObservedAt,
+      runtimeObservedAt: new Date(CREATED_AT.getTime() + 4_000).toISOString(),
+      runtime: {
+        state: 'idle' as const,
+        can_send_message: true as const,
+        has_task: false as const,
+        task_status: 'finished' as const,
+        is_processing: false as const,
+        pending_confirmations: 0 as const,
+        turn_id: null,
+      },
+    };
+
+    await expect(timedStore.recordTerminalProof(RUN_ID, dispatching.revision, releasedEvidence)).rejects.toThrow(
+      'RUN_STATE_CONFLICT'
+    );
+
+    clock = new Date(CREATED_AT.getTime() + 3_000);
+    const bound = await timedStore.bindRunTurn(RUN_ID, {
+      expectedRevision: dispatching.revision,
+      conversationId: CONVERSATION_ID,
+      turnId: RUN_C,
+      runtime: 'aionrs',
+      now: clock.toISOString(),
+    });
+    await expect(
+      timedStore.recordTerminalProof(RUN_ID, bound.manifest.revision, {
+        ...releasedEvidence,
+        turnId: RUN_D,
+      })
+    ).rejects.toThrow();
+    await expect(
+      timedStore.recordTerminalProof(RUN_ID, bound.manifest.revision, {
+        ...releasedEvidence,
+        runtime: { ...releasedEvidence.runtime, state: 'active' },
+      })
+    ).rejects.toThrow();
+
+    clock = new Date(CREATED_AT.getTime() + 4_000);
+    const terminal = await timedStore.recordTerminalProof(RUN_ID, bound.manifest.revision, releasedEvidence);
+
+    expect(Date.parse(terminal.terminalEvidence!.eventObservedAt)).toBeLessThan(Date.parse(terminal.binding!.boundAt));
+    expect(terminal).toMatchObject({
+      dispatchStatus: 'terminal_verified',
+      binding: { conversationId: CONVERSATION_ID, turnId: RUN_C },
+      terminalEvidence: {
+        conversationId: CONVERSATION_ID,
+        turnId: RUN_C,
+        runtime: { state: 'idle', task_status: 'finished' },
+      },
+    });
+  });
+
+  it('rejects null binding runtime as current terminal authority while preserving the readable legacy fallback', async () => {
+    const current = storedRun(RUN_ID, 'terminal_verified', {
+      ...exactTerminalLifecycle(),
+      binding: {
+        conversationId: CONVERSATION_ID,
+        turnId: REQUEST_ID,
+        runtime: null,
+        boundAt: CREATED_AT.toISOString(),
+      },
+    });
+    const legacy = storedRun(RUN_B, 'terminal_verified', {
+      postInvoked: true,
+      binding: {
+        conversationId: CONVERSATION_ID,
+        turnId: RUN_D,
+        runtime: null,
+        boundAt: CREATED_AT.toISOString(),
+      },
+    });
+    await journal.transaction({
+      mutations: [
+        { entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest: current },
+        { entityKind: 'run', entityId: RUN_B, expectedRevision: null, nextManifest: legacy },
+      ],
+    });
+
+    await store.initialize();
+
+    await expect(store.getRun(RUN_ID)).resolves.toBeNull();
+    await expect(store.getRun(RUN_B)).resolves.toMatchObject({
+      dispatchStatus: 'terminal_verified',
+      binding: { turnId: RUN_D, runtime: null },
+    });
+    const reconciliation = await store.listTerminalReconciliation();
+    expect(reconciliation).toEqual([expect.objectContaining({ runId: RUN_B })]);
+    expect(Object.hasOwn(reconciliation[0]!, 'terminalEvidence')).toBe(false);
+  });
+
+  it('quarantines current retained candidates without one exact three-hash proof and reconciles the exact record', async () => {
+    const candidateHash = 'c'.repeat(64);
+    const retainedCandidate = {
+      relativePath: 'retained/candidate.pptx' as const,
+      sha256: candidateHash,
+      byteLength: 4,
+    };
+    const candidateRun = (runId: string): StoredPresentationRunManifest =>
+      storedRun(runId, 'terminal_verified', {
+        ...exactTerminalLifecycle(runId),
+        artifactPhase: 'candidate_retained',
+        retainedCandidate,
+        retainedBytes: 4,
+      });
+    const missingProofBase = candidateRun(RUN_G);
+    const { retentionProof: _missingProof, ...missingProof } = missingProofBase;
+    const nullProof = candidateRun(RUN_H);
+    const mismatchedProof = {
+      ...candidateRun(RUN_I),
+      retentionProof: {
+        stagingBeforeRetain: candidateHash,
+        retainedTemp: candidateHash,
+        stagingAfterRetain: 'd'.repeat(64),
+      },
+    };
+    const exactProof = {
+      ...candidateRun(RUN_J),
+      retentionProof: {
+        stagingBeforeRetain: candidateHash,
+        retainedTemp: candidateHash,
+        stagingAfterRetain: candidateHash,
+      },
+    };
+    await files.initialize();
+    await Promise.all([RUN_G, RUN_H, RUN_I, RUN_J].map((runId) => files.createRunLayout(runId)));
+    await Promise.all(
+      [missingProof, nullProof, mismatchedProof, exactProof].map((manifest) =>
+        writeFile(files.getEntityManifestPath('run', manifest.runId), `${JSON.stringify(manifest)}\n`, 'utf8')
+      )
+    );
+
+    await store.initialize();
+
+    await expect(store.getRun(RUN_G)).resolves.toBeNull();
+    await expect(store.getRun(RUN_H)).resolves.toBeNull();
+    await expect(store.getRun(RUN_I)).resolves.toBeNull();
+    await expect(store.getRun(RUN_J)).resolves.toMatchObject({
+      artifactPhase: 'candidate_retained',
+      retentionProof: {
+        stagingBeforeRetain: candidateHash,
+        retainedTemp: candidateHash,
+        stagingAfterRetain: candidateHash,
+      },
+    });
+    await expect(store.listTerminalReconciliation()).resolves.toEqual([expect.objectContaining({ runId: RUN_J })]);
+  });
+
   it('keeps a terminal candidate recoverable when it becomes failed review-required', async () => {
     const terminal = storedRun(RUN_ID, 'terminal_verified', {
+      ...exactTerminalLifecycle(),
       clientRequestId: REQUEST_ID,
       requestFingerprint: 'a'.repeat(64),
       artifactPhase: 'sources_extracted',
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-review-recovery',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
     });
     await journal.transaction({
       mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest: terminal }],
@@ -1242,11 +1509,10 @@ describe('PresentationRunStore', () => {
     await writeFile(path.join(layout.stagingDirectory, 'candidate.pptx'), 'x'.repeat(42));
     const retained = await store.retainCandidate(RUN_ID, 0);
 
-    const failed = await store.transitionRun(RUN_ID, {
-      expectedRevision: retained.revision,
-      dispatchStatus: 'failed_retained',
-      disposition: 'REVIEW_REQUIRED',
-      now: '2026-08-04T00:00:01.000Z',
+    const failed = await store.settleReadinessFailure(RUN_ID, retained.revision, {
+      status: 'error',
+      recordedAt: '2026-08-04T00:00:01.000Z',
+      code: 'INSPECTION_FAILED',
     });
 
     expect(failed).toMatchObject({
@@ -1322,13 +1588,7 @@ describe('PresentationRunStore', () => {
 
   it('rejects stale candidate retention before copying and cleans a pre-intent temp durably', async () => {
     const terminal = storedRun(RUN_ID, 'terminal_verified', {
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-1',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
+      ...exactTerminalLifecycle(),
     });
     await journal.transaction({
       mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest: terminal }],
@@ -1365,13 +1625,7 @@ describe('PresentationRunStore', () => {
 
   it('recovers journal and cache health even when pre-intent temp cleanup throws', async () => {
     const terminal = storedRun(RUN_ID, 'terminal_verified', {
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-1',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
+      ...exactTerminalLifecycle(),
     });
     await journal.transaction({
       mutations: [{ entityKind: 'run', entityId: RUN_ID, expectedRevision: null, nextManifest: terminal }],
@@ -1399,25 +1653,15 @@ describe('PresentationRunStore', () => {
     vi.spyOn(files, 'removePreparedRetainedCandidate').mockRejectedValueOnce(new Error('cleanup failed'));
 
     await expect(recoveringStore.retainCandidate(RUN_ID, 0)).rejects.toThrow('cleanup failed');
-    await expect(
-      recoveringStore.transitionRun(RUN_ID, {
-        expectedRevision: 0,
-        dispatchStatus: 'failed_retained',
-        disposition: 'TRACKING_REQUIRED',
-        now: '2026-08-04T00:01:00.000Z',
-      })
-    ).resolves.toMatchObject({ dispatchStatus: 'failed_retained', revision: 1 });
+    await expect(recoveringStore.settleTerminalFailure(RUN_ID, 0, 'RETENTION_FAILED')).resolves.toMatchObject({
+      dispatchStatus: 'failed_retained',
+      revision: 1,
+    });
   });
 
   it('rechecks prepared candidate bytes against quotas and removes the temp on a staging replacement race', async () => {
     const terminal = storedRun(RUN_ID, 'terminal_verified', {
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-quota',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
+      ...exactTerminalLifecycle(),
       retainedBytes: 640 * 1_024 * 1_024 - 5,
     });
     await journal.transaction({
@@ -1499,6 +1743,18 @@ describe('PresentationRunStore', () => {
     const results = await Promise.allSettled([store.bindRunTurn(RUN_ID, binding), store.bindRunTurn(RUN_B, binding)]);
 
     expect(results.map(({ status }) => status).sort()).toEqual(['fulfilled', 'rejected']);
+    const fulfilled = results.find((result) => result.status === 'fulfilled');
+    if (fulfilled?.status !== 'fulfilled') throw new Error('binding unexpectedly failed');
+    expect(fulfilled.value.manifest).toEqual(
+      expect.objectContaining({
+        preparation: null,
+        initialDispatchLease: null,
+        terminalEvidence: null,
+        runtimeReleaseObservations: [],
+        retentionProof: null,
+        readiness: null,
+      })
+    );
   });
 
   it('keeps distinct turn tuples separate when identifiers contain the old delimiter', async () => {
@@ -1564,7 +1820,7 @@ describe('PresentationRunStore', () => {
         },
         now: CREATED_AT.toISOString(),
       })
-    ).rejects.toThrow('Presentation run binding requires bindRunTurn');
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
   });
 
   it('does not let generic lifecycle transitions authorize fabricated retained bytes', async () => {
@@ -1594,7 +1850,7 @@ describe('PresentationRunStore', () => {
         },
         now: CREATED_AT.toISOString(),
       })
-    ).rejects.toThrow('Presentation candidate retention requires retainCandidate');
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
   });
 
   it('does not let generic lifecycle transitions bypass canonical tombstone discard', async () => {
@@ -1613,7 +1869,7 @@ describe('PresentationRunStore', () => {
         dispatchStatus: 'discarded',
         now: '2026-08-04T00:00:01.000Z',
       })
-    ).rejects.toThrow('Presentation discard requires discardRun');
+    ).rejects.toThrow('Presentation lifecycle mutation requires a dedicated store method');
     await expect(journal.readCanonical('run-tombstone', RUN_ID)).resolves.toBeNull();
   });
 
@@ -1836,26 +2092,28 @@ describe('PresentationRunStore', () => {
       grantClaims: [],
     });
     if (!allocated.ok) throw new Error('allocation unexpectedly failed');
-    await store.transitionRun(RUN_ID, {
+    const snapshotted = await store.transitionRun(RUN_ID, {
       expectedRevision: 0,
-      dispatchStatus: 'committed',
+      dispatchStatus: 'allocating',
       artifactPhase: 'sources_snapshotted',
       now: CREATED_AT.toISOString(),
     });
-    await store.transitionRun(RUN_ID, {
-      expectedRevision: 1,
-      dispatchStatus: 'committed',
-      artifactPhase: 'sources_extracted',
-      now: CREATED_AT.toISOString(),
+    const { prepared } = await prepareTask5RunAssets();
+    const committed = await store.commitPreparedRun(RUN_ID, snapshotted.revision, prepared);
+    const claimed = await store.claimInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      holderId: RUN_B,
+      expectedRevision: committed.revision,
     });
-    await store.transitionRun(RUN_ID, {
-      expectedRevision: 2,
-      dispatchStatus: 'dispatching',
-      postInvoked: true,
-      now: CREATED_AT.toISOString(),
+    const dispatching = await store.beginInitialDispatch({
+      runId: RUN_ID,
+      conversationId: CONVERSATION_ID,
+      leaseToken: claimed.leaseToken,
+      expectedRevision: claimed.manifest.revision,
     });
     const binding = {
-      expectedRevision: 3,
+      expectedRevision: dispatching.revision,
       conversationId: CONVERSATION_ID,
       turnId: 'turn-original',
       runtime: 'aionrs' as const,
@@ -1863,7 +2121,8 @@ describe('PresentationRunStore', () => {
     };
     const bindingPromise = store.bindRunTurn(RUN_ID, binding);
     binding.turnId = 'turn-mutated';
-    await expect(bindingPromise).resolves.toMatchObject({
+    const bound = await bindingPromise;
+    expect(bound).toMatchObject({
       manifest: { binding: { turnId: 'turn-original' } },
     });
 
@@ -1875,7 +2134,7 @@ describe('PresentationRunStore', () => {
       state: 'bound',
       details: { runId: RUN_ID },
     };
-    const failurePromise = store.recordPostAllocationFailure(RUN_ID, 4, failure);
+    const failurePromise = store.recordPostAllocationFailure(RUN_ID, bound.manifest.revision, failure);
     (failure.details as { runId: string }).runId = RUN_B;
     await expect(failurePromise).resolves.toMatchObject({
       postAllocationFailure: { details: { runId: RUN_ID } },
@@ -2353,19 +2612,28 @@ describe('PresentationRunStore', () => {
       now: () => clock,
       getFreeDiskBytes: async () => 32 * 1_024 * 1_024 * 1_024,
     });
-    const dispatch = (runId: string) =>
-      uncertainStore.transitionRun(runId, {
-        expectedRevision: 0,
-        dispatchStatus: 'dispatching',
-        postInvoked: true,
-        now: clock.toISOString(),
+    const dispatch = async (runId: string) => {
+      const run = await uncertainStore.getRun(runId);
+      if (run === null) throw new Error('run missing');
+      const claimed = await uncertainStore.claimInitialDispatch({
+        runId,
+        conversationId: run.conversationId,
+        holderId: RUN_L,
+        expectedRevision: run.revision,
       });
+      return uncertainStore.beginInitialDispatch({
+        runId,
+        conversationId: run.conversationId,
+        leaseToken: claimed.leaseToken,
+        expectedRevision: claimed.manifest.revision,
+      });
+    };
 
     await expect(dispatch(RUN_C)).rejects.toThrow('Presentation live run resource limit exceeded');
-    await expect(dispatch(RUN_B)).resolves.toMatchObject({ dispatchStatus: 'dispatching', revision: 1 });
+    await expect(dispatch(RUN_B)).resolves.toMatchObject({ dispatchStatus: 'dispatching', revision: 2 });
     await expect(dispatch(RUN_D)).rejects.toThrow('Presentation live run resource limit exceeded');
-    await expect(uncertainStore.getRun(RUN_C)).resolves.toMatchObject({ dispatchStatus: 'committed', revision: 0 });
-    await expect(uncertainStore.getRun(RUN_D)).resolves.toMatchObject({ dispatchStatus: 'committed', revision: 0 });
+    await expect(uncertainStore.getRun(RUN_C)).resolves.toMatchObject({ dispatchStatus: 'committed', revision: 1 });
+    await expect(uncertainStore.getRun(RUN_D)).resolves.toMatchObject({ dispatchStatus: 'committed', revision: 1 });
   });
 
   it('applies stale-run GC and expired-tombstone purge during startup', async () => {
@@ -2562,13 +2830,22 @@ describe('PresentationRunStore', () => {
       now: () => clock,
       getFreeDiskBytes: async () => 32 * 1_024 * 1_024 * 1_024,
     });
-    const dispatch = (runId: string) =>
-      liveStore.transitionRun(runId, {
-        expectedRevision: 0,
-        dispatchStatus: 'dispatching',
-        postInvoked: true,
-        now: clock.toISOString(),
+    const dispatch = async (runId: string) => {
+      const run = await liveStore.getRun(runId);
+      if (run === null) throw new Error('run missing');
+      const claimed = await liveStore.claimInitialDispatch({
+        runId,
+        conversationId: run.conversationId,
+        holderId: RUN_L,
+        expectedRevision: run.revision,
       });
+      return liveStore.beginInitialDispatch({
+        runId,
+        conversationId: run.conversationId,
+        leaseToken: claimed.leaseToken,
+        expectedRevision: claimed.manifest.revision,
+      });
+    };
 
     const sameConversation = await Promise.allSettled([dispatch(RUN_ID), dispatch(RUN_B)]);
     expect(sameConversation.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
@@ -2578,7 +2855,7 @@ describe('PresentationRunStore', () => {
     });
     await expect(dispatch(RUN_C)).resolves.toMatchObject({ dispatchStatus: 'dispatching' });
     await expect(dispatch(RUN_D)).rejects.toThrow('Presentation live run resource limit exceeded');
-    await expect(liveStore.getRun(RUN_D)).resolves.toMatchObject({ revision: 0, dispatchStatus: 'committed' });
+    await expect(liveStore.getRun(RUN_D)).resolves.toMatchObject({ revision: 1, dispatchStatus: 'committed' });
   });
 
   it.each([
@@ -2897,16 +3174,10 @@ describe('PresentationRunStore', () => {
     const candidateBytes = 10;
     const baseBytes = maximum - candidateBytes + testCase.overBy;
     const terminal = storedRun(RUN_ID, 'terminal_verified', {
+      ...exactTerminalLifecycle(),
       clientRequestId: REQUEST_ID,
       requestFingerprint: 'a'.repeat(64),
       artifactPhase: 'sources_extracted',
-      binding: {
-        conversationId: CONVERSATION_ID,
-        turnId: 'turn-candidate-boundary',
-        runtime: 'aionrs',
-        boundAt: CREATED_AT.toISOString(),
-      },
-      postInvoked: true,
       retainedBytes: testCase.scope === 'conversation' ? baseBytes : 0,
     });
     const retained: StoredPresentationRunManifest[] = [];

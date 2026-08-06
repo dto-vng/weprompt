@@ -17,9 +17,10 @@ import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell 
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
-import { withLocalTokenHeaders } from './common/adapter/httpBridge';
+import WebSocket from 'ws';
+import { MainBackendHttpError, mainHttpRequest, withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
-import { DESKTOP_PET_ENABLED } from './common/config/constants';
+import { DESKTOP_PET_ENABLED, PRESENTATION_RUN_V2_ENABLED } from './common/config/constants';
 import { isUpdateFeatureEnabled } from './common/update/updatePolicy';
 import { ipcBridge } from './common';
 import { initializeProcess } from './process';
@@ -44,7 +45,21 @@ import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
 import { appOperationsBroker } from '@process/services/appOperations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
-import { disposeOfficeArtifactService } from '@process/services/office-artifact';
+import {
+  createOfficeCliRunner,
+  disposeOfficeArtifactService,
+  inspectPptxOoxml,
+  PresentationReadinessService,
+} from '@process/services/office-artifact';
+import {
+  createPresentationRuntimeLifecycleOwner,
+  PresentationRunLifecycleCoordinator,
+  PresentationRuntimeEventClient,
+} from '@process/services/presentation-template';
+import {
+  getPresentationRunLifecycleGraph,
+  setPresentationRunLifecycleCoordinator,
+} from '@process/services/presentation-template/bridge';
 import { setupApplicationMenu } from './process/utils/appMenu';
 import { startWebHost } from '@aionui/web-host';
 import { initializeZoomFactor, setupZoomForWindow } from './process/utils/zoom';
@@ -220,6 +235,118 @@ const backendManager = new BackendLifecycleManager(
   },
   resolveBinaryPath
 );
+
+const isPresentationBackendRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const presentationConversationPath = (conversationId: string): string =>
+  `/api/conversations/${encodeURIComponent(conversationId)}`;
+
+const createPresentationRunLifecycleCoordinator = (): PresentationRunLifecycleCoordinator => {
+  const graph = getPresentationRunLifecycleGraph();
+  if (graph === null) throw new Error('Presentation run lifecycle graph is unavailable');
+
+  const readinessRunner = createOfficeCliRunner();
+  let coordinator: PresentationRunLifecycleCoordinator | null = null;
+  const eventClient = new PresentationRuntimeEventClient({
+    createSocket: (url, options) => new WebSocket(url, options),
+    onTerminalEvent: (event, authority) =>
+      coordinator === null ? Promise.resolve('forged' as const) : coordinator.handleTerminalEvent(event, authority),
+    diagnostic: (code) => console.warn(`[AionUi][presentation-runtime] ${code}`),
+  });
+
+  coordinator = new PresentationRunLifecycleCoordinator({
+    store: graph.store,
+    files: graph.files,
+    eventClient,
+    getPreparedRun: async (runId) => {
+      const prepared = await graph.run.getPreparedRun(runId);
+      if (prepared === null) throw new Error('Presentation run preparation is unavailable');
+      return prepared;
+    },
+    preflightDispatch: async (credentials, conversationId, runtime) => {
+      try {
+        const conversation = await mainHttpRequest<unknown>({
+          ...credentials,
+          method: 'GET',
+          path: presentationConversationPath(conversationId),
+        });
+        if (
+          !isPresentationBackendRecord(conversation) ||
+          conversation['id'] !== conversationId ||
+          conversation['type'] !== runtime
+        ) {
+          return { ok: false, kind: 'hard' } as const;
+        }
+        const observed = conversation['runtime'];
+        if (
+          !isPresentationBackendRecord(observed) ||
+          observed['state'] !== 'idle' ||
+          observed['can_send_message'] !== true ||
+          observed['has_task'] !== false ||
+          observed['is_processing'] !== false ||
+          observed['pending_confirmations'] !== 0 ||
+          observed['turn_id'] !== null ||
+          ('task_status' in observed && observed['task_status'] !== 'finished')
+        ) {
+          return { ok: false, kind: 'transient', retryAfterMs: 1_000 } as const;
+        }
+        return { ok: true } as const;
+      } catch (error) {
+        if (
+          error instanceof MainBackendHttpError &&
+          (error.status === 401 || error.status === 403 || error.status === 404)
+        ) {
+          return { ok: false, kind: 'hard' } as const;
+        }
+        return { ok: false, kind: 'transient', retryAfterMs: 1_000 } as const;
+      }
+    },
+    postInitialMessage: (credentials, request) =>
+      mainHttpRequest({
+        ...credentials,
+        method: 'POST',
+        path: `${presentationConversationPath(request.conversationId)}/messages`,
+        body: {
+          content: request.content,
+          files: request.files,
+          inject_skills: request.injectSkills,
+        },
+      }),
+    observeRuntime: async (credentials, conversationId, options) => {
+      const conversation = await mainHttpRequest<unknown>({
+        ...credentials,
+        method: 'GET',
+        path: presentationConversationPath(conversationId),
+        signal: options?.signal,
+      });
+      return isPresentationBackendRecord(conversation) ? (conversation['runtime'] ?? null) : null;
+    },
+    inspectReadiness: (request, workspace) =>
+      new PresentationReadinessService({
+        runner: readinessRunner,
+        inspectOoxml: inspectPptxOoxml,
+        createInspectionWorkspace: async () => workspace,
+      }).inspect(request),
+    isFeatureEnabled: () => PRESENTATION_RUN_V2_ENABLED,
+  });
+  setPresentationRunLifecycleCoordinator(coordinator);
+  return coordinator;
+};
+
+const presentationRuntimeLifecycleOwner = createPresentationRuntimeLifecycleOwner({
+  createCoordinator: createPresentationRunLifecycleCoordinator,
+});
+
+async function stopBackendWithPresentationRuntimeLifecycle(): Promise<void> {
+  try {
+    await presentationRuntimeLifecycleOwner.dispose();
+  } finally {
+    setPresentationRunLifecycleCoordinator(null);
+    await backendManager.stop();
+  }
+}
+
 let disposeCronResumeListener: (() => void) | null = null;
 
 // Flag tracking whether the backend subprocess started successfully. Read by
@@ -265,7 +392,7 @@ ipcMain.handle('backend:recover-corrupted-database', async () => {
 
   await recoverCorruptedDatabaseAfterUserConfirmation({
     getFailure: () => backendStartupFailureInfo,
-    stopBackend: () => backendManager.stop(),
+    stopBackend: stopBackendWithPresentationRuntimeLifecycle,
     startBackendWithRecovery: async () => {
       try {
         const { getDataPath } = await import('./process/utils/utils');
@@ -408,9 +535,12 @@ function ensureAdminUserOnce(backendPort: number): Promise<void> {
 }
 
 function markBackendReady(backendPort: number, source: string): void {
-  if (backendStartedOk) return;
   console.log(`[AionUi] ${source} ready (port=${backendPort})`);
   exposeBackendPort(backendPort);
+  void presentationRuntimeLifecycleOwner
+    .backendReady({ port: backendPort, token: backendManager.localToken })
+    .catch(() => console.warn('[AionUi][presentation-runtime] LIFECYCLE_START_FAILED'));
+  if (backendStartedOk) return;
   registerCronResumeBridge(backendPort);
   backendStartedOk = true;
   backendStartupFailed = false;
@@ -740,7 +870,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
         const statusBroadcast = createAutoUpdateStatusBroadcast();
         autoUpdaterService.initialize(statusBroadcast);
         autoUpdaterService.setBeforeQuitAndInstall(async () => {
-          await backendManager.stop();
+          await stopBackendWithPresentationRuntimeLifecycle();
         });
         // Check for updates after 3 seconds delay
         // 3秒后检查更新
@@ -1248,7 +1378,7 @@ installQuitCleanup({
   disposeOfficeArtifacts: disposeOfficeArtifactService,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
-  stopBackend: () => backendManager.stop(),
+  stopBackend: stopBackendWithPresentationRuntimeLifecycle,
   destroyPetWindow: async () => {
     const { destroyPetWindow } = await import('./process/pet/petManager');
     destroyPetWindow();

@@ -12,9 +12,15 @@ import { ipcBridge } from '@/common';
 import { httpRequest, isBackendHttpError } from '@/common/adapter/httpBridge';
 import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import type {
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
   FailureFor,
   GrantPresentationExternalDropResult,
   PresentationGrantOwner,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
   StartPresentationRunRequest,
   StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
@@ -25,7 +31,10 @@ import {
   createPresentationSourceGrantService,
   type PresentationConversationOwnerResolution,
   type PresentationRunAuthorityResolution,
+  type PresentationRunFiles,
+  type PresentationRunLifecycleCoordinator,
   type PresentationRunService,
+  type PresentationRunStore,
   type PresentationScopeResolver,
   type PresentationScopeResolverOptions,
 } from './run';
@@ -47,11 +56,17 @@ type PresentationSourceGrantServiceInstance = ReturnType<typeof createPresentati
 type PresentationRunServices = {
   source: PresentationSourceGrantServiceInstance;
   run: PresentationRunService | null;
+  files: PresentationRunFiles | null;
+  store: PresentationRunStore | null;
 };
 
 let service: PresentationTemplateService | null = null;
 let artifactScratchService: ArtifactScratchService | null = null;
 let presentationRunServices: PresentationRunServices | null = null;
+let presentationRunLifecycleCoordinator: Pick<
+  PresentationRunLifecycleCoordinator,
+  'claimInitialDispatch' | 'renewInitialDispatch' | 'dispatch'
+> | null = null;
 let presentationScopeResolver: PresentationScopeResolver | null = null;
 let presentationSourceMainWindow: BrowserWindow | null = null;
 let presentationExternalDropHandlerRegistered = false;
@@ -181,6 +196,8 @@ const getPresentationRunServices = (): PresentationRunServices => {
     presentationRunServices = {
       source: createPresentationSourceGrantService({ userDataDir, tempDir, ...sourceOptions }),
       run: null,
+      files: null,
+      store: null,
     };
     return presentationRunServices;
   }
@@ -206,6 +223,8 @@ const getPresentationRunServices = (): PresentationRunServices => {
     presentationRunServices = {
       source: createPresentationSourceGrantService({ userDataDir, tempDir, ...sourceOptions }),
       run: null,
+      files: null,
+      store: null,
     };
     return presentationRunServices;
   }
@@ -225,10 +244,49 @@ const getPresentationRunServices = (): PresentationRunServices => {
     isFeatureEnabled: () => PRESENTATION_RUN_V2_ENABLED,
     isDesktopRuntime: isPresentationDesktopRuntime,
     resolveAuthority: resolveRunAuthority,
+    lifecycle: {
+      claimInitialDispatch: (request) => {
+        const lifecycle = presentationRunLifecycleCoordinator;
+        return lifecycle === null
+          ? Promise.resolve(sourceFailure('INTERNAL_ERROR') as ClaimInitialPresentationDispatchResult)
+          : lifecycle.claimInitialDispatch(request);
+      },
+      renewInitialDispatch: (request) => {
+        const lifecycle = presentationRunLifecycleCoordinator;
+        return lifecycle === null
+          ? Promise.resolve(sourceFailure('INTERNAL_ERROR') as RenewInitialPresentationDispatchResult)
+          : lifecycle.renewInitialDispatch(request);
+      },
+      dispatch: (request, runtime) => {
+        const lifecycle = presentationRunLifecycleCoordinator;
+        return lifecycle === null
+          ? Promise.resolve(sourceFailure('INTERNAL_ERROR') as DispatchInitialPresentationRunResult)
+          : lifecycle.dispatch(request, runtime);
+      },
+    },
   });
-  presentationRunServices = { source, run };
+  presentationRunServices = { source, run, files, store };
   return presentationRunServices;
 };
+
+export function getPresentationRunLifecycleGraph(): {
+  files: PresentationRunFiles;
+  store: PresentationRunStore;
+  run: PresentationRunService;
+} | null {
+  const services = getPresentationRunServices();
+  return services.files === null || services.store === null || services.run === null
+    ? null
+    : { files: services.files, store: services.store, run: services.run };
+}
+export function setPresentationRunLifecycleCoordinator(
+  coordinator: Pick<
+    PresentationRunLifecycleCoordinator,
+    'claimInitialDispatch' | 'renewInitialDispatch' | 'dispatch'
+  > | null
+): void {
+  presentationRunLifecycleCoordinator = coordinator;
+}
 
 const getPresentationSourceGrantService = (): PresentationSourceGrantServiceInstance =>
   getPresentationRunServices().source;
@@ -296,6 +354,26 @@ const callPresentationStartProvider = async (
     return sourceFailure('RUNTIME_UNSUPPORTED');
   }
   return callPresentationSourceService(() => getPresentationRunService().start(request));
+};
+
+const callPresentationMutationProvider = async <Result>(
+  conversationId: string,
+  operation: () => Promise<Result>
+): Promise<Result> => {
+  if (!PRESENTATION_RUN_V2_ENABLED) return sourceFailure('FEATURE_DISABLED') as Result;
+  if (!isPresentationDesktopRuntime()) return sourceFailure('DESKTOP_REQUIRED') as Result;
+  let authority: PresentationRunAuthorityResolution;
+  try {
+    authority = await resolveRunAuthority({ conversationId });
+  } catch {
+    return sourceFailure('SCOPE_UNAVAILABLE') as Result;
+  }
+  if (authority.ok === false) return sourceFailure(authority.code) as Result;
+  if (authority.scope !== 'individual') return sourceFailure('TEAM_SCOPE_UNSUPPORTED') as Result;
+  if (authority.runtime !== 'aionrs' && authority.runtime !== 'acp') {
+    return sourceFailure('RUNTIME_UNSUPPORTED') as Result;
+  }
+  return callPresentationSourceService(operation);
 };
 
 const callPresentationRecoveryProvider = <Result>(operation: () => Promise<Result>): Promise<Result> => {
@@ -449,6 +527,19 @@ export function initPresentationTemplateBridge(): void {
   );
   runProviders?.discard.provider((request) =>
     callPresentationRecoveryProvider(() => getPresentationRunService().discard(request))
+  );
+  runProviders?.claimInitialDispatch.provider((request: ClaimInitialPresentationDispatchRequest) =>
+    callPresentationMutationProvider(request.conversation_id, () =>
+      getPresentationRunService().claimInitialDispatch(request)
+    )
+  );
+  runProviders?.renewInitialDispatch.provider((request: RenewInitialPresentationDispatchRequest) =>
+    callPresentationMutationProvider(request.conversation_id, () =>
+      getPresentationRunService().renewInitialDispatch(request)
+    )
+  );
+  runProviders?.dispatch.provider((request: DispatchInitialPresentationRunRequest) =>
+    callPresentationMutationProvider(request.conversation_id, () => getPresentationRunService().dispatch(request))
   );
   registerPresentationExternalDropHandler();
 }
