@@ -219,6 +219,13 @@ for ($pass = 0; $pass -lt 16; $pass++) {
       if ($knownCreationTicks.ContainsKey($processId)) { continue }
       $parentProcess = $processById[$parentProcessId]
       $processCreationTicks = Get-ProcessCreationTicks $process
+      $childMatchesKnownParentGeneration = (
+        $null -ne $processCreationTicks -and
+        $processCreationTicks -ge $treeCreationFloorTicks -and
+        $knownCreationTicks.ContainsKey($parentProcessId) -and
+        $processCreationTicks -ge $knownCreationTicks[$parentProcessId]
+      )
+      if (-not $childMatchesKnownParentGeneration) { continue }
       $parentMatchesKnownIdentity = (
         $null -ne $parentProcess -and
         (Test-KnownProcessIdentity $parentProcess)

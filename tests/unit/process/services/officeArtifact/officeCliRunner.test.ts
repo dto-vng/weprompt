@@ -301,6 +301,15 @@ describe('createOfficeCliRunner', () => {
     );
   });
 
+  it('requires a discovered child to be at least as new as its exact known parent generation', async () => {
+    const [, args] = await captureCompletedWindowsReaperInvocation();
+    const command = args[4] ?? '';
+
+    expect(command).toContain(
+      '$childMatchesKnownParentGeneration = (\n        $null -ne $processCreationTicks -and\n        $processCreationTicks -ge $treeCreationFloorTicks -and\n        $knownCreationTicks.ContainsKey($parentProcessId) -and\n        $processCreationTicks -ge $knownCreationTicks[$parentProcessId]\n      )\n      if (-not $childMatchesKnownParentGeneration) { continue }\n      $parentMatchesKnownIdentity = ('
+    );
+  });
+
   it.runIf(process.platform === 'win32')(
     'does not stop a reused descendant PID or the unrelated tree of a reused completed root PID',
     async () => {
@@ -386,6 +395,68 @@ ${command}
 `;
 
       await expect(runPowerShell(harness)).resolves.toEqual({ code: 0, stdout: '500' });
+    }
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'does not stop a child older than its exact known parent generation',
+    async () => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-06T00:00:05.000Z'));
+      const [, args] = await captureCompletedWindowsReaperInvocation().finally(() => now.mockRestore());
+      const command = args[4] ?? '';
+      const harness = String.raw`
+$script:stopped = [System.Collections.Generic.HashSet[uint32]]::new()
+function Get-CimInstance {
+  param([string]$ClassName, [string]$Filter)
+  if ($Filter) {
+    [uint32]$processId = [uint32]($Filter -replace '[^0-9]', '')
+    if ($script:stopped.Contains($processId)) { return $null }
+    return [pscustomobject]@{
+      ProcessId = $processId
+      ParentProcessId = $(if ($processId -eq 600) { 99999 } else { 600 })
+      CreationDate = $(switch ($processId) {
+        600 { [datetime]'2026-08-06T00:00:20Z' }
+        700 { [datetime]'2026-08-06T00:00:10Z' }
+        800 { [datetime]'2026-08-06T00:00:30Z' }
+      })
+    }
+  }
+  return @(
+    [pscustomobject]@{
+      ProcessId = 600
+      ParentProcessId = 99999
+      CreationDate = [datetime]'2026-08-06T00:00:20Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 700
+      ParentProcessId = 600
+      CreationDate = [datetime]'2026-08-06T00:00:10Z'
+    },
+    [pscustomobject]@{
+      ProcessId = 800
+      ParentProcessId = 600
+      CreationDate = [datetime]'2026-08-06T00:00:30Z'
+    }
+  ) | Where-Object { -not $script:stopped.Contains([uint32]$_.ProcessId) }
+}
+function Stop-Process {
+  param([int]$Id, [switch]$Force, [switch]$PassThru, [object]$ErrorAction)
+  [Console]::Out.Write([string]$Id)
+  [void]$script:stopped.Add([uint32]$Id)
+  return [pscustomobject]@{
+    Id = $Id
+    ExitTime = [datetime]'2026-08-06T00:00:40Z'
+  }
+}
+function Wait-Process {
+  param([Parameter(ValueFromPipeline = $true)]$InputObject, [object]$ErrorAction)
+  process {}
+}
+function Start-Sleep { param([int]$Milliseconds) }
+${command}
+`;
+
+      await expect(runPowerShell(harness)).resolves.toEqual({ code: 0, stdout: '600800' });
     }
   );
 
