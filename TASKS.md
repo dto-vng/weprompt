@@ -2,11 +2,62 @@
 
 ## Active
 
+- [ ] **[BUG-024][P2][Creative Studio] A shot whose media route is not ready loses its generate action with no explanation**
+  - Reproduction: open a project containing both image and video shots while exactly one media role is ready — for example the image model configured and the video model still `setup_required`.
+  - Actual: `ProducePhase.tsx` swaps the whole surface for `ConnectEngineCard` only when **zero** roles are ready, so partial readiness renders the normal shot grid. The engine strip lists only the ready role, and for every shot of the unready kind `buildSingleSceneReviewRequest` returns `null`, which `ShotGrid` passes as `reviewAvailable={false}` and `ShotCard` renders as `{reviewAvailable && …}` — the generate button is **absent**, not disabled. Nothing states that a model is missing or which one.
+  - Reachability: main derives the three role statuses independently, once per role, so a workspace whose providers expose image models but no video models yields `image: 'ready'` with `video: 'setup_required'`. This is a normal reachable state, not a contrived one.
+  - Expected: the shot keeps a disabled control carrying its reason, **and** the Produce models panel states the same fact once for the project. Design settled 2026-08-06 as "state 7" — both surfaces, not a choice between them; a disabled-control-only fix is the incomplete answer.
+  - Verification: cover partial readiness in both directions and assert the affected shot exposes a stated reason; keep a control shot of the ready kind in the same project so an all-null result cannot pass vacuously. Note the four-value `StudioModelAvailability` union — `selection_required` and `setup_required` need different remedies.
+
+- [ ] **[BUG-025][P2][Creative Studio] `StudioPage.dom.test.tsx` batch-action test flakes in full-suite position**
+  - Actual: `fits 18 seconds to 15 with one atomic command…` fails intermittently **only** in a full suite run, with `findByRole` timing out on the batch-generate button. Failed on identical trees at machine load 15.2 **and** at load 7.8 with zero competing processes, so it is not load-fragility.
+  - Investigation (2026-08-06): **unreproduced in 35 targeted executions** — shuffle seeds 1–12, 20 target repetitions, one-worker studio suite, and the full DOM project (2,484 tests) all passed. Working hypothesis is that reproduction needs full cross-project context, which targeted runs cannot recreate. No speculative fix was made.
+  - A leaked body-root `<video>` in the failure dump was convicted as a **separate** defect and then **exonerated** as the cause — it was present during passing runs too, and the target still failed after that defect was fixed.
+  - Gate policy until reproduced: a gate failure on exactly this test → rerun the file in isolation; if green, record the full-suite log against this bug and proceed. Do not raise the timeout — that hides the order dependence.
+
+- [ ] **[BUG-027][P3][Creative Studio] `jobManager.test.ts` capped-backoff test flakes in full-suite position**
+  - Actual: `persists the remote identity before polling and uses the exact capped backoff schedule` failed once during a `just push` gate on a quiet machine (load 6.1): `waitFor` expired with the job still `running`. Passed 3×118/118 in isolation immediately after, and passed two other full-suite runs the same day.
+  - Second member of the same family as BUG-025, in the node project rather than dom. Not one of the known shared-path node races.
+  - Expected: the wait survives full-suite scheduling, or the backoff schedule is driven by fake timers so wall-clock contention cannot expire the assertion window. A timeout raise is the disallowed non-fix.
+
+- [ ] **[BUG-028][P2][Creative Studio] A paid storyboard result is discarded after a concurrent revision change**
+  - Actual: the service checks the expected revision, performs the **paid** planner request, and only then attempts the CAS write with the old revision. The CAS correctly fails closed, but the paid result has already been obtained and is thrown away. A test currently codifies that sequence.
+  - Concrete failure: while storyboard drafting is in flight, another window edits the project or a running job bumps the revision. The provider charges for a completed draft, the app rejects it, and the user must pay again to regenerate.
+  - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
+  - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
+
+- [ ] **[BUG-029][P2][Creative Studio] Runtime disposal does not cancel or await active FFmpeg renders**
+  - Actual: runtime disposal owns the planner, job manager, protocol and fake bundle, but not the render runner. `StudioRenderRunner` exposes only per-project `renderCut`, `cancelRender` and `getState`, with no dispose/cancel-all boundary. Quit cleanup awaits runtime disposal and then lets main exit without cancelling active FFmpeg children.
+  - Concrete failure: quit during a long render — the close handshake checks unsaved renderer edits, not active renders. The child can outlive its parent, and main exits before `executeRender()` can reliably run its `finally`, leaving `aionui-studio-render-*` files in the OS temp directory.
+  - Found by independent review of MR !71; accepted as a follow-up for the same reason as BUG-028.
+
+- [ ] **[EPIC-005-G1][P3][Creative Studio] Model-selection provenance for the `CHOSEN FOR YOU` disclosure**
+  - Actual: automatic adoption of a sole route persists through the same CAS command a person's own choice uses, and the stored route ref carries no provenance. Once written, an auto-pick is indistinguishable from a deliberate one, so the panel cannot honestly disclose that the app chose the model.
+  - Expected: durable per-role provenance the renderer can read but not author, surviving remount and restart, cleared when the user selects explicitly. Existing projects must read as **unknown**, never as `auto`, or every current project would claim the app picked its models.
+  - Trap: `toRendererProject` projects routing field-by-field into a different renderer-side type, so a new project field is silently dropped at that boundary — main would store it correctly and the renderer would never see it. Cover that with a test.
+  - Two sibling gaps are resolved and need no work: **G2** (appended-clip acknowledgement) was dissolved by the hold-outside design, which is derived and needs no persisted state; **G3** (undo) was closed by deletion — no undo, and explicitly no bounded order-only undo either.
+
+- [ ] **[P3][Creative Studio] Suite exits non-zero after a fully green run**
+  - Observed once: a full DOM-project run passed all 2,484 tests and still exited 1 via an `EnvironmentTeardownError` from `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`. A teardown error after a green run fails `just push` with zero failing tests — a third gate-poisoner class alongside BUG-025 and BUG-027. Not yet reproduced in the mixed full suite.
+
 ## Waiting On
+
+- [ ] **[Creative Studio] Review screen redraw — commissioned, delivered, awaiting build capacity**
+  - The designer delivered the full Review redraw (cut editor, inspector, render/failure/export states, compact and dark, three new tokens). It supersedes the provisional render placement. Sequencing is settled in `docs/design/creative-studio-v11-cut-editor-plan.md`: `renderCut` must read the cut **before** any editor UI ships, because scene-derived segments mean clip order is not honoured today.
+
+- [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
+  - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
 
 ## Someday
 
 ## Done
+
+- [x] **[BUG-026][P2][Creative Studio] `createManagedVideo.open()` leaked its body-root `<video>` when cancelled before open resolved** - verified fixed
+  - Actual: `open()` appended a hidden `<video>` to `document.body`, then waited for `loadedmetadata`/`error`. If the consumer unmounted first, `useManagedVideo` marked the request cancelled but its `opened` handle was still `null`, so `close()` could not run — the element and its listeners leaked. Deterministic under jsdom (`HTMLMediaElement.load()` is unimplemented, so open never resolves); reachable in production by unmounting during a stalled load.
+  - Root cause: cancellation had no path that could clean up an open that had not yet resolved.
+  - Fix: thread an `AbortSignal` through `open()`; abort removes the appended element, detaches listeners and rejects the pending promise. Happy-path open/close, poster capture and preview are unchanged.
+  - Verification: a new test mounts, unmounts before open resolves, and asserts no body-root `<video>` survives — it fails on the unfixed code and passes after. Independent revert-proof: 101/101 with the fix, exactly one failure without it. `StudioPage.dom.test.tsx` still passes 93/93, and `--detectAsyncLeaks` no longer reports the pending microtask.
+  - Split out of the BUG-025 investigation; it removes a fellow symptom and does **not** close BUG-025.
 
 - [x] **[BUG-007][P1] Clean artifact scratch files after successful delivery** - verified fixed
   - Actual: Office artifact runs placed QA renders, repair scripts, command payloads, backups, and intermediate presentations in the visible conversation workspace with no ownership or lifecycle boundary.
