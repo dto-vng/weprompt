@@ -328,4 +328,18 @@ describe('GuidActionRow skill/MCP submenu search', () => {
     expect(onManagedFilePicker).not.toHaveBeenCalled();
     expect(showOpenInvokeMock).toHaveBeenCalledTimes(1);
   });
+
+  it('locks managed source selection and duplicate send while the durable Guid handoff is pending', () => {
+    const onManagedFilePicker = vi.fn();
+    const onSend = vi.fn();
+    renderActionRow({ onManagedFilePicker, onSend, managedPresentationPending: true });
+
+    fireEvent.click(screen.getByText('common.fileAttach.addFiles').closest('[role="menuitem"]')!);
+    fireEvent.click(screen.getByTestId('guid-send-btn'));
+
+    expect(onManagedFilePicker).not.toHaveBeenCalled();
+    expect(showOpenInvokeMock).not.toHaveBeenCalled();
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByTestId('guid-send-btn')).toBeDisabled();
+  });
 });

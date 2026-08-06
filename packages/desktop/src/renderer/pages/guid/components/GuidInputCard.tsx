@@ -42,6 +42,7 @@ type GuidInputCardProps = {
   presentationSourceDescriptors?: readonly PresentationSourceDescriptor[];
   onRevokePresentationSource?: (grantId: string) => void;
   onManagedDrop?: (files: readonly File[]) => void | Promise<void>;
+  managedPresentationPending?: boolean;
 
   // Action row
   actionRow: React.ReactNode;
@@ -77,6 +78,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   presentationSourceDescriptors = [],
   onRevokePresentationSource,
   onManagedDrop,
+  managedPresentationPending = false,
   actionRow,
   slashCommandMenu,
   templateChip,
@@ -107,12 +109,13 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
     (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (managedPresentationPending) return;
       const droppedFiles = Array.from(event.dataTransfer.files ?? []);
       if (droppedFiles.length > 0) {
         void onManagedDrop?.(droppedFiles);
       }
     },
-    [onManagedDrop]
+    [managedPresentationPending, onManagedDrop]
   );
   const resolvedDragHandlers = onManagedDrop ? { ...dragHandlers, onDrop: handleManagedDrop } : dragHandlers;
 
@@ -189,9 +192,12 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
                     type='text'
                     size='mini'
                     className='!h-20px !w-20px !p-0'
+                    disabled={managedPresentationPending}
                     aria-label={`${t('common.remove')} ${descriptor.displayName}`}
                     icon={<CloseOne theme='outline' size='12' />}
-                    onClick={() => onRevokePresentationSource(descriptor.grantId)}
+                    onClick={() => {
+                      if (!managedPresentationPending) onRevokePresentationSource(descriptor.grantId);
+                    }}
                   />
                 ) : null}
               </div>

@@ -144,6 +144,22 @@ describe('resolveManagedPresentationInitialSend', () => {
       )
     ).toBeNull();
   });
+
+  it('keeps ACP on directive-driven OfficeCLI loading without injectSkills metadata', () => {
+    expect(
+      resolveManagedPresentationInitialSend(
+        'Create a presentation from the request below. Managed rules.\n\nACP quarterly review',
+        [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ],
+        'acp'
+      )
+    ).toEqual({
+      input: 'ACP quarterly review',
+      selectedTemplateId: 'business-review',
+    });
+  });
 });
 
 describe('usePresentationTemplates artifact scratch lifecycle', () => {

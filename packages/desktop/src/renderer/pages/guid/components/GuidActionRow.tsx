@@ -104,6 +104,7 @@ type GuidActionRowProps = {
   // Send button
   loading: boolean;
   isButtonDisabled: boolean;
+  managedPresentationPending?: boolean;
   speechInputNode?: React.ReactNode;
   onSend: () => void;
 };
@@ -136,6 +137,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
   onToggleMcpServer,
   loading,
   isButtonDisabled,
+  managedPresentationPending = false,
   speechInputNode,
   onSend,
 }) => {
@@ -164,6 +166,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
 
   const handleLocalFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (managedPresentationPending) return;
       const fileList = e.target.files;
       if (!fileList || fileList.length === 0) return;
       setUploading(true);
@@ -180,7 +183,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       // Reset so the same file can be re-selected
       e.target.value = '';
     },
-    [onFilesUploaded, t]
+    [managedPresentationPending, onFilesUploaded, t]
   );
 
   const getModeDisplayLabel = (mode: AgentModeOption): string =>
@@ -215,12 +218,13 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
   }, [onFilesUploaded]);
 
   const openDesktopFilePicker = useCallback(() => {
+    if (managedPresentationPending) return;
     if (!isWebUI && onManagedFilePicker) {
       void onManagedFilePicker();
       return;
     }
     openHostFilePicker();
-  }, [isWebUI, onManagedFilePicker, openHostFilePicker]);
+  }, [isWebUI, managedPresentationPending, onManagedFilePicker, openHostFilePicker]);
 
   // Build the mobile action sheet entries: model / thought level / permission
   // (single-select), attach (action), skills / MCP (multi-select checkboxes).
@@ -323,7 +327,11 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       label: t('common.fileAttach.addFiles', { defaultValue: 'Add files' }),
       variant: 'muted',
       dividerBefore: true,
-      onClick: () => (isWebUI ? fileInputRef.current?.click() : openDesktopFilePicker()),
+      onClick: () => {
+        if (managedPresentationPending) return;
+        if (isWebUI) fileInputRef.current?.click();
+        else openDesktopFilePicker();
+      },
     });
 
     // Skills (multi-select).
@@ -544,7 +552,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
                 shape='circle'
                 icon={<Plus theme='outline' size='14' strokeWidth={2} fill={iconColors.primary} />}
                 loading={uploading}
-                disabled={uploading}
+                disabled={uploading || managedPresentationPending}
                 data-testid='file-upload-btn'
                 onClick={() => setIsSheetOpen(true)}
               />
@@ -566,7 +574,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
                   className={isPlusDropdownOpen ? styles.plusButtonRotate : ''}
                   icon={<Plus theme='outline' size='14' strokeWidth={2} fill={iconColors.primary} />}
                   loading={uploading}
-                  disabled={uploading}
+                  disabled={uploading || managedPresentationPending}
                   data-testid='file-upload-btn'
                 />
                 {files.length > 0 && (
@@ -625,14 +633,16 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
           shape='circle'
           type='primary'
           loading={loading}
-          disabled={isButtonDisabled}
+          disabled={isButtonDisabled || managedPresentationPending}
           className='send-button-custom'
           style={{
             backgroundColor: isButtonDisabled ? undefined : '#000000',
             borderColor: isButtonDisabled ? undefined : '#000000',
           }}
           icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-          onClick={onSend}
+          onClick={() => {
+            if (!managedPresentationPending) onSend();
+          }}
           data-testid='guid-send-btn'
         />
       </div>
