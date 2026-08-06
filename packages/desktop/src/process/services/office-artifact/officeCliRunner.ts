@@ -224,12 +224,6 @@ async function terminateRenderProcessTree(
   if (!Number.isSafeInteger(pid) || !pid || pid <= 1) return;
 
   if (platform === 'win32') {
-    if (
-      (child.exitCode !== undefined && child.exitCode !== null) ||
-      (child.signalCode !== undefined && child.signalCode !== null)
-    ) {
-      return;
-    }
     let cleanupFailed = false;
     for (;;) {
       let taskkill: OfficeCliWatchProcess;

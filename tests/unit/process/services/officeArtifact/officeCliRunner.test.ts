@@ -258,6 +258,74 @@ describe('createOfficeCliRunner', () => {
   });
 
   it.runIf(process.platform !== 'win32')(
+    'terminates Windows render descendants before resolving after their parent exits successfully',
+    async () => {
+      const root = await mkdtemp(path.join(tmpdir(), 'officecli-windows-completed-tree-'));
+      const executable = path.join(root, 'fake-officecli');
+      const outputPath = path.join(root, 'slide-1.png');
+      const pidPath = `${outputPath}.pid`;
+      const heartbeatPath = `${outputPath}.heartbeat`;
+      const heartbeatProgram = `
+        const { appendFileSync } = require('node:fs');
+        const heartbeatPath = ${JSON.stringify(heartbeatPath)};
+        appendFileSync(heartbeatPath, 'x');
+        setInterval(() => appendFileSync(heartbeatPath, 'x'), 10);
+      `;
+      await writeFile(
+        executable,
+        `#!/usr/bin/env node
+          const { spawn } = require('node:child_process');
+          const { writeFileSync } = require('node:fs');
+          writeFileSync(${JSON.stringify(heartbeatPath)}, '');
+          const child = spawn(process.execPath, ['-e', ${JSON.stringify(heartbeatProgram)}], { stdio: 'ignore' });
+          child.unref();
+          writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
+          process.stdout.write(JSON.stringify({ success: true, data: {} }));
+        `,
+        { mode: 0o700 }
+      );
+
+      let descendantPid = 0;
+      let renderProcess: ChildProcess | undefined;
+      const spawn: OfficeCliSpawn = (file, args, options) => {
+        renderProcess = nodeSpawn(file, args, { ...options, detached: true });
+        return renderProcess as unknown as OfficeCliWatchProcess;
+      };
+      const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((_file, args) => {
+        const taskkill = createWatchProcess();
+        queueMicrotask(() => {
+          process.kill(-Number(args[2]), 'SIGKILL');
+          Object.assign(taskkill, { exitCode: 0 });
+          taskkill.emit('close', 0, null);
+        });
+        return taskkill;
+      });
+      const runner = createOfficeCliRunner({
+        binaryPath: executable,
+        platform: 'win32',
+        processTreeSpawn,
+        spawn,
+      });
+
+      try {
+        const pending = runner.renderSlide('/inspection/candidate.pptx', 1, outputPath);
+        descendantPid = await readProcessId(pidPath);
+        expect(descendantPid).toBeGreaterThan(1);
+        await expect(pending).resolves.toBeUndefined();
+        expect(processTreeSpawn).toHaveBeenCalledTimes(1);
+        const heartbeatAtResolution = await readFile(heartbeatPath);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(await readFile(heartbeatPath)).toEqual(heartbeatAtResolution);
+        expect(isProcessAlive(descendantPid)).toBe(false);
+      } finally {
+        if (descendantPid > 1 && isProcessAlive(descendantPid)) process.kill(descendantPid, 'SIGKILL');
+        if (renderProcess?.pid && isProcessAlive(renderProcess.pid)) renderProcess.kill('SIGKILL');
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.runIf(process.platform !== 'win32')(
     'retries a failed Windows tree termination before rejecting and releasing the render workspace',
     async () => {
       const root = await mkdtemp(path.join(tmpdir(), 'officecli-windows-render-tree-'));
