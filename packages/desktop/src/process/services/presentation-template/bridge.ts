@@ -513,6 +513,14 @@ export function initPresentationTemplateBridge(): void {
   ipcBridge.presentationSources.revoke.provider((request) =>
     callPresentationSourceProvider(() => getPresentationSourceGrantService().revoke(request))
   );
+  const confirmQueuedProvider = (
+    ipcBridge.presentationSources as typeof ipcBridge.presentationSources & {
+      confirmQueued?: typeof ipcBridge.presentationSources.confirmQueued;
+    }
+  ).confirmQueued;
+  confirmQueuedProvider?.provider((request) =>
+    callPresentationSourceProvider(() => getPresentationSourceGrantService().confirmQueued(request))
+  );
   const runProviders = (ipcBridge as typeof ipcBridge & { presentationRuns?: typeof ipcBridge.presentationRuns })
     .presentationRuns;
   runProviders?.start.provider(callPresentationStartProvider);

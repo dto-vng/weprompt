@@ -631,6 +631,13 @@
       "manual": "Manuell senden"
     }
   },
+  "presentationSubmission": {
+    "pending": "Präsentationsübermittlung ausstehend",
+    "restore": "Wiederherstellen",
+    "persistenceFailure": "Die Präsentationsübermittlung konnte nicht gespeichert werden.",
+    "queued": "Präsentation zur Warteschlange hinzugefügt",
+    "uncertainTracking": "Der Übermittlungsstatus ist ungewiss. Verfolgen Sie den bestehenden Lauf und senden Sie nicht erneut."
+  },
   "contextUsage": {
     "contextUsed": "Kontext verwendet",
     "contextWindow": "Kontextfenster",

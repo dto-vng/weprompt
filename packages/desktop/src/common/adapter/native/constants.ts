@@ -49,6 +49,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'presentation-sources.pick-sources',
   'presentation-sources.grant-workspace-source',
   'presentation-sources.revoke',
+  'presentation-sources.confirm-queued',
   'presentation-runs.start',
   'presentation-runs.get',
   'presentation-runs.list-recoverable',

@@ -12,6 +12,7 @@ import type {
   PresentationGrantOwner,
   PresentationRunFailure,
   PresentationSourceDescriptor,
+  PresentationSourceRef,
 } from '@/common/types/office/presentationRun';
 import {
   PresentationRunSimulatedProcessCrashError,
@@ -188,6 +189,11 @@ export type PresentationSourceOwnerSnapshot = {
   owner: PresentationGrantOwner;
   ownerRevision: number;
   grants: StoredPresentationSourceGrantManifest[];
+};
+
+export type ConfirmQueuedPresentationSourcesStoreResult = PresentationSourceOwnerSnapshot & {
+  status: 'confirmed' | 'already_confirmed';
+  expiresAt: string;
 };
 
 export type CreatePresentationSourceDraftStoreResult = {
@@ -1018,29 +1024,34 @@ export class PresentationRunStore {
   async extendPresentationSourceGrantsForQueue(input: {
     owner: PresentationGrantOwner;
     principalId: string;
-    grantIds: readonly string[];
+    sources: readonly PresentationSourceRef[];
     queueItemId: string;
     expectedOwnerRevision: number;
-  }): Promise<PresentationSourceOwnerSnapshot> {
+  }): Promise<ConfirmQueuedPresentationSourcesStoreResult> {
     await this.initialize();
     this.assertStorageHealthy();
+    if (
+      !Array.isArray(input.sources) ||
+      input.sources.length === 0 ||
+      input.sources.length > PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN ||
+      !input.sources.every(isIntegrityPresentationRunGrantClaim) ||
+      new Set(input.sources.map(({ grantId }) => grantId.toLowerCase())).size !== input.sources.length ||
+      input.sources.reduce((total, source) => total + source.expectedByteLength, 0) >
+        PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES ||
+      typeof input.queueItemId !== 'string' ||
+      !UUID_RE.test(input.queueItemId) ||
+      !Number.isSafeInteger(input.expectedOwnerRevision) ||
+      input.expectedOwnerRevision < 0
+    ) {
+      throw new PresentationSourceStoreError('INVALID_REQUEST');
+    }
     await this.expirePresentationSourceOwnerIfNeeded(input.owner);
     const ownerId = presentationSourceOwnerId(input.owner);
     return this.lock.runExclusive(
-      ['store:health', 'policy:app', `owner:${ownerId}`, ...input.grantIds.map((grantId) => `grant:${grantId}`)],
+      ['store:health', 'policy:app', `owner:${ownerId}`, ...input.sources.map(({ grantId }) => `grant:${grantId}`)],
       async () => {
         this.assertStorageHealthy();
-        if (
-          input.grantIds.length === 0 ||
-          input.grantIds.length > PRESENTATION_RUN_LIMITS.MAX_UNBOUND_GRANTS_PER_OWNER ||
-          new Set(input.grantIds).size !== input.grantIds.length ||
-          typeof input.queueItemId !== 'string' ||
-          input.queueItemId.length === 0 ||
-          input.queueItemId.length > 256
-        ) {
-          throw new PresentationSourceStoreError('INVALID_REQUEST');
-        }
-        for (const grantId of input.grantIds) {
+        for (const { grantId } of input.sources) {
           const tombstone = this.sourceGrantTombstones.get(grantId);
           if (tombstone === undefined) continue;
           if (presentationSourceOwnerKey(tombstone.owner) !== presentationSourceOwnerKey(input.owner)) {
@@ -1051,20 +1062,83 @@ export class PresentationRunStore {
             { grantId }
           );
         }
-        const owner = this.requireMutableSourceOwner(input.owner, input.principalId, input.expectedOwnerRevision);
-        const grants = input.grantIds.map((grantId) => {
-          const grant = this.sourceGrants.get(grantId);
-          if (grant === undefined || !owner.grantIds.includes(grantId)) {
-            throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId });
+        const owner = this.sourceOwners.get(ownerId);
+        if (owner === undefined) {
+          if (input.owner.owner_type === 'draft') {
+            this.throwDraftLookupFailure(input.owner.draft_id, input.principalId);
+          }
+          throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', {
+            grantId: input.sources[0]?.grantId,
+          });
+        }
+        if (owner.principalId !== input.principalId) {
+          throw new PresentationSourceStoreError(
+            input.owner.owner_type === 'draft' ? 'DRAFT_FOREIGN' : 'RUN_FORBIDDEN'
+          );
+        }
+        if (input.owner.owner_type === 'draft') {
+          if (owner.draftLifecycle === 'expired') {
+            throw new PresentationSourceStoreError('DRAFT_EXPIRED', { draftId: input.owner.draft_id });
+          }
+          if (owner.draftLifecycle !== 'active') throw new PresentationSourceStoreError('DRAFT_NOT_FOUND');
+        }
+        const grants = input.sources.map((source) => {
+          const grant = this.sourceGrants.get(source.grantId);
+          if (grant === undefined || !owner.grantIds.includes(source.grantId)) {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_INVALID', { grantId: source.grantId });
           }
           if (presentationSourceOwnerKey(grant.owner) !== presentationSourceOwnerKey(input.owner)) {
-            throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId });
+            throw new PresentationSourceStoreError('SOURCE_GRANT_FOREIGN', { grantId: source.grantId });
           }
-          if (grant.state !== 'active' || grant.queueExtendedAt !== null || grant.queueItemId !== null) {
-            throw new PresentationSourceStoreError('SOURCE_GRANT_REPLAYED', { grantId });
+          if (grant.state !== 'active') {
+            throw new PresentationSourceStoreError('SOURCE_GRANT_REPLAYED', { grantId: source.grantId });
+          }
+          if (grant.byteLength !== source.expectedByteLength || grant.sha256 !== source.expectedSha256) {
+            throw new PresentationSourceStoreError('SOURCE_TAMPERED', { grantId: source.grantId });
           }
           return grant;
         });
+        const queueBoundGrants = owner.grantIds
+          .map((grantId) => this.sourceGrants.get(grantId))
+          .filter(
+            (grant): grant is StoredPresentationSourceGrantManifest =>
+              grant !== undefined && grant.queueItemId === input.queueItemId
+          );
+        const exactReplay =
+          queueBoundGrants.length === grants.length &&
+          grants.every((grant) => grant.queueItemId === input.queueItemId && grant.queueExtendedAt !== null) &&
+          // The exact owner, queue binding, and complete ref set are the durable idempotency identity.
+          // A replay with an older owner revision performs no mutation or TTL extension; first mutation
+          // still requires the strict owner-revision CAS below.
+          input.expectedOwnerRevision < owner.revision;
+        if (exactReplay) {
+          const expiresAt = grants[0]?.expiresAt;
+          if (expiresAt === undefined || grants.some((grant) => grant.expiresAt !== expiresAt)) {
+            throw new PresentationCanonicalCorruptionError('Queued presentation source expiries are inconsistent');
+          }
+          return {
+            status: 'already_confirmed',
+            owner: structuredClone(input.owner),
+            ownerRevision: owner.revision,
+            expiresAt,
+            grants: owner.grantIds.map((grantId) => {
+              const grant = this.sourceGrants.get(grantId);
+              if (grant === undefined) {
+                throw new PresentationCanonicalCorruptionError('Presentation source owner references a missing grant');
+              }
+              return frozenSnapshot(grant);
+            }),
+          };
+        }
+        const replayedGrant = grants.find((grant) => grant.queueExtendedAt !== null || grant.queueItemId !== null);
+        if (queueBoundGrants.length > 0 || replayedGrant !== undefined) {
+          throw new PresentationSourceStoreError('SOURCE_GRANT_REPLAYED', {
+            grantId: replayedGrant?.grantId ?? queueBoundGrants[0]?.grantId,
+          });
+        }
+        if (owner.revision !== input.expectedOwnerRevision) {
+          throw new PresentationSourceStoreError('INVALID_REQUEST');
+        }
         const now = this.now().toISOString();
         const expiresAt = new Date(Date.parse(now) + PRESENTATION_RUN_LIMITS.QUEUED_GRANT_TTL_MS).toISOString();
         const nextGrants = grants.map<StoredPresentationSourceGrantManifest>((grant) => ({
@@ -1112,8 +1186,10 @@ export class PresentationRunStore {
         this.index = this.buildIndex();
         await this.persistDerivedIndexBestEffort();
         return {
+          status: 'confirmed',
           owner: structuredClone(input.owner),
           ownerRevision: nextOwner.revision,
+          expiresAt,
           grants: nextOwner.grantIds.map((grantId) => {
             const grant = this.sourceGrants.get(grantId);
             if (grant === undefined) {

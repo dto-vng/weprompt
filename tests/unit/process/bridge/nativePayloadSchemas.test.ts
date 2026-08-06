@@ -113,6 +113,18 @@ const VALID_PAYLOADS = {
     grant_id: '229ca31e-1150-4ad1-ad62-1c3368330adc',
     expected_owner_revision: 2,
   },
+  'presentation-sources.confirm-queued': {
+    owner: { owner_type: 'conversation', conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730' },
+    queue_item_id: '37f0a614-3e7f-41b5-87fd-49076fcf078d',
+    sources: [
+      {
+        grantId: '229ca31e-1150-4ad1-ad62-1c3368330adc',
+        expectedByteLength: 128,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ],
+    expected_owner_revision: 2,
+  },
   'presentation-runs.start': {
     conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
     client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8',
@@ -517,6 +529,53 @@ const INVALID_PAYLOADS = [
     'presentation-sources.revoke',
     'malformed grant UUID',
     { ...VALID_PAYLOADS['presentation-sources.revoke'], grant_id: 'grant-1' },
+  ],
+  [
+    'presentation-sources.confirm-queued',
+    'path-shaped queue item identifier',
+    { ...VALID_PAYLOADS['presentation-sources.confirm-queued'], queue_item_id: '/private/queue-item' },
+  ],
+  [
+    'presentation-sources.confirm-queued',
+    'empty source refs',
+    { ...VALID_PAYLOADS['presentation-sources.confirm-queued'], sources: [] },
+  ],
+  [
+    'presentation-sources.confirm-queued',
+    'duplicate source refs',
+    {
+      ...VALID_PAYLOADS['presentation-sources.confirm-queued'],
+      sources: [
+        VALID_PAYLOADS['presentation-sources.confirm-queued'].sources[0],
+        VALID_PAYLOADS['presentation-sources.confirm-queued'].sources[0],
+      ],
+    },
+  ],
+  [
+    'presentation-sources.confirm-queued',
+    'native path inside an opaque source ref',
+    {
+      ...VALID_PAYLOADS['presentation-sources.confirm-queued'],
+      sources: [
+        {
+          ...VALID_PAYLOADS['presentation-sources.confirm-queued'].sources[0],
+          native_path: '/private/source.pdf',
+        },
+      ],
+    },
+  ],
+  [
+    'presentation-sources.confirm-queued',
+    'uppercase source hash',
+    {
+      ...VALID_PAYLOADS['presentation-sources.confirm-queued'],
+      sources: [
+        {
+          ...VALID_PAYLOADS['presentation-sources.confirm-queued'].sources[0],
+          expectedSha256: 'A'.repeat(64),
+        },
+      ],
+    },
   ],
   [
     'presentation-runs.start',

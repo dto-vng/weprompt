@@ -630,6 +630,13 @@
       "manual": "手動發送"
     }
   },
+  "presentationSubmission": {
+    "pending": "簡報提交處理中",
+    "restore": "還原",
+    "persistenceFailure": "無法儲存簡報提交。",
+    "queued": "簡報已加入佇列",
+    "uncertainTracking": "簡報提交狀態不確定。請追蹤現有執行，不要重新傳送。"
+  },
   "contextUsage": {
     "contextUsed": "上下文已使用",
     "contextWindow": "上下文視窗",

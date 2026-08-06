@@ -23,6 +23,7 @@ const CONVERSATION_ID = '745b7d43-a0aa-4bb7-b0cc-283f2db4873d';
 const SECOND_CONVERSATION_ID = '8a3bbfb3-141e-4cf3-8a45-a8b61585385c';
 const PRINCIPAL_ID = 'local-user';
 const CLIENT_REQUEST_ID = '326ce889-fbba-462b-82f1-fe8b7bc594b0';
+const QUEUE_ITEM_ID = '37f0a614-3e7f-41b5-87fd-49076fcf078d';
 const fixtureRoots: string[] = [];
 
 function createService(
@@ -31,6 +32,7 @@ function createService(
     desktopRuntime?: boolean;
     principalId?: string | null;
     ownerCode?: 'RUN_NOT_FOUND' | 'RUN_FORBIDDEN' | 'SCOPE_UNAVAILABLE' | 'TEAM_SCOPE_UNSUPPORTED';
+    teamScope?: boolean;
     fileFailureInjector?: (point: PresentationRunFileFailurePoint) => void | Promise<void>;
     now?: () => Date;
   } = {}
@@ -62,7 +64,7 @@ function createService(
       ok: true as const,
       conversationId,
       principalId,
-      scope: 'individual' as const,
+      scope: overrides.teamScope ? ('team' as const) : ('individual' as const),
       workspace,
     };
   });
@@ -236,6 +238,188 @@ describe('PresentationSourceGrantService grants', () => {
         expected_owner_revision: 0,
       })
     ).resolves.toMatchObject({ ok: false, code: 'SOURCE_TAMPERED' });
+  });
+
+  it('confirms queued refs and idempotently replays a lost reply with the pre-mutation owner revision', async () => {
+    const fixture = createService();
+    const sourcePath = path.join(fixture.root, 'queued-brief.txt');
+    await writeFile(sourcePath, 'Quarterly revenue\n', { mode: 0o600 });
+    fixture.pickNativeSourcePaths.mockResolvedValue([sourcePath]);
+    const selected = await fixture.service.pickSources({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      expected_owner_revision: 0,
+    });
+    if (!selected.ok || selected.status !== 'selected') throw new Error('Expected one selected source');
+    const grant = selected.grants[0];
+    if (!grant) throw new Error('Expected one selected grant');
+    const request = {
+      owner: { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID },
+      queue_item_id: QUEUE_ITEM_ID,
+      sources: [
+        {
+          grantId: grant.grantId,
+          expectedByteLength: grant.byteLength,
+          expectedSha256: grant.sha256,
+        },
+      ],
+      expected_owner_revision: selected.ownerRevision,
+    };
+
+    const confirmed = await fixture.service.confirmQueued(request);
+    const replayed = await fixture.service.confirmQueued(request);
+
+    expect(confirmed).toMatchObject({ ok: true, status: 'confirmed', ownerRevision: 2 });
+    expect(replayed).toEqual({
+      ...(confirmed as Extract<typeof confirmed, { ok: true }>),
+      status: 'already_confirmed',
+    });
+  });
+
+  it('fails the direct confirmation gate before parsing or storage side effects', async () => {
+    const fixture = createService({ featureEnabled: false });
+    const extend = vi.spyOn(fixture.store, 'extendPresentationSourceGrantsForQueue');
+
+    await expect(
+      fixture.service.confirmQueued({
+        owner: { owner_type: 'conversation', conversation_id: '/private/conversation' },
+        queue_item_id: '/private/queue-item',
+        sources: [{ native_path: '/private/source.pdf' }],
+        expected_owner_revision: -1,
+      } as never)
+    ).resolves.toMatchObject({ ok: false, code: 'FEATURE_DISABLED' });
+
+    expect(fixture.getPrincipalId).not.toHaveBeenCalled();
+    expect(fixture.resolveConversationOwner).not.toHaveBeenCalled();
+    expect(fixture.initialize).not.toHaveBeenCalled();
+    expect(extend).not.toHaveBeenCalled();
+  });
+
+  it('applies DESKTOP_REQUIRED directly to confirmQueued with zero principal, owner, or storage side effects', async () => {
+    const fixture = createService({ desktopRuntime: false });
+    const extend = vi.spyOn(fixture.store, 'extendPresentationSourceGrantsForQueue');
+
+    await expect(
+      fixture.service.confirmQueued({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        queue_item_id: QUEUE_ITEM_ID,
+        sources: [{ grantId: CLIENT_REQUEST_ID, expectedByteLength: 1, expectedSha256: 'a'.repeat(64) }],
+        expected_owner_revision: 0,
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'DESKTOP_REQUIRED' });
+
+    expect(fixture.getPrincipalId).not.toHaveBeenCalled();
+    expect(fixture.resolveConversationOwner).not.toHaveBeenCalled();
+    expect(fixture.initialize).not.toHaveBeenCalled();
+    expect(extend).not.toHaveBeenCalled();
+  });
+
+  it('applies the authoritative team-scope denial directly to confirmQueued before storage side effects', async () => {
+    const fixture = createService({ teamScope: true });
+    const extend = vi.spyOn(fixture.store, 'extendPresentationSourceGrantsForQueue');
+
+    await expect(
+      fixture.service.confirmQueued({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        queue_item_id: QUEUE_ITEM_ID,
+        sources: [{ grantId: CLIENT_REQUEST_ID, expectedByteLength: 1, expectedSha256: 'a'.repeat(64) }],
+        expected_owner_revision: 0,
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'TEAM_SCOPE_UNSUPPORTED' });
+
+    expect(fixture.getPrincipalId).toHaveBeenCalledOnce();
+    expect(fixture.resolveConversationOwner).toHaveBeenCalledOnce();
+    expect(fixture.initialize).not.toHaveBeenCalled();
+    expect(extend).not.toHaveBeenCalled();
+  });
+
+  it('applies the authoritative owner denial directly to confirmQueued before storage side effects', async () => {
+    const fixture = createService({ ownerCode: 'RUN_FORBIDDEN' });
+    const extend = vi.spyOn(fixture.store, 'extendPresentationSourceGrantsForQueue');
+
+    await expect(
+      fixture.service.confirmQueued({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        queue_item_id: QUEUE_ITEM_ID,
+        sources: [{ grantId: CLIENT_REQUEST_ID, expectedByteLength: 1, expectedSha256: 'a'.repeat(64) }],
+        expected_owner_revision: 0,
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'RUN_FORBIDDEN' });
+
+    expect(fixture.getPrincipalId).toHaveBeenCalledOnce();
+    expect(fixture.resolveConversationOwner).toHaveBeenCalledOnce();
+    expect(fixture.initialize).not.toHaveBeenCalled();
+    expect(extend).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown fields and path-shaped nested confirmation input before storage mutation', async () => {
+    const fixture = createService();
+    const extend = vi.spyOn(fixture.store, 'extendPresentationSourceGrantsForQueue');
+
+    await expect(
+      fixture.service.confirmQueued({
+        owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+        queue_item_id: QUEUE_ITEM_ID,
+        sources: [
+          {
+            grantId: CLIENT_REQUEST_ID,
+            expectedByteLength: 1,
+            expectedSha256: 'a'.repeat(64),
+            native_path: '/private/source.pdf',
+          },
+        ],
+        expected_owner_revision: 0,
+        descriptor: { displayName: 'source.pdf' },
+      } as never)
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_REQUEST' });
+
+    expect(extend).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale first-call CAS plus hash and length drift without extending a grant', async () => {
+    const fixture = createService();
+    const sourcePath = path.join(fixture.root, 'drift-brief.txt');
+    await writeFile(sourcePath, 'Quarterly revenue\n', { mode: 0o600 });
+    fixture.pickNativeSourcePaths.mockResolvedValue([sourcePath]);
+    const selected = await fixture.service.pickSources({
+      owner: { owner_type: 'conversation', conversation_id: CONVERSATION_ID },
+      expected_owner_revision: 0,
+    });
+    if (!selected.ok || selected.status !== 'selected') throw new Error('Expected one selected source');
+    const grant = selected.grants[0];
+    if (!grant) throw new Error('Expected one selected grant');
+    const base = {
+      owner: { owner_type: 'conversation' as const, conversation_id: CONVERSATION_ID },
+      queue_item_id: QUEUE_ITEM_ID,
+      sources: [
+        {
+          grantId: grant.grantId,
+          expectedByteLength: grant.byteLength,
+          expectedSha256: grant.sha256,
+        },
+      ],
+      expected_owner_revision: selected.ownerRevision,
+    };
+
+    await expect(
+      fixture.service.confirmQueued({ ...base, expected_owner_revision: selected.ownerRevision - 1 })
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_REQUEST' });
+    await expect(
+      fixture.service.confirmQueued({
+        ...base,
+        sources: [{ ...base.sources[0]!, expectedSha256: 'f'.repeat(64) }],
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'SOURCE_TAMPERED' });
+    await expect(
+      fixture.service.confirmQueued({
+        ...base,
+        sources: [{ ...base.sources[0]!, expectedByteLength: grant.byteLength + 1 }],
+      })
+    ).resolves.toMatchObject({ ok: false, code: 'SOURCE_TAMPERED' });
+    await expect(fixture.service.getSourceOwner({ owner: base.owner })).resolves.toMatchObject({
+      ok: true,
+      ownerRevision: selected.ownerRevision,
+      grants: [{ expiresAt: grant.expiresAt }],
+    });
   });
 
   it('returns an explicit cancellation without changing the owner', async () => {
