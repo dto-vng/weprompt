@@ -791,6 +791,23 @@
       "cleanupSuccess": "Temporäre Artefaktdateien entfernt",
       "cleanupError": "Bereinigung fehlgeschlagen: {{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Der Präsentationskandidat muss geprüft werden.",
+        "reviewRequiredAfterFailure": "Die Erstellung wurde beendet; der aufbewahrte Präsentationskandidat muss weiterhin geprüft werden.",
+        "trackingRequired": "Der Präsentationslauf muss nachverfolgt werden.",
+        "dispatchUncertain": "Das Ergebnis des Präsentationslaufs ist unbestätigt. Eine Bedienperson muss es prüfen."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "In Systemanwendung öffnen",
+        "discard": "Eintrag verwerfen"
+      },
+      "loadError": "Der Wiederherstellungsstatus der Präsentation konnte nicht geladen werden.",
+      "invalidResponse": "Der Wiederherstellungsstatus der Präsentation konnte nicht bestätigt werden.",
+      "openError": "Der aktuelle Präsentationskandidat konnte nicht geöffnet werden.",
+      "discardError": "Das Verwerfen des Präsentationseintrags konnte nicht bestätigt werden."
+    },
     "importSuccess": "Vorlage importiert",
     "importError": "Import fehlgeschlagen: {{error}}",
     "removeError": "Löschen fehlgeschlagen: {{error}}",

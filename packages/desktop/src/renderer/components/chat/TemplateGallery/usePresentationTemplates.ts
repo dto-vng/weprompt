@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createElement, useCallback, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Button, Message } from '@arco-design/web-react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import type {
   PresentationTemplateFormat,
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
+import type { PresentationRunPublicDto } from '@/common/types/office/presentationRun';
 import { composePresentationSend } from './directive';
 import { useAddEventListener } from '@/renderer/utils/emitter';
 import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
@@ -112,7 +113,15 @@ export function usePresentationTemplates(conversationId?: string) {
   const { t } = useTranslation();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PresentationTemplateSummary | null>(null);
+  const [recoverableRuns, setRecoverableRuns] = useState<PresentationRunPublicDto[]>([]);
   const scratchRunByTurnRef = useRef(new Map<string, string>());
+  const recoveryRequestRef = useRef(0);
+  const recoveryLifecycleEpochRef = useRef(0);
+  const currentConversationIdRef = useRef(conversationId);
+  const recoveryConversationIdRef = useRef(conversationId);
+  const recoveryTranslationRef = useRef(t);
+  currentConversationIdRef.current = conversationId;
+  recoveryTranslationRef.current = t;
 
   const {
     data: templates,
@@ -205,6 +214,224 @@ export function usePresentationTemplates(conversationId?: string) {
     },
     [t]
   );
+
+  const isRecoveryActionCurrent = useCallback(
+    (action: { conversationId: string; lifecycleEpoch: number }): boolean =>
+      currentConversationIdRef.current === action.conversationId &&
+      recoveryLifecycleEpochRef.current === action.lifecycleEpoch,
+    []
+  );
+
+  const refreshRecoverableRuns = useCallback(
+    async (showFailure = true, action?: { conversationId: string; lifecycleEpoch: number }): Promise<boolean> => {
+      if (action && !isRecoveryActionCurrent(action)) return false;
+      const requestId = ++recoveryRequestRef.current;
+      if (!conversationId) {
+        setRecoverableRuns([]);
+        return true;
+      }
+
+      try {
+        const result = await ipcBridge.presentationRuns.listRecoverable.invoke({
+          conversation_id: conversationId,
+          limit: 20,
+        });
+        if (action && !isRecoveryActionCurrent(action)) return false;
+        if (requestId !== recoveryRequestRef.current) return false;
+        if (result.ok === false) {
+          if (result.code === 'DESKTOP_REQUIRED' || result.code === 'TEAM_SCOPE_UNSUPPORTED') {
+            setRecoverableRuns([]);
+            return true;
+          }
+          if (showFailure) {
+            Message.error(recoveryTranslationRef.current('conversation.presentationTemplates.recovery.loadError'));
+          }
+          return false;
+        }
+
+        const hasForeignOrUnsupportedRun = result.items.some(
+          (run) =>
+            run.conversationId !== conversationId ||
+            !['retained', 'failed_retained', 'dispatch_uncertain'].includes(run.dispatchStatus)
+        );
+        if (hasForeignOrUnsupportedRun) {
+          setRecoverableRuns([]);
+          Message.error(recoveryTranslationRef.current('conversation.presentationTemplates.recovery.invalidResponse'));
+          return false;
+        }
+
+        setRecoverableRuns(result.items.slice(0, 20));
+        return true;
+      } catch {
+        if (requestId === recoveryRequestRef.current && (!action || isRecoveryActionCurrent(action)) && showFailure) {
+          Message.error(recoveryTranslationRef.current('conversation.presentationTemplates.recovery.loadError'));
+        }
+        return false;
+      }
+    },
+    [conversationId, isRecoveryActionCurrent]
+  );
+
+  const openRecovery = useCallback(
+    async (run: PresentationRunPublicDto): Promise<void> => {
+      const sha256 = run.retainedCandidate?.sha256;
+      if (
+        !conversationId ||
+        currentConversationIdRef.current !== conversationId ||
+        run.conversationId !== conversationId ||
+        run.dispatchStatus === 'dispatch_uncertain' ||
+        !run.actions.openAllowed ||
+        !sha256
+      ) {
+        return;
+      }
+      const action = {
+        conversationId,
+        lifecycleEpoch: recoveryLifecycleEpochRef.current,
+      };
+
+      try {
+        const result = await ipcBridge.presentationRuns.openRecovery.invoke({
+          conversation_id: conversationId,
+          run_id: run.runId,
+          expected_sha256: sha256,
+        });
+        if (!isRecoveryActionCurrent(action)) return;
+        if (result.ok && result.runId === run.runId && result.sha256 === sha256) return;
+      } catch {
+        // Reconcile from main below. A lost reply cannot prove that Open succeeded.
+      }
+
+      if (!isRecoveryActionCurrent(action)) return;
+      Message.error(recoveryTranslationRef.current('conversation.presentationTemplates.recovery.openError'));
+      await refreshRecoverableRuns(false, action);
+    },
+    [conversationId, isRecoveryActionCurrent, refreshRecoverableRuns]
+  );
+
+  const discardRecovery = useCallback(
+    async (run: PresentationRunPublicDto): Promise<void> => {
+      if (
+        !conversationId ||
+        currentConversationIdRef.current !== conversationId ||
+        run.conversationId !== conversationId ||
+        run.dispatchStatus === 'dispatch_uncertain' ||
+        !run.actions.discardAllowed
+      ) {
+        return;
+      }
+      const action = {
+        conversationId,
+        lifecycleEpoch: recoveryLifecycleEpochRef.current,
+      };
+
+      try {
+        const result = await ipcBridge.presentationRuns.discard.invoke({
+          conversation_id: conversationId,
+          run_id: run.runId,
+          expected_revision: run.revision,
+        });
+        if (!isRecoveryActionCurrent(action)) return;
+        if (result.ok && result.runId === run.runId) {
+          await refreshRecoverableRuns(true, action);
+          return;
+        }
+      } catch {
+        // Reconcile from main below. A lost reply cannot authorize local removal.
+      }
+
+      if (!isRecoveryActionCurrent(action)) return;
+      Message.error(recoveryTranslationRef.current('conversation.presentationTemplates.recovery.discardError'));
+      await refreshRecoverableRuns(false, action);
+    },
+    [conversationId, isRecoveryActionCurrent, refreshRecoverableRuns]
+  );
+
+  useLayoutEffect(() => {
+    recoveryLifecycleEpochRef.current += 1;
+    if (recoveryConversationIdRef.current !== conversationId) {
+      recoveryConversationIdRef.current = conversationId;
+      setRecoverableRuns([]);
+    }
+    return () => {
+      recoveryLifecycleEpochRef.current += 1;
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    void refreshRecoverableRuns();
+    return () => {
+      recoveryRequestRef.current += 1;
+    };
+  }, [refreshRecoverableRuns]);
+
+  useEffect(() => {
+    const translate = recoveryTranslationRef.current;
+    const closeMessages = recoverableRuns
+      .filter((run) => run.conversationId === conversationId)
+      .map((run) => {
+        const isUncertain = run.dispatchStatus === 'dispatch_uncertain';
+        const statusKey = isUncertain
+          ? 'conversation.presentationTemplates.recovery.status.dispatchUncertain'
+          : run.disposition === 'REVIEW_REQUIRED'
+            ? run.dispatchStatus === 'failed_retained'
+              ? 'conversation.presentationTemplates.recovery.status.reviewRequiredAfterFailure'
+              : 'conversation.presentationTemplates.recovery.status.reviewRequired'
+            : 'conversation.presentationTemplates.recovery.status.trackingRequired';
+        const status = translate(statusKey);
+        const sha256 = run.retainedCandidate?.sha256;
+        const canOpen = !isUncertain && run.actions.openAllowed && Boolean(sha256);
+        const canDiscard = !isUncertain && run.actions.discardAllowed;
+
+        return Message.warning({
+          id: `presentation-recovery-${conversationId}-${run.runId}`,
+          duration: 0,
+          closable: true,
+          content: createElement(
+            'span',
+            { role: 'status', 'aria-label': status },
+            createElement('span', null, status),
+            sha256
+              ? createElement(
+                  'span',
+                  { className: 'ml-8px' },
+                  translate('conversation.presentationTemplates.recovery.hash', { sha256 })
+                )
+              : null,
+            canOpen
+              ? createElement(
+                  Button,
+                  {
+                    size: 'mini',
+                    type: 'text',
+                    className: 'ml-8px',
+                    'aria-label': translate('conversation.presentationTemplates.recovery.actions.open'),
+                    onClick: () => void openRecovery(run),
+                  },
+                  translate('conversation.presentationTemplates.recovery.actions.open')
+                )
+              : null,
+            canDiscard
+              ? createElement(
+                  Button,
+                  {
+                    size: 'mini',
+                    type: 'text',
+                    className: 'ml-8px',
+                    'aria-label': translate('conversation.presentationTemplates.recovery.actions.discard'),
+                    onClick: () => void discardRecovery(run),
+                  },
+                  translate('conversation.presentationTemplates.recovery.actions.discard')
+                )
+              : null
+          ),
+        });
+      });
+
+    return () => {
+      for (const closeMessage of closeMessages) closeMessage?.();
+    };
+  }, [conversationId, discardRecovery, openRecovery, recoverableRuns]);
 
   const showRetainedScratch = useCallback(
     (runId: string, directory: string): void => {
@@ -302,5 +529,7 @@ export function usePresentationTemplates(conversationId?: string) {
     handleScratchTerminal,
     interruptScratchTurn,
     discardScratch,
+    recoverableRuns: recoverableRuns.filter((run) => run.conversationId === conversationId),
+    refreshRecoverableRuns,
   };
 }
