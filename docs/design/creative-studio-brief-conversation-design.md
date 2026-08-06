@@ -92,6 +92,23 @@ Required:
 - Create Brief conversations with a **curated MCP snapshot** that excludes `builtin-image-gen` and any unreviewed MCP capable of paid generation. The snapshot is frozen at creation (§5), so this must be right at creation time.
 - Assert on the **persisted MCP snapshot**, and instrument the **image-generation client** as well as the Studio job manager. A job-manager-only assertion is insufficient by construction.
 
+#### [rev 3] The auto-attach surface is six servers, not one — so the rule must be an allow-list
+
+Measured against the branch on 2026-08-06. Rev 2 named a single server to exclude; the code attaches six without user selection, by **two independent mechanisms**:
+
+| Mechanism | Servers | Notes |
+| --- | --- | --- |
+| `hiddenAutoAttachServers` (`useGuidSend.ts:165-172`) | `builtin-image-gen`, `builtin-idp` (GreenNode), `builtin-vision` (image analysis) | Force-attached whenever enabled, appended to both `assistantOverrideMcpIds` and the session server list if missing |
+| `mergeCommodityMcpServerIds` (`builtinCapabilities.ts:228`) | `builtin-chrome-devtools`, `builtin-memory`, `builtin-tavily` | Auto-attached on the default (no explicit user selection) path |
+
+At least two beyond image-gen reach keyed, metered APIs. **A deny-list naming `builtin-image-gen` would leave five other servers attached**, and rev 2's prescribed verification would have passed while that hole was open — the same failure mode rev 2 itself identified in rev 1.
+
+**Decided 2026-08-06: the curated snapshot is an allow-list.** A Brief conversation's snapshot contains exactly the explicitly listed servers and nothing else; the auto-attach paths are never consulted rather than filtered after the fact. The surface has already drifted from one server to six between revisions, and an allow-list is the only form that does not need editing each time a builtin is added. It fails toward less capability; a deny-list fails toward an unreviewed paid call.
+
+**v1 allow-list membership: the Studio proposal server only.** No web search, no memory, no knowledge search. Confirmed with the product owner 2026-08-06. Note the consequence, which follows from §5: because the snapshot is frozen at creation, Brief conversations created under this membership can **never** gain a capability added later — widening the list only affects new conversations.
+
+**Assertion targets** are the four creation-frozen fields on the conversation record (`storage.ts:484-490`): `mcp_server_ids`, `mcp_servers`, `mcp_statuses`, `session_mcp_servers`. Assert the exact allow-list on each, and assert each of the six auto-attached ids is **absent** — an equality assertion alone can pass vacuously if the snapshot is empty for an unrelated reason.
+
 The rule stands — an assistant may propose what to generate and never cause a paid call — but it now has a mechanism behind it instead of an assumption.
 
 ## 5. Conversation lifecycle
