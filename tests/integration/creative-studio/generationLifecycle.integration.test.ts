@@ -324,13 +324,17 @@ describe('Creative Studio generation lifecycle integration', () => {
       ],
     ]);
 
+    // The per-project cap admits two paid jobs at a time, so this batch of three settles
+    // at two `queued_remote` and one still `queued_local` — waiting for all three to reach
+    // `queued_remote` would hang forever. Wait for that capped state specifically: it is
+    // quiescent until the harness clock is released, so the revision read here stays valid
+    // for the compare-and-set below.
     const activeProject = await waitFor(async () => {
       const current = await harness.store.getProject(configured.id);
-      return current?.jobs.job_acceptance_1.status === 'queued_remote' &&
-        current.jobs.job_acceptance_2.status === 'queued_remote' &&
-        current.jobs.job_acceptance_3.status === 'queued_remote'
-        ? current
-        : null;
+      const batch = [current?.jobs.job_acceptance_1, current?.jobs.job_acceptance_2, current?.jobs.job_acceptance_3];
+      const remote = batch.filter((job) => job?.status === 'queued_remote').length;
+      const local = batch.filter((job) => job?.status === 'queued_local').length;
+      return current && remote === 2 && local === 1 ? current : null;
     });
     const changed = await harness.store.updateProject(
       configured.id,

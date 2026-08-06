@@ -33,6 +33,12 @@ const activeLanguage = vi.hoisted(() => ({ value: 'en-US' }));
 const activePlatform = vi.hoisted(() => ({ isMacOS: true }));
 
 vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
+// Creative Studio ships behind a default-off release gate, so the sidebar entry this
+// suite asserts on only renders with the flag open.
+vi.mock('@/common/config/constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/common/config/constants')>()),
+  CREATIVE_STUDIO_ENABLED: true,
+}));
 vi.mock('@renderer/utils/platform', () => ({
   isElectronDesktop: () => true,
   isMacOS: () => activePlatform.isMacOS,
