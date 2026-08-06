@@ -186,6 +186,12 @@ const stableMessageKeys = [
   'jobs.errors.unknown',
 ] as const;
 
+const ordinaryRetryConfirmationKeys = [
+  'jobs.retryConfirmationTitle',
+  'jobs.retryConfirmationBody',
+  'jobs.retryConfirmationConfirm',
+] as const;
+
 const readinessActionKeys = [
   'review.noReadyScenes',
   'preview.missingVisualPrompt',
@@ -276,6 +282,27 @@ function isPluralVariantKey(key: string): boolean {
 }
 
 describe('Creative Studio localization contract', () => {
+  it.each(i18nConfig.supportedLanguages)(
+    'keeps the %s ordinary-retry confirmation free of price-like numerals',
+    (locale) => {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const leaves = flattenStringLeaves(creativeStudio);
+
+      for (const key of ordinaryRetryConfirmationKeys) {
+        const value = leaves[key];
+        expect(value, `${locale}/${key} must exist`).toBeTruthy();
+        expect(value, `${locale}/${key} must not contain a price-like numeral`).not.toMatch(/\p{N}/u);
+      }
+    }
+  );
+
+  it('states that ordinary retry resubmits to the provider and may incur provider charges', () => {
+    const creativeStudio = loadConversationLocale(i18nConfig.referenceLanguage).creativeStudio;
+    const body = flattenStringLeaves(creativeStudio)['jobs.retryConfirmationBody'];
+
+    expect(body).toBe('Retrying resubmits this generation to the provider and may incur provider charges.');
+  });
+
   // Asserts the ABSENCE of a fabricated cost fragment rather than exact wording,
   // so improving a translation does not fail the guard while re-adding a fake
   // price still does.

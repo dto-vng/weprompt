@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -164,13 +164,11 @@ describe('GenerationJobList', () => {
     });
     render(<GenerationJobList {...props} />);
 
-    fireEvent.click(
+    expect(
       within(screen.getByRole('listitem', { name: 'job-failed-scene-1' })).getByRole('button', {
         name: 'conversation.creativeStudio.jobs.retry',
       })
-    );
-
-    expect(props.onRetryJob).toHaveBeenCalledExactlyOnceWith('job-failed-scene-1');
+    ).toBeEnabled();
   });
 
   it('blocks recovery while the same scene has another active job', () => {
@@ -230,12 +228,77 @@ describe('GenerationJobList', () => {
         name: 'conversation.creativeStudio.jobs.retry',
       })
     ).not.toBeInTheDocument();
-    fireEvent.click(
+    expect(
       within(screen.getByRole('listitem', { name: 'job-child' })).getByRole('button', {
         name: 'conversation.creativeStudio.jobs.retry',
       })
-    );
-    expect(props.onRetryJob).toHaveBeenCalledExactlyOnceWith('job-child');
+    ).toBeEnabled();
+  });
+
+  it('holds ordinary provider retry until the charge confirmation is accepted', () => {
+    const props = createProps({
+      jobs: [
+        job({
+          id: 'job-provider-failure',
+          status: 'failed',
+          error: {
+            code: 'provider_unavailable',
+            messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
+          },
+        }),
+      ],
+    });
+    render(<GenerationJobList {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
+
+    expect(props.onRetryJob).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveTextContent('conversation.creativeStudio.jobs.retryConfirmationBody');
+  });
+
+  it('retries the confirmed ordinary provider failure exactly once with the right job id', () => {
+    const onRetryJob = vi.fn().mockResolvedValue(true);
+    const props = createProps({
+      jobs: [
+        job({
+          id: 'job-provider-failure',
+          status: 'failed',
+          error: {
+            code: 'provider_unavailable',
+            messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
+          },
+        }),
+      ],
+      onRetryJob,
+    });
+    render(<GenerationJobList {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retryConfirmationConfirm' }));
+
+    expect(onRetryJob).toHaveBeenCalledExactlyOnceWith('job-provider-failure');
+  });
+
+  it('leaves the ordinary provider failure untouched when retry is cancelled', async () => {
+    const props = createProps({
+      jobs: [
+        job({
+          id: 'job-provider-failure',
+          status: 'failed',
+          error: {
+            code: 'provider_unavailable',
+            messageKey: 'conversation.creativeStudio.jobs.errors.providerUnavailable',
+          },
+        }),
+      ],
+    });
+    render(<GenerationJobList {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.jobs.retry' }));
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.review.cancel' }));
+
+    expect(props.onRetryJob).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('renders Cancel only when main supplies canCancel', () => {

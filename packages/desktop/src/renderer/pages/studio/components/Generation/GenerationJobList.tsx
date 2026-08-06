@@ -5,9 +5,9 @@
  */
 
 import type { StudioCommandErrorCode, StudioRendererJob } from '@/common/types/project/creativeStudioTypes';
-import { Button, Progress, Spin } from '@arco-design/web-react';
+import { Button, Modal, Progress, Spin } from '@arco-design/web-react';
 import { Attention, CheckOne, CloseOne, Loading, Time } from '@icon-park/react';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import studioType from '../../StudioTypography.module.css';
@@ -101,6 +101,7 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
   onReviewUnknownSubmission,
 }) => {
   const { t } = useTranslation();
+  const [retryConfirmationJobId, setRetryConfirmationJobId] = useState<string | null>(null);
   const sortedJobs = useMemo(() => jobs.toSorted(compareJobs), [jobs]);
   const pendingIds = useMemo(() => new Set(pendingJobIds), [pendingJobIds]);
   const retryParentIds = useMemo(
@@ -109,6 +110,7 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
   );
   const runningCount = jobs.filter((candidate) => ACTIVE_JOB_STATUSES.has(candidate.status)).length;
   const visibleIssue = actionIssue !== null && jobs.some((candidate) => candidate.id === actionIssue.jobId);
+  const retryConfirmationPending = retryConfirmationJobId !== null && pendingIds.has(retryConfirmationJobId);
 
   return (
     <section
@@ -215,7 +217,11 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
                       </Button>
                     )}
                     {canRetry && (
-                      <Button size='mini' disabled={disabled || pending} onClick={() => void onRetryJob(candidate.id)}>
+                      <Button
+                        size='mini'
+                        disabled={disabled || pending}
+                        onClick={() => setRetryConfirmationJobId(candidate.id)}
+                      >
                         {t('conversation.creativeStudio.jobs.retry')}
                       </Button>
                     )}
@@ -240,6 +246,47 @@ export const GenerationJobList: React.FC<GenerationJobListProps> = ({
           })}
         </ul>
       )}
+      <Modal
+        visible={retryConfirmationJobId !== null}
+        title={t('conversation.creativeStudio.jobs.retryConfirmationTitle')}
+        closable={!retryConfirmationPending}
+        maskClosable={!retryConfirmationPending}
+        escToExit={!retryConfirmationPending}
+        onCancel={() => {
+          if (!retryConfirmationPending) setRetryConfirmationJobId(null);
+        }}
+        footer={
+          <div className='flex flex-wrap justify-end gap-8px'>
+            <Button disabled={retryConfirmationPending} onClick={() => setRetryConfirmationJobId(null)}>
+              {t('conversation.creativeStudio.review.cancel')}
+            </Button>
+            <Button
+              type='primary'
+              disabled={disabled}
+              loading={retryConfirmationPending}
+              onClick={() => {
+                const jobId = retryConfirmationJobId;
+                if (jobId === null || disabled || retryConfirmationPending) return;
+                void Promise.resolve(onRetryJob(jobId)).then((retried) => {
+                  if (retried !== false) {
+                    setRetryConfirmationJobId((currentJobId) => (currentJobId === jobId ? null : currentJobId));
+                  }
+                });
+              }}
+            >
+              {t('conversation.creativeStudio.jobs.retryConfirmationConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <p>{t('conversation.creativeStudio.jobs.retryConfirmationBody')}</p>
+        {actionIssue?.jobId === retryConfirmationJobId && (
+          <div role='alert' className='rounded-8px border border-danger-3 bg-danger-light-1 p-10px text-danger'>
+            <span>{t(actionIssue.messageKey)}</span>
+            <code className='ml-8px text-11px'>{actionIssue.code}</code>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 };
