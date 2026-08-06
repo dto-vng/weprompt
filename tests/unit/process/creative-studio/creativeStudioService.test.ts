@@ -1043,7 +1043,7 @@ describe('CreativeStudioService', () => {
 
   it.each([
     { status: 'queued_local', policy: 'none', expected: true },
-    { status: 'submitting', policy: 'queued_and_running', expected: false },
+    { status: 'submitting', policy: 'queued_and_running', expected: true },
     { status: 'queued_remote', policy: 'none', expected: false },
     { status: 'queued_remote', policy: 'queued_only', expected: true },
     { status: 'queued_remote', policy: 'queued_and_running', expected: true },

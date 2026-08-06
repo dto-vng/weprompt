@@ -41,6 +41,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,256}$/;
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const POLL_BASE_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 const MAX_POLL_DELAY_MS = 15_000;
+const SUBMISSION_DEADLINE_MS = 5 * 60_000;
 const REMOTE_POLL_ATTEMPT_TIMEOUT_MS = 60_000;
 const REMOTE_POLL_DEADLINE_MS = 30 * 60_000;
 const MAX_IN_FLIGHT_PAID_JOBS_PER_PROJECT = 2;
@@ -336,7 +337,7 @@ const executionKey = (projectId: string, jobId: string): string => `${projectId}
 
 export const canCancelJob = (job: StudioJob): boolean => {
   const policy = job.cancellationPolicy ?? 'none';
-  if (job.status === 'queued_local') return true;
+  if (job.status === 'queued_local' || job.status === 'submitting') return true;
   if (job.status === 'queued_remote') return policy !== 'none' && job.providerJobId !== null;
   if (job.status === 'running' || job.status === 'needs_attention') {
     return policy === 'queued_and_running' && job.providerJobId !== null;
@@ -977,9 +978,11 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
 
       let result;
       try {
-        result = await prepared.adapter.submit(prepared.request, prepared.provider, signal);
+        result = await runWithProviderDeadline(signal, SUBMISSION_DEADLINE_MS, (submissionSignal) =>
+          prepared.adapter.submit(prepared.request, prepared.provider, submissionSignal)
+        );
       } catch (error) {
-        if (signal.aborted && disposed) return;
+        if (signal.aborted) return;
         const code = providerErrorCode(error);
         if (
           code === null ||
@@ -1256,6 +1259,28 @@ export const createStudioJobManager = (deps: StudioJobManagerDeps): StudioJobMan
       if (cancelled.status !== 'cancelled') throw new StudioJobManagerError('cancellation_refused');
       controllers.get(executionKey(project.id, current.id))?.abort();
       return cancelled;
+    }
+    if (current.status === 'submitting') {
+      const uncertain = await mutateJob(
+        project.id,
+        current.id,
+        (nextProject, job) => {
+          if (job.status !== 'submitting' || job.providerJobId !== null) return false;
+          job.status = 'needs_attention';
+          job.error = jobError('submission_unknown');
+          nextProject.scenes[job.sceneId].reviewState = 'blocked';
+          return true;
+        },
+        input.expectedRevision
+      );
+      if (uncertain.status !== 'needs_attention' || uncertain.error?.code !== 'submission_unknown') {
+        throw new StudioJobManagerError('cancellation_refused');
+      }
+      const key = executionKey(project.id, current.id);
+      const activeRun = activeRunByKey.get(key);
+      controllers.get(key)?.abort();
+      await activeRun;
+      return uncertain;
     }
     if (!canCancelJob(current) || current.providerJobId === null) {
       throw new StudioJobManagerError('cancellation_refused');

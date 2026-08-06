@@ -41,6 +41,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
 const mp4 = Buffer.from('000000186674797069736f6d00000000', 'hex');
+const SUBMISSION_DEADLINE_MS = 5 * 60_000;
 const REMOTE_POLL_ATTEMPT_TIMEOUT_MS = 60_000;
 const REMOTE_POLL_DEADLINE_MS = 30 * 60_000;
 
@@ -1735,6 +1736,87 @@ describe('StudioJobManager scheduling', () => {
     });
   });
 
+  it('times out never-settling submissions and releases project and global slots', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-06T00:00:00.000Z'));
+    try {
+      const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+      const started: string[] = [];
+      const submit: GenerationProviderAdapter['submit'] = async (request) => {
+        started.push(request.prompt);
+        return new Promise<ProviderSubmitResult>(() => undefined);
+      };
+      const imageAdapter = controllableAdapter('weprompt-image-v1', { submit });
+      const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', { submit });
+      const harness = await createHarness(imageAdapter, {
+        scenes,
+        routes,
+        provider: selectedProvider,
+        additionalAdapters: [videoAdapter],
+        jobIds: ['job_1', 'job_2', 'job_3', 'job_4'],
+        idempotencyKeys: ['key_1', 'key_2', 'key_3', 'key_4'],
+        now: () => new Date(Date.now()).toISOString(),
+        nowEpochMs: () => Date.now(),
+      });
+      const projectBScene = scene({
+        id: 'scene_project_b',
+        title: 'Project B video',
+        visualPrompt: 'project_b_video_prompt',
+        mediaKind: 'video',
+      });
+      const projectBRoute: StudioResolvedSceneRouteSnapshot = {
+        ...routes[0]!,
+        sceneId: projectBScene.id,
+      };
+      const projectB = await createProjectFixture(harness.store, 'Project B', [projectBScene], [projectBRoute]);
+
+      await harness.manager.submitScenes({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneIds: scenes.map((candidate) => candidate.id),
+        routes,
+        catalogVersion: 'catalog_1',
+      });
+      await vi.waitFor(async () => {
+        const projectA = await harness.store.getProject(harness.project.id);
+        expect(started).toEqual(['video_prompt', 'image_prompt_first']);
+        expect(projectA?.jobs.job_3.status).toBe('queued_local');
+      });
+
+      await harness.manager.submitScenes({
+        projectId: projectB.id,
+        expectedRevision: projectB.revision,
+        sceneIds: [projectBScene.id],
+        routes: [projectBRoute],
+        catalogVersion: 'catalog_1',
+      });
+      await vi.waitFor(async () => {
+        const currentProjectB = await harness.store.getProject(projectB.id);
+        expect(started).toEqual(['video_prompt', 'image_prompt_first']);
+        expect(currentProjectB?.jobs.job_4.status).toBe('queued_local');
+      });
+
+      await vi.advanceTimersByTimeAsync(SUBMISSION_DEADLINE_MS);
+
+      await vi.waitFor(async () => {
+        const [projectA, currentProjectB] = await Promise.all([
+          harness.store.getProject(harness.project.id),
+          harness.store.getProject(projectB.id),
+        ]);
+        expect(projectA?.jobs).toMatchObject({
+          job_1: { status: 'needs_attention', error: { code: 'submission_unknown' } },
+          job_2: { status: 'needs_attention', error: { code: 'submission_unknown' } },
+          job_3: { status: 'submitting' },
+        });
+        expect(currentProjectB?.jobs.job_4.status).toBe('submitting');
+        expect(started.slice(0, 2)).toEqual(['video_prompt', 'image_prompt_first']);
+        expect(started.slice(2).toSorted()).toEqual(['image_prompt_waiting', 'project_b_video_prompt']);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('admits another project while two mixed-media jobs occupy the first project cap', async () => {
     const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
     const started: string[] = [];
@@ -2386,7 +2468,7 @@ describe('StudioJobManager cancellation', () => {
 
   it.each([
     { status: 'queued_local', policy: 'none', outcome: 'cancelled', providerCalls: 0 },
-    { status: 'submitting', policy: 'queued_and_running', outcome: 'refused', providerCalls: 0 },
+    { status: 'submitting', policy: 'queued_and_running', outcome: 'needs_attention', providerCalls: 0 },
     { status: 'queued_remote', policy: 'none', outcome: 'refused', providerCalls: 0 },
     { status: 'queued_remote', policy: 'queued_only', outcome: 'cancelled', providerCalls: 1 },
     { status: 'queued_remote', policy: 'queued_and_running', outcome: 'cancelled', providerCalls: 1 },
@@ -2419,10 +2501,105 @@ describe('StudioJobManager cancellation', () => {
       });
 
       if (outcome === 'cancelled') await expect(operation).resolves.toMatchObject({ status: 'cancelled' });
-      else await expect(operation).rejects.toMatchObject({ code: 'cancellation_refused' });
+      else if (outcome === 'needs_attention') {
+        await expect(operation).resolves.toMatchObject({
+          status: 'needs_attention',
+          error: { code: 'submission_unknown' },
+        });
+      } else await expect(operation).rejects.toMatchObject({ code: 'cancellation_refused' });
       expect(cancel).toHaveBeenCalledTimes(providerCalls);
     }
   );
+
+  it('cancels a never-settling submission without losing duplicate-charge safety or either slot', async () => {
+    const { selectedProvider, scenes, routes } = mixedSchedulingFixture();
+    const started: string[] = [];
+    const submit: GenerationProviderAdapter['submit'] = async (request, _provider, signal) => {
+      started.push(request.prompt);
+      if (request.prompt === 'video_prompt') {
+        return new Promise<ProviderSubmitResult>((resolve) => {
+          signal.addEventListener('abort', () => resolve({ kind: 'complete', outputs: [] }), { once: true });
+        });
+      }
+      return new Promise<ProviderSubmitResult>(() => undefined);
+    };
+    const imageAdapter = controllableAdapter('weprompt-image-v1', { submit });
+    const videoAdapter = controllableAdapter('weprompt-media-gateway-v1', { submit });
+    const harness = await createHarness(imageAdapter, {
+      scenes,
+      routes,
+      provider: selectedProvider,
+      additionalAdapters: [videoAdapter],
+      jobIds: ['job_1', 'job_2', 'job_3', 'job_4'],
+      idempotencyKeys: ['key_1', 'key_2', 'key_3', 'key_4'],
+    });
+    const projectBScene = scene({
+      id: 'scene_project_b',
+      title: 'Project B video',
+      visualPrompt: 'project_b_video_prompt',
+      mediaKind: 'video',
+    });
+    const projectBRoute: StudioResolvedSceneRouteSnapshot = {
+      ...routes[0]!,
+      sceneId: projectBScene.id,
+    };
+    const projectB = await createProjectFixture(harness.store, 'Project B', [projectBScene], [projectBRoute]);
+
+    await harness.manager.submitScenes({
+      projectId: harness.project.id,
+      expectedRevision: harness.project.revision,
+      sceneIds: scenes.map((candidate) => candidate.id),
+      routes,
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(async () => {
+      const projectA = await harness.store.getProject(harness.project.id);
+      expect(started).toEqual(['video_prompt', 'image_prompt_first']);
+      expect(projectA?.jobs.job_3.status).toBe('queued_local');
+    });
+    await harness.manager.submitScenes({
+      projectId: projectB.id,
+      expectedRevision: projectB.revision,
+      sceneIds: [projectBScene.id],
+      routes: [projectBRoute],
+      catalogVersion: 'catalog_1',
+    });
+    await waitFor(async () =>
+      expect((await harness.store.getProject(projectB.id))?.jobs.job_4.status).toBe('queued_local')
+    );
+    const beforeCancel = (await harness.store.getProject(harness.project.id))!;
+
+    await expect(
+      harness.manager.cancelJob({
+        projectId: beforeCancel.id,
+        jobId: 'job_1',
+        expectedRevision: beforeCancel.revision,
+      })
+    ).resolves.toMatchObject({
+      status: 'needs_attention',
+      providerJobId: null,
+      error: { code: 'submission_unknown' },
+    });
+
+    await waitFor(async () => {
+      const [projectA, currentProjectB] = await Promise.all([
+        harness.store.getProject(harness.project.id),
+        harness.store.getProject(projectB.id),
+      ]);
+      expect(projectA?.jobs.job_3.status).toBe('submitting');
+      expect(currentProjectB?.jobs.job_4.status).toBe('submitting');
+      expect(started.slice(0, 2)).toEqual(['video_prompt', 'image_prompt_first']);
+      expect(started.slice(2).toSorted()).toEqual(['image_prompt_waiting', 'project_b_video_prompt']);
+    });
+    const afterCancel = (await harness.store.getProject(harness.project.id))!;
+    await expect(
+      harness.manager.retryJob({
+        projectId: afterCancel.id,
+        jobId: 'job_1',
+        expectedRevision: afterCancel.revision,
+      })
+    ).rejects.toMatchObject({ code: 'duplicate_charge_acknowledgement_required' });
+  });
 
   it('uses the durable job tuple after project selection and current route catalog both change', async () => {
     const cancel = vi.fn(async () => ({ kind: 'cancelled' as const }));
