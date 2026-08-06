@@ -12,7 +12,9 @@ import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 import type {
   CreateStudioProjectInput,
   StudioConnectionBinding,
+  StudioJob,
   StudioRenderProgressEvent,
+  StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import {
   createCreativeStudioRuntime,
@@ -28,9 +30,13 @@ import {
   STUDIO_E2E_FAKE_PROVIDER_ID,
   STUDIO_E2E_RAW_OUTPUT_BODY_SENTINEL,
 } from '@process/services/creative-studio/adapters/e2eFakeAdapter';
-import type { GenerationProviderAdapterRegistry } from '@process/services/creative-studio/adapters';
-import type { StudioJobManager } from '@process/services/creative-studio/jobManager';
-import type { StudioMediaStore } from '@process/services/creative-studio/mediaStore';
+import type {
+  GenerationProviderAdapter,
+  GenerationProviderAdapterRegistry,
+  ProviderJobSnapshot,
+} from '@process/services/creative-studio/adapters';
+import { createStudioJobManager, type StudioJobManager } from '@process/services/creative-studio/jobManager';
+import { createStudioMediaStore, type StudioMediaStore } from '@process/services/creative-studio/mediaStore';
 import type { StudioProviderResolver } from '@process/services/creative-studio/providerResolver';
 import type { CreativeStudioService } from '@process/services/creative-studio/creativeStudioService';
 import type { CreativeStudioStore } from '@process/services/creative-studio/store';
@@ -105,6 +111,7 @@ const createHarness = (
     store?: CreativeStudioStore;
     onProposalUpdated?: (projectId: string, proposalId: string) => void;
     onRenderProgress?: (event: StudioRenderProgressEvent) => void;
+    enabled?: boolean;
   } = {}
 ): RuntimeHarness => {
   const calls: string[] = [];
@@ -177,6 +184,7 @@ const createHarness = (
 
   const runtime = createCreativeStudioRuntime({
     rootDir: overrides.rootDir ?? '/tmp/creative-studio-runtime-test',
+    enabled: overrides.enabled ?? true,
     environment,
     isPackaged: overrides.isPackaged ?? false,
     factories,
@@ -197,6 +205,114 @@ const createHarness = (
   });
 
   return { runtime, calls, captures, resumePendingJobs, disposeJobs, disposePlanner, uninstallProtocol };
+};
+
+const interruptedScene: StudioScene = {
+  id: 'scene_interrupted',
+  title: 'Interrupted render',
+  purpose: 'Prove disabled recovery stays dormant',
+  visualPrompt: 'A paid video render still running at shutdown',
+  narration: '',
+  onScreenText: '',
+  mediaKind: 'video',
+  durationSeconds: 5,
+  referenceAssetId: null,
+  selectedAssetId: null,
+  assetIds: [],
+  jobIds: ['job_interrupted'],
+  reviewState: 'generating',
+};
+
+const createPersistedRecoveryHarness = async (enabled: boolean) => {
+  const rootDir = await mkdtemp(path.join(os.tmpdir(), 'studio-runtime-recovery-'));
+  temporaryDirectories.push(rootDir);
+  const store = createCreativeStudioStore({ rootDir });
+  const created = await store.createProject({
+    name: 'Interrupted film',
+    brief: 'Recover a paid render only while Studio is enabled',
+    aspectRatio: '16:9',
+    targetDurationSeconds: 5,
+    resolution: '720p',
+  });
+  const project = await store.updateProject(created.id, (current) => {
+    const next = structuredClone(current);
+    const timestamp = current.createdAt;
+    const job: StudioJob = {
+      id: 'job_interrupted',
+      projectId: current.id,
+      sceneId: interruptedScene.id,
+      status: 'running',
+      provider: {
+        providerId: 'provider_1',
+        adapterId: 'weprompt-media-gateway-v1',
+        model: 'model_1',
+      },
+      idempotencyKey: 'key_interrupted',
+      providerJobId: 'remote_interrupted',
+      remoteStartedAt: timestamp,
+      cancellationPolicy: 'queued_and_running',
+      outputAssetIds: [],
+      error: null,
+      retryOfJobId: null,
+      retryReason: null,
+      duplicateChargeAcknowledged: false,
+      duplicateChargeAcknowledgedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    next.sceneOrder = [interruptedScene.id];
+    next.scenes = { [interruptedScene.id]: interruptedScene };
+    next.jobs = { [job.id]: job };
+    next.routing.video = job.provider;
+    return next;
+  });
+  const runtimeStore: CreativeStudioStore = {
+    ...store,
+    watchProposals: async () => async () => {},
+  };
+  const mediaStore = createStudioMediaStore({ store: runtimeStore });
+  const listProviders = vi.fn<() => Promise<IProvider[]>>(async () => [provider()]);
+  const resolveProvider = vi.fn(async () => true);
+  const poll = vi.fn<NonNullable<GenerationProviderAdapter['poll']>>(
+    async (): Promise<ProviderJobSnapshot> => ({ status: 'failed', error: { code: 'unknown' } })
+  );
+  const adapter: GenerationProviderAdapter = {
+    id: 'weprompt-media-gateway-v1',
+    validateConnection: async () => ({ ok: true }),
+    validateRequest: () => ({ ok: false, issues: [{ code: 'invalid_request' }] }),
+    submit: async () => ({ kind: 'remote', providerJobId: 'remote_unexpected' }),
+    poll,
+  };
+  const factories: CreativeStudioRuntimeFactories = {
+    createStore: () => runtimeStore,
+    createMediaStore: () => mediaStore,
+    createAdapters: () => new Map([[adapter.id, adapter]]),
+    createPlanner: () => ({ dispose: async () => {} }) as StudioStoryboardPlanner,
+    createProviderResolver: () => ({
+      listConnectionCandidates: async () => [],
+      listGenerationRoutes: async () => ({ routes: [], generationCatalogVersion: 'unused' }),
+      isGenerationRouteAvailable: resolveProvider,
+    }),
+    createJobManager: (input) => createStudioJobManager({ ...input, sleep: async () => undefined }),
+    createService: () => ({}) as CreativeStudioService,
+    createE2EFakeBundle: () => {
+      throw new Error('fake bundle was not expected');
+    },
+  };
+  const runtime = createCreativeStudioRuntime({
+    rootDir,
+    enabled,
+    isPackaged: false,
+    factories,
+    listProviders,
+    onProjectUpdated: vi.fn(),
+    onProposalUpdated: vi.fn(),
+    protocol: {
+      install: () => ({ dispose: async () => {} }),
+      uninstall: async (installation) => installation?.dispose(),
+    },
+  });
+  return { runtime, store, project, listProviders, resolveProvider, poll };
 };
 
 describe('Creative Studio runtime identity and lifecycle', () => {
@@ -311,6 +427,41 @@ describe('Creative Studio runtime identity and lifecycle', () => {
     await Promise.all([runtime.start(), runtime.start()]);
 
     expect(calls).toEqual(['cleanup-parts', 'install-protocol']);
+  });
+
+  it('does no startup or pending-job recovery work while the release gate is disabled', async () => {
+    const { runtime, calls, resumePendingJobs } = createHarness({}, { enabled: false });
+
+    await Promise.all([runtime.start(), runtime.onBackendReady(), runtime.onBackendReady()]);
+
+    expect(calls).toEqual([]);
+    expect(resumePendingJobs).not.toHaveBeenCalled();
+  });
+
+  it('leaves a persisted remote job dormant without resolving or polling its provider while disabled', async () => {
+    const { runtime, store, project, listProviders, resolveProvider, poll } =
+      await createPersistedRecoveryHarness(false);
+
+    await runtime.onBackendReady();
+
+    expect(resolveProvider).not.toHaveBeenCalled();
+    expect(listProviders).not.toHaveBeenCalled();
+    expect(poll).not.toHaveBeenCalled();
+    await expect(store.getProject(project.id)).resolves.toMatchObject({
+      jobs: { job_interrupted: { status: 'running', providerJobId: 'remote_interrupted' } },
+    });
+    await runtime.dispose();
+  });
+
+  it('still resolves and polls a persisted remote job while the release gate is enabled', async () => {
+    const { runtime, listProviders, resolveProvider, poll } = await createPersistedRecoveryHarness(true);
+
+    await runtime.onBackendReady();
+    await vi.waitFor(() => expect(poll).toHaveBeenCalledTimes(1));
+
+    expect(resolveProvider).toHaveBeenCalledTimes(1);
+    expect(listProviders).toHaveBeenCalledTimes(1);
+    await runtime.dispose();
   });
 
   it('shares normal and late backend-ready calls and resumes jobs exactly once', async () => {

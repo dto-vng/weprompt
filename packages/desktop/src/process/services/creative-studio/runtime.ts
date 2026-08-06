@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import { httpRequest } from '@/common/adapter/httpBridge';
+import { CREATIVE_STUDIO_ENABLED } from '@/common/config/constants';
 import type { IProvider } from '@/common/config/storage';
 import type { StudioRenderProgressEvent } from '@/common/types/project/creativeStudioTypes';
 import { app, protocol } from 'electron';
@@ -64,6 +65,7 @@ export type CreativeStudioRuntimeFactories = {
 
 export type CreativeStudioRuntimeDeps = {
   rootDir: string;
+  enabled: boolean;
   environment?: RuntimeEnvironment;
   isPackaged: boolean;
   factories?: CreativeStudioRuntimeFactories;
@@ -180,8 +182,10 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
   let protocolInstallation: CreativeStudioProtocolInstallation | null = null;
   let disposeProposalWatcher: (() => Promise<void>) | null = null;
   let disposed = false;
+  const disabledLifecycle = Promise.resolve();
 
   const start = (): Promise<void> => {
+    if (!deps.enabled) return disabledLifecycle;
     startPromise ??= (async () => {
       if (disposed) return;
       await mediaStore.cleanupOrphanParts();
@@ -202,6 +206,7 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
   };
 
   const onBackendReady = (): Promise<void> => {
+    if (!deps.enabled) return disabledLifecycle;
     backendReadyPromise ??= (async () => {
       await start();
       if (!disposed) await jobManager.resumePendingJobs();
@@ -300,6 +305,7 @@ let productionRuntime: CreativeStudioRuntime | null = null;
 export const getCreativeStudioRuntime = (): CreativeStudioRuntime => {
   productionRuntime ??= createCreativeStudioRuntime({
     rootDir: getCreativeStudioRootDir(),
+    enabled: CREATIVE_STUDIO_ENABLED,
     environment: process.env,
     isPackaged: app.isPackaged,
     listProviders: () => httpRequest<IProvider[]>('GET', '/api/providers'),

@@ -19,7 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
-import { DESKTOP_PET_ENABLED } from './common/config/constants';
+import { CREATIVE_STUDIO_ENABLED, DESKTOP_PET_ENABLED } from './common/config/constants';
 import { isUpdateFeatureEnabled } from './common/update/updatePolicy';
 import { ipcBridge } from './common';
 import { initializeProcess } from './process';
@@ -422,7 +422,7 @@ function ensureAdminUserOnce(backendPort: number): Promise<void> {
 }
 
 function markBackendReady(backendPort: number, source: string): void {
-  if (!isWebUIMode && !isResetPasswordMode) {
+  if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
     resumeCreativeStudioAfterBackendReady(getCreativeStudioRuntime());
   }
   if (backendStartedOk) return;
@@ -909,7 +909,7 @@ const handleAppReady = async (): Promise<void> => {
 
   try {
     await initializeProcess();
-    if (!isWebUIMode && !isResetPasswordMode) {
+    if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
       await getCreativeStudioRuntime().start();
     }
     rendererInitialLanguage = ProcessConfig.getSync('language') ?? null;
