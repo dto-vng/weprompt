@@ -111,4 +111,32 @@ describe('GuidInputCard', () => {
     expect(onManagedDrop).not.toHaveBeenCalled();
     expect(legacyDrop).not.toHaveBeenCalled();
   });
+
+  it('keeps managed descriptors visible but immutable while a Guid handoff is pending', () => {
+    const onManagedDrop = vi.fn();
+    const onRevokePresentationSource = vi.fn();
+    const descriptor: PresentationSourceDescriptor = {
+      grantId: 'grant-1',
+      displayName: 'Quarterly Revenue.xlsx',
+      format: 'xlsx',
+      sourceKind: 'native-picker',
+      byteLength: 2048,
+      sha256: 'a'.repeat(64),
+      expiresAt: '2026-08-05T12:00:00.000Z',
+    };
+    const source = new File(['revenue'], 'revenue.csv', { type: 'text/csv' });
+    renderInputCard({
+      managedPresentationPending: true,
+      onManagedDrop,
+      onRevokePresentationSource,
+      presentationSourceDescriptors: [descriptor],
+    });
+
+    fireEvent.drop(screen.getByTestId('guid-input-card'), { dataTransfer: { files: [source] } });
+    fireEvent.click(screen.getByRole('button', { name: 'common.remove Quarterly Revenue.xlsx' }));
+
+    expect(screen.getByText('Quarterly Revenue.xlsx')).toBeInTheDocument();
+    expect(onManagedDrop).not.toHaveBeenCalled();
+    expect(onRevokePresentationSource).not.toHaveBeenCalled();
+  });
 });

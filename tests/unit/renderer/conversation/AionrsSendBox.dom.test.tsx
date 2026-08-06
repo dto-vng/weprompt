@@ -1473,6 +1473,123 @@ describe('AionrsSendBox', () => {
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
+  it('routes a prompt-only managed initial message through the persistent queue with stable ids', async () => {
+    featureEnabledState.current = true;
+    sessionStorage.setItem(
+      'aionrs_initial_message_conv-1',
+      JSON.stringify({
+        input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+        files: [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ],
+        injectSkills: ['officecli'],
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    const initial = presentationControllerMock.enqueue.mock.calls[0]?.[0] as {
+      queueItemId: string;
+      clientRequestId: string;
+      input: string;
+      selectedTemplateId: string;
+      sources: unknown[];
+    };
+    expect(initial).toMatchObject({
+      input: 'Initial deck',
+      selectedTemplateId: 'business-review',
+      sources: [],
+    });
+    expect(initial.queueItemId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(initial.clientRequestId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBe('1');
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('hydrates and persists opaque grants before routing a managed initial message', async () => {
+    featureEnabledState.current = true;
+    hydrateSourceOwnerMock.mockResolvedValue({
+      ok: true,
+      owner: currentConversationOwner,
+      ownerRevision: 11,
+      grants: [
+        {
+          ...sourceDescriptor,
+          grantId: '44444444-4444-4444-8444-444444444444',
+        },
+      ],
+    });
+    sessionStorage.setItem(
+      'aionrs_initial_message_conv-1',
+      JSON.stringify({
+        input: 'Create a presentation from the request below. Managed rules.\n\nInitial sourced deck',
+        files: [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ],
+        injectSkills: ['officecli'],
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'Initial sourced deck',
+        sources: [
+          {
+            grantId: '44444444-4444-4444-8444-444444444444',
+            expectedByteLength: 42,
+            expectedSha256: 'a'.repeat(64),
+          },
+        ],
+        sourceOwner: currentConversationOwner,
+        expectedOwnerRevision: 11,
+      })
+    );
+    expect(JSON.stringify(presentationControllerMock.enqueue.mock.calls[0]?.[0])).not.toContain('/private/');
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'a string', files: '/private/presentation-templates/business-review/THEME.md' },
+    { name: 'an object', files: { path: '/private/presentation-templates/business-review/THEME.md' } },
+    {
+      name: 'a mixed array',
+      files: [
+        '/private/presentation-templates/business-review/THEME.md',
+        { path: '/private/presentation-templates/business-review/reference.pptx' },
+      ],
+    },
+  ])('fails closed for a managed initial handoff whose files value is $name', async ({ files }) => {
+    featureEnabledState.current = true;
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const serialized = JSON.stringify({
+      input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+      files,
+      injectSkills: ['officecli'],
+    });
+    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'legacy-turn', runtime: null, msg_id: 'legacy-msg' });
+    sessionStorage.setItem(storageKey, serialized);
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(sessionStorage.getItem(storageKey)).toBe(serialized);
+    expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBeNull();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
   it('keeps the raw legacy send when the managed feature flag is false', async () => {
     featureEnabledState.current = false;
     selectedTemplateState.current = pptxTemplate;
