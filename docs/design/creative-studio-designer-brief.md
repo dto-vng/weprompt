@@ -66,6 +66,8 @@ Measured type/colour specs are in the [pass 3 prep doc](creative-studio-fidelity
 - **Drop the inline cycling.** Model Settings stays the single place selection changes. Two controls that can disagree about who owns the choice is worse than one extra click.
 - **Keep `Open Model Settings`** as the panel's action.
 
+> **[Designer, 2026-08-06] Confirmed, with a requirement attached.** The cycler was not load-bearing — its value was *compression*, and compression is the panel's job rather than the control's. But the cycler also carried a signal: that models are **per-project and changeable**. The panel must keep that signal by naming the roles and keeping one clear route out to Settings. Removing the control must not turn model choice into something that reads as fixed or global.
+
 ### 3.2 The question we need you to answer
 
 **How should the panel and the unconfigured state coexist?**
@@ -84,10 +86,16 @@ The per-role panel is the natural place to fix this, because it already shows on
 
 Our weak preference is **(1)** — one place that answers "what will render this, and can it?" — but this is your call, and the per-shot half of (3) may be needed regardless, since a user looking at a shot with no button will look at the *shot* first.
 
+> **[Designer, 2026-08-06] Resolved — it is not either/or.** The cheap fix we offered as an alternative (a disabled control with a tooltip) is *"not the worse answer, it is the incomplete one."* Ship it **as part of** this rather than instead of it — the per-shot treatment and the panel state are **one deliverable**, specified as **state 7**.
+>
+> This settles the question BUG-024 deferred: the fix is both surfaces, not a choice between them. A user looking at a shot with no action looks at the shot first, so the shot must answer; the panel is where the same fact is explained once for the whole project.
+
 ### 3.3 Constraints that shape the answer
 
 - **Availability is four states, not two:** `ready`, `selection_required`, `setup_required`, `unavailable`. The status dot needs to express these, and `selection_required` ("several options, none chosen") differs meaningfully from `setup_required` ("no credentials"). Today all four collapse to a binary.
 - **There are three roles, not two.** The catalog carries `storyboard` (a text model) alongside `image` and `video`; the current engine bar shows only the two media roles. Whether a text model belongs in a panel about *render engines* is an open question — we lean toward excluding it, but the data is there if you want it.
+
+  > **[Designer, 2026-08-06] Resolved — exclude it, and say so in the name.** The panel's title must signal that its scope is render engines, so a user does not read a missing text model as a missing panel entry. **And excluding it here is not the same as it having nowhere to fail** — the storyboard model can be unconfigured or unavailable exactly as the media roles can, and that failure needs a home in **Write**, where the text model is actually used. That is a separate surface, not an omission.
 - **Capability text is real content.** `up to 15s` is a genuine limit that changes what a user can ask for. It should survive into the role rows; the prototype's value-only buttons had nowhere to put it.
 - **Auto-selection is invisible today.** A user may never learn the app picked their model. Whether the panel should say so is worth a thought — we have not decided this either way.
 
@@ -133,6 +141,8 @@ Because the cut is editable, it can **diverge** from the storyboard. The design 
 3. **How does an appended shot announce itself?** It arrives at the end, away from where the user is looking, potentially long after they last touched the cut.
 4. **Is divergence a warning or a neutral fact?** Our position: **neutral**. A user hand-ordering a cut is doing their job, not making a mistake — consistent with a decision already taken on this branch that timing is advisory and never blocks. Please do not design it as an error state unless you disagree and can say why.
 
+> **[Designer, 2026-08-06] Confirmed, no dissent.** Divergence is neutral throughout. The single exception is the **appended clip**, which is emphatic — but that emphasis is about **location, not fault**. It answers "your new shot went to the end" rather than "something is wrong." Any implementation that borrows warning styling for it has misread this.
+
 ### 5.4 Deliverable
 
 Whatever expresses states 1–4 on the Review surface. Note that Review does not currently have a cut editor at all, so this may imply structure, not just a badge — which is part of why §4 matters.
@@ -159,11 +169,23 @@ These are hard, and they apply to all three asks.
 
 ---
 
-## Assumptions in this brief
+## Assumptions in this brief — all four answered
 
-Stated so you can correct them rather than inherit them:
+Stated so they could be corrected rather than inherited. **Designer response received 2026-08-06; all four agreed, two with corrections that change the work.**
 
-1. That the collapsible framing is worth adopting **without** the inline cycling. If you think the cycler was load-bearing to the panel's value, say so — the decision was made on engineering reasoning about ownership of model choice, not on a design argument.
-2. That partial readiness is a design problem rather than purely an engineering fix. We could make the generate button appear-but-disabled with a tooltip and ship nothing new. We think that is the worse answer, but it is available.
-3. That excluding the storyboard text model from a render-engine panel is right. Weakly held.
-4. That divergence should read as neutral rather than as a warning. Held more firmly, for consistency with the advisory-timing decision — but it is a product position, not a fact.
+| # | Assumption | Outcome |
+| --- | --- | --- |
+| 1 | Collapsible framing **without** the inline cycler | **Agreed.** Cycler not load-bearing — but the panel must inherit its signal that models are *per-project and changeable* (§3.1) |
+| 2 | Partial readiness is a design problem, and disabled-plus-tooltip is the worse answer | **Agreed with correction.** Not the worse answer — the **incomplete** one. Both surfaces ship together as **state 7** (§3.2) |
+| 3 | Exclude the storyboard text model | **Agreed, extended.** Say it in the panel's name, and give the text model a failure surface in **Write** (§3.3) |
+| 4 | Divergence reads as neutral | **Agreed, no dissent.** Sole exception: the appended clip is emphatic about *location, not fault* (§5.3) |
+
+Net effect on scope: assumptions 2 and 3 each **added** work rather than removing it. The per-shot treatment is now in scope alongside the panel, and Write needs a model-failure state it does not have today.
+
+## Outstanding — referenced but not yet received
+
+The designer response cites material not yet in hand. These are load-bearing and the panel cannot be implemented against a reference we cannot read:
+
+- **The screen map** — cited twice ("the map above"), and the source of the Write item in §3.3.
+- **State 7** — the named specification for the combined panel-plus-shot treatment in §3.2. We have its *shape* (both surfaces, one deliverable) but not its content.
+- **The Write entry** in that map, which determines whether the storyboard model's failure surface is new design or an existing state.
