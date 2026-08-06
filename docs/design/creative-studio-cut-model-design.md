@@ -1,6 +1,6 @@
 # Creative Studio — the cut (edit-decision) model
 
-**Status:** rev 6 — implementation-surfaced defaults recorded · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
+**Status:** rev 6 — implementation-surfaced defaults recorded · **Date:** 2026-08-06 · **Branch family:** `creative-suite`
 **Independent of:** the video-capability spike — this is why it can proceed now
 **Blocks:** the Review editor UI and any render pipeline
 
