@@ -3,6 +3,19 @@
 **Date:** 2026-08-06 · **Re:** `Creative Studio - Model & Divergence States.dc.html`
 **Related:** [designer brief](creative-studio-designer-brief.md) §8
 
+> ## ✅ ANSWERED 2026-08-06 — design response §2a
+>
+> Kept as the record of what was asked and why; the answers are authoritative in
+> [cut model design](creative-studio-cut-model-design.md) §4 rev 7 and §11.2.
+>
+> - **The question — append vs hold outside: take the alternative**, scoped to `orderMode === 'manual'` only. Storyboard mode still inserts at the `sceneOrder` slot with no group and no marker.
+> - **Our objection 2 was wrong, on the designer's own drawing.** We argued hold-outside breaks the contract that the cut eventually contains every renderable shot. Cut state 1 already renders a takeless scene as a hatched `SLATE` — a storyboard shot with no clip in the cut. That contract was already gone; hold-outside is the same fact in the one mode with no slot to hold it.
+> - **What decided it against the marker** was §2a·2: a batch finishing overnight is the ordinary case, and three clips appended in storyboard sequence to the tail of a hand-made order read as corruption. One aggregated count is thin cover.
+> - **`Undo the move`: dropped, no objection**, and explicitly do *not* scope the bounded order-only undo we offered as a fallback. The flip is not destructive — the user gained an order and lost nothing — so the way back belongs in the copy, not in a control: *"Change above puts it back."*
+> - **`CHOSEN FOR YOU`: confirmed** as the right fix, no design change.
+>
+> Net effect: `EPIC-005-G2` dissolved and `G3` closed by deletion, both without schema. Only `G1` (provenance) remains to build.
+
 We implemented against your states and hit one constraint you had no way to see from the drawing. It
 affects three of them. Two we can resolve ourselves and are telling you about; **one is a genuine
 question we would rather you answer.**
