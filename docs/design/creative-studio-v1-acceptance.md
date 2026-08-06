@@ -3,7 +3,7 @@
 **Date:** 2026-08-06 · **Tree:** `creative-suite-sprint2@d2b2e70ec` (pushed) · **Driven:** live Electron dev app over CDP (port 9230), real providers, real spend
 **Plan:** [v1 delivery plan](creative-studio-v1-delivery-plan.md) §0 definition of done
 
-## Verdict: PASS, with one clause pending a human folder-pick and one honest deviation
+## Verdict: PASS — every clause verified; one honest deviation (storyboard authored, not assistant-generated)
 
 ## The run
 
@@ -17,7 +17,7 @@
 | **Render video** (the new capability) | Progress visible (`Rendering video… 38%`) with a working Cancel; completed in ~4s; result playable in Review from the managed store |
 | The file itself | `assets/ce6b36c1_87bb_4696_a9bb_c3a99a6d01b9.mp4` + `.render.json` sidecar, 4,297,983 bytes |
 | ffprobe | h264 video 1280×720 (720p/16:9 mapping) **10.0547s**; AAC audio **10.0560s** — Δ 1.3ms; container 10.0757s. Duration = 5s held still + ~5s video take, correct order |
-| Export `cut.mp4` | **Pending:** the export flow opens a native macOS directory picker (`creativeStudioBridge.ts:340`), which cannot be driven over CDP. Export-includes-`cut.mp4` is covered by A2's tests; the live confirmation completes when a human picks the folder |
+| Export `cut.mp4` | **Verified.** The export flow's native macOS directory picker (`creativeStudioBridge.ts:340`) cannot be driven over CDP, so the user picked the folder; the exported directory contains `cut.mp4`, `scene-01-sunrise-over-the-terraces.png`, `scene-02-the-morning-pour.mp4` and `storyboard.json`. Probed: 2 streams, 10.0757s — and `cut.mp4` is **byte-identical to the managed render** (matching SHA-256 `5670b8ea…`), so export delivers the verified artifact, not a re-encode |
 
 ## Incidental live confirmations
 
