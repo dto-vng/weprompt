@@ -3,6 +3,25 @@
 **Reported:** 2026-08-06 · **Owner:** EPIC-001 (artifacts / presentation runs)
 **Found by:** the `creative-suite-sprint2` back-merge gate · **Not a Creative Studio defect**
 
+## CLOSED 2026-08-06 — fixed upstream, and the diagnosis below misattributed it
+
+**Fixed on `sprint2`** via `82dd0e47f`, merged through MR !61 as `54d685481`. EPIC-001 took the
+preferred fix from §"Suggested fix": the monolithic test was split into independent named cases with
+no timeout increase and no production-code workaround. Verified directly rather than taken on
+report — on `origin/sprint2` the test name `recovers atomic run tombstones after every journal and
+two-manifest durability boundary` **no longer exists**, and that file now contains 62 `it()`/`it.each`
+blocks.
+
+**Correction to this report.** It reads as though an unowned flaky test needed fixing. It did not.
+The fix had already landed upstream; `creative-suite-sprint2` simply did not contain it, being
+**17 commits behind `sprint2`** at `07424fdfe`. The failing test measured on that branch was the old
+pre-split version. The mechanism described below is accurate; the framing — a live defect awaiting an
+owner — was wrong, and a later reading that "nobody is fixing this" followed from the same error.
+
+**The real lesson is the one worth keeping:** a suite-growth failure on a long-lived branch should
+prompt "how far behind are we?" before "who owns this test?". The branch being 17 behind was the
+cause; the flake was only how it surfaced.
+
 ## Summary
 
 One test in `tests/unit/process/services/presentation-template/storage/presentationRunStore.test.ts` fails when the suite is large enough:
