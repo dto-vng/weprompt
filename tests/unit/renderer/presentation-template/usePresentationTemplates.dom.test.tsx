@@ -12,6 +12,7 @@ import type {
 } from '@/common/types/office/presentationTemplate';
 import {
   getPresentationRunEligibility,
+  resolveManagedPresentationInitialSend,
   type PresentationRunEligibilityInput,
   usePresentationTemplates,
 } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
@@ -111,6 +112,37 @@ describe('getPresentationRunEligibility', () => {
     { name: 'runtime is unknown', override: { runtime: null } },
   ])('rejects managed UX when $name', ({ override }) => {
     expect(getPresentationRunEligibility({ ...eligibleInput, ...override })).toBe(false);
+  });
+});
+
+describe('resolveManagedPresentationInitialSend', () => {
+  it('recovers raw user input and the selected template without forwarding template paths', () => {
+    expect(
+      resolveManagedPresentationInitialSend(
+        'Create a presentation from the request below. Managed rules.\n\nQuarterly review',
+        [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ]
+      )
+    ).toEqual({
+      input: 'Quarterly review',
+      selectedTemplateId: 'business-review',
+      injectSkills: ['officecli'],
+    });
+  });
+
+  it('rejects an initial managed send that still contains a raw user attachment', () => {
+    expect(
+      resolveManagedPresentationInitialSend(
+        'Create a presentation from the request below. Managed rules.\n\nQuarterly review',
+        [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+          '/private/user/revenue.xlsx',
+        ]
+      )
+    ).toBeNull();
   });
 });
 

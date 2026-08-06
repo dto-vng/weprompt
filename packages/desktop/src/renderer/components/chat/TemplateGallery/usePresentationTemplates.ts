@@ -16,6 +16,8 @@ import type {
 } from '@/common/types/office/presentationTemplate';
 import { composePresentationSend } from './directive';
 import { useAddEventListener } from '@/renderer/utils/emitter';
+import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
+import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 
 export type PresentationRunEligibilityInput = {
   featureEnabled: boolean;
@@ -24,6 +26,31 @@ export type PresentationRunEligibilityInput = {
   runtime: string | null;
   templateFormat: PresentationTemplateFormat | null;
 };
+
+export type ManagedPresentationInitialSend = {
+  input: string;
+  selectedTemplateId: string;
+  injectSkills: ['officecli'];
+};
+
+/**
+ * Recovers the raw prompt from the legacy Guid handoff without returning any
+ * template or user paths. A raw user attachment makes the handoff ineligible
+ * for managed dispatch; AionRS keeps it blocked for explicit source reselect.
+ */
+export function resolveManagedPresentationInitialSend(
+  input: string,
+  files: string[]
+): ManagedPresentationInitialSend | null {
+  if (!input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX)) return null;
+  const parsed = parseTemplatedSend(input, files);
+  if (parsed === null || parsed.userFiles.length > 0) return null;
+  return {
+    input: parsed.userText,
+    selectedTemplateId: parsed.templateId,
+    injectSkills: ['officecli'],
+  };
+}
 
 /**
  * Renderer-only UX hint for the managed presentation path.
