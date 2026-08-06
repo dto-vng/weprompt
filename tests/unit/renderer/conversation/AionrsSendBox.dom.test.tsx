@@ -1554,6 +1554,42 @@ describe('AionrsSendBox', () => {
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { name: 'a string', files: '/private/presentation-templates/business-review/THEME.md' },
+    { name: 'an object', files: { path: '/private/presentation-templates/business-review/THEME.md' } },
+    {
+      name: 'a mixed array',
+      files: [
+        '/private/presentation-templates/business-review/THEME.md',
+        { path: '/private/presentation-templates/business-review/reference.pptx' },
+      ],
+    },
+  ])('fails closed for a managed initial handoff whose files value is $name', async ({ files }) => {
+    featureEnabledState.current = true;
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const serialized = JSON.stringify({
+      input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+      files,
+      injectSkills: ['officecli'],
+    });
+    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'legacy-turn', runtime: null, msg_id: 'legacy-msg' });
+    sessionStorage.setItem(storageKey, serialized);
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(sessionStorage.getItem(storageKey)).toBe(serialized);
+    expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBeNull();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
   it('keeps the raw legacy send when the managed feature flag is false', async () => {
     featureEnabledState.current = false;
     selectedTemplateState.current = pptxTemplate;

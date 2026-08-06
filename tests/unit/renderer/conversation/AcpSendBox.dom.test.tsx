@@ -447,9 +447,6 @@ vi.mock('@/renderer/utils/file/fileSelection', () => ({
 vi.mock('@/renderer/utils/file/messageFiles', () => ({
   buildDisplayMessage: (input: string) => input,
 }));
-vi.mock('@/renderer/pages/conversation/platforms/acp/useAcpInitialMessage', () => ({
-  useAcpInitialMessage: vi.fn(),
-}));
 vi.mock('@arco-design/web-react', () => ({
   Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
     <button type='button' onClick={onClick}>
@@ -574,6 +571,7 @@ const makeMessageState = (overrides: Partial<UseAcpMessageReturn> = {}): UseAcpM
 describe('AcpSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     isMobileMock.current = false;
     mobileActionSheetEntries.current = [];
     contextUsageIndicatorProps.current = null;
@@ -1296,6 +1294,92 @@ describe('AcpSendBox', () => {
     ]);
     expect(presentationStartInvokeMock).toHaveBeenCalledTimes(2);
     expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves a managed initial handoff until the hydrated queue accepts it without legacy send', async () => {
+    featureEnabledState.current = true;
+    runtimeViewState.current = {
+      ...runtimeViewState.current,
+      canSendMessage: false,
+      isProcessing: true,
+      state: 'running',
+    };
+    const queueItemId = '11111111-1111-4111-8111-111111111111';
+    const clientRequestId = '22222222-2222-4222-8222-222222222222';
+    const storageKey = 'acp_initial_message_conv-1';
+    const serialized = JSON.stringify({
+      input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+      files: [
+        '/private/presentation-templates/business-review/THEME.md',
+        '/private/presentation-templates/business-review/reference.pptx',
+      ],
+      queueItemId,
+      clientRequestId,
+    });
+    const queueAccepted = createDeferred<void>();
+    hydrateSourceOwnerMock.mockResolvedValue({
+      ok: true,
+      owner: currentConversationOwner,
+      ownerRevision: 11,
+      grants: [
+        {
+          ...sourceDescriptor,
+          grantId: '44444444-4444-4444-8444-444444444444',
+        },
+      ],
+    });
+    presentationControllerMock.enqueue.mockImplementationOnce(async (input: Record<string, unknown>) => {
+      await queueAccepted.promise;
+      const queued = {
+        ...input,
+        confirmedOwnerRevision: input.expectedOwnerRevision ?? null,
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:00.000Z',
+        execution: { state: 'queued' },
+      };
+      presentationQueueItemsState.current = [queued];
+      return queued;
+    });
+    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'legacy-turn', runtime: null, msg_id: 'legacy-msg' });
+    sessionStorage.setItem(storageKey, serialized);
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+
+    await waitFor(() =>
+      expect(hydrateSourceOwnerMock).toHaveBeenCalledWith({
+        owner_type: 'conversation',
+        conversation_id: 'conv-1',
+      })
+    );
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith({
+      queueItemId,
+      clientRequestId,
+      input: 'Initial deck',
+      selectedTemplateId: 'business-review',
+      sources: [
+        {
+          grantId: '44444444-4444-4444-8444-444444444444',
+          expectedByteLength: 42,
+          expectedSha256: 'a'.repeat(64),
+        },
+      ],
+      sourceOwner: currentConversationOwner,
+      expectedOwnerRevision: 11,
+    });
+    expect(sessionStorage.getItem(storageKey)).toBe(serialized);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+
+    await act(async () => queueAccepted.resolve());
+
+    await waitFor(() => expect(sessionStorage.getItem(storageKey)).toBeNull());
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
   it('keeps the raw legacy send when the managed feature flag is false', async () => {

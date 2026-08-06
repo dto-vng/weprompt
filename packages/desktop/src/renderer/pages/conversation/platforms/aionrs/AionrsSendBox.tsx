@@ -1024,11 +1024,10 @@ const AionrsSendBox: React.FC<{
           const candidate = parsed as Record<string, unknown>;
           const input = candidate.input;
           const files = candidate.files;
-          if (
-            typeof input === 'string' &&
-            input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX) &&
-            (files === undefined || (Array.isArray(files) && files.every((file) => typeof file === 'string')))
-          ) {
+          if (typeof input === 'string' && input.startsWith(PRESENTATION_RUN_DIRECTIVE_PREFIX)) {
+            if (!(files === undefined || (Array.isArray(files) && files.every((file) => typeof file === 'string')))) {
+              return;
+            }
             if (managedInitialSubmissionRef.current === storageKey) return;
             const managed = resolveManagedPresentationInitialSend(input, (files as string[] | undefined) ?? []);
             if (managed === null) return;
