@@ -144,6 +144,17 @@ export type PersistCapturedPosterInput = {
   body: AsyncIterable<Uint8Array>;
 };
 
+/** A derived project output whose lifecycle is independent from editable scenes. */
+export type PersistProjectOutputInput = {
+  projectId: string;
+  declaredMimeType: 'video/mp4';
+  declaredByteSize?: number;
+  width: number;
+  height: number;
+  durationSeconds?: number;
+  body: AsyncIterable<Uint8Array>;
+};
+
 export type InternalStudioExportResult = {
   folderName: string;
   exported: Array<{ assetId: string; fileName: string }>;
@@ -159,6 +170,7 @@ export type StudioMediaStore = {
   persistProviderPosterForJob(input: PersistProviderJobPosterInput): Promise<StudioAsset>;
   persistProviderPosterFromUrlForJob(input: PersistProviderJobPosterUrlInput): Promise<StudioAsset>;
   persistCapturedPoster(input: PersistCapturedPosterInput): Promise<StudioAsset>;
+  persistProjectOutput(input: PersistProjectOutputInput): Promise<StudioAsset>;
   resolveAsset(
     projectId: string,
     assetId: string
@@ -614,12 +626,17 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     project: { assets: Record<string, StudioAsset> },
     directory: string,
     perAssetMaxBytes: number,
-    declaredBytes?: number
+    declaredBytes?: number,
+    additionalUsedBytes = 0
   ): Promise<WriteCapacity> => {
-    if (declaredBytes !== undefined && (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0)) {
+    if (
+      (declaredBytes !== undefined && (!Number.isSafeInteger(declaredBytes) || declaredBytes < 0)) ||
+      !Number.isSafeInteger(additionalUsedBytes) ||
+      additionalUsedBytes < 0
+    ) {
       throw new CreativeStudioMediaError('invalid_media');
     }
-    const used = Object.values(project.assets).reduce((total, asset) => total + asset.byteSize, 0);
+    const used = Object.values(project.assets).reduce((total, asset) => total + asset.byteSize, additionalUsedBytes);
     const projectRemaining = limits.projectMaxBytes - used;
     if (projectRemaining <= 0) throw new CreativeStudioMediaError('invalid_media');
     const reportedDiskBytes = await getAvailableDiskBytes(directory);
@@ -764,6 +781,87 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     }
   };
 
+  const readProjectOutputAsset = async (
+    projectDir: string,
+    projectId: string,
+    assetId: string
+  ): Promise<StudioAsset | null> => {
+    const assetsDir = path.join(projectDir, 'assets');
+    const metadataPath = path.join(assetsDir, `${assetId}.render.json`);
+    if (path.dirname(metadataPath) !== assetsDir) return null;
+    let handle: Awaited<ReturnType<typeof fs.open>> | null = null;
+    try {
+      const assetsStats = await fs.lstat(assetsDir);
+      if (!assetsStats.isDirectory() || assetsStats.isSymbolicLink() || (await fs.realpath(assetsDir)) !== assetsDir) {
+        return null;
+      }
+      handle = await fs.open(
+        metadataPath,
+        fsConstants.O_RDONLY | (typeof fsConstants.O_NOFOLLOW === 'number' ? fsConstants.O_NOFOLLOW : 0)
+      );
+      const before = await handle.stat();
+      if (!before.isFile() || before.size < 2 || before.size > 4096) return null;
+      const parsed = JSON.parse(await handle.readFile({ encoding: 'utf8' })) as unknown;
+      const after = await handle.stat();
+      if (
+        before.dev !== after.dev ||
+        before.ino !== after.ino ||
+        before.size !== after.size ||
+        before.mtimeMs !== after.mtimeMs
+      )
+        return null;
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+      const candidate = parsed as Partial<StudioAsset>;
+      const managedAsset = candidate.managedAsset;
+      const keys = new Set([
+        'id',
+        'projectId',
+        'sceneId',
+        'mediaKind',
+        'mimeType',
+        'managedAsset',
+        'byteSize',
+        'sha256',
+        'width',
+        'height',
+        'durationSeconds',
+        'createdAt',
+      ]);
+      if (
+        Object.keys(parsed).some((key) => !keys.has(key)) ||
+        candidate.id !== assetId ||
+        candidate.projectId !== projectId ||
+        candidate.sceneId !== null ||
+        candidate.mediaKind !== 'video' ||
+        candidate.mimeType !== 'video/mp4' ||
+        typeof managedAsset !== 'object' ||
+        managedAsset === null ||
+        Object.keys(managedAsset).length !== 2 ||
+        managedAsset?.collection !== 'assets' ||
+        managedAsset.fileName !== `${assetId}.mp4` ||
+        !Number.isSafeInteger(candidate.byteSize) ||
+        candidate.byteSize! < 1 ||
+        typeof candidate.sha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(candidate.sha256) ||
+        !Number.isSafeInteger(candidate.width) ||
+        candidate.width! < 1 ||
+        !Number.isSafeInteger(candidate.height) ||
+        candidate.height! < 1 ||
+        (candidate.durationSeconds !== undefined &&
+          (!Number.isFinite(candidate.durationSeconds) || candidate.durationSeconds <= 0)) ||
+        typeof candidate.createdAt !== 'string' ||
+        candidate.createdAt.length === 0
+      ) {
+        return null;
+      }
+      return candidate as StudioAsset;
+    } catch {
+      return null;
+    } finally {
+      await handle?.close().catch((): undefined => undefined);
+    }
+  };
+
   const resolveAsset = async (
     projectId: string,
     assetId: string
@@ -777,8 +875,9 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
         deps.store.getVerifiedProjectDirectory(projectId),
         deps.store.getProject(projectId),
       ]);
-      const asset = project?.assets[assetId];
-      if (!projectDir || !asset || asset.projectId !== projectId) return null;
+      if (!projectDir || !project) return null;
+      const asset = project.assets[assetId] ?? (await readProjectOutputAsset(projectDir, projectId, assetId));
+      if (!asset || asset.projectId !== projectId) return null;
       if (!['assets', 'imports', 'thumbnails'].includes(asset.managedAsset.collection)) return null;
       if (!/^[A-Za-z0-9_-]+\.(?:jpg|png|webp|mp4|webm)$/.test(asset.managedAsset.fileName)) return null;
       const collectionDir = path.join(projectDir, asset.managedAsset.collection);
@@ -1120,18 +1219,17 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     };
   };
 
-  type ManagedStreamInput = Pick<
-    PersistProviderOutputInput,
-    | 'projectId'
-    | 'sceneId'
-    | 'mediaKind'
-    | 'declaredMimeType'
-    | 'declaredByteSize'
-    | 'width'
-    | 'height'
-    | 'durationSeconds'
-    | 'body'
-  >;
+  type ManagedStreamInput = {
+    projectId: string;
+    sceneId: string | null;
+    mediaKind: 'image' | 'video';
+    declaredMimeType: string;
+    declaredByteSize?: number;
+    width?: number;
+    height?: number;
+    durationSeconds?: number;
+    body: AsyncIterable<Uint8Array>;
+  };
 
   const persistManagedOutputWithPlan = async (
     input: ManagedStreamInput,
@@ -1215,6 +1313,70 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
   const persistProviderOutput = async (input: PersistProviderOutputInput): Promise<StudioAsset> => {
     const plan = await prepareProviderWrite(input);
     return persistManagedOutputWithPlan(input, plan, (asset) => commitProviderAsset(input, asset));
+  };
+
+  const prepareProjectOutputWrite = async (
+    input: Omit<PersistProjectOutputInput, 'body'>
+  ): Promise<ManagedWritePlan> => {
+    if (
+      !SAFE_ID.test(input.projectId) ||
+      input.declaredMimeType !== 'video/mp4' ||
+      !Number.isSafeInteger(input.width) ||
+      input.width < 1 ||
+      !Number.isSafeInteger(input.height) ||
+      input.height < 1 ||
+      (input.declaredByteSize !== undefined &&
+        (!Number.isSafeInteger(input.declaredByteSize) || input.declaredByteSize < 1)) ||
+      (input.durationSeconds !== undefined && (!Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0))
+    ) {
+      throw new CreativeStudioMediaError('invalid_media');
+    }
+    const [projectDir, project] = await Promise.all([
+      deps.store.getVerifiedProjectDirectory(input.projectId),
+      deps.store.getProject(input.projectId),
+    ]);
+    if (!projectDir || !project) throw new CreativeStudioMediaError('not_found');
+    const assetsDir = path.join(projectDir, 'assets');
+    const outputMetadata = await fs.readdir(assetsDir).catch((error: NodeJS.ErrnoException): string[] => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const outputAssets = await Promise.all(
+      outputMetadata.flatMap((fileName) => {
+        const match = /^([A-Za-z0-9_-]{1,256})\.render\.json$/.exec(fileName);
+        return match ? [readProjectOutputAsset(projectDir, input.projectId, match[1]!)] : [];
+      })
+    );
+    const outputBytes = outputAssets.reduce((total, asset) => total + (asset?.byteSize ?? 0), 0);
+    return {
+      projectDir,
+      project,
+      capacity: await planWriteCapacity(
+        project,
+        projectDir,
+        limits.videoOutputMaxBytes,
+        input.declaredByteSize,
+        outputBytes
+      ),
+      collection: 'assets',
+    };
+  };
+
+  const persistProjectOutput = async (input: PersistProjectOutputInput): Promise<StudioAsset> => {
+    const plan = await prepareProjectOutputWrite(input);
+    return persistManagedOutputWithPlan({ ...input, sceneId: null, mediaKind: 'video' }, plan, async (asset) => {
+      const partsDir = await ensureManagedDirectory(plan.projectDir, 'parts');
+      const assetsDir = await ensureManagedDirectory(plan.projectDir, 'assets');
+      const metadataPart = path.join(partsDir, `${asset.id}.render-metadata.part`);
+      const metadataPath = path.join(assetsDir, `${asset.id}.render.json`);
+      try {
+        await fs.writeFile(metadataPart, JSON.stringify(asset), { encoding: 'utf8', flag: 'wx' });
+        await finalizeManagedPart(metadataPart, partsDir, metadataPath, assetsDir);
+      } catch (error) {
+        await fs.rm(metadataPart, { force: true }).catch((): undefined => undefined);
+        throw error;
+      }
+    });
   };
 
   const commitProviderJobAsset = async (input: ProviderJobOutputMetadata, asset: StudioAsset): Promise<void> => {
@@ -1491,6 +1653,7 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     persistProviderPosterForJob,
     persistProviderPosterFromUrlForJob,
     persistCapturedPoster,
+    persistProjectOutput,
     resolveAsset,
     resolveProviderInput,
     exportAssetsToDirectory,
