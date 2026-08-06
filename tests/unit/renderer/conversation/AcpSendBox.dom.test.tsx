@@ -13,8 +13,10 @@ import type {
   PickPresentationSourcesResult,
   PresentationGrantOwner,
   PresentationSourceDescriptor,
+  PresentationSourceRef,
 } from '@/common/types/office/presentationRun';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type { ManagedPresentationSubmission } from '@/common/types/platform/presentationSubmission';
 import AcpSendBox from '@/renderer/pages/conversation/platforms/acp/AcpSendBox';
 import type { UseAcpMessageReturn } from '@/renderer/pages/conversation/platforms/acp/useAcpMessage';
 
@@ -43,6 +45,12 @@ const {
   legacyOpenFileSelectorMock,
   messageWarningMock,
   pickSourcesMock,
+  presentationClaimInvokeMock,
+  presentationControllerMock,
+  presentationDispatchInvokeMock,
+  presentationGetInvokeMock,
+  presentationQueueItemsState,
+  presentationStartInvokeMock,
   prepareScratchMock,
   revokeSourceMock,
   resetSourceDraftMock,
@@ -50,6 +58,9 @@ const {
   sourceDescriptorsState,
   sourceOwnerRevisionState,
   sourceOwnerState,
+  sourcePendingState,
+  sourceRefsState,
+  runtimeViewState,
 } = vi.hoisted(() => ({
   sendMessageInvokeMock: vi.fn(),
   addOrUpdateMessageMock: vi.fn(),
@@ -90,6 +101,7 @@ const {
       hasPendingAttachments?: boolean;
       onFilesAdded?: (files: unknown[]) => void;
       onManagedDrop?: (files: readonly File[]) => Promise<void> | void;
+      managedPresentationSubmission?: ManagedPresentationSubmission;
     } | null,
   },
   clearFilesMock: vi.fn(),
@@ -116,6 +128,24 @@ const {
   legacyOpenFileSelectorMock: vi.fn(),
   messageWarningMock: vi.fn(),
   pickSourcesMock: vi.fn(),
+  presentationClaimInvokeMock: vi.fn(),
+  presentationControllerMock: {
+    read: vi.fn(),
+    enqueue: vi.fn(),
+    recoverPersisting: vi.fn(),
+    editQueued: vi.fn(),
+    removeQueued: vi.fn(),
+    claimHead: vi.fn(),
+    allocateClaimed: vi.fn(),
+    transition: vi.fn(),
+    removePreflightFailed: vi.fn(),
+    removeBound: vi.fn(),
+    runCommittedHead: vi.fn(),
+  },
+  presentationDispatchInvokeMock: vi.fn(),
+  presentationGetInvokeMock: vi.fn(),
+  presentationQueueItemsState: { current: [] as Array<Record<string, unknown>> },
+  presentationStartInvokeMock: vi.fn(),
   prepareScratchMock: vi.fn().mockResolvedValue(undefined),
   revokeSourceMock: vi.fn(),
   resetSourceDraftMock: vi.fn(),
@@ -123,6 +153,19 @@ const {
   sourceDescriptorsState: { current: [] as PresentationSourceDescriptor[] },
   sourceOwnerRevisionState: { current: null as number | null },
   sourceOwnerState: { current: null as PresentationGrantOwner | null },
+  sourcePendingState: { current: false },
+  sourceRefsState: { current: [] as PresentationSourceRef[] },
+  runtimeViewState: {
+    current: {
+      hydrated: true,
+      canSendMessage: true,
+      isProcessing: false,
+      state: 'idle',
+      markSendStarted: vi.fn(),
+      markSendAccepted: vi.fn(),
+      markSendFailed: vi.fn(),
+    },
+  },
 }));
 
 vi.mock('@/common/config/constants', async (importOriginal) => {
@@ -142,6 +185,12 @@ vi.mock('@/common', () => ({
         invoke: sendMessageInvokeMock,
       },
     },
+    presentationRuns: {
+      start: { invoke: presentationStartInvokeMock },
+      get: { invoke: presentationGetInvokeMock },
+      claimInitialDispatch: { invoke: presentationClaimInvokeMock },
+      dispatch: { invoke: presentationDispatchInvokeMock },
+    },
     conversation: {
       stop: {
         invoke: vi.fn().mockResolvedValue(undefined),
@@ -156,15 +205,17 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
     onChange,
     prefix,
     rightTools,
+    managedPresentationSubmission,
     ...props
   }: {
     onSend: (message: string) => Promise<void>;
     onChange?: (value: string) => void;
     prefix?: React.ReactNode;
     rightTools?: React.ReactNode;
+    managedPresentationSubmission?: ManagedPresentationSubmission;
   }) =>
     (() => {
-      sendBoxProps.current = props;
+      sendBoxProps.current = { ...props, managedPresentationSubmission };
       return (
         <div>
           {rightTools}
@@ -175,6 +226,17 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
           <button
             type='button'
             onClick={() => {
+              if (managedPresentationSubmission) {
+                void managedPresentationSubmission.onSubmit({
+                  queueItemId: '11111111-1111-4111-8111-111111111111',
+                  clientRequestId: '22222222-2222-4222-8222-222222222222',
+                  input: 'Hello',
+                  selectedTemplateId: managedPresentationSubmission.selectedTemplateId,
+                  sources: managedPresentationSubmission.sources,
+                  capturedAt: '2026-08-05T00:00:00.000Z',
+                });
+                return;
+              }
               void onSend('Hello').catch(() => {});
             }}
           >
@@ -314,8 +376,8 @@ vi.mock('@/renderer/hooks/file/selection', () => ({
     owner: sourceOwnerState.current,
     ownerRevision: sourceOwnerRevisionState.current,
     descriptors: sourceDescriptorsState.current,
-    sourceRefs: [],
-    pending: false,
+    sourceRefs: sourceRefsState.current,
+    pending: sourcePendingState.current,
     hydrate: hydrateSourceOwnerMock,
     createDraft: vi.fn(),
     pickSources: pickSourcesMock,
@@ -338,6 +400,7 @@ vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useMessageList: () => [],
 }));
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
+  createPresentationCommandQueueController: () => presentationControllerMock,
   shouldEnqueueConversationCommand: () => false,
   useConversationCommandQueue: () => ({
     items: [],
@@ -354,6 +417,9 @@ vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', (
     unlockInteraction: vi.fn(),
     resetActiveExecution: vi.fn(),
   }),
+}));
+vi.mock('@/renderer/pages/conversation/runtime/useConversationRuntimeView', () => ({
+  useConversationRuntimeView: () => runtimeViewState.current,
 }));
 vi.mock('@/renderer/pages/conversation/Preview', () => ({
   usePreviewContext: () => ({
@@ -470,6 +536,24 @@ const createDeferred = <Value,>() => {
   return { promise, resolve };
 };
 
+const presentationQueueItem = (
+  queueItemId: string,
+  clientRequestId: string,
+  execution: Record<string, unknown>
+): Record<string, unknown> => ({
+  queueItemId,
+  clientRequestId,
+  input: `Prompt ${queueItemId}`,
+  selectedTemplateId: 'business-review',
+  sources: [],
+  sourceOwner: null,
+  expectedOwnerRevision: null,
+  confirmedOwnerRevision: null,
+  createdAt: '2026-08-05T00:00:00.000Z',
+  updatedAt: '2026-08-05T00:00:00.000Z',
+  execution,
+});
+
 const makeMessageState = (overrides: Partial<UseAcpMessageReturn> = {}): UseAcpMessageReturn => ({
   thought: { subject: '', description: '' },
   setThought: vi.fn(),
@@ -509,6 +593,113 @@ describe('AcpSendBox', () => {
     sourceDescriptorsState.current = [];
     sourceOwnerState.current = null;
     sourceOwnerRevisionState.current = null;
+    sourcePendingState.current = false;
+    sourceRefsState.current = [];
+    runtimeViewState.current = {
+      hydrated: true,
+      canSendMessage: true,
+      isProcessing: false,
+      state: 'idle',
+      markSendStarted: vi.fn(),
+      markSendAccepted: vi.fn(),
+      markSendFailed: vi.fn(),
+    };
+    presentationQueueItemsState.current = [];
+    presentationControllerMock.read.mockImplementation(() => ({
+      version: 2,
+      conversationId: 'conv-1',
+      revision: 1,
+      items: presentationQueueItemsState.current,
+    }));
+    presentationControllerMock.recoverPersisting.mockResolvedValue(undefined);
+    presentationControllerMock.enqueue.mockImplementation(async (input: Record<string, unknown>) => {
+      if (
+        presentationQueueItemsState.current.some(
+          (item) => item.queueItemId === input.queueItemId || item.clientRequestId === input.clientRequestId
+        )
+      ) {
+        throw new Error('managed presentation queue identifier collision');
+      }
+      const item = {
+        ...input,
+        sourceOwner: input.sourceOwner ?? null,
+        expectedOwnerRevision: input.expectedOwnerRevision ?? null,
+        confirmedOwnerRevision: input.expectedOwnerRevision ?? null,
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:00.000Z',
+        execution: { state: 'queued' },
+      };
+      presentationQueueItemsState.current = [...presentationQueueItemsState.current, item];
+      return item;
+    });
+    presentationControllerMock.claimHead.mockImplementation(async () => {
+      const item = presentationQueueItemsState.current[0];
+      const claimed = { ...item, execution: { state: 'claimed', claimedAt: '2026-08-05T00:00:01.000Z' } };
+      presentationQueueItemsState.current = [claimed, ...presentationQueueItemsState.current.slice(1)];
+      return claimed;
+    });
+    presentationControllerMock.allocateClaimed.mockImplementation(
+      async (_queueItemId: string, start: (request: Record<string, unknown>) => Promise<Record<string, unknown>>) => {
+        const item = presentationQueueItemsState.current[0];
+        const result = await start({
+          conversation_id: 'conv-1',
+          client_request_id: item.clientRequestId,
+          input: item.input,
+          selected_template_id: item.selectedTemplateId,
+          sources: item.sources,
+        });
+        if (result.ok !== true) throw new Error(String(result.code));
+        const run = result.run as { runId: string; revision: number };
+        const committed = {
+          ...item,
+          execution: { state: 'committed', runId: run.runId, revision: run.revision, postInvoked: false },
+        };
+        presentationQueueItemsState.current = [committed, ...presentationQueueItemsState.current.slice(1)];
+        return committed;
+      }
+    );
+    presentationControllerMock.transition.mockImplementation(async (queueItemId: string, execution: unknown) => {
+      const index = presentationQueueItemsState.current.findIndex((item) => item.queueItemId === queueItemId);
+      const transitioned = { ...presentationQueueItemsState.current[index], execution };
+      presentationQueueItemsState.current = presentationQueueItemsState.current.map((item, itemIndex) =>
+        itemIndex === index ? transitioned : item
+      );
+      return transitioned;
+    });
+    presentationControllerMock.removeBound.mockImplementation(async (queueItemId: string) => {
+      presentationQueueItemsState.current = presentationQueueItemsState.current.filter(
+        (item) => item.queueItemId !== queueItemId
+      );
+    });
+    presentationStartInvokeMock.mockResolvedValue({
+      ok: true,
+      run: { runId: '33333333-3333-4333-8333-333333333333', revision: 4 },
+    });
+    presentationClaimInvokeMock.mockResolvedValue({
+      ok: true,
+      status: 'claimed',
+      runId: '33333333-3333-4333-8333-333333333333',
+      leaseToken: 'opaque-lease',
+      revision: 5,
+      expiresAt: '2026-08-05T00:01:00.000Z',
+      renewAfterMs: 10_000,
+    });
+    presentationDispatchInvokeMock.mockResolvedValue({
+      ok: true,
+      status: 'bound',
+      runId: '33333333-3333-4333-8333-333333333333',
+      conversationId: 'conv-1',
+      revision: 6,
+      dispatchStatus: 'bound',
+    });
+    presentationGetInvokeMock.mockResolvedValue({
+      ok: false,
+      code: 'RUN_NOT_FOUND',
+      messageKey: 'conversation.presentationRun.RUN_NOT_FOUND',
+      retryable: false,
+      state: 'lookup',
+      details: null,
+    });
     hydrateSourceOwnerMock.mockResolvedValue(hydratedOwnerResult);
     pickSourcesMock.mockResolvedValue({
       ok: true,
@@ -559,6 +750,90 @@ describe('AcpSendBox', () => {
     expect(prepareScratchMock).not.toHaveBeenCalled();
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
     expect(clearSelectionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'source hydration is pending',
+      arrange: () => {
+        sourcePendingState.current = true;
+      },
+    },
+    {
+      name: 'source hydration failed',
+      arrange: () => {
+        hydrateSourceOwnerMock.mockResolvedValue(failedOwnerHydration);
+      },
+    },
+    {
+      name: 'source owner belongs to another conversation',
+      arrange: () => {
+        sourceOwnerState.current = { owner_type: 'conversation', conversation_id: 'conv-other' };
+        sourceOwnerRevisionState.current = 3;
+      },
+    },
+    {
+      name: 'source owner revision is unavailable',
+      arrange: () => {
+        sourceOwnerState.current = currentConversationOwner;
+        sourceOwnerRevisionState.current = null;
+      },
+    },
+  ])('keeps an eligible managed draft out of legacy send while $name', async ({ arrange }) => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    draftState.current.content = 'Draft request';
+    arrange();
+
+    render(
+      <AcpSendBox
+        conversation_id='conv-1'
+        backend='codex'
+        workspacePath='/tmp/workspace'
+        messageState={makeMessageState()}
+      />
+    );
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    expect(draftState.current.content).toBe('Hello');
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(resetSourceDraftMock).not.toHaveBeenCalled();
+    expect(prepareScratchMock).not.toHaveBeenCalled();
+    expect(composeSendMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('queues a previously blocked managed draft exactly once after source hydration becomes authoritative', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourcePendingState.current = true;
+
+    const { rerender } = render(
+      <AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />
+    );
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+
+    sourcePendingState.current = false;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    rerender(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(1);
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
   it('keeps legacy attachments when managed source reselect is cancelled', async () => {
@@ -622,10 +897,11 @@ describe('AcpSendBox', () => {
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
-  it('allows a prompt-only managed-eligible draft to continue', async () => {
+  it('routes a prompt-only managed draft through durable claim and main-owned dispatch', async () => {
     featureEnabledState.current = true;
     selectedTemplateState.current = pptxTemplate;
-    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'turn-1', runtime: null, msg_id: 'msg-1' });
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
 
     render(
       <AcpSendBox
@@ -639,9 +915,387 @@ describe('AcpSendBox', () => {
       screen.getByRole('button', { name: 'send' }).click();
     });
 
-    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
-    expect(messageWarningMock).not.toHaveBeenCalled();
-    expect(prepareScratchMock).toHaveBeenCalledWith('conv-1');
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith({
+      queueItemId: '11111111-1111-4111-8111-111111111111',
+      clientRequestId: '22222222-2222-4222-8222-222222222222',
+      input: 'Hello',
+      selectedTemplateId: 'business-review',
+      sources: [],
+      sourceOwner: null,
+      expectedOwnerRevision: null,
+    });
+    expect(presentationControllerMock.claimHead).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
+    expect(presentationStartInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      client_request_id: '22222222-2222-4222-8222-222222222222',
+      input: 'Hello',
+      selected_template_id: 'business-review',
+      sources: [],
+    });
+    expect(presentationClaimInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      run_id: '33333333-3333-4333-8333-333333333333',
+      holder_id: '11111111-1111-4111-8111-111111111111',
+      expected_revision: 4,
+    });
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(prepareScratchMock).not.toHaveBeenCalled();
+  });
+
+  it('persists opaque grants and preserves them when durable queue persistence fails', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 7;
+    sourceRefsState.current = [
+      {
+        grantId: '44444444-4444-4444-8444-444444444444',
+        expectedByteLength: 42,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ];
+    presentationControllerMock.enqueue.mockRejectedValueOnce(new Error('localStorage quota'));
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    const managed = sendBoxProps.current?.managedPresentationSubmission;
+    expect(managed).toBeDefined();
+    await expect(
+      managed?.onSubmit({
+        queueItemId: '11111111-1111-4111-8111-111111111111',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        input: 'Hello',
+        selectedTemplateId: 'business-review',
+        sources: sourceRefsState.current,
+        capturedAt: '2026-08-05T00:00:00.000Z',
+      })
+    ).rejects.toThrow('localStorage quota');
+
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sources: sourceRefsState.current,
+        sourceOwner: currentConversationOwner,
+        expectedOwnerRevision: 7,
+      })
+    );
+    expect(JSON.stringify(presentationControllerMock.enqueue.mock.calls[0]?.[0])).not.toContain('/private/');
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(resetSourceDraftMock).not.toHaveBeenCalled();
+    expect(sourceRefsState.current).toHaveLength(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a managed submission queued without claiming while the runtime is busy, then drains it', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    runtimeViewState.current = {
+      ...runtimeViewState.current,
+      canSendMessage: false,
+      isProcessing: true,
+      state: 'running',
+    };
+
+    const { rerender } = render(
+      <AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />
+    );
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+
+    runtimeViewState.current = {
+      ...runtimeViewState.current,
+      canSendMessage: true,
+      isProcessing: false,
+      state: 'idle',
+    };
+    rerender(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('recovers a lost start reply by the stable client request id', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationControllerMock.allocateClaimed.mockImplementationOnce(
+      async (_queueItemId: string, start: (request: Record<string, unknown>) => Promise<unknown>) => {
+        await start({
+          conversation_id: 'conv-1',
+          client_request_id: '22222222-2222-4222-8222-222222222222',
+          input: 'Hello',
+          selected_template_id: 'business-review',
+          sources: [],
+        });
+        throw new Error('lost start reply');
+      }
+    );
+    presentationStartInvokeMock.mockRejectedValueOnce(new Error('ipc reply lost'));
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 4,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_snapshotted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: true },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationGetInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      client_request_id: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(presentationControllerMock.transition).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
+      state: 'committed',
+      runId: '33333333-3333-4333-8333-333333333333',
+      revision: 4,
+      postInvoked: false,
+    });
+  });
+
+  it('keeps definitive claim failure committed and retries the same run without reallocating', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationClaimInvokeMock.mockResolvedValueOnce({
+      ok: false,
+      code: 'LEASE_CONFLICT',
+      messageKey: 'conversation.presentationRun.LEASE_CONFLICT',
+      retryable: false,
+      state: 'committed',
+      details: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        leaseExpiresAt: '2026-08-05T00:01:00.000Z',
+      },
+    });
+
+    const first = render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    await waitFor(() => expect(presentationClaimInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationQueueItemsState.current[0]).toMatchObject({
+      execution: {
+        state: 'committed',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: 4,
+        postInvoked: false,
+      },
+    });
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    first.unmount();
+
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 4,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_snapshotted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: true },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('does not redispatch a committed local item when main already reports dispatching', async () => {
+    featureEnabledState.current = true;
+    presentationQueueItemsState.current = [
+      presentationQueueItem('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', {
+        state: 'committed',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: 4,
+        postInvoked: false,
+      }),
+    ];
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 5,
+        dispatchStatus: 'dispatching',
+        artifactPhase: 'sources_extracted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: false },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(presentationQueueItemsState.current[0]).toMatchObject({ execution: { state: 'committed' } });
+  });
+
+  it.each([
+    { status: 'bound', expectedState: null },
+    { status: 'dispatch_uncertain', expectedState: 'dispatch_uncertain' },
+  ])('reconciles a lost dispatch reply reported as $status without resending', async ({ status, expectedState }) => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockRejectedValueOnce(new Error('dispatch reply lost'));
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 6,
+        dispatchStatus: status,
+        artifactPhase: 'sources_extracted',
+        disposition: status === 'dispatch_uncertain' ? 'TRACKING_REQUIRED' : null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: false },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    if (expectedState === null) {
+      await waitFor(() => expect(presentationQueueItemsState.current).toEqual([]));
+      expect(presentationControllerMock.removeBound).toHaveBeenCalledTimes(1);
+    } else {
+      await waitFor(() =>
+        expect(presentationQueueItemsState.current[0]).toMatchObject({ execution: { state: expectedState } })
+      );
+    }
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps dispatch uncertainty observe-only across remount', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockResolvedValueOnce({
+      ok: false,
+      code: 'DISPATCH_UNCERTAIN',
+      messageKey: 'conversation.presentationRun.DISPATCH_UNCERTAIN',
+      retryable: false,
+      state: 'dispatch_uncertain',
+      details: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        postInvoked: true,
+        queryRequired: true,
+      },
+    });
+
+    const { unmount } = render(
+      <AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />
+    );
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    await waitFor(() =>
+      expect(presentationQueueItemsState.current[0]).toMatchObject({ execution: { state: 'dispatch_uncertain' } })
+    );
+    unmount();
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('continues FIFO only after confirmed bound removal', async () => {
+    featureEnabledState.current = true;
+    presentationQueueItemsState.current = [
+      presentationQueueItem('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', {
+        state: 'bound',
+        runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        revision: 8,
+      }),
+      presentationQueueItem('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', {
+        state: 'queued',
+      }),
+      presentationQueueItem('44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555', {
+        state: 'queued',
+      }),
+    ];
+    presentationStartInvokeMock
+      .mockResolvedValueOnce({
+        ok: true,
+        run: { runId: '33333333-3333-4333-8333-333333333333', revision: 4 },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        run: { runId: '66666666-6666-4666-8666-666666666666', revision: 4 },
+      });
+    presentationClaimInvokeMock.mockImplementation(async (request: { run_id: string }) => ({
+      ok: true,
+      status: 'claimed',
+      runId: request.run_id,
+      leaseToken: `lease-${request.run_id}`,
+      revision: 5,
+      expiresAt: '2026-08-05T00:01:00.000Z',
+      renewAfterMs: 10_000,
+    }));
+    presentationDispatchInvokeMock.mockImplementation(async (request: { run_id: string }) => ({
+      ok: true,
+      status: 'bound',
+      runId: request.run_id,
+      conversationId: 'conv-1',
+      revision: 6,
+      dispatchStatus: 'bound',
+    }));
+
+    render(<AcpSendBox conversation_id='conv-1' backend='codex' messageState={makeMessageState()} />);
+
+    await waitFor(() => expect(presentationQueueItemsState.current).toEqual([]));
+    expect(presentationControllerMock.claimHead.mock.calls.map(([queueItemId]) => queueItemId)).toEqual([
+      '11111111-1111-4111-8111-111111111111',
+      '44444444-4444-4444-8444-444444444444',
+    ]);
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(2);
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the raw legacy send when the managed feature flag is false', async () => {
@@ -649,6 +1303,11 @@ describe('AcpSendBox', () => {
     selectedTemplateState.current = pptxTemplate;
     draftState.current = { atPath: [], uploadFile: ['/private/legacy.xlsx'], content: 'Draft request' };
     sendMessageInvokeMock.mockResolvedValue({ turn_id: 'turn-1', runtime: null, msg_id: 'msg-1' });
+    composeSendMock.mockReturnValue({
+      input: 'legacy directive\n\nHello',
+      files: ['/private/legacy.xlsx', '/private/template/SKILL.md', '/private/template/reference.pptx'],
+      injectSkills: ['officecli'],
+    });
 
     render(
       <AcpSendBox
@@ -663,6 +1322,12 @@ describe('AcpSendBox', () => {
     });
 
     await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+    expect(sendMessageInvokeMock).toHaveBeenCalledWith({
+      input: 'legacy directive\n\nHello',
+      conversation_id: 'conv-1',
+      files: ['/private/legacy.xlsx', '/private/template/SKILL.md', '/private/template/reference.pptx'],
+    });
+    expect(sendBoxProps.current?.managedPresentationSubmission).toBeUndefined();
     expect(clearFilesMock).toHaveBeenCalledTimes(1);
     expect(messageWarningMock).not.toHaveBeenCalled();
   });

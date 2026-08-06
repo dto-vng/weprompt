@@ -1,6 +1,17 @@
 import { ipcBridge } from '@/common';
 import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import type { IConversationMcpStatus } from '@/common/config/storage';
+import type {
+  DispatchInitialPresentationRunResult,
+  PresentationGrantOwner,
+} from '@/common/types/office/presentationRun';
+import type { PresentationCommandQueueItem } from '@/common/types/platform/presentationCommandQueue';
+import type {
+  ManagedPresentationSubmission,
+  PresentationSubmissionProgress,
+  PresentationSubmissionProgressObservation,
+  PresentationSubmissionSnapshot,
+} from '@/common/types/platform/presentationSubmission';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { isSideQuestionSupported } from '@/common/chat/sideQuestion';
 import { parseError, uuid } from '@/common/utils';
@@ -37,8 +48,10 @@ import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
+  createPresentationCommandQueueController,
   shouldEnqueueConversationCommand,
   useConversationCommandQueue,
+  type PresentationCommandQueueController,
   type ConversationCommandQueueItem,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
@@ -56,7 +69,7 @@ import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { classifyConversationBusyError } from '../conversationBusyError';
 import { buildSendFailureError } from './buildSendFailureError';
@@ -80,6 +93,60 @@ const useAcpSendBoxDraft = getSendBoxDraftHook('acp', {
 
 const EMPTY_AT_PATH: Array<string | FileOrFolderItem> = [];
 const EMPTY_UPLOAD_FILES: string[] = [];
+
+const toPresentationSubmissionProgress = (item: PresentationCommandQueueItem): PresentationSubmissionProgress => {
+  const { execution } = item;
+  if (execution.state === 'queued') return { state: 'queued' };
+  if (execution.state === 'committed') {
+    return { state: 'committed', runId: execution.runId, revision: execution.revision };
+  }
+  if (execution.state === 'dispatching') {
+    return { state: 'dispatching', runId: execution.runId, revision: execution.revision };
+  }
+  if (execution.state === 'bound') return { state: 'bound', runId: execution.runId, revision: execution.revision };
+  if (execution.state === 'preflight_failed') return { state: 'preflight_failed', code: execution.code };
+  if (execution.state === 'dispatch_uncertain') {
+    return { state: 'dispatch_uncertain', runId: execution.runId, revision: execution.revision };
+  }
+  return { state: 'persisting' };
+};
+
+const presentationOwnersEqual = (
+  left: PresentationGrantOwner | null,
+  right: PresentationGrantOwner | null
+): boolean => {
+  if (left === null || right === null) return left === right;
+  if (left.owner_type !== right.owner_type) return false;
+  if (left.owner_type === 'draft' && right.owner_type === 'draft') return left.draft_id === right.draft_id;
+  return (
+    left.owner_type === 'conversation' &&
+    right.owner_type === 'conversation' &&
+    left.conversation_id === right.conversation_id
+  );
+};
+
+const isExactManagedPresentationItem = (
+  item: PresentationCommandQueueItem,
+  snapshot: PresentationSubmissionSnapshot,
+  sourceOwner: PresentationGrantOwner | null,
+  expectedOwnerRevision: number | null
+): boolean =>
+  item.queueItemId === snapshot.queueItemId &&
+  item.clientRequestId === snapshot.clientRequestId &&
+  item.input === snapshot.input &&
+  item.selectedTemplateId === snapshot.selectedTemplateId &&
+  presentationOwnersEqual(item.sourceOwner, sourceOwner) &&
+  item.expectedOwnerRevision === expectedOwnerRevision &&
+  item.sources.length === snapshot.sources.length &&
+  item.sources.every((source, index) => {
+    const expected = snapshot.sources[index];
+    return (
+      expected !== undefined &&
+      source.grantId === expected.grantId &&
+      source.expectedByteLength === expected.expectedByteLength &&
+      source.expectedSha256 === expected.expectedSha256
+    );
+  });
 
 const useSendBoxDraft = (conversation_id: string) => {
   const { data, mutate } = useAcpSendBoxDraft(conversation_id);
@@ -161,10 +228,32 @@ const AcpSendBox: React.FC<{
     runtime: 'acp',
     templateFormat: presentationTemplates.selectedTemplate?.manifest.format ?? null,
   });
+  const managedPresentationPlatformEligible = getPresentationRunEligibility({
+    featureEnabled: PRESENTATION_RUN_V2_ENABLED,
+    isDesktop: isElectronDesktop(),
+    scope: teamSendMessage ? 'team' : 'individual',
+    runtime: 'acp',
+    templateFormat: 'pptx',
+  });
   const hasLegacyPresentationAttachments = uploadFile.length > 0 || atPath.length > 0;
   const [showPresentationSourceReselect, setShowPresentationSourceReselect] = useState(false);
+  const [managedPresentationProgress, setManagedPresentationProgress] =
+    useState<PresentationSubmissionProgressObservation | null>(null);
+  const managedPresentationControllerRef = useRef<{
+    conversationId: string;
+    controller: PresentationCommandQueueController;
+  } | null>(null);
+  const managedPresentationDrainRef = useRef(false);
   const presentationConversationIdRef = useLatestRef(conversation_id);
   const managedPresentationEligibleRef = useLatestRef(managedPresentationEligible);
+
+  const getManagedPresentationController = useCallback((): PresentationCommandQueueController => {
+    const current = managedPresentationControllerRef.current;
+    if (current?.conversationId === conversation_id) return current.controller;
+    const controller = createPresentationCommandQueueController({ conversationId: conversation_id });
+    managedPresentationControllerRef.current = { conversationId: conversation_id, controller };
+    return controller;
+  }, [conversation_id]);
 
   useEffect(() => {
     if (!managedPresentationEligible) return;
@@ -174,6 +263,8 @@ const AcpSendBox: React.FC<{
 
   useEffect(() => {
     setShowPresentationSourceReselect(false);
+    setManagedPresentationProgress(null);
+    managedPresentationControllerRef.current = null;
   }, [conversation_id]);
 
   useEffect(() => {
@@ -368,6 +459,452 @@ const AcpSendBox: React.FC<{
   const isCancelling = runtimeView.state === 'cancelling';
   const isBusy = isCancelling || commandQueueRuntimeGate.isProcessing || !commandQueueRuntimeGate.canSendMessage;
 
+  const publishManagedPresentationProgress = useCallback((item: PresentationCommandQueueItem): void => {
+    setManagedPresentationProgress({
+      queueItemId: item.queueItemId,
+      progress: toPresentationSubmissionProgress(item),
+    });
+  }, []);
+
+  const recoverClaimedManagedPresentation = useCallback(
+    async (
+      controller: PresentationCommandQueueController,
+      item: PresentationCommandQueueItem
+    ): Promise<PresentationCommandQueueItem> => {
+      let lookup;
+      try {
+        lookup = await ipcBridge.presentationRuns.get.invoke({
+          conversation_id,
+          client_request_id: item.clientRequestId,
+        });
+      } catch {
+        publishManagedPresentationProgress(item);
+        return item;
+      }
+      if ('code' in lookup) {
+        if (lookup.code !== 'RUN_NOT_FOUND') {
+          publishManagedPresentationProgress(item);
+          return item;
+        }
+        try {
+          const committed = await controller.allocateClaimed(item.queueItemId, (request) =>
+            ipcBridge.presentationRuns.start.invoke(request)
+          );
+          publishManagedPresentationProgress(committed);
+          return committed;
+        } catch {
+          const current = controller.read().items.find(({ queueItemId }) => queueItemId === item.queueItemId) ?? item;
+          publishManagedPresentationProgress(current);
+          return current;
+        }
+      }
+
+      const { run } = lookup;
+      let recovered = await controller.transition(item.queueItemId, {
+        state: 'committed',
+        runId: run.runId,
+        revision: run.revision,
+        postInvoked: false,
+      });
+      if (run.dispatchStatus === 'dispatching') {
+        recovered = await controller.transition(item.queueItemId, {
+          state: 'dispatching',
+          runId: run.runId,
+          revision: run.revision,
+        });
+      } else if (run.dispatchStatus === 'bound') {
+        recovered = await controller.transition(item.queueItemId, {
+          state: 'bound',
+          runId: run.runId,
+          revision: run.revision,
+        });
+      } else if (run.dispatchStatus === 'dispatch_uncertain') {
+        recovered = await controller.transition(item.queueItemId, {
+          state: 'dispatch_uncertain',
+          runId: run.runId,
+          revision: run.revision,
+        });
+      } else if (run.dispatchStatus !== 'committed' && run.dispatchStatus !== 'allocating') {
+        recovered = await controller.transition(item.queueItemId, {
+          state: 'bound',
+          runId: run.runId,
+          revision: run.revision,
+        });
+      }
+      publishManagedPresentationProgress(recovered);
+      return recovered;
+    },
+    [conversation_id, publishManagedPresentationProgress]
+  );
+
+  const observeManagedPresentation = useCallback(
+    async (
+      controller: PresentationCommandQueueController,
+      item: PresentationCommandQueueItem
+    ): Promise<PresentationCommandQueueItem> => {
+      publishManagedPresentationProgress(item);
+      if (item.execution.state !== 'dispatching' && item.execution.state !== 'dispatch_uncertain') return item;
+      let lookup;
+      try {
+        lookup = await ipcBridge.presentationRuns.get.invoke({
+          conversation_id,
+          run_id: item.execution.runId,
+        });
+      } catch {
+        return item;
+      }
+      if (item.execution.state === 'dispatch_uncertain') return item;
+      if ('code' in lookup) return item;
+      if (lookup.run.dispatchStatus === 'dispatch_uncertain') {
+        const uncertain = await controller.transition(item.queueItemId, {
+          state: 'dispatch_uncertain',
+          runId: lookup.run.runId,
+          revision: lookup.run.revision,
+        });
+        publishManagedPresentationProgress(uncertain);
+        return uncertain;
+      }
+      if (
+        lookup.run.dispatchStatus === 'allocating' ||
+        lookup.run.dispatchStatus === 'committed' ||
+        lookup.run.dispatchStatus === 'dispatching'
+      ) {
+        return item;
+      }
+      const bound = await controller.transition(item.queueItemId, {
+        state: 'bound',
+        runId: lookup.run.runId,
+        revision: lookup.run.revision,
+      });
+      publishManagedPresentationProgress(bound);
+      await controller.removeBound(item.queueItemId);
+      return bound;
+    },
+    [conversation_id, publishManagedPresentationProgress]
+  );
+
+  const markManagedPresentationUncertain = useCallback(
+    async (
+      controller: PresentationCommandQueueController,
+      item: PresentationCommandQueueItem,
+      runId: string,
+      revision: number | null
+    ): Promise<PresentationCommandQueueItem> => {
+      const uncertain = await controller.transition(item.queueItemId, {
+        state: 'dispatch_uncertain',
+        runId,
+        revision,
+      });
+      publishManagedPresentationProgress(uncertain);
+      return uncertain;
+    },
+    [publishManagedPresentationProgress]
+  );
+
+  const settleManagedPresentationDispatch = useCallback(
+    async (
+      controller: PresentationCommandQueueController,
+      item: PresentationCommandQueueItem,
+      dispatched: DispatchInitialPresentationRunResult
+    ): Promise<PresentationCommandQueueItem> => {
+      if ('code' in dispatched) {
+        if (dispatched.code !== 'DISPATCH_UNCERTAIN') return item;
+        return markManagedPresentationUncertain(controller, item, dispatched.details.runId, null);
+      }
+      const bound = await controller.transition(item.queueItemId, {
+        state: 'bound',
+        runId: dispatched.runId,
+        revision: dispatched.revision,
+      });
+      publishManagedPresentationProgress(bound);
+      await controller.removeBound(item.queueItemId);
+      return bound;
+    },
+    [markManagedPresentationUncertain, publishManagedPresentationProgress]
+  );
+
+  const dispatchManagedPresentation = useCallback(
+    async (
+      controller: PresentationCommandQueueController,
+      item: PresentationCommandQueueItem,
+      verifyMainAuthority: boolean
+    ): Promise<PresentationCommandQueueItem> => {
+      if (item.execution.state !== 'committed') return item;
+      let expectedRevision = item.execution.revision;
+      if (verifyMainAuthority) {
+        let lookup;
+        try {
+          lookup = await ipcBridge.presentationRuns.get.invoke({
+            conversation_id,
+            run_id: item.execution.runId,
+          });
+        } catch {
+          return item;
+        }
+        if ('code' in lookup) return item;
+        if (lookup.run.dispatchStatus === 'dispatch_uncertain') {
+          return markManagedPresentationUncertain(controller, item, lookup.run.runId, lookup.run.revision);
+        }
+        if (
+          lookup.run.dispatchStatus === 'bound' ||
+          (lookup.run.dispatchStatus !== 'allocating' &&
+            lookup.run.dispatchStatus !== 'committed' &&
+            lookup.run.dispatchStatus !== 'dispatching')
+        ) {
+          const bound = await controller.transition(item.queueItemId, {
+            state: 'bound',
+            runId: lookup.run.runId,
+            revision: lookup.run.revision,
+          });
+          publishManagedPresentationProgress(bound);
+          await controller.removeBound(item.queueItemId);
+          return bound;
+        }
+        if (lookup.run.dispatchStatus !== 'committed') return item;
+        expectedRevision = lookup.run.revision;
+      }
+
+      let claimed;
+      try {
+        claimed = await ipcBridge.presentationRuns.claimInitialDispatch.invoke({
+          conversation_id,
+          run_id: item.execution.runId,
+          holder_id: item.queueItemId,
+          expected_revision: expectedRevision,
+        });
+      } catch {
+        return item;
+      }
+      if ('code' in claimed) return item;
+
+      try {
+        const dispatched = await ipcBridge.presentationRuns.dispatch.invoke({
+          conversation_id,
+          run_id: claimed.runId,
+          lease_token: claimed.leaseToken,
+          expected_revision: claimed.revision,
+        });
+        return settleManagedPresentationDispatch(controller, item, dispatched);
+      } catch {
+        let lookup;
+        try {
+          lookup = await ipcBridge.presentationRuns.get.invoke({
+            conversation_id,
+            run_id: item.execution.runId,
+          });
+        } catch {
+          return item;
+        }
+        if ('code' in lookup) return item;
+        if (lookup.run.dispatchStatus === 'dispatch_uncertain') {
+          return markManagedPresentationUncertain(controller, item, lookup.run.runId, lookup.run.revision);
+        }
+        if (
+          lookup.run.dispatchStatus === 'allocating' ||
+          lookup.run.dispatchStatus === 'committed' ||
+          lookup.run.dispatchStatus === 'dispatching'
+        ) {
+          return item;
+        }
+        const bound = await controller.transition(item.queueItemId, {
+          state: 'bound',
+          runId: lookup.run.runId,
+          revision: lookup.run.revision,
+        });
+        publishManagedPresentationProgress(bound);
+        await controller.removeBound(item.queueItemId);
+        return bound;
+      }
+    },
+    [
+      conversation_id,
+      markManagedPresentationUncertain,
+      publishManagedPresentationProgress,
+      settleManagedPresentationDispatch,
+    ]
+  );
+
+  const drainManagedPresentationQueue = useCallback(
+    async (targetQueueItemId?: string): Promise<PresentationCommandQueueItem | null> => {
+      if (!managedPresentationPlatformEligible) return null;
+      const controller = getManagedPresentationController();
+      if (controller.read().items.length === 0 || managedPresentationDrainRef.current) return null;
+      managedPresentationDrainRef.current = true;
+      try {
+        await controller.recoverPersisting();
+        let targetResult: PresentationCommandQueueItem | null = null;
+        let latestResult: PresentationCommandQueueItem | null = null;
+        const drainNext = async (): Promise<PresentationCommandQueueItem | null> => {
+          let item = controller.read().items[0];
+          if (item === undefined) return targetResult ?? latestResult;
+          let freshlyCommitted = false;
+          if (item.execution.state === 'preflight_failed') {
+            publishManagedPresentationProgress(item);
+            return targetResult ?? item;
+          }
+          if (item.execution.state === 'queued') {
+            publishManagedPresentationProgress(item);
+            if (
+              !commandQueueRuntimeGate.hydrated ||
+              !commandQueueRuntimeGate.canSendMessage ||
+              commandQueueRuntimeGate.isProcessing
+            ) {
+              return targetResult ?? item;
+            }
+            item = await controller.claimHead(item.queueItemId);
+            publishManagedPresentationProgress(item);
+            try {
+              item = await controller.allocateClaimed(item.queueItemId, (request) =>
+                ipcBridge.presentationRuns.start.invoke(request)
+              );
+              freshlyCommitted = item.execution.state === 'committed';
+              publishManagedPresentationProgress(item);
+            } catch {
+              item = await recoverClaimedManagedPresentation(controller, item);
+              freshlyCommitted = item.execution.state === 'committed';
+            }
+          } else if (item.execution.state === 'claimed') {
+            item = await recoverClaimedManagedPresentation(controller, item);
+            freshlyCommitted = item.execution.state === 'committed';
+          }
+          if (item.execution.state === 'committed') {
+            if (
+              !commandQueueRuntimeGate.hydrated ||
+              !commandQueueRuntimeGate.canSendMessage ||
+              commandQueueRuntimeGate.isProcessing
+            ) {
+              return targetResult ?? item;
+            }
+            item = await dispatchManagedPresentation(controller, item, !freshlyCommitted);
+          } else if (item.execution.state === 'bound') {
+            publishManagedPresentationProgress(item);
+            await controller.removeBound(item.queueItemId);
+          } else if (item.execution.state === 'dispatching' || item.execution.state === 'dispatch_uncertain') {
+            item = await observeManagedPresentation(controller, item);
+          }
+          latestResult = item;
+          if (item.queueItemId === targetQueueItemId) targetResult = item;
+          const itemStillQueued = controller.read().items.some(({ queueItemId }) => queueItemId === item.queueItemId);
+          if (itemStillQueued) return targetResult ?? item;
+          return drainNext();
+        };
+        return drainNext();
+      } finally {
+        managedPresentationDrainRef.current = false;
+      }
+    },
+    [
+      commandQueueRuntimeGate.canSendMessage,
+      commandQueueRuntimeGate.hydrated,
+      commandQueueRuntimeGate.isProcessing,
+      dispatchManagedPresentation,
+      getManagedPresentationController,
+      managedPresentationPlatformEligible,
+      observeManagedPresentation,
+      publishManagedPresentationProgress,
+      recoverClaimedManagedPresentation,
+    ]
+  );
+
+  const enqueueManagedPresentation = useCallback(
+    async (
+      snapshot: PresentationSubmissionSnapshot,
+      sourceOwner: PresentationGrantOwner | null,
+      expectedOwnerRevision: number | null,
+      consumeSelection = true
+    ): Promise<PresentationSubmissionProgress> => {
+      const controller = getManagedPresentationController();
+      const existing = controller
+        .read()
+        .items.find(
+          (item) => item.queueItemId === snapshot.queueItemId || item.clientRequestId === snapshot.clientRequestId
+        );
+      let queued: PresentationCommandQueueItem;
+      if (existing !== undefined) {
+        if (!isExactManagedPresentationItem(existing, snapshot, sourceOwner, expectedOwnerRevision)) {
+          throw new Error('Managed presentation queue identity collision');
+        }
+        queued = existing;
+      } else {
+        queued = await controller.enqueue({
+          queueItemId: snapshot.queueItemId,
+          clientRequestId: snapshot.clientRequestId,
+          input: snapshot.input,
+          selectedTemplateId: snapshot.selectedTemplateId,
+          sources: snapshot.sources.map((source) => ({ ...source })),
+          sourceOwner,
+          expectedOwnerRevision,
+        });
+      }
+      publishManagedPresentationProgress(queued);
+      const current = (await drainManagedPresentationQueue(snapshot.queueItemId)) ?? queued;
+      const progress = toPresentationSubmissionProgress(current);
+      if (
+        consumeSelection &&
+        (progress.state === 'queued' || progress.state === 'bound' || progress.state === 'dispatch_uncertain')
+      ) {
+        presentationTemplates.clearSelection();
+      }
+      return progress;
+    },
+    [
+      drainManagedPresentationQueue,
+      getManagedPresentationController,
+      presentationTemplates,
+      publishManagedPresentationProgress,
+    ]
+  );
+
+  useEffect(() => {
+    if (!managedPresentationPlatformEligible) return;
+    void drainManagedPresentationQueue();
+  }, [drainManagedPresentationQueue, managedPresentationPlatformEligible]);
+
+  const managedPresentationSubmission = useMemo<ManagedPresentationSubmission | undefined>(() => {
+    const selectedTemplateId = presentationTemplates.selectedTemplate?.manifest.id;
+    if (!managedPresentationEligible || hasLegacyPresentationAttachments || selectedTemplateId === undefined) {
+      return undefined;
+    }
+    const sources = presentationSourceDraft.sourceRefs;
+    const sourceOwner = presentationSourceDraft.owner;
+    const expectedOwnerRevision = presentationSourceDraft.ownerRevision;
+    if (
+      presentationSourceDraft.pending ||
+      sourceOwner?.owner_type !== 'conversation' ||
+      sourceOwner.conversation_id !== conversation_id ||
+      expectedOwnerRevision === null
+    ) {
+      return undefined;
+    }
+    return {
+      selectedTemplateId,
+      sources,
+      onSubmit: (snapshot) =>
+        enqueueManagedPresentation(
+          snapshot,
+          sources.length > 0 ? sourceOwner : null,
+          sources.length > 0 ? expectedOwnerRevision : null
+        ),
+      onRestore: async (snapshot) => {
+        await getManagedPresentationController().removePreflightFailed(snapshot.queueItemId);
+        setManagedPresentationProgress(null);
+      },
+      progress: managedPresentationProgress,
+    };
+  }, [
+    conversation_id,
+    enqueueManagedPresentation,
+    getManagedPresentationController,
+    hasLegacyPresentationAttachments,
+    managedPresentationEligible,
+    managedPresentationProgress,
+    presentationSourceDraft.owner,
+    presentationSourceDraft.ownerRevision,
+    presentationSourceDraft.pending,
+    presentationSourceDraft.sourceRefs,
+    presentationTemplates.selectedTemplate?.manifest.id,
+  ]);
+
   // Register handler for adding text from preview panel to sendbox
   useEffect(() => {
     const handler = (text: string) => {
@@ -554,9 +1091,9 @@ Please check your local CLI tool authentication status`,
   });
 
   const onSendHandler = async (message: string) => {
-    if (managedPresentationEligible && hasLegacyPresentationAttachments) {
+    if (managedPresentationEligible && managedPresentationSubmission === undefined) {
       setContent(message);
-      setShowPresentationSourceReselect(true);
+      if (hasLegacyPresentationAttachments) setShowPresentationSourceReselect(true);
       return;
     }
 
@@ -566,7 +1103,8 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     emitter.emit('acp.selected.file.clear');
 
-    // ACP ignores `injectSkills` here — agents discover skills themselves.
+    // This is the legacy ACP path, which ignores `injectSkills`. Managed
+    // presentation dispatch never enters it; its directive requires OfficeCLI.
     const scratch = teamSendMessage ? undefined : await presentationTemplates.prepareScratch(conversation_id);
     const composed = presentationTemplates.composeSend(message, allFiles, scratch);
 
@@ -1024,6 +1562,7 @@ Please check your local CLI tool authentication status`,
           </>
         }
         onSend={onSendHandler}
+        managedPresentationSubmission={managedPresentationSubmission}
         slash_commands={slashCommands}
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         allowSendWhileLoading
