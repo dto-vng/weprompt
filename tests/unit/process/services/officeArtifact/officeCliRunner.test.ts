@@ -185,13 +185,20 @@ describe('createOfficeCliRunner', () => {
   });
 
   it('fails closed when Windows tree termination exits unsuccessfully', async () => {
-    const renderProcess = Object.assign(createWatchProcess(), { pid: 99_999, exitCode: 0 });
-    const taskkillProcess = Object.assign(createWatchProcess(), { exitCode: 1 });
-    const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>(() => taskkillProcess);
+    const renderProcess = Object.assign(createWatchProcess(), { pid: 99_999 });
+    const failedTaskkillProcess = Object.assign(createWatchProcess(), { exitCode: 1 });
+    const successfulTaskkillProcess = Object.assign(createWatchProcess(), { exitCode: 0 });
+    const processTreeSpawn = vi
+      .fn<OfficeCliProcessTreeSpawn>()
+      .mockReturnValueOnce(failedTaskkillProcess)
+      .mockImplementationOnce(() => {
+        Object.assign(renderProcess, { signalCode: 'SIGKILL' });
+        queueMicrotask(() => renderProcess.emit('exit', null, 'SIGKILL'));
+        return successfulTaskkillProcess;
+      });
     const spawn = vi.fn<OfficeCliSpawn>(() => {
       queueMicrotask(() => {
-        renderProcess.stdout.end(JSON.stringify({ success: true, data: {} }));
-        renderProcess.emit('close', 0, null);
+        renderProcess.stdout.write(Buffer.alloc(PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES + 1));
       });
       return renderProcess;
     });
@@ -205,11 +212,126 @@ describe('createOfficeCliRunner', () => {
     await expect(
       runner.renderSlide('C:\\inspection\\candidate.pptx', 1, 'C:\\render\\slide-1.png')
     ).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+    expect(processTreeSpawn).toHaveBeenCalledTimes(2);
     expect(processTreeSpawn).toHaveBeenCalledWith('taskkill', ['/F', '/PID', '99999', '/T'], {
       stdio: 'ignore',
       windowsHide: true,
     });
   });
+
+  it('stops a timed-out Windows cleanup helper before retrying tree termination', async () => {
+    vi.useFakeTimers();
+    try {
+      const renderProcess = Object.assign(createWatchProcess(), { pid: 99_999 });
+      const stalledTaskkillProcess = Object.assign(createWatchProcess(), { pid: 88_888 });
+      const successfulTaskkillProcess = Object.assign(createWatchProcess(), { exitCode: 0 });
+      const processTreeSpawn = vi
+        .fn<OfficeCliProcessTreeSpawn>()
+        .mockReturnValueOnce(stalledTaskkillProcess)
+        .mockImplementationOnce(() => {
+          Object.assign(renderProcess, { signalCode: 'SIGKILL' });
+          queueMicrotask(() => renderProcess.emit('exit', null, 'SIGKILL'));
+          return successfulTaskkillProcess;
+        });
+      const runner = createOfficeCliRunner({
+        binaryPath: 'C:\\officecli.exe',
+        platform: 'win32',
+        processTreeSpawn,
+        spawn: () => {
+          queueMicrotask(() => {
+            renderProcess.stdout.write(Buffer.alloc(PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES + 1));
+          });
+          return renderProcess;
+        },
+      });
+
+      const pending = runner.renderSlide('C:\\inspection\\candidate.pptx', 1, 'C:\\render\\slide-1.png');
+      const rejection = expect(pending).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+      await vi.advanceTimersByTimeAsync(5_250);
+
+      await rejection;
+      expect(stalledTaskkillProcess.kill).toHaveBeenCalledWith('SIGKILL');
+      expect(processTreeSpawn).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.runIf(process.platform !== 'win32')(
+    'retries a failed Windows tree termination before rejecting and releasing the render workspace',
+    async () => {
+      const root = await mkdtemp(path.join(tmpdir(), 'officecli-windows-render-tree-'));
+      const executable = path.join(root, 'fake-officecli');
+      const outputPath = path.join(root, 'slide-1.png');
+      const pidPath = `${outputPath}.pid`;
+      const heartbeatPath = `${outputPath}.heartbeat`;
+      const heartbeatProgram = `
+        const { appendFileSync } = require('node:fs');
+        const heartbeatPath = ${JSON.stringify(heartbeatPath)};
+        appendFileSync(heartbeatPath, 'x');
+        setInterval(() => appendFileSync(heartbeatPath, 'x'), 10);
+      `;
+      await writeFile(
+        executable,
+        `#!/usr/bin/env node
+          const { spawn } = require('node:child_process');
+          const { writeFileSync } = require('node:fs');
+          const child = spawn(process.execPath, ['-e', ${JSON.stringify(heartbeatProgram)}], { stdio: 'ignore' });
+          writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
+          setInterval(() => undefined, 1_000);
+        `,
+        { mode: 0o700 }
+      );
+
+      let descendantPid = 0;
+      let renderProcess: ChildProcess | undefined;
+      let taskkillAttempt = 0;
+      const spawn: OfficeCliSpawn = (file, args, options) => {
+        renderProcess = nodeSpawn(file, args, { ...options, detached: true });
+        return renderProcess as unknown as OfficeCliWatchProcess;
+      };
+      const processTreeSpawn = vi.fn<OfficeCliProcessTreeSpawn>((_file, args) => {
+        const taskkill = createWatchProcess();
+        taskkillAttempt += 1;
+        const attempt = taskkillAttempt;
+        queueMicrotask(() => {
+          if (attempt === 1) {
+            Object.assign(taskkill, { exitCode: 1 });
+            taskkill.emit('close', 1, null);
+            return;
+          }
+          process.kill(-Number(args[2]), 'SIGKILL');
+          Object.assign(taskkill, { exitCode: 0 });
+          taskkill.emit('close', 0, null);
+        });
+        return taskkill;
+      });
+      const runner = createOfficeCliRunner({
+        binaryPath: executable,
+        platform: 'win32',
+        processTreeSpawn,
+        spawn,
+      });
+
+      try {
+        const pending = runner.renderSlide('/inspection/candidate.pptx', 1, outputPath);
+        descendantPid = await readProcessId(pidPath);
+        expect(descendantPid).toBeGreaterThan(1);
+        await writeFile(outputPath, '');
+        await truncate(outputPath, PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE + 1);
+
+        await expect(pending).rejects.toMatchObject({ code: 'OFFICECLI_FAILED' });
+        expect(processTreeSpawn).toHaveBeenCalledTimes(2);
+        const heartbeatAtRejection = await readFile(heartbeatPath);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        expect(await readFile(heartbeatPath)).toEqual(heartbeatAtRejection);
+      } finally {
+        if (descendantPid > 1 && isProcessAlive(descendantPid)) process.kill(descendantPid, 'SIGKILL');
+        if (renderProcess?.pid && isProcessAlive(renderProcess.pid)) renderProcess.kill('SIGKILL');
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it.runIf(process.platform !== 'win32')('kills a descendant writer before a timed-out render rejects', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'officecli-render-tree-'));

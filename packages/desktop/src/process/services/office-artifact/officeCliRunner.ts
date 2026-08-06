@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable no-await-in-loop -- cleanup attempts must remain serialized until every child is confirmed stopped */
+
 import { execFile as nodeExecFile, spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { lstat } from 'node:fs/promises';
@@ -143,6 +145,7 @@ const WATCH_READY_TIMEOUT_MS = 60_000;
 const WATCH_STOP_TIMEOUT_MS = 5_000;
 const RENDER_OUTPUT_POLL_INTERVAL_MS = 25;
 const RENDER_TREE_STOP_TIMEOUT_MS = 5_000;
+const RENDER_TREE_STOP_RETRY_MS = 250;
 
 const defaultExecFile: OfficeCliExecFile = (file, args, options, callback) => {
   return nodeExecFile(file, args, options, (error, stdout, stderr) => {
@@ -221,20 +224,55 @@ async function terminateRenderProcessTree(
   if (!Number.isSafeInteger(pid) || !pid || pid <= 1) return;
 
   if (platform === 'win32') {
-    let taskkill: OfficeCliWatchProcess;
-    try {
-      taskkill = processTreeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } catch {
-      throw new OfficeArtifactError('OFFICECLI_FAILED');
+    if (
+      (child.exitCode !== undefined && child.exitCode !== null) ||
+      (child.signalCode !== undefined && child.signalCode !== null)
+    ) {
+      return;
     }
-    const taskkillOutcome = await waitForChildProcessEnd(taskkill);
-    if (!taskkillOutcome.ended || taskkillOutcome.code !== 0) throw new OfficeArtifactError('OFFICECLI_FAILED');
-    const renderOutcome = await waitForChildProcessEnd(child);
-    if (!renderOutcome.ended) throw new OfficeArtifactError('OFFICECLI_FAILED');
-    return;
+    let cleanupFailed = false;
+    for (;;) {
+      let taskkill: OfficeCliWatchProcess;
+      try {
+        taskkill = processTreeSpawn('taskkill', ['/F', '/PID', String(pid), '/T'], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+      } catch {
+        cleanupFailed = true;
+        await wait(RENDER_TREE_STOP_RETRY_MS);
+        continue;
+      }
+
+      let taskkillOutcome = await waitForChildProcessEnd(taskkill);
+      const taskkillCompletedSuccessfully = taskkillOutcome.ended && taskkillOutcome.code === 0;
+      if (!taskkillOutcome.ended) {
+        cleanupFailed = true;
+        const taskkillPid = taskkill.pid;
+        if (Number.isSafeInteger(taskkillPid) && taskkillPid && taskkillPid > 1) {
+          do {
+            try {
+              taskkill.kill('SIGKILL');
+            } catch {
+              // Keep ownership until the cleanup helper is confirmed stopped.
+            }
+            taskkillOutcome = await waitForChildProcessEnd(taskkill);
+          } while (!taskkillOutcome.ended);
+        }
+      }
+
+      if (taskkillCompletedSuccessfully) {
+        const renderOutcome = await waitForChildProcessEnd(child);
+        if (renderOutcome.ended) {
+          if (cleanupFailed) throw new OfficeArtifactError('OFFICECLI_FAILED');
+          return;
+        }
+        cleanupFailed = true;
+      } else {
+        cleanupFailed = true;
+      }
+      await wait(RENDER_TREE_STOP_RETRY_MS);
+    }
   }
 
   try {
@@ -482,6 +520,7 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
       let monitorTimer: NodeJS.Timeout | undefined;
       let timeoutTimer: NodeJS.Timeout | undefined;
       let settling = false;
+      let cleanupFinished = false;
       let stdoutByteLength = 0;
       const stdoutChunks: Buffer[] = [];
 
@@ -493,15 +532,20 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
       const settle = (error: unknown, stdout = ''): void => {
         if (settling) return;
         settling = true;
-        clearTimers();
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         void (async () => {
-          await terminateRenderProcessTree(child, platform, processTreeSpawn);
-          if (error) throw toOfficeCliRenderError(error);
-          await assertRenderOutputWithinLimit(outputPath);
-          if (Buffer.byteLength(stdout, 'utf8') > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {
-            throw new OfficeArtifactError('OFFICECLI_FAILED');
+          try {
+            await terminateRenderProcessTree(child, platform, processTreeSpawn);
+            if (error) throw toOfficeCliRenderError(error);
+            await assertRenderOutputWithinLimit(outputPath);
+            if (Buffer.byteLength(stdout, 'utf8') > PRESENTATION_RUN_LIMITS.MAX_OFFICECLI_STDOUT_BYTES) {
+              throw new OfficeArtifactError('OFFICECLI_FAILED');
+            }
+            parseOfficeCliEnvelope(stdout);
+          } finally {
+            cleanupFinished = true;
+            clearTimers();
           }
-          parseOfficeCliEnvelope(stdout);
         })().then(
           () => resolve(),
           (settleError: unknown) => reject(settleError)
@@ -509,14 +553,13 @@ export function createOfficeCliRunner(dependencies: OfficeCliRunnerDependencies 
       };
 
       const monitorOutput = async (): Promise<void> => {
-        if (settling) return;
+        if (cleanupFinished) return;
         try {
           await assertRenderOutputWithinLimit(outputPath);
         } catch (error) {
-          settle(error);
-          return;
+          if (!settling) settle(error);
         }
-        if (!settling) {
+        if (!cleanupFinished) {
           monitorTimer = setTimeout(() => void monitorOutput(), RENDER_OUTPUT_POLL_INTERVAL_MS);
         }
       };
