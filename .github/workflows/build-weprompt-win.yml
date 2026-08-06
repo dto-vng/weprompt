@@ -1,21 +1,21 @@
-name: "🪟 Build WePrompt (Windows x64)"
+name: '🪟 Build WePrompt (Windows x64)'
 
 on:
   workflow_dispatch:
     inputs:
       aioncore_ref:
-        description: "aioncore branch, tag or commit to build the backend from"
+        description: 'aioncore branch, tag or commit to build the backend from'
         required: true
-        default: "security/pilot-hardening-d01-d06"
+        default: 'security/pilot-hardening-d01-d06'
         type: string
 
 permissions:
   contents: read
 
 env:
-  RUST_TOOLCHAIN: "1.95.0"
-  RUST_TARGET: "x86_64-pc-windows-msvc"
-  AIONCORE_REPO: "khoapnt-vng/aioncore"
+  RUST_TOOLCHAIN: '1.95.0'
+  RUST_TARGET: 'x86_64-pc-windows-msvc'
+  AIONCORE_REPO: 'khoapnt-vng/aioncore'
 
 jobs:
   build:
@@ -54,16 +54,16 @@ jobs:
         shell: bash
         working-directory: aioncore-src
         env:
-          RUSTFLAGS: "-C target-feature=+crt-static"
+          RUSTFLAGS: '-C target-feature=+crt-static'
           CARGO_TERM_COLOR: always
-          CARGO_HTTP_TIMEOUT: "600"
-          CARGO_NET_RETRY: "10"
+          CARGO_HTTP_TIMEOUT: '600'
+          CARGO_NET_RETRY: '10'
         run: cargo build --release --target "$RUST_TARGET" -p aionui-app
 
       - name: Assemble the backend bundle
         shell: bash
         env:
-          AIONUI_BUNDLED_MANAGED_RESOURCES: ""
+          AIONUI_BUNDLED_MANAGED_RESOURCES: ''
         run: |
           set -euo pipefail
           BUNDLE="$GITHUB_WORKSPACE/aioncore-bundle"
