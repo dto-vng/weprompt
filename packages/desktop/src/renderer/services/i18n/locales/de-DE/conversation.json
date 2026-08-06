@@ -788,6 +788,23 @@
     "sources": {
       "reselectRequired": "Wählen Sie angehängte Dateien erneut aus, um sie mit dieser PPTX-Vorlage zu verwenden.",
       "reselectAction": "Dateien erneut auswählen"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Der Präsentationskandidat muss geprüft werden.",
+        "reviewRequiredAfterFailure": "Die Erstellung wurde beendet; der aufbewahrte Präsentationskandidat muss weiterhin geprüft werden.",
+        "trackingRequired": "Der Präsentationslauf muss nachverfolgt werden.",
+        "dispatchUncertain": "Das Ergebnis des Präsentationslaufs ist unbestätigt. Eine Bedienperson muss es prüfen."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "In Systemanwendung öffnen",
+        "discard": "Eintrag verwerfen"
+      },
+      "loadError": "Der Wiederherstellungsstatus der Präsentation konnte nicht geladen werden.",
+      "invalidResponse": "Der Wiederherstellungsstatus der Präsentation konnte nicht bestätigt werden.",
+      "openError": "Es konnte nicht bestätigt werden, ob der aktuelle Präsentationskandidat geöffnet wurde.",
+      "discardError": "Das Verwerfen des Präsentationseintrags konnte nicht bestätigt werden."
     }
   },
   "status": {
@@ -1335,5 +1352,12 @@
     "body": "Dieser Chat kann die Wissensdatenbank des Projekts nicht durchsuchen – er wurde begonnen, bevor Dateien hinzugefügt wurden.",
     "action": "Neuen Chat starten"
   },
-  "emptyChat": "Sende eine Nachricht, um zu beginnen."
+  "emptyChat": "Sende eine Nachricht, um zu beginnen.",
+  "presentationSubmission": {
+    "pending": "Präsentationsübermittlung ausstehend",
+    "restore": "Wiederherstellen",
+    "persistenceFailure": "Die Präsentationsübermittlung konnte nicht gespeichert werden.",
+    "queued": "Präsentation zur Warteschlange hinzugefügt",
+    "uncertainTracking": "Der Übermittlungsstatus ist ungewiss. Verfolgen Sie den bestehenden Lauf und senden Sie nicht erneut."
+  }
 }

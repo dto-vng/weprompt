@@ -11,6 +11,10 @@ import {
   PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
 import type {
+  PresentationReadinessBlocker,
+  PresentationReadinessEvidence,
+} from '@/common/types/office/artifactReadiness';
+import type {
   PresentationGrantOwner,
   PresentationSourceDescriptor,
   PresentationSourceRef,
@@ -32,6 +36,42 @@ export type PresentationRunBinding = {
   runtime: 'aionrs' | 'acp' | null;
   boundAt: string;
 };
+
+export type PresentationInitialDispatchLease = {
+  holderId: string;
+  leaseToken: string;
+  claimedAt: string;
+  expiresAt: string;
+};
+
+export type PresentationRuntimeReleaseObservation = {
+  state: 'idle';
+  can_send_message: true;
+  has_task: false;
+  task_status?: 'finished';
+  is_processing: false;
+  pending_confirmations: 0;
+  turn_id: null;
+};
+
+export type PresentationRunTerminalEvidence = {
+  conversationId: string;
+  turnId: string;
+  eventObservedAt: string;
+  runtimeObservedAt: string;
+  runtime: PresentationRuntimeReleaseObservation;
+};
+
+export type PresentationRunRetentionProof = {
+  stagingBeforeRetain: string;
+  retainedTemp: string;
+  stagingAfterRetain: string;
+};
+
+export type PresentationRunReadiness =
+  | { status: 'passed'; recordedAt: string; evidence: PresentationReadinessEvidence }
+  | { status: 'blocked'; recordedAt: string; blockers: readonly PresentationReadinessBlocker[] }
+  | { status: 'error'; recordedAt: string; code: string };
 
 export type PresentationRunPreparationFile = {
   fileName: string;
@@ -91,6 +131,12 @@ export type PresentationRunManifest = {
   retainedBytes: number;
   /** Optional only for canonical manifests written before the preparation schema existed. */
   preparation?: PresentationRunPreparationRecord | null;
+  /** Optional only for exact Task 1-7 version-2 manifests. New writes always include all five fields. */
+  initialDispatchLease?: PresentationInitialDispatchLease | null;
+  terminalEvidence?: PresentationRunTerminalEvidence | null;
+  runtimeReleaseObservations?: string[];
+  retentionProof?: PresentationRunRetentionProof | null;
+  readiness?: PresentationRunReadiness | null;
 };
 
 export type PresentationRunTransition = {
@@ -99,6 +145,7 @@ export type PresentationRunTransition = {
   artifactPhase?: Exclude<PresentationRunArtifactPhase, null>;
   disposition?: PresentationRunDisposition;
   retainedCandidate?: PresentationRunRetainedCandidate | null;
+  retentionProof?: PresentationRunRetentionProof;
   binding?: PresentationRunBinding;
   postInvoked?: boolean;
   now: string;
@@ -108,7 +155,7 @@ export type BindPresentationRunTurnInput = {
   expectedRevision: number;
   conversationId: string;
   turnId: string;
-  runtime: PresentationRunBinding['runtime'];
+  runtime: Exclude<PresentationRunBinding['runtime'], null>;
   now: string;
 };
 
@@ -171,6 +218,396 @@ function assertCandidate(candidate: PresentationRunRetainedCandidate | null): vo
     candidate.byteLength > PRESENTATION_RUN_LIMITS.MAX_CANDIDATE_COMPRESSED_BYTES
   ) {
     throw new Error('Invalid retained presentation candidate');
+  }
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
+function isBoundedInteger(value: unknown, minimum: number, maximum: number): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
+}
+
+const VISUAL_ANCHOR_KIND_ORDER = ['picture', 'chart', 'table', 'connector'] as const;
+const VISUAL_ANCHOR_KINDS = new Set(VISUAL_ANCHOR_KIND_ORDER);
+const SLIDE_ROLES = new Set(['cover', 'divider', 'quote', 'closing', 'minimal', 'content']);
+
+/** Returns true only for the complete, exact Task-8 terminal proof bound to this run. */
+export function hasExactPresentationTerminalEvidence(run: PresentationRunManifest): boolean {
+  const terminal = run.terminalEvidence;
+  if (
+    !isPlainRecord(terminal) ||
+    !hasExactManifestKeys(terminal, ['conversationId', 'turnId', 'eventObservedAt', 'runtimeObservedAt', 'runtime'])
+  ) {
+    return false;
+  }
+  const runtime = terminal.runtime;
+  if (!isPlainRecord(runtime)) return false;
+  const runtimeKeys = [
+    'state',
+    'can_send_message',
+    'has_task',
+    'is_processing',
+    'pending_confirmations',
+    'turn_id',
+    ...(Object.hasOwn(runtime, 'task_status') ? ['task_status'] : []),
+  ];
+  return (
+    hasExactManifestKeys(runtime, runtimeKeys) &&
+    terminal.conversationId === run.conversationId &&
+    typeof terminal.turnId === 'string' &&
+    UUID_RE.test(terminal.turnId) &&
+    isIsoTimestamp(terminal.eventObservedAt) &&
+    isIsoTimestamp(terminal.runtimeObservedAt) &&
+    Date.parse(terminal.runtimeObservedAt) >= Date.parse(terminal.eventObservedAt) &&
+    runtime.state === 'idle' &&
+    runtime.can_send_message === true &&
+    runtime.has_task === false &&
+    runtime.is_processing === false &&
+    runtime.pending_confirmations === 0 &&
+    runtime.turn_id === null &&
+    (!Object.hasOwn(runtime, 'task_status') || runtime.task_status === 'finished') &&
+    run.binding !== null &&
+    (run.binding.runtime === 'aionrs' || run.binding.runtime === 'acp') &&
+    terminal.conversationId === run.binding.conversationId &&
+    terminal.turnId === run.binding.turnId
+  );
+}
+
+function hasExactArtifactIdentity(value: unknown, maximumByteLength: number): boolean {
+  return (
+    isPlainRecord(value) &&
+    hasExactManifestKeys(value, ['sha256', 'byteLength']) &&
+    isSha256(value.sha256) &&
+    isBoundedInteger(value.byteLength, 1, maximumByteLength)
+  );
+}
+
+function hasExactOoxmlSlide(value: unknown, slideNumber: number): boolean {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactManifestKeys(value, [
+      'slideNumber',
+      'shapeCount',
+      'textCharCount',
+      'textOnlyShapeCount',
+      'notesTextCharCount',
+      'visualAnchorKinds',
+    ]) ||
+    value.slideNumber !== slideNumber ||
+    !isBoundedInteger(value.shapeCount, 0, PRESENTATION_RUN_LIMITS.MAX_SHAPES_PER_SLIDE) ||
+    !isBoundedInteger(value.textCharCount, 0, PRESENTATION_RUN_LIMITS.MAX_TEXT_CHARS_PER_SLIDE) ||
+    !isBoundedInteger(value.textOnlyShapeCount, 0, value.shapeCount as number) ||
+    !isBoundedInteger(value.notesTextCharCount, 0, PRESENTATION_RUN_LIMITS.MAX_TEXT_CHARS_PER_SLIDE) ||
+    !Array.isArray(value.visualAnchorKinds) ||
+    value.visualAnchorKinds.length > VISUAL_ANCHOR_KINDS.size ||
+    value.visualAnchorKinds.some(
+      (kind) => typeof kind !== 'string' || !VISUAL_ANCHOR_KINDS.has(kind as (typeof VISUAL_ANCHOR_KIND_ORDER)[number])
+    ) ||
+    new Set(value.visualAnchorKinds).size !== value.visualAnchorKinds.length ||
+    value.visualAnchorKinds.some(
+      (kind, index) =>
+        index > 0 &&
+        VISUAL_ANCHOR_KIND_ORDER.indexOf(kind as (typeof VISUAL_ANCHOR_KIND_ORDER)[number]) <=
+          VISUAL_ANCHOR_KIND_ORDER.indexOf(
+            (value.visualAnchorKinds as unknown[])[index - 1] as (typeof VISUAL_ANCHOR_KIND_ORDER)[number]
+          )
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasExactPolicySlide(value: unknown, slideNumber: number, knownSourceRefs: ReadonlySet<string>): boolean {
+  return (
+    isPlainRecord(value) &&
+    hasExactManifestKeys(value, ['slideNumber', 'role', 'sourceRefs', 'requiresNotes', 'requiresVisualAnchor']) &&
+    value.slideNumber === slideNumber &&
+    typeof value.role === 'string' &&
+    SLIDE_ROLES.has(value.role) &&
+    Array.isArray(value.sourceRefs) &&
+    value.sourceRefs.length <= PRESENTATION_RUN_LIMITS.MAX_SOURCE_REFS_PER_SLIDE &&
+    value.sourceRefs.every(
+      (sourceRef) =>
+        typeof sourceRef === 'string' &&
+        sourceRef.length > 0 &&
+        sourceRef.length <= 256 &&
+        knownSourceRefs.has(sourceRef)
+    ) &&
+    new Set(value.sourceRefs).size === value.sourceRefs.length &&
+    typeof value.requiresNotes === 'boolean' &&
+    typeof value.requiresVisualAnchor === 'boolean' &&
+    value.requiresNotes === (value.role === 'content') &&
+    value.requiresVisualAnchor === (value.role === 'content')
+  );
+}
+
+/**
+ * Validates the complete path-free Task-6 evidence graph against the canonical
+ * retained candidate and retention proof. This predicate is the sole evidence
+ * authority used by persistence and recovery action projection.
+ */
+export function hasExactPassedPresentationReadiness(run: PresentationRunManifest): boolean {
+  const candidate = run.retainedCandidate;
+  const proof = run.retentionProof;
+  const readiness = run.readiness;
+  if (
+    candidate === null ||
+    !isPlainRecord(proof) ||
+    !hasExactManifestKeys(proof, ['stagingBeforeRetain', 'retainedTemp', 'stagingAfterRetain']) ||
+    proof.stagingBeforeRetain !== candidate.sha256 ||
+    proof.retainedTemp !== candidate.sha256 ||
+    proof.stagingAfterRetain !== candidate.sha256 ||
+    !isPlainRecord(readiness) ||
+    !hasExactManifestKeys(readiness, ['status', 'recordedAt', 'evidence']) ||
+    readiness.status !== 'passed' ||
+    !isIsoTimestamp(readiness.recordedAt)
+  ) {
+    return false;
+  }
+
+  const evidence = readiness.evidence;
+  if (
+    !isPlainRecord(evidence) ||
+    !hasExactManifestKeys(evidence, [
+      'version',
+      'candidate',
+      'plan',
+      'hashChain',
+      'structure',
+      'ooxml',
+      'policy',
+      'renders',
+    ]) ||
+    evidence.version !== 1 ||
+    !hasExactArtifactIdentity(evidence.candidate, PRESENTATION_RUN_LIMITS.MAX_CANDIDATE_COMPRESSED_BYTES) ||
+    evidence.candidate.sha256 !== candidate.sha256 ||
+    evidence.candidate.byteLength !== candidate.byteLength ||
+    !hasExactArtifactIdentity(evidence.plan, PRESENTATION_RUN_LIMITS.MAX_PLAN_JSON_BYTES)
+  ) {
+    return false;
+  }
+
+  const hashChain = evidence.hashChain;
+  if (
+    !isPlainRecord(hashChain) ||
+    !hasExactManifestKeys(hashChain, [
+      'stagingBeforeRetain',
+      'retainedTemp',
+      'stagingAfterRetain',
+      'manifestRetained',
+      'inspectionCopy',
+      'retainedAfterStructuralValidation',
+      'retainedAfterOoxmlInspection',
+      'retainedAfterEachSlideRender',
+    ]) ||
+    !Array.isArray(hashChain.retainedAfterEachSlideRender) ||
+    [
+      hashChain.stagingBeforeRetain,
+      hashChain.retainedTemp,
+      hashChain.stagingAfterRetain,
+      hashChain.manifestRetained,
+      hashChain.inspectionCopy,
+      hashChain.retainedAfterStructuralValidation,
+      hashChain.retainedAfterOoxmlInspection,
+      ...hashChain.retainedAfterEachSlideRender,
+    ].some((hash) => hash !== candidate.sha256)
+  ) {
+    return false;
+  }
+
+  const structure = evidence.structure;
+  const ooxml = evidence.ooxml;
+  if (
+    !isPlainRecord(structure) ||
+    !hasExactManifestKeys(structure, ['officeCliValidated']) ||
+    structure.officeCliValidated !== true ||
+    !isPlainRecord(ooxml) ||
+    !hasExactManifestKeys(ooxml, [
+      'zipEntryCount',
+      'expandedByteLength',
+      'xmlByteLength',
+      'slideCount',
+      'totalTextChars',
+      'slides',
+    ]) ||
+    !isBoundedInteger(ooxml.zipEntryCount, 1, PRESENTATION_RUN_LIMITS.MAX_ZIP_ENTRIES) ||
+    !isBoundedInteger(ooxml.expandedByteLength, 1, PRESENTATION_RUN_LIMITS.MAX_ZIP_EXPANDED_BYTES) ||
+    !isBoundedInteger(ooxml.xmlByteLength, 1, PRESENTATION_RUN_LIMITS.MAX_XML_BYTES) ||
+    !isBoundedInteger(ooxml.slideCount, 1, PRESENTATION_RUN_LIMITS.MAX_SLIDES) ||
+    !isBoundedInteger(ooxml.totalTextChars, 0, PRESENTATION_RUN_LIMITS.MAX_TEXT_CHARS_TOTAL) ||
+    !Array.isArray(ooxml.slides) ||
+    ooxml.slides.length !== ooxml.slideCount ||
+    ooxml.slides.some((slide, index) => !hasExactOoxmlSlide(slide, index + 1)) ||
+    ooxml.slides.reduce((total, slide) => total + (slide as Record<string, number>).textCharCount, 0) !==
+      ooxml.totalTextChars
+  ) {
+    return false;
+  }
+
+  const policy = evidence.policy;
+  const knownSourceRefs = new Set(run.sourceGrants);
+  if (
+    !isPlainRecord(policy) ||
+    !hasExactManifestKeys(policy, ['version', 'plan', 'slides', 'blockers']) ||
+    policy.version !== 1 ||
+    !isPlainRecord(policy.plan) ||
+    !hasExactManifestKeys(policy.plan, ['valid', 'slideCount', 'sourceRefCount']) ||
+    policy.plan.valid !== true ||
+    policy.plan.slideCount !== ooxml.slideCount ||
+    !isBoundedInteger(
+      policy.plan.sourceRefCount,
+      0,
+      PRESENTATION_RUN_LIMITS.MAX_SLIDES * PRESENTATION_RUN_LIMITS.MAX_SOURCE_REFS_PER_SLIDE
+    ) ||
+    !Array.isArray(policy.slides) ||
+    policy.slides.length !== ooxml.slideCount ||
+    policy.slides.some((slide, index) => !hasExactPolicySlide(slide, index + 1, knownSourceRefs)) ||
+    policy.slides.reduce(
+      (total, slide) => total + ((slide as Record<string, unknown>).sourceRefs as readonly unknown[]).length,
+      0
+    ) !== policy.plan.sourceRefCount ||
+    !Array.isArray(policy.blockers) ||
+    policy.blockers.length !== 0
+  ) {
+    return false;
+  }
+
+  const renders = evidence.renders;
+  if (
+    !Array.isArray(renders) ||
+    renders.length !== ooxml.slideCount ||
+    hashChain.retainedAfterEachSlideRender.length !== renders.length
+  ) {
+    return false;
+  }
+  let totalRenderBytes = 0;
+  for (const [index, render] of renders.entries()) {
+    if (
+      !isPlainRecord(render) ||
+      !hasExactManifestKeys(render, ['slideNumber', 'candidateSha256', 'sha256', 'byteLength']) ||
+      render.slideNumber !== index + 1 ||
+      render.candidateSha256 !== candidate.sha256 ||
+      !isSha256(render.sha256) ||
+      !isBoundedInteger(render.byteLength, 1, PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_PER_SLIDE)
+    ) {
+      return false;
+    }
+    totalRenderBytes += render.byteLength;
+    if (totalRenderBytes > PRESENTATION_RUN_LIMITS.MAX_RENDER_BYTES_TOTAL) return false;
+  }
+  return true;
+}
+
+const CURRENT_LIFECYCLE_KEYS = [
+  'initialDispatchLease',
+  'terminalEvidence',
+  'runtimeReleaseObservations',
+  'retentionProof',
+  'readiness',
+] as const;
+
+function hasCurrentLifecycleSchema(run: PresentationRunManifest): boolean {
+  const fieldCount = CURRENT_LIFECYCLE_KEYS.filter((key) => Object.hasOwn(run, key)).length;
+  if (fieldCount !== 0 && fieldCount !== CURRENT_LIFECYCLE_KEYS.length) {
+    throw new Error('Invalid presentation lifecycle schema');
+  }
+  return fieldCount === CURRENT_LIFECYCLE_KEYS.length;
+}
+
+function assertLifecycleEvidence(run: PresentationRunManifest): void {
+  const lease = run.initialDispatchLease;
+  if (
+    lease !== undefined &&
+    lease !== null &&
+    (!isPlainRecord(lease) ||
+      !hasExactManifestKeys(lease, ['holderId', 'leaseToken', 'claimedAt', 'expiresAt']) ||
+      !UUID_RE.test(lease.holderId) ||
+      !/^[A-Za-z0-9_-]{32,256}$/.test(lease.leaseToken) ||
+      !isIsoTimestamp(lease.claimedAt) ||
+      !isIsoTimestamp(lease.expiresAt) ||
+      Date.parse(lease.expiresAt) <= Date.parse(lease.claimedAt))
+  ) {
+    throw new Error('Invalid presentation dispatch lease');
+  }
+
+  const observations = run.runtimeReleaseObservations;
+  if (
+    observations !== undefined &&
+    (!Array.isArray(observations) ||
+      observations.length > 2 ||
+      observations.some((value) => !isIsoTimestamp(value)) ||
+      observations.some((value, index) => index > 0 && value <= observations[index - 1]!))
+  ) {
+    throw new Error('Invalid presentation runtime release observations');
+  }
+
+  const terminal = run.terminalEvidence;
+  if (terminal !== undefined && terminal !== null && !hasExactPresentationTerminalEvidence(run)) {
+    throw new Error('Invalid presentation terminal evidence');
+  }
+  const isCurrentLifecycleSchema = hasCurrentLifecycleSchema(run);
+  const requiresTerminalEvidence =
+    run.dispatchStatus === 'terminal_verified' ||
+    run.retainedCandidate !== null ||
+    run.disposition === 'REVIEW_REQUIRED' ||
+    run.retentionProof != null ||
+    run.readiness != null;
+  if (isCurrentLifecycleSchema && requiresTerminalEvidence && !hasExactPresentationTerminalEvidence(run)) {
+    throw new Error('Invalid presentation terminal evidence');
+  }
+
+  const proof = run.retentionProof;
+  if (
+    proof !== undefined &&
+    proof !== null &&
+    (!isPlainRecord(proof) ||
+      !hasExactManifestKeys(proof, ['stagingBeforeRetain', 'retainedTemp', 'stagingAfterRetain']) ||
+      !isSha256(proof.stagingBeforeRetain) ||
+      !isSha256(proof.retainedTemp) ||
+      !isSha256(proof.stagingAfterRetain) ||
+      proof.stagingBeforeRetain !== proof.retainedTemp ||
+      proof.retainedTemp !== proof.stagingAfterRetain ||
+      run.retainedCandidate === null ||
+      proof.retainedTemp !== run.retainedCandidate.sha256)
+  ) {
+    throw new Error('Invalid presentation retention proof');
+  }
+  if (isCurrentLifecycleSchema && run.retainedCandidate !== null && (proof === undefined || proof === null)) {
+    throw new Error('Invalid presentation retention proof');
+  }
+
+  const readiness = run.readiness;
+  if (readiness === undefined || readiness === null) return;
+  if (!isPlainRecord(readiness) || !isIsoTimestamp(readiness.recordedAt)) {
+    throw new Error('Invalid presentation readiness evidence');
+  }
+  if (readiness.status === 'passed') {
+    if (!hasExactPassedPresentationReadiness(run)) {
+      throw new Error('Invalid presentation readiness evidence');
+    }
+    return;
+  }
+  if (readiness.status === 'blocked') {
+    if (
+      !hasExactManifestKeys(readiness, ['status', 'recordedAt', 'blockers']) ||
+      !Array.isArray(readiness.blockers) ||
+      readiness.blockers.length < 1 ||
+      readiness.blockers.length > 512
+    ) {
+      throw new Error('Invalid presentation readiness evidence');
+    }
+    return;
+  }
+  if (
+    readiness.status !== 'error' ||
+    !hasExactManifestKeys(readiness, ['status', 'recordedAt', 'code']) ||
+    typeof readiness.code !== 'string' ||
+    !/^[A-Z0-9_]{1,128}$/.test(readiness.code)
+  ) {
+    throw new Error('Invalid presentation readiness evidence');
   }
 }
 
@@ -315,6 +752,7 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
   if (run.preparation !== undefined && run.preparation !== null) {
     assertPresentationRunPreparationRecord(run.preparation);
   }
+  assertLifecycleEvidence(run);
   const createdAt = Date.parse(run.createdAt);
   const updatedAt = Date.parse(run.updatedAt);
   const statusEnteredAt = Date.parse(run.statusEnteredAt);
@@ -351,6 +789,9 @@ export function assertPresentationRunManifestState(run: PresentationRunManifest)
       Date.parse(run.binding.boundAt) > updatedAt)
   ) {
     throw new Error('Invalid presentation run manifest');
+  }
+  if (hasCurrentLifecycleSchema(run) && run.binding !== null && run.binding.runtime === null) {
+    throw new Error('Invalid presentation binding runtime');
   }
   if (run.dispatchStatus === 'discarded') {
     if (
@@ -466,6 +907,11 @@ export function transitionPresentationRunState(
       binding: null,
       retainedBytes: 0,
       ...(current.preparation === undefined ? {} : { preparation: null }),
+      ...(current.initialDispatchLease === undefined ? {} : { initialDispatchLease: null }),
+      ...(current.terminalEvidence === undefined ? {} : { terminalEvidence: null }),
+      ...(current.runtimeReleaseObservations === undefined ? {} : { runtimeReleaseObservations: [] }),
+      ...(current.retentionProof === undefined ? {} : { retentionProof: null }),
+      ...(current.readiness === undefined ? {} : { readiness: null }),
     };
   }
 
@@ -503,6 +949,9 @@ export function transitionPresentationRunState(
         : current.disposition),
     retainedCandidate:
       transition.retainedCandidate === undefined ? current.retainedCandidate : transition.retainedCandidate,
+    ...(transition.retentionProof === undefined && current.retentionProof === undefined
+      ? {}
+      : { retentionProof: transition.retentionProof ?? current.retentionProof ?? null }),
     binding: transition.binding ?? current.binding,
     postInvoked: transition.postInvoked ?? current.postInvoked,
   };
@@ -515,6 +964,9 @@ export function bindPresentationRunTurn(
   current: PresentationRunManifest,
   input: BindPresentationRunTurnInput
 ): { status: 'bound' | 'already_bound'; manifest: PresentationRunManifest } {
+  if (input.runtime !== 'aionrs' && input.runtime !== 'acp') {
+    throw new Error('Invalid presentation binding runtime');
+  }
   if (current.binding !== null) {
     if (isSameBinding(current.binding, input)) {
       return { status: 'already_bound', manifest: current };

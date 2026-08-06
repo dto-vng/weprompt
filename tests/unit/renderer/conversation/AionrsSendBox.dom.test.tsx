@@ -8,8 +8,10 @@ import type {
   PickPresentationSourcesResult,
   PresentationGrantOwner,
   PresentationSourceDescriptor,
+  PresentationSourceRef,
 } from '@/common/types/office/presentationRun';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type { ManagedPresentationSubmission } from '@/common/types/platform/presentationSubmission';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
 
@@ -81,6 +83,12 @@ const {
   legacyOpenFileSelectorMock,
   messageWarningMock,
   pickSourcesMock,
+  presentationClaimInvokeMock,
+  presentationControllerMock,
+  presentationDispatchInvokeMock,
+  presentationGetInvokeMock,
+  presentationQueueItemsState,
+  presentationStartInvokeMock,
   prepareScratchMock,
   revokeSourceMock,
   resetSourceDraftMock,
@@ -88,6 +96,8 @@ const {
   sourceDescriptorsState,
   sourceOwnerRevisionState,
   sourceOwnerState,
+  sourcePendingState,
+  sourceRefsState,
 } = vi.hoisted(() => ({
   checkAndUpdateTitleMock: vi.fn(),
   createAionrsMessageState: (): AionrsMessageStateMock => ({
@@ -148,6 +158,7 @@ const {
       hasPendingAttachments?: boolean;
       onFilesAdded?: (files: unknown[]) => void;
       onManagedDrop?: (files: readonly File[]) => Promise<void> | void;
+      managedPresentationSubmission?: ManagedPresentationSubmission;
     } | null,
   },
   clearFilesMock: vi.fn(),
@@ -174,6 +185,24 @@ const {
   legacyOpenFileSelectorMock: vi.fn(),
   messageWarningMock: vi.fn(),
   pickSourcesMock: vi.fn(),
+  presentationClaimInvokeMock: vi.fn(),
+  presentationControllerMock: {
+    read: vi.fn(),
+    enqueue: vi.fn(),
+    recoverPersisting: vi.fn(),
+    editQueued: vi.fn(),
+    removeQueued: vi.fn(),
+    claimHead: vi.fn(),
+    allocateClaimed: vi.fn(),
+    transition: vi.fn(),
+    removePreflightFailed: vi.fn(),
+    removeBound: vi.fn(),
+    runCommittedHead: vi.fn(),
+  },
+  presentationDispatchInvokeMock: vi.fn(),
+  presentationGetInvokeMock: vi.fn(),
+  presentationQueueItemsState: { current: [] as Array<Record<string, unknown>> },
+  presentationStartInvokeMock: vi.fn(),
   prepareScratchMock: vi.fn().mockResolvedValue(undefined),
   revokeSourceMock: vi.fn(),
   resetSourceDraftMock: vi.fn(),
@@ -181,6 +210,8 @@ const {
   sourceDescriptorsState: { current: [] as PresentationSourceDescriptor[] },
   sourceOwnerRevisionState: { current: null as number | null },
   sourceOwnerState: { current: null as PresentationGrantOwner | null },
+  sourcePendingState: { current: false },
+  sourceRefsState: { current: [] as PresentationSourceRef[] },
 }));
 
 vi.mock('@/common/config/constants', async (importOriginal) => {
@@ -203,6 +234,12 @@ vi.mock('@/common', () => ({
         invoke: vi.fn().mockResolvedValue(undefined),
       },
     },
+    presentationRuns: {
+      start: { invoke: presentationStartInvokeMock },
+      get: { invoke: presentationGetInvokeMock },
+      claimInitialDispatch: { invoke: presentationClaimInvokeMock },
+      dispatch: { invoke: presentationDispatchInvokeMock },
+    },
   },
 }));
 
@@ -211,6 +248,7 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
     enableContextCommand,
     onSend,
     onChange,
+    managedPresentationSubmission,
     prefix,
     rightTools,
     ...props
@@ -218,11 +256,12 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
     enableContextCommand?: boolean;
     onSend: (message: string) => Promise<void>;
     onChange?: (value: string) => void;
+    managedPresentationSubmission?: ManagedPresentationSubmission;
     prefix?: React.ReactNode;
     rightTools?: React.ReactNode;
   }) =>
     (() => {
-      sendBoxProps.current = props;
+      sendBoxProps.current = { ...props, managedPresentationSubmission };
       return (
         <div>
           {rightTools}
@@ -231,7 +270,23 @@ vi.mock('@/renderer/components/chat/SendBox', () => ({
           <button type='button' onClick={() => onChange?.('hello')}>
             change
           </button>
-          <button type='button' onClick={() => void onSend('Hello').catch(() => {})}>
+          <button
+            type='button'
+            onClick={() => {
+              if (managedPresentationSubmission) {
+                void managedPresentationSubmission.onSubmit({
+                  queueItemId: '11111111-1111-4111-8111-111111111111',
+                  clientRequestId: '22222222-2222-4222-8222-222222222222',
+                  input: 'Hello',
+                  selectedTemplateId: managedPresentationSubmission.selectedTemplateId,
+                  sources: managedPresentationSubmission.sources,
+                  capturedAt: '2026-08-05T00:00:00.000Z',
+                });
+                return;
+              }
+              void onSend('Hello').catch(() => {});
+            }}
+          >
             send
           </button>
           <button type='button' onClick={() => void onSend('/context compact').catch(() => {})}>
@@ -384,8 +439,8 @@ vi.mock('@/renderer/hooks/file/selection', () => ({
     owner: sourceOwnerState.current,
     ownerRevision: sourceOwnerRevisionState.current,
     descriptors: sourceDescriptorsState.current,
-    sourceRefs: [],
-    pending: false,
+    sourceRefs: sourceRefsState.current,
+    pending: sourcePendingState.current,
     hydrate: hydrateSourceOwnerMock,
     createDraft: vi.fn(),
     pickSources: pickSourcesMock,
@@ -404,6 +459,7 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', () => ({
   },
 }));
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
+  createPresentationCommandQueueController: () => presentationControllerMock,
   shouldEnqueueConversationCommand: () => false,
   useConversationCommandQueue: () => ({
     items: [],
@@ -556,6 +612,24 @@ const createDeferred = <Value,>() => {
   return { promise, resolve };
 };
 
+const presentationQueueItem = (
+  queueItemId: string,
+  clientRequestId: string,
+  execution: Record<string, unknown>
+): Record<string, unknown> => ({
+  queueItemId,
+  clientRequestId,
+  input: `Prompt ${queueItemId}`,
+  selectedTemplateId: 'business-review',
+  sources: [],
+  sourceOwner: null,
+  expectedOwnerRevision: null,
+  confirmedOwnerRevision: null,
+  createdAt: '2026-08-05T00:00:00.000Z',
+  updatedAt: '2026-08-05T00:00:00.000Z',
+  execution,
+});
+
 const modelSelection = {
   current_model: {
     provider_id: 'openai',
@@ -567,6 +641,7 @@ const modelSelection = {
 describe('AionrsSendBox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     aionrsMessageState.current = createAionrsMessageState();
     runtimeViewState.current = {
       ...createRuntimeViewState(),
@@ -591,6 +666,111 @@ describe('AionrsSendBox', () => {
     selectedTemplateState.current = null;
     sourceDescriptorsState.current = [];
     sourceOwnerState.current = null;
+    sourcePendingState.current = false;
+    sourceRefsState.current = [];
+    presentationQueueItemsState.current = [];
+    presentationControllerMock.read.mockImplementation(() => ({
+      version: 2,
+      conversationId: 'conv-1',
+      revision: 1,
+      items: presentationQueueItemsState.current,
+    }));
+    presentationControllerMock.recoverPersisting.mockResolvedValue(undefined);
+    presentationControllerMock.enqueue.mockImplementation(async (input: Record<string, unknown>) => {
+      const item = {
+        ...input,
+        sourceOwner: input.sourceOwner ?? null,
+        expectedOwnerRevision: input.expectedOwnerRevision ?? null,
+        confirmedOwnerRevision: input.expectedOwnerRevision ?? null,
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:00.000Z',
+        execution: { state: 'queued' },
+      };
+      presentationQueueItemsState.current = [...presentationQueueItemsState.current, item];
+      return item;
+    });
+    presentationControllerMock.claimHead.mockImplementation(async () => {
+      const item = presentationQueueItemsState.current[0];
+      const claimed = { ...item, execution: { state: 'claimed', claimedAt: '2026-08-05T00:00:01.000Z' } };
+      presentationQueueItemsState.current = [claimed, ...presentationQueueItemsState.current.slice(1)];
+      return claimed;
+    });
+    presentationControllerMock.allocateClaimed.mockImplementation(
+      async (_queueItemId: string, start: (request: Record<string, unknown>) => Promise<Record<string, unknown>>) => {
+        const item = presentationQueueItemsState.current[0];
+        const result = await start({
+          conversation_id: 'conv-1',
+          client_request_id: item.clientRequestId,
+          input: item.input,
+          selected_template_id: item.selectedTemplateId,
+          sources: item.sources,
+        });
+        if (result.ok !== true) throw new Error(String(result.code));
+        const run = result.run as { runId: string; revision: number };
+        const committed = {
+          ...item,
+          execution: { state: 'committed', runId: run.runId, revision: run.revision, postInvoked: false },
+        };
+        presentationQueueItemsState.current = [committed, ...presentationQueueItemsState.current.slice(1)];
+        return committed;
+      }
+    );
+    presentationControllerMock.transition.mockImplementation(async (queueItemId: string, execution: unknown) => {
+      const index = presentationQueueItemsState.current.findIndex((item) => item.queueItemId === queueItemId);
+      const transitioned = { ...presentationQueueItemsState.current[index], execution };
+      presentationQueueItemsState.current = presentationQueueItemsState.current.map((item, itemIndex) =>
+        itemIndex === index ? transitioned : item
+      );
+      return transitioned;
+    });
+    presentationControllerMock.runCommittedHead.mockImplementation(
+      async (execute: (item: unknown) => Promise<void>) => {
+        const item = presentationQueueItemsState.current[0];
+        if ((item.execution as { state?: string })?.state !== 'committed') return 'not_runnable';
+        const execution = item.execution as { runId: string; revision: number };
+        const dispatching = {
+          ...item,
+          execution: { state: 'dispatching', runId: execution.runId, revision: execution.revision },
+        };
+        presentationQueueItemsState.current = [dispatching, ...presentationQueueItemsState.current.slice(1)];
+        await execute(dispatching);
+        return 'executed';
+      }
+    );
+    presentationControllerMock.removeBound.mockImplementation(async (queueItemId: string) => {
+      presentationQueueItemsState.current = presentationQueueItemsState.current.filter(
+        (item) => item.queueItemId !== queueItemId
+      );
+    });
+    presentationStartInvokeMock.mockResolvedValue({
+      ok: true,
+      run: { runId: '33333333-3333-4333-8333-333333333333', revision: 4 },
+    });
+    presentationClaimInvokeMock.mockResolvedValue({
+      ok: true,
+      status: 'claimed',
+      runId: '33333333-3333-4333-8333-333333333333',
+      leaseToken: 'opaque-lease',
+      revision: 5,
+      expiresAt: '2026-08-05T00:01:00.000Z',
+      renewAfterMs: 10_000,
+    });
+    presentationDispatchInvokeMock.mockResolvedValue({
+      ok: true,
+      status: 'bound',
+      runId: '33333333-3333-4333-8333-333333333333',
+      conversationId: 'conv-1',
+      revision: 6,
+      dispatchStatus: 'bound',
+    });
+    presentationGetInvokeMock.mockResolvedValue({
+      ok: false,
+      code: 'RUN_NOT_FOUND',
+      messageKey: 'conversation.presentationRun.RUN_NOT_FOUND',
+      retryable: false,
+      state: 'lookup',
+      details: null,
+    });
     sourceOwnerRevisionState.current = null;
     hydrateSourceOwnerMock.mockResolvedValue(hydratedOwnerResult);
     pickSourcesMock.mockResolvedValue({
@@ -627,8 +807,87 @@ describe('AionrsSendBox', () => {
     expect(messageWarningMock).not.toHaveBeenCalled();
     expect(clearFilesMock).not.toHaveBeenCalled();
     expect(prepareScratchMock).not.toHaveBeenCalled();
+    expect(sendBoxProps.current?.managedPresentationSubmission).toBeUndefined();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
     expect(clearSelectionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'source hydration is pending',
+      arrange: () => {
+        sourcePendingState.current = true;
+      },
+    },
+    {
+      name: 'source hydration failed',
+      arrange: () => {
+        hydrateSourceOwnerMock.mockResolvedValue(failedOwnerHydration);
+      },
+    },
+    {
+      name: 'source owner belongs to another conversation',
+      arrange: () => {
+        sourceOwnerState.current = { owner_type: 'conversation', conversation_id: 'conv-other' };
+        sourceOwnerRevisionState.current = 3;
+      },
+    },
+    {
+      name: 'source owner revision is unavailable',
+      arrange: () => {
+        sourceOwnerState.current = currentConversationOwner;
+        sourceOwnerRevisionState.current = null;
+      },
+    },
+  ])('keeps an eligible managed draft out of legacy send while $name', async ({ arrange }) => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    draftState.current.content = 'Draft request';
+    arrange();
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    expect(draftState.current.content).toBe('Hello');
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(resetSourceDraftMock).not.toHaveBeenCalled();
+    expect(prepareScratchMock).not.toHaveBeenCalled();
+    expect(composeSendMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('queues a previously blocked managed draft exactly once after source hydration becomes authoritative', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourcePendingState.current = true;
+    draftState.current.content = 'Draft request';
+
+    const { rerender } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+
+    sourcePendingState.current = false;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(1);
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
   it('keeps legacy attachments when managed source reselect is cancelled', async () => {
@@ -681,16 +940,654 @@ describe('AionrsSendBox', () => {
   it('allows a prompt-only managed-eligible draft to continue', async () => {
     featureEnabledState.current = true;
     selectedTemplateState.current = pptxTemplate;
-    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'turn-1', runtime: null, msg_id: 'msg-1' });
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
 
     render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
     await act(async () => {
       screen.getByRole('button', { name: 'send' }).click();
     });
 
-    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith({
+      queueItemId: '11111111-1111-4111-8111-111111111111',
+      clientRequestId: '22222222-2222-4222-8222-222222222222',
+      input: 'Hello',
+      selectedTemplateId: 'business-review',
+      sources: [],
+      sourceOwner: null,
+      expectedOwnerRevision: null,
+    });
+    expect(presentationControllerMock.claimHead).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
+    expect(presentationStartInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      client_request_id: '22222222-2222-4222-8222-222222222222',
+      input: 'Hello',
+      selected_template_id: 'business-review',
+      sources: [],
+    });
+    expect(presentationClaimInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      run_id: '33333333-3333-4333-8333-333333333333',
+      holder_id: '11111111-1111-4111-8111-111111111111',
+      expected_revision: 4,
+    });
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      run_id: '33333333-3333-4333-8333-333333333333',
+      lease_token: 'opaque-lease',
+      expected_revision: 5,
+    });
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(prepareScratchMock).not.toHaveBeenCalled();
     expect(messageWarningMock).not.toHaveBeenCalled();
-    expect(prepareScratchMock).toHaveBeenCalledWith('conv-1');
+  });
+
+  it('persists only opaque granted sources before the durable managed claim', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 7;
+    sourceRefsState.current = [
+      {
+        grantId: '44444444-4444-4444-8444-444444444444',
+        expectedByteLength: 42,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ];
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sources: sourceRefsState.current,
+        sourceOwner: currentConversationOwner,
+        expectedOwnerRevision: 7,
+      })
+    );
+    expect(JSON.stringify(presentationControllerMock.enqueue.mock.calls[0]?.[0])).not.toContain('/private/');
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves the selected template and source state when queue persistence fails', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 7;
+    sourceRefsState.current = [
+      {
+        grantId: '44444444-4444-4444-8444-444444444444',
+        expectedByteLength: 42,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ];
+    presentationControllerMock.enqueue.mockRejectedValueOnce(new Error('localStorage quota'));
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    const managed = sendBoxProps.current?.managedPresentationSubmission;
+    expect(managed).toBeDefined();
+    await expect(
+      managed?.onSubmit({
+        queueItemId: '11111111-1111-4111-8111-111111111111',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        input: 'Hello',
+        selectedTemplateId: 'business-review',
+        sources: sourceRefsState.current,
+        capturedAt: '2026-08-05T00:00:00.000Z',
+      })
+    ).rejects.toThrow('localStorage quota');
+
+    expect(clearSelectionMock).not.toHaveBeenCalled();
+    expect(resetSourceDraftMock).not.toHaveBeenCalled();
+    expect(sourceRefsState.current).toHaveLength(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a managed submission durably queued without claiming while the runtime is busy', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      hydrated: true,
+      canSendMessage: false,
+      isProcessing: true,
+      state: 'running',
+    };
+
+    const { rerender } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+
+    runtimeViewState.current = createRuntimeViewState();
+    rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps opaque granted sources in a busy managed queue without allocating a run', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 9;
+    sourceRefsState.current = [
+      {
+        grantId: '44444444-4444-4444-8444-444444444444',
+        expectedByteLength: 42,
+        expectedSha256: 'a'.repeat(64),
+      },
+    ];
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      hydrated: true,
+      canSendMessage: false,
+      isProcessing: true,
+      state: 'running',
+    };
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sources: sourceRefsState.current,
+        sourceOwner: currentConversationOwner,
+        expectedOwnerRevision: 9,
+      })
+    );
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('queries by the stable client request id before recovering a lost start reply', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationControllerMock.allocateClaimed.mockImplementationOnce(
+      async (_queueItemId: string, start: (request: Record<string, unknown>) => Promise<unknown>) => {
+        await start({
+          conversation_id: 'conv-1',
+          client_request_id: '22222222-2222-4222-8222-222222222222',
+          input: 'Hello',
+          selected_template_id: 'business-review',
+          sources: [],
+        });
+        throw new Error('lost start reply');
+      }
+    );
+    presentationStartInvokeMock.mockRejectedValueOnce(new Error('ipc reply lost'));
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 4,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_snapshotted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: true },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationGetInvokeMock).toHaveBeenCalledWith({
+      conversation_id: 'conv-1',
+      client_request_id: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(presentationControllerMock.transition).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
+      state: 'committed',
+      runId: '33333333-3333-4333-8333-333333333333',
+      revision: 4,
+      postInvoked: false,
+    });
+  });
+
+  it('keeps a definitive claim failure in safe committed state without dispatching or allocating another run', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationClaimInvokeMock.mockResolvedValueOnce({
+      ok: false,
+      code: 'LEASE_CONFLICT',
+      messageKey: 'conversation.presentationRun.LEASE_CONFLICT',
+      retryable: false,
+      state: 'committed',
+      details: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        leaseExpiresAt: '2026-08-05T00:01:00.000Z',
+      },
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationClaimInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationQueueItemsState.current[0]).toMatchObject({
+      queueItemId: '11111111-1111-4111-8111-111111111111',
+      clientRequestId: '22222222-2222-4222-8222-222222222222',
+      execution: {
+        state: 'committed',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: 4,
+        postInvoked: false,
+      },
+    });
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('retries the same committed run after a definitive no-POST dispatch response without starting another run', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockResolvedValueOnce({
+      ok: false,
+      code: 'BACKEND_PREFLIGHT_BLOCKED',
+      messageKey: 'conversation.presentationRun.BACKEND_PREFLIGHT_BLOCKED',
+      retryable: true,
+      state: 'committed',
+      details: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        retryAfterMs: 1_000,
+        postInvoked: false,
+      },
+    });
+
+    const first = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 5,
+        dispatchStatus: 'committed',
+        artifactPhase: 'sources_snapshotted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: true },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(2));
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(1);
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1);
+    expect(presentationQueueItemsState.current).toEqual([]);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('does not redispatch a persisted committed item when main authority already reports dispatching', async () => {
+    featureEnabledState.current = true;
+    presentationQueueItemsState.current = [
+      presentationQueueItem('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', {
+        state: 'committed',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: 4,
+        postInvoked: false,
+      }),
+    ];
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 5,
+        dispatchStatus: 'dispatching',
+        artifactPhase: 'sources_extracted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: false },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(presentationQueueItemsState.current[0]).toMatchObject({
+      queueItemId: '11111111-1111-4111-8111-111111111111',
+      execution: { state: 'committed', runId: '33333333-3333-4333-8333-333333333333' },
+    });
+  });
+
+  it('reconciles a lost dispatch reply reported as bound without resending', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockRejectedValueOnce(new Error('dispatch reply lost'));
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 6,
+        dispatchStatus: 'bound',
+        artifactPhase: 'sources_extracted',
+        disposition: null,
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: false },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() => expect(presentationQueueItemsState.current).toEqual([]));
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(presentationControllerMock.removeBound).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a lost dispatch reply reported as uncertain without resending', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockRejectedValueOnce(new Error('dispatch reply lost'));
+    presentationGetInvokeMock.mockResolvedValueOnce({
+      ok: true,
+      run: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        clientRequestId: '22222222-2222-4222-8222-222222222222',
+        conversationId: 'conv-1',
+        selectedTemplateId: 'business-review',
+        revision: 6,
+        dispatchStatus: 'dispatch_uncertain',
+        artifactPhase: 'sources_extracted',
+        disposition: 'TRACKING_REQUIRED',
+        retainedCandidate: null,
+        actions: { openAllowed: false, discardAllowed: false },
+        createdAt: '2026-08-05T00:00:00.000Z',
+        updatedAt: '2026-08-05T00:00:01.000Z',
+      },
+    });
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() =>
+      expect(presentationQueueItemsState.current[0]).toMatchObject({
+        queueItemId: '11111111-1111-4111-8111-111111111111',
+        execution: {
+          state: 'dispatch_uncertain',
+          runId: '33333333-3333-4333-8333-333333333333',
+          revision: 6,
+        },
+      })
+    );
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('continues FIFO draining after confirmed bound cleanup without double-claiming a successor', async () => {
+    featureEnabledState.current = true;
+    presentationQueueItemsState.current = [
+      presentationQueueItem('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', {
+        state: 'bound',
+        runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        revision: 8,
+      }),
+      presentationQueueItem('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', {
+        state: 'queued',
+      }),
+      presentationQueueItem('44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555', {
+        state: 'queued',
+      }),
+    ];
+    presentationStartInvokeMock
+      .mockResolvedValueOnce({
+        ok: true,
+        run: { runId: '33333333-3333-4333-8333-333333333333', revision: 4 },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        run: { runId: '66666666-6666-4666-8666-666666666666', revision: 4 },
+      });
+    presentationClaimInvokeMock.mockImplementation(async (request: { run_id: string }) => ({
+      ok: true,
+      status: 'claimed',
+      runId: request.run_id,
+      leaseToken: `lease-${request.run_id}`,
+      revision: 5,
+      expiresAt: '2026-08-05T00:01:00.000Z',
+      renewAfterMs: 10_000,
+    }));
+    presentationDispatchInvokeMock.mockImplementation(async (request: { run_id: string }) => ({
+      ok: true,
+      status: 'bound',
+      runId: request.run_id,
+      conversationId: 'conv-1',
+      revision: 6,
+      dispatchStatus: 'bound',
+    }));
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationQueueItemsState.current).toEqual([]));
+    expect(presentationControllerMock.claimHead.mock.calls.map(([queueItemId]) => queueItemId)).toEqual([
+      '11111111-1111-4111-8111-111111111111',
+      '44444444-4444-4444-8444-444444444444',
+    ]);
+    expect(presentationStartInvokeMock).toHaveBeenCalledTimes(2);
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps dispatch uncertainty pending and observe-only without a renderer backend resend', async () => {
+    featureEnabledState.current = true;
+    selectedTemplateState.current = pptxTemplate;
+    sourceOwnerState.current = currentConversationOwner;
+    sourceOwnerRevisionState.current = 0;
+    presentationDispatchInvokeMock.mockResolvedValueOnce({
+      ok: false,
+      code: 'DISPATCH_UNCERTAIN',
+      messageKey: 'conversation.presentationRun.DISPATCH_UNCERTAIN',
+      retryable: false,
+      state: 'dispatch_uncertain',
+      details: {
+        runId: '33333333-3333-4333-8333-333333333333',
+        postInvoked: true,
+        queryRequired: true,
+      },
+    });
+
+    const { unmount } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'send' }).click();
+    });
+
+    await waitFor(() =>
+      expect(presentationControllerMock.transition).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111', {
+        state: 'dispatch_uncertain',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: null,
+      })
+    );
+    expect(sendBoxProps.current?.managedPresentationSubmission?.progress).toEqual({
+      queueItemId: '11111111-1111-4111-8111-111111111111',
+      progress: {
+        state: 'dispatch_uncertain',
+        runId: '33333333-3333-4333-8333-333333333333',
+        revision: null,
+      },
+    });
+
+    unmount();
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await waitFor(() => expect(presentationGetInvokeMock).toHaveBeenCalledTimes(1));
+    expect(presentationDispatchInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('routes a prompt-only managed initial message through the persistent queue with stable ids', async () => {
+    featureEnabledState.current = true;
+    sessionStorage.setItem(
+      'aionrs_initial_message_conv-1',
+      JSON.stringify({
+        input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+        files: [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ],
+        injectSkills: ['officecli'],
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    const initial = presentationControllerMock.enqueue.mock.calls[0]?.[0] as {
+      queueItemId: string;
+      clientRequestId: string;
+      input: string;
+      selectedTemplateId: string;
+      sources: unknown[];
+    };
+    expect(initial).toMatchObject({
+      input: 'Initial deck',
+      selectedTemplateId: 'business-review',
+      sources: [],
+    });
+    expect(initial.queueItemId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(initial.clientRequestId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBe('1');
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('hydrates and persists opaque grants before routing a managed initial message', async () => {
+    featureEnabledState.current = true;
+    hydrateSourceOwnerMock.mockResolvedValue({
+      ok: true,
+      owner: currentConversationOwner,
+      ownerRevision: 11,
+      grants: [
+        {
+          ...sourceDescriptor,
+          grantId: '44444444-4444-4444-8444-444444444444',
+        },
+      ],
+    });
+    sessionStorage.setItem(
+      'aionrs_initial_message_conv-1',
+      JSON.stringify({
+        input: 'Create a presentation from the request below. Managed rules.\n\nInitial sourced deck',
+        files: [
+          '/private/presentation-templates/business-review/THEME.md',
+          '/private/presentation-templates/business-review/reference.pptx',
+        ],
+        injectSkills: ['officecli'],
+      })
+    );
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(presentationControllerMock.enqueue).toHaveBeenCalledTimes(1));
+    expect(presentationControllerMock.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'Initial sourced deck',
+        sources: [
+          {
+            grantId: '44444444-4444-4444-8444-444444444444',
+            expectedByteLength: 42,
+            expectedSha256: 'a'.repeat(64),
+          },
+        ],
+        sourceOwner: currentConversationOwner,
+        expectedOwnerRevision: 11,
+      })
+    );
+    expect(JSON.stringify(presentationControllerMock.enqueue.mock.calls[0]?.[0])).not.toContain('/private/');
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'a string', files: '/private/presentation-templates/business-review/THEME.md' },
+    { name: 'an object', files: { path: '/private/presentation-templates/business-review/THEME.md' } },
+    {
+      name: 'a mixed array',
+      files: [
+        '/private/presentation-templates/business-review/THEME.md',
+        { path: '/private/presentation-templates/business-review/reference.pptx' },
+      ],
+    },
+  ])('fails closed for a managed initial handoff whose files value is $name', async ({ files }) => {
+    featureEnabledState.current = true;
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const serialized = JSON.stringify({
+      input: 'Create a presentation from the request below. Managed rules.\n\nInitial deck',
+      files,
+      injectSkills: ['officecli'],
+    });
+    sendMessageInvokeMock.mockResolvedValue({ turn_id: 'legacy-turn', runtime: null, msg_id: 'legacy-msg' });
+    sessionStorage.setItem(storageKey, serialized);
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(sessionStorage.getItem(storageKey)).toBe(serialized);
+    expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBeNull();
+    expect(presentationControllerMock.enqueue).not.toHaveBeenCalled();
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
+    expect(presentationStartInvokeMock).not.toHaveBeenCalled();
+    expect(presentationClaimInvokeMock).not.toHaveBeenCalled();
+    expect(presentationDispatchInvokeMock).not.toHaveBeenCalled();
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
   it('keeps the raw legacy send when the managed feature flag is false', async () => {
@@ -698,6 +1595,11 @@ describe('AionrsSendBox', () => {
     selectedTemplateState.current = pptxTemplate;
     draftState.current = { atPath: [], uploadFile: ['/private/legacy.xlsx'], content: 'Draft request' };
     sendMessageInvokeMock.mockResolvedValue({ turn_id: 'turn-1', runtime: null, msg_id: 'msg-1' });
+    composeSendMock.mockReturnValue({
+      input: 'legacy directive\n\nHello',
+      files: ['/private/legacy.xlsx', '/private/template/SKILL.md', '/private/template/reference.pptx'],
+      injectSkills: ['officecli'],
+    });
 
     render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
     await act(async () => {
@@ -705,6 +1607,14 @@ describe('AionrsSendBox', () => {
     });
 
     await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+    expect(sendMessageInvokeMock).toHaveBeenCalledWith({
+      input: 'legacy directive\n\nHello',
+      conversation_id: 'conv-1',
+      files: ['/private/legacy.xlsx', '/private/template/SKILL.md', '/private/template/reference.pptx'],
+      pinned_context: [],
+      inject_skills: ['officecli'],
+    });
+    expect(sendBoxProps.current?.managedPresentationSubmission).toBeUndefined();
     expect(clearFilesMock).toHaveBeenCalledTimes(1);
     expect(messageWarningMock).not.toHaveBeenCalled();
   });

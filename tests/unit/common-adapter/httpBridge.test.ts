@@ -25,6 +25,8 @@ import {
   wsMappedEmitter,
   stubEmitter,
   httpRequest,
+  mainHttpRequest,
+  MainBackendHttpError,
   getLocalToken,
   withLocalTokenHeaders,
   withLocalTokenQuery,
@@ -615,6 +617,108 @@ describe('httpBridge', () => {
 
       expect(fetchSpy.mock.calls[0][1]?.body).toBe('{"key":"value"}');
       expect(fetchSpy.mock.calls[0][1]?.headers).toEqual({ 'Content-Type': 'application/json' });
+    });
+  });
+
+  describe('mainHttpRequest', () => {
+    it('requires explicit port and token, sends them without global fallback, and unwraps data', async () => {
+      (globalThis as { __backendPort?: number; __backendLocalToken?: string }).__backendPort = 65500;
+      (globalThis as { __backendPort?: number; __backendLocalToken?: string }).__backendLocalToken = 'global-secret';
+      const fetchImpl = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { msg_id: 'msg-1' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const result = await mainHttpRequest<{ msg_id: string }>({
+        port: 13457,
+        token: 'lifecycle-secret',
+        method: 'POST',
+        path: '/api/conversations/conversation-1/messages',
+        body: { content: 'private prompt' },
+        fetchImpl,
+      });
+
+      expect(result).toEqual({ msg_id: 'msg-1' });
+      expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:13457/api/conversations/conversation-1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AionUI-Local-Token': 'lifecycle-secret',
+        },
+        body: '{"content":"private prompt"}',
+        signal: undefined,
+      });
+      delete (globalThis as { __backendPort?: number }).__backendPort;
+      delete (globalThis as { __backendLocalToken?: string }).__backendLocalToken;
+    });
+
+    it.each([
+      { port: 0, token: 'secret', path: '/api/x' },
+      { port: 65_536, token: 'secret', path: '/api/x' },
+      { port: 13400.5, token: 'secret', path: '/api/x' },
+      { port: 13400, token: '', path: '/api/x' },
+      { port: 13400, token: 'secret', path: 'https://attacker.example/x' },
+      { port: 13400, token: 'secret', path: '//attacker.example/x' },
+    ])('rejects invalid explicit configuration before fetch: %o', async ({ port, token, path }) => {
+      const fetchImpl = vi.fn();
+
+      await expect(mainHttpRequest({ port, token, method: 'GET', path, fetchImpl })).rejects.toThrow(
+        /invalid main backend request configuration/i
+      );
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('forwards abort signals without substituting credentials', async () => {
+      const controller = new AbortController();
+      const fetchImpl = vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError'));
+      controller.abort();
+
+      await expect(
+        mainHttpRequest({
+          port: 13400,
+          token: 'abort-secret',
+          method: 'POST',
+          path: '/api/messages',
+          body: { content: 'sensitive-body' },
+          signal: controller.signal,
+          fetchImpl,
+        })
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fetchImpl.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    });
+
+    it('returns a body-free structured error and never logs URLs, tokens, request bodies, or response bodies', async () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fetchImpl = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: 'BACKEND_BUSY', error: 'response-secret' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caught = await mainHttpRequest({
+        port: 13400,
+        token: 'token-secret',
+        method: 'POST',
+        path: '/api/private/messages',
+        body: { content: 'request-secret' },
+        fetchImpl,
+      }).catch((caughtError: unknown) => caughtError);
+
+      expect(caught).toBeInstanceOf(MainBackendHttpError);
+      expect(caught).toMatchObject({ status: 409, code: 'BACKEND_BUSY' });
+      expect(caught).not.toHaveProperty('body');
+      expect(String(caught)).not.toContain('token-secret');
+      expect(String(caught)).not.toContain('request-secret');
+      expect(String(caught)).not.toContain('response-secret');
+      expect(String(caught)).not.toContain('/api/private/messages');
+      expect(debug).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 

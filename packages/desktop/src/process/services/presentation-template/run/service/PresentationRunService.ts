@@ -4,13 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
+  DiscardPresentationRunRequest,
+  DiscardPresentationRunResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
+  GetPresentationRunRequest,
+  GetPresentationRunResult,
+  ListRecoverablePresentationRunsRequest,
+  ListRecoverablePresentationRunsResult,
+  OpenPresentationRunRequest,
+  OpenPresentationRunResult,
   PresentationRunFailure,
   PresentationRunFailureCode,
+  PresentationRunPublicDto,
   PresentationSourceRef,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
   StartPresentationRunRequest,
   StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
@@ -34,6 +49,8 @@ import {
   type PresentationRunStore,
   type PresentationSourceSnapshotReader,
   type StoredPresentationRunManifest,
+  hasExactPassedPresentationReadiness,
+  hasExactPresentationTerminalEvidence,
 } from '../storage';
 import { buildPresentationRunDirective } from './presentationRunDirective';
 import {
@@ -43,9 +60,11 @@ import {
   type ExtractedPresentationSource,
   type PresentationSourceExtractionInput,
 } from './presentationSourceExtractor';
+import type { PresentationRunLifecycleCoordinator } from './PresentationRunLifecycleCoordinator';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256_RE = /^[0-9a-f]{64}$/;
+const LEASE_TOKEN_RE = /^[A-Za-z0-9_-]{32,256}$/;
 
 export type PresentationRunAuthorityResolution =
   | {
@@ -70,11 +89,15 @@ export type PresentationRunServiceOptions = {
     | 'recordPostAllocationFailure'
     | 'getRun'
     | 'getByRequest'
+    | 'listPublicRecoverable'
+    | 'discardRun'
   >;
   templates: Pick<PresentationTemplateService, 'getById'>;
+  lifecycle: Pick<PresentationRunLifecycleCoordinator, 'claimInitialDispatch' | 'renewInitialDispatch' | 'dispatch'>;
   isFeatureEnabled: () => boolean;
   isDesktopRuntime: () => boolean;
   resolveAuthority: (input: { conversationId: string }) => Promise<PresentationRunAuthorityResolution>;
+  recoveryCursorSecret?: Uint8Array;
   extractSources?: typeof extractPresentationSources;
   now?: () => Date;
 };
@@ -90,6 +113,14 @@ export type PreparedPresentationRunDispatch = {
 };
 
 type NormalizedStartRequest = StartPresentationRunRequest;
+
+type AuthorizedPresentationConversation = Extract<PresentationRunAuthorityResolution, { ok: true }>;
+
+type PresentationRecoveryCursor = {
+  conversationId: string;
+  updatedAt: string;
+  runId: string;
+};
 
 class PresentationRunPreparationFailure extends Error {
   constructor(readonly failure: PresentationRunFailure) {
@@ -223,6 +254,296 @@ function normalizeRequest(value: unknown): NormalizedStartRequest | null {
   };
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function normalizeGetRequest(value: unknown): GetPresentationRunRequest | null {
+  if (!isPlainRecord(value) || typeof value.conversation_id !== 'string' || !UUID_RE.test(value.conversation_id)) {
+    return null;
+  }
+  if (
+    hasExactKeys(value, ['conversation_id', 'run_id']) &&
+    typeof value.run_id === 'string' &&
+    UUID_RE.test(value.run_id)
+  ) {
+    return { conversation_id: value.conversation_id.toLowerCase(), run_id: value.run_id.toLowerCase() };
+  }
+  if (
+    hasExactKeys(value, ['conversation_id', 'client_request_id']) &&
+    typeof value.client_request_id === 'string' &&
+    UUID_RE.test(value.client_request_id)
+  ) {
+    return {
+      conversation_id: value.conversation_id.toLowerCase(),
+      client_request_id: value.client_request_id.toLowerCase(),
+    };
+  }
+  return null;
+}
+
+function normalizeListRequest(value: unknown): ListRecoverablePresentationRunsRequest | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasOnlyKeys(value, ['conversation_id', 'cursor', 'limit']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    (value.cursor !== undefined &&
+      (typeof value.cursor !== 'string' ||
+        value.cursor.length < 3 ||
+        value.cursor.length > 2048 ||
+        !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value.cursor))) ||
+    (value.limit !== undefined &&
+      (!Number.isSafeInteger(value.limit) ||
+        (value.limit as number) < PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MIN_LIMIT ||
+        (value.limit as number) > PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MAX_LIMIT))
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    ...(value.cursor === undefined ? {} : { cursor: value.cursor as string }),
+    ...(value.limit === undefined ? {} : { limit: value.limit as number }),
+  };
+}
+
+function normalizeOpenRequest(value: unknown): OpenPresentationRunRequest | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'expected_sha256']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    typeof value.expected_sha256 !== 'string' ||
+    !SHA256_RE.test(value.expected_sha256)
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    expected_sha256: value.expected_sha256,
+  };
+}
+
+function normalizeDiscardRequest(value: unknown): DiscardPresentationRunRequest | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'expected_revision']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    !Number.isSafeInteger(value.expected_revision) ||
+    (value.expected_revision as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    expected_revision: value.expected_revision as number,
+  };
+}
+
+function normalizeClaimRequest(value: unknown): ClaimInitialPresentationDispatchRequest | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'holder_id', 'expected_revision']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    typeof value.holder_id !== 'string' ||
+    !UUID_RE.test(value.holder_id) ||
+    !Number.isSafeInteger(value.expected_revision) ||
+    (value.expected_revision as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    holder_id: value.holder_id.toLowerCase(),
+    expected_revision: value.expected_revision as number,
+  };
+}
+
+function normalizeLeaseRequest<
+  T extends RenewInitialPresentationDispatchRequest | DispatchInitialPresentationRunRequest,
+>(value: unknown): T | null {
+  if (
+    !isPlainRecord(value) ||
+    !hasExactKeys(value, ['conversation_id', 'run_id', 'lease_token', 'expected_revision']) ||
+    typeof value.conversation_id !== 'string' ||
+    !UUID_RE.test(value.conversation_id) ||
+    typeof value.run_id !== 'string' ||
+    !UUID_RE.test(value.run_id) ||
+    typeof value.lease_token !== 'string' ||
+    !LEASE_TOKEN_RE.test(value.lease_token) ||
+    !Number.isSafeInteger(value.expected_revision) ||
+    (value.expected_revision as number) < 0
+  ) {
+    return null;
+  }
+  return {
+    conversation_id: value.conversation_id.toLowerCase(),
+    run_id: value.run_id.toLowerCase(),
+    lease_token: value.lease_token,
+    expected_revision: value.expected_revision as number,
+  } as T;
+}
+
+function isDiscardQualified(run: StoredPresentationRunManifest): boolean {
+  if ((run.dispatchStatus === 'allocating' || run.dispatchStatus === 'committed') && !run.postInvoked) return true;
+  if (run.dispatchStatus === 'failed_retained') return true;
+  return run.dispatchStatus === 'retained' && run.disposition === 'REVIEW_REQUIRED';
+}
+
+// Electron exposes external Office applications only through a mutable path.
+// There is no exact-byte handle transfer available on every supported desktop.
+const EXACT_BYTE_SYSTEM_OPEN_AVAILABLE = false;
+
+function canOpenRecovery(run: StoredPresentationRunManifest): boolean {
+  const hasExactEvidence = hasExactPassedPresentationReadiness(run);
+  const hasExactTerminalProof = hasExactPresentationTerminalEvidence(run);
+  return (
+    EXACT_BYTE_SYSTEM_OPEN_AVAILABLE &&
+    run.dispatchStatus === 'retained' &&
+    run.artifactPhase === 'rendered_exact_hash' &&
+    run.disposition === 'REVIEW_REQUIRED' &&
+    hasExactTerminalProof &&
+    hasExactEvidence
+  );
+}
+
+function toPublicRun(run: StoredPresentationRunManifest): PresentationRunPublicDto {
+  const base = {
+    runId: run.runId,
+    clientRequestId: run.clientRequestId,
+    conversationId: run.conversationId,
+    selectedTemplateId: run.selectedTemplateId,
+    revision: run.revision,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
+  };
+  if (run.dispatchStatus === 'discarded') {
+    if (run.artifactPhase !== null || run.disposition !== null || run.retainedCandidate !== null) {
+      throw new Error('Invalid discarded presentation run projection');
+    }
+    return {
+      ...base,
+      dispatchStatus: 'discarded',
+      artifactPhase: null,
+      disposition: null,
+      retainedCandidate: null,
+      actions: { openAllowed: false, discardAllowed: false },
+    };
+  }
+  if (run.artifactPhase === null) throw new Error('Invalid presentation run projection');
+  return {
+    ...base,
+    dispatchStatus: run.dispatchStatus,
+    artifactPhase: run.artifactPhase,
+    disposition: run.disposition,
+    retainedCandidate:
+      run.retainedCandidate === null
+        ? null
+        : { sha256: run.retainedCandidate.sha256, byteLength: run.retainedCandidate.byteLength },
+    actions: {
+      openAllowed: canOpenRecovery(run),
+      discardAllowed: isDiscardQualified(run),
+    },
+  } as PresentationRunPublicDto;
+}
+
+function runStateFailure(run: StoredPresentationRunManifest): PresentationRunFailure {
+  return {
+    ok: false,
+    code: 'RUN_STATE_CONFLICT',
+    messageKey: 'conversation.presentationRun.RUN_STATE_CONFLICT',
+    retryable: false,
+    state: 'lookup',
+    details: { runId: run.runId, dispatchStatus: run.dispatchStatus },
+  };
+}
+
+type RecoveryDenialFailure = Extract<PresentationRunFailure, { code: 'UNSAFE_TO_OPEN' | 'UNSAFE_TO_DISCARD' }>;
+
+const RECOVERY_DENIAL_STATE_BY_DISPATCH_STATUS = {
+  allocating: 'committed',
+  committed: 'committed',
+  dispatching: 'dispatching',
+  bound: 'bound',
+  terminal_verified: 'bound',
+  retained: 'retained',
+  failed_retained: 'retained',
+  dispatch_uncertain: 'dispatch_uncertain',
+  discarded: 'retained',
+} as const satisfies Record<StoredPresentationRunManifest['dispatchStatus'], RecoveryDenialFailure['state']>;
+
+function recoveryDenialFailure(
+  code: RecoveryDenialFailure['code'],
+  runId: string,
+  dispatchStatus: StoredPresentationRunManifest['dispatchStatus']
+): RecoveryDenialFailure {
+  return {
+    ok: false,
+    code,
+    messageKey: `conversation.presentationRun.${code}`,
+    retryable: false,
+    state: RECOVERY_DENIAL_STATE_BY_DISPATCH_STATUS[dispatchStatus],
+    details: { runId },
+  };
+}
+
+function mintRecoveryCursor(cursor: PresentationRecoveryCursor, secret: Buffer): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      version: 1,
+      conversationId: cursor.conversationId,
+      updatedAt: cursor.updatedAt,
+      runId: cursor.runId,
+    })
+  ).toString('base64url');
+  const signature = createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function parseRecoveryCursor(value: string, conversationId: string, secret: Buffer): PresentationRecoveryCursor | null {
+  const parts = value.split('.');
+  if (parts.length !== 2) return null;
+  const [payload, encodedSignature] = parts;
+  if (payload === undefined || encodedSignature === undefined) return null;
+  let signature: Buffer;
+  let decoded: unknown;
+  try {
+    signature = Buffer.from(encodedSignature, 'base64url');
+    if (signature.toString('base64url') !== encodedSignature) return null;
+    const payloadBytes = Buffer.from(payload, 'base64url');
+    if (payloadBytes.toString('base64url') !== payload) return null;
+    decoded = JSON.parse(payloadBytes.toString('utf8')) as unknown;
+  } catch {
+    return null;
+  }
+  const expectedSignature = createHmac('sha256', secret).update(payload).digest();
+  if (signature.length !== expectedSignature.length || !timingSafeEqual(signature, expectedSignature)) return null;
+  if (
+    !isPlainRecord(decoded) ||
+    !hasExactKeys(decoded, ['version', 'conversationId', 'updatedAt', 'runId']) ||
+    decoded.version !== 1 ||
+    decoded.conversationId !== conversationId ||
+    typeof decoded.updatedAt !== 'string' ||
+    !Number.isFinite(Date.parse(decoded.updatedAt)) ||
+    typeof decoded.runId !== 'string' ||
+    !UUID_RE.test(decoded.runId)
+  ) {
+    return null;
+  }
+  return { conversationId, updatedAt: decoded.updatedAt, runId: decoded.runId.toLowerCase() };
+}
+
 /** Hashes the exact user request and ordered opaque source claims, excluding the retry request id. */
 export function createPresentationRunRequestFingerprint(request: StartPresentationRunRequest): string {
   return createHash('sha256')
@@ -336,12 +657,15 @@ export class PresentationRunService {
   private readonly options: PresentationRunServiceOptions;
   private readonly extractSources: typeof extractPresentationSources;
   private readonly now: () => Date;
+  private readonly recoveryCursorSecret: Buffer;
   private readonly starts = new Map<string, Promise<StartPresentationRunResult>>();
 
   constructor(options: PresentationRunServiceOptions) {
     this.options = options;
     this.extractSources = options.extractSources ?? extractPresentationSources;
     this.now = options.now ?? (() => new Date());
+    this.recoveryCursorSecret = Buffer.from(options.recoveryCursorSecret ?? randomBytes(32));
+    if (this.recoveryCursorSecret.length < 32) throw new Error('Presentation recovery cursor secret is too short');
   }
 
   async start(unsafeRequest: StartPresentationRunRequest): Promise<StartPresentationRunResult> {
@@ -376,6 +700,229 @@ export class PresentationRunService {
     );
     this.starts.set(inFlightKey, pending);
     return pending;
+  }
+
+  async claimInitialDispatch(
+    unsafeRequest: ClaimInitialPresentationDispatchRequest
+  ): Promise<ClaimInitialPresentationDispatchResult> {
+    if (!this.options.isFeatureEnabled())
+      return runFailure('FEATURE_DISABLED') as ClaimInitialPresentationDispatchResult;
+    if (!this.options.isDesktopRuntime())
+      return runFailure('DESKTOP_REQUIRED') as ClaimInitialPresentationDispatchResult;
+    const request = normalizeClaimRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as ClaimInitialPresentationDispatchResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as ClaimInitialPresentationDispatchResult;
+    return this.options.lifecycle.claimInitialDispatch(request);
+  }
+
+  async renewInitialDispatch(
+    unsafeRequest: RenewInitialPresentationDispatchRequest
+  ): Promise<RenewInitialPresentationDispatchResult> {
+    if (!this.options.isFeatureEnabled())
+      return runFailure('FEATURE_DISABLED') as RenewInitialPresentationDispatchResult;
+    if (!this.options.isDesktopRuntime())
+      return runFailure('DESKTOP_REQUIRED') as RenewInitialPresentationDispatchResult;
+    const request = normalizeLeaseRequest<RenewInitialPresentationDispatchRequest>(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as RenewInitialPresentationDispatchResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as RenewInitialPresentationDispatchResult;
+    return this.options.lifecycle.renewInitialDispatch(request);
+  }
+
+  async dispatch(unsafeRequest: DispatchInitialPresentationRunRequest): Promise<DispatchInitialPresentationRunResult> {
+    if (!this.options.isFeatureEnabled()) return runFailure('FEATURE_DISABLED') as DispatchInitialPresentationRunResult;
+    if (!this.options.isDesktopRuntime()) return runFailure('DESKTOP_REQUIRED') as DispatchInitialPresentationRunResult;
+    const request = normalizeLeaseRequest<DispatchInitialPresentationRunRequest>(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST') as DispatchInitialPresentationRunResult;
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure as DispatchInitialPresentationRunResult;
+    return this.options.lifecycle.dispatch(request, authorization.value.runtime as 'aionrs' | 'acp');
+  }
+
+  /** Returns an authorized, path-free projection for an existing durable run. */
+  async get(unsafeRequest: GetPresentationRunRequest): Promise<GetPresentationRunResult> {
+    const request = normalizeGetRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST');
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure;
+    let run: StoredPresentationRunManifest | null;
+    try {
+      run =
+        'run_id' in request
+          ? await this.options.store.getRun(request.run_id)
+          : await this.options.store.getByRequest(request.conversation_id, request.client_request_id);
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    if (run === null || run.conversationId !== request.conversation_id) return runFailure('RUN_NOT_FOUND');
+    try {
+      return { ok: true, run: toPublicRun(run) };
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+  }
+
+  /** Lists only authorized public recovery states using a main-authenticated cursor. */
+  async listRecoverable(
+    unsafeRequest: ListRecoverablePresentationRunsRequest
+  ): Promise<ListRecoverablePresentationRunsResult> {
+    const request = normalizeListRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST');
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure;
+    const cursor =
+      request.cursor === undefined
+        ? null
+        : parseRecoveryCursor(request.cursor, request.conversation_id, this.recoveryCursorSecret);
+    if (request.cursor !== undefined && cursor === null) return runFailure('INVALID_REQUEST');
+
+    let runs: StoredPresentationRunManifest[];
+    try {
+      runs = await this.options.store.listPublicRecoverable(request.conversation_id);
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    if (runs.some((run) => run.conversationId !== request.conversation_id)) return runFailure('PERSISTENCE_FAILED');
+
+    let offset = 0;
+    if (cursor !== null) {
+      const index = runs.findIndex((run) => run.runId === cursor.runId && run.updatedAt === cursor.updatedAt);
+      if (index < 0) return runFailure('INVALID_REQUEST');
+      offset = index + 1;
+    }
+    const limit = request.limit ?? PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_DEFAULT_LIMIT;
+    const selected = runs.slice(offset, offset + limit);
+    try {
+      const items = selected.map(toPublicRun);
+      const last = selected.at(-1);
+      const nextCursor =
+        last !== undefined && offset + selected.length < runs.length
+          ? mintRecoveryCursor(
+              { conversationId: request.conversation_id, updatedAt: last.updatedAt, runId: last.runId },
+              this.recoveryCursorSecret
+            )
+          : null;
+      return { ok: true, items, nextCursor };
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+  }
+
+  /** Keeps Open fail-closed until the desktop can transfer exact bytes instead of a mutable path. */
+  async openRecovery(unsafeRequest: OpenPresentationRunRequest): Promise<OpenPresentationRunResult> {
+    const request = normalizeOpenRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST');
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure;
+    let run: StoredPresentationRunManifest | null;
+    try {
+      run = await this.options.store.getRun(request.run_id);
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    if (run === null || run.conversationId !== request.conversation_id) return runFailure('RUN_NOT_FOUND');
+    const candidate = run.retainedCandidate;
+    if (candidate === null || candidate.sha256 !== request.expected_sha256 || !canOpenRecovery(run)) {
+      return recoveryDenialFailure('UNSAFE_TO_OPEN', run.runId, run.dispatchStatus);
+    }
+    return recoveryDenialFailure('UNSAFE_TO_OPEN', run.runId, run.dispatchStatus);
+  }
+
+  /** Discards only pre-dispatch or safely retained records; uncertain runs remain immutable. */
+  async discard(unsafeRequest: DiscardPresentationRunRequest): Promise<DiscardPresentationRunResult> {
+    const request = normalizeDiscardRequest(unsafeRequest);
+    if (request === null) return runFailure('INVALID_REQUEST');
+    const authorization = await this.authorizeConversation(request.conversation_id);
+    if ('failure' in authorization) return authorization.failure;
+    let run: StoredPresentationRunManifest | null;
+    try {
+      run = await this.options.store.getRun(request.run_id);
+    } catch {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    if (run === null || run.conversationId !== request.conversation_id) return runFailure('RUN_NOT_FOUND');
+    if (run.dispatchStatus === 'discarded') {
+      let completedTombstone: StoredPresentationRunManifest;
+      try {
+        completedTombstone = await this.options.store.discardRun(run.runId, request.expected_revision);
+      } catch {
+        return runFailure('PERSISTENCE_FAILED');
+      }
+      if (
+        completedTombstone.conversationId !== request.conversation_id ||
+        completedTombstone.dispatchStatus !== 'discarded'
+      ) {
+        return runFailure('PERSISTENCE_FAILED');
+      }
+      return {
+        ok: true,
+        runId: completedTombstone.runId,
+        discardedAt: completedTombstone.updatedAt,
+        alreadyDiscarded: true,
+      };
+    }
+    if (run.revision !== request.expected_revision) return runStateFailure(run);
+    if (!isDiscardQualified(run)) {
+      return recoveryDenialFailure('UNSAFE_TO_DISCARD', run.runId, run.dispatchStatus);
+    }
+
+    let discarded: StoredPresentationRunManifest;
+    try {
+      discarded = await this.options.store.discardRun(run.runId, request.expected_revision);
+    } catch {
+      let current: StoredPresentationRunManifest | null;
+      try {
+        current = await this.options.store.getRun(run.runId);
+      } catch {
+        return runFailure('PERSISTENCE_FAILED');
+      }
+      if (current?.conversationId !== request.conversation_id) return runFailure('PERSISTENCE_FAILED');
+      if (current.dispatchStatus === 'discarded') {
+        try {
+          discarded = await this.options.store.discardRun(current.runId, request.expected_revision);
+        } catch {
+          return runFailure('PERSISTENCE_FAILED');
+        }
+        if (discarded.conversationId !== request.conversation_id || discarded.dispatchStatus !== 'discarded') {
+          return runFailure('PERSISTENCE_FAILED');
+        }
+        return { ok: true, runId: discarded.runId, discardedAt: discarded.updatedAt, alreadyDiscarded: false };
+      }
+      if (current.revision !== request.expected_revision) return runStateFailure(current);
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    if (discarded.conversationId !== request.conversation_id || discarded.dispatchStatus !== 'discarded') {
+      return runFailure('PERSISTENCE_FAILED');
+    }
+    return { ok: true, runId: discarded.runId, discardedAt: discarded.updatedAt, alreadyDiscarded: false };
+  }
+
+  private async authorizeConversation(
+    conversationId: string
+  ): Promise<{ ok: true; value: AuthorizedPresentationConversation } | { ok: false; failure: PresentationRunFailure }> {
+    if (!this.options.isDesktopRuntime()) return { ok: false, failure: runFailure('DESKTOP_REQUIRED') };
+    let authority: PresentationRunAuthorityResolution;
+    try {
+      authority = await this.options.resolveAuthority({ conversationId });
+    } catch {
+      return { ok: false, failure: runFailure('SCOPE_UNAVAILABLE') };
+    }
+    if (authority.ok === false) return { ok: false, failure: runFailure(authority.code) };
+    if (authority.scope !== 'individual') {
+      return { ok: false, failure: runFailure('TEAM_SCOPE_UNSUPPORTED') };
+    }
+    if (authority.runtime !== 'aionrs' && authority.runtime !== 'acp') {
+      return { ok: false, failure: runFailure('RUNTIME_UNSUPPORTED') };
+    }
+    if (
+      authority.principalId.length < 1 ||
+      authority.principalId.length > 256 ||
+      authority.principalId.includes('\u0000')
+    ) {
+      return { ok: false, failure: runFailure('SCOPE_UNAVAILABLE') };
+    }
+    return { ok: true, value: authority };
   }
 
   private async startPrepared(

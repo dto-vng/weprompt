@@ -789,6 +789,23 @@
     "sources": {
       "reselectRequired": "Ekli dosyaları bu PPTX şablonuyla kullanmak için yeniden seçin.",
       "reselectAction": "Dosyaları yeniden seç"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Sunum adayının incelenmesi gerekiyor.",
+        "reviewRequiredAfterFailure": "Oluşturma durdu; saklanan sunum adayının yine de incelenmesi gerekiyor.",
+        "trackingRequired": "Sunum çalışmasının izlenmesi gerekiyor.",
+        "dispatchUncertain": "Sunum çalışmasının sonucu doğrulanmadı. Operatörün ilgilenmesi gerekiyor."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Sistem uygulamasında aç",
+        "discard": "Kaydı sil"
+      },
+      "loadError": "Sunum kurtarma durumu yüklenemedi.",
+      "invalidResponse": "Sunum kurtarma durumu doğrulanamadı.",
+      "openError": "Geçerli sunum adayının açılıp açılmadığı doğrulanamadı.",
+      "discardError": "Sunum kaydının silindiği doğrulanamadı."
     }
   },
   "status": {
@@ -1336,5 +1353,12 @@
     "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
     "action": "Yeni sohbet başlat"
   },
-  "emptyChat": "Başlamak için bir mesaj gönderin."
+  "emptyChat": "Başlamak için bir mesaj gönderin.",
+  "presentationSubmission": {
+    "pending": "Sunum gönderimi bekliyor",
+    "restore": "Geri yükle",
+    "persistenceFailure": "Sunum gönderimi kaydedilemedi.",
+    "queued": "Sunum kuyruğa alındı",
+    "uncertainTracking": "Gönderim durumu belirsiz. Mevcut çalışmayı izleyin; yeniden göndermeyin."
+  }
 }

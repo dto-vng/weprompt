@@ -126,6 +126,16 @@ export type PreparedRetainedCandidate = {
   byteLength: number;
   dev: string;
   ino: string;
+  /** Optional only for exact Task 1-7 journal intents recovered after upgrade. */
+  stagingBeforeRetain?: string;
+  retainedTemp?: string;
+  stagingAfterRetain?: string;
+};
+
+export type DeferredPresentationInspectionWorkspace = {
+  readonly directory: string;
+  readonly dispose: () => Promise<void>;
+  readonly cleanupAfterSettlement: () => Promise<void>;
 };
 
 export type PreparedPresentationRunAsset<
@@ -295,6 +305,11 @@ function assertUuid(id: string, label: string): void {
 }
 
 function assertPreparedRetainedCandidate(prepared: PreparedRetainedCandidate): void {
+  const proofValues = [prepared.stagingBeforeRetain, prepared.retainedTemp, prepared.stagingAfterRetain];
+  const hasLegacyProof = proofValues.every((value) => value === undefined);
+  const hasCurrentProof = proofValues.every(
+    (value) => typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value) && value === prepared.sha256
+  );
   if (
     !UUID_RE.test(prepared.runId) ||
     prepared.finalRelativePath !== RETAINED_CANDIDATE_RELATIVE_PATH ||
@@ -306,7 +321,8 @@ function assertPreparedRetainedCandidate(prepared: PreparedRetainedCandidate): v
     prepared.byteLength < 0 ||
     prepared.byteLength > PRESENTATION_RUN_LIMITS.MAX_CANDIDATE_COMPRESSED_BYTES ||
     !/^(0|[1-9][0-9]*)$/.test(prepared.dev) ||
-    !/^[1-9][0-9]*$/.test(prepared.ino)
+    !/^[1-9][0-9]*$/.test(prepared.ino) ||
+    (!hasLegacyProof && !hasCurrentProof)
   ) {
     throw new Error('Invalid retained candidate promotion');
   }
@@ -1606,6 +1622,65 @@ export class PresentationRunFiles {
     return inspectionDirectory;
   }
 
+  async readAuthorizedPlan(runId: string): Promise<Buffer> {
+    assertUuid(runId, 'run');
+    const planPath = this.getStagingRunPaths(runId).planPath;
+    const message = 'Presentation plan must be one bounded regular file';
+    return this.withDirectoryLease(this.stagingCandidateDirectoryChain(runId), async (directoryLease) => {
+      const { handle, metadata } = await openOwnedRegularFile(planPath, message);
+      try {
+        if (metadata.size < BigInt(1) || metadata.size > BigInt(PRESENTATION_RUN_LIMITS.MAX_PLAN_JSON_BYTES)) {
+          throw new Error(message);
+        }
+        await assertPathNamesFile(planPath, metadata, message);
+        await directoryLease.assertCurrent();
+        const bytes = Buffer.alloc(Number(metadata.size));
+        let offset = 0;
+        while (offset < bytes.length) {
+          const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
+          if (bytesRead === 0) throw new Error('Presentation plan changed while reading');
+          offset += bytesRead;
+        }
+        const after = await handle.stat({ bigint: true });
+        if (!sameFileIdentity(metadata, after) || metadata.size !== after.size) {
+          throw new Error('Presentation plan changed while reading');
+        }
+        await directoryLease.assertCurrent();
+        return bytes;
+      } finally {
+        await handle.close();
+      }
+    });
+  }
+
+  async createDeferredInspectionWorkspace(runId: string): Promise<DeferredPresentationInspectionWorkspace> {
+    const directory = await this.createInspectionLayout(runId);
+    const runDirectory = this.ownedChild(this.roots.inspectionRoot, runId);
+    let disposeRequested = false;
+    let cleaned = false;
+    return Object.freeze({
+      directory,
+      dispose: async (): Promise<void> => {
+        disposeRequested = true;
+      },
+      cleanupAfterSettlement: async (): Promise<void> => {
+        if (cleaned) return;
+        if (!disposeRequested) throw new Error('Inspection cleanup requires service disposal first');
+        await this.removeOwnedDirectoryTree(
+          [this.tempDir, this.roots.inspectionRoot, runDirectory, directory],
+          directory
+        );
+        cleaned = true;
+      },
+    });
+  }
+
+  async cleanupSettledInspectionWorkspaces(runId: string): Promise<void> {
+    assertUuid(runId, 'run');
+    const runDirectory = this.ownedChild(this.roots.inspectionRoot, runId);
+    await this.removeOwnedDirectoryTree([this.tempDir, this.roots.inspectionRoot, runDirectory], runDirectory);
+  }
+
   getEntityManifestPath(kind: PresentationRunEntityKind, entityId: string): string {
     const root = this.entityRoot(kind);
     if (kind.endsWith('-tombstone')) {
@@ -2775,6 +2850,9 @@ export class PresentationRunFiles {
           temporaryRelativePath,
           finalRelativePath: RETAINED_CANDIDATE_RELATIVE_PATH,
           sha256: beforeHash,
+          stagingBeforeRetain: beforeHash,
+          retainedTemp: retainedHash,
+          stagingAfterRetain: afterHash,
           byteLength,
           ...identity,
         };

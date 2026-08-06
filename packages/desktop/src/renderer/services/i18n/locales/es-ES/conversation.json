@@ -788,6 +788,23 @@
     "sources": {
       "reselectRequired": "Vuelve a seleccionar los archivos adjuntos para usarlos con esta plantilla PPTX.",
       "reselectAction": "Volver a seleccionar archivos"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "El candidato de presentación requiere revisión.",
+        "reviewRequiredAfterFailure": "La generación se detuvo; el candidato de presentación conservado todavía requiere revisión.",
+        "trackingRequired": "La ejecución de la presentación requiere seguimiento.",
+        "dispatchUncertain": "El resultado de la ejecución de la presentación no está confirmado. Requiere la atención de un operador."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Abrir en la aplicación del sistema",
+        "discard": "Descartar registro"
+      },
+      "loadError": "No se pudo cargar el estado de recuperación de la presentación.",
+      "invalidResponse": "No se pudo verificar el estado de recuperación de la presentación.",
+      "openError": "No se pudo confirmar si se abrió el candidato de presentación actual.",
+      "discardError": "No se pudo confirmar que se descartó el registro de la presentación."
     }
   },
   "status": {
@@ -1350,5 +1367,12 @@
     "body": "Este chat no puede buscar en la base de conocimiento del proyecto: se inició antes de que se añadieran archivos.",
     "action": "Iniciar un chat nuevo"
   },
-  "emptyChat": "Envía un mensaje para empezar."
+  "emptyChat": "Envía un mensaje para empezar.",
+  "presentationSubmission": {
+    "pending": "Envío de presentación pendiente",
+    "restore": "Restaurar",
+    "persistenceFailure": "No se pudo guardar el envío de la presentación.",
+    "queued": "Presentación añadida a la cola",
+    "uncertainTracking": "El estado del envío es incierto. Sigue la ejecución existente; no vuelvas a enviarla."
+  }
 }

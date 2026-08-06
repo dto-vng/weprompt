@@ -61,16 +61,34 @@ import type {
 import type {
   BindPresentationDraftRequest,
   BindPresentationDraftResult,
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
+  ConfirmQueuedPresentationSourcesRequest,
+  ConfirmQueuedPresentationSourcesResult,
   CreatePresentationDraftRequest,
   CreatePresentationDraftResult,
+  DiscardPresentationRunRequest,
+  DiscardPresentationRunResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
+  GetPresentationRunRequest,
+  GetPresentationRunResult,
   GetPresentationSourceOwnerRequest,
   GetPresentationSourceOwnerResult,
   GrantPresentationWorkspaceSourceRequest,
   GrantPresentationWorkspaceSourceResult,
+  ListRecoverablePresentationRunsRequest,
+  ListRecoverablePresentationRunsResult,
+  OpenPresentationRunRequest,
+  OpenPresentationRunResult,
   PickPresentationSourcesRequest,
   PickPresentationSourcesResult,
   RevokePresentationSourceRequest,
   RevokePresentationSourceResult,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
+  StartPresentationRunRequest,
+  StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
 import type {
   EnsureConversationRuntimeResponse,
@@ -698,6 +716,34 @@ export const presentationSources = {
   >('presentation-sources.grant-workspace-source'),
   revoke: bridge.buildProvider<RevokePresentationSourceResult, RevokePresentationSourceRequest>(
     'presentation-sources.revoke'
+  ),
+  confirmQueued: bridge.buildProvider<ConfirmQueuedPresentationSourcesResult, ConfirmQueuedPresentationSourcesRequest>(
+    'presentation-sources.confirm-queued'
+  ),
+};
+
+export const presentationRuns = {
+  start: bridge.buildProvider<StartPresentationRunResult, StartPresentationRunRequest>('presentation-runs.start'),
+  get: bridge.buildProvider<GetPresentationRunResult, GetPresentationRunRequest>('presentation-runs.get'),
+  listRecoverable: bridge.buildProvider<ListRecoverablePresentationRunsResult, ListRecoverablePresentationRunsRequest>(
+    'presentation-runs.list-recoverable'
+  ),
+  openRecovery: bridge.buildProvider<OpenPresentationRunResult, OpenPresentationRunRequest>(
+    'presentation-runs.open-recovery'
+  ),
+  discard: bridge.buildProvider<DiscardPresentationRunResult, DiscardPresentationRunRequest>(
+    'presentation-runs.discard'
+  ),
+  claimInitialDispatch: bridge.buildProvider<
+    ClaimInitialPresentationDispatchResult,
+    ClaimInitialPresentationDispatchRequest
+  >('presentation-runs.claim-initial-dispatch'),
+  renewInitialDispatch: bridge.buildProvider<
+    RenewInitialPresentationDispatchResult,
+    RenewInitialPresentationDispatchRequest
+  >('presentation-runs.renew-initial-dispatch'),
+  dispatch: bridge.buildProvider<DispatchInitialPresentationRunResult, DispatchInitialPresentationRunRequest>(
+    'presentation-runs.dispatch'
   ),
 };
 

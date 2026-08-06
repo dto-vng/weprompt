@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import * as commandQueueModule from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
 import {
   createQueuedCommandItem,
   getCommandQueueExecutionGate,
@@ -111,5 +112,17 @@ describe('getCommandQueueExecutionGate', () => {
       canExecute: true,
       isProcessing: false,
     });
+  });
+});
+
+describe('managed presentation queue execution gate', () => {
+  it('runs only committed work with durable proof that POST has not begun', () => {
+    const isRunnable = Reflect.get(commandQueueModule, 'isPresentationCommandExecutionRunnable');
+    expect(isRunnable).toBeTypeOf('function');
+
+    expect(isRunnable({ state: 'committed', runId: 'run-1', revision: 4, postInvoked: false })).toBe(true);
+    expect(isRunnable({ state: 'dispatching', runId: 'run-1', revision: 5 })).toBe(false);
+    expect(isRunnable({ state: 'bound', runId: 'run-1', revision: 6 })).toBe(false);
+    expect(isRunnable({ state: 'dispatch_uncertain', runId: 'run-1', revision: null })).toBe(false);
   });
 });

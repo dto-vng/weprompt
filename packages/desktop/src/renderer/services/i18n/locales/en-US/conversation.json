@@ -1307,6 +1307,23 @@
     "sources": {
       "reselectRequired": "Reselect attached files to use them with this PPTX template.",
       "reselectAction": "Reselect files"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Presentation candidate requires review.",
+        "reviewRequiredAfterFailure": "Generation stopped; the retained presentation candidate still requires review.",
+        "trackingRequired": "Presentation run needs tracking attention.",
+        "dispatchUncertain": "Presentation run outcome is unconfirmed. Operator attention is required."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Open in system app",
+        "discard": "Discard record"
+      },
+      "loadError": "Could not load presentation recovery status.",
+      "invalidResponse": "Presentation recovery status could not be verified.",
+      "openError": "Could not confirm whether the current presentation candidate opened.",
+      "discardError": "Could not confirm that the presentation record was discarded."
     }
   },
   "status": {
@@ -1334,5 +1351,12 @@
     "body": "This chat can't search the project's knowledge base — it started before files were added.",
     "action": "Start a new chat"
   },
-  "emptyChat": "Send a message to get started."
+  "emptyChat": "Send a message to get started.",
+  "presentationSubmission": {
+    "pending": "Presentation submission pending",
+    "restore": "Restore",
+    "persistenceFailure": "The presentation submission could not be saved.",
+    "queued": "Presentation queued",
+    "uncertainTracking": "Presentation submission status is uncertain. Track the existing run; do not resend."
+  }
 }

@@ -11,6 +11,7 @@ import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
 import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import { resolveLocaleKey } from '@/common/utils';
 import type { AssistantDetail } from '@/common/types/agent/assistantTypes';
+import type { PresentationRunFailure } from '@/common/types/office/presentationRun';
 
 import { useInputFocusRing } from '@/renderer/hooks/chat/useInputFocusRing';
 import { appendPromptToDraft } from '@/renderer/hooks/chat/useSendBoxDraft';
@@ -57,6 +58,28 @@ type GuidNavigationState = {
   workspace?: string;
   [key: string]: unknown;
 };
+
+const GUID_PRESENTATION_DRAFT_REQUEST_STORAGE_KEY = 'guid_presentation_draft_request_v2';
+const GUID_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const readGuidPresentationDraftClientRequestId = (): string => {
+  try {
+    const stored = sessionStorage.getItem(GUID_PRESENTATION_DRAFT_REQUEST_STORAGE_KEY);
+    if (stored && GUID_UUID_RE.test(stored)) return stored;
+  } catch {
+    // The managed send will fail closed when it cannot confirm persistence.
+  }
+  return crypto.randomUUID();
+};
+
+function trackGuidPresentationDraftExpiry<Result extends { ok: boolean }>(
+  result: Result,
+  expiredRef: { current: boolean }
+): Result {
+  if (result.ok) expiredRef.current = false;
+  else if ('code' in result && result.code === 'DRAFT_EXPIRED') expiredRef.current = true;
+  return result;
+}
 
 const GuidPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -152,6 +175,12 @@ const GuidPage: React.FC = () => {
   const presentationTemplates = usePresentationTemplates();
   const presentationSources = usePresentationSourceDraft();
   const presentationDraftClientRequestIdRef = useRef<string | null>(null);
+  const presentationDraftExpiredRef = useRef(false);
+  const presentationRecoveryStartedRef = useRef(false);
+  const retireManagedPresentationAttemptRef = useRef<(succeeded: boolean) => Promise<void>>(async () => {});
+  if (presentationDraftClientRequestIdRef.current === null) {
+    presentationDraftClientRequestIdRef.current = readGuidPresentationDraftClientRequestId();
+  }
   const [showPresentationSourceReselect, setShowPresentationSourceReselect] = useState(false);
   const presentationRunEligible = getPresentationRunEligibility({
     featureEnabled: PRESENTATION_RUN_V2_ENABLED,
@@ -164,20 +193,101 @@ const GuidPage: React.FC = () => {
   presentationRunEligibleRef.current = presentationRunEligible;
   const requiresPresentationSourceReselect = presentationRunEligible && guidInput.files.length > 0;
 
-  const ensurePresentationSourceDraft = useCallback(async (): Promise<boolean> => {
-    if (presentationSources.owner !== null) return true;
-    if (presentationDraftClientRequestIdRef.current === null) {
-      presentationDraftClientRequestIdRef.current = crypto.randomUUID();
+  const persistPresentationDraftClientRequestId = useCallback((clientRequestId: string): boolean => {
+    try {
+      sessionStorage.setItem(GUID_PRESENTATION_DRAFT_REQUEST_STORAGE_KEY, clientRequestId);
+      return sessionStorage.getItem(GUID_PRESENTATION_DRAFT_REQUEST_STORAGE_KEY) === clientRequestId;
+    } catch {
+      return false;
     }
-    const result = await presentationSources.createDraft(presentationDraftClientRequestIdRef.current);
-    return result.ok;
-  }, [presentationSources.createDraft, presentationSources.owner]);
+  }, []);
+
+  const ensurePresentationSourceDraft = useCallback(
+    async (allowExpiredReselect = false): Promise<boolean> => {
+      const replaceExpiredDraft = allowExpiredReselect && presentationDraftExpiredRef.current;
+      if (presentationSources.owner !== null && !replaceExpiredDraft) return true;
+      let clientRequestId = replaceExpiredDraft ? crypto.randomUUID() : presentationDraftClientRequestIdRef.current;
+      if (clientRequestId === null) {
+        clientRequestId = crypto.randomUUID();
+      }
+      presentationDraftClientRequestIdRef.current = clientRequestId;
+      if (!persistPresentationDraftClientRequestId(clientRequestId)) return false;
+      let result = trackGuidPresentationDraftExpiry(
+        await presentationSources.createDraft(clientRequestId),
+        presentationDraftExpiredRef
+      );
+      const failureCode = 'code' in result ? (result.code as PresentationRunFailure['code']) : null;
+      if (failureCode === 'DRAFT_EXPIRED' && allowExpiredReselect) {
+        clientRequestId = crypto.randomUUID();
+        presentationDraftClientRequestIdRef.current = clientRequestId;
+        if (!persistPresentationDraftClientRequestId(clientRequestId)) return false;
+        result = trackGuidPresentationDraftExpiry(
+          await presentationSources.createDraft(clientRequestId),
+          presentationDraftExpiredRef
+        );
+      }
+      return result.ok;
+    },
+    [persistPresentationDraftClientRequestId, presentationSources]
+  );
+
+  const preparePresentationSourceOwner = useCallback(
+    async (recoveryConversationId?: string) => {
+      if (recoveryConversationId) {
+        const recovered = trackGuidPresentationDraftExpiry(
+          await presentationSources.hydrate({
+            owner_type: 'conversation',
+            conversation_id: recoveryConversationId,
+          }),
+          presentationDraftExpiredRef
+        );
+        if (recovered.ok && recovered.ownerRevision > 0) return recovered;
+        if ('code' in recovered && recovered.code !== 'RUN_NOT_FOUND') return recovered;
+      }
+
+      const currentOwner = presentationSources.owner;
+      const currentOwnerIsSyntheticConversation =
+        currentOwner?.owner_type === 'conversation' && presentationSources.ownerRevision === 0;
+      if (currentOwner !== null && !currentOwnerIsSyntheticConversation) {
+        return trackGuidPresentationDraftExpiry(
+          await presentationSources.hydrate(currentOwner),
+          presentationDraftExpiredRef
+        );
+      }
+
+      const clientRequestId = presentationDraftClientRequestIdRef.current ?? crypto.randomUUID();
+      presentationDraftClientRequestIdRef.current = clientRequestId;
+      if (!persistPresentationDraftClientRequestId(clientRequestId)) {
+        const failure: PresentationRunFailure = {
+          ok: false,
+          code: 'PERSISTENCE_FAILED',
+          messageKey: 'conversation.presentationRun.errors.PERSISTENCE_FAILED',
+          retryable: false,
+          state: 'preflight',
+          details: { postInvoked: false },
+        };
+        return failure;
+      }
+      const created = trackGuidPresentationDraftExpiry(
+        await presentationSources.createDraft(clientRequestId),
+        presentationDraftExpiredRef
+      );
+      if ('code' in created) return created;
+      return trackGuidPresentationDraftExpiry(
+        await presentationSources.hydrate({ owner_type: 'draft', draft_id: created.draft.draftId }),
+        presentationDraftExpiredRef
+      );
+    },
+    [persistPresentationDraftClientRequestId, presentationSources]
+  );
 
   const handlePresentationSourcePicker = useCallback(async (): Promise<void> => {
-    if (!(await ensurePresentationSourceDraft())) return;
+    if (!(await ensurePresentationSourceDraft(true))) return;
     if (!presentationRunEligibleRef.current) return;
     const result = await presentationSources.pickSources();
     if (presentationRunEligibleRef.current && result?.ok && result.status === 'selected') {
+      presentationDraftExpiredRef.current = false;
+      await retireManagedPresentationAttemptRef.current(true);
       guidInput.setFiles([]);
       setShowPresentationSourceReselect(false);
     }
@@ -185,10 +295,12 @@ const GuidPage: React.FC = () => {
 
   const handlePresentationSourceDrop = useCallback(
     async (files: readonly File[]): Promise<void> => {
-      if (!(await ensurePresentationSourceDraft())) return;
+      if (!(await ensurePresentationSourceDraft(true))) return;
       if (!presentationRunEligibleRef.current) return;
       const result = await presentationSources.grantExternalDrop(files);
       if (presentationRunEligibleRef.current && result?.ok && result.status === 'granted') {
+        presentationDraftExpiredRef.current = false;
+        await retireManagedPresentationAttemptRef.current(true);
         guidInput.setFiles([]);
         setShowPresentationSourceReselect(false);
       }
@@ -198,7 +310,12 @@ const GuidPage: React.FC = () => {
 
   const handlePresentationSourceRevoke = useCallback(
     (grantId: string): void => {
-      void presentationSources.revoke(grantId);
+      void presentationSources.revoke(grantId).then(async (result) => {
+        if (result?.ok) {
+          presentationDraftExpiredRef.current = false;
+          await retireManagedPresentationAttemptRef.current(true);
+        }
+      });
     },
     [presentationSources.revoke]
   );
@@ -317,6 +434,44 @@ const GuidPage: React.FC = () => {
     [slashController.filteredCommands, slashController.query]
   );
 
+  const handleManagedPresentationHandoffAccepted = useCallback((): void => {
+    presentationDraftExpiredRef.current = false;
+    presentationSources.reset();
+    setShowPresentationSourceReselect(false);
+    try {
+      sessionStorage.removeItem(GUID_PRESENTATION_DRAFT_REQUEST_STORAGE_KEY);
+    } catch {
+      // The durable queue already owns the handoff; stale path-free IDs are harmless.
+    }
+  }, [presentationSources.reset]);
+
+  const managedGuidPresentation = useMemo(
+    () =>
+      presentationRunEligible && presentationTemplates.selectedTemplate && presentationDraftClientRequestIdRef.current
+        ? {
+            selectedTemplateId: presentationTemplates.selectedTemplate.manifest.id,
+            draftClientRequestId: presentationDraftClientRequestIdRef.current,
+            sourceRefs: presentationSources.sourceRefs,
+            conversationId:
+              presentationSources.owner?.owner_type === 'conversation'
+                ? presentationSources.owner.conversation_id
+                : undefined,
+            prepareSourceOwner: preparePresentationSourceOwner,
+            bindDraft: presentationSources.bindDraft,
+            onHandoffAccepted: handleManagedPresentationHandoffAccepted,
+          }
+        : undefined,
+    [
+      handleManagedPresentationHandoffAccepted,
+      preparePresentationSourceOwner,
+      presentationRunEligible,
+      presentationSources.bindDraft,
+      presentationSources.owner,
+      presentationSources.sourceRefs,
+      presentationTemplates.selectedTemplate,
+    ]
+  );
+
   const send = useGuidSend({
     // Input state
     input: guidInput.input,
@@ -352,6 +507,7 @@ const GuidPage: React.FC = () => {
     onPresentationTemplateConsumed: presentationTemplates.clearSelection,
     requiresPresentationSourceReselect,
     onPresentationSourceReselectRequired: () => setShowPresentationSourceReselect(true),
+    managedPresentation: managedGuidPresentation,
 
     // Mention state reset
     setMentionOpen: resetMentionOpen,
@@ -364,6 +520,43 @@ const GuidPage: React.FC = () => {
     t,
     localeKey,
   });
+  const pendingPresentationRecovery = PRESENTATION_RUN_V2_ENABLED ? (send.managedPresentationRecovery ?? null) : null;
+  useEffect(() => {
+    if (
+      pendingPresentationRecovery === null ||
+      guidInput.projectId !== undefined ||
+      typeof window === 'undefined' ||
+      !window.electronAPI
+    ) {
+      return;
+    }
+    const currentRuntime = agentSelection.selectedAssistantBackend === 'aionrs' ? 'aionrs' : 'acp';
+    if (pendingPresentationRecovery.runtime !== currentRuntime) return;
+    const recoveredTemplate = presentationTemplates.templates.find(
+      (template) =>
+        template.manifest.id === pendingPresentationRecovery.selectedTemplateId && template.manifest.format === 'pptx'
+    );
+    if (recoveredTemplate === undefined) return;
+    if (presentationTemplates.selectedTemplate?.manifest.id !== recoveredTemplate.manifest.id) {
+      presentationTemplates.selectTemplate(recoveredTemplate);
+    }
+    if (presentationRecoveryStartedRef.current) return;
+    presentationRecoveryStartedRef.current = true;
+    presentationDraftClientRequestIdRef.current = pendingPresentationRecovery.draftClientRequestId;
+    if (!persistPresentationDraftClientRequestId(pendingPresentationRecovery.draftClientRequestId)) return;
+    void preparePresentationSourceOwner(pendingPresentationRecovery.conversationId).catch(() => {
+      // The durable pending snapshot stays intact so a later retry or remount can recover again.
+    });
+  }, [
+    agentSelection.selectedAssistantBackend,
+    guidInput.projectId,
+    pendingPresentationRecovery,
+    persistPresentationDraftClientRequestId,
+    preparePresentationSourceOwner,
+    presentationTemplates,
+  ]);
+  retireManagedPresentationAttemptRef.current =
+    send.retireManagedPresentationAttemptAfterSourceChange ?? (async (): Promise<void> => {});
 
   // --- Coordinated handlers (depend on multiple hooks) ---
   const handleInputChange = useCallback(
@@ -629,7 +822,10 @@ const GuidPage: React.FC = () => {
     const prefillPrompt = prefillState?.prefillPrompt;
     const prefillFiles = prefillState?.prefillFiles;
     const preserveCurrentDraft = Boolean(prefillState?.preservePrefillDraft || skipNextClearRef.current);
-    if (prefillPrompt && consumedPrefillKeyRef.current !== location.key) {
+    if (pendingPresentationRecovery !== null) {
+      guidInput.setInput(pendingPresentationRecovery.input);
+      guidInput.setFiles([]);
+    } else if (prefillPrompt && consumedPrefillKeyRef.current !== location.key) {
       // Consume prompt + optional attachments (e.g. bug-report screenshots) once.
       consumedPrefillKeyRef.current = location.key;
       skipNextClearRef.current = true;
@@ -651,7 +847,15 @@ const GuidPage: React.FC = () => {
     if (!preserveCurrentDraft && !(location.state as { workspace?: string } | null)?.workspace) {
       guidInput.setDir('');
     }
-  }, [guidInput.setDir, guidInput.setFiles, guidInput.setInput, guidInput.setLoading, location.key, location.state]);
+  }, [
+    guidInput.setDir,
+    guidInput.setFiles,
+    guidInput.setInput,
+    guidInput.setLoading,
+    location.key,
+    location.state,
+    pendingPresentationRecovery,
+  ]);
 
   // A draft-preserving prefill is an action, not durable navigation state.
   // Strip it after consumption so browser history or a remount cannot replay it.
@@ -768,6 +972,7 @@ const GuidPage: React.FC = () => {
       }
       loading={guidInput.loading}
       isButtonDisabled={send.isButtonDisabled}
+      managedPresentationPending={send.managedPresentationPending}
       onSend={send.sendMessageHandler}
     />
   );
@@ -832,6 +1037,7 @@ const GuidPage: React.FC = () => {
             presentationSourceDescriptors={presentationRunEligible ? presentationSources.descriptors : []}
             onRevokePresentationSource={presentationRunEligible ? handlePresentationSourceRevoke : undefined}
             onManagedDrop={presentationRunEligible ? handlePresentationSourceDrop : undefined}
+            managedPresentationPending={send.managedPresentationPending}
             actionRow={actionRowNode}
             slashCommandMenu={slashCommandMenuNode}
             templateChip={
