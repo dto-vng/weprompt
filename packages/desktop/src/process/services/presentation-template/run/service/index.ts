@@ -5,3 +5,6 @@
  */
 
 export * from './PresentationSourceGrantService';
+export * from './PresentationRunService';
+export * from './presentationRunDirective';
+export * from './presentationSourceExtractor';

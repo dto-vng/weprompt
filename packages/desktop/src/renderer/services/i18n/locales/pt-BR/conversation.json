@@ -789,7 +789,11 @@
     "importError": "Falha na importação: {{error}}",
     "removeError": "Falha ao excluir: {{error}}",
     "deleteTooltip": "Excluir modelo",
-    "deleteConfirm": "Excluir este modelo?"
+    "deleteConfirm": "Excluir este modelo?",
+    "sources": {
+      "reselectRequired": "Selecione novamente os arquivos anexados para usá-los com este modelo PPTX.",
+      "reselectAction": "Selecionar arquivos novamente"
+    }
   },
   "status": {
     "waitingApproval": "Aguardando sua aprovação",

@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { constants, type BigIntStats } from 'node:fs';
+import { lstat, mkdir, open, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { TextDecoder } from 'node:util';
+import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
   PresentationTemplateManifest,
   PresentationTemplateSummary,
@@ -15,6 +19,263 @@ import { TEMPLATE_ID_RE, validateTemplateManifest } from './templateManifest';
 import { parseThemeTokens, renderThemeThumbnailSvg, svgToDataUrl } from './themeThumbnail';
 
 const MANIFEST_FILE = 'template.json';
+const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
+const DIRECTORY_ONLY = constants.O_DIRECTORY ?? 0;
+const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+
+export type PresentationTemplateResolutionErrorCode = 'TEMPLATE_UNSUPPORTED' | 'RESOURCE_LIMIT_EXCEEDED';
+
+/** Typed main-process lookup failure for a present but unusable template pack. */
+export class PresentationTemplateResolutionError extends Error {
+  constructor(
+    readonly code: PresentationTemplateResolutionErrorCode,
+    options?: ErrorOptions
+  ) {
+    super(code, options);
+    this.name = 'PresentationTemplateResolutionError';
+  }
+}
+
+export type ResolvedPresentationTemplateFile = {
+  fileName: string;
+  bytes: Buffer;
+  byteLength: number;
+  sha256: string;
+};
+
+/** Main-owned byte snapshot. It intentionally carries no filesystem path. */
+export type ResolvedPresentationTemplate = {
+  manifest: PresentationTemplateManifest;
+  theme: ResolvedPresentationTemplateFile;
+  reference: ResolvedPresentationTemplateFile | null;
+};
+
+type StableDirectory = {
+  handle: Awaited<ReturnType<typeof open>>;
+  metadata: BigIntStats;
+};
+
+function hasErrorCode(error: unknown, code: string): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if ('code' in error && error.code === code) return true;
+  return 'cause' in error && hasErrorCode(error.cause, code);
+}
+
+function sameFileVersion(left: BigIntStats, right: BigIntStats): boolean {
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.mode === right.mode &&
+    left.nlink === right.nlink &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
+}
+
+function sameFileIdentity(left: BigIntStats, right: BigIntStats): boolean {
+  return left.dev === right.dev && left.ino === right.ino && left.mode === right.mode;
+}
+
+function unsupported(cause?: unknown): PresentationTemplateResolutionError {
+  return new PresentationTemplateResolutionError('TEMPLATE_UNSUPPORTED', cause === undefined ? undefined : { cause });
+}
+
+async function openStableDirectory(directory: string): Promise<StableDirectory> {
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    const named = await lstat(directory, { bigint: true });
+    if (named.isSymbolicLink() || !named.isDirectory()) throw unsupported();
+    handle = await open(directory, constants.O_RDONLY | NO_FOLLOW | DIRECTORY_ONLY);
+    const metadata = await handle.stat({ bigint: true });
+    if (!metadata.isDirectory() || !sameFileVersion(named, metadata)) throw unsupported();
+    return { handle, metadata };
+  } catch (error) {
+    if (handle !== null) await handle.close();
+    if (error instanceof PresentationTemplateResolutionError) throw error;
+    throw unsupported(error);
+  }
+}
+
+async function assertStableDirectory(directory: string, stable: StableDirectory): Promise<void> {
+  try {
+    const [opened, named] = await Promise.all([
+      stable.handle.stat({ bigint: true }),
+      lstat(directory, { bigint: true }),
+    ]);
+    if (
+      !opened.isDirectory() ||
+      named.isSymbolicLink() ||
+      !named.isDirectory() ||
+      !sameFileVersion(stable.metadata, opened) ||
+      !sameFileVersion(stable.metadata, named)
+    ) {
+      throw unsupported();
+    }
+  } catch (error) {
+    if (error instanceof PresentationTemplateResolutionError) throw error;
+    throw unsupported(error);
+  }
+}
+
+async function assertStableDirectoryIdentity(directory: string, stable: StableDirectory): Promise<void> {
+  try {
+    const [opened, named] = await Promise.all([
+      stable.handle.stat({ bigint: true }),
+      lstat(directory, { bigint: true }),
+    ]);
+    if (
+      !opened.isDirectory() ||
+      named.isSymbolicLink() ||
+      !named.isDirectory() ||
+      !sameFileIdentity(stable.metadata, opened) ||
+      !sameFileIdentity(stable.metadata, named)
+    ) {
+      throw unsupported();
+    }
+  } catch (error) {
+    if (error instanceof PresentationTemplateResolutionError) throw error;
+    throw unsupported(error);
+  }
+}
+
+async function openOrCreateStableDirectory(directory: string): Promise<StableDirectory> {
+  try {
+    return await openStableDirectory(directory);
+  } catch (error) {
+    if (!hasErrorCode(error, 'ENOENT')) throw error;
+  }
+
+  try {
+    await mkdir(directory, { mode: 0o700 });
+  } catch (error) {
+    throw unsupported(error);
+  }
+  return openStableDirectory(directory);
+}
+
+async function writeStableFile(
+  directory: string,
+  stableDirectory: StableDirectory,
+  fileName: string,
+  contents: string | Buffer
+): Promise<void> {
+  if (path.basename(fileName) !== fileName) throw unsupported();
+  const filePath = path.join(directory, fileName);
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  let namedBefore: BigIntStats | null = null;
+  try {
+    await assertStableDirectoryIdentity(directory, stableDirectory);
+    try {
+      namedBefore = await lstat(filePath, { bigint: true });
+      if (namedBefore.isSymbolicLink() || !namedBefore.isFile() || namedBefore.nlink !== BigInt(1)) {
+        throw unsupported();
+      }
+    } catch (error) {
+      if (!hasErrorCode(error, 'ENOENT')) throw error;
+    }
+
+    handle = await open(filePath, constants.O_WRONLY | constants.O_CREAT | NO_FOLLOW, 0o600);
+    const openedBefore = await handle.stat({ bigint: true });
+    if (
+      !openedBefore.isFile() ||
+      openedBefore.nlink !== BigInt(1) ||
+      (namedBefore !== null && !sameFileIdentity(namedBefore, openedBefore))
+    ) {
+      throw unsupported();
+    }
+    const namedOpened = await lstat(filePath, { bigint: true });
+    if (
+      namedOpened.isSymbolicLink() ||
+      !namedOpened.isFile() ||
+      namedOpened.nlink !== BigInt(1) ||
+      !sameFileIdentity(openedBefore, namedOpened)
+    ) {
+      throw unsupported();
+    }
+    await assertStableDirectoryIdentity(directory, stableDirectory);
+
+    const bytes = typeof contents === 'string' ? Buffer.from(contents, 'utf-8') : contents;
+    await handle.truncate(0);
+    await handle.writeFile(bytes);
+    await handle.sync();
+
+    const [openedAfter, namedAfter] = await Promise.all([
+      handle.stat({ bigint: true }),
+      lstat(filePath, { bigint: true }),
+    ]);
+    if (
+      !openedAfter.isFile() ||
+      openedAfter.nlink !== BigInt(1) ||
+      namedAfter.isSymbolicLink() ||
+      !namedAfter.isFile() ||
+      namedAfter.nlink !== BigInt(1) ||
+      !sameFileIdentity(openedBefore, openedAfter) ||
+      !sameFileIdentity(openedBefore, namedAfter) ||
+      openedAfter.size !== BigInt(bytes.byteLength)
+    ) {
+      throw unsupported();
+    }
+    await assertStableDirectoryIdentity(directory, stableDirectory);
+  } catch (error) {
+    if (error instanceof PresentationTemplateResolutionError) throw error;
+    throw unsupported(error);
+  } finally {
+    if (handle !== null) await handle.close();
+  }
+}
+
+async function readStableFile(
+  filePath: string,
+  fileName: string,
+  maxBytes: number
+): Promise<ResolvedPresentationTemplateFile> {
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    const namedBefore = await lstat(filePath, { bigint: true });
+    if (namedBefore.isSymbolicLink() || !namedBefore.isFile()) throw unsupported();
+    handle = await open(filePath, constants.O_RDONLY | NO_FOLLOW);
+    const openedBefore = await handle.stat({ bigint: true });
+    if (!openedBefore.isFile() || !sameFileVersion(namedBefore, openedBefore)) throw unsupported();
+    if (openedBefore.size > BigInt(maxBytes) || openedBefore.size > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new PresentationTemplateResolutionError('RESOURCE_LIMIT_EXCEEDED');
+    }
+
+    const byteLength = Number(openedBefore.size);
+    const bytes = Buffer.alloc(byteLength);
+    let offset = 0;
+    while (offset < byteLength) {
+      // eslint-disable-next-line no-await-in-loop -- one stable file handle must be read sequentially and bounded
+      const { bytesRead } = await handle.read(bytes, offset, byteLength - offset, offset);
+      if (bytesRead === 0) throw unsupported();
+      offset += bytesRead;
+    }
+    const trailing = Buffer.alloc(1);
+    if ((await handle.read(trailing, 0, 1, byteLength)).bytesRead !== 0) throw unsupported();
+
+    const openedAfter = await handle.stat({ bigint: true });
+    const namedAfter = await lstat(filePath, { bigint: true });
+    if (
+      namedAfter.isSymbolicLink() ||
+      !namedAfter.isFile() ||
+      !sameFileVersion(openedBefore, openedAfter) ||
+      !sameFileVersion(openedBefore, namedAfter)
+    ) {
+      throw unsupported();
+    }
+    return {
+      fileName,
+      bytes,
+      byteLength,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+  } catch (error) {
+    if (error instanceof PresentationTemplateResolutionError) throw error;
+    throw unsupported(error);
+  } finally {
+    if (handle !== null) await handle.close();
+  }
+}
 
 const slugify = (name: string): string =>
   name
@@ -46,22 +307,67 @@ export class PresentationTemplateService {
   }
 
   private async syncBuiltins(): Promise<void> {
-    await mkdir(this.rootDir, { recursive: true });
-    for (const pack of this.builtinPacks) {
-      try {
+    const stableRoot = await openOrCreateStableDirectory(this.rootDir);
+    try {
+      for (const pack of this.builtinPacks) {
         const dir = path.join(this.rootDir, pack.manifest.id);
-        const installed = await this.readManifest(dir);
-        if (installed && installed.version >= pack.manifest.version) continue;
-        await mkdir(dir, { recursive: true });
-        await writeFile(path.join(dir, pack.manifest.themeFile), pack.themeMd, 'utf-8');
-        await writeFile(path.join(dir, pack.manifest.preview), pack.previewSvg, 'utf-8');
-        if (pack.manifest.referenceFile && pack.referenceSourcePath) {
-          await copyFile(pack.referenceSourcePath(), path.join(dir, pack.manifest.referenceFile));
+        let stablePack: StableDirectory | null = null;
+        try {
+          const manifest = validateTemplateManifest(pack.manifest);
+          await assertStableDirectoryIdentity(this.rootDir, stableRoot);
+          stablePack = await openOrCreateStableDirectory(dir);
+          await assertStableDirectoryIdentity(this.rootDir, stableRoot);
+
+          const installed = await this.readManifestForSync(dir, stablePack);
+          if (installed && installed.version >= manifest.version) continue;
+          const referenceBytes =
+            manifest.referenceFile && pack.referenceSourcePath ? await readFile(pack.referenceSourcePath()) : null;
+
+          await writeStableFile(dir, stablePack, manifest.themeFile, pack.themeMd);
+          await writeStableFile(dir, stablePack, manifest.preview, pack.previewSvg);
+          if (manifest.referenceFile && referenceBytes) {
+            await writeStableFile(dir, stablePack, manifest.referenceFile, referenceBytes);
+          }
+          await writeStableFile(dir, stablePack, MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+        } catch (error) {
+          console.warn('[PresentationTemplates] failed to sync builtin pack', pack.manifest.id, error);
+        } finally {
+          if (stablePack !== null) {
+            try {
+              await assertStableDirectoryIdentity(dir, stablePack);
+            } catch (error) {
+              console.warn('[PresentationTemplates] builtin pack changed during sync', pack.manifest.id, error);
+            } finally {
+              await stablePack.handle.close();
+            }
+          }
         }
-        await writeFile(path.join(dir, MANIFEST_FILE), JSON.stringify(pack.manifest, null, 2), 'utf-8');
-      } catch (error) {
-        console.warn('[PresentationTemplates] failed to sync builtin pack', pack.manifest.id, error);
       }
+    } finally {
+      try {
+        await assertStableDirectoryIdentity(this.rootDir, stableRoot);
+      } finally {
+        await stableRoot.handle.close();
+      }
+    }
+  }
+
+  private async readManifestForSync(
+    dir: string,
+    stableDirectory: StableDirectory
+  ): Promise<PresentationTemplateManifest | null> {
+    try {
+      await assertStableDirectoryIdentity(dir, stableDirectory);
+      const manifestFile = await readStableFile(
+        path.join(dir, MANIFEST_FILE),
+        MANIFEST_FILE,
+        PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES
+      );
+      await assertStableDirectoryIdentity(dir, stableDirectory);
+      return validateTemplateManifest(JSON.parse(STRICT_UTF8.decode(manifestFile.bytes)));
+    } catch {
+      await assertStableDirectoryIdentity(dir, stableDirectory);
+      return null;
     }
   }
 
@@ -109,6 +415,83 @@ export class PresentationTemplateService {
       if (a.manifest.source !== b.manifest.source) return a.manifest.source === 'builtin' ? -1 : 1;
       return a.manifest.name.localeCompare(b.manifest.name);
     });
+  }
+
+  /** Resolves one pack into stable bounded bytes for main-process preparation. */
+  async getById(id: string): Promise<ResolvedPresentationTemplate | null> {
+    if (!TEMPLATE_ID_RE.test(id)) return null;
+    await this.ensureInitialized();
+    const directory = path.join(this.rootDir, id);
+    const stableRoot = await openStableDirectory(this.rootDir);
+    let stableDirectory: StableDirectory | null = null;
+
+    try {
+      try {
+        stableDirectory = await openStableDirectory(directory);
+      } catch (error) {
+        if (hasErrorCode(error, 'ENOENT')) return null;
+        throw error;
+      }
+      const manifestFile = await readStableFile(
+        path.join(directory, MANIFEST_FILE),
+        MANIFEST_FILE,
+        PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES
+      );
+
+      let manifest: PresentationTemplateManifest;
+      try {
+        manifest = validateTemplateManifest(JSON.parse(STRICT_UTF8.decode(manifestFile.bytes)));
+      } catch (error) {
+        throw unsupported(error);
+      }
+      if (manifest.id !== id) throw unsupported();
+      if (
+        (manifest.format === 'pptx' && path.extname(manifest.referenceFile ?? '').toLowerCase() !== '.pptx') ||
+        (manifest.format === 'docx' && path.extname(manifest.referenceFile ?? '').toLowerCase() !== '.docx')
+      ) {
+        throw unsupported();
+      }
+
+      const theme = await readStableFile(
+        path.join(directory, manifest.themeFile),
+        manifest.themeFile,
+        PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES
+      );
+      if (theme.byteLength === 0) throw unsupported();
+      try {
+        STRICT_UTF8.decode(theme.bytes);
+      } catch (error) {
+        throw unsupported(error);
+      }
+      const reference =
+        manifest.referenceFile === null
+          ? null
+          : await readStableFile(
+              path.join(directory, manifest.referenceFile),
+              manifest.referenceFile,
+              PRESENTATION_RUN_LIMITS.MAX_REFERENCE_BYTES
+            );
+      if (reference !== null && reference.byteLength === 0) throw unsupported();
+      if (theme.byteLength + (reference?.byteLength ?? 0) > PRESENTATION_RUN_LIMITS.MAX_TEMPLATE_REFERENCE_BYTES) {
+        throw new PresentationTemplateResolutionError('RESOURCE_LIMIT_EXCEEDED');
+      }
+
+      return { manifest, theme, reference };
+    } finally {
+      try {
+        if (stableDirectory !== null) await assertStableDirectory(directory, stableDirectory);
+      } finally {
+        try {
+          await assertStableDirectory(this.rootDir, stableRoot);
+        } finally {
+          try {
+            if (stableDirectory !== null) await stableDirectory.handle.close();
+          } finally {
+            await stableRoot.handle.close();
+          }
+        }
+      }
+    }
   }
 
   private async uniqueId(base: string): Promise<string> {

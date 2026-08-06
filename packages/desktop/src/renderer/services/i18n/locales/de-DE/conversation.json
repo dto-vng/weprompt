@@ -784,7 +784,11 @@
     "importError": "Import fehlgeschlagen: {{error}}",
     "removeError": "Löschen fehlgeschlagen: {{error}}",
     "deleteTooltip": "Vorlage löschen",
-    "deleteConfirm": "Diese Vorlage löschen?"
+    "deleteConfirm": "Diese Vorlage löschen?",
+    "sources": {
+      "reselectRequired": "Wählen Sie angehängte Dateien erneut aus, um sie mit dieser PPTX-Vorlage zu verwenden.",
+      "reselectAction": "Dateien erneut auswählen"
+    }
   },
   "status": {
     "waitingApproval": "Wartet auf deine Freigabe",

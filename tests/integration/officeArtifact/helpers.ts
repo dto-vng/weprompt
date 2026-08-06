@@ -10,7 +10,7 @@ import { homedir, tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 
 import type { OfficeArtifactMutationResult } from '@/common/types/office/artifactEditor';
-import { OfficeArtifactService } from '@/process/services/office-artifact/OfficeArtifactService';
+import { OfficeArtifactService } from '@/process/services/office-artifact/service/OfficeArtifactService';
 import { hashOfficeArtifact, resolveOfficeArtifactPath } from '@/process/services/office-artifact/officeArtifactPath';
 import { OfficeArtifactSnapshotStore } from '@/process/services/office-artifact/officeArtifactSnapshots';
 import { OfficeArtifactWorkingFiles } from '@/process/services/office-artifact/officeArtifactWorkingFiles';

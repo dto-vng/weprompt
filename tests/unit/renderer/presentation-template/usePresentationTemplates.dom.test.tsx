@@ -6,8 +6,15 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
-import { usePresentationTemplates } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
+import type {
+  PresentationTemplateFormat,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
+import {
+  getPresentationRunEligibility,
+  type PresentationRunEligibilityInput,
+  usePresentationTemplates,
+} from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
 import { emitter } from '@/renderer/utils/emitter';
 
 const {
@@ -78,6 +85,34 @@ const allocation = {
   directory: '/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed',
   readyMarker: '/tmp/aionui-artifact-runs/5a68fccc-7b90-49b4-88f9-d78bb88255ed/.aionui-delivery-ready',
 };
+
+describe('getPresentationRunEligibility', () => {
+  const eligibleInput: PresentationRunEligibilityInput = {
+    featureEnabled: true,
+    isDesktop: true,
+    scope: 'individual',
+    runtime: 'aionrs',
+    templateFormat: 'pptx',
+  };
+
+  it.each(['aionrs', 'acp'])('accepts a selected PPTX for the supported %s desktop runtime', (runtime) => {
+    expect(getPresentationRunEligibility({ ...eligibleInput, runtime })).toBe(true);
+  });
+
+  it.each([
+    { name: 'feature flag is false', override: { featureEnabled: false } },
+    { name: 'environment is browser', override: { isDesktop: false } },
+    { name: 'scope is team', override: { scope: 'team' as const } },
+    { name: 'scope is unknown', override: { scope: 'unknown' as const } },
+    { name: 'template is unselected', override: { templateFormat: null } },
+    { name: 'template format is DOCX', override: { templateFormat: 'docx' as PresentationTemplateFormat } },
+    { name: 'template format is HTML', override: { templateFormat: 'html' as PresentationTemplateFormat } },
+    { name: 'runtime is unsupported', override: { runtime: 'claude' } },
+    { name: 'runtime is unknown', override: { runtime: null } },
+  ])('rejects managed UX when $name', ({ override }) => {
+    expect(getPresentationRunEligibility({ ...eligibleInput, ...override })).toBe(false);
+  });
+});
 
 describe('usePresentationTemplates artifact scratch lifecycle', () => {
   beforeEach(() => {

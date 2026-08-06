@@ -785,7 +785,11 @@
     "importError": "İçe aktarma başarısız: {{error}}",
     "removeError": "Silme başarısız: {{error}}",
     "deleteTooltip": "Şablonu sil",
-    "deleteConfirm": "Bu şablon silinsin mi?"
+    "deleteConfirm": "Bu şablon silinsin mi?",
+    "sources": {
+      "reselectRequired": "Ekli dosyaları bu PPTX şablonuyla kullanmak için yeniden seçin.",
+      "reselectAction": "Dosyaları yeniden seç"
+    }
   },
   "status": {
     "waitingApproval": "Onayınızı bekliyor",

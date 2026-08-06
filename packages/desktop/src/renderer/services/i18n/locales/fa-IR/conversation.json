@@ -783,7 +783,11 @@
     "importError": "خطا در وارد کردن: {{error}}",
     "removeError": "خطا در حذف: {{error}}",
     "deleteTooltip": "حذف قالب",
-    "deleteConfirm": "این قالب حذف شود؟"
+    "deleteConfirm": "این قالب حذف شود؟",
+    "sources": {
+      "reselectRequired": "برای استفاده از فایل‌های پیوست با این قالب PPTX، آن‌ها را دوباره انتخاب کنید.",
+      "reselectAction": "انتخاب دوباره فایل‌ها"
+    }
   },
   "status": {
     "waitingApproval": "در انتظار تأیید شما",

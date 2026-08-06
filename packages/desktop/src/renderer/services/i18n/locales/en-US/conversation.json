@@ -1283,7 +1283,11 @@
     "importError": "Import failed: {{error}}",
     "removeError": "Delete failed: {{error}}",
     "deleteTooltip": "Delete template",
-    "deleteConfirm": "Delete this template?"
+    "deleteConfirm": "Delete this template?",
+    "sources": {
+      "reselectRequired": "Reselect attached files to use them with this PPTX template.",
+      "reselectAction": "Reselect files"
+    }
   },
   "status": {
     "waitingApproval": "Awaiting approval",

@@ -8,14 +8,17 @@ import { randomUUID as createRandomUUID } from 'node:crypto';
 import { constants, type BigIntStats } from 'node:fs';
 import { lstat, open, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
-import type {
-  PreparedPresentationSourceSnapshot,
-  PreparedRetainedCandidate,
-  PresentationOwnedDirectoryLease,
-  PresentationPreparedCandidateGuard,
-  PresentationRunEntityKind,
-  PresentationRunFiles,
+import {
+  assertPreparedPresentationRunAssets,
+  type PreparedPresentationRunAssets,
+  type PreparedPresentationSourceSnapshot,
+  type PreparedRetainedCandidate,
+  type PresentationOwnedDirectoryLease,
+  type PresentationPreparedCandidateGuard,
+  type PresentationRunEntityKind,
+  type PresentationRunFiles,
 } from './presentationRunFiles';
 
 export type PresentationRunDurableBoundary =
@@ -63,6 +66,7 @@ export type PresentationRunJournalTransaction = {
   mutations: PresentationRunJournalMutation[];
   retainedCandidatePromotions?: PreparedRetainedCandidate[];
   sourceSnapshotPromotions?: PreparedPresentationSourceSnapshot[];
+  preparedRunAssetPromotions?: PreparedPresentationRunAssets[];
 };
 
 type IntentRecord = {
@@ -73,6 +77,7 @@ type IntentRecord = {
   mutations: PresentationRunJournalMutation[];
   retainedCandidatePromotions: PreparedRetainedCandidate[];
   sourceSnapshotPromotions: PreparedPresentationSourceSnapshot[];
+  preparedRunAssetPromotions: PreparedPresentationRunAssets[];
 };
 
 type CommitRecord = {
@@ -240,7 +245,8 @@ function parseSourcePromotion(value: unknown): PreparedPresentationSourceSnapsho
 function validateIntentParticipants(
   mutations: PresentationRunJournalMutation[],
   promotions: PreparedRetainedCandidate[],
-  sourcePromotions: PreparedPresentationSourceSnapshot[]
+  sourcePromotions: PreparedPresentationSourceSnapshot[],
+  preparedRunPromotions: PreparedPresentationRunAssets[]
 ): void {
   const participantKeys = mutations.map(({ entityKind, entityId }) => `${entityKind}:${entityId}`);
   if (new Set(participantKeys).size !== participantKeys.length) journalCorrupt();
@@ -305,6 +311,32 @@ function validateIntentParticipants(
       journalCorrupt();
     }
   }
+  const preparedRuns = new Set<string>();
+  for (const promotion of preparedRunPromotions) {
+    if (preparedRuns.has(promotion.runId)) journalCorrupt();
+    preparedRuns.add(promotion.runId);
+    const mutation = mutations.find(({ entityKind, entityId }) => entityKind === 'run' && entityId === promotion.runId);
+    if (
+      mutation === undefined ||
+      mutation.nextManifest.runId !== promotion.runId ||
+      mutation.nextManifest.dispatchStatus !== 'committed' ||
+      mutation.nextManifest.artifactPhase !== 'sources_extracted' ||
+      !isDeepStrictEqual(mutation.nextManifest.preparation, promotion.record)
+    ) {
+      journalCorrupt();
+    }
+  }
+  for (const mutation of mutations) {
+    if (
+      mutation.entityKind === 'run' &&
+      mutation.nextManifest.dispatchStatus === 'committed' &&
+      mutation.nextManifest.artifactPhase === 'sources_extracted' &&
+      mutation.nextManifest.preparation != null &&
+      !preparedRuns.has(mutation.entityId)
+    ) {
+      journalCorrupt();
+    }
+  }
 }
 
 function validateTransaction(input: PresentationRunJournalTransaction): void {
@@ -320,7 +352,14 @@ function validateTransaction(input: PresentationRunJournalTransaction): void {
     journalCorrupt();
   }
   const sourcePromotions = (input.sourceSnapshotPromotions ?? []).map(parseSourcePromotion);
-  validateIntentParticipants(mutations, promotions, sourcePromotions);
+  if (input.preparedRunAssetPromotions !== undefined && !Array.isArray(input.preparedRunAssetPromotions)) {
+    journalCorrupt();
+  }
+  const preparedRunPromotions = (input.preparedRunAssetPromotions ?? []).map((promotion) => {
+    assertPreparedPresentationRunAssets(promotion);
+    return promotion;
+  });
+  validateIntentParticipants(mutations, promotions, sourcePromotions, preparedRunPromotions);
 }
 
 function parseJournalRecord(line: string): JournalRecord {
@@ -341,13 +380,17 @@ function parseJournalRecord(line: string): JournalRecord {
   if (value.type === 'intent') {
     const legacyKeys = ['version', 'type', 'transactionId', 'createdAt', 'mutations', 'retainedCandidatePromotions'];
     const currentKeys = [...legacyKeys, 'sourceSnapshotPromotions'];
+    const preparedRunKeys = [...currentKeys, 'preparedRunAssetPromotions'];
     if (
-      (!hasExactKeys(value, legacyKeys) && !hasExactKeys(value, currentKeys)) ||
+      (!hasExactKeys(value, legacyKeys) &&
+        !hasExactKeys(value, currentKeys) &&
+        !hasExactKeys(value, preparedRunKeys)) ||
       !UUID_RE.test(value.transactionId) ||
       !isIsoTimestamp(value.createdAt) ||
       !Array.isArray(value.mutations) ||
       !Array.isArray(value.retainedCandidatePromotions) ||
-      (value.sourceSnapshotPromotions !== undefined && !Array.isArray(value.sourceSnapshotPromotions))
+      (value.sourceSnapshotPromotions !== undefined && !Array.isArray(value.sourceSnapshotPromotions)) ||
+      (value.preparedRunAssetPromotions !== undefined && !Array.isArray(value.preparedRunAssetPromotions))
     ) {
       journalCorrupt();
     }
@@ -356,12 +399,24 @@ function parseJournalRecord(line: string): JournalRecord {
     const sourceSnapshotPromotions = (
       Array.isArray(value.sourceSnapshotPromotions) ? value.sourceSnapshotPromotions : []
     ).map(parseSourcePromotion);
-    validateIntentParticipants(mutations, retainedCandidatePromotions, sourceSnapshotPromotions);
-    return {
-      ...(value as Omit<IntentRecord, 'sourceSnapshotPromotions'>),
+    const preparedRunAssetPromotions = (
+      Array.isArray(value.preparedRunAssetPromotions) ? value.preparedRunAssetPromotions : []
+    ).map((promotion) => {
+      assertPreparedPresentationRunAssets(promotion as PreparedPresentationRunAssets);
+      return promotion as PreparedPresentationRunAssets;
+    });
+    validateIntentParticipants(
       mutations,
       retainedCandidatePromotions,
       sourceSnapshotPromotions,
+      preparedRunAssetPromotions
+    );
+    return {
+      ...(value as Omit<IntentRecord, 'sourceSnapshotPromotions' | 'preparedRunAssetPromotions'>),
+      mutations,
+      retainedCandidatePromotions,
+      sourceSnapshotPromotions,
+      preparedRunAssetPromotions,
     };
   }
   if (
@@ -605,6 +660,7 @@ export class PresentationRunJournal {
           mutations: inputSnapshot.mutations,
           retainedCandidatePromotions: inputSnapshot.retainedCandidatePromotions ?? [],
           sourceSnapshotPromotions: inputSnapshot.sourceSnapshotPromotions ?? [],
+          preparedRunAssetPromotions: inputSnapshot.preparedRunAssetPromotions ?? [],
         };
         await this.files.withJournalDirectoryLease(async (journalLease) => {
           const journalPath = this.files.getJournalPath();
@@ -613,24 +669,27 @@ export class PresentationRunJournal {
             intent.retainedCandidatePromotions,
             async (retainedGuard) =>
               this.files.withPreparedSourceSnapshotLeases(intent.sourceSnapshotPromotions, async (sourceGuard) =>
-                this.appendRecord(intent, {
-                  journalLease,
-                  expectedJournalIdentity: journalIdentityBeforeIntent,
-                  prePersistGuard: {
-                    assertCurrent: async () => {
-                      await retainedGuard.assertCurrent();
-                      await sourceGuard.assertCurrent();
+                this.files.withPreparedRunAssetLeases(intent.preparedRunAssetPromotions, async (preparedRunGuard) =>
+                  this.appendRecord(intent, {
+                    journalLease,
+                    expectedJournalIdentity: journalIdentityBeforeIntent,
+                    prePersistGuard: {
+                      assertCurrent: async () => {
+                        await retainedGuard.assertCurrent();
+                        await sourceGuard.assertCurrent();
+                        await preparedRunGuard.assertCurrent();
+                      },
                     },
-                  },
-                  onAppendMayPersist: () => {
-                    this.recoveryRequired = true;
-                    intentMayExist = true;
-                  },
-                })
+                    onAppendMayPersist: () => {
+                      this.recoveryRequired = true;
+                      intentMayExist = true;
+                    },
+                  })
+                )
               )
           );
           await this.applyIntent(intent);
-          await this.appendRecord(
+          const committedJournalIdentity = await this.appendRecord(
             {
               version: 1,
               type: 'commit',
@@ -639,6 +698,7 @@ export class PresentationRunJournal {
             },
             { journalLease, expectedJournalIdentity: journalIdentity }
           );
+          await this.compactCommittedRecords(journalLease, committedJournalIdentity);
           await journalLease.assertCurrent();
           this.recoveryRequired = false;
         });
@@ -684,6 +744,7 @@ export class PresentationRunJournal {
             { journalLease, expectedJournalIdentity: journalIdentity }
           );
         }
+        await this.compactCommittedRecords(journalLease, journalIdentity);
         await journalLease.assertCurrent();
         this.recoveryRequired = false;
       });
@@ -850,12 +911,37 @@ export class PresentationRunJournal {
     }
   }
 
+  private async compactCommittedRecords(
+    journalLease: PresentationOwnedDirectoryLease,
+    expectedJournalIdentity: BigIntStats | null
+  ): Promise<void> {
+    await journalLease.assertCurrent();
+    if (expectedJournalIdentity === null) return;
+    const journalPath = this.files.getJournalPath();
+    const opened = await openOwnedFile(journalPath, constants.O_RDWR);
+    try {
+      if (!sameFileIdentity(expectedJournalIdentity, opened.metadata)) throw new Error(CHANGED_FILE_ERROR);
+      await journalLease.assertCurrent();
+      await assertOpenFileUnchanged(opened, journalPath);
+      await opened.handle.truncate(0);
+      await refreshOpenFileAfterMutation(opened, journalPath);
+      await opened.handle.sync();
+      await assertOpenFileUnchanged(opened, journalPath);
+      await journalLease.assertCurrent();
+    } finally {
+      await opened.handle.close();
+    }
+  }
+
   private async applyIntent(intent: IntentRecord, recovering = false): Promise<void> {
     for (const promotion of intent.retainedCandidatePromotions) {
       await this.files.recoverRetainedCandidatePromotion(promotion);
     }
     for (const promotion of intent.sourceSnapshotPromotions) {
       await this.files.recoverSourceSnapshotPromotion(promotion);
+    }
+    for (const promotion of intent.preparedRunAssetPromotions) {
+      await this.files.recoverRunAssetPromotion(promotion);
     }
     for (const [mutationIndex, mutation] of intent.mutations.entries()) {
       if (recovering && (await this.isMutationApplied(mutation))) continue;

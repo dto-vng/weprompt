@@ -166,6 +166,7 @@ const SendBox: React.FC<{
   prefix?: React.ReactNode;
   placeholder?: string;
   onFilesAdded?: (files: FileMetadata[]) => void;
+  onManagedDrop?: (files: readonly File[]) => Promise<void> | void;
   supportedExts?: string[];
   defaultMultiLine?: boolean;
   lockMultiLine?: boolean;
@@ -203,6 +204,7 @@ const SendBox: React.FC<{
   value: input = '',
   onChange: setInput = constVoid,
   onFilesAdded,
+  onManagedDrop,
   supportedExts = allSupportedExts,
   defaultMultiLine = false,
   lockMultiLine = false,
@@ -384,6 +386,7 @@ const SendBox: React.FC<{
   const { isFileDragging, dragHandlers } = useDragUpload({
     supportedExts,
     onFilesAdded,
+    onManagedDrop,
     conversation_id: conversationContext?.conversation_id,
   });
 

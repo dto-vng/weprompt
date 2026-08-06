@@ -783,7 +783,11 @@
     "importError": "Помилка імпорту: {{error}}",
     "removeError": "Помилка видалення: {{error}}",
     "deleteTooltip": "Видалити шаблон",
-    "deleteConfirm": "Видалити цей шаблон?"
+    "deleteConfirm": "Видалити цей шаблон?",
+    "sources": {
+      "reselectRequired": "Повторно виберіть прикріплені файли, щоб використати їх із цим шаблоном PPTX.",
+      "reselectAction": "Вибрати файли повторно"
+    }
   },
   "status": {
     "waitingApproval": "Очікує вашого підтвердження",

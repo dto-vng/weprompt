@@ -783,7 +783,11 @@
     "importError": "インポートに失敗しました: {{error}}",
     "removeError": "削除に失敗しました: {{error}}",
     "deleteTooltip": "テンプレートを削除",
-    "deleteConfirm": "このテンプレートを削除しますか？"
+    "deleteConfirm": "このテンプレートを削除しますか？",
+    "sources": {
+      "reselectRequired": "この PPTX テンプレートで使用するには、添付ファイルを選択し直してください。",
+      "reselectAction": "ファイルを選択し直す"
+    }
   },
   "status": {
     "waitingApproval": "承認待ちです",

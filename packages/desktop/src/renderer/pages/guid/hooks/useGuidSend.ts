@@ -68,6 +68,8 @@ export type GuidSendDeps = {
     files: string[]
   ) => { input: string; files: string[]; injectSkills: string[] };
   onPresentationTemplateConsumed?: () => void;
+  requiresPresentationSourceReselect?: boolean;
+  onPresentationSourceReselectRequired?: () => void;
 
   // Navigation
   navigate: NavigateFunction;
@@ -112,6 +114,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     assistantDefaultMcpIds,
     composePresentationSend,
     onPresentationTemplateConsumed,
+    requiresPresentationSourceReselect,
+    onPresentationSourceReselectRequired,
     setMentionOpen,
     setMentionQuery,
     setMentionSelectorOpen,
@@ -372,6 +376,10 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
 
   const sendMessageHandler = useCallback(() => {
     if (loading || sendingRef.current) return;
+    if (requiresPresentationSourceReselect) {
+      onPresentationSourceReselectRequired?.();
+      return;
+    }
     sendingRef.current = true;
     setLoading(true);
     handleSend()
@@ -396,6 +404,8 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
       });
   }, [
     loading,
+    requiresPresentationSourceReselect,
+    onPresentationSourceReselectRequired,
     handleSend,
     setLoading,
     setInput,

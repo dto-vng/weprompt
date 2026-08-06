@@ -783,7 +783,11 @@
     "importError": "匯入失敗：{{error}}",
     "removeError": "刪除失敗：{{error}}",
     "deleteTooltip": "刪除範本",
-    "deleteConfirm": "確定刪除該範本？"
+    "deleteConfirm": "確定刪除該範本？",
+    "sources": {
+      "reselectRequired": "若要將附件用於此 PPTX 範本，請重新選擇檔案。",
+      "reselectAction": "重新選擇檔案"
+    }
   },
   "status": {
     "waitingApproval": "等待你的核准",

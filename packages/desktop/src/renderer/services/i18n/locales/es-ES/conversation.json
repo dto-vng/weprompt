@@ -784,7 +784,11 @@
     "importError": "Error al importar: {{error}}",
     "removeError": "Error al eliminar: {{error}}",
     "deleteTooltip": "Eliminar plantilla",
-    "deleteConfirm": "¿Eliminar esta plantilla?"
+    "deleteConfirm": "¿Eliminar esta plantilla?",
+    "sources": {
+      "reselectRequired": "Vuelve a seleccionar los archivos adjuntos para usarlos con esta plantilla PPTX.",
+      "reselectAction": "Volver a seleccionar archivos"
+    }
   },
   "status": {
     "waitingApproval": "Esperando tu aprobación",

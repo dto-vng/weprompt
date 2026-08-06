@@ -1,4 +1,5 @@
 import { ipcBridge } from '@/common';
+import { PRESENTATION_RUN_V2_ENABLED } from '@/common/config/constants';
 import type { IConversationMcpStatus } from '@/common/config/storage';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { isSideQuestionSupported } from '@/common/chat/sideQuestion';
@@ -19,6 +20,7 @@ import {
   TemplateGalleryPanel,
   usePresentationTemplates,
 } from '@/renderer/components/chat/TemplateGallery';
+import { getPresentationRunEligibility } from '@/renderer/components/chat/TemplateGallery/usePresentationTemplates';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -29,7 +31,7 @@ import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/cha
 import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useSendBoxFiles';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
-import { useOpenFileSelector } from '@/renderer/hooks/file/useOpenFileSelector';
+import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hooks/file/selection';
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
@@ -51,7 +53,8 @@ import { formatCompactModelName } from '@/renderer/utils/model/agentLogo';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
 import { mergeFileSelectionItems } from '@/renderer/utils/file/fileSelection';
 import { buildDisplayMessage } from '@/renderer/utils/file/messageFiles';
-import { Message, Tag } from '@arco-design/web-react';
+import { isElectronDesktop } from '@/renderer/utils/platform';
+import { Button, Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -150,6 +153,34 @@ const AcpSendBox: React.FC<{
   const { checkAndUpdateTitle } = useAutoTitle();
   const { atPath, uploadFile, setAtPath, setUploadFile, content, setContent } = useSendBoxDraft(conversation_id);
   const presentationTemplates = usePresentationTemplates(conversation_id);
+  const presentationSourceDraft = usePresentationSourceDraft();
+  const managedPresentationEligible = getPresentationRunEligibility({
+    featureEnabled: PRESENTATION_RUN_V2_ENABLED,
+    isDesktop: isElectronDesktop(),
+    scope: teamSendMessage ? 'team' : 'individual',
+    runtime: 'acp',
+    templateFormat: presentationTemplates.selectedTemplate?.manifest.format ?? null,
+  });
+  const hasLegacyPresentationAttachments = uploadFile.length > 0 || atPath.length > 0;
+  const [showPresentationSourceReselect, setShowPresentationSourceReselect] = useState(false);
+  const presentationConversationIdRef = useLatestRef(conversation_id);
+  const managedPresentationEligibleRef = useLatestRef(managedPresentationEligible);
+
+  useEffect(() => {
+    if (!managedPresentationEligible) return;
+    void presentationSourceDraft.hydrate({ owner_type: 'conversation', conversation_id });
+    return () => presentationSourceDraft.reset();
+  }, [conversation_id, managedPresentationEligible, presentationSourceDraft.hydrate, presentationSourceDraft.reset]);
+
+  useEffect(() => {
+    setShowPresentationSourceReselect(false);
+  }, [conversation_id]);
+
+  useEffect(() => {
+    if (!managedPresentationEligible || !hasLegacyPresentationAttachments) {
+      setShowPresentationSourceReselect(false);
+    }
+  }, [hasLegacyPresentationAttachments, managedPresentationEligible]);
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
   const conversationContext = useConversationContextSafe();
@@ -254,6 +285,81 @@ const AcpSendBox: React.FC<{
     setAtPath,
     setUploadFile,
   });
+
+  const pickPresentationSources = useCallback(async () => {
+    const requestedConversationId = conversation_id;
+    const requestIsCurrent = () =>
+      managedPresentationEligibleRef.current && presentationConversationIdRef.current === requestedConversationId;
+    const hasCurrentOwner =
+      presentationSourceDraft.owner?.owner_type === 'conversation' &&
+      presentationSourceDraft.owner.conversation_id === requestedConversationId &&
+      presentationSourceDraft.ownerRevision !== null;
+    if (!hasCurrentOwner) {
+      const hydration = await presentationSourceDraft.hydrate({
+        owner_type: 'conversation',
+        conversation_id: requestedConversationId,
+      });
+      if (!hydration.ok || !requestIsCurrent()) return null;
+    }
+    if (!requestIsCurrent()) return null;
+
+    const result = await presentationSourceDraft.pickSources();
+    if (result?.ok && result.status === 'selected' && requestIsCurrent()) {
+      if (hasLegacyPresentationAttachments) {
+        clearFiles();
+        emitter.emit('acp.selected.file.clear');
+      }
+      setShowPresentationSourceReselect(false);
+    }
+    return result;
+  }, [
+    clearFiles,
+    conversation_id,
+    hasLegacyPresentationAttachments,
+    presentationSourceDraft.hydrate,
+    presentationSourceDraft.owner,
+    presentationSourceDraft.ownerRevision,
+    presentationSourceDraft.pickSources,
+  ]);
+
+  const grantDroppedPresentationSources = useCallback(
+    async (files: readonly File[]): Promise<void> => {
+      const requestedConversationId = conversation_id;
+      const requestIsCurrent = () =>
+        managedPresentationEligibleRef.current && presentationConversationIdRef.current === requestedConversationId;
+      const hasCurrentOwner =
+        presentationSourceDraft.owner?.owner_type === 'conversation' &&
+        presentationSourceDraft.owner.conversation_id === requestedConversationId &&
+        presentationSourceDraft.ownerRevision !== null;
+      if (!hasCurrentOwner) {
+        const hydration = await presentationSourceDraft.hydrate({
+          owner_type: 'conversation',
+          conversation_id: requestedConversationId,
+        });
+        if (!hydration.ok || !requestIsCurrent()) return;
+      }
+      if (!requestIsCurrent()) return;
+
+      const result = await presentationSourceDraft.grantExternalDrop(files);
+      if (result?.ok && result.status === 'granted' && requestIsCurrent()) {
+        if (hasLegacyPresentationAttachments) {
+          clearFiles();
+          emitter.emit('acp.selected.file.clear');
+        }
+        setShowPresentationSourceReselect(false);
+      }
+    },
+    [
+      clearFiles,
+      conversation_id,
+      hasLegacyPresentationAttachments,
+      presentationSourceDraft.grantExternalDrop,
+      presentationSourceDraft.hydrate,
+      presentationSourceDraft.owner,
+      presentationSourceDraft.ownerRevision,
+    ]
+  );
+
   const commandQueueRuntimeGate = teamRuntime?.runtimeGate ?? {
     hydrated: runtimeView.hydrated,
     canSendMessage: runtimeView.canSendMessage,
@@ -448,6 +554,12 @@ Please check your local CLI tool authentication status`,
   });
 
   const onSendHandler = async (message: string) => {
+    if (managedPresentationEligible && hasLegacyPresentationAttachments) {
+      setContent(message);
+      setShowPresentationSourceReselect(true);
+      return;
+    }
+
     const atPathFiles = atPath.map((item) => (typeof item === 'string' ? item : item.path));
     const allFiles = [...uploadFile, ...atPathFiles];
 
@@ -502,9 +614,27 @@ Please check your local CLI tool authentication status`,
     },
     [setUploadFile]
   );
-  const { openFileSelector, onSlashBuiltinCommand } = useOpenFileSelector({
-    onFilesSelected: appendSelectedFiles,
-  });
+  const { openFileSelector: openLegacyFileSelector, onSlashBuiltinCommand: onLegacySlashBuiltinCommand } =
+    useOpenFileSelector({
+      onFilesSelected: appendSelectedFiles,
+    });
+  const openFileSelector = useCallback(() => {
+    if (managedPresentationEligible) {
+      void pickPresentationSources();
+      return;
+    }
+    openLegacyFileSelector();
+  }, [managedPresentationEligible, openLegacyFileSelector, pickPresentationSources]);
+  const onSlashBuiltinCommand = useCallback(
+    (name: string) => {
+      if (managedPresentationEligible && name === 'open') {
+        void pickPresentationSources();
+        return;
+      }
+      onLegacySlashBuiltinCommand(name);
+    },
+    [managedPresentationEligible, onLegacySlashBuiltinCommand, pickPresentationSources]
+  );
 
   const { entries: attachEntries, hiddenFileInput: attachHiddenInput } = useAttachEntry({
     openFileSelector,
@@ -770,7 +900,12 @@ Please check your local CLI tool authentication status`,
         onStop={effectiveHandleStop}
         className='z-10'
         onFilesAdded={handleFilesAdded}
-        hasPendingAttachments={uploadFile.length > 0 || atPath.length > 0}
+        onManagedDrop={managedPresentationEligible ? grantDroppedPresentationSources : undefined}
+        hasPendingAttachments={
+          uploadFile.length > 0 ||
+          atPath.length > 0 ||
+          (managedPresentationEligible && presentationSourceDraft.descriptors.length > 0)
+        }
         enableBtw={isSideQuestionSupported({ type: 'acp', backend })}
         supportedExts={allSupportedExts}
         defaultMultiLine={!isMobile}
@@ -819,6 +954,36 @@ Please check your local CLI tool authentication status`,
                   template={presentationTemplates.selectedTemplate}
                   onRemove={presentationTemplates.clearSelection}
                 />
+              </div>
+            )}
+            {showPresentationSourceReselect && managedPresentationEligible && hasLegacyPresentationAttachments && (
+              <div
+                className='mb-8px flex items-center justify-between gap-8px rounded-8px border border-warning-3 bg-warning-1 px-10px py-8px text-12px text-warning-7'
+                role='alert'
+              >
+                <span>{t('conversation.presentationTemplates.sources.reselectRequired')}</span>
+                <Button
+                  type='text'
+                  size='mini'
+                  loading={presentationSourceDraft.pending}
+                  onClick={() => void pickPresentationSources()}
+                >
+                  {t('conversation.presentationTemplates.sources.reselectAction')}
+                </Button>
+              </div>
+            )}
+            {managedPresentationEligible && presentationSourceDraft.descriptors.length > 0 && (
+              <div className='flex flex-wrap items-center gap-8px mb-8px'>
+                {presentationSourceDraft.descriptors.map((source, index) => (
+                  <Tag
+                    key={source.grantId}
+                    data-testid={`acp-presentation-source-${index}`}
+                    closable
+                    onClose={() => void presentationSourceDraft.revoke(source.grantId)}
+                  >
+                    {source.displayName}
+                  </Tag>
+                ))}
               </div>
             )}
             {uploadFile.length > 0 && (

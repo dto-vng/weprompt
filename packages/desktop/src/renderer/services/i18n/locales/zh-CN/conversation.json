@@ -783,7 +783,11 @@
     "importError": "导入失败：{{error}}",
     "removeError": "删除失败：{{error}}",
     "deleteTooltip": "删除模板",
-    "deleteConfirm": "确定删除该模板？"
+    "deleteConfirm": "确定删除该模板？",
+    "sources": {
+      "reselectRequired": "要将附件用于此 PPTX 模板，请重新选择文件。",
+      "reselectAction": "重新选择文件"
+    }
   },
   "status": {
     "waitingApproval": "等待你的批准",
