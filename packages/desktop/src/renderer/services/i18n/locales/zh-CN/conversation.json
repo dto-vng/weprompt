@@ -790,6 +790,23 @@
       "cleanupSuccess": "临时产物文件已移除",
       "cleanupError": "清理失败：{{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "演示文稿候选文件需要人工检查。",
+        "reviewRequiredAfterFailure": "生成已停止；保留的演示文稿候选文件仍需人工检查。",
+        "trackingRequired": "演示文稿任务需要跟踪处理。",
+        "dispatchUncertain": "演示文稿任务结果尚未确认，需要操作人员处理。"
+      },
+      "hash": "SHA-256：{{sha256}}",
+      "actions": {
+        "open": "使用系统应用打开",
+        "discard": "丢弃记录"
+      },
+      "loadError": "无法加载演示文稿恢复状态。",
+      "invalidResponse": "无法验证演示文稿恢复状态。",
+      "openError": "无法确认当前演示文稿候选文件是否已打开。",
+      "discardError": "无法确认演示文稿记录已丢弃。"
+    },
     "importSuccess": "模板已导入",
     "importError": "导入失败：{{error}}",
     "removeError": "删除失败：{{error}}",

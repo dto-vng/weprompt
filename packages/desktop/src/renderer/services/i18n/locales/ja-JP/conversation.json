@@ -790,6 +790,23 @@
       "cleanupSuccess": "一時ファイルを削除しました",
       "cleanupError": "クリーンアップに失敗しました: {{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "プレゼンテーション候補の確認が必要です。",
+        "reviewRequiredAfterFailure": "生成は停止しました。保持されたプレゼンテーション候補は引き続き確認が必要です。",
+        "trackingRequired": "プレゼンテーション実行の追跡対応が必要です。",
+        "dispatchUncertain": "プレゼンテーション実行の結果は未確認です。オペレーターの対応が必要です。"
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "システムアプリで開く",
+        "discard": "記録を破棄"
+      },
+      "loadError": "プレゼンテーションの復旧状態を読み込めませんでした。",
+      "invalidResponse": "プレゼンテーションの復旧状態を確認できませんでした。",
+      "openError": "現在のプレゼンテーション候補が開いたかどうかを確認できませんでした。",
+      "discardError": "プレゼンテーション記録の破棄を確認できませんでした。"
+    },
     "importSuccess": "テンプレートをインポートしました",
     "importError": "インポートに失敗しました: {{error}}",
     "removeError": "削除に失敗しました: {{error}}",

@@ -851,6 +851,23 @@
       "cleanupSuccess": "Temporary artifact files removed",
       "cleanupError": "Cleanup failed: {{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Presentation candidate requires review.",
+        "reviewRequiredAfterFailure": "Generation stopped; the retained presentation candidate still requires review.",
+        "trackingRequired": "Presentation run needs tracking attention.",
+        "dispatchUncertain": "Presentation run outcome is unconfirmed. Operator attention is required."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Open in system app",
+        "discard": "Discard record"
+      },
+      "loadError": "Could not load presentation recovery status.",
+      "invalidResponse": "Presentation recovery status could not be verified.",
+      "openError": "Could not confirm whether the current presentation candidate opened.",
+      "discardError": "Could not confirm that the presentation record was discarded."
+    },
     "importSuccess": "Template imported",
     "importError": "Import failed: {{error}}",
     "removeError": "Delete failed: {{error}}",

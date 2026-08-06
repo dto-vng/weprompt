@@ -796,6 +796,23 @@
       "cleanupSuccess": "Arquivos temporários do artefato removidos",
       "cleanupError": "Falha na limpeza: {{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "O candidato de apresentação precisa de revisão.",
+        "reviewRequiredAfterFailure": "A geração foi interrompida; o candidato de apresentação mantido ainda precisa de revisão.",
+        "trackingRequired": "A execução da apresentação precisa de acompanhamento.",
+        "dispatchUncertain": "O resultado da execução da apresentação não foi confirmado. É necessária a atenção de um operador."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Abrir no aplicativo do sistema",
+        "discard": "Descartar registro"
+      },
+      "loadError": "Não foi possível carregar o status de recuperação da apresentação.",
+      "invalidResponse": "Não foi possível verificar o status de recuperação da apresentação.",
+      "openError": "Não foi possível confirmar se o candidato de apresentação atual foi aberto.",
+      "discardError": "Não foi possível confirmar o descarte do registro da apresentação."
+    },
     "importSuccess": "Modelo importado",
     "importError": "Falha na importação: {{error}}",
     "removeError": "Falha ao excluir: {{error}}",

@@ -792,6 +792,23 @@
       "cleanupSuccess": "Geçici çıktı dosyaları kaldırıldı",
       "cleanupError": "Temizleme başarısız oldu: {{error}}"
     },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Sunum adayının incelenmesi gerekiyor.",
+        "reviewRequiredAfterFailure": "Oluşturma durdu; saklanan sunum adayının yine de incelenmesi gerekiyor.",
+        "trackingRequired": "Sunum çalışmasının izlenmesi gerekiyor.",
+        "dispatchUncertain": "Sunum çalışmasının sonucu doğrulanmadı. Operatörün ilgilenmesi gerekiyor."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Sistem uygulamasında aç",
+        "discard": "Kaydı sil"
+      },
+      "loadError": "Sunum kurtarma durumu yüklenemedi.",
+      "invalidResponse": "Sunum kurtarma durumu doğrulanamadı.",
+      "openError": "Geçerli sunum adayının açılıp açılmadığı doğrulanamadı.",
+      "discardError": "Sunum kaydının silindiği doğrulanamadı."
+    },
     "importSuccess": "Şablon içe aktarıldı",
     "importError": "İçe aktarma başarısız: {{error}}",
     "removeError": "Silme başarısız: {{error}}",
