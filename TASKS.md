@@ -73,6 +73,10 @@
   - Reachability: main derives the three role statuses independently, once per role, so a workspace whose providers expose image models but no video models yields `image: 'ready'` with `video: 'setup_required'`. This is a normal reachable state, not a contrived one.
   - Expected: the shot keeps a disabled control carrying its reason, **and** the Produce models panel states the same fact once for the project. Design settled 2026-08-06 as "state 7" — both surfaces, not a choice between them; a disabled-control-only fix is the incomplete answer.
   - Verification: cover partial readiness in both directions and assert the affected shot exposes a stated reason; keep a control shot of the ready kind in the same project so an all-null result cannot pass vacuously. Note the four-value `StudioModelAvailability` union — `selection_required` and `setup_required` need different remedies.
+  - **Scope corrected 2026-08-07 — it is eight facts, not one.** The causes were derived from the code rather than estimated: **13 paths, 10 real causes, 8 distinct sentences**. Full table with triggers and remedies in the [generate-reason derivation](docs/design/creative-studio-generate-reason-derivation.md). The earlier "nine causes" figure in the design docs was an estimate and wrong in both directions.
+  - **Two of the eight must offer no action at all** — the model not answering, and the catalogue not loaded. Neither is the user's to fix. The naive implementation offers _Open Model settings_ on all eight and sends a user to a screen that cannot help them in two cases; that is the specific way this bug gets "fixed" wrongly.
+  - Two code paths are **unreachable** on this call path and must not get copy: the kind check (the route is already filtered by media kind) and the scene check (the per-shot call passes no scene id). Writing copy for either would imply a state no user can reach.
+  - Blocked on the designer for the copy itself — Ask B of the [open asks commission](docs/design/creative-studio-open-asks-commission.md), sent with the derivation. They estimated a day's turnaround.
 
 - [ ] **[BUG-027][P3][Creative Studio] `jobManager.test.ts` capped-backoff test flakes in full-suite position**
   - Actual: `persists the remote identity before polling and uses the exact capped backoff schedule` failed once during a `just push` gate on a quiet machine (load 6.1): `waitFor` expired with the job still `running`. Passed 3×118/118 in isolation immediately after, and passed two other full-suite runs the same day.
@@ -88,6 +92,7 @@
   - Concrete failure: while storyboard drafting is in flight, another window edits the project or a running job bumps the revision. The provider charges for a completed draft, the app rejects it, and the user must pay again to regenerate.
   - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
   - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
+  - **Design settled 2026-08-07** (`docs/design/creative-studio-bug028-durable-drafts.md`): region-guarded merge inside the serialised update fn (authored script + planner inputs compared, operational fields excluded, active-jobs overlap treated as conflict), with a true conflict recording the paid draft as a pending proposal instead of discarding it. Sequence the implementation after EPIC-006 Slice A3 — the fallback needs the proposal card UI.
 
 - [ ] **[BUG-029][P2][Creative Studio] Runtime disposal does not cancel or await active FFmpeg renders**
   - Actual: runtime disposal owns the planner, job manager, protocol and fake bundle, but not the render runner. `StudioRenderRunner` exposes only per-project `renderCut`, `cancelRender` and `getState`, with no dispose/cancel-all boundary. Quit cleanup awaits runtime disposal and then lets main exit without cancelling active FFmpeg children.
@@ -107,6 +112,53 @@
   - Observed once, in a single-project run. **Not yet reproduced in the mixed full suite**, so it may need that context — the same thing turned out to be true of BUG-025, where coverage instrumentation was the missing ingredient.
   - Expected: a green run exits 0. Fix the teardown, or establish why the environment is torn down while work is outstanding.
 
+- [ ] **[BUG-032][P3][Creative Studio] The Write assistant dock overpromises its capability in all 12 locales**
+  - Actual: `AssistantDock.tsx:149` renders `conversation.creativeStudio.phase.write.assistantDescription` — _"Use the assistant to develop story structure, shot ideas, and prompts"_ — while the dock's only capability is the one-shot **Draft storyboard** button. All 12 locales make the equivalent promise. Recorded in the Write-assistant design §1 as a defect of the same class as the closed false-audio claim.
+  - Became standalone 2026-08-07: the Write-assistant design that would have made the copy true is **parked** (`docs/design/creative-studio-write-assistant-design.md`, parking banner — its capabilities were absorbed by EPIC-006 Slices A/P and the scene assist), so the spec's own rule "this design fixes it or the copy must change" now resolves to changing the copy.
+  - Expected: the description states what the dock does today — drafts a storyboard from the brief — with the provider/model labels and charge disclosure unchanged. Copy change ×12 locales, `bun run i18n:types` + `node scripts/check-i18n.js`; no behavior change.
+  - Scope note: when the scene assist ships, the copy may additionally point at it for per-scene help; do not pre-write that promise before it lands.
+
+- [ ] **[BUG-033][P1][Creative Studio] A render whose ffmpeg child dies never releases the busy lock**
+  - Actual: when the render child terminates without completing, the project's render slot is never reclaimed. `renderCut` then returns `busy` for the rest of the app process, so the project **can never be rendered again without restarting the app**, and nothing in the UI explains why.
+  - Found live 2026-08-07, not by tests: after killing a wedged ffmpeg (see `BUG-034`), `getLatestRender` stayed `null`, no failure state surfaced, the `aionui-studio-render-*` temp directory was left behind, and a fresh `renderCut` was rejected with `{ code: 'busy' }`.
+  - **Two problems stacked, and fixing one is not enough.** The lock is not released on abnormal child exit; and **ffmpeg ignored `SIGTERM`** here — it kept running at ~99% CPU and only died on `SIGKILL`. A cancel path that sends TERM and assumes the child is gone will neither kill the process nor reclaim the slot.
+  - This is R4's "state 2" busy guard stuck permanently on. The guard itself is correct; nothing releases it.
+  - Expected: an abnormal child exit finalizes the render as failed, releases the slot, cleans the temp directory, and surfaces one of the three typed failures. Cancellation must escalate to `SIGKILL` after a bounded wait.
+  - Related: `BUG-029` covers disposal not cancelling active renders at quit. Same subsystem, different trigger — that one leaks a process at exit, this one wedges the feature during a session.
+
+- [ ] **[BUG-034][P2][Creative Studio] An unreadable asset wedges the render forever with no timeout or validation**
+  - Actual: a segment whose input image cannot be decoded makes ffmpeg spin indefinitely instead of failing. Observed **3h 20m at ~99% CPU on the first of four segments** before being killed manually. Nothing bounds a segment's duration and nothing checks the asset before it is handed to ffmpeg.
+  - Mechanism: the render invokes `-loop 1 -t 3 -i <asset>`. With a zero-dimension input, `-loop 1` never yields a frame, so ffmpeg neither errors nor exits. `ffprobe` on the same file reports `width=0` with `chunk too big`.
+  - Expected: validate that an asset decodes to non-zero dimensions before rendering it, and bound each segment with a timeout. A take that cannot be decoded is `render_failed` naming the clip, not an infinite spin.
+  - Cheap partial fix worth considering on its own: dropping `-loop 1` for still images in favour of a bounded frame count removes the infinite-loop shape entirely.
+
+- [ ] **[BUG-035][P3][Test infrastructure] The Studio e2e fake provider emits assets that cannot be rendered**
+  - Actual: with `AIONUI_E2E_STUDIO_FAKE=1`, a generated take is a **39-byte stub** — the 8-byte PNG magic header followed by the ASCII string `STUDIO_RAW_OUTPUT_BODY_SENTINEL`. It passes a magic-byte check and is not an image; `file` reports `data`.
+  - Consequence: the generate → render journey **cannot be exercised end to end** with the fake provider, which is why the Studio e2e spec asserts state transitions and never a real render. It is also what triggered `BUG-034` in practice.
+  - Expected: the fake emits a genuine minimal PNG (a 1×1 or small solid frame) so a fake-provider run can render. That would have caught `BUG-034` and `BUG-033` automatically.
+  - Not a production defect — the stub is deliberate for state tests. Filed so nobody concludes from a green e2e run that rendering works.
+
+- [ ] **[BUG-036][P2][Creative Studio][Blocks flag-enablement] The v1.1 Review editor has four accessibility and localization defects**
+  - Found by an independent four-lens review of MR !73 (2026-08-07). None is reachable today — `CREATIVE_STUDIO_ENABLED` is opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1` (`common/config/constants.ts:66`) — which is why they were filed rather than held. **They must close before the flag is ever defaulted on**, not merely "someday".
+  - **(a) The four clip states reach screen readers only as data attributes.** The `aria-describedby` → `sr-only` span hardcodes `phase.review.selectedTake` regardless of the `reviewState` prop (`CutTimeline.tsx:231-233`), and on slate items the running/failed/slate label sits inside a button whose `aria-label` (`:468`) suppresses inner content from the accessible name, with no `describedby` (`:491`). BUG-031's stated guarantee — state surviving _without colour_ — does hold, because the labels are visible text; the screen-reader half is narrower than the entry implies. Independently flagged by two lenses.
+  - **(b) Escape closes the R5 drawer but drops focus to `<body>`.** Arco's Drawer renders react-focus-lock without `returnFocus`, `onCancel` only flips state, and `unmountOnExit` discards the node (`ReviewCut.tsx:357-386`). Escape-close itself is tested; focus return is neither implemented nor asserted. The dialog is also unnamed (`title={null}` + `closable={false}`).
+  - **(c) `render.errors.noRenderableShots` has no plural forms in any of the 12 locales and passes no `count`** (`ReviewPhase.tsx:73-79` joins shot numbers into a string). One missing shot renders plural phrasing everywhere. Its sibling `export.gapWarning` does this correctly. It was also omitted from `pluralLogicalKeys` in `tests/unit/pages/studio/studioI18n.test.ts`, so the repo's 0/1/2/5 convention test never exercised it — fix the key and the test list together.
+  - **(d) A raw ISO timestamp is shown to users** — `StudioExportModal.tsx:116` renders `latestRender.renderedAt` verbatim ("Rendered 2026-07-29T08:15:00.000Z"), and `StudioExport.dom.test.tsx` asserts that raw string, codifying it. Needs locale-aware formatting, and the assertion updated rather than preserved.
+  - Verification: for (a) assert each of the four states through the accessibility tree, not `data-review-state`; for (b) assert focus returns to the opener; for (c) real i18next plural tests at counts 1/2/5 in ru-RU and uk-UA; for (d) assert a formatted, locale-aware string.
+  - P3 tail from the same review, deliberately not expanded here: SR seconds plurals (`cut.secondsValue`), hardcoded `s` unit and decimal parsing in trim fields, unrounded playhead float in `duration.played`, zh-TW `common.close` untranslated, two failing contrast pairings on the export modal that repeat pre-existing pairings (ratchet-neutral), selected slates having no visual selected state.
+
+- [ ] **[BUG-037][P3][Creative Studio] Three renderer-side render-state surface gaps**
+  - Also from the MR !73 review; all three leave the store correct and are renderer-only.
+  - **(a) After a ReviewPhase remount, the user's own in-flight render reads as "busy" with no Cancel.** The runner's `getState` is never exposed over IPC, so `useStudioRender` resets to `idle` on mount and labels any `running` event it did not start as another surface's render (`useStudioRender.ts:130-143`). Leave Review mid-render and return: the UI claims someone else is rendering and offers no way out until the next progress event.
+  - **(b) A cancel landing after the output is persisted yields status `cancelled` for a render that exists.** `renderService.ts:826` persists, then `:836` checks cancellation and throws, so `:840` reports `cancelled` while the file is committed — and `getLatestRender` (`creativeStudioService.ts:1897`) does not filter by status, so the export modal then offers a `cut.mp4` the user believes was never produced. The file itself is a valid complete render.
+  - **(c) The export modal's latest-render line is a snapshot** taken at modal open while the export re-reads at export time, so a render finishing while the modal is open exports a newer file than the modal described.
+  - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
+
+- [ ] **[BUG-038][P3][Process] A slice merged into the v1.1 branch with a red gate, undetected until review**
+  - Actual: R3 (`d8e0bf1ff`) added the `place-cut-scenes` provider to `ipcBridge.ts` without a manifest entry. The manifest-completeness test (`tests/unit/process/bridge/nativePayloadSchemas.test.ts:1675`) predates that commit on `sprint2`, so it was **red on `creative-suite-sprint2` from `d8e0bf1ff` until the fix `7bd5a1561`** — verified by inspecting both files at that commit.
+  - The fix's commit message states "every unit test passed by bypassing the bridge". That is false, and the false version is the one a future reader will find. The real lesson is stronger: the machine-enforced parity net worked exactly as designed and **nobody ran it between slices**.
+  - Expected: slice merges into an integration branch run the gate before merge, not only at the epic's end. No production change needed.
+
 ## Waiting On
 
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
@@ -116,15 +168,34 @@
   - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
   - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
 
-- [ ] **[Creative Studio] Review screen redraw — commissioned, delivered, awaiting build capacity**
-  - The designer delivered the full Review redraw (cut editor, inspector, render/failure/export states, compact and dark, three new tokens). It supersedes the provisional render placement. Sequencing is settled in `docs/design/creative-studio-v11-cut-editor-plan.md`: `renderCut` must read the cut **before** any editor UI ships, because scene-derived segments mean clip order is not honoured today.
-
 - [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
   - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
 
 ## Someday
 
 ## Done
+
+- [x] **[Creative Studio] Review screen redraw — delivered** — completed 2026-08-07
+  - The designer delivered the full Review redraw (cut editor, inspector, render/failure/export states, compact and dark, three new tokens). It supersedes the provisional render placement.
+  - **Current boundary: all five slices are built, reviewed, and pushed as [MR !73](https://code.vng.vn/dto/weprompt/-/merge_requests/73) into `sprint2` (2026-08-07).** §3a–§3d are complete. The sequencing constraint recorded here is satisfied — `renderCut` reads the cut (R1/R2) and shipped before any editor UI (R3).
+  - The slices, in order: **R1** clip order `646d5db7d` · **R2** render edits `a48cd5581`, `f7b6544c4` · **R3** cut editor `d8e0bf1ff` · **R4** render/failure/export states `850944843` · **R5** compact, drawer and dark `f0e75e86d`.
+  - Each slice was independently reviewed before merge against a revert-proof run by the reviewer, not the implementer. That caught three defects worth recording as a class: a hardware-encoder-only pixel probe (R2), a dropped user-visible state with its covering accessibility test deleted (R3, now `BUG-031`), and an IPC provider registered in `ipcBridge` but absent from the native manifest, which shipped keyboard clip placement broken past a green suite (R3, fixed in `7bd5a1561`).
+  - **Next gate:** review and merge of MR !73. The full suite is green on the merged tree — 7,921 passed, 0 failed — and every push gate passes. Nothing in the redraw is blocked on design.
+  - Not part of this item, and open: the designer's four asks from 2026-08-07 — see [open asks commission](docs/design/creative-studio-open-asks-commission.md). **Ask A cannot ship as drawn** (its fourth slate state has an unreachable cause; we replied and are waiting), and **Ask C depends on `EPIC-005-G1`**, which is P3 and unstarted.
+  - **Done 2026-08-07** — MR !73 merged to `origin/sprint2` as `29b4bee97`. §3a–§3d complete across R1–R5.
+
+- [x] **[BUG-031][P2][Creative Studio] Review no longer distinguishes a generating shot from a failed one**
+  - Actual: on the Review screen every shot without a selected take renders as the same hatched slate — title plus one `phase.review.slateLabel`. Three different situations collapse into one indistinguishable plate: still generating, failed and needing a retry, and never generated. Each has a different next action (wait, retry, generate), and the screen no longer says which applies.
+  - Regression, not a missing feature. The previous Review rail labelled four states; `ReviewCut.tsx` derived them from `readiness.sceneStatuses` (`generating` → running, `needs_attention` → failed, otherwise → missing-slate). Introduced by the R3 cut editor (`d8e0bf1ff` on `creative-suite-sprint2`), which replaced `SceneTimeline` with `CutTimeline` and dropped the derivation.
+  - **The data is still in scope.** `ReviewCut` still receives the prop; R3 renamed it to `_readiness`, the project's deliberately-unused-parameter convention. It was marked unused to satisfy lint rather than noticed as a dropped distinction, so the fix does not need new plumbing or new i18n keys — `scene.status.generating` and `jobs.status.failed` already exist.
+  - **Its covering test was deleted, not replaced.** `labels selected, slate, running, and failed rail states without relying on color` is gone from `ReviewPhase.dom.test.tsx` along with all eight of its assertions; only a `slateLabel` count survives. That test carried the non-colour accessibility guarantee, so nothing now protects it. Restore an equivalent assertion with the fix.
+  - Genuinely a design question, which is why it was filed rather than patched. The cut model defines a slate as simply "a scene with no selected take" (`docs/design/creative-studio-cut-model-design.md:74`), so a single undifferentiated slate is defensible against the written spec — but the old screen was strictly more informative.
+  - Found by review of R3 before merge; accepted as a follow-up rather than a blocker because the slice matches its spec, is fully gated, and the loss is informational rather than a spend or correctness fault. The R3 agent reported "No §3a gaps were identified", so this was not disclosed.
+  - **Current boundary — fixed and independently verified, not yet integrated.** Repaired in the R4 slice (`850944843` on `creative-suite-sprint2`), scoped to restoring the parity that existed rather than designing a richer slate model. `readiness` is consumed again, `CutTimelineReviewState` carries all four states to `CutTimeline`, and the state is exposed via `aria-describedby` onto an `sr-only` span, so it survives without colour. The deleted assertion is restored as `labels selected, slate, running, and failed cut states without relying on colour`; both it and the slate-position assertion fail under an independent production revert, so the guarantee is genuinely protected rather than merely present.
+  - **Next gate:** [MR !73](https://code.vng.vn/dto/weprompt/-/merge_requests/73), opened 2026-08-07. Stays open until that merge is accepted, per this register's Done rule.
+  - Residue, deliberately not expanded into this bug: R4 carried the four-state logic into `CutTimeline` and **retained** `SceneTimeline.tsx`, which still has no production consumer and survives only through the barrel export and two tests that render it directly. Retiring it is a tidy-up, not part of this defect — but it now reads as live code and will mislead the next reader.
+  - Still open for the designer, unchanged by the fix: whether the cut timeline is the right surface for generation status at all, or whether a slate should say more than the old rail did. The fix restored parity; it did not settle the question.
+  - **Done 2026-08-07** — merged to `origin/sprint2` in `29b4bee97` (MR !73). Fixed in R4 `850944843`; the restored non-colour assertion fails under an independent production revert.
 
 - [x] **[EPIC-001][P1] Presentation artifact-quality foundation and synthetic stabilization** — completed 2026-08-06
   - All 14 accepted task heads are merged into `origin/sprint2`, including fail-closed grounding, canonical presentation routing, deterministic readiness checks, rendered QA foundations, bounded repair controls, and final synthetic stabilization.

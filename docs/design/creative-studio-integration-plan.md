@@ -4,13 +4,13 @@
 
 ## 1. Branch topology as it actually is
 
-| Ref                                   | Base    | Ahead | Studio UI files | Contents                                                        |
-| ------------------------------------- | ------- | ----- | --------------- | --------------------------------------------------------------- |
-| `origin/sprint2`                      | —       | —     | 0               | tip `343b725c4` (2026-08-03)                                    |
-| `origin/creative-suite-sprint2`       | sprint2 | **0** | 0               | **empty — a bare fork point**                                   |
-| `creative-suite-sprint2` (local)      | sprint2 | 2     | 32              | khoapnt's line ported: `c11e53354` + `a40df852d`. **Unpushed.** |
-| `codex/studio-integration`            | sprint1 | 121   | **69**          | the redesign + fidelity work + hardening                        |
-| `codex/creative-suite-studio-refresh` | sprint1 | 50    | 32              | khoapnt's line, tip `c5b879c3e`                                 |
+| Ref                                   | Base    | Ahead | Studio UI files | Contents                                                                       |
+| ------------------------------------- | ------- | ----- | --------------- | ------------------------------------------------------------------------------ |
+| `origin/sprint2`                      | —       | —     | 0               | tip `343b725c4` (2026-08-03)                                                   |
+| `origin/creative-suite-sprint2`       | sprint2 | **0** | 0               | **empty — a bare fork point**                                                  |
+| `creative-suite-sprint2` (local)      | sprint2 | 2     | 32              | khoapnt's line ported: `c11e53354` + `a40df852d`. **Unpushed.**                |
+| `codex/studio-integration`            | sprint1 | 121   | **69**          | the redesign + fidelity work + hardening                                       |
+| `codex/creative-suite-studio-refresh` | sprint1 | 50    | 32              | tip `c5b879c3e` — **NOT khoapnt's studio work; ignore this line (2026-08-07)** |
 
 The agreed model is right: one long-lived isolated branch off `sprint2`, regular merges _from_ `sprint2` to avoid late conflicts, one merge request into `sprint2` when stable. Nothing below changes that.
 

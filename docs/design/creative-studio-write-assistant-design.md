@@ -1,8 +1,21 @@
 # Creative Studio — the Write assistant
 
-**Status:** rev 2 — revised after execution review · **Date:** 2026-08-05 · **Branch family:** `creative-suite`
+**Status:** PARKED 2026-08-07 — superseded in part, remainder deliberately deferred · **Date:** 2026-08-05 (rev 2) · **Branch family:** `creative-suite`
 **Depends on:** `creative-studio-brief-conversation-design.md` (rev 2 — inherits its conversation, binding and writer model)
 **Independent of:** the video-capability spike
+
+> **PARKING BANNER (2026-08-07, decided with the product owner).** The sprint-3 designs absorbed most of what this spec required; per house rule the superseded claims below are kept, not deleted. The map:
+>
+> | This spec required                                             | Absorbed by                                                                                                             |
+> | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+> | The conversation, binding, writer model                        | EPIC-006 **Slice A** (Brief owns the mount)                                                                             |
+> | The acceptance coordinator + the §3.1 draft-loss fix           | **Slice A** — accept flushes-or-refuses, and the retained one-shot path gets the same guard                             |
+> | Generated references (§4 — "the only genuinely new machinery") | **Slice P** in full (`outputRole`, the project pool)                                                                    |
+> | Shot-level text refinement                                     | The **scene assist** (`creative-studio-scene-assist-design.md`) — bounded one-shots into drafts, no conversation needed |
+> | "Suggest a visual" becomes real (§2.2)                         | Split: the image is Slice P's Generate-reference; the text is the scene assist rewriting `visualPrompt`                 |
+> | The overpromising dock copy (§1)                               | **Now standalone — `TASKS.md` BUG-032.** This design no longer ships to make the copy true, so the copy changes instead |
+>
+> **What stays parked, not retired:** mounting the shared Brief conversation as a second surface in Write (§2.1's single-mount analysis stands and remains the reference), and the prefilled-turn form of "Suggest a visual". **Revisit trigger:** after Slice A3 ships, evidence that users repeatedly hop to Brief for script-level asks mid-Write, or ask the scene assist for structural changes (restructure, re-pace). A3's extracted conversation mount makes this a small slice when the trigger fires. Do not plan implementation from this spec without re-validating §1's measurements first.
 
 > **Rev 2** incorporates a verification review whose verdict on rev 1 was: _do not plan implementation from this spec unchanged._ Three P0 defects and two factual errors. Corrections are marked **[rev 2]** and superseded claims are stated rather than deleted.
 
