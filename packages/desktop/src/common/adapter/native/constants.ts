@@ -13,6 +13,7 @@ export const ADAPTER_BRIDGE_EVENT_KEY = 'office-ai-bridge-adapter';
  */
 export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'restart-app',
+  'quit-app',
   'open-dev-tools',
   'is-dev-tools-opened',
   'app.get-path',

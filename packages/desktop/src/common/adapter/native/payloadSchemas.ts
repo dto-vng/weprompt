@@ -477,6 +477,7 @@ export const rendererBridgeQuerySchemas = {
 
 export const nativeBridgePayloadSchemas = {
   'restart-app': voidPayloadSchema,
+  'quit-app': voidPayloadSchema,
   'open-dev-tools': voidPayloadSchema,
   'is-dev-tools-opened': voidPayloadSchema,
   'app.get-path': z.object({ name: z.enum(['desktop', 'home', 'downloads']) }).strict(),

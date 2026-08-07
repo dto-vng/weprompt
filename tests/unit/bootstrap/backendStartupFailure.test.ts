@@ -1,4 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const bridgeMocks = vi.hoisted(() => ({ quitInvoke: vi.fn() }));
+
+vi.mock('@/common', () => ({
+  ipcBridge: { application: { quit: { invoke: bridgeMocks.quitInvoke } } },
+}));
+
 import { classifyBackendStartupFailure } from '@/process/startup/backendStartupFailure';
 import { detectStartupArchitectureMismatch } from '@/process/startup/architectureCompatibility';
 import { getInstallationIntegrityModalActions } from '@/renderer/components/layout/InstallationIntegrityDialog';
@@ -449,11 +456,10 @@ describe('getInstallationIntegrityModalActions', () => {
   it('uses compatibility copy and never exposes database recovery for lineage failures', () => {
     const t = vi.fn((key: string) => key) as any;
     const onRecoverCorruptedDatabase = vi.fn();
-    const onQuit = vi.fn();
+    bridgeMocks.quitInvoke.mockClear();
 
     const actions = getInstallationIntegrityModalActions(t, {
       diagnosticsKind: 'database_lineage',
-      onQuit,
       onRecoverCorruptedDatabase,
     } as any);
 
@@ -461,7 +467,7 @@ describe('getInstallationIntegrityModalActions', () => {
     expect(actions.quitText).toBe('common.backendStartup.databaseLineage.quitApplication');
     expect(actions.recoverText).toBeUndefined();
     actions.onQuit();
-    expect(onQuit).toHaveBeenCalledOnce();
+    expect(bridgeMocks.quitInvoke).toHaveBeenCalledOnce();
     expect(onRecoverCorruptedDatabase).not.toHaveBeenCalled();
   });
 

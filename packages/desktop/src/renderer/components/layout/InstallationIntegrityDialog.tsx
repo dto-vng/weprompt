@@ -2,6 +2,7 @@ import { Button, Message, Modal, Space, Typography } from '@arco-design/web-reac
 import type { TFunction } from 'i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ipcBridge } from '@/common';
 import {
   type FeedbackEventTags,
   type SubmitFeedbackReportResult,
@@ -169,7 +170,11 @@ export function getInstallationIntegrityModalActions(
   return {
     onRecoverCorruptedDatabase: options.onRecoverCorruptedDatabase ?? (() => Promise.resolve()),
     onReportDiagnostics: options.onReportDiagnostics ?? (() => ({ status: 'failed' })),
-    onQuit: options.onQuit ?? (() => window.close()),
+    onQuit:
+      options.onQuit ??
+      (() => {
+        void ipcBridge.application.quit.invoke();
+      }),
     quitText:
       diagnosticsKind === 'database_lineage' ? t('common.backendStartup.databaseLineage.quitApplication') : undefined,
     recoverText:

@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   inspect: vi.fn(),
   apply: vi.fn(),
   undo: vi.fn(),
+  appQuit: vi.fn(),
 }));
 
 const registeredProviders = new Map<string, (params: unknown) => Promise<unknown>>();
@@ -30,6 +31,7 @@ vi.mock('electron', () => ({
     isPackaged: false,
     getLoginItemSettings: vi.fn(() => ({})),
     setLoginItemSettings: vi.fn(),
+    quit: mocks.appQuit,
   },
 }));
 
@@ -47,6 +49,7 @@ vi.mock('@/common', () => ({
     },
     application: {
       restart: provider('restart'),
+      quit: provider('quit'),
       isDevToolsOpened: provider('isDevToolsOpened'),
       openDevTools: provider('openDevTools'),
       getZoomFactor: provider('getZoomFactor'),
@@ -88,6 +91,12 @@ describe('applicationBridge Office artifact authorization', () => {
     vi.clearAllMocks();
     registeredProviders.clear();
     initApplicationBridge();
+  });
+
+  it('quits the Electron application through the main-process provider', async () => {
+    await registeredProviders.get('quit')?.(undefined);
+
+    expect(mocks.appQuit).toHaveBeenCalledOnce();
   });
 
   it('rejects a forged root workspace using the conversation workspace fetched in main', async () => {
