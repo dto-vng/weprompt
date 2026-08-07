@@ -115,6 +115,16 @@ describe('composePresentationSend', () => {
     expect(result.injectSkills).toEqual(['officecli']);
   });
 
+  it('office directives stop when attached-source extraction is empty or unusable', () => {
+    for (const format of ['pptx', 'docx'] as const) {
+      const result = composePresentationSend(summary(format), 'Create from the attached source', ['/user/source.docx']);
+
+      expect(result.input).toContain('returns empty or unusable content');
+      expect(result.input).toContain('stop and ask the user');
+      expect(result.input).toContain('never proceed to build');
+    }
+  });
+
   it('docx: falls back to the html directive when the pack has no resolved reference', () => {
     const broken = summary('docx');
     const result = composePresentationSend({ ...broken, referencePath: null }, 'x', []);

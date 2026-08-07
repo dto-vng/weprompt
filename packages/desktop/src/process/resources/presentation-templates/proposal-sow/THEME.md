@@ -11,7 +11,9 @@ block.
    from scratch, never write raw OOXML.
 3. If the user attached source documents (Excel, Word, CSV, PDF), read them with
    `officecli view <file> text` and build every fee, date, and deliverable from that
-   data. Never invent a price.
+   data. Never invent a price. If `officecli view <file> text` returns empty or unusable
+   content for any required source, STOP and ask the user for a readable source — never
+   proceed to build.
 4. Replace the sample content wholesale. Keep the styles, numbering definitions, page
    setup, and structure.
 
@@ -80,7 +82,8 @@ US Letter portrait, 1 inch margins. Table `colWidths` must sum to 9360 twips,
 
 1. `officecli validate <file>` returns `no errors found`.
 2. `officecli view <file> issues` is clean.
-3. No placeholder tokens remain, and no fee or date is fabricated.
+3. No placeholder tokens remain, and no fee or date is fabricated. Literal-escape scan:
+   `officecli view <file> text | grep -F '\n'` must print nothing.
 4. Contact-sheet visual pass: `officecli view <file> screenshot --grid auto`, inspected
    for the cover standing alone, table column proportions, the total row reading as a
    total, signature rules having room to sign between them, and no page ending in a large
