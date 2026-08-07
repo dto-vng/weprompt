@@ -46,9 +46,17 @@ Split by **hard problem**, not by task. Strictly ordered; each epic ships user v
 | **B** | Office templates sourced from app-owned artifacts (EPIC-001 retained run candidates) | gallery install for binary packs; no raw ingestion, no sanitizer | Not scheduled; wants EPIC-001's retained-candidate machinery live first |
 | **C** | Raw workspace Office ingestion + sanitization | all of them — this is a security/lifecycle epic and must be chartered as one | Not scheduled; may never be needed if B covers real usage |
 
-**Scope guard (binding for every epic below):** if a task in Epic A or B needs a sanitizer, a new
-authority seam, or a new crash-recovery protocol, the task is in the wrong epic. Stop and
-re-charter rather than absorb it.
+**Scope guard (binding for every epic below):** each epic's charter names its hard problems and
+seams **up front**; Epic A declares exactly two (below). If a task needs a sanitizer, an
+**undeclared** authority seam, or an **undeclared** crash-recovery protocol, the task is in the
+wrong epic — stop and re-charter rather than absorb it. (The original absolute form of this guard
+was revised 2026-08-07: review showed Epic A's staging and installation contracts were *not*
+already solved, so pretending it carries zero hard problems would have reproduced the EPIC-002
+pattern of discovering boundaries mid-implementation.)
+
+**Decision record (2026-08-07):** A/B/C decomposition **approved**. Epic A **conditionally
+approved** after correcting the staging and installation contracts (folded in below). No Office
+sanitizer, Store V3, historical chronology, or raw Office ingestion enters Epic A.
 
 ## Epic A — HTML template creation (Sprint 2 backlog)
 
@@ -57,17 +65,43 @@ the agent writes a `THEME.md` and emits the accepted marker; WePrompt stages the
 text file, shows a review card (name, preview, disclosure), and on explicit confirm installs it
 into the Template Gallery as a user pack.
 
-**Why it is small — the reuse map:**
+**The two declared hard problems (review-verified 2026-08-07 — Epic A is small, not free):**
 
-- **Proposal persistence:** the accepted Store V2 at `2f883cee`, consumed as-is (crash-safe
-  proposals, idempotent terminal operations, committed ownership already solved and reviewed).
-- **Pack conversion:** the shipped `PresentationTemplateService.importThemeSpec` path already
-  turns a theme spec into an html pack — manifest derivation, theme-token parsing, and SVG
-  thumbnail included. Epic A feeds it from a staged proposal instead of a file-picker dialog.
-- **Marker + trust boundary:** Task 1's accepted contracts, unchanged: the agent writes content
-  and a terminal marker; WePrompt owns identity, validation, preview, state, and installation.
-- **Gallery UI:** the existing gallery lists user packs already; the review card follows the
-  existing message-card patterns.
+1. **Storage-owned immutable staging of one bounded `THEME.md`.** Verified gap:
+   `TemplateProposalStore.recordStagedSnapshot()` accepts a caller-supplied snapshot receipt and
+   copies its digest/files/byteLength into durable state after structural assertion only, and
+   `beginValidation()`'s "proof" compares caller fields against those same caller fields —
+   circular. HTML avoids Office privacy, but not mutable-source, symlink/swap, or
+   previewed-vs-installed divergence. Epic A therefore charters **one narrow internal
+   Store/coordinator seam** that: copies and re-inspects the exact marker-bound file, **mints
+   the physical snapshot proof inside trusted storage code** (never accepts it), and previews
+   and installs only that immutable snapshot.
+2. **Atomic, idempotent gallery installation consuming Store V2's reserved template ID.**
+   Verified gap: `importThemeSpec()` mints its own `uniqueId(slugify(name))`, writes the pack's
+   three files sequentially at the final destination — no destination-local temp directory, no
+   atomic rename — so a crash leaves a partial pack and a retry produces `name-2` instead of
+   completing the original commit. Epic A's installer writes into a temporary gallery directory,
+   atomically renames, consumes the **reserved** ID, and survives duplicate confirmation and
+   restart without creating a second template.
+
+**Reuse map (contract-checked, not existence-checked):**
+
+- **Proposal persistence:** accepted Store V2 at `2f883cee`, consumed as-is *except* the
+  declared seam in problem 1; crash-safe proposals, idempotent terminal operations, and
+  committed ownership are reviewed and reused.
+- **Pack conversion:** reuse `importThemeSpec`'s **parsing, token extraction, manifest
+  derivation, and SVG generation** — explicitly *not* its direct-write workflow as the commit
+  mechanism (problem 2 replaces that).
+- **Marker + trust boundary:** Task 1's accepted contracts, unchanged.
+- **Gallery UI:** existing user-pack listing; review card follows existing message-card patterns.
+- **Cross-backend:** templated *use* already works on AionRS and ACP via shared composition;
+  cross-backend *creation and marker emission* is unproven and requires explicit smoke evidence
+  (see acceptance).
+
+**De-scope valve (per the two-blocked-revisions rule):** if either declared problem blows past
+its bounds in review, fall back to **A0** — the assistant writes `THEME.md` and the user imports
+it through the existing picker. A0 needs no Store V2 proposal work at all; it sacrifices the
+create-review-confirm experience, not safety. The fallback is a scope cut, never added mechanism.
 
 **Scope:**
 
@@ -87,11 +121,19 @@ schema or API change; gallery rename/edit/delete by chat; sharing/export; forkin
 
 **Acceptance:**
 
-- Create → review → confirm → template usable in a new templated send, end to end on AionRS and
-  at least one ACP backend.
-- Discard, expiry, duplicate-request idempotency, and app-restart recovery behave per Store V2's
-  accepted semantics with **zero** store modifications.
-- The scope guard held: no new seam, sanitizer, or recovery protocol was introduced.
+- Create → review → confirm → template usable in a new templated send, with **creation and
+  marker emission smoke-proven on AionRS and at least one ACP backend** (use-path parity is not
+  evidence of creation-path parity).
+- **Staging contract:** the installed pack's `THEME.md` is byte-identical to the previewed
+  immutable snapshot; the physical proof was minted inside storage code; a mutable-source swap
+  after staging is detected and rejected.
+- **Installation contract:** duplicate confirmation and app restart complete the *original*
+  commit under the reserved ID — no `name-2`, no partial pack ever visible in the gallery; a
+  crash mid-install leaves only a temporary directory that cleanup owns.
+- Discard, expiry, and terminal idempotency behave per Store V2's accepted semantics; the only
+  store change shipped is the declared seam from problem 1.
+- The scope guard held: **no seam beyond the one declared**, no sanitizer, no new recovery
+  protocol.
 
 ## Epic B — Office templates from app-owned artifacts (not scheduled)
 
