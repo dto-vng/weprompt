@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { StudioRendererProject } from '@/common/types/project/creativeStudioTypes';
+import type { StudioLatestRender, StudioRendererProject } from '@/common/types/project/creativeStudioTypes';
 import { Button, Checkbox, Modal } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,11 +20,19 @@ export type StudioExportModalProps = {
   exportedFolderName: string | null;
   missingSceneIds: string[];
   issueMessageKey: string | null;
+  latestRender: StudioLatestRender | null;
+  latestRenderReady: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   onIncludeReferencesChange: (checked: boolean) => void;
   onOpenProduce?: () => void;
 };
+
+export const studioShotNumbers = (project: StudioRendererProject, sceneIds: readonly string[]): string[] =>
+  sceneIds.map((sceneId) => {
+    const sceneIndex = project.sceneOrder.indexOf(sceneId);
+    return sceneIndex < 0 ? sceneId : String(sceneIndex + 1).padStart(2, '0');
+  });
 
 export const StudioExportModal: React.FC<StudioExportModalProps> = ({
   visible,
@@ -35,16 +43,22 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
   exportedFolderName,
   missingSceneIds,
   issueMessageKey,
+  latestRender = null,
+  latestRenderReady = true,
   onCancel,
   onConfirm,
   onIncludeReferencesChange,
   onOpenProduce,
 }) => {
   const { t } = useTranslation();
-  const missingShotNumbers = missingSceneIds.map((sceneId) => {
-    const sceneIndex = project.sceneOrder.indexOf(sceneId);
-    return sceneIndex < 0 ? sceneId : String(sceneIndex + 1).padStart(2, '0');
-  });
+  const missingShotNumbers = studioShotNumbers(project, missingSceneIds);
+  const renderedAt = latestRender === null ? null : Date.parse(latestRender.renderedAt);
+  const projectUpdatedAt = Date.parse(project.updatedAt);
+  const staleRender =
+    renderedAt !== null &&
+    Number.isFinite(renderedAt) &&
+    Number.isFinite(projectUpdatedAt) &&
+    renderedAt < projectUpdatedAt;
 
   return (
     <Modal
@@ -74,7 +88,12 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
             </Button>
           )}
           {exportedFolderName === null && (
-            <Button type='primary' loading={pending} disabled={pending || selectedAssetCount === 0} onClick={onConfirm}>
+            <Button
+              type='primary'
+              loading={pending}
+              disabled={pending || selectedAssetCount === 0 || !latestRenderReady}
+              onClick={onConfirm}
+            >
               {t('conversation.creativeStudio.export.confirm')}
             </Button>
           )}
@@ -84,6 +103,26 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
       {exportedFolderName === null ? (
         <div className='flex flex-col gap-12px'>
           <p className='m-0'>{t('conversation.creativeStudio.export.body')}</p>
+          <dl className='m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-12px gap-y-8px rounded-8px bg-fill-1 p-12px'>
+            <dt className='text-12px text-t-tertiary'>cut.mp4</dt>
+            <dd className='m-0 text-13px text-t-primary'>
+              {!latestRenderReady ? (
+                t('conversation.creativeStudio.export.checkingRender')
+              ) : latestRender === null ? (
+                t('conversation.creativeStudio.export.noRender')
+              ) : (
+                <>
+                  <span>{t('conversation.creativeStudio.export.renderedAt')}</span>{' '}
+                  <time dateTime={latestRender.renderedAt}>{latestRender.renderedAt}</time>
+                </>
+              )}
+            </dd>
+          </dl>
+          {staleRender && (
+            <p role='alert' className='m-0 rounded-8px bg-warning-light-1 p-10px text-13px text-warning'>
+              {t('conversation.creativeStudio.export.staleRender')}
+            </p>
+          )}
           {selectedAssetCount === 0 && (
             <p className='m-0 text-13px text-warning'>{t('conversation.creativeStudio.export.noSelectedAssets')}</p>
           )}

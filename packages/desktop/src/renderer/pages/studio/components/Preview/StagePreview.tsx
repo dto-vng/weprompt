@@ -9,10 +9,11 @@ import type {
   StudioRendererProject,
   StudioRouteCatalog,
   StudioScene,
+  StudioNormalisedRect,
 } from '@/common/types/project/creativeStudioTypes';
-import { Button } from '@arco-design/web-react';
-import { Picture, VideoOne } from '@icon-park/react';
-import React, { useEffect, useState } from 'react';
+import { Button, Slider } from '@arco-design/web-react';
+import { Picture, VideoOne, VolumeUp } from '@icon-park/react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildSingleSceneReviewRequest, type GenerationSingleReviewRequest } from '../Generation/GenerationControls';
@@ -24,6 +25,7 @@ import {
   isCanonicalStudioSelectedAsset,
   isSafeStudioId,
 } from './managedStudioAssets';
+import styles from './CutEditor/cut-editor.module.css';
 
 const SLATE_PREVIEW_STYLE = {
   background: 'var(--studio-slate-surface)',
@@ -48,6 +50,13 @@ export type StagePreviewProps = {
     durationSeconds: number;
   } | null;
   onOpenSingleReview?: (request: GenerationSingleReviewRequest) => void;
+  crop?: StudioNormalisedRect | null;
+  cropOverlayVisible?: boolean;
+  cropDisabled?: boolean;
+  seekSeconds?: number;
+  playbackEndSeconds?: number;
+  onPlaybackTimeChange?: (seconds: number) => void;
+  onNudgeCrop?: (deltaX: number, deltaY: number) => void;
 };
 
 const StagePreview: React.FC<StagePreviewProps> = ({
@@ -62,9 +71,19 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   presentation = 'produce',
   slate = null,
   onOpenSingleReview,
+  crop = null,
+  cropOverlayVisible = false,
+  cropDisabled = false,
+  seekSeconds,
+  playbackEndSeconds,
+  onPlaybackTimeChange,
+  onNudgeCrop,
 }) => {
   const { t } = useTranslation();
   const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [volume, setVolume] = useState(1);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const volumeControlRef = useRef<HTMLLabelElement | null>(null);
   const mediaKind = selectedScene?.mediaKind ?? 'image';
   const accessibleName = t(
     mediaKind === 'video'
@@ -100,6 +119,18 @@ const StagePreview: React.FC<StagePreviewProps> = ({
   useEffect(() => {
     setFailedSource(null);
   }, [selectedAssetId]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video === null || seekSeconds === undefined || !Number.isFinite(seekSeconds)) return;
+    if (Math.abs(video.currentTime - seekSeconds) > 0.02) video.currentTime = seekSeconds;
+  }, [seekSeconds, selectedAssetId]);
+
+  useEffect(() => {
+    volumeControlRef.current
+      ?.querySelector<HTMLElement>('[role="slider"]')
+      ?.setAttribute('aria-label', t('conversation.creativeStudio.phase.review.cut.volume'));
+  }, [t, volume]);
 
   if (selectedAssetId === null) {
     const PlaceholderIcon = mediaKind === 'video' ? VideoOne : Picture;
@@ -199,19 +230,97 @@ const StagePreview: React.FC<StagePreviewProps> = ({
       aria-label={t('conversation.creativeStudio.preview.title')}
       className='m-0 flex min-h-320px flex-col items-center justify-center gap-10px overflow-hidden rounded-12px border border-border-2 bg-fill-1'
     >
-      {mediaKind === 'video' ? (
-        <>
+      <div className={styles.stageFrame}>
+        {mediaKind === 'video' ? (
           <video
+            ref={videoRef}
             aria-label={accessibleName}
             className='max-h-70vh max-w-full object-contain'
             src={source}
             poster={posterSource ?? undefined}
             controls
-            muted
             playsInline
             preload='metadata'
+            onLoadedMetadata={(event) => {
+              event.currentTarget.volume = volume;
+            }}
+            onPlay={(event) => {
+              if (playbackEndSeconds !== undefined && event.currentTarget.currentTime >= playbackEndSeconds - 0.02) {
+                event.currentTarget.currentTime = seekSeconds ?? 0;
+              }
+            }}
+            onTimeUpdate={(event) => {
+              if (playbackEndSeconds !== undefined && event.currentTarget.currentTime >= playbackEndSeconds) {
+                event.currentTarget.pause();
+                event.currentTarget.currentTime = playbackEndSeconds;
+                onPlaybackTimeChange?.(playbackEndSeconds);
+                return;
+              }
+              onPlaybackTimeChange?.(event.currentTarget.currentTime);
+            }}
             onError={() => setFailedSource(source)}
           />
+        ) : (
+          <img
+            alt={accessibleName}
+            className='max-h-70vh max-w-full object-contain'
+            src={source}
+            onError={() => setFailedSource(source)}
+          />
+        )}
+        {cropOverlayVisible && (
+          <div
+            role='group'
+            tabIndex={cropDisabled ? -1 : 0}
+            aria-label={t('conversation.creativeStudio.phase.review.cut.cropOverlay')}
+            className={styles.cropOverlay}
+            style={{
+              left: `${(crop?.x ?? 0) * 100}%`,
+              top: `${(crop?.y ?? 0) * 100}%`,
+              width: `${(crop?.width ?? 1) * 100}%`,
+              height: `${(crop?.height ?? 1) * 100}%`,
+            }}
+            onKeyDown={(event) => {
+              const jump = event.shiftKey ? 0.1 : 0.01;
+              const delta = (() => {
+                switch (event.key) {
+                  case 'ArrowLeft':
+                    return [-jump, 0] as const;
+                  case 'ArrowRight':
+                    return [jump, 0] as const;
+                  case 'ArrowUp':
+                    return [0, -jump] as const;
+                  case 'ArrowDown':
+                    return [0, jump] as const;
+                  default:
+                    return null;
+                }
+              })();
+              if (delta === null || cropDisabled) return;
+              event.preventDefault();
+              onNudgeCrop?.(delta[0], delta[1]);
+            }}
+          />
+        )}
+      </div>
+      {mediaKind === 'video' ? (
+        <>
+          <label ref={volumeControlRef} className={styles.volumeControl}>
+            <VolumeUp aria-hidden='true' />
+            <span className='sr-only'>{t('conversation.creativeStudio.phase.review.cut.volume')}</span>
+            <Slider
+              aria-label={t('conversation.creativeStudio.phase.review.cut.volume')}
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={(value) => {
+                if (typeof value !== 'number') return;
+                setVolume(value);
+                if (videoRef.current !== null) videoRef.current.volume = value;
+              }}
+            />
+          </label>
           {posterSource === null && (
             <div role='status' className={`${studioType.body} flex items-center gap-6px px-12px pb-12px`}>
               <VideoOne aria-hidden='true' />
@@ -219,14 +328,7 @@ const StagePreview: React.FC<StagePreviewProps> = ({
             </div>
           )}
         </>
-      ) : (
-        <img
-          alt={accessibleName}
-          className='max-h-70vh max-w-full object-contain'
-          src={source}
-          onError={() => setFailedSource(source)}
-        />
-      )}
+      ) : null}
     </figure>
   );
 };

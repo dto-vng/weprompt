@@ -118,6 +118,7 @@ const catalog = (): StudioRouteCatalog => {
 describe('StagePreview managed media', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('renders a canonical managed image without exposing any other source shape', () => {
@@ -169,6 +170,66 @@ describe('StagePreview managed media', () => {
     expect(video).toHaveAttribute('src', 'weprompt-studio://asset/project-1/video-1');
     expect(video).toHaveAttribute('poster', 'weprompt-studio://asset/project-1/poster-1');
     expect(video).toHaveAttribute('controls');
+  });
+
+  it('previews real audio with an explicit volume control instead of forcing mute', () => {
+    const selectedAsset = asset({
+      id: 'video-1',
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'video-1.mp4' },
+    });
+    render(
+      <StagePreview
+        projectId='project-1'
+        selectedScene={scene({
+          mediaKind: 'video',
+          selectedAssetId: selectedAsset.id,
+          assetIds: [selectedAsset.id],
+        })}
+        selectedAsset={selectedAsset}
+      />
+    );
+
+    expect((screen.getByLabelText('conversation.creativeStudio.preview.videoLabel') as HTMLVideoElement).muted).toBe(
+      false
+    );
+    expect(screen.getByRole('slider', { name: 'conversation.creativeStudio.phase.review.cut.volume' })).toHaveAttribute(
+      'aria-valuenow',
+      '1'
+    );
+  });
+
+  it('stops a video preview at the trimmed out point', () => {
+    const selectedAsset = asset({
+      id: 'video-1',
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'video-1.mp4' },
+    });
+    const onPlaybackTimeChange = vi.fn();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+    render(
+      <StagePreview
+        projectId='project-1'
+        selectedScene={scene({
+          mediaKind: 'video',
+          selectedAssetId: selectedAsset.id,
+          assetIds: [selectedAsset.id],
+        })}
+        selectedAsset={selectedAsset}
+        playbackEndSeconds={0.7}
+        onPlaybackTimeChange={onPlaybackTimeChange}
+      />
+    );
+    const video = screen.getByLabelText('conversation.creativeStudio.preview.videoLabel') as HTMLVideoElement;
+    video.currentTime = 0.8;
+
+    fireEvent.timeUpdate(video);
+
+    expect(pause).toHaveBeenCalledOnce();
+    expect(video.currentTime).toBe(0.7);
+    expect(onPlaybackTimeChange).toHaveBeenCalledExactlyOnceWith(0.7);
   });
 
   it('announces that a posterless video is ready while keeping canonical playback available', () => {

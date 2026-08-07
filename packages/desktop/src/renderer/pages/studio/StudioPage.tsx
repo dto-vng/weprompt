@@ -12,6 +12,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ipcBridge } from '@/common';
 import type {
   StudioRendererProject,
+  StudioLatestRender,
   StudioRouteCatalog,
   StudioRouteCatalogEntry,
   StudioScene,
@@ -203,6 +204,8 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   const [exportedFolderName, setExportedFolderName] = useState<string | null>(null);
   const [exportMissingSceneIds, setExportMissingSceneIds] = useState<string[]>([]);
   const [exportIssueMessageKey, setExportIssueMessageKey] = useState<string | null>(null);
+  const [exportLatestRender, setExportLatestRender] = useState<StudioLatestRender | null>(null);
+  const [exportLatestRenderReady, setExportLatestRenderReady] = useState(false);
   const [pendingTransition, setPendingTransition] = useState<StudioPhaseTransition | null>(null);
   const [transitionReady, setTransitionReady] = useState(false);
   const [transitionIssueMessageKey, setTransitionIssueMessageKey] = useState<string | null>(null);
@@ -595,13 +598,26 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
   }, [exportBlocked, exportIncludeReferences, exportPending, project, readiness?.selectedAssetCount]);
 
   const openExport = useCallback((): void => {
-    if (exportBlocked || readiness?.selectedAssetCount === 0) return;
+    if (exportBlocked || readiness?.selectedAssetCount === 0 || project === null) return;
     setExportIncludeReferences(false);
     setExportedFolderName(null);
     setExportMissingSceneIds([]);
     setExportIssueMessageKey(null);
+    setExportLatestRender(null);
+    setExportLatestRenderReady(false);
     setExportVisible(true);
-  }, [exportBlocked, readiness?.selectedAssetCount]);
+    void ipcBridge.creativeStudio.getLatestRender
+      .invoke({ projectId: project.id })
+      .then((result) => {
+        if (result.ok === false) {
+          setExportIssueMessageKey('conversation.creativeStudio.export.latestRenderUnavailable');
+          return;
+        }
+        setExportLatestRender(result.data);
+        setExportLatestRenderReady(true);
+      })
+      .catch(() => setExportIssueMessageKey('conversation.creativeStudio.export.latestRenderUnavailable'));
+  }, [exportBlocked, project, readiness?.selectedAssetCount]);
 
   const focusRecoveryAlert = useCallback((): void => {
     requestAnimationFrame(() => {
@@ -768,6 +784,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     openSingleGenerationReview: openSingleReview,
     openBatchGenerationReview: openBatchReview,
     openExport,
+    refreshProject: refetch,
     openModelSettings,
     importReference: handleImportReference,
     selectVariation: handleSelectVariation,
@@ -840,6 +857,8 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
         exportedFolderName={exportedFolderName}
         missingSceneIds={exportMissingSceneIds}
         issueMessageKey={exportIssueMessageKey}
+        latestRender={exportLatestRender}
+        latestRenderReady={exportLatestRenderReady}
         onCancel={() => setExportVisible(false)}
         onConfirm={() => void handleExportAssets()}
         onIncludeReferencesChange={setExportIncludeReferences}

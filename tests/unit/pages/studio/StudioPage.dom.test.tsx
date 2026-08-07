@@ -28,6 +28,7 @@ import {
   readLastStudioPhase,
   rememberStudioPhase,
   resolveStudioEntryPhase,
+  type StudioPhase,
   studioPhasePath,
 } from '@renderer/pages/studio/studioPhaseRoute';
 
@@ -247,6 +248,34 @@ const renderRoute = (path: string | { pathname: string; state?: unknown } = '/st
     initialEntries: [path],
   });
   return { router, view: render(<RouterProvider router={router} />) };
+};
+
+type StudioTestRouter = ReturnType<typeof createMemoryRouter>;
+
+const selectStudioPhase = async (router: StudioTestRouter, phase: StudioPhase): Promise<void> => {
+  const expectedPath = studioPhasePath('project-1', phase);
+  fireEvent.click(
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+      'button',
+      { name: `conversation.creativeStudio.phase.nav.${phase}` }
+    )
+  );
+
+  await waitFor(() => expect(router.state.location.pathname).toBe(expectedPath));
+  await act(async () => {});
+
+  expect(
+    within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
+      'button',
+      { current: 'step' }
+    )
+  ).toHaveTextContent(`conversation.creativeStudio.phase.nav.${phase}`);
+};
+
+const fitStoryboardToGoal = async (): Promise<void> => {
+  fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' }));
+  await waitFor(() => expect(bridge.fitStoryboard.invoke).toHaveBeenCalledTimes(1));
+  await act(async () => {});
 };
 
 type ResizeObservation = {
@@ -495,6 +524,16 @@ describe('StudioPage and useStudioProject', () => {
             targetDurationSeconds: missingScene.durationSeconds,
             sceneOrder: [missingScene.id],
             scenes: { [missingScene.id]: missingScene },
+            cuts: {
+              'cut-1': {
+                id: 'cut-1',
+                name: 'Launch film',
+                orderMode: 'storyboard',
+                clipOrder: [],
+                clips: {},
+              },
+            },
+            activeCutId: 'cut-1',
           })
         )
       );
@@ -534,7 +573,7 @@ describe('StudioPage and useStudioProject', () => {
       const { observations, resize } = installResizeObserverMock();
       const { router, view } = renderRoute('/studio/project-1/brief');
 
-      const phaseNavigation = await screen.findByRole('navigation', {
+      await screen.findByRole('navigation', {
         name: 'conversation.creativeStudio.phase.nav.label',
       });
       expect(observations).toHaveLength(1);
@@ -548,11 +587,7 @@ describe('StudioPage and useStudioProject', () => {
 
       const expectSharedPhaseLayout = async (phase: 'brief' | 'write' | 'produce' | 'review'): Promise<void> => {
         if (router.state.location.pathname !== `/studio/project-1/${phase}`) {
-          fireEvent.click(
-            within(phaseNavigation).getByRole('button', {
-              name: `conversation.creativeStudio.phase.nav.${phase}`,
-            })
-          );
+          await selectStudioPhase(router, phase);
           await waitFor(() => expect(router.state.location.pathname).toBe(`/studio/project-1/${phase}`));
         }
         const headingName =
@@ -635,14 +670,7 @@ describe('StudioPage and useStudioProject', () => {
       ).toBeNull();
       const loadCount = bridge.getProject.invoke.mock.calls.length;
 
-      fireEvent.click(
-        within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
-          'button',
-          {
-            name: 'conversation.creativeStudio.phase.nav.write',
-          }
-        )
-      );
+      await selectStudioPhase(router, 'write');
 
       await waitFor(() => expect(router.state.location.pathname).toBe('/studio/project-1/write'));
       const writeHeading = (
@@ -960,7 +988,7 @@ describe('StudioPage and useStudioProject', () => {
       )
     );
 
-    renderRoute();
+    const { router } = renderRoute();
 
     expect(
       await screen.findByRole('region', { name: 'conversation.creativeStudio.phase.write.scriptTableTitle' })
@@ -974,14 +1002,7 @@ describe('StudioPage and useStudioProject', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('conversation.creativeStudio.preview.noAssetTitle')).toBeNull();
 
-    fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
-        'button',
-        {
-          name: 'conversation.creativeStudio.phase.nav.produce',
-        }
-      )
-    );
+    await selectStudioPhase(router, 'produce');
     expect(
       await screen.findByRole('heading', {
         name: 'conversation.creativeStudio.phase.produce.connectEngine',
@@ -1413,9 +1434,9 @@ describe('StudioPage and useStudioProject', () => {
         lockedSceneIds: [],
       })
     );
-    renderRoute();
+    const { router } = renderRoute();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' }));
+    await fitStoryboardToGoal();
 
     await waitFor(() =>
       expect(bridge.fitStoryboard.invoke).toHaveBeenCalledExactlyOnceWith({
@@ -1428,14 +1449,7 @@ describe('StudioPage and useStudioProject', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' })).toBeNull()
     );
-    fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
-        'button',
-        {
-          name: 'conversation.creativeStudio.phase.nav.produce',
-        }
-      )
-    );
+    await selectStudioPhase(router, 'produce');
     const { batchAction } = await findBatchAction();
     expect(batchAction).toBeEnabled();
   });
@@ -1459,21 +1473,14 @@ describe('StudioPage and useStudioProject', () => {
         maximumTotalSeconds: 12,
       })
     );
-    renderRoute();
+    const { router } = renderRoute();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' }));
+    await fitStoryboardToGoal();
 
     expect(
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'conversation.creativeStudio.phase.nav.label' })).getByRole(
-        'button',
-        {
-          name: 'conversation.creativeStudio.phase.nav.produce',
-        }
-      )
-    );
+    await selectStudioPhase(router, 'produce');
     const { batchAction, activityPanel } = await findBatchAction();
     expect(batchAction).toBeEnabled();
     expect(within(activityPanel).getByText('conversation.creativeStudio.review.durationMismatch')).toBeVisible();
@@ -1529,7 +1536,7 @@ describe('StudioPage and useStudioProject', () => {
     );
     renderRoute();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' }));
+    await fitStoryboardToGoal();
     expect(
       await screen.findByText('conversation.creativeStudio.storyboard.fitUnreachable.target_out_of_bounds')
     ).toBeInTheDocument();

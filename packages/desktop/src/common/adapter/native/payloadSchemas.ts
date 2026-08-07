@@ -682,6 +682,19 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict(),
   'creative-studio.update-cut': studioUpdateCutSchema,
+  'creative-studio.place-cut-scenes': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      cutId: safeIdSchema,
+      sceneIds: z
+        .array(safeIdSchema)
+        .min(1)
+        .max(24)
+        .refine((ids) => new Set(ids).size === ids.length),
+      beforeClipId: safeIdSchema.nullable(),
+    })
+    .strict(),
   'creative-studio.delete-project': z
     .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
     .strict(),
@@ -723,6 +736,7 @@ export const nativeBridgePayloadSchemas = {
   'creative-studio.choose-and-export-assets': z
     .object({ projectId: safeIdSchema, includeReferences: z.boolean() })
     .strict(),
+  'creative-studio.get-latest-render': studioProjectRequestSchema,
   'creative-studio.render-cut': studioProjectRequestSchema,
   'creative-studio.cancel-render': studioProjectRequestSchema,
   'creative-studio.fit-storyboard': studioFitStoryboardSchema,
