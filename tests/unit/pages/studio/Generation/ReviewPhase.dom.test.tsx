@@ -521,14 +521,30 @@ describe('Review phase cut', () => {
       )
     );
     expect(
-      Number(
-        (
-          screen.getByRole('spinbutton', {
-            name: 'conversation.creativeStudio.phase.review.cut.trimInField',
-          }) as HTMLInputElement
-        ).value
-      )
-    ).toBe(1.4);
+      (
+        screen.getByRole('spinbutton', {
+          name: 'conversation.creativeStudio.phase.review.cut.trimInField',
+        }) as HTMLInputElement
+      ).value
+    ).toBe('1.40s');
+  });
+
+  it('shows trim points as rounded seconds instead of raw floating point', () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    const trimIn = screen.getByRole('spinbutton', {
+      name: 'conversation.creativeStudio.phase.review.cut.trimInField',
+    }) as HTMLInputElement;
+    const trimOut = screen.getByRole('spinbutton', {
+      name: 'conversation.creativeStudio.phase.review.cut.trimOutField',
+    }) as HTMLInputElement;
+
+    // A one-frame step of 1/30 makes Arco widen the field to step's own decimals,
+    // which rendered trim points as 0.00000000000000 before this was formatted.
+    for (const field of [trimIn, trimOut]) {
+      expect(field.value).toMatch(/^\d+\.\d{2}s$/);
+      expect(field.value).not.toMatch(/\d\.\d{3,}/);
+    }
   });
 
   it('persists a precisely typed trim point through the same cut edit', async () => {

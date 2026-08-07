@@ -29,6 +29,19 @@ const FRAME_SECONDS = 1 / 30;
 const roundSeconds = (value: number): number => Math.round(value * 1000) / 1000;
 const roundNormalised = (value: number): number => Math.round(value * 1000) / 1000;
 
+/**
+ * Arco derives an InputNumber's displayed decimals from `step` whenever `precision` asks for
+ * fewer, so a one-frame step of `1 / 30` renders trim points as `0.00000000000000`. Formatting
+ * the field explicitly keeps frame-accurate stepping while showing seconds the way a person
+ * reads them.
+ */
+const formatSecondsField = (value: number | string): string => {
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(2)}s` : '';
+};
+
+const parseSecondsField = (value: string): number | string => value.replace(/[^\d.-]/g, '');
+
 const filterAmount = (clip: StudioCutClip, id: StudioCutFilter['id']): number =>
   clip.filters.find((filter) => filter.id === id)?.amount ?? 0;
 
@@ -184,7 +197,8 @@ export const CutInspector: React.FC<CutInspectorProps> = ({
                   min={0}
                   max={outSeconds - FRAME_SECONDS}
                   step={FRAME_SECONDS}
-                  precision={3}
+                  formatter={formatSecondsField}
+                  parser={parseSecondsField}
                   value={inSeconds}
                   disabled={disabled}
                   onChange={(value) => commitTrim(typeof value === 'number' ? value : inSeconds, outSeconds)}
@@ -197,7 +211,8 @@ export const CutInspector: React.FC<CutInspectorProps> = ({
                   min={inSeconds + FRAME_SECONDS}
                   max={sourceDuration}
                   step={FRAME_SECONDS}
-                  precision={3}
+                  formatter={formatSecondsField}
+                  parser={parseSecondsField}
                   value={outSeconds}
                   disabled={disabled}
                   onChange={(value) => commitTrim(inSeconds, typeof value === 'number' ? value : outSeconds)}
