@@ -88,6 +88,7 @@
   - Concrete failure: while storyboard drafting is in flight, another window edits the project or a running job bumps the revision. The provider charges for a completed draft, the app rejects it, and the user must pay again to regenerate.
   - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
   - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
+  - **Design settled 2026-08-07** (`docs/design/creative-studio-bug028-durable-drafts.md`): region-guarded merge inside the serialised update fn (authored script + planner inputs compared, operational fields excluded, active-jobs overlap treated as conflict), with a true conflict recording the paid draft as a pending proposal instead of discarding it. Sequence the implementation after EPIC-006 Slice A3 — the fallback needs the proposal card UI.
 
 - [ ] **[BUG-029][P2][Creative Studio] Runtime disposal does not cancel or await active FFmpeg renders**
   - Actual: runtime disposal owns the planner, job manager, protocol and fake bundle, but not the render runner. `StudioRenderRunner` exposes only per-project `renderCut`, `cancelRender` and `getState`, with no dispose/cancel-all boundary. Quit cleanup awaits runtime disposal and then lets main exit without cancelling active FFmpeg children.
