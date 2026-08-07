@@ -107,6 +107,15 @@
   - Observed once, in a single-project run. **Not yet reproduced in the mixed full suite**, so it may need that context — the same thing turned out to be true of BUG-025, where coverage instrumentation was the missing ingredient.
   - Expected: a green run exits 0. Fix the teardown, or establish why the environment is torn down while work is outstanding.
 
+- [ ] **[BUG-031][P2][Creative Studio] Review no longer distinguishes a generating shot from a failed one**
+  - Actual: on the Review screen every shot without a selected take renders as the same hatched slate — title plus one `phase.review.slateLabel`. Three different situations collapse into one indistinguishable plate: still generating, failed and needing a retry, and never generated. Each has a different next action (wait, retry, generate), and the screen no longer says which applies.
+  - Regression, not a missing feature. The previous Review rail labelled four states; `ReviewCut.tsx` derived them from `readiness.sceneStatuses` (`generating` → running, `needs_attention` → failed, otherwise → missing-slate). Introduced by the R3 cut editor (`d8e0bf1ff` on `creative-suite-sprint2`), which replaced `SceneTimeline` with `CutTimeline` and dropped the derivation.
+  - **The data is still in scope.** `ReviewCut` still receives the prop; R3 renamed it to `_readiness`, the project's deliberately-unused-parameter convention. It was marked unused to satisfy lint rather than noticed as a dropped distinction, so the fix does not need new plumbing or new i18n keys — `scene.status.generating` and `jobs.status.failed` already exist.
+  - **Its covering test was deleted, not replaced.** `labels selected, slate, running, and failed rail states without relying on color` is gone from `ReviewPhase.dom.test.tsx` along with all eight of its assertions; only a `slateLabel` count survives. That test carried the non-colour accessibility guarantee, so nothing now protects it. Restore an equivalent assertion with the fix.
+  - Genuinely a design question, which is why it is filed rather than patched. The cut model defines a slate as simply "a scene with no selected take" (`docs/design/creative-studio-cut-model-design.md:74`), so a single undifferentiated slate is defensible against the written spec — but the old screen was strictly more informative. Whether the cut timeline is the right surface for generation status, or whether it belongs in the R4 failure-state work, is the designer's call.
+  - Side effect worth noting: `SceneTimeline.tsx` now has **no production consumer** and is reachable only through the barrel export and two tests. Whoever fixes this should decide whether to carry its four-state logic into `CutTimeline` or retire the component.
+  - Found by review of R3 before merge; accepted as a follow-up rather than a blocker because the slice matches its spec, is fully gated, and the loss is informational rather than a spend or correctness fault. The R3 agent reported "No §3a gaps were identified", so this was not disclosed.
+
 ## Waiting On
 
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
