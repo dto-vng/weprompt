@@ -25,22 +25,16 @@ Prepared for relay. Two different recipients; send separately.
 
 ---
 
-## 2 → khoapnt-vng: two questions, unrelated to each other
+## 2 → khoapnt-vng: one question, about the seeded MCP endpoints
 
-> **A. Who operates the two seeded MCP endpoints?**
+> **Who operates the two seeded MCP endpoints?**
 >
 > You added both in `f257a31c4` ("feat(mcp): seed TSE Datahub and Outlook Advanced MCP servers by default"). The _catalog entries_ are clearly ours, but who **operates** the endpoints is not determinable from outside: `aigw.vng.vn` is corporate infrastructure behind Azure AD App Proxy, and the Outlook endpoint is a public-internet Azure Container Apps deployment under an auto-generated name (`thankfulhill-292d9583`) that exposes no ownership metadata.
 >
 > We need this for the **support and escalation story** in the connector catalog — not for feasibility, which is already proven. Specifically: when a user's connector stops working, who do they escalate to, and is either endpoint's availability something we should be monitoring rather than discovering from a bug report?
->
-> **B. What happens to `codex/creative-suite-studio-refresh`?**
->
-> This one is time-sensitive and it is our doing as much as yours. Your parallel Creative Studio line (tip `c5b879c3e`, 2026-08-05) is **still 50 commits unmerged**, and as of today our line is **293 commits ahead of it**. The two touch the same core files — `ipcBridge.ts`, the native bridge manifest and payload schemas, `creativeStudioTypes.ts`, `creativeStudioBridge.ts`, `creativeStudioService.ts` — and a naive merge was measured at **98 conflicts**, including `add/add` on most of the studio service layer.
->
-> With MR !73 landing the v1.1 Review redraw, that gap only grows. Three options as we see them, and the choice is yours because it is your work:
->
-> 1. **Retire the branch** — if its content is superseded, say so and we will close it rather than leave a 50-commit line looking live.
-> 2. **Name what must survive** — if specific commits carry work ours does not, point at them and we will port those individually, which is far cheaper than a merge.
-> 3. **A real reconciliation** — possible, but it should be scoped as its own piece of work with someone owning it, not attempted incidentally.
->
-> What we would like to avoid is a fourth outcome where it simply stays open and the reconciliation cost keeps compounding.
+
+### Not asking about the Creative Studio branch — settled 2026-08-07
+
+`codex/creative-suite-studio-refresh` (tip `c5b879c3e`) is **not khoapnt's work on the Creative Studio** and needs no reconciliation. Recorded because the branch's tip commit is authored by `khoapnt-vng`, which is what led us to attribute it, and because the [landing plan](creative-studio-landing-plan.md) and [integration plan](creative-studio-integration-plan.md) both describe it as "khoapnt's line" — a stale premise in both documents.
+
+**The line is to be ignored.** Do not re-open a reconciliation question about its 50 commits, do not attempt a merge (previously measured at 98 conflicts), and do not treat its divergence from our line as a growing cost. If those commits matter to anyone, that will surface on its own terms.
