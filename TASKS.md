@@ -120,6 +120,12 @@
   - Residue, deliberately not expanded into this bug: R4 carried the four-state logic into `CutTimeline` and **retained** `SceneTimeline.tsx`, which still has no production consumer and survives only through the barrel export and two tests that render it directly. Retiring it is a tidy-up, not part of this defect — but it now reads as live code and will mislead the next reader.
   - Still open for the designer, unchanged by the fix: whether the cut timeline is the right surface for generation status at all, or whether a slate should say more than the old rail did. The fix restored parity; it did not settle the question.
 
+- [ ] **[BUG-032][P3][Creative Studio] The Write assistant dock overpromises its capability in all 12 locales**
+  - Actual: `AssistantDock.tsx:149` renders `conversation.creativeStudio.phase.write.assistantDescription` — _"Use the assistant to develop story structure, shot ideas, and prompts"_ — while the dock's only capability is the one-shot **Draft storyboard** button. All 12 locales make the equivalent promise. Recorded in the Write-assistant design §1 as a defect of the same class as the closed false-audio claim.
+  - Became standalone 2026-08-07: the Write-assistant design that would have made the copy true is **parked** (`docs/design/creative-studio-write-assistant-design.md`, parking banner — its capabilities were absorbed by EPIC-006 Slices A/P and the scene assist), so the spec's own rule "this design fixes it or the copy must change" now resolves to changing the copy.
+  - Expected: the description states what the dock does today — drafts a storyboard from the brief — with the provider/model labels and charge disclosure unchanged. Copy change ×12 locales, `bun run i18n:types` + `node scripts/check-i18n.js`; no behavior change.
+  - Scope note: when the scene assist ships, the copy may additionally point at it for per-scene help; do not pre-write that promise before it lands.
+
 ## Waiting On
 
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
