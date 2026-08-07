@@ -32,6 +32,7 @@ const aioncoreTrust = require('./aioncore-trust');
 
 const GITHUB_OWNER = 'iOfficeAI';
 const GITHUB_REPO = 'AionCore';
+const ACCEPTED_AIONCORE_SOURCE_COMMIT = '260dbbc05d5c8d079fb60e0e9578d4250b6e4338';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
 // artifacts (see aioncore-trust.js). Overridable via env for other mirrors.
@@ -664,12 +665,38 @@ function listActionsArtifacts(runId) {
   return Array.isArray(response?.artifacts) ? response.artifacts : [];
 }
 
+function assertAcceptedActionsRun(run, runId = 'unknown') {
+  const status = typeof run?.status === 'string' ? run.status : 'unknown';
+  const conclusion = typeof run?.conclusion === 'string' ? run.conclusion : 'unknown';
+  const headSha = typeof run?.head_sha === 'string' ? run.head_sha : 'unknown';
+
+  if (status !== 'completed' || conclusion !== 'success') {
+    throw makeIntegrityError(
+      `AionCore run ${runId} is not completed successfully (status=${status}, conclusion=${conclusion}).`
+    );
+  }
+  if (headSha !== ACCEPTED_AIONCORE_SOURCE_COMMIT) {
+    throw makeIntegrityError(
+      `AionCore run ${runId} head ${headSha} does not match accepted source commit ` +
+        `${ACCEPTED_AIONCORE_SOURCE_COMMIT}.`
+    );
+  }
+
+  return { conclusion, headSha, status };
+}
+
+function getAcceptedActionsRun(runId) {
+  const run = githubApiGetJson(`repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`);
+  return assertAcceptedActionsRun(run, runId);
+}
+
 function downloadAndExtractActionsArtifact(platform, arch, runId) {
   const expectedArtifactName = getActionsArtifactName(platform, arch);
   if (!expectedArtifactName) {
     throw new Error(`Unsupported AionCore Actions artifact target: ${platform}-${arch}`);
   }
 
+  const acceptedRun = getAcceptedActionsRun(runId);
   const artifacts = listActionsArtifacts(runId);
   const availableArtifactNames = artifacts
     .map((artifact) => artifact.name)
@@ -724,6 +751,7 @@ function downloadAndExtractActionsArtifact(platform, arch, runId) {
     tempDir,
     artifactName: expectedArtifactName,
     archivePath,
+    headSha: acceptedRun.headSha,
     url: downloadUrl,
   };
 }
@@ -932,6 +960,7 @@ function prepareAioncore(options) {
     sourceDetail = {
       runId: actionsRunId,
       artifactName: result.artifactName,
+      headSha: result.headSha,
       url: result.url,
     };
     console.log(`  Downloaded from GitHub Actions artifact`);
@@ -1032,6 +1061,8 @@ function prepareAioncore(options) {
 }
 
 module.exports = {
+  ACCEPTED_AIONCORE_SOURCE_COMMIT,
+  assertAcceptedActionsRun,
   assertHttpsUrl,
   computeSha256,
   cosign,

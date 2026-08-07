@@ -581,6 +581,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify native migration-lineage recovery
+        if: startsWith(matrix.platform, 'macos') || startsWith(matrix.platform, 'windows')
+        shell: bash
+        run: |
+          node -e "if (process.arch !== process.env.EXPECTED_ARCH) { console.error('Native acceptance runner architecture mismatch: expected ' + process.env.EXPECTED_ARCH + ', got ' + process.arch); process.exit(1); }"
+          bunx playwright test --config playwright.config.ts tests/e2e/specs/installation-integrity.e2e.ts --grep "migration-lineage rejection"
+        env:
+          E2E_PACKAGED: 1
+          EXPECTED_ARCH: ${{ matrix.arch }}
+
       # macOS 钥匙串清理
       - name: Clean up keychain (macOS only)
         if: startsWith(matrix.platform, 'macos') && always()

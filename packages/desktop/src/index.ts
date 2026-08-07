@@ -606,6 +606,19 @@ function resolveDebugBackendStartupFailure(): BackendStartupFailureInfo | null {
       missingResources: ['managed node runtime', 'ACP adapters'],
     };
   }
+  if (reason === 'backend_database_lineage_incompatible') {
+    return {
+      reason,
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+      lineageReason: 'changed',
+      appliedVersion: 20,
+      floorVersion: 19,
+      latestVersion: 27,
+      expectedFingerprint: '7ab8e15a44ab55603a32038ae20c38eff5c18ca4d5c2cc23c00f3fa868727999',
+      actualFingerprint: 'e2e-debug-lineage-mismatch',
+    };
+  }
 
   console.warn(`[AionUi] Ignoring unknown AIONUI_DEBUG_BACKEND_STARTUP_FAILURE value: ${reason}`);
   return null;
