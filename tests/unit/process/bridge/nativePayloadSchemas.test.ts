@@ -247,6 +247,13 @@ const VALID_PAYLOADS = {
       },
     },
   },
+  'creative-studio.place-cut-scenes': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    cutId: 'cut_1',
+    sceneIds: ['scene_1'],
+    beforeClipId: null,
+  },
   'creative-studio.delete-project': { projectId: 'project_1', expectedRevision: 1 },
   'creative-studio.update-scene': {
     projectId: 'project_1',

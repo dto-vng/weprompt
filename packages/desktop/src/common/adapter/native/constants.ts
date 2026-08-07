@@ -81,6 +81,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'creative-studio.update-project',
   'creative-studio.bind-brief-conversation',
   'creative-studio.update-cut',
+  'creative-studio.place-cut-scenes',
   'creative-studio.delete-project',
   'creative-studio.update-scene',
   'creative-studio.reorder-scenes',

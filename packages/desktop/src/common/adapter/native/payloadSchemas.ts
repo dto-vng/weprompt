@@ -682,6 +682,19 @@ export const nativeBridgePayloadSchemas = {
     })
     .strict(),
   'creative-studio.update-cut': studioUpdateCutSchema,
+  'creative-studio.place-cut-scenes': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      cutId: safeIdSchema,
+      sceneIds: z
+        .array(safeIdSchema)
+        .min(1)
+        .max(24)
+        .refine((ids) => new Set(ids).size === ids.length),
+      beforeClipId: safeIdSchema.nullable(),
+    })
+    .strict(),
   'creative-studio.delete-project': z
     .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
     .strict(),
