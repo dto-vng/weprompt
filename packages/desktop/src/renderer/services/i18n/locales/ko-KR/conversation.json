@@ -1039,7 +1039,12 @@
           "footer": "컷 렌더링",
           "action": "동영상 렌더링",
           "progress": "동영상 렌더링 중… {{percent}}%",
+          "progressWithClip": "동영상 렌더링 중… {{percent}}% · 클립 {{clip}}/{{total}}",
           "cancel": "렌더링 취소",
+          "busyReason": "이 프로젝트는 이미 렌더링 중입니다. 완료될 때까지 기다리거나 렌더링을 시작한 창에서 취소하세요.",
+          "installFfmpeg": "FFmpeg 설치",
+          "tryAgain": "렌더링 다시 시도",
+          "openProduce": "생성으로 이동",
           "missingScenes": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
           "missingScenes_one": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
           "missingScenes_other": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
@@ -1049,6 +1054,8 @@
             "busy": "이 프로젝트는 이미 렌더링 중입니다.",
             "noRenderableScenes": "렌더링할 테이크가 있는 장면이 없습니다.",
             "failed": "동영상을 렌더링하지 못했습니다.",
+            "failedClip": "클립 {{clip}}/{{total}}을 렌더링할 수 없습니다.",
+            "noRenderableShots": "샷 {{shots}}에 렌더링 가능한 클립이 없습니다.",
             "cancelled": "동영상 렌더링을 취소했습니다."
           }
         }
@@ -1330,6 +1337,11 @@
     "export": {
       "title": "에셋 내보내기",
       "body": "스토리보드 매니페스트와 각 장면에서 선택한 에셋을 내보냅니다.",
+      "checkingRender": "렌더링된 컷을 확인하는 중…",
+      "noRender": "아직 렌더링되지 않음",
+      "renderedAt": "렌더링 시간",
+      "staleRender": "이 컷은 최근 편집 전에 렌더링되었습니다.",
+      "latestRenderUnavailable": "최신 렌더링 컷을 확인할 수 없습니다. 내보내기를 다시 여세요.",
       "gapWarning": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
       "gapWarning_other": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
       "confirmSelectedCount": "쇼트 {{count}}개를 내보낼까요?",

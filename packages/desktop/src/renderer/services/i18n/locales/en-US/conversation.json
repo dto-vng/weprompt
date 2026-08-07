@@ -878,7 +878,12 @@
           "footer": "Render cut",
           "action": "Render video",
           "progress": "Rendering video… {{percent}}%",
+          "progressWithClip": "Rendering video… {{percent}}% · Clip {{clip}} of {{total}}",
           "cancel": "Cancel render",
+          "busyReason": "A render is already running for this project. Wait for it to finish or cancel it from the window that started it.",
+          "installFfmpeg": "Install FFmpeg",
+          "tryAgain": "Try render again",
+          "openProduce": "Go to Produce",
           "missingScenes": "{{count}} scenes have no take and will not be in the video.",
           "missingScenes_one": "{{count}} scene has no take and will not be in the video.",
           "missingScenes_other": "{{count}} scenes have no take and will not be in the video.",
@@ -888,6 +893,8 @@
             "busy": "This project is already rendering.",
             "noRenderableScenes": "No scenes have a take to render.",
             "failed": "The video could not be rendered.",
+            "failedClip": "Clip {{clip}} of {{total}} could not be rendered.",
+            "noRenderableShots": "Shots {{shots}} do not have renderable clips.",
             "cancelled": "Video render cancelled."
           }
         }
@@ -1177,6 +1184,11 @@
     "export": {
       "title": "Export assets",
       "body": "Export the storyboard manifest and each scene's selected asset.",
+      "checkingRender": "Checking for a rendered cut...",
+      "noRender": "Not rendered yet",
+      "renderedAt": "Rendered",
+      "staleRender": "This cut was rendered before your latest edits.",
+      "latestRenderUnavailable": "The latest rendered cut could not be checked. Try reopening Export.",
       "gapWarning": "Shots {{shots}} are still slates — they won't be included.",
       "gapWarning_one": "Shot {{shots}} is still a slate — it won't be included.",
       "gapWarning_other": "Shots {{shots}} are still slates — they won't be included.",

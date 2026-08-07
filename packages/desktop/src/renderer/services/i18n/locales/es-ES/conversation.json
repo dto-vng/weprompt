@@ -1048,7 +1048,12 @@
           "footer": "Renderizar montaje",
           "action": "Renderizar vídeo",
           "progress": "Renderizando vídeo… {{percent}}%",
+          "progressWithClip": "Renderizando vídeo… {{percent}}% · Clip {{clip}} de {{total}}",
           "cancel": "Cancelar renderizado",
+          "busyReason": "Este proyecto ya se está renderizando. Espera a que termine o cancélalo desde la ventana que lo inició.",
+          "installFfmpeg": "Instalar FFmpeg",
+          "tryAgain": "Reintentar renderizado",
+          "openProduce": "Ir a Producir",
           "missingScenes": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
           "missingScenes_one": "{{count}} escena no tiene toma y no aparecerá en el vídeo.",
           "missingScenes_other": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
@@ -1058,6 +1063,8 @@
             "busy": "Este proyecto ya se está renderizando.",
             "noRenderableScenes": "Ninguna escena tiene una toma para renderizar.",
             "failed": "No se pudo renderizar el vídeo.",
+            "failedClip": "No se pudo renderizar el clip {{clip}} de {{total}}.",
+            "noRenderableShots": "Los planos {{shots}} no tienen clips renderizables.",
             "cancelled": "Renderizado de vídeo cancelado."
           }
         }
@@ -1355,6 +1362,11 @@
     "export": {
       "title": "Exportar recursos",
       "body": "Exporta el manifiesto del guion gráfico y el recurso seleccionado de cada escena.",
+      "checkingRender": "Comprobando el montaje renderizado…",
+      "noRender": "Aún no renderizado",
+      "renderedAt": "Renderizado",
+      "staleRender": "Este montaje se renderizó antes de tus últimos cambios.",
+      "latestRenderUnavailable": "No se pudo comprobar el último montaje renderizado. Vuelve a abrir Exportar.",
       "gapWarning": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
       "gapWarning_one": "El plano {{shots}} sigue siendo una claqueta y no se incluirá.",
       "gapWarning_many": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",

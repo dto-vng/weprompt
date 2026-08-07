@@ -1045,7 +1045,12 @@
           "footer": "Kurguyu oluştur",
           "action": "Videoyu işle",
           "progress": "Video işleniyor… {{percent}}%",
+          "progressWithClip": "Video işleniyor… {{percent}}% · Klip {{clip}}/{{total}}",
           "cancel": "İşlemeyi iptal et",
+          "busyReason": "Bu proje zaten işleniyor. Tamamlanmasını bekleyin veya işlemi başlatan pencereden iptal edin.",
+          "installFfmpeg": "FFmpeg'i yükle",
+          "tryAgain": "İşlemeyi tekrar dene",
+          "openProduce": "Üret'e git",
           "missingScenes": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
           "missingScenes_one": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
           "missingScenes_other": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
@@ -1055,6 +1060,8 @@
             "busy": "Bu proje zaten işleniyor.",
             "noRenderableScenes": "İşlenecek çekimi olan sahne yok.",
             "failed": "Video işlenemedi.",
+            "failedClip": "{{clip}}/{{total}} numaralı klip işlenemedi.",
+            "noRenderableShots": "{{shots}} numaralı çekimlerde işlenebilir klip yok.",
             "cancelled": "Video işleme iptal edildi."
           }
         }
@@ -1344,6 +1351,11 @@
     "export": {
       "title": "Varlıkları dışa aktar",
       "body": "Storyboard bildirim dosyasını ve her sahnenin seçili varlığını dışa aktarın.",
+      "checkingRender": "İşlenmiş kurgu kontrol ediliyor…",
+      "noRender": "Henüz işlenmedi",
+      "renderedAt": "İşlenme zamanı",
+      "staleRender": "Bu kurgu son düzenlemelerinizden önce işlendi.",
+      "latestRenderUnavailable": "En son işlenmiş kurgu kontrol edilemedi. Dışa Aktar'ı yeniden açın.",
       "gapWarning": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
       "gapWarning_one": "{{shots}} numaralı çekim hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
       "gapWarning_other": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",

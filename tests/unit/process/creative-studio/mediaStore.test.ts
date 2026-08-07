@@ -1510,6 +1510,11 @@ describe('createStudioMediaStore', () => {
       height: 720,
       body: Readable.from([newCut]),
     });
+    await expect(media.getLatestProjectOutput('project_1')).resolves.toMatchObject({
+      id: 'render_new',
+      createdAt: '2026-08-06T02:00:00.000Z',
+      sceneId: null,
+    });
     const destination = await fs.mkdtemp(path.join(os.tmpdir(), 'studio-export-rendered-cut-'));
     created.push(destination);
 

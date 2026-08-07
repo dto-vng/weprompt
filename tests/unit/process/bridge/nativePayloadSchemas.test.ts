@@ -284,6 +284,7 @@ const VALID_PAYLOADS = {
     expectedRevision: 1,
   },
   'creative-studio.choose-and-export-assets': { projectId: 'project_1', includeReferences: true },
+  'creative-studio.get-latest-render': { projectId: 'project_1' },
   'creative-studio.render-cut': { projectId: 'project_1' },
   'creative-studio.cancel-render': { projectId: 'project_1' },
   'creative-studio.fit-storyboard': {

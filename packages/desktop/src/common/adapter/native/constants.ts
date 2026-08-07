@@ -88,6 +88,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'creative-studio.persist-captured-poster',
   'creative-studio.choose-and-import-reference',
   'creative-studio.choose-and-export-assets',
+  'creative-studio.get-latest-render',
   'creative-studio.render-cut',
   'creative-studio.cancel-render',
   'creative-studio.fit-storyboard',

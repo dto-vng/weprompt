@@ -37,6 +37,7 @@ import type {
   StudioConnectionValidationResult,
   StudioExportItem,
   StudioListRoutesRequest,
+  StudioLatestRender,
   StudioRemoveConnectionRequest,
   StudioRouteCatalog,
   StudioSaveConnectionRequest,
@@ -145,6 +146,7 @@ export type CreativeStudioService = {
   listProjects(): Promise<StudioProjectSummary[]>;
   createProject(input: CreateStudioProjectInput): Promise<StudioRendererProject>;
   getProject(projectId: string): Promise<StudioRendererProject | null>;
+  getLatestRender(input: StudioProjectRequest): Promise<StudioLatestRender | null>;
   listProposals(input: StudioProjectRequest): Promise<StudioProposal[]>;
   acceptProposal(input: StudioProposalRequest): Promise<StudioProposalAcceptance>;
   rejectProposal(input: StudioProposalRequest): Promise<StudioProposal>;
@@ -206,6 +208,7 @@ export type CreativeStudioServiceDeps = {
       destinationDirectory: string;
       includeReferences: boolean;
     }): Promise<{ folderName: string; exported: StudioExportItem[]; missingSceneIds: string[] }>;
+    getLatestProjectOutput(projectId: string): Promise<StudioAsset | null>;
     persistCapturedPoster?(input: {
       projectId: string;
       sceneId: string;
@@ -1889,6 +1892,13 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
       }
       if (!deps.mediaStore) throw new CreativeStudioStoreError('storage_error', 'Studio media storage is unavailable');
       return deps.mediaStore.exportAssetsToDirectory(input);
+    },
+
+    async getLatestRender(input: StudioProjectRequest): Promise<StudioLatestRender | null> {
+      assertSafeId(input.projectId, 'project id');
+      if (!deps.mediaStore) throw new CreativeStudioStoreError('storage_error', 'Studio media storage is unavailable');
+      const asset = await deps.mediaStore.getLatestProjectOutput(input.projectId);
+      return asset === null ? null : { fileName: 'cut.mp4', renderedAt: asset.createdAt };
     },
 
     async listConnectionCandidates(): Promise<StudioConnectionCandidate[]> {

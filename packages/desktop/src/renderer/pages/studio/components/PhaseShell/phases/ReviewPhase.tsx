@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@arco-design/web-react';
 
 import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
-import { ReviewCut, createManagedStudioAssetUrl } from '../../Preview';
+import { openExternalUrl } from '@renderer/utils/platform';
+import { ReviewCut, createManagedStudioAssetUrl, studioShotNumbers } from '../../Preview';
 import { useCutEditor, useStudioRender } from '../../../hooks';
 import type { ReviewPhaseController } from '../types';
 import type { StudioLayoutMode } from '../useStudioLayoutMode';
@@ -36,6 +37,54 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
   const renderSource = render.assetId === null ? null : createManagedStudioAssetUrl(project.id, render.assetId);
   const renderRunning = render.status === 'running';
   const renderPercent = Math.round(render.progress * 100);
+  const busyReasonId = React.useId();
+  const progressMessage = t(
+    render.clipIndex === null || render.clipTotal === null
+      ? 'conversation.creativeStudio.phase.review.render.progress'
+      : 'conversation.creativeStudio.phase.review.render.progressWithClip',
+    {
+      percent: renderPercent,
+      ...(render.clipIndex === null ? {} : { clip: render.clipIndex }),
+      ...(render.clipTotal === null ? {} : { total: render.clipTotal }),
+    }
+  );
+  const renderFailure = (() => {
+    switch (render.errorCode) {
+      case 'ffmpeg_unavailable':
+        return {
+          message: t('conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable'),
+          action: t('conversation.creativeStudio.phase.review.render.installFfmpeg'),
+          run: (): void => void openExternalUrl('https://ffmpeg.org/download.html'),
+        };
+      case 'render_failed':
+        return {
+          message:
+            render.clipIndex === null || render.clipTotal === null
+              ? t('conversation.creativeStudio.phase.review.render.errors.failed')
+              : t('conversation.creativeStudio.phase.review.render.errors.failedClip', {
+                  clip: render.clipIndex,
+                  total: render.clipTotal,
+                }),
+          action: t('conversation.creativeStudio.phase.review.render.tryAgain'),
+          run: (): void => void render.render(),
+        };
+      case 'no_renderable_scenes': {
+        const shots = studioShotNumbers(project, render.missingSceneIds ?? canonicalMissingSceneIds);
+        return {
+          message:
+            shots.length === 0
+              ? t('conversation.creativeStudio.phase.review.render.errors.noRenderableScenes')
+              : t('conversation.creativeStudio.phase.review.render.errors.noRenderableShots', {
+                  shots: shots.join(', '),
+                }),
+          action: t('conversation.creativeStudio.phase.review.render.openProduce'),
+          run: () => controller.requestTransition({ phase: 'produce' }),
+        };
+      }
+      default:
+        return null;
+    }
+  })();
 
   return (
     <section data-layout={layoutMode} className={styles.phase} aria-labelledby='studio-review-phase-heading'>
@@ -81,28 +130,61 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
               })}
             </p>
           )}
-          <div className='flex flex-wrap gap-8px'>
-            <Button
-              type='primary'
-              disabled={renderRunning}
-              loading={renderRunning}
-              onClick={() => void render.render()}
-            >
-              {renderRunning
-                ? t('conversation.creativeStudio.phase.review.render.progress', { percent: renderPercent })
-                : t('conversation.creativeStudio.phase.review.render.action')}
-            </Button>
-            {renderRunning && (
-              <Button onClick={() => void render.cancel()}>
-                {t('conversation.creativeStudio.phase.review.render.cancel')}
-              </Button>
+          <div
+            data-render-state-slot
+            data-render-state={
+              render.busy
+                ? 'busy'
+                : renderRunning
+                  ? 'running'
+                  : renderFailure === null
+                    ? render.status
+                    : render.errorCode
+            }
+            className={styles.renderStateSlot}
+          >
+            {render.busy ? (
+              <>
+                <Button type='primary' className={styles.renderPrimaryAction} disabled aria-describedby={busyReasonId}>
+                  {progressMessage}
+                </Button>
+                <p id={busyReasonId} className={`${styles.handoffDescription} m-0`}>
+                  {t('conversation.creativeStudio.phase.review.render.busyReason')}
+                </p>
+              </>
+            ) : renderRunning ? (
+              <>
+                <Button type='primary' className={styles.renderPrimaryAction} disabled loading>
+                  {progressMessage}
+                </Button>
+                <div className={styles.renderStateSupport}>
+                  <Button onClick={() => void render.cancel()}>
+                    {t('conversation.creativeStudio.phase.review.render.cancel')}
+                  </Button>
+                </div>
+              </>
+            ) : renderFailure !== null ? (
+              <>
+                <Button type='primary' className={styles.renderPrimaryAction} onClick={renderFailure.run}>
+                  {renderFailure.action}
+                </Button>
+                <p role='alert' className={`${styles.handoffDescription} m-0 text-danger`}>
+                  {renderFailure.message}
+                </p>
+              </>
+            ) : (
+              <>
+                <Button type='primary' className={styles.renderPrimaryAction} onClick={() => void render.render()}>
+                  {t('conversation.creativeStudio.phase.review.render.action')}
+                </Button>
+                {render.errorCode === 'cancelled' && render.errorMessageKey !== null && (
+                  <p role='status' className={`${styles.handoffDescription} m-0`}>
+                    {t(render.errorMessageKey)}
+                  </p>
+                )}
+              </>
             )}
           </div>
-          {render.errorMessageKey !== null && (
-            <p role='alert' className={`${styles.handoffDescription} m-0 text-danger`}>
-              {t(render.errorMessageKey)}
-            </p>
-          )}
           {renderSource !== null && (
             <video
               aria-label={t('conversation.creativeStudio.phase.review.render.resultLabel')}

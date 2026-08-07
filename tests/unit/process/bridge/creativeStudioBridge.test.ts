@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   persistCapturedPosterProvider: vi.fn(),
   chooseAndImportReferenceProvider: vi.fn(),
   chooseAndExportAssetsProvider: vi.fn(),
+  getLatestRenderProvider: vi.fn(),
   renderCutProvider: vi.fn(),
   cancelRenderProvider: vi.fn(),
   submitScenesProvider: vi.fn(),
@@ -70,6 +71,7 @@ vi.mock('@/common', () => ({
       persistCapturedPoster: { provider: mocks.persistCapturedPosterProvider },
       chooseAndImportReference: { provider: mocks.chooseAndImportReferenceProvider },
       chooseAndExportAssets: { provider: mocks.chooseAndExportAssetsProvider },
+      getLatestRender: { provider: mocks.getLatestRenderProvider },
       renderCut: { provider: mocks.renderCutProvider },
       cancelRender: { provider: mocks.cancelRenderProvider },
       submitScenes: { provider: mocks.submitScenesProvider },
@@ -151,6 +153,7 @@ describe('initCreativeStudioBridge', () => {
         persistCapturedPoster: vi.fn(),
         importReferenceFromPath: vi.fn(),
         exportAssetsToDirectory: vi.fn(),
+        getLatestRender: vi.fn(async () => null),
         submitScenes: vi.fn(async () => []),
         cancelJob: vi.fn(),
         retryJob: vi.fn(),
@@ -193,6 +196,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.persistCapturedPosterProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndImportReferenceProvider).toHaveBeenCalledOnce();
     expect(mocks.chooseAndExportAssetsProvider).toHaveBeenCalledOnce();
+    expect(mocks.getLatestRenderProvider).toHaveBeenCalledOnce();
     expect(mocks.renderCutProvider).toHaveBeenCalledOnce();
     expect(mocks.cancelRenderProvider).toHaveBeenCalledOnce();
     expect(mocks.submitScenesProvider).toHaveBeenCalledOnce();
@@ -219,6 +223,7 @@ describe('initCreativeStudioBridge', () => {
       getRenderRunner,
     });
     const getProject = mocks.getProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const getLatestRender = mocks.getLatestRenderProvider.mock.calls[0]?.[0] as ProviderHandler;
     const updateProject = mocks.updateProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
     const renderCut = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
     const disabled = {
@@ -230,6 +235,7 @@ describe('initCreativeStudioBridge', () => {
     };
 
     await expect(getProject({ projectId: 'project_1' })).resolves.toEqual(disabled);
+    await expect(getLatestRender({ projectId: 'project_1' })).resolves.toEqual(disabled);
     await expect(updateProject({ projectId: 'project_1', expectedRevision: 1, name: 'Changed' })).resolves.toEqual(
       disabled
     );
@@ -237,6 +243,7 @@ describe('initCreativeStudioBridge', () => {
     expect(getService).not.toHaveBeenCalled();
     expect(getRenderRunner).not.toHaveBeenCalled();
     expect(service.getProject).not.toHaveBeenCalled();
+    expect(service.getLatestRender).not.toHaveBeenCalled();
     expect(service.updateProject).not.toHaveBeenCalled();
     expect(runner.renderCut).not.toHaveBeenCalled();
   });
@@ -246,10 +253,12 @@ describe('initCreativeStudioBridge', () => {
     const runner = dependencies.getRenderRunner!();
     initCreativeStudioBridge({ ...dependencies, getService: () => service, getRenderRunner: () => runner });
     const getProject = mocks.getProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const getLatestRender = mocks.getLatestRenderProvider.mock.calls[0]?.[0] as ProviderHandler;
     const updateProject = mocks.updateProjectProvider.mock.calls[0]?.[0] as ProviderHandler;
     const renderCut = mocks.renderCutProvider.mock.calls[0]?.[0] as ProviderHandler;
 
     await expect(getProject({ projectId: 'project_1' })).resolves.toEqual({ ok: true, data: project });
+    await expect(getLatestRender({ projectId: 'project_1' })).resolves.toEqual({ ok: true, data: null });
     await expect(updateProject({ projectId: 'project_1', expectedRevision: 1, name: 'Changed' })).resolves.toEqual({
       ok: true,
       data: project,

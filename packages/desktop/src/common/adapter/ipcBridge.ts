@@ -124,6 +124,7 @@ import type {
   StudioConnectionValidationResult,
   StudioConnectionCandidate,
   StudioListRoutesRequest,
+  StudioLatestRender,
   StudioRemoveConnectionRequest,
   StudioRouteCatalog,
   StudioSaveConnectionRequest,
@@ -1241,6 +1242,9 @@ export const creativeStudio = {
     StudioCommandResult<StudioExportOutcome>,
     StudioChooseAndExportAssetsRequest
   >('creative-studio.choose-and-export-assets'),
+  getLatestRender: bridge.buildProvider<StudioCommandResult<StudioLatestRender | null>, StudioProjectRequest>(
+    'creative-studio.get-latest-render'
+  ),
   renderCut: bridge.buildProvider<StudioCommandResult<StudioRenderCutResult>, StudioProjectRequest>(
     'creative-studio.render-cut'
   ),

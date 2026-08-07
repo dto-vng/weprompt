@@ -294,6 +294,37 @@ describe('CreativeStudioService', () => {
     });
   });
 
+  it('reports the newest verified cut file and its render time without exposing a storage path', async () => {
+    const renderedCut: StudioAsset = {
+      id: 'render_1',
+      projectId: 'project_1',
+      sceneId: null,
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'render_1.mp4' },
+      byteSize: 512,
+      sha256: 'a'.repeat(64),
+      createdAt: '2026-08-07T04:05:06.000Z',
+    };
+    const getLatestProjectOutput = vi.fn(async () => renderedCut);
+    const renderService = createCreativeStudioService({
+      store,
+      onProjectUpdated,
+      storyboardPlanner: makePlanner(),
+      mediaStore: {
+        importReferenceFromPath: vi.fn(),
+        exportAssetsToDirectory: vi.fn(),
+        getLatestProjectOutput,
+      },
+    });
+
+    await expect(renderService.getLatestRender({ projectId: 'project_1' })).resolves.toEqual({
+      fileName: 'cut.mp4',
+      renderedAt: renderedCut.createdAt,
+    });
+    expect(getLatestProjectOutput).toHaveBeenCalledExactlyOnceWith('project_1');
+  });
+
   it('rejects a stale Brief binding revision without replacing the persisted conversation id', async () => {
     const project = await service.createProject(makeInput());
     await service.bindBriefConversation({
@@ -426,6 +457,7 @@ describe('CreativeStudioService', () => {
       mediaStore: {
         importReferenceFromPath: vi.fn(),
         exportAssetsToDirectory: vi.fn(),
+        getLatestProjectOutput: vi.fn(async () => null),
         persistCapturedPoster,
       },
     });

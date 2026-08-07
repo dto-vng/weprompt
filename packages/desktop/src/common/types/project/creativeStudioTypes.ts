@@ -481,7 +481,14 @@ export type StudioRenderCutResult = { assetId: string; missingSceneIds: string[]
 export type StudioCancelRenderResult = { cancelled: boolean };
 
 export type StudioRenderProgressEvent =
-  | { projectId: string; status: 'running'; progress: number }
+  | {
+      projectId: string;
+      status: 'running';
+      progress: number;
+      /** Optional so renderer boundaries remain compatible with renders started before an upgrade. */
+      clipIndex?: number;
+      clipTotal?: number;
+    }
   | (StudioRenderCutResult & { projectId: string; status: 'succeeded'; progress: 1 })
   | {
       projectId: string;
@@ -489,8 +496,12 @@ export type StudioRenderProgressEvent =
       progress: number;
       errorCode: Exclude<StudioRenderErrorCode, 'busy' | 'cancelled'>;
       missingSceneIds?: string[];
+      clipIndex?: number;
+      clipTotal?: number;
     }
   | { projectId: string; status: 'cancelled'; progress: number; missingSceneIds: string[] };
+
+export type StudioLatestRender = { fileName: 'cut.mp4'; renderedAt: string };
 
 export type ProposeStudioStoryboardInput = StudioProjectRequest & {
   expectedRevision: number;

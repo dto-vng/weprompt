@@ -1039,7 +1039,12 @@
           "footer": "算繪剪輯",
           "action": "算繪影片",
           "progress": "正在算繪影片… {{percent}}%",
+          "progressWithClip": "正在算繪影片… {{percent}}% · 片段 {{clip}}/{{total}}",
           "cancel": "取消算繪",
+          "busyReason": "此專案已有算繪工作在執行。請等待完成，或在啟動算繪的視窗中取消。",
+          "installFfmpeg": "安裝 FFmpeg",
+          "tryAgain": "重試算繪",
+          "openProduce": "前往生成",
           "missingScenes": "{{count}} 個場景沒有鏡頭，不會出現在影片中。",
           "missingScenes_one": "{{count}} 個場景沒有鏡頭，不會出現在影片中。",
           "missingScenes_other": "{{count}} 個場景沒有鏡頭，不會出現在影片中。",
@@ -1049,6 +1054,8 @@
             "busy": "此專案正在算繪。",
             "noRenderableScenes": "沒有可供算繪的場景鏡頭。",
             "failed": "無法算繪影片。",
+            "failedClip": "無法算繪第 {{clip}}/{{total}} 個片段。",
+            "noRenderableShots": "鏡頭 {{shots}} 沒有可算繪的片段。",
             "cancelled": "已取消影片算繪。"
           }
         }
@@ -1330,6 +1337,11 @@
     "export": {
       "title": "匯出素材",
       "body": "匯出分鏡資訊清單與每個場景選取的素材。",
+      "checkingRender": "正在檢查已算繪的剪輯…",
+      "noRender": "尚未算繪",
+      "renderedAt": "算繪時間",
+      "staleRender": "此剪輯是在你最近的編輯之前算繪的。",
+      "latestRenderUnavailable": "無法檢查最新算繪的剪輯。請重新開啟匯出。",
       "gapWarning": "鏡頭 {{shots}} 仍是場記卡，將不會包含在匯出中。",
       "gapWarning_other": "鏡頭 {{shots}} 仍是場記卡，將不會包含在匯出中。",
       "confirmSelectedCount": "匯出 {{count}} 個鏡頭嗎？",

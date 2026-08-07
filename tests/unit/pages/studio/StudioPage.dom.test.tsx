@@ -524,6 +524,16 @@ describe('StudioPage and useStudioProject', () => {
             targetDurationSeconds: missingScene.durationSeconds,
             sceneOrder: [missingScene.id],
             scenes: { [missingScene.id]: missingScene },
+            cuts: {
+              'cut-1': {
+                id: 'cut-1',
+                name: 'Launch film',
+                orderMode: 'storyboard',
+                clipOrder: [],
+                clips: {},
+              },
+            },
+            activeCutId: 'cut-1',
           })
         )
       );

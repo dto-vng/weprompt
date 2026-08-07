@@ -1039,7 +1039,12 @@
           "footer": "渲染剪辑",
           "action": "渲染视频",
           "progress": "正在渲染视频… {{percent}}%",
+          "progressWithClip": "正在渲染视频… {{percent}}% · 片段 {{clip}}/{{total}}",
           "cancel": "取消渲染",
+          "busyReason": "此项目已有渲染任务在运行。请等待完成，或在启动渲染的窗口中取消。",
+          "installFfmpeg": "安装 FFmpeg",
+          "tryAgain": "重试渲染",
+          "openProduce": "前往生成",
           "missingScenes": "{{count}} 个场景没有镜头，不会出现在视频中。",
           "missingScenes_one": "{{count}} 个场景没有镜头，不会出现在视频中。",
           "missingScenes_other": "{{count}} 个场景没有镜头，不会出现在视频中。",
@@ -1049,6 +1054,8 @@
             "busy": "此项目正在渲染。",
             "noRenderableScenes": "没有可用于渲染的场景镜头。",
             "failed": "无法渲染视频。",
+            "failedClip": "无法渲染第 {{clip}}/{{total}} 个片段。",
+            "noRenderableShots": "镜头 {{shots}} 没有可渲染的片段。",
             "cancelled": "已取消视频渲染。"
           }
         }
@@ -1330,6 +1337,11 @@
     "export": {
       "title": "导出素材",
       "body": "导出故事板清单及每个场景选中的素材。",
+      "checkingRender": "正在检查已渲染的剪辑…",
+      "noRender": "尚未渲染",
+      "renderedAt": "渲染时间",
+      "staleRender": "此剪辑在你最近的编辑之前渲染。",
+      "latestRenderUnavailable": "无法检查最新渲染的剪辑。请重新打开导出。",
       "gapWarning": "镜头 {{shots}} 仍是场记卡，将不会包含在导出中。",
       "gapWarning_other": "镜头 {{shots}} 仍是场记卡，将不会包含在导出中。",
       "confirmSelectedCount": "导出 {{count}} 个镜头吗？",

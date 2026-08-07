@@ -19,7 +19,13 @@ import type { UseCutEditorResult } from '../../hooks';
 import type { StudioReadinessSummary } from '../../studioReadiness';
 import studioType from '../../StudioTypography.module.css';
 import { CutInspector } from './CutEditor/CutInspector';
-import { buildCutTimelineEntries, CutTimeline, renderedDurationFor, sourceDurationFor } from './CutEditor/CutTimeline';
+import {
+  buildCutTimelineEntries,
+  CutTimeline,
+  renderedDurationFor,
+  sourceDurationFor,
+  type CutTimelineReviewState,
+} from './CutEditor/CutTimeline';
 import { StagePreview } from './StagePreview';
 import styles from './CutEditor/cut-editor.module.css';
 
@@ -38,7 +44,7 @@ export type ReviewCutProps = {
 /** The complete Review cut editor: stage, timeline, selected-clip inspector, and manual-cut recovery. */
 export const ReviewCut: React.FC<ReviewCutProps> = ({
   cutEditor,
-  readiness: _readiness,
+  readiness,
   selectedSceneId,
   posterAsset,
   mutationPending,
@@ -68,6 +74,32 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
       }),
     [project]
   );
+  const reviewStates = useMemo<Readonly<Partial<Record<string, CutTimelineReviewState>>>>(() => {
+    const states: Partial<Record<string, CutTimelineReviewState>> = {};
+    for (const sceneId of project.sceneOrder) {
+      const scene = project.scenes[sceneId];
+      if (scene === undefined) continue;
+      const selectedAsset = scene.selectedAssetId === null ? undefined : project.assets[scene.selectedAssetId];
+      if (selectedAsset !== undefined && isCanonicalStudioGeneratedTake(selectedAsset, project.id, scene)) {
+        states[scene.id] = 'selected-take';
+        continue;
+      }
+      switch (readiness.sceneStatuses[scene.id]) {
+        case 'generated':
+          states[scene.id] = 'selected-take';
+          break;
+        case 'generating':
+          states[scene.id] = 'running';
+          break;
+        case 'needs_attention':
+          states[scene.id] = 'failed';
+          break;
+        default:
+          states[scene.id] = 'missing-slate';
+      }
+    }
+    return states;
+  }, [project, readiness.sceneStatuses]);
   const outsideScenes = useMemo(() => {
     if (activeCut?.orderMode !== 'manual') return [];
     const clippedSceneIds = new Set(Object.values(activeCut.clips).map((clip) => clip.sceneId));
@@ -261,6 +293,7 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
             scenes={project.scenes}
             assets={project.assets}
             slateScenes={slateScenes}
+            reviewStates={reviewStates}
             selectedSceneId={selectedSceneId}
             playheadSeconds={globalPlayhead}
             disabled={disabled}

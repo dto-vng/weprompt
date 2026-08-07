@@ -71,10 +71,16 @@ export type StudioRenderSpawn = (
   options: SpawnOptionsWithoutStdio
 ) => ChildProcessWithoutNullStreams;
 
+export type StudioRenderProgress = {
+  progress: number;
+  clipIndex: number;
+  clipTotal: number;
+};
+
 export type StudioRenderDeps = {
   store: Pick<CreativeStudioStore, 'getProject'>;
   mediaStore: Pick<StudioMediaStore, 'resolveAsset' | 'persistProjectOutput'>;
-  onProgress?: (progress: number) => void;
+  onProgress?: (progress: StudioRenderProgress) => void;
   environment?: NodeJS.ProcessEnv;
   temporaryRoot?: string;
   spawnProcess?: StudioRenderSpawn;
@@ -720,7 +726,7 @@ const executeRender = async (
   projectId: string,
   deps: StudioRenderDeps,
   state: RenderState,
-  reportProgress: (progress: number) => void
+  reportProgress: (progress: StudioRenderProgress) => void
 ): Promise<StudioRenderResult> => {
   let temporaryDirectory: string | null = null;
   let missingSceneIds: string[] = [];
@@ -739,7 +745,8 @@ const executeRender = async (
         'aionui-studio-render-'
       )
     );
-    reportProgress(0);
+    const clipTotal = selection.segments.length;
+    reportProgress({ progress: 0, clipIndex: 1, clipTotal });
     for (const [index, segment] of selection.segments.entries()) {
       if (state.cancelled) throw new RenderCancelledError();
       const extension = path.extname(segment.asset.managedAsset.fileName);
@@ -770,7 +777,11 @@ const executeRender = async (
       // eslint-disable-next-line no-await-in-loop
       await encodeSegment(binary, encoder, segment, dimensions, runOptions, temporaryDirectory, (outTime) => {
         if (totalDuration !== null) {
-          reportProgress(NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration));
+          reportProgress({
+            progress: NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration),
+            clipIndex: index + 1,
+            clipTotal,
+          });
         }
       });
       if (trimFilterOptions(segment.edits).length !== 0) {
@@ -781,17 +792,33 @@ const executeRender = async (
       }
       if (totalDuration !== null && segmentDuration !== undefined) {
         completedDuration += segmentDuration;
-        reportProgress(NORMALISE_PROGRESS_SHARE * Math.min(1, completedDuration / totalDuration));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE * Math.min(1, completedDuration / totalDuration),
+          clipIndex: index + 1,
+          clipTotal,
+        });
       } else {
-        reportProgress(NORMALISE_PROGRESS_SHARE * ((index + 1) / selection.segments.length));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE * ((index + 1) / selection.segments.length),
+          clipIndex: index + 1,
+          clipTotal,
+        });
       }
     }
     const outputPath = await concatSegments(binary, selection.segments, temporaryDirectory, runOptions, (outTime) => {
       if (totalDuration !== null) {
-        reportProgress(NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE * Math.min(1, outTime / totalDuration));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE * Math.min(1, outTime / totalDuration),
+          clipIndex: clipTotal,
+          clipTotal,
+        });
       }
     });
-    reportProgress(NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE);
+    reportProgress({
+      progress: NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE,
+      clipIndex: clipTotal,
+      clipTotal,
+    });
     if (state.cancelled) throw new RenderCancelledError();
     const stats = await fs.stat(outputPath);
     const output = createReadStream(outputPath);
@@ -807,7 +834,7 @@ const executeRender = async (
     });
     if (state.activeStream === output) state.activeStream = null;
     if (state.cancelled) throw new RenderCancelledError();
-    reportProgress(1);
+    reportProgress({ progress: 1, clipIndex: clipTotal, clipTotal });
     return { status: 'rendered', assetId: asset.id, missingSceneIds };
   } catch (error) {
     if (state.cancelled || error instanceof RenderCancelledError) return { status: 'cancelled', missingSceneIds };
@@ -826,12 +853,14 @@ const executeRender = async (
 export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRenderOperation => {
   const state: RenderState = { cancelled: false, activeProcess: null, activeStream: null };
   let lastProgress = 0;
-  const reportProgress = (progress: number): void => {
-    const next = Math.max(lastProgress, Math.min(1, progress));
-    if (next === lastProgress && next !== 0) return;
+  let lastClipIndex = 0;
+  const reportProgress = (update: StudioRenderProgress): void => {
+    const next = Math.max(lastProgress, Math.min(1, update.progress));
+    if (next === lastProgress && update.clipIndex === lastClipIndex && next !== 0) return;
     lastProgress = next;
+    lastClipIndex = update.clipIndex;
     try {
-      deps.onProgress?.(next);
+      deps.onProgress?.({ ...update, progress: next });
     } catch {
       // A relay callback cannot invalidate a local render.
     }
@@ -855,7 +884,7 @@ export type StudioRenderRunner = {
 };
 
 export type StudioRenderRunnerDeps = {
-  startOperation(projectId: string, onProgress: (progress: number) => void): StudioRenderOperation;
+  startOperation(projectId: string, onProgress: (progress: StudioRenderProgress) => void): StudioRenderOperation;
   onStateChanged(state: StudioRenderProgressEvent): void;
 };
 
@@ -902,15 +931,39 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
   const start = async (projectId: string): Promise<StudioRenderCutResult> => {
     if (activeOperations.has(projectId)) throw new StudioRenderRunnerError('busy');
     let progress = 0;
+    let clipProgress: Pick<StudioRenderProgress, 'clipIndex' | 'clipTotal'> | null = null;
     let operation: StudioRenderOperation | null = null;
     publish({ projectId, status: 'running', progress });
     try {
       operation = deps.startOperation(projectId, (reportedProgress) => {
-        if (!Number.isFinite(reportedProgress)) return;
-        const next = Math.max(progress, Math.min(1, Math.max(0, reportedProgress)));
-        if (next === progress) return;
+        if (!Number.isFinite(reportedProgress.progress)) return;
+        const next = Math.max(progress, Math.min(1, Math.max(0, reportedProgress.progress)));
+        const hasValidClipProgress =
+          Number.isSafeInteger(reportedProgress.clipIndex) &&
+          Number.isSafeInteger(reportedProgress.clipTotal) &&
+          reportedProgress.clipIndex > 0 &&
+          reportedProgress.clipTotal > 0 &&
+          reportedProgress.clipIndex <= reportedProgress.clipTotal;
+        const reportedClipProgress = hasValidClipProgress
+          ? { clipIndex: reportedProgress.clipIndex, clipTotal: reportedProgress.clipTotal }
+          : null;
+        const nextClipProgress =
+          reportedClipProgress !== null &&
+          clipProgress !== null &&
+          reportedClipProgress.clipTotal === clipProgress.clipTotal &&
+          reportedClipProgress.clipIndex < clipProgress.clipIndex
+            ? clipProgress
+            : reportedClipProgress;
+        if (
+          next === progress &&
+          nextClipProgress?.clipIndex === clipProgress?.clipIndex &&
+          nextClipProgress?.clipTotal === clipProgress?.clipTotal
+        ) {
+          return;
+        }
         progress = next;
-        publish({ projectId, status: 'running', progress });
+        clipProgress = nextClipProgress;
+        publish({ projectId, status: 'running', progress, ...clipProgress });
       });
       activeOperations.set(projectId, operation);
       const result = await operation.result;
@@ -939,7 +992,7 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
     } catch (error) {
       if (error instanceof StudioRenderRunnerError) throw error;
       const code = error instanceof CreativeStudioRenderError ? error.code : 'render_failed';
-      publish({ projectId, status: 'failed', progress, errorCode: code });
+      publish({ projectId, status: 'failed', progress, errorCode: code, ...clipProgress });
       throw new StudioRenderRunnerError(code);
     } finally {
       if (operation !== null && activeOperations.get(projectId) === operation) {

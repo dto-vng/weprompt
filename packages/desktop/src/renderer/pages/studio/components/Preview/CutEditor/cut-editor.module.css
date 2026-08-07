@@ -162,6 +162,18 @@
   color: var(--studio-slate-text);
 }
 
+.slatePlate [data-review-state='running'],
+.slatePlate [data-review-state='failed'] {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+}
+
+.failedState {
+  color: var(--danger);
+}
+
 .playhead {
   position: absolute;
   z-index: 5;

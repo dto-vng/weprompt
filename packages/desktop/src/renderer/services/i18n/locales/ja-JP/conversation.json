@@ -1039,7 +1039,12 @@
           "footer": "カットを書き出す",
           "action": "動画をレンダリング",
           "progress": "動画をレンダリング中… {{percent}}%",
+          "progressWithClip": "動画をレンダリング中… {{percent}}% · クリップ {{clip}}/{{total}}",
           "cancel": "レンダリングをキャンセル",
+          "busyReason": "このプロジェクトはすでにレンダリング中です。完了を待つか、開始したウィンドウからキャンセルしてください。",
+          "installFfmpeg": "FFmpeg をインストール",
+          "tryAgain": "レンダリングを再試行",
+          "openProduce": "生成へ移動",
           "missingScenes": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
           "missingScenes_one": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
           "missingScenes_other": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
@@ -1049,6 +1054,8 @@
             "busy": "このプロジェクトはすでにレンダリング中です。",
             "noRenderableScenes": "レンダリングできるテイクがあるシーンはありません。",
             "failed": "動画をレンダリングできませんでした。",
+            "failedClip": "クリップ {{clip}}/{{total}} をレンダリングできませんでした。",
+            "noRenderableShots": "ショット {{shots}} にはレンダリング可能なクリップがありません。",
             "cancelled": "動画のレンダリングをキャンセルしました。"
           }
         }
@@ -1330,6 +1337,11 @@
     "export": {
       "title": "素材を書き出す",
       "body": "ストーリーボードのマニフェストと各シーンで選択した素材を書き出します。",
+      "checkingRender": "レンダリング済みカットを確認中…",
+      "noRender": "未レンダリング",
+      "renderedAt": "レンダリング日時",
+      "staleRender": "このカットは最新の編集より前にレンダリングされています。",
+      "latestRenderUnavailable": "最新のレンダリング済みカットを確認できませんでした。書き出しを開き直してください。",
       "gapWarning": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
       "gapWarning_other": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
       "confirmSelectedCount": "{{count}} ショットを書き出しますか？",

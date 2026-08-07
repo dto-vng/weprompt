@@ -1053,7 +1053,12 @@
           "footer": "Renderizar corte",
           "action": "Renderizar vídeo",
           "progress": "Renderizando vídeo… {{percent}}%",
+          "progressWithClip": "Renderizando vídeo… {{percent}}% · Clipe {{clip}} de {{total}}",
           "cancel": "Cancelar renderização",
+          "busyReason": "Este projeto já está sendo renderizado. Aguarde a conclusão ou cancele na janela que iniciou a renderização.",
+          "installFfmpeg": "Instalar FFmpeg",
+          "tryAgain": "Tentar renderizar novamente",
+          "openProduce": "Ir para Produzir",
           "missingScenes": "{{count}} cenas não têm tomada e não aparecerão no vídeo.",
           "missingScenes_one": "{{count}} cena não tem tomada e não aparecerá no vídeo.",
           "missingScenes_other": "{{count}} cenas não têm tomada e não aparecerão no vídeo.",
@@ -1063,6 +1068,8 @@
             "busy": "Este projeto já está sendo renderizado.",
             "noRenderableScenes": "Nenhuma cena tem uma tomada para renderizar.",
             "failed": "Não foi possível renderizar o vídeo.",
+            "failedClip": "Não foi possível renderizar o clipe {{clip}} de {{total}}.",
+            "noRenderableShots": "Os planos {{shots}} não têm clipes renderizáveis.",
             "cancelled": "Renderização do vídeo cancelada."
           }
         }
@@ -1360,6 +1367,11 @@
     "export": {
       "title": "Exportar recursos",
       "body": "Exporte o manifesto do storyboard e o recurso selecionado de cada cena.",
+      "checkingRender": "Verificando o corte renderizado…",
+      "noRender": "Ainda não renderizado",
+      "renderedAt": "Renderizado",
+      "staleRender": "Este corte foi renderizado antes das suas edições mais recentes.",
+      "latestRenderUnavailable": "Não foi possível verificar o corte renderizado mais recente. Abra Exportar novamente.",
       "gapWarning": "Os planos {{shots}} ainda são cartelas e não serão incluídos.",
       "gapWarning_one": "O plano {{shots}} ainda é uma cartela e não será incluído.",
       "gapWarning_many": "Os planos {{shots}} ainda são cartelas e não serão incluídos.",

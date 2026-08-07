@@ -634,7 +634,7 @@ describe('Studio render runner', () => {
 
   it('relays monotonic progress and exposes the succeeded terminal state', async () => {
     const pending = deferred<StudioRenderResult>();
-    let reportProgress: ((progress: number) => void) | undefined;
+    let reportProgress: ((progress: { progress: number; clipIndex: number; clipTotal: number }) => void) | undefined;
     const states: StudioRenderProgressEvent[] = [];
     const runner = createStudioRenderRunner({
       startOperation: (_projectId, onProgress) => {
@@ -645,8 +645,8 @@ describe('Studio render runner', () => {
     });
 
     const result = runner.renderCut('project_1');
-    reportProgress?.(0.45);
-    reportProgress?.(0.2);
+    reportProgress?.({ progress: 0.45, clipIndex: 2, clipTotal: 3 });
+    reportProgress?.({ progress: 0.2, clipIndex: 1, clipTotal: 3 });
     pending.resolve({ status: 'rendered', assetId: 'render_1', missingSceneIds: ['scene_2'] });
 
     await expect(result).resolves.toEqual({ assetId: 'render_1', missingSceneIds: ['scene_2'] });
@@ -655,6 +655,7 @@ describe('Studio render runner', () => {
       ['running', 0.45],
       ['succeeded', 1],
     ]);
+    expect(states[1]).toMatchObject({ clipIndex: 2, clipTotal: 3 });
     expect(runner.getState('project_1')).toEqual({
       projectId: 'project_1',
       status: 'succeeded',
@@ -1304,7 +1305,7 @@ describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () =
       { id: 'scene_silent', mediaKind: 'video', durationSeconds: 1, fixture: 'silentVideo' },
       { id: 'scene_audio', mediaKind: 'video', durationSeconds: 1, fixture: 'videoWithAudio' },
     ]);
-    const progress: number[] = [];
+    const progress: Array<{ progress: number; clipIndex: number; clipTotal: number }> = [];
 
     const result = await renderCut('project_1', {
       store: harness.store,
@@ -1339,8 +1340,10 @@ describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () =
     ]);
     const meanVolume = /mean_volume:\s*(-?[\d.]+) dB/.exec(stderr);
     expect(Number(meanVolume?.[1])).toBeGreaterThan(-50);
-    expect(progress.at(-1)).toBe(1);
-    expect(progress.every((value, index) => index === 0 || value >= progress[index - 1]!)).toBe(true);
+    expect(progress.at(-1)).toEqual({ progress: 1, clipIndex: 2, clipTotal: 2 });
+    expect(progress.some(({ clipIndex, clipTotal }) => clipIndex === 1 && clipTotal === 2)).toBe(true);
+    expect(progress.some(({ clipIndex, clipTotal }) => clipIndex === 2 && clipTotal === 2)).toBe(true);
+    expect(progress.every((value, index) => index === 0 || value.progress >= progress[index - 1]!.progress)).toBe(true);
   }, 60_000);
 
   it('returns no_renderable_scenes without invoking ffmpeg for a selected import', async () => {

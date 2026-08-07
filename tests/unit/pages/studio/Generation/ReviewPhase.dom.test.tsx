@@ -5,6 +5,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,7 +15,7 @@ import type { ReviewPhaseController } from '@renderer/pages/studio/components/Ph
 import type { UseStoryboardEditorResult } from '@renderer/pages/studio/hooks/useStoryboardEditor';
 
 type RenderProgressEvent =
-  | { projectId: string; status: 'running'; progress: number }
+  | { projectId: string; status: 'running'; progress: number; clipIndex?: number; clipTotal?: number }
   | {
       projectId: string;
       status: 'succeeded';
@@ -28,6 +29,8 @@ type RenderProgressEvent =
       progress: number;
       errorCode: 'ffmpeg_unavailable' | 'render_failed' | 'no_renderable_scenes';
       missingSceneIds?: string[];
+      clipIndex?: number;
+      clipTotal?: number;
     }
   | { projectId: string; status: 'cancelled'; progress: number; missingSceneIds: string[] };
 
@@ -42,6 +45,10 @@ const bridge = vi.hoisted(() => ({
 const dnd = vi.hoisted(() => ({
   onDragEnd: null as null | ((event: { active: { id: string }; over: { id: string } | null }) => void),
 }));
+
+const external = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
+
+vi.mock('@renderer/utils/platform', () => external);
 
 vi.mock('@dnd-kit/core', async () => {
   const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core');
@@ -742,7 +749,40 @@ describe('Review phase cut', () => {
 
     expect(container.querySelectorAll('[data-cut-clip-id]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-slate-scene-id]')).toHaveLength(3);
-    expect(screen.getAllByText('conversation.creativeStudio.phase.review.slateLabel')).toHaveLength(3);
+    expect(screen.getAllByText('conversation.creativeStudio.phase.review.slateLabel')).toHaveLength(1);
+  });
+
+  it('labels selected, slate, running, and failed cut states without relying on colour', () => {
+    const { container } = render(<ReviewPhase controller={controller()} />);
+
+    expect(
+      Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
+    ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.selectedTake');
+    expect(screen.getByText('conversation.creativeStudio.phase.review.slateLabel')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.scene.status.generating')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
+  });
+
+  it('keeps the new footer and rail state styling on tokens defined for light and dark themes', () => {
+    const cutStyles = readFileSync(
+      'packages/desktop/src/renderer/pages/studio/components/Preview/CutEditor/cut-editor.module.css',
+      'utf8'
+    );
+    const footerStyles = readFileSync(
+      'packages/desktop/src/renderer/pages/studio/components/PhaseShell/phases/ReviewPhase.module.css',
+      'utf8'
+    );
+    const themeStyles = readFileSync('packages/desktop/src/renderer/styles/themes/default-color-scheme.css', 'utf8');
+
+    expect(cutStyles).toMatch(/\.failedState\s*\{[^}]*color:\s*var\(--danger\)/);
+    expect(`${cutStyles}\n${footerStyles}`).not.toMatch(/#[\da-f]{3,8}|rgba?\(/i);
+    expect(themeStyles.match(/--danger:/g)).toHaveLength(2);
+    expect(themeStyles.match(/--color-fill-2:/g)).toHaveLength(2);
   });
 
   it('keeps a takeless storyboard slate at its intended position between clips', () => {
@@ -816,7 +856,7 @@ describe('Review phase cut', () => {
     expect(bridge.renderCut.invoke).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1' });
   });
 
-  it('disables the action and updates its percentage from render progress events', async () => {
+  it('keeps the primary action in one slot while showing percentage and clip count', async () => {
     const pending = deferred<{
       ok: false;
       error: { code: 'cancelled'; messageKey: string };
@@ -824,15 +864,26 @@ describe('Review phase cut', () => {
     bridge.renderCut.invoke.mockReturnValueOnce(pending.promise);
     render(<ReviewPhase controller={controller()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' }));
+    const action = screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' });
+    const slot = action.closest('[data-render-state-slot]');
+    fireEvent.click(action);
 
     expect(
       screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progress:0' })
     ).toBeDisabled();
-    act(() => renderProgressListener?.({ projectId: 'project-1', status: 'running', progress: 0.42 }));
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'running',
+        progress: 0.42,
+        clipIndex: 2,
+        clipTotal: 3,
+      })
+    );
     expect(
-      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progress:42' })
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progressWithClip:42,2,3' })
     ).toBeDisabled();
+    expect(action.closest('[data-render-state-slot]')).toBe(slot);
 
     pending.resolve({
       ok: false,
@@ -844,10 +895,111 @@ describe('Review phase cut', () => {
     await screen.findByText('conversation.creativeStudio.phase.review.render.errors.cancelled');
   });
 
+  it('degrades a legacy running event with no clip fields to percentage only', () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    act(() => renderProgressListener?.({ projectId: 'project-1', status: 'running', progress: 0.42 }));
+
+    expect(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.progress:42' })
+    ).toBeDisabled();
+    expect(document.body).not.toHaveTextContent('undefined');
+  });
+
+  it('states the busy reason visibly and accessibly before the disabled action is hit', () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'running',
+        progress: 0.25,
+        clipIndex: 1,
+        clipTotal: 3,
+      })
+    );
+
+    const busyAction = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.review.render.progressWithClip:25,1,3',
+    });
+    expect(busyAction).toBeDisabled();
+    expect(busyAction).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.render.busyReason');
+    expect(screen.getByText('conversation.creativeStudio.phase.review.render.busyReason')).toBeVisible();
+    fireEvent.click(busyAction);
+    expect(bridge.renderCut.invoke).not.toHaveBeenCalled();
+  });
+
+  it('offers only FFmpeg installation for an unavailable renderer', () => {
+    render(<ReviewPhase controller={controller()} />);
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'failed',
+        progress: 0,
+        errorCode: 'ffmpeg_unavailable',
+      })
+    );
+
+    const slot = screen
+      .getByText('conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable')
+      .closest('[data-render-state-slot]')!;
+    const actions = within(slot as HTMLElement).getAllByRole('button');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toHaveAccessibleName('conversation.creativeStudio.phase.review.render.installFfmpeg');
+    fireEvent.click(actions[0]!);
+    expect(external.openExternalUrl).toHaveBeenCalledExactlyOnceWith('https://ffmpeg.org/download.html');
+  });
+
+  it('names the failed clip and offers only a render retry', async () => {
+    render(<ReviewPhase controller={controller()} />);
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'failed',
+        progress: 0.51,
+        errorCode: 'render_failed',
+        clipIndex: 2,
+        clipTotal: 3,
+      })
+    );
+
+    const failure = screen.getByText('conversation.creativeStudio.phase.review.render.errors.failedClip:2,3');
+    const slot = failure.closest('[data-render-state-slot]')!;
+    expect(slot).not.toHaveTextContent(/asset-|scene-/);
+    const actions = within(slot as HTMLElement).getAllByRole('button');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toHaveAccessibleName('conversation.creativeStudio.phase.review.render.tryAgain');
+    await act(async () => fireEvent.click(actions[0]!));
+    expect(bridge.renderCut.invoke).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1' });
+  });
+
+  it('names missing shots and offers only the Produce recovery for no renderable scenes', () => {
+    const reviewController = controller();
+    render(<ReviewPhase controller={reviewController} />);
+    act(() =>
+      renderProgressListener?.({
+        projectId: 'project-1',
+        status: 'failed',
+        progress: 0,
+        errorCode: 'no_renderable_scenes',
+        missingSceneIds: ['scene-slate', 'scene-running', 'scene-failed'],
+      })
+    );
+
+    const failure = screen.getByText(
+      'conversation.creativeStudio.phase.review.render.errors.noRenderableShots:02, 03, 04'
+    );
+    const slot = failure.closest('[data-render-state-slot]')!;
+    expect(slot).not.toHaveTextContent(/scene-slate|scene-running|scene-failed/);
+    const actions = within(slot as HTMLElement).getAllByRole('button');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toHaveAccessibleName('conversation.creativeStudio.phase.review.render.openProduce');
+    fireEvent.click(actions[0]!);
+    expect(reviewController.requestTransition).toHaveBeenCalledExactlyOnceWith({ phase: 'produce' });
+  });
+
   it.each([
     ['ffmpeg_unavailable', 'conversation.creativeStudio.phase.review.render.errors.ffmpegUnavailable'],
-    ['busy', 'conversation.creativeStudio.phase.review.render.errors.busy'],
-    ['no_renderable_scenes', 'conversation.creativeStudio.phase.review.render.errors.noRenderableScenes'],
     ['render_failed', 'conversation.creativeStudio.phase.review.render.errors.failed'],
     ['cancelled', 'conversation.creativeStudio.phase.review.render.errors.cancelled'],
   ] as const)('shows the distinct %s render failure', async (code, messageKey) => {

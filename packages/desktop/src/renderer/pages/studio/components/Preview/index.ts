@@ -13,4 +13,4 @@ export {
   StagePreview,
   type StagePreviewProps,
 } from './StagePreview';
-export { StudioExportModal, type StudioExportModalProps } from './StudioExportModal';
+export { studioShotNumbers, StudioExportModal, type StudioExportModalProps } from './StudioExportModal';

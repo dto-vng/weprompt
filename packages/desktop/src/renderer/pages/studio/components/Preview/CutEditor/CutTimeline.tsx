@@ -8,7 +8,7 @@ import { DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor,
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@arco-design/web-react';
-import { Drag } from '@icon-park/react';
+import { Attention, Drag, Loading } from '@icon-park/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -44,6 +44,8 @@ export const renderedDurationFor = (
 export type CutTimelineEntry =
   | { kind: 'clip'; clip: StudioCutClip; scene: StudioScene; asset: StudioAsset | undefined }
   | { kind: 'slate'; scene: StudioScene };
+
+export type CutTimelineReviewState = 'selected-take' | 'missing-slate' | 'running' | 'failed';
 
 export const buildCutTimelineEntries = (
   cut: StudioCut,
@@ -82,6 +84,7 @@ type SortableClipProps = {
   total: number;
   selected: boolean;
   disabled: boolean;
+  reviewState: CutTimelineReviewState;
   onSelect: () => void;
   onMove: (targetIndex: number) => void;
   onEdit: (edit: StudioEditableCutClip) => void;
@@ -95,11 +98,13 @@ const SortableClip: React.FC<SortableClipProps> = ({
   total,
   selected,
   disabled,
+  reviewState,
   onSelect,
   onMove,
   onEdit,
 }) => {
   const { t } = useTranslation();
+  const reviewStateId = React.useId();
   const sourceDuration = sourceDurationFor(clip, scene, asset);
   const persistedIn = clip.sourceInSeconds ?? 0;
   const persistedOut = clip.sourceOutSeconds ?? sourceDuration;
@@ -204,6 +209,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
         type='text'
         long
         aria-label={accessibleName}
+        aria-describedby={reviewStateId}
         aria-current={selected ? 'true' : undefined}
         className={styles.clipPlate}
         onClick={onSelect}
@@ -218,6 +224,9 @@ const SortableClip: React.FC<SortableClipProps> = ({
           }
         }}
       >
+        <span id={reviewStateId} data-review-state={reviewState} className='sr-only'>
+          {t('conversation.creativeStudio.phase.review.selectedTake')}
+        </span>
         <span className={styles.clipCopy}>
           <span className={`${studioType.eyebrow} ${styles.clipTitle}`}>{scene.title}</span>
           <span className={`${studioType.meta} ${styles.clipDuration}`}>
@@ -276,6 +285,7 @@ export type CutTimelineProps = {
   scenes: Readonly<Record<string, StudioScene>>;
   assets: Readonly<Record<string, StudioAsset>>;
   slateScenes: readonly StudioScene[];
+  reviewStates: Readonly<Partial<Record<string, CutTimelineReviewState>>>;
   selectedSceneId: string | null;
   playheadSeconds: number;
   disabled: boolean;
@@ -292,6 +302,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
   scenes,
   assets,
   slateScenes,
+  reviewStates,
   selectedSceneId,
   playheadSeconds,
   disabled,
@@ -360,8 +371,27 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={cut.clipOrder} strategy={horizontalListSortingStrategy}>
             <ol className={styles.clipList}>
-              {timelineEntries.map((entry) =>
-                entry.kind === 'clip' ? (
+              {timelineEntries.map((entry) => {
+                const reviewState = reviewStates[entry.scene.id] ?? 'missing-slate';
+                const reviewPresentation = (() => {
+                  switch (reviewState) {
+                    case 'running':
+                      return {
+                        icon: <Loading aria-hidden='true' />,
+                        label: t('conversation.creativeStudio.scene.status.generating'),
+                      };
+                    case 'failed':
+                      return {
+                        icon: <Attention aria-hidden='true' />,
+                        label: t('conversation.creativeStudio.jobs.status.failed'),
+                      };
+                    case 'selected-take':
+                      return { icon: null, label: t('conversation.creativeStudio.phase.review.selectedTake') };
+                    default:
+                      return { icon: null, label: t('conversation.creativeStudio.phase.review.slateLabel') };
+                  }
+                })();
+                return entry.kind === 'clip' ? (
                   <SortableClip
                     key={entry.clip.id}
                     clip={entry.clip}
@@ -371,6 +401,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                     total={clipEntries.length}
                     selected={selectedSceneId === entry.scene.id}
                     disabled={disabled}
+                    reviewState={reviewState}
                     onSelect={() => onSelectScene(entry.scene.id)}
                     onMove={(targetIndex) => onMoveClip(entry.clip.id, targetIndex)}
                     onEdit={(edit) => onEditClip(entry.clip.id, edit)}
@@ -395,11 +426,17 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                       onClick={() => onSelectScene(entry.scene.id)}
                     >
                       <span className={styles.clipTitle}>{entry.scene.title}</span>
-                      <span>{t('conversation.creativeStudio.phase.review.slateLabel')}</span>
+                      <span
+                        data-review-state={reviewState}
+                        className={reviewState === 'failed' ? styles.failedState : undefined}
+                      >
+                        {reviewPresentation.icon}
+                        <span>{reviewPresentation.label}</span>
+                      </span>
                     </Button>
                   </li>
-                )
-              )}
+                );
+              })}
             </ol>
           </SortableContext>
         </DndContext>

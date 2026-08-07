@@ -358,6 +358,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
       return { status: 'exported' as const, ...result };
     })
   );
+  ipcBridge.creativeStudio.getLatestRender.provider((input) =>
+    runCommand(() => dependencies.getService().getLatestRender(input))
+  );
   ipcBridge.creativeStudio.renderCut.provider((input) =>
     runCommand(() => getRenderRunner().renderCut(input.projectId))
   );
