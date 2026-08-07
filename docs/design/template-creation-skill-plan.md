@@ -117,7 +117,8 @@ create-review-confirm experience, not safety. The fallback is a scope cut, never
 
 **Non-goals:** pptx/docx in any form; reference files; sample-token extraction from references
 (HTML packs have none); sanitizer or privacy receipts beyond the disclosure line; any Store V2
-schema or API change; gallery rename/edit/delete by chat; sharing/export; forking builtins.
+schema change or public/general-purpose API expansion beyond the declared internal staging seam;
+gallery rename/edit/delete by chat; sharing/export; forking builtins.
 
 **Acceptance:**
 
