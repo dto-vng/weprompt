@@ -57,7 +57,7 @@ The enum threaded confirm → submit → job record → completion, default `tak
 
 ## 3. Explicitly not in this epic
 
-Scene-level assistant (bounded-context one-shots into editor drafts — deferred by design), the chip question card, additional proposal payload kinds, allow-list widening (KB search et al. — product decision when it comes; affects only future conversations), the Write surface, orphan-conversation reaping.
+Scene-level assistant — **now designed and planned as its own sprint-3 stretch item** ([design](creative-studio-scene-assist-design.md); plan `docs/superpowers/plans/2026-08-07-studio-scene-assist.md`, 8 tasks, independent of both slices). Still not in this epic: the chip question card, additional proposal payload kinds, allow-list widening (KB search et al. — product decision when it comes; affects only future conversations), the Write surface, orphan-conversation reaping.
 
 ## 4. Boundary with sprint 2 — corrected 2026-08-07
 
