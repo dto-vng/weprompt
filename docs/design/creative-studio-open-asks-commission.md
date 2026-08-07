@@ -113,6 +113,39 @@ The load-bearing part is the **arrival banner**: a disabled control in Produce n
 
 The model picker behind `Change model` is **not drawn** — a separate ask if we want it.
 
+## Our reply — three things to settle, sent 2026-08-07
+
+### 1. The fourth slate state is real, but its cause is inverted — and the drawn fix does not work
+
+The state you added exists. The mechanism you gave for it does not.
+
+- **A user cannot deselect a take.** `StudioSelectAssetRequest.assetId` is a plain `string`, and the payload schema requires a real id. There is no operation that nulls a selection.
+- **Every generated take selects itself on arrival** — `mediaStore.ts:1423` pushes the asset and sets it as selected in the same write.
+
+So "the user has deselected all of them" cannot happen. The state is reachable by exactly one route: **changing a shot's media kind**. That nulls the selection (`creativeStudioService.ts:1690`) while keeping the takes (`:1696`) — which means the takes that remain are all of the shot's **previous** kind.
+
+That breaks both halves of the drawing. **Takes, none chosen** says the user declined to choose, when in fact we dropped their selection. And **Choose a take** in the inspector would offer image takes for a shot that is now video — a second dead end, not a repair. The honest fact is closer to _these takes are for a different kind of shot_, and the only real fix is to generate again.
+
+Two ways out, and it is your call: re-label and re-action this case for what actually causes it, or tell us to build a real deselect so your version becomes reachable. It cannot ship as drawn.
+
+### 2. USER NOUNS collides with 71 strings we have already shipped
+
+The rule is right. The scope is the question. Our English Studio strings use **"scene" in 71 of 437** — including the timeline's accessible name (`Select scene {{number}}…`) and the handoff copy — and 4b's own screen-reader example says **"Shot 05"**.
+
+So: does USER NOUNS govern only the eight reason lines, or is it the product's vocabulary? The first is a morning's work. The second is a 71-string rename across twelve locales and should be planned as its own slice rather than absorbed. We have not assumed either.
+
+### 3. Model Settings depends on provenance, which is unbuilt and currently P3
+
+Every role card in 4a carries a provenance chip — `YOU CHOSE THIS`, `CHOSEN FOR YOU`, `NO RECORD`. That data does not exist yet; it is `EPIC-005-G1`, filed at **P3 and not started**. Model Settings cannot be built honestly without it, because a project with no provenance record would have to claim one.
+
+Either G1 is promoted and lands first, or the first cut of Model Settings ships without chips and gains them later. Not a design question — but it changes what we can deliver and when, so you should know before you expect the screen.
+
+Worth saying: your Ask D rule is **better than what G1 currently specifies**. The register says provenance is "cleared when the user selects explicitly"; you say the chip should disappear the moment anyone sets that role, because the chip answers _how did this get here_ and once a user chooses, it got there because they chose. We are taking your version.
+
+### Also delivered
+
+The Ask B list, derived from the code as promised: [generate-reason derivation](creative-studio-generate-reason-derivation.md). Thirteen paths, ten causes, eight sentences — and your guess that two would be outside the user's control was exactly right.
+
 ## D — settled, with the reasoning
 
 Copy: **"We have no record of how this model was set."** The chip reads **NO RECORD**, not `UNKNOWN`.
