@@ -13,7 +13,10 @@ import { useCronJobsMap } from '@/renderer/pages/cron';
 import { restrictToVerticalAxis } from '@/renderer/utils/ui/dndModifiers';
 import { ProjectCreateModal } from '@/renderer/pages/conversation/projects/ProjectCreateModal';
 import { buildProjectSidebarGroups } from '@/renderer/pages/conversation/projects/projectGrouping';
-import { resolveProjectClickTarget } from '@/renderer/pages/conversation/projects/projectNavigation';
+import {
+  buildProjectHomePath,
+  resolveProjectClickTarget,
+} from '@/renderer/pages/conversation/projects/projectNavigation';
 import { createProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { useProjects } from '@/renderer/pages/conversation/projects/useProjects';
 import { emitter } from '@/renderer/utils/emitter';
@@ -559,7 +562,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         onCreated={(project) => {
           refreshProjects();
           setProjectCreateVisible(false);
-          navigateToProjectChat(project.workspace, project.id);
+          void navigate(buildProjectHomePath(project.id));
         }}
       />
 

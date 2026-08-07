@@ -6,7 +6,7 @@
 
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import type { TChatConversation } from '@/common/config/storage';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -17,6 +17,10 @@ const conversationsHarness = vi.hoisted(() => ({
   expandedWorkspaces: [] as string[],
   timelineSections: [] as Array<Record<string, unknown>>,
   handleToggleWorkspace: vi.fn(),
+}));
+const projectCreateHarness = vi.hoisted(() => ({
+  onCreated: undefined as ((project: ForgeProject) => void) | undefined,
+  refreshProjects: vi.fn(),
 }));
 
 const project: ForgeProject = {
@@ -99,8 +103,15 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/DragOverlayContent', () =>
   default: () => null,
 }));
 
+vi.mock('@/renderer/pages/conversation/projects/ProjectCreateModal', () => ({
+  ProjectCreateModal: ({ onCreated }: { onCreated: (project: ForgeProject) => void }) => {
+    projectCreateHarness.onCreated = onCreated;
+    return null;
+  },
+}));
+
 vi.mock('@/renderer/pages/conversation/projects/useProjects', () => ({
-  useProjects: () => ({ projects: [project], refreshProjects: vi.fn() }),
+  useProjects: () => ({ projects: [project], refreshProjects: projectCreateHarness.refreshProjects }),
 }));
 
 vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversations', () => ({
@@ -197,6 +208,8 @@ describe('sidebar project row actions', () => {
     conversationsHarness.expandedWorkspaces = [];
     conversationsHarness.timelineSections = [];
     conversationsHarness.handleToggleWorkspace.mockReset();
+    projectCreateHarness.onCreated = undefined;
+    projectCreateHarness.refreshProjects.mockReset();
   });
 
   it('places both actions in one right-aligned, vertically centred slot', () => {
@@ -238,6 +251,22 @@ describe('sidebar project row actions', () => {
     expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid', {
       state: { workspace: '/w/alpha', projectId: 'p1' },
     });
+  });
+
+  it('opens the encoded Project Home route after project creation completes', () => {
+    renderSidebar();
+
+    act(() => {
+      projectCreateHarness.onCreated?.({
+        ...project,
+        id: 'created/project',
+        name: 'Created Project',
+        workspace: '/w/created',
+      });
+    });
+
+    expect(projectCreateHarness.refreshProjects).toHaveBeenCalledOnce();
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/project/created%2Fproject');
   });
 
   it('does not navigate when the row menu is opened', () => {
