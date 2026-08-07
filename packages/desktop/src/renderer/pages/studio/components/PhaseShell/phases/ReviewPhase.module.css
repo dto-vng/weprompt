@@ -25,37 +25,13 @@
 }
 
 .workspace {
-  display: grid;
+  display: flex;
   min-width: 0;
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 290px);
+  flex-direction: column;
   gap: 16px;
 }
 
-.previewArea {
-  display: grid;
-  min-width: 0;
-  align-items: start;
-  grid-template-areas:
-    'stage takes'
-    'filmstrip takes';
-  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
-  gap: 16px;
-}
-
-.previewArea > :global([data-review-region='stage']) {
-  grid-area: stage;
-}
-
-.previewArea > :global([data-review-region='takes']) {
-  grid-area: takes;
-}
-
-.previewArea > :global([data-review-region='filmstrip']) {
-  grid-area: filmstrip;
-}
-
-.handoff {
+.renderFoot {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -85,16 +61,4 @@
   border-radius: 999px;
   background: var(--color-fill-2);
   padding: 4px 8px;
-}
-
-.phase[data-layout='compact'] .workspace {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.phase[data-layout='compact'] .previewArea {
-  grid-template-areas:
-    'stage'
-    'filmstrip'
-    'takes';
-  grid-template-columns: minmax(0, 1fr);
 }

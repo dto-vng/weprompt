@@ -10,7 +10,7 @@ import { Button } from '@arco-design/web-react';
 
 import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
 import { ReviewCut, createManagedStudioAssetUrl } from '../../Preview';
-import { useStudioRender } from '../../../hooks';
+import { useCutEditor, useStudioRender } from '../../../hooks';
 import type { ReviewPhaseController } from '../types';
 import type { StudioLayoutMode } from '../useStudioLayoutMode';
 import styles from './ReviewPhase.module.css';
@@ -22,7 +22,9 @@ export type ReviewPhaseProps = {
 
 export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode = 'inline' }) => {
   const { t } = useTranslation();
-  const { project, readiness, editor, selectedAsset, posterAsset, mutationPending, selectVariation } = controller;
+  const { readiness, editor, posterAsset, mutationPending, selectVariation } = controller;
+  const cutEditor = useCutEditor(controller.project, controller.refreshProject);
+  const { project } = cutEditor;
   const missingSlateCount = Math.max(0, readiness.totalSceneCount - readiness.selectedAssetCount);
   const render = useStudioRender(project.id);
   const canonicalMissingSceneIds = project.sceneOrder.filter((sceneId) => {
@@ -42,22 +44,16 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
       </h2>
       <p className={`${styles.description} m-0`}>{t('conversation.creativeStudio.phase.review.description')}</p>
       <div className={styles.workspace}>
-        <div className={styles.previewArea}>
-          <ReviewCut
-            project={project}
-            readiness={readiness}
-            selectedSceneId={editor.selectedSceneId}
-            selectedAsset={selectedAsset}
-            posterAsset={posterAsset}
-            mutationPending={mutationPending || editor.hasUnsavedSceneDrafts}
-            onSelectAsset={selectVariation}
-            onSelectScene={editor.selectScene}
-          />
-        </div>
-        <aside aria-labelledby='studio-review-handoff-heading' className={styles.handoff}>
-          <h3 id='studio-review-handoff-heading' className={`${styles.handoffTitle} m-0`}>
-            {t('conversation.creativeStudio.phase.review.handoff')}
-          </h3>
+        <ReviewCut
+          cutEditor={cutEditor}
+          readiness={readiness}
+          selectedSceneId={editor.selectedSceneId}
+          posterAsset={posterAsset}
+          mutationPending={mutationPending || editor.hasUnsavedSceneDrafts}
+          onSelectAsset={selectVariation}
+          onSelectScene={editor.selectScene}
+        />
+        <footer aria-label={t('conversation.creativeStudio.phase.review.render.footer')} className={styles.renderFoot}>
           <div className={styles.handoffSummary}>
             <span>
               {t('conversation.creativeStudio.phase.review.renderedShots', {
@@ -117,7 +113,7 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
               preload='metadata'
             />
           )}
-        </aside>
+        </footer>
       </div>
     </section>
   );

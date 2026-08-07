@@ -113,6 +113,7 @@ import type {
   StudioProposalAcceptance,
   StudioProposalRequest,
   StudioPersistCapturedPosterRequest,
+  StudioPlaceCutScenesRequest,
   StudioRendererProject,
   StudioRenderCutResult,
   StudioRenderProgressEvent,
@@ -1213,6 +1214,9 @@ export const creativeStudio = {
   >('creative-studio.bind-brief-conversation'),
   updateCut: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateCutRequest>(
     'creative-studio.update-cut'
+  ),
+  placeCutScenes: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioPlaceCutScenesRequest>(
+    'creative-studio.place-cut-scenes'
   ),
   deleteProject: bridge.buildProvider<StudioCommandResult<boolean>, StudioDeleteProjectRequest>(
     'creative-studio.delete-project'

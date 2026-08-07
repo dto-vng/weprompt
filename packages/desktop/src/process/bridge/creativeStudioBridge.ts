@@ -318,6 +318,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
     runCommand(() => dependencies.getService().bindBriefConversation(input))
   );
   ipcBridge.creativeStudio.updateCut.provider((input) => runCommand(() => dependencies.getService().updateCut(input)));
+  ipcBridge.creativeStudio.placeCutScenes.provider((input) =>
+    runCommand(() => dependencies.getService().placeCutScenes(input))
+  );
   ipcBridge.creativeStudio.deleteProject.provider((input) =>
     runCommand(() => dependencies.getService().deleteProject(input))
   );

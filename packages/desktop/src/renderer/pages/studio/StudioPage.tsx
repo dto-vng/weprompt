@@ -768,6 +768,7 @@ const StudioProjectShell: React.FC<{ routePhase: StudioPhase | null }> = ({ rout
     openSingleGenerationReview: openSingleReview,
     openBatchGenerationReview: openBatchReview,
     openExport,
+    refreshProject: refetch,
     openModelSettings,
     importReference: handleImportReference,
     selectVariation: handleSelectVariation,

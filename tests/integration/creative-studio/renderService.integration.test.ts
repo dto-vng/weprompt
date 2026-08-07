@@ -21,6 +21,8 @@ import type {
   StudioScene,
 } from '@/common/types/project/creativeStudioTypes';
 import { createStudioMediaStore } from '@process/services/creative-studio/mediaStore';
+import { createCreativeStudioService } from '@process/services/creative-studio/creativeStudioService';
+import type { StudioStoryboardPlanner } from '@process/services/creative-studio/planning/storyboardPlanner';
 import {
   createStudioRenderRunner,
   CreativeStudioRenderError,
@@ -709,6 +711,76 @@ describe('Studio render runner', () => {
 });
 
 describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () => {
+  it('persists a guarded cut edit and renders its trim, crop, and colour into the probed file', async () => {
+    const harness = await createHarness([
+      { id: 'scene_edited', mediaKind: 'image', durationSeconds: 1, fixture: 'cropImage' },
+    ]);
+    const storyboardPlanner: StudioStoryboardPlanner = {
+      listModels: async () => [],
+      draft: async () => {
+        throw new Error('not used');
+      },
+      dispose: async () => undefined,
+    };
+    const service = createCreativeStudioService({
+      store: harness.store,
+      storyboardPlanner,
+      onProjectUpdated: vi.fn(),
+    });
+    const opened = (await service.getProject('project_1'))!;
+    const cutId = opened.activeCutId!;
+    const cut = opened.cuts![cutId]!;
+    const clipId = cut.clipOrder[0]!;
+    const edited = await service.updateCut({
+      projectId: opened.id,
+      expectedRevision: opened.revision,
+      cutId,
+      cut: {
+        orderMode: cut.orderMode,
+        clipOrder: [...cut.clipOrder],
+        clips: Object.fromEntries(
+          Object.entries(cut.clips).map(([id, clip]) => [
+            id,
+            id === clipId
+              ? {
+                  sourceInSeconds: 0.2,
+                  sourceOutSeconds: 0.7,
+                  crop: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+                  filters: [{ id: 'saturation', amount: -1 }],
+                }
+              : {
+                  sourceInSeconds: clip.sourceInSeconds,
+                  sourceOutSeconds: clip.sourceOutSeconds,
+                  crop: clip.crop,
+                  filters: clip.filters,
+                },
+          ])
+        ),
+      },
+    });
+
+    expect(edited.cuts?.[cutId]?.orderMode).toBe('manual');
+    expect((await harness.store.getProject('project_1'))?.cuts?.[cutId]?.clips[clipId]).toMatchObject({
+      sourceInSeconds: 0.2,
+      sourceOutSeconds: 0.7,
+      crop: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+      filters: [{ id: 'saturation', amount: -1 }],
+    });
+
+    await renderCut('project_1', {
+      store: harness.store,
+      mediaStore: harness.mediaStore,
+      environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+      temporaryRoot: harness.temporaryRoot,
+    }).result;
+
+    expect(Number((await probe(harness.outputPath)).format.duration)).toBeCloseTo(0.5, 1);
+    const edge = await probeRgbPixel(harness.outputPath, 0.25, 20, 20, 1280);
+    const centre = await probeRgbPixel(harness.outputPath, 0.25, 640, 360, 1280);
+    expect(Math.max(...edge) - Math.min(...edge)).toBeLessThanOrEqual(3);
+    expect(edge).toEqual(centre);
+  }, 60_000);
+
   it('renders a manual cut in clip order instead of scene order', async () => {
     const harness = await createHarness([
       { id: 'scene_short', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },

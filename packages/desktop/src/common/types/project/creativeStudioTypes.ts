@@ -521,6 +521,13 @@ export type StudioUpdateCutRequest = StudioProjectRequest & {
   cut: StudioEditableCut;
 };
 
+export type StudioPlaceCutScenesRequest = StudioProjectRequest & {
+  expectedRevision: number;
+  cutId: string;
+  sceneIds: string[];
+  beforeClipId: string | null;
+};
+
 export type StudioModelSelectionChange =
   | {
       role: 'storyboard';
@@ -675,6 +682,7 @@ export type StudioDesktopApi = {
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   updateCut(input: StudioUpdateCutRequest): Promise<StudioCommandResult<StudioRendererProject>>;
+  placeCutScenes(input: StudioPlaceCutScenesRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<StudioCommandResult<boolean>>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioCommandResult<StudioRendererProject>>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioCommandResult<StudioRendererProject>>;

@@ -9,7 +9,9 @@ import type {
   ProposeStudioStoryboardInput,
   StudioBindBriefConversationRequest,
   StudioCut,
+  StudioCutClip,
   StudioEditableCut,
+  StudioEditableCutClip,
   StudioEditableScene,
   StudioProject,
   StudioProjectSummary,
@@ -19,6 +21,7 @@ import type {
   StudioProposalRequest,
   StudioProjectRequest,
   StudioPersistCapturedPosterRequest,
+  StudioPlaceCutScenesRequest,
   StudioScene,
   StudioSelectAssetRequest,
   StudioUpdateProjectRequest,
@@ -149,6 +152,7 @@ export type CreativeStudioService = {
   updateProject(input: StudioUpdateProjectRequest): Promise<StudioRendererProject>;
   bindBriefConversation(input: StudioBindBriefConversationRequest): Promise<StudioRendererProject>;
   updateCut(input: StudioUpdateCutRequest): Promise<StudioRendererProject>;
+  placeCutScenes(input: StudioPlaceCutScenesRequest): Promise<StudioRendererProject>;
   deleteProject(input: StudioDeleteProjectRequest): Promise<boolean>;
   updateScene(input: StudioUpdateSceneRequest): Promise<StudioRendererProject>;
   reorderScenes(input: StudioReorderScenesRequest): Promise<StudioRendererProject>;
@@ -269,6 +273,31 @@ const isIntegerInRange = (value: unknown, minimum: number, maximum: number): val
   value <= maximum;
 
 const invalid = (message: string): CreativeStudioStoreError => new CreativeStudioStoreError('invalid_payload', message);
+
+const cutClipEditChanged = (current: StudioCutClip, edit: StudioEditableCutClip): boolean => {
+  const currentFilters = current.filters
+    .filter((filter) => filter.amount !== 0)
+    .toSorted((left, right) => left.id.localeCompare(right.id));
+  const editedFilters = edit.filters
+    .filter((filter) => filter.amount !== 0)
+    .toSorted((left, right) => left.id.localeCompare(right.id));
+  const cropChanged =
+    current.crop === null || edit.crop === null
+      ? current.crop !== edit.crop
+      : current.crop.x !== edit.crop.x ||
+        current.crop.y !== edit.crop.y ||
+        current.crop.width !== edit.crop.width ||
+        current.crop.height !== edit.crop.height;
+  return (
+    current.sourceInSeconds !== edit.sourceInSeconds ||
+    current.sourceOutSeconds !== edit.sourceOutSeconds ||
+    cropChanged ||
+    currentFilters.length !== editedFilters.length ||
+    currentFilters.some(
+      (filter, index) => filter.id !== editedFilters[index]?.id || filter.amount !== editedFilters[index]?.amount
+    )
+  );
+};
 
 const assertSafeId: (value: unknown, label: string) => asserts value is string = (value, label) => {
   if (!isSafeId(value)) throw invalid(`Invalid Studio ${label}`);
@@ -535,6 +564,17 @@ const isFiniteInRange = (value: unknown, minimum: number, maximum: number): valu
 
 const trimPointIsValid = (value: unknown): value is number | null =>
   value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+
+const placedClipIdSuffix = (value: number | null): string => (value === null ? '' : `_${value}`);
+
+const allocatePlacedClipId = (sceneId: string, occupied: ReadonlySet<string>): string => {
+  const candidate = (value: number | null): string =>
+    `clip_${sceneId}`.slice(0, 256 - placedClipIdSuffix(value).length) + placedClipIdSuffix(value);
+  if (!occupied.has(candidate(null))) return candidate(null);
+  let sequence = 2;
+  while (occupied.has(candidate(sequence))) sequence += 1;
+  return candidate(sequence);
+};
 
 const assertEditableCut: (value: unknown) => asserts value is StudioEditableCut = (value) => {
   if (
@@ -1232,12 +1272,15 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
             const orderChanged =
               input.cut.clipOrder.some((clipId, index) => clipId !== currentCut.clipOrder[index]) ||
               input.cut.clipOrder.length !== currentCut.clipOrder.length;
+            const clipsChanged = currentClipIds.some((clipId) =>
+              cutClipEditChanged(currentCut.clips[clipId]!, input.cut.clips[clipId]!)
+            );
             const orderMode =
               currentCut.orderMode === 'manual'
                 ? input.cut.orderMode === 'storyboard'
                   ? 'storyboard'
                   : 'manual'
-                : orderChanged
+                : orderChanged || clipsChanged
                   ? 'manual'
                   : 'storyboard';
             const editedCut: StudioCut = {
@@ -1255,7 +1298,9 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
                       sourceInSeconds: edit.sourceInSeconds,
                       sourceOutSeconds: edit.sourceOutSeconds,
                       crop: edit.crop === null ? null : { ...edit.crop },
-                      filters: edit.filters.map((filter) => ({ ...filter })),
+                      filters: edit.filters
+                        .filter((filter) => filter.amount !== 0)
+                        .map((filter) => ({ id: filter.id, amount: filter.amount })),
                     },
                   ];
                 })
@@ -1269,6 +1314,76 @@ export const createCreativeStudioService = (deps: CreativeStudioServiceDeps): Cr
               },
               activeCutId: cutState.activeCutId,
             });
+          },
+          input.expectedRevision
+        )
+      );
+    },
+
+    async placeCutScenes(input: StudioPlaceCutScenesRequest): Promise<StudioRendererProject> {
+      assertSafeId(input.projectId, 'project id');
+      assertSafeId(input.cutId, 'cut id');
+      assertExpectedRevision(input.expectedRevision);
+      if (
+        !Array.isArray(input.sceneIds) ||
+        input.sceneIds.length === 0 ||
+        input.sceneIds.some((sceneId) => !isSafeId(sceneId)) ||
+        new Set(input.sceneIds).size !== input.sceneIds.length ||
+        (input.beforeClipId !== null && !isSafeId(input.beforeClipId))
+      ) {
+        throw invalid('Invalid Studio cut placement');
+      }
+      return notify(
+        await deps.store.updateProject(
+          input.projectId,
+          (project) => {
+            const cutState = resolveStudioCutState(project);
+            const currentCut = cutState.cuts[input.cutId];
+            if (currentCut === undefined || currentCut.orderMode !== 'manual') {
+              throw invalid('Studio cut placement requires a manual cut');
+            }
+            const insertionIndex =
+              input.beforeClipId === null
+                ? currentCut.clipOrder.length
+                : currentCut.clipOrder.indexOf(input.beforeClipId);
+            if (insertionIndex < 0) throw invalid('Studio cut placement target not found');
+
+            const clips = structuredClone(currentCut.clips);
+            const occupied = new Set(Object.keys(clips));
+            const placedIds = input.sceneIds.map((sceneId) => {
+              const scene = project.scenes[sceneId];
+              const asset = scene?.selectedAssetId === null ? undefined : project.assets[scene?.selectedAssetId ?? ''];
+              if (
+                scene === undefined ||
+                asset === undefined ||
+                !isCanonicalStudioGeneratedTake(asset, project.id, scene) ||
+                Object.values(clips).some((clip) => clip.sceneId === sceneId)
+              ) {
+                throw invalid('Studio cut placement scene is not available');
+              }
+              const clipId = allocatePlacedClipId(sceneId, occupied);
+              occupied.add(clipId);
+              clips[clipId] = {
+                id: clipId,
+                sceneId,
+                assetId: asset.id,
+                sourceInSeconds: null,
+                sourceOutSeconds: null,
+                crop: null,
+                filters: [],
+              };
+              return clipId;
+            });
+            const clipOrder = [...currentCut.clipOrder];
+            clipOrder.splice(insertionIndex, 0, ...placedIds);
+            return {
+              ...project,
+              cuts: {
+                ...structuredClone(cutState.cuts),
+                [input.cutId]: { ...currentCut, clipOrder, clips },
+              },
+              activeCutId: cutState.activeCutId,
+            };
           },
           input.expectedRevision
         )

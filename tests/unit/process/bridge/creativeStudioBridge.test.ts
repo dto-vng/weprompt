@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   updateProjectProvider: vi.fn(),
   bindBriefConversationProvider: vi.fn(),
   updateCutProvider: vi.fn(),
+  placeCutScenesProvider: vi.fn(),
   fitStoryboardProvider: vi.fn(),
   deleteProjectProvider: vi.fn(),
   updateSceneProvider: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock('@/common', () => ({
       updateProject: { provider: mocks.updateProjectProvider },
       bindBriefConversation: { provider: mocks.bindBriefConversationProvider },
       updateCut: { provider: mocks.updateCutProvider },
+      placeCutScenes: { provider: mocks.placeCutScenesProvider },
       fitStoryboard: { provider: mocks.fitStoryboardProvider },
       deleteProject: { provider: mocks.deleteProjectProvider },
       updateScene: { provider: mocks.updateSceneProvider },
@@ -135,6 +137,7 @@ describe('initCreativeStudioBridge', () => {
         updateProject: vi.fn(async () => project),
         bindBriefConversation: vi.fn(async () => project),
         updateCut: vi.fn(async () => project),
+        placeCutScenes: vi.fn(async () => project),
         fitStoryboard: vi.fn(async () => ({
           status: 'already_matches' as const,
           project,
@@ -181,6 +184,7 @@ describe('initCreativeStudioBridge', () => {
     expect(mocks.updateProjectProvider).toHaveBeenCalledOnce();
     expect(mocks.bindBriefConversationProvider).toHaveBeenCalledOnce();
     expect(mocks.updateCutProvider).toHaveBeenCalledOnce();
+    expect(mocks.placeCutScenesProvider).toHaveBeenCalledOnce();
     expect(mocks.fitStoryboardProvider).toHaveBeenCalledOnce();
     expect(mocks.deleteProjectProvider).toHaveBeenCalledOnce();
     expect(mocks.updateSceneProvider).toHaveBeenCalledOnce();
@@ -355,6 +359,22 @@ describe('initCreativeStudioBridge', () => {
 
     await expect(handler(input)).resolves.toEqual({ ok: true, data: project });
     expect(service.updateCut).toHaveBeenCalledExactlyOnceWith(input);
+  });
+
+  it('delegates canonical cut placement without letting the renderer mint clip identities', async () => {
+    const service = dependencies.getService();
+    initCreativeStudioBridge({ getService: () => service });
+    const handler = mocks.placeCutScenesProvider.mock.calls[0]?.[0] as ProviderHandler;
+    const input = {
+      projectId: 'project_1',
+      expectedRevision: 4,
+      cutId: 'cut_1',
+      sceneIds: ['scene_2'],
+      beforeClipId: 'clip_1',
+    };
+
+    await expect(handler(input)).resolves.toEqual({ ok: true, data: project });
+    expect(service.placeCutScenes).toHaveBeenCalledExactlyOnceWith(input);
   });
 
   it.each([

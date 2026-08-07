@@ -32,10 +32,50 @@ type RenderProgressEvent =
   | { projectId: string; status: 'cancelled'; progress: number; missingSceneIds: string[] };
 
 const bridge = vi.hoisted(() => ({
+  updateCut: { invoke: vi.fn() },
+  placeCutScenes: { invoke: vi.fn() },
   renderCut: { invoke: vi.fn() },
   cancelRender: { invoke: vi.fn() },
   renderProgress: { on: vi.fn() },
 }));
+
+const dnd = vi.hoisted(() => ({
+  onDragEnd: null as null | ((event: { active: { id: string }; over: { id: string } | null }) => void),
+}));
+
+vi.mock('@dnd-kit/core', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core');
+  return {
+    ...actual,
+    DndContext: ({
+      children,
+      onDragEnd,
+    }: {
+      children: React.ReactNode;
+      onDragEnd?: (event: { active: { id: string }; over: { id: string } | null }) => void;
+    }) => {
+      dnd.onDragEnd = onDragEnd ?? null;
+      return <>{children}</>;
+    },
+  };
+});
+
+vi.mock('@dnd-kit/sortable', async () => {
+  const actual = await vi.importActual<typeof import('@dnd-kit/sortable')>('@dnd-kit/sortable');
+  return {
+    ...actual,
+    SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useSortable: () => ({
+      attributes: {},
+      listeners: {},
+      setNodeRef: vi.fn(),
+      setActivatorNodeRef: vi.fn(),
+      transform: null,
+      transition: undefined,
+      isDragging: false,
+    }),
+  };
+});
 
 let renderProgressListener: ((event: RenderProgressEvent) => void) | undefined;
 
@@ -84,6 +124,9 @@ const asset = (id: string, sceneId = 'scene-selected'): StudioAsset => ({
   managedAsset: { collection: 'assets', fileName: `${id}.png` },
   byteSize: 128,
   sha256: id.padEnd(64, 'a').slice(0, 64),
+  width: 1280,
+  height: 720,
+  durationSeconds: 5,
   createdAt: '2026-08-04T00:00:00.000Z',
 });
 
@@ -113,6 +156,26 @@ const project = (): StudioRendererProject => {
       [running.id]: running,
       [failed.id]: failed,
     },
+    cuts: {
+      'cut-1': {
+        id: 'cut-1',
+        name: 'Launch film',
+        orderMode: 'storyboard',
+        clipOrder: ['clip-selected'],
+        clips: {
+          'clip-selected': {
+            id: 'clip-selected',
+            sceneId: selected.id,
+            assetId: 'asset-1',
+            sourceInSeconds: 0.4,
+            sourceOutSeconds: 4.6,
+            crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+            filters: [{ id: 'exposure', amount: 0.2 }],
+          },
+        },
+      },
+    },
+    activeCutId: 'cut-1',
     assets: {
       'asset-1': asset('asset-1'),
       'asset-2': asset('asset-2'),
@@ -201,8 +264,26 @@ const controller = (selectedSceneId = 'scene-selected'): ReviewPhaseController =
   };
 };
 
+const addSecondClip = (reviewController: ReviewPhaseController): void => {
+  const secondScene = reviewController.project.scenes['scene-slate']!;
+  secondScene.selectedAssetId = 'asset-3';
+  secondScene.assetIds = ['asset-3'];
+  reviewController.project.assets['asset-3'] = asset('asset-3', secondScene.id);
+  reviewController.project.cuts!['cut-1']!.clips['clip-second'] = {
+    id: 'clip-second',
+    sceneId: secondScene.id,
+    assetId: 'asset-3',
+    sourceInSeconds: null,
+    sourceOutSeconds: null,
+    crop: null,
+    filters: [],
+  };
+  reviewController.project.cuts!['cut-1']!.clipOrder.push('clip-second');
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  dnd.onDragEnd = null;
   renderProgressListener = undefined;
   bridge.renderProgress.on.mockImplementation((listener: (event: RenderProgressEvent) => void) => {
     renderProgressListener = listener;
@@ -215,9 +296,417 @@ beforeEach(() => {
     data: { assetId: 'render-default', missingSceneIds: [] },
   });
   bridge.cancelRender.invoke.mockResolvedValue({ ok: true, data: { cancelled: true } });
+  bridge.updateCut.invoke.mockImplementation(async (input: { cut: StudioRendererProject['cuts'][string] }) => {
+    const current = project();
+    const cut = current.cuts!['cut-1']!;
+    return {
+      ok: true,
+      data: {
+        ...current,
+        revision: current.revision + 1,
+        cuts: {
+          'cut-1': {
+            ...cut,
+            orderMode: input.cut.orderMode,
+            clipOrder: [...input.cut.clipOrder],
+            clips: Object.fromEntries(
+              Object.entries(cut.clips).map(([clipId, clip]) => [clipId, { ...clip, ...input.cut.clips[clipId] }])
+            ),
+          },
+        },
+      },
+    };
+  });
+  bridge.placeCutScenes.invoke.mockResolvedValue({ ok: true, data: project() });
 });
 
 describe('Review phase cut', () => {
+  it('shows played, untrimmed, and rendered durations with trim and grade marks', () => {
+    const { container } = render(<ReviewPhase controller={controller()} />);
+
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.duration.played:0')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.duration.untrimmed:5')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.duration.render:4.2')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.trimmed')).toBeVisible();
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.graded')).toBeVisible();
+    expect((container.querySelector("[data-cut-clip-id='clip-selected']") as HTMLElement).style.flexGrow).toBe('4.2');
+  });
+
+  it('reorders a focused clip with modifier plus arrow through the guarded cut mutation', async () => {
+    const reviewController = controller();
+    addSecondClip(reviewController);
+
+    render(<ReviewPhase controller={reviewController} />);
+    fireEvent.keyDown(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:2,Missing close,5',
+      }),
+      { key: 'ArrowLeft', metaKey: true }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'project-1',
+          expectedRevision: 12,
+          cutId: 'cut-1',
+          cut: expect.objectContaining({ clipOrder: ['clip-second', 'clip-selected'] }),
+        })
+      )
+    );
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.moveAnnouncement:2,1,2')).toBeInTheDocument();
+  });
+
+  it('uses the same guarded cut permutation for pointer drag reorder', async () => {
+    const reviewController = controller();
+    addSecondClip(reviewController);
+    render(<ReviewPhase controller={reviewController} />);
+
+    act(() => {
+      dnd.onDragEnd?.({ active: { id: 'clip-second' }, over: { id: 'clip-selected' } });
+    });
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: 'project-1',
+          expectedRevision: 12,
+          cutId: 'cut-1',
+          cut: expect.objectContaining({ clipOrder: ['clip-second', 'clip-selected'] }),
+        })
+      )
+    );
+  });
+
+  it('keeps the trim handle and typed in point on the same persisted value', async () => {
+    render(<ReviewPhase controller={controller()} />);
+    const inHandle = screen.getByRole('slider', {
+      name: 'conversation.creativeStudio.phase.review.cut.trimInHandle',
+    });
+
+    fireEvent.keyDown(inHandle, { key: 'ArrowRight', shiftKey: true });
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceInSeconds: 1.4 }),
+            }),
+          }),
+        })
+      )
+    );
+    expect(
+      Number(
+        (
+          screen.getByRole('spinbutton', {
+            name: 'conversation.creativeStudio.phase.review.cut.trimInField',
+          }) as HTMLInputElement
+        ).value
+      )
+    ).toBe(1.4);
+  });
+
+  it('persists a precisely typed trim point through the same cut edit', async () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.change(
+      screen.getByRole('spinbutton', {
+        name: 'conversation.creativeStudio.phase.review.cut.trimInField',
+      }),
+      { target: { value: '0.75' } }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceInSeconds: 0.75 }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it.each([
+    ['ArrowRight', false, 0.433],
+    ['Home', false, null],
+  ] as const)('moves the in handle with %s to the exact persisted value', async (key, shiftKey, expected) => {
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'conversation.creativeStudio.phase.review.cut.trimInHandle' }),
+      { key, shiftKey }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceInSeconds: expected }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('moves the out handle to its clip bound with End', async () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', { name: 'conversation.creativeStudio.phase.review.cut.trimOutHandle' }),
+      { key: 'End' }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceOutSeconds: null }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('exposes a visible zero recovery tick for every bipolar colour slider', () => {
+    const { container } = render(<ReviewPhase controller={controller()} />);
+
+    expect(container.querySelectorAll('[data-control-zero-tick]')).toHaveLength(4);
+  });
+
+  it('persists colour changes from the slider keyboard path', async () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.keyDown(
+      screen.getByRole('slider', {
+        name: 'conversation.creativeStudio.phase.review.cut.colourLabels.exposure',
+      }),
+      { key: 'ArrowRight' }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({
+                filters: expect.arrayContaining([{ id: 'exposure', amount: 0.21 }]),
+              }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('nudges the focusable crop overlay and resets trim, crop, and colour together', async () => {
+    render(<ReviewPhase controller={controller()} />);
+
+    fireEvent.keyDown(screen.getByRole('group', { name: 'conversation.creativeStudio.phase.review.cut.cropOverlay' }), {
+      key: 'ArrowRight',
+      shiftKey: true,
+    });
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({
+                crop: expect.objectContaining({ x: 0.2, y: 0.1 }),
+              }),
+            }),
+          }),
+        })
+      )
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.cut.resetClip' }));
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': {
+                sourceInSeconds: null,
+                sourceOutSeconds: null,
+                crop: null,
+                filters: [],
+              },
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('changes the aspect-locked crop scale from the select keyboard path', async () => {
+    const reviewController = controller();
+    reviewController.project.assets['asset-1'] = {
+      ...reviewController.project.assets['asset-1']!,
+      width: 960,
+      height: 720,
+    };
+    render(<ReviewPhase controller={reviewController} />);
+    const scale = screen.getByRole('combobox', { name: 'conversation.creativeStudio.phase.review.cut.scale' });
+
+    fireEvent.keyDown(scale, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+    await waitFor(() => expect(scale).toHaveAttribute('aria-expanded', 'true'));
+    fireEvent.keyDown(scale, { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40 });
+    fireEvent.keyDown(scale, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({
+                crop: { x: 0.15, y: 0.238, width: 0.7, height: 0.525 },
+              }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('offers keyboard-operable placement only for canonical takes outside a manual cut', async () => {
+    const reviewController = controller();
+    const outsideScene = reviewController.project.scenes['scene-slate']!;
+    outsideScene.selectedAssetId = 'asset-outside';
+    outsideScene.assetIds = ['asset-outside'];
+    reviewController.project.assets['asset-outside'] = asset('asset-outside', outsideScene.id);
+    reviewController.project.cuts!['cut-1']!.orderMode = 'manual';
+
+    const view = render(<ReviewPhase controller={reviewController} />);
+    expect(screen.getByText('conversation.creativeStudio.phase.review.cut.divergence')).toBeVisible();
+    const add = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.review.cut.addToEnd:Missing close',
+    });
+    fireEvent.keyDown(add, { key: 'Enter' });
+
+    await waitFor(() =>
+      expect(bridge.placeCutScenes.invoke).toHaveBeenCalledExactlyOnceWith({
+        projectId: 'project-1',
+        expectedRevision: 12,
+        cutId: 'cut-1',
+        sceneIds: ['scene-slate'],
+        beforeClipId: null,
+      })
+    );
+
+    view.unmount();
+    const storyboardController = controller();
+    const storyboardOutside = storyboardController.project.scenes['scene-slate']!;
+    storyboardOutside.selectedAssetId = 'asset-outside';
+    storyboardOutside.assetIds = ['asset-outside'];
+    storyboardController.project.assets['asset-outside'] = asset('asset-outside', storyboardOutside.id);
+    render(<ReviewPhase controller={storyboardController} />);
+    expect(screen.queryByText('conversation.creativeStudio.phase.review.cut.outsideTitle')).not.toBeInTheDocument();
+  });
+
+  it('seeks from the timeline, follows the selected video on stage, and sets I at the playhead', async () => {
+    const reviewController = controller();
+    const selected = reviewController.project.scenes['scene-selected']!;
+    selected.mediaKind = 'video';
+    reviewController.project.assets['asset-1'] = {
+      ...reviewController.project.assets['asset-1']!,
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'asset-1.mp4' },
+    };
+    render(<ReviewPhase controller={reviewController} />);
+    const track = document.querySelector<HTMLElement>('[data-cut-timeline-track]')!;
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 20,
+      width: 100,
+      height: 20,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(track, { clientX: 10 });
+
+    const video = screen.getByLabelText('conversation.creativeStudio.preview.videoLabel') as HTMLVideoElement;
+    await waitFor(() => expect(video.currentTime).toBeCloseTo(2.52, 2));
+    expect(reviewController.editor.selectScene).toHaveBeenCalledWith('scene-selected');
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'conversation.creativeStudio.timeline.title' }), {
+      key: 'I',
+    });
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceInSeconds: 2.52 }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
+  it('sets O at the timeline playhead and toggles video transport with Space', async () => {
+    const reviewController = controller();
+    const selected = reviewController.project.scenes['scene-selected']!;
+    selected.mediaKind = 'video';
+    reviewController.project.assets['asset-1'] = {
+      ...reviewController.project.assets['asset-1']!,
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'asset-1.mp4' },
+    };
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+    render(<ReviewPhase controller={reviewController} />);
+    const timeline = screen.getByRole('region', { name: 'conversation.creativeStudio.timeline.title' });
+    const track = document.querySelector<HTMLElement>('[data-cut-timeline-track]')!;
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 20,
+      width: 100,
+      height: 20,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(track, { clientX: 10 });
+
+    fireEvent.keyDown(timeline, { key: ' ' });
+    expect(play).toHaveBeenCalledOnce();
+    const video = screen.getByLabelText('conversation.creativeStudio.preview.videoLabel');
+    Object.defineProperty(video, 'paused', { configurable: true, value: false });
+    fireEvent.keyDown(timeline, { key: ' ' });
+    expect(pause).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(timeline, { key: 'O' });
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({
+            clips: expect.objectContaining({
+              'clip-selected': expect.objectContaining({ sourceOutSeconds: 2.52 }),
+            }),
+          }),
+        })
+      )
+    );
+  });
+
   it('shows the selected take and changes variations with the canonical project revision', () => {
     const reviewController = controller();
     render(<ReviewPhase controller={reviewController} />);
@@ -248,21 +737,36 @@ describe('Review phase cut', () => {
     expect(within(preview).getByText('conversation.creativeStudio.phase.review.excludedFromHandoff')).toBeVisible();
   });
 
-  it('labels selected, slate, running, and failed rail states without relying on color', () => {
+  it('keeps every takeless storyboard scene as a labeled slate outside the rendered clip order', () => {
     const { container } = render(<ReviewPhase controller={controller()} />);
 
-    expect(
-      Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
-    ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
-    expect(screen.getAllByText('conversation.creativeStudio.phase.review.selectedTake')).toHaveLength(2);
-    expect(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:1,Selected opening,5,5',
-      })
-    ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.selectedTake');
-    expect(screen.getByText('conversation.creativeStudio.phase.review.slateLabel')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.scene.status.generating')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
+    expect(container.querySelectorAll('[data-cut-clip-id]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-slate-scene-id]')).toHaveLength(3);
+    expect(screen.getAllByText('conversation.creativeStudio.phase.review.slateLabel')).toHaveLength(3);
+  });
+
+  it('keeps a takeless storyboard slate at its intended position between clips', () => {
+    const reviewController = controller();
+    const running = reviewController.project.scenes['scene-running']!;
+    running.selectedAssetId = 'asset-running';
+    running.assetIds = ['asset-running'];
+    reviewController.project.assets['asset-running'] = asset('asset-running', running.id);
+    reviewController.project.cuts!['cut-1']!.clips['clip-running'] = {
+      id: 'clip-running',
+      sceneId: running.id,
+      assetId: 'asset-running',
+      sourceInSeconds: null,
+      sourceOutSeconds: null,
+      crop: null,
+      filters: [],
+    };
+    reviewController.project.cuts!['cut-1']!.clipOrder.push('clip-running');
+    const { container } = render(<ReviewPhase controller={reviewController} />);
+
+    const timelineItems = [...(container.querySelector('[data-cut-timeline-track] ol')?.children ?? [])].map(
+      (item) => item.getAttribute('data-cut-clip-id') ?? item.getAttribute('data-slate-scene-id')
+    );
+    expect(timelineItems.slice(0, 3)).toEqual(['clip-selected', 'scene-slate', 'clip-running']);
   });
 
   it('keeps a selected take visibly in cut while another variation renders', () => {
@@ -273,9 +777,7 @@ describe('Review phase cut', () => {
     };
     const { container } = render(<ReviewPhase controller={reviewController} />);
 
-    expect(
-      container.querySelector("[data-review-region='filmstrip'] [data-review-state='selected-take']")
-    ).not.toBeNull();
+    expect(container.querySelector("[data-cut-clip-id='clip-selected']")).not.toBeNull();
     expect(screen.getByText('conversation.creativeStudio.phase.review.renderedShots:1')).toBeVisible();
   });
 
@@ -288,13 +790,18 @@ describe('Review phase cut', () => {
     expect(screen.queryByText('conversation.creativeStudio.review.generateScene')).not.toBeInTheDocument();
   });
 
-  it('exposes the handoff summary as a complementary region beside the review workspace', () => {
+  it('keeps the handoff summary with the render action at the foot of the cut', () => {
     render(<ReviewPhase controller={controller()} />);
 
-    const handoff = screen.getByRole('complementary', {
-      name: 'conversation.creativeStudio.phase.review.handoff',
+    const renderFoot = screen.getByRole('contentinfo', {
+      name: 'conversation.creativeStudio.phase.review.render.footer',
     });
-    expect(handoff).toContainElement(screen.getByText('conversation.creativeStudio.phase.review.handoffDescription'));
+    expect(renderFoot).toContainElement(
+      screen.getByText('conversation.creativeStudio.phase.review.handoffDescription')
+    );
+    expect(renderFoot).toContainElement(
+      screen.getByRole('button', { name: 'conversation.creativeStudio.phase.review.render.action' })
+    );
   });
 
   it('shows the render action and a non-blocking missing-take count', () => {
