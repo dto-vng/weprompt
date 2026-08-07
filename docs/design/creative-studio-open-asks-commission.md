@@ -78,3 +78,43 @@ So you can spend the time where it counts:
 - A Review redraw. §3a–§3d stand; Ask A is one state inside it, not a reopening.
 - Anything on Produce beyond Ask B's copy. The panel shape is settled.
 - Brief-as-conversation, alternate cuts, transitions, audio mixing, text overlays, or NLE export — all out of scope and unchanged.
+
+---
+
+# Response received — 2026-08-07
+
+All four answered the same day. Recorded here; the drawings live on the designer's canvas (turn 4: **4a** Model Settings, **4b** the slate, **4c** the copy shape).
+
+## A — settled: one plate, four labels
+
+**Keep the distinction, drop the treatments.** The hatch means _no footage here_ in every case, so it stays constant and **only the text changes** — one plate with four labels, not three differently-treated plates. Our restoration was right about the need and wrong about the shape.
+
+The fourth label is the designer's own addition: **a shot with takes where none is selected**. It is the only one of the four fixable inside Review, since the takes already exist and the user need only pick one.
+
+**The repair action lives in the inspector on selection, never on the plate** — at three seconds a plate cannot hold a button, and the designer explicitly refused to widen one case to fit one control.
+
+**Verified reachable, not hypothetical.** We checked whether the model can even express the fourth state, and it is produced by an ordinary action: changing a shot's media kind after it has takes. `creativeStudioService.ts:1690` nulls `selectedAssetId` when the selected asset's kind no longer matches, while `:1696` retains `assetIds` intact. So takes-without-a-selection is a real reachable state today, and nothing currently explains it to the user.
+
+**Implication for us:** the fourth state does not exist in `CutTimelineReviewState`, which carries `selected-take | missing-slate | running | failed`. It needs a fifth member and an inspector action. That is new work, not a relabelling.
+
+## B — the list is ours to produce
+
+The designer accepted the caveat at face value: without the conditions written down they would be _inventing_ conditions rather than naming them. **They asked for the list.**
+
+One instruction that may reduce the work: **4c gives the shape each line must fit**, so the derivation has to collect the right facts — and _if two causes produce the same sentence they are one string_. Nine code paths is not necessarily nine strings.
+
+**Blocked on us**, not on them. Needs 4c before the list is shaped.
+
+## C — Model Settings is drawn
+
+Organised **by role, never by provider or catalogue**. Four states per role, with the state owning the action.
+
+The load-bearing part is the **arrival banner**: a disabled control in Produce names a shot, and this screen must catch that intent **in the same words**, offer the way back, and take **initial focus on that role's primary action**. It is a **route rather than a modal** because repair detours through a credential. **No new tokens.**
+
+The model picker behind `Change model` is **not drawn** — a separate ask if we want it.
+
+## D — settled, with the reasoning
+
+Copy: **"We have no record of how this model was set."** The chip reads **NO RECORD**, not `UNKNOWN`.
+
+The distinction is the point and worth preserving in implementation: _unknown_ describes the **model**, which is alarming and wrong; _no record_ describes **our bookkeeping**, which is what is actually missing. Applies to `EPIC-005-G1`.
