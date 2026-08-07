@@ -38,6 +38,7 @@ export type StudioPhaseControllers = {
   openSingleGenerationReview: (request: GenerationSingleReviewRequest) => void;
   openBatchGenerationReview: (request: GenerationBatchReviewRequest) => void;
   openExport: () => void;
+  refreshProject?: () => Promise<StudioRendererProject | null>;
   openModelSettings: () => void;
   importReference: (sceneId: string) => Promise<void>;
   selectVariation: (request: StudioSelectVariationRequest) => Promise<void>;
@@ -96,5 +97,6 @@ export type ReviewPhaseController = Pick<
   | 'mutationPending'
   | 'requestTransition'
   | 'openExport'
+  | 'refreshProject'
   | 'selectVariation'
 >;

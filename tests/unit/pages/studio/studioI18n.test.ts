@@ -199,6 +199,21 @@ const readinessActionKeys = [
   'preview.generateThisScene',
 ] as const;
 
+const renderStateAndExportKeys = [
+  'phase.review.render.progressWithClip',
+  'phase.review.render.busyReason',
+  'phase.review.render.installFfmpeg',
+  'phase.review.render.tryAgain',
+  'phase.review.render.openProduce',
+  'phase.review.render.errors.failedClip',
+  'phase.review.render.errors.noRenderableShots',
+  'export.checkingRender',
+  'export.noRender',
+  'export.renderedAt',
+  'export.staleRender',
+  'export.latestRenderUnavailable',
+] as const;
+
 const pluralLogicalKeys = [
   'export.confirmSelectedCount',
   'export.gapWarning',
@@ -603,6 +618,23 @@ describe('Creative Studio localization contract', () => {
       const leaves = flattenStringLeaves(creativeStudio);
 
       for (const key of stableMessageKeys) {
+        if (!leaves[key]?.trim()) {
+          issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
+        }
+      }
+    }
+
+    expect(issues).toEqual([]);
+  });
+
+  it('localizes every R4 render-state and pre-export metadata message in every configured locale', () => {
+    const issues: string[] = [];
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const leaves = flattenStringLeaves(creativeStudio);
+
+      for (const key of renderStateAndExportKeys) {
         if (!leaves[key]?.trim()) {
           issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
         }

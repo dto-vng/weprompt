@@ -37,6 +37,9 @@
   --studio-take-border: #dcd3c0;
   --studio-take-chip: rgb(31 29 27 / 42%); /* ink scrim so a take label stays legible over any frame */
   --studio-take-text: #fffdf8;
+  --cut-slate-hatch: repeating-linear-gradient(135deg, transparent 0 6px, rgb(180 56 15 / 12%) 6px 8px);
+  --control-handle: #374ea2;
+  --control-zero-tick: #14181f;
   --studio-library-hairline: #e4dccb;
   --studio-library-chip-text: #54503f;
   --studio-library-shape-surface: #fbf8f1;
@@ -137,6 +140,9 @@
   --studio-take-border: var(--color-border-2);
   --studio-take-chip: rgb(6 8 12 / 62%); /* deeper scrim: dark frames need more separation than the cream theme */
   --studio-take-text: var(--text-white);
+  --cut-slate-hatch: repeating-linear-gradient(135deg, transparent 0 6px, rgb(232 100 97 / 18%) 6px 8px);
+  --control-handle: #6e82d6;
+  --control-zero-tick: #e6ecf5;
   --studio-library-hairline: var(--color-border-2);
   --studio-library-chip-text: var(--text-secondary);
   --studio-library-shape-surface: var(--color-fill-1);

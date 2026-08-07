@@ -19,6 +19,7 @@ export {
 } from './useStudioJobs';
 export { useStudioModels, type UseStudioModelsOptions, type UseStudioModelsResult } from './useStudioModels';
 export { useStudioProject, type UseStudioProjectOptions, type UseStudioProjectResult } from './useStudioProject';
+export { useCutEditor, type StudioCutMoveAnnouncement, type UseCutEditorResult } from './useCutEditor';
 export { useStudioRender, type StudioRenderViewState, type UseStudioRenderResult } from './useStudioRender';
 export {
   useStudioVideoPosterCapture,

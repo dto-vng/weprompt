@@ -767,15 +767,17 @@ const reconcileCut = (project: StudioProject, cut: StudioCut): StudioCut => {
 
   const occupied = new Set(Object.keys(clips));
   const addedIds: string[] = [];
-  for (const sceneId of project.sceneOrder) {
-    const scene = project.scenes[sceneId];
-    if (scene === undefined || Object.values(clips).some((clip) => clip.sceneId === sceneId)) continue;
-    const asset = selectedTake(project, scene);
-    if (asset === null) continue;
-    const clipId = allocateClipId(sceneId, occupied);
-    occupied.add(clipId);
-    addedIds.push(clipId);
-    clips[clipId] = pristineClip(scene, asset, clipId);
+  if (cut.orderMode === 'storyboard') {
+    for (const sceneId of project.sceneOrder) {
+      const scene = project.scenes[sceneId];
+      if (scene === undefined || Object.values(clips).some((clip) => clip.sceneId === sceneId)) continue;
+      const asset = selectedTake(project, scene);
+      if (asset === null) continue;
+      const clipId = allocateClipId(sceneId, occupied);
+      occupied.add(clipId);
+      addedIds.push(clipId);
+      clips[clipId] = pristineClip(scene, asset, clipId);
+    }
   }
 
   const retainedPriorOrder = priorOrder.filter((clipId) => Object.hasOwn(clips, clipId));

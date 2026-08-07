@@ -113,6 +113,7 @@ import type {
   StudioProposalAcceptance,
   StudioProposalRequest,
   StudioPersistCapturedPosterRequest,
+  StudioPlaceCutScenesRequest,
   StudioRendererProject,
   StudioRenderCutResult,
   StudioRenderProgressEvent,
@@ -123,6 +124,7 @@ import type {
   StudioConnectionValidationResult,
   StudioConnectionCandidate,
   StudioListRoutesRequest,
+  StudioLatestRender,
   StudioRemoveConnectionRequest,
   StudioRouteCatalog,
   StudioSaveConnectionRequest,
@@ -1214,6 +1216,9 @@ export const creativeStudio = {
   updateCut: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateCutRequest>(
     'creative-studio.update-cut'
   ),
+  placeCutScenes: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioPlaceCutScenesRequest>(
+    'creative-studio.place-cut-scenes'
+  ),
   deleteProject: bridge.buildProvider<StudioCommandResult<boolean>, StudioDeleteProjectRequest>(
     'creative-studio.delete-project'
   ),
@@ -1237,6 +1242,9 @@ export const creativeStudio = {
     StudioCommandResult<StudioExportOutcome>,
     StudioChooseAndExportAssetsRequest
   >('creative-studio.choose-and-export-assets'),
+  getLatestRender: bridge.buildProvider<StudioCommandResult<StudioLatestRender | null>, StudioProjectRequest>(
+    'creative-studio.get-latest-render'
+  ),
   renderCut: bridge.buildProvider<StudioCommandResult<StudioRenderCutResult>, StudioProjectRequest>(
     'creative-studio.render-cut'
   ),
