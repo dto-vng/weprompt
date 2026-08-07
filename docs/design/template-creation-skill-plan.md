@@ -24,33 +24,33 @@ feature scope, but pptx/docx raw ingestion is what carried effectively all of th
 lifecycle burden. HTML template creation needs almost none of it.
 
 Contrast evidence from the same sprint: EPIC-001's foundation (MR 57) froze contracts, limits,
-state machine, and crash-injection boundaries *before* any consumer existed — and passed
+state machine, and crash-injection boundaries _before_ any consumer existed — and passed
 independent review on the first pass.
 
 ### What the epic produced (real, preserved, reusable)
 
-| Asset | Where | Disposition |
-| --- | --- | --- |
-| **Accepted Store V2 foundation** — exact durable-byte head protection, root authority checks, permanent committed ownership, sanitizer identity validation, PPTX/DOCX reload parity | `2f883cee531d5334250870f4bbe66b6bf472adc2` | **Consumed as-is by Epic A. API frozen; Epic A may not extend or modify it** |
-| Blocked Task 3 candidate — source copying, pack snapshots, transient cleanup, 119 focused tests | `a1754a13e01c886458db6c1385fa88e6b0719823` | Preserved as **Epic C reference material** (mine its tests; never rebase it into A or B) |
-| Task 1 proposal + marker contracts | frozen in the SDD area | Carried into Epic A unchanged |
-| Privacy decision | resolved as **sanitize-v1** during the epic | Applies to Epics B/C; Epic A's staged artifact is reviewable text, so disclosure-on-card suffices |
+| Asset                                                                                                                                                                               | Where                                       | Disposition                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Accepted Store V2 foundation** — exact durable-byte head protection, root authority checks, permanent committed ownership, sanitizer identity validation, PPTX/DOCX reload parity | `2f883cee531d5334250870f4bbe66b6bf472adc2`  | **Consumed as-is by Epic A. API frozen; Epic A may not extend or modify it**                      |
+| Blocked Task 3 candidate — source copying, pack snapshots, transient cleanup, 119 focused tests                                                                                     | `a1754a13e01c886458db6c1385fa88e6b0719823`  | Preserved as **Epic C reference material** (mine its tests; never rebase it into A or B)          |
+| Task 1 proposal + marker contracts                                                                                                                                                  | frozen in the SDD area                      | Carried into Epic A unchanged                                                                     |
+| Privacy decision                                                                                                                                                                    | resolved as **sanitize-v1** during the epic | Applies to Epics B/C; Epic A's staged artifact is reviewable text, so disclosure-on-card suffices |
 
 ## The split
 
 Split by **hard problem**, not by task. Strictly ordered; each epic ships user value on its own.
 
-| Epic | Outcome | Hard problems carried | Status |
-| --- | --- | --- | --- |
-| **A** | HTML template creation end-to-end from chat | none beyond what is already solved and accepted | **Sprint 2 backlog** |
-| **B** | Office templates sourced from app-owned artifacts (EPIC-001 retained run candidates) | gallery install for binary packs; no raw ingestion, no sanitizer | Not scheduled; wants EPIC-001's retained-candidate machinery live first |
-| **C** | Raw workspace Office ingestion + sanitization | all of them — this is a security/lifecycle epic and must be chartered as one | Not scheduled; may never be needed if B covers real usage |
+| Epic  | Outcome                                                                              | Hard problems carried                                                        | Status                                                                  |
+| ----- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **A** | HTML template creation end-to-end from chat                                          | none beyond what is already solved and accepted                              | **Sprint 2 backlog**                                                    |
+| **B** | Office templates sourced from app-owned artifacts (EPIC-001 retained run candidates) | gallery install for binary packs; no raw ingestion, no sanitizer             | Not scheduled; wants EPIC-001's retained-candidate machinery live first |
+| **C** | Raw workspace Office ingestion + sanitization                                        | all of them — this is a security/lifecycle epic and must be chartered as one | Not scheduled; may never be needed if B covers real usage               |
 
 **Scope guard (binding for every epic below):** each epic's charter names its hard problems and
 seams **up front**; Epic A declares exactly two (below). If a task needs a sanitizer, an
 **undeclared** authority seam, or an **undeclared** crash-recovery protocol, the task is in the
 wrong epic — stop and re-charter rather than absorb it. (The original absolute form of this guard
-was revised 2026-08-07: review showed Epic A's staging and installation contracts were *not*
+was revised 2026-08-07: review showed Epic A's staging and installation contracts were _not_
 already solved, so pretending it carries zero hard problems would have reproduced the EPIC-002
 pattern of discovering boundaries mid-implementation.)
 
@@ -86,16 +86,16 @@ into the Template Gallery as a user pack.
 
 **Reuse map (contract-checked, not existence-checked):**
 
-- **Proposal persistence:** accepted Store V2 at `2f883cee`, consumed as-is *except* the
+- **Proposal persistence:** accepted Store V2 at `2f883cee`, consumed as-is _except_ the
   declared seam in problem 1; crash-safe proposals, idempotent terminal operations, and
   committed ownership are reviewed and reused.
 - **Pack conversion:** reuse `importThemeSpec`'s **parsing, token extraction, manifest
-  derivation, and SVG generation** — explicitly *not* its direct-write workflow as the commit
+  derivation, and SVG generation** — explicitly _not_ its direct-write workflow as the commit
   mechanism (problem 2 replaces that).
 - **Marker + trust boundary:** Task 1's accepted contracts, unchanged.
 - **Gallery UI:** existing user-pack listing; review card follows existing message-card patterns.
-- **Cross-backend:** templated *use* already works on AionRS and ACP via shared composition;
-  cross-backend *creation and marker emission* is unproven and requires explicit smoke evidence
+- **Cross-backend:** templated _use_ already works on AionRS and ACP via shared composition;
+  cross-backend _creation and marker emission_ is unproven and requires explicit smoke evidence
   (see acceptance).
 
 **De-scope valve (per the two-blocked-revisions rule):** if either declared problem blows past
@@ -106,7 +106,7 @@ create-review-confirm experience, not safety. The fallback is a scope cut, never
 **Scope:**
 
 - Source rule: **artifact-derived and description-only HTML templates.** A from-description
-  *deck* template still composes as "generate the deck through the normal flow, then save it" —
+  _deck_ template still composes as "generate the deck through the normal flow, then save it" —
   which lands in Epic B, not here.
 - Staging accepts exactly one `THEME.md` (bounded size) from the marker-named staging directory
   under the authorized conversation workspace; the existing path/symlink/containment validation
@@ -128,7 +128,7 @@ gallery rename/edit/delete by chat; sharing/export; forking builtins.
 - **Staging contract:** the installed pack's `THEME.md` is byte-identical to the previewed
   immutable snapshot; the physical proof was minted inside storage code; a mutable-source swap
   after staging is detected and rejected.
-- **Installation contract:** duplicate confirmation and app restart complete the *original*
+- **Installation contract:** duplicate confirmation and app restart complete the _original_
   commit under the reserved ID — no `name-2`, no partial pack ever visible in the gallery; a
   crash mid-install leaves only a temporary directory that cleanup owns.
 - Discard, expiry, and terminal idempotency behave per Store V2's accepted semantics; the only
