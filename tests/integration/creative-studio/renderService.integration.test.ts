@@ -567,10 +567,21 @@ const matrixFromVideoFilter = (videoFilter: string): number[] | null => {
   ];
 };
 
-const expectPixelNear = (actual: readonly number[], expected: readonly number[]): void => {
+/**
+ * Colour-conformance probes use the tight default: the golden-pixel table is the
+ * contract and must hold to within a codec rounding step.
+ *
+ * Spatial probes near a frame edge need a wider window. 4:2:0 chroma is subsampled,
+ * and how an encoder reconstructs it at the boundary differs between `libx264` and
+ * `h264_videotoolbox` — the same crop assertion measures 3 on the hardware encoder
+ * and passes on the software one. Widening it there costs nothing, because those
+ * probes distinguish a saturated colour from its absence (a gap of ~200), not one
+ * rounding step from another.
+ */
+const expectPixelNear = (actual: readonly number[], expected: readonly number[], tolerance = 2): void => {
   expect(actual).toHaveLength(3);
   for (const [index, value] of actual.entries()) {
-    expect(Math.abs(value - expected[index]!)).toBeLessThanOrEqual(2);
+    expect(Math.abs(value - expected[index]!)).toBeLessThanOrEqual(tolerance);
   }
 };
 
@@ -880,7 +891,8 @@ describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () =
     expect(video).toMatchObject({ width: 1280, height: 720 });
     expect(video!.width! % 2).toBe(0);
     expect(video!.height! % 2).toBe(0);
-    expectPixelNear(await probeRgbPixel(harness.outputPath, 0.5, 20, 20, 1280), [0, 255, 0]);
+    // Edge-region probe: see expectPixelNear — encoder chroma reconstruction differs there.
+    expectPixelNear(await probeRgbPixel(harness.outputPath, 0.5, 20, 20, 1280), [0, 255, 0], 8);
   }, 60_000);
 
   it('derives the fixed-order 4x5 matrix identically from different filter array orders', async () => {
