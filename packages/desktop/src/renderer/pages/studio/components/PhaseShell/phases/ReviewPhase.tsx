@@ -95,6 +95,7 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
       <div className={styles.workspace}>
         <ReviewCut
           cutEditor={cutEditor}
+          layoutMode={layoutMode}
           readiness={readiness}
           selectedSceneId={editor.selectedSceneId}
           posterAsset={posterAsset}
@@ -104,27 +105,27 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
         />
         <footer aria-label={t('conversation.creativeStudio.phase.review.render.footer')} className={styles.renderFoot}>
           <div className={styles.handoffSummary}>
-            <span>
+            <span data-render-count>
               {t('conversation.creativeStudio.phase.review.renderedShots', {
                 count: readiness.selectedAssetCount,
               })}
             </span>
-            <span>
+            <span data-render-count>
               {t('conversation.creativeStudio.phase.review.missingSlates', {
                 count: missingSlateCount,
               })}
             </span>
           </div>
-          <p className={`${styles.handoffDescription} m-0`}>
+          <p data-render-footer-line className={`${styles.handoffDescription} m-0`}>
             {t('conversation.creativeStudio.phase.review.handoffDescription')}
           </p>
           {readiness.selectedAssetCount === 0 && (
-            <p className={`${styles.handoffDescription} m-0`}>
+            <p data-render-footer-line className={`${styles.handoffDescription} m-0`}>
               {t('conversation.creativeStudio.phase.review.noAssets')}
             </p>
           )}
           {renderMissingSceneIds.length > 0 && (
-            <p className={`${styles.handoffDescription} m-0`}>
+            <p data-render-footer-line className={`${styles.handoffDescription} m-0`}>
               {t('conversation.creativeStudio.phase.review.render.missingScenes', {
                 count: renderMissingSceneIds.length,
               })}
@@ -145,16 +146,28 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
           >
             {render.busy ? (
               <>
-                <Button type='primary' className={styles.renderPrimaryAction} disabled aria-describedby={busyReasonId}>
+                <Button
+                  type='primary'
+                  data-render-primary-action
+                  className={styles.renderPrimaryAction}
+                  disabled
+                  aria-describedby={busyReasonId}
+                >
                   {progressMessage}
                 </Button>
-                <p id={busyReasonId} className={`${styles.handoffDescription} m-0`}>
+                <p id={busyReasonId} data-render-footer-line className={`${styles.handoffDescription} m-0`}>
                   {t('conversation.creativeStudio.phase.review.render.busyReason')}
                 </p>
               </>
             ) : renderRunning ? (
               <>
-                <Button type='primary' className={styles.renderPrimaryAction} disabled loading>
+                <Button
+                  type='primary'
+                  data-render-primary-action
+                  className={styles.renderPrimaryAction}
+                  disabled
+                  loading
+                >
                   {progressMessage}
                 </Button>
                 <div className={styles.renderStateSupport}>
@@ -165,20 +178,30 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
               </>
             ) : renderFailure !== null ? (
               <>
-                <Button type='primary' className={styles.renderPrimaryAction} onClick={renderFailure.run}>
+                <Button
+                  type='primary'
+                  data-render-primary-action
+                  className={styles.renderPrimaryAction}
+                  onClick={renderFailure.run}
+                >
                   {renderFailure.action}
                 </Button>
-                <p role='alert' className={`${styles.handoffDescription} m-0 text-danger`}>
+                <p role='alert' data-render-footer-line className={`${styles.handoffDescription} m-0 text-danger`}>
                   {renderFailure.message}
                 </p>
               </>
             ) : (
               <>
-                <Button type='primary' className={styles.renderPrimaryAction} onClick={() => void render.render()}>
+                <Button
+                  type='primary'
+                  data-render-primary-action
+                  className={styles.renderPrimaryAction}
+                  onClick={() => void render.render()}
+                >
                   {t('conversation.creativeStudio.phase.review.render.action')}
                 </Button>
                 {render.errorCode === 'cancelled' && render.errorMessageKey !== null && (
-                  <p role='status' className={`${styles.handoffDescription} m-0`}>
+                  <p role='status' data-render-footer-line className={`${styles.handoffDescription} m-0`}>
                     {t(render.errorMessageKey)}
                   </p>
                 )}

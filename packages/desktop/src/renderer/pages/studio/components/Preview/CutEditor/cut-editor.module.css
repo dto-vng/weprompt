@@ -24,6 +24,24 @@
   overflow-x: auto;
 }
 
+.scrollAffordance {
+  position: sticky;
+  z-index: 6;
+  right: 0;
+  bottom: 28px;
+  display: flex;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+  pointer-events: none;
+}
+
 .clipList {
   display: flex;
   min-width: 560px;
@@ -103,7 +121,6 @@
   font-size: 9px;
   letter-spacing: 0.04em;
   line-height: 1;
-  opacity: 0.82;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -257,6 +274,11 @@
   white-space: nowrap;
 }
 
+.colourControl :global(.arco-slider-button) {
+  border-color: var(--control-handle);
+  background: var(--color-bg-2);
+}
+
 .sliderTrack {
   position: relative;
   display: block;
@@ -321,6 +343,11 @@
 .durationLine {
   justify-content: flex-start;
   font-variant-numeric: tabular-nums;
+}
+
+.durationLine > span {
+  flex: none;
+  white-space: nowrap;
 }
 
 .renderFoot,

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Button, Modal, Select, Tag } from '@arco-design/web-react';
-import React, { useMemo, useState } from 'react';
+import { Button, Drawer, Modal, Select, Tag } from '@arco-design/web-react';
+import { CloseSmall } from '@icon-park/react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
@@ -18,6 +19,7 @@ import type {
 import type { UseCutEditorResult } from '../../hooks';
 import type { StudioReadinessSummary } from '../../studioReadiness';
 import studioType from '../../StudioTypography.module.css';
+import type { StudioLayoutMode } from '../PhaseShell/useStudioLayoutMode';
 import { CutInspector } from './CutEditor/CutInspector';
 import {
   buildCutTimelineEntries,
@@ -33,6 +35,7 @@ type ActionResult = void | Promise<unknown>;
 
 export type ReviewCutProps = {
   cutEditor: UseCutEditorResult;
+  layoutMode?: StudioLayoutMode;
   readiness: StudioReadinessSummary;
   selectedSceneId: string | null;
   posterAsset: StudioAsset | null;
@@ -44,6 +47,7 @@ export type ReviewCutProps = {
 /** The complete Review cut editor: stage, timeline, selected-clip inspector, and manual-cut recovery. */
 export const ReviewCut: React.FC<ReviewCutProps> = ({
   cutEditor,
+  layoutMode = 'inline',
   readiness,
   selectedSceneId,
   posterAsset,
@@ -54,6 +58,8 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
   const { t } = useTranslation();
   const { project, activeCut } = cutEditor;
   const [playhead, setPlayhead] = useState({ sceneId: selectedSceneId, localSeconds: 0 });
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspectorPresentation = layoutMode === 'inline' ? 'inline' : 'drawer';
   const selectedScene = selectedSceneId === null ? null : (project.scenes[selectedSceneId] ?? null);
   const selectedAsset =
     selectedScene?.selectedAssetId === null || selectedScene?.selectedAssetId === undefined
@@ -64,6 +70,10 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
       ? null
       : (Object.values(activeCut.clips).find((clip) => clip.sceneId === selectedScene.id) ?? null);
   const disabled = mutationPending || cutEditor.mutationPending;
+
+  useEffect(() => {
+    if (inspectorPresentation === 'inline') setInspectorOpen(false);
+  }, [inspectorPresentation]);
 
   const slateScenes = useMemo(
     () =>
@@ -210,6 +220,8 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
 
   return (
     <section
+      data-review-cut-layout
+      data-layout={layoutMode}
       className='flex min-w-0 flex-col gap-12px'
       onKeyDown={(event) => {
         const target = event.target as HTMLElement;
@@ -261,8 +273,20 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
         )}
       </header>
 
-      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(250px,310px)] items-start gap-16px'>
-        <div className='flex min-w-0 flex-col gap-12px'>
+      <div
+        data-review-workspace
+        data-inspector-presentation={inspectorPresentation}
+        className={
+          inspectorPresentation === 'inline'
+            ? 'grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(250px,310px)] items-start gap-16px'
+            : 'flex min-w-0 items-start'
+        }
+      >
+        <div
+          data-review-primary
+          data-full-width={inspectorPresentation === 'drawer' ? 'true' : undefined}
+          className='flex min-w-0 flex-1 flex-col gap-12px'
+        >
           <div data-review-region='stage' className='min-w-0'>
             <StagePreview
               projectId={project.id}
@@ -288,6 +312,7 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
             />
           </div>
           <CutTimeline
+            layoutMode={layoutMode}
             cut={activeCut}
             sceneOrder={project.sceneOrder}
             scenes={project.scenes}
@@ -301,6 +326,7 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
             onSelectScene={(sceneId) => {
               onSelectScene(sceneId);
               setPlayhead({ sceneId, localSeconds: 0 });
+              if (inspectorPresentation === 'drawer') setInspectorOpen(true);
             }}
             onMoveClip={(clipId, targetIndex) => void cutEditor.moveClip(clipId, targetIndex)}
             onEditClip={(clipId, edit) => void cutEditor.updateClip(clipId, edit)}
@@ -310,20 +336,55 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
             {t('conversation.creativeStudio.phase.review.cut.duration.render', { seconds: renderDuration })}
           </div>
         </div>
-        <CutInspector
-          project={project}
-          scene={selectedScene}
-          asset={selectedAsset}
-          clip={selectedClip}
-          playheadInClipSeconds={selectedSourceIn + localPlayhead}
-          disabled={disabled}
-          onSelectAsset={onSelectAsset}
-          onEditClip={editSelectedClip}
-          onResetClip={() => {
-            if (selectedClip !== null) void cutEditor.resetClip(selectedClip.id);
-          }}
-        />
+        {inspectorPresentation === 'inline' && (
+          <CutInspector
+            project={project}
+            scene={selectedScene}
+            asset={selectedAsset}
+            clip={selectedClip}
+            playheadInClipSeconds={selectedSourceIn + localPlayhead}
+            disabled={disabled}
+            onSelectAsset={onSelectAsset}
+            onEditClip={editSelectedClip}
+            onResetClip={() => {
+              if (selectedClip !== null) void cutEditor.resetClip(selectedClip.id);
+            }}
+          />
+        )}
       </div>
+
+      {inspectorPresentation === 'drawer' && (
+        <Drawer
+          visible={inspectorOpen}
+          title={null}
+          width={layoutMode === 'drawer' ? '322px' : 'min(322px, 100vw)'}
+          footer={null}
+          closable={false}
+          unmountOnExit
+          onCancel={() => setInspectorOpen(false)}
+        >
+          <Button
+            type='text'
+            aria-label={t('common.close')}
+            className='mb-8px ml-auto flex'
+            icon={<CloseSmall aria-hidden='true' />}
+            onClick={() => setInspectorOpen(false)}
+          />
+          <CutInspector
+            project={project}
+            scene={selectedScene}
+            asset={selectedAsset}
+            clip={selectedClip}
+            playheadInClipSeconds={selectedSourceIn + localPlayhead}
+            disabled={disabled}
+            onSelectAsset={onSelectAsset}
+            onEditClip={editSelectedClip}
+            onResetClip={() => {
+              if (selectedClip !== null) void cutEditor.resetClip(selectedClip.id);
+            }}
+          />
+        </Drawer>
+      )}
 
       {activeCut.orderMode === 'manual' && outsideScenes.length > 0 && (
         <section aria-labelledby='studio-cut-outside-heading' className={styles.outsideGroup}>

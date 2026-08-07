@@ -328,6 +328,122 @@ beforeEach(() => {
 });
 
 describe('Review phase cut', () => {
+  it('keeps the inspector inline beside a proportional strip in inline mode', () => {
+    const { container } = render(<ReviewPhase controller={controller()} layoutMode='inline' />);
+
+    expect(container.querySelector('[data-review-cut-layout]')).toHaveAttribute('data-layout', 'inline');
+    expect(container.querySelector('[data-review-workspace]')).toHaveAttribute('data-inspector-presentation', 'inline');
+    expect(
+      screen.getByRole('complementary', { name: 'conversation.creativeStudio.phase.review.cut.inspector' })
+    ).toBeVisible();
+    expect((container.querySelector("[data-cut-clip-id='clip-selected']") as HTMLElement).style.flexGrow).toBe('4.2');
+  });
+
+  it('keeps the stage and strip full width while a selected clip opens a 322px inspector Drawer that Escape closes', async () => {
+    const { container } = render(<ReviewPhase controller={controller()} layoutMode='drawer' />);
+
+    expect(container.querySelector('[data-review-cut-layout]')).toHaveAttribute('data-layout', 'drawer');
+    expect(container.querySelector('[data-review-workspace]')).toHaveAttribute('data-inspector-presentation', 'drawer');
+    expect(container.querySelector('[data-review-primary]')).toHaveAttribute('data-full-width', 'true');
+    expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
+      })
+    );
+
+    const drawer = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>('.arco-drawer');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(drawer).toHaveStyle({ width: '322px' });
+    expect(
+      within(drawer).getByRole('complementary', {
+        name: 'conversation.creativeStudio.phase.review.cut.inspector',
+      })
+    ).toBeVisible();
+    expect(within(drawer).getByRole('button', { name: 'common.close' })).toBeVisible();
+
+    const drawerWrapper = document.querySelector('.arco-drawer-wrapper');
+    expect(drawerWrapper).not.toBeNull();
+    fireEvent.keyDown(drawerWrapper!, { key: 'Escape', keyCode: 27, which: 27 });
+
+    await waitFor(() => expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument());
+  });
+
+  it('uses fixed 96px strip items, duration labels, and a scroll cue in compact mode', () => {
+    const { container } = render(<ReviewPhase controller={controller()} layoutMode='compact' />);
+
+    expect(container.querySelector('[data-review-cut-layout]')).toHaveAttribute('data-layout', 'compact');
+    const track = container.querySelector('[data-cut-timeline-track]');
+    expect(track).toHaveAttribute('data-layout', 'compact');
+    expect(within(track as HTMLElement).getByTestId('cut-scroll-affordance')).toBeVisible();
+
+    const items = container.querySelectorAll<HTMLElement>('[data-cut-clip-id], [data-slate-scene-id]');
+    expect(items).toHaveLength(4);
+    for (const item of items) {
+      expect(item.style.flexBasis).toBe('96px');
+      expect(item.style.flexGrow).toBe('0');
+      expect(item.style.minWidth).toBe('96px');
+    }
+    expect(container.querySelectorAll('[data-cut-duration]')).toHaveLength(4);
+  });
+
+  it('maps compact seeking through equal-width items instead of the duration-proportional rail', async () => {
+    const reviewController = controller();
+    const selected = reviewController.project.scenes['scene-selected']!;
+    selected.mediaKind = 'video';
+    reviewController.project.assets['asset-1'] = {
+      ...reviewController.project.assets['asset-1']!,
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'asset-1.mp4' },
+    };
+    render(<ReviewPhase controller={reviewController} layoutMode='compact' />);
+    const track = document.querySelector<HTMLElement>('[data-cut-timeline-track]')!;
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 100,
+      bottom: 20,
+      width: 100,
+      height: 20,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(track, { clientX: 10 });
+
+    const video = screen.getByLabelText('conversation.creativeStudio.preview.videoLabel') as HTMLVideoElement;
+    await waitFor(() => expect(video.currentTime).toBeCloseTo(2.08, 2));
+  });
+
+  it.each(['drawer', 'compact'] as const)('keeps modifier-arrow reorder available in %s mode', async (layoutMode) => {
+    const reviewController = controller();
+    addSecondClip(reviewController);
+    const { container } = render(<ReviewPhase controller={reviewController} layoutMode={layoutMode} />);
+
+    expect(container.querySelector('[data-cut-timeline-track]')).toHaveAttribute('data-layout', layoutMode);
+
+    fireEvent.keyDown(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:2,Missing close,5',
+      }),
+      { key: 'ArrowLeft', ctrlKey: true }
+    );
+
+    await waitFor(() =>
+      expect(bridge.updateCut.invoke).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cut: expect.objectContaining({ clipOrder: ['clip-second', 'clip-selected'] }),
+        })
+      )
+    );
+  });
+
   it('shows played, untrimmed, and rendered durations with trim and grade marks', () => {
     const { container } = render(<ReviewPhase controller={controller()} />);
 
@@ -780,9 +896,62 @@ describe('Review phase cut', () => {
     const themeStyles = readFileSync('packages/desktop/src/renderer/styles/themes/default-color-scheme.css', 'utf8');
 
     expect(cutStyles).toMatch(/\.failedState\s*\{[^}]*color:\s*var\(--danger\)/);
+    expect(cutStyles).toMatch(/\.slateItem\s*\{[^}]*background-image:\s*var\(--cut-slate-hatch\)/);
+    expect(cutStyles).toMatch(/\.trimHandle[^}]*\}[\s\S]*?background:\s*var\(--control-handle\)/);
+    expect(cutStyles).toMatch(/\.cropOverlay\s*\{[^}]*border:\s*2px solid var\(--control-handle\)/);
+    expect(cutStyles).toMatch(/\.zeroTick\s*\{[^}]*background:\s*var\(--control-zero-tick\)/);
+    expect(cutStyles).toMatch(/\.colourControl[^}]*\.arco-slider-button[^}]*border-color:\s*var\(--control-handle\)/);
     expect(`${cutStyles}\n${footerStyles}`).not.toMatch(/#[\da-f]{3,8}|rgba?\(/i);
     expect(themeStyles.match(/--danger:/g)).toHaveLength(2);
     expect(themeStyles.match(/--color-fill-2:/g)).toHaveLength(2);
+  });
+
+  it('uses the same neutral fact chip for chosen, trimmed, and graded facts', () => {
+    const { container } = render(<ReviewPhase controller={controller()} />);
+    const chosen = container.querySelector<HTMLElement>('[data-selected-take-chip]');
+    const editMarks = container.querySelectorAll<HTMLElement>('[data-cut-fact-chip]');
+
+    expect(chosen).not.toBeNull();
+    expect(editMarks).toHaveLength(2);
+    for (const chip of [chosen!, ...editMarks]) {
+      expect(chip).toHaveClass('bg-fill-2', 'text-t-secondary');
+      expect(chip.className).not.toMatch(/danger|warning|primary/);
+    }
+  });
+
+  it('preserves strip-title ellipsis and non-truncating durations, counts, colour labels, and footer action', async () => {
+    const { container } = render(<ReviewPhase controller={controller()} layoutMode='compact' />);
+    const cutStyles = readFileSync(
+      'packages/desktop/src/renderer/pages/studio/components/Preview/CutEditor/cut-editor.module.css',
+      'utf8'
+    );
+    const footerStyles = readFileSync(
+      'packages/desktop/src/renderer/pages/studio/components/PhaseShell/phases/ReviewPhase.module.css',
+      'utf8'
+    );
+
+    expect(container.querySelector('[data-cut-title]')).toHaveAttribute('title', 'Selected opening');
+    expect(container.querySelectorAll('[data-cut-duration]')).toHaveLength(4);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
+      })
+    );
+    await screen.findByRole('complementary', {
+      name: 'conversation.creativeStudio.phase.review.cut.inspector',
+    });
+    expect(document.querySelectorAll('[data-colour-label]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-render-count]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-render-footer-line]').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-render-primary-action]')).toBeInTheDocument();
+
+    expect(cutStyles).toMatch(/\.clipTitle\s*\{[^}]*text-overflow:\s*ellipsis[^}]*white-space:\s*nowrap/);
+    expect(cutStyles).toMatch(/\.clipDuration\s*\{[^}]*white-space:\s*nowrap/);
+    expect(cutStyles).toMatch(/\.colourLabel\s*>\s*span\s*\{[^}]*white-space:\s*nowrap/);
+    expect(footerStyles).toMatch(/\.handoffSummary span\s*\{[^}]*white-space:\s*nowrap/);
+    expect(footerStyles).toMatch(/\.handoffDescription\s*\{[^}]*white-space:\s*normal/);
+    expect(footerStyles).toMatch(/\.renderPrimaryAction\s*\{[^}]*flex-shrink:\s*0/);
+    expect(`${cutStyles}\n${footerStyles}`).not.toMatch(/text-overflow:\s*ellipsis[^}]*data-render-footer-line/);
   });
 
   it('keeps a takeless storyboard slate at its intended position between clips', () => {

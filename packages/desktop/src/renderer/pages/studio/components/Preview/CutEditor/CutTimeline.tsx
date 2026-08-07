@@ -8,7 +8,7 @@ import { DndContext, PointerSensor, closestCenter, type DragEndEvent, useSensor,
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@arco-design/web-react';
-import { Attention, Drag, Loading } from '@icon-park/react';
+import { Attention, Drag, Loading, Right } from '@icon-park/react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,6 +21,7 @@ import type {
 } from '@/common/types/project/creativeStudioTypes';
 
 import studioType from '../../../StudioTypography.module.css';
+import type { StudioLayoutMode } from '../../PhaseShell/useStudioLayoutMode';
 import styles from './cut-editor.module.css';
 
 const FRAME_SECONDS = 1 / 30;
@@ -85,6 +86,7 @@ type SortableClipProps = {
   selected: boolean;
   disabled: boolean;
   reviewState: CutTimelineReviewState;
+  layoutMode: StudioLayoutMode;
   onSelect: () => void;
   onMove: (targetIndex: number) => void;
   onEdit: (edit: StudioEditableCutClip) => void;
@@ -99,6 +101,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
   selected,
   disabled,
   reviewState,
+  layoutMode,
   onSelect,
   onMove,
   onEdit,
@@ -186,8 +189,9 @@ const SortableClip: React.FC<SortableClipProps> = ({
   };
 
   const clipStyle: React.CSSProperties = {
-    flexBasis: 0,
-    flexGrow: renderedDuration,
+    flexBasis: layoutMode === 'compact' ? 96 : 0,
+    flexGrow: layoutMode === 'compact' ? 0 : renderedDuration,
+    minWidth: layoutMode === 'compact' ? 96 : undefined,
     transform: CSS.Transform.toString(transform),
     transition,
   };
@@ -228,15 +232,25 @@ const SortableClip: React.FC<SortableClipProps> = ({
           {t('conversation.creativeStudio.phase.review.selectedTake')}
         </span>
         <span className={styles.clipCopy}>
-          <span className={`${studioType.eyebrow} ${styles.clipTitle}`}>{scene.title}</span>
-          <span className={`${studioType.meta} ${styles.clipDuration}`}>
+          <span data-cut-title title={scene.title} className={`${studioType.eyebrow} ${styles.clipTitle}`}>
+            {scene.title}
+          </span>
+          <span data-cut-duration className={`${studioType.meta} ${styles.clipDuration}`}>
             {roundSeconds(renderedDuration)}
             {t('common.unit.second_short')}
           </span>
         </span>
         <span className={styles.editMarks}>
-          {trimmed && <span>{t('conversation.creativeStudio.phase.review.cut.trimmed')}</span>}
-          {graded && <span>{t('conversation.creativeStudio.phase.review.cut.graded')}</span>}
+          {trimmed && (
+            <span data-cut-fact-chip className='rounded-full bg-fill-2 px-6px py-2px text-t-secondary'>
+              {t('conversation.creativeStudio.phase.review.cut.trimmed')}
+            </span>
+          )}
+          {graded && (
+            <span data-cut-fact-chip className='rounded-full bg-fill-2 px-6px py-2px text-t-secondary'>
+              {t('conversation.creativeStudio.phase.review.cut.graded')}
+            </span>
+          )}
         </span>
       </Button>
       <Button
@@ -281,6 +295,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
 
 export type CutTimelineProps = {
   cut: StudioCut;
+  layoutMode?: StudioLayoutMode;
   sceneOrder: readonly string[];
   scenes: Readonly<Record<string, StudioScene>>;
   assets: Readonly<Record<string, StudioAsset>>;
@@ -298,6 +313,7 @@ export type CutTimelineProps = {
 
 export const CutTimeline: React.FC<CutTimelineProps> = ({
   cut,
+  layoutMode = 'inline',
   sceneOrder,
   scenes,
   assets,
@@ -333,6 +349,20 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
       (entry.kind === 'clip' ? renderedDurationFor(entry.clip, entry.scene, entry.asset) : entry.scene.durationSeconds),
     0
   );
+  const timelineEntryDurations = timelineEntries.map((entry) =>
+    entry.kind === 'clip' ? renderedDurationFor(entry.clip, entry.scene, entry.asset) : entry.scene.durationSeconds
+  );
+  const playheadPercent = (() => {
+    if (layoutMode !== 'compact') return timelineDuration === 0 ? 0 : (playheadSeconds / timelineDuration) * 100;
+    if (timelineEntries.length === 0) return 0;
+    let remaining = Math.max(0, playheadSeconds);
+    for (let index = 0; index < timelineEntryDurations.length; index += 1) {
+      const duration = timelineEntryDurations[index]!;
+      if (remaining <= duration) return ((index + Math.min(1, remaining / duration)) / timelineEntries.length) * 100;
+      remaining -= duration;
+    }
+    return 100;
+  })();
 
   const handleDragEnd = ({ active, over }: DragEndEvent): void => {
     if (over === null || active.id === over.id) return;
@@ -355,18 +385,32 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
       </div>
       <div
         data-cut-timeline-track
+        data-layout={layoutMode}
         className={styles.timelineTrack}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest('button') !== null) return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const ratio = bounds.width === 0 ? 0 : (event.clientX - bounds.left) / bounds.width;
-          onSeek(roundSeconds(Math.max(0, Math.min(1, ratio)) * timelineDuration));
+          const track = event.currentTarget;
+          const bounds = track.getBoundingClientRect();
+          const width = layoutMode === 'compact' ? Math.max(bounds.width, track.scrollWidth) : bounds.width;
+          const position = event.clientX - bounds.left + (layoutMode === 'compact' ? track.scrollLeft : 0);
+          const ratio = width === 0 ? 0 : Math.max(0, Math.min(1, position / width));
+          if (layoutMode !== 'compact' || timelineEntries.length === 0) {
+            onSeek(roundSeconds(ratio * timelineDuration));
+            return;
+          }
+          const scaledPosition = ratio * timelineEntries.length;
+          const entryIndex = Math.min(timelineEntries.length - 1, Math.floor(scaledPosition));
+          const entryProgress = Math.min(1, scaledPosition - entryIndex);
+          const elapsedBefore = timelineEntryDurations
+            .slice(0, entryIndex)
+            .reduce((total, duration) => total + duration, 0);
+          onSeek(roundSeconds(elapsedBefore + timelineEntryDurations[entryIndex]! * entryProgress));
         }}
       >
         <div
           aria-label={t('conversation.creativeStudio.phase.review.cut.playhead')}
           className={styles.playhead}
-          style={{ left: `${timelineDuration === 0 ? 0 : (playheadSeconds / timelineDuration) * 100}%` }}
+          style={{ left: `${playheadPercent}%` }}
         />
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={cut.clipOrder} strategy={horizontalListSortingStrategy}>
@@ -402,6 +446,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                     selected={selectedSceneId === entry.scene.id}
                     disabled={disabled}
                     reviewState={reviewState}
+                    layoutMode={layoutMode}
                     onSelect={() => onSelectScene(entry.scene.id)}
                     onMove={(targetIndex) => onMoveClip(entry.clip.id, targetIndex)}
                     onEdit={(edit) => onEditClip(entry.clip.id, edit)}
@@ -411,7 +456,11 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                     key={entry.scene.id}
                     data-slate-scene-id={entry.scene.id}
                     className={styles.slateItem}
-                    style={{ flexGrow: entry.scene.durationSeconds }}
+                    style={{
+                      flexBasis: layoutMode === 'compact' ? 96 : 0,
+                      flexGrow: layoutMode === 'compact' ? 0 : entry.scene.durationSeconds,
+                      minWidth: layoutMode === 'compact' ? 96 : undefined,
+                    }}
                   >
                     <Button
                       type='text'
@@ -425,7 +474,15 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                       className={styles.slatePlate}
                       onClick={() => onSelectScene(entry.scene.id)}
                     >
-                      <span className={styles.clipTitle}>{entry.scene.title}</span>
+                      <span className={styles.clipCopy}>
+                        <span data-cut-title title={entry.scene.title} className={styles.clipTitle}>
+                          {entry.scene.title}
+                        </span>
+                        <span data-cut-duration className={`${studioType.meta} ${styles.clipDuration}`}>
+                          {roundSeconds(entry.scene.durationSeconds)}
+                          {t('common.unit.second_short')}
+                        </span>
+                      </span>
                       <span
                         data-review-state={reviewState}
                         className={reviewState === 'failed' ? styles.failedState : undefined}
@@ -440,6 +497,11 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
             </ol>
           </SortableContext>
         </DndContext>
+        {layoutMode === 'compact' && (
+          <span aria-hidden='true' data-testid='cut-scroll-affordance' className={styles.scrollAffordance}>
+            <Right />
+          </span>
+        )}
       </div>
       <span className='sr-only' role='status' aria-live='polite'>
         {moveAnnouncement === null

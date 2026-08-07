@@ -256,7 +256,7 @@ export const CutInspector: React.FC<CutInspectorProps> = ({
                 const amount = filterAmount(clip, id);
                 return (
                   <label key={id} className={styles.colourControl}>
-                    <span className={styles.colourLabel}>
+                    <span data-colour-label className={styles.colourLabel}>
                       <span>{t(`conversation.creativeStudio.phase.review.cut.colourLabels.${id}`)}</span>
                       <span>{amount.toFixed(2)}</span>
                     </span>

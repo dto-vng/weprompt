@@ -55,12 +55,16 @@
 
 .handoffDescription {
   composes: body from '../../../StudioTypography.module.css';
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .handoffSummary span {
+  flex: none;
   border-radius: 999px;
   background: var(--color-fill-2);
   padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .renderStateSlot {
@@ -74,6 +78,7 @@
 
 .renderPrimaryAction {
   min-width: 210px;
+  flex-shrink: 0;
 }
 
 .renderStateSupport {
