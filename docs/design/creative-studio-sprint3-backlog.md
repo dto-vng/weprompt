@@ -57,12 +57,15 @@ The enum threaded confirm → submit → job record → completion, default `tak
 
 Scene-level assistant (bounded-context one-shots into editor drafts — deferred by design), the chip question card, additional proposal payload kinds, allow-list widening (KB search et al. — product decision when it comes; affects only future conversations), the Write surface, orphan-conversation reaping.
 
-## 4. Also open in sprint 3 — already sequenced elsewhere, pointers only
+## 4. Boundary with sprint 2 — corrected 2026-08-07
 
-- **v1.1 cut editor R2 → R5** — [v1.1 plan](creative-studio-v11-cut-editor-plan.md); runs in parallel with this epic per its §3/§4 (no interacting files).
-- **BUG-024** partial-readiness generate action, **BUG-028** paid storyboard result discarded on CAS race, **BUG-029** FFmpeg not cancelled on quit, **BUG-025/027** suite-position flakes (BUG-025 now reproducible under coverage) — all specified in `TASKS.md`.
-- **EPIC-005-G1** provenance — `TASKS.md`.
-- **FFmpeg licensing** — with the legal desk; release-blocking, not merge-blocking.
+The items below are **sprint-2 closeout scope** (one week remains as of 2026-08-07), not sprint-3 work as this section first claimed. Sprint 3 inherits only what slips past the sprint-2 boundary.
+
+- **v1.1 cut editor** — **R2 closes sprint 2**; **R3 → R5 are sprint 3** (R3 is an XL indivisible slice and does not open in a closeout week) — [v1.1 plan](creative-studio-v11-cut-editor-plan.md); no files shared with this epic.
+- **Sprint-2 bug tail** — BUG-024 (design settled), BUG-029, BUG-027, and a timeboxed BUG-025 instrumentation run; BUG-028 gets its design note in sprint 2, its implementation is expected to slip to sprint 3 — all specified in `TASKS.md`.
+- **EPIC-005-G1** provenance — idle-lane filler in sprint 2, otherwise sprint 3 — `TASKS.md`.
+- **FFmpeg licensing** — with the legal desk; chase during sprint 2 closeout; release-blocking, not merge-blocking.
+- **Data-connector spikes S1/S2** — run in sprint-2 closeout if connectors are to be a sprint-3 platform candidate; they inform planning, not build.
 
 ## 5. Execution notes
 
