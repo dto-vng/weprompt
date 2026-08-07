@@ -80,7 +80,7 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
 
 1. `officecli validate <file>` — zero errors.
 2. `officecli view <file> issues` — zero issues; fix and re-run until clean.
-3. Placeholder and literal-escape scan — THREE checks must print nothing:
+3. Placeholder, reference-sample, and literal-escape scans — the first and third commands must print nothing; the second requires source review:
    - `officecli view <file> text | grep -iE 'lorem|TODO|xxx'`
    - `officecli view <file> text | grep -iE 'atlas|osei|m\. tran|ibarra|novak|l\. devi|steering review|roastery'` — these are reference-sample indicators; verify each hit against the user sources and remove it only when it is leftover reference sample content. Legitimate user-source content must not fail this gate. Dividers and the closing slide are the most commonly forgotten — check them slide by slide.
    - `officecli view <file> text | grep -F '\n'` — visible literal newline escapes are a delivery defect.

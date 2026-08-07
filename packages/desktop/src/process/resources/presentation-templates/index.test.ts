@@ -59,13 +59,13 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
     }
   });
 
-  it('pptx packs carry the follow-up edit contract at version 3', () => {
+  it('pptx packs carry the follow-up edit contract at Track 0 version 4', () => {
     const pptxPacks = BUILTIN_TEMPLATE_PACKS.filter((p) => p.manifest.format === 'pptx');
     expect(pptxPacks.length).toBe(4);
     for (const pack of pptxPacks) {
       expect(pack.themeMd).toContain('## Follow-up edits');
       expect(pack.themeMd).toContain('source documents');
-      expect(pack.manifest.version).toBeGreaterThanOrEqual(3);
+      expect(pack.manifest.version).toBeGreaterThanOrEqual(4);
     }
   });
 
@@ -106,6 +106,8 @@ describe('BUILTIN_TEMPLATE_PACKS', () => {
     expect(referenceSampleScan(pptxThemes.get('connected-ops') ?? '')).not.toMatch(/connected sites/i);
 
     for (const themeMd of pptxThemes.values()) {
+      expect(themeMd).toContain('first and third commands must print nothing');
+      expect(themeMd).not.toContain('THREE checks must print nothing');
       expect(referenceSampleScan(themeMd)).toContain('verify each hit');
       expect(referenceSampleScan(themeMd)).not.toContain('any hit is a leftover');
     }
