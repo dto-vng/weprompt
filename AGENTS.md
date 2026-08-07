@@ -116,6 +116,20 @@ Any step that fails aborts the push. Fix the issue, commit, then retry.
 
 > **Note for AI agents**: `just push` uses `--quiet` for lint — only errors cause failure. The project has many pre-existing lint _warnings_ which do NOT indicate failure. Judge success by exit code, not by output volume.
 
+### Merging a slice into an integration branch
+
+When an epic is built as slices that merge into a long-lived integration branch before the branch itself goes to `sprint2`, **run the full suite at each slice merge, not only at the epic's end**:
+
+```bash
+bun run test              # the whole suite, not the slice's own files
+```
+
+A slice's own tests passing says nothing about the tests it broke elsewhere. Repo-wide invariant tests — the kind that assert two files agree with each other — live outside the slice and are exactly what a focused run misses.
+
+> **Why this rule exists.** A slice added an IPC provider to `ipcBridge.ts` without the matching native-manifest entry. `tests/unit/process/bridge/nativePayloadSchemas.test.ts` exists precisely to catch that and **was red on the integration branch for four slices**, from the commit that introduced the gap until it was found by review. The parity net worked as designed; nobody ran it. The feature it protected — keyboard clip placement — was broken at runtime the entire time.
+
+Corollary: **do not describe a defect as "every test passed" without having run every test.** If a repo-wide gate was never executed, the honest statement is that it was not run.
+
 ### Before PR (optional stricter check)
 
 `prek` replicates the **exact CI pipeline** (includes end-of-file, trailing whitespace checks on all file types):

@@ -154,11 +154,6 @@
   - **(c) The export modal's latest-render line is a snapshot** taken at modal open while the export re-reads at export time, so a render finishing while the modal is open exports a newer file than the modal described.
   - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
 
-- [ ] **[BUG-038][P3][Process] A slice merged into the v1.1 branch with a red gate, undetected until review**
-  - Actual: R3 (`d8e0bf1ff`) added the `place-cut-scenes` provider to `ipcBridge.ts` without a manifest entry. The manifest-completeness test (`tests/unit/process/bridge/nativePayloadSchemas.test.ts:1675`) predates that commit on `sprint2`, so it was **red on `creative-suite-sprint2` from `d8e0bf1ff` until the fix `7bd5a1561`** — verified by inspecting both files at that commit.
-  - The fix's commit message states "every unit test passed by bypassing the bridge". That is false, and the false version is the one a future reader will find. The real lesson is stronger: the machine-enforced parity net worked exactly as designed and **nobody ran it between slices**.
-  - Expected: slice merges into an integration branch run the gate before merge, not only at the epic's end. No production change needed.
-
 ## Waiting On
 
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
@@ -174,6 +169,12 @@
 ## Someday
 
 ## Done
+
+- [x] **[BUG-038][P3][Process] A slice merged into the v1.1 branch with a red gate, undetected until review**
+  - Actual: R3 (`d8e0bf1ff`) added the `place-cut-scenes` provider to `ipcBridge.ts` without a manifest entry. The manifest-completeness test (`tests/unit/process/bridge/nativePayloadSchemas.test.ts:1675`) predates that commit on `sprint2`, so it was **red on `creative-suite-sprint2` from `d8e0bf1ff` until the fix `7bd5a1561`** — verified by inspecting both files at that commit.
+  - The fix's commit message states "every unit test passed by bypassing the bridge". That is false, and the false version is the one a future reader will find. The real lesson is stronger: the machine-enforced parity net worked exactly as designed and **nobody ran it between slices**.
+  - Expected: slice merges into an integration branch run the gate before merge, not only at the epic's end. No production change needed.
+  - **Done 2026-08-07** — `AGENTS.md` § "Merging a slice into an integration branch" now requires the full suite at each slice merge, with the four-slice red window recorded as the reason, plus a corollary against claiming "every test passed" without having run every test. No production change, as expected.
 
 - [x] **[Creative Studio] Review screen redraw — delivered** — completed 2026-08-07
   - The designer delivered the full Review redraw (cut editor, inspector, render/failure/export states, compact and dark, three new tokens). It supersedes the provisional render placement.
