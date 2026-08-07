@@ -130,6 +130,26 @@
   - Expected: the description states what the dock does today — drafts a storyboard from the brief — with the provider/model labels and charge disclosure unchanged. Copy change ×12 locales, `bun run i18n:types` + `node scripts/check-i18n.js`; no behavior change.
   - Scope note: when the scene assist ships, the copy may additionally point at it for per-scene help; do not pre-write that promise before it lands.
 
+- [ ] **[BUG-033][P1][Creative Studio] A render whose ffmpeg child dies never releases the busy lock**
+  - Actual: when the render child terminates without completing, the project's render slot is never reclaimed. `renderCut` then returns `busy` for the rest of the app process, so the project **can never be rendered again without restarting the app**, and nothing in the UI explains why.
+  - Found live 2026-08-07, not by tests: after killing a wedged ffmpeg (see `BUG-034`), `getLatestRender` stayed `null`, no failure state surfaced, the `aionui-studio-render-*` temp directory was left behind, and a fresh `renderCut` was rejected with `{ code: 'busy' }`.
+  - **Two problems stacked, and fixing one is not enough.** The lock is not released on abnormal child exit; and **ffmpeg ignored `SIGTERM`** here — it kept running at ~99% CPU and only died on `SIGKILL`. A cancel path that sends TERM and assumes the child is gone will neither kill the process nor reclaim the slot.
+  - This is R4's "state 2" busy guard stuck permanently on. The guard itself is correct; nothing releases it.
+  - Expected: an abnormal child exit finalizes the render as failed, releases the slot, cleans the temp directory, and surfaces one of the three typed failures. Cancellation must escalate to `SIGKILL` after a bounded wait.
+  - Related: `BUG-029` covers disposal not cancelling active renders at quit. Same subsystem, different trigger — that one leaks a process at exit, this one wedges the feature during a session.
+
+- [ ] **[BUG-034][P2][Creative Studio] An unreadable asset wedges the render forever with no timeout or validation**
+  - Actual: a segment whose input image cannot be decoded makes ffmpeg spin indefinitely instead of failing. Observed **3h 20m at ~99% CPU on the first of four segments** before being killed manually. Nothing bounds a segment's duration and nothing checks the asset before it is handed to ffmpeg.
+  - Mechanism: the render invokes `-loop 1 -t 3 -i <asset>`. With a zero-dimension input, `-loop 1` never yields a frame, so ffmpeg neither errors nor exits. `ffprobe` on the same file reports `width=0` with `chunk too big`.
+  - Expected: validate that an asset decodes to non-zero dimensions before rendering it, and bound each segment with a timeout. A take that cannot be decoded is `render_failed` naming the clip, not an infinite spin.
+  - Cheap partial fix worth considering on its own: dropping `-loop 1` for still images in favour of a bounded frame count removes the infinite-loop shape entirely.
+
+- [ ] **[BUG-035][P3][Test infrastructure] The Studio e2e fake provider emits assets that cannot be rendered**
+  - Actual: with `AIONUI_E2E_STUDIO_FAKE=1`, a generated take is a **39-byte stub** — the 8-byte PNG magic header followed by the ASCII string `STUDIO_RAW_OUTPUT_BODY_SENTINEL`. It passes a magic-byte check and is not an image; `file` reports `data`.
+  - Consequence: the generate → render journey **cannot be exercised end to end** with the fake provider, which is why the Studio e2e spec asserts state transitions and never a real render. It is also what triggered `BUG-034` in practice.
+  - Expected: the fake emits a genuine minimal PNG (a 1×1 or small solid frame) so a fake-provider run can render. That would have caught `BUG-034` and `BUG-033` automatically.
+  - Not a production defect — the stub is deliberate for state tests. Filed so nobody concludes from a green e2e run that rendering works.
+
 ## Waiting On
 
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
