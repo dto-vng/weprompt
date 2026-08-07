@@ -90,6 +90,15 @@
   color: var(--text-white);
 }
 
+/*
+ * The duration carries the shared `meta` type, which pins `--text-secondary` — a tone chosen for
+ * the page ground. Left alone on the selected plate it measured 1.27:1 against `--brand`, so it
+ * has to take the plate's own foreground instead. Size still separates it from the title.
+ */
+.clipPlate[aria-current='true']:global(.arco-btn-text):not(:global(.arco-btn-disabled)) .clipDuration {
+  color: inherit;
+}
+
 .clipCopy {
   display: flex;
   min-width: 0;

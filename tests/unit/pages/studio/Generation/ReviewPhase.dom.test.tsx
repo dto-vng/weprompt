@@ -922,6 +922,17 @@ describe('Review phase cut', () => {
     expect(themeStyles.match(/--color-fill-2:/g)).toHaveLength(2);
   });
 
+  it('keeps the selected clip duration legible on the brand plate', () => {
+    const cutStyles = readFileSync(
+      'packages/desktop/src/renderer/pages/studio/components/Preview/CutEditor/cut-editor.module.css',
+      'utf8'
+    );
+
+    // The duration carries the shared `meta` type, which pins --text-secondary. On the selected
+    // plate that measured 1.27:1 against --brand, so it has to take the plate's own foreground.
+    expect(cutStyles).toMatch(/\.clipPlate\[aria-current='true'\][^{]*\.clipDuration\s*\{[^}]*color:\s*inherit/);
+  });
+
   it('uses the same neutral fact chip for chosen, trimmed, and graded facts', () => {
     const { container } = render(<ReviewPhase controller={controller()} />);
     const chosen = container.querySelector<HTMLElement>('[data-selected-take-chip]');
