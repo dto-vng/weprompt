@@ -101,6 +101,7 @@
       "description": "AionCore wurde angehalten, bevor die Datenbank geändert wurde, weil deren Migrationsverlauf nicht mit diesem WePrompt-Paket kompatibel ist (Grund: {{reason}}, angewendet: {{appliedVersion}}, unterstützte Untergrenze: {{floorVersion}}, neueste gebündelte Version: {{latestVersion}}). Diese Kompatibilitätsprüfung hat weder Datenbankschema noch Daten einschließlich WAL- und SHM-Journaldateien verändert. Erstellen oder ersetzen Sie die Datenbank nicht neu. Schließen Sie WePrompt und installieren Sie eine freigegebene Version, die diese Datenbank unterstützt, oder speichern Sie Diagnosen für den Support.",
       "unknownVersion": "unbekannt",
       "unknownReason": "unbekannt",
+      "quitApplication": "WePrompt beenden",
       "sendDiagnostics": "Diagnosen speichern",
       "diagnosticsSent": "Diagnosen gespeichert",
       "diagnosticsReportSuccess": "Diagnosepaket gespeichert",

@@ -102,6 +102,7 @@
       "description": "データベースの移行履歴がこの WePrompt パッケージと互換性がないため、AionCore はデータベースを変更する前に停止しました（理由: {{reason}}、適用済み: {{appliedVersion}}、対応下限: {{floorVersion}}、同梱最新版: {{latestVersion}}）。この互換性チェックでは、WAL および SHM ジャーナルファイルを含むデータベースのスキーマやデータは変更されていません。データベースを再構築または置換しないでください。WePrompt を閉じ、このデータベースに対応する承認済みバージョンをインストールするか、サポート用に診断情報を保存してください。",
       "unknownVersion": "不明",
       "unknownReason": "不明",
+      "quitApplication": "WePrompt を終了",
       "sendDiagnostics": "診断情報を保存",
       "diagnosticsSent": "診断情報を保存しました",
       "diagnosticsReportSuccess": "診断パッケージを保存しました",

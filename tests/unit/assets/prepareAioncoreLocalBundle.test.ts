@@ -1,10 +1,73 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const { acceptedMigrationLineage } = require('../../../packages/shared-scripts/src/verify-bundled-aioncore-resources');
-const { buildBundleManifest, prepareAioncore } = require('../../../packages/shared-scripts/src/prepare-aioncore');
+const { prepareAioncore } = require('../../../packages/shared-scripts/src/prepare-aioncore');
+
+function writeFixtureFile(filePath: string, contents = '') {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, contents);
+}
+
+function createCompleteLocalBundle(root: string, platform: 'darwin' | 'win32', arch: 'arm64' | 'x64') {
+  const runtimeKey = `${platform}-${arch}`;
+  const binaryName = platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+  const executableSuffix = platform === 'win32' ? '.exe' : '';
+  const targetTriple =
+    platform === 'darwin'
+      ? arch === 'arm64'
+        ? 'aarch64-apple-darwin'
+        : 'x86_64-apple-darwin'
+      : arch === 'arm64'
+        ? 'aarch64-pc-windows-msvc'
+        : 'x86_64-pc-windows-msvc';
+  const managedRoot = join(root, 'managed-resources');
+  const nodeRoot = `node/node-v24.11.0-${runtimeKey}`;
+  const nodeExecutable = platform === 'win32' ? 'node.exe' : 'bin/node';
+  const claudeRoot = `cli/claude/2.1.215/${runtimeKey}`;
+  const codexRoot = `cli/codex/0.144.6/${runtimeKey}`;
+
+  writeFixtureFile(join(root, binaryName));
+  writeFixtureFile(join(root, 'migration-lineage.json'), `${JSON.stringify(acceptedMigrationLineage, null, 2)}\n`);
+  writeFixtureFile(join(managedRoot, nodeRoot, nodeExecutable));
+  writeFixtureFile(join(managedRoot, claudeRoot, `claude${executableSuffix}`));
+  writeFixtureFile(join(managedRoot, codexRoot, 'vendor', targetTriple, 'bin', `codex${executableSuffix}`));
+  mkdirSync(join(managedRoot, codexRoot, 'vendor', targetTriple, 'codex-resources'), { recursive: true });
+  writeFixtureFile(
+    join(managedRoot, 'manifest.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: 2,
+        runtimeKey,
+        node: { version: '24.11.0', root: nodeRoot, executable: nodeExecutable },
+        clis: [
+          {
+            name: 'claude',
+            version: '2.1.215',
+            root: claudeRoot,
+            platformDirectory: runtimeKey,
+            executable: `claude${executableSuffix}`,
+            requiredFiles: [],
+            requiredDirectories: [],
+          },
+          {
+            name: 'codex',
+            version: '0.144.6',
+            root: codexRoot,
+            platformDirectory: runtimeKey,
+            executable: `vendor/${targetTriple}/bin/codex${executableSuffix}`,
+            requiredFiles: [],
+            requiredDirectories: [`vendor/${targetTriple}/codex-resources`],
+          },
+        ],
+      },
+      null,
+      2
+    )}\n`
+  );
+}
 
 describe('prepare-aioncore local bundle input', () => {
   it('fails closed when an explicit local bundle has no migration lineage document', () => {
@@ -156,27 +219,46 @@ describe('prepare-aioncore local bundle input', () => {
     }
   });
 
-  it('binds macOS ARM, macOS Intel, and Windows manifests to the exact same accepted lineage', () => {
+  it('prepares macOS ARM, macOS Intel, Windows Intel, and Windows ARM with the exact accepted lineage', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'aionui-lineage-targets-'));
     const targets = [
       ['darwin', 'arm64'],
       ['darwin', 'x64'],
       ['win32', 'x64'],
+      ['win32', 'arm64'],
     ] as const;
-    const lineages = targets.map(
-      ([platform, arch]) =>
-        buildBundleManifest({
+    const previous = process.env.AIONUI_BACKEND_LOCAL_BUNDLE_DIR;
+
+    try {
+      const lineages = targets.map(([platform, arch]) => {
+        const runtimeKey = `${platform}-${arch}`;
+        const localBundle = join(tmp, runtimeKey, 'bundle');
+        const projectRoot = join(tmp, runtimeKey, 'project');
+        createCompleteLocalBundle(localBundle, platform, arch);
+        process.env.AIONUI_BACKEND_LOCAL_BUNDLE_DIR = localBundle;
+        prepareAioncore({
+          projectRoot,
           platform,
           arch,
           version: 'v0.1.50',
-          sourceType: 'test',
-          source: { fixture: true },
-          generatedAt: '2026-08-07T00:00:00.000Z',
-        }).migrationLineage
-    );
+        });
+        const preparedRoot = join(projectRoot, 'resources', 'bundled-aioncore', runtimeKey);
+        const manifest = JSON.parse(readFileSync(join(preparedRoot, 'manifest.json'), 'utf8'));
+        const document = JSON.parse(readFileSync(join(preparedRoot, 'migration-lineage.json'), 'utf8'));
+        expect(document).toEqual(acceptedMigrationLineage);
+        expect(manifest.migrationLineage.entries).toEqual(acceptedMigrationLineage.entries);
+        return manifest.migrationLineage;
+      });
 
-    expect(lineages[0]).toEqual(lineages[1]);
-    expect(lineages[1]).toEqual(lineages[2]);
-    expect(lineages[0].fingerprint).toBe(acceptedMigrationLineage.fingerprint);
-    expect(lineages[0].minimumSupportedVersion).toBe(acceptedMigrationLineage.minimumSupportedVersion);
+      expect(lineages[0]).toEqual(lineages[1]);
+      expect(lineages[1]).toEqual(lineages[2]);
+      expect(lineages[2]).toEqual(lineages[3]);
+      expect(lineages[0].fingerprint).toBe(acceptedMigrationLineage.fingerprint);
+      expect(lineages[0].minimumSupportedVersion).toBe(acceptedMigrationLineage.minimumSupportedVersion);
+    } finally {
+      if (previous === undefined) delete process.env.AIONUI_BACKEND_LOCAL_BUNDLE_DIR;
+      else process.env.AIONUI_BACKEND_LOCAL_BUNDLE_DIR = previous;
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

@@ -153,6 +153,23 @@ describe('classifyBackendStartupFailure', () => {
     });
   });
 
+  it('does not misclassify a lineage-stage preflight error without a stable reason', () => {
+    const error = new Error('aioncore exited before health check passed') as Error & {
+      details?: Record<string, unknown>;
+    };
+    error.details = {
+      stage: 'early_exit',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+    };
+
+    expect(classifyBackendStartupFailure(error)).toEqual({
+      reason: 'backend_startup_failed',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+    });
+  });
+
   it('classifies recoverable database corruption boundary failures separately from data migration failures', () => {
     const error = new Error('aioncore exited before health check passed') as Error & {
       details?: Record<string, unknown>;
@@ -432,14 +449,19 @@ describe('getInstallationIntegrityModalActions', () => {
   it('uses compatibility copy and never exposes database recovery for lineage failures', () => {
     const t = vi.fn((key: string) => key) as any;
     const onRecoverCorruptedDatabase = vi.fn();
+    const onQuit = vi.fn();
 
     const actions = getInstallationIntegrityModalActions(t, {
       diagnosticsKind: 'database_lineage',
+      onQuit,
       onRecoverCorruptedDatabase,
     } as any);
 
     expect(actions.reportText).toBe('common.backendStartup.databaseLineage.sendDiagnostics');
+    expect(actions.quitText).toBe('common.backendStartup.databaseLineage.quitApplication');
     expect(actions.recoverText).toBeUndefined();
+    actions.onQuit();
+    expect(onQuit).toHaveBeenCalledOnce();
     expect(onRecoverCorruptedDatabase).not.toHaveBeenCalled();
   });
 

@@ -146,7 +146,7 @@ function verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetA
     );
   }
 
-  const expectedLineage = getAcceptedMigrationLineageSummary();
+  const expectedLineage = getAcceptedMigrationLineageManifest();
   if (!isDeepStrictEqual(manifest.migrationLineage, expectedLineage)) {
     addFailure(failures, missing, {
       component: 'migration-lineage',
@@ -156,13 +156,10 @@ function verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetA
   }
 }
 
-function getAcceptedMigrationLineageSummary() {
+function getAcceptedMigrationLineageManifest() {
   return {
-    schemaVersion: acceptedMigrationLineage.schemaVersion,
-    minimumSupportedVersion: acceptedMigrationLineage.minimumSupportedVersion,
-    latestVersion: acceptedMigrationLineage.latestVersion,
-    entryCount: acceptedMigrationLineage.entryCount,
-    fingerprint: acceptedMigrationLineage.fingerprint,
+    ...acceptedMigrationLineage,
+    entries: acceptedMigrationLineage.entries.map((entry) => ({ ...entry })),
     file: 'migration-lineage.json',
   };
 }
@@ -876,6 +873,6 @@ function verifyBundledAioncoreResources({ resourcesDir, electronPlatformName, ta
 
 module.exports = {
   acceptedMigrationLineage,
-  getAcceptedMigrationLineageSummary,
+  getAcceptedMigrationLineageManifest,
   verifyBundledAioncoreResources,
 };

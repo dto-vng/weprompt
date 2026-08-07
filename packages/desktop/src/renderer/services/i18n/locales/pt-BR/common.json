@@ -102,6 +102,7 @@
       "description": "O AionCore parou antes de alterar o banco de dados porque o histórico de migrações não é compatível com este pacote do WePrompt (motivo: {{reason}}, aplicada: {{appliedVersion}}, versão mínima compatível: {{floorVersion}}, mais recente incluída: {{latestVersion}}). Esta verificação de compatibilidade não alterou o esquema nem os dados do banco, incluindo os arquivos de diário WAL e SHM. Não recrie nem substitua o banco de dados. Feche o WePrompt e instale uma versão aprovada compatível com este banco, ou salve os diagnósticos para o suporte.",
       "unknownVersion": "desconhecida",
       "unknownReason": "desconhecido",
+      "quitApplication": "Sair do WePrompt",
       "sendDiagnostics": "Salvar diagnósticos",
       "diagnosticsSent": "Diagnósticos salvos",
       "diagnosticsReportSuccess": "Pacote de diagnóstico salvo",

@@ -153,12 +153,15 @@ export function getInstallationIntegrityModalActions(
   t: TFunction,
   options: {
     diagnosticsKind?: InstallationIntegrityDialogKind;
+    onQuit?: () => void;
     onRecoverCorruptedDatabase?: () => Promise<unknown> | void;
     onReportDiagnostics?: () => Promise<SubmitFeedbackReportResult> | SubmitFeedbackReportResult;
   } = {}
 ): {
   onRecoverCorruptedDatabase: () => Promise<unknown> | void;
   onReportDiagnostics: () => Promise<SubmitFeedbackReportResult> | SubmitFeedbackReportResult;
+  onQuit: () => void;
+  quitText?: string;
   recoverText?: string;
   reportText: string;
 } {
@@ -166,6 +169,9 @@ export function getInstallationIntegrityModalActions(
   return {
     onRecoverCorruptedDatabase: options.onRecoverCorruptedDatabase ?? (() => Promise.resolve()),
     onReportDiagnostics: options.onReportDiagnostics ?? (() => ({ status: 'failed' })),
+    onQuit: options.onQuit ?? (() => window.close()),
+    quitText:
+      diagnosticsKind === 'database_lineage' ? t('common.backendStartup.databaseLineage.quitApplication') : undefined,
     recoverText:
       diagnosticsKind === 'recoverable_database_corruption'
         ? t('common.backendStartup.recoverableDatabaseCorruption.confirmRebuild')
@@ -305,6 +311,11 @@ export const InstallationIntegrityFooter: React.FC<{
           onClick={handleRecoverCorruptedDatabase}
         >
           {actions.recoverText}
+        </Button>
+      ) : null}
+      {actions.quitText ? (
+        <Button data-testid='database-lineage-quit' type='primary' onClick={actions.onQuit}>
+          {actions.quitText}
         </Button>
       ) : null}
     </Space>

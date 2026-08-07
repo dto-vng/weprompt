@@ -102,6 +102,7 @@
       "description": "Veritabanının geçiş geçmişi bu WePrompt paketiyle uyumlu olmadığı için AionCore veritabanını değiştirmeden önce durdu (neden: {{reason}}, uygulanan: {{appliedVersion}}, desteklenen alt sınır: {{floorVersion}}, paketlenen en son: {{latestVersion}}). Bu uyumluluk denetimi, WAL ve SHM günlük dosyaları dahil veritabanı şemasını veya verileri değiştirmedi. Veritabanını yeniden oluşturmayın veya değiştirmeyin. WePrompt’u kapatıp bu veritabanını destekleyen onaylı bir sürüm yükleyin ya da destek için tanıları kaydedin.",
       "unknownVersion": "bilinmiyor",
       "unknownReason": "bilinmiyor",
+      "quitApplication": "WePrompt'tan çık",
       "sendDiagnostics": "Tanıları kaydet",
       "diagnosticsSent": "Tanılar kaydedildi",
       "diagnosticsReportSuccess": "Tanı paketi kaydedildi",

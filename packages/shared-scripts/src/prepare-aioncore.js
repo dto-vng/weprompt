@@ -23,7 +23,7 @@ const path = require('path');
 const { isDeepStrictEqual } = require('util');
 const {
   acceptedMigrationLineage,
-  getAcceptedMigrationLineageSummary,
+  getAcceptedMigrationLineageManifest,
   verifyBundledAioncoreResources,
 } = require('./verify-bundled-aioncore-resources');
 
@@ -161,7 +161,7 @@ function buildBundleManifest({ platform, arch, version, sourceType, source, gene
     generatedAt,
     sourceType,
     source,
-    migrationLineage: getAcceptedMigrationLineageSummary(),
+    migrationLineage: getAcceptedMigrationLineageManifest(),
     files: [getBinaryName(platform), 'migration-lineage.json', 'managed-resources/'],
   };
 }

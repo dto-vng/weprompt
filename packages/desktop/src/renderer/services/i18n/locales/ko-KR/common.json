@@ -102,6 +102,7 @@
       "description": "데이터베이스의 마이그레이션 기록이 이 WePrompt 패키지와 호환되지 않아 AionCore가 데이터베이스를 변경하기 전에 중지되었습니다(사유: {{reason}}, 적용 버전: {{appliedVersion}}, 지원 하한: {{floorVersion}}, 번들 최신 버전: {{latestVersion}}). 이 호환성 검사는 WAL 및 SHM 저널 파일을 포함한 데이터베이스 스키마나 데이터를 변경하지 않았습니다. 데이터베이스를 재구축하거나 교체하지 마세요. WePrompt를 닫고 이 데이터베이스를 지원하는 승인된 버전을 설치하거나 지원을 위해 진단 정보를 저장하세요.",
       "unknownVersion": "알 수 없음",
       "unknownReason": "알 수 없음",
+      "quitApplication": "WePrompt 종료",
       "sendDiagnostics": "진단 정보 저장",
       "diagnosticsSent": "진단 정보를 저장했습니다",
       "diagnosticsReportSuccess": "진단 패키지를 저장했습니다",

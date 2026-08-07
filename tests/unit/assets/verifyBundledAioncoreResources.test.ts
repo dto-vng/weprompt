@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 const {
   acceptedMigrationLineage,
-  getAcceptedMigrationLineageSummary,
+  getAcceptedMigrationLineageManifest,
   verifyBundledAioncoreResources,
 } = require('../../../packages/shared-scripts/src/verify-bundled-aioncore-resources');
 
@@ -190,7 +190,7 @@ describe('verifyBundledAioncoreResources', () => {
     writeJson(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'manifest.json'), {
       platform: 'win32',
       arch: 'x64',
-      migrationLineage: getAcceptedMigrationLineageSummary(),
+      migrationLineage: getAcceptedMigrationLineageManifest(),
     });
     writeJson(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'migration-lineage.json'), acceptedMigrationLineage);
 
@@ -489,7 +489,7 @@ describe('verifyBundledAioncoreResources', () => {
     writeJson(join(runtimeRoot, 'manifest.json'), {
       platform: 'darwin',
       arch: 'arm64',
-      migrationLineage: getAcceptedMigrationLineageSummary(),
+      migrationLineage: getAcceptedMigrationLineageManifest(),
     });
     writeJson(join(runtimeRoot, 'migration-lineage.json'), acceptedMigrationLineage);
     writeFile(join(managedRoot, 'node', 'node-v24.11.0-darwin-arm64', 'bin', 'node'));

@@ -303,21 +303,20 @@ export function classifyBackendStartupFailure(error: unknown): BackendStartupFai
   ) {
     const fields = details?.backendBoundaryFields;
     const rawLineageReason = readBoundaryField(fields, 'lineageReason');
-    const lineageReason = DATABASE_LINEAGE_REASONS.has(rawLineageReason as BackendDatabaseLineageReason)
-      ? (rawLineageReason as BackendDatabaseLineageReason)
-      : undefined;
-    const actualFingerprint = readBoundaryField(fields, 'actualFingerprint');
-    return {
-      reason: 'backend_database_lineage_incompatible',
-      backendBoundaryCode,
-      backendBoundaryStage,
-      lineageReason,
-      appliedVersion: readBoundaryVersion(fields, 'appliedVersion'),
-      floorVersion: readBoundaryVersion(fields, 'floorVersion'),
-      latestVersion: readBoundaryVersion(fields, 'latestVersion'),
-      expectedFingerprint: readBoundaryField(fields, 'expectedFingerprint'),
-      actualFingerprint: actualFingerprint === 'none' ? undefined : actualFingerprint,
-    };
+    if (DATABASE_LINEAGE_REASONS.has(rawLineageReason as BackendDatabaseLineageReason)) {
+      const actualFingerprint = readBoundaryField(fields, 'actualFingerprint');
+      return {
+        reason: 'backend_database_lineage_incompatible',
+        backendBoundaryCode,
+        backendBoundaryStage,
+        lineageReason: rawLineageReason as BackendDatabaseLineageReason,
+        appliedVersion: readBoundaryVersion(fields, 'appliedVersion'),
+        floorVersion: readBoundaryVersion(fields, 'floorVersion'),
+        latestVersion: readBoundaryVersion(fields, 'latestVersion'),
+        expectedFingerprint: readBoundaryField(fields, 'expectedFingerprint'),
+        actualFingerprint: actualFingerprint === 'none' ? undefined : actualFingerprint,
+      };
+    }
   }
 
   if (
