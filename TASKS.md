@@ -1,6 +1,71 @@
-# Tasks
+# Sprint 2 Tasks
+
+> **Canonical work register. Last reconciled: 2026-08-07.**
+>
+> - Mark an item **Done** only when its accepted head is merged into `origin/sprint2`. Local branches, worktrees, plans, and green focused tests remain open until integration is accepted.
+> - Every active epic records its current boundary and next admission gate. Do not infer whole-sprint progress from raw checkbox count: epics and bugs differ materially in size.
+> - Update this file after every accepted merge, blocker decision, scope change, and code-freeze checkpoint. Preserve evidence links and move completed items to **Done** instead of deleting them.
 
 ## Active
+
+- [ ] **[EPIC-002][P2][Design-blocked] Create reusable HTML/PPTX/DOCX template packs from chat**
+  - Outcome: derive a template from a workspace artifact, or describe an HTML template, then review, add, or discard it in chat before anything reaches the Template Gallery.
+  - Current boundary: Task 1 of 11 is independently accepted on the preserved candidate but is not merged into `origin/sprint2`. Task 2 is **blocked at the mandatory store-boundary redesign checkpoint** after two bounded hardening rounds; Tasks 3–11, runtime registration, IPC, gallery installation, enablement, packaging, and release are not admitted or started.
+  - Open Task 2 invariants: failed/expired terminalization must atomically persist exact cleanup proof for every owned allocation, and every public path must fail closed after poison or root-identity uncertainty. Committed ownership and PPTX/DOCX reload-proof parity are now addressed.
+  - Preserved candidate: `codex/epic002-template-creation-r-02ee3f8d6@86c966bda7644ae87c105532dcf47f282407add9`; focused Task 2 boundary passed 159/159, but independent exact-head review correctly returned BLOCK on the two remaining invariants.
+  - Next gate: redesign the store boundary and obtain independent design approval before any further production edit. The revised design must allocate cleanup authority explicitly, make terminalization consume a complete durable receipt set, and centralize usable-root enforcement across all public operations. No third micro-patch round is admissible.
+  - Dependencies: release waits for EPIC-001's accepted shared presentation seams and BUG-014 packaged-template acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
+  - Evidence: the authoritative reconciled Task 2 contract and review package remain preserved at the candidate head above until accepted and merged. The tracked [original design spec](docs/design/template-creation-skill-plan.md) is historical background only; it targets an earlier base and must not be used as the current execution plan.
+
+- [ ] **[EPIC-003][P2][Planning gate] Expose provider- and model-aware reasoning controls**
+  - Outcome: show only reasoning controls a selected provider/model can actually honor, using capability evidence rather than provider-name special cases.
+  - Current boundary: session-local, unmerged provider evidence, canonical fixtures, capability-revision design, and candidate AionCore migrations `038`/`039` have been prepared. Independent review blocked the three implementation plans because their steps, owners, exact paths, and RED assertions were not executable enough. No runtime, migration, IPC, renderer, or packaging implementation has started, and the evidence package is not yet present in the tracked Sprint 2 tree.
+  - Current evidence: Moonshot `kimi-k2.6` and `kimi-k2.5` have documented toggle semantics but remain feature-disabled; unverified GreenNode gateway models and ACP remain unsupported.
+  - Next gate: materialize the evidence package in an auditable branch, rewrite and independently approve the three repository-specific plans, refresh all immutable bases and migration occupancy, then admit the first AionRS DTO/private-mapping slice.
+  - Scope rule: capability-based and provider-agnostic; do not hard-code Kimi, GreenNode, or Sol-style effort labels into the shared contract.
+
+- [ ] **[SPRINT2-PLATFORM][P1][Scope gate] Complete SSO and the security/packaging workflow**
+  - Outcome: employees can sign in through the approved SSO route and install or upgrade a package that starts securely without data loss or undocumented recovery steps.
+  - Current boundary: local-backend authentication and pilot-hardening candidates exist on separate, substantially stale security branches; they are not integrated into Sprint 2. No accepted SSO provider/session/tenant contract is recorded in this register.
+  - Next gate: approve the SSO contract and owner, reconcile the security branches against the current Sprint 2 tip, then define one clean-install/upgrade/recovery matrix for macOS ARM, macOS Intel, and Windows.
+  - Scope rule: keep SSO identity, application security, packaging mechanics, and release acceptance visible as separate slices even when they share one program outcome.
+
+- [ ] **[SPRINT2-CONNECTORS][P2][Acceptance gate] Make Outlook and FDL data connectors available**
+  - Outcome: users can discover the two approved connectors, authenticate, reconnect, and use them from a supported assistant flow.
+  - Current boundary: Sprint 2 already seeds the OAuth-backed `outlook-advanced` and `tse-datahub` HTTP MCP endpoints. Packaged login, permission, reconnect, and supported-flow acceptance is not recorded, and the exact FDL product name/endpoint still needs confirmation against the seeded data connector.
+  - Next gate: confirm the FDL identity, run packaged authentication and least-privilege smokes for both connectors, record failure/recovery behavior, and decide whether they remain enabled by default in the hardened pilot package.
+  - Scope rule: this is availability of two named connectors, not a generic MCP/data-platform expansion.
+
+- [ ] **[BUG-013][P0][Packaging] Make installed upgrades schema-compatible on first startup**
+  - Actual: a packaged application can fail to start against existing app data when the bundled AionCore migration set is older than migrations already recorded in the database.
+  - Current boundary: a schema-lineage candidate branch exists, but native Windows and end-user upgrade acceptance are not merged or complete.
+  - Expected: preserve user data, fail safely with an actionable recovery path, and prove the shipped migration set supports the declared data floor on every release platform.
+
+- [ ] **[BUG-014][P1][Packaging] Ship and hand off all built-in PPTX/DOCX templates**
+  - Actual: packaging and first-turn readiness can leave built-in templates absent or consume an initial templated message before the runtime is ready.
+  - Current boundary: a template-inventory candidate branch exists; packaged gallery and first-send acceptance across macOS ARM, macOS Intel, and Windows remain open.
+  - Expected: fail packaging when any required reference is absent, list all built-ins in the installed gallery, and remove a stored initial message only after execution succeeds.
+
+- [ ] **[BUG-015][P1] Report authoritative context-window usage and local token totals**
+  - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
+  - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
+
+- [ ] **[BUG-016][P1] Show thinking activity when `thinking.subject` is missing**
+  - Actual: completed thinking records with content but no subject disappear from the grouped work summary.
+  - Expected: show a localized safe fallback with correct state while preserving the existing disclosure and redaction boundary.
+
+- [ ] **[BUG-017][P1][Needs reproduction] Recover safely when AionCore loses SQLite access**
+  - Actual: a real incident returned SQLite code 14 across providers, assistants, conversations, App Operations, and Health Check; integrity passed and restart restored service, but the durable cause is unconfirmed.
+  - Expected: identify local-data access failure accurately, preserve the database, offer safe restart/retry and bounded diagnostics, and never delete or rebuild data without confirmed corruption and explicit consent.
+
+- [ ] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions**
+  - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
+  - Expected: preserve the provider's structured failure type, use HTTP status only as fallback, respect bounded retry guidance, and expose accurate localized recovery actions.
+
+- [ ] **[BUG-019][P1] Open Project Home after creating a project**
+  - Actual: project creation succeeds and immediately navigates to `/guid`, bypassing the setup home.
+  - Expected: refresh the list, close the modal, and navigate to `/project/:id`; explicit project **New chat** actions must continue to open `/guid`.
+  - Verified root cause: the creation callback still calls `navigateToProjectChat(...)` instead of the existing project-home route builder.
 
 - [ ] **[BUG-024][P2][Creative Studio] A shot whose media route is not ready loses its generate action with no explanation**
   - Reproduction: open a project containing both image and video shots while exactly one media role is ready — for example the image model configured and the video model still `setup_required`.
@@ -35,10 +100,21 @@
   - Trap: `toRendererProject` projects routing field-by-field into a different renderer-side type, so a new project field is silently dropped at that boundary — main would store it correctly and the renderer would never see it. Cover that with a test.
   - Two sibling gaps are resolved and need no work: **G2** (appended-clip acknowledgement) was dissolved by the hold-outside design, which is derived and needs no persisted state; **G3** (undo) was closed by deletion — no undo, and explicitly no bounded order-only undo either.
 
-- [ ] **[P3][Creative Studio] Suite exits non-zero after a fully green run**
-  - Observed once: a full DOM-project run passed all 2,484 tests and still exited 1 via an `EnvironmentTeardownError` from `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`. A teardown error after a green run fails `just push` with zero failing tests — a third gate-poisoner class alongside BUG-025 and BUG-027. Not yet reproduced in the mixed full suite.
+- [ ] **[BUG-030][P3][Test infrastructure] Suite exits non-zero after a fully green run**
+  - Actual: a full DOM-project run (`vitest run --project dom`) passed all 2,484 tests and still **exited 1**, via an `EnvironmentTeardownError` from `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`. A teardown error after a green run fails `just push` with **zero failing tests**, which reads as an inexplicable gate failure.
+  - **Not Creative Studio code**, despite being found during Studio work — `TeamSiderSection` is the team sidebar. It was previously filed unnumbered under Creative Studio, which was misleading on both counts; ownership belongs with whoever owns that suite or the shared test setup.
+  - Third member of the gate-poisoner family, alongside BUG-025 (now fixed) and BUG-027. Distinct from both: those fail a test, this one fails the process while every test passes.
+  - Observed once, in a single-project run. **Not yet reproduced in the mixed full suite**, so it may need that context — the same thing turned out to be true of BUG-025, where coverage instrumentation was the missing ingredient.
+  - Expected: a green run exits 0. Fix the teardown, or establish why the environment is torn down while work is outstanding.
 
 ## Waiting On
+
+- [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
+  - Outcome: users request workbook changes in plain language, receive one bounded pre-change audit and approval point, and get a verified result without silent damage to formulas, formatting, charts, or unsupported workbook features.
+  - Current boundary: the problem statement, solution contract, and implementation plan were approved in planning sessions, but the evidence package is session-local and not present in the tracked Sprint 2 tree. No runtime implementation has started or been merged.
+  - Waiting on: the shared Office artifact/mutation boundary and EPIC-002's OfficeCLI ownership contract must settle before Excel introduces another publication or cleanup path.
+  - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
+  - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
 
 - [ ] **[Creative Studio] Review screen redraw — commissioned, delivered, awaiting build capacity**
   - The designer delivered the full Review redraw (cut editor, inspector, render/failure/export states, compact and dark, three new tokens). It supersedes the provisional render placement. Sequencing is settled in `docs/design/creative-studio-v11-cut-editor-plan.md`: `renderCut` must read the cut **before** any editor UI ships, because scene-derived segments mean clip order is not honoured today.
@@ -49,6 +125,14 @@
 ## Someday
 
 ## Done
+
+- [x] **[EPIC-001][P1] Presentation artifact-quality foundation and synthetic stabilization** — completed 2026-08-06
+  - All 14 accepted task heads are merged into `origin/sprint2`, including fail-closed grounding, canonical presentation routing, deterministic readiness checks, rendered QA foundations, bounded repair controls, and final synthetic stabilization.
+  - Completion boundary: the foundation is integrated with `PRESENTATION_RUN_V2_ENABLED=false`. Live-provider activation, production containment, packaged-template acceptance, and release work remain deliberately tracked under the active packaging and bug gates rather than being hidden inside this completion.
+
+- [x] **[EPIC-005][P1] Creative Studio v1 core workflow** — completed 2026-08-06
+  - The accepted v1 process service, model configuration, IPC/native contracts, localized renderer workflow, and verification boundary are merged into `origin/sprint2` via `cd3896d13`.
+  - Completion boundary: the merged v1 remains done; BUG-024, BUG-027, BUG-028, BUG-029, BUG-030, EPIC-005-G1, Review redraw, and FFmpeg licensing are explicit follow-ups and do not silently reopen the core epic.
 
 - [x] **[BUG-025][P2][Creative Studio] `StudioPage.dom.test.tsx` phase-navigation flake** - verified fixed
   - Actual: `fits 18 seconds to 15 with one atomic command…` failed intermittently in full-suite and coverage runs, unable to find the batch-generation button on Produce. Five sightings across both `creative-suite-sprint2` and `sprint2`, at machine loads from 6.1 to 15.2, never reproducible in isolation (40+ clean runs).
