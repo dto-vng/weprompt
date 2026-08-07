@@ -15,6 +15,8 @@ The joint deliverable: talk → accept a script whose scenes carry visual direct
 
 ## 2. Backlog items
 
+> **Execution-ready 2026-08-07:** both slices have task-by-task implementation plans in `docs/superpowers/plans/` (gitignored working docs, copied into the Documents clone and the `creative-suite-sprint2` worktree): `2026-08-07-studio-brief-conversation-slice-a.md` (13 tasks) and `2026-08-07-studio-reference-pool-slice-p.md` (9 tasks).
+
 ### A1 — `builtin-mcp-studio` server — **M**
 
 The new stdio subprocess in `builtinMcp/`, cloned from `knowledgeServer`'s per-conversation session pattern, plus its `build-mcp-servers.js` entry and `STUDIO_ENV` (project dir read, `proposals/pending/` write — never the store root).
