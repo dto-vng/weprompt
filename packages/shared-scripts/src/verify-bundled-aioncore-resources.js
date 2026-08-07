@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { isDeepStrictEqual } = require('util');
+const acceptedMigrationLineage = require('./aioncore-migration-lineage.json');
 
 const REQUIRED_ACP_TOOL_SLUGS = ['codex-acp', 'claude-agent-acp'];
 const REQUIRED_SCHEMA_2_CLI_NAMES = ['claude', 'codex'];
@@ -142,6 +144,56 @@ function verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetA
       { component: 'bundle-manifest', reason: 'runtime_key_mismatch', path: relativePath },
       `${relativePath}<arch:${targetArch}>`
     );
+  }
+
+  const expectedLineage = getAcceptedMigrationLineageSummary();
+  if (!isDeepStrictEqual(manifest.migrationLineage, expectedLineage)) {
+    addFailure(failures, missing, {
+      component: 'migration-lineage',
+      reason: 'manifest_mismatch',
+      path: relativePath,
+    });
+  }
+}
+
+function getAcceptedMigrationLineageSummary() {
+  return {
+    schemaVersion: acceptedMigrationLineage.schemaVersion,
+    minimumSupportedVersion: acceptedMigrationLineage.minimumSupportedVersion,
+    latestVersion: acceptedMigrationLineage.latestVersion,
+    entryCount: acceptedMigrationLineage.entryCount,
+    fingerprint: acceptedMigrationLineage.fingerprint,
+    file: 'migration-lineage.json',
+  };
+}
+
+function verifyMigrationLineage(baseDir, runtimeKey, checked, missing, failures) {
+  const relativePath = bundledPath(runtimeKey, 'migration-lineage.json');
+  const lineagePath = path.join(baseDir, 'migration-lineage.json');
+  checked.push(relativePath);
+
+  if (!isFile(lineagePath)) {
+    addFailure(failures, missing, { component: 'migration-lineage', reason: 'missing_file', path: relativePath });
+    return;
+  }
+
+  const document = readManifest(lineagePath);
+  if (!document) {
+    addFailure(
+      failures,
+      missing,
+      { component: 'migration-lineage', reason: 'invalid_json', path: relativePath },
+      `${relativePath}<invalid-json>`
+    );
+    return;
+  }
+
+  if (!isDeepStrictEqual(document, acceptedMigrationLineage)) {
+    addFailure(failures, missing, {
+      component: 'migration-lineage',
+      reason: 'lineage_mismatch',
+      path: relativePath,
+    });
   }
 }
 
@@ -811,6 +863,7 @@ function verifyBundledAioncoreResources({ resourcesDir, electronPlatformName, ta
 
   requireRelativePath(baseDir, runtimeKey, [backendBinaryName(electronPlatformName)], checked, missing, failures);
   verifyBundleManifest(baseDir, runtimeKey, electronPlatformName, targetArch, checked, missing, failures);
+  verifyMigrationLineage(baseDir, runtimeKey, checked, missing, failures);
   requireRelativeDirectory(baseDir, runtimeKey, ['managed-resources'], checked, missing, failures);
   const managedRootInfo = inspectManagedResourcesRoot(baseDir, runtimeKey, missing, failures);
   if (managedRootInfo) verifyManagedResourcesContract(managedRootInfo, runtimeKey, checked, missing, failures);
@@ -822,5 +875,7 @@ function verifyBundledAioncoreResources({ resourcesDir, electronPlatformName, ta
 }
 
 module.exports = {
+  acceptedMigrationLineage,
+  getAcceptedMigrationLineageSummary,
   verifyBundledAioncoreResources,
 };

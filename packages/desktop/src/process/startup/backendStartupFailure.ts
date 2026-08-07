@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { BackendStartupFailureInfo } from '@/common/types/platform/electron';
+import type { BackendDatabaseLineageReason, BackendStartupFailureInfo } from '@/common/types/platform/electron';
 
 type ErrorWithDetails = Error & {
   details?: {
@@ -15,6 +15,7 @@ type ErrorWithDetails = Error & {
     stdoutTail?: unknown;
     backendBoundaryCode?: unknown;
     backendBoundaryStage?: unknown;
+    backendBoundaryFields?: unknown;
     runtimeKey?: unknown;
     binaryName?: unknown;
     bundledDirExists?: unknown;
@@ -32,6 +33,16 @@ const GLIBC_VERSION_RE = /GLIBC_(\d+\.\d+)/g;
 const GLIBC_NOT_FOUND_RE = /GLIBC_\d+\.\d+[\s\S]{0,160}not found|not found[\s\S]{0,160}GLIBC_\d+\.\d+/i;
 const PACKAGED_APP_MARKER_ENTRIES = new Set(['app.asar', 'app.asar.unpacked/']);
 const DATA_MIGRATION_BOUNDARY_STAGES = new Set(['database.migration', 'database.schema_repair']);
+const DATABASE_LINEAGE_BOUNDARY_STAGE = 'database.migration_lineage';
+const DATABASE_LINEAGE_REASONS = new Set<BackendDatabaseLineageReason>([
+  'newer',
+  'unknown',
+  'gapped',
+  'changed',
+  'unsuccessful',
+  'missing',
+  'below_floor',
+]);
 const RECOVERABLE_DATABASE_CORRUPTION_BOUNDARY_STAGE = 'database.recoverable_corruption';
 const LOCAL_DATA_REPAIR_BOUNDARY_CODE = 'BOOTSTRAP_SERVICE_INIT_FAILED';
 const LOCAL_DATA_REPAIR_BOUNDARY_STAGE = 'services.init';
@@ -83,6 +94,18 @@ function extractMissingGlibcVersions(text: string): string[] {
 
 function getBackendStartupDetails(error: unknown): ErrorWithDetails['details'] | undefined {
   return (error as ErrorWithDetails | undefined)?.details;
+}
+
+function readBoundaryField(fields: unknown, name: string): string | undefined {
+  if (!fields || typeof fields !== 'object') return undefined;
+  const value = (fields as Record<string, unknown>)[name];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readBoundaryVersion(fields: unknown, name: string): number | undefined {
+  const value = readBoundaryField(fields, name);
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  return Number(value);
 }
 
 function getStringArray(value: unknown): string[] | undefined {
@@ -273,6 +296,29 @@ export function classifyBackendStartupFailure(error: unknown): BackendStartupFai
     backendBoundaryStage
   );
   if (transientConcurrentStartupFailure) return transientConcurrentStartupFailure;
+
+  if (
+    backendBoundaryCode === 'BOOTSTRAP_DATA_INIT_FAILED' &&
+    backendBoundaryStage === DATABASE_LINEAGE_BOUNDARY_STAGE
+  ) {
+    const fields = details?.backendBoundaryFields;
+    const rawLineageReason = readBoundaryField(fields, 'lineageReason');
+    const lineageReason = DATABASE_LINEAGE_REASONS.has(rawLineageReason as BackendDatabaseLineageReason)
+      ? (rawLineageReason as BackendDatabaseLineageReason)
+      : undefined;
+    const actualFingerprint = readBoundaryField(fields, 'actualFingerprint');
+    return {
+      reason: 'backend_database_lineage_incompatible',
+      backendBoundaryCode,
+      backendBoundaryStage,
+      lineageReason,
+      appliedVersion: readBoundaryVersion(fields, 'appliedVersion'),
+      floorVersion: readBoundaryVersion(fields, 'floorVersion'),
+      latestVersion: readBoundaryVersion(fields, 'latestVersion'),
+      expectedFingerprint: readBoundaryField(fields, 'expectedFingerprint'),
+      actualFingerprint: actualFingerprint === 'none' ? undefined : actualFingerprint,
+    };
+  }
 
   if (
     backendBoundaryCode === 'BOOTSTRAP_DATA_INIT_FAILED' &&

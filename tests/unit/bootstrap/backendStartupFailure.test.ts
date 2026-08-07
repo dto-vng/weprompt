@@ -122,6 +122,37 @@ describe('classifyBackendStartupFailure', () => {
     });
   });
 
+  it('classifies migration lineage failures as a non-destructive compatibility block', () => {
+    const error = new Error('aioncore exited before health check passed') as Error & {
+      details?: Record<string, unknown>;
+    };
+    error.details = {
+      stage: 'early_exit',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+      backendBoundaryFields: {
+        actualFingerprint: 'actual456',
+        appliedVersion: '20',
+        expectedFingerprint: 'expected123',
+        floorVersion: '19',
+        latestVersion: '27',
+        lineageReason: 'changed',
+      },
+    };
+
+    expect(classifyBackendStartupFailure(error)).toEqual({
+      reason: 'backend_database_lineage_incompatible',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+      lineageReason: 'changed',
+      appliedVersion: 20,
+      floorVersion: 19,
+      latestVersion: 27,
+      expectedFingerprint: 'expected123',
+      actualFingerprint: 'actual456',
+    });
+  });
+
   it('classifies recoverable database corruption boundary failures separately from data migration failures', () => {
     const error = new Error('aioncore exited before health check passed') as Error & {
       details?: Record<string, unknown>;
@@ -396,6 +427,20 @@ describe('getInstallationIntegrityModalActions', () => {
     expect(actions.reportText).toBe('common.backendStartup.dataMigration.sendDiagnostics');
     expect('downloadText' in actions).toBe(false);
     expect(failure.backendBoundaryStage).toBe('database.migration');
+  });
+
+  it('uses compatibility copy and never exposes database recovery for lineage failures', () => {
+    const t = vi.fn((key: string) => key) as any;
+    const onRecoverCorruptedDatabase = vi.fn();
+
+    const actions = getInstallationIntegrityModalActions(t, {
+      diagnosticsKind: 'database_lineage',
+      onRecoverCorruptedDatabase,
+    } as any);
+
+    expect(actions.reportText).toBe('common.backendStartup.databaseLineage.sendDiagnostics');
+    expect(actions.recoverText).toBeUndefined();
+    expect(onRecoverCorruptedDatabase).not.toHaveBeenCalled();
   });
 
   it('uses local data repair copy and diagnostics-only actions for local cache corruption', () => {

@@ -97,6 +97,16 @@
       "description": "当前 WePrompt 安装包是 {{packageArch}}，但这台 Mac 是 {{deviceArch}}。请从获批的内部分发渠道获取 {{expectedArch}} 安装包，关闭 WePrompt 后再安装该版本。",
       "closeApplication": "关闭 WePrompt"
     },
+    "databaseLineage": {
+      "title": "此数据库需要兼容的 WePrompt 版本",
+      "description": "由于数据库迁移历史与此 WePrompt 安装包不兼容，AionCore 已在更改数据库前停止（原因：{{reason}}，已应用版本：{{appliedVersion}}，支持下限：{{floorVersion}}，捆绑最新版本：{{latestVersion}}）。此兼容性检查未更改数据库架构或数据，包括 WAL 和 SHM 日志文件。请勿重建或替换数据库。请关闭 WePrompt，并安装支持此数据库的已批准版本，或保存诊断信息以供支持人员分析。",
+      "unknownVersion": "未知",
+      "unknownReason": "未知",
+      "sendDiagnostics": "保存诊断信息",
+      "diagnosticsSent": "诊断信息已保存",
+      "diagnosticsReportSuccess": "诊断包已保存",
+      "diagnosticsReportFailed": "无法保存诊断包"
+    },
     "dataMigration": {
       "title": "本地数据迁移失败",
       "description": "WePrompt 已打开，但 AionCore 在初始化本地数据时停止。重新安装 WePrompt 可能无法解决此问题。请将诊断包保存到本地，以便检查数据库迁移情况。",

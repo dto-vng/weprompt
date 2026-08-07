@@ -746,6 +746,14 @@ if (skipNative) console.log('⚡ --skip-native: Will skip native module rebuildi
 if (packOnly) console.log('⚡ --pack-only: Will skip electron-builder distributable creation');
 if (forceBuild) console.log('⚡ --force: Force full rebuild');
 
+if (multiArch) {
+  console.error(
+    '❌ Multi-architecture packaging is disabled: each architecture must prepare and verify its own AionCore lineage-bound runtime. Run one build command per architecture.'
+  );
+  process.exitCode = 1;
+  return;
+}
+
 const packageJsonPath = path.resolve(__dirname, '../package.json');
 let restorePackageVersionOverride = () => {};
 let buildFailed = false;
