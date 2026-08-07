@@ -1,0 +1,153 @@
+# Commission — four open asks after the Review build
+
+**Date:** 2026-08-07 · **For:** the Creative Studio designer
+**Why now:** Review §3a–§3c are built and merged; §3d is the last slice. These four are what remains that only you can answer.
+**Related:** [review screen commission](creative-studio-review-screen-commission.md) · [designer brief](creative-studio-designer-brief.md) · [cut model design](creative-studio-cut-model-design.md) · [v1.1 cut editor plan](creative-studio-v11-cut-editor-plan.md)
+
+Four asks, in the order we would take them. They are independent — answer in any order, or decline any one. Two are small, one is copy, one is a drawing.
+
+| #     | Ask                                                      | Size                 | Blocking                            |
+| ----- | -------------------------------------------------------- | -------------------- | ----------------------------------- |
+| **A** | Does a slate say _why_ it is a slate?                    | Small — one decision | Nothing, but §3d closes Review      |
+| **B** | The reason vocabulary — eight causes still have no words | Copy — eight lines   | **BUG-024**, P2 and otherwise ready |
+| **C** | **Model Settings** has never been drawn                  | Real drawing         | Two repair paths depend on it       |
+| **D** | What does _unknown_ model provenance say?                | Copy — one line      | `EPIC-005-G1`, P3                   |
+
+---
+
+## Ask A — does a slate say why it is a slate?
+
+You drew the slate as one thing: a shot with no selected take, hatched, dashed, occupying its intended duration. The cut model records it that way too — _"a scene with no selected take renders as a hatched `SLATE`."_ One state, one treatment.
+
+The screen it replaced was more talkative. The old Review rail labelled four states, deriving them from readiness: a selected take, a shot still generating, a shot that failed, and a shot never started. When the cut editor landed, that distinction disappeared and all three takeless cases became the same plate. We caught it in review and restored the distinction, deliberately as **parity with what existed** rather than as a new design, so the decision would stay yours.
+
+So the built behaviour currently carries more information than your drawing describes, and we would rather you settle it than let an accident stand:
+
+- **If one slate is right**, we will collapse it back and the screen matches your spec exactly.
+- **If the distinction is right**, tell us how it should read. The argument for it is that the three cases have three different next actions — wait, retry, generate — and a user looking at an undifferentiated plate cannot tell which applies.
+
+Whatever you choose, the state must be legible without colour; that is how it is built today, via assistive-technology text rather than a colour cue alone.
+
+## Ask B — eight of the nine reasons still have no words
+
+This is the one most likely to unblock engineering immediately.
+
+You settled the **shape** on 2026-08-06, and we are not reopening it: partial readiness shows a disabled control carrying its reason **and** the models panel stating the same fact once for the project — your state 7, both surfaces, not a choice between them.
+
+What is missing is the copy. A shot's generate action can be absent for **nine** distinct reasons; the drawing addresses one. The other eight need words in the user's vocabulary, and we do not want to invent them — the whole point of the disabled-control-with-a-reason is that the reason is true and specific.
+
+One caveat in the interest of not wasting your time: **the nine are a count, not yet a written list.** The number came from reading the code paths that can suppress the action; nobody has enumerated them with their triggering conditions. Ask for them and we will derive that list from the code and send it — a day's work at most, and it is ours to do, not yours. There is no point drafting copy against causes nobody has written down.
+
+## Ask C — Model Settings has never been drawn
+
+This one is your own finding, not ours. It came out of your reliability map: Model Settings has never been drawn, and it is **load-bearing for two repair paths** — the routes a user takes when a model is missing or misconfigured. Ask B's disabled control points at it, which is what makes it structural rather than cosmetic.
+
+It has been open since 2026-08-06. If those repair paths are still the intended destination, this needs a drawing. If you would rather re-route them somewhere already drawn, that answer works too and is cheaper for everyone.
+
+## Ask D — what does _unknown_ provenance say?
+
+Smallest ask, lowest priority, but it has a trap worth stating.
+
+For the `CHOSEN FOR YOU` disclosure, the app must distinguish a model **you** picked from one **it** picked. Projects that already exist predate any provenance record, so they can only honestly read as **unknown** — never as _auto_, because that would have every current project falsely claim the app chose its models.
+
+So: one line of copy for the unknown case. It should not imply the user chose, and it should not imply the app chose.
+
+---
+
+## Constraints that are still real
+
+Unchanged from the Review commission, restated so nothing is assumed:
+
+- **Arco components; no raw interactive HTML.** Semantic tokens only — if a state needs a colour we do not have, call it out and we will add a token rather than inline a value.
+- **Twelve locales**, with truncation behaviour specified rather than assumed. Your German truncation spec for the models panel was exactly the right level of detail.
+- **Keyboard parity is not optional.** Every affordance needs a non-drag, non-pointer path.
+- **Both themes.**
+- **No undo exists and none is planned** — your decision, and it still holds. Recovery lives in copy and in previewed dialogs, not in a control.
+
+## What is already built — please do not redraw it
+
+So you can spend the time where it counts:
+
+- **§3a–§3c are merged.** Clip order with a keyboard path, trim/crop/colour with keyboard control and a visible zero tick, the divergence chip widening to order-plus-edits, the five footer states, the three typed failures each with exactly one action, and the export dialog carrying the consequence line and the render time before the folder picker.
+- **The three tokens you specified** for dark theme — `--cut-slate-hatch`, `--control-handle`, `--control-zero-tick` — landed early and are defined in both themes.
+- **Your §16 breakpoint numbers were discarded** in favour of the app's own 820/1120, as you asked.
+- **§3d is the last slice** — compact, dark, and the 322px drawer. It is specified and needs nothing further from you.
+
+## What we are NOT asking for
+
+- A Review redraw. §3a–§3d stand; Ask A is one state inside it, not a reopening.
+- Anything on Produce beyond Ask B's copy. The panel shape is settled.
+- Brief-as-conversation, alternate cuts, transitions, audio mixing, text overlays, or NLE export — all out of scope and unchanged.
+
+---
+
+# Response received — 2026-08-07
+
+All four answered the same day. Recorded here; the drawings live on the designer's canvas (turn 4: **4a** Model Settings, **4b** the slate, **4c** the copy shape).
+
+## A — settled: one plate, four labels
+
+**Keep the distinction, drop the treatments.** The hatch means _no footage here_ in every case, so it stays constant and **only the text changes** — one plate with four labels, not three differently-treated plates. Our restoration was right about the need and wrong about the shape.
+
+The fourth label is the designer's own addition: **a shot with takes where none is selected**. It is the only one of the four fixable inside Review, since the takes already exist and the user need only pick one.
+
+**The repair action lives in the inspector on selection, never on the plate** — at three seconds a plate cannot hold a button, and the designer explicitly refused to widen one case to fit one control.
+
+**Verified reachable, not hypothetical.** We checked whether the model can even express the fourth state, and it is produced by an ordinary action: changing a shot's media kind after it has takes. `creativeStudioService.ts:1690` nulls `selectedAssetId` when the selected asset's kind no longer matches, while `:1696` retains `assetIds` intact. So takes-without-a-selection is a real reachable state today, and nothing currently explains it to the user.
+
+**Implication for us:** the fourth state does not exist in `CutTimelineReviewState`, which carries `selected-take | missing-slate | running | failed`. It needs a fifth member and an inspector action. That is new work, not a relabelling.
+
+## B — the list is ours to produce
+
+The designer accepted the caveat at face value: without the conditions written down they would be _inventing_ conditions rather than naming them. **They asked for the list.**
+
+One instruction that may reduce the work: **4c gives the shape each line must fit**, so the derivation has to collect the right facts — and _if two causes produce the same sentence they are one string_. Nine code paths is not necessarily nine strings.
+
+**Blocked on us**, not on them. Needs 4c before the list is shaped.
+
+## C — Model Settings is drawn
+
+Organised **by role, never by provider or catalogue**. Four states per role, with the state owning the action.
+
+The load-bearing part is the **arrival banner**: a disabled control in Produce names a shot, and this screen must catch that intent **in the same words**, offer the way back, and take **initial focus on that role's primary action**. It is a **route rather than a modal** because repair detours through a credential. **No new tokens.**
+
+The model picker behind `Change model` is **not drawn** — a separate ask if we want it.
+
+## Our reply — three things to settle, sent 2026-08-07
+
+### 1. The fourth slate state is real, but its cause is inverted — and the drawn fix does not work
+
+The state you added exists. The mechanism you gave for it does not.
+
+- **A user cannot deselect a take.** `StudioSelectAssetRequest.assetId` is a plain `string`, and the payload schema requires a real id. There is no operation that nulls a selection.
+- **Every generated take selects itself on arrival** — `mediaStore.ts:1423` pushes the asset and sets it as selected in the same write.
+
+So "the user has deselected all of them" cannot happen. The state is reachable by exactly one route: **changing a shot's media kind**. That nulls the selection (`creativeStudioService.ts:1690`) while keeping the takes (`:1696`) — which means the takes that remain are all of the shot's **previous** kind.
+
+That breaks both halves of the drawing. **Takes, none chosen** says the user declined to choose, when in fact we dropped their selection. And **Choose a take** in the inspector would offer image takes for a shot that is now video — a second dead end, not a repair. The honest fact is closer to _these takes are for a different kind of shot_, and the only real fix is to generate again.
+
+Two ways out, and it is your call: re-label and re-action this case for what actually causes it, or tell us to build a real deselect so your version becomes reachable. It cannot ship as drawn.
+
+### 2. USER NOUNS collides with 71 strings we have already shipped
+
+The rule is right. The scope is the question. Our English Studio strings use **"scene" in 71 of 437** — including the timeline's accessible name (`Select scene {{number}}…`) and the handoff copy — and 4b's own screen-reader example says **"Shot 05"**.
+
+So: does USER NOUNS govern only the eight reason lines, or is it the product's vocabulary? The first is a morning's work. The second is a 71-string rename across twelve locales and should be planned as its own slice rather than absorbed. We have not assumed either.
+
+### 3. Model Settings depends on provenance, which is unbuilt and currently P3
+
+Every role card in 4a carries a provenance chip — `YOU CHOSE THIS`, `CHOSEN FOR YOU`, `NO RECORD`. That data does not exist yet; it is `EPIC-005-G1`, filed at **P3 and not started**. Model Settings cannot be built honestly without it, because a project with no provenance record would have to claim one.
+
+Either G1 is promoted and lands first, or the first cut of Model Settings ships without chips and gains them later. Not a design question — but it changes what we can deliver and when, so you should know before you expect the screen.
+
+Worth saying: your Ask D rule is **better than what G1 currently specifies**. The register says provenance is "cleared when the user selects explicitly"; you say the chip should disappear the moment anyone sets that role, because the chip answers _how did this get here_ and once a user chooses, it got there because they chose. We are taking your version.
+
+### Also delivered
+
+The Ask B list, derived from the code as promised: [generate-reason derivation](creative-studio-generate-reason-derivation.md). Thirteen paths, ten causes, eight sentences — and your guess that two would be outside the user's control was exactly right.
+
+## D — settled, with the reasoning
+
+Copy: **"We have no record of how this model was set."** The chip reads **NO RECORD**, not `UNKNOWN`.
+
+The distinction is the point and worth preserving in implementation: _unknown_ describes the **model**, which is alarming and wrong; _no record_ describes **our bookkeeping**, which is what is actually missing. Applies to `EPIC-005-G1`.

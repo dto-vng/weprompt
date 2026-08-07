@@ -15,6 +15,8 @@ The joint deliverable: talk → accept a script whose scenes carry visual direct
 
 ## 2. Backlog items
 
+> **Execution-ready 2026-08-07:** both slices have task-by-task implementation plans in `docs/superpowers/plans/` (gitignored working docs, copied into the Documents clone and the `creative-suite-sprint2` worktree): `2026-08-07-studio-brief-conversation-slice-a.md` (13 tasks) and `2026-08-07-studio-reference-pool-slice-p.md` (9 tasks).
+
 ### A1 — `builtin-mcp-studio` server — **M**
 
 The new stdio subprocess in `builtinMcp/`, cloned from `knowledgeServer`'s per-conversation session pattern, plus its `build-mcp-servers.js` entry and `STUDIO_ENV` (project dir read, `proposals/pending/` write — never the store root).
@@ -55,7 +57,7 @@ The enum threaded confirm → submit → job record → completion, default `tak
 
 ## 3. Explicitly not in this epic
 
-Scene-level assistant (bounded-context one-shots into editor drafts — deferred by design), the chip question card, additional proposal payload kinds, allow-list widening (KB search et al. — product decision when it comes; affects only future conversations), the Write surface, orphan-conversation reaping.
+Scene-level assistant — **now designed and planned as its own sprint-3 stretch item** ([design](creative-studio-scene-assist-design.md); plan `docs/superpowers/plans/2026-08-07-studio-scene-assist.md`, 8 tasks, independent of both slices). Still not in this epic: the chip question card, additional proposal payload kinds, allow-list widening (KB search et al. — product decision when it comes; affects only future conversations), the Write surface, orphan-conversation reaping.
 
 ## 4. Boundary with sprint 2 — corrected 2026-08-07
 
