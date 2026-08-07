@@ -11,7 +11,7 @@
 3. Plan the full slide-title sequence first. Map each content section to a reference slide via the layout catalog below; duplicate a reference slide when a pattern is needed twice; delete reference slides you do not use.
 4. Replace ALL sample content — every project name, person, date and sentence in the reference is placeholder material. Keep positions, sizes, fonts, colors and the slide chrome exactly as they are.
 5. Update speaker notes on every slide (the reference carries notes explaining each slide's role — replace them with a real presenter script).
-6. If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first (`officecli view <file> text` reads Office files) and build slide content and chart data from it — never invent numbers when sources are attached.
+6. If the user attached source documents (Excel, Word, CSV, PDF), extract their real content first (`officecli view <file> text` reads Office files) and build slide content and chart data from it — never invent numbers when sources are attached. If `officecli view <file> text` returns empty or unusable content for any required source, STOP and ask the user for a readable source — never proceed to build.
 
 ## Visual system
 
@@ -80,9 +80,10 @@ Grid rules: 1.5cm side margins minimum, 0.76cm gaps between cards, ≥20% of eac
 
 1. `officecli validate <file>` — zero errors.
 2. `officecli view <file> issues` — zero issues; fix and re-run until clean.
-3. Placeholder scan — BOTH checks must print nothing:
+3. Placeholder, reference-sample, and literal-escape scans — the first and third commands must print nothing; the second requires source review:
    - `officecli view <file> text | grep -iE 'lorem|TODO|xxx'`
-   - `officecli view <file> text | grep -iE 'atlas|osei|m\. tran|ibarra|novak|l\. devi|warehouse|operator shifts|steering review|roastery'` — these tokens exist only in the reference's sample content; any hit is a leftover you must replace or delete. Dividers and the closing slide are the most commonly forgotten — check them slide by slide.
+   - `officecli view <file> text | grep -iE 'atlas|osei|m\. tran|ibarra|novak|l\. devi|steering review|roastery'` — these are reference-sample indicators; verify each hit against the user sources and remove it only when it is leftover reference sample content. Legitimate user-source content must not fail this gate. Dividers and the closing slide are the most commonly forgotten — check them slide by slide.
+   - `officecli view <file> text | grep -F '\n'` — visible literal newline escapes are a delivery defect.
 4. Visual audit: `officecli view <file> screenshot --page N` for every slide; inspect each image for overflow, overlap, low contrast and margin violations; fix and re-render until a full pass finds zero new issues (max 3 cycles).
 
 ## Follow-up edits (all later change requests in this conversation)

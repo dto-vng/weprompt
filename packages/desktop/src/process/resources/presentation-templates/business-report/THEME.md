@@ -9,7 +9,9 @@ page, a contents page, and prose-led sections with supporting tables.
 2. Copy the attached `reference.docx` to the output file. Edit the copy. Never build
    from scratch, never write raw OOXML.
 3. If the user attached source documents (Excel, Word, CSV, PDF), read them with
-   `officecli view <file> text` and build every number and claim from that data.
+   `officecli view <file> text` and build every number and claim from that data. If
+   `officecli view <file> text` returns empty or unusable content for any required source,
+   STOP and ask the user for a readable source — never proceed to build.
 4. Replace the sample content wholesale. Keep the styles, numbering definitions, page
    setup, and structure.
 
@@ -80,7 +82,8 @@ page numbers to match. Do **not** replace them with `--type toc`.
 
 1. `officecli validate <file>` returns `no errors found`.
 2. `officecli view <file> issues` is clean.
-3. No placeholder tokens remain.
+3. No placeholder tokens remain. Literal-escape scan:
+   `officecli view <file> text | grep -F '\n'` must print nothing.
 4. Contact-sheet visual pass: `officecli view <file> screenshot --grid auto`, inspected
    for pagination faults, blank pages, clipped table text, and heading rhythm. Confirm
    any fine call on the page with `screenshot --page N`. Fix and re-render until a full
