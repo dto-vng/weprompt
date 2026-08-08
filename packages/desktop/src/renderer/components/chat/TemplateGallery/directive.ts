@@ -32,6 +32,12 @@ const TEMPLATE_CREATION_INTENT_PATTERNS = [
   /\b(?:create|make|build|generate|draft)\s+(?:me\s+)?(?:(?:an?|the|this|that|new|reusable)\s+)*(?:template|theme)\b/i,
   /\b(?:save|capture|extract|derive|reuse)\s+(?:this|that|the|current)\s+(?:(?:look|style|design|visual\s+system|theme)\s+)?as\s+(?:an?\s+)?(?:reusable\s+)?(?:template|theme)\b/i,
   /\b(?:turn|convert)\s+(?:this|that|the|current)(?:\s+(?:look|style|design|visual\s+(?:style|system)|theme))?\s+into\s+(?:an?\s+)?(?:reusable\s+)?(?:template|theme)\b/i,
+  /(?<![\p{L}\p{N}_])(?:tạo|làm|dựng)\s+(?:(?:cho\s+(?:tôi|mình|chúng\s+tôi))\s+)?(?:(?:một|cái|bộ|mới|tái\s+sử\s+dụng)\s+)*(?:template|theme|mẫu)(?![\p{L}\p{N}_])/iu,
+  /(?<![\p{L}\p{N}_])(?:lưu|giữ)(?:\s+lại)?\s+(?:giao\s+diện|phong\s+cách|thiết\s+kế|bố\s+cục)(?:\s+(?:này|đó|hiện\s+tại))?(?:\s+lại)?\s+(?:thành|làm)\s+(?:(?:một|cái|bộ)\s+)?(?:template|theme|mẫu)(?![\p{L}\p{N}_])/iu,
+  /(?<![\p{L}\p{N}_])(?:chuyển|biến)\s+(?:giao\s+diện|phong\s+cách|thiết\s+kế|bố\s+cục)(?:\s+(?:này|đó|hiện\s+tại))?\s+thành\s+(?:(?:một|cái|bộ)\s+)?(?:template|theme|mẫu)(?![\p{L}\p{N}_])/iu,
+  /\b(?:tao|lam)\s+(?:(?:cho\s+(?:toi|minh|chung\s+toi))\s+)?(?:(?:mot|cai|bo|moi|tai\s+su\s+dung)\s+)*(?:template|theme)\b/i,
+  /\b(?:luu|giu)(?:\s+lai)?\s+(?:giao\s+dien|phong\s+cach|thiet\s+ke|bo\s+cuc)(?:\s+(?:nay|do|hien\s+tai))?(?:\s+lai)?\s+(?:thanh|lam)\s+(?:(?:mot|cai|bo)\s+)?(?:template|theme)\b/i,
+  /\b(?:chuyen|bien)\s+(?:giao\s+dien|phong\s+cach|thiet\s+ke|bo\s+cuc)(?:\s+(?:nay|do|hien\s+tai))?\s+thanh\s+(?:(?:mot|cai|bo)\s+)?(?:template|theme)\b/i,
 ];
 
 const hasTemplateCreationIntent = (message: string): boolean =>

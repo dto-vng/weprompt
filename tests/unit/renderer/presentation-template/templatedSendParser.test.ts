@@ -6,7 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
-import { TEMPLATE_CREATION_DIRECTIVE } from '@/renderer/components/chat/TemplateGallery/directive';
+import {
+  composeAssistantSend,
+  TEMPLATE_CREATION_DIRECTIVE,
+} from '@/renderer/components/chat/TemplateGallery/directive';
 import { parseAssistantDirectiveSend, parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
 
 const THEME = '/Users/u/Library/Application Support/Forge/presentation-templates/business-review/THEME.md';
@@ -85,5 +88,12 @@ describe('parseAssistantDirectiveSend', () => {
   it('does not hide ordinary text or an incomplete directive-shaped send', () => {
     expect(parseAssistantDirectiveSend('Save this look as a reusable template')).toBeNull();
     expect(parseAssistantDirectiveSend(TEMPLATE_CREATION_DIRECTIVE)).toBeNull();
+  });
+
+  it('recovers Vietnamese user text from a composed template-creation send', () => {
+    const message = 'Biến thiết kế này thành mẫu';
+    const composed = composeAssistantSend(null, message, []);
+
+    expect(parseAssistantDirectiveSend(composed.input)).toEqual({ userText: message });
   });
 });

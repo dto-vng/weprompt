@@ -319,6 +319,16 @@ describe('usePresentationTemplates send composition', () => {
     });
     unmount();
   });
+
+  it('adds the creation contract for Vietnamese template-creation intent', async () => {
+    const { result, unmount } = renderHook(() => usePresentationTemplates('conversation-1'));
+    await waitFor(() => expect(listRecoverableInvokeMock).toHaveBeenCalled());
+
+    expect(result.current.composeSend('Lưu giao diện này thành template', []).input).toContain(
+      'AIONUI_TEMPLATE_REVIEW_V1'
+    );
+    unmount();
+  });
 });
 
 describe('usePresentationTemplates managed run recovery', () => {
