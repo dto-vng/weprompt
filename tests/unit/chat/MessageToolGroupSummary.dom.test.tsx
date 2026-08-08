@@ -1482,6 +1482,27 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
+    it('keeps the turn recap independent of provider thinking subjects', () => {
+      const withoutSubject = render(
+        <MessageToolGroupSummary
+          messages={[toolGroupStep('failed-tool', ['Error']), thinkingStep('thinking-fallback', undefined, 'done')]}
+        />
+      );
+      const recapWithoutSubject = screen.getByRole('status').textContent;
+      withoutSubject.unmount();
+
+      render(
+        <MessageToolGroupSummary
+          messages={[
+            toolGroupStep('failed-tool', ['Error']),
+            thinkingStep('thinking-subject', 'Reviewing the failed operation', 'done'),
+          ]}
+        />
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent(recapWithoutSubject ?? '');
+    });
+
     it('keeps raw command, path, output, telemetry, and provider narration out of the recap', () => {
       const unsafePlan = 'Run: bun test packages/desktop/src/renderer/App.tsx request_id=secret';
       render(
