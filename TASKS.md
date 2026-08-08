@@ -35,6 +35,7 @@
   - Dependencies: Epic A needs no EPIC-001 or BUG-014 gate. Epic B waits on EPIC-001 retained-candidate acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
 
 - [ ] **[EPIC-003][P2][Planning gate] Expose provider- and model-aware reasoning controls**
+  - **Sprint-2 goal restated 2026-08-08 (Controller decision):** this sprint delivers the **closed planning gate and the validated backend floor** — evidence tracked, executable plans, decision record, and the DR-3 bump merged through packaged acceptance once the Forge `v0.1.62` build exists. **Implementation (31 tasks across three repositories, serially reviewed) is Sprint 3 scope.** Admitting the AionRS slice before sprint end is upside, not commitment. This restatement exists so sprint-end review measures against what was actually promised.
   - Outcome: show only reasoning controls a selected provider/model can actually honor, using capability evidence rather than provider-name special cases.
   - Current boundary: session-local, unmerged provider evidence, canonical fixtures, capability-revision design, and candidate AionCore migrations `038`/`039` have been prepared. Independent review blocked the three implementation plans because their steps, owners, exact paths, and RED assertions were not executable enough. No runtime, migration, IPC, renderer, or packaging implementation has started, and the evidence package is not yet present in the tracked Sprint 2 tree.
   - Current evidence: Moonshot `kimi-k2.6` and `kimi-k2.5` have documented toggle semantics but remain feature-disabled; unverified GreenNode gateway models and ACP remain unsupported.
@@ -59,6 +60,12 @@
 > below is reachable by users today. They are deferred, not dropped: BUG-036 still blocks ever
 > defaulting that flag on. Studio work already merged into `sprint2` stays merged and is not
 > reverted by this deferral.
+
+- [ ] **[EPIC-004][P2][Re-charter required] Make Excel workbook changes reviewable, deterministic, and fail-closed** — moved from Waiting On 2026-08-08
+  - Outcome unchanged: one bounded pre-change audit and approval point; verified results; no silent damage to formulas, formatting, charts, or unsupported features.
+  - **Why it moved: its entry condition died.** It was waiting on "EPIC-002's OfficeCLI ownership contract" — but EPIC-002 was re-scoped to A0+ (HTML-only) on 2026-08-08 and will not produce that contract. Waiting is no longer a path to admission.
+  - **Evidence materialized 2026-08-08:** the approved design (problem statement, solution contract with six OfficeCLI-1.0.143-verified corrections, implementation plan) is now tracked at [docs/design/excel-controlled-change-workflow.md](docs/design/excel-controlled-change-workflow.md). It previously existed only as a session-local gitignored file on one machine — the third such exposure found this sprint.
+  - First task when picked up: **re-charter the entry criteria** against what exists now (plausible replacement anchor: the 2A `OfficeArtifactService` fail-closed boundary), then independent plan acceptance per the original gate. Scope rule unchanged: request-led controlled changes with one bounded audit; packaging and release stay outside.
 
 - [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
   - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
@@ -99,13 +106,6 @@
   - Current boundary: local-backend authentication and pilot-hardening candidates sit on separate, substantially stale security branches, not integrated into Sprint 2.
   - Next gate (whenever it is picked up): name the owner, approve the SSO contract, then reconcile those branches against the then-current tip.
   - Scope rule unchanged: keep SSO identity, application security, packaging mechanics, and release acceptance as separate slices even when they share one program outcome.
-
-- [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
-  - Outcome: users request workbook changes in plain language, receive one bounded pre-change audit and approval point, and get a verified result without silent damage to formulas, formatting, charts, or unsupported workbook features.
-  - Current boundary: the problem statement, solution contract, and implementation plan were approved in planning sessions, but the evidence package is session-local and not present in the tracked Sprint 2 tree. No runtime implementation has started or been merged.
-  - Waiting on: the shared Office artifact/mutation boundary and EPIC-002's OfficeCLI ownership contract must settle before Excel introduces another publication or cleanup path.
-  - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
-  - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
 
 ## Someday
 
