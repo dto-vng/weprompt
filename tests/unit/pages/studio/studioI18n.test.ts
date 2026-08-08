@@ -297,7 +297,35 @@ function isPluralVariantKey(key: string): boolean {
   return pluralLogicalKeys.some((base) => key.startsWith(`${base}_`));
 }
 
+const truthfulAssistantDescriptions: Record<string, string> = {
+  'zh-CN': '根据创作简报生成故事板草稿。',
+  'en-US': 'Draft a storyboard from your brief.',
+  'ja-JP': 'ブリーフをもとにストーリーボードの下書きを作成します。',
+  'zh-TW': '根據創作簡報產生分鏡腳本草稿。',
+  'ko-KR': '브리프를 바탕으로 스토리보드 초안을 만듭니다.',
+  'tr-TR': 'Kısa açıklamanızdan bir storyboard taslağı oluşturun.',
+  'ru-RU': 'Создайте черновик раскадровки на основе брифа.',
+  'uk-UA': 'Створіть чернетку розкадрування на основі брифу.',
+  'pt-BR': 'Crie um rascunho de storyboard a partir do seu briefing.',
+  'de-DE': 'Erstelle aus deinem Briefing einen Storyboard-Entwurf.',
+  'es-ES': 'Crea un borrador de storyboard a partir de tu brief.',
+  'fa-IR': 'از شرح مختصر خود یک پیش‌نویس استوری‌بورد بسازید.',
+};
+
 describe('Creative Studio localization contract', () => {
+  it('describes the Write assistant truthfully in every configured locale', () => {
+    expect(Object.keys(truthfulAssistantDescriptions).toSorted()).toEqual(
+      [...i18nConfig.supportedLanguages].toSorted()
+    );
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const description = flattenStringLeaves(creativeStudio)['phase.write.assistantDescription'];
+
+      expect(description, `${locale}/phase.write.assistantDescription`).toBe(truthfulAssistantDescriptions[locale]);
+    }
+  });
+
   it.each(i18nConfig.supportedLanguages)(
     'keeps the %s ordinary-retry confirmation free of price-like numerals',
     (locale) => {
