@@ -15,17 +15,22 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// DMG retry logic for macOS: detects DMG creation failures by checking artifacts
-// (.app exists but .dmg missing) and retries only the DMG step using
-// electron-builder --prepackaged with the .app path (not the parent directory).
-// This preserves full DMG styling (window size, icon positions, background)
+// DMG retry logic for macOS: electron-builder's artifactBuildStarted hook writes
+// a per-invocation authorization only after packaging, validation and signing have
+// completed. A failed build may use --prepackaged only when that authorization,
+// the target .app and the missing .dmg all agree that artifact creation had begun.
+// This preserves full DMG styling (window size, icon positions, background).
 // Background: GitHub Actions macos-14 runners occasionally suffer from transient
 // "Device not configured" hdiutil errors (electron-builder#8415, actions/runner-images#12323).
 const DMG_RETRY_MAX = 3;
 const DMG_RETRY_DELAY_SEC = 30;
+const MAC_DMG_RETRY_MARKER_ENV = 'WEPROMPT_MAC_DMG_RETRY_MARKER';
+const MAC_DMG_RETRY_NONCE_ENV = 'WEPROMPT_MAC_DMG_RETRY_NONCE';
 
 // Incremental build: hash of source files to detect changes
 const INCREMENTAL_CACHE_FILE = 'out/.build-hash';
+const PRESENTATION_TEMPLATE_MANIFEST_FILE = 'packages/desktop/resources/presentation-templates/manifest.json';
+const PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE = 'out/main/presentation-template-inventory.sha256';
 const DEBUG_AUTO_UPDATE_CURRENT_VERSION_ENV = 'AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION';
 const CURRENT_WINDOWS_EXECUTABLE = 'WePrompt.exe';
 const LEGACY_WINDOWS_EXECUTABLES = ['Forge.exe', 'AionUi.exe'];
@@ -286,16 +291,47 @@ function saveCurrentHash(hash) {
   } catch {}
 }
 
-function viteBuildExists() {
-  const outDir = path.resolve(__dirname, '../out');
-  const mainDir = path.join(outDir, 'main');
-  const rendererDir = path.join(outDir, 'renderer');
+function computePresentationTemplateInventoryDigest() {
+  const manifestPath = path.resolve(__dirname, '..', PRESENTATION_TEMPLATE_MANIFEST_FILE);
+  return crypto.createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex');
+}
 
-  return (
-    fs.existsSync(path.join(mainDir, 'index.js')) &&
-    fs.existsSync(path.join(outDir, 'preload', 'index.js')) &&
-    validateRendererBuildOutput(rendererDir).valid
-  );
+function validatePresentationTemplateBuildBinding() {
+  const digestPath = path.resolve(__dirname, '..', PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE);
+  if (!fs.existsSync(digestPath)) {
+    return {
+      valid: false,
+      problems: [
+        `Vite build output is incomplete: missing ${PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE}; rebuild without --skip-vite`,
+      ],
+    };
+  }
+
+  const builtDigest = fs.readFileSync(digestPath, 'utf8').trim();
+  if (!/^[a-f0-9]{64}$/.test(builtDigest)) {
+    return {
+      valid: false,
+      problems: [
+        `Vite build output is incomplete: invalid ${PRESENTATION_TEMPLATE_BUILD_DIGEST_FILE}; rebuild without --skip-vite`,
+      ],
+    };
+  }
+
+  const currentDigest = computePresentationTemplateInventoryDigest();
+  if (builtDigest !== currentDigest) {
+    return {
+      valid: false,
+      problems: [
+        'Vite build output is stale: cached main presentation template inventory does not match the current manifest; rebuild without --skip-vite',
+      ],
+    };
+  }
+
+  return { valid: true, problems: [] };
+}
+
+function viteBuildExists() {
+  return validateViteBuildOutput().valid;
 }
 
 function collectHtmlAssetRefs(html, htmlDirRelative) {
@@ -392,6 +428,8 @@ function validateViteBuildOutput() {
 
   const rendererValidation = validateRendererBuildOutput(path.join(outDir, 'renderer'));
   problems.push(...rendererValidation.problems);
+  const templateInventoryValidation = validatePresentationTemplateBuildBinding();
+  problems.push(...templateInventoryValidation.problems);
 
   return { valid: problems.length === 0, problems };
 }
@@ -587,21 +625,55 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
   );
 }
 
+function createMacDmgRetryAuthorization(outDir) {
+  const nonce = crypto.randomBytes(32).toString('hex');
+  const markerPath = path.join(outDir, `.mac-dmg-retry-${nonce}.json`);
+  fs.rmSync(markerPath, { force: true });
+  return { markerPath, nonce };
+}
+
+function hasMacDmgRetryAuthorization(markerPath, nonce, dmgPath) {
+  try {
+    const authorization = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
+    return (
+      authorization.artifactPath === path.resolve(dmgPath) &&
+      authorization.nonce === nonce &&
+      authorization.target === 'DMG'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function buildWithDmgRetry(cmd, targetArch) {
   const isMac = process.platform === 'darwin';
   const outDir = path.resolve(__dirname, '../out');
   const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
   const { appDir, dmgPath } = resolveMacArtifactPaths(outDir, targetArch, packageVersion);
+  const retryAuthorization = isMac ? createMacDmgRetryAuthorization(outDir) : null;
 
   try {
-    execSync(cmd, { stdio: 'inherit', shell: process.platform === 'win32' });
+    execSync(cmd, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+      env:
+        retryAuthorization == null
+          ? process.env
+          : {
+              ...process.env,
+              [MAC_DMG_RETRY_MARKER_ENV]: retryAuthorization.markerPath,
+              [MAC_DMG_RETRY_NONCE_ENV]: retryAuthorization.nonce,
+            },
+    });
     return;
   } catch (error) {
     const hasTargetApp = isMac && fs.existsSync(appDir) && fs.readdirSync(appDir).some((file) => file.endsWith('.app'));
-    if (!hasTargetApp || fs.existsSync(dmgPath)) throw error;
+    const retryAuthorized =
+      retryAuthorization != null &&
+      hasMacDmgRetryAuthorization(retryAuthorization.markerPath, retryAuthorization.nonce, dmgPath);
+    if (!hasTargetApp || fs.existsSync(dmgPath) || !retryAuthorized) throw error;
 
-    // .app exists but no .dmg → DMG creation failed
-    console.log('\n🔄 Build failed during DMG creation (.app exists, .dmg missing)');
+    console.log('\n🔄 Build failed after validated macOS packaging reached DMG creation');
     console.log('   Retrying macOS distributable creation with --prepackaged...');
 
     for (let attempt = 1; attempt <= DMG_RETRY_MAX; attempt++) {
@@ -621,6 +693,10 @@ function buildWithDmgRetry(cmd, targetArch) {
           throw retryError;
         }
       }
+    }
+  } finally {
+    if (retryAuthorization != null) {
+      fs.rmSync(retryAuthorization.markerPath, { force: true });
     }
   }
 }

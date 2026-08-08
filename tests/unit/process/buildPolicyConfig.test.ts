@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sentryVitePluginMock = vi.hoisted(() => vi.fn(() => ({ name: 'test-sentry-plugin' })));
@@ -27,6 +30,17 @@ async function resolveProductionConfig() {
   }
   return configExport({ command: 'build', mode: 'production' });
 }
+
+type BuildPluginContext = {
+  emitFile: (asset: { fileName: string; source: string; type: 'asset' }) => string;
+  error: (error: string | Error) => never;
+};
+
+type TestBuildPlugin = {
+  name?: string;
+  buildStart?: (this: BuildPluginContext) => void | Promise<void>;
+  generateBundle?: (this: BuildPluginContext) => void | Promise<void>;
+};
 
 describe('electron-vite internal release policy', () => {
   beforeEach(() => {
@@ -58,5 +72,39 @@ describe('electron-vite internal release policy', () => {
 
     await expect(resolveProductionConfig()).rejects.toThrow(/SENTRY_AUTH_TOKEN/);
     expect(sentryVitePluginMock).not.toHaveBeenCalled();
+  });
+
+  it('emits the presentation template inventory digest with the main bundle', async () => {
+    const config = await resolveProductionConfig();
+    const plugins = (config.main?.plugins ?? []) as TestBuildPlugin[];
+    const plugin = plugins.find(
+      (candidate) => candidate?.name === 'vite-plugin-presentation-template-inventory-digest'
+    );
+    const emittedAssets: Array<{ fileName: string; source: string; type: 'asset' }> = [];
+    const context: BuildPluginContext = {
+      emitFile: (asset) => {
+        emittedAssets.push(asset);
+        return `asset-${emittedAssets.length}`;
+      },
+      error: (error) => {
+        throw error instanceof Error ? error : new Error(error);
+      },
+    };
+
+    expect(plugin).toBeDefined();
+    await plugin?.buildStart?.call(context);
+    await plugin?.generateBundle?.call(context);
+
+    const manifest = readFileSync(
+      resolve(__dirname, '../../../packages/desktop/resources/presentation-templates/manifest.json')
+    );
+    const expectedDigest = createHash('sha256').update(manifest).digest('hex');
+    expect(emittedAssets).toEqual([
+      {
+        type: 'asset',
+        fileName: 'presentation-template-inventory.sha256',
+        source: `${expectedDigest}\n`,
+      },
+    ]);
   });
 });

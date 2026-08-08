@@ -118,6 +118,7 @@ const useAionrsSendBoxDraft = getSendBoxDraftHook('aionrs', {
 
 const EMPTY_AT_PATH: Array<string | FileOrFolderItem> = [];
 const EMPTY_UPLOAD_FILES: string[] = [];
+const initialMessageInFlight = new Map<string, string>();
 
 const toPresentationSourceRefs = (descriptors: readonly PresentationSourceDescriptor[]): PresentationSourceRef[] =>
   descriptors.map((descriptor) => ({
@@ -1001,7 +1002,8 @@ const AionrsSendBox: React.FC<{
     onExecute: executeCommand,
   });
 
-  // Handle initial message from Guid page — wait until model is ready
+  // Handle the initial message from the Guid page. Managed presentation handoffs
+  // remain eligible for durable queueing before the runtime can execute a turn.
   useEffect(() => {
     if (!conversation_id || !current_model?.use_model) return;
 
@@ -1067,20 +1069,40 @@ const AionrsSendBox: React.FC<{
         }
       }
 
-      sessionStorage.setItem(processedKey, '1');
-      sessionStorage.removeItem(storageKey);
+      if (
+        !agentWarmed ||
+        !commandQueueRuntimeGate.hydrated ||
+        !commandQueueRuntimeGate.canSendMessage ||
+        commandQueueRuntimeGate.isProcessing ||
+        initialMessageInFlight.has(storageKey)
+      ) {
+        return;
+      }
+
+      initialMessageInFlight.set(storageKey, storedMessage);
 
       try {
         const { input, files: initialFiles, injectSkills } = JSON.parse(storedMessage);
         await executeCommand({ input, files: initialFiles || [], injectSkills });
+        if (sessionStorage.getItem(storageKey) === storedMessage) {
+          sessionStorage.setItem(processedKey, '1');
+          sessionStorage.removeItem(storageKey);
+        }
       } catch (error) {
         console.error('[AionrsSendBox] Failed to send initial message:', error);
-        sessionStorage.removeItem(processedKey);
+      } finally {
+        if (initialMessageInFlight.get(storageKey) === storedMessage) {
+          initialMessageInFlight.delete(storageKey);
+        }
       }
     };
 
     void processInitialMessage();
   }, [
+    agentWarmed,
+    commandQueueRuntimeGate.canSendMessage,
+    commandQueueRuntimeGate.hydrated,
+    commandQueueRuntimeGate.isProcessing,
     conversation_id,
     current_model?.use_model,
     enqueueManagedPresentation,

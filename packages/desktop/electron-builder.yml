@@ -115,7 +115,7 @@ extraResources:
   - from: resources/hub
     to: hub
   # built-in presentation template reference decks
-  - from: resources/presentation-templates
+  - from: packages/desktop/resources/presentation-templates
     to: presentation-templates
 win:
   target:
@@ -167,6 +167,7 @@ dmg:
 
 afterPack: scripts/afterPack.js
 afterSign: scripts/afterSign.js
+artifactBuildStarted: scripts/afterSign.js
 
 linux:
   target:

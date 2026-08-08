@@ -1,8 +1,10 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import { execSync } from 'child_process';
+import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import type { Plugin } from 'vite';
 import { resolveDesktopReleaseBuildPolicy } from './src/common/update/updatePolicy';
 import UnoCSS from 'unocss/vite';
 import unoConfig from '../../uno.config.ts';
@@ -14,6 +16,32 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 const rootPackageJson = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8')) as {
   version: string;
 };
+const presentationTemplateManifestPath = resolve(__dirname, 'resources/presentation-templates/manifest.json');
+
+function computePresentationTemplateInventoryDigest(): string {
+  return createHash('sha256').update(readFileSync(presentationTemplateManifestPath)).digest('hex');
+}
+
+function presentationTemplateInventoryDigestPlugin(): Plugin {
+  let buildDigest = '';
+
+  return {
+    name: 'vite-plugin-presentation-template-inventory-digest',
+    buildStart() {
+      buildDigest = computePresentationTemplateInventoryDigest();
+    },
+    generateBundle() {
+      if (!buildDigest || computePresentationTemplateInventoryDigest() !== buildDigest) {
+        this.error('Presentation template inventory changed during the Vite build; run the build again');
+      }
+      this.emitFile({
+        type: 'asset',
+        fileName: 'presentation-template-inventory.sha256',
+        source: `${buildDigest}\n`,
+      });
+    },
+  };
+}
 
 // Build builtin MCP servers after main process bundle so they survive out/main/ cleanup.
 function buildMcpServersPlugin() {
@@ -109,6 +137,7 @@ export default defineConfig(({ mode }) => {
         // are bundled by esbuild rather than left as `require('@aionui/web-host')`, which Node
         // cannot resolve because the package ships no compiled .js files (workspace-only).
         externalizeDepsPlugin({ exclude: ['fix-path', '@aionui/web-host'] }),
+        presentationTemplateInventoryDigestPlugin(),
         ...(isDevelopment
           ? [
               {

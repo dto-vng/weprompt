@@ -1,0 +1,62 @@
+[
+  {
+    "id": "editorial-field-report",
+    "format": "html",
+    "packagedReferenceFile": null
+  },
+  {
+    "id": "simple-light",
+    "format": "html",
+    "packagedReferenceFile": null
+  },
+  {
+    "id": "simple-dark",
+    "format": "html",
+    "packagedReferenceFile": null
+  },
+  {
+    "id": "market-trends-report",
+    "format": "html",
+    "packagedReferenceFile": null
+  },
+  {
+    "id": "business-review",
+    "format": "pptx",
+    "packagedReferenceFile": "business-review.pptx"
+  },
+  {
+    "id": "project-kickoff",
+    "format": "pptx",
+    "packagedReferenceFile": "project-kickoff.pptx"
+  },
+  {
+    "id": "monthly-steerco",
+    "format": "pptx",
+    "packagedReferenceFile": "monthly-steerco.pptx"
+  },
+  {
+    "id": "connected-ops",
+    "format": "pptx",
+    "packagedReferenceFile": "connected-ops.pptx"
+  },
+  {
+    "id": "business-report",
+    "format": "docx",
+    "packagedReferenceFile": "business-report.docx"
+  },
+  {
+    "id": "decision-memo",
+    "format": "docx",
+    "packagedReferenceFile": "decision-memo.docx"
+  },
+  {
+    "id": "operations-guide",
+    "format": "docx",
+    "packagedReferenceFile": "operations-guide.docx"
+  },
+  {
+    "id": "proposal-sow",
+    "format": "docx",
+    "packagedReferenceFile": "proposal-sow.docx"
+  }
+]

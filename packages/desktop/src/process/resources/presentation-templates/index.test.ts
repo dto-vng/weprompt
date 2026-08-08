@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateTemplateManifest } from '@process/services/presentation-template/templateManifest';
-import { BUILTIN_TEMPLATE_PACKS } from './index';
+import { BUILTIN_TEMPLATE_INVENTORY, BUILTIN_TEMPLATE_PACKS } from './index';
 
 const REFERENCE_FORMATS = new Set(['pptx', 'docx']);
 const TRACK_0_OFFICE_PACK_VERSIONS = new Map([
@@ -22,8 +24,27 @@ const TRACK_0_OFFICE_PACK_VERSIONS = new Map([
 
 const referenceSampleScan = (themeMd: string): string | undefined =>
   themeMd.split('\n').find((line) => line.includes("grep -iE '") && !line.includes('lorem|TODO|xxx'));
+const PACKAGED_TEMPLATE_INVENTORY = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../../resources/presentation-templates/manifest.json'), 'utf8')
+) as Array<{
+  id: string;
+  format: 'html' | 'pptx' | 'docx';
+  packagedReferenceFile: string | null;
+}>;
 
 describe('BUILTIN_TEMPLATE_PACKS', () => {
+  it('uses the packaged inventory as the source for builtin ids, formats, and references', () => {
+    expect(BUILTIN_TEMPLATE_INVENTORY).toEqual(PACKAGED_TEMPLATE_INVENTORY);
+    expect(BUILTIN_TEMPLATE_PACKS.map((pack) => [pack.manifest.id, pack.manifest.format])).toEqual(
+      PACKAGED_TEMPLATE_INVENTORY.map((entry) => [entry.id, entry.format])
+    );
+
+    for (const entry of PACKAGED_TEMPLATE_INVENTORY) {
+      const pack = BUILTIN_TEMPLATE_PACKS.find((candidate) => candidate.manifest.id === entry.id);
+      expect(Boolean(pack?.referenceSourcePath)).toBe(entry.packagedReferenceFile !== null);
+    }
+  });
+
   it('contains every builtin pack with unique ids', () => {
     const ids = BUILTIN_TEMPLATE_PACKS.map((p) => p.manifest.id);
     expect(ids).toEqual(
