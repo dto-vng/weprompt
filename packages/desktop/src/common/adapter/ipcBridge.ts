@@ -397,7 +397,7 @@ export const conversation = {
     (p) => `/api/conversations/${p.conversation_id}/artifacts/${p.artifact_id}`,
     (p) => ({ status: p.status })
   ),
-  responseStream: wsEmitter<IResponseMessage>('message.stream'),
+  responseStream: wsMappedEmitter<IResponseMessage>('message.stream', normalizeResponseMessage),
   userCreated: wsEmitter<{
     conversation_id: string;
     msg_id: string;
@@ -2044,6 +2044,45 @@ export interface IResponseMessage {
   status?: 'finish' | 'pending' | 'error' | 'work';
   /** Replace accumulated text for the same msg_id instead of appending. */
   replace?: boolean;
+  /** Canonical authoritative provider consumption, when the backend reported both token sides. */
+  provider_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const readNonNegativeSafeInteger = (
+  value: Record<string, unknown>,
+  snakeCaseKey: string,
+  camelCaseKey: string
+): number | null => {
+  const candidate = value[snakeCaseKey] ?? value[camelCaseKey];
+  return typeof candidate === 'number' && Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : null;
+};
+
+const normalizeProviderUsage = (value: unknown): IResponseMessage['provider_usage'] => {
+  if (!isRecord(value)) return undefined;
+  const inputTokens = readNonNegativeSafeInteger(value, 'input_tokens', 'inputTokens');
+  const outputTokens = readNonNegativeSafeInteger(value, 'output_tokens', 'outputTokens');
+  if (inputTokens === null || outputTokens === null) return undefined;
+  return { input_tokens: inputTokens, output_tokens: outputTokens };
+};
+
+/** Normalize optional usage fields once at the WebSocket/IPC boundary. */
+export function normalizeResponseMessage(raw: unknown): IResponseMessage {
+  const message = (isRecord(raw) ? raw : {}) as unknown as IResponseMessage;
+  const data = isRecord(message.data) ? message.data : null;
+  const existing = normalizeProviderUsage(message.provider_usage);
+  const nestedUsage = normalizeProviderUsage(data?.usage);
+  const directUsage = normalizeProviderUsage(data);
+  const acpMetaUsage = message.type === 'acp_context_usage' ? normalizeProviderUsage(data?._meta) : undefined;
+  const providerUsage =
+    existing ?? acpMetaUsage ?? nestedUsage ?? (message.type === 'finish' ? directUsage : undefined);
+
+  return providerUsage === undefined ? message : { ...message, provider_usage: providerUsage };
 }
 
 export type IConversationArtifactKind = 'cron_trigger' | 'skill_suggest';

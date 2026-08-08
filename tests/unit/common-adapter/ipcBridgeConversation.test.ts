@@ -102,6 +102,43 @@ describe('ipcBridge conversation adapter', () => {
     resetConversationRuntimeViewStoreForTest();
   });
 
+  it('normalizes authoritative usage from ACP metadata and AionRS finish envelopes', async () => {
+    const { normalizeResponseMessage } = await import('@/common/adapter/ipcBridge');
+
+    expect(
+      normalizeResponseMessage({
+        type: 'acp_context_usage',
+        data: { used: 12_000, size: 32_000, _meta: { input_tokens: 10, output_tokens: 5 } },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-acp',
+      }).provider_usage
+    ).toEqual({ input_tokens: 10, output_tokens: 5 });
+    expect(
+      normalizeResponseMessage({
+        type: 'finish',
+        data: { usage: { inputTokens: 20, outputTokens: 7 } },
+        msg_id: 'message-2',
+        turn_id: 'turn-2',
+        conversation_id: 'conv-aionrs',
+      }).provider_usage
+    ).toEqual({ input_tokens: 20, output_tokens: 7 });
+  });
+
+  it('keeps provider usage absent when either authoritative counter is missing', async () => {
+    const { normalizeResponseMessage } = await import('@/common/adapter/ipcBridge');
+
+    const normalized = normalizeResponseMessage({
+      type: 'acp_context_usage',
+      data: { used: 12_000, size: 32_000, _meta: { input_tokens: 10 } },
+      msg_id: 'message-1',
+      turn_id: 'turn-1',
+      conversation_id: 'conv-acp',
+    });
+
+    expect(normalized).not.toHaveProperty('provider_usage');
+  });
+
   it('deletes conversations through the standard conversation endpoint', async () => {
     const { conversation } = await import('@/common/adapter/ipcBridge');
 
