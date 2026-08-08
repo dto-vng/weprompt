@@ -1489,6 +1489,9 @@ describe('MessageToolGroupSummary plain-language activity', () => {
         />
       );
       const recapWithoutSubject = screen.getByRole('status').textContent;
+      // Without this the comparison below would still pass if the recap ever rendered
+      // empty in both cases, which is the regression this test exists to catch.
+      expect(recapWithoutSubject).toBeTruthy();
       withoutSubject.unmount();
 
       render(
