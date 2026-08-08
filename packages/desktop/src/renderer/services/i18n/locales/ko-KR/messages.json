@@ -17,6 +17,27 @@
   "imageLoadFailed": "이미지 로드 실패",
   "scrollToBottom": "맨 아래로 스크롤",
   "reasoning": "추론",
+  "templateReview": {
+    "reviewing": "테마를 검토하는 중…",
+    "disclosure": "테마 콘텐츠는 로컬에 보관되며 이후 템플릿 전송에 사용됩니다.",
+    "confirm": "템플릿 갤러리에 설치",
+    "installing": "설치 중…",
+    "installed": "템플릿 갤러리에 설치됨",
+    "requestFailed": "테마를 검토할 수 없습니다. 설치된 항목은 없습니다.",
+    "failure": {
+      "INVALID_REQUEST": "템플릿 검토 요청이 올바르지 않습니다. 설치된 항목은 없습니다.",
+      "RUN_NOT_FOUND": "프레젠테이션 실행을 찾을 수 없습니다. 설치된 항목은 없습니다.",
+      "RUN_FORBIDDEN": "이 프레젠테이션 실행은 현재 채팅에 속하지 않습니다. 설치된 항목은 없습니다.",
+      "SCOPE_UNAVAILABLE": "이 채팅의 작업 공간을 사용할 수 없습니다. 설치된 항목은 없습니다.",
+      "TEAM_SCOPE_UNSUPPORTED": "팀 채팅에서는 템플릿 검토를 사용할 수 없습니다. 설치된 항목은 없습니다.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "테마 파일이 이 채팅의 작업 공간 밖에 있습니다. 설치된 항목은 없습니다.",
+      "CANDIDATE_UNSUPPORTED": "지원되는 THEME.md 파일이 아닙니다. 설치된 항목은 없습니다.",
+      "CANDIDATE_TOO_LARGE": "테마 파일이 너무 큽니다. 설치된 항목은 없습니다.",
+      "CANDIDATE_CHANGED": "검토 후 테마 콘텐츠가 변경되었습니다. 설치된 항목은 없습니다.",
+      "CONFIRMATION_NOT_MINTED": "이 검토는 더 이상 유효하지 않습니다. 설치하기 전에 테마를 다시 검토하세요. 설치된 항목은 없습니다.",
+      "INSTALL_FAILED": "테마를 설치할 수 없습니다. 설치된 항목은 없습니다."
+    }
+  },
   "availableCommands": "{{count}}개의 사용 가능한 명령어",
   "atFile.hint": "파일을 검색하려면 입력하세요",
   "atFile.menuLabel": "파일 멘션",

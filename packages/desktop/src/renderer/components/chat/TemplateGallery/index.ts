@@ -10,5 +10,6 @@ export { default as TemplateGalleryColumns } from './TemplateGalleryColumns';
 export { default as TemplateGalleryExpanded } from './TemplateGalleryExpanded';
 export { default as TemplateChipCard } from './TemplateChipCard';
 export { default as TemplateMessageCard } from './TemplateMessageCard';
+export { TemplateReviewCard } from './TemplateMessageCard';
 export { usePresentationTemplates } from './usePresentationTemplates';
 export { composePresentationSend } from './directive';

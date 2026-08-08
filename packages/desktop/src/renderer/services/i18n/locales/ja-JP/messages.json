@@ -17,6 +17,27 @@
   "imageLoadFailed": "画像の読み込みに失敗しました",
   "scrollToBottom": "下にスクロール",
   "reasoning": "推論",
+  "templateReview": {
+    "reviewing": "テーマを確認しています…",
+    "disclosure": "テーマの内容はローカルに保持され、今後のテンプレート送信で使用されます。",
+    "confirm": "テンプレートギャラリーにインストール",
+    "installing": "インストール中…",
+    "installed": "テンプレートギャラリーにインストールしました",
+    "requestFailed": "テーマを確認できませんでした。何もインストールされていません。",
+    "failure": {
+      "INVALID_REQUEST": "テンプレート確認リクエストが無効です。何もインストールされていません。",
+      "RUN_NOT_FOUND": "プレゼンテーション実行が見つかりません。何もインストールされていません。",
+      "RUN_FORBIDDEN": "このプレゼンテーション実行はこのチャットのものではありません。何もインストールされていません。",
+      "SCOPE_UNAVAILABLE": "このチャットのワークスペースは利用できません。何もインストールされていません。",
+      "TEAM_SCOPE_UNSUPPORTED": "チームチャットではテンプレートを確認できません。何もインストールされていません。",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "テーマファイルはこのチャットのワークスペース外にあります。何もインストールされていません。",
+      "CANDIDATE_UNSUPPORTED": "このテーマファイルは対応する THEME.md ではありません。何もインストールされていません。",
+      "CANDIDATE_TOO_LARGE": "テーマファイルが大きすぎます。何もインストールされていません。",
+      "CANDIDATE_CHANGED": "確認後にテーマの内容が変更されました。何もインストールされていません。",
+      "CONFIRMATION_NOT_MINTED": "この確認は無効になりました。インストール前にテーマをもう一度確認してください。何もインストールされていません。",
+      "INSTALL_FAILED": "テーマをインストールできませんでした。何もインストールされていません。"
+    }
+  },
   "availableCommands": "{{count}} 個の利用可能なコマンド",
   "atFile.hint": "ファイルを検索するには入力してください",
   "atFile.menuLabel": "ファイル参照",

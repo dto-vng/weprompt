@@ -17,6 +17,27 @@
   "imageLoadFailed": "Falha ao carregar a imagem",
   "scrollToBottom": "Rolar para o final",
   "reasoning": "Raciocínio",
+  "templateReview": {
+    "reviewing": "Revisando o tema…",
+    "disclosure": "O conteúdo do tema é mantido localmente e usado em futuros envios com modelo.",
+    "confirm": "Instalar na Galeria de Modelos",
+    "installing": "Instalando…",
+    "installed": "Instalado na Galeria de Modelos",
+    "requestFailed": "Não foi possível revisar o tema. Nada foi instalado.",
+    "failure": {
+      "INVALID_REQUEST": "A solicitação de revisão do modelo é inválida. Nada foi instalado.",
+      "RUN_NOT_FOUND": "A execução da apresentação não foi encontrada. Nada foi instalado.",
+      "RUN_FORBIDDEN": "Esta execução de apresentação não pertence a este chat. Nada foi instalado.",
+      "SCOPE_UNAVAILABLE": "O espaço de trabalho deste chat não está disponível. Nada foi instalado.",
+      "TEAM_SCOPE_UNSUPPORTED": "A revisão de modelos não está disponível em chats de equipe. Nada foi instalado.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "O arquivo de tema está fora do espaço de trabalho deste chat. Nada foi instalado.",
+      "CANDIDATE_UNSUPPORTED": "O arquivo de tema não é um THEME.md compatível. Nada foi instalado.",
+      "CANDIDATE_TOO_LARGE": "O arquivo de tema é grande demais. Nada foi instalado.",
+      "CANDIDATE_CHANGED": "O conteúdo do tema mudou depois da sua revisão. Nada foi instalado.",
+      "CONFIRMATION_NOT_MINTED": "Esta revisão não é mais válida. Revise o tema novamente antes de instalá-lo. Nada foi instalado.",
+      "INSTALL_FAILED": "Não foi possível instalar o tema. Nada foi instalado."
+    }
+  },
   "availableCommands": "{{count}} Comandos Disponíveis",
   "atFile.hint": "Digite para procurar arquivos",
   "atFile.menuLabel": "Menções de arquivo",

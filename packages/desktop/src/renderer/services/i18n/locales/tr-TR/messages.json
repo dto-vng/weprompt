@@ -17,6 +17,27 @@
   "imageLoadFailed": "Görüntü yüklenemedi",
   "scrollToBottom": "Aşağı kaydır",
   "reasoning": "Akıl yürütme",
+  "templateReview": {
+    "reviewing": "Tema inceleniyor…",
+    "disclosure": "Tema içeriği yerel olarak saklanır ve gelecekteki şablonlu gönderimlerde kullanılır.",
+    "confirm": "Şablon Galerisine Yükle",
+    "installing": "Yükleniyor…",
+    "installed": "Şablon Galerisine yüklendi",
+    "requestFailed": "Tema incelenemedi. Hiçbir şey yüklenmedi.",
+    "failure": {
+      "INVALID_REQUEST": "Şablon inceleme isteği geçersiz. Hiçbir şey yüklenmedi.",
+      "RUN_NOT_FOUND": "Sunum çalıştırması bulunamadı. Hiçbir şey yüklenmedi.",
+      "RUN_FORBIDDEN": "Bu sunum çalıştırması bu sohbete ait değil. Hiçbir şey yüklenmedi.",
+      "SCOPE_UNAVAILABLE": "Bu sohbetin çalışma alanı kullanılamıyor. Hiçbir şey yüklenmedi.",
+      "TEAM_SCOPE_UNSUPPORTED": "Ekip sohbetlerinde şablon inceleme kullanılamaz. Hiçbir şey yüklenmedi.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "Tema dosyası bu sohbetin çalışma alanı dışında. Hiçbir şey yüklenmedi.",
+      "CANDIDATE_UNSUPPORTED": "Tema dosyası desteklenen bir THEME.md değil. Hiçbir şey yüklenmedi.",
+      "CANDIDATE_TOO_LARGE": "Tema dosyası çok büyük. Hiçbir şey yüklenmedi.",
+      "CANDIDATE_CHANGED": "Tema içeriği incelemenizden sonra değişti. Hiçbir şey yüklenmedi.",
+      "CONFIRMATION_NOT_MINTED": "Bu inceleme artık geçerli değil. Yüklemeden önce temayı yeniden inceleyin. Hiçbir şey yüklenmedi.",
+      "INSTALL_FAILED": "Tema yüklenemedi. Hiçbir şey yüklenmedi."
+    }
+  },
   "availableCommands": "{{count}} Kullanılabilir Komut",
   "atFile.hint": "Dosya aramak için yazın",
   "atFile.menuLabel": "Dosya bahsetmeleri",
