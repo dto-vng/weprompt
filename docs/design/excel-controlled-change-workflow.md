@@ -7,6 +7,18 @@
 > therefore needs a **re-charter of its entry criteria** (plausible replacement anchor: the 2A
 > `OfficeArtifactService` fail-closed boundary from the artifact-quality epic) before any task
 > below is admitted. Deferred to Sprint 3 by decision; see `TASKS.md`.
+>
+> **Deferral affirmed + direction note (2026-08-08).** Deferred pending demand evidence (see the
+> EPIC-004 register entry's gate). When re-chartered, evaluate the **result-gated architecture**
+> against this document's plan-approve-execute design before admitting any task: let the model
+> edit a shell-owned versioned copy with its full OfficeCLI capability, and have the shell own the
+> mutation lock, confirmed flush (this doc's correction #1 survives either way), fail-closed
+> validation, a scope-enforced cell-level diff, one approval bound to diff + result hash, and
+> atomic publish via the existing `replaceOfficeArtifactConditionally`. That variant deletes Tasks
+> 1/4/5/7's plan-contract machinery (~10 → ~4–5 tasks, the diff engine being the one large new
+> component) and accepts paid-work-discarded-on-rejection as its trade-off. §5 (bounded audit),
+> §8 (validation/diff enforcement) and Task 0's integration decisions remain load-bearing under
+> both architectures.
 
 > Problem statement, approved solution contract, and implementation plan  
 > Date: 2026-08-05  
