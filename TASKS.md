@@ -102,6 +102,11 @@
 
 ## Waiting On
 
+- [ ] **[SPRINT2-PLATFORM-2][P1][Owner-gated] Transfer Forge-Aion to a VNG-controlled GitHub organization and decide the CI home** — handoff written, owner: khoapnt (proposed)
+  - Actual: the AionCore build/signing pipeline (`minhtq1234/Forge-Aion`) is a private repo under a personal account, on the critical path of every AionCore ship; and WePrompt itself has **no GitLab CI** — all pipelines are inherited GitHub Actions that never run on code.vng.vn MRs. Since `!79`, default packaging **fails closed** until Forge-built `v0.1.62` artifacts (binary + `migration-lineage.json` in-archive) exist.
+  - Full picture, symptom table for packaging failures, and ordered recommendations: [docs/design/aioncore-build-provenance-handoff.md](docs/design/aioncore-build-provenance-handoff.md).
+  - Sequence: dispatch the prepared `forge-v0162` build first (unblocks the sprint), transfer the repo second (org governance; only the `aioncore-trust.js` identity string changes), decide the long-term CI home third — deliberately, not by inheritance.
+
 - [ ] **[SPRINT2-PLATFORM][P1][Owner-gated] SSO and the security/packaging workflow**
   - **SSO dropped from Sprint 2 on 2026-08-08 by decision. khoapnt will pick it up later**; there is no Sprint 2 gate for it and no accepted provider/session/tenant contract in this register. Do not plan, scope, or start SSO slices against Sprint 2 capacity.
   - The packaging half of this item progressed independently and is recorded under its own IDs: BUG-013 (`!79`) and BUG-014 (`!80`). What remains unowned here is SSO identity plus the reconciliation of the stale security branches.
