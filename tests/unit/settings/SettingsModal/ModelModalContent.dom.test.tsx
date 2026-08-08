@@ -13,9 +13,14 @@ const {
   addPlatformModalOptions,
   addPlatformOpenMock,
   appOperationsCardProps,
+  checkProviderHealthMock,
   createProviderMock,
   creativeStudioEnabled,
+  listProvidersMock,
+  messageErrorMock,
+  messageSuccessMock,
   providersQueryData,
+  updateProviderMock,
 } = vi.hoisted(() => ({
   addPlatformModalOptions: {
     current: undefined as { onSubmit: (platform: IProvider) => void } | undefined,
@@ -31,11 +36,16 @@ const {
         }
       | undefined,
   },
+  checkProviderHealthMock: vi.fn(),
   createProviderMock: vi.fn(),
   creativeStudioEnabled: { current: true },
+  listProvidersMock: vi.fn(),
+  messageErrorMock: vi.fn(),
+  messageSuccessMock: vi.fn(),
   providersQueryData: {
     current: undefined as IProvider[] | undefined,
   },
+  updateProviderMock: vi.fn(),
 }));
 
 vi.mock('@/common/config/constants', async (importOriginal) => {
@@ -54,11 +64,14 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/common', () => ({
   ipcBridge: {
+    acpConversation: {
+      checkProviderHealth: { invoke: checkProviderHealthMock },
+    },
     mode: {
       createProvider: { invoke: createProviderMock },
       deleteProvider: { invoke: vi.fn() },
-      listProviders: { invoke: vi.fn() },
-      updateProvider: { invoke: vi.fn() },
+      listProviders: { invoke: listProvidersMock },
+      updateProvider: { invoke: updateProviderMock },
     },
   },
 }));
@@ -121,6 +134,8 @@ vi.mock('@arco-design/web-react', async (importOriginal) => {
     ...actual,
     Message: {
       ...actual.Message,
+      error: messageErrorMock,
+      success: messageSuccessMock,
       useMessage: () => [{ error: vi.fn() }, null],
     },
   };
@@ -138,17 +153,44 @@ const provider: IProvider = {
   enabled: true,
 };
 
+// The model rows live inside a collapsed Arco panel, so the panel has to be
+// expanded before the per-model health-check button exists in the DOM.
+const clickModelHealthCheck = async (): Promise<void> => {
+  const header = await screen.findByText(provider.name);
+  await act(async () => {
+    header.click();
+  });
+  const healthCheckButton = await screen.findByRole('button', { name: 'settings.healthCheck' });
+  await act(async () => {
+    healthCheckButton.click();
+  });
+};
+
+const failedHealthResponse = (overrides: Record<string, unknown>) => ({
+  provider_id: provider.id,
+  platform: provider.platform,
+  model: 'model-a',
+  status: 'unhealthy' as const,
+  elapsed_ms: 25,
+  message: 'Provider request failed',
+  ...overrides,
+});
+
 describe('ModelModalContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     addPlatformModalOptions.current = undefined;
     appOperationsCardProps.current = undefined;
+    checkProviderHealthMock.mockReset();
     createProviderMock.mockResolvedValue(undefined);
     creativeStudioEnabled.current = true;
+    listProvidersMock.mockResolvedValue([provider]);
+    updateProviderMock.mockResolvedValue(undefined);
     providersQueryData.current = [];
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
   });
 
@@ -226,5 +268,131 @@ describe('ModelModalContent', () => {
     render(<ModelModalContent />);
 
     expect(screen.getByRole('region', { name: 'Studio media models' })).toBeInTheDocument();
+  });
+
+  it('preserves a structured overload instead of relabeling its 429 status as rate limiting', async () => {
+    providersQueryData.current = [provider];
+    checkProviderHealthMock.mockResolvedValue(
+      failedHealthResponse({
+        provider_error_type: 'engine_overloaded_error',
+        error_kind: 'rate_limited',
+        http_status: 429,
+      })
+    );
+    render(<ModelModalContent />);
+
+    await clickModelHealthCheck();
+
+    await waitFor(() =>
+      expect(messageErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.stringContaining('settings.providerHealth.overload.action') })
+      )
+    );
+    expect(updateProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model_health: expect.objectContaining({
+          'model-a': expect.objectContaining({ failure_class: 'overload' }),
+        }),
+      })
+    );
+  });
+
+  it('preserves structured rate limiting with the localized wait action', async () => {
+    providersQueryData.current = [provider];
+    checkProviderHealthMock.mockResolvedValue(
+      failedHealthResponse({ provider_error_type: 'rate_limit_exceeded', http_status: 503 })
+    );
+    render(<ModelModalContent />);
+
+    await clickModelHealthCheck();
+
+    await waitFor(() =>
+      expect(messageErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.stringContaining('settings.providerHealth.rateLimit.action') })
+      )
+    );
+    expect(updateProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model_health: expect.objectContaining({
+          'model-a': expect.objectContaining({ failure_class: 'rate_limit' }),
+        }),
+      })
+    );
+  });
+
+  it('preserves structured setup failure with the localized configuration recovery action', async () => {
+    providersQueryData.current = [provider];
+    checkProviderHealthMock.mockResolvedValue(
+      failedHealthResponse({ provider_error_type: 'invalid_api_key', http_status: 429 })
+    );
+    render(<ModelModalContent />);
+
+    await clickModelHealthCheck();
+
+    await waitFor(() =>
+      expect(messageErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.stringContaining('settings.providerHealth.setup.action') })
+      )
+    );
+    expect(updateProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model_health: expect.objectContaining({
+          'model-a': expect.objectContaining({ failure_class: 'setup' }),
+        }),
+      })
+    );
+  });
+
+  it('preserves connectivity failure with the localized network recovery action', async () => {
+    providersQueryData.current = [provider];
+    checkProviderHealthMock.mockResolvedValue(
+      failedHealthResponse({ provider_error_type: 'connection_error', http_status: 429 })
+    );
+    render(<ModelModalContent />);
+
+    await clickModelHealthCheck();
+
+    await waitFor(() =>
+      expect(messageErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({ content: expect.stringContaining('settings.providerHealth.connectivity.action') })
+      )
+    );
+    expect(updateProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model_health: expect.objectContaining({
+          'model-a': expect.objectContaining({ failure_class: 'connectivity' }),
+        }),
+      })
+    );
+  });
+
+  it('retries once only when the provider supplies bounded retry guidance', async () => {
+    // shouldAdvanceTime keeps Testing Library's real-timer polling alive while the
+    // component's retry delay stays under advanceTimersByTime control.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    providersQueryData.current = [provider];
+    checkProviderHealthMock
+      .mockResolvedValueOnce(
+        failedHealthResponse({
+          provider_error_type: 'engine_overloaded_error',
+          retry_after_ms: 250,
+        })
+      )
+      .mockResolvedValueOnce({
+        provider_id: provider.id,
+        platform: provider.platform,
+        model: 'model-a',
+        status: 'healthy',
+        elapsed_ms: 20,
+      });
+    render(<ModelModalContent />);
+
+    await clickModelHealthCheck();
+    await vi.waitFor(() => expect(checkProviderHealthMock).toHaveBeenCalledTimes(1));
+    await act(async () => vi.advanceTimersByTime(250));
+
+    await vi.waitFor(() => expect(checkProviderHealthMock).toHaveBeenCalledTimes(2));
+    expect(messageSuccessMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

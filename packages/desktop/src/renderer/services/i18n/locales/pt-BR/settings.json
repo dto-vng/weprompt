@@ -885,6 +885,15 @@
   "includePrereleaseUpdates": "Incluir versões de pré-lançamento/dev",
   "saveModelConfigFailed": "Falha ao salvar a configuração do modelo",
   "healthCheck": "Verificação de Saúde",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Configurado · inferência indisponível.",
+    "setupNeedsAttention": "A configuração precisa de atenção.",
+    "overload": { "action": "O provedor está temporariamente sobrecarregado. Tente novamente mais tarde." },
+    "rateLimit": { "action": "Aguarde o limite do provedor ser redefinido e tente novamente." },
+    "setup": { "action": "Revise as credenciais e a configuração do provedor e tente novamente." },
+    "connectivity": { "action": "Verifique a rede, o proxy e a Base URL e tente novamente." },
+    "provider": { "action": "O provedor não concluiu a verificação de inferência. Tente novamente mais tarde." }
+  },
   "clearStatus": "Limpar status",
   "healthStatusCleared": "Status de saúde limpo",
   "latency": "Latência",

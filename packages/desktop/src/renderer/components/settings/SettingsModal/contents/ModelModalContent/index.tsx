@@ -7,6 +7,10 @@
 import { ipcBridge } from '@/common';
 import { CREATIVE_STUDIO_ENABLED } from '@/common/config/constants';
 import type { IProvider } from '@/common/config/storage';
+import {
+  normalizeProviderHealthCheckFailure,
+  type ProviderHealthCheckResponse,
+} from '@/common/types/provider/providerApi';
 import { supportsOpenAiApiMode } from '@/common/utils/modelCapabilities';
 import { Button, Divider, Message, Popconfirm, Collapse, Tag, Switch, Tooltip } from '@arco-design/web-react';
 import {
@@ -223,13 +227,30 @@ const ModelModalContent: React.FC = () => {
     const startTime = Date.now();
 
     try {
-      const result = await ipcBridge.acpConversation.checkProviderHealth.invoke({
+      const request = {
         provider_id: platform.id,
         model: modelName,
-      });
+      };
+      let result: ProviderHealthCheckResponse = await ipcBridge.acpConversation.checkProviderHealth.invoke(request);
+      if (result.status !== 'healthy') {
+        const initialFailure = normalizeProviderHealthCheckFailure(result);
+        if (initialFailure.retryAfterMs !== undefined) {
+          await new Promise<void>((resolve) => setTimeout(resolve, initialFailure.retryAfterMs));
+          result = await ipcBridge.acpConversation.checkProviderHealth.invoke(request);
+        }
+      }
       const latency = result.elapsed_ms || Date.now() - startTime;
       const success = result.status === 'healthy';
-      const errorMessage = result.message || t('common.unknownError');
+      const failure = success ? undefined : normalizeProviderHealthCheckFailure(result);
+      const errorMessage = failure ? `${t(failure.statusKey)} ${t(failure.actionKey)}` : t('common.unknownError');
+
+      if (failure) {
+        console.warn('[provider-health] check failed', {
+          failure_class: failure.failureClass,
+          ...(failure.httpStatus !== undefined ? { http_status: failure.httpStatus } : {}),
+          ...(failure.requestId !== undefined ? { request_id: failure.requestId } : {}),
+        });
+      }
 
       try {
         // 先获取最新的数据，确保不会覆盖其他并发的更新
@@ -241,6 +262,11 @@ const ModelModalContent: React.FC = () => {
           last_check: Date.now(),
           latency,
           error: success ? undefined : errorMessage,
+          failure_class: failure?.failureClass,
+          http_status: failure?.httpStatus,
+          request_id: failure?.requestId,
+          retry_after_ms: failure?.retryAfterMs,
+          provider_error_type: failure?.providerErrorType,
         };
 
         await ipcBridge.mode.updateProvider.invoke({ id: platform.id, model_health });
@@ -558,7 +584,11 @@ const ModelModalContent: React.FC = () => {
                                         <div className='flex items-center gap-4px'>
                                           <span>{healthStatus === 'healthy' ? '✅' : '❌'}</span>
                                           <span>
-                                            {healthStatus === 'healthy' ? t('common.success') : t('common.failed')}
+                                            {healthStatus === 'healthy'
+                                              ? t('common.success')
+                                              : model_health?.failure_class === 'setup'
+                                                ? t('settings.providerHealth.setupNeedsAttention')
+                                                : t('settings.providerHealth.configuredInferenceUnavailable')}
                                           </span>
                                         </div>
                                         {model_health?.latency && (
@@ -656,6 +686,7 @@ const ModelModalContent: React.FC = () => {
                                 {/* 心跳检测按钮 / Health check button */}
                                 <Tooltip content={t('settings.healthCheck')}>
                                   <Button
+                                    aria-label={t('settings.healthCheck')}
                                     size='mini'
                                     className='!w-28px !h-28px !min-w-28px !bg-[var(--color-bg-1)] text-t-secondary hover:text-t-primary hover:!bg-[var(--fill-0)]'
                                     icon={<Heartbeat theme='outline' size='16' />}

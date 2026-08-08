@@ -95,6 +95,23 @@ export type ProviderHealthCheckErrorKind =
   | 'api_error'
   | 'unknown';
 
+export type ProviderHealthFailureClass = 'overload' | 'rate_limit' | 'setup' | 'connectivity' | 'provider';
+
+export type NormalizedProviderHealthFailure = {
+  failureClass: ProviderHealthFailureClass;
+  statusKey: 'settings.providerHealth.configuredInferenceUnavailable' | 'settings.providerHealth.setupNeedsAttention';
+  actionKey:
+    | 'settings.providerHealth.overload.action'
+    | 'settings.providerHealth.rateLimit.action'
+    | 'settings.providerHealth.setup.action'
+    | 'settings.providerHealth.connectivity.action'
+    | 'settings.providerHealth.provider.action';
+  retryAfterMs?: number;
+  httpStatus?: number;
+  requestId?: string;
+  providerErrorType?: string;
+};
+
 export interface ProviderHealthCheckRequest {
   provider_id: string;
   model: string;
@@ -108,6 +125,111 @@ export interface ProviderHealthCheckResponse {
   elapsed_ms: number;
   message?: string;
   error_kind?: ProviderHealthCheckErrorKind;
+  /** Provider-supplied structured error type. Takes precedence over normalized status fields. */
+  provider_error_type?: string;
   http_status?: number;
   timeout_stage?: string;
+  /** Provider retry guidance. The renderer accepts only a short, bounded delay. */
+  retry_after_ms?: number;
+  /** Sanitized provider request identifier for support diagnostics. */
+  request_id?: string;
 }
+
+const MAX_PROVIDER_HEALTH_RETRY_AFTER_MS = 30_000;
+
+const classifyStructuredProviderType = (value: string): ProviderHealthFailureClass => {
+  const normalized = value.trim().toLowerCase();
+  if (/overload|server[_-]?busy|capacity|temporarily[_-]?unavailable/.test(normalized)) return 'overload';
+  if (/rate[_-]?limit|too[_-]?many[_-]?requests|throttl|quota/.test(normalized)) return 'rate_limit';
+  if (/auth|credential|api[_-]?key|forbidden|permission|config|aws/.test(normalized)) return 'setup';
+  if (/connect|network|dns|timeout|tls|socket/.test(normalized)) return 'connectivity';
+  return 'provider';
+};
+
+const classifyNormalizedKind = (value: ProviderHealthCheckErrorKind): ProviderHealthFailureClass | undefined => {
+  if (value === 'rate_limited' || value === 'insufficient_quota') return 'rate_limit';
+  if (
+    value === 'invalid_authorization_header' ||
+    value === 'unauthorized' ||
+    value === 'forbidden' ||
+    value === 'aws_credentials' ||
+    value === 'invalid_request' ||
+    value === 'not_found'
+  ) {
+    return 'setup';
+  }
+  if (value === 'connection_error' || value === 'timeout') return 'connectivity';
+  return undefined;
+};
+
+const classifyHttpStatus = (status: number | undefined): ProviderHealthFailureClass => {
+  if (status === 429) return 'rate_limit';
+  if (status === 401 || status === 403 || status === 404) return 'setup';
+  if (status === 408 || status === 504) return 'connectivity';
+  if (status === 502 || status === 503 || status === 529) return 'overload';
+  return 'provider';
+};
+
+const ACTION_KEYS: Record<ProviderHealthFailureClass, NormalizedProviderHealthFailure['actionKey']> = {
+  overload: 'settings.providerHealth.overload.action',
+  rate_limit: 'settings.providerHealth.rateLimit.action',
+  setup: 'settings.providerHealth.setup.action',
+  connectivity: 'settings.providerHealth.connectivity.action',
+  provider: 'settings.providerHealth.provider.action',
+};
+
+/** Normalize optional old/new AionCore health fields at the shared HTTP/IPC boundary. */
+export const normalizeProviderHealthCheckFailure = (
+  response: ProviderHealthCheckResponse
+): NormalizedProviderHealthFailure => {
+  const structuredType =
+    typeof response.provider_error_type === 'string' && response.provider_error_type.trim().length > 0
+      ? response.provider_error_type
+      : undefined;
+  const rawErrorKind = typeof response.error_kind === 'string' ? response.error_kind : undefined;
+  const normalizedKind = rawErrorKind
+    ? classifyNormalizedKind(rawErrorKind as ProviderHealthCheckErrorKind)
+    : undefined;
+  const effectiveStructuredType =
+    structuredType ??
+    (rawErrorKind && normalizedKind === undefined && rawErrorKind !== 'api_error' && rawErrorKind !== 'unknown'
+      ? rawErrorKind
+      : undefined);
+  const providerErrorType =
+    effectiveStructuredType && /^[\w.:-]{1,128}$/.test(effectiveStructuredType) ? effectiveStructuredType : undefined;
+  const httpStatus =
+    typeof response.http_status === 'number' &&
+    Number.isSafeInteger(response.http_status) &&
+    response.http_status >= 100 &&
+    response.http_status <= 599
+      ? response.http_status
+      : undefined;
+  const failureClass = effectiveStructuredType
+    ? classifyStructuredProviderType(effectiveStructuredType)
+    : (normalizedKind ?? classifyHttpStatus(httpStatus));
+  const retryAfterMs =
+    (failureClass === 'overload' || failureClass === 'rate_limit') &&
+    typeof response.retry_after_ms === 'number' &&
+    Number.isSafeInteger(response.retry_after_ms) &&
+    response.retry_after_ms > 0 &&
+    response.retry_after_ms <= MAX_PROVIDER_HEALTH_RETRY_AFTER_MS
+      ? response.retry_after_ms
+      : undefined;
+  const requestId =
+    typeof response.request_id === 'string' && /^[\w.:-]{1,128}$/.test(response.request_id)
+      ? response.request_id
+      : undefined;
+
+  return {
+    failureClass,
+    statusKey:
+      failureClass === 'setup'
+        ? 'settings.providerHealth.setupNeedsAttention'
+        : 'settings.providerHealth.configuredInferenceUnavailable',
+    actionKey: ACTION_KEYS[failureClass],
+    ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+    ...(httpStatus !== undefined ? { httpStatus } : {}),
+    ...(requestId !== undefined ? { requestId } : {}),
+    ...(providerErrorType !== undefined ? { providerErrorType } : {}),
+  };
+};

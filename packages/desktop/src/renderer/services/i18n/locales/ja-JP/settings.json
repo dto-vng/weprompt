@@ -873,6 +873,15 @@
   "includePrereleaseUpdates": "プレリリース/dev ビルドを含める",
   "saveModelConfigFailed": "モデル設定の保存に失敗しました",
   "healthCheck": "ヘルスチェック",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",
+    "setupNeedsAttention": "設定を確認してください。",
+    "overload": { "action": "プロバイダーが一時的に過負荷です。しばらくしてから再試行してください。" },
+    "rateLimit": { "action": "プロバイダーの上限がリセットされてから再試行してください。" },
+    "setup": { "action": "プロバイダーの認証情報と設定を確認してから再試行してください。" },
+    "connectivity": { "action": "ネットワーク、プロキシ、Base URL を確認してから再試行してください。" },
+    "provider": { "action": "プロバイダーは推論チェックを完了できませんでした。しばらくしてから再試行してください。" }
+  },
   "clearStatus": "ステータスをクリア",
   "healthStatusCleared": "ヘルスステータスがクリアされました",
   "latency": "レイテンシ",
