@@ -347,11 +347,11 @@ describe('Review phase cut', () => {
     expect(container.querySelector('[data-review-primary]')).toHaveAttribute('data-full-width', 'true');
     expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
-      })
-    );
+    const opener = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
+    });
+    opener.focus();
+    fireEvent.click(opener);
 
     const drawer = await waitFor(() => {
       const element = document.querySelector<HTMLElement>('.arco-drawer');
@@ -359,18 +359,27 @@ describe('Review phase cut', () => {
       return element!;
     });
     expect(drawer).toHaveStyle({ width: '322px' });
+    const dialog = screen.queryByRole('dialog');
+    expect.soft(dialog).not.toBeNull();
+    if (dialog !== null) {
+      expect.soft(dialog).toHaveAccessibleName('conversation.creativeStudio.phase.review.cut.inspector');
+    }
     expect(
       within(drawer).getByRole('complementary', {
         name: 'conversation.creativeStudio.phase.review.cut.inspector',
       })
     ).toBeVisible();
-    expect(within(drawer).getByRole('button', { name: 'common.close' })).toBeVisible();
+    const closeButton = within(drawer).getByRole('button', { name: 'common.close' });
+    expect(closeButton).toBeVisible();
+    closeButton.focus();
+    expect(closeButton).toHaveFocus();
 
     const drawerWrapper = document.querySelector('.arco-drawer-wrapper');
     expect(drawerWrapper).not.toBeNull();
     fireEvent.keyDown(drawerWrapper!, { key: 'Escape', keyCode: 27, which: 27 });
 
     await waitFor(() => expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
   });
 
   it('uses fixed 96px strip items, duration labels, and a scroll cue in compact mode', () => {
@@ -885,19 +894,28 @@ describe('Review phase cut', () => {
   });
 
   it('labels selected, slate, running, and failed cut states without relying on colour', () => {
-    const { container } = render(<ReviewPhase controller={controller()} />);
+    render(<ReviewPhase controller={controller()} />);
 
-    expect(
-      Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
-    ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
     expect(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
       })
     ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.selectedTake');
-    expect(screen.getByText('conversation.creativeStudio.phase.review.slateLabel')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.scene.status.generating')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:2,Missing close,7',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.slateLabel');
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:3,Running reveal,5',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.scene.status.generating');
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:4,Failed end card,5',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.jobs.status.failed');
   });
 
   it('keeps the new footer and rail state styling on tokens defined for light and dark themes', () => {
@@ -1183,7 +1201,7 @@ describe('Review phase cut', () => {
     );
 
     const failure = screen.getByText(
-      'conversation.creativeStudio.phase.review.render.errors.noRenderableShots:02, 03, 04'
+      'conversation.creativeStudio.phase.review.render.errors.noRenderableShots:3,02, 03, 04'
     );
     const slot = failure.closest('[data-render-state-slot]')!;
     expect(slot).not.toHaveTextContent(/scene-slate|scene-running|scene-failed/);

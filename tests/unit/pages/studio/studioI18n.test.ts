@@ -217,6 +217,7 @@ const renderStateAndExportKeys = [
 const pluralLogicalKeys = [
   'export.confirmSelectedCount',
   'export.gapWarning',
+  'phase.review.render.errors.noRenderableShots',
   'library.shotCount',
   'library.projectCount',
   'close.unsavedMessage',
@@ -586,7 +587,10 @@ describe('Creative Studio localization contract', () => {
             returnDetails: true,
           });
           const expectedExactKey = `${key}${resolver.getSuffix(locale, count)}`;
-          const expectedRenderedValue = base === 'export.gapWarning' ? '03' : String(count);
+          const expectedRenderedValue =
+            base === 'export.gapWarning' || base === 'phase.review.render.errors.noRenderableShots'
+              ? '03'
+              : String(count);
           if (typeof details.res !== 'string' || !details.res.includes(expectedRenderedValue)) {
             issues.push(`${locale}.${base} did not render count ${count}`);
           }

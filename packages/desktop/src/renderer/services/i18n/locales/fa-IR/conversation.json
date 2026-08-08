@@ -1060,6 +1060,8 @@
             "failed": "رندر ویدیو انجام نشد.",
             "failedClip": "کلیپ {{clip}} از {{total}} رندر نشد.",
             "noRenderableShots": "نماهای {{shots}} کلیپ قابل رندر ندارند.",
+            "noRenderableShots_one": "نمای {{shots}} کلیپ قابل رندر ندارد.",
+            "noRenderableShots_other": "نماهای {{shots}} کلیپ قابل رندر ندارند.",
             "cancelled": "رندر ویدیو لغو شد."
           }
         }

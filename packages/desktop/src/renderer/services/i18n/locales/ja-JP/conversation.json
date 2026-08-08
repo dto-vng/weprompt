@@ -1056,6 +1056,7 @@
             "failed": "動画をレンダリングできませんでした。",
             "failedClip": "クリップ {{clip}}/{{total}} をレンダリングできませんでした。",
             "noRenderableShots": "ショット {{shots}} にはレンダリング可能なクリップがありません。",
+            "noRenderableShots_other": "ショット {{shots}} にはレンダリング可能なクリップがありません。",
             "cancelled": "動画のレンダリングをキャンセルしました。"
           }
         }

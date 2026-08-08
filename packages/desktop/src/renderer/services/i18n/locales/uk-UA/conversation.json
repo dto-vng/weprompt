@@ -1068,6 +1068,10 @@
             "failed": "Не вдалося зібрати відео.",
             "failedClip": "Не вдалося зібрати кліп {{clip}} із {{total}}.",
             "noRenderableShots": "У кадрах {{shots}} немає кліпів для збирання.",
+            "noRenderableShots_one": "У кадрі {{shots}} немає кліпу для збирання.",
+            "noRenderableShots_few": "У кадрах {{shots}} немає кліпів для збирання.",
+            "noRenderableShots_many": "Кадри {{shots}} не містять кліпів для збирання.",
+            "noRenderableShots_other": "У кадрах {{shots}} немає кліпів для збирання.",
             "cancelled": "Збирання відео скасовано."
           }
         }

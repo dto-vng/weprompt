@@ -1056,6 +1056,7 @@
             "failed": "無法算繪影片。",
             "failedClip": "無法算繪第 {{clip}}/{{total}} 個片段。",
             "noRenderableShots": "鏡頭 {{shots}} 沒有可算繪的片段。",
+            "noRenderableShots_other": "鏡頭 {{shots}} 沒有可算繪的片段。",
             "cancelled": "已取消影片算繪。"
           }
         }

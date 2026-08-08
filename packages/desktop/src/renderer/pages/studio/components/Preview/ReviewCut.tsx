@@ -6,7 +6,7 @@
 
 import { Button, Drawer, Modal, Select, Tag } from '@arco-design/web-react';
 import { CloseSmall } from '@icon-park/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isCanonicalStudioGeneratedTake } from '@/common/types/project/creativeStudioCanonicalTake';
@@ -59,6 +59,8 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
   const { project, activeCut } = cutEditor;
   const [playhead, setPlayhead] = useState({ sceneId: selectedSceneId, localSeconds: 0 });
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspectorOpenerRef = useRef<HTMLElement | null>(null);
+  const previousInspectorOpenRef = useRef(inspectorOpen);
   const inspectorPresentation = layoutMode === 'inline' ? 'inline' : 'drawer';
   const selectedScene = selectedSceneId === null ? null : (project.scenes[selectedSceneId] ?? null);
   const selectedAsset =
@@ -74,6 +76,11 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
   useEffect(() => {
     if (inspectorPresentation === 'inline') setInspectorOpen(false);
   }, [inspectorPresentation]);
+
+  useLayoutEffect(() => {
+    if (previousInspectorOpenRef.current && !inspectorOpen) inspectorOpenerRef.current?.focus();
+    previousInspectorOpenRef.current = inspectorOpen;
+  }, [inspectorOpen]);
 
   const slateScenes = useMemo(
     () =>
@@ -326,7 +333,11 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
             onSelectScene={(sceneId) => {
               onSelectScene(sceneId);
               setPlayhead({ sceneId, localSeconds: 0 });
-              if (inspectorPresentation === 'drawer') setInspectorOpen(true);
+              if (inspectorPresentation === 'drawer') {
+                inspectorOpenerRef.current =
+                  document.activeElement instanceof HTMLElement ? document.activeElement : null;
+                setInspectorOpen(true);
+              }
             }}
             onMoveClip={(clipId, targetIndex) => void cutEditor.moveClip(clipId, targetIndex)}
             onEditClip={(clipId, edit) => void cutEditor.updateClip(clipId, edit)}
@@ -356,33 +367,35 @@ export const ReviewCut: React.FC<ReviewCutProps> = ({
       {inspectorPresentation === 'drawer' && (
         <Drawer
           visible={inspectorOpen}
-          title={null}
+          title={t('conversation.creativeStudio.phase.review.cut.inspector')}
           width={layoutMode === 'drawer' ? '322px' : 'min(322px, 100vw)'}
           footer={null}
           closable={false}
           unmountOnExit
           onCancel={() => setInspectorOpen(false)}
         >
-          <Button
-            type='text'
-            aria-label={t('common.close')}
-            className='mb-8px ml-auto flex'
-            icon={<CloseSmall aria-hidden='true' />}
-            onClick={() => setInspectorOpen(false)}
-          />
-          <CutInspector
-            project={project}
-            scene={selectedScene}
-            asset={selectedAsset}
-            clip={selectedClip}
-            playheadInClipSeconds={selectedSourceIn + localPlayhead}
-            disabled={disabled}
-            onSelectAsset={onSelectAsset}
-            onEditClip={editSelectedClip}
-            onResetClip={() => {
-              if (selectedClip !== null) void cutEditor.resetClip(selectedClip.id);
-            }}
-          />
+          <section role='dialog' aria-label={t('conversation.creativeStudio.phase.review.cut.inspector')}>
+            <Button
+              type='text'
+              aria-label={t('common.close')}
+              className='mb-8px ml-auto flex'
+              icon={<CloseSmall aria-hidden='true' />}
+              onClick={() => setInspectorOpen(false)}
+            />
+            <CutInspector
+              project={project}
+              scene={selectedScene}
+              asset={selectedAsset}
+              clip={selectedClip}
+              playheadInClipSeconds={selectedSourceIn + localPlayhead}
+              disabled={disabled}
+              onSelectAsset={onSelectAsset}
+              onEditClip={editSelectedClip}
+              onResetClip={() => {
+                if (selectedClip !== null) void cutEditor.resetClip(selectedClip.id);
+              }}
+            />
+          </section>
         </Drawer>
       )}
 

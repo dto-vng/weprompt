@@ -1056,6 +1056,7 @@
             "failed": "无法渲染视频。",
             "failedClip": "无法渲染第 {{clip}}/{{total}} 个片段。",
             "noRenderableShots": "镜头 {{shots}} 没有可渲染的片段。",
+            "noRenderableShots_other": "镜头 {{shots}} 没有可渲染的片段。",
             "cancelled": "已取消视频渲染。"
           }
         }

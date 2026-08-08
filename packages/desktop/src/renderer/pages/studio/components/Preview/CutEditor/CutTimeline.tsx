@@ -86,6 +86,7 @@ type SortableClipProps = {
   selected: boolean;
   disabled: boolean;
   reviewState: CutTimelineReviewState;
+  reviewStateLabel: string;
   layoutMode: StudioLayoutMode;
   onSelect: () => void;
   onMove: (targetIndex: number) => void;
@@ -101,6 +102,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
   selected,
   disabled,
   reviewState,
+  reviewStateLabel,
   layoutMode,
   onSelect,
   onMove,
@@ -229,7 +231,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
         }}
       >
         <span id={reviewStateId} data-review-state={reviewState} className='sr-only'>
-          {t('conversation.creativeStudio.phase.review.selectedTake')}
+          {reviewStateLabel}
         </span>
         <span className={styles.clipCopy}>
           <span data-cut-title title={scene.title} className={`${studioType.eyebrow} ${styles.clipTitle}`}>
@@ -329,6 +331,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
   onSeek,
 }) => {
   const { t } = useTranslation();
+  const slateReviewStateId = React.useId();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const clipEntries = useMemo(
     () =>
@@ -446,6 +449,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                     selected={selectedSceneId === entry.scene.id}
                     disabled={disabled}
                     reviewState={reviewState}
+                    reviewStateLabel={reviewPresentation.label}
                     layoutMode={layoutMode}
                     onSelect={() => onSelectScene(entry.scene.id)}
                     onMove={(targetIndex) => onMoveClip(entry.clip.id, targetIndex)}
@@ -470,6 +474,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                         title: entry.scene.title,
                         seconds: entry.scene.durationSeconds,
                       })}
+                      aria-describedby={`${slateReviewStateId}-${entry.scene.id}`}
                       aria-current={selectedSceneId === entry.scene.id ? 'true' : undefined}
                       className={styles.slatePlate}
                       onClick={() => onSelectScene(entry.scene.id)}
@@ -484,6 +489,7 @@ export const CutTimeline: React.FC<CutTimelineProps> = ({
                         </span>
                       </span>
                       <span
+                        id={`${slateReviewStateId}-${entry.scene.id}`}
                         data-review-state={reviewState}
                         className={reviewState === 'failed' ? styles.failedState : undefined}
                       >

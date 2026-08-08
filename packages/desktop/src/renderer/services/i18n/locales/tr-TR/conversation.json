@@ -1062,6 +1062,8 @@
             "failed": "Video işlenemedi.",
             "failedClip": "{{clip}}/{{total}} numaralı klip işlenemedi.",
             "noRenderableShots": "{{shots}} numaralı çekimlerde işlenebilir klip yok.",
+            "noRenderableShots_one": "{{shots}} numaralı çekimde işlenebilir klip yok.",
+            "noRenderableShots_other": "{{shots}} numaralı çekimlerde işlenebilir klip yok.",
             "cancelled": "Video işleme iptal edildi."
           }
         }
