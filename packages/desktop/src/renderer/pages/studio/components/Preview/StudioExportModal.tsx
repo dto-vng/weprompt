@@ -50,7 +50,7 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
   onIncludeReferencesChange,
   onOpenProduce,
 }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const missingShotNumbers = studioShotNumbers(project, missingSceneIds);
   const renderedAt = latestRender === null ? null : Date.parse(latestRender.renderedAt);
   const projectUpdatedAt = Date.parse(project.updatedAt);
@@ -113,7 +113,12 @@ export const StudioExportModal: React.FC<StudioExportModalProps> = ({
               ) : (
                 <>
                   <span>{t('conversation.creativeStudio.export.renderedAt')}</span>{' '}
-                  <time dateTime={latestRender.renderedAt}>{latestRender.renderedAt}</time>
+                  <time dateTime={latestRender.renderedAt}>
+                    {new Date(latestRender.renderedAt).toLocaleString(i18n.resolvedLanguage ?? i18n.language, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
                 </>
               )}
             </dd>

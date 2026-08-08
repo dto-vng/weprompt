@@ -59,6 +59,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
       values === undefined ? key : `${key}:${Object.values(values).join(',')}`,
+    i18n: { language: 'en-US' },
   }),
 }));
 
@@ -235,6 +236,7 @@ describe('Studio asset export', () => {
   });
 
   it('shows the persisted cut render time and stale-edit warning before opening the folder picker', async () => {
+    const formatTimestamp = vi.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('Jul 29, 2026, 3:15 PM');
     bridge.getLatestRender.invoke.mockResolvedValueOnce(
       ok({ fileName: 'cut.mp4' as const, renderedAt: '2026-07-29T08:15:00.000Z' })
     );
@@ -251,10 +253,10 @@ describe('Studio asset export', () => {
     expect(within(dialog).getByText('cut.mp4')).toBeVisible();
     expect(within(dialog).getByText('conversation.creativeStudio.export.renderedAt')).toBeVisible();
     expect(within(dialog).getByText('conversation.creativeStudio.export.staleRender')).toBeVisible();
-    expect(within(dialog).getByText('2026-07-29T08:15:00.000Z')).toHaveAttribute(
-      'datetime',
-      '2026-07-29T08:15:00.000Z'
-    );
+    expect(within(dialog).getByText('Jul 29, 2026, 3:15 PM')).toHaveAttribute('datetime', '2026-07-29T08:15:00.000Z');
+    expect(within(dialog).queryByText('2026-07-29T08:15:00.000Z')).not.toBeInTheDocument();
+    expect(formatTimestamp).toHaveBeenCalledWith('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    formatTimestamp.mockRestore();
     expect(bridge.chooseAndExportAssets.invoke).not.toHaveBeenCalled();
   });
 
