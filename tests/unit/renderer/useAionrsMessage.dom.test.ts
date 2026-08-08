@@ -335,7 +335,7 @@ describe('useAionrsMessage runtime state', () => {
     expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
   });
 
-  it('persists canonical AionRS provider usage once without using consumption as occupancy', async () => {
+  it('persists AionRS occupancy and records canonical provider usage once per turn', async () => {
     const { result } = renderHook(() => useAionrsMessage('conv-canonical'));
     const occurredAt = Date.now();
 
@@ -354,6 +354,14 @@ describe('useAionrsMessage runtime state', () => {
     } as IResponseMessage;
 
     act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'tips',
+        data: { content: 'Token watermark override: provider=0, local_estimate=11768, using=11768' },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-canonical',
+        created_at: occurredAt,
+      });
       responseStreamHandlerRef.current?.(completedTurn);
       responseStreamHandlerRef.current?.(completedTurn);
     });
@@ -361,17 +369,12 @@ describe('useAionrsMessage runtime state', () => {
     await waitFor(() => {
       expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1);
     });
-    expect(result.current.tokenUsage).toBeNull();
+    expect(result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
     expect(updateConversationInvokeMock).toHaveBeenCalledWith({
       id: 'conv-canonical',
       updates: {
         extra: {
-          last_provider_usage: {
-            usage_event_id: 'conv-canonical:turn-1',
-            input_tokens: 10,
-            output_tokens: 5,
-            occurred_at: occurredAt,
-          },
+          last_token_usage: { total_tokens: 11_768 },
         },
       },
       merge_extra: true,
@@ -404,7 +407,7 @@ describe('useAionrsMessage runtime state', () => {
         created_at: occurredAt,
       });
     });
-    await waitFor(() => expect(updateConversationInvokeMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1));
     firstMount.unmount();
 
     vi.mocked(getConversationOrNull).mockResolvedValue({
@@ -416,12 +419,6 @@ describe('useAionrsMessage runtime state', () => {
       extra: {
         workspace: '/tmp/conv-restart',
         last_token_usage: { total_tokens: 11_768 },
-        last_provider_usage: {
-          usage_event_id: 'conv-restart:turn-1',
-          input_tokens: 10,
-          output_tokens: 5,
-          occurred_at: occurredAt,
-        },
       },
       model: {
         id: 'provider-1',

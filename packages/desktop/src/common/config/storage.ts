@@ -179,13 +179,6 @@ export interface TokenUsageData {
   total_tokens: number;
 }
 
-export type ProviderTokenUsageData = {
-  usage_event_id: string;
-  input_tokens: number;
-  output_tokens: number;
-  occurred_at: number;
-};
-
 export type TContextHandoffItemSource = 'manual' | 'context_md';
 
 export type TContextHandoffItem = {
@@ -291,8 +284,6 @@ export type TChatConversation =
           last_token_usage?: TokenUsageData;
           /** Context window capacity from usage_update */
           last_context_limit?: number;
-          /** Last authoritative provider consumption report, distinct from context occupancy. */
-          last_provider_usage?: ProviderTokenUsageData;
           /** Context handoff artifact and pinned context metadata. */
           context_handoff?: TConversationContextHandoffExtra;
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
@@ -520,8 +511,6 @@ export type TChatConversation =
         is_health_check?: boolean;
         /** Last token usage stats */
         last_token_usage?: TokenUsageData;
-        /** Last authoritative provider consumption report, distinct from context occupancy. */
-        last_provider_usage?: ProviderTokenUsageData;
         /** Cron job ID that spawned this conversation */
         cron_job_id?: string;
       }
