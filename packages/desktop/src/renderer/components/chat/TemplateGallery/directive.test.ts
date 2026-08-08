@@ -159,11 +159,46 @@ describe('composeAssistantSend', () => {
   });
 
   it.each([
+    'Tạo cho tôi một mẫu từ thiết kế này',
+    'Làm một template mới từ bố cục hiện tại',
+    'Dựng theme từ phong cách này',
+    'Lưu giao diện này thành template',
+    'Giữ lại phong cách này làm mẫu',
+    'Lưu thiết kế này lại thành theme',
+    'Chuyển bố cục này thành mẫu',
+    'Biến giao diện này thành template',
+    'tao cho toi mot template tu thiet ke nay',
+    'luu giao dien nay thanh theme',
+    'chuyen bo cuc nay thanh template',
+    `Ta\u0323o cho tôi một ma\u0302\u0303u từ thiết kế này`,
+  ])('adds template-creation instructions for Vietnamese creation intent: %s', (message) => {
+    const result = composeAssistantSend(null, message, []);
+
+    expect(result.input.startsWith(TEMPLATE_CREATION_DIRECTIVE)).toBe(true);
+    expect(result.input.endsWith(message)).toBe(true);
+  });
+
+  it.each([
     'Summarize this report',
     'Create a presentation using the quarterly template',
     'How do reusable templates work?',
     'Update the colors in this design',
   ])('leaves sends without template-creation intent unchanged: %s', (message) => {
+    expect(composeAssistantSend(null, message, ['/workspace/source.csv'])).toEqual({
+      input: message,
+      files: ['/workspace/source.csv'],
+      injectSkills: [],
+    });
+  });
+
+  it.each([
+    'Mẫu này có mấy slide?',
+    'Dùng template này tạo một bài thuyết trình',
+    'Tôi thích phong cách của template này',
+    'Hãy cập nhật bố cục của mẫu này',
+    // Do not globally strip Vietnamese diacritics: unaccented "mau" is too ambiguous without an ASCII anchor.
+    'luu giao dien nay thanh mau',
+  ])('leaves Vietnamese sends without explicit template-creation intent byte-for-byte unchanged: %s', (message) => {
     expect(composeAssistantSend(null, message, ['/workspace/source.csv'])).toEqual({
       input: message,
       files: ['/workspace/source.csv'],
