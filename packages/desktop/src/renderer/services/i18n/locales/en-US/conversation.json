@@ -757,7 +757,7 @@
         "continueToProduce": "Continue to Produce",
         "askAssistant": "Ask assistant",
         "assistantTitle": "Writing assistant",
-        "assistantDescription": "Use the assistant to develop story structure, shot ideas, and prompts.",
+        "assistantDescription": "Draft a storyboard from your brief.",
         "textChargeDisclosure": "Drafting a storyboard uses your configured text model. Your provider may charge for model use.",
         "draftStoryboard": "Draft storyboard",
         "addShot": "Add shot",
