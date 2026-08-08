@@ -1,6 +1,10 @@
 # Sprint 2 Tasks
 
-> **Canonical work register. Last reconciled: 2026-08-08.**
+> **Canonical work register. Last reconciled: 2026-08-08 (second pass, after the `!80` merge).**
+>
+> Scope decisions taken in this pass, so they are not re-litigated: **Creative Studio moves to
+> Sprint 3** (own section below), and **SSO leaves Sprint 2** with khoapnt to own it later. BUG-014
+> closed against its merged head `!80`. BUG-039 filed with a proven root cause.
 >
 > - Mark an item **Done** only when its accepted head is merged into `origin/sprint2`. Local branches, worktrees, plans, and green focused tests remain open until integration is accepted.
 > - Every active epic records its current boundary and next admission gate. Do not infer whole-sprint progress from raw checkbox count: epics and bugs differ materially in size.
@@ -17,6 +21,7 @@
     - **Epic C — raw workspace Office ingestion + sanitization.** The actual security/lifecycle epic; may never be needed. Entry criteria in the plan of record: seam contract frozen and reviewed **before** implementation, and legacy bypass paths removed in the same change that adds the trusted one.
   - Preserved assets — do **not** rebase or reopen: accepted Store V2 foundation `2f883cee531d5334250870f4bbe66b6bf472adc2` (consumed by Epic A); blocked Task 3 candidate `a1754a13e01c886458db6c1385fa88e6b0719823` (Epic C reference material only).
   - Scope guard, binding: each epic declares its hard problems and seams up front. A task that needs a sanitizer, an **undeclared** authority seam, or an **undeclared** crash-recovery protocol is in the wrong epic — stop and re-charter.
+  - **Partial progress on declared problem 2, in review as `!84`:** `importThemeSpec` now writes to a gallery-local temp directory and commits by atomic `rename`, excludes temp directories from the gallery listing, and reaps stale temps under a bound. Because nothing partial survives a failure, a retry reclaims the original id instead of minting `name-2`. This also closes a **live defect in shipped code** — the gallery import button reaches that path today. Still outstanding for problem 2: consuming Store V2's **reserved** ID so a duplicate _successful_ confirmation cannot install twice. Problem 1 (storage-minted staging proof) is untouched.
   - Next gate: register Epic A's charter, then implement starting from its two declared contracts. Do not resume the retired task line.
   - Dependencies: Epic A needs no EPIC-001 or BUG-014 gate. Epic B waits on EPIC-001 retained-candidate acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
 
@@ -27,24 +32,13 @@
   - Next gate: materialize the evidence package in an auditable branch, rewrite and independently approve the three repository-specific plans, refresh all immutable bases and migration occupancy, then admit the first AionRS DTO/private-mapping slice.
   - Scope rule: capability-based and provider-agnostic; do not hard-code Kimi, GreenNode, or Sol-style effort labels into the shared contract.
 
-- [ ] **[SPRINT2-PLATFORM][P1][Scope gate] Complete SSO and the security/packaging workflow**
-  - Outcome: employees can sign in through the approved SSO route and install or upgrade a package that starts securely without data loss or undocumented recovery steps.
-  - Current boundary: local-backend authentication and pilot-hardening candidates exist on separate, substantially stale security branches; they are not integrated into Sprint 2. No accepted SSO provider/session/tenant contract is recorded in this register.
-  - Next gate: approve the SSO contract and owner, reconcile the security branches against the current Sprint 2 tip, then define one clean-install/upgrade/recovery matrix for macOS ARM, macOS Intel, and Windows.
-  - Scope rule: keep SSO identity, application security, packaging mechanics, and release acceptance visible as separate slices even when they share one program outcome.
-
 - [ ] **[SPRINT2-CONNECTORS][P2][Acceptance gate] Make Outlook and FDL data connectors available**
   - Outcome: users can discover the two approved connectors, authenticate, reconnect, and use them from a supported assistant flow.
   - Current boundary: Sprint 2 already seeds the OAuth-backed `outlook-advanced` and `tse-datahub` HTTP MCP endpoints. Packaged login, permission, reconnect, and supported-flow acceptance is not recorded, and the exact FDL product name/endpoint still needs confirmation against the seeded data connector.
   - Next gate: confirm the FDL identity, run packaged authentication and least-privilege smokes for both connectors, record failure/recovery behavior, and decide whether they remain enabled by default in the hardened pilot package.
   - Scope rule: this is availability of two named connectors, not a generic MCP/data-platform expansion.
 
-- [ ] **[BUG-014][P1][Packaging] Ship and hand off all built-in PPTX/DOCX templates**
-  - Actual: packaging and first-turn readiness can leave built-in templates absent or consume an initial templated message before the runtime is ready.
-  - Current boundary: a template-inventory candidate branch exists; packaged gallery and first-send acceptance across macOS ARM, macOS Intel, and Windows remain open.
-  - Expected: fail packaging when any required reference is absent, list all built-ins in the installed gallery, and remove a stored initial message only after execution succeeds.
-
-- [ ] **[BUG-015][P1] Report authoritative context-window usage and local token totals**
+- [ ] **[BUG-015][P1] Report authoritative context-window usage and local token totals** — fix in review, `!82`
   - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
   - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
 
@@ -52,9 +46,35 @@
   - Actual: a real incident returned SQLite code 14 across providers, assistants, conversations, App Operations, and Health Check; integrity passed and restart restored service, but the durable cause is unconfirmed.
   - Expected: identify local-data access failure accurately, preserve the database, offer safe restart/retry and bounded diagnostics, and never delete or rebuild data without confirmed corruption and explicit consent.
 
-- [ ] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions**
+- [ ] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions** — fix in review, `!83`
   - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
   - Expected: preserve the provider's structured failure type, use HTTP status only as fallback, respect bounded retry guidance, and expose accurate localized recovery actions.
+
+- [ ] **[BUG-039][P2][Test infrastructure] `renderService.integration.test.ts` abnormal-exit case flakes under load** — fix in review, `!81`
+  - Actual: `finalizes an exited ffmpeg child, cleans its temp directory, and releases the project busy slot` raced `renderCut()` against a hand-rolled `Promise.race` + `setTimeout(reject, 250)` deadline. That deadline asserts **timing**, not behaviour, so it expires under CPU contention while the code under test is correct. It hit 2 of 4 full-suite runs on 2026-08-08.
+  - **Root cause proven by controlled experiment**, not inferred. Same test, same machine, `yes` spinners for load; only the deadline differs:
+
+    |        | 4 workers | 8 workers    |
+    | ------ | --------- | ------------ |
+    | Before | 6/6 pass  | **0/5 pass** |
+    | After  | 6/6 pass  | **5/5 pass** |
+
+  - Note for future triage: at **4** workers neither version fails. An under-powered load control reads as "already fixed" — this needs real oversubscription to reproduce.
+  - Expected: delete the deadline. Vitest's own `testTimeout` already enforces that the promise settles, so the property is kept and the arbitrary number is gone. Raising the deadline would have been the disallowed non-fix.
+  - **Evidence correction:** an earlier "3 of 4 `just push` runs" figure for this test was measured under machine oversubscription, and a later reproduction attempt was confounded by an agent's own 15-worker load harness that livelocked the machine. Neither number should be cited; the table above is the measured result.
+  - Fourth member of the gate-poisoner family alongside BUG-025 (fixed), BUG-027, and BUG-030. Distinct from BUG-027, which asserts an exact backoff schedule against real `Date.now()` rather than racing a deadline — do not assume one fix closes the other.
+
+## Deferred to Sprint 3
+
+> Creative Studio moved out of Sprint 2 on 2026-08-08 by decision. The feature stays behind
+> `CREATIVE_STUDIO_ENABLED` (opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1`), so none of the items
+> below is reachable by users today. They are deferred, not dropped: BUG-036 still blocks ever
+> defaulting that flag on. Studio work already merged into `sprint2` stays merged and is not
+> reverted by this deferral.
+
+- [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
+  - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
+  - Moved here from **Waiting On** with the rest of Creative Studio. Deferring the feature defers the release it blocks, so nothing is lost by holding the legal questions until Sprint 3 — but they must be answered before the flag is defaulted on, not after.
 
 - [ ] **[BUG-024][P2][Creative Studio] A shot whose media route is not ready loses its generate action with no explanation**
   - Reproduction: open a project containing both image and video shots while exactly one media role is ready — for example the image model configured and the video model still `setup_required`.
@@ -85,15 +105,19 @@
 
 ## Waiting On
 
+- [ ] **[SPRINT2-PLATFORM][P1][Owner-gated] SSO and the security/packaging workflow**
+  - **SSO dropped from Sprint 2 on 2026-08-08 by decision. khoapnt will pick it up later**; there is no Sprint 2 gate for it and no accepted provider/session/tenant contract in this register. Do not plan, scope, or start SSO slices against Sprint 2 capacity.
+  - The packaging half of this item progressed independently and is recorded under its own IDs: BUG-013 (`!79`) and BUG-014 (`!80`). What remains unowned here is SSO identity plus the reconciliation of the stale security branches.
+  - Current boundary: local-backend authentication and pilot-hardening candidates sit on separate, substantially stale security branches, not integrated into Sprint 2.
+  - Next gate (whenever it is picked up): name the owner, approve the SSO contract, then reconcile those branches against the then-current tip.
+  - Scope rule unchanged: keep SSO identity, application security, packaging mechanics, and release acceptance as separate slices even when they share one program outcome.
+
 - [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
   - Outcome: users request workbook changes in plain language, receive one bounded pre-change audit and approval point, and get a verified result without silent damage to formulas, formatting, charts, or unsupported workbook features.
   - Current boundary: the problem statement, solution contract, and implementation plan were approved in planning sessions, but the evidence package is session-local and not present in the tracked Sprint 2 tree. No runtime implementation has started or been merged.
   - Waiting on: the shared Office artifact/mutation boundary and EPIC-002's OfficeCLI ownership contract must settle before Excel introduces another publication or cleanup path.
   - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
   - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
-
-- [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
-  - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
 
 ## Someday
 
@@ -135,6 +159,10 @@
   - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
 
 ## Done
+
+- [x] **[BUG-014][P1][Packaging] Ship and hand off all built-in PPTX/DOCX templates** — merged 2026-08-08 via `!80`
+  - Packaging now fails closed when a required reference is absent, the installed gallery lists every built-in, and a stored initial message is removed only after execution succeeds.
+  - **Open evidence:** packaged gallery and first-send acceptance on macOS ARM, macOS Intel, and Windows were not executed locally. Confirm on a release build before treating the packaged path as covered.
 
 - [x] **[BUG-013][P0][Packaging] Make installed upgrades schema-compatible on first startup** — merged 2026-08-08 via `!79`
   - Migration lineage is bound, the recovery contract completed, and the app quits safely after a lineage rejection rather than starting against incompatible data.
