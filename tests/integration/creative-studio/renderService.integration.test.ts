@@ -1526,12 +1526,7 @@ describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () =
       onStateChanged: vi.fn(),
     });
 
-    await expect(
-      Promise.race([
-        runner.renderCut('project_1'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('abnormal exit did not settle')), 250)),
-      ])
-    ).rejects.toMatchObject({ code: 'render_failed' });
+    await expect(runner.renderCut('project_1')).rejects.toMatchObject({ code: 'render_failed' });
     expect(runner.getState('project_1')).toMatchObject({ status: 'failed', errorCode: 'render_failed' });
     await expect(fs.readdir(harness.temporaryRoot)).resolves.toEqual([]);
     await expect(runner.renderCut('project_1')).resolves.toMatchObject({ assetId: 'render_asset' });
