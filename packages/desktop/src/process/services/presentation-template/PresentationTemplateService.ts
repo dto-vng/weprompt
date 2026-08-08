@@ -314,6 +314,9 @@ export class PresentationTemplateService {
   private async syncBuiltins(): Promise<void> {
     const stableRoot = await openOrCreateStableDirectory(this.rootDir);
     try {
+      // Bracket the only destructive step the same way the pack loop below does: the root is
+      // proven before anything is removed, not only after.
+      await assertStableDirectoryIdentity(this.rootDir, stableRoot);
       await this.cleanupStaleInstallTemporaries();
       await assertStableDirectoryIdentity(this.rootDir, stableRoot);
       for (const pack of this.builtinPacks) {
