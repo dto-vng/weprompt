@@ -23,6 +23,60 @@ export type TemplatedSend = {
   userFiles: string[];
 };
 
+export const TEMPLATE_REVIEW_MARKER_PREFIX = '<!-- AIONUI_TEMPLATE_REVIEW_V1 ';
+
+export type TemplateReviewAnnouncement = {
+  visibleText: string;
+  filePath: string;
+};
+
+const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/;
+
+/**
+ * Extract a reserved, terminal assistant metadata comment without interpreting
+ * marker-shaped examples inside Markdown fences. Only file_path is read from
+ * the payload: conversation authority and the confirmation digest come from
+ * trusted runtime state.
+ */
+export function parseTemplateReviewAnnouncement(text: string): TemplateReviewAnnouncement | null {
+  const lines = text.split(/\r?\n/);
+  let fence: { character: string; length: number } | null = null;
+  let markerIndex = -1;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const fenceMatch = lines[index].match(FENCE_LINE_RE);
+    if (fenceMatch) {
+      const token = fenceMatch[1];
+      if (fence === null) {
+        fence = { character: token[0], length: token.length };
+      } else if (token[0] === fence.character && token.length >= fence.length) {
+        fence = null;
+      }
+      continue;
+    }
+    if (fence === null && lines[index].startsWith(TEMPLATE_REVIEW_MARKER_PREFIX)) markerIndex = index;
+  }
+
+  if (markerIndex === -1 || lines.slice(markerIndex + 1).some((line) => line.trim() !== '')) return null;
+  const markerLine = lines[markerIndex];
+  if (!markerLine.endsWith(' -->')) return null;
+
+  try {
+    const payload = JSON.parse(markerLine.slice(TEMPLATE_REVIEW_MARKER_PREFIX.length, -4)) as unknown;
+    if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return null;
+    const filePath = 'file_path' in payload ? payload.file_path : undefined;
+    if (typeof filePath !== 'string' || filePath.length === 0 || filePath.length > 4096 || filePath.includes('\0')) {
+      return null;
+    }
+    return {
+      visibleText: lines.slice(0, markerIndex).join('\n').trimEnd(),
+      filePath,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Detect a presentation-template send from its two independent signals: the
  * directive prefix in the text AND an attached template THEME.md. Returns null

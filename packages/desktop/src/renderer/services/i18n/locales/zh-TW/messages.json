@@ -17,6 +17,27 @@
   "imageLoadFailed": "圖片載入失敗",
   "scrollToBottom": "滾動到底部",
   "reasoning": "推理過程",
+  "templateReview": {
+    "reviewing": "正在審核主題…",
+    "disclosure": "主題內容會保留在本機，並用於之後的範本化傳送。",
+    "confirm": "安裝到範本庫",
+    "installing": "正在安裝…",
+    "installed": "已安裝到範本庫",
+    "requestFailed": "無法審核此主題。未安裝任何內容。",
+    "failure": {
+      "INVALID_REQUEST": "範本審核請求無效。未安裝任何內容。",
+      "RUN_NOT_FOUND": "找不到簡報工作。未安裝任何內容。",
+      "RUN_FORBIDDEN": "此簡報工作不屬於目前對話。未安裝任何內容。",
+      "SCOPE_UNAVAILABLE": "目前對話的工作區無法使用。未安裝任何內容。",
+      "TEAM_SCOPE_UNSUPPORTED": "團隊對話目前不支援範本審核。未安裝任何內容。",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "主題檔案位於目前對話工作區之外。未安裝任何內容。",
+      "CANDIDATE_UNSUPPORTED": "此主題檔案不是支援的 THEME.md。未安裝任何內容。",
+      "CANDIDATE_TOO_LARGE": "主題檔案太大。未安裝任何內容。",
+      "CANDIDATE_CHANGED": "主題內容在您審核後已變更。未安裝任何內容。",
+      "CONFIRMATION_NOT_MINTED": "此審核已失效。請重新審核主題後再安裝。未安裝任何內容。",
+      "INSTALL_FAILED": "無法安裝此主題。未安裝任何內容。"
+    }
+  },
   "availableCommands": "{{count}} 個可用指令",
   "atFile.hint": "輸入以搜尋檔案",
   "atFile.menuLabel": "檔案提及",

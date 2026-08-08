@@ -17,6 +17,27 @@
   "imageLoadFailed": "Bild konnte nicht geladen werden",
   "scrollToBottom": "Nach unten scrollen",
   "reasoning": "Überlegung",
+  "templateReview": {
+    "reviewing": "Theme wird geprüft…",
+    "disclosure": "Der Theme-Inhalt wird lokal gespeichert und für zukünftige Vorlagen-Sendungen verwendet.",
+    "confirm": "In der Vorlagengalerie installieren",
+    "installing": "Wird installiert…",
+    "installed": "In der Vorlagengalerie installiert",
+    "requestFailed": "Das Theme konnte nicht geprüft werden. Es wurde nichts installiert.",
+    "failure": {
+      "INVALID_REQUEST": "Die Anfrage zur Vorlagenprüfung ist ungültig. Es wurde nichts installiert.",
+      "RUN_NOT_FOUND": "Der Präsentationslauf wurde nicht gefunden. Es wurde nichts installiert.",
+      "RUN_FORBIDDEN": "Dieser Präsentationslauf gehört nicht zu diesem Chat. Es wurde nichts installiert.",
+      "SCOPE_UNAVAILABLE": "Der Arbeitsbereich dieses Chats ist nicht verfügbar. Es wurde nichts installiert.",
+      "TEAM_SCOPE_UNSUPPORTED": "Die Vorlagenprüfung ist in Team-Chats nicht verfügbar. Es wurde nichts installiert.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "Die Theme-Datei liegt außerhalb des Arbeitsbereichs dieses Chats. Es wurde nichts installiert.",
+      "CANDIDATE_UNSUPPORTED": "Die Theme-Datei ist keine unterstützte THEME.md. Es wurde nichts installiert.",
+      "CANDIDATE_TOO_LARGE": "Die Theme-Datei ist zu groß. Es wurde nichts installiert.",
+      "CANDIDATE_CHANGED": "Der Theme-Inhalt wurde nach Ihrer Prüfung geändert. Es wurde nichts installiert.",
+      "CONFIRMATION_NOT_MINTED": "Diese Prüfung ist nicht mehr gültig. Prüfen Sie das Theme vor der Installation erneut. Es wurde nichts installiert.",
+      "INSTALL_FAILED": "Das Theme konnte nicht installiert werden. Es wurde nichts installiert."
+    }
+  },
   "availableCommands": "{{count}} verfügbare Befehle",
   "atFile.hint": "Zum Suchen nach Dateien tippen",
   "atFile.menuLabel": "Dateierwähnungen",
