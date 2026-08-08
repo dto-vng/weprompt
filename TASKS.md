@@ -16,13 +16,16 @@
   - Outcome: derive or describe a template in chat, review it, then add or discard it before anything reaches the Template Gallery.
   - **Re-scoped 2026-08-07 after the EPIC-002 postmortem.** The unified HTML/PPTX/DOCX epic is **retired**: it combined seven hard problems (mutable-source reading, raw Office content under a privacy policy, sanitization, crash-safe persistence, idempotent recovery, gallery installation, multi-backend skill routing) and implemented storage before the storage-to-filesystem authority seam was frozen. Reviews contained every unsafe step; nothing was integrated, pushed, or enabled.
   - Replaced by three epics split **by hard problem**, strictly ordered — see the tracked [plan of record](docs/design/template-creation-skill-plan.md) (`b76383d15` → `d5973b34c` → `bd13775af`):
-    - **Epic A — HTML only, end to end.** Consumes the accepted Store V2 foundation **as-is, API frozen**. Architecture accepted 2026-08-07 with two declared hard problems: storage-owned immutable staging of one bounded `THEME.md`, and atomic idempotent installation consuming Store V2's reserved template ID. Reuse `importThemeSpec`'s parsing/tokens/manifest/SVG, **not** its direct-write commit workflow. **A0 de-scope valve:** assistant writes `THEME.md`, user imports through the existing picker.
+    - **Epic A — HTML only, end to end.** _(This bullet records the 2026-08-07 charter. It was superseded on 2026-08-08 by the A0+ re-scope further down; read that before acting on this.)_ Consumes the accepted Store V2 foundation **as-is, API frozen**. Architecture accepted 2026-08-07 with two declared hard problems: storage-owned immutable staging of one bounded `THEME.md`, and atomic idempotent installation consuming Store V2's reserved template ID. Reuse `importThemeSpec`'s parsing/tokens/manifest/SVG, **not** its direct-write commit workflow. **A0 de-scope valve:** assistant writes `THEME.md`, user imports through the existing picker.
     - **Epic B — Office templates from app-owned artifacts.** Sourced from EPIC-001 retained run candidates (`retained/candidate.pptx`), where byte authority is already proven. No raw workspace ingestion. Not scheduled; wants the retained-candidate flow live in a packaged build first.
     - **Epic C — raw workspace Office ingestion + sanitization.** The actual security/lifecycle epic; may never be needed. Entry criteria in the plan of record: seam contract frozen and reviewed **before** implementation, and legacy bypass paths removed in the same change that adds the trusted one.
-  - Preserved assets — do **not** rebase or reopen: accepted Store V2 foundation `2f883cee531d5334250870f4bbe66b6bf472adc2` (consumed by Epic A); blocked Task 3 candidate `a1754a13e01c886458db6c1385fa88e6b0719823` (Epic C reference material only).
+  - Preserved assets — do **not** rebase or reopen: Store V2 foundation `2f883cee531d5334250870f4bbe66b6bf472adc2` (local-only, on `codex/epic002-template-creation-r-02ee3f8d6`; **no longer on Epic A's path** — see the A0+ re-scope below); blocked Task 3 candidate `a1754a13e01c886458db6c1385fa88e6b0719823` (Epic C reference material only). Both exist only on this machine. If Epic B or C is ever chartered and either is wanted, **push it to a remote branch first** — right now a disk failure loses both.
   - Scope guard, binding: each epic declares its hard problems and seams up front. A task that needs a sanitizer, an **undeclared** authority seam, or an **undeclared** crash-recovery protocol is in the wrong epic — stop and re-charter.
-  - **Partial progress on declared problem 2, in review as `!84`:** `importThemeSpec` now writes to a gallery-local temp directory and commits by atomic `rename`, excludes temp directories from the gallery listing, and reaps stale temps under a bound. Because nothing partial survives a failure, a retry reclaims the original id instead of minting `name-2`. This also closes a **live defect in shipped code** — the gallery import button reaches that path today. Still outstanding for problem 2: consuming Store V2's **reserved** ID so a duplicate _successful_ confirmation cannot install twice. Problem 1 (storage-minted staging proof) is untouched.
-  - Next gate: register Epic A's charter, then implement starting from its two declared contracts. Do not resume the retired task line.
+  - **Atomic install landed 2026-08-08 via `!84`:** `importThemeSpec` writes to a gallery-local temp directory and commits by atomic `rename`, excludes temp directories from the gallery listing, and reaps stale temps under a bound. Because nothing partial survives a failure, a retry reclaims the original id instead of minting `name-2`. This closed a **live defect in shipped code** — the gallery Import button (`TemplateGalleryExpanded.tsx:41`, `TemplateGalleryPanel.tsx:42` → `importFromDialog` → `importSpec`) reaches that path today. Hardened in the same MR so the stale-temp sweep proves the gallery root before removing anything, matching the rest of `syncBuiltins`.
+  - **Epic A re-scoped to A0+ on 2026-08-08. This supersedes the "two declared hard problems" plan above; do not start Store V2 integration.** The trigger was a measured fact, not a preference: the "accepted Store V2 foundation… consumed as-is" is **10,828 insertions across 21 files**, on a branch **83 commits behind `sprint2`** that has **never been pushed to any remote** — it exists only as a local commit object. "Consume as-is" therefore meant integrating and integration-reviewing the largest artifact of the stalled epic _before_ either declared hard problem began. That cost was invisible in the word "consume".
+  - **A0+ = the shipped Import path, plus an in-chat one-click confirm, bound by content hash.** The assistant writes a `THEME.md`; chat renders a review card; one click installs through the existing atomic path. **No proposal store, no Store V2, no durable pending-proposal state.** Against full Epic A it gives up the crash-safe proposal lifecycle; it does **not** give up the TOCTOU protection, which is the part that mattered — a `THEME.md` is injected into future model prompts, so a file swapped between review and click is a prompt-injection vector. Closing that needs a digest minted by the main process at describe time and re-verified against a re-read at install time, never a digest the renderer supplied. That is a small contract, not a store.
+  - Slices: **A0+/1** main-process describe + hash-bound install + path containment + IPC and native-manifest parity (in progress, `codex/a0plus-bound-import`); **A0+/2** renderer marker detection, review card, disclosure, i18n ×12; **A0+/3** the assistant-side skill that produces the file and marker, with cross-backend creation smoke on AionRS and one ACP backend (use-path parity is not creation-path parity).
+  - Next gate: review A0+/1 against its RED matrix, in particular that a swap between describe and install is refused and that no caller-supplied digest is ever trusted. Do not resume the retired task line, and do not reopen `a1754a13`.
   - Dependencies: Epic A needs no EPIC-001 or BUG-014 gate. Epic B waits on EPIC-001 retained-candidate acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
 
 - [ ] **[EPIC-003][P2][Planning gate] Expose provider- and model-aware reasoning controls**
@@ -38,31 +41,9 @@
   - Next gate: confirm the FDL identity, run packaged authentication and least-privilege smokes for both connectors, record failure/recovery behavior, and decide whether they remain enabled by default in the hardened pilot package.
   - Scope rule: this is availability of two named connectors, not a generic MCP/data-platform expansion.
 
-- [ ] **[BUG-015][P1] Report authoritative context-window usage and local token totals** — fix in review, `!82`
-  - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
-  - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
-
 - [ ] **[BUG-017][P1][Needs reproduction] Recover safely when AionCore loses SQLite access**
   - Actual: a real incident returned SQLite code 14 across providers, assistants, conversations, App Operations, and Health Check; integrity passed and restart restored service, but the durable cause is unconfirmed.
   - Expected: identify local-data access failure accurately, preserve the database, offer safe restart/retry and bounded diagnostics, and never delete or rebuild data without confirmed corruption and explicit consent.
-
-- [ ] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions** — fix in review, `!83`
-  - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
-  - Expected: preserve the provider's structured failure type, use HTTP status only as fallback, respect bounded retry guidance, and expose accurate localized recovery actions.
-
-- [ ] **[BUG-039][P2][Test infrastructure] `renderService.integration.test.ts` abnormal-exit case flakes under load** — fix in review, `!81`
-  - Actual: `finalizes an exited ffmpeg child, cleans its temp directory, and releases the project busy slot` raced `renderCut()` against a hand-rolled `Promise.race` + `setTimeout(reject, 250)` deadline. That deadline asserts **timing**, not behaviour, so it expires under CPU contention while the code under test is correct. It hit 2 of 4 full-suite runs on 2026-08-08.
-  - **Root cause proven by controlled experiment**, not inferred. Same test, same machine, `yes` spinners for load; only the deadline differs:
-
-    |        | 4 workers | 8 workers    |
-    | ------ | --------- | ------------ |
-    | Before | 6/6 pass  | **0/5 pass** |
-    | After  | 6/6 pass  | **5/5 pass** |
-
-  - Note for future triage: at **4** workers neither version fails. An under-powered load control reads as "already fixed" — this needs real oversubscription to reproduce.
-  - Expected: delete the deadline. Vitest's own `testTimeout` already enforces that the promise settles, so the property is kept and the arbitrary number is gone. Raising the deadline would have been the disallowed non-fix.
-  - **Evidence correction:** an earlier "3 of 4 `just push` runs" figure for this test was measured under machine oversubscription, and a later reproduction attempt was confounded by an agent's own 15-worker load harness that livelocked the machine. Neither number should be cited; the table above is the measured result.
-  - Fourth member of the gate-poisoner family alongside BUG-025 (fixed), BUG-027, and BUG-030. Distinct from BUG-027, which asserts an exact backoff schedule against real `Date.now()` rather than racing a deadline — do not assume one fix closes the other.
 
 ## Deferred to Sprint 3
 
@@ -159,6 +140,28 @@
   - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
 
 ## Done
+
+- [x] **[BUG-015][P1] Report authoritative context-window usage and local token totals** — merged 2026-08-08 via `!82`
+  - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
+  - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
+
+- [x] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions** — merged 2026-08-08 via `!83`
+  - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
+  - Expected: preserve the provider's structured failure type, use HTTP status only as fallback, respect bounded retry guidance, and expose accurate localized recovery actions.
+
+- [x] **[BUG-039][P2][Test infrastructure] `renderService.integration.test.ts` abnormal-exit case flakes under load** — merged 2026-08-08 via `!81`
+  - Actual: `finalizes an exited ffmpeg child, cleans its temp directory, and releases the project busy slot` raced `renderCut()` against a hand-rolled `Promise.race` + `setTimeout(reject, 250)` deadline. That deadline asserts **timing**, not behaviour, so it expires under CPU contention while the code under test is correct. It hit 2 of 4 full-suite runs on 2026-08-08.
+  - **Root cause proven by controlled experiment**, not inferred. Same test, same machine, `yes` spinners for load; only the deadline differs:
+
+    |        | 4 workers | 8 workers    |
+    | ------ | --------- | ------------ |
+    | Before | 6/6 pass  | **0/5 pass** |
+    | After  | 6/6 pass  | **5/5 pass** |
+
+  - Note for future triage: at **4** workers neither version fails. An under-powered load control reads as "already fixed" — this needs real oversubscription to reproduce.
+  - Expected: delete the deadline. Vitest's own `testTimeout` already enforces that the promise settles, so the property is kept and the arbitrary number is gone. Raising the deadline would have been the disallowed non-fix.
+  - **Evidence correction:** an earlier "3 of 4 `just push` runs" figure for this test was measured under machine oversubscription, and a later reproduction attempt was confounded by an agent's own 15-worker load harness that livelocked the machine. Neither number should be cited; the table above is the measured result.
+  - Fourth member of the gate-poisoner family alongside BUG-025 (fixed), BUG-027, and BUG-030. Distinct from BUG-027, which asserts an exact backoff schedule against real `Date.now()` rather than racing a deadline — do not assume one fix closes the other.
 
 - [x] **[BUG-014][P1][Packaging] Ship and hand off all built-in PPTX/DOCX templates** — merged 2026-08-08 via `!80`
   - Packaging now fails closed when a required reference is absent, the installed gallery lists every built-in, and a stored initial message is removed only after execution succeeds.
