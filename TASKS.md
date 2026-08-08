@@ -1,6 +1,6 @@
 # Sprint 2 Tasks
 
-> **Canonical work register. Last reconciled: 2026-08-08 (second pass, after the `!80` merge).**
+> **Canonical work register. Last reconciled: 2026-08-08 (bug-fix wave closeout through `!101`).**
 >
 > Scope decisions taken in this pass, so they are not re-litigated: **Creative Studio moves to
 > Sprint 3** (own section below), and **SSO leaves Sprint 2** with khoapnt to own it later. BUG-014
@@ -11,10 +11,6 @@
 > - Update this file after every accepted merge, blocker decision, scope change, and code-freeze checkpoint. Preserve evidence links and move completed items to **Done** instead of deleting them.
 
 ## Active
-
-- [ ] **[BUG-041][P2] Template-creation intent matching is English-only** — fix dispatched (`codex/bug041-vietnamese-intent`)
-  - Actual: `!94`'s `TEMPLATE_CREATION_INTENT_PATTERNS` (`TemplateGallery/directive.ts`) are three English regexes, so a Vietnamese request — "Lưu giao diện này thành template" — matches nothing and the A0+ review-card flow silently never triggers for WePrompt's primary user base. Nothing breaks; the capability is invisible. Was recorded only in `!94`'s MR body; registered here so it cannot be lost (MR bodies are the same shadow-register hazard as stale TASKS.md copies).
-  - Expected: Vietnamese intent patterns, precision-biased like the English set (a false positive injects an irrelevant directive; prefer missing odd phrasings). The diacritics policy (bare-form collisions like "mau"/"tao" are a false-positive machine) must be an explicit, tested decision. Directive text stays English — it is model-facing.
 
 - [ ] **[BUG-040][P1][Integrity] `!79` pinned artifact provenance to a fabricated commit** — audit complete 2026-08-08; scope widened
   - Actual: `ACCEPTED_AIONCORE_SOURCE_COMMIT = 260dbbc05…`, introduced by `3bd2b3cf6` (BUG-013, `!79`, 2026-08-08), does not exist anywhere reachable: not in `iOfficeAI/AionCore` or the Forge mirror after full fetches, zero results from GitHub's authenticated global commit search, no Actions run in either repo has it as `head_sha`, and it is not an object in any local clone. The authoring agent ran sandboxed **without network**, so it could not have observed a real commit — the value is fabricated by construction. Its unit tests (`prepareAioncoreActionsArtifact.test.ts`) are self-referential — they feed the constant into the function that compares against the constant — under a test name claiming "the reviewed AionCore commit". No such review happened.
@@ -63,13 +59,14 @@
 
 > Creative Studio moved out of Sprint 2 on 2026-08-08 by decision. The feature stays behind
 > `CREATIVE_STUDIO_ENABLED` (opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1`), so none of the items
-> below is reachable by users today. They are deferred, not dropped: BUG-036 still blocks ever
+> below is reachable by users today. They are deferred, not dropped. BUG-036's accessibility and
+> localization gate is now closed; the remaining listed bugs still need their own acceptance before
 > defaulting that flag on. Studio work already merged into `sprint2` stays merged and is not
 > reverted by this deferral.
 >
 > **Pull-back 2026-08-08 (Controller decision):** with the sprint's critical path parked on human
-> actions, BUG-036 (+BUG-032 from Someday), then BUG-024, BUG-037, and BUG-028's merge half are
-> being worked as a Sprint 2 bug wave after all. The feature stays behind the flag; the deferral
+> actions, BUG-036 (+BUG-032 from Someday) were completed as a Sprint 2 bug wave; BUG-024,
+> BUG-037, and BUG-028's merge half remain open. The feature stays behind the flag; the deferral
 > of the Studio _feature_ to Sprint 3 is unchanged. BUG-024's recorded blocker is stale: the
 > designer's answers, including Ask B's copy, were delivered and recorded in
 > `docs/design/creative-studio-open-asks-commission.md` (`49f1c107f`).
@@ -103,15 +100,6 @@
   - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
   - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
   - **Design settled 2026-08-07** (`docs/design/creative-studio-bug028-durable-drafts.md`): region-guarded merge inside the serialised update fn (authored script + planner inputs compared, operational fields excluded, active-jobs overlap treated as conflict), with a true conflict recording the paid draft as a pending proposal instead of discarding it. Sequence the implementation after EPIC-006 Slice A3 — the fallback needs the proposal card UI.
-
-- [ ] **[BUG-036][P2][Creative Studio][Blocks flag-enablement] The v1.1 Review editor has four accessibility and localization defects**
-  - Found by an independent four-lens review of MR !73 (2026-08-07). None is reachable today — `CREATIVE_STUDIO_ENABLED` is opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1` (`common/config/constants.ts:66`) — which is why they were filed rather than held. **They must close before the flag is ever defaulted on**, not merely "someday".
-  - **(a) The four clip states reach screen readers only as data attributes.** The `aria-describedby` → `sr-only` span hardcodes `phase.review.selectedTake` regardless of the `reviewState` prop (`CutTimeline.tsx:231-233`), and on slate items the running/failed/slate label sits inside a button whose `aria-label` (`:468`) suppresses inner content from the accessible name, with no `describedby` (`:491`). BUG-031's stated guarantee — state surviving _without colour_ — does hold, because the labels are visible text; the screen-reader half is narrower than the entry implies. Independently flagged by two lenses.
-  - **(b) Escape closes the R5 drawer but drops focus to `<body>`.** Arco's Drawer renders react-focus-lock without `returnFocus`, `onCancel` only flips state, and `unmountOnExit` discards the node (`ReviewCut.tsx:357-386`). Escape-close itself is tested; focus return is neither implemented nor asserted. The dialog is also unnamed (`title={null}` + `closable={false}`).
-  - **(c) `render.errors.noRenderableShots` has no plural forms in any of the 12 locales and passes no `count`** (`ReviewPhase.tsx:73-79` joins shot numbers into a string). One missing shot renders plural phrasing everywhere. Its sibling `export.gapWarning` does this correctly. It was also omitted from `pluralLogicalKeys` in `tests/unit/pages/studio/studioI18n.test.ts`, so the repo's 0/1/2/5 convention test never exercised it — fix the key and the test list together.
-  - **(d) A raw ISO timestamp is shown to users** — `StudioExportModal.tsx:116` renders `latestRender.renderedAt` verbatim ("Rendered 2026-07-29T08:15:00.000Z"), and `StudioExport.dom.test.tsx` asserts that raw string, codifying it. Needs locale-aware formatting, and the assertion updated rather than preserved.
-  - Verification: for (a) assert each of the four states through the accessibility tree, not `data-review-state`; for (b) assert focus returns to the opener; for (c) real i18next plural tests at counts 1/2/5 in ru-RU and uk-UA; for (d) assert a formatted, locale-aware string.
-  - P3 tail from the same review, deliberately not expanded here: SR seconds plurals (`cut.secondsValue`), hardcoded `s` unit and decimal parsing in trim fields, unrounded playhead float in `duration.played`, zh-TW `common.close` untranslated, two failing contrast pairings on the export modal that repeat pre-existing pairings (ratchet-neutral), selected slates having no visual selected state.
 
 ## Waiting On
 
@@ -154,12 +142,6 @@
   - Observed once, in a single-project run. **Not yet reproduced in the mixed full suite**, so it may need that context — the same thing turned out to be true of BUG-025, where coverage instrumentation was the missing ingredient.
   - Expected: a green run exits 0. Fix the teardown, or establish why the environment is torn down while work is outstanding.
 
-- [ ] **[BUG-032][P3][Creative Studio] The Write assistant dock overpromises its capability in all 12 locales**
-  - Actual: `AssistantDock.tsx:149` renders `conversation.creativeStudio.phase.write.assistantDescription` — _"Use the assistant to develop story structure, shot ideas, and prompts"_ — while the dock's only capability is the one-shot **Draft storyboard** button. All 12 locales make the equivalent promise. Recorded in the Write-assistant design §1 as a defect of the same class as the closed false-audio claim.
-  - Became standalone 2026-08-07: the Write-assistant design that would have made the copy true is **parked** (`docs/design/creative-studio-write-assistant-design.md`, parking banner — its capabilities were absorbed by EPIC-006 Slices A/P and the scene assist), so the spec's own rule "this design fixes it or the copy must change" now resolves to changing the copy.
-  - Expected: the description states what the dock does today — drafts a storyboard from the brief — with the provider/model labels and charge disclosure unchanged. Copy change ×12 locales, `bun run i18n:types` + `node scripts/check-i18n.js`; no behavior change.
-  - Scope note: when the scene assist ships, the copy may additionally point at it for per-scene help; do not pre-write that promise before it lands.
-
 - [ ] **[BUG-037][P3][Creative Studio] Three renderer-side render-state surface gaps**
   - Also from the MR !73 review; all three leave the store correct and are renderer-only.
   - **(a) After a ReviewPhase remount, the user's own in-flight render reads as "busy" with no Cancel.** The runner's `getState` is never exposed over IPC, so `useStudioRender` resets to `idle` on mount and labels any `running` event it did not start as another surface's render (`useStudioRender.ts:130-143`). Leave Review mid-render and return: the UI claims someone else is rendering and offers no way out until the next progress event.
@@ -168,6 +150,18 @@
   - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
 
 ## Done
+
+- [x] **[BUG-041][P2] Match Vietnamese template-creation intent without broad false positives** — merged 2026-08-08 via `!99`
+  - Source head `e3665cb32`; Sprint 2 merge `1537bc7ab`. The Template Gallery directive now recognizes accented, unaccented, and decomposed-Unicode Vietnamese creation phrasing while leaving ambiguous bare `mau` input unchanged. English matching and model-facing directive text are preserved.
+  - Evidence: removing only the matcher produced 14 focused failures; the restored implementation passed 93/93 focused tests. The merge gate passed 621 files and 8,108 tests, with 19 skipped.
+
+- [x] **[BUG-036][P2][Creative Studio] Close the v1.1 Review accessibility and localization gate** — merged 2026-08-08 via `!100`
+  - Source head `34e0ee6a9`; Sprint 2 merge `4996236ab`. Review states now reach the accessibility tree, the inspector is named and returns focus to its opener, missing-shot recovery text uses locale plurals, and persisted render timestamps display in the active locale while retaining ISO `datetime` values.
+  - Evidence: reverting only the four production components produced four focused failures across all four seams; the restored implementation passed 90/90 focused tests. The final merge gate passed 621 files and 8,108 tests, with 19 skipped. An unrelated OfficeCLI timing assertion seen once in a prior suite run passed both exact isolation and its full 55-test file before the green gate.
+
+- [x] **[BUG-032][P3][Creative Studio] Make the Write assistant dock description truthful in all 12 locales** — merged 2026-08-08 via `!101`
+  - Source head `c384840b3`; Sprint 2 merge `85a1131cb`. Every supported locale now states the capability that exists today: draft a storyboard from the brief. Provider/model labels, charge disclosure, runtime behavior, and the feature flag are unchanged.
+  - Evidence: a test-first exact-value contract failed on the old copy, covers precisely the configured 12-locale set, and passed 37/37 after the copy change. The merge gate passed 621 files and 8,109 tests, with 19 skipped.
 
 - [x] **[BUG-015][P1] Report authoritative context-window usage and local token totals** — merged 2026-08-08 via `!82`
   - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
