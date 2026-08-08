@@ -877,6 +877,17 @@
   "includePrereleaseUpdates": "Vorveröffentlichungs-/Entwicklungs-Builds einschließen",
   "saveModelConfigFailed": "Modellkonfiguration speichern fehlgeschlagen",
   "healthCheck": "Gesundheitsprüfung",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",
+    "setupNeedsAttention": "Die Einrichtung muss geprüft werden.",
+    "overload": { "action": "Der Anbieter ist vorübergehend überlastet. Versuchen Sie es später erneut." },
+    "rateLimit": { "action": "Warten Sie, bis das Anbieterlimit zurückgesetzt ist, und versuchen Sie es erneut." },
+    "setup": { "action": "Prüfen Sie die Anmeldedaten und Konfiguration des Anbieters und versuchen Sie es erneut." },
+    "connectivity": { "action": "Prüfen Sie Netzwerk, Proxy und Base URL und versuchen Sie es erneut." },
+    "provider": {
+      "action": "Der Anbieter konnte die Inferenzprüfung nicht abschließen. Versuchen Sie es später erneut."
+    }
+  },
   "clearStatus": "Status löschen",
   "healthStatusCleared": "Gesundheitsstatus gelöscht",
   "latency": "Latenz",

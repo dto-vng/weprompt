@@ -873,6 +873,15 @@
   "includePrereleaseUpdates": "프리릴리즈/dev 빌드 포함",
   "saveModelConfigFailed": "모델 구성 저장 실패",
   "healthCheck": "상태 확인",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",
+    "setupNeedsAttention": "설정을 확인해야 합니다.",
+    "overload": { "action": "공급자가 일시적으로 과부하 상태입니다. 나중에 다시 시도하세요." },
+    "rateLimit": { "action": "공급자 한도가 재설정된 후 다시 시도하세요." },
+    "setup": { "action": "공급자 자격 증명과 구성을 확인한 후 다시 시도하세요." },
+    "connectivity": { "action": "네트워크, 프록시 및 Base URL을 확인한 후 다시 시도하세요." },
+    "provider": { "action": "공급자가 추론 확인을 완료하지 못했습니다. 나중에 다시 시도하세요." }
+  },
   "clearStatus": "상태 지우기",
   "healthStatusCleared": "상태가 초기화되었습니다",
   "latency": "지연 시간",

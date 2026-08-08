@@ -885,6 +885,15 @@
   "includePrereleaseUpdates": "Include prerelease/dev builds",
   "saveModelConfigFailed": "Failed to save model configuration",
   "healthCheck": "Health Check",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Configured · inference unavailable.",
+    "setupNeedsAttention": "Setup needs attention.",
+    "overload": { "action": "The provider is temporarily overloaded. Try again later." },
+    "rateLimit": { "action": "Wait for the provider limit to reset, then try again." },
+    "setup": { "action": "Review the provider credentials and configuration, then try again." },
+    "connectivity": { "action": "Check the network, proxy, and Base URL, then try again." },
+    "provider": { "action": "The provider could not complete the inference check. Try again later." }
+  },
   "clearStatus": "Clear status",
   "healthStatusCleared": "Health status cleared",
   "latency": "Latency",

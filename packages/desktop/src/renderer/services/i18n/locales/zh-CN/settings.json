@@ -885,6 +885,15 @@
   "includePrereleaseUpdates": "包含预发布/dev 版本",
   "saveModelConfigFailed": "保存模型配置失败",
   "healthCheck": "健康检测",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "已配置 · 推理暂不可用。",
+    "setupNeedsAttention": "设置需要处理。",
+    "overload": { "action": "服务商暂时过载，请稍后重试。" },
+    "rateLimit": { "action": "请等待服务商限额重置后再试。" },
+    "setup": { "action": "请检查服务商凭据和配置后再试。" },
+    "connectivity": { "action": "请检查网络、代理和 Base URL 后再试。" },
+    "provider": { "action": "服务商未能完成推理检测，请稍后重试。" }
+  },
   "clearStatus": "清除状态",
   "healthStatusCleared": "健康状态已清除",
   "latency": "延迟",

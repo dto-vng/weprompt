@@ -873,6 +873,15 @@
   "includePrereleaseUpdates": "Ön sürüm/geliştirici sürümlerini dahil et",
   "saveModelConfigFailed": "Model yapılandırması kaydedilemedi",
   "healthCheck": "Sağlık Kontrolü",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",
+    "setupNeedsAttention": "Kurulumun kontrol edilmesi gerekiyor.",
+    "overload": { "action": "Sağlayıcı geçici olarak aşırı yüklü. Daha sonra tekrar deneyin." },
+    "rateLimit": { "action": "Sağlayıcı sınırının sıfırlanmasını bekleyip tekrar deneyin." },
+    "setup": { "action": "Sağlayıcı kimlik bilgilerini ve yapılandırmasını kontrol edip tekrar deneyin." },
+    "connectivity": { "action": "Ağı, proxy'yi ve Base URL'yi kontrol edip tekrar deneyin." },
+    "provider": { "action": "Sağlayıcı çıkarım kontrolünü tamamlayamadı. Daha sonra tekrar deneyin." }
+  },
   "clearStatus": "Durumu Temizle",
   "healthStatusCleared": "Sağlık durumu temizlendi",
   "latency": "Gecikme",

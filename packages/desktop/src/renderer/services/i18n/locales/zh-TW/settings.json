@@ -885,6 +885,15 @@
   "includePrereleaseUpdates": "包含預發佈/dev 版本",
   "saveModelConfigFailed": "儲存模型設定失敗",
   "healthCheck": "健康檢測",
+  "providerHealth": {
+    "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",
+    "setupNeedsAttention": "設定需要處理。",
+    "overload": { "action": "服務供應商暫時過載，請稍後再試。" },
+    "rateLimit": { "action": "請等待服務供應商限額重設後再試。" },
+    "setup": { "action": "請檢查服務供應商憑證和設定後再試。" },
+    "connectivity": { "action": "請檢查網路、代理和 Base URL 後再試。" },
+    "provider": { "action": "服務供應商未能完成推論檢測，請稍後再試。" }
+  },
   "clearStatus": "清除狀態",
   "healthStatusCleared": "健康狀態已清除",
   "latency": "延遲",
