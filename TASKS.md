@@ -12,6 +12,10 @@
 
 ## Active
 
+- [ ] **[BUG-041][P2] Template-creation intent matching is English-only** — fix dispatched (`codex/bug041-vietnamese-intent`)
+  - Actual: `!94`'s `TEMPLATE_CREATION_INTENT_PATTERNS` (`TemplateGallery/directive.ts`) are three English regexes, so a Vietnamese request — "Lưu giao diện này thành template" — matches nothing and the A0+ review-card flow silently never triggers for WePrompt's primary user base. Nothing breaks; the capability is invisible. Was recorded only in `!94`'s MR body; registered here so it cannot be lost (MR bodies are the same shadow-register hazard as stale TASKS.md copies).
+  - Expected: Vietnamese intent patterns, precision-biased like the English set (a false positive injects an irrelevant directive; prefer missing odd phrasings). The diacritics policy (bare-form collisions like "mau"/"tao" are a false-positive machine) must be an explicit, tested decision. Directive text stays English — it is model-facing.
+
 - [ ] **[BUG-040][P1][Integrity] `!79` pinned artifact provenance to a fabricated commit** — audit complete 2026-08-08; scope widened
   - Actual: `ACCEPTED_AIONCORE_SOURCE_COMMIT = 260dbbc05…`, introduced by `3bd2b3cf6` (BUG-013, `!79`, 2026-08-08), does not exist anywhere reachable: not in `iOfficeAI/AionCore` or the Forge mirror after full fetches, zero results from GitHub's authenticated global commit search, no Actions run in either repo has it as `head_sha`, and it is not an object in any local clone. The authoring agent ran sandboxed **without network**, so it could not have observed a real commit — the value is fabricated by construction. Its unit tests (`prepareAioncoreActionsArtifact.test.ts`) are self-referential — they feed the constant into the function that compares against the constant — under a test name claiming "the reviewed AionCore commit". No such review happened.
   - Impact: **fails closed, not open.** A fabricated pin can never match a genuine run, so the env-gated Actions-artifact path (`AIONUI_BACKEND_RUN_ID`) rejects everything; the default release path ships stock upstream `v0.1.50` assets and never consults the constant. Nothing shipped is affected. The defect is the integrity of merged review evidence, not a vulnerability.
@@ -62,6 +66,13 @@
 > below is reachable by users today. They are deferred, not dropped: BUG-036 still blocks ever
 > defaulting that flag on. Studio work already merged into `sprint2` stays merged and is not
 > reverted by this deferral.
+>
+> **Pull-back 2026-08-08 (Controller decision):** with the sprint's critical path parked on human
+> actions, BUG-036 (+BUG-032 from Someday), then BUG-024, BUG-037, and BUG-028's merge half are
+> being worked as a Sprint 2 bug wave after all. The feature stays behind the flag; the deferral
+> of the Studio _feature_ to Sprint 3 is unchanged. BUG-024's recorded blocker is stale: the
+> designer's answers, including Ask B's copy, were delivered and recorded in
+> `docs/design/creative-studio-open-asks-commission.md` (`49f1c107f`).
 
 - [ ] **[EPIC-004][P2][Re-charter required] Make Excel workbook changes reviewable, deterministic, and fail-closed** — moved from Waiting On 2026-08-08
   - Outcome unchanged: one bounded pre-change audit and approval point; verified results; no silent damage to formulas, formatting, charts, or unsupported features.
@@ -127,6 +138,7 @@
   - **Investigated 2026-08-07 after BUG-025 was solved — the same trick does NOT work here.** BUG-025 reproduced under `--coverage`; the analogous command for this one, `bunx vitest run --project node --coverage tests/unit/process/creative-studio`, passes **3/3 (744 tests)**. Coverage overhead is not the ingredient, so do not spend time there.
   - Mechanism analysis (plausible, **unconfirmed** — no reproduction, so nothing was changed): the suite's local `waitFor` (`jobManager.test.ts:141`) budgets **100 attempts × 5ms**, i.e. a fixed poll count rather than a time budget, while the work underneath performs real filesystem I/O through `fsWithoutDiskBarriers`. The injected `sleep` is instant (`epochMs += delayMs`), so provider backoff is not the wait — real I/O is. A fixed poll budget against variable real I/O is fragile by construction.
   - Remaining suspect: whole-suite multi-project concurrency, which is how both sightings occurred (inside `just push`), rather than any single-project run. Reproducing likely needs repeated full-suite runs, which is expensive — weigh that against this being **P3 with two sightings** while BUG-024/028/029 are P2 and actionable.
+  - **Third family sighting, 2026-08-08:** a DIFFERENT test in the same file — `stops repeated running snapshots at the thirty-minute lifecycle deadline` — failed once in full-suite position (host run during the A0+/1 verification, concurrent agent load), timeout signature, then passed 3/3 in isolation. The family is real and now has two member tests; the no-repro rule still holds for both.
   - **Do not "fix" the `waitFor` budget without a reproduction.** It is a reasonable suspect and an unreasonable thing to change blind; that judgement is what kept BUG-025 honest until the reproduction arrived.
 
 - [ ] **[EPIC-005-G1][P3][Creative Studio] Model-selection provenance for the `CHOSEN FOR YOU` disclosure**
