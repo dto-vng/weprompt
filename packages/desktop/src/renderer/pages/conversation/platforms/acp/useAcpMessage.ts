@@ -10,7 +10,7 @@ import type { AvailableCommand, TMessage } from '@/common/chat/chatLib';
 import { mapAcpCommandsToSlashCommands } from '@/common/chat/slash/acpMapping';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
-import type { ProviderTokenUsageData, TChatConversation, TokenUsageData } from '@/common/config/storage';
+import type { TChatConversation, TokenUsageData } from '@/common/config/storage';
 import { useMergeLiveMessage } from '@/renderer/pages/conversation/Messages/hooks';
 import { logStreamTerminalObserved } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
@@ -186,8 +186,6 @@ export const useAcpMessage = (
         typeof message.created_at === 'number' && Number.isSafeInteger(message.created_at) && message.created_at >= 0
           ? message.created_at
           : Date.now();
-      let persistedProviderUsage: ProviderTokenUsageData | undefined;
-
       if (
         hasProviderUsage &&
         usageEventId !== null &&
@@ -195,12 +193,6 @@ export const useAcpMessage = (
         !processedProviderUsageIdsRef.current.has(usageEventId)
       ) {
         processedProviderUsageIdsRef.current.add(usageEventId);
-        persistedProviderUsage = {
-          usage_event_id: usageEventId,
-          input_tokens: providerUsage.input_tokens,
-          output_tokens: providerUsage.output_tokens,
-          occurred_at: occurredAt,
-        };
         recordLocalTokenUsage({
           id: usageEventId,
           inputTokens: providerUsage.input_tokens,
@@ -218,7 +210,6 @@ export const useAcpMessage = (
       const extra: TChatConversation['extra'] = {
         last_token_usage: { total_tokens: usedTokens },
         ...(contextLimit === undefined ? {} : { last_context_limit: contextLimit }),
-        ...(persistedProviderUsage === undefined ? {} : { last_provider_usage: persistedProviderUsage }),
       } as TChatConversation['extra'];
       enqueueUsageWrite(conversation_id, extra);
     },

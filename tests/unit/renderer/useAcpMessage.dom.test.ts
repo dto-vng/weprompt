@@ -334,7 +334,7 @@ describe('useAcpMessage', () => {
     }
   );
 
-  it('persists authoritative ACP turn usage once without conflating it with context occupancy', async () => {
+  it('persists ACP occupancy and records authoritative provider usage once per turn', async () => {
     vi.mocked(getConversationOrNull).mockResolvedValue(null);
     const { result } = renderHook(() => useAcpMessage('conv-usage'));
     const occurredAt = Date.now();
@@ -367,12 +367,6 @@ describe('useAcpMessage', () => {
         extra: {
           last_token_usage: { total_tokens: 12_000 },
           last_context_limit: 32_000,
-          last_provider_usage: {
-            usage_event_id: 'conv-usage:turn-1',
-            input_tokens: 10,
-            output_tokens: 5,
-            occurred_at: occurredAt,
-          },
         },
       },
       merge_extra: true,
@@ -410,12 +404,6 @@ describe('useAcpMessage', () => {
       extra: {
         last_token_usage: { total_tokens: 12_000 },
         last_context_limit: 32_000,
-        last_provider_usage: {
-          usage_event_id: 'conv-restart:turn-1',
-          input_tokens: 10,
-          output_tokens: 5,
-          occurred_at: occurredAt,
-        },
       },
       model: {
         id: 'provider-1',

@@ -7,7 +7,7 @@
 import { ipcBridge } from '@/common';
 import { extractDiagnosticTokenEstimate, isErrorTipMessage, transformMessage } from '@/common/chat/chatLib';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
-import type { ProviderTokenUsageData, TChatConversation, TokenUsageData } from '@/common/config/storage';
+import type { TChatConversation, TokenUsageData } from '@/common/config/storage';
 import { uuid } from '@/common/utils';
 import type { ThoughtData } from '@/renderer/components/chat/ThoughtDisplay';
 import { useMergeLiveMessage } from '@/renderer/pages/conversation/Messages/hooks';
@@ -202,19 +202,12 @@ export const useAionrsMessage = (
         typeof message.created_at === 'number' && Number.isSafeInteger(message.created_at) && message.created_at >= 0
           ? message.created_at
           : Date.now();
-      const persistedUsage: ProviderTokenUsageData = {
-        usage_event_id: usageEventId,
-        input_tokens: usage.input_tokens,
-        output_tokens: usage.output_tokens,
-        occurred_at: occurredAt,
-      };
       recordLocalTokenUsage({
         id: usageEventId,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
         occurredAt,
       });
-      enqueueUsageWrite(conversation_id, { last_provider_usage: persistedUsage } as TChatConversation['extra']);
     },
     [conversation_id]
   );
