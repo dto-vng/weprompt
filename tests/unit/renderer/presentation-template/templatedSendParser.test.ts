@@ -6,7 +6,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
-import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
+import { TEMPLATE_CREATION_DIRECTIVE } from '@/renderer/components/chat/TemplateGallery/directive';
+import { parseAssistantDirectiveSend, parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
 
 const THEME = '/Users/u/Library/Application Support/Forge/presentation-templates/business-review/THEME.md';
 const REF = '/Users/u/Library/Application Support/Forge/presentation-templates/business-review/reference.pptx';
@@ -69,5 +70,20 @@ describe('parseTemplatedSend', () => {
     expect(r!.userText).toBe('Board report for Q3');
     expect(r!.templateFiles).toEqual([DOCX_THEME, DOCX_REF]);
     expect(r!.userFiles).toEqual(['/user/figures.xlsx']);
+  });
+});
+
+describe('parseAssistantDirectiveSend', () => {
+  it('returns only the user text from a template-creation send', () => {
+    expect(
+      parseAssistantDirectiveSend(
+        `${TEMPLATE_CREATION_DIRECTIVE}\n\nSave this look as a reusable template\n\nKeep the navy palette.`
+      )
+    ).toEqual({ userText: 'Save this look as a reusable template\n\nKeep the navy palette.' });
+  });
+
+  it('does not hide ordinary text or an incomplete directive-shaped send', () => {
+    expect(parseAssistantDirectiveSend('Save this look as a reusable template')).toBeNull();
+    expect(parseAssistantDirectiveSend(TEMPLATE_CREATION_DIRECTIVE)).toBeNull();
   });
 });

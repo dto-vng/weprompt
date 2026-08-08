@@ -23,7 +23,11 @@ import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
 import { splitThinkContent, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
-import { parseTemplateReviewAnnouncement, parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
+import {
+  parseAssistantDirectiveSend,
+  parseTemplateReviewAnnouncement,
+  parseTemplatedSend,
+} from '@/renderer/utils/chat/templatedSendParser';
 import { TemplateMessageCard, TemplateReviewCard } from '@/renderer/components/chat/TemplateGallery';
 
 /**
@@ -252,11 +256,21 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     () => (isUserMessage ? parseTemplatedSend(text, files) : null),
     [isUserMessage, text, files]
   );
+  const assistantDirectiveSend = useMemo(
+    () => (isUserMessage && templatedSend === null ? parseAssistantDirectiveSend(text) : null),
+    [isUserMessage, templatedSend, text]
+  );
   const templateReview = useMemo(
     () => (!isUserMessage ? parseTemplateReviewAnnouncement(text) : null),
     [isUserMessage, text]
   );
-  const visibleText = templatedSend ? templatedSend.userText : templateReview ? templateReview.visibleText : text;
+  const visibleText = templatedSend
+    ? templatedSend.userText
+    : assistantDirectiveSend
+      ? assistantDirectiveSend.userText
+      : templateReview
+        ? templateReview.visibleText
+        : text;
   const visibleFiles = templatedSend ? templatedSend.userFiles : files;
   const { data, json } = useFormatContent(visibleText);
   const shouldRevealStream = isStreaming && !isUserMessage && !json;

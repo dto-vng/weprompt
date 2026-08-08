@@ -12,6 +12,7 @@ import { ipcBridge } from '@/common';
 import type { PresentationTemplateCandidateFailureCode } from '@/common/types/office/presentationTemplate';
 import { ConversationProvider } from '@/renderer/hooks/context/ConversationContext';
 import MessageText from '@/renderer/pages/conversation/Messages/components/MessageText';
+import { TEMPLATE_CREATION_DIRECTIVE } from '@/renderer/components/chat/TemplateGallery/directive';
 import { TEMPLATE_REVIEW_MARKER_PREFIX } from '@/renderer/utils/chat/templatedSendParser';
 
 const candidate = {
@@ -161,6 +162,34 @@ const renderMessage = (content: string, conversationId = 'conv-context') => {
     </ConversationProvider>
   );
 };
+
+const renderUserMessage = (content: string) => {
+  const message: IMessageText = {
+    id: 'user-template-request',
+    msg_id: 'user-template-request',
+    conversation_id: 'conv-context',
+    type: 'text',
+    position: 'right',
+    createdAt: Date.now(),
+    content: { content },
+  };
+
+  return render(
+    <ConversationProvider value={{ conversation_id: 'conv-context', workspace: '/workspace', type: 'acp' }}>
+      <MessageText message={message} />
+    </ConversationProvider>
+  );
+};
+
+describe('user template-creation sends', () => {
+  it('hides the assistant-only directive and keeps the original request visible', () => {
+    const request = 'Save this look as a reusable template';
+    renderUserMessage(`${TEMPLATE_CREATION_DIRECTIVE}\n\n${request}`);
+
+    expect(screen.getByTestId('message-text-content')).toHaveTextContent(request);
+    expect(screen.getByTestId('message-text-content')).not.toHaveTextContent('Template creation instructions');
+  });
+});
 
 describe('assistant template review messages', () => {
   beforeEach(() => {
