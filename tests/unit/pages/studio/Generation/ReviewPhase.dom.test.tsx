@@ -347,11 +347,11 @@ describe('Review phase cut', () => {
     expect(container.querySelector('[data-review-primary]')).toHaveAttribute('data-full-width', 'true');
     expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
-      })
-    );
+    const opener = screen.getByRole('button', {
+      name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
+    });
+    opener.focus();
+    fireEvent.click(opener);
 
     const drawer = await waitFor(() => {
       const element = document.querySelector<HTMLElement>('.arco-drawer');
@@ -359,18 +359,27 @@ describe('Review phase cut', () => {
       return element!;
     });
     expect(drawer).toHaveStyle({ width: '322px' });
+    const dialog = screen.queryByRole('dialog');
+    expect.soft(dialog).not.toBeNull();
+    if (dialog !== null) {
+      expect.soft(dialog).toHaveAccessibleName('conversation.creativeStudio.phase.review.cut.inspector');
+    }
     expect(
       within(drawer).getByRole('complementary', {
         name: 'conversation.creativeStudio.phase.review.cut.inspector',
       })
     ).toBeVisible();
-    expect(within(drawer).getByRole('button', { name: 'common.close' })).toBeVisible();
+    const closeButton = within(drawer).getByRole('button', { name: 'common.close' });
+    expect(closeButton).toBeVisible();
+    closeButton.focus();
+    expect(closeButton).toHaveFocus();
 
     const drawerWrapper = document.querySelector('.arco-drawer-wrapper');
     expect(drawerWrapper).not.toBeNull();
     fireEvent.keyDown(drawerWrapper!, { key: 'Escape', keyCode: 27, which: 27 });
 
     await waitFor(() => expect(document.querySelector('.arco-drawer')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
   });
 
   it('uses fixed 96px strip items, duration labels, and a scroll cue in compact mode', () => {
