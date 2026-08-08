@@ -1706,8 +1706,10 @@ describe('presentation run native provider policy', () => {
     const templateProviders = {
       allocateScratch: provider('templateAllocate'),
       completeScratch: provider('templateComplete'),
+      describeSpec: provider('templateDescribe'),
       discardScratch: provider('templateDiscard'),
       importSpec: provider('templateImport'),
+      importSpecBound: provider('templateImportBound'),
       list: provider('templateList'),
       remove: provider('templateRemove'),
       retainScratch: provider('templateRetain'),

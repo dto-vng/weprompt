@@ -30,6 +30,7 @@ import {
   BUILTIN_TEMPLATE_PACKS,
   type BuiltinTemplatePack,
 } from '@process/resources/presentation-templates/index';
+import { PresentationRunFiles } from './run';
 import { PresentationTemplateService } from './PresentationTemplateService';
 
 vi.mock('node:fs/promises', { spy: true });
@@ -94,14 +95,29 @@ async function createPptxPack(
 
 describe('PresentationTemplateService', () => {
   let rootDir: string;
+  let workspaceDir: string;
 
   beforeEach(async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), 'ptpl-'));
+    workspaceDir = await mkdtemp(path.join(tmpdir(), 'ptpl-workspace-'));
   });
 
   afterEach(async () => {
-    await rm(rootDir, { recursive: true, force: true });
+    await Promise.all([
+      rm(rootDir, { recursive: true, force: true }),
+      rm(workspaceDir, { recursive: true, force: true }),
+    ]);
   });
+
+  const createBoundService = (): PresentationTemplateService =>
+    new PresentationTemplateService({
+      rootDir,
+      builtinPacks: [],
+      workspaceSourceAuthorizer: new PresentationRunFiles({
+        userDataDir: path.join(rootDir, 'run-data'),
+        tempDir: path.join(rootDir, 'run-temp'),
+      }),
+    });
 
   it('syncs builtin packs on init and lists them', async () => {
     const service = new PresentationTemplateService({ rootDir, builtinPacks: [pack('alpha'), pack('beta')] });
@@ -216,6 +232,162 @@ describe('PresentationTemplateService', () => {
     const second = await service.importThemeSpec(specPath);
     expect(first.manifest.id).toBe('same-name');
     expect(second.manifest.id).toBe('same-name-2');
+  });
+
+  describe('hash-bound workspace imports', () => {
+    const conversationId = '2be7b8fc-6af5-42b8-aed5-03644735c730';
+
+    it('installs the exact bytes described by the main process', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Bound Theme\n\n--accent: #c8341e\nfamily=Fraunces&display=swap', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const installed = await service.importThemeSpecBound({
+        conversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({
+        name: 'Bound Theme',
+        tokens: { colors: ['#c8341e'], fonts: ['Fraunces'] },
+        sha256: sha256(themeBytes),
+        byte_length: themeBytes.byteLength,
+      });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    it('refuses content swapped after describe without creating a partial pack', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Original Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      await writeFile(filePath, '# Swapped Theme\n#abcdef', 'utf-8');
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: described.sha256,
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_CHANGED' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses a caller-supplied digest that the main process never minted', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Unminted Theme\n#112233', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: sha256(themeBytes),
+        })
+      ).rejects.toMatchObject({ code: 'CONFIRMATION_NOT_MINTED' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses a lexical escape from the authorized workspace', async () => {
+      const service = createBoundService();
+      const outsidePath = path.join(path.dirname(workspaceDir), 'outside-theme.md');
+      const traversalPath = `${workspaceDir}/../${path.basename(outsidePath)}`;
+      await writeFile(outsidePath, '# Outside Theme\n#112233', 'utf-8');
+
+      try {
+        await expect(
+          service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: traversalPath })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+        expect(await service.list()).toEqual([]);
+      } finally {
+        await rm(outsidePath, { force: true });
+      }
+    });
+
+    it('refuses a symlink escape from the authorized workspace', async () => {
+      const service = createBoundService();
+      const outsideDir = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-workspace-'));
+      const outsidePath = path.join(outsideDir, 'THEME.md');
+      const linkedPath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(outsidePath, '# Linked Outside Theme\n#112233', 'utf-8');
+      await symlink(outsidePath, linkedPath);
+
+      try {
+        await expect(
+          service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: linkedPath })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+        expect(await service.list()).toEqual([]);
+      } finally {
+        await rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns a typed size failure without creating partial state', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Oversized Theme', 'utf-8');
+      await truncate(filePath, PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES + 1);
+
+      await expect(
+        service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_TOO_LARGE' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('treats repeated install confirmation as idempotent', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Install Once\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const input = {
+        conversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      };
+
+      const first = await service.importThemeSpecBound(input);
+      const second = await service.importThemeSpecBound(input);
+
+      expect(second.manifest.id).toBe(first.manifest.id);
+      expect((await service.list()).map((template) => template.manifest.id)).toEqual(['install-once']);
+      expect(await readdir(rootDir)).not.toContain('install-once-2');
+    });
+
+    it('keeps an interrupted bound install hidden from the gallery', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Interrupted Bound Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+        if (path.basename(file.toString()) === 'preview.svg') throw new Error('injected bound install interruption');
+        return actualFsPromises.writeFile(file, data, options);
+      });
+
+      try {
+        await expect(
+          service.importThemeSpecBound({
+            conversationId,
+            workspaceRoot: workspaceDir,
+            filePath,
+            expectedSha256: described.sha256,
+          })
+        ).rejects.toThrow('injected bound install interruption');
+      } finally {
+        writeSpy.mockRestore();
+      }
+
+      expect(await service.list()).toEqual([]);
+      expect(await readdir(rootDir)).not.toContain('interrupted-bound-theme');
+    });
   });
 
   it('uses only a gallery-hidden temporary while a failed import is incomplete', async () => {

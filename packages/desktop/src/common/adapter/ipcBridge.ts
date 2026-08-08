@@ -56,6 +56,8 @@ import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/
 import type {
   ArtifactScratchAllocation,
   ArtifactScratchResult,
+  DescribePresentationTemplateCandidateResult,
+  ImportPresentationTemplateCandidateResult,
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import type {
@@ -685,6 +687,14 @@ export const presentationTemplates = {
     { ok: true; template: PresentationTemplateSummary } | { ok: false; error: string },
     { file_path: string }
   >('presentation-templates.import-spec'),
+  describeSpec: bridge.buildProvider<
+    DescribePresentationTemplateCandidateResult,
+    { conversation_id: string; file_path: string }
+  >('presentation-templates.describe-spec'),
+  importSpecBound: bridge.buildProvider<
+    ImportPresentationTemplateCandidateResult,
+    { conversation_id: string; file_path: string; expected_sha256: string }
+  >('presentation-templates.import-spec-bound'),
   remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
   allocateScratch: bridge.buildProvider<ArtifactScratchAllocation, { conversation_id: string; template_id: string }>(
     'presentation-templates.scratch.allocate'
