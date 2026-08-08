@@ -923,7 +923,7 @@
         "continueToProduce": "Weiter zu Produzieren",
         "askAssistant": "Assistenten fragen",
         "assistantTitle": "Schreibassistent",
-        "assistantDescription": "Nutze den Assistenten für Erzählstruktur, Einstellungsideen und Prompts.",
+        "assistantDescription": "Erstelle aus deinem Briefing einen Storyboard-Entwurf.",
         "textChargeDisclosure": "Der Storyboard-Entwurf verwendet dein konfiguriertes Textmodell. Der Anbieter kann die Modellnutzung berechnen.",
         "draftStoryboard": "Storyboard entwerfen",
         "addShot": "Einstellung hinzufügen",

@@ -929,7 +929,7 @@
         "continueToProduce": "Continuar para Produzir",
         "askAssistant": "Perguntar ao assistente",
         "assistantTitle": "Assistente de escrita",
-        "assistantDescription": "Use o assistente para desenvolver a estrutura da história, ideias de tomadas e prompts.",
+        "assistantDescription": "Crie um rascunho de storyboard a partir do seu briefing.",
         "textChargeDisclosure": "O rascunho do storyboard usa o modelo de texto configurado. O provedor pode cobrar pelo uso do modelo.",
         "draftStoryboard": "Criar rascunho do storyboard",
         "addShot": "Adicionar tomada",

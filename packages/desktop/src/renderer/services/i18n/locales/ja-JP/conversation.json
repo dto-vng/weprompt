@@ -921,7 +921,7 @@
         "continueToProduce": "生成へ進む",
         "askAssistant": "アシスタントに相談",
         "assistantTitle": "構成アシスタント",
-        "assistantDescription": "ストーリー構成、ショット案、プロンプトの作成にアシスタントを利用できます。",
+        "assistantDescription": "ブリーフをもとにストーリーボードの下書きを作成します。",
         "textChargeDisclosure": "ストーリーボードの下書きには設定済みのテキストモデルを使用します。プロバイダーから利用料が請求される場合があります。",
         "draftStoryboard": "ストーリーボードを下書き",
         "addShot": "ショットを追加",
