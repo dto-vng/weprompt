@@ -153,8 +153,17 @@ const provider: IProvider = {
   enabled: true,
 };
 
-const clickModelHealthCheck = (): void => {
-  screen.getByRole('button', { name: 'settings.healthCheck' }).click();
+// The model rows live inside a collapsed Arco panel, so the panel has to be
+// expanded before the per-model health-check button exists in the DOM.
+const clickModelHealthCheck = async (): Promise<void> => {
+  const header = await screen.findByText(provider.name);
+  await act(async () => {
+    header.click();
+  });
+  const healthCheckButton = await screen.findByRole('button', { name: 'settings.healthCheck' });
+  await act(async () => {
+    healthCheckButton.click();
+  });
 };
 
 const failedHealthResponse = (overrides: Record<string, unknown>) => ({
@@ -272,7 +281,7 @@ describe('ModelModalContent', () => {
     );
     render(<ModelModalContent />);
 
-    clickModelHealthCheck();
+    await clickModelHealthCheck();
 
     await waitFor(() =>
       expect(messageErrorMock).toHaveBeenCalledWith(
@@ -295,7 +304,7 @@ describe('ModelModalContent', () => {
     );
     render(<ModelModalContent />);
 
-    clickModelHealthCheck();
+    await clickModelHealthCheck();
 
     await waitFor(() =>
       expect(messageErrorMock).toHaveBeenCalledWith(
@@ -318,7 +327,7 @@ describe('ModelModalContent', () => {
     );
     render(<ModelModalContent />);
 
-    clickModelHealthCheck();
+    await clickModelHealthCheck();
 
     await waitFor(() =>
       expect(messageErrorMock).toHaveBeenCalledWith(
@@ -341,7 +350,7 @@ describe('ModelModalContent', () => {
     );
     render(<ModelModalContent />);
 
-    clickModelHealthCheck();
+    await clickModelHealthCheck();
 
     await waitFor(() =>
       expect(messageErrorMock).toHaveBeenCalledWith(
@@ -358,7 +367,9 @@ describe('ModelModalContent', () => {
   });
 
   it('retries once only when the provider supplies bounded retry guidance', async () => {
-    vi.useFakeTimers();
+    // shouldAdvanceTime keeps Testing Library's real-timer polling alive while the
+    // component's retry delay stays under advanceTimersByTime control.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     providersQueryData.current = [provider];
     checkProviderHealthMock
       .mockResolvedValueOnce(
@@ -376,7 +387,7 @@ describe('ModelModalContent', () => {
       });
     render(<ModelModalContent />);
 
-    clickModelHealthCheck();
+    await clickModelHealthCheck();
     await vi.waitFor(() => expect(checkProviderHealthMock).toHaveBeenCalledTimes(1));
     await act(async () => vi.advanceTimersByTime(250));
 
