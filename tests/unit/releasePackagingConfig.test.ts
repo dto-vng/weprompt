@@ -277,6 +277,21 @@ describe('release packaging configuration', () => {
     expect(workflow).not.toContain('Contents/MacOS/Forge');
   });
 
+  it('runs lineage recovery acceptance on architecture-matched native package runners', () => {
+    const manualWorkflow = readProjectFile('.github/workflows/build-manual.yml');
+    const releaseWorkflow = readProjectFile('.github/workflows/build-and-release.yml');
+    const reusableWorkflow = readProjectFile('.github/workflows/_build-reusable.yml');
+
+    for (const workflow of [manualWorkflow, releaseWorkflow]) {
+      expect(workflow).toContain('"platform":"macos-arm64","os":"macos-15"');
+      expect(workflow).toContain('"platform":"macos-x64","os":"macos-15-intel"');
+    }
+    expect(reusableWorkflow).toContain('Verify native migration-lineage recovery');
+    expect(reusableWorkflow).toContain('process.arch !== process.env.EXPECTED_ARCH');
+    expect(reusableWorkflow).toContain('E2E_PACKAGED: 1');
+    expect(reusableWorkflow).toContain('--grep "migration-lineage rejection"');
+  });
+
   it('keeps desktop release assets on WePrompt names without renaming web-cli artifacts', () => {
     const prepareScript = readProjectFile('scripts/prepare-release-assets.sh');
     const verifyScript = readProjectFile('scripts/verify-release-assets.sh');

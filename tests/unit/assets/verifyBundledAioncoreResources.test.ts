@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const {
+  acceptedMigrationLineage,
+  getAcceptedMigrationLineageManifest,
   verifyBundledAioncoreResources,
 } = require('../../../packages/shared-scripts/src/verify-bundled-aioncore-resources');
 
@@ -188,7 +190,9 @@ describe('verifyBundledAioncoreResources', () => {
     writeJson(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'manifest.json'), {
       platform: 'win32',
       arch: 'x64',
+      migrationLineage: getAcceptedMigrationLineageManifest(),
     });
+    writeJson(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'migration-lineage.json'), acceptedMigrationLineage);
 
     writeFile(join(managedResourcesDir, 'node', 'node-v24.11.0-win-x64', 'node.exe'));
     codexRoot = createManagedAcpToolFixture({
@@ -224,6 +228,50 @@ describe('verifyBundledAioncoreResources', () => {
     expect(result.runtimeKey).toBe('win32-x64');
     expect(result.missing).toEqual([]);
     expect(result.failures).toEqual([]);
+  });
+
+  it('fails closed when the bundled runtime has no migration lineage contract', () => {
+    rmSync(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'migration-lineage.json'));
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.failures).toContainEqual(
+      expect.objectContaining({
+        component: 'migration-lineage',
+        reason: 'missing_file',
+      })
+    );
+  });
+
+  it.each([
+    [
+      'gapped',
+      (entries: Array<{ version: number; description: string; checksum: string }>) =>
+        entries.filter((entry) => entry.version !== 20),
+    ],
+    [
+      'changed',
+      (entries: Array<{ version: number; description: string; checksum: string }>) =>
+        entries.map((entry) => (entry.version === 20 ? { ...entry, checksum: '0'.repeat(96) } : entry)),
+    ],
+  ])('fails closed when migration lineage is %s', (_reason, changeEntries) => {
+    writeJson(join(resourcesDir, 'bundled-aioncore', 'win32-x64', 'migration-lineage.json'), {
+      ...acceptedMigrationLineage,
+      entries: changeEntries(acceptedMigrationLineage.entries),
+    });
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.failures).toContainEqual(
+      expect.objectContaining({ component: 'migration-lineage', reason: 'lineage_mismatch' })
+    );
   });
 
   it('fails when managed resources contract is missing', () => {
@@ -438,7 +486,12 @@ describe('verifyBundledAioncoreResources', () => {
     const runtimeRoot = join(darwinResourcesDir, 'bundled-aioncore', 'darwin-arm64');
     const managedRoot = join(runtimeRoot, 'managed-resources');
     writeFile(join(runtimeRoot, 'aioncore'));
-    writeJson(join(runtimeRoot, 'manifest.json'), { platform: 'darwin', arch: 'arm64' });
+    writeJson(join(runtimeRoot, 'manifest.json'), {
+      platform: 'darwin',
+      arch: 'arm64',
+      migrationLineage: getAcceptedMigrationLineageManifest(),
+    });
+    writeJson(join(runtimeRoot, 'migration-lineage.json'), acceptedMigrationLineage);
     writeFile(join(managedRoot, 'node', 'node-v24.11.0-darwin-arm64', 'bin', 'node'));
     writeFile(join(managedRoot, 'cli', 'claude', '2.1.215', 'darwin-arm64', 'claude'));
     writeFile(

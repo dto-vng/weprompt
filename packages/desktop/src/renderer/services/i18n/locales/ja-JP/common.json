@@ -97,6 +97,17 @@
       "description": "この WePrompt パッケージは {{packageArch}} 用ですが、この Mac は {{deviceArch}} です。承認済みの社内配布チャネルから {{expectedArch}} インストーラーを取得し、WePrompt を閉じてからそのパッケージをインストールしてください。",
       "closeApplication": "WePrompt を閉じる"
     },
+    "databaseLineage": {
+      "title": "このデータベースには互換性のある WePrompt が必要です",
+      "description": "データベースの移行履歴がこの WePrompt パッケージと互換性がないため、AionCore はデータベースを変更する前に停止しました（理由: {{reason}}、適用済み: {{appliedVersion}}、対応下限: {{floorVersion}}、同梱最新版: {{latestVersion}}）。この互換性チェックでは、WAL および SHM ジャーナルファイルを含むデータベースのスキーマやデータは変更されていません。データベースを再構築または置換しないでください。WePrompt を閉じ、このデータベースに対応する承認済みバージョンをインストールするか、サポート用に診断情報を保存してください。",
+      "unknownVersion": "不明",
+      "unknownReason": "不明",
+      "quitApplication": "WePrompt を終了",
+      "sendDiagnostics": "診断情報を保存",
+      "diagnosticsSent": "診断情報を保存しました",
+      "diagnosticsReportSuccess": "診断パッケージを保存しました",
+      "diagnosticsReportFailed": "診断パッケージを保存できませんでした"
+    },
     "dataMigration": {
       "title": "Local data migration failed",
       "description": "WePrompt は起動しましたが、AionCore はローカルデータの初期化中に停止しました。WePrompt を再インストールしても解決しない可能性があります。データベース移行を確認できるよう、診断パッケージをローカルに保存してください。",

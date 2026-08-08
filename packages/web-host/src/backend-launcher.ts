@@ -60,7 +60,15 @@ type HealthCheckResult = {
 type ParsedBackendBoundaryError = {
   code: string;
   stage?: string;
+  fields?: BackendBoundaryFields;
 };
+
+export type BackendBoundaryFields = Partial<
+  Record<
+    'actualFingerprint' | 'appliedVersion' | 'expectedFingerprint' | 'floorVersion' | 'latestVersion' | 'lineageReason',
+    string
+  >
+>;
 
 type SpawnConfig = {
   port: number;
@@ -118,6 +126,7 @@ export type BackendStartupErrorDetails = {
   causeMessage?: string;
   backendBoundaryCode?: string;
   backendBoundaryStage?: string;
+  backendBoundaryFields?: BackendBoundaryFields;
   stdoutTail?: string;
   stderrTail?: string;
   resourcesPath?: string;
@@ -375,7 +384,19 @@ function parseBackendBoundaryError(text: string): ParsedBackendBoundaryError | u
     const line = lines[i];
     const match = /^(BOOTSTRAP_[A-Z0-9_]+|CLI_[A-Z0-9_]+|MCP_[A-Z0-9_]+)\b(?:[^\n]*?\bstage=([^:\s]+))?/.exec(line);
     if (match) {
-      return { code: match[1], stage: match[2] };
+      const fields: BackendBoundaryFields = {};
+      for (const field of [
+        'actualFingerprint',
+        'appliedVersion',
+        'expectedFingerprint',
+        'floorVersion',
+        'latestVersion',
+        'lineageReason',
+      ] as const) {
+        const value = new RegExp(`(?:^|\\s)${field}=([^:\\s]+)`).exec(line)?.[1];
+        if (value) fields[field] = value;
+      }
+      return { code: match[1], stage: match[2], fields: Object.keys(fields).length > 0 ? fields : undefined };
     }
   }
   return undefined;
@@ -660,6 +681,7 @@ export class BackendLifecycleManager {
           causeMessage: getErrorMessage(cause),
           backendBoundaryCode: boundary?.code,
           backendBoundaryStage: boundary?.stage,
+          backendBoundaryFields: boundary?.fields,
           stdoutTail: stdoutTail || undefined,
           stderrTail: stderrTail || undefined,
           serverListeningObserved,

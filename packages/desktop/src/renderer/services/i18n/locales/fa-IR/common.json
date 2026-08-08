@@ -97,6 +97,17 @@
       "description": "این بسته WePrompt برای {{packageArch}} است، اما این مک از {{deviceArch}} استفاده می‌کند. نصب‌کننده {{expectedArch}} را از کانال توزیع داخلی تأییدشده دریافت کنید، WePrompt را ببندید و آن بسته را نصب کنید.",
       "closeApplication": "بستن WePrompt"
     },
+    "databaseLineage": {
+      "title": "این پایگاه داده به نسخه سازگار WePrompt نیاز دارد",
+      "description": "AionCore پیش از تغییر پایگاه داده متوقف شد، زیرا سابقه مهاجرت آن با این بسته WePrompt سازگار نیست (دلیل: {{reason}}، نسخه اعمال‌شده: {{appliedVersion}}، حداقل نسخه پشتیبانی‌شده: {{floorVersion}}، جدیدترین نسخه همراه: {{latestVersion}}). این بررسی سازگاری، طرح یا داده‌های پایگاه داده، از جمله فایل‌های WAL و SHM را تغییر نداد. پایگاه داده را بازسازی یا جایگزین نکنید. WePrompt را ببندید و یک نسخه تأییدشده سازگار با این پایگاه داده نصب کنید، یا اطلاعات تشخیصی را برای پشتیبانی ذخیره کنید.",
+      "unknownVersion": "نامشخص",
+      "unknownReason": "نامشخص",
+      "quitApplication": "خروج از WePrompt",
+      "sendDiagnostics": "ذخیره تشخیص‌ها",
+      "diagnosticsSent": "تشخیص‌ها ذخیره شدند",
+      "diagnosticsReportSuccess": "بسته تشخیصی ذخیره شد",
+      "diagnosticsReportFailed": "بسته تشخیصی ذخیره نشد"
+    },
     "dataMigration": {
       "title": "مهاجرت داده‌های محلی ناموفق بود",
       "description": "WePrompt باز شد، اما AionCore هنگام مقداردهی اولیه داده‌های محلی متوقف شد. نصب مجدد WePrompt ممکن است مشکل را حل نکند. بسته تشخیصی را به‌صورت محلی ذخیره کنید تا مهاجرت پایگاه داده بررسی شود.",

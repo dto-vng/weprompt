@@ -4,10 +4,13 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 
 const {
+  ACCEPTED_AIONCORE_SOURCE_COMMIT,
+  assertAcceptedActionsRun,
   getActionsArtifactName,
   getActionsArtifactMissingMessage,
   prepareAioncore,
 } = require('../../../packages/shared-scripts/src/prepare-aioncore');
+const { acceptedMigrationLineage } = require('../../../packages/shared-scripts/src/verify-bundled-aioncore-resources');
 
 const posixFakeToolchainIt = process.platform === 'win32' ? it.skip : it;
 
@@ -51,6 +54,12 @@ printf 'archive' > "$out"
   writeExecutable(
     join(binDir, 'gh'),
     `#!/usr/bin/env bash
+if [[ "$*" != *'/artifacts?per_page=100'* ]]; then
+  cat <<'JSON'
+{"status":"completed","conclusion":"success","head_sha":"260dbbc05d5c8d079fb60e0e9578d4250b6e4338"}
+JSON
+  exit 0
+fi
 cat <<'JSON'
 {"artifacts":[{"id":123,"name":"aioncore-manual-linux-x64","archive_download_url":"https://example.invalid/artifact.zip"}]}
 JSON
@@ -90,6 +99,9 @@ cat > "$out/aioncore" <<'SH'
 exit 0
 SH
 chmod +x "$out/aioncore"
+cat > "$out/migration-lineage.json" <<'JSON'
+${JSON.stringify(acceptedMigrationLineage, null, 2)}
+JSON
 `
   );
 
@@ -116,9 +128,44 @@ function useIsolatedTmpdir(root: string): () => void {
 afterEach(() => {
   delete process.env.AIONUI_BACKEND_RUN_ID;
   delete process.env.AIONUI_BACKEND_LOCAL_BINARY;
+  delete process.env.AIONUI_BACKEND_LOCAL_LINEAGE;
 });
 
 describe('prepare-aioncore GitHub Actions artifact resolver', () => {
+  it('accepts only a completed successful run from the reviewed AionCore commit', () => {
+    expect(
+      assertAcceptedActionsRun({
+        conclusion: 'success',
+        head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338',
+        status: 'completed',
+      })
+    ).toEqual({
+      conclusion: 'success',
+      headSha: ACCEPTED_AIONCORE_SOURCE_COMMIT,
+      status: 'completed',
+    });
+  });
+
+  it.each([
+    [
+      'a different source commit',
+      { conclusion: 'success', head_sha: '7061136ee8159d6e2768cabfa40b22d49351e74b', status: 'completed' },
+      /does not match accepted source commit/,
+    ],
+    [
+      'an unfinished run',
+      { conclusion: null, head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338', status: 'in_progress' },
+      /is not completed successfully/,
+    ],
+    [
+      'a failed run',
+      { conclusion: 'failure', head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338', status: 'completed' },
+      /is not completed successfully/,
+    ],
+  ])('rejects %s', (_case, run, expectedMessage) => {
+    expect(() => assertAcceptedActionsRun(run)).toThrow(expectedMessage);
+  });
+
   it.each([
     ['win32', 'x64', 'aioncore-manual-windows-x64'],
     ['win32', 'arm64', 'aioncore-manual-windows-arm64'],
@@ -208,6 +255,36 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
   posixFakeToolchainIt('hard fails local binary fallback when prepared managed resources lack contract', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'aionui-local-binary-gate-'));
     const localBinary = join(tmp, 'aioncore');
+    const localLineage = join(tmp, 'migration-lineage.json');
+    writeExecutable(localBinary, '#!/usr/bin/env bash\nexit 0\n');
+    writeFile(localLineage, `${JSON.stringify(acceptedMigrationLineage, null, 2)}\n`);
+    const fakeBin = createFakeToolchain(tmp, { curlFails: true });
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+    process.env.AIONUI_BACKEND_LOCAL_BINARY = localBinary;
+    process.env.AIONUI_BACKEND_LOCAL_LINEAGE = localLineage;
+    const restoreTmpdir = useIsolatedTmpdir(tmp);
+
+    try {
+      expect(() =>
+        prepareAioncore({
+          projectRoot: join(tmp, 'project'),
+          platform: 'linux',
+          arch: 'x64',
+          version: 'v0.1.46',
+        })
+      ).toThrow(/managed-resources\/manifest\.json/);
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      restoreTmpdir();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  posixFakeToolchainIt('fails closed when local binary fallback has no lineage provenance', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'aionui-local-binary-lineage-'));
+    const localBinary = join(tmp, 'aioncore');
     writeExecutable(localBinary, '#!/usr/bin/env bash\nexit 0\n');
     const fakeBin = createFakeToolchain(tmp, { curlFails: true });
     const previousPath = process.env.PATH;
@@ -223,7 +300,7 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
           arch: 'x64',
           version: 'v0.1.46',
         })
-      ).toThrow(/managed-resources\/manifest\.json/);
+      ).toThrow(/AIONUI_BACKEND_LOCAL_LINEAGE/);
     } finally {
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;

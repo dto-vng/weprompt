@@ -1,4 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const bridgeMocks = vi.hoisted(() => ({ quitInvoke: vi.fn() }));
+
+vi.mock('@/common', () => ({
+  ipcBridge: { application: { quit: { invoke: bridgeMocks.quitInvoke } } },
+}));
+
 import { classifyBackendStartupFailure } from '@/process/startup/backendStartupFailure';
 import { detectStartupArchitectureMismatch } from '@/process/startup/architectureCompatibility';
 import { getInstallationIntegrityModalActions } from '@/renderer/components/layout/InstallationIntegrityDialog';
@@ -119,6 +126,54 @@ describe('classifyBackendStartupFailure', () => {
       reason: 'backend_data_migration_failed',
       backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
       backendBoundaryStage: 'database.migration',
+    });
+  });
+
+  it('classifies migration lineage failures as a non-destructive compatibility block', () => {
+    const error = new Error('aioncore exited before health check passed') as Error & {
+      details?: Record<string, unknown>;
+    };
+    error.details = {
+      stage: 'early_exit',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+      backendBoundaryFields: {
+        actualFingerprint: 'actual456',
+        appliedVersion: '20',
+        expectedFingerprint: 'expected123',
+        floorVersion: '19',
+        latestVersion: '27',
+        lineageReason: 'changed',
+      },
+    };
+
+    expect(classifyBackendStartupFailure(error)).toEqual({
+      reason: 'backend_database_lineage_incompatible',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+      lineageReason: 'changed',
+      appliedVersion: 20,
+      floorVersion: 19,
+      latestVersion: 27,
+      expectedFingerprint: 'expected123',
+      actualFingerprint: 'actual456',
+    });
+  });
+
+  it('does not misclassify a lineage-stage preflight error without a stable reason', () => {
+    const error = new Error('aioncore exited before health check passed') as Error & {
+      details?: Record<string, unknown>;
+    };
+    error.details = {
+      stage: 'early_exit',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
+    };
+
+    expect(classifyBackendStartupFailure(error)).toEqual({
+      reason: 'backend_startup_failed',
+      backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+      backendBoundaryStage: 'database.migration_lineage',
     });
   });
 
@@ -396,6 +451,24 @@ describe('getInstallationIntegrityModalActions', () => {
     expect(actions.reportText).toBe('common.backendStartup.dataMigration.sendDiagnostics');
     expect('downloadText' in actions).toBe(false);
     expect(failure.backendBoundaryStage).toBe('database.migration');
+  });
+
+  it('uses compatibility copy and never exposes database recovery for lineage failures', () => {
+    const t = vi.fn((key: string) => key) as any;
+    const onRecoverCorruptedDatabase = vi.fn();
+    bridgeMocks.quitInvoke.mockClear();
+
+    const actions = getInstallationIntegrityModalActions(t, {
+      diagnosticsKind: 'database_lineage',
+      onRecoverCorruptedDatabase,
+    } as any);
+
+    expect(actions.reportText).toBe('common.backendStartup.databaseLineage.sendDiagnostics');
+    expect(actions.quitText).toBe('common.backendStartup.databaseLineage.quitApplication');
+    expect(actions.recoverText).toBeUndefined();
+    actions.onQuit();
+    expect(bridgeMocks.quitInvoke).toHaveBeenCalledOnce();
+    expect(onRecoverCorruptedDatabase).not.toHaveBeenCalled();
   });
 
   it('uses local data repair copy and diagnostics-only actions for local cache corruption', () => {

@@ -594,6 +594,7 @@ export interface IRendererLogEntry {
 
 export const application = {
   restart: bridge.buildProvider<IAppRestartResult, void>('restart-app'),
+  quit: bridge.buildProvider<void, void>('quit-app'),
   openDevTools: bridge.buildProvider<boolean, void>('open-dev-tools'),
   isDevToolsOpened: bridge.buildProvider<boolean, void>('is-dev-tools-opened'),
   systemInfo: withResponseMap(

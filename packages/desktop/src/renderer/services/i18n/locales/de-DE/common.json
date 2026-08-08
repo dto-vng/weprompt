@@ -96,6 +96,17 @@
       "description": "Dieses WePrompt-Paket ist für {{packageArch}}, aber dieser Mac ist {{deviceArch}}. Beziehe das {{expectedArch}}-Installationsprogramm über den genehmigten internen Verteilungskanal, schließe WePrompt und installiere dieses Paket.",
       "closeApplication": "WePrompt schließen"
     },
+    "databaseLineage": {
+      "title": "Diese Datenbank benötigt eine kompatible WePrompt-Version",
+      "description": "AionCore wurde angehalten, bevor die Datenbank geändert wurde, weil deren Migrationsverlauf nicht mit diesem WePrompt-Paket kompatibel ist (Grund: {{reason}}, angewendet: {{appliedVersion}}, unterstützte Untergrenze: {{floorVersion}}, neueste gebündelte Version: {{latestVersion}}). Diese Kompatibilitätsprüfung hat weder Datenbankschema noch Daten einschließlich WAL- und SHM-Journaldateien verändert. Erstellen oder ersetzen Sie die Datenbank nicht neu. Schließen Sie WePrompt und installieren Sie eine freigegebene Version, die diese Datenbank unterstützt, oder speichern Sie Diagnosen für den Support.",
+      "unknownVersion": "unbekannt",
+      "unknownReason": "unbekannt",
+      "quitApplication": "WePrompt beenden",
+      "sendDiagnostics": "Diagnosen speichern",
+      "diagnosticsSent": "Diagnosen gespeichert",
+      "diagnosticsReportSuccess": "Diagnosepaket gespeichert",
+      "diagnosticsReportFailed": "Diagnosepaket konnte nicht gespeichert werden"
+    },
     "dataMigration": {
       "title": "Local data migration failed",
       "description": "WePrompt wurde geöffnet, aber AionCore wurde beim Initialisieren der lokalen Daten beendet. Eine Neuinstallation von WePrompt behebt das Problem möglicherweise nicht. Speichern Sie das Diagnosepaket lokal, damit die Datenbankmigration geprüft werden kann.",

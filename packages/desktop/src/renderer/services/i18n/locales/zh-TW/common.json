@@ -97,6 +97,17 @@
       "description": "目前 WePrompt 安裝包是 {{packageArch}}，但這台 Mac 是 {{deviceArch}}。請從核准的內部分發管道取得 {{expectedArch}} 安裝包，關閉 WePrompt 後再安裝該版本。",
       "closeApplication": "關閉 WePrompt"
     },
+    "databaseLineage": {
+      "title": "此資料庫需要相容的 WePrompt 版本",
+      "description": "由於資料庫遷移歷程與此 WePrompt 安裝套件不相容，AionCore 已在變更資料庫前停止（原因：{{reason}}，已套用版本：{{appliedVersion}}，支援下限：{{floorVersion}}，隨附最新版本：{{latestVersion}}）。此相容性檢查未變更資料庫結構或資料，包括 WAL 與 SHM 日誌檔案。請勿重建或取代資料庫。請關閉 WePrompt，並安裝支援此資料庫的已核准版本，或儲存診斷資訊以供支援人員分析。",
+      "unknownVersion": "未知",
+      "unknownReason": "未知",
+      "quitApplication": "結束 WePrompt",
+      "sendDiagnostics": "儲存診斷資訊",
+      "diagnosticsSent": "診斷資訊已儲存",
+      "diagnosticsReportSuccess": "診斷套件已儲存",
+      "diagnosticsReportFailed": "無法儲存診斷套件"
+    },
     "dataMigration": {
       "title": "本地資料遷移失敗",
       "description": "WePrompt 已開啟，但 AionCore 在初始化本機資料時停止。重新安裝 WePrompt 可能無法解決此問題。請將診斷套件儲存到本機，以便檢查資料庫遷移狀況。",

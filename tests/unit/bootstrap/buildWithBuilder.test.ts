@@ -141,6 +141,16 @@ function resolveAppBuilderInstallUtil(): string {
 }
 
 describe('build-with-builder', () => {
+  it('fails before packaging when multiple architectures would share one prepared AionCore runtime', () => {
+    const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', '--mac', '--arm64', '--x64'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('each architecture must prepare and verify its own AionCore lineage-bound runtime');
+  });
+
   it('uses the WePrompt executable for current outputs and retains legacy upgrade cleanup names', () => {
     const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
 

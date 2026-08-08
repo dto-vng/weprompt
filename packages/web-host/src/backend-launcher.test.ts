@@ -558,6 +558,48 @@ describe('BackendLifecycleManager.start (health timeout)', () => {
     });
   });
 
+  it('captures allowlisted migration lineage fields from early-exit stderr', async () => {
+    vi.useFakeTimers();
+    vi.mocked(createServer).mockImplementation(
+      () => makeSyncFakeServer(33337) as unknown as ReturnType<typeof createServer>
+    );
+    const child = makeFakeChild();
+    vi.mocked(spawn).mockReturnValue(child as unknown as ChildProcess);
+
+    const mgr = new BackendLifecycleManager(APP_META_PACKAGED, () => '/abs/path/aioncore');
+    const startPromise = mgr.start('/db/path', '/log/dir', {
+      cacheDir: '/cache',
+      workDir: '/work',
+      logDir: '/log',
+    });
+
+    await Promise.resolve();
+    child.stderr?.emit(
+      'data',
+      Buffer.from(
+        'BOOTSTRAP_DATA_INIT_FAILED stage=database.migration_lineage databasePath=/db/path/aionui-backend.db lineageReason=changed appliedVersion=20 floorVersion=19 latestVersion=27 expectedFingerprint=expected123 actualFingerprint=actual456: failed to initialize application data\n'
+      )
+    );
+    child.emit('exit', 1, null);
+    child.emit('close', 1, null);
+
+    await expect(startPromise).rejects.toMatchObject({
+      name: 'BackendStartupError',
+      details: expect.objectContaining({
+        backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+        backendBoundaryStage: 'database.migration_lineage',
+        backendBoundaryFields: {
+          actualFingerprint: 'actual456',
+          appliedVersion: '20',
+          expectedFingerprint: 'expected123',
+          floorVersion: '19',
+          latestVersion: '27',
+          lineageReason: 'changed',
+        },
+      }),
+    });
+  });
+
   it('kills child and reports listen_timeout when aioncore never reports a port', async () => {
     vi.useFakeTimers();
     const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');

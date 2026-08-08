@@ -96,6 +96,17 @@
       "description": "Este paquete de WePrompt es para {{packageArch}}, pero esta Mac es {{deviceArch}}. Obtén el instalador {{expectedArch}} del canal de distribución interno aprobado, cierra WePrompt e instala ese paquete.",
       "closeApplication": "Cerrar WePrompt"
     },
+    "databaseLineage": {
+      "title": "Esta base de datos necesita una versión compatible de WePrompt",
+      "description": "AionCore se detuvo antes de modificar la base de datos porque su historial de migraciones no es compatible con este paquete de WePrompt (motivo: {{reason}}, aplicada: {{appliedVersion}}, versión mínima compatible: {{floorVersion}}, última incluida: {{latestVersion}}). Esta comprobación de compatibilidad no modificó el esquema ni los datos de la base, incluidos los archivos de diario WAL y SHM. No reconstruyas ni reemplaces la base de datos. Cierra WePrompt e instala una versión aprobada compatible con esta base de datos, o guarda los diagnósticos para soporte.",
+      "unknownVersion": "desconocida",
+      "unknownReason": "desconocido",
+      "quitApplication": "Salir de WePrompt",
+      "sendDiagnostics": "Guardar diagnósticos",
+      "diagnosticsSent": "Diagnósticos guardados",
+      "diagnosticsReportSuccess": "Paquete de diagnóstico guardado",
+      "diagnosticsReportFailed": "No se pudo guardar el paquete de diagnóstico"
+    },
     "dataMigration": {
       "title": "Local data migration failed",
       "description": "WePrompt se abrió, pero AionCore se detuvo al inicializar los datos locales. Es posible que reinstalar WePrompt no resuelva el problema. Guarda el paquete de diagnóstico localmente para poder revisar la migración de la base de datos.",

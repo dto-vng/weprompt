@@ -5,12 +5,13 @@
  */
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'path';
 import { pathToFileURL } from 'node:url';
+import { resolvePackagedApp } from '../helpers/packagedApp';
 
 declare global {
   interface Window {
@@ -30,6 +31,24 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
   const page = await electronApp.waitForEvent('window', { timeout: 30_000 });
   await page.waitForLoadState('domcontentloaded');
   return page;
+}
+
+async function launchLineageRecoveryApp(projectRoot: string, env: NodeJS.ProcessEnv): Promise<ElectronApplication> {
+  if (process.env.E2E_PACKAGED !== '1') {
+    return electron.launch({ args: ['.'], cwd: projectRoot, env, timeout: 60_000 });
+  }
+
+  const rootPackage = JSON.parse(await readFile(path.join(projectRoot, 'package.json'), 'utf8')) as {
+    productName: string;
+  };
+  const packaged = resolvePackagedApp({
+    outDir: path.join(projectRoot, 'out'),
+    platform: process.platform,
+    productName: rootPackage.productName,
+  });
+  if (!packaged) throw new Error(`No packaged ${process.platform} application found under out/`);
+
+  return electron.launch({ executablePath: packaged.executablePath, cwd: packaged.cwd, env, timeout: 60_000 });
 }
 
 function escapeRegExp(value: string): string {
@@ -55,6 +74,47 @@ async function resolveSavedCopyPattern(projectRoot: string): Promise<RegExp> {
 }
 
 test.describe('Installation integrity failure dialog', () => {
+  test('preserves user data and quits safely after a migration-lineage rejection', async () => {
+    const projectRoot = path.resolve(__dirname, '../../..');
+    const testDir = await mkdtemp(path.join(tmpdir(), 'weprompt-lineage-recovery-e2e-'));
+    const userDataDir = path.join(testDir, 'user-data');
+    const sentinelPath = path.join(userDataDir, 'existing-user-data.txt');
+    const sentinel = 'preserve-this-user-data';
+    let electronApp: ElectronApplication | undefined;
+
+    try {
+      await mkdir(userDataDir, { recursive: true });
+      await writeFile(sentinelPath, sentinel, 'utf8');
+      electronApp = await launchLineageRecoveryApp(projectRoot, {
+        ...process.env,
+        AIONUI_DEBUG_BACKEND_STARTUP_FAILURE: 'backend_database_lineage_incompatible',
+        AIONUI_DISABLE_AUTO_UPDATE: '1',
+        AIONUI_DISABLE_DEVTOOLS: '1',
+        AIONUI_E2E_TEST: '1',
+        AIONUI_E2E_USER_DATA_DIR: userDataDir,
+        AIONUI_CDP_PORT: '0',
+        NODE_ENV: 'development',
+      });
+      const page = await resolveMainWindow(electronApp);
+
+      await expect(page.getByTestId('installation-integrity-dialog')).toBeVisible();
+      await expect(page.getByTestId('installation-integrity-report')).toBeVisible();
+      await expect(page.getByTestId('recoverable-database-corruption-rebuild')).toHaveCount(0);
+      await expect(page.getByTestId('database-lineage-quit')).toBeVisible();
+      expect(await readFile(sentinelPath, 'utf8')).toBe(sentinel);
+
+      const closed = electronApp.waitForEvent('close');
+      await page.getByTestId('database-lineage-quit').click();
+      await closed;
+      electronApp = undefined;
+
+      expect(await readFile(sentinelPath, 'utf8')).toBe(sentinel);
+    } finally {
+      await electronApp?.close();
+      await rm(testDir, { recursive: true, force: true });
+    }
+  });
+
   test('shows local diagnostics export and records a saved user report', async () => {
     const projectRoot = path.resolve(__dirname, '../../..');
     const savedCopyPattern = await resolveSavedCopyPattern(projectRoot);
