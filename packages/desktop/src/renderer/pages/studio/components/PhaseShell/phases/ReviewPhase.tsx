@@ -75,6 +75,7 @@ export const ReviewPhase: React.FC<ReviewPhaseProps> = ({ controller, layoutMode
             shots.length === 0
               ? t('conversation.creativeStudio.phase.review.render.errors.noRenderableScenes')
               : t('conversation.creativeStudio.phase.review.render.errors.noRenderableShots', {
+                  count: shots.length,
                   shots: shots.join(', '),
                 }),
           action: t('conversation.creativeStudio.phase.review.render.openProduce'),

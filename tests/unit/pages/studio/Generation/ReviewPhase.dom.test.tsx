@@ -1201,7 +1201,7 @@ describe('Review phase cut', () => {
     );
 
     const failure = screen.getByText(
-      'conversation.creativeStudio.phase.review.render.errors.noRenderableShots:02, 03, 04'
+      'conversation.creativeStudio.phase.review.render.errors.noRenderableShots:3,02, 03, 04'
     );
     const slot = failure.closest('[data-render-state-slot]')!;
     expect(slot).not.toHaveTextContent(/scene-slate|scene-running|scene-failed/);

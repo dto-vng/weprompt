@@ -1056,6 +1056,7 @@
             "failed": "동영상을 렌더링하지 못했습니다.",
             "failedClip": "클립 {{clip}}/{{total}}을 렌더링할 수 없습니다.",
             "noRenderableShots": "샷 {{shots}}에 렌더링 가능한 클립이 없습니다.",
+            "noRenderableShots_other": "샷 {{shots}}에 렌더링 가능한 클립이 없습니다.",
             "cancelled": "동영상 렌더링을 취소했습니다."
           }
         }

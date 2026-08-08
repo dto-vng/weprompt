@@ -895,6 +895,8 @@
             "failed": "The video could not be rendered.",
             "failedClip": "Clip {{clip}} of {{total}} could not be rendered.",
             "noRenderableShots": "Shots {{shots}} do not have renderable clips.",
+            "noRenderableShots_one": "Shot {{shots}} does not have a renderable clip.",
+            "noRenderableShots_other": "Shots {{shots}} do not have renderable clips.",
             "cancelled": "Video render cancelled."
           }
         }

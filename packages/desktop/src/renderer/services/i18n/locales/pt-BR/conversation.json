@@ -1070,6 +1070,9 @@
             "failed": "Não foi possível renderizar o vídeo.",
             "failedClip": "Não foi possível renderizar o clipe {{clip}} de {{total}}.",
             "noRenderableShots": "Os planos {{shots}} não têm clipes renderizáveis.",
+            "noRenderableShots_one": "O plano {{shots}} não tem clipes renderizáveis.",
+            "noRenderableShots_many": "Os planos {{shots}} não têm clipes renderizáveis.",
+            "noRenderableShots_other": "Os planos {{shots}} não têm clipes renderizáveis.",
             "cancelled": "Renderização do vídeo cancelada."
           }
         }
