@@ -14,6 +14,10 @@ import type { PresentationTemplateSummary } from '@/common/types/office/presenta
 import type { ManagedPresentationSubmission } from '@/common/types/platform/presentationSubmission';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
+import {
+  clearActiveContextBudget,
+  getActiveContextBudget,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 
 type AionrsMessageStateMock = {
   thought: {
@@ -640,6 +644,7 @@ const modelSelection = {
 
 describe('AionrsSendBox', () => {
   beforeEach(() => {
+    clearActiveContextBudget('conv-1');
     vi.clearAllMocks();
     sessionStorage.clear();
     aionrsMessageState.current = createAionrsMessageState();
@@ -2121,6 +2126,29 @@ describe('AionrsSendBox', () => {
     expect(sendBoxProps.current).not.toHaveProperty('tokenUsage');
     expect(sendBoxProps.current).not.toHaveProperty('localUsage');
     expect(sendBoxProps.current).not.toHaveProperty('context_limit');
+  });
+
+  it('publishes, updates, and clears the composer budget synchronously for sibling surfaces', () => {
+    aionrsMessageState.current = {
+      ...createAionrsMessageState(),
+      tokenUsage: { total_tokens: 110_000 },
+    };
+
+    const { rerender, unmount } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(getActiveContextBudget('conv-1')).toEqual(contextUsageIndicatorProps.current?.budget);
+
+    aionrsMessageState.current = {
+      ...createAionrsMessageState(),
+      tokenUsage: { total_tokens: 220_000 },
+    };
+    rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(getActiveContextBudget('conv-1')).toEqual(contextUsageIndicatorProps.current?.budget);
+    expect(getActiveContextBudget('conv-1')?.totalTokens).toBe(220_000);
+
+    unmount();
+    expect(getActiveContextBudget('conv-1')).toBeUndefined();
   });
 
   it('renders an estimated context usage meter when AionRS runtime usage is unavailable', () => {

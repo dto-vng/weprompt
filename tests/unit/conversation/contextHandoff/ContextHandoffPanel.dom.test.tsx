@@ -1,5 +1,9 @@
 import type { TChatConversation } from '@/common/config/storage';
 import ContextHandoffPanel from '@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel';
+import {
+  clearActiveContextBudget,
+  publishActiveContextBudget,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -187,6 +191,7 @@ const conversation: TChatConversation = {
 
 describe('ContextHandoffPanel', () => {
   beforeEach(() => {
+    clearActiveContextBudget('conversation-1');
     mocks.addToSendBox.mockClear();
     mocks.createWithConversation.mockClear();
     mocks.emit.mockClear();
@@ -367,6 +372,22 @@ describe('ContextHandoffPanel', () => {
     await waitFor(() =>
       expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThan(0)
     );
+  });
+
+  it('uses the active composer budget instead of recomputing from a partial message page', async () => {
+    publishActiveContextBudget('conversation-1', {
+      source: 'estimated',
+      totalTokens: 110_000,
+      contextLimit: 1_000_000,
+      ratio: 0.11,
+      status: 'healthy',
+    });
+
+    render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
+
+    await screen.findByRole('button', { name: /Context\.md/ });
+    expect(screen.getByText('conversation.contextUsage.estimated · 11%')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '11');
   });
 
   it('shows updating immediately while the always-mounted controller is compacting', async () => {

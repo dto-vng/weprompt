@@ -29,6 +29,55 @@ export type ContextUsageSnapshot = {
   status: TContextHandoffBudgetSnapshot['status'];
 };
 
+export const contextUsagePercent = (ratio: number | null): number => {
+  if (ratio === null) return 0;
+  return Math.max(0, Math.round(ratio * 100));
+};
+
+export const contextUsageProgressPercent = (ratio: number | null): number => Math.min(100, contextUsagePercent(ratio));
+
+export const formatContextUsagePercent = (ratio: number | null): string =>
+  ratio === null ? '--' : `${contextUsagePercent(ratio)}%`;
+
+type ActiveContextBudgetListener = () => void;
+
+const activeContextBudgets = new Map<string, ContextUsageSnapshot>();
+const activeContextBudgetListeners = new Map<string, Set<ActiveContextBudgetListener>>();
+
+const notifyActiveContextBudgetListeners = (conversationId: string): void => {
+  activeContextBudgetListeners.get(conversationId)?.forEach((listener) => listener());
+};
+
+export const getActiveContextBudget = (conversationId: string): ContextUsageSnapshot | undefined =>
+  activeContextBudgets.get(conversationId);
+
+export const subscribeActiveContextBudget = (
+  conversationId: string,
+  listener: ActiveContextBudgetListener
+): (() => void) => {
+  const listeners = activeContextBudgetListeners.get(conversationId) ?? new Set<ActiveContextBudgetListener>();
+  listeners.add(listener);
+  activeContextBudgetListeners.set(conversationId, listeners);
+
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) activeContextBudgetListeners.delete(conversationId);
+  };
+};
+
+export const publishActiveContextBudget = (conversationId: string, snapshot: ContextUsageSnapshot): void => {
+  if (activeContextBudgets.get(conversationId) === snapshot) return;
+  activeContextBudgets.set(conversationId, snapshot);
+  notifyActiveContextBudgetListeners(conversationId);
+};
+
+export const clearActiveContextBudget = (conversationId: string, expectedSnapshot?: ContextUsageSnapshot): void => {
+  const currentSnapshot = activeContextBudgets.get(conversationId);
+  if (expectedSnapshot && currentSnapshot !== expectedSnapshot) return;
+  if (!activeContextBudgets.delete(conversationId)) return;
+  notifyActiveContextBudgetListeners(conversationId);
+};
+
 type ResolveConversationContextBudgetInput = {
   conversation: TChatConversation | null;
   messages?: TMessage[];
