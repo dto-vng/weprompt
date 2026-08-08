@@ -297,6 +297,30 @@ describe('resolveManagedPresentationInitialSend', () => {
   });
 });
 
+describe('usePresentationTemplates send composition', () => {
+  it('adds the creation contract when no gallery template is selected', async () => {
+    const { result, unmount } = renderHook(() => usePresentationTemplates('conversation-1'));
+    await waitFor(() => expect(listRecoverableInvokeMock).toHaveBeenCalled());
+
+    expect(result.current.composeSend('Save this look as a reusable template', []).input).toContain(
+      'AIONUI_TEMPLATE_REVIEW_V1'
+    );
+    unmount();
+  });
+
+  it('does not add the creation contract to an ordinary send', async () => {
+    const { result, unmount } = renderHook(() => usePresentationTemplates('conversation-1'));
+    await waitFor(() => expect(listRecoverableInvokeMock).toHaveBeenCalled());
+
+    expect(result.current.composeSend('Summarize this report', ['/workspace/report.csv'])).toEqual({
+      input: 'Summarize this report',
+      files: ['/workspace/report.csv'],
+      injectSkills: [],
+    });
+    unmount();
+  });
+});
+
 describe('usePresentationTemplates managed run recovery', () => {
   it('discovers the current conversation again after a remount', async () => {
     const first = renderHook(() => usePresentationTemplates('conversation-1'));

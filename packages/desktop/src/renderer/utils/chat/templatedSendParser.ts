@@ -8,6 +8,7 @@ import {
   DOCX_DIRECTIVE_PREFIX,
   HTML_DIRECTIVE_PREFIX,
   PPTX_DIRECTIVE_PREFIX,
+  TEMPLATE_CREATION_DIRECTIVE_PREFIX,
 } from '@/renderer/components/chat/TemplateGallery/directive';
 
 const THEME_PATH_RE = /[/\\]presentation-templates[/\\]([^/\\]+)[/\\]THEME\.md$/i;
@@ -30,7 +31,19 @@ export type TemplateReviewAnnouncement = {
   filePath: string;
 };
 
+export type AssistantDirectiveSend = {
+  userText: string;
+};
+
 const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/;
+
+/** Hides the model-facing creation contract while preserving the user's exact request. */
+export function parseAssistantDirectiveSend(text: string): AssistantDirectiveSend | null {
+  if (!text.startsWith(TEMPLATE_CREATION_DIRECTIVE_PREFIX)) return null;
+  const splitAt = text.indexOf('\n\n');
+  if (splitAt === -1) return null;
+  return { userText: text.slice(splitAt + 2) };
+}
 
 /**
  * Extract a reserved, terminal assistant metadata comment without interpreting

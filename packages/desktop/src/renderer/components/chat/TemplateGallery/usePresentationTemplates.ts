@@ -15,7 +15,7 @@ import type {
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import type { PresentationRunPublicDto } from '@/common/types/office/presentationRun';
-import { composePresentationSend } from './directive';
+import { composeAssistantSend } from './directive';
 import { useAddEventListener } from '@/renderer/utils/emitter';
 import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
 import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
@@ -198,9 +198,7 @@ export function usePresentationTemplates(conversationId?: string) {
 
   const composeSend = useCallback(
     (message: string, files: string[], scratch?: ArtifactScratchAllocation) =>
-      selectedTemplate
-        ? composePresentationSend(selectedTemplate, message, files, scratch)
-        : { input: message, files, injectSkills: [] as string[] },
+      composeAssistantSend(selectedTemplate, message, files, scratch),
     [selectedTemplate]
   );
 

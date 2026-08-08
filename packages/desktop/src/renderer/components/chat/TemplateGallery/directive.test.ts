@@ -7,7 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import { PRESENTATION_RUN_DIRECTIVE_PREFIX } from '@/common/config/constants';
 import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
-import { composePresentationSend, PPTX_DIRECTIVE_PREFIX } from './directive';
+import {
+  composeAssistantSend,
+  composePresentationSend,
+  PPTX_DIRECTIVE_PREFIX,
+  TEMPLATE_CREATION_DIRECTIVE,
+} from './directive';
 
 const summary = (format: 'html' | 'pptx' | 'docx'): PresentationTemplateSummary => {
   const referenceFile = format === 'pptx' ? 'reference.pptx' : format === 'docx' ? 'reference.docx' : null;
@@ -130,5 +135,49 @@ describe('composePresentationSend', () => {
     const result = composePresentationSend({ ...broken, referencePath: null }, 'x', []);
     expect(result.input).toContain('ONE self-contained HTML file');
     expect(result.input).not.toContain('reference.docx');
+  });
+});
+
+describe('composeAssistantSend', () => {
+  it.each([
+    'Save this look as a reusable template',
+    'Create a template from the current design',
+    'Turn this visual style into a reusable theme',
+  ])('adds template-creation instructions for explicit creation intent: %s', (message) => {
+    const result = composeAssistantSend(null, message, []);
+
+    expect(result.input.startsWith(TEMPLATE_CREATION_DIRECTIVE)).toBe(true);
+    expect(result.input).toContain('absolute path');
+    expect(result.input).toContain('inside the conversation workspace');
+    expect(result.input).toContain('Only if you successfully wrote that file during this turn');
+    expect(result.input).toContain('exactly one marker');
+    expect(result.input).toContain('standalone final line, outside any Markdown fence');
+    expect(result.input).toContain('confirming the review card installs');
+    expect(result.input.endsWith(message)).toBe(true);
+    expect(result.files).toEqual([]);
+    expect(result.injectSkills).toEqual([]);
+  });
+
+  it.each([
+    'Summarize this report',
+    'Create a presentation using the quarterly template',
+    'How do reusable templates work?',
+    'Update the colors in this design',
+  ])('leaves sends without template-creation intent unchanged: %s', (message) => {
+    expect(composeAssistantSend(null, message, ['/workspace/source.csv'])).toEqual({
+      input: message,
+      files: ['/workspace/source.csv'],
+      injectSkills: [],
+    });
+  });
+
+  it('keeps an existing presentation directive prefix while adding template-creation instructions', () => {
+    const result = composeAssistantSend(summary('pptx'), 'Save this style as a reusable template', []);
+
+    expect(result.input.startsWith(PPTX_DIRECTIVE_PREFIX)).toBe(true);
+    expect(result.input).toContain(TEMPLATE_CREATION_DIRECTIVE);
+    expect(result.input.endsWith('Save this style as a reusable template')).toBe(true);
+    expect(result.files).toEqual(['/abs/t1/THEME.md', '/abs/t1/reference.pptx']);
+    expect(result.injectSkills).toEqual(['officecli']);
   });
 });

@@ -18,6 +18,25 @@ export const HTML_DIRECTIVE_PREFIX = 'Create a presentation/report from the requ
 export { PRESENTATION_RUN_DIRECTIVE_PREFIX as PPTX_DIRECTIVE_PREFIX };
 export const DOCX_DIRECTIVE_PREFIX = 'Create a Word document from the request below.';
 
+export const TEMPLATE_CREATION_DIRECTIVE_PREFIX = 'Template creation instructions:';
+
+export const TEMPLATE_CREATION_DIRECTIVE = [
+  `${TEMPLATE_CREATION_DIRECTIVE_PREFIX} write a complete reusable HTML template specification to a file named \`THEME.md\` inside the conversation workspace (your current working directory); never write it outside that workspace.`,
+  `Resolve the file's absolute path for the marker. Make the specification self-contained and actionable: include its purpose, visual system (palette and typography), layout and reusable-component catalog, content and data rules, responsive and accessibility behavior, hard bans, and delivery/QA checks.`,
+  `Briefly explain in prose what you created and that confirming the review card installs it into the local Template Gallery for future use.`,
+  `Only if you successfully wrote that file during this turn, append exactly one marker as the standalone final line, outside any Markdown fence: \`<!-- AIONUI_TEMPLATE_REVIEW_V1 {"file_path":"<absolute path to THEME.md>"} -->\`.`,
+  `Replace the placeholder with the JSON-escaped absolute path. Never emit the marker for a file you did not just write, never emit more than one marker, and put nothing after it.`,
+].join(' ');
+
+const TEMPLATE_CREATION_INTENT_PATTERNS = [
+  /\b(?:create|make|build|generate|draft)\s+(?:me\s+)?(?:(?:an?|the|this|that|new|reusable)\s+)*(?:template|theme)\b/i,
+  /\b(?:save|capture|extract|derive|reuse)\s+(?:this|that|the|current)\s+(?:(?:look|style|design|visual\s+system|theme)\s+)?as\s+(?:an?\s+)?(?:reusable\s+)?(?:template|theme)\b/i,
+  /\b(?:turn|convert)\s+(?:this|that|the|current)(?:\s+(?:look|style|design|visual\s+(?:style|system)|theme))?\s+into\s+(?:an?\s+)?(?:reusable\s+)?(?:template|theme)\b/i,
+];
+
+const hasTemplateCreationIntent = (message: string): boolean =>
+  TEMPLATE_CREATION_INTENT_PATTERNS.some((pattern) => pattern.test(message.normalize('NFKC')));
+
 const htmlDirective = (themeFile: string): string =>
   [
     HTML_DIRECTIVE_PREFIX,
@@ -148,4 +167,31 @@ export function composePresentationSend(
     injectSkills: clonesReference || files.some((f) => OFFICE_SOURCE_EXT_RE.test(f)) ? ['officecli'] : [],
     ...(scratch ? { artifactScratchRunId: scratch.runId } : {}),
   };
+}
+
+/**
+ * Adds assistant-only template-creation guidance for explicit creation intent.
+ * Existing presentation prefixes remain byte-for-byte stable because the extra
+ * guidance is inserted after their directive paragraph and before user text.
+ */
+export function composeAssistantSend(
+  template: PresentationTemplateSummary | null,
+  message: string,
+  files: string[],
+  scratch?: ArtifactScratchAllocation
+): { input: string; files: string[]; injectSkills: string[]; artifactScratchRunId?: string } {
+  const composed = template
+    ? composePresentationSend(template, message, files, scratch)
+    : { input: message, files, injectSkills: [] as string[] };
+  if (!hasTemplateCreationIntent(message)) return composed;
+
+  if (template) {
+    const directiveEnd = composed.input.indexOf('\n\n');
+    return {
+      ...composed,
+      input: `${composed.input.slice(0, directiveEnd)} ${TEMPLATE_CREATION_DIRECTIVE}${composed.input.slice(directiveEnd)}`,
+    };
+  }
+
+  return { ...composed, input: `${TEMPLATE_CREATION_DIRECTIVE}\n\n${message}` };
 }
