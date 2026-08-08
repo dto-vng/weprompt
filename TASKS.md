@@ -1,6 +1,6 @@
 # Sprint 2 Tasks
 
-> **Canonical work register. Last reconciled: 2026-08-07.**
+> **Canonical work register. Last reconciled: 2026-08-08.**
 >
 > - Mark an item **Done** only when its accepted head is merged into `origin/sprint2`. Local branches, worktrees, plans, and green focused tests remain open until integration is accepted.
 > - Every active epic records its current boundary and next admission gate. Do not infer whole-sprint progress from raw checkbox count: epics and bugs differ materially in size.
@@ -8,14 +8,17 @@
 
 ## Active
 
-- [ ] **[EPIC-002][P2][Design-blocked] Create reusable HTML/PPTX/DOCX template packs from chat**
-  - Outcome: derive a template from a workspace artifact, or describe an HTML template, then review, add, or discard it in chat before anything reaches the Template Gallery.
-  - Current boundary: Task 1 of 11 is independently accepted on the preserved candidate but is not merged into `origin/sprint2`. Task 2 is **blocked at the mandatory store-boundary redesign checkpoint** after two bounded hardening rounds; Tasks 3–11, runtime registration, IPC, gallery installation, enablement, packaging, and release are not admitted or started.
-  - Open Task 2 invariants: failed/expired terminalization must atomically persist exact cleanup proof for every owned allocation, and every public path must fail closed after poison or root-identity uncertainty. Committed ownership and PPTX/DOCX reload-proof parity are now addressed.
-  - Preserved candidate: `codex/epic002-template-creation-r-02ee3f8d6@86c966bda7644ae87c105532dcf47f282407add9`; focused Task 2 boundary passed 159/159, but independent exact-head review correctly returned BLOCK on the two remaining invariants.
-  - Next gate: redesign the store boundary and obtain independent design approval before any further production edit. The revised design must allocate cleanup authority explicitly, make terminalization consume a complete durable receipt set, and centralize usable-root enforcement across all public operations. No third micro-patch round is admissible.
-  - Dependencies: release waits for EPIC-001's accepted shared presentation seams and BUG-014 packaged-template acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
-  - Evidence: the authoritative reconciled Task 2 contract and review package remain preserved at the candidate head above until accepted and merged. The tracked [original design spec](docs/design/template-creation-skill-plan.md) is historical background only; it targets an earlier base and must not be used as the current execution plan.
+- [ ] **[EPIC-002][P2][Re-scoped] Create reusable template packs from chat — Epic A (HTML) first**
+  - Outcome: derive or describe a template in chat, review it, then add or discard it before anything reaches the Template Gallery.
+  - **Re-scoped 2026-08-07 after the EPIC-002 postmortem.** The unified HTML/PPTX/DOCX epic is **retired**: it combined seven hard problems (mutable-source reading, raw Office content under a privacy policy, sanitization, crash-safe persistence, idempotent recovery, gallery installation, multi-backend skill routing) and implemented storage before the storage-to-filesystem authority seam was frozen. Reviews contained every unsafe step; nothing was integrated, pushed, or enabled.
+  - Replaced by three epics split **by hard problem**, strictly ordered — see the tracked [plan of record](docs/design/template-creation-skill-plan.md) (`b76383d15` → `d5973b34c` → `bd13775af`):
+    - **Epic A — HTML only, end to end.** Consumes the accepted Store V2 foundation **as-is, API frozen**. Architecture accepted 2026-08-07 with two declared hard problems: storage-owned immutable staging of one bounded `THEME.md`, and atomic idempotent installation consuming Store V2's reserved template ID. Reuse `importThemeSpec`'s parsing/tokens/manifest/SVG, **not** its direct-write commit workflow. **A0 de-scope valve:** assistant writes `THEME.md`, user imports through the existing picker.
+    - **Epic B — Office templates from app-owned artifacts.** Sourced from EPIC-001 retained run candidates (`retained/candidate.pptx`), where byte authority is already proven. No raw workspace ingestion. Not scheduled; wants the retained-candidate flow live in a packaged build first.
+    - **Epic C — raw workspace Office ingestion + sanitization.** The actual security/lifecycle epic; may never be needed. Entry criteria in the plan of record: seam contract frozen and reviewed **before** implementation, and legacy bypass paths removed in the same change that adds the trusted one.
+  - Preserved assets — do **not** rebase or reopen: accepted Store V2 foundation `2f883cee531d5334250870f4bbe66b6bf472adc2` (consumed by Epic A); blocked Task 3 candidate `a1754a13e01c886458db6c1385fa88e6b0719823` (Epic C reference material only).
+  - Scope guard, binding: each epic declares its hard problems and seams up front. A task that needs a sanitizer, an **undeclared** authority seam, or an **undeclared** crash-recovery protocol is in the wrong epic — stop and re-charter.
+  - Next gate: register Epic A's charter, then implement starting from its two declared contracts. Do not resume the retired task line.
+  - Dependencies: Epic A needs no EPIC-001 or BUG-014 gate. Epic B waits on EPIC-001 retained-candidate acceptance. Preserve the EPIC-003 and Creative Studio ownership boundaries.
 
 - [ ] **[EPIC-003][P2][Planning gate] Expose provider- and model-aware reasoning controls**
   - Outcome: show only reasoning controls a selected provider/model can actually honor, using capability evidence rather than provider-name special cases.
@@ -36,11 +39,6 @@
   - Next gate: confirm the FDL identity, run packaged authentication and least-privilege smokes for both connectors, record failure/recovery behavior, and decide whether they remain enabled by default in the hardened pilot package.
   - Scope rule: this is availability of two named connectors, not a generic MCP/data-platform expansion.
 
-- [ ] **[BUG-013][P0][Packaging] Make installed upgrades schema-compatible on first startup**
-  - Actual: a packaged application can fail to start against existing app data when the bundled AionCore migration set is older than migrations already recorded in the database.
-  - Current boundary: a schema-lineage candidate branch exists, but native Windows and end-user upgrade acceptance are not merged or complete.
-  - Expected: preserve user data, fail safely with an actionable recovery path, and prove the shipped migration set supports the declared data floor on every release platform.
-
 - [ ] **[BUG-014][P1][Packaging] Ship and hand off all built-in PPTX/DOCX templates**
   - Actual: packaging and first-turn readiness can leave built-in templates absent or consume an initial templated message before the runtime is ready.
   - Current boundary: a template-inventory candidate branch exists; packaged gallery and first-send acceptance across macOS ARM, macOS Intel, and Windows remain open.
@@ -50,10 +48,6 @@
   - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
   - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
 
-- [ ] **[BUG-016][P1] Show thinking activity when `thinking.subject` is missing**
-  - Actual: completed thinking records with content but no subject disappear from the grouped work summary.
-  - Expected: show a localized safe fallback with correct state while preserving the existing disclosure and redaction boundary.
-
 - [ ] **[BUG-017][P1][Needs reproduction] Recover safely when AionCore loses SQLite access**
   - Actual: a real incident returned SQLite code 14 across providers, assistants, conversations, App Operations, and Health Check; integrity passed and restart restored service, but the durable cause is unconfirmed.
   - Expected: identify local-data access failure accurately, preserve the database, offer safe restart/retry and bounded diagnostics, and never delete or rebuild data without confirmed corruption and explicit consent.
@@ -61,11 +55,6 @@
 - [ ] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions**
   - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
   - Expected: preserve the provider's structured failure type, use HTTP status only as fallback, respect bounded retry guidance, and expose accurate localized recovery actions.
-
-- [ ] **[BUG-019][P1] Open Project Home after creating a project**
-  - Actual: project creation succeeds and immediately navigates to `/guid`, bypassing the setup home.
-  - Expected: refresh the list, close the modal, and navigate to `/project/:id`; explicit project **New chat** actions must continue to open `/guid`.
-  - Verified root cause: the creation callback still calls `navigateToProjectChat(...)` instead of the existing project-home route builder.
 
 - [ ] **[BUG-024][P2][Creative Studio] A shot whose media route is not ready loses its generate action with no explanation**
   - Reproduction: open a project containing both image and video shots while exactly one media role is ready — for example the image model configured and the video model still `setup_required`.
@@ -78,6 +67,38 @@
   - Two code paths are **unreachable** on this call path and must not get copy: the kind check (the route is already filtered by media kind) and the scene check (the per-shot call passes no scene id). Writing copy for either would imply a state no user can reach.
   - Blocked on the designer for the copy itself — Ask B of the [open asks commission](docs/design/creative-studio-open-asks-commission.md), sent with the derivation. They estimated a day's turnaround.
 
+- [ ] **[BUG-028][P2][Creative Studio] A paid storyboard result is discarded after a concurrent revision change**
+  - Actual: the service checks the expected revision, performs the **paid** planner request, and only then attempts the CAS write with the old revision. The CAS correctly fails closed, but the paid result has already been obtained and is thrown away. A test currently codifies that sequence.
+  - Concrete failure: while storyboard drafting is in flight, another window edits the project or a running job bumps the revision. The provider charges for a completed draft, the app rejects it, and the user must pay again to regenerate.
+  - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
+  - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
+  - **Design settled 2026-08-07** (`docs/design/creative-studio-bug028-durable-drafts.md`): region-guarded merge inside the serialised update fn (authored script + planner inputs compared, operational fields excluded, active-jobs overlap treated as conflict), with a true conflict recording the paid draft as a pending proposal instead of discarding it. Sequence the implementation after EPIC-006 Slice A3 — the fallback needs the proposal card UI.
+
+- [ ] **[BUG-036][P2][Creative Studio][Blocks flag-enablement] The v1.1 Review editor has four accessibility and localization defects**
+  - Found by an independent four-lens review of MR !73 (2026-08-07). None is reachable today — `CREATIVE_STUDIO_ENABLED` is opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1` (`common/config/constants.ts:66`) — which is why they were filed rather than held. **They must close before the flag is ever defaulted on**, not merely "someday".
+  - **(a) The four clip states reach screen readers only as data attributes.** The `aria-describedby` → `sr-only` span hardcodes `phase.review.selectedTake` regardless of the `reviewState` prop (`CutTimeline.tsx:231-233`), and on slate items the running/failed/slate label sits inside a button whose `aria-label` (`:468`) suppresses inner content from the accessible name, with no `describedby` (`:491`). BUG-031's stated guarantee — state surviving _without colour_ — does hold, because the labels are visible text; the screen-reader half is narrower than the entry implies. Independently flagged by two lenses.
+  - **(b) Escape closes the R5 drawer but drops focus to `<body>`.** Arco's Drawer renders react-focus-lock without `returnFocus`, `onCancel` only flips state, and `unmountOnExit` discards the node (`ReviewCut.tsx:357-386`). Escape-close itself is tested; focus return is neither implemented nor asserted. The dialog is also unnamed (`title={null}` + `closable={false}`).
+  - **(c) `render.errors.noRenderableShots` has no plural forms in any of the 12 locales and passes no `count`** (`ReviewPhase.tsx:73-79` joins shot numbers into a string). One missing shot renders plural phrasing everywhere. Its sibling `export.gapWarning` does this correctly. It was also omitted from `pluralLogicalKeys` in `tests/unit/pages/studio/studioI18n.test.ts`, so the repo's 0/1/2/5 convention test never exercised it — fix the key and the test list together.
+  - **(d) A raw ISO timestamp is shown to users** — `StudioExportModal.tsx:116` renders `latestRender.renderedAt` verbatim ("Rendered 2026-07-29T08:15:00.000Z"), and `StudioExport.dom.test.tsx` asserts that raw string, codifying it. Needs locale-aware formatting, and the assertion updated rather than preserved.
+  - Verification: for (a) assert each of the four states through the accessibility tree, not `data-review-state`; for (b) assert focus returns to the opener; for (c) real i18next plural tests at counts 1/2/5 in ru-RU and uk-UA; for (d) assert a formatted, locale-aware string.
+  - P3 tail from the same review, deliberately not expanded here: SR seconds plurals (`cut.secondsValue`), hardcoded `s` unit and decimal parsing in trim fields, unrounded playhead float in `duration.played`, zh-TW `common.close` untranslated, two failing contrast pairings on the export modal that repeat pre-existing pairings (ratchet-neutral), selected slates having no visual selected state.
+
+## Waiting On
+
+- [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
+  - Outcome: users request workbook changes in plain language, receive one bounded pre-change audit and approval point, and get a verified result without silent damage to formulas, formatting, charts, or unsupported workbook features.
+  - Current boundary: the problem statement, solution contract, and implementation plan were approved in planning sessions, but the evidence package is session-local and not present in the tracked Sprint 2 tree. No runtime implementation has started or been merged.
+  - Waiting on: the shared Office artifact/mutation boundary and EPIC-002's OfficeCLI ownership contract must settle before Excel introduces another publication or cleanup path.
+  - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
+  - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
+
+- [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
+  - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
+
+## Someday
+
+> Demoted from Active 2026-08-08: real but not Sprint 2 material — test-infrastructure flakes and polish on a feature that is still behind `CREATIVE_STUDIO_ENABLED`. Promote back if the Studio flag is enabled this sprint.
+
 - [ ] **[BUG-027][P3][Creative Studio] `jobManager.test.ts` capped-backoff test flakes in full-suite position**
   - Actual: `persists the remote identity before polling and uses the exact capped backoff schedule` failed once during a `just push` gate on a quiet machine (load 6.1): `waitFor` expired with the job still `running`. Passed 3×118/118 in isolation immediately after, and passed two other full-suite runs the same day.
   - Second member of the same family as BUG-025, in the node project rather than dom. Not one of the known shared-path node races.
@@ -86,18 +107,6 @@
   - Mechanism analysis (plausible, **unconfirmed** — no reproduction, so nothing was changed): the suite's local `waitFor` (`jobManager.test.ts:141`) budgets **100 attempts × 5ms**, i.e. a fixed poll count rather than a time budget, while the work underneath performs real filesystem I/O through `fsWithoutDiskBarriers`. The injected `sleep` is instant (`epochMs += delayMs`), so provider backoff is not the wait — real I/O is. A fixed poll budget against variable real I/O is fragile by construction.
   - Remaining suspect: whole-suite multi-project concurrency, which is how both sightings occurred (inside `just push`), rather than any single-project run. Reproducing likely needs repeated full-suite runs, which is expensive — weigh that against this being **P3 with two sightings** while BUG-024/028/029 are P2 and actionable.
   - **Do not "fix" the `waitFor` budget without a reproduction.** It is a reasonable suspect and an unreasonable thing to change blind; that judgement is what kept BUG-025 honest until the reproduction arrived.
-
-- [ ] **[BUG-028][P2][Creative Studio] A paid storyboard result is discarded after a concurrent revision change**
-  - Actual: the service checks the expected revision, performs the **paid** planner request, and only then attempts the CAS write with the old revision. The CAS correctly fails closed, but the paid result has already been obtained and is thrown away. A test currently codifies that sequence.
-  - Concrete failure: while storyboard drafting is in flight, another window edits the project or a running job bumps the revision. The provider charges for a completed draft, the app rejects it, and the user must pay again to regenerate.
-  - Expected: a durable reservation or result path that does not discard completed provider work. This is a design change, not a patch.
-  - Found by independent review of MR !71; accepted as a follow-up rather than a merge blocker because it cannot spend without consent or bypass the release gate.
-  - **Design settled 2026-08-07** (`docs/design/creative-studio-bug028-durable-drafts.md`): region-guarded merge inside the serialised update fn (authored script + planner inputs compared, operational fields excluded, active-jobs overlap treated as conflict), with a true conflict recording the paid draft as a pending proposal instead of discarding it. Sequence the implementation after EPIC-006 Slice A3 — the fallback needs the proposal card UI.
-
-- [ ] **[BUG-029][P2][Creative Studio] Runtime disposal does not cancel or await active FFmpeg renders**
-  - Actual: runtime disposal owns the planner, job manager, protocol and fake bundle, but not the render runner. `StudioRenderRunner` exposes only per-project `renderCut`, `cancelRender` and `getState`, with no dispose/cancel-all boundary. Quit cleanup awaits runtime disposal and then lets main exit without cancelling active FFmpeg children.
-  - Concrete failure: quit during a long render — the close handshake checks unsaved renderer edits, not active renders. The child can outlive its parent, and main exits before `executeRender()` can reliably run its `finally`, leaving `aionui-studio-render-*` files in the OS temp directory.
-  - Found by independent review of MR !71; accepted as a follow-up for the same reason as BUG-028.
 
 - [ ] **[EPIC-005-G1][P3][Creative Studio] Model-selection provenance for the `CHOSEN FOR YOU` disclosure**
   - Actual: automatic adoption of a sole route persists through the same CAS command a person's own choice uses, and the stored route ref carries no provenance. Once written, an auto-pick is indistinguishable from a deliberate one, so the panel cannot honestly disclose that the app chose the model.
@@ -118,35 +127,6 @@
   - Expected: the description states what the dock does today — drafts a storyboard from the brief — with the provider/model labels and charge disclosure unchanged. Copy change ×12 locales, `bun run i18n:types` + `node scripts/check-i18n.js`; no behavior change.
   - Scope note: when the scene assist ships, the copy may additionally point at it for per-scene help; do not pre-write that promise before it lands.
 
-- [ ] **[BUG-033][P1][Creative Studio] A render whose ffmpeg child dies never releases the busy lock**
-  - Actual: when the render child terminates without completing, the project's render slot is never reclaimed. `renderCut` then returns `busy` for the rest of the app process, so the project **can never be rendered again without restarting the app**, and nothing in the UI explains why.
-  - Found live 2026-08-07, not by tests: after killing a wedged ffmpeg (see `BUG-034`), `getLatestRender` stayed `null`, no failure state surfaced, the `aionui-studio-render-*` temp directory was left behind, and a fresh `renderCut` was rejected with `{ code: 'busy' }`.
-  - **Two problems stacked, and fixing one is not enough.** The lock is not released on abnormal child exit; and **ffmpeg ignored `SIGTERM`** here — it kept running at ~99% CPU and only died on `SIGKILL`. A cancel path that sends TERM and assumes the child is gone will neither kill the process nor reclaim the slot.
-  - This is R4's "state 2" busy guard stuck permanently on. The guard itself is correct; nothing releases it.
-  - Expected: an abnormal child exit finalizes the render as failed, releases the slot, cleans the temp directory, and surfaces one of the three typed failures. Cancellation must escalate to `SIGKILL` after a bounded wait.
-  - Related: `BUG-029` covers disposal not cancelling active renders at quit. Same subsystem, different trigger — that one leaks a process at exit, this one wedges the feature during a session.
-
-- [ ] **[BUG-034][P2][Creative Studio] An unreadable asset wedges the render forever with no timeout or validation**
-  - Actual: a segment whose input image cannot be decoded makes ffmpeg spin indefinitely instead of failing. Observed **3h 20m at ~99% CPU on the first of four segments** before being killed manually. Nothing bounds a segment's duration and nothing checks the asset before it is handed to ffmpeg.
-  - Mechanism: the render invokes `-loop 1 -t 3 -i <asset>`. With a zero-dimension input, `-loop 1` never yields a frame, so ffmpeg neither errors nor exits. `ffprobe` on the same file reports `width=0` with `chunk too big`.
-  - Expected: validate that an asset decodes to non-zero dimensions before rendering it, and bound each segment with a timeout. A take that cannot be decoded is `render_failed` naming the clip, not an infinite spin.
-  - Cheap partial fix worth considering on its own: dropping `-loop 1` for still images in favour of a bounded frame count removes the infinite-loop shape entirely.
-
-- [ ] **[BUG-035][P3][Test infrastructure] The Studio e2e fake provider emits assets that cannot be rendered**
-  - Actual: with `AIONUI_E2E_STUDIO_FAKE=1`, a generated take is a **39-byte stub** — the 8-byte PNG magic header followed by the ASCII string `STUDIO_RAW_OUTPUT_BODY_SENTINEL`. It passes a magic-byte check and is not an image; `file` reports `data`.
-  - Consequence: the generate → render journey **cannot be exercised end to end** with the fake provider, which is why the Studio e2e spec asserts state transitions and never a real render. It is also what triggered `BUG-034` in practice.
-  - Expected: the fake emits a genuine minimal PNG (a 1×1 or small solid frame) so a fake-provider run can render. That would have caught `BUG-034` and `BUG-033` automatically.
-  - Not a production defect — the stub is deliberate for state tests. Filed so nobody concludes from a green e2e run that rendering works.
-
-- [ ] **[BUG-036][P2][Creative Studio][Blocks flag-enablement] The v1.1 Review editor has four accessibility and localization defects**
-  - Found by an independent four-lens review of MR !73 (2026-08-07). None is reachable today — `CREATIVE_STUDIO_ENABLED` is opt-in via `AIONUI_ENABLE_CREATIVE_STUDIO=1` (`common/config/constants.ts:66`) — which is why they were filed rather than held. **They must close before the flag is ever defaulted on**, not merely "someday".
-  - **(a) The four clip states reach screen readers only as data attributes.** The `aria-describedby` → `sr-only` span hardcodes `phase.review.selectedTake` regardless of the `reviewState` prop (`CutTimeline.tsx:231-233`), and on slate items the running/failed/slate label sits inside a button whose `aria-label` (`:468`) suppresses inner content from the accessible name, with no `describedby` (`:491`). BUG-031's stated guarantee — state surviving _without colour_ — does hold, because the labels are visible text; the screen-reader half is narrower than the entry implies. Independently flagged by two lenses.
-  - **(b) Escape closes the R5 drawer but drops focus to `<body>`.** Arco's Drawer renders react-focus-lock without `returnFocus`, `onCancel` only flips state, and `unmountOnExit` discards the node (`ReviewCut.tsx:357-386`). Escape-close itself is tested; focus return is neither implemented nor asserted. The dialog is also unnamed (`title={null}` + `closable={false}`).
-  - **(c) `render.errors.noRenderableShots` has no plural forms in any of the 12 locales and passes no `count`** (`ReviewPhase.tsx:73-79` joins shot numbers into a string). One missing shot renders plural phrasing everywhere. Its sibling `export.gapWarning` does this correctly. It was also omitted from `pluralLogicalKeys` in `tests/unit/pages/studio/studioI18n.test.ts`, so the repo's 0/1/2/5 convention test never exercised it — fix the key and the test list together.
-  - **(d) A raw ISO timestamp is shown to users** — `StudioExportModal.tsx:116` renders `latestRender.renderedAt` verbatim ("Rendered 2026-07-29T08:15:00.000Z"), and `StudioExport.dom.test.tsx` asserts that raw string, codifying it. Needs locale-aware formatting, and the assertion updated rather than preserved.
-  - Verification: for (a) assert each of the four states through the accessibility tree, not `data-review-state`; for (b) assert focus returns to the opener; for (c) real i18next plural tests at counts 1/2/5 in ru-RU and uk-UA; for (d) assert a formatted, locale-aware string.
-  - P3 tail from the same review, deliberately not expanded here: SR seconds plurals (`cut.secondsValue`), hardcoded `s` unit and decimal parsing in trim fields, unrounded playhead float in `duration.played`, zh-TW `common.close` untranslated, two failing contrast pairings on the export modal that repeat pre-existing pairings (ratchet-neutral), selected slates having no visual selected state.
-
 - [ ] **[BUG-037][P3][Creative Studio] Three renderer-side render-state surface gaps**
   - Also from the MR !73 review; all three leave the store correct and are renderer-only.
   - **(a) After a ReviewPhase remount, the user's own in-flight render reads as "busy" with no Cancel.** The runner's `getState` is never exposed over IPC, so `useStudioRender` resets to `idle` on mount and labels any `running` event it did not start as another surface's render (`useStudioRender.ts:130-143`). Leave Review mid-render and return: the UI claims someone else is rendering and offers no way out until the next progress event.
@@ -154,21 +134,25 @@
   - **(c) The export modal's latest-render line is a snapshot** taken at modal open while the export re-reads at export time, so a render finishing while the modal is open exports a newer file than the modal described.
   - Related but separate: `BUG-033` covers the busy lock never releasing when the ffmpeg child dies.
 
-## Waiting On
-
-- [ ] **[EPIC-004][P2][Dependency-gated] Make Excel workbook changes reviewable, deterministic, and fail-closed**
-  - Outcome: users request workbook changes in plain language, receive one bounded pre-change audit and approval point, and get a verified result without silent damage to formulas, formatting, charts, or unsupported workbook features.
-  - Current boundary: the problem statement, solution contract, and implementation plan were approved in planning sessions, but the evidence package is session-local and not present in the tracked Sprint 2 tree. No runtime implementation has started or been merged.
-  - Waiting on: the shared Office artifact/mutation boundary and EPIC-002's OfficeCLI ownership contract must settle before Excel introduces another publication or cleanup path.
-  - Next gate: materialize the approved design in an auditable branch, close the X0 contracts for workbook identity, supported-change classification, immutable source/snapshot handling, audit evidence, publication, rollback, and report transaction, then obtain independent plan acceptance before admitting implementation.
-  - Scope rule: request-led controlled changes with one bounded audit. Packaging and release remain outside this epic.
-
-- [ ] **[Creative Studio] FFmpeg licensing — two legal-desk items before release**
-  - Rendering is validated and shipping default-off with FFmpeg resolved from `PATH`, never bundled. Bundling is a packaging decision with two open legal questions; release-blocking, not merge-blocking.
-
-## Someday
-
 ## Done
+
+- [x] **[BUG-013][P0][Packaging] Make installed upgrades schema-compatible on first startup** — merged 2026-08-08 via `!79`
+  - Migration lineage is bound, the recovery contract completed, and the app quits safely after a lineage rejection rather than starting against incompatible data.
+  - Adds immutable verification that packaged AionCore artifacts came from the accepted source commit, plus native macOS/Windows CI acceptance and a packaged recovery test that seeds user data and asserts preservation.
+  - **Open evidence:** native Windows acceptance runs in CI only; it was not executed locally. Confirm those jobs pass on a release build before treating Windows as covered. Note that bumping AionCore now requires updating `ACCEPTED_AIONCORE_SOURCE_COMMIT`, or packaging fails closed.
+
+- [x] **[BUG-033][P1] · [BUG-034][P2] · [BUG-029][P2] · [BUG-035][P3] [Creative Studio] Render lifecycle made crash-safe and bounded** — merged 2026-08-08 via `!78`
+  - Fixed as **one change** because they are one defect surface: BUG-033 was found while killing the ffmpeg that BUG-034 wedged, BUG-029 is the same subsystem at quit, and BUG-035 is why e2e could not reproduce any of it.
+  - An abnormal ffmpeg child exit now settles as `render_failed`, removes its temp directory, and releases the project busy slot, so a project is no longer unrenderable for the rest of the app process. Cancellation escalates SIGTERM → bounded wait → SIGKILL. Segment inputs are probed for non-zero decoded dimensions and bounded by a timeout. Disposal cancels and awaits active renders. The e2e fake adapter emits a decodable PNG.
+  - Evidence: seven tests confirmed failing on unmodified `sprint2` before the fix — the timeout test hung the full 60s, reproducing the defect. Full suite 7,940 passed, 0 failed outside the sandbox.
+
+- [x] **[BUG-019][P1] Open Project Home after creating a project** — merged 2026-08-08 via `!74`
+  - Creation now navigates to the encoded `/project/:id` home; explicit project **New chat** actions still open `/guid`.
+  - The regression test pins the URL encoding with a slash-bearing project id, so a future refactor cannot silently drop `encodeURIComponent`.
+
+- [x] **[BUG-016][P1] Show thinking activity when `thinking.subject` is missing** — merged 2026-08-08 via `!75`
+  - Subjectless thinking now renders a localized fallback (`conversation.thinking.label` / `.complete`, both pre-existing and already translated in all 12 locales, so no locale churn). Raw reasoning text stays out of the DOM.
+  - Deliberate accompanying change: thinking rows no longer contribute to the turn recap, making the recap provider-independent rather than varying with whether a provider supplies subjects. Open follow-up: no test pins that exclusion.
 
 - [x] **[BUG-038][P3][Process] A slice merged into the v1.1 branch with a red gate, undetected until review**
   - Actual: R3 (`d8e0bf1ff`) added the `place-cut-scenes` provider to `ipcBridge.ts` without a manifest entry. The manifest-completeness test (`tests/unit/process/bridge/nativePayloadSchemas.test.ts:1675`) predates that commit on `sprint2`, so it was **red on `creative-suite-sprint2` from `d8e0bf1ff` until the fix `7bd5a1561`** — verified by inspecting both files at that commit.
@@ -201,6 +185,7 @@
 - [x] **[EPIC-001][P1] Presentation artifact-quality foundation and synthetic stabilization** — completed 2026-08-06
   - All 14 accepted task heads are merged into `origin/sprint2`, including fail-closed grounding, canonical presentation routing, deterministic readiness checks, rendered QA foundations, bounded repair controls, and final synthetic stabilization.
   - Completion boundary: the foundation is integrated with `PRESENTATION_RUN_V2_ENABLED=false`. Live-provider activation, production containment, packaged-template acceptance, and release work remain deliberately tracked under the active packaging and bug gates rather than being hidden inside this completion.
+  - Production containment **partially discharged 2026-08-08 via `!76`**: Track 0.1–0.3 shipped to the live Template Gallery path — fail-closed source extraction, literal `\n` delivery scan, and reference-token checks reframed as review candidates so ordinary business vocabulary no longer fails a gate. All eight Office pack manifest versions were bumped (five `3 → 4`, three `2 → 3`), which is the mechanism that reaches **existing** installs through `syncBuiltins`. This is interim containment on the default-off path and is not superseded by the V2 foundation.
 
 - [x] **[EPIC-005][P1] Creative Studio v1 core workflow** — completed 2026-08-06
   - The accepted v1 process service, model configuration, IPC/native contracts, localized renderer workflow, and verification boundary are merged into `origin/sprint2` via `cd3896d13`.
