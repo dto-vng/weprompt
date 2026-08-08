@@ -11,10 +11,13 @@ import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type {
+  PresentationTemplateCandidateDescription,
+  PresentationTemplateCandidateFailureCode,
   PresentationTemplateManifest,
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
+import type { PresentationSourcePathAuthorization } from './run';
 import { TEMPLATE_ID_RE, validateTemplateManifest } from './templateManifest';
 import { parseThemeTokens, renderThemeThumbnailSvg, svgToDataUrl } from './themeThumbnail';
 
@@ -24,9 +27,45 @@ const INSTALL_TEMP_DIRECTORY_RE = /^\.aionui-template-install-[a-z0-9][a-z0-9-]{
 const INSTALL_TEMP_STALE_MS = 24 * 60 * 60 * 1000;
 const MAX_INSTALL_TEMP_INSPECTIONS = 100;
 const MAX_INSTALL_TEMP_REMOVALS = 20;
+const MAX_CANDIDATE_CONFIRMATIONS = 100;
 const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
 const DIRECTORY_ONLY = constants.O_DIRECTORY ?? 0;
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
+const SHA256_RE = /^[0-9a-f]{64}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type WorkspaceSourceAuthorizer = {
+  authorizeWorkspaceSourcePath: (
+    workspaceRoot: string,
+    relativePath: string
+  ) => Promise<PresentationSourcePathAuthorization>;
+};
+
+type CandidateInput = {
+  conversationId: string;
+  workspaceRoot: string;
+  filePath: string;
+};
+
+type CandidateConfirmation = {
+  conversationId: string;
+  workspaceRoot: string;
+  canonicalFilePath: string;
+  sha256: string;
+  installedId?: string;
+  installPromise?: Promise<PresentationTemplateSummary>;
+};
+
+/** Typed failure for a main-owned candidate describe or bound import. */
+export class PresentationTemplateCandidateError extends Error {
+  constructor(
+    readonly code: PresentationTemplateCandidateFailureCode,
+    options?: ErrorOptions
+  ) {
+    super(code, options);
+    this.name = 'PresentationTemplateCandidateError';
+  }
+}
 
 export type PresentationTemplateResolutionErrorCode = 'TEMPLATE_UNSUPPORTED' | 'RESOURCE_LIMIT_EXCEEDED';
 
@@ -291,6 +330,22 @@ const slugify = (name: string): string =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'template';
 
+const parseThemeName = (themeMd: string, filePath: string): string => {
+  const nameMatch = themeMd.match(/^#\s+(.+)$/m);
+  return (nameMatch ? nameMatch[1] : path.basename(filePath, '.md')).replace(/\s*[—-]\s*Theme Spec.*$/i, '').trim();
+};
+
+const sameAuthorization = (
+  left: PresentationSourcePathAuthorization,
+  right: PresentationSourcePathAuthorization
+): boolean =>
+  left.allowedRootPath === right.allowedRootPath &&
+  left.allowedRootDev === right.allowedRootDev &&
+  left.allowedRootIno === right.allowedRootIno &&
+  left.canonicalSourcePath === right.canonicalSourcePath &&
+  left.sourceDev === right.sourceDev &&
+  left.sourceIno === right.sourceIno;
+
 /**
  * Owns the on-disk template pack directory (one folder per template).
  * All methods are async and safe to call repeatedly; builtin sync is
@@ -299,11 +354,18 @@ const slugify = (name: string): string =>
 export class PresentationTemplateService {
   private readonly rootDir: string;
   private readonly builtinPacks: BuiltinTemplatePack[];
+  private readonly workspaceSourceAuthorizer: WorkspaceSourceAuthorizer | null;
+  private readonly candidateConfirmations = new Map<string, CandidateConfirmation>();
   private initialized: Promise<void> | null = null;
 
-  constructor(options: { rootDir: string; builtinPacks: BuiltinTemplatePack[] }) {
+  constructor(options: {
+    rootDir: string;
+    builtinPacks: BuiltinTemplatePack[];
+    workspaceSourceAuthorizer?: WorkspaceSourceAuthorizer;
+  }) {
     this.rootDir = options.rootDir;
     this.builtinPacks = options.builtinPacks;
+    this.workspaceSourceAuthorizer = options.workspaceSourceAuthorizer ?? null;
   }
 
   ensureInitialized(): Promise<void> {
@@ -536,14 +598,159 @@ export class PresentationTemplateService {
     }
   }
 
+  private candidateRelativePath(input: CandidateInput): string {
+    if (
+      !UUID_RE.test(input.conversationId) ||
+      !path.isAbsolute(input.workspaceRoot) ||
+      path.resolve(input.workspaceRoot) !== input.workspaceRoot ||
+      !path.isAbsolute(input.filePath) ||
+      path.resolve(input.filePath) !== input.filePath ||
+      !input.filePath.toLowerCase().endsWith('.md')
+    ) {
+      throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE');
+    }
+    const relativePath = path.relative(input.workspaceRoot, input.filePath);
+    if (
+      relativePath.length === 0 ||
+      path.isAbsolute(relativePath) ||
+      relativePath === '..' ||
+      relativePath.startsWith(`..${path.sep}`)
+    ) {
+      throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE');
+    }
+    return relativePath.split(path.sep).join('/');
+  }
+
+  private async readCandidate(input: CandidateInput): Promise<{
+    file: ResolvedPresentationTemplateFile;
+    authorization: PresentationSourcePathAuthorization;
+  }> {
+    const relativePath = this.candidateRelativePath(input);
+    if (this.workspaceSourceAuthorizer === null) {
+      throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE');
+    }
+    try {
+      const authorization = await this.workspaceSourceAuthorizer.authorizeWorkspaceSourcePath(
+        input.workspaceRoot,
+        relativePath
+      );
+      const file = await readStableFile(
+        authorization.canonicalSourcePath,
+        path.basename(authorization.canonicalSourcePath),
+        PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES
+      );
+      const currentAuthorization = await this.workspaceSourceAuthorizer.authorizeWorkspaceSourcePath(
+        input.workspaceRoot,
+        relativePath
+      );
+      if (!sameAuthorization(authorization, currentAuthorization)) {
+        throw new PresentationTemplateCandidateError('CANDIDATE_CHANGED');
+      }
+      return { file, authorization };
+    } catch (error) {
+      if (error instanceof PresentationTemplateCandidateError) throw error;
+      if (error instanceof PresentationTemplateResolutionError && error.code === 'RESOURCE_LIMIT_EXCEEDED') {
+        throw new PresentationTemplateCandidateError('CANDIDATE_TOO_LARGE', { cause: error });
+      }
+      throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE', { cause: error });
+    }
+  }
+
+  private confirmationKey(input: { conversationId: string; canonicalFilePath: string; sha256: string }): string {
+    return `${input.conversationId}\0${input.canonicalFilePath}\0${input.sha256}`;
+  }
+
+  private rememberConfirmation(key: string, confirmation: CandidateConfirmation): void {
+    this.candidateConfirmations.delete(key);
+    this.candidateConfirmations.set(key, confirmation);
+    while (this.candidateConfirmations.size > MAX_CANDIDATE_CONFIRMATIONS) {
+      const oldest = this.candidateConfirmations.keys().next().value;
+      if (oldest === undefined) break;
+      this.candidateConfirmations.delete(oldest);
+    }
+  }
+
+  /** Reads and previews one authorized workspace theme while minting its content confirmation. */
+  async describeThemeSpec(input: CandidateInput): Promise<PresentationTemplateCandidateDescription> {
+    const { file, authorization } = await this.readCandidate(input);
+    if (file.byteLength === 0) throw new PresentationTemplateCandidateError('CANDIDATE_UNSUPPORTED');
+    let themeMd: string;
+    try {
+      themeMd = STRICT_UTF8.decode(file.bytes);
+    } catch (error) {
+      throw new PresentationTemplateCandidateError('CANDIDATE_UNSUPPORTED', { cause: error });
+    }
+    const name = parseThemeName(themeMd, file.fileName);
+    if (name.length === 0) throw new PresentationTemplateCandidateError('CANDIDATE_UNSUPPORTED');
+    const tokens = parseThemeTokens(themeMd);
+    const confirmation: CandidateConfirmation = {
+      conversationId: input.conversationId,
+      workspaceRoot: authorization.allowedRootPath,
+      canonicalFilePath: authorization.canonicalSourcePath,
+      sha256: file.sha256,
+    };
+    this.rememberConfirmation(this.confirmationKey(confirmation), confirmation);
+    return {
+      name,
+      tokens,
+      preview_data_url: svgToDataUrl(
+        renderThemeThumbnailSvg({ name, format: 'html', colors: tokens.colors, fonts: tokens.fonts })
+      ),
+      sha256: file.sha256,
+      byte_length: file.byteLength,
+    };
+  }
+
+  /** Installs only bytes that still match a main-minted workspace confirmation. */
+  async importThemeSpecBound(input: CandidateInput & { expectedSha256: string }): Promise<PresentationTemplateSummary> {
+    if (!SHA256_RE.test(input.expectedSha256)) {
+      throw new PresentationTemplateCandidateError('CONFIRMATION_NOT_MINTED');
+    }
+    const { file, authorization } = await this.readCandidate(input);
+    if (file.sha256 !== input.expectedSha256) {
+      throw new PresentationTemplateCandidateError('CANDIDATE_CHANGED');
+    }
+    const key = this.confirmationKey({
+      conversationId: input.conversationId,
+      canonicalFilePath: authorization.canonicalSourcePath,
+      sha256: input.expectedSha256,
+    });
+    const confirmation = this.candidateConfirmations.get(key);
+    if (
+      confirmation === undefined ||
+      confirmation.workspaceRoot !== authorization.allowedRootPath ||
+      confirmation.canonicalFilePath !== authorization.canonicalSourcePath
+    ) {
+      throw new PresentationTemplateCandidateError('CONFIRMATION_NOT_MINTED');
+    }
+    if (confirmation.installPromise !== undefined) return confirmation.installPromise;
+    if (confirmation.installedId !== undefined) {
+      const installed = (await this.list()).find((template) => template.manifest.id === confirmation.installedId);
+      if (installed !== undefined) return installed;
+    }
+
+    const installPromise = this.installThemeSpecBytes(file.bytes, file.fileName).then((installed) => {
+      confirmation.installedId = installed.manifest.id;
+      return installed;
+    });
+    confirmation.installPromise = installPromise;
+    try {
+      return await installPromise;
+    } finally {
+      confirmation.installPromise = undefined;
+    }
+  }
+
   async importThemeSpec(filePath: string): Promise<PresentationTemplateSummary> {
     await this.ensureInitialized();
     if (!filePath.toLowerCase().endsWith('.md')) throw new Error('unsupported file type');
-    const themeMd = await readFile(filePath, 'utf-8');
-    const nameMatch = themeMd.match(/^#\s+(.+)$/m);
-    const name = (nameMatch ? nameMatch[1] : path.basename(filePath, '.md'))
-      .replace(/\s*[—-]\s*Theme Spec.*$/i, '')
-      .trim();
+    return this.installThemeSpecBytes(await readFile(filePath), filePath);
+  }
+
+  private async installThemeSpecBytes(themeBytes: Buffer, sourcePath: string): Promise<PresentationTemplateSummary> {
+    await this.ensureInitialized();
+    const themeMd = themeBytes.toString('utf-8');
+    const name = parseThemeName(themeMd, sourcePath);
     const id = await this.uniqueId(slugify(name));
     if (!TEMPLATE_ID_RE.test(id)) throw new Error(`invalid manifest: bad id: ${id}`);
 
@@ -565,7 +772,7 @@ export class PresentationTemplateService {
     const temporaryDir = await mkdtemp(path.join(this.rootDir, `${INSTALL_TEMP_PREFIX}${id}-`));
     let committed = false;
     try {
-      await writeFile(path.join(temporaryDir, 'THEME.md'), themeMd, 'utf-8');
+      await writeFile(path.join(temporaryDir, 'THEME.md'), themeBytes);
       await writeFile(
         path.join(temporaryDir, 'preview.svg'),
         renderThemeThumbnailSvg({ name, format: 'html', colors: tokens.colors, fonts: tokens.fonts }),

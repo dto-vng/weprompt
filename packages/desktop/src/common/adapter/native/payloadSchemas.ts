@@ -534,6 +534,16 @@ export const nativeBridgePayloadSchemas = {
     .optional(),
   'presentation-templates.list': voidPayloadSchema,
   'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
+  'presentation-templates.describe-spec': z
+    .object({ conversation_id: presentationUuidSchema, file_path: pathSchema })
+    .strict(),
+  'presentation-templates.import-spec-bound': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      file_path: pathSchema,
+      expected_sha256: presentationSha256Schema,
+    })
+    .strict(),
   'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
   'presentation-templates.scratch.allocate': z
     .object({ conversation_id: identifierSchema, template_id: identifierSchema })

@@ -24,8 +24,13 @@ import type {
   StartPresentationRunRequest,
   StartPresentationRunResult,
 } from '@/common/types/office/presentationRun';
+import type {
+  DescribePresentationTemplateCandidateResult,
+  ImportPresentationTemplateCandidateResult,
+  PresentationTemplateCandidateFailureCode,
+} from '@/common/types/office/presentationTemplate';
 import { BUILTIN_TEMPLATE_PACKS } from '@process/resources/presentation-templates/index';
-import { PresentationTemplateService } from './PresentationTemplateService';
+import { PresentationTemplateCandidateError, PresentationTemplateService } from './PresentationTemplateService';
 import {
   ArtifactScratchService,
   createPresentationSourceGrantService,
@@ -75,6 +80,13 @@ const getService = (): PresentationTemplateService => {
   service ??= new PresentationTemplateService({
     rootDir: path.join(app.getPath('userData'), 'presentation-templates'),
     builtinPacks: BUILTIN_TEMPLATE_PACKS,
+    workspaceSourceAuthorizer: {
+      authorizeWorkspaceSourcePath: (workspaceRoot, relativePath) => {
+        const files = getPresentationRunServices().files;
+        if (files === null) throw new Error('Presentation workspace authorization is unavailable');
+        return files.authorizeWorkspaceSourcePath(workspaceRoot, relativePath);
+      },
+    },
   });
   return service;
 };
@@ -383,6 +395,31 @@ const callPresentationRecoveryProvider = <Result>(operation: () => Promise<Resul
   return callPresentationSourceService(operation);
 };
 
+const candidateFailure = (
+  code: PresentationTemplateCandidateFailureCode
+): Extract<DescribePresentationTemplateCandidateResult, { ok: false }> => ({ ok: false, code });
+
+const resolveCandidateWorkspace = async (
+  conversationId: string
+): Promise<{ ok: true; workspace: string } | { ok: false; code: PresentationTemplateCandidateFailureCode }> => {
+  let resolution: Awaited<ReturnType<typeof resolvePresentationScope>>;
+  try {
+    resolution = await resolvePresentationScope({
+      conversationId,
+      principalId: PRESENTATION_PRINCIPAL_ID,
+    });
+  } catch {
+    return candidateFailure('SCOPE_UNAVAILABLE');
+  }
+  if (resolution.ok === false) return candidateFailure(resolution.code);
+  if (resolution.scope !== 'individual') return candidateFailure('TEAM_SCOPE_UNSUPPORTED');
+  if (resolution.workspace === null) return candidateFailure('SCOPE_UNAVAILABLE');
+  return { ok: true, workspace: resolution.workspace };
+};
+
+const mapCandidateError = (error: unknown): Extract<DescribePresentationTemplateCandidateResult, { ok: false }> =>
+  candidateFailure(error instanceof PresentationTemplateCandidateError ? error.code : 'INSTALL_FAILED');
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -484,6 +521,41 @@ export function initPresentationTemplateBridge(): void {
       return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcBridge.presentationTemplates.describeSpec.provider(async ({ conversation_id, file_path }) => {
+    const scope = await resolveCandidateWorkspace(conversation_id);
+    if (scope.ok === false) return scope;
+    try {
+      return {
+        ok: true as const,
+        candidate: await getService().describeThemeSpec({
+          conversationId: conversation_id,
+          workspaceRoot: scope.workspace,
+          filePath: file_path,
+        }),
+      };
+    } catch (error) {
+      return mapCandidateError(error);
+    }
+  });
+  ipcBridge.presentationTemplates.importSpecBound.provider(
+    async ({ conversation_id, file_path, expected_sha256 }): Promise<ImportPresentationTemplateCandidateResult> => {
+      const scope = await resolveCandidateWorkspace(conversation_id);
+      if (scope.ok === false) return scope;
+      try {
+        return {
+          ok: true,
+          template: await getService().importThemeSpecBound({
+            conversationId: conversation_id,
+            workspaceRoot: scope.workspace,
+            filePath: file_path,
+            expectedSha256: expected_sha256,
+          }),
+        };
+      } catch (error) {
+        return mapCandidateError(error);
+      }
+    }
+  );
   ipcBridge.presentationTemplates.remove.provider(({ id }) => getService().remove(id));
   ipcBridge.presentationTemplates.allocateScratch.provider(({ conversation_id, template_id }) =>
     getArtifactScratchService().allocate({ conversationId: conversation_id, templateId: template_id })

@@ -83,8 +83,10 @@ vi.mock('@/common', () => ({
     presentationTemplates: {
       allocateScratch: provider('allocateScratch'),
       completeScratch: provider('completeScratch'),
+      describeSpec: provider('describeSpec'),
       discardScratch: provider('discardScratch'),
       importSpec: provider('importSpec'),
+      importSpecBound: provider('importSpecBound'),
       list: provider('list'),
       remove: provider('remove'),
       retainScratch: provider('retainScratch'),

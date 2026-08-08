@@ -39,6 +39,8 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'show-open',
   'presentation-templates.list',
   'presentation-templates.import-spec',
+  'presentation-templates.describe-spec',
+  'presentation-templates.import-spec-bound',
   'presentation-templates.remove',
   'presentation-templates.scratch.allocate',
   'presentation-templates.scratch.complete',
