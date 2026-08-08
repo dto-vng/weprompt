@@ -100,13 +100,39 @@ into production as a side effect of a reasoning epic. Instead:
 
 ---
 
+## Addendum — DR-1 precondition investigated (2026-08-08, same day)
+
+The reconciliation was run with live fetches of both `iOfficeAI/AionCore` and the Forge mirror.
+Findings, in decreasing order of comfort:
+
+1. **WePrompt's accepted lineage 27 is exactly upstream `v0.1.50`** (27 migrations, highest
+   `027_provider_model_settings`, release commit `4089fced543d`), consistent with the repo's
+   `aioncoreVersion: v0.1.50` pin. The shipped state is coherent.
+2. **The evidence base maps to upstream `v0.1.62`** — `81ef2589` is an ancestor of the `v0.1.62`
+   release commit `35707c0a249964227c1b227b34b93e2bcf0d08f8`, and `v0.1.62` carries exactly the 37
+   migrations the matrix inspected. **The DR-3 bump target is therefore `v0.1.62`** (a release, not
+   an arbitrary commit), and the lineage extension 28–37 is derived from its tree.
+3. **`ACCEPTED_AIONCORE_SOURCE_COMMIT` (`260dbbc05…`) is not resolvable anywhere we can see** — not
+   in upstream after a full fetch, not in the Forge mirror after a full fetch, and the GitHub API
+   returns "No commit found". The pin still _functions_ (it gates Actions-run `head_sha` at
+   download time), but the accepted source is no longer independently auditable. This strengthens
+   the case for the bump and adds an open question: **who built `260dbbc05`, from which branch, and
+   does it carry the team's fork patches** (the `preset_context`/`preset_rules` injection the fork
+   maintains)? If it does, the bump must be fork-patches-rebased-onto-`v0.1.62`, not stock
+   upstream, and the final accepted SHA is the rebased build commit.
+4. The `v0.1.62` CI run on upstream completed successfully but retains **zero artifacts**, so the
+   packaging path runs through the Forge mirror's self-built, cosign-signed release as designed.
+   The bump is not mergeable until that Forge build exists; the preparation branch is expected to
+   be complete-but-held.
+
 ## Remaining open questions (not decided here)
 
-| #   | Question                                                                                                             | Owner                                                                                                                       | Blocking?                                                                                  |
-| --- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 1   | Exact AionCore request/startup DTO field carrying `{ backend, providerId, capabilityRevision, modelId }` into AionRS | AionCore slice design (fork branch)                                                                                         | Blocks the AionRS slice's wire task only                                                   |
-| 2   | Is `kimi-k2.5` still admitted given its documented 2026-08-31 sunset?                                                | Controller                                                                                                                  | No — matrix default already answers: no new K2.5 rollout behaviour without an explicit yes |
-| 3   | Packaged-schema/release coordination proving migrations + contract v1 before the UI becomes writable                 | Resolved in substance by DR-2/DR-3 (single-source floor + pre-epic bump); the release checklist item remains with packaging | No                                                                                         |
+| #   | Question                                                                                                                         | Owner                                                                                                                       | Blocking?                                                                                  |
+| --- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | Exact AionCore request/startup DTO field carrying `{ backend, providerId, capabilityRevision, modelId }` into AionRS             | AionCore slice design (fork branch)                                                                                         | Blocks the AionRS slice's wire task only                                                   |
+| 1b  | Who built accepted commit `260dbbc05`, from which branch, and does it carry the fork's `preset_context` patches? (See addendum.) | Controller / whoever runs Forge builds                                                                                      | **Yes — blocks merging the DR-3 bump** (determines stock-vs-fork rebase target)            |
+| 2   | Is `kimi-k2.5` still admitted given its documented 2026-08-31 sunset?                                                            | Controller                                                                                                                  | No — matrix default already answers: no new K2.5 rollout behaviour without an explicit yes |
+| 3   | Packaged-schema/release coordination proving migrations + contract v1 before the UI becomes writable                             | Resolved in substance by DR-2/DR-3 (single-source floor + pre-epic bump); the release checklist item remains with packaging | No                                                                                         |
 
 ## Consequences for the G3 plans
 
