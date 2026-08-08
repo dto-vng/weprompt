@@ -6,7 +6,20 @@
 
 import { createHash } from 'node:crypto';
 import { renameSync } from 'node:fs';
-import { mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, truncate, writeFile } from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  open,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  symlink,
+  truncate,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +31,8 @@ import {
   type BuiltinTemplatePack,
 } from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
+
+vi.mock('node:fs/promises', { spy: true });
 
 const pack = (id: string, version = 1): BuiltinTemplatePack => ({
   manifest: {
@@ -201,6 +216,99 @@ describe('PresentationTemplateService', () => {
     const second = await service.importThemeSpec(specPath);
     expect(first.manifest.id).toBe('same-name');
     expect(second.manifest.id).toBe('same-name-2');
+  });
+
+  it('uses only a gallery-hidden temporary while a failed import is incomplete', async () => {
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+    await service.ensureInitialized();
+    const specPath = path.join(rootDir, 'crash-safe-theme.md');
+    await writeFile(specPath, '# Crash Safe Theme\ncontent', 'utf-8');
+    let incompleteEntries: string[] = [];
+    let listedIdsDuringImport: string[] = [];
+    const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+      if (path.basename(file.toString()) === 'preview.svg') {
+        incompleteEntries = await actualFsPromises.readdir(rootDir);
+        listedIdsDuringImport = (await service.list()).map((summary) => summary.manifest.id);
+        throw new Error('injected preview write failure');
+      }
+      return actualFsPromises.writeFile(file, data, options);
+    });
+
+    try {
+      await expect(service.importThemeSpec(specPath)).rejects.toThrow('injected preview write failure');
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    expect({
+      hasFinalPath: incompleteEntries.includes('crash-safe-theme'),
+      temporaryCount: incompleteEntries.filter((name) => name.startsWith('.aionui-template-install-')).length,
+      listedIdsDuringImport,
+    }).toEqual({ hasFinalPath: false, temporaryCount: 1, listedIdsDuringImport: [] });
+    expect(await readdir(rootDir)).not.toContain('crash-safe-theme');
+  });
+
+  it('retries a failed import with the intended id', async () => {
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+    await service.ensureInitialized();
+    const specPath = path.join(rootDir, 'retry-theme.md');
+    await writeFile(specPath, '# Retry Theme\ncontent', 'utf-8');
+    const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+      if (path.basename(file.toString()) === 'preview.svg') throw new Error('injected preview write failure');
+      return actualFsPromises.writeFile(file, data, options);
+    });
+
+    await expect(service.importThemeSpec(specPath)).rejects.toThrow('injected preview write failure');
+    writeSpy.mockRestore();
+
+    const retried = await service.importThemeSpec(specPath);
+
+    expect(retried.manifest.id).toBe('retry-theme');
+  });
+
+  it('removes at most twenty stale install temporaries during initialization', async () => {
+    const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const staleNames = Array.from(
+      { length: 22 },
+      (_, index) => `.aionui-template-install-stale-${index.toString().padStart(2, '0')}-ABC123`
+    );
+    await Promise.all(
+      staleNames.map(async (name) => {
+        const directory = path.join(rootDir, name);
+        await mkdir(directory);
+        await utimes(directory, staleTime, staleTime);
+      })
+    );
+    const recentName = '.aionui-template-install-recent-ABC123';
+    await mkdir(path.join(rootDir, recentName));
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await service.ensureInitialized();
+
+    const remainingTemporaries = (await readdir(rootDir)).filter((name) =>
+      name.startsWith('.aionui-template-install-')
+    );
+    expect(remainingTemporaries).toHaveLength(3);
+    expect(remainingTemporaries).toContain(recentName);
+  });
+
+  it('never cleans nonmatching directories or matching regular files', async () => {
+    const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const similarDirectory = path.join(rootDir, '.aionui-template-install-not-ours');
+    const matchingFile = path.join(rootDir, '.aionui-template-install-file-ABC123');
+    await mkdir(similarDirectory);
+    await writeFile(matchingFile, 'keep', 'utf-8');
+    await Promise.all([utimes(similarDirectory, staleTime, staleTime), utimes(matchingFile, staleTime, staleTime)]);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await service.ensureInitialized();
+
+    expect(await readdir(rootDir)).toEqual([
+      '.aionui-template-install-file-ABC123',
+      '.aionui-template-install-not-ours',
+    ]);
   });
 
   it('rejects non-md files', async () => {

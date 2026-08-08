@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 import { constants, type BigIntStats } from 'node:fs';
-import { lstat, mkdir, open, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
@@ -19,6 +19,11 @@ import { TEMPLATE_ID_RE, validateTemplateManifest } from './templateManifest';
 import { parseThemeTokens, renderThemeThumbnailSvg, svgToDataUrl } from './themeThumbnail';
 
 const MANIFEST_FILE = 'template.json';
+const INSTALL_TEMP_PREFIX = '.aionui-template-install-';
+const INSTALL_TEMP_DIRECTORY_RE = /^\.aionui-template-install-[a-z0-9][a-z0-9-]{1,63}-[A-Za-z0-9]{6}$/;
+const INSTALL_TEMP_STALE_MS = 24 * 60 * 60 * 1000;
+const MAX_INSTALL_TEMP_INSPECTIONS = 100;
+const MAX_INSTALL_TEMP_REMOVALS = 20;
 const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
 const DIRECTORY_ONLY = constants.O_DIRECTORY ?? 0;
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
@@ -309,6 +314,11 @@ export class PresentationTemplateService {
   private async syncBuiltins(): Promise<void> {
     const stableRoot = await openOrCreateStableDirectory(this.rootDir);
     try {
+      // Bracket the only destructive step the same way the pack loop below does: the root is
+      // proven before anything is removed, not only after.
+      await assertStableDirectoryIdentity(this.rootDir, stableRoot);
+      await this.cleanupStaleInstallTemporaries();
+      await assertStableDirectoryIdentity(this.rootDir, stableRoot);
       for (const pack of this.builtinPacks) {
         const dir = path.join(this.rootDir, pack.manifest.id);
         let stablePack: StableDirectory | null = null;
@@ -348,6 +358,28 @@ export class PresentationTemplateService {
         await assertStableDirectoryIdentity(this.rootDir, stableRoot);
       } finally {
         await stableRoot.handle.close();
+      }
+    }
+  }
+
+  private async cleanupStaleInstallTemporaries(): Promise<void> {
+    const entries = await readdir(this.rootDir, { withFileTypes: true });
+    const candidates = entries
+      .filter((entry) => entry.isDirectory() && INSTALL_TEMP_DIRECTORY_RE.test(entry.name))
+      .slice(0, MAX_INSTALL_TEMP_INSPECTIONS);
+    let removed = 0;
+    for (const candidate of candidates) {
+      if (removed >= MAX_INSTALL_TEMP_REMOVALS) break;
+      const directory = path.join(this.rootDir, candidate.name);
+      try {
+        // eslint-disable-next-line no-await-in-loop -- cleanup is bounded and stops at the removal cap
+        const metadata = await lstat(directory);
+        if (!metadata.isDirectory() || Date.now() - metadata.mtimeMs < INSTALL_TEMP_STALE_MS) continue;
+        // eslint-disable-next-line no-await-in-loop -- stale directories are removed serially to enforce the cap
+        await rm(directory, { recursive: true, force: true });
+        removed += 1;
+      } catch (error) {
+        console.warn('[PresentationTemplates] failed to clean stale install temporary', candidate.name, error);
       }
     }
   }
@@ -403,6 +435,7 @@ export class PresentationTemplateService {
     const summaries: PresentationTemplateSummary[] = [];
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+      if (INSTALL_TEMP_DIRECTORY_RE.test(entry.name)) continue;
       const manifest = await this.readManifest(path.join(this.rootDir, entry.name));
       if (!manifest || manifest.id !== entry.name) continue;
       try {
@@ -529,14 +562,21 @@ export class PresentationTemplateService {
       createdAt: new Date().toISOString(),
     };
     const dir = path.join(this.rootDir, id);
-    await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, 'THEME.md'), themeMd, 'utf-8');
-    await writeFile(
-      path.join(dir, 'preview.svg'),
-      renderThemeThumbnailSvg({ name, format: 'html', colors: tokens.colors, fonts: tokens.fonts }),
-      'utf-8'
-    );
-    await writeFile(path.join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), 'utf-8');
+    const temporaryDir = await mkdtemp(path.join(this.rootDir, `${INSTALL_TEMP_PREFIX}${id}-`));
+    let committed = false;
+    try {
+      await writeFile(path.join(temporaryDir, 'THEME.md'), themeMd, 'utf-8');
+      await writeFile(
+        path.join(temporaryDir, 'preview.svg'),
+        renderThemeThumbnailSvg({ name, format: 'html', colors: tokens.colors, fonts: tokens.fonts }),
+        'utf-8'
+      );
+      await writeFile(path.join(temporaryDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), 'utf-8');
+      await rename(temporaryDir, dir);
+      committed = true;
+    } finally {
+      if (!committed) await rm(temporaryDir, { recursive: true, force: true });
+    }
     return this.toSummary(manifest);
   }
 
