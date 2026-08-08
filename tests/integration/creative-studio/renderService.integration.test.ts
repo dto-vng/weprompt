@@ -8,9 +8,11 @@
 
 import { createHash } from 'node:crypto';
 import { execFile as execFileCallback, spawn, spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { createReadStream, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { promisify } from 'node:util';
 import type {
   StudioAsset,
@@ -81,6 +83,36 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void; reje
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+};
+
+const fakeChild = (
+  onKill: (signal: NodeJS.Signals, child: EventEmitter) => void = (_signal, child) => {
+    queueMicrotask(() => child.emit('close', null));
+  }
+): ReturnType<StudioRenderSpawn> => {
+  const child = new EventEmitter() as EventEmitter & {
+    stdin: PassThrough;
+    stdout: PassThrough;
+    stderr: PassThrough;
+    kill(signal?: NodeJS.Signals): boolean;
+  };
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.kill = (signal = 'SIGTERM') => {
+    onKill(signal, child);
+    return true;
+  };
+  return child as ReturnType<StudioRenderSpawn>;
+};
+
+const completeFakeChild = (child: ReturnType<StudioRenderSpawn>, code = 0, stdout = ''): void => {
+  queueMicrotask(() => {
+    if (stdout) child.stdout.write(stdout);
+    child.stdout.end();
+    child.stderr.end();
+    child.emit('close', code);
+  });
 };
 
 const run = async (command: string, args: string[]): Promise<{ stdout: string; stderr: string }> => {
@@ -684,6 +716,37 @@ describe('Studio render runner', () => {
       progress: 0,
       missingSceneIds: ['scene_2'],
     });
+  });
+
+  it('cancels every active render and waits for termination during disposal', async () => {
+    const first = deferred<StudioRenderResult>();
+    const second = deferred<StudioRenderResult>();
+    const cancellations: string[] = [];
+    const runner = createStudioRenderRunner({
+      startOperation: (projectId) => ({
+        result: projectId === 'project_1' ? first.promise : second.promise,
+        cancel: () => {
+          cancellations.push(projectId);
+        },
+      }),
+      onStateChanged: vi.fn(),
+    });
+    const renderOne = runner.renderCut('project_1');
+    const renderTwo = runner.renderCut('project_2');
+
+    let disposed = false;
+    const disposal = runner.dispose().then(() => {
+      disposed = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(cancellations).toEqual(['project_1', 'project_2']);
+    expect(disposed).toBe(false);
+    first.resolve({ status: 'cancelled', missingSceneIds: [] });
+    second.resolve({ status: 'cancelled', missingSceneIds: [] });
+    await Promise.allSettled([renderOne, renderTwo]);
+    await disposal;
+    expect(disposed).toBe(true);
   });
 
   it.each([
@@ -1405,6 +1468,132 @@ describe.skipIf(!ffmpegAvailable)('renderCut with real ffmpeg and ffprobe', () =
     expect(() => process.kill(segmentProcessId!, 0)).toThrow();
     await expect(fs.readdir(harness.temporaryRoot)).resolves.toEqual([]);
     await expect(fs.access(harness.outputPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  }, 60_000);
+
+  it('escalates cancellation from SIGTERM to SIGKILL when ffmpeg ignores termination', async () => {
+    const harness = await createHarness([
+      { id: 'scene_long', mediaKind: 'image', durationSeconds: 60, fixture: 'image' },
+    ]);
+    const signals: NodeJS.Signals[] = [];
+    let operation: ReturnType<typeof renderCut>;
+    const spawnProcess: StudioRenderSpawn = (command, args, options) => {
+      if (!args.some((argument) => argument.endsWith('segment-0000.mp4'))) return spawn(command, args, options);
+      const child = fakeChild((signal, emitter) => {
+        signals.push(signal);
+        if (signal === 'SIGKILL') queueMicrotask(() => emitter.emit('close', null));
+      });
+      queueMicrotask(() => operation.cancel());
+      return child;
+    };
+
+    operation = renderCut('project_1', {
+      store: harness.store,
+      mediaStore: harness.mediaStore,
+      spawnProcess,
+      environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+      temporaryRoot: harness.temporaryRoot,
+      terminationGraceMs: 5,
+    });
+
+    await expect(operation.result).resolves.toEqual({ status: 'cancelled', missingSceneIds: [] });
+    expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+  }, 60_000);
+
+  it('finalizes an exited ffmpeg child, cleans its temp directory, and releases the project busy slot', async () => {
+    const harness = await createHarness([
+      { id: 'scene_exit', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+    ]);
+    let failSegment = true;
+    const spawnProcess: StudioRenderSpawn = (command, args, options) => {
+      if (failSegment && args.some((argument) => argument.endsWith('segment-0000.mp4'))) {
+        failSegment = false;
+        const child = fakeChild();
+        queueMicrotask(() => child.emit('exit', null, 'SIGKILL'));
+        return child;
+      }
+      return spawn(command, args, options);
+    };
+    const runner = createStudioRenderRunner({
+      startOperation: (projectId, onProgress) =>
+        renderCut(projectId, {
+          store: harness.store,
+          mediaStore: harness.mediaStore,
+          spawnProcess,
+          onProgress,
+          environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+          temporaryRoot: harness.temporaryRoot,
+        }),
+      onStateChanged: vi.fn(),
+    });
+
+    await expect(
+      Promise.race([
+        runner.renderCut('project_1'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('abnormal exit did not settle')), 250)),
+      ])
+    ).rejects.toMatchObject({ code: 'render_failed' });
+    expect(runner.getState('project_1')).toMatchObject({ status: 'failed', errorCode: 'render_failed' });
+    await expect(fs.readdir(harness.temporaryRoot)).resolves.toEqual([]);
+    await expect(runner.renderCut('project_1')).resolves.toMatchObject({ assetId: 'render_asset' });
+  }, 60_000);
+
+  it('rejects a zero-dimension decoded asset before starting its segment encoder', async () => {
+    const harness = await createHarness([
+      { id: 'scene_zero', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+    ]);
+    let segmentStarted = false;
+    const spawnProcess: StudioRenderSpawn = (command, args) => {
+      const child = fakeChild();
+      if (path.basename(command).startsWith('ffprobe')) {
+        completeFakeChild(child, 0, JSON.stringify({ streams: [{ width: 0, height: 0 }] }));
+      } else if (args.some((argument) => argument.endsWith('segment-0000.mp4'))) {
+        segmentStarted = true;
+        completeFakeChild(child);
+      } else {
+        completeFakeChild(child);
+      }
+      return child;
+    };
+
+    await expect(
+      renderCut('project_1', {
+        store: harness.store,
+        mediaStore: harness.mediaStore,
+        spawnProcess,
+        environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+        temporaryRoot: harness.temporaryRoot,
+      }).result
+    ).rejects.toMatchObject({ code: 'render_failed' });
+    expect(segmentStarted).toBe(false);
+    await expect(fs.readdir(harness.temporaryRoot)).resolves.toEqual([]);
+  });
+
+  it('bounds a segment that produces no frame and reports render_failed', async () => {
+    const harness = await createHarness([
+      { id: 'scene_hung', mediaKind: 'image', durationSeconds: 1, fixture: 'image' },
+    ]);
+    const signals: NodeJS.Signals[] = [];
+    const spawnProcess: StudioRenderSpawn = (command, args, options) => {
+      if (!args.some((argument) => argument.endsWith('segment-0000.mp4'))) return spawn(command, args, options);
+      return fakeChild((signal, emitter) => {
+        signals.push(signal);
+        if (signal === 'SIGKILL') queueMicrotask(() => emitter.emit('close', null));
+      });
+    };
+
+    await expect(
+      renderCut('project_1', {
+        store: harness.store,
+        mediaStore: harness.mediaStore,
+        spawnProcess,
+        environment: { ...process.env, FFMPEG_PATH: ffmpegPath },
+        temporaryRoot: harness.temporaryRoot,
+        segmentTimeoutMs: 5,
+        terminationGraceMs: 5,
+      }).result
+    ).rejects.toMatchObject({ code: 'render_failed' });
+    expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
+    await expect(fs.readdir(harness.temporaryRoot)).resolves.toEqual([]);
   }, 60_000);
 
   it('reports ffmpeg_unavailable without changing the project or leaving temporary files', async () => {

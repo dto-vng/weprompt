@@ -32,6 +32,8 @@ const RENDER_PIXEL_FORMAT = 'yuv420p';
 const STDERR_TAIL_BYTES = 16 * 1024;
 const NORMALISE_PROGRESS_SHARE = 0.75;
 const CONCAT_PROGRESS_SHARE = 0.24;
+const DEFAULT_TERMINATION_GRACE_MS = 1_000;
+const DEFAULT_SEGMENT_TIMEOUT_MS = 120_000;
 
 const RENDER_DIMENSIONS = {
   '720p': {
@@ -84,6 +86,8 @@ export type StudioRenderDeps = {
   environment?: NodeJS.ProcessEnv;
   temporaryRoot?: string;
   spawnProcess?: StudioRenderSpawn;
+  terminationGraceMs?: number;
+  segmentTimeoutMs?: number;
 };
 
 export class CreativeStudioRenderError extends Error {
@@ -112,11 +116,13 @@ type RenderState = {
   cancelled: boolean;
   activeProcess: ChildProcessWithoutNullStreams | null;
   activeStream: Readable | null;
+  activeTerminationTimer: NodeJS.Timeout | null;
 };
 
 type FfmpegRunResult = {
   code: number | null;
   stderrTail: string;
+  stdoutTail: string;
 };
 
 class RenderCancelledError extends Error {}
@@ -300,6 +306,16 @@ const unavailableSpawnError = (error: unknown): boolean => {
   return code === 'ENOENT' || code === 'EACCES' || code === 'ENOTDIR';
 };
 
+const positiveTimeout = (value: number | undefined, fallback: number): number =>
+  value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const terminateProcess = (child: ChildProcessWithoutNullStreams, graceMs: number): NodeJS.Timeout => {
+  child.kill('SIGTERM');
+  const timer = setTimeout(() => child.kill('SIGKILL'), graceMs);
+  timer.unref?.();
+  return timer;
+};
+
 const runFfmpeg = (
   binary: string,
   args: string[],
@@ -310,6 +326,8 @@ const runFfmpeg = (
     cwd?: string;
     onOutTime?: (seconds: number) => void;
     onFrame?: (frame: number) => void;
+    timeoutMs?: number;
+    terminationGraceMs: number;
   }
 ): Promise<FfmpegRunResult> => {
   if (options.state.cancelled) return Promise.reject(new RenderCancelledError());
@@ -332,17 +350,28 @@ const runFfmpeg = (
     options.state.activeProcess = child;
     let settled = false;
     let stderrTail = '';
+    let stdoutTail = '';
     let progressBuffer = '';
+    let terminationTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+    let timedOut = false;
     const finish = (work: () => void): void => {
       if (settled) return;
       settled = true;
-      if (options.state.activeProcess === child) options.state.activeProcess = null;
+      if (terminationTimer !== null) clearTimeout(terminationTimer);
+      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      if (options.state.activeProcess === child) {
+        if (options.state.activeTerminationTimer !== null) clearTimeout(options.state.activeTerminationTimer);
+        options.state.activeTerminationTimer = null;
+        options.state.activeProcess = null;
+      }
       work();
     };
     child.stderr.on('data', (chunk: Buffer) => {
       stderrTail = appendTail(stderrTail, chunk);
     });
     child.stdout.on('data', (chunk: Buffer) => {
+      stdoutTail = appendTail(stdoutTail, chunk);
       progressBuffer += chunk.toString('utf8');
       const lines = progressBuffer.split(/\r?\n/);
       progressBuffer = lines.pop() ?? '';
@@ -360,12 +389,29 @@ const runFfmpeg = (
         else reject(new CreativeStudioRenderError('render_failed'));
       });
     });
+    child.once('exit', (code, signal) => {
+      if (code === 0 && signal === null) return;
+      finish(() => {
+        if (options.state.cancelled) reject(new RenderCancelledError());
+        else if (timedOut) reject(new CreativeStudioRenderError('render_failed', stderrTail || undefined));
+        else resolve({ code, stderrTail, stdoutTail });
+      });
+    });
     child.once('close', (code) => {
       finish(() => {
         if (options.state.cancelled) reject(new RenderCancelledError());
-        else resolve({ code, stderrTail });
+        else if (timedOut) reject(new CreativeStudioRenderError('render_failed', stderrTail || undefined));
+        else resolve({ code, stderrTail, stdoutTail });
       });
     });
+    if (options.timeoutMs !== undefined) {
+      timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        terminationTimer = terminateProcess(child, options.terminationGraceMs);
+        options.state.activeTerminationTimer = terminationTimer;
+      }, options.timeoutMs);
+      timeoutTimer.unref?.();
+    }
   });
 };
 
@@ -376,6 +422,45 @@ const requireSuccess = (result: FfmpegRunResult, temporaryDirectory: string): vo
   if (result.code === 0) return;
   const tail = sanitizedTail(result.stderrTail, temporaryDirectory);
   throw new CreativeStudioRenderError('render_failed', tail || undefined);
+};
+
+const resolveFfprobeBinary = (ffmpegBinary: string, environment: NodeJS.ProcessEnv): string => {
+  const configured = environment.FFPROBE_PATH?.trim();
+  if (configured) return configured;
+  if (!ffmpegBinary.includes(path.sep)) return 'ffprobe';
+  const extension = path.extname(ffmpegBinary).toLowerCase() === '.exe' ? '.exe' : '';
+  return path.join(path.dirname(ffmpegBinary), `ffprobe${extension}`);
+};
+
+const validateDecodedDimensions = async (
+  ffmpegBinary: string,
+  inputPath: string,
+  runOptions: Parameters<typeof runFfmpeg>[2],
+  temporaryDirectory: string,
+  timeoutMs: number
+): Promise<void> => {
+  const result = await runFfmpeg(
+    resolveFfprobeBinary(ffmpegBinary, runOptions.environment),
+    ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', inputPath],
+    { ...runOptions, timeoutMs }
+  );
+  requireSuccess(result, temporaryDirectory);
+  try {
+    const parsed = JSON.parse(result.stdoutTail) as { streams?: Array<{ width?: unknown; height?: unknown }> };
+    const decodable = parsed.streams?.some(
+      ({ width, height }) =>
+        typeof width === 'number' &&
+        Number.isFinite(width) &&
+        width > 0 &&
+        typeof height === 'number' &&
+        Number.isFinite(height) &&
+        height > 0
+    );
+    if (!decodable) throw new CreativeStudioRenderError('render_failed');
+  } catch (error) {
+    if (error instanceof CreativeStudioRenderError) throw error;
+    throw new CreativeStudioRenderError('render_failed');
+  }
 };
 
 const selectEncoder = async (
@@ -434,13 +519,17 @@ const videoHasAudio = async (
 
 const normalizationFilter = (
   { width, height }: { width: number; height: number },
-  edits: RenderSegment['edits']
+  edits: RenderSegment['edits'],
+  stillDurationSeconds?: number
 ): string => {
   const trim = trimFilterOptions(edits);
   const colour = edits.filters.some(({ amount }) => amount !== 0)
     ? colourMatrixFilter(deriveColourMatrix(edits.filters))
     : null;
   return [
+    ...(stillDurationSeconds === undefined
+      ? []
+      : [`tpad=stop_mode=clone:stop_duration=${stillDurationSeconds}`, `trim=duration=${stillDurationSeconds}`]),
     ...(trim.length === 0 ? [] : [`trim=${trim.join(':')}`, 'setpts=PTS-STARTPTS']),
     ...(edits.crop === null ? [] : [cropFilter(edits.crop)]),
     ...(colour === null ? [] : [colour]),
@@ -474,10 +563,15 @@ const encodeSegment = async (
   const durationArgs: string[] = [];
   let audioFilter: string;
   if (segment.scene.mediaKind === 'image') {
-    inputArgs.push('-loop', '1', '-t', String(segment.scene.durationSeconds), '-i', inputPath);
+    inputArgs.push('-i', inputPath);
     inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     mappingArgs.push('-map', '1:a:0');
-    durationArgs.push('-t', String(segment.scene.durationSeconds));
+    durationArgs.push(
+      '-t',
+      String(segment.scene.durationSeconds),
+      '-frames:v',
+      String(Math.ceil(segment.scene.durationSeconds * RENDER_FPS))
+    );
     audioFilter = audioFilterWithTrim('asetpts=PTS-STARTPTS', segment.edits);
   } else if (await videoHasAudio(binary, inputPath, runOptions, temporaryDirectory)) {
     inputArgs.push('-i', inputPath);
@@ -503,7 +597,11 @@ const encodeSegment = async (
       ...inputArgs,
       ...mappingArgs,
       '-vf',
-      normalizationFilter(dimensions, segment.edits),
+      normalizationFilter(
+        dimensions,
+        segment.edits,
+        segment.scene.mediaKind === 'image' ? segment.scene.durationSeconds : undefined
+      ),
       '-af',
       audioFilter,
       ...durationArgs,
@@ -542,7 +640,7 @@ const encodeSegment = async (
       '-y',
       outputPath,
     ],
-    { ...runOptions, onOutTime }
+    { ...runOptions, onOutTime, timeoutMs: runOptions.timeoutMs }
   );
   requireSuccess(result, temporaryDirectory);
 };
@@ -764,8 +862,21 @@ const executeRender = async (
     const binary = environment.FFMPEG_PATH?.trim() || 'ffmpeg';
     const spawnProcess: StudioRenderSpawn =
       deps.spawnProcess ?? ((command, args, options) => spawn(command, args, options));
-    const runOptions = { state, environment, spawnProcess };
+    const terminationGraceMs = positiveTimeout(deps.terminationGraceMs, DEFAULT_TERMINATION_GRACE_MS);
+    const segmentTimeoutMs = positiveTimeout(deps.segmentTimeoutMs, DEFAULT_SEGMENT_TIMEOUT_MS);
+    const runOptions = { state, environment, spawnProcess, terminationGraceMs };
     const dimensions = resolveStudioRenderDimensions(project.resolution, project.aspectRatio);
+    for (const segment of selection.segments) {
+      // Validate every copied asset before any segment encoder can enter an unbounded decode loop.
+      // eslint-disable-next-line no-await-in-loop
+      await validateDecodedDimensions(
+        binary,
+        segment.inputPath!,
+        runOptions,
+        temporaryDirectory,
+        DEFAULT_SEGMENT_TIMEOUT_MS
+      );
+    }
     const encoder = await selectEncoder(binary, dimensions, runOptions, temporaryDirectory);
     const expectedDurations = selection.segments.map(expectedSegmentDuration);
     const hasKnownDuration = expectedDurations.every((duration): duration is number => duration !== undefined);
@@ -775,15 +886,23 @@ const executeRender = async (
       const segmentDuration = expectedDurations[index];
       // Sequential encoding keeps ffmpeg resource use bounded and produces deterministic progress.
       // eslint-disable-next-line no-await-in-loop
-      await encodeSegment(binary, encoder, segment, dimensions, runOptions, temporaryDirectory, (outTime) => {
-        if (totalDuration !== null) {
-          reportProgress({
-            progress: NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration),
-            clipIndex: index + 1,
-            clipTotal,
-          });
+      await encodeSegment(
+        binary,
+        encoder,
+        segment,
+        dimensions,
+        { ...runOptions, timeoutMs: segmentTimeoutMs },
+        temporaryDirectory,
+        (outTime) => {
+          if (totalDuration !== null) {
+            reportProgress({
+              progress: NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration),
+              clipIndex: index + 1,
+              clipTotal,
+            });
+          }
         }
-      });
+      );
       if (trimFilterOptions(segment.edits).length !== 0) {
         // The concat demuxer otherwise advances by AAC-padded container duration and leaves a frame gap.
         // eslint-disable-next-line no-await-in-loop
@@ -843,6 +962,8 @@ const executeRender = async (
   } finally {
     state.activeStream = null;
     state.activeProcess = null;
+    if (state.activeTerminationTimer !== null) clearTimeout(state.activeTerminationTimer);
+    state.activeTerminationTimer = null;
     if (temporaryDirectory !== null) {
       await fs.rm(temporaryDirectory, { recursive: true, force: true }).catch((): undefined => undefined);
     }
@@ -851,7 +972,12 @@ const executeRender = async (
 
 /** Starts an active-cut render without entering the project's serialized mutation queue. */
 export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRenderOperation => {
-  const state: RenderState = { cancelled: false, activeProcess: null, activeStream: null };
+  const state: RenderState = {
+    cancelled: false,
+    activeProcess: null,
+    activeStream: null,
+    activeTerminationTimer: null,
+  };
   let lastProgress = 0;
   let lastClipIndex = 0;
   const reportProgress = (update: StudioRenderProgress): void => {
@@ -871,7 +997,12 @@ export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRend
       if (state.cancelled) return;
       state.cancelled = true;
       state.activeStream?.destroy(new RenderCancelledError());
-      state.activeProcess?.kill('SIGKILL');
+      if (state.activeProcess !== null) {
+        state.activeTerminationTimer = terminateProcess(
+          state.activeProcess,
+          positiveTimeout(deps.terminationGraceMs, DEFAULT_TERMINATION_GRACE_MS)
+        );
+      }
     },
   };
   return operation;
@@ -881,6 +1012,7 @@ export type StudioRenderRunner = {
   renderCut(projectId: string): Promise<StudioRenderCutResult>;
   cancelRender(projectId: string): boolean;
   getState(projectId: string): StudioRenderProgressEvent | null;
+  dispose(): Promise<void>;
 };
 
 export type StudioRenderRunnerDeps = {
@@ -1012,6 +1144,11 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
     getState(projectId): StudioRenderProgressEvent | null {
       const state = states.get(projectId);
       return state === undefined ? null : cloneRenderState(state);
+    },
+    async dispose(): Promise<void> {
+      const operations = [...activeOperations.values()];
+      for (const operation of operations) operation.cancel();
+      await Promise.allSettled(operations.map(({ result }) => result));
     },
   };
 };

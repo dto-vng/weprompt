@@ -226,7 +226,7 @@ export const createCreativeStudioRuntime = (deps: CreativeStudioRuntimeDeps): Cr
         }
         disposeProposalWatcher = null;
       }
-      for (const disposeBoundary of [storyboardPlanner.dispose, jobManager.dispose]) {
+      for (const disposeBoundary of [renderRunner.dispose, storyboardPlanner.dispose, jobManager.dispose]) {
         try {
           // Cleanup boundaries are intentionally attempted in deterministic order.
           // eslint-disable-next-line no-await-in-loop
