@@ -12,7 +12,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
-import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
+import {
+  BUILTIN_TEMPLATE_INVENTORY,
+  BUILTIN_TEMPLATE_PACKS,
+  type BuiltinTemplatePack,
+} from '@process/resources/presentation-templates/index';
 import { PresentationTemplateService } from './PresentationTemplateService';
 
 const pack = (id: string, version = 1): BuiltinTemplatePack => ({
@@ -91,6 +95,28 @@ describe('PresentationTemplateService', () => {
     expect(list.map((s) => s.manifest.id)).toEqual(['alpha', 'beta']);
     expect(list[0].themePath).toBe(path.join(rootDir, 'alpha', 'THEME.md'));
     expect(list[0].previewDataUrl.startsWith('data:image/svg+xml;base64,')).toBe(true);
+  });
+
+  it('installs every packaged-inventory builtin into the gallery', async () => {
+    const packagedResourcesDir = path.resolve(__dirname, '../../../../resources/presentation-templates');
+    const inventoryById = new Map(BUILTIN_TEMPLATE_INVENTORY.map((entry) => [entry.id, entry]));
+    const packagedPacks = BUILTIN_TEMPLATE_PACKS.map((builtin): BuiltinTemplatePack => {
+      const packagedReferenceFile = inventoryById.get(builtin.manifest.id)?.packagedReferenceFile;
+      return {
+        manifest: builtin.manifest,
+        themeMd: builtin.themeMd,
+        previewSvg: builtin.previewSvg,
+        referenceSourcePath:
+          packagedReferenceFile === null || packagedReferenceFile === undefined
+            ? undefined
+            : () => path.join(packagedResourcesDir, packagedReferenceFile),
+      };
+    });
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: packagedPacks });
+
+    const installedIds = (await service.list()).map((summary) => summary.manifest.id).toSorted();
+
+    expect(installedIds).toEqual(BUILTIN_TEMPLATE_INVENTORY.map((entry) => entry.id).toSorted());
   });
 
   it('rejects a symlinked template root before syncing a nonempty builtin pack', async () => {
