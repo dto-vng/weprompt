@@ -885,19 +885,28 @@ describe('Review phase cut', () => {
   });
 
   it('labels selected, slate, running, and failed cut states without relying on colour', () => {
-    const { container } = render(<ReviewPhase controller={controller()} />);
+    render(<ReviewPhase controller={controller()} />);
 
-    expect(
-      Array.from(container.querySelectorAll('[data-review-state]'), (node) => node.getAttribute('data-review-state'))
-    ).toEqual(['selected-take', 'missing-slate', 'running', 'failed']);
     expect(
       screen.getByRole('button', {
         name: 'conversation.creativeStudio.phase.review.cut.clipAccessible:1,Selected opening,4.2',
       })
     ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.selectedTake');
-    expect(screen.getByText('conversation.creativeStudio.phase.review.slateLabel')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.scene.status.generating')).toBeVisible();
-    expect(screen.getByText('conversation.creativeStudio.jobs.status.failed')).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:2,Missing close,7',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.phase.review.slateLabel');
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:3,Running reveal,5',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.scene.status.generating');
+    expect(
+      screen.getByRole('button', {
+        name: 'conversation.creativeStudio.timeline.selectSceneAccessible:4,Failed end card,5',
+      })
+    ).toHaveAccessibleDescription('conversation.creativeStudio.jobs.status.failed');
   });
 
   it('keeps the new footer and rail state styling on tokens defined for light and dark themes', () => {
