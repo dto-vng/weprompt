@@ -1,24 +1,30 @@
 # Sprint 2 Tasks
 
-> **Canonical work register. Last reconciled: 2026-08-08 (bug-fix wave closeout through `!101`).**
+> **Canonical work register. Sprint 2 code-frozen: 2026-08-09 at `296733b0e` (through `!103`).**
 >
-> Scope decisions taken in this pass, so they are not re-litigated: **Creative Studio moves to
-> Sprint 3** (own section below), and **SSO leaves Sprint 2** with khoapnt to own it later. BUG-014
-> closed against its merged head `!80`. BUG-039 filed with a proven root cause.
+> Sprint 2 implementation is closed. Unchecked items below are explicit carryover, deferred work,
+> external acceptance, or owner-gated decisions; they are not hidden inside the sprint's Done count.
+> **Creative Studio moves to Sprint 3**, and **SSO leaves Sprint 2** with khoapnt to own it later.
+> See the [closeout](docs/readme/sprint2-closeout.md) for the release boundary and handoffs.
 >
-> - Mark an item **Done** only when its accepted head is merged into `origin/sprint2`. Local branches, worktrees, plans, and green focused tests remain open until integration is accepted.
+> - Mark an item **Done** only when its accepted head is merged into `origin/sprint2`. Cross-repository changes additionally require an accepted source pin and the recorded package/runtime acceptance for the claimed user outcome. Local branches, worktrees, plans, open upstream PRs, and green focused tests remain open.
 > - Every active epic records its current boundary and next admission gate. Do not infer whole-sprint progress from raw checkbox count: epics and bugs differ materially in size.
 > - Update this file after every accepted merge, blocker decision, scope change, and code-freeze checkpoint. Preserve evidence links and move completed items to **Done** instead of deleting them.
 
-## Active
+## Carryover after Sprint 2 code freeze
 
 - [ ] **[BUG-040][P1][Integrity] `!79` pinned artifact provenance to a fabricated commit** — audit complete 2026-08-08; scope widened
   - Actual: `ACCEPTED_AIONCORE_SOURCE_COMMIT = 260dbbc05…`, introduced by `3bd2b3cf6` (BUG-013, `!79`, 2026-08-08), does not exist anywhere reachable: not in `iOfficeAI/AionCore` or the Forge mirror after full fetches, zero results from GitHub's authenticated global commit search, no Actions run in either repo has it as `head_sha`, and it is not an object in any local clone. The authoring agent ran sandboxed **without network**, so it could not have observed a real commit — the value is fabricated by construction. Its unit tests (`prepareAioncoreActionsArtifact.test.ts`) are self-referential — they feed the constant into the function that compares against the constant — under a test name claiming "the reviewed AionCore commit". No such review happened.
-  - Impact: **fails closed, not open.** A fabricated pin can never match a genuine run, so the env-gated Actions-artifact path (`AIONUI_BACKEND_RUN_ID`) rejects everything; the default release path ships stock upstream `v0.1.50` assets and never consults the constant. Nothing shipped is affected. The defect is the integrity of merged review evidence, not a vulnerability.
+  - Impact: **fails closed, not open.** A fabricated pin can never match a genuine run, so the env-gated Actions-artifact path (`AIONUI_BACKEND_RUN_ID`) rejects everything. The pre-`!79` release path shipped stock upstream `v0.1.50` assets without consulting that constant; the current post-`!79` package path additionally rejects those archives because they lack `migration-lineage.json`. Nothing already shipped is affected. New distributable creation is mechanically quarantined until a trustworthy bundle is available. The defect is the integrity of merged review evidence, not a vulnerability.
   - Expected: the constant points at a real, auditable release commit — the DR-3 bump branch (`chore/aioncore-v0162-bump`, in progress) already replaces it with `v0.1.62` @ `35707c0a` and is the fix vehicle; the test wording stops claiming a review that never happened; and `!79`'s remaining claims (native macOS/Windows CI acceptance, the packaged recovery test) receive an independent skeptical verification, since one fabricated anchor removes the presumption of accuracy from the rest.
   - **Audit verdicts (read-only skeptical pass, 2026-08-08).** The lineage itself is **CONFIRMED-REAL** — all 27 checksums and the fingerprint match the real `v0.1.50` migration bytes, independently derived three ways (audit recomputation, the DR-3 generator reproduction, and a Controller-run script). No second fabricated checksum exists. But three more of `!79`'s claims are **CONFIRMED-DEFECTIVE**: (a) no test injects a real AionCore lineage failure and proves the full rejection→preservation→quit chain — the quit path is real, the claimed behavioural proof is not; (b) the packaged recovery test synthetically installs a prebuilt failure object, skips AionCore startup entirely, and is excluded from `bun run test`; (c) **the default native CI builds cannot pass as written** — they consume the upstream `v0.1.50` release archive, whose release workflow archives _only the binary_ (`tar -czf … binary_name`, independently verified against upstream's `release.yml`), while `!79` requires `migration-lineage.json` in the bundle, so default builds fail before packaging starts. Whether any nonstandard run ever passed is UNVERIFIABLE-OFFLINE. Fixture-echo tests recur in three places beyond the fabricated anchor.
   - **Consequence for the DR-3 bump (binding):** the Forge `v0.1.62` build must archive `migration-lineage.json` alongside the binary, or the packaged acceptance the bump depends on cannot run; and the packaged recovery acceptance must be made real (seed an AionCore DB, exercise lineage preflight, prove preservation) before BUG-013's "recovery contract completed" claim can stand. Until then, treat BUG-013's Done entry as **partially hollow: the runtime rejection path is real; the packaged end-to-end acceptance is not.**
   - Standing lesson (applies to all agent-produced work): a sandboxed agent asked for a real-world anchor — a SHA, a run id, a URL — will produce a plausible fabrication, and self-referential tests will green it. Provenance constants require out-of-band verification at review time.
+
+- [ ] **[BUG-015][P1][External acceptance] Finish authoritative Kimi local token totals** — WePrompt display fix merged; AionCore upstream review pending
+  - The context-window half is integrated: `!82` established the provider/context contracts, and follow-up `!103` (`af2c48773`, merged as `296733b0e`) makes the composer and Project Context consume the same active-conversation snapshot and applies the selected Kimi model's actual window. The WePrompt gate passed 8,120 tests with 19 skipped; a macOS smoke showed the two context percentages agree.
+  - The zero Today/Week/Month totals had a separate backend cause: AionCore discarded AionRS provider counters before the finish event reached WePrompt. The reviewed fix is public as [AionCore PR #808](https://github.com/iOfficeAI/AionCore/pull/808), commit `2a9a02e27`; its mandatory gate passed 8,366 tests with 24 skipped. It is open and mergeable, but has no upstream approval or CI result yet.
+  - **Acceptance gate:** upstream merges/releases #808, or WePrompt explicitly adopts and owns the forked source pin; then the bundled application must record a real Kimi turn as non-zero local usage, preserve it across reload, and avoid double-counting a replayed finish event. Until that happens, do not claim the local-token-total half is shipped.
 
 - [ ] **[EPIC-002][P2][Re-scoped] Create reusable template packs from chat — Epic A (HTML) first**
   - Outcome: derive or describe a template in chat, review it, then add or discard it before anything reaches the Template Gallery.
@@ -162,10 +168,6 @@
 - [x] **[BUG-032][P3][Creative Studio] Make the Write assistant dock description truthful in all 12 locales** — merged 2026-08-08 via `!101`
   - Source head `c384840b3`; Sprint 2 merge `85a1131cb`. Every supported locale now states the capability that exists today: draft a storyboard from the brief. Provider/model labels, charge disclosure, runtime behavior, and the feature flag are unchanged.
   - Evidence: a test-first exact-value contract failed on the old copy, covers precisely the configured 12-locale set, and passed 37/37 after the copy change. The merge gate passed 621 files and 8,109 tests, with 19 skipped.
-
-- [x] **[BUG-015][P1] Report authoritative context-window usage and local token totals** — merged 2026-08-08 via `!82`
-  - Actual: real Kimi activity can leave context usage unavailable and Today/Week/Month totals at zero because authoritative usage is lost before conversation persistence and the local ledger.
-  - Expected: propagate, deduplicate, persist, and restore authoritative provider usage across AionRS and ACP; distinguish current-context occupancy from cumulative consumption.
 
 - [x] **[BUG-018][P1] Preserve provider overload, rate-limit, setup, and connectivity distinctions** — merged 2026-08-08 via `!83`
   - Actual: structured provider failures can collapse into misleading rate-limit or unconfigured states.
