@@ -9,7 +9,10 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TokenUsageData } from '@/common/config/storage';
-import type { ContextUsageSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
+import {
+  contextUsagePercent,
+  type ContextUsageSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import type { LocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
 type ContextUsageIndicatorProps = {
@@ -64,6 +67,7 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const contextUsage = budget ?? legacyBudget;
   const percentage =
     typeof contextUsage.ratio === 'number' && Number.isFinite(contextUsage.ratio) ? contextUsage.ratio * 100 : null;
+  const roundedPercentage = percentage === null ? null : contextUsagePercent(contextUsage.ratio);
   const displayTotal = typeof contextUsage.totalTokens === 'number' ? formatTokenCount(contextUsage.totalTokens) : null;
   const displayLimit = contextUsage.contextLimit ? formatTokenCount(contextUsage.contextLimit, true) : null;
   const isWarning = contextUsage.status === 'compress';
@@ -85,7 +89,7 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const percentageLabel =
     percentage === null
       ? t('conversation.contextUsage.unavailable')
-      : t('conversation.contextUsage.percentUsed', { percent: Math.round(percentage) });
+      : t('conversation.contextUsage.percentUsed', { percent: roundedPercentage });
   const usageLabel =
     contextUsage.source === 'estimated' && percentage !== null
       ? `${t('conversation.contextUsage.estimated')} · ${percentageLabel}`
@@ -94,7 +98,7 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const statusAnnouncement =
     percentage === null
       ? t('conversation.contextUsage.unavailable')
-      : t(`conversation.contextHandoff.budget.${contextUsage.status}`, { percent: `${Math.round(percentage)}%` });
+      : t(`conversation.contextHandoff.budget.${contextUsage.status}`, { percent: `${roundedPercentage}%` });
 
   const popoverContent = (
     <div className='min-w-240px p-12px'>

@@ -53,7 +53,11 @@ import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hook
 import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
-import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
+import {
+  clearActiveContextBudget,
+  publishActiveContextBudget,
+  resolveConversationContextBudgetSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   createPresentationCommandQueueController,
   shouldEnqueueConversationCommand,
@@ -80,7 +84,7 @@ import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { classifyConversationBusyError } from '../conversationBusyError';
 import { useAionrsMessage } from './useAionrsMessage';
@@ -232,6 +236,10 @@ const AionrsSendBox: React.FC<{
       }),
     [conversationContext?.conversation, current_model, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
   );
+  useLayoutEffect(() => {
+    publishActiveContextBudget(conversation_id, contextBudget);
+    return () => clearActiveContextBudget(conversation_id, contextBudget);
+  }, [contextBudget, conversation_id]);
   const runtimeView = useConversationRuntimeView(conversation_id);
   const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 

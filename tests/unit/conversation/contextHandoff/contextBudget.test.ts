@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TMessage } from '@/common/chat/chatLib';
 import type { TChatConversation, TContextHandoffItem } from '@/common/config/storage';
 import {
+  clearActiveContextBudget,
+  contextUsagePercent,
+  contextUsageProgressPercent,
   estimateContextBudget,
+  formatContextUsagePercent,
+  getActiveContextBudget,
+  publishActiveContextBudget,
   resolveConversationContextBudgetSnapshot,
+  subscribeActiveContextBudget,
 } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 
 const textMessage = (content: string): TMessage => ({
@@ -152,5 +159,47 @@ describe('estimateContextBudget', () => {
       ratio: null,
       status: 'healthy',
     });
+  });
+});
+
+describe('active context budget sharing', () => {
+  it('shares the latest composer snapshot with sibling conversation surfaces', () => {
+    const first = {
+      source: 'estimated' as const,
+      totalTokens: 20_000,
+      contextLimit: 1_000_000,
+      ratio: 0.02,
+      status: 'healthy' as const,
+    };
+    const latest = { ...first, totalTokens: 110_000, ratio: 0.11 };
+    const listener = vi.fn();
+    const unsubscribe = subscribeActiveContextBudget('conv-shared', listener);
+
+    publishActiveContextBudget('conv-shared', first);
+    publishActiveContextBudget('conv-shared', latest);
+
+    expect(getActiveContextBudget('conv-shared')).toEqual(latest);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    clearActiveContextBudget('conv-shared', first);
+    expect(getActiveContextBudget('conv-shared')).toEqual(latest);
+
+    clearActiveContextBudget('conv-shared', latest);
+    expect(getActiveContextBudget('conv-shared')).toBeUndefined();
+    unsubscribe();
+  });
+});
+
+describe('context usage percentage formatting', () => {
+  it.each([
+    { ratio: null, percent: 0, label: '--', progress: 0 },
+    { ratio: 0, percent: 0, label: '0%', progress: 0 },
+    { ratio: 0.004, percent: 0, label: '0%', progress: 0 },
+    { ratio: 0.006, percent: 1, label: '1%', progress: 1 },
+    { ratio: 1.2, percent: 120, label: '120%', progress: 100 },
+  ])('formats $ratio consistently as $label', ({ ratio, percent, label, progress }) => {
+    expect(contextUsagePercent(ratio)).toBe(percent);
+    expect(formatContextUsagePercent(ratio)).toBe(label);
+    expect(contextUsageProgressPercent(ratio)).toBe(progress);
   });
 });

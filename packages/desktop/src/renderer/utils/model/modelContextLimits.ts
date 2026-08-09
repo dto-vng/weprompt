@@ -79,6 +79,11 @@ const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   'deepseek-chat': 128_000,
   'deepseek-reasoner': 128_000,
 
+  // Kimi 系列
+  'kimi-k3': 1_048_576,
+  'kimi-k2.6': 262_144,
+  'kimi-k2.5': 262_144,
+
   // xAI 系列
   'grok-4.5': 500_000,
   'grok-4.3': 1_000_000,

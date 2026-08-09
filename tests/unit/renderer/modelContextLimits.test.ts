@@ -82,6 +82,14 @@ describe('getKnownModelContextLimit', () => {
     expect(getKnownModelContextLimit('minimax-m3')).toBe(1_000_000);
   });
 
+  it.each(['kimi-k2.5', 'kimi-k2.6'])('returns the official 256K window for %s', (model) => {
+    expect(getKnownModelContextLimit(model)).toBe(262_144);
+  });
+
+  it('returns the official 1M window for Kimi K3', () => {
+    expect(getKnownModelContextLimit('kimi-k3')).toBe(1_048_576);
+  });
+
   it('matches known models case-insensitively and via provider suffixes', () => {
     expect(getKnownModelContextLimit('MiniMax-M2.5-preview')).toBe(204_800);
   });
