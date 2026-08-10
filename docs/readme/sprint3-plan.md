@@ -58,8 +58,13 @@ the one with real schedule risk.
 - [ ] Push `dc7460883` to `khoapnt-vng/WePrompt:sprint2` (verified fast-forward; GitHub's
       `4c523888` is an ancestor).
 - [ ] Push `sprint3` @ `05abda690` and make it the working branch.
-- [ ] **Do not** build from `build/win-oauth-fix-v0.1.51`. It forked from a stale snapshot and
-      is 126 commits / 37 merges behind Sprint 2; its one useful commit is already ported.
+- [ ] The `build/win-oauth-fix-*` branches are **internal demo builds**, deliberately cut from
+      the older `4c523888` snapshot; they are not release candidates and need no rebase. Treat
+      them as throwaway. Their useful commit (`658ed0335`) is already ported to `sprint3` as
+      `515d0b963`, with two defects fixed — see T0.3 and the port notes.
+- [ ] **Release builds come from `sprint3` only.** Because the demo branches are 126 commits
+      behind, demo feedback is against pre-freeze code: triage it against `sprint2` before
+      filing, or already-fixed issues will be re-reported as new.
 - [ ] Configure the GitLab mirror direction and record the cutover point, so `TASKS.md`'s
       `!1`–`!103` evidence links stay readable alongside future GitHub PR numbers.
 
