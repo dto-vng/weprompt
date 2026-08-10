@@ -50,8 +50,17 @@ so it is not still open at Sprint 4 planning.**
 
 ## Track 0 — Unblock (must land before anything else)
 
-Every other track depends on these. **T0.2 is decided**; T0.1 and T0.3 remain open, and T0.3 is
-the one with real schedule risk.
+> **CLOSED 2026-08-10.** All three items are done and merged to `sprint3`. T0.1 published the
+> corrected baseline; T0.2 fixed the release line at `v0.1.51`/`d4d8e877` and its corrected
+> record is tracked at [docs/design/aioncore-sprint3-release-line.md](../design/aioncore-sprint3-release-line.md);
+> T0.3 shipped the main-process interceptor plus the fifth call site it could not reach
+> (`3492449f3`). Tracks 1, 2 and 4 are now admissible. Detail below is retained as the record of
+> what was decided and why.
+>
+> **Also delivered in the same window, outside the original plan:** the first CI pipeline in this
+> repository's history (`sprint3-pr-gate.yml`, macOS, blocking as of `af4a8af75`), which passed a
+> full hosted run at `31405462957`. It immediately produced two findings — BUG-042 and BUG-043 —
+> neither of which any local gate could have surfaced.
 
 ### T0.1 Publish the corrected baseline
 
@@ -265,6 +274,26 @@ today, which is why the GitLab runner problem stopped mattering.
       to ignore the gate.
 - [ ] CI then becomes the reproduction harness both bugs needed and never got locally. Triage
       them from real samples rather than hunting reproductions by hand.
+
+> **T3.1/T3.2 DELIVERED 2026-08-10.** `sprint3-pr-gate.yml` runs the full gate on `macos-15` for
+> pull requests to `sprint3` and pushes to it. Actions are pinned to verified commit SHAs.
+> BUG-027's two tests carry CI-only retries (`process.env.CI ? 2 : 0`, so local runs still surface
+> the flake honestly) and BUG-030 is quarantined by exact log signature rather than a blanket
+> allow-failure. The gate is **blocking** — `continue-on-error` was removed after a fully green
+> hosted run.
+>
+> **Two traps recorded here so they are not repeated.** (1) `vitest run --exclude=<file>`
+> **replaces** the resolved exclude list rather than adding to it — using it to carve out one file
+> discovered 13,874 test files instead of 625. (2) `.github/workflows/pr-checks.yml` is **not** a
+> generic quality workflow: it carries the mac/Windows build blocks, signing config, and packaged
+> artifact-name checks that BUG-013/BUG-014 depend on, and `releasePackagingConfig.test.ts` pins
+> its contents. New gates get new files.
+>
+> **Still outstanding:** the gate is blocking at the workflow level but **not enforced**, because
+> `sprint3` has no branch protection. Only a repository admin can add one; the current maintainer
+> account has `admin: false`. The required check must reference the **job** name exactly —
+> `Quality and tests (macOS)` — not the workflow name, and required checks read the job
+> conclusion, so a rule added while `continue-on-error` is present would block every PR.
 
 ### T3.3 Matrix jobs — concurrency, not cost
 
