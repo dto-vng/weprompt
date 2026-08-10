@@ -15,7 +15,6 @@
  *   → `{"type":"done"}` (server closes after), or `{"type":"error","code","msg"}` then close.
  */
 
-import { withLocalTokenQuery } from '@/common/adapter/httpBridge';
 import { STREAM_SAMPLE_RATE } from './pcmRecorder';
 
 // ---------------------------------------------------------------------------
@@ -111,8 +110,7 @@ export const getSpeechStreamUrl = (): string => {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/api/stt/stream`;
   }
-  // A browser `WebSocket` cannot set headers, so the secret rides in the query.
-  return withLocalTokenQuery(`ws://127.0.0.1:${getBackendPort()}/api/stt/stream`);
+  return `ws://127.0.0.1:${getBackendPort()}/api/stt/stream`;
 };
 
 // ---------------------------------------------------------------------------
