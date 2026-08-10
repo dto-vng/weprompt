@@ -1,0 +1,91 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches: [sprint3]
+  push:
+    branches: [sprint3]
+
+concurrency:
+  group: pull-request-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_INSTALL_REGISTRY: 'https://registry.npmjs.org/'
+
+jobs:
+  quality-and-tests:
+    name: Quality and tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+
+      - name: Restore Bun dependency cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.3.14-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: bunx tsc --noEmit
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bunx oxfmt --check
+
+      - name: Validate i18n
+        run: |
+          bun run i18n:types
+          node scripts/check-i18n.js
+
+      # Aggregate baseline across this step and the BUG-030 quarantine below:
+      # 621 files (1 skipped), 8,120 passed, 19 skipped.
+      - name: Run Vitest suite outside BUG-030 teardown scope
+        run: bunx vitest run --exclude='tests/unit/renderer/team/TeamSiderSection.dom.test.tsx'
+
+      # BUG-030: TeamSiderSection can raise EnvironmentTeardownError after all five tests pass.
+      # Tracking: https://github.com/khoapnt-vng/WePrompt/blob/sprint3/TASKS.md#bug-030p3test-infrastructure-suite-exits-non-zero-after-a-fully-green-run
+      - name: Quarantine BUG-030 TeamSiderSection teardown
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/bug-030.log"
+
+          for attempt in 1 2 3; do
+            : > "$log"
+            if bunx vitest run --project=dom tests/unit/renderer/team/TeamSiderSection.dom.test.tsx 2>&1 | tee "$log"; then
+              exit 0
+            fi
+            echo "::warning title=BUG-030 retry::TeamSiderSection teardown attempt $attempt failed."
+          done
+
+          clean_log="$RUNNER_TEMP/bug-030-clean.log"
+          sed $'s/\033\\[[0-9;]*[mK]//g' "$log" > "$clean_log"
+          if grep -q 'EnvironmentTeardownError' "$clean_log" \
+            && grep -Eq 'Test Files[[:space:]]+1 passed' "$clean_log" \
+            && grep -Eq 'Tests[[:space:]]+5 passed' "$clean_log"; then
+            echo '::warning title=BUG-030 quarantine::Known post-green EnvironmentTeardownError persisted after two retries; see the tracking link in this step.'
+            echo '### BUG-030 quarantine' >> "$GITHUB_STEP_SUMMARY"
+            echo 'All five TeamSiderSection tests passed, but the known EnvironmentTeardownError persisted after two retries. BUG-030 remains non-blocking.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo '::error title=BUG-030 scope exceeded::TeamSiderSection failed without the exact known post-green teardown signature.'
+          exit 1
