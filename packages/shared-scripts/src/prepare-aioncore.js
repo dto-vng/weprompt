@@ -30,9 +30,16 @@ const {
 const aioncoreChecksums = require('./aioncore-checksums');
 const aioncoreTrust = require('./aioncore-trust');
 
-const GITHUB_OWNER = 'iOfficeAI';
-const GITHUB_REPO = 'AionCore';
-const ACCEPTED_AIONCORE_SOURCE_COMMIT = '260dbbc05d5c8d079fb60e0e9578d4250b6e4338';
+// Security-patched fork (D-01 loopback token, MCP OAuth discovery/DCR fix).
+// The upstream iOfficeAI/AionCore is unpatched; the desktop app ships the fork.
+const GITHUB_OWNER = 'khoapnt-vng';
+const GITHUB_REPO = 'aioncore';
+
+// Target of the `v0.1.51` tag, which is the release this file's checksums pin.
+// Verified out-of-band on both hosts before use: code.vng.vn/dto/aioncore and
+// github.com/khoapnt-vng/aioncore resolve `v0.1.51^{}` to this same commit.
+// Replaces the fabricated `260dbbc05…` value (BUG-040), which existed on neither.
+const ACCEPTED_AIONCORE_SOURCE_COMMIT = 'd4d8e87714690cdb230ab7a6987de3ceacbea275';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
 // artifacts (see aioncore-trust.js). Overridable via env for other mirrors.
