@@ -18,23 +18,25 @@ env:
 
 jobs:
   quality-and-tests:
-    name: Quality and tests (Linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # TEMPORARY, added 2026-08-10 — remove as the closing step of BUG-042.
+    # macOS runner, matching how the suite has always been run and the primary
+    # platform the product ships on. The gate briefly ran on ubuntu-latest and
+    # found 26 host-dependent failures (BUG-042): updater/tray/menu tests that
+    # implicitly assert darwin behaviour. Linux is inherited upstream build
+    # capability, NOT a release target (product owner, 2026-08-10), so the
+    # gate follows the shipping reality instead of forcing 25 test edits for a
+    # host nobody ships on. If a Linux release is ever chartered, BUG-042
+    # documents exactly what breaks.
     #
-    # This gate's first-ever run found 26 tests that pass on macOS and fail on
-    # Linux (updater, tray, application-menu surfaces). Those are real defects:
-    # Linux x64 and arm64 are shipped release targets, published as .deb by
-    # build-and-release.yml. They are NOT a reason to move the gate to macOS,
-    # which would hide breakage in a distributed platform.
-    #
-    # Landing non-blocking so the pipeline produces signal from day one without
-    # blocking every PR on a pre-existing, newly-visible failure set. Failures
-    # still appear in the run; they simply do not gate merges yet.
-    #
-    # REMOVE THIS LINE once BUG-042 is closed. Leaving it in place permanently
-    # would make the gate decorative.
+    # macos-15 = the same runner family as build-and-release.yml's arm64 leg.
+    # If a required status check is ever configured, it must reference THIS
+    # job name.
+    name: Quality and tests (macOS)
+    runs-on: macos-15
+    timeout-minutes: 45
+    # TEMPORARY, added 2026-08-10 — remove once the first macOS run of this
+    # gate is green. Kept for exactly one cycle so a surprise runner-specific
+    # failure cannot block PRs before it is understood. Leaving it in place
+    # permanently would make the gate decorative.
     continue-on-error: true
     steps:
       - name: Check out repository
