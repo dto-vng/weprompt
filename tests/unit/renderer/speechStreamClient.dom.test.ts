@@ -120,6 +120,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   setBackendPort(undefined);
+  delete (window as Window & { __backendLocalToken?: string }).__backendLocalToken;
   vi.restoreAllMocks();
 });
 
@@ -128,6 +129,15 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('start frame', () => {
+  it('keeps the local secret out of the desktop speech WebSocket URL', () => {
+    setBackendPort(24680);
+    (window as Window & { __backendLocalToken?: string }).__backendLocalToken = 'speech-secret';
+
+    startSpeechStream({ callbacks: makeCallbacks(), createSocket });
+
+    expect(lastSocket().url).toBe('ws://127.0.0.1:24680/api/stt/stream');
+  });
+
   it('sends the exact start frame first on open, with languageHint', () => {
     const callbacks = makeCallbacks();
     startSpeechStream({ languageHint: 'zh', callbacks, createSocket });

@@ -8,7 +8,7 @@ import type { IChannelPairingRequest, IChannelPluginStatus, IChannelUser } from 
 import { assistants, channel } from '@/common/adapter/ipcBridge';
 import { isAionrsAssistant, type Assistant } from '@/common/types/agent/assistantTypes';
 import { resolveLocaleKey } from '@/common/utils';
-import { getBaseUrl, withLocalTokenQuery } from '@/common/adapter/httpBridge';
+import { getBaseUrl } from '@/common/adapter/httpBridge';
 import { resolveAssistantDisplayName } from '@/renderer/utils/model/assistantDisplay';
 import GoogleModelSelector from '@/renderer/pages/conversation/platforms/gemini/GoogleModelSelector';
 import type { GoogleModelSelection } from '@/renderer/pages/conversation/platforms/gemini/useGoogleModelSelection';
@@ -254,8 +254,7 @@ const WeixinConfigForm: React.FC<WeixinConfigFormProps> = ({ pluginStatus, model
     setLoginState('loading_qr');
     setQrcodeDataUrl(null);
 
-    // `EventSource` cannot set headers, so the local-mode secret goes in the query.
-    const es = new EventSource(withLocalTokenQuery(`${getBaseUrl()}/api/channel/weixin/login`));
+    const es = new EventSource(`${getBaseUrl()}/api/channel/weixin/login`);
     eventSourceRef.current = es;
 
     es.addEventListener('qr', (e: MessageEvent) => {

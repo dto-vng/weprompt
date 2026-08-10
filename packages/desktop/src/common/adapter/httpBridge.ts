@@ -31,18 +31,6 @@ declare global {
 export const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
 
 /**
- * Query parameter carrying the same secret, for callers that cannot set headers.
- *
- * ⚠️ The pinned fork does **not** accept a query-parameter token. Its
- * `extract_token_from_ws_headers` reads `Authorization` > `aionui-session`
- * cookie > `Sec-WebSocket-Protocol`, and the plain extractor reads only the
- * first two. Every {@link withLocalTokenQuery} caller therefore authenticates
- * against upstream AionCore but 401s against the fork. Unresolved — see the
- * Sprint 3 register entry before relying on this path.
- */
-export const LOCAL_TOKEN_QUERY = 'local_token';
-
-/**
  * Resolve the local-mode secret for the current context.
  *
  * Mirrors {@link getBackendPort}: the preload bridge writes
@@ -80,19 +68,6 @@ export function withLocalTokenHeaders(headers: Record<string, string> = {}): Rec
   const token = getLocalToken();
   if (!token) return headers;
   return { ...headers, ...localTokenAuthHeaders(token) };
-}
-
-/**
- * Add the local-mode secret to a URL's query string.
- *
- * For request kinds that cannot carry a header: `WebSocket`, `EventSource`, and
- * URLs handed to `<img src>` or an iframe.
- */
-export function withLocalTokenQuery(url: string): string {
-  const token = getLocalToken();
-  if (!token) return url;
-  const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}${LOCAL_TOKEN_QUERY}=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -142,8 +117,7 @@ function getWsUrl(): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/ws`;
   }
-  // A browser `WebSocket` cannot set headers, so the secret rides in the query.
-  return withLocalTokenQuery(`ws://127.0.0.1:${getBackendPort()}/ws`);
+  return `ws://127.0.0.1:${getBackendPort()}/ws`;
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ import {
 import { startBackendOrExit } from './process/startup/backendStartup';
 import { assertStartupArchitectureCompatible } from './process/startup/architectureCompatibility';
 import { classifyBackendStartupFailure } from './process/startup/backendStartupFailure';
+import { installLocalBackendAuth } from './process/startup/localBackendAuth';
 import { installQuitCleanup } from './process/startup/quitCleanup';
 import {
   createRendererDocumentPolicy,
@@ -534,6 +535,11 @@ function exposeBackendPort(backendPort: number): void {
   (globalThis as typeof globalThis & { __backendLocalToken?: string }).__backendLocalToken = backendManager.localToken;
 }
 
+function installLocalBackendAuthForMainWindow(backendPort: number): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  installLocalBackendAuth(session.defaultSession, mainWindow.webContents, backendPort, backendManager.localToken);
+}
+
 function ensureAdminUserOnce(backendPort: number): Promise<void> {
   if (!ensureAdminUserPromise) {
     ensureAdminUserPromise = (async () => {
@@ -551,6 +557,7 @@ function ensureAdminUserOnce(backendPort: number): Promise<void> {
 function markBackendReady(backendPort: number, source: string): void {
   console.log(`[AionUi] ${source} ready (port=${backendPort})`);
   exposeBackendPort(backendPort);
+  installLocalBackendAuthForMainWindow(backendPort);
   void presentationRuntimeLifecycleOwner
     .backendReady({ port: backendPort, token: backendManager.localToken })
     .catch(() => console.warn('[AionUi][presentation-runtime] LIFECYCLE_START_FAILED'));
@@ -844,6 +851,8 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     },
   });
   console.log(`[AionUi] Main window created (id=${mainWindow.id})`);
+  const backendPort = (globalThis as typeof globalThis & { __backendPort?: number }).__backendPort;
+  if (backendPort) installLocalBackendAuthForMainWindow(backendPort);
 
   scheduleStartupLogReport(mainWindow);
 
