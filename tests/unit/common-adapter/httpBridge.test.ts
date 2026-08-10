@@ -146,12 +146,14 @@ describe('httpBridge', () => {
       expect(getLocalToken()).toBe('');
     });
 
-    it('adds the secret header while keeping the caller headers', () => {
+    it('adds the secret as a Bearer credential while keeping the caller headers', () => {
       (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
 
+      // The pinned fork authenticates via `Authorization: Bearer`, not the
+      // legacy `X-AionUI-Local-Token` header that upstream AionCore read.
       expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
         'Content-Type': 'application/json',
-        'X-AionUI-Local-Token': 'abc123',
+        Authorization: 'Bearer abc123',
       });
     });
 
@@ -645,7 +647,7 @@ describe('httpBridge', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-AionUI-Local-Token': 'lifecycle-secret',
+          Authorization: 'Bearer lifecycle-secret',
         },
         body: '{"content":"private prompt"}',
         signal: undefined,

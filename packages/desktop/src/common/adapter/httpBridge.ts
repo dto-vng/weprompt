@@ -22,12 +22,24 @@ declare global {
 // ---------------------------------------------------------------------------
 
 /**
- * Header carrying the local-mode secret. Must match AionCore's
- * `LOCAL_TOKEN_HEADER` (crates/aionui-auth/src/middleware.rs).
+ * Legacy header that carried the local-mode secret upstream. **No longer sent.**
+ *
+ * The pinned `khoapnt-vng/aioncore` fork authenticates via `Authorization:
+ * Bearer` — see {@link localTokenAuthHeaders}. Retained only to document the
+ * historical wire name; do not add new callers.
  */
 export const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
 
-/** Query parameter carrying the same secret, for callers that cannot set headers. */
+/**
+ * Query parameter carrying the same secret, for callers that cannot set headers.
+ *
+ * ⚠️ The pinned fork does **not** accept a query-parameter token. Its
+ * `extract_token_from_ws_headers` reads `Authorization` > `aionui-session`
+ * cookie > `Sec-WebSocket-Protocol`, and the plain extractor reads only the
+ * first two. Every {@link withLocalTokenQuery} caller therefore authenticates
+ * against upstream AionCore but 401s against the fork. Unresolved — see the
+ * Sprint 3 register entry before relying on this path.
+ */
 export const LOCAL_TOKEN_QUERY = 'local_token';
 
 /**
@@ -47,6 +59,18 @@ export function getLocalToken(): string {
 }
 
 /**
+ * Build the auth header bag for a known local-mode secret.
+ *
+ * Single source of truth for the wire format. The pinned aioncore fork
+ * (`v0.1.51`) reads the loopback token from `Authorization: Bearer` in its
+ * `auth_middleware`, not from `X-AionUI-Local-Token`. Every caller must go
+ * through this so the two construction sites cannot drift apart again.
+ */
+export function localTokenAuthHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
+/**
  * Add the local-mode secret to a header bag.
  *
  * Every `fetch`/`XMLHttpRequest` aimed at the backend must go through this —
@@ -55,10 +79,7 @@ export function getLocalToken(): string {
 export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
   const token = getLocalToken();
   if (!token) return headers;
-  // Local build: the pinned aioncore v0.1.50 reads the loopback token from
-  // `Authorization: Bearer` (auth_middleware), not `X-AionUI-Local-Token`.
-  // Send Bearer so requests authenticate against the shipped binary.
-  return { ...headers, Authorization: `Bearer ${token}` };
+  return { ...headers, ...localTokenAuthHeaders(token) };
 }
 
 /**
@@ -261,7 +282,7 @@ function assertMainHttpRequestOptions(options: MainHttpRequestOptions): void {
  */
 export async function mainHttpRequest<T>(options: MainHttpRequestOptions): Promise<T> {
   assertMainHttpRequestOptions(options);
-  const headers: Record<string, string> = { [LOCAL_TOKEN_HEADER]: options.token };
+  const headers: Record<string, string> = localTokenAuthHeaders(options.token);
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await (options.fetchImpl ?? fetch)(`http://127.0.0.1:${options.port}${options.path}`, {
     method: options.method,
