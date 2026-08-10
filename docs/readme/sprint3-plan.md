@@ -50,8 +50,8 @@ so it is not still open at Sprint 4 planning.**
 
 ## Track 0 — Unblock (must land before anything else)
 
-Three questions currently have no answer, and every other track depends on all three. Nothing
-else should start until these close.
+Every other track depends on these. **T0.2 is decided**; T0.1 and T0.3 remain open, and T0.3 is
+the one with real schedule risk.
 
 ### T0.1 Publish the corrected baseline
 
@@ -63,21 +63,38 @@ else should start until these close.
 - [ ] Configure the GitLab mirror direction and record the cutover point, so `TASKS.md`'s
       `!1`–`!103` evidence links stay readable alongside future GitHub PR numbers.
 
-### T0.2 Resolve the release-line ambiguity — **decision required**
+### T0.2 Release line — **DECIDED 2026-08-10**
 
-Three candidate commits are all currently defensible, which means none is authoritative:
+**The Sprint 3 AionCore release line is `d4d8e87714690cdb230ab7a6987de3ceacbea275`**, the
+target of tag `v0.1.51`. It resolves identically on `code.vng.vn/dto/aioncore` and
+`github.com/khoapnt-vng/aioncore`, and it is the release whose cross-verified checksums the
+desktop build already pins. `ACCEPTED_AIONCORE_SOURCE_COMMIT` is aligned with it as of
+`515d0b963`; no further change is required.
 
-| Candidate  | What it is                | Notes                                                               |
-| ---------- | ------------------------- | ------------------------------------------------------------------- |
-| `fbe0ac6b` | `fix/mcp-oauth-discovery` | The decision record's designated release line; declares `0.1.50`    |
-| `d4d8e877` | target of tag `v0.1.51`   | What the build actually consumes; identical tree bar Cargo metadata |
-| `9b418ea3` | target of tag `v0.1.52`   | Exists only on GitHub; cut 2026-08-10, GitLab has never seen it     |
+Candidates not chosen, and why it matters that they were considered:
 
-- [ ] Name exactly one as the Sprint 3 release line and record it in the decision record.
-- [ ] Align `ACCEPTED_AIONCORE_SOURCE_COMMIT` with it. The port currently pins `d4d8e877`
-      because that is what `v0.1.51` resolves to on both hosts — revisit if the answer differs.
-- [ ] Correct the decision record's Sprint 2 backend table: BUG-013 has **no recoverable
-      AionCore commit**. The `260dbbc05…` value is fabricated and absent from all three hosts.
+| Candidate  | What it is                | Disposition                                                                                         |
+| ---------- | ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `fbe0ac6b` | `fix/mcp-oauth-discovery` | **Not the release line**, despite the decision record designating it. Same tree bar Cargo metadata. |
+| `9b418ea3` | target of tag `v0.1.52`   | Newer. Forgone deliberately — see below.                                                            |
+
+Two consequences that must be written into the backend decision record:
+
+- [ ] **The record's designated branch is wrong.** It names `fix/mcp-oauth-discovery` as the
+      release line and instructs that this branch be protected. The chosen commit is not on
+      that branch's tip lineage — it is the `v0.1.51` tag on `security/pilot-hardening-d01-d06`.
+      Restate the branch policy against the line actually being shipped.
+- [ ] **The release line is a tag, not a branch head.** `security/pilot-hardening-d01-d06` has
+      already advanced past it on GitHub. Pinning an immutable tag is the safer choice, but it
+      means "merge accepted changes back into the release line" no longer describes reality:
+      future work lands on a branch and is cut as a _new_ tag, which then becomes a new pin.
+- [ ] Correct the record's Sprint 2 backend table: BUG-013 has **no recoverable AionCore
+      commit**. The `260dbbc05…` value is fabricated and absent from all three hosts.
+
+**Deliberately forgone by this choice:** `v0.1.52` is `v0.1.51` plus exactly two commits —
+`b2c329d fix(mcp): send stored OAuth token on MCP connection test` and a version bump. Pinning
+`v0.1.51` therefore gives up one MCP OAuth connection-test fix in exchange for staying on the
+release whose checksums are already cross-verified. Revisit at the next tag, not mid-sprint.
 
 ### T0.3 Local-auth transport for header-less consumers — **design required, P0**
 
@@ -302,7 +319,7 @@ A merged PR, a pushed branch, or a green source-only run satisfies only part of 
 | T0.3 auth design slips and blocks packaging           | High       | Decide in week 1; it gates Track 4 entirely                |
 | Personal-account ownership of source, CI, and signing | Certain    | Accepted for Sprint 3; org request filed week 1            |
 | Matrix jobs queue behind free-tier concurrency limits | Low        | Public repos bill no minutes; keep per-PR to Linux         |
-| Release line stays ambiguous and a fourth tag appears | Medium     | T0.2 names one commit; re-verify at cutover                |
+| A newer AionCore tag invites a mid-sprint re-pin      | Low        | Line fixed at `v0.1.51`/`d4d8e877`; re-pin at tags only    |
 | Quarantined flakes quietly become permanent           | Medium     | Each carries a tracking link; review at sprint end         |
 | EPIC-003 starts against the dead DR-3 gate            | Medium     | T5.1 is an explicit entry condition                        |
 | Owner-gated items stall the sprint, as in Sprint 2    | Medium     | Track 3/4 do not block Tracks 1–2; org request is parallel |
