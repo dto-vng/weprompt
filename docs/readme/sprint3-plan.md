@@ -114,10 +114,37 @@ WePrompt's `withLocalTokenQuery` therefore fails against it at four sites:
 | `WeixinConfigForm.tsx:258`  | EventSource, WeChat login | Cookie, or backend accepts query |
 | `platform.ts:61`            | media / `<img src>` URLs  | Cookie, or backend accepts query |
 
-- [ ] Decide the transport for the two header-less cases: issue the `aionui-session` cookie to
-      the Electron session, or add a query-parameter path to the fork's extractor.
-- [ ] Implement the two WebSocket cases via subprotocol.
-- [ ] Cover all four with tests that fail against the pre-fix transport.
+**DECIDED 2026-08-10: inject the credential in the main process.** Install a
+`session.defaultSession.webRequest.onBeforeSendHeaders` handler that adds
+`Authorization: Bearer <localToken>` to requests aimed at the backend origin, and **delete
+`withLocalTokenQuery` and `LOCAL_TOKEN_QUERY` entirely**. One mechanism covers all four sites,
+because Electron's `webRequest` sees `<img>`, `EventSource`, `fetch`, and WebSocket upgrades
+alike, and it is indifferent to the renderer's origin.
+
+Rejected, with reasons worth keeping:
+
+| Option                                                  | Why not                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aionui-session` cookie                                 | The cookie **does** carry the local token (`middleware.rs:83` compares whatever `extract_token_from_headers` returns). But the renderer is **cross-site** to the backend — `Origin: null` when packaged via `loadFile`, a vite URL in dev — so the cookie would need `SameSite=None`. That re-opens the browser CSRF drive-by that D-01 exists to close (`middleware.rs:80`). Actively regressive. |
+| Add a query-param path to the fork                      | Needs a Rust change on khoapnt's critical path, puts a credential in URLs (logs, history, referrers), and re-adds a surface the fork's authors deliberately omitted.                                                                                                                                                                                                                               |
+| Per-site fixes (WS subprotocol + something for `<img>`) | Two mechanisms, partial coverage, more code, same end state.                                                                                                                                                                                                                                                                                                                                       |
+
+Implementation, in order:
+
+- [ ] Scope the filter to **exactly** `http://127.0.0.1:<backendPort>/*` and
+      `ws://127.0.0.1:<backendPort>/*`. A broad filter would attach the local token to
+      arbitrary outbound requests — the one way this change can make things worse.
+- [ ] **Gate it to the app-shell `webContents`.** `session.defaultSession` is shared with
+      partition-less `<webview>` guests, and `URLViewer` renders arbitrary remote URLs; an
+      ungated interceptor would let guest content reach the backend authenticated. The
+      backend's `Origin` allow-list (`rendererAllowedOrigins()`) is a second layer, not a
+      substitute. Moving those two viewers onto dedicated partitions resolves this **and** the
+      CSP shared-session caveat at `index.ts:724` — prefer that if the cost is acceptable.
+- [ ] Verify `onBeforeSendHeaders` fires for the `webSocket` resource type on the Electron
+      version in use before relying on it for the two WS sites.
+- [ ] Remove `withLocalTokenQuery`, `LOCAL_TOKEN_QUERY`, and their four call sites. Net
+      security improvement: the token stops appearing in URLs.
+- [ ] Cover all four sites with tests that fail against the pre-fix transport.
 
 **This is a release blocker, not a follow-up.** A packaged build from today's branch ships
 broken media, WeChat login, and speech streaming — in exactly the installer this sprint exists
