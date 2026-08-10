@@ -354,9 +354,16 @@ handoff artifact.
       now against the GitHub release line rather than upstream.
 - [ ] Existing evidence is tracked: the capability matrix and model-selector contract in
       `docs/design/` and `docs/prds/` (`!89`), and the backend decision record.
-- [ ] The 31-task / 406-step / 157-RED-assertion plans are gitignored under
-      `docs/superpowers/plans/`. **Publish them to a tracked location before handoff** — they
-      cannot be shared from there, and Sprint 2 lost three separate documents this way.
+- [x] **PUBLISHED 2026-08-11.** The three implementation plans are now tracked and shareable:
+      [AionCore](../design/epic003-aioncore-reasoning-controls-plan.md),
+      [AionRS](../design/epic003-aionrs-reasoning-controls-plan.md), and
+      [WePrompt](../design/epic003-weprompt-reasoning-controls-plan.md). Bodies are **verbatim**;
+      each carries a banner stating the DR-3 baseline is dead and that T5.1 must be completed
+      before any step is executed.
+- [ ] They were found during worktree cleanup as the **only** copy, inside an untracked worktree
+      that `git status` reported as clean — gitignored files are invisible to it. One
+      `git worktree remove` would have destroyed 110 KB of task-level planning. **Do not leave
+      handoff material in `docs/superpowers/`**; that directory is for local working state only.
 
 ### T5.3 Scope rule
 
