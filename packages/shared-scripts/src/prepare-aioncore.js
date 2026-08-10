@@ -25,8 +25,10 @@ const { verifyBundledAioncoreResources } = require('./verify-bundled-aioncore-re
 const aioncoreChecksums = require('./aioncore-checksums');
 const aioncoreTrust = require('./aioncore-trust');
 
-const GITHUB_OWNER = 'iOfficeAI';
-const GITHUB_REPO = 'AionCore';
+// Security-patched fork (D-01 loopback token, MCP OAuth discovery/DCR fix).
+// The upstream iOfficeAI/AionCore is unpatched; the desktop app ships the fork.
+const GITHUB_OWNER = 'khoapnt-vng';
+const GITHUB_REPO = 'aioncore';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
 // artifacts (see aioncore-trust.js). Overridable via env for other mirrors.

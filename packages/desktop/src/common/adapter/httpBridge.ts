@@ -55,7 +55,10 @@ export function getLocalToken(): string {
 export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
   const token = getLocalToken();
   if (!token) return headers;
-  return { ...headers, [LOCAL_TOKEN_HEADER]: token };
+  // Local build: the pinned aioncore v0.1.50 reads the loopback token from
+  // `Authorization: Bearer` (auth_middleware), not `X-AionUI-Local-Token`.
+  // Send Bearer so requests authenticate against the shipped binary.
+  return { ...headers, Authorization: `Bearer ${token}` };
 }
 
 /**
