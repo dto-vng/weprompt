@@ -197,13 +197,17 @@ today, which is why the GitLab runner problem stopped mattering.
 - [ ] CI then becomes the reproduction harness both bugs needed and never got locally. Triage
       them from real samples rather than hunting reproductions by hand.
 
-### T3.3 Cost control — matrix on release only
+### T3.3 Matrix jobs — concurrency, not cost
 
-- [ ] macOS bills at **10×** and Windows at **2×** for private repos. The Free tier's 2,000
-      minutes is roughly **200 macOS minutes** — five to ten packaging runs.
-- [ ] Run the macOS/Windows matrix **only on release branches and tags**, never per-PR.
-- [ ] If the cadence still exceeds quota, choose a paid plan or a self-hosted macOS runner
-      before the sprint's packaging phase, not during it.
+Both repositories are **public**, so standard hosted runners — including macOS ARM and
+Windows — are free with no minute billing. The 10×/2× private-repo multipliers do not apply
+and no paid plan or self-hosted runner is required.
+
+- [ ] Budget against **concurrency** instead: the free tier allows a limited number of
+      simultaneous jobs, with macOS the tightest. A wide matrix on every PR will queue.
+- [ ] Run the macOS/Windows matrix on release branches and tags; keep per-PR to Linux. This is
+      now a latency choice, not a cost one, so relax it if queueing is not a problem in practice.
+- [ ] Do not use larger runners — those are billed even on public repositories.
 
 ---
 
@@ -293,15 +297,15 @@ A merged PR, a pushed branch, or a green source-only run satisfies only part of 
 
 ## Risks
 
-| Risk                                                  | Likelihood | Control                                                     |
-| ----------------------------------------------------- | ---------- | ----------------------------------------------------------- |
-| T0.3 auth design slips and blocks packaging           | High       | Decide in week 1; it gates Track 4 entirely                 |
-| Personal-account ownership of source, CI, and signing | Certain    | Accepted for Sprint 3; org request filed week 1             |
-| Actions macOS minutes exhausted mid-sprint            | Medium     | Matrix on release only; decide paid vs self-hosted up front |
-| Release line stays ambiguous and a fourth tag appears | Medium     | T0.2 names one commit; re-verify at cutover                 |
-| Quarantined flakes quietly become permanent           | Medium     | Each carries a tracking link; review at sprint end          |
-| EPIC-003 starts against the dead DR-3 gate            | Medium     | T5.1 is an explicit entry condition                         |
-| Owner-gated items stall the sprint, as in Sprint 2    | Medium     | Track 3/4 do not block Tracks 1–2; org request is parallel  |
+| Risk                                                  | Likelihood | Control                                                    |
+| ----------------------------------------------------- | ---------- | ---------------------------------------------------------- |
+| T0.3 auth design slips and blocks packaging           | High       | Decide in week 1; it gates Track 4 entirely                |
+| Personal-account ownership of source, CI, and signing | Certain    | Accepted for Sprint 3; org request filed week 1            |
+| Matrix jobs queue behind free-tier concurrency limits | Low        | Public repos bill no minutes; keep per-PR to Linux         |
+| Release line stays ambiguous and a fourth tag appears | Medium     | T0.2 names one commit; re-verify at cutover                |
+| Quarantined flakes quietly become permanent           | Medium     | Each carries a tracking link; review at sprint end         |
+| EPIC-003 starts against the dead DR-3 gate            | Medium     | T5.1 is an explicit entry condition                        |
+| Owner-gated items stall the sprint, as in Sprint 2    | Medium     | Track 3/4 do not block Tracks 1–2; org request is parallel |
 
 ## Exit criteria
 
