@@ -56,7 +56,7 @@ printf 'archive' > "$out"
     `#!/usr/bin/env bash
 if [[ "$*" != *'/artifacts?per_page=100'* ]]; then
   cat <<'JSON'
-{"status":"completed","conclusion":"success","head_sha":"260dbbc05d5c8d079fb60e0e9578d4250b6e4338"}
+{"status":"completed","conclusion":"success","head_sha":"${ACCEPTED_AIONCORE_SOURCE_COMMIT}"}
 JSON
   exit 0
 fi
@@ -132,11 +132,17 @@ afterEach(() => {
 });
 
 describe('prepare-aioncore GitHub Actions artifact resolver', () => {
-  it('accepts only a completed successful run from the reviewed AionCore commit', () => {
+  // Scope note (BUG-040): these cases verify that the resolver *gates on* the
+  // pinned commit and rejects everything else. They cannot verify that the
+  // pinned commit is real or reviewed — a test that feeds the constant back to
+  // the function comparing against it passes for any value, including a
+  // fabricated one. Provenance must be confirmed out-of-band against the
+  // publishing host before the pin is trusted.
+  it('accepts a completed successful run whose head is the pinned source commit', () => {
     expect(
       assertAcceptedActionsRun({
         conclusion: 'success',
-        head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338',
+        head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT,
         status: 'completed',
       })
     ).toEqual({
@@ -154,12 +160,12 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
     ],
     [
       'an unfinished run',
-      { conclusion: null, head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338', status: 'in_progress' },
+      { conclusion: null, head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT, status: 'in_progress' },
       /is not completed successfully/,
     ],
     [
       'a failed run',
-      { conclusion: 'failure', head_sha: '260dbbc05d5c8d079fb60e0e9578d4250b6e4338', status: 'completed' },
+      { conclusion: 'failure', head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT, status: 'completed' },
       /is not completed successfully/,
     ],
   ])('rejects %s', (_case, run, expectedMessage) => {
