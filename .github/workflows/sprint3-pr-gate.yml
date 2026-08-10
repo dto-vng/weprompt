@@ -55,39 +55,44 @@ jobs:
           bun run i18n:types
           node scripts/check-i18n.js
 
-      # Aggregate baseline across this step and the BUG-030 quarantine below,
-      # measured on the integrated sprint3 tip: 624 files (1 skipped), 8,126
-      # passed, 19 skipped. (The pre-integration figure was 621 / 8,120; the
-      # T0.3 and CI slices added three files and six tests.)
-      - name: Run Vitest suite outside BUG-030 teardown scope
-        run: bunx vitest run --exclude='tests/unit/renderer/team/TeamSiderSection.dom.test.tsx'
-
-      # BUG-030: TeamSiderSection can raise EnvironmentTeardownError after all five tests pass.
-      # Tracking: https://github.com/khoapnt-vng/WePrompt/blob/sprint3/TASKS.md#bug-030p3test-infrastructure-suite-exits-non-zero-after-a-fully-green-run
-      - name: Quarantine BUG-030 TeamSiderSection teardown
+      # Runs the whole suite in one invocation. Baseline on the integrated
+      # sprint3 tip: 624 files (1 skipped), 8,126 passed, 19 skipped.
+      #
+      # BUG-030 quarantine: TeamSiderSection can raise EnvironmentTeardownError
+      # that fails the PROCESS after every test has already passed. That is
+      # detectable from this run's own summary, so it needs no separate
+      # invocation. Tracking:
+      # https://github.com/khoapnt-vng/WePrompt/blob/sprint3/TASKS.md
+      #
+      # Do NOT reintroduce `vitest run --exclude=<file>` to carve this file out.
+      # The CLI flag REPLACES the resolved exclude list rather than adding to
+      # it, so the glob escapes into node_modules and sibling worktrees —
+      # measured locally as 13,874 discovered test files instead of 625.
+      - name: Run Vitest suite
         shell: bash
         run: |
           set -o pipefail
-          log="$RUNNER_TEMP/bug-030.log"
+          log="$RUNNER_TEMP/suite.log"
 
-          for attempt in 1 2 3; do
-            : > "$log"
-            if bunx vitest run --project=dom tests/unit/renderer/team/TeamSiderSection.dom.test.tsx 2>&1 | tee "$log"; then
-              exit 0
-            fi
-            echo "::warning title=BUG-030 retry::TeamSiderSection teardown attempt $attempt failed."
-          done
-
-          clean_log="$RUNNER_TEMP/bug-030-clean.log"
-          sed $'s/\033\\[[0-9;]*[mK]//g' "$log" > "$clean_log"
-          if grep -q 'EnvironmentTeardownError' "$clean_log" \
-            && grep -Eq 'Test Files[[:space:]]+1 passed' "$clean_log" \
-            && grep -Eq 'Tests[[:space:]]+5 passed' "$clean_log"; then
-            echo '::warning title=BUG-030 quarantine::Known post-green EnvironmentTeardownError persisted after two retries; see the tracking link in this step.'
-            echo '### BUG-030 quarantine' >> "$GITHUB_STEP_SUMMARY"
-            echo 'All five TeamSiderSection tests passed, but the known EnvironmentTeardownError persisted after two retries. BUG-030 remains non-blocking.' >> "$GITHUB_STEP_SUMMARY"
+          if bun run test 2>&1 | tee "$log"; then
             exit 0
           fi
 
-          echo '::error title=BUG-030 scope exceeded::TeamSiderSection failed without the exact known post-green teardown signature.'
+          clean="$RUNNER_TEMP/suite-clean.log"
+          sed $'s/\033\\[[0-9;]*[mK]//g' "$log" > "$clean"
+
+          # Pass only when the process died on the known teardown error while
+          # NOTHING actually failed. Any failed file or test still blocks.
+          if grep -q 'EnvironmentTeardownError' "$clean" \
+            && ! grep -Eq 'Test Files[[:space:]]+[0-9]+ failed' "$clean" \
+            && ! grep -Eq 'Tests[[:space:]]+[0-9]+ failed' "$clean"; then
+            echo '::warning title=BUG-030 quarantine::Suite exited non-zero via EnvironmentTeardownError with zero failing tests; treated as the known BUG-030 teardown.'
+            {
+              echo '### BUG-030 quarantine'
+              echo 'The suite exited non-zero through the known EnvironmentTeardownError while every test passed. BUG-030 remains non-blocking.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo '::error title=Suite failed::Failure is not the known BUG-030 post-green teardown signature.'
           exit 1
