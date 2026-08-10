@@ -33,11 +33,17 @@ jobs:
     name: Quality and tests (macOS)
     runs-on: macos-15
     timeout-minutes: 45
-    # TEMPORARY, added 2026-08-10 — remove once the first macOS run of this
-    # gate is green. Kept for exactly one cycle so a surprise runner-specific
-    # failure cannot block PRs before it is understood. Leaving it in place
-    # permanently would make the gate decorative.
-    continue-on-error: true
+    # BLOCKING as of 2026-08-10. `continue-on-error` was removed after this
+    # gate passed a full hosted run (`31405462957`: every step green, zero
+    # failing tests) once BUG-042's CI-environment isolation landed.
+    #
+    # Known intermittent: BUG-043 — the readiness hardlink-drift guard fails
+    # open on hosted filesystems, observed fail/fail/pass across three hosted
+    # runs. It WILL red this gate occasionally. That is deliberate: it is a
+    # real fail-open defect on a shipped-adjacent path, and hiding it behind a
+    # retry would repeat the mistake BUG-030's narrow quarantine exists to
+    # avoid. Re-run the job; if the noise becomes unmanageable, quarantine
+    # that single test by exact signature — never the whole job.
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
