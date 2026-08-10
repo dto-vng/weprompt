@@ -55,8 +55,10 @@ jobs:
           bun run i18n:types
           node scripts/check-i18n.js
 
-      # Aggregate baseline across this step and the BUG-030 quarantine below:
-      # 621 files (1 skipped), 8,120 passed, 19 skipped.
+      # Aggregate baseline across this step and the BUG-030 quarantine below,
+      # measured on the integrated sprint3 tip: 624 files (1 skipped), 8,126
+      # passed, 19 skipped. (The pre-integration figure was 621 / 8,120; the
+      # T0.3 and CI slices added three files and six tests.)
       - name: Run Vitest suite outside BUG-030 teardown scope
         run: bunx vitest run --exclude='tests/unit/renderer/team/TeamSiderSection.dom.test.tsx'
 

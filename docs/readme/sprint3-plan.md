@@ -150,6 +150,26 @@ Implementation, in order:
 broken media, WeChat login, and speech streaming — in exactly the installer this sprint exists
 to produce.
 
+**Implemented 2026-08-10** (`44f00a112`, merged). The interceptor lives in
+`packages/desktop/src/process/startup/localBackendAuth.ts`, is filtered to the runtime backend
+port, gates on `details.webContentsId === appShell.id`, re-checks the origin as defence in
+depth, and fails closed to _unauthenticated_ on a malformed URL. `withLocalTokenQuery` and
+`LOCAL_TOKEN_QUERY` are gone along with all four renderer call sites.
+
+#### T0.3 follow-up — a **fifth** call site the interceptor cannot reach
+
+- [ ] `PresentationRuntimeEventClient.ts:221` builds `ws://127.0.0.1:<port>/ws?local_token=…`
+      inline, which is why a `withLocalTokenQuery` grep missed it. It runs in the **main
+      process** over the Node `ws` library (`createSocket(url, options)`, `socket.on('open')`),
+      so it never enters Chromium's session layer — `onBeforeSendHeaders` cannot see it, and
+      the `webContents` gate would exclude it even if it could.
+- [ ] **Not urgent, but latent:** it is reached only through
+      `createPresentationRunLifecycleCoordinator`, behind `PRESENTATION_RUN_V2_ENABLED = false`
+      (`index.ts:346`). Dormant today; it will 401 the moment that flag flips.
+- [ ] Fix is small: `ws` accepts `headers` in its constructor options and `createSocket`
+      already forwards them, so pass `Authorization: Bearer <token>` and drop the query
+      parameter. Must land **before** EPIC-001 V2 is enabled.
+
 ---
 
 ## Track 1 — Provenance and artifact chain
