@@ -151,7 +151,7 @@ describe('httpBridge', () => {
 
       expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
         'Content-Type': 'application/json',
-        'X-AionUI-Local-Token': 'abc123',
+        Authorization: 'Bearer abc123',
       });
     });
 
