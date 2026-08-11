@@ -114,8 +114,11 @@ extraResources:
     to: bundled-aioncore
   - from: resources/hub
     to: hub
-  # built-in presentation template reference decks
-  - from: resources/presentation-templates
+  # built-in presentation template reference decks. Source lives under the
+  # desktop package (where the reference-deck generators write and dev resolves
+  # it), NOT the repo-root resources/ dir the other extraResources use — so this
+  # entry must be package-qualified or electron-builder finds nothing (WP #24093).
+  - from: packages/desktop/resources/presentation-templates
     to: presentation-templates
 win:
   target:
