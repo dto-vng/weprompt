@@ -454,4 +454,17 @@ describe('URL derivation', () => {
     startSpeechStream({ callbacks, createSocket });
     expect(lastSocket().url).toBe('ws://127.0.0.1:14512/api/stt/stream');
   });
+
+  it('Electron mode with a local token: appends it as a query fallback (belt-and-suspenders with the subprotocol)', () => {
+    setBackendPort(14512);
+    const w = window as Window & { __backendLocalToken?: string };
+    w.__backendLocalToken = 'stt-secret';
+    try {
+      const callbacks = makeCallbacks();
+      startSpeechStream({ callbacks, createSocket });
+      expect(lastSocket().url).toBe('ws://127.0.0.1:14512/api/stt/stream?local_token=stt-secret');
+    } finally {
+      delete w.__backendLocalToken;
+    }
+  });
 });

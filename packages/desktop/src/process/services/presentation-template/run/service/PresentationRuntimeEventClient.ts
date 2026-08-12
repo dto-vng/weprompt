@@ -53,7 +53,7 @@ type SocketLike = {
 };
 
 export type PresentationRuntimeEventClientOptions = {
-  createSocket: (url: string, options: { maxPayload: number }) => SocketLike;
+  createSocket: (url: string, options: { maxPayload: number; headers: Record<string, string> }) => SocketLike;
   onTerminalEvent: (
     event: PresentationRuntimeTerminalEvent,
     authority: PresentationTerminalEventAuthority
@@ -218,8 +218,16 @@ export class PresentationRuntimeEventClient {
     this.socketEpoch += 1;
     const epoch = this.socketEpoch;
     this.clearConnectionState();
-    const url = `ws://127.0.0.1:${credentials.port}/ws?local_token=${encodeURIComponent(credentials.token)}`;
-    const socket = this.options.createSocket(url, { maxPayload: MAX_FRAME_BYTES });
+    // aioncore authenticates the /ws upgrade from request headers, never the
+    // query string. A Node `ws` client can set them directly, so the per-launch
+    // secret goes in `Authorization: Bearer` (crates/aionui-auth
+    // extract_token_from_ws_headers). The renderer's browser WebSocket, which
+    // cannot set headers, uses `Sec-WebSocket-Protocol` for the same purpose.
+    const url = `ws://127.0.0.1:${credentials.port}/ws`;
+    const socket = this.options.createSocket(url, {
+      maxPayload: MAX_FRAME_BYTES,
+      headers: { Authorization: `Bearer ${credentials.token}` },
+    });
     this.socket = socket;
     socket.on('open', () => {
       if (this.isCurrentSocket(socket, generation, epoch)) this.reconnectAttempt = 0;

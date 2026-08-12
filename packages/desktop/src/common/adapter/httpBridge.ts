@@ -50,14 +50,18 @@ export function getLocalToken(): string {
  * Add the local-mode secret to a header bag.
  *
  * Every `fetch`/`XMLHttpRequest` aimed at the backend must go through this —
- * without the header the backend answers 401.
+ * without the secret the backend answers 401.
+ *
+ * aioncore authenticates the per-launch secret from `Authorization: Bearer`
+ * (crates/aionui-auth/src/extract.rs `extract_token_from_headers`); it never
+ * reads the legacy `X-AionUI-Local-Token` header, so only `Authorization: Bearer`
+ * is sent — the value the backend validates.
  */
 export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
   const token = getLocalToken();
   if (!token) return headers;
-  // Local build: the pinned aioncore v0.1.50 reads the loopback token from
-  // `Authorization: Bearer` (auth_middleware), not `X-AionUI-Local-Token`.
-  // Send Bearer so requests authenticate against the shipped binary.
+  // aioncore reads the loopback token from `Authorization: Bearer`
+  // (extract_token_from_headers), not the legacy `X-AionUI-Local-Token` header.
   return { ...headers, Authorization: `Bearer ${token}` };
 }
 
@@ -121,8 +125,23 @@ function getWsUrl(): string {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/ws`;
   }
-  // A browser `WebSocket` cannot set headers, so the secret rides in the query.
-  return withLocalTokenQuery(`ws://127.0.0.1:${getBackendPort()}/ws`);
+  return `ws://127.0.0.1:${getBackendPort()}/ws`;
+}
+
+/**
+ * WebSocket subprotocols carrying the local-mode secret for the direct-backend
+ * (Electron) connection.
+ *
+ * A browser `WebSocket` cannot set request headers, so the per-launch secret must
+ * ride in the first `Sec-WebSocket-Protocol` value — NOT the query string, which
+ * aioncore never reads for auth. The backend extracts it via
+ * `extract_token_from_ws_headers` (crates/aionui-auth/src/extract.rs) and echoes
+ * the protocol back so the handshake completes. Empty in WebUI browser mode,
+ * where the session cookie authenticates the same-origin upgrade instead.
+ */
+export function getWsProtocols(): string[] {
+  const token = getLocalToken();
+  return token ? [token] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +280,10 @@ function assertMainHttpRequestOptions(options: MainHttpRequestOptions): void {
  */
 export async function mainHttpRequest<T>(options: MainHttpRequestOptions): Promise<T> {
   assertMainHttpRequestOptions(options);
-  const headers: Record<string, string> = { [LOCAL_TOKEN_HEADER]: options.token };
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${options.token}`,
+    [LOCAL_TOKEN_HEADER]: options.token,
+  };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await (options.fetchImpl ?? fetch)(`http://127.0.0.1:${options.port}${options.path}`, {
     method: options.method,
@@ -519,9 +541,10 @@ function ensureWs(): void {
   }
 
   const url = getWsUrl();
+  const protocols = getWsProtocols();
   console.debug('[ensureWs] connecting to', url);
   try {
-    ws = new WebSocket(url);
+    ws = protocols.length > 0 ? new WebSocket(url, protocols) : new WebSocket(url);
   } catch (e) {
     console.error('[ensureWs] WebSocket constructor threw:', e);
     scheduleWsReconnect();

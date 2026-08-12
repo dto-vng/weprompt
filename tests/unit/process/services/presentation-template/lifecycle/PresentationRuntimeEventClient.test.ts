@@ -129,11 +129,11 @@ describe('PresentationRuntimeEventClient', () => {
     harness.client.connect({ port: 43123, token: TOKEN });
     harness.client.connect({ port: 43124, token: 'rotated&token' });
 
-    expect(harness.urls).toEqual([
-      'ws://127.0.0.1:43123/ws?local_token=backend-secret-token',
-      'ws://127.0.0.1:43124/ws?local_token=rotated%26token',
+    expect(harness.urls).toEqual(['ws://127.0.0.1:43123/ws', 'ws://127.0.0.1:43124/ws']);
+    expect(harness.socketOptions).toEqual([
+      { maxPayload: 256 * 1024, headers: { Authorization: `Bearer ${TOKEN}` } },
+      { maxPayload: 256 * 1024, headers: { Authorization: 'Bearer rotated&token' } },
     ]);
-    expect(harness.socketOptions).toEqual([{ maxPayload: 256 * 1024 }, { maxPayload: 256 * 1024 }]);
     expect(harness.sockets[0]?.close).toHaveBeenCalledTimes(1);
   });
 
