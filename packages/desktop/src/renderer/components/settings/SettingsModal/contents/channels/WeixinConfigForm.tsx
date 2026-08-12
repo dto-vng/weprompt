@@ -254,8 +254,11 @@ const WeixinConfigForm: React.FC<WeixinConfigFormProps> = ({ pluginStatus, model
     setLoginState('loading_qr');
     setQrcodeDataUrl(null);
 
-    // `EventSource` cannot set headers, so the local-mode secret goes in the query.
-    const es = new EventSource(withLocalTokenQuery(`${getBaseUrl()}/api/channel/weixin/login`));
+    // `EventSource` cannot set headers; `withCredentials` makes it send the
+    // `aionui-session` cookie the main process planted, which the backend
+    // authenticates. The query token stays as a harmless fallback for a backend
+    // that reads it instead of the cookie.
+    const es = new EventSource(withLocalTokenQuery(`${getBaseUrl()}/api/channel/weixin/login`), { withCredentials: true });
     eventSourceRef.current = es;
 
     es.addEventListener('qr', (e: MessageEvent) => {

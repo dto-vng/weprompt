@@ -532,6 +532,38 @@ function exposeBackendPort(backendPort: number): void {
   // backend through httpBridge too, and it reads the token from globalThis when
   // there is no `window`.
   (globalThis as typeof globalThis & { __backendLocalToken?: string }).__backendLocalToken = backendManager.localToken;
+  installBackendSessionCookie(backendPort);
+}
+
+/**
+ * Plant the local-mode secret as the `aionui-session` cookie the backend already
+ * accepts (crates/aionui-auth extract_token_from_headers), so the renderer's
+ * header-less backend requests authenticate without a query token: `<img>` asset
+ * loads (model/agent logos, assistant avatars) and EventSource channels.
+ *
+ * The renderer is cross-site to the loopback backend (dev: localhost:5173,
+ * packaged: a custom scheme → 127.0.0.1), so the cookie must be SameSite=None
+ * (`no_restriction`) and Secure to ride cross-site subresource requests;
+ * 127.0.0.1 is a secure context, so Chromium honors a Secure cookie over http
+ * there. Cookies are port-agnostic, so one cookie covers whatever port the
+ * backend was assigned. Requests that can carry a header (fetch via
+ * Authorization, the chat WebSocket via Sec-WebSocket-Protocol) still do and do
+ * not depend on this.
+ */
+function installBackendSessionCookie(backendPort: number): void {
+  const token = backendManager.localToken;
+  if (!token) return;
+  void session.defaultSession.cookies
+    .set({
+      url: `http://127.0.0.1:${backendPort}`,
+      name: 'aionui-session',
+      value: token,
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'no_restriction',
+    })
+    .catch((err) => console.warn('[AionUi] failed to install backend session cookie:', err));
 }
 
 function ensureAdminUserOnce(backendPort: number): Promise<void> {
