@@ -160,7 +160,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   const showDownload = shouldShowDownload(content_type, showOpenInSystemButton);
 
   const toolbarBtn =
-    'flex items-center gap-2px px-8px py-3px rd-4px cursor-pointer transition-colors duration-150 text-12px font-medium text-t-secondary hover:text-t-primary hover:bg-bg-3';
+    'flex items-center gap-2px px-8px py-3px rd-4px cursor-pointer transition-colors duration-150 text-12px font-medium text-t-secondary hover:text-t-primary hover:bg-3';
   const toolbarBtnActive = '!text-white bg-brand hover:!text-white hover:bg-brand-hover';
   const toolbarIconSize = 12;
 
@@ -173,7 +173,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   const isSplitSegmentActive = showSplitSegment && isSplitScreenEnabled;
   const segmentBase =
     'flex items-center justify-center h-full px-10px cursor-pointer transition-colors duration-150 text-12px font-medium';
-  const segmentInactive = 'text-t-secondary hover:text-t-primary hover:bg-bg-3';
+  const segmentInactive = 'text-t-secondary hover:text-t-primary hover:bg-3';
   const segmentDivider = <div className='w-1px self-stretch bg-border-1' />;
 
   // 选择 Source/Preview 时，如果当前处于分屏模式则一并关闭，避免出现"分屏 + 单栏"的矛盾状态
@@ -211,7 +211,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   if (officeToolbar) return <>{officeToolbar}</>;
 
   return (
-    <div className='flex items-center justify-between h-32px px-10px bg-bg-2 flex-shrink-0 border-b border-border-1 overflow-x-auto'>
+    <div className='flex items-center justify-between h-32px px-10px bg-2 flex-shrink-0 border-b border-[var(--color-border-1)] overflow-x-auto'>
       <div className='flex items-center justify-between gap-8px w-full' style={{ minWidth: 'max-content' }}>
         {/* 左侧：Tabs（Markdown/HTML）+ 文件名 / Left: Tabs (Markdown/HTML) + Filename */}
         <div className='flex items-center h-full gap-8px'>
@@ -240,7 +240,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
           {showSaveControl && showViewSegments && <div className='w-1px h-16px bg-border-1 flex-shrink-0' />}
           {showViewSegments && (
             <div
-              className='inline-flex items-center h-24px rd-6px border border-solid border-border-1 overflow-hidden flex-shrink-0'
+              className='inline-flex items-center h-24px rd-6px border border-solid border-[var(--color-border-1)] overflow-hidden flex-shrink-0'
               data-testid='preview-view-segmented-control'
             >
               <div

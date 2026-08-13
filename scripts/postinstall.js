@@ -10,6 +10,10 @@ const { execSync } = require('child_process');
 
 function runPostInstall() {
   try {
+    // i18n key types are generated, not tracked — every install must produce
+    // them before any typecheck can run (CI and local alike).
+    execSync('node scripts/generate-i18n-types.js', { stdio: 'inherit' });
+
     // Check if we're in a CI environment
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
     const electronVersion = require('../package.json').devDependencies.electron.replace(/^[~^]/, '');
@@ -34,7 +38,7 @@ function runPostInstall() {
     }
   } catch (e) {
     console.error('Postinstall failed:', e.message);
-    // Don't exit with error code to avoid breaking installation
+    throw e;
   }
 }
 

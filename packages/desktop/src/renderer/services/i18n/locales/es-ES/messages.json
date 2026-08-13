@@ -16,6 +16,7 @@
   "downloadFailed": "Error en la descarga",
   "imageLoadFailed": "Error al cargar la imagen",
   "scrollToBottom": "Ir al final",
+  "reasoning": "Razonamiento",
   "availableCommands": "{{count}} comandos disponibles",
   "atFile.hint": "Escribe para buscar archivos",
   "atFile.menuLabel": "Menciones de archivos",
@@ -50,12 +51,25 @@
   "unknownMessageType": "Tipo de mensaje desconocido: {{type}}",
   "permissionRequest": "Solicitud de permiso",
   "agentRequestingPermission": "El agente está solicitando permiso.",
+  "permission": {
+    "intent": {
+      "run": "Me gustaría ejecutar un comando",
+      "edit": "Me gustaría editar un archivo",
+      "read": "Me gustaría leer un archivo",
+      "fetch": "Me gustaría obtener algo de la web",
+      "tool": "Me gustaría usar una herramienta",
+      "destructive": "Me gustaría eliminar o borrar archivos",
+      "generic": "Me gustaría hacer algo que necesita tu aprobación"
+    },
+    "destructiveWarning": "Esto puede eliminar o sobrescribir archivos de forma permanente: no se puede deshacer."
+  },
   "command": "Comando:",
   "chooseAction": "Elige una acción:",
   "option": "Opción",
   "noOptionsAvailable": "No hay opciones disponibles",
   "processing": "Procesando...",
   "responseSentSuccessfully": "Respuesta enviada correctamente",
+  "permissionResponseFailed": "No se pudo enviar tu respuesta. Inténtalo de nuevo.",
   "confirmation": {
     "applyChange": "¿Aplicar este cambio?",
     "allowExecution": "¿Permitir la ejecución?",
@@ -106,6 +120,28 @@
         "failed": "No pude completar el trabajo previsto. Acciones previstas: {{total, number}}. Pendientes de otro intento: {{failed, number}}.",
         "failedWithCanceled": "No pude completar el trabajo previsto. Acciones previstas: {{total, number}}. Pendientes de otro intento: {{failed, number}}. Detenidas: {{canceled, number}}.",
         "canceled": "Detuve este turno antes de completar el trabajo previsto. Acciones previstas: {{total, number}}. Sin completar: {{unfinished, number}}. Detenidas: {{canceled, number}}."
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "Listo, todo ha salido según lo previsto. Dime qué te gustaría hacer a continuación.",
+        "v2": "Esto ya está terminado y funcionando. Dime por dónde quieres seguir a partir de aquí.",
+        "v3": "Hecho: todo ha encajado. Estoy listo para lo siguiente cuando tú lo estés."
+      },
+      "recovered": {
+        "v1": "Hecho: un paso necesitó un segundo intento, pero ya está todo resuelto.",
+        "v2": "Terminado: hizo falta un breve reintento por el camino, pero todo está en su sitio."
+      },
+      "partial": {
+        "v1": "He hecho casi todo. Un par de cosas aún necesitan otra pasada; tienes los detalles justo abajo.",
+        "v2": "Buen avance: la mayor parte está hecha, aunque algo todavía necesita otro intento. Encontrarás los detalles abajo."
+      },
+      "failed": {
+        "v1": "No he podido terminar esto. Tienes los detalles abajo y puedes pedirme que lo intente de nuevo cuando quieras.",
+        "v2": "Esto no ha salido adelante. Echa un vistazo a los detalles de abajo o simplemente dime que lo intente otra vez."
+      },
+      "canceled": {
+        "v1": "Me he detenido aquí. Dime si quieres que lo retome."
       }
     },
     "attempt": "(intento {{n}})",
@@ -205,5 +241,8 @@
         "failedTitle": "No pude preparar el archivo final"
       }
     }
+  },
+  "plan": {
+    "title": "Lista de tareas"
   }
 }

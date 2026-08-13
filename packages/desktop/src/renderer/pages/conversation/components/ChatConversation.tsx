@@ -5,7 +5,13 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { IConversationMcpStatus, IProvider, TChatConversation, TProviderWithModel } from '@/common/config/storage';
+import type {
+  IConversationMcpStatus,
+  IProvider,
+  ISessionMcpServer,
+  TChatConversation,
+  TProviderWithModel,
+} from '@/common/config/storage';
 import { uuid } from '@/common/utils';
 import addChatIcon from '@/renderer/assets/icons/add-chat.svg';
 import { CronJobManager } from '@/renderer/pages/cron';
@@ -26,6 +32,7 @@ import ChatLayout from './ChatLayout';
 import ChatSlider from './ChatSlider.tsx';
 import AcpModelSelector from '@/renderer/components/agent/AcpModelSelector';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
+import { getChatSurfaceWidthClass } from '@/renderer/pages/conversation/utils/chatSurfaceWidth';
 import { getConversationCreateErrorMessage } from '@/renderer/pages/conversation/utils/conversationCreateError';
 import GoogleModelSelector from '../platforms/gemini/GoogleModelSelector';
 import AionrsChat from '../platforms/aionrs/AionrsChat';
@@ -36,7 +43,30 @@ import { isLegacyReadOnlyConversationType } from '../utils/conversationRuntime';
 import { resolveConversationBackend } from '../utils/conversationAssistantIdentity';
 import LegacyReadOnlyConversation from '../platforms/legacy/LegacyReadOnlyConversation';
 import { useActiveLease } from '../hooks/useActiveLease';
+import { KnowledgeCitationsProvider } from '../knowledge/KnowledgeCitationsContext';
 // import SkillRuleGenerator from './components/SkillRuleGenerator'; // Temporarily hidden
+
+/**
+ * The greeting a solo conversation shows before its first message.
+ *
+ * Deliberately one muted line and nothing else — no avatar, no fetch, no prompt chips. The
+ * team equivalent (`TeamChatEmptyState`) is heavy and team-specific by construction (SWR,
+ * preset-assistant info, agent logos, teammate colour, draft wiring, and an early
+ * `if (!team_id) return null`), so copying it would mean a parallel component of comparable
+ * weight for a surface that only needs to say the scroller is not broken. Chips would also
+ * compete with the template gallery on the page the user just came from.
+ *
+ * Sized with `getChatSurfaceWidthClass` so it lines up with the composer column below it —
+ * the same helper KbStaleChatHint uses.
+ */
+const ConversationEmptySlot: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <div className={`${getChatSurfaceWidthClass(false)} text-center text-13px text-t-secondary select-none`}>
+      {t('conversation.emptyChat')}
+    </div>
+  );
+};
 
 const configErrorMessageKey = (error: unknown) => {
   const errorKind = classifyConfigSetError(error);
@@ -224,6 +254,8 @@ const AionrsConversationPanel: React.FC<{
     <ChatLayout {...chatLayoutProps} conversation_id={conversation.id}>
       <AionrsChat
         conversation_id={conversation.id}
+        conversation={conversation}
+        emptySlot={<ConversationEmptySlot />}
         workspace={conversation.extra.workspace}
         modelSelection={modelSelection}
         modelSelector={modelSelector}
@@ -234,6 +266,8 @@ const AionrsConversationPanel: React.FC<{
         loadedMcpStatuses={
           (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
         }
+        project_id={conversation.extra?.project_id}
+        session_mcp_servers={conversation.extra?.session_mcp_servers}
         agent_name={presetAssistantInfo?.name}
         assistantId={aionrsAssistantId}
       />
@@ -299,6 +333,10 @@ const ChatConversation: React.FC<{
           <AcpChat
             key={conversation.id}
             conversation_id={conversation.id}
+            conversation={conversation}
+            // Interactive platforms only. LegacyReadOnlyConversation deliberately gets none:
+            // inviting someone to start typing in a read-only conversation is a bug.
+            emptySlot={<ConversationEmptySlot />}
             workspace={conversation.extra?.workspace}
             backend={resolvedConversationBackend || 'claude'}
             session_mode={conversation.extra?.session_mode}
@@ -310,6 +348,10 @@ const ChatConversation: React.FC<{
             loadedMcpServers={(conversation.extra as { mcp_servers?: string[] } | undefined)?.mcp_servers}
             loadedMcpStatuses={
               (conversation.extra as { mcp_statuses?: IConversationMcpStatus[] } | undefined)?.mcp_statuses
+            }
+            project_id={(conversation.extra as { project_id?: string } | undefined)?.project_id}
+            session_mcp_servers={
+              (conversation.extra as { session_mcp_servers?: ISessionMcpServer[] } | undefined)?.session_mcp_servers
             }
             assistantId={acpAssistantId}
           ></AcpChat>
@@ -338,7 +380,11 @@ const ChatConversation: React.FC<{
   }, [t]);
 
   if (conversation && conversation.type === 'aionrs') {
-    return <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />;
+    return (
+      <KnowledgeCitationsProvider conversation={conversation}>
+        <AionrsConversationPanel key={conversation.id} conversation={conversation} sliderTitle={sliderTitle} />
+      </KnowledgeCitationsProvider>
+    );
   }
 
   // 如果有预设助手信息，使用预设助手的 logo 和名称；加载中时不进入 fallback；否则使用 backend 的 logo
@@ -366,22 +412,24 @@ const ChatConversation: React.FC<{
   );
 
   return (
-    <ChatLayout
-      title={conversation?.name}
-      {...chatLayoutProps}
-      headerExtra={headerExtraNode}
-      siderTitle={sliderTitle}
-      sider={<ChatSlider conversation={conversation} />}
-      workspaceEnabled={workspaceEnabled}
-      workspacePresentation='project-menu'
-      workspacePath={conversation?.extra?.workspace}
-      isTemporaryWorkspace={
-        (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
-      }
-      conversation_id={conversation?.id}
-    >
-      {conversationNode}
-    </ChatLayout>
+    <KnowledgeCitationsProvider conversation={conversation}>
+      <ChatLayout
+        title={conversation?.name}
+        {...chatLayoutProps}
+        headerExtra={headerExtraNode}
+        siderTitle={sliderTitle}
+        sider={<ChatSlider conversation={conversation} />}
+        workspaceEnabled={workspaceEnabled}
+        workspacePresentation='project-menu'
+        workspacePath={conversation?.extra?.workspace}
+        isTemporaryWorkspace={
+          (conversation?.extra as { is_temporary_workspace?: boolean } | undefined)?.is_temporary_workspace
+        }
+        conversation_id={conversation?.id}
+      >
+        {conversationNode}
+      </ChatLayout>
+    </KnowledgeCitationsProvider>
   );
 };
 

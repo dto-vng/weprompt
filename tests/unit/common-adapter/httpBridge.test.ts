@@ -25,6 +25,12 @@ import {
   wsMappedEmitter,
   stubEmitter,
   httpRequest,
+  mainHttpRequest,
+  MainBackendHttpError,
+  getLocalToken,
+  withLocalTokenHeaders,
+  withLocalTokenQuery,
+  getWsProtocols,
 } from '@/common/adapter/httpBridge';
 
 type FakeSocketEventMap = {
@@ -119,6 +125,85 @@ describe('httpBridge', () => {
     });
   });
 
+  describe('local-mode secret', () => {
+    afterEach(() => {
+      delete (globalThis as { __backendLocalToken?: string }).__backendLocalToken;
+    });
+
+    it('reads the secret from globalThis for main-process callers', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'main-secret';
+
+      expect(getLocalToken()).toBe('main-secret');
+    });
+
+    it('prefers window over globalThis, so the renderer uses what preload exposed', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'main-secret';
+      vi.stubGlobal('window', { __backendLocalToken: 'renderer-secret' });
+
+      expect(getLocalToken()).toBe('renderer-secret');
+    });
+
+    it('returns an empty string when no secret is exposed', () => {
+      expect(getLocalToken()).toBe('');
+    });
+
+    it('adds the secret as Authorization: Bearer (what aioncore validates)', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer abc123',
+      });
+    });
+
+    it('leaves headers untouched in WebUI mode, where real auth applies instead', () => {
+      expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('appends the secret to a URL with no query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws?local_token=abc123');
+    });
+
+    it('appends the secret to a URL that already has a query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x?a=1')).toBe(
+        'http://127.0.0.1:1234/api/x?a=1&local_token=abc123'
+      );
+    });
+
+    it('percent-encodes the secret so it cannot break out of the query string', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'a&b=c';
+
+      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x')).toBe(
+        'http://127.0.0.1:1234/api/x?local_token=a%26b%3Dc'
+      );
+    });
+
+    it('leaves the URL untouched when no secret is exposed', () => {
+      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws');
+    });
+
+    // A browser WebSocket cannot set request headers, and aioncore never reads
+    // the secret from the query string — it authenticates the upgrade from
+    // `Sec-WebSocket-Protocol`. So the direct-backend socket must carry the
+    // secret as a subprotocol, or every live event is rejected (1008) and the
+    // socket reconnect-loops forever with no live messages reaching the UI.
+    it('carries the secret as a WebSocket subprotocol for the direct-backend connection', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(getWsProtocols()).toEqual(['abc123']);
+    });
+
+    it('sends no subprotocol in WebUI mode, where the session cookie authenticates the upgrade', () => {
+      expect(getWsProtocols()).toEqual([]);
+    });
+  });
+
   describe('httpGet', () => {
     it('constructs provider and invoke, provider is no-op', () => {
       const h = httpGet('/api/x');
@@ -203,6 +288,72 @@ describe('httpBridge', () => {
   });
 
   describe('error handling', () => {
+    it('passes the request abort signal to fetch', async () => {
+      const controller = new AbortController();
+      const networkError = new Error('request aborted');
+      let capturedSignal: AbortSignal | null | undefined;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((_url: string, options?: RequestInit) => {
+          capturedSignal = options?.signal;
+          return Promise.reject(networkError);
+        })
+      );
+      vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/cancelable', undefined, { signal: controller.signal })).rejects.toBe(
+        networkError
+      );
+
+      expect(capturedSignal).toBe(controller.signal);
+    });
+
+    it('keeps request logging before a normal network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/network-failure')).rejects.toThrow('network unavailable');
+
+      expect(debugSpy).toHaveBeenCalledWith('[httpBridge] GET /api/network-failure', '(no body)');
+    });
+
+    it('logs and preserves a deferred request network failure', async () => {
+      const networkError = new Error('app operations backend unavailable');
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError));
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+      await expect(httpRequest('GET', '/api/app-operations/model', undefined, { silentStatuses: [404] })).rejects.toBe(
+        networkError
+      );
+
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledWith('[httpBridge] GET /api/app-operations/model', '(no body)');
+    });
+
+    it('keeps a configured silent status out of logs while preserving its BackendHttpError', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: 'backend upgrade required' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+      );
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(
+        httpRequest('GET', '/api/app-operations/model', undefined, { silentStatuses: [404] })
+      ).rejects.toMatchObject({
+        status: 404,
+        body: { error: 'backend upgrade required' },
+      });
+
+      expect(debugSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
     it('non-2xx response throws BackendHttpError with code/status/backendMessage', async () => {
       const fetchSpy = vi.fn().mockResolvedValue(
         new Response(
@@ -482,6 +633,109 @@ describe('httpBridge', () => {
 
       expect(fetchSpy.mock.calls[0][1]?.body).toBe('{"key":"value"}');
       expect(fetchSpy.mock.calls[0][1]?.headers).toEqual({ 'Content-Type': 'application/json' });
+    });
+  });
+
+  describe('mainHttpRequest', () => {
+    it('requires explicit port and token, sends them without global fallback, and unwraps data', async () => {
+      (globalThis as { __backendPort?: number; __backendLocalToken?: string }).__backendPort = 65500;
+      (globalThis as { __backendPort?: number; __backendLocalToken?: string }).__backendLocalToken = 'global-secret';
+      const fetchImpl = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { msg_id: 'msg-1' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const result = await mainHttpRequest<{ msg_id: string }>({
+        port: 13457,
+        token: 'lifecycle-secret',
+        method: 'POST',
+        path: '/api/conversations/conversation-1/messages',
+        body: { content: 'private prompt' },
+        fetchImpl,
+      });
+
+      expect(result).toEqual({ msg_id: 'msg-1' });
+      expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:13457/api/conversations/conversation-1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer lifecycle-secret',
+          'X-AionUI-Local-Token': 'lifecycle-secret',
+        },
+        body: '{"content":"private prompt"}',
+        signal: undefined,
+      });
+      delete (globalThis as { __backendPort?: number }).__backendPort;
+      delete (globalThis as { __backendLocalToken?: string }).__backendLocalToken;
+    });
+
+    it.each([
+      { port: 0, token: 'secret', path: '/api/x' },
+      { port: 65_536, token: 'secret', path: '/api/x' },
+      { port: 13400.5, token: 'secret', path: '/api/x' },
+      { port: 13400, token: '', path: '/api/x' },
+      { port: 13400, token: 'secret', path: 'https://attacker.example/x' },
+      { port: 13400, token: 'secret', path: '//attacker.example/x' },
+    ])('rejects invalid explicit configuration before fetch: %o', async ({ port, token, path }) => {
+      const fetchImpl = vi.fn();
+
+      await expect(mainHttpRequest({ port, token, method: 'GET', path, fetchImpl })).rejects.toThrow(
+        /invalid main backend request configuration/i
+      );
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('forwards abort signals without substituting credentials', async () => {
+      const controller = new AbortController();
+      const fetchImpl = vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError'));
+      controller.abort();
+
+      await expect(
+        mainHttpRequest({
+          port: 13400,
+          token: 'abort-secret',
+          method: 'POST',
+          path: '/api/messages',
+          body: { content: 'sensitive-body' },
+          signal: controller.signal,
+          fetchImpl,
+        })
+      ).rejects.toMatchObject({ name: 'AbortError' });
+      expect(fetchImpl.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    });
+
+    it('returns a body-free structured error and never logs URLs, tokens, request bodies, or response bodies', async () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const fetchImpl = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: 'BACKEND_BUSY', error: 'response-secret' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caught = await mainHttpRequest({
+        port: 13400,
+        token: 'token-secret',
+        method: 'POST',
+        path: '/api/private/messages',
+        body: { content: 'request-secret' },
+        fetchImpl,
+      }).catch((caughtError: unknown) => caughtError);
+
+      expect(caught).toBeInstanceOf(MainBackendHttpError);
+      expect(caught).toMatchObject({ status: 409, code: 'BACKEND_BUSY' });
+      expect(caught).not.toHaveProperty('body');
+      expect(String(caught)).not.toContain('token-secret');
+      expect(String(caught)).not.toContain('request-secret');
+      expect(String(caught)).not.toContain('response-secret');
+      expect(String(caught)).not.toContain('/api/private/messages');
+      expect(debug).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 

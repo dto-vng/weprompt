@@ -47,6 +47,6 @@ export function warnUnsupportedRemoteAccess(
 ): void {
   if (policy.requestedBy.length === 0) return;
   warn(
-    `[aionui-web] Remote access requested by ${policy.requestedBy.join(', ')}, but Forge WebUI is local-only; binding to 127.0.0.1.`
+    `[aionui-web] Remote access requested by ${policy.requestedBy.join(', ')}, but WePrompt WebUI is local-only; binding to 127.0.0.1.`
   );
 }

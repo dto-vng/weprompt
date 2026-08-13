@@ -1,8 +1,10 @@
 import React, { Suspense } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import AppLoader from '@renderer/components/layout/AppLoader';
+import RouteErrorBoundary from '@renderer/components/layout/RouteErrorBoundary';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
-import { DESKTOP_PET_ENABLED, TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { isElectronDesktop } from '@renderer/utils/platform';
+import { CREATIVE_STUDIO_ENABLED, DESKTOP_PET_ENABLED, TEAM_MODE_ENABLED } from '@/common/config/constants';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
 const AgentSettings = React.lazy(() => import('@renderer/pages/settings/AgentSettings'));
@@ -16,17 +18,32 @@ const ModeSettings = React.lazy(() => import('@renderer/pages/settings/ModeSetti
 const SystemSettings = React.lazy(() => import('@renderer/pages/settings/SystemSettings'));
 const WebuiSettings = React.lazy(() => import('@renderer/pages/settings/WebuiSettings'));
 const PetSettings = React.lazy(() => import('@renderer/pages/settings/PetSettings'));
+const ProfileSettings = React.lazy(() => import('@renderer/pages/settings/ProfileSettings'));
 const ExtensionSettingsPage = React.lazy(() => import('@renderer/pages/settings/ExtensionSettingsPage'));
 const LoginPage = React.lazy(() => import('@renderer/pages/login'));
 const ComponentsShowcase = React.lazy(() => import('@renderer/pages/TestShowcase'));
 const ScheduledTasksPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage'));
 const TaskDetailPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage/TaskDetailPage'));
 const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
+const ProjectHome = React.lazy(() => import('@renderer/pages/project'));
+const StudioPage = React.lazy(() => import('@renderer/pages/studio/StudioPage'));
+
+/**
+ * Scopes render failures to the active route. Sits outside `Suspense` so a
+ * failed lazy chunk is caught too, and resets on navigation so leaving a broken
+ * screen is enough to recover.
+ */
+const RouteBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation();
+  return <RouteErrorBoundary resetKey={pathname}>{children}</RouteErrorBoundary>;
+};
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
-  <Suspense fallback={<AppLoader />}>
-    <Component />
-  </Suspense>
+  <RouteBoundary>
+    <Suspense fallback={<AppLoader />}>
+      <Component />
+    </Suspense>
+  </RouteBoundary>
 );
 
 /**
@@ -53,6 +70,14 @@ const ProtectedLayout: React.FC<{ layout: React.ReactElement }> = ({ layout }) =
   return React.cloneElement(layout);
 };
 
+const DesktopStudioRoute: React.FC = () => {
+  if (!CREATIVE_STUDIO_ENABLED || !isElectronDesktop()) {
+    return <Navigate to='/guid' replace />;
+  }
+
+  return withRouteFallback(StudioPage);
+};
+
 const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
   const { status } = useAuth();
 
@@ -67,10 +92,14 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route index element={<Navigate to='/guid' replace />} />
           <Route path='/guid' element={withRouteFallback(Guid)} />
           <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
+          <Route path='/project/:id' element={withRouteFallback(ProjectHome)} />
+          <Route path='/studio' element={<DesktopStudioRoute />} />
+          <Route path='/studio/:id/:phase?' element={<DesktopStudioRoute />} />
           <Route
             path='/team/:id'
             element={TEAM_MODE_ENABLED ? withRouteFallback(TeamIndex) : <Navigate to='/guid' replace />}
           />
+          <Route path='/settings/profile' element={withRouteFallback(ProfileSettings)} />
           <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
           <Route path='/assistants' element={withRouteFallback(AssistantSettings)} />
           {/* Assistants moved out of Settings to a top-level entry; keep a redirect
@@ -98,7 +127,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
             element={DESKTOP_PET_ENABLED ? withRouteFallback(PetSettings) : <Navigate to='/settings' replace />}
           />
           <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
-          <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
+          <Route path='/settings/about' element={<Navigate to='/settings/system' replace />} />
           <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
           <Route path='/settings' element={<Navigate to='/settings/agent' replace />} />
           <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />

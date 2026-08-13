@@ -1,3 +1,8 @@
+import type {
+  GrantPresentationExternalDropRequest,
+  GrantPresentationExternalDropResult,
+} from '../office/presentationRun';
+
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
   running: boolean;
@@ -10,17 +15,41 @@ export interface WebUIStatus {
   initialPassword?: string;
 }
 
+export type FeedbackScreenshotAttachment = {
+  contentType: 'image/jpeg' | 'image/png';
+  data: number[];
+  filename: string;
+};
+
+export type LocalFeedbackDiagnosticExportInput = {
+  collectLogs: boolean;
+  description: string;
+  module: string;
+  moduleLabel: string;
+  screenshots: FeedbackScreenshotAttachment[];
+  tags?: Record<string, string>;
+};
+
+export type LocalFeedbackDiagnosticExportResult =
+  | { path: string; status: 'saved' }
+  | { status: 'cancelled' }
+  | { status: 'failed' };
+
 export interface ElectronBridgeAPI {
   emit: (name: string, data: unknown) => Promise<unknown> | void;
   on: (callback: (event: { value: string }) => void) => void;
   // 获取拖拽文件/目录的绝对路径 / Get absolute path for dragged file/directory
   getPathForFile?: (file: File) => string;
-  // Feedback log collection / 收集反馈日志
-  collectFeedbackLogs?: () => Promise<{ filename: string; data: number[] } | null>;
+  presentationSources?: {
+    grantExternalDrop: (request: GrantPresentationExternalDropRequest) => Promise<GrantPresentationExternalDropResult>;
+  };
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
-  // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
-  logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
+  // Export a local diagnostic archive selected by the user. The user description
+  // and screenshots are deliberately unredacted and must be reviewed before sharing.
+  exportLocalFeedbackDiagnostics?: (
+    input: LocalFeedbackDiagnosticExportInput
+  ) => Promise<LocalFeedbackDiagnosticExportResult>;
   recoverCorruptedDatabase?: () => Promise<void>;
 }
 

@@ -17,7 +17,6 @@
     "quickActionStar": "마음에 드시나요? 별을 주세요!",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "커뮤니티 Skills를 필요에 따라 검색하고 활성화. 한 번 설정하면 모든 Agent에서 사용 가능.",
-    "skillsMarketDetails": "자세히 >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "프로젝트 {{name}}",
+    "eyebrow": "프로젝트",
+    "tabs": {
+      "label": "프로젝트 보기",
+      "chat": "채팅",
+      "files": "파일",
+      "context": "컨텍스트",
+      "artifacts": "결과물"
+    }
+  },
+  "projectHome": {
+    "newChat": "새 채팅",
+    "composerPlaceholder": "이 프로젝트에서 새 채팅 시작…",
+    "scopedHint": "— 이 프로젝트로 범위 한정",
+    "chats": "채팅",
+    "showAll": "모두 보기",
+    "showLess": "간략히 보기",
+    "emptyChatsTitle": "아직 채팅이 없습니다",
+    "emptyChatsBody": "위에서 채팅을 시작하면 이 프로젝트에서 작업을 시작할 수 있습니다.",
+    "instructions": "지침",
+    "instructionsApplies": "이 프로젝트의 새 채팅에 적용됩니다.",
+    "instructionsEmpty": "이 프로젝트의 모든 채팅을 안내할 지침을 추가하세요.",
+    "addInstructions": "지침 추가",
+    "edit": "편집",
+    "save": "저장",
+    "cancel": "취소",
+    "instructionsSaved": "지침이 저장되었습니다",
+    "instructionsSaveFailed": "지침을 저장할 수 없습니다",
+    "files": "파일",
+    "revealInFolder": "폴더에서 보기",
+    "filesReadonly": "읽기 전용 · 폴더에서 관리",
+    "filesEmpty": "이 프로젝트의 폴더가 비어 있습니다.",
+    "folderMissingTitle": "폴더를 찾을 수 없습니다",
+    "folderMissingRelink": "폴더 다시 연결",
+    "folderMissingBody": "나머지 페이지는 계속 이용할 수 있습니다.",
+    "metaChats": "채팅 {{count}}개",
+    "metaActive": "{{time}} 활성",
+    "notFoundTitle": "프로젝트를 찾을 수 없습니다",
+    "notFoundBody": "이 프로젝트가 삭제되었거나 링크가 오래되었을 수 있습니다.",
+    "backHome": "홈으로 돌아가기",
+    "rename": "이름 변경",
+    "relink": "폴더 다시 연결",
+    "reveal": "폴더에서 보기",
+    "remove": "제거",
+    "knowledge": "지식",
+    "knowledgeAdd": "파일 추가",
+    "knowledgeDropFolderMissing": "파일을 추가하기 전에 Knowledge Base 폴더를 다시 연결하세요.",
+    "knowledgeDropUnsupported": "지원되지 않는 파일입니다. 지원 형식: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "지식 베이스를 새로 고칠 수 없습니다.",
+    "knowledgeRelinkFailed": "프로젝트 폴더를 다시 연결할 수 없습니다.",
+    "knowledgeRetryFailed": "해당 파일을 색인 대기열에 추가할 수 없습니다.",
+    "knowledgeDeleteFailed": "해당 파일을 휴지통으로 이동할 수 없습니다.",
+    "knowledgeAddFailed": "해당 파일을 지식 베이스에 추가할 수 없습니다.",
+    "knowledgeEmpty": "문서를 추가하면 이 프로젝트의 지식 베이스를 구축할 수 있습니다. 어시스턴트가 이 프로젝트의 모든 채팅에서 자동으로 검색합니다.",
+    "knowledgeSemanticOff": "시맨틱 검색 꺼짐 — 임베딩 모델 미설정",
+    "knowledgeSemanticOffAction": "임베딩 모델 추가",
+    "knowledgeEmbedAll": "모두 임베딩",
+    "knowledgePassagesTooltip": "이 파일은 검색 가능한 구절로 나뉘며, 어시스턴트가 답변할 때 가장 관련 있는 부분을 가져옵니다.",
+    "knowledgeStatusIndexing": "색인 중…",
+    "knowledgeProgressReading": "{{total}}페이지 중 {{done}}페이지 읽는 중",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}} 페이지 텍스트 변환 중",
+    "knowledgeProgressEmbedding": "임베딩 중 {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "실패",
+    "knowledgeStatusUnsupported": "지원되지 않음",
+    "knowledgeStatusNotEmbedded": "키워드 전용",
+    "knowledgeNotEmbeddedDetail": "키워드로는 검색되지만 {{done}}/{{total}} 구절만 임베딩되었습니다. 다시 시도하면 나머지를 임베딩합니다.",
+    "knowledgeRetry": "다시 시도",
+    "knowledgeError": "지식 베이스를 사용할 수 없습니다.",
+    "knowledgeSupportedTypes": "지원 형식: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "새로 고침",
+    "knowledgeOpenOriginal": "원본 파일 열기",
+    "knowledgeDeleteFile": "파일 삭제",
+    "knowledgeDeleteConfirm": "\"{{fileName}}\"을(를) 휴지통으로 옮길까요? 지식 베이스에서도 제거됩니다.",
+    "knowledgeFolderHint": "파일은 프로젝트 폴더 안의 \"Knowledge Base\" 폴더에 있습니다. 넣어 두면 자동으로 색인됩니다.",
+    "knowledgeFolderMissingTitle": "Knowledge Base 폴더를 찾을 수 없습니다",
+    "knowledgeFolderMissingBody": "이동, 이름 변경 또는 삭제되었을 수 있습니다. 색인된 지식은 그대로 유지됩니다. 폴더를 복원하거나 프로젝트를 다시 연결한 후 새로 고치세요.",
+    "knowledgePreviewNote": "어시스턴트가 검색하는 색인 텍스트이며 원본 서식이 아닙니다.",
+    "knowledgePreviewTruncated": "미리보기가 잘렸습니다. 전체 문서는 원본 파일을 열어 확인하세요.",
+    "knowledgePreviewError": "이 파일의 색인 텍스트를 불러올 수 없습니다.",
+    "knowledgePreviewNotReady": "아직 열 수 있는 색인 텍스트가 없습니다.",
+    "knowledgeCitationMissing": "이 파일은 더 이상 지식 베이스에 없습니다.",
+    "knowledgeOcrTag": "텍스트 변환됨(OCR)",
+    "knowledgeOcrDetail": "{{model}}이(가) 스캔본에서 변환했습니다. 건너뛴 페이지: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "없음"
+  },
   "history": {
+    "moreActions": "추가 작업",
     "recents": "최근",
     "today": "오늘",
     "yesterday": "어제",
@@ -80,6 +166,8 @@
     "removeProject": "프로젝트 제거",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "이 프로젝트에서 새 대화",
+    "expandProjectChats": "프로젝트 채팅 펼치기",
+    "collapseProjectChats": "프로젝트 채팅 접기",
     "deleting": "삭제 중...",
     "reorderPinned": "드래그하여 고정된 대화 순서 변경",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "프로젝트를 제거하지 못했습니다. 프로젝트를 다시 연 후 재시도하세요. 폴더의 파일은 삭제되지 않았습니다.",
+    "removeProjectChatDetachFailed": "일부 채팅을 이 프로젝트에서 분리하지 못했습니다. 프로젝트는 유지되었습니다. 제거를 다시 시도하세요.",
+    "removeProjectStateChanged": "제거하기 전에 프로젝트 목록이 변경되었습니다. 새로 고친 후 다시 시도하세요.",
+    "removeProjectStorageFailed": "프로젝트 변경 사항을 저장하지 못했습니다. WePrompt가 앱 데이터에 접근할 수 있는지 확인한 후 다시 시도하세요.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "프로젝트",
+    "projectMenu": {
+      "trigger": "프로젝트"
+    },
     "pasteConfirm_title": "파일 붙여넣기",
     "pasteConfirm_message": "'{{name}}'을(를) 선택된 폴더({{target}})에 붙여넣으시겠습니까?",
     "pasteConfirm_paste": "붙여넣기",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "터미널",
       "explorer": "파일 탐색기"
-    },
-    "projectMenu": {
-      "trigger": "프로젝트"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "현재 세션에 선택된 모델이 없어 메시지를 보낼 수 없습니다",
     "sendMessageTo": "{{model}}에게 메시지 보내기",
     "processing": "처리 중...",
+    "stopGenerating": "생성 중지",
     "quotaExceededTitle": "모델 할당량 도달",
     "quotaExceededBody": "현재 모델 할당량이 소진되었습니다. {{model}}(으)로 전환하여 계속하시겠습니까?",
     "quotaExceededNoFallback": "모델 할당량에 도달했습니다. 다른 사용 가능한 모델로 전환하세요.",
@@ -547,7 +639,9 @@
     "today": "오늘",
     "weekToDate": "이번 주 누적",
     "monthToDate": "이번 달 누적",
-    "triggerLabel": "컨텍스트 사용량 표시"
+    "triggerLabel": "컨텍스트 사용량 표시",
+    "estimated": "예상",
+    "unavailable": "컨텍스트 사용량을 확인할 수 없음"
   },
   "skill_generator": {
     "title": "스킬/규칙 생성",
@@ -616,36 +710,109 @@
     }
   },
   "notFound": "대화를 찾을 수 없거나 삭제되었습니다",
-  "projectHeader": {
-    "label": "프로젝트 {{name}}",
-    "eyebrow": "프로젝트",
-    "tabs": {
-      "label": "프로젝트 보기",
-      "chat": "채팅",
-      "files": "파일",
-      "context": "컨텍스트",
-      "artifacts": "결과물"
-    }
-  },
   "emptyModelReply": "모델이 표시할 응답 없이 턴을 종료했습니다. 요청을 다시 보내 주세요. 출력이 큰 경우 결과를 여러 부분으로 나누어 요청하세요.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "비즈니스 리뷰",
+        "description": "분기 실적 덱 — KPI 요약, 세그먼트 상세, 전망. 네이비와 앰버."
+      },
+      "project-kickoff": {
+        "name": "프로젝트 킥오프",
+        "description": "킥오프 덱 — 범위, 팀, 일정, 다음 단계. 깔끔한 청록."
+      },
+      "monthly-steerco": {
+        "name": "월간 운영위원회",
+        "description": "운영위원회 보고 — 포트폴리오 현황, 리스크, 결정 필요 사항. 세리프와 골드."
+      },
+      "connected-ops": {
+        "name": "커넥티드 운영",
+        "description": "운영 리뷰 — 사업장 지표, 가동률, 장애. 인더스트리얼 그린."
+      },
+      "editorial-field-report": {
+        "name": "에디토리얼 현장 보고서",
+        "description": "장문 보고서 — 세리프 서체, 불릿보다 서술문, 빨강 강조 하나."
+      },
+      "market-trends-report": {
+        "name": "시장 동향 보고서",
+        "description": "데이터 중심 스크롤 보고서 — 출처가 있는 차트."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "미니멀 라이트 덱 — 슬라이드당 하나의 메시지, 파랑 강조 하나."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "기술 발표용 미니멀 다크 덱 — 코드에 적합, 초록 강조."
+      },
+      "business-report": {
+        "name": "비즈니스 보고서",
+        "description": "장문 공식 보고서 — 표지, 목차, 데이터 표, 네이비 세리프 제목."
+      },
+      "decision-memo": {
+        "name": "의사결정 메모",
+        "description": "짧은 의사결정 메모 — 수신/발신/제목 블록, 권고를 앞에, 표지 없음."
+      },
+      "operations-guide": {
+        "name": "운영 가이드",
+        "description": "간결한 표준 절차 — 번호 단계, 참고 박스, 체크리스트, 청록 강조."
+      },
+      "proposal-sow": {
+        "name": "제안서 / SOW",
+        "description": "고객 제안서 — 범위, 일정, 가격표, 서명란."
+      }
+    },
     "title": "템플릿",
     "columnPptx": "프레젠테이션 · PPTX",
-    "columnHtml": "보고서 · HTML",
+    "columnHtml": "웹 · HTML",
+    "columnDocx": "문서 · DOCX",
     "selected": "선택됨",
-    "buttonTooltip": "프레젠테이션 템플릿",
-    "slashDescription": "프레젠테이션 템플릿 선택",
-    "importCard": "테마 가져오기 (.md)",
+    "buttonTooltip": "템플릿",
+    "slashDescription": "템플릿 선택",
+    "importCard": "템플릿 가져오기 (.md)",
     "empty": "사용 가능한 템플릿이 없습니다",
     "chipTooltip": "이 메시지는 템플릿을 사용합니다",
+    "scratch": {
+      "prepareError": "아티팩트 임시 공간을 준비하지 못했습니다: {{error}}",
+      "retained": "복구를 위해 임시 아티팩트 파일을 {{path}}에 보관했습니다.",
+      "cleanup": "정리",
+      "cleanupSuccess": "임시 아티팩트 파일을 제거했습니다",
+      "cleanupError": "정리 실패: {{error}}"
+    },
     "importSuccess": "템플릿을 가져왔습니다",
     "importError": "가져오기 실패: {{error}}",
     "removeError": "삭제 실패: {{error}}",
     "deleteTooltip": "템플릿 삭제",
-    "deleteConfirm": "이 템플릿을 삭제하시겠습니까?"
+    "deleteConfirm": "이 템플릿을 삭제하시겠습니까?",
+    "sources": {
+      "reselectRequired": "이 PPTX 템플릿에서 사용하려면 첨부 파일을 다시 선택하세요.",
+      "reselectAction": "파일 다시 선택"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "프레젠테이션 후보를 검토해야 합니다.",
+        "reviewRequiredAfterFailure": "생성이 중지되었습니다. 보관된 프레젠테이션 후보는 계속 검토가 필요합니다.",
+        "trackingRequired": "프레젠테이션 실행을 추적해 확인해야 합니다.",
+        "dispatchUncertain": "프레젠테이션 실행 결과가 확인되지 않았습니다. 운영자의 확인이 필요합니다."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "시스템 앱에서 열기",
+        "discard": "기록 폐기"
+      },
+      "loadError": "프레젠테이션 복구 상태를 불러오지 못했습니다.",
+      "invalidResponse": "프레젠테이션 복구 상태를 확인할 수 없습니다.",
+      "openError": "현재 프레젠테이션 후보가 열렸는지 확인하지 못했습니다.",
+      "discardError": "프레젠테이션 기록 폐기를 확인하지 못했습니다."
+    }
   },
   "status": {
-    "waitingApproval": "승인을 기다리는 중"
+    "waitingApproval": "승인을 기다리는 중",
+    "running": "작업 중",
+    "done": "완료",
+    "doneIdle": "완료 — 유휴",
+    "stopped": "중지됨",
+    "failed": "실패"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -708,8 +875,473 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "크리에이티브 스튜디오"
+    },
+    "close": {
+      "saveAndClose": "저장하고 닫기",
+      "discard": "변경 사항을 버리고 닫기",
+      "cancel": "취소",
+      "unsavedMessage": "{{count}}개 장면에 저장되지 않은 편집 내용이 있습니다. 저장한 후 닫을까요?",
+      "unsavedMessage_other": "{{count}}개 장면에 저장되지 않은 편집 내용이 있습니다. 저장한 후 닫을까요?",
+      "unavailableMessage": "크리에이티브 스튜디오가 응답하지 않습니다. 지금 닫으면 저장되지 않은 장면 편집 내용이 손실될 수 있습니다."
+    },
+    "phase": {
+      "nav": {
+        "label": "제작 워크플로",
+        "brief": "기획",
+        "write": "작성",
+        "produce": "제작",
+        "review": "검토",
+        "saved": "저장됨",
+        "saving": "변경 사항 저장 중..."
+      },
+      "shared": {
+        "backToLibrary": "프로젝트 라이브러리로 돌아가기",
+        "noMediaGeneration": "이 단계에서는 이미지나 동영상을 생성하지 않습니다."
+      },
+      "brief": {
+        "title": "기획",
+        "description": "작성을 시작하기 전에 프로젝트 목표, 형식, 길이를 정하세요.",
+        "nameLabel": "프로젝트 이름",
+        "intentLabel": "제작 의도",
+        "durationLabel": "목표 길이",
+        "aspectRatioLabel": "화면 비율",
+        "startWriting": "작성 시작",
+        "saved": "기획 변경 사항이 모두 저장되었습니다.",
+        "saving": "기획 변경 사항 저장 중...",
+        "unsaved": "기획 변경 사항이 아직 저장되지 않았습니다.",
+        "invalidName": "계속하기 전에 프로젝트 이름을 입력하세요.",
+        "aspectLocked": "화면 비율이 잠겼습니다",
+        "aspectLockedHelp": "생성된 미디어를 추가한 후에는 화면 비율을 변경할 수 없습니다."
+      },
+      "write": {
+        "title": "작성",
+        "continueToProduce": "제작으로 계속",
+        "askAssistant": "어시스턴트에게 묻기",
+        "assistantTitle": "작성 어시스턴트",
+        "assistantDescription": "어시스턴트로 이야기 구조, 숏 아이디어, 프롬프트를 발전시키세요.",
+        "textChargeDisclosure": "스토리보드 초안에는 설정한 텍스트 모델이 사용됩니다. 공급자가 모델 사용 요금을 청구할 수 있습니다.",
+        "draftStoryboard": "스토리보드 초안 만들기",
+        "addShot": "숏 추가",
+        "fitToGoal": "목표에 맞추기",
+        "noScenes": "숏을 추가하거나 스토리보드 초안을 만들어 시작하세요.",
+        "scriptTableTitle": "대본",
+        "scriptTableHelp": "숏마다 한 줄에서 문구, 화면, 길이, 출력을 함께 다듬으세요.",
+        "shotColumn": "숏",
+        "scriptColumn": "대본",
+        "visualColumn": "화면",
+        "outputColumn": "출력",
+        "visualPlaceholder": "화면에 보이는 내용을 설명하세요…",
+        "suggestVisual": "화면 제안",
+        "addReference": "참조 이미지 추가",
+        "moreDetails": "자세히 보기",
+        "invalidTitle": "저장하기 전에 숏 제목을 입력하세요.",
+        "placeholder": {
+          "opening": "오프닝 숏",
+          "middle": "중간 숏",
+          "closing": "클로징 숏"
+        },
+        "needsTitle": "제목 필요",
+        "pacingTitle": "페이싱",
+        "pacingSummary": "총 {{total}}초 · 목표 {{target}}초",
+        "goalMarker": "목표 {{seconds}}초"
+      },
+      "produce": {
+        "connectEngine": "엔진 연결 — 약 1분, 전체 작업 공간에서 한 번만",
+        "askTeammate": "팀원에게 요청",
+        "askTeammateCopy": "이 작업 공간용 이미지 또는 비디오 엔진을 WePrompt 모델 설정에서 연결해 주세요.",
+        "renderingWith": "렌더링 엔진 —",
+        "engineSummary": "{{model}} · {{kind}} · 최대 {{seconds}}초",
+        "changeEngines": "엔진 변경",
+        "takeRatio": "테이크 {{current}} / {{total}}",
+        "noVisualYet": "아직 비주얼 없음",
+        "writeVisual": "비주얼 작성",
+        "render": "렌더링",
+        "renderAnother": "다시 렌더링",
+        "openPreview": "{{title}} 미리보기 열기",
+        "reviewCut": "편집본 검토",
+        "modelsTitle": "모델",
+        "activityTitle": "생성 활동",
+        "activityEmpty": "실행 중인 생성 작업이 없습니다.",
+        "jobsRunning": "생성 작업 {{count}}개 실행 중",
+        "jobsRunning_other": "생성 작업 {{count}}개 실행 중"
+      },
+      "review": {
+        "title": "검토",
+        "description": "선택한 미디어를 확인하고 빠진 슬레이트를 채운 뒤 전달을 준비하세요.",
+        "handoff": "전달 준비",
+        "noAssets": "전달할 수 있는 선택된 미디어가 없습니다.",
+        "selectedTake": "컷에 포함",
+        "slateLabel": "슬레이트",
+        "slateDescription": "렌더링된 미디어를 선택하지 않은 경우에도 슬레이트로 숏을 순서에 유지할 수 있습니다.",
+        "excludedFromHandoff": "선택된 미디어가 없는 장면은 전달에서 제외됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
+        "renderedShots": "렌더링된 숏 {{count}}개",
+        "renderedShots_other": "렌더링된 숏 {{count}}개",
+        "missingSlates": "누락된 슬레이트 {{count}}개",
+        "missingSlates_other": "누락된 슬레이트 {{count}}개",
+        "openProduce": "제작 열기",
+        "handoffDescription": "전달에는 스토리보드 매니페스트와 선택된 미디어만 포함됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
+        "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다.",
+        "render": {
+          "action": "동영상 렌더링",
+          "progress": "동영상 렌더링 중… {{percent}}%",
+          "cancel": "렌더링 취소",
+          "missingScenes": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "missingScenes_one": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "missingScenes_other": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
+          "resultLabel": "렌더링된 동영상",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg가 설치되어 있지 않습니다. 동영상을 렌더링하려면 FFmpeg를 설치하세요.",
+            "busy": "이 프로젝트는 이미 렌더링 중입니다.",
+            "noRenderableScenes": "렌더링할 테이크가 있는 장면이 없습니다.",
+            "failed": "동영상을 렌더링하지 못했습니다.",
+            "cancelled": "동영상 렌더링을 취소했습니다."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "수정 내용을 저장하는 중입니다. 잠시 후 다시 시도해 주세요."
+    },
+    "library": {
+      "title": "크리에이티브 스튜디오",
+      "subtitle": "이야기를 기획하고 모든 장면을 검토한 뒤 이미지나 동영상 에셋을 생성하세요.",
+      "sectionLabel": "또는 이전 작업에서 이어서",
+      "loading": "프로젝트를 불러오는 중...",
+      "retry": "다시 시도",
+      "readinessLabel": "스토리보드 초안",
+      "readinessSetupRequired": "모델 설정 필요",
+      "openProject": "프로젝트 열기",
+      "deleteProject": "프로젝트 삭제",
+      "deleteConfirmTitle": "이 프로젝트를 삭제할까요?",
+      "deleteConfirmBody": "‘{{name}}’ 프로젝트와 로컬에서 관리되는 에셋을 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
+      "deleteActiveWork": "이 프로젝트에서 생성 작업이 진행 중입니다. 삭제하기 전에 작업을 취소하거나 완료될 때까지 기다리세요.",
+      "composer": {
+        "label": "무엇을 만들까요?",
+        "placeholder": "이야기 아이디어를 한 문장으로 적어 주세요…",
+        "aspectRatioLabel": "화면 비율",
+        "durationLabel": "예상 길이",
+        "durationGuess": "약 {{seconds}}초",
+        "attachBrief": "브리프 문서 첨부",
+        "attachBriefUnavailable": "브리프 문서 첨부는 아직 사용할 수 없습니다.",
+        "submit": "브리프 확인 →",
+        "empty": "한 문장이면 충분합니다. 무엇을 만들지 알려 주세요."
+      },
+      "shape": {
+        "title": "구성으로 시작",
+        "label": "{{name}} · {{count}}개 숏 · {{seconds}}초",
+        "sceneTitle": "숏 {{number}}",
+        "productStory": {
+          "name": "제품 스토리",
+          "starter": "우리를 처음 접하는 사람들을 위한 제품 스토리 — 네 개의 비트로 구성하고 워드마크로 마무리합니다."
+        },
+        "featureTeaser": {
+          "name": "기능 티저",
+          "starter": "이미 제품을 사용 중인 고객을 대상으로 한 새 기능의 짧은 티저입니다."
+        },
+        "recapReel": {
+          "name": "분기 회고 릴",
+          "starter": "전사를 위한 분기 회고 릴로, 따뜻하면서도 조금은 자랑스러운 분위기입니다."
+        }
+      },
+      "scriptOnly": "스크립트만",
+      "posterBadge": "테이크 {{take}} · 숏 {{scene}}",
+      "status": {
+        "partiallyRendered": "{{total}}개 숏 중 {{rendered}}개 렌더링됨",
+        "handedOff": "전달 완료 · {{seconds}}초",
+        "scriptOnly": "{{count}}개 숏 작성됨, 렌더링 없음"
+      },
+      "meta": "{{shots}} · {{seconds}}초 · {{relative}}",
+      "shotCount": "{{count}}개 숏",
+      "shotCount_other": "{{count}}개 숏",
+      "projectCount": "프로젝트 {{count}}개",
+      "projectCount_other": "프로젝트 {{count}}개",
+      "deleteConfirm": "삭제"
+    },
+    "empty": {
+      "title": "첫 번째 이야기를 만들어 보세요",
+      "body": "브리프로 시작한 뒤 유료 생성 전에 스토리보드를 충분히 다듬으세요.",
+      "create": "프로젝트 만들기"
+    },
+    "create": {
+      "title": "크리에이티브 스튜디오 프로젝트 만들기",
+      "nameLabel": "프로젝트 이름",
+      "namePlaceholder": "제품 출시 이야기",
+      "aspectRatio16x9": "가로형(16:9)",
+      "aspectRatio9x16": "세로형(9:16)",
+      "aspectRatio1x1": "정사각형(1:1)",
+      "aspectRatio4x3": "클래식 가로형(4:3)",
+      "aspectRatio3x4": "클래식 세로형(3:4)",
+      "invalidDuration": "5초에서 60초 사이의 정수를 입력하세요.",
+      "cancel": "취소"
+    },
+    "project": {
+      "loading": "프로젝트를 불러오는 중...",
+      "notFound": "이 크리에이티브 스튜디오 프로젝트를 찾을 수 없습니다.",
+      "title": "프로젝트 개요",
+      "brief": "브리프",
+      "aspectRatio": "화면 비율",
+      "targetDuration": "목표 길이",
+      "resolution": "해상도",
+      "sceneCount": "장면 수",
+      "readiness": "초안 준비 상태"
+    },
+    "storyboard": {
+      "title": "스토리보드",
+      "addScene": "장면 추가",
+      "noScenes": "장면을 추가하여 이야기를 구성해 보세요.",
+      "sceneLimit": "스토리보드에는 최대 24개의 장면을 넣을 수 있습니다.",
+      "durationTotal": "스토리보드 시간: {{total}} / {{target}}초",
+      "durationMatches": "장면 시간이 프로젝트 목표와 일치합니다.",
+      "durationMismatch": "일괄 생성 전에 장면 시간을 프로젝트 목표와 맞춰야 합니다.",
+      "fitToTarget": "{{seconds}}초에 맞추기",
+      "fitUnlockedOnly": "렌더링되지 않은 샷의 길이만 조정합니다.",
+      "fitUnreachable": {
+        "route_unavailable": "다음 렌더링되지 않은 샷에 호환 모델을 선택하세요: {{scenes}}.",
+        "affectedSceneCount": "영향받는 샷: {{count}}개",
+        "no_adjustable_scenes": "모든 샷이 렌더링되었거나 활성 상태이며 총 {{fixedTotalSeconds}}초입니다. 목표를 변경하거나 렌더링되지 않은 샷을 편집하세요.",
+        "target_out_of_bounds": "선택한 모델에 맞게 전체 프로젝트 목표를 {{minimumTotalSeconds}}초에서 {{maximumTotalSeconds}}초 사이로 설정하세요."
+      },
+      "durationOver": "목표보다 {{seconds}}초 초과",
+      "durationRemaining": "{{seconds}}초 남음",
+      "increaseTarget": "목표를 {{seconds}}초로 늘리기",
+      "shortenBeforeAdding": "다른 장면을 추가하기 전에 기존 장면을 줄이세요.",
+      "dragScene": "장면을 끌어 순서 변경",
+      "removeScene": "장면 제거",
+      "dragSceneAccessible": "장면 {{number}}: {{title}} 끌기",
+      "moveSceneUpAccessible": "장면 {{number}}: {{title}} 위로 이동",
+      "moveSceneDownAccessible": "장면 {{number}}: {{title}} 아래로 이동",
+      "removeSceneAccessible": "장면 {{number}}: {{title}} 제거",
+      "removeConfirmTitle": "이 장면을 제거할까요?",
+      "removeConfirmBody": "가져오거나 생성한 미디어 또는 생성 기록이 있는 장면은 제거할 수 없습니다.",
+      "removeBlocked": "가져오거나 생성한 미디어 또는 생성 기록이 있는 장면은 제거할 수 없습니다.",
+      "retry": "변경 다시 시도",
+      "discard": "로컬 변경 사항 버리기"
+    },
+    "scene": {
+      "accessibleName": "장면 {{number}}: {{title}}",
+      "number": "장면 {{number}}",
+      "status": {
+        "needs_title": "제목 필요",
+        "needs_prompt": "프롬프트 필요",
+        "ready": "생성 준비 완료",
+        "generating": "생성 중",
+        "needs_selection": "변형 선택",
+        "generated": "생성됨",
+        "needs_attention": "확인 필요"
+      },
+      "image": "이미지",
+      "video": "동영상",
+      "duration": "길이",
+      "durationSeconds": "{{seconds}}초",
+      "durationSeconds_other": "{{seconds}}초",
+      "selected": "선택한 장면"
+    },
+    "inspector": {
+      "title": "장면 연출",
+      "sectionsLabel": "장면 편집 섹션",
+      "directionTab": "비주얼",
+      "scriptTab": "스크립트",
+      "titleLabel": "장면 제목",
+      "purposeLabel": "장면 목표",
+      "purposePlaceholder": "이 장면에서 무엇을 달성해야 하나요?",
+      "visualPromptLabel": "시각적 프롬프트",
+      "visualPromptPlaceholder": "샷, 피사체, 배경, 조명, 움직임을 설명하세요.",
+      "narrationLabel": "내레이션",
+      "onScreenTextLabel": "화면 텍스트",
+      "mediaKindLabel": "출력 유형",
+      "durationLabel": "장면 길이(초)",
+      "invalidDuration": "1초에서 60초 사이의 정수를 입력하세요.",
+      "saving": "장면을 저장하는 중...",
+      "saved": "장면을 저장했습니다",
+      "saveFailed": "장면을 저장할 수 없습니다.",
+      "unsavedChanges": "저장되지 않은 변경 사항은 그대로 유지됩니다."
+    },
+    "draft": {
+      "title": "스토리보드 초안 만들기",
+      "body": "WePrompt가 검토할 장면, 내레이션, 화면 텍스트와 타이밍을 제안합니다.",
+      "checking": "선택한 스토리보드 모델을 확인하는 중...",
+      "ready": "초안 생성 준비 완료",
+      "setupRequired": "AI 초안을 만들려면 스토리보드 모델을 선택하고 설정하세요.",
+      "unavailable": "현재 스토리보드 초안을 만들 수 없습니다.",
+      "providerLabel": "스토리보드 제공자",
+      "modelLabel": "스토리보드 모델",
+      "chargeNotice": "초안 작성은 프로젝트에서 선택한 모델을 사용하며 제공자 요금이 발생할 수 있습니다.",
+      "replaceTitle": "기존 스토리보드를 교체할까요?",
+      "replaceBody": "다시 초안을 만들면 유효한 제안이 반환된 후에만 현재의 모든 장면이 교체됩니다.",
+      "confirm": "스토리보드 초안 만들기",
+      "cancel": "취소",
+      "configureModel": "모델 설정 열기",
+      "manualFallback": "수동 편집 계속하기",
+      "failed": "스토리보드 초안을 만들 수 없습니다. 현재 장면은 변경되지 않았습니다."
+    },
+    "routing": {
+      "title": "생성 경로",
+      "modelLabel": "모델",
+      "missingRoute": "호환되는 생성 경로를 선택하세요.",
+      "invalidRoute": "이 경로는 더 이상 유효하지 않습니다. 생성하기 전에 검토하세요."
+    },
+    "review": {
+      "generateReadyScenes": "준비된 장면 {{count}}개 생성",
+      "generateReadyScenes_other": "준비된 장면 {{count}}개 생성",
+      "noReadyScenes": "생성할 준비가 된 장면이 없습니다.",
+      "generateScene": "장면 생성",
+      "regenerateScene": "다른 변형 생성",
+      "title": "생성 설정 검토",
+      "sceneCount": "선택한 장면 {{count}}개",
+      "videoSeconds": "요청한 동영상 길이 {{seconds}}초",
+      "selectedDurationFull": "선택한 길이: {{seconds}}초",
+      "selectedDurationFull_other": "선택한 길이: {{seconds}}초",
+      "targetDurationFull": "목표 길이: {{seconds}}초",
+      "targetDurationFull_other": "목표 길이: {{seconds}}초",
+      "providerLabel": "제공업체",
+      "modelLabel": "모델",
+      "aspectRatio": "화면 비율",
+      "resolution": "해상도",
+      "watermarkOff": "워터마크 비활성화",
+      "audioOff": "무음 출력, 오디오 생성 비활성화",
+      "missingRoute": "하나 이상의 장면에 생성 경로가 없습니다.",
+      "invalidRoute": "선택한 경로 중 하나 이상이 유효하지 않습니다.",
+      "durationMismatch": "스토리보드 시간이 프로젝트 목표와 일치하지 않습니다.",
+      "chargeNotice": "생성에는 선택한 제공업체 계정이 사용되며 제공업체 요금이 발생할 수 있습니다.",
+      "confirm": "확인 후 생성",
+      "cancel": "취소",
+      "disabledMissingRoutes": "선택한 모든 장면에 유효한 경로를 지정하세요.",
+      "audioOn": "이 렌더링에는 생성된 오디오가 포함됩니다. 무음 경로가 있는 경우 해당 출력은 계속 무음입니다."
+    },
+    "jobs": {
+      "progress": "{{percent}}% 완료",
+      "cancel": "작업 취소",
+      "retry": "생성 다시 시도",
+      "retryConfirmationTitle": "생성을 다시 시도할까요?",
+      "retryConfirmationBody": "다시 시도하면 이 생성 요청이 제공업체에 다시 제출되며 제공업체 요금이 발생할 수 있습니다.",
+      "retryConfirmationConfirm": "확인 후 다시 시도",
+      "retryDownload": "다운로드 다시 시도",
+      "retryChargeTitle": "중복 요금 가능성을 감수하고 다시 시도할까요?",
+      "retryChargeBody": "이전 제출 결과를 알 수 없습니다. 다시 시도하면 제공업체 요금이 한 번 더 발생할 수 있습니다.",
+      "retryChargeConfirm": "확인 후 다시 시도",
+      "status": {
+        "queuedLocal": "제출 대기 중",
+        "submitting": "제출 중",
+        "queuedRemote": "제공업체 대기열에 있음",
+        "running": "생성 중",
+        "needsAttention": "확인 필요",
+        "succeeded": "완료됨",
+        "failed": "실패함",
+        "cancelled": "취소됨"
+      },
+      "errors": {
+        "invalidRequest": "생성 요청이 유효하지 않습니다.",
+        "auth": "제공업체가 자격 증명을 거부했습니다.",
+        "quota": "제공업체 계정의 할당량이 부족합니다.",
+        "rateLimited": "제공업체 요청 한도에 도달했습니다. 나중에 다시 시도하세요.",
+        "providerUnavailable": "생성 제공업체를 사용할 수 없습니다.",
+        "timeout": "제공업체가 제시간에 응답하지 않았습니다.",
+        "pollDeadline": "엔진에서 더 이상 진행 상황을 보고하지 않습니다. 다시 시도하기 전에 제공업체에 확인하세요.",
+        "noOutput": "제공업체가 작업을 완료했지만 사용 가능한 결과가 없습니다.",
+        "submissionUnknown": "제출 결과를 알 수 없습니다. 다시 시도하기 전에 중복 요금 경고를 검토하세요.",
+        "downloadFailed": "생성은 완료되었지만 결과를 다운로드할 수 없습니다.",
+        "unsupported": "이 제공업체는 요청한 작업을 지원하지 않습니다.",
+        "unknown": "알 수 없는 이유로 생성 작업이 실패했습니다."
+      }
+    },
+    "preview": {
+      "title": "미리보기",
+      "noAssetTitle": "생성된 에셋이 선택되지 않았습니다",
+      "noAssetBody": "장면을 생성하거나 기존 변형을 선택하여 미리 보세요.",
+      "imageAlt": "생성된 장면 이미지",
+      "videoLabel": "생성된 장면 동영상",
+      "loadFailed": "관리되는 이 에셋을 불러올 수 없습니다.",
+      "versions": "변형",
+      "versionLabel": "변형 {{number}}",
+      "selectVersion": "이 변형 선택",
+      "selectVersionAccessible": "변형 {{number}} 선택",
+      "importReference": "첫 프레임 이미지 가져오기",
+      "importing": "참조 이미지를 가져오는 중...",
+      "missingVisualPrompt": "이 장면을 생성하기 전에 비주얼 프롬프트를 추가하세요.",
+      "missingModel": "이 장면을 생성하기 전에 호환되는 프로젝트 모델을 선택하세요.",
+      "generateThisScene": "이 장면 생성",
+      "videoReady": "동영상 준비 완료"
+    },
+    "timeline": {
+      "title": "장면 스트립",
+      "selectScene": "장면 선택",
+      "totalDuration": "스토리보드 전체 길이",
+      "totalDurationFull": "총 길이: {{seconds}}초",
+      "totalDurationFull_other": "총 길이: {{seconds}}초",
+      "selectSceneAccessible": "장면 {{number}} 선택: {{title}}, {{seconds}}초",
+      "selectSceneAccessible_other": "장면 {{number}} 선택: {{title}}, {{seconds}}초",
+      "noScenes": "표시할 장면이 없습니다"
+    },
+    "export": {
+      "title": "에셋 내보내기",
+      "body": "스토리보드 매니페스트와 각 장면에서 선택한 에셋을 내보냅니다.",
+      "gapWarning": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
+      "gapWarning_other": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
+      "confirmSelectedCount": "쇼트 {{count}}개를 내보낼까요?",
+      "confirmSelectedCount_other": "쇼트 {{count}}개를 내보낼까요?",
+      "includeReferences": "가져온 참조 이미지 포함",
+      "confirm": "에셋 내보내기",
+      "cancel": "취소",
+      "choosing": "내보낼 폴더 선택...",
+      "successTitle": "에셋을 내보냈습니다",
+      "successBody": "선택된 장면 {{count}}개를 ‘{{folderName}}’ 폴더로 전달했습니다.",
+      "successBody_other": "선택된 장면 {{count}}개를 ‘{{folderName}}’ 폴더로 전달했습니다.",
+      "partialTitle": "일부 장면을 제외하고 에셋을 내보냈습니다",
+      "partialBody": "사용 가능한 에셋을 ‘{{folderName}}’ 폴더로 내보냈습니다.",
+      "failed": "에셋을 내보낼 수 없습니다.",
+      "noSelectedAssets": "내보낼 수 있는 선택된 장면 에셋이 없습니다.",
+      "folderLabel": "내보내기 폴더"
+    },
+    "errors": {
+      "featureDisabled": "이 빌드에서는 Creative Studio가 비활성화되어 있습니다.",
+      "invalidPayload": "요청에 유효하지 않거나 불완전한 정보가 포함되어 있습니다.",
+      "projectNotFound": "이 크리에이티브 스튜디오 프로젝트는 더 이상 존재하지 않습니다.",
+      "storyboardExists": "이 프로젝트에는 이미 스토리보드가 있습니다. 다시 초안을 만들기 전에 교체를 확인하세요.",
+      "staleProject": "다른 곳에서 프로젝트가 변경되었습니다. 새로 고친 후 다시 시도하세요.",
+      "planningUnavailable": "스토리보드 초안 기능을 사용할 수 없습니다. 수동 편집은 계속할 수 있습니다.",
+      "invalidRoute": "선택한 생성 경로가 유효하지 않거나 사용할 수 없습니다.",
+      "cancellationRefused": "제공업체가 실행 중인 이 작업을 더 이상 취소할 수 없습니다.",
+      "duplicateChargeAcknowledgementRequired": "다시 시도하기 전에 제공업체 요금이 중복될 수 있음을 확인하세요.",
+      "busy": "이 프로젝트에서 생성 작업이 진행 중입니다.",
+      "provider": "제공업체가 요청을 완료할 수 없습니다.",
+      "storage": "크리에이티브 스튜디오에서 로컬 데이터를 업데이트할 수 없습니다."
+    },
+    "models": {
+      "storyboard": "스토리보드 모델",
+      "selectionRequired": "모델 선택",
+      "unavailable": "선택한 모델을 사용할 수 없습니다",
+      "openSettings": "모델 설정 열기",
+      "refresh": "모델 새로고침",
+      "loading": "모델 불러오는 중...",
+      "updateFailed": "프로젝트 모델 선택을 업데이트할 수 없습니다."
+    }
+  },
   "artifact": {
     "emptyTitle": "열린 아티팩트 없음",
     "emptyHint": "생성된 파일과 문서가 여기에 열립니다."
+  },
+  "statusTooltip": {
+    "waitingApproval": "계속하려면 승인을 기다리고 있습니다.",
+    "running": "이 채팅을 처리하고 있습니다.",
+    "doneUnseen": "완료되었지만 아직 확인하지 않았습니다.",
+    "doneSeen": "최근에 완료되었으며 확인했습니다.",
+    "doneIdle": "최소 1분 전에 완료되었으며 확인했습니다.",
+    "stopped": "완료되기 전에 중지되었습니다.",
+    "failed": "오류로 인해 완료하지 못했습니다."
+  },
+  "staleKnowledgeHint": {
+    "body": "이 대화는 프로젝트 지식 베이스를 검색할 수 없습니다. 파일이 추가되기 전에 시작되었기 때문입니다.",
+    "action": "새 대화 시작"
+  },
+  "emptyChat": "메시지를 보내 시작하세요.",
+  "presentationSubmission": {
+    "pending": "프레젠테이션 제출 처리 중",
+    "restore": "복원",
+    "persistenceFailure": "프레젠테이션 제출을 저장하지 못했습니다.",
+    "queued": "프레젠테이션이 대기열에 추가됨",
+    "uncertainTracking": "제출 상태가 확실하지 않습니다. 다시 보내지 말고 기존 실행을 추적하세요."
   }
 }

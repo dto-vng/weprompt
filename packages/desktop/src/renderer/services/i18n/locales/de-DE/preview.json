@@ -62,6 +62,7 @@
       "installFailed": "Automatische Installation von officecli fehlgeschlagen. Überprüfe Backend-Logs und versuche es erneut.",
       "portTimeout": "Vorschau-Dienst gestartet, wurde aber nicht rechtzeitig bereit. Versuche es erneut.",
       "startFailed": "Office-Vorschau-Dienst konnte nicht gestartet werden.",
+      "invalidArtifact": "Diese Office-Datei ist beschädigt oder ungültig und kann nicht sicher bereitgestellt werden.",
       "outsideSandbox": "Diese Datei befindet sich außerhalb der aktuellen Projekt-Sandbox.",
       "originalSafe": "Die ursprüngliche Workspace-Datei wurde nicht geändert."
     },

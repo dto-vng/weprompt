@@ -48,9 +48,77 @@
  * Source: https://github.com/iOfficeAI/AionCore/releases/download/v0.1.50/aioncore-checksums.txt
  * Cross-verified: aioncore-v0.1.50-aarch64-apple-darwin.tar.gz downloaded and
  * hashed with node:crypto — matched the checksums file (30094957 bytes).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * v0.1.51 (security-patched fork: khoapnt-vng/aioncore)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Source: https://github.com/khoapnt-vng/aioncore/releases/download/v0.1.51/aioncore-checksums.txt
+ * Cross-verified: aioncore-v0.1.51-aarch64-apple-darwin.tar.gz downloaded and
+ * hashed with shasum -a 256 — matched the checksums file (31387543 bytes).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * v0.1.52 (security-patched fork: khoapnt-vng/aioncore)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Source: https://github.com/khoapnt-vng/aioncore/releases/download/v0.1.52/aioncore-checksums.txt
+ * Cross-verified: aioncore-v0.1.52-aarch64-apple-darwin.tar.gz downloaded and
+ * hashed with shasum -a 256 — matched the checksums file (31396940 bytes).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * v0.1.53 (security-patched fork: khoapnt-vng/aioncore)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Source: https://github.com/khoapnt-vng/aioncore/releases/download/v0.1.53/aioncore-checksums.txt
+ * Cross-verified: aioncore-v0.1.53-aarch64-apple-darwin.tar.gz downloaded and
+ * hashed with shasum -a 256 — matched the checksums file (31428166 bytes).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * v0.1.54 (security-patched fork: khoapnt-vng/aioncore)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Source: https://github.com/khoapnt-vng/aioncore/releases/download/v0.1.54/aioncore-checksums.txt
+ * Cross-verified: aioncore-v0.1.54-x86_64-pc-windows-msvc.zip downloaded and
+ * hashed with node:crypto — matched the checksums file (31081559 bytes).
  */
 
 const CHECKSUMS = {
+  'v0.1.54': {
+    'aioncore-v0.1.54-aarch64-apple-darwin.tar.gz': '5de59456b1ca2fec14e5674f19548612b82e346de9906c637ce58a19b6b05b34',
+    'aioncore-v0.1.54-aarch64-pc-windows-msvc.zip': '13c17d14a8bb187301b11b205d2eaee0953ced1957d8138d591fa4dbe4f5f9c9',
+    'aioncore-v0.1.54-aarch64-unknown-linux-gnu.tar.gz':
+      '48b997a18ab7aaa2751f835cd3ebedf0ace90b28d52b73c3820caa6c3d1e1d52',
+    'aioncore-v0.1.54-x86_64-apple-darwin.tar.gz': '46058a1d4fa6fbb72c82445464df5c8a56a742fbf95c29188871e01ff33be063',
+    'aioncore-v0.1.54-x86_64-pc-windows-msvc.zip': '5aff7f2b836c6b63f1ee30d54ba166a306fa5fbba8f5040b97c46abe519c3be7',
+    'aioncore-v0.1.54-x86_64-unknown-linux-gnu.tar.gz':
+      '7b935651ad0d94ca698e679565f0bc5815579078de13bb2e454e71d95f559371',
+  },
+  'v0.1.53': {
+    'aioncore-v0.1.53-aarch64-apple-darwin.tar.gz': '2f313cbdf64e16579cce41424f592ddcb9b30ade675448ec95ef6d5e685f2577',
+    'aioncore-v0.1.53-aarch64-pc-windows-msvc.zip': '883f3317756068e3b4d8bcf4e9291aaf8ede0e33408f82eadb4dfb2af59800f0',
+    'aioncore-v0.1.53-aarch64-unknown-linux-gnu.tar.gz':
+      'c699904913370957bb7154ac203aeb3d1766671db70569df50f8c19295b58c73',
+    'aioncore-v0.1.53-x86_64-apple-darwin.tar.gz': '9ca148520a7f0789bbdd529111fc7cf81a3e1285b7b8fb4a1b8f005fce605b09',
+    'aioncore-v0.1.53-x86_64-pc-windows-msvc.zip': '5311585d27d4ca694f95c8d9370985c9724e612a2a7c5f2a6d39e3f0d499c0ef',
+    'aioncore-v0.1.53-x86_64-unknown-linux-gnu.tar.gz':
+      '699fcd0556542bfaeac41ee419c23f6bae00c5aa05d2ce65442132f7f8f5f592',
+  },
+  'v0.1.52': {
+    'aioncore-v0.1.52-aarch64-apple-darwin.tar.gz': '88cd6271a0e47dde0c774961042f8bd9ccf7f55d5f11e189e427c2125ef0dac8',
+    'aioncore-v0.1.52-aarch64-pc-windows-msvc.zip': '2ddfe4ddf89964894b05ea9cc3343e05a4eaa27346029f09b5c9a24473c3af38',
+    'aioncore-v0.1.52-aarch64-unknown-linux-gnu.tar.gz':
+      'ad7af0a6ffa76ac2e2e2ec86e61e7f2989df9b113c9833c25a9aaa66a09994b7',
+    'aioncore-v0.1.52-x86_64-apple-darwin.tar.gz': '4e7bb85795c72aa2b4c2fc8a2615bcb08df0215b6966b250dfddc0366449332b',
+    'aioncore-v0.1.52-x86_64-pc-windows-msvc.zip': '993623ce28e16ce8daba24fa37040f5295920a1453bf53a1898b87222519d201',
+    'aioncore-v0.1.52-x86_64-unknown-linux-gnu.tar.gz':
+      '2d047be0fcce5701d49b8068e67e3d1a81c7304ccee4658427a28cd19bb47be7',
+  },
+  'v0.1.51': {
+    'aioncore-v0.1.51-aarch64-apple-darwin.tar.gz': '116069dd12116c77533457b6c913d1509552f672da42e9812a711b4e013194f4',
+    'aioncore-v0.1.51-aarch64-pc-windows-msvc.zip': '9b64955ff0e8601e013cc679b02102efae43f59f6ca626a6bf42bf0d3253cfa1',
+    'aioncore-v0.1.51-aarch64-unknown-linux-gnu.tar.gz':
+      '0be9cb398e4f7701b4dd6f683d235cccc67630509775b8250e8c51ab5d9b5c0e',
+    'aioncore-v0.1.51-x86_64-apple-darwin.tar.gz': 'e2796c6e7858c58bb218a937f9fb0248943c16d155717d50d5b6f397f1e3c73c',
+    'aioncore-v0.1.51-x86_64-pc-windows-msvc.zip': 'b20ff966850940743fbc83ad6dfb95178ad25612e72cdebd6e47741a18756060',
+    'aioncore-v0.1.51-x86_64-unknown-linux-gnu.tar.gz':
+      '0a16bc5392565f53710ae096b882133c5a3ad35600d4bac17a99cd362ddb898d',
+  },
   'v0.1.50': {
     'aioncore-v0.1.50-aarch64-apple-darwin.tar.gz': '9f37c9d9b5f6e74a69796053be9e52a88dd43a58eee0aa7e042ff334830f8dd5',
     'aioncore-v0.1.50-aarch64-pc-windows-msvc.zip': '327287106a5c4fc5e9ad52148ba598e2d338077d63bde39953e8195da5cecc69',

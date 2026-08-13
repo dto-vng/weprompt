@@ -11,6 +11,94 @@
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/native/constants';
+import type {
+  GrantPresentationExternalDropRequest,
+  GrantPresentationExternalDropResult,
+  PresentationGrantOwner,
+} from '../common/types/office/presentationRun';
+
+const PRESENTATION_EXTERNAL_DROP_CHANNEL = 'presentation-sources:grant-external-drop';
+const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const hasExactKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean => {
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === keys.length && actualKeys.every((key) => keys.includes(key));
+};
+
+const isPresentationGrantOwner = (value: unknown): value is PresentationGrantOwner => {
+  if (!isRecord(value) || typeof value.owner_type !== 'string') return false;
+
+  if (value.owner_type === 'draft') {
+    return (
+      hasExactKeys(value, ['owner_type', 'draft_id']) &&
+      typeof value.draft_id === 'string' &&
+      UUID_PATTERN.test(value.draft_id)
+    );
+  }
+
+  return (
+    value.owner_type === 'conversation' &&
+    hasExactKeys(value, ['owner_type', 'conversation_id']) &&
+    typeof value.conversation_id === 'string' &&
+    UUID_PATTERN.test(value.conversation_id)
+  );
+};
+
+const presentationDropFailure = (
+  code: 'INVALID_REQUEST' | 'NATIVE_FILE_REQUIRED' | 'INTERNAL_ERROR'
+): GrantPresentationExternalDropResult => ({
+  ok: false,
+  code,
+  messageKey: `conversation.presentationRun.${code}`,
+  retryable: false,
+  state: 'preflight',
+  details: null,
+});
+
+const grantPresentationExternalDrop = async (
+  request: GrantPresentationExternalDropRequest
+): Promise<GrantPresentationExternalDropResult> => {
+  if (
+    !isRecord(request) ||
+    !hasExactKeys(request, ['owner', 'files', 'expected_owner_revision']) ||
+    !isPresentationGrantOwner(request.owner) ||
+    !Number.isSafeInteger(request.expected_owner_revision) ||
+    (request.expected_owner_revision as number) < 0 ||
+    !Array.isArray(request.files) ||
+    request.files.length < 1 ||
+    request.files.length > 16 ||
+    !request.files.every((file) => file instanceof File)
+  ) {
+    return presentationDropFailure('INVALID_REQUEST');
+  }
+
+  const nativePaths: string[] = [];
+  for (const file of request.files) {
+    let nativePath: unknown;
+    try {
+      nativePath = webUtils.getPathForFile(file);
+    } catch {
+      return presentationDropFailure('NATIVE_FILE_REQUIRED');
+    }
+    if (typeof nativePath !== 'string' || nativePath.length === 0) {
+      return presentationDropFailure('NATIVE_FILE_REQUIRED');
+    }
+    nativePaths.push(nativePath);
+  }
+
+  try {
+    return (await ipcRenderer.invoke(PRESENTATION_EXTERNAL_DROP_CHANNEL, {
+      owner: request.owner,
+      native_paths: nativePaths,
+      expected_owner_revision: request.expected_owner_revision,
+    })) as GrantPresentationExternalDropResult;
+  } catch {
+    return presentationDropFailure('INTERNAL_ERROR');
+  }
+};
 
 /**
  * @description 注入到renderer进程中, 用于与main进程通信
@@ -41,13 +129,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 获取拖拽文件/目录的绝对路径 / Get absolute path for dragged file/directory
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
-  // Feedback: collect and compress recent log files
-  collectFeedbackLogs: () => ipcRenderer.invoke('feedback:collect-logs'),
+  presentationSources: {
+    grantExternalDrop: grantPresentationExternalDrop,
+  },
   // Feedback: capture a screenshot of the current window
   captureFeedbackScreenshot: () => ipcRenderer.invoke('feedback:capture-screenshot'),
-  // Feedback: forward diagnostics logs to the main process console
-  logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
-    ipcRenderer.send('feedback:renderer-log', payload),
+  // Feedback: export a local diagnostic package chosen by the user
+  exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   recoverCorruptedDatabase: () => ipcRenderer.invoke('backend:recover-corrupted-database'),
 });
 
@@ -57,7 +145,12 @@ const backendPort = ipcRenderer.sendSync('get-backend-port') as number;
 const initialLanguage = ipcRenderer.sendSync('get-initial-language') as string | null;
 const backendStartupFailed = ipcRenderer.sendSync('get-backend-startup-failed') as boolean;
 const backendStartupFailure = ipcRenderer.sendSync('get-backend-startup-failure') as unknown;
+const backendLocalToken = ipcRenderer.sendSync('get-backend-local-token') as string;
 contextBridge.exposeInMainWorld('__backendPort', backendPort > 0 ? backendPort : 0);
+// Secret the `--local` backend requires on every call. Exposed to the app's own
+// renderer only — webviews and iframes get their own preload (or none), so page
+// content rendered inside the app never sees it.
+contextBridge.exposeInMainWorld('__backendLocalToken', backendLocalToken || '');
 contextBridge.exposeInMainWorld('__initialLanguage', initialLanguage ?? null);
 contextBridge.exposeInMainWorld('__aionuiE2ETest', process.env.AIONUI_E2E_TEST === '1');
 contextBridge.exposeInMainWorld('__backendStartupFailed', backendStartupFailed === true);
@@ -68,7 +161,6 @@ contextBridge.exposeInMainWorld('__backendStartupFailure', backendStartupFailure
 const trayEvents = [
   'tray:navigate-to-guid',
   'tray:navigate-to-conversation',
-  'tray:open-about',
   'tray:pause-all-tasks',
   'tray:check-update',
 ];

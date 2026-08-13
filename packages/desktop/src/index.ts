@@ -13,30 +13,63 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, powerMonitor, protocol, session, shell } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
+import WebSocket from 'ws';
+import { MainBackendHttpError, mainHttpRequest, withLocalTokenHeaders } from './common/adapter/httpBridge';
 import { initMainAdapterWithWindow } from './common/adapter/main';
-import { DESKTOP_PET_ENABLED } from './common/config/constants';
+import { CREATIVE_STUDIO_ENABLED, DESKTOP_PET_ENABLED, PRESENTATION_RUN_V2_ENABLED } from './common/config/constants';
+import { isUpdateFeatureEnabled } from './common/update/updatePolicy';
 import { ipcBridge } from './common';
 import { initializeProcess } from './process';
+import { registerCreativeStudioScheme } from './process/services/creative-studio/mediaProtocol';
+import {
+  disposeCreativeStudioRuntime,
+  getCreativeStudioRuntime,
+  resumeCreativeStudioAfterBackendReady,
+} from './process/services/creative-studio/runtime';
 import { startBackendOrExit } from './process/startup/backendStartup';
 import { assertStartupArchitectureCompatible } from './process/startup/architectureCompatibility';
 import { classifyBackendStartupFailure } from './process/startup/backendStartupFailure';
 import { installQuitCleanup } from './process/startup/quitCleanup';
+import {
+  createRendererDocumentPolicy,
+  isAuthorizedRendererSender,
+  isTrustedRendererDocument,
+} from './process/startup/rendererDocumentPolicy';
 import { shouldRegisterBackendStartup } from './process/startup/singleInstanceGating';
 import { ProcessConfig } from './process/utils/initStorage';
 import type { BackendStartupFailureInfo } from './common/types/platform/electron';
 import { registerWindowMaximizeListeners } from '@process/bridge';
 import { BackendLifecycleManager } from '@aionui/web-host';
 import { resolveBinaryPath } from '@process/backend';
-import './process/bridge/feedbackBridge';
+import { initializeFeedbackBridge } from './process/bridge/feedbackBridge';
+import {
+  createCreativeStudioCloseHandshake,
+  type CreativeStudioCloseHandshake,
+} from './process/bridge/creativeStudioBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
-import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
-import { setInitialLanguage } from '@process/services/i18n';
+import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
+import i18n, { setInitialLanguage } from '@process/services/i18n';
+import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
-import { disposeOfficeArtifactService } from '@process/services/office-artifact';
+import {
+  createOfficeCliRunner,
+  disposeOfficeArtifactService,
+  inspectPptxOoxml,
+  PresentationReadinessService,
+} from '@process/services/office-artifact';
+import {
+  createPresentationRuntimeLifecycleOwner,
+  PresentationRunLifecycleCoordinator,
+  PresentationRuntimeEventClient,
+} from '@process/services/presentation-template';
+import {
+  getPresentationRunLifecycleGraph,
+  setPresentationRunLifecycleCoordinator,
+} from '@process/services/presentation-template/bridge';
 import { setupApplicationMenu } from './process/utils/appMenu';
 import { startWebHost } from '@aionui/web-host';
 import { initializeZoomFactor, setupZoomForWindow } from './process/utils/zoom';
@@ -78,6 +111,17 @@ import {
 import { readCloseToTraySetting } from './process/utils/closeToTraySetting';
 // @ts-expect-error - electron-squirrel-startup doesn't have types
 import electronSquirrelStartup from 'electron-squirrel-startup';
+
+// Privileges are accepted only before Electron reaches its ready lifecycle.
+registerCreativeStudioScheme(protocol);
+
+const rendererDirectory = path.join(__dirname, '../renderer');
+const fallbackRendererFile = path.join(rendererDirectory, 'index.html');
+const rendererDocumentPolicy = createRendererDocumentPolicy({
+  isPackaged: app.isPackaged,
+  rendererDirectory,
+  rendererUrl: process.env['ELECTRON_RENDERER_URL'],
+});
 
 // ============ Single Instance Lock ============
 // Acquire lock early so the second instance quits before doing unnecessary work.
@@ -195,6 +239,7 @@ let isExplicitQuit = false;
 let appReadyDone = false;
 
 let mainWindow: BrowserWindow;
+let creativeStudioCloseHandshake: CreativeStudioCloseHandshake | null = null;
 const backendManager = new BackendLifecycleManager(
   {
     version: app.getVersion(),
@@ -204,6 +249,118 @@ const backendManager = new BackendLifecycleManager(
   },
   resolveBinaryPath
 );
+
+const isPresentationBackendRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const presentationConversationPath = (conversationId: string): string =>
+  `/api/conversations/${encodeURIComponent(conversationId)}`;
+
+const createPresentationRunLifecycleCoordinator = (): PresentationRunLifecycleCoordinator => {
+  const graph = getPresentationRunLifecycleGraph();
+  if (graph === null) throw new Error('Presentation run lifecycle graph is unavailable');
+
+  const readinessRunner = createOfficeCliRunner();
+  let coordinator: PresentationRunLifecycleCoordinator | null = null;
+  const eventClient = new PresentationRuntimeEventClient({
+    createSocket: (url, options) => new WebSocket(url, options),
+    onTerminalEvent: (event, authority) =>
+      coordinator === null ? Promise.resolve('forged' as const) : coordinator.handleTerminalEvent(event, authority),
+    diagnostic: (code) => console.warn(`[AionUi][presentation-runtime] ${code}`),
+  });
+
+  coordinator = new PresentationRunLifecycleCoordinator({
+    store: graph.store,
+    files: graph.files,
+    eventClient,
+    getPreparedRun: async (runId) => {
+      const prepared = await graph.run.getPreparedRun(runId);
+      if (prepared === null) throw new Error('Presentation run preparation is unavailable');
+      return prepared;
+    },
+    preflightDispatch: async (credentials, conversationId, runtime) => {
+      try {
+        const conversation = await mainHttpRequest<unknown>({
+          ...credentials,
+          method: 'GET',
+          path: presentationConversationPath(conversationId),
+        });
+        if (
+          !isPresentationBackendRecord(conversation) ||
+          conversation['id'] !== conversationId ||
+          conversation['type'] !== runtime
+        ) {
+          return { ok: false, kind: 'hard' } as const;
+        }
+        const observed = conversation['runtime'];
+        if (
+          !isPresentationBackendRecord(observed) ||
+          observed['state'] !== 'idle' ||
+          observed['can_send_message'] !== true ||
+          observed['has_task'] !== false ||
+          observed['is_processing'] !== false ||
+          observed['pending_confirmations'] !== 0 ||
+          observed['turn_id'] !== null ||
+          ('task_status' in observed && observed['task_status'] !== 'finished')
+        ) {
+          return { ok: false, kind: 'transient', retryAfterMs: 1_000 } as const;
+        }
+        return { ok: true } as const;
+      } catch (error) {
+        if (
+          error instanceof MainBackendHttpError &&
+          (error.status === 401 || error.status === 403 || error.status === 404)
+        ) {
+          return { ok: false, kind: 'hard' } as const;
+        }
+        return { ok: false, kind: 'transient', retryAfterMs: 1_000 } as const;
+      }
+    },
+    postInitialMessage: (credentials, request) =>
+      mainHttpRequest({
+        ...credentials,
+        method: 'POST',
+        path: `${presentationConversationPath(request.conversationId)}/messages`,
+        body: {
+          content: request.content,
+          files: request.files,
+          inject_skills: request.injectSkills,
+        },
+      }),
+    observeRuntime: async (credentials, conversationId, options) => {
+      const conversation = await mainHttpRequest<unknown>({
+        ...credentials,
+        method: 'GET',
+        path: presentationConversationPath(conversationId),
+        signal: options?.signal,
+      });
+      return isPresentationBackendRecord(conversation) ? (conversation['runtime'] ?? null) : null;
+    },
+    inspectReadiness: (request, workspace) =>
+      new PresentationReadinessService({
+        runner: readinessRunner,
+        inspectOoxml: inspectPptxOoxml,
+        createInspectionWorkspace: async () => workspace,
+      }).inspect(request),
+    isFeatureEnabled: () => PRESENTATION_RUN_V2_ENABLED,
+  });
+  setPresentationRunLifecycleCoordinator(coordinator);
+  return coordinator;
+};
+
+const presentationRuntimeLifecycleOwner = createPresentationRuntimeLifecycleOwner({
+  createCoordinator: createPresentationRunLifecycleCoordinator,
+});
+
+async function stopBackendWithPresentationRuntimeLifecycle(): Promise<void> {
+  try {
+    await presentationRuntimeLifecycleOwner.dispose();
+  } finally {
+    setPresentationRunLifecycleCoordinator(null);
+    await backendManager.stop();
+  }
+}
+
 let disposeCronResumeListener: (() => void) | null = null;
 
 // Flag tracking whether the backend subprocess started successfully. Read by
@@ -217,6 +374,19 @@ let ensureAdminUserPromise: Promise<void> | null = null;
 
 ipcMain.on('get-backend-port', (event) => {
   event.returnValue = backendManager.port;
+});
+
+// The `--local` backend skips JWT verification, so this per-launch secret is the
+// only thing separating the app's own renderer from any other page or process
+// that reaches the loopback port. Handed out over the preload bridge only.
+ipcMain.on('get-backend-local-token', (event) => {
+  const boundWebContents = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  if (!isAuthorizedRendererSender(event, boundWebContents, rendererDocumentPolicy.mainWindowDocuments)) {
+    console.warn('[AionUi][security] Denied backend local token request from an untrusted renderer document');
+    event.returnValue = '';
+    return;
+  }
+  event.returnValue = backendManager.localToken;
 });
 
 ipcMain.on('get-initial-language', (event) => {
@@ -236,7 +406,7 @@ ipcMain.handle('backend:recover-corrupted-database', async () => {
 
   await recoverCorruptedDatabaseAfterUserConfirmation({
     getFailure: () => backendStartupFailureInfo,
-    stopBackend: () => backendManager.stop(),
+    stopBackend: stopBackendWithPresentationRuntimeLifecycle,
     startBackendWithRecovery: async () => {
       try {
         const { getDataPath } = await import('./process/utils/utils');
@@ -263,6 +433,7 @@ ipcMain.handle('backend:recover-corrupted-database', async () => {
             onReady: (backendPort) => {
               markBackendReady(backendPort, 'backendManager.recoverCorruptedDatabase.lateReady');
             },
+            allowedOrigins: rendererAllowedOrigins(),
           },
           undefined,
           { recoverCorruptedDatabase: true }
@@ -296,9 +467,9 @@ function registerCronResumeBridge(backendPort: number): void {
   const onResume = () => {
     void fetch(`http://127.0.0.1:${backendPort}/api/cron/internal/system-resume`, {
       method: 'POST',
-      headers: {
+      headers: withLocalTokenHeaders({
         'x-aionui-internal': '1',
-      },
+      }),
     }).catch((error) => {
       console.error('[AionUi] Failed to notify backend about system resume:', error);
     });
@@ -330,12 +501,69 @@ const scheduleBackendMigrations = (): void => {
   })();
 };
 
+/**
+ * Browser origins allowed to call the local backend.
+ *
+ * A packaged renderer is loaded with `loadFile`, so its requests carry
+ * `Origin: null` — that literal is what the backend's allow-list has to match.
+ * In dev the renderer is served by vite and gets a real origin, so add that too.
+ * Anything not listed here cannot read a local-mode response.
+ */
+function rendererAllowedOrigins(): string[] {
+  const origins = ['null'];
+  const devUrl = rendererDocumentPolicy.developmentRendererUrl;
+  if (devUrl) {
+    try {
+      origins.push(new URL(devUrl).origin);
+    } catch {
+      console.warn(`[AionUi] ignoring malformed ELECTRON_RENDERER_URL: ${devUrl}`);
+    }
+  }
+  return origins;
+}
+
 function exposeBackendPort(backendPort: number): void {
   // Expose the backend port to main-process callers of httpBridge (e.g. the
   // one-shot assistant migration hook below). Must land BEFORE any
   // ipcBridge.* invoke from the main process — the renderer side reads
   // window.__backendPort via preload, but main has no `window`.
   (globalThis as typeof globalThis & { __backendPort?: number }).__backendPort = backendPort;
+  // Same reason, for the local-mode secret: main-process callers reach the
+  // backend through httpBridge too, and it reads the token from globalThis when
+  // there is no `window`.
+  (globalThis as typeof globalThis & { __backendLocalToken?: string }).__backendLocalToken = backendManager.localToken;
+  installBackendSessionCookie(backendPort);
+}
+
+/**
+ * Plant the local-mode secret as the `aionui-session` cookie the backend already
+ * accepts (crates/aionui-auth extract_token_from_headers), so the renderer's
+ * header-less backend requests authenticate without a query token: `<img>` asset
+ * loads (model/agent logos, assistant avatars) and EventSource channels.
+ *
+ * The renderer is cross-site to the loopback backend (dev: localhost:5173,
+ * packaged: a custom scheme → 127.0.0.1), so the cookie must be SameSite=None
+ * (`no_restriction`) and Secure to ride cross-site subresource requests;
+ * 127.0.0.1 is a secure context, so Chromium honors a Secure cookie over http
+ * there. Cookies are port-agnostic, so one cookie covers whatever port the
+ * backend was assigned. Requests that can carry a header (fetch via
+ * Authorization, the chat WebSocket via Sec-WebSocket-Protocol) still do and do
+ * not depend on this.
+ */
+function installBackendSessionCookie(backendPort: number): void {
+  const token = backendManager.localToken;
+  if (!token) return;
+  void session.defaultSession.cookies
+    .set({
+      url: `http://127.0.0.1:${backendPort}`,
+      name: 'aionui-session',
+      value: token,
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'no_restriction',
+    })
+    .catch((err) => console.warn('[AionUi] failed to install backend session cookie:', err));
 }
 
 function ensureAdminUserOnce(backendPort: number): Promise<void> {
@@ -353,9 +581,18 @@ function ensureAdminUserOnce(backendPort: number): Promise<void> {
 }
 
 function markBackendReady(backendPort: number, source: string): void {
-  if (backendStartedOk) return;
   console.log(`[AionUi] ${source} ready (port=${backendPort})`);
   exposeBackendPort(backendPort);
+  void presentationRuntimeLifecycleOwner
+    .backendReady({ port: backendPort, token: backendManager.localToken })
+    .catch(() => console.warn('[AionUi][presentation-runtime] LIFECYCLE_START_FAILED'));
+  // Runs on every backend-ready, like the presentation lifecycle above, so an
+  // interrupted job resumes after a reconnect and not only on first start. Gated:
+  // with Creative Studio disabled this must not resume paid provider work.
+  if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
+    resumeCreativeStudioAfterBackendReady(getCreativeStudioRuntime());
+  }
+  if (backendStartedOk) return;
   registerCronResumeBridge(backendPort);
   backendStartedOk = true;
   backendStartupFailed = false;
@@ -413,35 +650,17 @@ function applyDebugBackendStartupFailure(failure: BackendStartupFailureInfo): vo
 }
 
 // ============ Renderer navigation allowlist ============
-// The renderer is loaded either from a local file (`loadFile` → file:// in
-// production and when the dev server is unreachable) or from the Vite dev
-// server URL (`ELECTRON_RENDERER_URL`, e.g. http://localhost:5173) in dev.
-// Pet windows load the same way (file:// or the dev server). Top-level
-// BrowserWindow contents must never navigate away from that app content;
-// this allowlist encodes what is legitimately part of the app shell.
+// The renderer is loaded from one of the exact application documents resolved
+// at startup. Pet windows have their own checked-in documents. Top-level
+// BrowserWindow contents must never navigate to a sibling local file or an
+// arbitrary loopback page just because its protocol or host looks familiar.
 //
 // NOTE: this list intentionally governs only top-level `window`-type contents.
 // The <webview> guest contents (HTML preview, external OAuth/settings pages)
 // are meant to browse arbitrary URLs and are handled separately — see
 // installWebContentsSecurity() below, which does NOT block guest navigation.
 const isAllowedTopLevelNavigation = (targetUrl: string): boolean => {
-  let parsed: URL;
-  try {
-    parsed = new URL(targetUrl);
-  } catch {
-    return false;
-  }
-  // Local built renderer (production) and pet windows loaded via loadFile.
-  if (parsed.protocol === 'file:') {
-    return true;
-  }
-  // Dev server (Vite) and the local backend. Port is dynamic in both cases
-  // (Vite may auto-increment; backend port is assigned at runtime), so allow
-  // any port on the loopback hosts rather than hardcoding one.
-  if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
-    return true;
-  }
-  return false;
+  return isTrustedRendererDocument(targetUrl, rendererDocumentPolicy.topLevelDocuments);
 };
 
 // ============ web-contents-created security guard (Task 1.5 / #2b) ============
@@ -473,13 +692,19 @@ const installWebContentsSecurity = (): void => {
     // Block top-level navigation away from the app shell. Only applies to
     // `window`-type contents (main + pet windows); <webview> guests are meant
     // to browse arbitrary content, so their navigation is left untouched.
-    contents.on('will-navigate', (navEvent, targetUrl) => {
+    const enforceTopLevelDocumentPolicy = (navigationEvent: Electron.Event, targetUrl: string) => {
       if (contents.getType() !== 'window') {
         return;
       }
       if (!isAllowedTopLevelNavigation(targetUrl)) {
         console.warn(`[AionUi][security] Blocked top-level navigation to: ${targetUrl}`);
-        navEvent.preventDefault();
+        navigationEvent.preventDefault();
+      }
+    };
+    contents.on('will-navigate', enforceTopLevelDocumentPolicy);
+    contents.on('will-redirect', (redirectEvent, targetUrl, _isInPlace, isMainFrame) => {
+      if (isMainFrame) {
+        enforceTopLevelDocumentPolicy(redirectEvent, targetUrl);
       }
     });
 
@@ -557,7 +782,8 @@ const CSP_DIRECTIVES = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: weprompt-studio:",
+  "media-src 'self' weprompt-studio:",
   "font-src 'self' data:",
   "connect-src 'self' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*",
   "worker-src 'self' blob:",
@@ -667,8 +893,32 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     void app.dock.hide();
   }
 
+  // Define renderer documents once so loading and privileged feedback IPC use
+  // the same exact application-document paths. URL hashes are handled by the
+  // bridge because client-side routing may change them after load.
+  const rendererUrl = rendererDocumentPolicy.developmentRendererUrl;
+
   initMainAdapterWithWindow(mainWindow);
+  const studioWindow = mainWindow;
+  const closeHandshake = createCreativeStudioCloseHandshake({
+    getCurrentUrl: () =>
+      studioWindow.isDestroyed() || studioWindow.webContents.isDestroyed() ? '' : studioWindow.webContents.getURL(),
+    queryUnsavedWork: (options) => ipcBridge.creativeStudio.hasUnsavedWork.invoke(options),
+    flushUnsavedWork: (options) => ipcBridge.creativeStudio.flushUnsavedWork.invoke(options),
+    showMessageBox: (options) => dialog.showMessageBox(studioWindow, options),
+    translate: (key, options) => i18n.t(key, options ?? {}),
+    closeWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.close();
+    },
+    hideWindow: () => {
+      if (!studioWindow.isDestroyed()) studioWindow.hide();
+    },
+    quitApp: () => app.quit(),
+    onQuitCancelled: () => setIsQuitting(false),
+  });
+  creativeStudioCloseHandshake = closeHandshake;
   bindMainWindowReferences(mainWindow);
+  initializeFeedbackBridge(mainWindow, rendererDocumentPolicy.mainWindowDocuments);
 
   setupApplicationMenu();
 
@@ -678,17 +928,14 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
 
   // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI)
   // 初始化自动更新服务（通过环境变量禁用时跳过，例如 E2E / CI 场景）
-  const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
-  const disableAutoUpdater =
-    process.env.AIONUI_DISABLE_AUTO_UPDATE === '1' || process.env.AIONUI_E2E_TEST === '1' || isCiRuntime;
-  if (!disableAutoUpdater) {
-    Promise.all([import('./process/services/autoUpdaterService'), import('./process/bridge/updateBridge')])
+  if (isUpdateFeatureEnabled()) {
+    Promise.all([import('./process/services/update/autoUpdaterService'), import('./process/bridge/updateBridge')])
       .then(([{ autoUpdaterService }, { createAutoUpdateStatusBroadcast }]) => {
         // Create status broadcast callback that emits via ipcBridge (pure emitter, no window binding)
         const statusBroadcast = createAutoUpdateStatusBroadcast();
         autoUpdaterService.initialize(statusBroadcast);
         autoUpdaterService.setBeforeQuitAndInstall(async () => {
-          await backendManager.stop();
+          await stopBackendWithPresentationRuntimeLifecycle();
         });
         // Automatic update check is intentionally disabled for this pilot build: the update
         // feed points at upstream's CDN, and an automatic check could silently move a pilot
@@ -704,24 +951,21 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
         console.error('[App] Failed to initialize autoUpdaterService:', error);
       });
   } else {
-    console.log('[AionUi] Auto-updater disabled via env/CI guard');
+    console.log('[AionUi] Auto-updater disabled by release policy or env/CI guard');
   }
 
   // Load the renderer: dev server URL in development, built HTML file in production
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  const fallbackFile = path.join(__dirname, '../renderer/index.html');
-
   if (!app.isPackaged && rendererUrl) {
     console.log(`[AionUi] Loading renderer URL: ${rendererUrl}`);
     mainWindow.loadURL(rendererUrl).catch((error) => {
       console.error('[AionUi] loadURL failed, falling back to file:', error.message || error);
-      mainWindow.loadFile(fallbackFile).catch((e2) => {
+      mainWindow.loadFile(fallbackRendererFile).catch((e2) => {
         console.error('[AionUi] loadFile fallback also failed:', e2.message || e2);
       });
     });
   } else {
-    console.log(`[AionUi] Loading renderer file: ${fallbackFile}`);
-    mainWindow.loadFile(fallbackFile).catch((error) => {
+    console.log(`[AionUi] Loading renderer file: ${fallbackRendererFile}`);
+    mainWindow.loadFile(fallbackRendererFile).catch((error) => {
       console.error('[AionUi] loadFile failed:', error.message || error);
     });
   }
@@ -744,7 +988,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
           console.error('[AionUi] Recovery loadURL failed:', error.message || error);
         });
       } else {
-        mainWindow.loadFile(fallbackFile).catch((error) => {
+        mainWindow.loadFile(fallbackRendererFile).catch((error) => {
           console.error('[AionUi] Recovery loadFile failed:', error.message || error);
         });
       }
@@ -757,6 +1001,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
 
   mainWindow.on('closed', () => {
     console.log('[AionUi] Main window closed');
+    if (creativeStudioCloseHandshake === closeHandshake) creativeStudioCloseHandshake = null;
   });
 
   // DevTools is no longer auto-opened at startup.
@@ -778,7 +1023,9 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     if (getCloseToTrayEnabled() && !getIsQuitting()) {
       event.preventDefault();
       mainWindow.hide();
+      return;
     }
+    closeHandshake.handleWindowClose(event);
   });
 };
 
@@ -831,6 +1078,9 @@ const handleAppReady = async (): Promise<void> => {
 
   try {
     await initializeProcess();
+    if (CREATIVE_STUDIO_ENABLED && !isWebUIMode && !isResetPasswordMode) {
+      await getCreativeStudioRuntime().start();
+    }
     rendererInitialLanguage = ProcessConfig.getSync('language') ?? null;
     mark('initializeProcess');
   } catch (error) {
@@ -878,6 +1128,7 @@ const handleAppReady = async (): Promise<void> => {
             onReady: (backendPort) => {
               markBackendReady(backendPort, 'backendManager.lateReady');
             },
+            allowedOrigins: rendererAllowedOrigins(),
           }
         );
       },
@@ -1188,6 +1439,7 @@ app.on('activate', () => {
 
 installQuitCleanup({
   onBeforeQuit: (handler) => app.on('before-quit', (event) => handler(event)),
+  beforeCleanup: (event) => creativeStudioCloseHandshake?.handleBeforeQuit(event) ?? false,
   quitApp: () => app.quit(),
   setIsQuitting,
   markExplicitQuit: () => {
@@ -1198,10 +1450,12 @@ installQuitCleanup({
     disposeCronResumeListener?.();
     disposeCronResumeListener = null;
   },
+  cancelAppOperations: () => appOperationsBroker.cancelAll(),
+  disposeCreativeStudio: disposeCreativeStudioRuntime,
   disposeOfficeArtifacts: disposeOfficeArtifactService,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
-  stopBackend: () => backendManager.stop(),
+  stopBackend: stopBackendWithPresentationRuntimeLifecycle,
   destroyPetWindow: async () => {
     const { destroyPetWindow } = await import('./process/pet/petManager');
     destroyPetWindow();

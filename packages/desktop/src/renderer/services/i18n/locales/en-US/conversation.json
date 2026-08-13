@@ -17,7 +17,6 @@
     "quickActionStar": "Like us? Give us a star!",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "Search and activate community Skills on demand. Configure once, available for all agents.",
-    "skillsMarketDetails": "View More >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "Project {{name}}",
+    "eyebrow": "PROJECT",
+    "tabs": {
+      "label": "Project views",
+      "chat": "Chat",
+      "files": "Files",
+      "context": "Context",
+      "artifacts": "Artifacts"
+    }
+  },
+  "projectHome": {
+    "newChat": "New chat",
+    "composerPlaceholder": "Start a new chat in this project…",
+    "scopedHint": "— scoped to this project",
+    "chats": "Chats",
+    "showAll": "Show all",
+    "showLess": "Show less",
+    "emptyChatsTitle": "No chats yet",
+    "emptyChatsBody": "Start one above to begin working in this project.",
+    "instructions": "Instructions",
+    "instructionsApplies": "Applies to new chats in this project.",
+    "instructionsEmpty": "Add instructions to steer every chat in this project.",
+    "addInstructions": "Add instructions",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "instructionsSaved": "Instructions saved",
+    "instructionsSaveFailed": "Instructions could not be saved",
+    "files": "Files",
+    "revealInFolder": "Reveal in folder",
+    "filesReadonly": "Read-only · manage in the folder",
+    "filesEmpty": "This project's folder is empty.",
+    "folderMissingTitle": "Folder not found",
+    "folderMissingRelink": "Relink folder",
+    "folderMissingBody": "The rest of the page still works.",
+    "metaChats": "{{count}} chats",
+    "metaActive": "active {{time}}",
+    "notFoundTitle": "Project not found",
+    "notFoundBody": "This project may have been removed or its link is out of date.",
+    "backHome": "Back to home",
+    "rename": "Rename",
+    "relink": "Relink folder",
+    "reveal": "Reveal in folder",
+    "remove": "Remove",
+    "knowledge": "Knowledge",
+    "knowledgeAdd": "Add files",
+    "knowledgeDropFolderMissing": "Reconnect the Knowledge Base folder before adding files.",
+    "knowledgeDropUnsupported": "None of those files are supported. Supported: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Couldn't refresh the knowledge base.",
+    "knowledgeRelinkFailed": "Couldn't relink the project folder.",
+    "knowledgeRetryFailed": "Couldn't queue that file for indexing.",
+    "knowledgeDeleteFailed": "Couldn't move that file to the Trash.",
+    "knowledgeAddFailed": "Couldn't add those files to the knowledge base.",
+    "knowledgeEmpty": "Add documents to build this project's knowledge base. The assistant searches them automatically in every project chat.",
+    "knowledgeSemanticOff": "semantic off — no embedding model configured",
+    "knowledgeSemanticOffAction": "Add an embedding model",
+    "knowledgeEmbedAll": "Embed all",
+    "knowledgePassagesTooltip": "This file is split into searchable passages, and the assistant pulls in the most relevant ones when it answers.",
+    "knowledgeStatusIndexing": "Indexing…",
+    "knowledgeProgressReading": "Reading page {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcribing page {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Embedding {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "Failed",
+    "knowledgeStatusUnsupported": "Unsupported",
+    "knowledgeStatusNotEmbedded": "Keyword only",
+    "knowledgeNotEmbeddedDetail": "Searchable by keyword, but only {{done}}/{{total}} passages are embedded. Retry to embed the rest.",
+    "knowledgeRetry": "Retry",
+    "knowledgeError": "The knowledge base is unavailable.",
+    "knowledgeSupportedTypes": "Supported: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Refresh",
+    "knowledgeOpenOriginal": "Open original",
+    "knowledgeDeleteFile": "Delete file",
+    "knowledgeDeleteConfirm": "Move \"{{fileName}}\" to the Trash? It is also removed from the knowledge base.",
+    "knowledgeFolderHint": "Files live in the \"Knowledge Base\" folder inside the project folder. Anything you put there is indexed automatically.",
+    "knowledgeFolderMissingTitle": "Knowledge Base folder not found",
+    "knowledgeFolderMissingBody": "It may have been moved, renamed, or deleted. Your indexed knowledge is preserved — restore the folder or relink the project, then refresh.",
+    "knowledgePreviewNote": "This is the indexed text the assistant searches, not the original layout.",
+    "knowledgePreviewTruncated": "Preview shortened. Open the original for the whole document.",
+    "knowledgePreviewError": "Could not load the indexed text for this file.",
+    "knowledgePreviewNotReady": "No indexed text to open yet.",
+    "knowledgeCitationMissing": "This file is no longer in the knowledge base.",
+    "knowledgeOcrTag": "Transcribed (OCR)",
+    "knowledgeOcrDetail": "Transcribed from a scan by {{model}}. Pages skipped: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "none"
+  },
   "history": {
+    "moreActions": "More actions",
     "recents": "Recents",
     "noHistory": "No chat history",
     "deleteTitle": "Delete",
@@ -80,6 +166,8 @@
     "removeProject": "Remove project",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "New chat in this project",
+    "expandProjectChats": "Expand project chats",
+    "collapseProjectChats": "Collapse project chats",
     "deleting": "Deleting...",
     "reorderPinned": "Drag to reorder pinned conversation",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Project could not be removed. Reopen it and try again; folder files were not deleted.",
+    "removeProjectChatDetachFailed": "Some chats could not be disconnected from this project. The project was kept; retry removal.",
+    "removeProjectStateChanged": "The project list changed before removal. Refresh it and try again.",
+    "removeProjectStorageFailed": "Project changes could not be saved. Check that WePrompt can access its app data, then retry.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "Project",
+    "projectMenu": {
+      "trigger": "Project"
+    },
     "pasteConfirm_title": "Paste files",
     "pasteConfirm_message": "Are you sure you want to paste '{{name}}' into the selected folder ({{target}})?",
     "pasteConfirm_paste": "Paste",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "Terminal",
       "explorer": "File Explorer"
-    },
-    "projectMenu": {
-      "trigger": "Project"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "No model selected for current session, cannot send message",
     "sendMessageTo": "Send message to {{model}}",
     "processing": "Processing...",
+    "stopGenerating": "Stop generating",
     "quotaExceededTitle": "Model quota reached",
     "quotaExceededBody": "The current model quota is exhausted. Switch to {{model}} to continue?",
     "quotaExceededNoFallback": "Model quota reached. Please switch to another available model.",
@@ -547,7 +639,9 @@
     "today": "Today",
     "weekToDate": "Week to date",
     "monthToDate": "Month to date",
-    "triggerLabel": "Show context usage"
+    "triggerLabel": "Show context usage",
+    "estimated": "Estimated",
+    "unavailable": "Context usage unavailable"
   },
   "skill_generator": {
     "title": "Generate Skill/Rule",
@@ -616,15 +710,463 @@
     }
   },
   "notFound": "Conversation not found or has been deleted",
-  "projectHeader": {
-    "label": "Project {{name}}",
-    "eyebrow": "PROJECT",
-    "tabs": {
-      "label": "Project views",
-      "chat": "Chat",
-      "files": "Files",
-      "context": "Context",
-      "artifacts": "Artifacts"
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Save and close",
+      "discard": "Discard and close",
+      "cancel": "Cancel",
+      "unsavedMessage": "{{count}} scenes have unsaved edits. Save them before closing?",
+      "unsavedMessage_one": "{{count}} scene has unsaved edits. Save it before closing?",
+      "unsavedMessage_other": "{{count}} scenes have unsaved edits. Save them before closing?",
+      "unavailableMessage": "Creative Studio did not respond. Closing now may discard unsaved scene edits."
+    },
+    "phase": {
+      "nav": {
+        "label": "Creative workflow",
+        "brief": "Brief",
+        "write": "Write",
+        "produce": "Produce",
+        "review": "Review",
+        "saved": "Saved",
+        "saving": "Saving changes..."
+      },
+      "shared": {
+        "backToLibrary": "Back to project library",
+        "noMediaGeneration": "This step does not generate images or video."
+      },
+      "brief": {
+        "title": "Brief",
+        "description": "Define the project goal, format, and timing before writing.",
+        "nameLabel": "Project name",
+        "intentLabel": "Creative intent",
+        "durationLabel": "Target duration",
+        "aspectRatioLabel": "Aspect ratio",
+        "startWriting": "Start writing",
+        "saved": "All brief changes are saved.",
+        "saving": "Saving brief changes...",
+        "unsaved": "Brief changes have not been saved.",
+        "invalidName": "Enter a project name before continuing.",
+        "aspectLocked": "Aspect ratio is locked",
+        "aspectLockedHelp": "The aspect ratio cannot change after generated media has been added."
+      },
+      "write": {
+        "title": "Write",
+        "continueToProduce": "Continue to Produce",
+        "askAssistant": "Ask assistant",
+        "assistantTitle": "Writing assistant",
+        "assistantDescription": "Use the assistant to develop story structure, shot ideas, and prompts.",
+        "textChargeDisclosure": "Drafting a storyboard uses your configured text model. Your provider may charge for model use.",
+        "draftStoryboard": "Draft storyboard",
+        "addShot": "Add shot",
+        "fitToGoal": "Fit to goal",
+        "noScenes": "Add a shot or draft a storyboard to begin.",
+        "scriptTableTitle": "Script",
+        "scriptTableHelp": "One row per shot. Shape the words, visuals, timing, and output together.",
+        "shotColumn": "Shot",
+        "scriptColumn": "Script",
+        "visualColumn": "Visual",
+        "outputColumn": "Output",
+        "visualPlaceholder": "Describe what we see…",
+        "suggestVisual": "Suggest a visual",
+        "addReference": "Add reference",
+        "moreDetails": "More details",
+        "invalidTitle": "Enter a shot title before saving.",
+        "placeholder": {
+          "opening": "Opening shot",
+          "middle": "Middle shot",
+          "closing": "Closing shot"
+        },
+        "needsTitle": "Needs title",
+        "pacingTitle": "Pacing",
+        "pacingSummary": "{{total}}s total · {{target}}s goal",
+        "goalMarker": "{{seconds}}s goal"
+      },
+      "produce": {
+        "connectEngine": "Connect an engine — about a minute, once for the whole workspace",
+        "askTeammate": "Ask a teammate",
+        "askTeammateCopy": "Could you connect an image or video engine in WePrompt Model Settings for this workspace?",
+        "renderingWith": "Rendering with —",
+        "engineSummary": "{{model}} · {{kind}} · up to {{seconds}}s",
+        "changeEngines": "Change engines",
+        "takeRatio": "Take {{current}} / {{total}}",
+        "noVisualYet": "NO VISUAL YET",
+        "writeVisual": "Write the visual",
+        "render": "Render",
+        "renderAnother": "Render another",
+        "openPreview": "Open {{title}} preview",
+        "reviewCut": "Review cut",
+        "modelsTitle": "Models",
+        "activityTitle": "Generation activity",
+        "activityEmpty": "No generation jobs are running.",
+        "jobsRunning": "{{count}} generation jobs running",
+        "jobsRunning_one": "{{count}} generation job running",
+        "jobsRunning_other": "{{count}} generation jobs running"
+      },
+      "review": {
+        "title": "Review",
+        "description": "Check selected media, fill missing slates, and prepare the handoff.",
+        "handoff": "Prepare handoff",
+        "noAssets": "No selected media is ready for handoff.",
+        "selectedTake": "In cut",
+        "slateLabel": "Slate",
+        "slateDescription": "A slate keeps a shot in sequence when no rendered media is selected.",
+        "excludedFromHandoff": "Scenes without selected media are excluded from the handoff. Review slates are not exported.",
+        "renderedShots": "{{count}} rendered shots",
+        "renderedShots_one": "{{count}} rendered shot",
+        "renderedShots_other": "{{count}} rendered shots",
+        "missingSlates": "{{count}} missing slates",
+        "missingSlates_one": "{{count}} missing slate",
+        "missingSlates_other": "{{count}} missing slates",
+        "openProduce": "Open Produce",
+        "handoffDescription": "The handoff contains the storyboard manifest and selected media only. Review slates are not exported.",
+        "partialHandoff": "This handoff is partial because some scenes have no selected media.",
+        "render": {
+          "action": "Render video",
+          "progress": "Rendering video… {{percent}}%",
+          "cancel": "Cancel render",
+          "missingScenes": "{{count}} scenes have no take and will not be in the video.",
+          "missingScenes_one": "{{count}} scene has no take and will not be in the video.",
+          "missingScenes_other": "{{count}} scenes have no take and will not be in the video.",
+          "resultLabel": "Rendered video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg is not installed. Install FFmpeg to render video.",
+            "busy": "This project is already rendering.",
+            "noRenderableScenes": "No scenes have a take to render.",
+            "failed": "The video could not be rendered.",
+            "cancelled": "Video render cancelled."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Still saving your edits — try again in a moment."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Plan stories, review every scene, and generate image or video assets.",
+      "sectionLabel": "Or pick up where you left off",
+      "loading": "Loading projects...",
+      "retry": "Try again",
+      "readinessLabel": "Storyboard drafting",
+      "readinessSetupRequired": "Model setup required",
+      "openProject": "Open project",
+      "deleteProject": "Delete project",
+      "deleteConfirmTitle": "Delete this project?",
+      "deleteConfirmBody": "Delete “{{name}}” and its locally managed assets? This cannot be undone.",
+      "deleteActiveWork": "This project has active generation work. Cancel it or wait for it to finish before deleting.",
+      "composer": {
+        "label": "What are we making?",
+        "placeholder": "A one-sentence idea for the story...",
+        "aspectRatioLabel": "Aspect ratio",
+        "durationLabel": "Estimated length",
+        "durationGuess": "About {{seconds}}s",
+        "attachBrief": "Attach a brief doc",
+        "attachBriefUnavailable": "Brief document attachments are not available yet.",
+        "submit": "Read my brief →",
+        "empty": "One sentence is enough — say what we are making."
+      },
+      "shape": {
+        "title": "Start from a shape",
+        "label": "{{name}} · {{count}} shots · {{seconds}}s",
+        "sceneTitle": "Shot {{number}}",
+        "productStory": {
+          "name": "Product story",
+          "starter": "A product story for people who have never heard of us — four beats, ending on the wordmark."
+        },
+        "featureTeaser": {
+          "name": "Feature teaser",
+          "starter": "A short teaser for one new feature, aimed at customers already using the product."
+        },
+        "recapReel": {
+          "name": "Recap reel",
+          "starter": "A recap reel of the quarter for the whole company, warm and a little proud."
+        }
+      },
+      "scriptOnly": "SCRIPT ONLY",
+      "posterBadge": "Take {{take}} · Shot {{scene}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} of {{total}} shots rendered",
+        "handedOff": "Handed off · {{seconds}}s",
+        "scriptOnly": "{{count}} shots written, none rendered"
+      },
+      "meta": "{{shots}} · {{seconds}}s · {{relative}}",
+      "shotCount": "{{count}} shots",
+      "shotCount_one": "{{count}} shot",
+      "shotCount_other": "{{count}} shots",
+      "projectCount": "{{count}} projects",
+      "projectCount_one": "{{count}} project",
+      "projectCount_other": "{{count}} projects",
+      "deleteConfirm": "Delete"
+    },
+    "empty": {
+      "title": "Create your first story",
+      "body": "Start with a brief, then shape the storyboard before any paid generation begins.",
+      "create": "Create project"
+    },
+    "create": {
+      "title": "Create a Creative Studio project",
+      "nameLabel": "Project name",
+      "namePlaceholder": "Product launch story",
+      "aspectRatio16x9": "Landscape (16:9)",
+      "aspectRatio9x16": "Portrait (9:16)",
+      "aspectRatio1x1": "Square (1:1)",
+      "aspectRatio4x3": "Classic landscape (4:3)",
+      "aspectRatio3x4": "Classic portrait (3:4)",
+      "invalidDuration": "Enter a whole number from 5 to 60 seconds.",
+      "cancel": "Cancel"
+    },
+    "project": {
+      "loading": "Loading project...",
+      "notFound": "This Creative Studio project was not found.",
+      "title": "Project overview",
+      "brief": "Brief",
+      "aspectRatio": "Aspect ratio",
+      "targetDuration": "Target length",
+      "resolution": "Resolution",
+      "sceneCount": "Scenes",
+      "readiness": "Drafting readiness"
+    },
+    "storyboard": {
+      "title": "Storyboard",
+      "addScene": "Add scene",
+      "noScenes": "Add a scene to begin shaping this story.",
+      "sceneLimit": "A storyboard can contain up to 24 scenes.",
+      "durationTotal": "Storyboard timing: {{total}} of {{target}} seconds",
+      "durationMatches": "Scene timing matches the project target.",
+      "durationMismatch": "Scene timing must match the project target before batch generation.",
+      "fitToTarget": "Fit to {{seconds}}s",
+      "fitUnlockedOnly": "Retimes unrendered shots only.",
+      "fitUnreachable": {
+        "route_unavailable": "Select a compatible model for these unrendered shots: {{scenes}}.",
+        "affectedSceneCount": "Affected shots: {{count}}",
+        "no_adjustable_scenes": "All shots are rendered or active, totaling {{fixedTotalSeconds}} seconds. Change the target or edit an unrendered shot.",
+        "target_out_of_bounds": "Set the full project target between {{minimumTotalSeconds}} and {{maximumTotalSeconds}} seconds for the selected models."
+      },
+      "durationOver": "{{seconds}} seconds over target",
+      "durationRemaining": "{{seconds}} seconds remaining",
+      "increaseTarget": "Increase target to {{seconds}} seconds",
+      "shortenBeforeAdding": "Shorten existing scenes before adding another.",
+      "dragScene": "Drag scene to reorder",
+      "removeScene": "Remove scene",
+      "dragSceneAccessible": "Drag scene {{number}}: {{title}}",
+      "moveSceneUpAccessible": "Move scene {{number}}: {{title}} up",
+      "moveSceneDownAccessible": "Move scene {{number}}: {{title}} down",
+      "removeSceneAccessible": "Remove scene {{number}}: {{title}}",
+      "removeConfirmTitle": "Remove this scene?",
+      "removeConfirmBody": "Scenes with imported or generated media, or generation history, cannot be removed.",
+      "removeBlocked": "Scenes with imported or generated media, or generation history, cannot be removed.",
+      "retry": "Retry change",
+      "discard": "Discard local changes"
+    },
+    "scene": {
+      "accessibleName": "Scene {{number}}: {{title}}",
+      "number": "Scene {{number}}",
+      "status": {
+        "needs_title": "Needs title",
+        "needs_prompt": "Needs prompt",
+        "ready": "Ready to generate",
+        "generating": "Generating",
+        "needs_selection": "Select a variation",
+        "generated": "Generated",
+        "needs_attention": "Needs attention"
+      },
+      "image": "Image",
+      "video": "Video",
+      "duration": "Duration",
+      "durationSeconds": "{{seconds}} seconds",
+      "durationSeconds_one": "{{seconds}} second",
+      "durationSeconds_other": "{{seconds}} seconds",
+      "selected": "Selected scene"
+    },
+    "inspector": {
+      "title": "Scene direction",
+      "sectionsLabel": "Scene editing sections",
+      "directionTab": "Visual",
+      "scriptTab": "Script",
+      "titleLabel": "Scene title",
+      "purposeLabel": "Scene goal",
+      "purposePlaceholder": "What should this scene accomplish?",
+      "visualPromptLabel": "Visual prompt",
+      "visualPromptPlaceholder": "Describe the shot, subject, setting, lighting, and motion.",
+      "narrationLabel": "Narration",
+      "onScreenTextLabel": "On-screen text",
+      "mediaKindLabel": "Output type",
+      "durationLabel": "Scene duration in seconds",
+      "invalidDuration": "Enter a whole number from 1 to 60 seconds.",
+      "saving": "Saving scene...",
+      "saved": "Scene saved",
+      "saveFailed": "The scene could not be saved.",
+      "unsavedChanges": "Your unsaved changes are preserved."
+    },
+    "draft": {
+      "title": "Draft a storyboard",
+      "body": "WePrompt will propose scenes, narration, on-screen text, and timing for your review.",
+      "checking": "Checking the selected Storyboard model...",
+      "ready": "Ready to draft",
+      "setupRequired": "Select and configure a Storyboard model to draft with AI.",
+      "unavailable": "Storyboard drafting is currently unavailable.",
+      "providerLabel": "Storyboard provider",
+      "modelLabel": "Storyboard model",
+      "chargeNotice": "Drafting uses the project-selected Storyboard model and may incur provider charges.",
+      "replaceTitle": "Replace the existing storyboard?",
+      "replaceBody": "Drafting again replaces every current scene only after a valid proposal is returned.",
+      "confirm": "Draft storyboard",
+      "cancel": "Cancel",
+      "configureModel": "Open model settings",
+      "manualFallback": "Continue with manual editing",
+      "failed": "A storyboard could not be drafted. Your current scenes were not changed."
+    },
+    "routing": {
+      "title": "Generation route",
+      "modelLabel": "Model",
+      "missingRoute": "Choose a compatible generation route.",
+      "invalidRoute": "This route is no longer valid. Review it before generating."
+    },
+    "review": {
+      "generateReadyScenes": "Generate {{count}} ready scenes",
+      "generateReadyScenes_one": "Generate {{count}} ready scene",
+      "generateReadyScenes_other": "Generate {{count}} ready scenes",
+      "noReadyScenes": "No scenes are ready to generate.",
+      "generateScene": "Generate scene",
+      "regenerateScene": "Generate another variation",
+      "title": "Review generation",
+      "sceneCount": "{{count}} selected scenes",
+      "videoSeconds": "{{seconds}} requested video seconds",
+      "selectedDurationFull": "Selected duration: {{seconds}} seconds",
+      "selectedDurationFull_one": "Selected duration: {{seconds}} second",
+      "selectedDurationFull_other": "Selected duration: {{seconds}} seconds",
+      "targetDurationFull": "Target duration: {{seconds}} seconds",
+      "targetDurationFull_one": "Target duration: {{seconds}} second",
+      "targetDurationFull_other": "Target duration: {{seconds}} seconds",
+      "providerLabel": "Provider",
+      "modelLabel": "Model",
+      "aspectRatio": "Aspect ratio",
+      "resolution": "Resolution",
+      "watermarkOff": "Watermark disabled",
+      "audioOff": "Silent output; audio generation disabled",
+      "missingRoute": "At least one scene has no generation route.",
+      "invalidRoute": "At least one selected route is invalid.",
+      "durationMismatch": "Storyboard timing does not match the project target.",
+      "chargeNotice": "Generation uses your selected provider account and may incur provider charges.",
+      "confirm": "Confirm and generate",
+      "cancel": "Cancel",
+      "disabledMissingRoutes": "Choose a valid route for every selected scene.",
+      "audioOn": "This render includes generated audio; silent routes, if present, remain silent."
+    },
+    "jobs": {
+      "progress": "{{percent}}% complete",
+      "cancel": "Cancel job",
+      "retry": "Retry generation",
+      "retryConfirmationTitle": "Retry generation?",
+      "retryConfirmationBody": "Retrying resubmits this generation to the provider and may incur provider charges.",
+      "retryConfirmationConfirm": "Confirm and retry",
+      "retryDownload": "Retry download",
+      "retryChargeTitle": "Retry with possible duplicate charge?",
+      "retryChargeBody": "The previous submission outcome is unknown. Retrying may create another provider charge.",
+      "retryChargeConfirm": "Acknowledge and retry",
+      "status": {
+        "queuedLocal": "Waiting to submit",
+        "submitting": "Submitting",
+        "queuedRemote": "Queued by provider",
+        "running": "Generating",
+        "needsAttention": "Needs attention",
+        "succeeded": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "invalidRequest": "The generation request is invalid.",
+        "auth": "The provider rejected the credentials.",
+        "quota": "The provider account has insufficient quota.",
+        "rateLimited": "The provider rate limit was reached. Try again later.",
+        "providerUnavailable": "The generation provider is unavailable.",
+        "timeout": "The provider did not respond in time.",
+        "pollDeadline": "The engine stopped reporting progress. Check with the provider before retrying.",
+        "noOutput": "The provider completed without a usable output.",
+        "submissionUnknown": "The submission outcome is unknown. Review the duplicate-charge warning before retrying.",
+        "downloadFailed": "Generation completed, but the output could not be downloaded.",
+        "unsupported": "This provider does not support the requested operation.",
+        "unknown": "The generation job failed for an unknown reason."
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "noAssetTitle": "No generated asset selected",
+      "noAssetBody": "Generate a scene or select an existing variation to preview it.",
+      "imageAlt": "Generated scene image",
+      "videoLabel": "Generated scene video",
+      "loadFailed": "This managed asset could not be loaded.",
+      "versions": "Variations",
+      "versionLabel": "Variation {{number}}",
+      "selectVersion": "Select this variation",
+      "selectVersionAccessible": "Select version {{number}}",
+      "importReference": "Import first-frame image",
+      "importing": "Importing reference...",
+      "missingVisualPrompt": "Add a visual prompt before generating this scene.",
+      "missingModel": "Select a compatible project model before generating this scene.",
+      "generateThisScene": "Generate this scene",
+      "videoReady": "Video ready"
+    },
+    "timeline": {
+      "title": "Scene strip",
+      "selectScene": "Select scene",
+      "totalDuration": "Total storyboard duration",
+      "totalDurationFull": "Total duration: {{seconds}} seconds",
+      "totalDurationFull_one": "Total duration: {{seconds}} second",
+      "totalDurationFull_other": "Total duration: {{seconds}} seconds",
+      "selectSceneAccessible": "Select scene {{number}}: {{title}}, {{seconds}} seconds",
+      "selectSceneAccessible_one": "Select scene {{number}}: {{title}}, {{seconds}} second",
+      "selectSceneAccessible_other": "Select scene {{number}}: {{title}}, {{seconds}} seconds",
+      "noScenes": "No scenes to show"
+    },
+    "export": {
+      "title": "Export assets",
+      "body": "Export the storyboard manifest and each scene's selected asset.",
+      "gapWarning": "Shots {{shots}} are still slates — they won't be included.",
+      "gapWarning_one": "Shot {{shots}} is still a slate — it won't be included.",
+      "gapWarning_other": "Shots {{shots}} are still slates — they won't be included.",
+      "confirmSelectedCount": "Export {{count}} shots?",
+      "confirmSelectedCount_one": "Export {{count}} shot?",
+      "confirmSelectedCount_other": "Export {{count}} shots?",
+      "includeReferences": "Include imported reference images",
+      "confirm": "Export assets",
+      "cancel": "Cancel",
+      "choosing": "Choose an export folder...",
+      "successTitle": "Assets exported",
+      "successBody": "Handed off {{count}} selected scenes to “{{folderName}}”.",
+      "successBody_one": "Handed off {{count}} selected scene to “{{folderName}}”.",
+      "successBody_other": "Handed off {{count}} selected scenes to “{{folderName}}”.",
+      "partialTitle": "Assets exported with missing scenes",
+      "partialBody": "Exported available assets to “{{folderName}}”.",
+      "failed": "Assets could not be exported.",
+      "noSelectedAssets": "No selected scene assets are ready to export.",
+      "folderLabel": "Export folder"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio is disabled in this build.",
+      "invalidPayload": "The request contains invalid or incomplete information.",
+      "projectNotFound": "The Creative Studio project no longer exists.",
+      "storyboardExists": "This project already has a storyboard. Confirm replacement before drafting again.",
+      "staleProject": "The project changed elsewhere. Refresh it before retrying.",
+      "planningUnavailable": "Storyboard drafting is unavailable. You can continue editing manually.",
+      "invalidRoute": "The selected generation route is invalid or unavailable.",
+      "cancellationRefused": "The provider can no longer cancel this running job.",
+      "duplicateChargeAcknowledgementRequired": "Acknowledge the possible duplicate provider charge before retrying.",
+      "busy": "This project has active generation work.",
+      "provider": "The provider could not complete the request.",
+      "storage": "Creative Studio could not update its local data."
+    },
+    "models": {
+      "storyboard": "Storyboard model",
+      "selectionRequired": "Select a model",
+      "unavailable": "The selected model is unavailable",
+      "openSettings": "Open Model Settings",
+      "refresh": "Refresh models",
+      "loading": "Loading models...",
+      "updateFailed": "The project model selection could not be updated."
     }
   },
   "contextHandoff": {
@@ -690,26 +1232,131 @@
   },
   "emptyModelReply": "The model ended its turn without a visible reply. Send the request again — for large outputs, ask for the result in smaller parts.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Business Review",
+        "description": "Quarterly results deck — KPI summary, segment detail, outlook. Navy and amber."
+      },
+      "project-kickoff": {
+        "name": "Project Kickoff",
+        "description": "Kickoff deck — scope, team, timeline, next steps. Clean teal."
+      },
+      "monthly-steerco": {
+        "name": "Monthly SteerCo",
+        "description": "Steering committee update — portfolio status, risks, decisions needed. Serif and gold."
+      },
+      "connected-ops": {
+        "name": "Connected Ops",
+        "description": "Operations review — site metrics, uptime, incidents. Industrial green."
+      },
+      "editorial-field-report": {
+        "name": "Editorial Field Report",
+        "description": "Long-read report — serif type, prose over bullets, one red accent."
+      },
+      "market-trends-report": {
+        "name": "Market Trends Report",
+        "description": "Data-forward scrolling report — charted exhibits with sourced notes."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimal light deck — one idea per slide, single blue accent."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Minimal dark deck for technical talks — code-friendly, green accent."
+      },
+      "business-report": {
+        "name": "Business Report",
+        "description": "Long-form formal report — cover, contents, data tables, navy serif headings."
+      },
+      "decision-memo": {
+        "name": "Decision Memo",
+        "description": "Short decision memo — TO/FROM/RE block, recommendation up front, no cover."
+      },
+      "operations-guide": {
+        "name": "Operations Guide",
+        "description": "Compact SOP — numbered steps, note boxes, checklists, teal accent."
+      },
+      "proposal-sow": {
+        "name": "Proposal / SOW",
+        "description": "Client proposal — scope, timeline, pricing table, signature block."
+      }
+    },
     "title": "Templates",
     "columnPptx": "Presentations · PPTX",
-    "columnHtml": "Reports · HTML",
+    "columnHtml": "Web · HTML",
+    "columnDocx": "Documents · DOCX",
     "selected": "Selected",
-    "buttonTooltip": "Presentation templates",
-    "slashDescription": "Choose a presentation template",
-    "importCard": "Import theme (.md)",
+    "buttonTooltip": "Templates",
+    "slashDescription": "Choose a template",
+    "importCard": "Import template (.md)",
     "empty": "No templates available",
     "chipTooltip": "This message will use the template",
+    "scratch": {
+      "prepareError": "Could not prepare artifact scratch space: {{error}}",
+      "retained": "Temporary artifact files were kept for recovery at {{path}}.",
+      "cleanup": "Clean up",
+      "cleanupSuccess": "Temporary artifact files removed",
+      "cleanupError": "Cleanup failed: {{error}}"
+    },
     "importSuccess": "Template imported",
     "importError": "Import failed: {{error}}",
     "removeError": "Delete failed: {{error}}",
     "deleteTooltip": "Delete template",
-    "deleteConfirm": "Delete this template?"
+    "deleteConfirm": "Delete this template?",
+    "sources": {
+      "reselectRequired": "Reselect attached files to use them with this PPTX template.",
+      "reselectAction": "Reselect files"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Presentation candidate requires review.",
+        "reviewRequiredAfterFailure": "Generation stopped; the retained presentation candidate still requires review.",
+        "trackingRequired": "Presentation run needs tracking attention.",
+        "dispatchUncertain": "Presentation run outcome is unconfirmed. Operator attention is required."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Open in system app",
+        "discard": "Discard record"
+      },
+      "loadError": "Could not load presentation recovery status.",
+      "invalidResponse": "Presentation recovery status could not be verified.",
+      "openError": "Could not confirm whether the current presentation candidate opened.",
+      "discardError": "Could not confirm that the presentation record was discarded."
+    }
   },
   "status": {
-    "waitingApproval": "Awaiting approval"
+    "waitingApproval": "Awaiting approval",
+    "running": "Working",
+    "done": "Finished",
+    "doneIdle": "Finished — idle",
+    "stopped": "Stopped",
+    "failed": "Failed"
   },
   "artifact": {
     "emptyTitle": "No artifact open",
     "emptyHint": "Generated files and documents open here."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Waiting for your approval to continue.",
+    "running": "Working on this chat.",
+    "doneUnseen": "Finished, but you haven't viewed it yet.",
+    "doneSeen": "Finished recently and already viewed.",
+    "doneIdle": "Finished at least a minute ago and already viewed.",
+    "stopped": "Stopped before finishing.",
+    "failed": "Couldn't finish because of an error."
+  },
+  "staleKnowledgeHint": {
+    "body": "This chat can't search the project's knowledge base — it started before files were added.",
+    "action": "Start a new chat"
+  },
+  "emptyChat": "Send a message to get started.",
+  "presentationSubmission": {
+    "pending": "Presentation submission pending",
+    "restore": "Restore",
+    "persistenceFailure": "The presentation submission could not be saved.",
+    "queued": "Presentation queued",
+    "uncertainTracking": "Presentation submission status is uncertain. Track the existing run; do not resend."
   }
 }

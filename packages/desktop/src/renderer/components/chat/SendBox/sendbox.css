@@ -36,8 +36,21 @@
   filter: drop-shadow(0 0 0.5px currentColor);
 }
 
-/* Dark mode: adjust send button brightness */
-[data-theme='dark'] .send-button-custom:not(:disabled) {
+/* Dark mode: adjust send button brightness.
+ *
+ * Scoped to `button` on purpose. In the conversation composer Arco wraps a
+ * disabled <Button> in a <span> and moves our className onto that wrapper, so
+ * `.send-button-custom` is the <button> while enabled and its parent <span>
+ * once disabled. A <span> never matches :disabled, so an unscoped
+ * `:not(:disabled)` painted the wrapper — a 32px square sitting behind the
+ * round button, visible whenever the composer was empty (i.e. right after
+ * sending). Matching only the real <button> leaves the wrapper unpainted.
+ *
+ * Note the `:disabled` rules in this file never match for the same reason:
+ * once disabled, the class has already moved off the button, so Arco's own
+ * disabled colours apply. Left alone deliberately — making them bite would
+ * change how the disabled button looks. */
+[data-theme='dark'] button.send-button-custom:not(:disabled) {
   background-color: var(--aou-4) !important;
   border-color: var(--aou-4) !important;
 }

@@ -1,0 +1,198 @@
+{
+  "success": true,
+  "data": {
+    "totalElements": 39,
+    "elements": [
+      {
+        "path": "/body/p[@paraId=00100000]",
+        "type": "paragraph",
+        "text": "CONFIDENTIAL — INTERNAL DISTRIBUTION"
+      },
+      {
+        "path": "/body/p[@paraId=00100002]",
+        "type": "paragraph",
+        "text": "Annual Performance Review"
+      },
+      {
+        "path": "/body/p[@paraId=00100004]",
+        "type": "paragraph",
+        "text": "Operating results, market position, and outlook"
+      },
+      {
+        "path": "/body/p[@paraId=00100006]",
+        "type": "paragraph",
+        "text": "Prepared for: Executive Committee"
+      },
+      {
+        "path": "/body/p[@paraId=00100008]",
+        "type": "paragraph",
+        "text": "Reporting period: January — December"
+      },
+      {
+        "path": "/body/p[@paraId=0010000A]",
+        "type": "paragraph",
+        "text": "Author: Strategy and Planning"
+      },
+      {
+        "path": "/body/p[@paraId=0010000C]",
+        "type": "paragraph",
+        "text": ""
+      },
+      {
+        "path": "/body/p[@paraId=0010000E]",
+        "type": "paragraph",
+        "text": "Contents"
+      },
+      {
+        "path": "/body/p[@paraId=00100010]",
+        "type": "paragraph",
+        "text": "1. Executive Summary\t3"
+      },
+      {
+        "path": "/body/p[@paraId=00100012]",
+        "type": "paragraph",
+        "text": "2. Operating Performance\t3"
+      },
+      {
+        "path": "/body/p[@paraId=00100014]",
+        "type": "paragraph",
+        "text": "3. Market Position\t3"
+      },
+      {
+        "path": "/body/p[@paraId=00100016]",
+        "type": "paragraph",
+        "text": "4. Outlook and Priorities\t4"
+      },
+      {
+        "path": "/body/p[@paraId=00100018]",
+        "type": "paragraph",
+        "text": ""
+      },
+      {
+        "path": "/body/p[@paraId=0010001A]",
+        "type": "paragraph",
+        "text": "1. Executive Summary"
+      },
+      {
+        "path": "/body/p[@paraId=0010001C]",
+        "type": "paragraph",
+        "text": "Recommendation — sustain the current investment plan and reallocate discretionary spend toward the two fastest-compounding segments."
+      },
+      {
+        "path": "/body/p[@paraId=0010001E]",
+        "type": "paragraph",
+        "text": "Performance for the period was ahead of plan on revenue and in line on margin. Growth was concentrated in the enterprise segment, where renewal rates improved and average contract value rose. The cost base grew more slowly than revenue for the third consecutive period, which is the clearest signal that the operating model is scaling as intended."
+      },
+      {
+        "path": "/body/p[@paraId=00100020]",
+        "type": "paragraph",
+        "text": "Three factors explain most of the variance against plan, and each is addressed in the sections that follow."
+      },
+      {
+        "path": "/body/p[@paraId=00100022]",
+        "type": "paragraph",
+        "text": "• Enterprise renewals closed earlier in the cycle than forecast, pulling revenue forward."
+      },
+      {
+        "path": "/body/p[@paraId=00100024]",
+        "type": "paragraph",
+        "text": "• Regional expansion costs landed below plan because two market entries were deferred."
+      },
+      {
+        "path": "/body/p[@paraId=00100026]",
+        "type": "paragraph",
+        "text": "• Input costs rose faster than the planning assumption, compressing gross margin."
+      },
+      {
+        "path": "/body/p[@paraId=00100028]",
+        "type": "paragraph",
+        "text": "2. Operating Performance"
+      },
+      {
+        "path": "/body/p[@paraId=0010002A]",
+        "type": "paragraph",
+        "text": "Results by segment"
+      },
+      {
+        "path": "/body/p[@paraId=0010002C]",
+        "type": "paragraph",
+        "text": "The table below summarises reported performance by segment against the approved plan."
+      },
+      {
+        "path": "/body/tbl[1]",
+        "type": "table",
+        "text": "[Table: 5 rows]"
+      },
+      {
+        "path": "/body/p[@paraId=00100056]",
+        "type": "paragraph",
+        "text": "Table 1 — Reported performance by segment, in millions."
+      },
+      {
+        "path": "/body/p[@paraId=00100058]",
+        "type": "paragraph",
+        "text": "Cost structure"
+      },
+      {
+        "path": "/body/p[@paraId=0010005A]",
+        "type": "paragraph",
+        "text": "Operating expense grew 7% against 12% revenue growth. Headcount was the largest single driver, followed by cloud infrastructure, which is now the fastest-growing line in the cost base and warrants a dedicated review next period."
+      },
+      {
+        "path": "/body/p[@paraId=0010005C]",
+        "type": "paragraph",
+        "text": "3. Market Position"
+      },
+      {
+        "path": "/body/p[@paraId=0010005E]",
+        "type": "paragraph",
+        "text": "Share held or improved in every served market. The competitive set has consolidated: two of the four principal competitors merged during the period, which raises the probability of aggressive pricing in the mid-market segment."
+      },
+      {
+        "path": "/body/p[@paraId=00100060]",
+        "type": "paragraph",
+        "text": "Competitive dynamics"
+      },
+      {
+        "path": "/body/p[@paraId=00100062]",
+        "type": "paragraph",
+        "text": "Win rates against the merged entity have not yet moved materially, but the sample is small and the integration is early. This is the single most important thing to monitor over the coming two quarters."
+      },
+      {
+        "path": "/body/p[@paraId=00100064]",
+        "type": "paragraph",
+        "text": "4. Outlook and Priorities"
+      },
+      {
+        "path": "/body/p[@paraId=00100066]",
+        "type": "paragraph",
+        "text": "The plan for the coming period holds revenue growth broadly flat and targets margin recovery through cost discipline rather than price increases. Four priorities follow from the analysis above."
+      },
+      {
+        "path": "/body/p[@paraId=00100068]",
+        "type": "paragraph",
+        "text": "1. Protect enterprise renewal rates; treat any decline as a leading indicator, not a lagging one."
+      },
+      {
+        "path": "/body/p[@paraId=0010006A]",
+        "type": "paragraph",
+        "text": "2. Complete the two deferred market entries before the competitive set stabilises."
+      },
+      {
+        "path": "/body/p[@paraId=0010006C]",
+        "type": "paragraph",
+        "text": "3. Bring cloud infrastructure spend under a dedicated cost owner."
+      },
+      {
+        "path": "/body/p[@paraId=0010006E]",
+        "type": "paragraph",
+        "text": "4. Re-test the mid-market pricing assumption against post-merger competitor behaviour."
+      },
+      {
+        "path": "/body/p[@paraId=00100070]",
+        "type": "paragraph",
+        "text": "Progress against each priority is reported monthly to the Executive Committee."
+      }
+    ]
+  }
+}

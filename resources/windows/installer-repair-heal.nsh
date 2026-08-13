@@ -9,11 +9,11 @@ Var /GLOBAL AionUiInnerFailureReadResult
 !macro AIONUI_READ_LAST_INNER_FAILURE
   InitPluginsDir
   StrCpy $AionUiInnerRootCode ""
-  StrCpy $AionUiInnerFailureSummary "No specific locking process was identified. Close AionUi, terminals, editors, and file managers opened in the install folder."
+  StrCpy $AionUiInnerFailureSummary "No specific locking process was identified. Close WePrompt, terminals, editors, and file managers opened in the install folder."
   nsExec::ExecToStack `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "& { \
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$logPath = '$AionUiSessionLogPath'; \
-    $$summary = 'No specific locking process was identified. Close AionUi, terminals, editors, and file managers opened in the install folder.'; \
+    $$summary = 'No specific locking process was identified. Close WePrompt, terminals, editors, and file managers opened in the install folder.'; \
     $$code = ''; \
     if ($$logPath -and (Test-Path -LiteralPath $$logPath)) { \
       $$events = @(Get-Content -LiteralPath $$logPath -ErrorAction SilentlyContinue | ForEach-Object { try { $$_ | ConvertFrom-Json } catch { $$null } } | Where-Object { $$_ }); \
@@ -70,9 +70,9 @@ Var /GLOBAL AionUiInnerFailureReadResult
   StrCpy $AionUiInstalledUninstaller "$INSTDIR\${UNINSTALL_FILENAME}"
 
   InitPluginsDir
-  StrCpy $AionUiBundledUninstaller "$PLUGINSDIR\AionUi-fixed-uninstaller.exe"
+  StrCpy $AionUiBundledUninstaller "$PLUGINSDIR\weprompt-fixed-uninstaller.exe"
   SetOverwrite on
-  File "/oname=$PLUGINSDIR\AionUi-fixed-uninstaller.exe" "${UNINSTALLER_OUT_FILE}"
+  File "/oname=$PLUGINSDIR\weprompt-fixed-uninstaller.exe" "${UNINSTALLER_OUT_FILE}"
 
   ${If} ${FileExists} "$AionUiInstalledUninstaller"
     ClearErrors
@@ -127,7 +127,13 @@ Var /GLOBAL AionUiInnerFailureReadResult
     !insertmacro AIONUI_LOG_EVENT "event=registry-heal phase=missing-install-location uninstallString=$AionUiRegUninstallString"
     !insertmacro AIONUI_CLEAR_INSTALL_REGISTRY "missing-install-location"
   ${Else}
-    StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${APP_EXECUTABLE_FILENAME}"
+    StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_APP_EXECUTABLE_FILENAME}"
+    ${IfNot} ${FileExists} "$AionUiRegInstallExe"
+      StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_LEGACY_FORGE_EXECUTABLE_FILENAME}"
+    ${EndIf}
+    ${IfNot} ${FileExists} "$AionUiRegInstallExe"
+      StrCpy $AionUiRegInstallExe "$AionUiRegInstallLocation\${AIONUI_LEGACY_AIONUI_EXECUTABLE_FILENAME}"
+    ${EndIf}
     ${If} ${FileExists} "$AionUiRegInstallExe"
       StrCpy $INSTDIR "$AionUiRegInstallLocation"
       StrCpy $AionUiRegistryInstallIsValid "1"

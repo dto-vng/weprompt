@@ -1,5 +1,6 @@
 {
   "sider": {
+    "empty": "尚無團隊",
     "title": "Teams",
     "createTeam": "New Team",
     "pin": "置頂",

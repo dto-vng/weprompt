@@ -62,6 +62,7 @@
       "installFailed": "Failed to install officecli automatically. Check backend logs and retry.",
       "portTimeout": "Preview service started but did not become ready in time. Retry.",
       "startFailed": "Failed to start the Office preview service.",
+      "invalidArtifact": "This Office file is corrupted or invalid and cannot be delivered safely.",
       "outsideSandbox": "This file is outside the current project sandbox.",
       "originalSafe": "The original workspace file was not changed."
     },

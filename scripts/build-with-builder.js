@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Simplified build script for AionUi
+ * Simplified build script for WePrompt
  * Coordinates electron-vite (bundling) and electron-builder (packaging)
  *
  * Features:
@@ -27,6 +27,34 @@ const DMG_RETRY_DELAY_SEC = 30;
 // Incremental build: hash of source files to detect changes
 const INCREMENTAL_CACHE_FILE = 'out/.build-hash';
 const DEBUG_AUTO_UPDATE_CURRENT_VERSION_ENV = 'AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION';
+const CURRENT_WINDOWS_EXECUTABLE = 'WePrompt.exe';
+const LEGACY_WINDOWS_EXECUTABLES = ['Forge.exe', 'AionUi.exe'];
+const INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES = [
+  'WEPROMPT_UPDATE_BASE_URL',
+  'SENTRY_DSN',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_UPLOAD_SOURCE_MAPS',
+  'SENTRY_ORG',
+  'SENTRY_PROJECT',
+  'SENTRY_RELEASE',
+  'BUILD_CERTIFICATE_BASE64',
+  'P12_PASSWORD',
+  'KEYCHAIN_PASSWORD',
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'CSC_IDENTITY_AUTO_DISCOVERY',
+  'APPLE_ID',
+  'APPLE_ID_PASSWORD',
+  'TEAM_ID',
+  'IDENTITY',
+  'appleId',
+  'appleIdPassword',
+  'teamId',
+  'identity',
+];
 
 function patchElectronBuilderNsisInstaller() {
   const rootDir = path.resolve(__dirname, '..');
@@ -118,6 +146,12 @@ function patchElectronBuilderNsisInstaller() {
     '  !insertmacro copyFile "$uninstallerFileName" "$uninstallerFileNameTemp"',
   ].join('\n');
   const bundledUninstallerOverride = [
+    '  ${if} ${FileExists} "$PLUGINSDIR\\weprompt-fixed-uninstaller.exe"',
+    '    DetailPrint `WePrompt bundled-uninstaller override source.`',
+    '    StrCpy $uninstallerFileName "$PLUGINSDIR\\weprompt-fixed-uninstaller.exe"',
+    '  ${endIf}',
+  ].join('\n');
+  const legacyBundledUninstallerOverride = [
     '  ${if} ${FileExists} "$PLUGINSDIR\\AionUi-fixed-uninstaller.exe"',
     '    DetailPrint `AionUi-bundled-uninstaller override source.`',
     '    StrCpy $uninstallerFileName "$PLUGINSDIR\\AionUi-fixed-uninstaller.exe"',
@@ -137,7 +171,9 @@ function patchElectronBuilderNsisInstaller() {
     );
   }
 
-  if (patched.includes(bundledUninstallerOverride)) {
+  if (patched.includes(legacyBundledUninstallerOverride)) {
+    patched = patched.replace(legacyBundledUninstallerOverride, bundledUninstallerOverride);
+  } else if (patched.includes(bundledUninstallerOverride)) {
     // Already patched.
   } else if (patched.includes(uninstallerCopySource)) {
     patched = patched.replace(uninstallerCopySource, bundledUninstallerCopySource);
@@ -408,26 +444,12 @@ function cleanupDiskImages() {
   }
 }
 
-// Find the .app directory from electron-builder output
-function findAppDir(outDir) {
-  const candidates = ['mac', 'mac-arm64', 'mac-x64', 'mac-universal'];
-  for (const dir of candidates) {
-    const fullPath = path.join(outDir, dir);
-    if (fs.existsSync(fullPath)) {
-      const hasApp = fs.readdirSync(fullPath).some((f) => f.endsWith('.app'));
-      if (hasApp) return fullPath;
-    }
-  }
-  return null;
-}
-
-// Check if DMG exists in output directory
-function dmgExists(outDir) {
-  try {
-    return fs.readdirSync(outDir).some((f) => f.endsWith('.dmg'));
-  } catch {
-    return false;
-  }
+function resolveMacArtifactPaths(outDir, targetArch, version) {
+  const appDirName = targetArch === 'arm64' ? 'mac-arm64' : 'mac';
+  return {
+    appDir: path.join(outDir, appDirName),
+    dmgPath: path.join(outDir, `WePrompt-${version}-mac-${targetArch}.dmg`),
+  };
 }
 
 function tryRemoveDir(targetDir) {
@@ -486,6 +508,31 @@ function writeGeneratedSentryDsnInclude(projectRoot) {
   );
 }
 
+function assertInternalReleaseBuildEnvironment() {
+  if (process.env.WEPROMPT_INTERNAL_RELEASE !== '1') {
+    return;
+  }
+
+  const inheritedVariables = [
+    ...new Set([...INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES, ...Object.keys(process.env)]),
+  ].filter((name) => {
+    const value = process.env[name];
+    const isForbiddenName =
+      INTERNAL_RELEASE_FORBIDDEN_ENV_NAMES.includes(name) || name.startsWith('CSC_') || name.startsWith('APPLE_');
+    if (name === 'CSC_IDENTITY_AUTO_DISCOVERY' && value === 'false') {
+      return false;
+    }
+    return isForbiddenName && typeof value === 'string' && value.trim() !== '';
+  });
+  if (inheritedVariables.length > 0) {
+    throw new Error(
+      `Internal release build rejects ambient network, upload, signing, or notarization variables: ${inheritedVariables.join(', ')}`
+    );
+  }
+
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+}
+
 function isValidPackageVersion(value) {
   return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
     value
@@ -530,8 +577,9 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
   if (!appName) throw new Error(`No .app found in ${appDir}`);
   const appPath = path.join(appDir, appName);
 
+  const internalIdentityArg = process.env.WEPROMPT_INTERNAL_RELEASE === '1' ? ' --config.mac.identity=-' : '';
   execSync(
-    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never`,
+    `bunx electron-builder --config packages/desktop/electron-builder.yml --mac dmg zip --${targetArch} --prepackaged "${appPath}" --publish=never${internalIdentityArg}`,
     {
       stdio: 'inherit',
       shell: process.platform === 'win32',
@@ -542,14 +590,15 @@ function createMacArtifactsWithPrepackaged(appDir, targetArch) {
 function buildWithDmgRetry(cmd, targetArch) {
   const isMac = process.platform === 'darwin';
   const outDir = path.resolve(__dirname, '../out');
+  const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
+  const { appDir, dmgPath } = resolveMacArtifactPaths(outDir, targetArch, packageVersion);
 
   try {
     execSync(cmd, { stdio: 'inherit', shell: process.platform === 'win32' });
     return;
   } catch (error) {
-    // On non-macOS or if .app doesn't exist, just throw
-    const appDir = isMac ? findAppDir(outDir) : null;
-    if (!appDir || dmgExists(outDir)) throw error;
+    const hasTargetApp = isMac && fs.existsSync(appDir) && fs.readdirSync(appDir).some((file) => file.endsWith('.app'));
+    if (!hasTargetApp || fs.existsSync(dmgPath)) throw error;
 
     // .app exists but no .dmg → DMG creation failed
     console.log('\n🔄 Build failed during DMG creation (.app exists, .dmg missing)');
@@ -763,6 +812,8 @@ try {
     return;
   }
 
+  assertInternalReleaseBuildEnvironment();
+
   // 5. Prepare aioncore binary (for packaged runtime usage)
   const { prepareAioncore } = require('../packages/shared-scripts/src/prepare-aioncore.js');
   const { resolveAioncoreVersion } = require('./resolveAioncoreVersion.js');
@@ -845,30 +896,35 @@ try {
     const winUnpackedDir = path.join(outDir, 'win-unpacked');
     let cleaned = tryRemoveDir(winUnpackedDir);
     if (!cleaned) {
-      const aionRunning = isProcessRunningWindows('AionUi.exe');
+      const appRunning = [CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES].some((name) =>
+        isProcessRunningWindows(name)
+      );
       const electronRunning = isProcessRunningWindows('electron.exe');
-      if (aionRunning || electronRunning) {
-        console.log('⚠️  Detected running AionUi/Electron process. Attempting to close...');
-        killWindowsProcesses(['AionUi.exe', 'electron.exe']);
+      if (appRunning || electronRunning) {
+        console.log('⚠️  Detected running WePrompt/legacy/Electron process. Attempting to close...');
+        killWindowsProcesses([CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES, 'electron.exe']);
         cleaned = tryRemoveDir(winUnpackedDir);
         if (!cleaned) {
-          console.log('⚠️  Directory still locked. Please close any running AionUi/Electron processes and retry.');
+          console.log('⚠️  Directory still locked. Please close any running WePrompt or legacy processes and retry.');
         }
       }
     }
   }
 
   const isWindowsBuild = builderArgs.includes('--win') || builderArgs.includes('--all');
+  const isMacBuild = builderArgs.includes('--mac') || (builderArgs.includes('--all') && process.platform === 'darwin');
   if (isWindowsBuild) {
     patchElectronBuilderNsisInstaller();
     cleanupWindowsPackOutput();
   }
 
-  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}`;
+  const internalMacIdentityArg =
+    process.env.WEPROMPT_INTERNAL_RELEASE === '1' && isMacBuild ? ' --config.mac.identity=-' : '';
+  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}${internalMacIdentityArg}`;
   try {
     buildWithDmgRetry(builderCommand, targetArch);
   } catch (error) {
-    const winExePath = path.join(outDir, 'win-unpacked', 'AionUi.exe');
+    const winExePath = path.join(outDir, 'win-unpacked', CURRENT_WINDOWS_EXECUTABLE);
     const firstError = formatExecError(error);
     const canRetryWithoutExecutableEdit =
       process.platform === 'win32' && isWindowsBuild && process.env.CI !== 'true' && fs.existsSync(winExePath);
@@ -877,7 +933,7 @@ try {
       throw error;
     }
 
-    console.log('⚠️  Windows local build failed after AionUi.exe was produced.');
+    console.log(`⚠️  Windows local build failed after ${CURRENT_WINDOWS_EXECUTABLE} was produced.`);
     if (firstError) {
       console.log('   First failure summary:');
       console.log(
@@ -890,7 +946,7 @@ try {
     }
     console.log('   Retrying local build with win.signAndEditExecutable=false...');
     console.log('   This fallback is intended for transient rcedit / file-lock failures on developer machines.');
-    killWindowsProcesses(['AionUi.exe', 'electron.exe']);
+    killWindowsProcesses([CURRENT_WINDOWS_EXECUTABLE, ...LEGACY_WINDOWS_EXECUTABLES, 'electron.exe']);
     cleanupWindowsPackOutput();
 
     try {

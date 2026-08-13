@@ -116,3 +116,21 @@
     transition: none;
   }
 }
+
+/* Clickable knowledge citation lines inside the expanded search tool result. */
+.tool-detail-content .kb-citation-link {
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.tool-detail-content .kb-citation-link:hover {
+  text-decoration: underline;
+}
+
+/* The citation is a role='button' anchor with no href, so it gets no focus ring for free. */
+.tool-detail-content .kb-citation-link:focus-visible {
+  outline: 1px solid rgb(var(--primary-6));
+  outline-offset: 2px;
+  border-radius: 2px;
+}

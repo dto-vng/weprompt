@@ -13,6 +13,7 @@ const autoUpdaterMock = vi.hoisted(() => ({
   logger: null as unknown,
   autoDownload: true,
   autoInstallOnAppQuit: false,
+  disableDifferentialDownload: false,
   forceDevUpdateConfig: false,
   allowPrerelease: false,
   allowDowngrade: false,
@@ -75,6 +76,7 @@ const setPlatform = (platform: NodeJS.Platform): void => {
 
 describe('AutoUpdaterService', () => {
   const originalPlatform = process.platform;
+  const originalUpdateBaseUrl = process.env.WEPROMPT_UPDATE_BASE_URL;
 
   beforeEach(() => {
     vi.resetModules();
@@ -83,6 +85,7 @@ describe('AutoUpdaterService', () => {
     autoUpdaterMock.logger = null;
     autoUpdaterMock.autoDownload = true;
     autoUpdaterMock.autoInstallOnAppQuit = false;
+    autoUpdaterMock.disableDifferentialDownload = false;
     autoUpdaterMock.forceDevUpdateConfig = false;
     autoUpdaterMock.allowPrerelease = false;
     autoUpdaterMock.allowDowngrade = false;
@@ -90,6 +93,7 @@ describe('AutoUpdaterService', () => {
     appMock.getPath.mockImplementation(() => '/tmp/aionui-test');
     delete (autoUpdaterMock as { updateInfoAndProvider?: unknown }).updateInfoAndProvider;
     appMock.isPackaged = false;
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     delete process.env.AIONUI_FORCE_DEV_AUTO_UPDATE;
     delete process.env.AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION;
     nativeAutoUpdaterMock.on.mockReset();
@@ -104,6 +108,8 @@ describe('AutoUpdaterService', () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     setPlatform(originalPlatform);
+    if (originalUpdateBaseUrl === undefined) delete process.env.WEPROMPT_UPDATE_BASE_URL;
+    else process.env.WEPROMPT_UPDATE_BASE_URL = originalUpdateBaseUrl;
   });
 
   it('does not use the stable CDN updater when prerelease manual mode is enabled', async () => {
@@ -111,14 +117,14 @@ describe('AutoUpdaterService', () => {
       isUpdateAvailable: true,
       updateInfo: {
         version: '2.1.14',
-        files: [{ url: 'AionUi-2.1.14-mac-arm64.dmg', sha512: 'sha512-value' }],
-        path: 'AionUi-2.1.14-mac-arm64.dmg',
+        files: [{ url: 'WePrompt-2.1.14-mac-arm64.dmg', sha512: 'sha512-value' }],
+        path: 'WePrompt-2.1.14-mac-arm64.dmg',
         sha512: 'sha512-value',
         releaseDate: '2026-06-08T00:00:00.000Z',
       },
     });
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setAllowPrerelease(true);
@@ -129,23 +135,26 @@ describe('AutoUpdaterService', () => {
     expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
   });
 
-  it('configures electron-updater to read stable metadata from the CDN', async () => {
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
-    const { CdnGenericProvider } = await import('@/process/services/cdnGenericProvider');
+  it('configures electron-updater to read stable metadata from the product-owned feed', async () => {
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
+    const { CdnGenericProvider, ContainedElectronHttpExecutor } =
+      await import('@/process/services/update/cdnGenericProvider');
 
     autoUpdaterService.resetForTest();
 
     expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledWith({
       provider: 'custom',
-      url: 'https://static.aionui.com/releases',
+      url: 'https://updates.weprompt.test/releases',
       updateProvider: CdnGenericProvider,
     });
+    expect((autoUpdaterMock as { httpExecutor?: unknown }).httpExecutor).toBeInstanceOf(ContainedElectronHttpExecutor);
+    expect(autoUpdaterMock.disableDifferentialDownload).toBe(true);
   });
 
   it('enables forced updater checks in unpacked dev builds when requested', async () => {
     process.env.AIONUI_FORCE_DEV_AUTO_UPDATE = '1';
 
-    await import('@/process/services/autoUpdaterService');
+    await import('@/process/services/update/autoUpdaterService');
 
     expect(autoUpdaterMock.forceDevUpdateConfig).toBe(true);
   });
@@ -154,7 +163,7 @@ describe('AutoUpdaterService', () => {
     process.env.AIONUI_FORCE_DEV_AUTO_UPDATE = '1';
     process.env.AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION = '2.1.12';
 
-    await import('@/process/services/autoUpdaterService');
+    await import('@/process/services/update/autoUpdaterService');
 
     expect(autoUpdaterMock.currentVersion.version).toBe('2.1.12');
   });
@@ -164,7 +173,7 @@ describe('AutoUpdaterService', () => {
     process.env.AIONUI_FORCE_DEV_AUTO_UPDATE = '1';
     process.env.AIONUI_DEBUG_AUTO_UPDATE_CURRENT_VERSION = '2.1.12';
 
-    await import('@/process/services/autoUpdaterService');
+    await import('@/process/services/update/autoUpdaterService');
 
     expect(autoUpdaterMock.forceDevUpdateConfig).toBe(false);
     expect(autoUpdaterMock.currentVersion.version).toBe('2.1.13');
@@ -202,7 +211,7 @@ describe('AutoUpdaterService', () => {
 
   it('clarifies the Squirrel bundle error in dev mode', async () => {
     appMock.isPackaged = false;
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     const statuses: Array<{ status: string; error?: string }> = [];
@@ -217,7 +226,7 @@ describe('AutoUpdaterService', () => {
 
   it('passes through unrelated auto-updater errors verbatim', async () => {
     appMock.isPackaged = false;
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     const statuses: Array<{ status: string; error?: string }> = [];
@@ -238,7 +247,7 @@ describe('AutoUpdaterService', () => {
         })
     );
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     const first = autoUpdaterService.downloadUpdate();
@@ -254,7 +263,7 @@ describe('AutoUpdaterService', () => {
   it('allows a new auto-update download after a terminal updater event', async () => {
     autoUpdaterMock.downloadUpdate.mockResolvedValue(undefined);
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     await expect(autoUpdaterService.downloadUpdate()).resolves.toEqual({ success: true });
@@ -273,7 +282,7 @@ describe('AutoUpdaterService', () => {
         })
     );
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     const download = autoUpdaterService.downloadUpdate();
@@ -295,16 +304,16 @@ describe('AutoUpdaterService', () => {
   it('restores a completed cached auto-update when the downloaded package validates', async () => {
     const updateInfo = {
       version: '2.1.14',
-      files: [{ url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' }],
-      path: 'AionUi-2.1.14-mac.zip',
+      files: [{ url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' }],
+      path: 'WePrompt-2.1.14-mac.zip',
       sha512: 'sha512-value',
       releaseDate: '2026-06-08T00:00:00.000Z',
     };
     const fileInfo = {
-      url: new URL('https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac.zip'),
-      info: { url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' },
+      url: new URL('https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac.zip'),
+      info: { url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' },
     };
-    const cachedUpdatePath = path.join('/cache/pending', 'AionUi-2.1.14-mac.zip');
+    const cachedUpdatePath = path.join('/cache/pending', 'WePrompt-2.1.14-mac.zip');
     const validateDownloadedPath = vi.fn().mockResolvedValue(cachedUpdatePath);
 
     autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
@@ -320,7 +329,7 @@ describe('AutoUpdaterService', () => {
     });
     autoUpdaterMock.downloadUpdate.mockResolvedValue(undefined);
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     await expect(autoUpdaterService.restoreDownloadedUpdateIfAvailable()).resolves.toEqual({
@@ -339,14 +348,14 @@ describe('AutoUpdaterService', () => {
   it('does not restore a cached auto-update when the downloaded package is missing or invalid', async () => {
     const updateInfo = {
       version: '2.1.14',
-      files: [{ url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' }],
-      path: 'AionUi-2.1.14-mac.zip',
+      files: [{ url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' }],
+      path: 'WePrompt-2.1.14-mac.zip',
       sha512: 'sha512-value',
       releaseDate: '2026-06-08T00:00:00.000Z',
     };
     const fileInfo = {
-      url: new URL('https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac.zip'),
-      info: { url: 'AionUi-2.1.14-mac.zip', sha512: 'sha512-value' },
+      url: new URL('https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac.zip'),
+      info: { url: 'WePrompt-2.1.14-mac.zip', sha512: 'sha512-value' },
     };
     const validateDownloadedPath = vi.fn().mockResolvedValue(null);
 
@@ -362,7 +371,7 @@ describe('AutoUpdaterService', () => {
       validateDownloadedPath,
     });
 
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
     autoUpdaterService.initialize();
 
     await expect(autoUpdaterService.restoreDownloadedUpdateIfAvailable()).resolves.toEqual({
@@ -376,7 +385,7 @@ describe('AutoUpdaterService', () => {
     setPlatform('darwin');
     const cleanup = vi.fn();
     const statuses: Array<{ status: string; error?: string }> = [];
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setBeforeQuitAndInstall(cleanup);
@@ -400,7 +409,7 @@ describe('AutoUpdaterService', () => {
   it('does not quit on macOS when native updater reports readiness error first', async () => {
     setPlatform('darwin');
     const statuses: Array<{ status: string; error?: string }> = [];
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.on('update-status', (status: { status: string; error?: string }) => statuses.push(status));
@@ -422,7 +431,7 @@ describe('AutoUpdaterService', () => {
     setPlatform('darwin');
     vi.useFakeTimers();
     const statuses: Array<{ status: string; error?: string }> = [];
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.on('update-status', (status: { status: string; error?: string }) => statuses.push(status));
@@ -444,7 +453,7 @@ describe('AutoUpdaterService', () => {
   it('resets macOS native readiness when a new update check starts', async () => {
     setPlatform('darwin');
     const cleanup = vi.fn();
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setBeforeQuitAndInstall(cleanup);
@@ -468,7 +477,7 @@ describe('AutoUpdaterService', () => {
 
   it('rejects a pending macOS install wait when a new update check starts', async () => {
     setPlatform('darwin');
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     getUpdateDownloadedHandler()({ version: '2.2.0' });
@@ -487,7 +496,7 @@ describe('AutoUpdaterService', () => {
     setPlatform('darwin');
     const cleanupError = new Error('cleanup failed');
     const statuses: Array<{ status: string; error?: string }> = [];
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setBeforeQuitAndInstall(async () => {
@@ -511,7 +520,7 @@ describe('AutoUpdaterService', () => {
   it('does not force exit when quitAndInstall handoff throws', async () => {
     setPlatform('darwin');
     const statuses: Array<{ status: string; error?: string }> = [];
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterMock.quitAndInstall.mockImplementationOnce(() => {
       throw new Error('handoff failed');
@@ -533,7 +542,7 @@ describe('AutoUpdaterService', () => {
   it('keeps non-macOS quitAndInstall behavior immediate', async () => {
     setPlatform('win32');
     const cleanup = vi.fn();
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setBeforeQuitAndInstall(cleanup);
@@ -548,7 +557,7 @@ describe('AutoUpdaterService', () => {
   it('uses a non-silent handoff for user-initiated Windows installs without changing app-quit installs', async () => {
     setPlatform('win32');
     const cleanup = vi.fn();
-    const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+    const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
 
     autoUpdaterService.initialize();
     autoUpdaterService.setBeforeQuitAndInstall(cleanup);
@@ -568,7 +577,7 @@ describe('AutoUpdaterService', () => {
     appMock.getPath.mockImplementation((name: string) => (name === 'temp' ? tempRoot : '/tmp/aionui-test'));
 
     try {
-      const { autoUpdaterService } = await import('@/process/services/autoUpdaterService');
+      const { autoUpdaterService } = await import('@/process/services/update/autoUpdaterService');
       autoUpdaterService.initialize();
 
       await autoUpdaterService.quitAndInstall();

@@ -2,10 +2,11 @@ import { Button, Message, Modal, Space, Typography } from '@arco-design/web-reac
 import type { TFunction } from 'i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type FeedbackEventTags, submitFeedbackReport } from '@/renderer/services/feedback/submitFeedbackReport';
-
-const AIONUI_DOWNLOAD_URL = 'https://www.aionui.com/';
-const INSTALLATION_INTEGRITY_REPORT_FLUSH_TIMEOUT_MS = 2000;
+import {
+  type FeedbackEventTags,
+  type SubmitFeedbackReportResult,
+  submitFeedbackReport,
+} from '@/renderer/services/feedback/submitFeedbackReport';
 
 type InstallationIntegrityDialogKind =
   | 'incomplete_installation'
@@ -30,10 +31,6 @@ export type InstallationIntegrityDiagnostics = {
   backendStartupFailure?: Record<string, unknown> | null;
 };
 
-export function openDownloadLatest(): void {
-  window.open(AIONUI_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
-}
-
 export function getInstallationIntegrityTitle(
   t: TFunction,
   diagnosticsKind: InstallationIntegrityDialogKind = 'incomplete_installation'
@@ -57,10 +54,6 @@ export function getBackendStartupInstallationDescription(t: TFunction): string {
 
 export function getRuntimeComponentInstallationDescription(t: TFunction, resource: string): string {
   return t('common.backendStartup.incompleteInstallation.runtimeComponentDescription', { resource });
-}
-
-export function getInstallationIntegrityDownloadText(t: TFunction): string {
-  return t('common.backendStartup.incompleteInstallation.downloadLatest');
 }
 
 export function getInstallationIntegritySendDiagnosticsText(t: TFunction): string {
@@ -123,47 +116,40 @@ export async function reportInstallationIntegrityDiagnostics(
   diagnostics: InstallationIntegrityDiagnostics,
   t: TFunction,
   diagnosticsKind: InstallationIntegrityDialogKind = 'incomplete_installation'
-): Promise<void> {
-  await submitFeedbackReport({
+): Promise<SubmitFeedbackReportResult> {
+  const result = await submitFeedbackReport({
     collectLogs: true,
     description: diagnostics.description ?? getBackendStartupInstallationDescription(t),
-    extra: {
-      installation_integrity: diagnostics,
-    },
-    flushTimeoutMs: INSTALLATION_INTEGRITY_REPORT_FLUSH_TIMEOUT_MS,
     module: 'installation-integrity',
     moduleLabel: getInstallationIntegrityTitle(t, diagnosticsKind),
     tags: buildInstallationIntegrityTags(diagnostics),
   });
 
-  if (typeof window !== 'undefined' && window.__aionuiE2ETest) {
+  if (result.status === 'saved' && typeof window !== 'undefined' && window.__aionuiE2ETest) {
     window.__installationIntegrityReportCount = (window.__installationIntegrityReportCount ?? 0) + 1;
     window.__lastInstallationIntegrityReportMessage = 'installation-integrity-user-report';
   }
+
+  return result;
 }
 
 export function getInstallationIntegrityModalActions(
   t: TFunction,
   options: {
     diagnosticsKind?: InstallationIntegrityDialogKind;
-    onDownloadLatest?: () => void;
     onRecoverCorruptedDatabase?: () => Promise<unknown> | void;
-    onReportDiagnostics?: () => Promise<unknown> | void;
+    onReportDiagnostics?: () => Promise<SubmitFeedbackReportResult> | SubmitFeedbackReportResult;
   } = {}
 ): {
-  downloadText?: string;
-  onDownloadLatest: () => void;
   onRecoverCorruptedDatabase: () => Promise<unknown> | void;
-  onReportDiagnostics: () => Promise<unknown> | void;
+  onReportDiagnostics: () => Promise<SubmitFeedbackReportResult> | SubmitFeedbackReportResult;
   recoverText?: string;
   reportText: string;
 } {
   const diagnosticsKind = options.diagnosticsKind ?? 'incomplete_installation';
   return {
-    downloadText: diagnosticsKind === 'incomplete_installation' ? getInstallationIntegrityDownloadText(t) : undefined,
-    onDownloadLatest: options.onDownloadLatest ?? openDownloadLatest,
     onRecoverCorruptedDatabase: options.onRecoverCorruptedDatabase ?? (() => Promise.resolve()),
-    onReportDiagnostics: options.onReportDiagnostics ?? (() => Promise.resolve()),
+    onReportDiagnostics: options.onReportDiagnostics ?? (() => ({ status: 'failed' })),
     recoverText:
       diagnosticsKind === 'recoverable_database_corruption'
         ? t('common.backendStartup.recoverableDatabaseCorruption.confirmRebuild')
@@ -183,26 +169,6 @@ export function getInstallationIntegrityModalActions(
   };
 }
 
-export function getDownloadLatestModalActionProps(t: TFunction): {
-  cancelButtonProps: {
-    style: {
-      display: 'none';
-    };
-  };
-  okText: string;
-  onOk: () => void;
-} {
-  return {
-    okText: getInstallationIntegrityDownloadText(t),
-    onOk: openDownloadLatest,
-    cancelButtonProps: {
-      style: {
-        display: 'none',
-      },
-    },
-  };
-}
-
 export const InstallationIntegrityContent: React.FC<{ description: string; diagnosticsHint?: string }> = ({
   description,
   diagnosticsHint,
@@ -217,11 +183,24 @@ export const InstallationIntegrityContent: React.FC<{ description: string; diagn
   </div>
 );
 
-const InstallationIntegrityFooter: React.FC<{
+export const PackageArchitectureMismatchFooter: React.FC<{ onClose?: () => void }> = ({
+  onClose = () => window.close(),
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Button data-testid='package-architecture-mismatch-close' type='primary' onClick={onClose}>
+      {t('common.backendStartup.packageArchitectureMismatch.closeApplication')}
+    </Button>
+  );
+};
+
+export const InstallationIntegrityFooter: React.FC<{
   diagnostics?: InstallationIntegrityDiagnostics;
   diagnosticsKind?: InstallationIntegrityDialogKind;
 }> = ({ diagnostics, diagnosticsKind = 'incomplete_installation' }) => {
   const { t } = useTranslation();
+  const isDiagnosticsExportAvailable = Boolean(window.electronAPI?.exportLocalFeedbackDiagnostics);
   const [reported, setReported] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -237,19 +216,25 @@ const InstallationIntegrityFooter: React.FC<{
     if (!diagnostics || reporting || reported) return;
     setReporting(true);
     try {
-      await actions.onReportDiagnostics();
-      setReported(true);
-      Message.success(
-        diagnosticsKind === 'recoverable_database_corruption'
-          ? t('common.backendStartup.recoverableDatabaseCorruption.diagnosticsReportSuccess')
-          : diagnosticsKind === 'transient_concurrent_startup'
-            ? t('common.backendStartup.transientConcurrentStartup.diagnosticsReportSuccess')
-            : diagnosticsKind === 'local_data_repair'
-              ? t('common.backendStartup.localDataRepair.diagnosticsReportSuccess')
-              : diagnosticsKind === 'data_migration'
-                ? t('common.backendStartup.dataMigration.diagnosticsReportSuccess')
-                : t('common.backendStartup.incompleteInstallation.diagnosticsReportSuccess')
-      );
+      const result = await actions.onReportDiagnostics();
+      if (result.status === 'saved') {
+        setReported(true);
+        Message.success(
+          diagnosticsKind === 'recoverable_database_corruption'
+            ? t('common.backendStartup.recoverableDatabaseCorruption.diagnosticsReportSuccess')
+            : diagnosticsKind === 'transient_concurrent_startup'
+              ? t('common.backendStartup.transientConcurrentStartup.diagnosticsReportSuccess')
+              : diagnosticsKind === 'local_data_repair'
+                ? t('common.backendStartup.localDataRepair.diagnosticsReportSuccess')
+                : diagnosticsKind === 'data_migration'
+                  ? t('common.backendStartup.dataMigration.diagnosticsReportSuccess')
+                  : t('common.backendStartup.incompleteInstallation.diagnosticsReportSuccess')
+        );
+      } else if (result.status === 'cancelled') {
+        Message.info(t('settings.bugReportCancelled'));
+      } else if (result.status === 'failed') {
+        throw new Error('Local diagnostics export failed');
+      }
     } catch {
       Message.error(
         diagnosticsKind === 'recoverable_database_corruption'
@@ -280,17 +265,14 @@ const InstallationIntegrityFooter: React.FC<{
 
   return (
     <Space>
-      <Button
-        data-testid='installation-integrity-report'
-        disabled={!diagnostics || reported}
-        loading={reporting}
-        onClick={handleReportDiagnostics}
-      >
-        {reported ? getInstallationIntegrityDiagnosticsSentText(t, diagnosticsKind) : actions.reportText}
-      </Button>
-      {actions.downloadText ? (
-        <Button data-testid='installation-integrity-download' type='primary' onClick={actions.onDownloadLatest}>
-          {actions.downloadText}
+      {isDiagnosticsExportAvailable ? (
+        <Button
+          data-testid='installation-integrity-report'
+          disabled={!diagnostics || reported}
+          loading={reporting}
+          onClick={handleReportDiagnostics}
+        >
+          {reported ? getInstallationIntegrityDiagnosticsSentText(t, diagnosticsKind) : actions.reportText}
         </Button>
       ) : null}
       {actions.recoverText ? (

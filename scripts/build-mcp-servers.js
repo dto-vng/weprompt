@@ -42,6 +42,11 @@ async function main() {
       entryPoints: [path.join(ROOT, 'packages/desktop/src/process/resources/builtinMcp/visionServer.ts')],
       outfile: path.join(ROOT, 'out/main/builtin-mcp-vision.js'),
     }),
+    esbuild.build({
+      ...SHARED_OPTIONS,
+      entryPoints: [path.join(ROOT, 'packages/desktop/src/process/resources/builtinMcp/knowledgeServer.ts')],
+      outfile: path.join(ROOT, 'out/main/builtin-mcp-knowledge.js'),
+    }),
   ]);
 }
 

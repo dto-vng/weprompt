@@ -9,18 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import SystemSettings from '@/renderer/pages/settings/SystemSettings';
 
-const mockUseLocation = vi.fn();
-
-vi.mock('react-router-dom', () => ({
-  useLocation: () => mockUseLocation(),
-}));
-
 vi.mock('@/renderer/components/settings/SettingsModal/contents/SystemModalContent', () => ({
   default: () => <div data-testid='system-modal-content'>SystemModalContent</div>,
-}));
-
-vi.mock('@/renderer/components/settings/SettingsModal/contents/AboutModalContent', () => ({
-  default: () => <div data-testid='about-modal-content'>AboutModalContent</div>,
 }));
 
 vi.mock('@/renderer/pages/settings/components/SettingsPageWrapper', () => ({
@@ -36,37 +26,22 @@ describe('SystemSettings', () => {
     vi.clearAllMocks();
   });
 
-  it('renders SystemModalContent when pathname is not /settings/about', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/system' });
-    render(<SystemSettings />);
-    expect(screen.getByTestId('system-modal-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('about-modal-content')).not.toBeInTheDocument();
-  });
-
-  it('renders AboutModalContent when pathname is /settings/about', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/about' });
-    render(<SystemSettings />);
-    expect(screen.getByTestId('about-modal-content')).toBeInTheDocument();
-    expect(screen.queryByTestId('system-modal-content')).not.toBeInTheDocument();
-  });
-
-  it('applies max-w-640px contentClassName for about page', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/about' });
-    render(<SystemSettings />);
-    const wrapper = screen.getByTestId('settings-page-wrapper');
-    expect(wrapper).toHaveAttribute('data-content-class', 'max-w-640px');
-  });
-
-  it('does not apply contentClassName for system page', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/system' });
-    render(<SystemSettings />);
-    const wrapper = screen.getByTestId('settings-page-wrapper');
-    expect(wrapper).not.toHaveAttribute('data-content-class');
-  });
-
-  it('wraps content in SettingsPageWrapper', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/system' });
+  it('renders the system content inside the settings page wrapper', () => {
     render(<SystemSettings />);
     expect(screen.getByTestId('settings-page-wrapper')).toBeInTheDocument();
+    expect(screen.getByTestId('system-modal-content')).toBeInTheDocument();
+  });
+
+  it('applies no content-width override', () => {
+    // The narrow 640px cap existed only for the removed About page; system
+    // content should fill the wrapper's default width.
+    render(<SystemSettings />);
+    expect(screen.getByTestId('settings-page-wrapper')).not.toHaveAttribute('data-content-class');
+  });
+
+  it('renders without a router, since it no longer branches on the route', () => {
+    // react-router-dom is deliberately not mocked here: if SystemSettings starts
+    // reading location again, this render throws outside a Router.
+    expect(() => render(<SystemSettings />)).not.toThrow();
   });
 });

@@ -71,6 +71,11 @@ bunx tsc --noEmit      # typecheck
 bun run test           # run tests (Vitest)
 ```
 
+Existing clones: run `just git-setup` once. It registers the locale-JSON merge
+driver (auto-resolves disjoint locale-key additions) and enables `git rerere`
+(replays your recorded resolutions of ordinary marker conflicts — note it does
+not learn the driver's marker-free locale conflicts). Both are per-clone.
+
 If you touch `packages/desktop/src/renderer/`, `locales/`, or the i18n config, also:
 
 ```bash

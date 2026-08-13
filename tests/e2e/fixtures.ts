@@ -5,7 +5,7 @@
  *
  * Two modes:
  *   1. **Packaged mode** (CI default): Launches from electron-builder's unpacked output
- *      (e.g. out/linux-unpacked/aionui, out/mac-arm64/AionUi.app, out/win-unpacked/AionUi.exe).
+ *      (e.g. out/linux-unpacked/weprompt, out/mac-arm64/WePrompt.app, out/win-unpacked/WePrompt.exe).
  *      This validates that packaged resources are intact.
  *   2. **Dev mode** (local default): Launches via `electron .` from project root with
  *      the Vite dev server (electron-vite dev).
@@ -23,6 +23,10 @@ type Fixtures = {
   page: Page;
 };
 
+type WorkerFixtures = {
+  e2eWorkerCleanup: void;
+};
+
 type RendererDiagnostic = {
   type: 'console' | 'pageerror' | 'requestfailed';
   text: string;
@@ -31,12 +35,11 @@ type RendererDiagnostic = {
 // Singleton – one app per test worker
 let app: ElectronApplication | null = null;
 let mainPage: Page | null = null;
+const projectRoot = path.resolve(__dirname, '../..');
 const e2eStateSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aionui-e2e-state-'));
 const e2eStateFile = path.join(e2eStateSandboxDir, 'extension-states.json');
-// Disposable userData root so AionCore migrates a fresh DB per run instead of
-// touching the developer's real database (a shared DB that fails migration
-// blocks the whole app from booting). Consumed by configureChromium.ts.
-const e2eUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aionui-e2e-userdata-'));
+const e2eUserDataSandboxDir = path.join(e2eStateSandboxDir, 'user-data');
+fs.mkdirSync(e2eUserDataSandboxDir, { recursive: true });
 const rendererDiagnostics = new WeakMap<Page, RendererDiagnostic[]>();
 
 function isDevToolsWindow(page: Page): boolean {
@@ -142,43 +145,31 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
   return resolveWindowBefore(Date.now() + 30_000);
 }
 
-/**
- * Resolve the path to the packaged Electron executable under out/.
- * Returns { executablePath, cwd } or null if not found.
- */
+/** Resolve the current WePrompt executable from electron-builder's unpacked output. */
 function resolvePackagedApp(): { executablePath: string; cwd: string } | null {
-  const projectRoot = path.resolve(__dirname, '../..');
   const outDir = path.join(projectRoot, 'out');
   if (!fs.existsSync(outDir)) return null;
 
-  const platform = process.platform;
-
-  if (platform === 'win32') {
-    // out/win-unpacked/AionUi.exe  or  out/win-x64-unpacked/AionUi.exe
+  if (process.platform === 'win32') {
     for (const dir of ['win-unpacked', 'win-x64-unpacked', 'win-arm64-unpacked']) {
-      const exe = path.join(outDir, dir, 'AionUi.exe');
-      if (fs.existsSync(exe)) return { executablePath: exe, cwd: path.join(outDir, dir) };
+      const executablePath = path.join(outDir, dir, 'WePrompt.exe');
+      if (fs.existsSync(executablePath)) return { executablePath, cwd: path.join(outDir, dir) };
     }
-  } else if (platform === 'darwin') {
-    // out/mac-arm64/AionUi.app/Contents/MacOS/AionUi  or  out/mac/AionUi.app/...
+  } else if (process.platform === 'darwin') {
     for (const dir of ['mac-arm64', 'mac-x64', 'mac', 'mac-universal']) {
-      const macDir = path.join(outDir, dir);
-      if (!fs.existsSync(macDir)) continue;
-      const appBundle = fs.readdirSync(macDir).find((f) => f.endsWith('.app'));
-      if (appBundle) {
-        const exe = path.join(macDir, appBundle, 'Contents', 'MacOS', 'AionUi');
-        if (fs.existsSync(exe)) return { executablePath: exe, cwd: macDir };
-      }
+      const cwd = path.join(outDir, dir);
+      if (!fs.existsSync(cwd)) continue;
+      const appBundle = fs.readdirSync(cwd).find((file) => file.endsWith('.app'));
+      if (!appBundle) continue;
+      const executablePath = path.join(cwd, appBundle, 'Contents', 'MacOS', 'WePrompt');
+      if (fs.existsSync(executablePath)) return { executablePath, cwd };
     }
   } else {
-    // Linux: out/linux-unpacked/aionui  (lowercase executable name)
     for (const dir of ['linux-unpacked', 'linux-x64-unpacked', 'linux-arm64-unpacked']) {
-      const dirPath = path.join(outDir, dir);
-      if (!fs.existsSync(dirPath)) continue;
-      // Try common executable names
-      for (const name of ['aionui', 'AionUi']) {
-        const exe = path.join(dirPath, name);
-        if (fs.existsSync(exe)) return { executablePath: exe, cwd: dirPath };
+      const cwd = path.join(outDir, dir);
+      for (const name of ['weprompt', 'WePrompt']) {
+        const executablePath = path.join(cwd, name);
+        if (fs.existsSync(executablePath)) return { executablePath, cwd };
       }
     }
   }
@@ -194,7 +185,6 @@ function shouldUsePackagedMode(): boolean {
 }
 
 async function launchApp(): Promise<ElectronApplication> {
-  const projectRoot = path.resolve(__dirname, '../..');
   const usePackaged = shouldUsePackagedMode();
 
   const commonEnv = {
@@ -204,7 +194,7 @@ async function launchApp(): Promise<ElectronApplication> {
     AIONUI_DISABLE_AUTO_UPDATE: '1',
     AIONUI_DISABLE_DEVTOOLS: '1',
     AIONUI_E2E_TEST: '1',
-    AIONUI_E2E_USER_DATA_DIR: process.env.AIONUI_E2E_USER_DATA_DIR || e2eUserDataDir,
+    AIONUI_E2E_USER_DATA_DIR: process.env.AIONUI_E2E_USER_DATA_DIR || e2eUserDataSandboxDir,
     AIONUI_CDP_PORT: '0',
   };
 
@@ -220,6 +210,9 @@ async function launchApp(): Promise<ElectronApplication> {
     console.log(`[E2E] Launching PACKAGED app: ${packaged.executablePath}`);
 
     const launchArgs: string[] = [];
+    if (process.env.AIONUI_E2E_STUDIO_FAKE === '1') {
+      launchArgs.push(`--user-data-dir=${e2eUserDataSandboxDir}`);
+    }
     if (process.platform === 'linux' && process.env.CI) {
       launchArgs.push('--no-sandbox');
     }
@@ -259,7 +252,40 @@ async function launchApp(): Promise<ElectronApplication> {
   return electronApp;
 }
 
-export const test = base.extend<Fixtures>({
+let cleanupPromise: Promise<void> | null = null;
+function cleanupE2EWorker(): Promise<void> {
+  cleanupPromise ??= (async () => {
+    if (app) {
+      try {
+        await app.evaluate(async ({ app: electronApp }) => {
+          electronApp.exit(0);
+        });
+      } catch {
+        // ignore: app may already be closed
+      }
+      await app.close().catch(() => {});
+      app = null;
+      mainPage = null;
+    }
+    fs.rmSync(e2eStateSandboxDir, { recursive: true, force: true });
+  })();
+
+  return cleanupPromise;
+}
+
+export const test = base.extend<Fixtures, WorkerFixtures>({
+  e2eWorkerCleanup: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      try {
+        await use();
+      } finally {
+        await cleanupE2EWorker();
+      }
+    },
+    { scope: 'worker', auto: true },
+  ],
+
   // eslint-disable-next-line no-empty-pattern
   electronApp: async ({}, use) => {
     if (!app) {
@@ -323,36 +349,23 @@ export const test = base.extend<Fixtures>({
 // end of **every** test.describe block, which would close and relaunch the
 // Electron app between describe blocks — each relaunch costs ~25-30 seconds.
 //
-// Instead, register a one-time process exit handler so the singleton app stays
-// alive for the entire worker lifetime (all spec files, all describe blocks).
+// The auto worker fixture above keeps the singleton app alive for the entire
+// worker lifetime and guarantees asynchronous cleanup during normal teardown.
+// Process handlers remain as a best-effort fallback for unusual termination.
 let cleanupRegistered = false;
 function registerCleanup(): void {
   if (cleanupRegistered) return;
   cleanupRegistered = true;
 
   // Async cleanup before the worker process exits
-  process.on('beforeExit', async () => {
-    if (app) {
-      try {
-        await app.evaluate(async ({ app: electronApp }) => {
-          electronApp.exit(0);
-        });
-      } catch {
-        // ignore: app may already be closed
-      }
-      await app.close().catch(() => {});
-      app = null;
-      mainPage = null;
-    }
-    fs.rmSync(e2eStateSandboxDir, { recursive: true, force: true });
-    fs.rmSync(e2eUserDataDir, { recursive: true, force: true });
+  process.on('beforeExit', () => {
+    void cleanupE2EWorker();
   });
 
   // Synchronous fallback for abrupt termination
   process.on('exit', () => {
     try {
       fs.rmSync(e2eStateSandboxDir, { recursive: true, force: true });
-      fs.rmSync(e2eUserDataDir, { recursive: true, force: true });
     } catch {
       // best-effort
     }

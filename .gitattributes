@@ -23,3 +23,7 @@
 *.woff binary
 *.woff2 binary
 *.ttf binary
+
+# Locale JSON: key-level three-way merge — register the driver once per clone
+# with `just git-setup` (unregistered clones silently fall back to line merge).
+packages/desktop/src/renderer/services/i18n/locales/**/*.json merge=locale-json

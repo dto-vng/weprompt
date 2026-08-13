@@ -59,3 +59,8 @@ export function isBuiltinVisionTransport(
     transport.args.some((a) => typeof a === 'string' && a.includes(`${BUILTIN_VISION_SCRIPT}.js`))
   );
 }
+
+export const BUILTIN_KNOWLEDGE_ID = 'builtin-project-knowledge';
+// BUILTIN_KNOWLEDGE_NAME lives in `@/common/knowledge/constants`: the renderer
+// matches conversations against it and may not import from `process/`.
+export const BUILTIN_KNOWLEDGE_SCRIPT = 'builtin-mcp-knowledge';

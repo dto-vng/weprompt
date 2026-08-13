@@ -53,13 +53,94 @@ import type {
   OfficeArtifactUndoRequest,
 } from '../types/office/artifactEditor';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
-import type { PresentationTemplateSummary } from '@/common/types/office/presentationTemplate';
+import type {
+  ArtifactScratchAllocation,
+  ArtifactScratchResult,
+  PresentationTemplateSummary,
+} from '@/common/types/office/presentationTemplate';
+import type {
+  BindPresentationDraftRequest,
+  BindPresentationDraftResult,
+  ClaimInitialPresentationDispatchRequest,
+  ClaimInitialPresentationDispatchResult,
+  ConfirmQueuedPresentationSourcesRequest,
+  ConfirmQueuedPresentationSourcesResult,
+  CreatePresentationDraftRequest,
+  CreatePresentationDraftResult,
+  DiscardPresentationRunRequest,
+  DiscardPresentationRunResult,
+  DispatchInitialPresentationRunRequest,
+  DispatchInitialPresentationRunResult,
+  GetPresentationRunRequest,
+  GetPresentationRunResult,
+  GetPresentationSourceOwnerRequest,
+  GetPresentationSourceOwnerResult,
+  GrantPresentationWorkspaceSourceRequest,
+  GrantPresentationWorkspaceSourceResult,
+  ListRecoverablePresentationRunsRequest,
+  ListRecoverablePresentationRunsResult,
+  OpenPresentationRunRequest,
+  OpenPresentationRunResult,
+  PickPresentationSourcesRequest,
+  PickPresentationSourcesResult,
+  RevokePresentationSourceRequest,
+  RevokePresentationSourceResult,
+  RenewInitialPresentationDispatchRequest,
+  RenewInitialPresentationDispatchResult,
+  StartPresentationRunRequest,
+  StartPresentationRunResult,
+} from '@/common/types/office/presentationRun';
 import type {
   EnsureConversationRuntimeResponse,
   GetConfigOptionsResponse,
   SetConfigOptionRequest,
   SetConfigOptionResponse,
 } from '../types/platform/acpTypes';
+import type { IProjectKnowledgeListResult } from '../types/project/knowledgeTypes';
+import type {
+  CreateStudioProjectInput,
+  ProposeStudioStoryboardInput,
+  StudioBindBriefConversationRequest,
+  StudioAsset,
+  StudioCancelRenderResult,
+  StudioCommandResult,
+  StudioChooseAndExportAssetsRequest,
+  StudioChooseAndImportReferenceRequest,
+  StudioDeleteProjectRequest,
+  StudioProjectRequest,
+  StudioProjectSummary,
+  StudioProposal,
+  StudioProposalAcceptance,
+  StudioProposalRequest,
+  StudioPersistCapturedPosterRequest,
+  StudioRendererProject,
+  StudioRenderCutResult,
+  StudioRenderProgressEvent,
+  StudioImportOutcome,
+  StudioExportOutcome,
+  StudioConnectionInventory,
+  StudioConnectionRecord,
+  StudioConnectionValidationResult,
+  StudioConnectionCandidate,
+  StudioListRoutesRequest,
+  StudioRemoveConnectionRequest,
+  StudioRouteCatalog,
+  StudioSaveConnectionRequest,
+  StudioValidateConnectionRequest,
+  StudioReorderScenesRequest,
+  StudioRendererJob,
+  StudioJobRequest,
+  StudioRetryDownloadRequest,
+  StudioRetryJobRequest,
+  StudioSelectAssetRequest,
+  StudioSubmitScenesRequest,
+  StudioFitStoryboardOutcome,
+  StudioFitStoryboardRequest,
+  StudioUpdateModelSelectionRequest,
+  StudioUpdateCutRequest,
+  StudioUpdateProjectRequest,
+  StudioUpdateSceneRequest,
+} from '../types/project/creativeStudioTypes';
 import type {
   CreateProviderRequest,
   FetchModelsAnonymousRequest,
@@ -104,9 +185,17 @@ import type {
   UpdateDownloadProgressEvent,
   UpdateDownloadRequest,
   UpdateDownloadResult,
+  UpdateBridgeErrorCode,
 } from '../update/updateTypes';
 import type { AgentMetadata } from '@/renderer/utils/model/agentTypes';
 import type { Theme } from '@/common/theme/types';
+import type {
+  AppOperationResult,
+  AppOperationsContextCompactOutput,
+  AppOperationsContextCompactRequest,
+  AppOperationsModelResponse,
+  AppOperationsModelSetting,
+} from '@/common/types/appOperations';
 import type { ProtocolDetectionRequest, ProtocolDetectionResponse } from '../utils/protocolDetector';
 import {
   buildCreateConversationBody,
@@ -134,13 +223,18 @@ import {
   fromBackendTeam,
   fromBackendTeamList,
   fromBackendTeamOptional,
+  fromBackendTeamRunAck,
+  fromBackendTeamRunEvent,
+  fromBackendTeamRunState,
   toBackendAssistant,
 } from './teamMapper';
 import { fromBackendCompareResult, type RawCompareResult } from './fileSnapshotMapper';
 import {
   absoluteToRelativePath,
+  fromBackendDirOrFiles,
   fromBackendWorkspaceFlatFiles,
   fromBackendWorkspaceList,
+  type RawDirOrFile,
   type RawWorkspaceFlatFile,
 } from './workspaceMapper';
 
@@ -315,7 +409,7 @@ export const conversation = {
   turnCompleted: wsMappedEmitter<IConversationTurnCompletedEvent>('turn.completed', (raw) => {
     const r = raw as Record<string, unknown>;
     const rawLast = (r.last_message ?? r.lastMessage) as Record<string, unknown> | undefined;
-    const last_message: IConversationTurnCompletedEvent['last_message'] = rawLast
+    const lastMessage = rawLast
       ? {
           id: rawLast.id as string | undefined,
           type: rawLast.type as string | undefined,
@@ -323,21 +417,26 @@ export const conversation = {
           status: rawLast.status as string | null | undefined,
           created_at: (rawLast.created_at ?? rawLast.createdAt ?? Date.now()) as number,
         }
-      : {
-          content: null,
-          created_at: Date.now(),
-        };
-    const rawRuntime = (r.runtime ?? {}) as Record<string, unknown>;
-    const runtime: IConversationTurnCompletedEvent['runtime'] = {
-      state: (rawRuntime.state ?? 'idle') as IConversationTurnCompletedEvent['runtime']['state'],
-      can_send_message: (rawRuntime.can_send_message ?? rawRuntime.canSendMessage ?? true) as boolean,
-      has_task: (rawRuntime.has_task ?? rawRuntime.hasTask ?? false) as boolean,
-      task_status: (rawRuntime.task_status ??
-        rawRuntime.taskStatus) as IConversationTurnCompletedEvent['runtime']['task_status'],
-      is_processing: (rawRuntime.is_processing ?? rawRuntime.isProcessing ?? false) as boolean,
-      pending_confirmations: (rawRuntime.pending_confirmations ?? rawRuntime.pendingConfirmations ?? 0) as number,
-      turn_id: (rawRuntime.turn_id ?? rawRuntime.turnId ?? null) as string | null,
-    };
+      : undefined;
+    const rawRuntime = r.runtime;
+    const runtimeRecord =
+      typeof rawRuntime === 'object' && rawRuntime !== null && !Array.isArray(rawRuntime)
+        ? (rawRuntime as Record<string, unknown>)
+        : null;
+    const runtime: IConversationTurnCompletedEvent['runtime'] = runtimeRecord
+      ? {
+          state: (runtimeRecord.state ?? 'idle') as TConversationRuntimeSummary['state'],
+          can_send_message: (runtimeRecord.can_send_message ?? runtimeRecord.canSendMessage ?? true) as boolean,
+          has_task: (runtimeRecord.has_task ?? runtimeRecord.hasTask ?? false) as boolean,
+          task_status: (runtimeRecord.task_status ??
+            runtimeRecord.taskStatus) as TConversationRuntimeSummary['task_status'],
+          is_processing: (runtimeRecord.is_processing ?? runtimeRecord.isProcessing ?? false) as boolean,
+          pending_confirmations: (runtimeRecord.pending_confirmations ??
+            runtimeRecord.pendingConfirmations ??
+            0) as number,
+          turn_id: (runtimeRecord.turn_id ?? runtimeRecord.turnId ?? null) as string | null,
+        }
+      : null;
     const rawModel = (r.model ?? {}) as Record<string, unknown>;
     const model: IConversationTurnCompletedEvent['model'] = {
       platform: (rawModel.platform ?? '') as string,
@@ -346,16 +445,15 @@ export const conversation = {
     };
     return {
       session_id: (r.session_id ?? r.sessionId ?? r.conversation_id ?? '') as string,
-      turn_id: (r.turn_id ?? r.turnId ?? runtime.turn_id ?? '') as string,
+      turn_id: (r.turn_id ?? r.turnId ?? runtime?.turn_id ?? '') as string,
       status: (r.status ?? 'finished') as IConversationTurnCompletedEvent['status'],
-      state: (r.state ??
-        (r.status === 'finished' ? 'ai_waiting_input' : 'unknown')) as IConversationTurnCompletedEvent['state'],
+      ...(r.state !== undefined ? { state: r.state as NonNullable<IConversationTurnCompletedEvent['state']> } : {}),
       detail: (r.detail ?? '') as string,
       can_send_message: (r.can_send_message ?? r.canSendMessage ?? r.status === 'finished') as boolean,
       runtime,
       workspace: (r.workspace ?? '') as string,
       model,
-      last_message,
+      ...(lastMessage ? { last_message: lastMessage } : {}),
     };
   }),
   listChanged: wsEmitter<IConversationListChangedEvent>('conversation.listChanged'),
@@ -558,7 +656,7 @@ export const autoUpdate = {
   ),
   download: bridge.buildProvider<IBridgeResponse, void>('auto-update.download'),
   cancelDownload: bridge.buildProvider<IBridgeResponse, void>('auto-update.download.cancel'),
-  quitAndInstall: bridge.buildProvider<void, void>('auto-update.quit-and-install'),
+  quitAndInstall: bridge.buildProvider<IBridgeResponse, void>('auto-update.quit-and-install'),
   status: bridge.buildEmitter<AutoUpdateStatus>('auto-update.status'),
 };
 
@@ -585,6 +683,68 @@ export const presentationTemplates = {
     { file_path: string }
   >('presentation-templates.import-spec'),
   remove: bridge.buildProvider<boolean, { id: string }>('presentation-templates.remove'),
+  allocateScratch: bridge.buildProvider<ArtifactScratchAllocation, { conversation_id: string; template_id: string }>(
+    'presentation-templates.scratch.allocate'
+  ),
+  completeScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.complete'
+  ),
+  retainScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string; reason: 'failed' | 'interrupted' }>(
+    'presentation-templates.scratch.retain'
+  ),
+  discardScratch: bridge.buildProvider<ArtifactScratchResult, { run_id: string }>(
+    'presentation-templates.scratch.discard'
+  ),
+};
+
+export const presentationSources = {
+  getSourceOwner: bridge.buildProvider<GetPresentationSourceOwnerResult, GetPresentationSourceOwnerRequest>(
+    'presentation-sources.get-source-owner'
+  ),
+  createDraft: bridge.buildProvider<CreatePresentationDraftResult, CreatePresentationDraftRequest>(
+    'presentation-sources.create-draft'
+  ),
+  bindDraft: bridge.buildProvider<BindPresentationDraftResult, BindPresentationDraftRequest>(
+    'presentation-sources.bind-draft'
+  ),
+  pickSources: bridge.buildProvider<PickPresentationSourcesResult, PickPresentationSourcesRequest>(
+    'presentation-sources.pick-sources'
+  ),
+  grantWorkspaceSource: bridge.buildProvider<
+    GrantPresentationWorkspaceSourceResult,
+    GrantPresentationWorkspaceSourceRequest
+  >('presentation-sources.grant-workspace-source'),
+  revoke: bridge.buildProvider<RevokePresentationSourceResult, RevokePresentationSourceRequest>(
+    'presentation-sources.revoke'
+  ),
+  confirmQueued: bridge.buildProvider<ConfirmQueuedPresentationSourcesResult, ConfirmQueuedPresentationSourcesRequest>(
+    'presentation-sources.confirm-queued'
+  ),
+};
+
+export const presentationRuns = {
+  start: bridge.buildProvider<StartPresentationRunResult, StartPresentationRunRequest>('presentation-runs.start'),
+  get: bridge.buildProvider<GetPresentationRunResult, GetPresentationRunRequest>('presentation-runs.get'),
+  listRecoverable: bridge.buildProvider<ListRecoverablePresentationRunsResult, ListRecoverablePresentationRunsRequest>(
+    'presentation-runs.list-recoverable'
+  ),
+  openRecovery: bridge.buildProvider<OpenPresentationRunResult, OpenPresentationRunRequest>(
+    'presentation-runs.open-recovery'
+  ),
+  discard: bridge.buildProvider<DiscardPresentationRunResult, DiscardPresentationRunRequest>(
+    'presentation-runs.discard'
+  ),
+  claimInitialDispatch: bridge.buildProvider<
+    ClaimInitialPresentationDispatchResult,
+    ClaimInitialPresentationDispatchRequest
+  >('presentation-runs.claim-initial-dispatch'),
+  renewInitialDispatch: bridge.buildProvider<
+    RenewInitialPresentationDispatchResult,
+    RenewInitialPresentationDispatchRequest
+  >('presentation-runs.renew-initial-dispatch'),
+  dispatch: bridge.buildProvider<DispatchInitialPresentationRunResult, DispatchInitialPresentationRunRequest>(
+    'presentation-runs.dispatch'
+  ),
 };
 
 // ---------------------------------------------------------------------------
@@ -592,7 +752,12 @@ export const presentationTemplates = {
 // ---------------------------------------------------------------------------
 
 export const fs = {
-  getFilesByDir: httpPost<Array<IDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+  getFilesByDir: withResponseMap(
+    // `/api/fs/dir` (aioncore DirOrFileResponse) returns snake_case keys, so the
+    // raw wire type is RawDirOrFile; the mapper converts it to IDirOrFile.
+    httpPost<Array<RawDirOrFile>, { dir: string; root: string }>('/api/fs/dir'),
+    fromBackendDirOrFiles
+  ),
   listWorkspaceFiles: withResponseMap(
     httpPost<Array<RawWorkspaceFlatFile>, { root: string }>('/api/fs/list'),
     fromBackendWorkspaceFlatFiles
@@ -950,39 +1115,177 @@ export const acpConversation = {
   ),
 };
 
-export interface ILocalContextCompactionParams extends ICompactContextParams {
-  provider_id: string;
-  model: string;
-  target_turn_id?: string;
-}
+export const appOperations = {
+  contextCompact: bridge.buildProvider<
+    AppOperationResult<AppOperationsContextCompactOutput>,
+    AppOperationsContextCompactRequest
+  >('app-operations.context-compact'),
+  cancel: bridge.buildProvider<void, { operation_id: string }>('app-operations.cancel'),
+};
 
-export interface ILocalContextCompactionResult {
-  snapshot: unknown;
-  through_turn_id: string;
-  model: {
-    provider_id: string;
-    model: string;
-  };
-}
+export const appOperationsModel = {
+  get: httpGet<AppOperationsModelResponse, void>('/api/app-operations/model', { silentStatuses: [404] }),
+  update: httpPut<AppOperationsModelResponse, AppOperationsModelSetting>('/api/app-operations/model'),
+  check: httpPost<AppOperationsModelResponse, void>('/api/app-operations/model/check'),
+};
 
-export type TLocalContextCompactionErrorCode =
-  | 'provider_not_found'
-  | 'provider_timeout'
-  | 'provider_auth_failed'
-  | 'provider_rate_limited'
-  | 'provider_request_failed'
-  | 'invalid_model_output'
-  | 'empty_model_output';
+// ---------------------------------------------------------------------------
+// Project Knowledge — stays IPC (main process owns per-project KB stores)
+// ---------------------------------------------------------------------------
 
-export type ILocalContextCompactionBridgeResult =
-  | { ok: true; result: ILocalContextCompactionResult }
-  | { ok: false; error_code: TLocalContextCompactionErrorCode };
-
-/** Desktop fallback when the installed backend does not yet expose the compact endpoint. */
-export const localContextCompaction = {
-  generate: bridge.buildProvider<ILocalContextCompactionBridgeResult, ILocalContextCompactionParams>(
-    'context.compaction.generate'
+export const projectKnowledge = {
+  listSources: bridge.buildProvider<IProjectKnowledgeListResult, { projectId: string }>(
+    'project-knowledge.list-sources'
   ),
+  // `workspace` is the project workspace path; the `Knowledge Base/` folder
+  // inside it is the source of truth for knowledge files. Required end-to-end:
+  // the native schema rejects payloads without it. NOTE the main process
+  // trusts the renderer's projectId→workspace pairing (projects live in
+  // renderer localStorage); ownership binding in main is a separate project.
+  addSources: bridge.buildProvider<void, { projectId: string; filePaths: string[]; workspace: string }>(
+    'project-knowledge.add-sources'
+  ),
+  removeSource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace: string }>(
+    'project-knowledge.remove-source'
+  ),
+  getSourceText: bridge.buildProvider<{ text: string; truncated: boolean }, { projectId: string; sourceId: string }>(
+    'project-knowledge.get-source-text'
+  ),
+  retrySource: bridge.buildProvider<void, { projectId: string; sourceId: string; workspace: string }>(
+    'project-knowledge.retry-source'
+  ),
+  syncFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.sync-folder'),
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — the renderer registers folder watches.
+  watchFolder: bridge.buildProvider<void, { projectId: string; workspace: string }>('project-knowledge.watch-folder'),
+  unwatchFolder: bridge.buildProvider<void, { projectId: string }>('project-knowledge.unwatch-folder'),
+  removeStore: bridge.buildProvider<void, { projectId: string }>('project-knowledge.remove-store'),
+  getSessionMcpServer: bridge.buildProvider<ISessionMcpServer | null, { projectId: string }>(
+    'project-knowledge.get-session-mcp-server'
+  ),
+  updated: bridge.buildEmitter<{ projectId: string }>('project-knowledge.updated'),
+};
+
+// ---------------------------------------------------------------------------
+// Creative Studio — native main process owns durable project manifests
+// ---------------------------------------------------------------------------
+
+export type StudioUnsavedWorkStatus = {
+  dirtySceneCount: number;
+};
+
+export type StudioFlushUnsavedWorkResult = {
+  saved: boolean;
+};
+
+export const creativeStudio = {
+  listProjects: bridge.buildProvider<StudioCommandResult<StudioProjectSummary[]>, void>(
+    'creative-studio.list-projects'
+  ),
+  createProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, CreateStudioProjectInput>(
+    'creative-studio.create-project'
+  ),
+  getProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject | null>, StudioProjectRequest>(
+    'creative-studio.get-project'
+  ),
+  listProposals: bridge.buildProvider<StudioCommandResult<StudioProposal[]>, StudioProjectRequest>(
+    'creative-studio.list-proposals'
+  ),
+  acceptProposal: bridge.buildProvider<StudioCommandResult<StudioProposalAcceptance>, StudioProposalRequest>(
+    'creative-studio.accept-proposal'
+  ),
+  rejectProposal: bridge.buildProvider<StudioCommandResult<StudioProposal>, StudioProposalRequest>(
+    'creative-studio.reject-proposal'
+  ),
+  proposeStoryboard: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, ProposeStudioStoryboardInput>(
+    'creative-studio.propose-storyboard'
+  ),
+  updateModelSelection: bridge.buildProvider<
+    StudioCommandResult<StudioRendererProject>,
+    StudioUpdateModelSelectionRequest
+  >('creative-studio.update-model-selection'),
+  updateProject: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateProjectRequest>(
+    'creative-studio.update-project'
+  ),
+  bindBriefConversation: bridge.buildProvider<
+    StudioCommandResult<StudioRendererProject>,
+    StudioBindBriefConversationRequest
+  >('creative-studio.bind-brief-conversation'),
+  updateCut: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateCutRequest>(
+    'creative-studio.update-cut'
+  ),
+  deleteProject: bridge.buildProvider<StudioCommandResult<boolean>, StudioDeleteProjectRequest>(
+    'creative-studio.delete-project'
+  ),
+  updateScene: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioUpdateSceneRequest>(
+    'creative-studio.update-scene'
+  ),
+  reorderScenes: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioReorderScenesRequest>(
+    'creative-studio.reorder-scenes'
+  ),
+  selectAsset: bridge.buildProvider<StudioCommandResult<StudioRendererProject>, StudioSelectAssetRequest>(
+    'creative-studio.select-asset'
+  ),
+  persistCapturedPoster: bridge.buildProvider<StudioCommandResult<StudioAsset>, StudioPersistCapturedPosterRequest>(
+    'creative-studio.persist-captured-poster'
+  ),
+  chooseAndImportReference: bridge.buildProvider<
+    StudioCommandResult<StudioImportOutcome>,
+    StudioChooseAndImportReferenceRequest
+  >('creative-studio.choose-and-import-reference'),
+  chooseAndExportAssets: bridge.buildProvider<
+    StudioCommandResult<StudioExportOutcome>,
+    StudioChooseAndExportAssetsRequest
+  >('creative-studio.choose-and-export-assets'),
+  renderCut: bridge.buildProvider<StudioCommandResult<StudioRenderCutResult>, StudioProjectRequest>(
+    'creative-studio.render-cut'
+  ),
+  cancelRender: bridge.buildProvider<StudioCommandResult<StudioCancelRenderResult>, StudioProjectRequest>(
+    'creative-studio.cancel-render'
+  ),
+  fitStoryboard: bridge.buildProvider<StudioCommandResult<StudioFitStoryboardOutcome>, StudioFitStoryboardRequest>(
+    'creative-studio.fit-storyboard'
+  ),
+  submitScenes: bridge.buildProvider<StudioCommandResult<StudioRendererJob[]>, StudioSubmitScenesRequest>(
+    'creative-studio.submit-scenes'
+  ),
+  cancelJob: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioJobRequest>(
+    'creative-studio.cancel-job'
+  ),
+  retryJob: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioRetryJobRequest>(
+    'creative-studio.retry-job'
+  ),
+  retryDownload: bridge.buildProvider<StudioCommandResult<StudioRendererJob>, StudioRetryDownloadRequest>(
+    'creative-studio.retry-download'
+  ),
+  listConnectionCandidates: bridge.buildProvider<StudioCommandResult<StudioConnectionCandidate[]>, void>(
+    'creative-studio.list-connection-candidates'
+  ),
+  listConnections: bridge.buildProvider<StudioCommandResult<StudioConnectionInventory>, void>(
+    'creative-studio.list-connections'
+  ),
+  validateConnection: bridge.buildProvider<
+    StudioCommandResult<StudioConnectionValidationResult>,
+    StudioValidateConnectionRequest
+  >('creative-studio.validate-connection'),
+  saveConnection: bridge.buildProvider<StudioCommandResult<StudioConnectionRecord>, StudioSaveConnectionRequest>(
+    'creative-studio.save-connection'
+  ),
+  removeConnection: bridge.buildProvider<StudioCommandResult<boolean>, StudioRemoveConnectionRequest>(
+    'creative-studio.remove-connection'
+  ),
+  listRoutes: bridge.buildProvider<StudioCommandResult<StudioRouteCatalog>, StudioListRoutesRequest | undefined>(
+    'creative-studio.list-routes'
+  ),
+  hasUnsavedWork: bridge.buildRendererQuery<StudioUnsavedWorkStatus>('creative-studio.has-unsaved-work', {
+    dirtySceneCount: 24,
+  }),
+  flushUnsavedWork: bridge.buildRendererQuery<StudioFlushUnsavedWorkResult>('creative-studio.flush-unsaved-work', {
+    saved: false,
+  }),
+  projectUpdated: bridge.buildEmitter<{ projectId: string }>('studio.project-updated'),
+  proposalUpdated: bridge.buildEmitter<{ projectId: string; proposalId: string }>('studio.proposal-updated'),
+  renderProgress: bridge.buildEmitter<StudioRenderProgressEvent>('studio.render-progress'),
 };
 
 // ---------------------------------------------------------------------------
@@ -1640,6 +1943,8 @@ export interface ICreateConversationParams {
   };
   extra: {
     project_id?: string;
+    /** Creative Studio project that owns this Brief conversation. */
+    studio_project_id?: string;
     workspace?: string;
     custom_workspace?: boolean;
     default_files?: string[];
@@ -1656,6 +1961,11 @@ export interface ICreateConversationParams {
     context?: string;
     context_file_name?: string;
     context_handoff?: TConversationContextHandoffExtra;
+    /** Global/project instructions injected as the first-turn preset context
+     *  (acp/codex). Composed client-side by resolveInjectedContext. */
+    preset_context?: string;
+    /** Same, for the native aionrs runtime (merged into system_prompt). */
+    preset_rules?: string;
     /** Transient: preset opt-in skills. Consumed by backend create handler
      *  and stripped before persistence. */
     preset_enabled_skills?: string[];
@@ -1770,7 +2080,7 @@ export interface IConversationTurnCompletedEvent {
   session_id: string;
   turn_id: string;
   status: 'pending' | 'running' | 'finished';
-  state:
+  state?:
     | 'ai_generating'
     | 'ai_waiting_input'
     | 'ai_waiting_confirmation'
@@ -1780,22 +2090,14 @@ export interface IConversationTurnCompletedEvent {
     | 'unknown';
   detail: string;
   can_send_message: boolean;
-  runtime: {
-    state: 'idle' | 'starting' | 'running' | 'cancelling' | 'waiting_confirmation';
-    can_send_message: boolean;
-    has_task: boolean;
-    task_status?: 'pending' | 'running' | 'finished';
-    is_processing: boolean;
-    pending_confirmations: number;
-    turn_id: string | null;
-  };
+  runtime: TConversationRuntimeSummary | null;
   workspace: string;
   model: {
     platform: string;
     name: string;
     use_model: string;
   };
-  last_message: {
+  last_message?: {
     id?: string;
     type?: string;
     content: unknown;
@@ -1821,6 +2123,7 @@ interface IBridgeResponse<D = {}> {
   success: boolean;
   data?: D;
   msg?: string;
+  code?: UpdateBridgeErrorCode;
 }
 
 // ---------------------------------------------------------------------------
@@ -2106,20 +2409,31 @@ export const team = {
     (p) => `/api/teams/${p.team_id}/session-mode`,
     (p) => ({ mode: p.session_mode })
   ),
-  getRunState: httpGet<ITeamRunStateResponse, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
-  sendMessage: httpPost<ITeamRunAck, ISendTeamMessageParams>(
-    (p) => `/api/teams/${p.team_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  // Run payloads are normalized (see `fromBackendTeamRunState`) so `slot_work`
+  // is always an array, even on backends that predate the field.
+  getRunState: withResponseMap(
+    httpGet<unknown, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
+    fromBackendTeamRunState
   ),
-  sendMessageToAgent: httpPost<ITeamRunAck, ISendTeamAgentMessageParams>(
-    (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
-    (p) => ({
-      content: p.input,
-      files: p.files,
-    })
+  sendMessage: withResponseMap(
+    httpPost<unknown, ISendTeamMessageParams>(
+      (p) => `/api/teams/${p.team_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
+  ),
+  sendMessageToAgent: withResponseMap(
+    httpPost<unknown, ISendTeamAgentMessageParams>(
+      (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
+      (p) => ({
+        content: p.input,
+        files: p.files,
+      })
+    ),
+    fromBackendTeamRunAck
   ),
   cancelRun: httpPost<void, ICancelTeamRunParams>(
     (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/cancel`,
@@ -2153,12 +2467,12 @@ export const team = {
   sessionStatusChanged: wsEmitter<ITeamSessionStatusChangedEvent>('team.sessionStatusChanged'),
   taskChanged: wsEmitter<ITeamTaskChangedEvent>('team.taskChanged'),
   sessionChanged: wsEmitter<ITeamSessionChangedEvent>('team.sessionChanged'),
-  runAccepted: wsEmitter<ITeamRunEvent>('team.runAccepted'),
-  runStarted: wsEmitter<ITeamRunEvent>('team.runStarted'),
-  runUpdated: wsEmitter<ITeamRunEvent>('team.runUpdated'),
-  runCompleted: wsEmitter<ITeamRunEvent>('team.runCompleted'),
-  runCancelled: wsEmitter<ITeamRunEvent>('team.runCancelled'),
-  runFailed: wsEmitter<ITeamRunEvent>('team.runFailed'),
+  runAccepted: wsMappedEmitter<ITeamRunEvent>('team.runAccepted', fromBackendTeamRunEvent),
+  runStarted: wsMappedEmitter<ITeamRunEvent>('team.runStarted', fromBackendTeamRunEvent),
+  runUpdated: wsMappedEmitter<ITeamRunEvent>('team.runUpdated', fromBackendTeamRunEvent),
+  runCompleted: wsMappedEmitter<ITeamRunEvent>('team.runCompleted', fromBackendTeamRunEvent),
+  runCancelled: wsMappedEmitter<ITeamRunEvent>('team.runCancelled', fromBackendTeamRunEvent),
+  runFailed: wsMappedEmitter<ITeamRunEvent>('team.runFailed', fromBackendTeamRunEvent),
   childTurnStarted: wsEmitter<ITeamChildTurnEvent>('team.childTurnStarted'),
   childTurnCompleted: wsEmitter<ITeamChildTurnEvent>('team.childTurnCompleted'),
   childTurnCancelled: wsEmitter<ITeamChildTurnEvent>('team.childTurnCancelled'),

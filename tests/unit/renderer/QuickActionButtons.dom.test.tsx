@@ -15,7 +15,6 @@ vi.mock('react-i18next', () => ({
       const values: Record<string, string> = {
         'guid.toolbar.history': 'History',
         'guid.toolbar.saved': 'Saved',
-        'guid.toolbar.community': 'Community',
       };
       return values[key] ?? key;
     },
@@ -35,15 +34,15 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/ConversationSearchPopover'
 }));
 
 describe('QuickActionButtons', () => {
-  it('renders a labeled top toolbar with working destinations', () => {
+  it('renders a labeled top toolbar without a public community destination', () => {
     render(<QuickActionButtons onOpenLink={mocks.openLink} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'History' }));
     fireEvent.click(screen.getByRole('button', { name: 'Saved' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Community' }));
 
     expect(mocks.openHistory).toHaveBeenCalledTimes(1);
     expect(mocks.navigate).toHaveBeenCalledWith('/settings/skills');
-    expect(mocks.openLink).toHaveBeenCalledWith('https://github.com/iOfficeAI/AionUi');
+    expect(screen.queryByRole('button', { name: 'Community' })).not.toBeInTheDocument();
+    expect(mocks.openLink).not.toHaveBeenCalled();
   });
 });

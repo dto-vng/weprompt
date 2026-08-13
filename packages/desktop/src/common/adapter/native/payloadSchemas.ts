@@ -9,7 +9,8 @@ import {
   OFFICE_ARTIFACT_MAX_SELECTED_CELLS,
   OFFICE_ARTIFACT_MAX_SELECTION_MESSAGE_BYTES,
 } from '../../types/office/artifactEditor';
-import type { NativeBridgeProviderKey } from './constants';
+import { PRESENTATION_RUN_LIMITS } from '../../types/office/presentationRunPolicy';
+import type { NativeBridgeProviderKey, RendererBridgeQueryKey } from './constants';
 
 const MAX_PATH_LENGTH = 4096;
 const MAX_IDENTIFIER_LENGTH = 256;
@@ -22,6 +23,7 @@ const MAX_CONTEXT_MARKDOWN_LENGTH = 24 * 1024;
 const MAX_CONTEXT_PINS = 20;
 const MAX_CONTEXT_PIN_LENGTH = 2_000;
 const MAX_CONTEXT_SNAPSHOT_ITEMS = 256;
+const MAX_PROJECT_KB_FILE_PATHS = 100;
 
 const voidPayloadSchema = z.undefined();
 const pathSchema = z.string().min(1).max(MAX_PATH_LENGTH);
@@ -93,16 +95,15 @@ const contextPinSchema = z
     updated_at: z.number().finite().int().nonnegative(),
   })
   .strict();
-const localContextCompactionSchema = z
+const appOperationsContextCompactSchema = z
   .object({
+    operation_id: identifierSchema,
     conversation_id: identifierSchema,
     trigger: z.enum(['auto', 'manual', 'handoff']),
     previous_snapshot: contextSnapshotSchema.optional(),
     previous_markdown: z.string().max(MAX_CONTEXT_MARKDOWN_LENGTH).optional(),
     pinned_context: z.array(contextPinSchema).max(MAX_CONTEXT_PINS).optional(),
     last_compacted_turn_id: identifierSchema.optional(),
-    provider_id: identifierSchema,
-    model: shortTextSchema,
     target_turn_id: identifierSchema.optional(),
   })
   .strict();
@@ -155,7 +156,324 @@ const officeInspectRequestSchema = z
   })
   .strict();
 
+// Project-knowledge ids are interpolated into filesystem paths by the main
+// process, so restrict them to characters that cannot traverse or escape.
+const safeIdSchema = z
+  .string()
+  .min(1)
+  .max(MAX_IDENTIFIER_LENGTH)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
+const projectKnowledgeProjectIdSchema = z.object({ projectId: safeIdSchema }).strict();
+const projectKnowledgeSourceRefSchema = z.object({ projectId: safeIdSchema, sourceId: safeIdSchema }).strict();
+const projectKnowledgeFolderSchema = z.object({ projectId: safeIdSchema, workspace: pathSchema }).strict();
+const presentationUuidSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+const presentationRevisionSchema = z
+  .number()
+  .finite()
+  .int()
+  .nonnegative()
+  .refine((value) => Number.isSafeInteger(value));
+const presentationGrantOwnerSchema = z.discriminatedUnion('owner_type', [
+  z.object({ owner_type: z.literal('draft'), draft_id: presentationUuidSchema }).strict(),
+  z.object({ owner_type: z.literal('conversation'), conversation_id: presentationUuidSchema }).strict(),
+]);
+const presentationRelativePathSchema = z
+  .string()
+  .min(1)
+  .max(MAX_PATH_LENGTH)
+  .refine((value) => {
+    if (
+      value.includes('\0') ||
+      value.includes('\\') ||
+      value.startsWith('/') ||
+      /^[A-Za-z]:/.test(value) ||
+      value.endsWith('/')
+    ) {
+      return false;
+    }
+
+    const segments = value.split('/');
+    return segments.every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+  });
+const presentationSha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
+const presentationTemplateIdSchema = z
+  .string()
+  .min(2)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]+$/);
+const presentationSourceRefSchema = z
+  .object({
+    grantId: presentationUuidSchema,
+    expectedByteLength: z.number().finite().int().min(1).max(PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES),
+    expectedSha256: presentationSha256Schema,
+  })
+  .strict();
+const presentationQueuedSourceRefsSchema = z
+  .array(presentationSourceRefSchema)
+  .min(1)
+  .max(PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN)
+  .superRefine((sources, context) => {
+    const grantIds = new Set(sources.map(({ grantId }) => grantId.toLowerCase()));
+    const totalBytes = sources.reduce((total, source) => total + source.expectedByteLength, 0);
+    if (grantIds.size !== sources.length) context.addIssue({ code: 'custom', message: 'duplicate source grant' });
+    if (totalBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES) {
+      context.addIssue({ code: 'custom', message: 'aggregate source bytes exceeded' });
+    }
+  });
+const startPresentationRunSchema = z
+  .object({
+    conversation_id: presentationUuidSchema,
+    client_request_id: presentationUuidSchema,
+    input: z
+      .string()
+      .min(1)
+      .max(PRESENTATION_RUN_LIMITS.MAX_EXTRACTED_CHARS_PER_SOURCE)
+      .refine((value) => value.trim().length > 0),
+    selected_template_id: presentationTemplateIdSchema,
+    sources: z.array(presentationSourceRefSchema).max(PRESENTATION_RUN_LIMITS.MAX_SOURCES_PER_RUN),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    const grantIds = new Set(request.sources.map(({ grantId }) => grantId.toLowerCase()));
+    const totalBytes = request.sources.reduce((total, source) => total + source.expectedByteLength, 0);
+    if (grantIds.size !== request.sources.length)
+      context.addIssue({ code: 'custom', message: 'duplicate source grant' });
+    if (totalBytes > PRESENTATION_RUN_LIMITS.MAX_TOTAL_SOURCE_BYTES) {
+      context.addIssue({ code: 'custom', message: 'aggregate source bytes exceeded' });
+    }
+  });
+const getPresentationRunSchema = z.union([
+  z.object({ conversation_id: presentationUuidSchema, run_id: presentationUuidSchema }).strict(),
+  z.object({ conversation_id: presentationUuidSchema, client_request_id: presentationUuidSchema }).strict(),
+]);
+const presentationRecoveryCursorSchema = z
+  .string()
+  .min(3)
+  .max(2048)
+  .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+
+const studioExpectedRevisionSchema = z.number().finite().int().positive();
+const studioProjectInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(256),
+    brief: z.string().max(16 * 1024),
+    forgeProjectId: safeIdSchema.optional(),
+    aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:3', '3:4']),
+    targetDurationSeconds: z.number().finite().int().min(5).max(60),
+    resolution: z.enum(['720p', '1080p']),
+  })
+  .strict();
+const studioProjectRequestSchema = z.object({ projectId: safeIdSchema }).strict();
+const studioCapturedPosterDataUrlMaxLength = Math.ceil((50 * 1024 * 1024) / 3) * 4 + 22;
+const studioCapturedPosterSchema = z
+  .object({
+    projectId: safeIdSchema,
+    sceneId: safeIdSchema,
+    videoAssetId: safeIdSchema,
+    dataUrl: z
+      .string()
+      .min(26)
+      .max(studioCapturedPosterDataUrlMaxLength)
+      .regex(/^data:image\/png;base64,(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+    width: z.number().finite().int().min(1).max(16_384),
+    height: z.number().finite().int().min(1).max(16_384),
+  })
+  .strict();
+const isUnsafeStudioTextCharacter = (character: string): boolean => {
+  const codePoint = character.codePointAt(0)!;
+  return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) || (codePoint >= 0xd800 && codePoint <= 0xdfff);
+};
+const studioModelSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => value === value.trim() && !Array.from(value).some(isUnsafeStudioTextCharacter));
+const studioTextModelSelectionSchema = z
+  .object({
+    providerId: safeIdSchema,
+    model: studioModelSchema,
+  })
+  .strict();
+const studioMediaModelSelectionSchema = z.object({ choiceId: safeIdSchema }).strict();
+const storyboardSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('storyboard'),
+    selection: studioTextModelSelectionSchema.nullable(),
+  })
+  .strict();
+const imageSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('image'),
+    selection: studioMediaModelSelectionSchema.nullable(),
+  })
+  .strict();
+const videoSelectionSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    role: z.literal('video'),
+    selection: studioMediaModelSelectionSchema.nullable(),
+  })
+  .strict();
+const studioUpdateModelSelectionSchema = z.discriminatedUnion('role', [
+  storyboardSelectionSchema,
+  imageSelectionSchema,
+  videoSelectionSchema,
+]);
+const studioConnectionSchema = z
+  .object({
+    providerId: safeIdSchema,
+    integrationId: safeIdSchema,
+    model: z.string().trim().min(1).max(256),
+  })
+  .strict();
+const studioSceneRouteSnapshotSchema = z
+  .object({
+    sceneId: safeIdSchema,
+    choiceId: safeIdSchema,
+    kind: z.enum(['image', 'video']),
+  })
+  .strict();
+const studioSubmitScenesSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    mode: z.enum(['single', 'batch']),
+    sceneIds: z
+      .array(safeIdSchema)
+      .min(1)
+      .max(24)
+      .refine((ids) => new Set(ids).size === ids.length),
+    catalogVersion: z.string().regex(/^[a-f0-9]{16}$/),
+    routes: z.array(studioSceneRouteSnapshotSchema).min(1).max(24),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.mode === 'single' && input.sceneIds.length !== 1) {
+      context.addIssue({ code: 'custom', message: 'single mode requires exactly one scene', path: ['sceneIds'] });
+    }
+    const routeSceneIds = input.routes.map((route) => route.sceneId);
+    const selectedSceneIds = new Set(input.sceneIds);
+    if (
+      new Set(routeSceneIds).size !== routeSceneIds.length ||
+      routeSceneIds.length !== input.sceneIds.length ||
+      routeSceneIds.some((sceneId) => !selectedSceneIds.has(sceneId))
+    ) {
+      context.addIssue({ code: 'custom', message: 'routes must exactly match sceneIds', path: ['routes'] });
+    }
+  });
+const studioFitStoryboardSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    catalogVersion: z.string().regex(/^[a-f0-9]{16}$/),
+  })
+  .strict();
+const studioJobRequestSchema = z
+  .object({
+    projectId: safeIdSchema,
+    jobId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+  })
+  .strict();
+const studioSceneSchema = z
+  .object({
+    title: z.string().trim().min(0).max(256),
+    purpose: z.string().max(256),
+    visualPrompt: z.string().max(8 * 1024),
+    narration: z.string().max(4 * 1024),
+    onScreenText: z.string().max(1024),
+    mediaKind: z.enum(['image', 'video']),
+    durationSeconds: z.number().finite().int().min(1).max(60),
+    referenceAssetId: safeIdSchema.nullable(),
+  })
+  .strict();
+const studioUpdateProjectSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    name: z.string().trim().min(1).max(256).optional(),
+    brief: z
+      .string()
+      .max(16 * 1024)
+      .optional(),
+    aspectRatio: z.enum(['16:9', '9:16', '1:1', '4:3', '3:4']).optional(),
+    targetDurationSeconds: z.number().finite().int().min(5).max(60).optional(),
+    resolution: z.enum(['720p', '1080p']).optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input).some((key) => key !== 'projectId' && key !== 'expectedRevision'));
+const studioNormalisedRectSchema = z
+  .object({
+    x: z.number().finite().min(0).max(1),
+    y: z.number().finite().min(0).max(1),
+    width: z.number().finite().positive().max(1),
+    height: z.number().finite().positive().max(1),
+  })
+  .strict()
+  .refine((rect) => rect.x + rect.width <= 1 && rect.y + rect.height <= 1);
+const studioCutFilterSchema = z
+  .object({
+    id: z.enum(['exposure', 'contrast', 'saturation', 'temperature']),
+    amount: z.number().finite().min(-1).max(1),
+  })
+  .strict();
+const studioEditableCutClipSchema = z
+  .object({
+    sourceInSeconds: z.number().finite().nonnegative().nullable(),
+    sourceOutSeconds: z.number().finite().nonnegative().nullable(),
+    crop: studioNormalisedRectSchema.nullable(),
+    filters: z
+      .array(studioCutFilterSchema)
+      .refine((filters) => new Set(filters.map((filter) => filter.id)).size === filters.length),
+  })
+  .strict()
+  .refine(
+    (clip) =>
+      clip.sourceInSeconds === null || clip.sourceOutSeconds === null || clip.sourceInSeconds < clip.sourceOutSeconds
+  );
+const studioEditableCutSchema = z
+  .object({
+    orderMode: z.enum(['storyboard', 'manual']),
+    clipOrder: z.array(safeIdSchema).refine((ids) => new Set(ids).size === ids.length),
+    clips: z.record(safeIdSchema, studioEditableCutClipSchema),
+  })
+  .strict()
+  .refine(
+    (cut) =>
+      cut.clipOrder.length === Object.keys(cut.clips).length &&
+      cut.clipOrder.every((clipId) => Object.hasOwn(cut.clips, clipId))
+  );
+const studioUpdateCutSchema = z
+  .object({
+    projectId: safeIdSchema,
+    expectedRevision: studioExpectedRevisionSchema,
+    cutId: safeIdSchema,
+    cut: studioEditableCutSchema,
+  })
+  .strict();
+
 export const INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE = '[adapter] Native IPC request rejected: invalid operation payload';
+export const INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE =
+  '[adapter] Renderer IPC query rejected: invalid operation payload';
+
+export const rendererBridgeQuerySchemas = {
+  'creative-studio.has-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ dirtySceneCount: z.number().finite().int().min(0).max(24) }).strict(),
+  },
+  'creative-studio.flush-unsaved-work': {
+    request: voidPayloadSchema,
+    response: z.object({ saved: z.boolean() }).strict(),
+  },
+} satisfies Record<RendererBridgeQueryKey, { request: z.ZodTypeAny; response: z.ZodTypeAny }>;
 
 export const nativeBridgePayloadSchemas = {
   'restart-app': voidPayloadSchema,
@@ -216,7 +534,210 @@ export const nativeBridgePayloadSchemas = {
   'presentation-templates.list': voidPayloadSchema,
   'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
   'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
-  'context.compaction.generate': localContextCompactionSchema,
+  'presentation-templates.scratch.allocate': z
+    .object({ conversation_id: identifierSchema, template_id: identifierSchema })
+    .strict(),
+  'presentation-templates.scratch.complete': z.object({ run_id: z.string().uuid() }).strict(),
+  'presentation-templates.scratch.retain': z
+    .object({ run_id: z.string().uuid(), reason: z.enum(['failed', 'interrupted']) })
+    .strict(),
+  'presentation-templates.scratch.discard': z.object({ run_id: z.string().uuid() }).strict(),
+  'presentation-sources.get-source-owner': z.object({ owner: presentationGrantOwnerSchema }).strict(),
+  'presentation-sources.create-draft': z.object({ client_request_id: presentationUuidSchema }).strict(),
+  'presentation-sources.bind-draft': z
+    .object({
+      draft_id: presentationUuidSchema,
+      conversation_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.pick-sources': z
+    .object({ owner: presentationGrantOwnerSchema, expected_owner_revision: presentationRevisionSchema })
+    .strict(),
+  'presentation-sources.grant-workspace-source': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      relative_path: presentationRelativePathSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.revoke': z
+    .object({
+      owner: presentationGrantOwnerSchema,
+      grant_id: presentationUuidSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-sources.confirm-queued': z
+    .object({
+      owner: presentationGrantOwnerSchema,
+      queue_item_id: presentationUuidSchema,
+      sources: presentationQueuedSourceRefsSchema,
+      expected_owner_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.start': startPresentationRunSchema,
+  'presentation-runs.get': getPresentationRunSchema,
+  'presentation-runs.list-recoverable': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      cursor: presentationRecoveryCursorSchema.optional(),
+      limit: z
+        .number()
+        .finite()
+        .int()
+        .min(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MIN_LIMIT)
+        .max(PRESENTATION_RUN_LIMITS.RECOVERABLE_LIST_MAX_LIMIT)
+        .optional(),
+    })
+    .strict(),
+  'presentation-runs.open-recovery': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      expected_sha256: presentationSha256Schema,
+    })
+    .strict(),
+  'presentation-runs.discard': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.claim-initial-dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      holder_id: presentationUuidSchema,
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.renew-initial-dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      lease_token: z
+        .string()
+        .min(32)
+        .max(256)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'presentation-runs.dispatch': z
+    .object({
+      conversation_id: presentationUuidSchema,
+      run_id: presentationUuidSchema,
+      lease_token: z
+        .string()
+        .min(32)
+        .max(256)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      expected_revision: presentationRevisionSchema,
+    })
+    .strict(),
+  'app-operations.context-compact': appOperationsContextCompactSchema,
+  'app-operations.cancel': z.object({ operation_id: identifierSchema }).strict(),
+  'project-knowledge.list-sources': projectKnowledgeProjectIdSchema,
+  'project-knowledge.add-sources': z
+    .object({
+      projectId: safeIdSchema,
+      filePaths: z.array(pathSchema).max(MAX_PROJECT_KB_FILE_PATHS),
+      workspace: pathSchema,
+    })
+    .strict(),
+  'project-knowledge.remove-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema })
+    .strict(),
+  'project-knowledge.get-source-text': projectKnowledgeSourceRefSchema,
+  'project-knowledge.retry-source': z
+    .object({ projectId: safeIdSchema, sourceId: safeIdSchema, workspace: pathSchema })
+    .strict(),
+  'project-knowledge.sync-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.watch-folder': projectKnowledgeFolderSchema,
+  'project-knowledge.unwatch-folder': projectKnowledgeProjectIdSchema,
+  'project-knowledge.remove-store': projectKnowledgeProjectIdSchema,
+  'project-knowledge.get-session-mcp-server': projectKnowledgeProjectIdSchema,
+  'creative-studio.list-projects': voidPayloadSchema,
+  'creative-studio.create-project': studioProjectInputSchema,
+  'creative-studio.get-project': studioProjectRequestSchema,
+  'creative-studio.list-proposals': studioProjectRequestSchema,
+  'creative-studio.accept-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
+  'creative-studio.reject-proposal': z.object({ projectId: safeIdSchema, proposalId: safeIdSchema }).strict(),
+  'creative-studio.propose-storyboard': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      replaceExisting: z.boolean(),
+    })
+    .strict(),
+  'creative-studio.update-model-selection': studioUpdateModelSelectionSchema,
+  'creative-studio.update-project': studioUpdateProjectSchema,
+  'creative-studio.bind-brief-conversation': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      conversationId: safeIdSchema.nullable(),
+    })
+    .strict(),
+  'creative-studio.update-cut': studioUpdateCutSchema,
+  'creative-studio.delete-project': z
+    .object({ projectId: safeIdSchema, expectedRevision: studioExpectedRevisionSchema })
+    .strict(),
+  'creative-studio.update-scene': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneId: safeIdSchema,
+      scene: studioSceneSchema.nullable(),
+    })
+    .strict(),
+  'creative-studio.reorder-scenes': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneOrder: z
+        .array(safeIdSchema)
+        .min(1)
+        .max(24)
+        .refine((ids) => new Set(ids).size === ids.length),
+    })
+    .strict(),
+  'creative-studio.select-asset': z
+    .object({
+      projectId: safeIdSchema,
+      expectedRevision: studioExpectedRevisionSchema,
+      sceneId: safeIdSchema,
+      assetId: safeIdSchema,
+    })
+    .strict(),
+  'creative-studio.persist-captured-poster': studioCapturedPosterSchema,
+  'creative-studio.choose-and-import-reference': z
+    .object({
+      projectId: safeIdSchema,
+      sceneId: safeIdSchema.optional(),
+      expectedRevision: studioExpectedRevisionSchema,
+    })
+    .strict(),
+  'creative-studio.choose-and-export-assets': z
+    .object({ projectId: safeIdSchema, includeReferences: z.boolean() })
+    .strict(),
+  'creative-studio.render-cut': studioProjectRequestSchema,
+  'creative-studio.cancel-render': studioProjectRequestSchema,
+  'creative-studio.fit-storyboard': studioFitStoryboardSchema,
+  'creative-studio.submit-scenes': studioSubmitScenesSchema,
+  'creative-studio.cancel-job': studioJobRequestSchema,
+  'creative-studio.retry-job': studioJobRequestSchema
+    .extend({ acknowledgePossibleDuplicateCharge: z.boolean().optional() })
+    .strict(),
+  'creative-studio.retry-download': studioJobRequestSchema,
+  'creative-studio.list-connection-candidates': voidPayloadSchema,
+  'creative-studio.list-connections': voidPayloadSchema,
+  'creative-studio.validate-connection': studioConnectionSchema,
+  'creative-studio.save-connection': studioConnectionSchema,
+  'creative-studio.remove-connection': z.object({ bindingId: safeIdSchema }).strict(),
+  'creative-studio.list-routes': z.object({ projectId: safeIdSchema.optional() }).strict().optional(),
   'office-artifact.get-state': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.prepare-preview': z.object(officeArtifactRequestShape).strict(),
   'office-artifact.start-preview': z.object({ leaseId: identifierSchema, url: urlSchema.optional() }).strict(),
@@ -267,6 +788,22 @@ export function parseNativeBridgePayload(providerKey: NativeBridgeProviderKey, p
   const result = nativeBridgePayloadSchemas[providerKey].safeParse(payload);
   if (!result.success) {
     throw new Error(INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryRequest(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].request.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
+  }
+  return result.data;
+}
+
+export function parseRendererBridgeQueryResponse(queryKey: RendererBridgeQueryKey, payload: unknown): unknown {
+  const result = rendererBridgeQuerySchemas[queryKey].response.safeParse(payload);
+  if (!result.success) {
+    throw new Error(INVALID_RENDERER_BRIDGE_QUERY_PAYLOAD_MESSAGE);
   }
   return result.data;
 }

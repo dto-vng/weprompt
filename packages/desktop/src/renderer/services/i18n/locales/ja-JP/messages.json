@@ -16,6 +16,7 @@
   "downloadFailed": "ダウンロードに失敗しました",
   "imageLoadFailed": "画像の読み込みに失敗しました",
   "scrollToBottom": "下にスクロール",
+  "reasoning": "推論",
   "availableCommands": "{{count}} 個の利用可能なコマンド",
   "atFile.hint": "ファイルを検索するには入力してください",
   "atFile.menuLabel": "ファイル参照",
@@ -50,12 +51,25 @@
   "unknownMessageType": "不明なメッセージタイプ: {{type}}",
   "permissionRequest": "権限リクエスト",
   "agentRequestingPermission": "The agent is requesting permission.",
+  "permission": {
+    "intent": {
+      "run": "コマンドを実行したいです",
+      "edit": "ファイルを編集したいです",
+      "read": "ファイルを読み取りたいです",
+      "fetch": "ウェブから情報を取得したいです",
+      "tool": "ツールを使用したいです",
+      "destructive": "ファイルを削除したいです",
+      "generic": "承認が必要な操作を行いたいです"
+    },
+    "destructiveWarning": "ファイルが完全に削除または上書きされる可能性があります。元に戻すことはできません。"
+  },
   "command": "コマンド:",
   "chooseAction": "操作を選択してください:",
   "option": "オプション",
   "noOptionsAvailable": "利用可能なオプションはありません",
   "processing": "Processing...",
   "responseSentSuccessfully": "応答が正常に送信されました",
+  "permissionResponseFailed": "応答を送信できませんでした。もう一度お試しください。",
   "confirmation": {
     "applyChange": "この変更を適用しますか？",
     "allowExecution": "実行を許可しますか？",
@@ -106,6 +120,28 @@
         "failed": "予定した作業を完了できませんでした。予定数: {{total, number}}。再試行が必要: {{failed, number}}。",
         "failedWithCanceled": "予定した作業を完了できませんでした。予定数: {{total, number}}。再試行が必要: {{failed, number}}。停止: {{canceled, number}}。",
         "canceled": "予定した作業が完了する前に、このターンを停止しました。予定数: {{total, number}}。未完了: {{unfinished, number}}。停止: {{canceled, number}}。"
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "すべて完了しました。計画どおりに進みました。次に何をしたいか教えてください。",
+        "v2": "こちらは完了し、問題なく動作しています。ここからどう進めたいか教えてください。",
+        "v3": "完了しました。すべてうまくまとまりました。準備ができ次第、次の作業に取りかかれます。"
+      },
+      "recovered": {
+        "v1": "完了しました。1 つの手順でもう一度試す必要がありましたが、今はすべて整っています。",
+        "v2": "完了しました。途中で軽く再試行が必要でしたが、すべて問題なく仕上がっています。"
+      },
+      "partial": {
+        "v1": "大部分を完了しました。いくつかはもう一度対応が必要です。詳細はすぐ下にあります。",
+        "v2": "順調に進みました。大部分は完了していますが、一部はもう一度試す必要があります。詳細は下にあります。"
+      },
+      "failed": {
+        "v1": "こちらは完了できませんでした。詳細は下にあります。準備ができたら、もう一度試すようお申し付けください。",
+        "v2": "こちらはうまくいきませんでした。下の詳細をご確認いただくか、もう一度試すようお伝えください。"
+      },
+      "canceled": {
+        "v1": "ここで停止しました。再開をご希望でしたらお知らせください。"
       }
     },
     "attempt": "（{{n}} 回目の試行）",
@@ -205,5 +241,8 @@
         "failedTitle": "完成したファイルを準備できませんでした"
       }
     }
+  },
+  "plan": {
+    "title": "ToDo リスト"
   }
 }

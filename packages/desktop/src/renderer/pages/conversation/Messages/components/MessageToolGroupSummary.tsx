@@ -10,13 +10,14 @@ import { coalesceToolCalls } from '@/common/chat/toolActivity/coalesceToolCalls'
 import type { CoalescedStep } from '@/common/chat/toolActivity/types';
 import type { NormalizedToolCall, NormalizedToolStatus, ToolMessage } from '@/common/chat/normalizeToolCall';
 import { isDiagnosticTelemetryText, normalizeToolMessages } from '@/common/chat/normalizeToolCall';
-import { DEFAULT_LANGUAGE, normalizeLanguageCode } from '@/common/config/i18n';
 import LocalImageView from '@/renderer/components/media/LocalImageView';
 import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Messages/types';
 import { iconColors } from '@/renderer/styles/colors';
 import { downloadFileFromPath } from '@/renderer/utils/file/download';
+import { buildTurnClose } from './toolActivity/buildTurnClose';
 import { buildTurnWorkRecap } from './toolActivity/buildTurnWorkRecap';
 import { useToolActionText } from './toolActivity/useToolActionText';
+import ToolOutputCitations, { toolUsesKnowledgeSearch } from './ToolOutputCitations';
 import './MessageToolGroupSummary.css';
 
 const statusToBadge = (status: NormalizedToolStatus): BadgeProps['status'] => {
@@ -388,7 +389,13 @@ const ToolItemDetail: React.FC<{ item: NormalizedToolCall }> = ({ item }) => {
           {displayItem.output && (
             <div className='tool-detail-section'>
               <div className='tool-detail-label'>{t('tools.labels.result')}</div>
-              <pre className='tool-detail-content'>{displayItem.output}</pre>
+              <pre className='tool-detail-content'>
+                {toolUsesKnowledgeSearch(displayItem.name) ? (
+                  <ToolOutputCitations output={displayItem.output} />
+                ) : (
+                  displayItem.output
+                )}
+              </pre>
             </div>
           )}
         </div>
@@ -451,27 +458,11 @@ const StepRow: React.FC<{ label: string; status: Exclude<NormalizedToolStatus, '
   );
 };
 
-const formatCategorySummary = (
-  categories: Array<{ category: string; count: number }>,
-  t: ReturnType<typeof useTranslation>['t'],
-  locale: string
-): string => {
-  const visibleCategories = categories.slice(0, 3);
-  const omittedActionCount = categories.slice(3).reduce((total, { count }) => total + count, 0);
-  const clauses = visibleCategories.map(({ category, count }) =>
-    t(`messages.toolActivity.recap.category.${category}`, { count })
-  );
-  if (omittedActionCount > 0) {
-    clauses.push(t('messages.toolActivity.recap.overflow', { count: omittedActionCount }));
-  }
-  return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(clauses);
-};
-
 const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; isActive?: boolean }> = ({
   messages,
   isActive = false,
 }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const action = useToolActionText();
   const toolMessages = useMemo(() => messages.filter(isToolMessage), [messages]);
   const tools = useMemo(() => normalizeToolMessages(toolMessages), [toolMessages]);
@@ -505,68 +496,55 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
       ),
     [isActive, rows]
   );
-  const locale = normalizeLanguageCode(i18n?.resolvedLanguage ?? i18n?.language ?? DEFAULT_LANGUAGE);
-  const categorySummary = useMemo(
-    () => formatCategorySummary(recap.categories, t, locale),
-    [locale, recap.categories, t]
-  );
-  const outcome = useMemo(() => {
-    switch (recap.status) {
-      case 'active':
-        if (recap.failed > 0 && recap.canceled > 0) {
-          return t('messages.toolActivity.recap.outcome.activeWithFailureAndCanceled', recap);
-        }
-        if (recap.failed > 0) return t('messages.toolActivity.recap.outcome.activeWithFailure', recap);
-        if (recap.canceled > 0) return t('messages.toolActivity.recap.outcome.activeWithCanceled', recap);
-        return t('messages.toolActivity.recap.outcome.active', recap);
-      case 'recovered':
-        return t('messages.toolActivity.recap.outcome.recovered', recap);
-      case 'partial':
-        return t(
-          recap.canceled > 0
-            ? 'messages.toolActivity.recap.outcome.partialWithCanceled'
-            : 'messages.toolActivity.recap.outcome.partial',
-          recap
-        );
-      case 'failed':
-        return t(
-          recap.canceled > 0
-            ? 'messages.toolActivity.recap.outcome.failedWithCanceled'
-            : 'messages.toolActivity.recap.outcome.failed',
-          recap
-        );
-      case 'canceled':
-        return t('messages.toolActivity.recap.outcome.canceled', recap);
-      case 'completed':
-        return t('messages.toolActivity.recap.outcome.completed', recap);
+  const turnClose = useMemo(() => (isActive ? null : buildTurnClose(recap, recap.safeSubject)), [isActive, recap]);
+  const allSteps = useMemo(() => {
+    const labeled: Array<{ key: string; label: string; status: Exclude<NormalizedToolStatus, 'error'> }> = [];
+    for (const row of rows) {
+      if (row.status === 'error') continue;
+      labeled.push({
+        key: row.key,
+        label: row.kind === 'tool' ? action.label(row.step) : row.label,
+        status: row.status,
+      });
     }
-  }, [recap, t]);
+    return labeled;
+  }, [action, rows]);
+  const visibleSteps = useMemo(() => {
+    if (!isActive) return [];
+    const findLastStep = (status: NormalizedToolStatus) => {
+      for (let index = allSteps.length - 1; index >= 0; index -= 1) {
+        if (allSteps[index].status === status) return allSteps[index];
+      }
+      return undefined;
+    };
+    const currentStep = findLastStep('running') ?? findLastStep('pending');
+    return currentStep ? [currentStep] : [];
+  }, [allSteps, isActive]);
   const [showDetails, setShowDetails] = useState(false);
 
   if (rows.length === 0 && tools.length === 0) return null;
 
   return (
     <div className='tool-group-summary flex flex-col gap-6px'>
-      <div className='flex flex-col gap-2px'>
-        <div
-          className='font-500 text-t-primary'
-          role={recap.status === 'active' ? 'status' : undefined}
-          aria-live={recap.status === 'active' ? 'polite' : undefined}
-          aria-atomic={recap.status === 'active' ? true : undefined}
-        >
-          {t(`messages.toolActivity.recap.headline.${recap.status}`, { total: recap.total })}
-        </div>
-        {recap.safeSubject && (
-          <div className='text-13px text-t-secondary'>
-            {t('messages.toolActivity.recap.subject', { subject: recap.safeSubject })}
+      <div
+        className='flex flex-col gap-4px'
+        role={isActive ? 'log' : undefined}
+        aria-live={isActive ? 'polite' : undefined}
+        aria-atomic={isActive ? false : undefined}
+      >
+        {visibleSteps.map((step) => (
+          <StepRow key={step.key} label={step.label} status={step.status} />
+        ))}
+        {turnClose && (
+          <div
+            className={'text-13px m-t-4px ' + (turnClose.tone === 'attention' ? 'text-warning' : 'text-t-primary')}
+            role='status'
+          >
+            {t(turnClose.key)}
           </div>
         )}
-        <div className='text-13px text-t-secondary'>
-          {t('messages.toolActivity.recap.activity', { categories: categorySummary })}
-        </div>
-        <div className='text-13px text-t-secondary'>{outcome}</div>
       </div>
-      {rows.length > 0 && (
+      {(allSteps.length > 0 || tools.length > 0) && (
         <Button
           type='text'
           size='mini'
@@ -584,16 +562,9 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
       )}
       {showDetails && (
         <div className='tool-group-summary__body'>
-          {rows.map((row) => {
-            if (row.status === 'error') return null;
-            return (
-              <StepRow
-                key={row.key}
-                label={row.kind === 'tool' ? action.label(row.step) : row.label}
-                status={row.status}
-              />
-            );
-          })}
+          {allSteps.map((step) => (
+            <StepRow key={step.key} label={step.label} status={step.status} />
+          ))}
           {tools.map((item) => (
             <ToolItemDetail key={item.key} item={item} />
           ))}

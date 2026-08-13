@@ -274,13 +274,43 @@ describe('OfficeWatchViewer lifecycle', () => {
     expect(mocks.showItemInFolderInvoke).toHaveBeenCalledWith('/w/a.docx');
   });
 
-  it('keeps PPT on its existing source path', async () => {
-    render(<OfficeWatchViewer docType='ppt' file_path='/w/slides.pptx' workspace='/w' refreshToken='1' />);
+  it('renders PPT from a validated private copy', async () => {
+    mocks.preparePreviewInvoke.mockResolvedValueOnce({
+      ok: true,
+      leaseId: 'ppt-preview-lease',
+      filePath: '/preview/slides.pptx',
+      workspace: '/preview',
+    });
+    render(
+      <OfficeWatchViewer
+        docType='ppt'
+        conversationId='conversation-1'
+        file_path='/w/slides.pptx'
+        workspace='/w'
+        refreshToken='1'
+      />
+    );
     await flushOfficeWatchStart();
 
-    expect(mocks.preparePreviewInvoke).not.toHaveBeenCalled();
-    expect(mocks.startInvoke).toHaveBeenCalledWith({ file_path: '/w/slides.pptx', workspace: '/w' });
+    expect(mocks.preparePreviewInvoke).toHaveBeenCalledWith({
+      conversationId: 'conversation-1',
+      workspace: '/w',
+      filePath: '/w/slides.pptx',
+    });
+    expect(mocks.startPreviewInvoke).toHaveBeenCalledWith({ leaseId: 'ppt-preview-lease' });
+    expect(mocks.startInvoke).not.toHaveBeenCalled();
     expect(mocks.webviewProps.current?.showViewerControls).toBeFalsy();
+  });
+
+  it('does not start a PPT watcher when validation rejects the private copy', async () => {
+    mocks.preparePreviewInvoke.mockResolvedValueOnce({ ok: false, code: 'INVALID_OFFICE_ARTIFACT' });
+
+    render(<OfficeWatchViewer docType='ppt' file_path='/w/corrupt.pptx' workspace='/w' refreshToken='1' />);
+    await flushOfficeWatchStart();
+
+    expect(mocks.startPreviewInvoke).not.toHaveBeenCalled();
+    expect(mocks.startInvoke).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('preview.office.errors.invalidArtifact');
   });
 
   it('retains the loaded host with a nonblocking indicator while a refresh starts', async () => {

@@ -6,6 +6,12 @@
 
 import { ipcBridge } from '@/common';
 import type { TChatConversation, TConversationRuntimeSummary } from '@/common/config/storage';
+import {
+  isConversationAwaitingApproval,
+  resolveConversationTerminalMark,
+  type TConversationCompletionRecord,
+  type TConversationTerminalMark,
+} from '@/renderer/pages/conversation/GroupedHistory/utils/conversationStatus';
 import { addEventListener } from '@/renderer/utils/emitter';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
@@ -94,34 +100,51 @@ export const getSidebarStreamGuardDecision = ({
 };
 
 type ConversationListSyncSnapshot = {
+  /**
+   * False until the first conversation load settles, whichever way it settles.
+   * `conversations: []` alone cannot tell "not fetched yet" from "genuinely empty",
+   * which made the sidebar paint its empty state on every cold start.
+   */
+  hasLoadedConversations: boolean;
   conversations: TChatConversation[];
   generatingConversationIds: Set<string>;
-  recentCompletionAtByConversationId: Map<string, number>;
+  completionByConversationId: Map<string, TConversationCompletionRecord>;
+  recentStoppedAtByConversationId: Map<string, number>;
+  recentFailureAtByConversationId: Map<string, number>;
 };
 
 const listeners = new Set<() => void>();
 
 let isStoreInitialized = false;
+let hasLoadedConversationsState = false;
 let conversationsState: TChatConversation[] = [];
 let generatingConversationIdsState = new Set<string>();
-let recentCompletionAtByConversationIdState = new Map<string, number>();
+let completionByConversationIdState = new Map<string, TConversationCompletionRecord>();
+let recentStoppedAtByConversationIdState = new Map<string, number>();
+let recentFailureAtByConversationIdState = new Map<string, number>();
 let runtimeByConversationIdState = new Map<string, TConversationRuntimeSummary>();
-let completedConversationIdsState = new Set<string>();
+let completedTurnIdByConversationIdState = new Map<string, string | undefined>();
 let conversation_idsState = new Set<string>();
 let latestRefreshRequestId = 0;
 let latestRuntimeRefreshRequestId = 0;
 let runtimeRefreshRequestIdByConversationId = new Map<string, number>();
 let snapshotState: ConversationListSyncSnapshot = {
+  hasLoadedConversations: hasLoadedConversationsState,
   conversations: conversationsState,
   generatingConversationIds: generatingConversationIdsState,
-  recentCompletionAtByConversationId: recentCompletionAtByConversationIdState,
+  completionByConversationId: completionByConversationIdState,
+  recentStoppedAtByConversationId: recentStoppedAtByConversationIdState,
+  recentFailureAtByConversationId: recentFailureAtByConversationIdState,
 };
 
 const emitStoreChange = () => {
   snapshotState = {
+    hasLoadedConversations: hasLoadedConversationsState,
     conversations: conversationsState,
     generatingConversationIds: generatingConversationIdsState,
-    recentCompletionAtByConversationId: recentCompletionAtByConversationIdState,
+    completionByConversationId: completionByConversationIdState,
+    recentStoppedAtByConversationId: recentStoppedAtByConversationIdState,
+    recentFailureAtByConversationId: recentFailureAtByConversationIdState,
   };
   listeners.forEach((listener) => listener());
 };
@@ -167,12 +190,14 @@ const refreshConversations = () => {
         // responseStream listener recognises them as known and doesn't
         // trigger an infinite refreshConversations loop.
         conversation_idsState = new Set(items.map((conversation) => conversation.id));
+        hasLoadedConversationsState = true;
         emitStoreChange();
         return;
       }
 
       conversationsState = [];
       conversation_idsState = new Set();
+      hasLoadedConversationsState = true;
       emitStoreChange();
     })
     .catch((error) => {
@@ -183,16 +208,23 @@ const refreshConversations = () => {
       console.error('[WorkspaceGroupedHistory] Failed to load conversations:', error);
       conversationsState = [];
       conversation_idsState = new Set();
+      // A failed load has still settled: leaving this false would hide the empty
+      // state forever and leave the rail blank with no explanation.
+      hasLoadedConversationsState = true;
       emitStoreChange();
     });
 };
 
 const markGenerating = (conversation_id: string) => {
-  if (generatingConversationIdsState.has(conversation_id)) {
+  const terminalMarkChanged = clearTerminalMarksState(conversation_id);
+  const alreadyGenerating = generatingConversationIdsState.has(conversation_id);
+  if (alreadyGenerating && !terminalMarkChanged) {
     return;
   }
 
-  generatingConversationIdsState = new Set(generatingConversationIdsState).add(conversation_id);
+  if (!alreadyGenerating) {
+    generatingConversationIdsState = new Set(generatingConversationIdsState).add(conversation_id);
+  }
   emitStoreChange();
 };
 
@@ -254,37 +286,117 @@ const clearConversationRuntimeState = (conversation_id: string) => {
   runtimeByConversationIdState = nextRuntimeByConversationId;
 };
 
-const markRecentCompletion = (conversation_id: string) => {
-  recentCompletionAtByConversationIdState = new Map(recentCompletionAtByConversationIdState).set(
-    conversation_id,
-    Date.now()
-  );
-  emitStoreChange();
-};
-
 const clearRecentCompletionState = (conversation_id: string) => {
-  if (!recentCompletionAtByConversationIdState.has(conversation_id)) {
+  if (!completionByConversationIdState.has(conversation_id)) {
     return;
   }
 
-  const nextCompletionTimes = new Map(recentCompletionAtByConversationIdState);
-  nextCompletionTimes.delete(conversation_id);
-  recentCompletionAtByConversationIdState = nextCompletionTimes;
+  const nextCompletions = new Map(completionByConversationIdState);
+  nextCompletions.delete(conversation_id);
+  completionByConversationIdState = nextCompletions;
   emitStoreChange();
 };
 
-const markCompleted = (conversation_id: string) => {
-  completedConversationIdsState = new Set(completedConversationIdsState).add(conversation_id);
+const clearRecentStoppedState = (conversation_id: string) => {
+  if (!recentStoppedAtByConversationIdState.has(conversation_id)) {
+    return;
+  }
+
+  const nextStoppedTimes = new Map(recentStoppedAtByConversationIdState);
+  nextStoppedTimes.delete(conversation_id);
+  recentStoppedAtByConversationIdState = nextStoppedTimes;
+  emitStoreChange();
+};
+
+const clearRecentFailureState = (conversation_id: string) => {
+  if (!recentFailureAtByConversationIdState.has(conversation_id)) {
+    return;
+  }
+
+  const nextFailureTimes = new Map(recentFailureAtByConversationIdState);
+  nextFailureTimes.delete(conversation_id);
+  recentFailureAtByConversationIdState = nextFailureTimes;
+  emitStoreChange();
+};
+
+function clearTerminalMarksState(conversation_id: string): boolean {
+  let changed = false;
+  if (completionByConversationIdState.has(conversation_id)) {
+    const nextCompletions = new Map(completionByConversationIdState);
+    nextCompletions.delete(conversation_id);
+    completionByConversationIdState = nextCompletions;
+    changed = true;
+  }
+  if (recentStoppedAtByConversationIdState.has(conversation_id)) {
+    const nextStoppedTimes = new Map(recentStoppedAtByConversationIdState);
+    nextStoppedTimes.delete(conversation_id);
+    recentStoppedAtByConversationIdState = nextStoppedTimes;
+    changed = true;
+  }
+  if (recentFailureAtByConversationIdState.has(conversation_id)) {
+    const nextFailureTimes = new Map(recentFailureAtByConversationIdState);
+    nextFailureTimes.delete(conversation_id);
+    recentFailureAtByConversationIdState = nextFailureTimes;
+    changed = true;
+  }
+  return changed;
+}
+
+const markTerminalState = (conversation_id: string, mark: TConversationTerminalMark, turn_id?: string) => {
+  if (mark === 'completed' && completionByConversationIdState.has(conversation_id)) {
+    const completedTurnId = completedTurnIdByConversationIdState.get(conversation_id);
+    if (!turn_id || !completedTurnId || turn_id === completedTurnId) {
+      return;
+    }
+  }
+
+  const now = Date.now();
+  clearTerminalMarksState(conversation_id);
+  if (mark === 'failed') {
+    recentFailureAtByConversationIdState = new Map(recentFailureAtByConversationIdState).set(conversation_id, now);
+  } else if (mark === 'stopped') {
+    recentStoppedAtByConversationIdState = new Map(recentStoppedAtByConversationIdState).set(conversation_id, now);
+  } else {
+    completionByConversationIdState = new Map(completionByConversationIdState).set(conversation_id, {
+      completedAt: now,
+    });
+  }
+  emitStoreChange();
+};
+
+const markCompletionSeenState = (conversation_id: string): void => {
+  const completion = completionByConversationIdState.get(conversation_id);
+  if (!completion || completion.seenAt !== undefined) {
+    return;
+  }
+
+  completionByConversationIdState = new Map(completionByConversationIdState).set(conversation_id, {
+    ...completion,
+    seenAt: Date.now(),
+  });
+  emitStoreChange();
+};
+
+const markRecentCompletion = (conversation_id: string, turn_id?: string) => {
+  markTerminalState(conversation_id, 'completed', turn_id);
+};
+
+const markRecentFailure = (conversation_id: string) => {
+  markTerminalState(conversation_id, 'failed');
+};
+
+const markCompleted = (conversation_id: string, turn_id?: string) => {
+  completedTurnIdByConversationIdState = new Map(completedTurnIdByConversationIdState).set(conversation_id, turn_id);
 };
 
 const clearCompleted = (conversation_id: string) => {
-  if (!completedConversationIdsState.has(conversation_id)) {
+  if (!completedTurnIdByConversationIdState.has(conversation_id)) {
     return;
   }
 
-  const next = new Set(completedConversationIdsState);
+  const next = new Map(completedTurnIdByConversationIdState);
   next.delete(conversation_id);
-  completedConversationIdsState = next;
+  completedTurnIdByConversationIdState = next;
 };
 
 const logLateStreamIgnored = (conversation_id: string, type: string) => {
@@ -314,6 +426,8 @@ const initializeConversationListSyncStore = () => {
     if (event.action === 'deleted') {
       clearGenerating(event.conversation_id);
       clearRecentCompletionState(event.conversation_id);
+      clearRecentStoppedState(event.conversation_id);
+      clearRecentFailureState(event.conversation_id);
       clearConversationRuntimeState(event.conversation_id);
       clearCompleted(event.conversation_id);
     }
@@ -332,9 +446,7 @@ const initializeConversationListSyncStore = () => {
     }
 
     const conversation = conversationsState.find((item) => item.id === conversation_id);
-    const wasWaitingApproval =
-      conversation?.runtime?.state === 'waiting_confirmation' ||
-      (conversation?.runtime?.pending_confirmations ?? 0) > 0;
+    const wasWaitingApproval = isConversationAwaitingApproval(conversation?.runtime);
     if (!conversation_idsState.has(conversation_id)) {
       refreshConversations();
     }
@@ -345,15 +457,18 @@ const initializeConversationListSyncStore = () => {
     if (isTerminalStreamMessage(message)) {
       const wasGenerating = generatingConversationIdsState.has(conversation_id);
       if (message.type === 'finish' && wasGenerating) {
-        markRecentCompletion(conversation_id);
+        markRecentCompletion(conversation_id, message.turn_id);
+      } else if (message.type !== 'finish') {
+        markRecentFailure(conversation_id);
       }
+      markCompleted(conversation_id, message.turn_id);
       clearGenerating(conversation_id);
       return;
     }
 
     const decision = getSidebarStreamGuardDecision({
       type: message.type,
-      completed: completedConversationIdsState.has(conversation_id),
+      completed: completedTurnIdByConversationIdState.has(conversation_id),
     });
     if (decision.clearCompleted) {
       clearCompleted(conversation_id);
@@ -371,11 +486,14 @@ const initializeConversationListSyncStore = () => {
   });
   ipcBridge.conversation.turnCompleted.on((event) => {
     advanceConversationRuntimeRequest(event.session_id);
-    applyConversationRuntime(event.session_id, event.runtime);
-    if (event.state === 'ai_waiting_input') {
-      markRecentCompletion(event.session_id);
+    if (event.runtime) {
+      applyConversationRuntime(event.session_id, event.runtime);
     }
-    markCompleted(event.session_id);
+    const terminalMark = resolveConversationTerminalMark(event.state);
+    if (terminalMark) {
+      markTerminalState(event.session_id, terminalMark, event.turn_id);
+    }
+    markCompleted(event.session_id, event.turn_id);
     clearGenerating(event.session_id);
     refreshConversations();
   });
@@ -386,7 +504,14 @@ export const useConversationListSync = () => {
     initializeConversationListSyncStore();
   }, []);
 
-  const { conversations, generatingConversationIds, recentCompletionAtByConversationId } = useSyncExternalStore(
+  const {
+    conversations,
+    hasLoadedConversations,
+    generatingConversationIds,
+    completionByConversationId,
+    recentStoppedAtByConversationId,
+    recentFailureAtByConversationId,
+  } = useSyncExternalStore(
     subscribeConversationListSync,
     getConversationListSyncSnapshot,
     getConversationListSyncSnapshot
@@ -399,21 +524,43 @@ export const useConversationListSync = () => {
     [generatingConversationIds]
   );
 
-  const getRecentCompletionAt = useCallback(
+  const getCompletion = useCallback(
     (conversation_id: string) => {
-      return recentCompletionAtByConversationId.get(conversation_id);
+      return completionByConversationId.get(conversation_id);
     },
-    [recentCompletionAtByConversationId]
+    [completionByConversationId]
+  );
+
+  const getRecentStoppedAt = useCallback(
+    (conversation_id: string) => {
+      return recentStoppedAtByConversationId.get(conversation_id);
+    },
+    [recentStoppedAtByConversationId]
+  );
+
+  const getRecentFailureAt = useCallback(
+    (conversation_id: string) => {
+      return recentFailureAtByConversationId.get(conversation_id);
+    },
+    [recentFailureAtByConversationId]
   );
 
   const refreshConversationRuntime = useCallback((conversation_id: string) => {
     refreshConversationRuntimeState(conversation_id);
   }, []);
 
+  const markCompletionSeen = useCallback((conversation_id: string) => {
+    markCompletionSeenState(conversation_id);
+  }, []);
+
   return {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
-    getRecentCompletionAt,
+    getCompletion,
+    getRecentStoppedAt,
+    getRecentFailureAt,
     refreshConversationRuntime,
+    markCompletionSeen,
   };
 };

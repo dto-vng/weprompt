@@ -17,7 +17,6 @@
     "quickActionStar": "Bizi beğendiniz mi? Yıldız verin!",
     "skillsMarket": "WePrompt Skills Market",
     "skillsMarketDesc": "Topluluk Skills'lerini ihtiyaç duyduğunuzda arayın ve etkinleştirin. Bir kez yapılandırın, tüm Agent'larda kullanılabilir.",
-    "skillsMarketDetails": "Ayrıntılar >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "Proje {{name}}",
+    "eyebrow": "PROJE",
+    "tabs": {
+      "label": "Proje görünümleri",
+      "chat": "Sohbet",
+      "files": "Dosyalar",
+      "context": "Bağlam",
+      "artifacts": "Çıktılar"
+    }
+  },
+  "projectHome": {
+    "newChat": "Yeni Sohbet",
+    "composerPlaceholder": "Bu projede yeni bir sohbet başlat…",
+    "scopedHint": "— yalnızca bu projeyle sınırlı",
+    "chats": "Sohbetler",
+    "showAll": "Tümünü göster",
+    "showLess": "Daha az göster",
+    "emptyChatsTitle": "Henüz sohbet yok",
+    "emptyChatsBody": "Bu projede çalışmaya başlamak için yukarıdan bir sohbet başlat.",
+    "instructions": "Talimatlar",
+    "instructionsApplies": "Bu projedeki yeni sohbetlere uygulanır.",
+    "instructionsEmpty": "Bu projedeki her sohbete yön vermek için talimat ekleyin.",
+    "addInstructions": "Talimat ekle",
+    "edit": "Düzenle",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "instructionsSaved": "Talimatlar kaydedildi",
+    "instructionsSaveFailed": "Talimatlar kaydedilemedi",
+    "files": "Dosyalar",
+    "revealInFolder": "Klasörde göster",
+    "filesReadonly": "Salt okunur · klasörden yönetilir",
+    "filesEmpty": "Bu projenin klasörü boş.",
+    "folderMissingTitle": "Klasör bulunamadı",
+    "folderMissingRelink": "Klasörü yeniden bağla",
+    "folderMissingBody": "Sayfanın geri kalanı çalışmaya devam ediyor.",
+    "metaChats": "{{count}} sohbet",
+    "metaActive": "{{time}} aktif",
+    "notFoundTitle": "Proje bulunamadı",
+    "notFoundBody": "Bu proje kaldırılmış olabilir veya bağlantısı güncel olmayabilir.",
+    "backHome": "Ana sayfaya dön",
+    "rename": "Yeniden Adlandır",
+    "relink": "Klasörü yeniden bağla",
+    "reveal": "Klasörde göster",
+    "remove": "Kaldır",
+    "knowledge": "Bilgi",
+    "knowledgeAdd": "Dosya Ekle",
+    "knowledgeDropFolderMissing": "Dosya eklemeden önce Knowledge Base klasörünü yeniden bağlayın.",
+    "knowledgeDropUnsupported": "Bu dosyaların hiçbiri desteklenmiyor. Desteklenen: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Bilgi tabanı yenilenemedi.",
+    "knowledgeRelinkFailed": "Proje klasörü yeniden bağlanamadı.",
+    "knowledgeRetryFailed": "Bu dosya dizinleme kuyruğuna alınamadı.",
+    "knowledgeDeleteFailed": "Bu dosya Çöp Kutusu'na taşınamadı.",
+    "knowledgeAddFailed": "Bu dosyalar bilgi tabanına eklenemedi.",
+    "knowledgeEmpty": "Bu projenin bilgi bankasını oluşturmak için belge ekleyin. Asistan bunları bu projedeki her sohbette otomatik olarak arar.",
+    "knowledgeSemanticOff": "anlamsal arama kapalı — gömme modeli yapılandırılmamış",
+    "knowledgeSemanticOffAction": "Gömme modeli ekle",
+    "knowledgeEmbedAll": "Tümünü göm",
+    "knowledgePassagesTooltip": "Bu dosya aranabilir bölümlere ayrılır ve asistan yanıt verirken en ilgili olanları kullanır.",
+    "knowledgeStatusIndexing": "Dizinleniyor…",
+    "knowledgeProgressReading": "Sayfa {{done}}/{{total}} okunuyor",
+    "knowledgeProgressTranscribing": "{{done}}/{{total}}. sayfa yazıya dökülüyor",
+    "knowledgeProgressEmbedding": "Gömülüyor {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "Başarısız",
+    "knowledgeStatusUnsupported": "Desteklenmiyor",
+    "knowledgeStatusNotEmbedded": "Yalnızca anahtar kelime",
+    "knowledgeNotEmbeddedDetail": "Anahtar kelimeyle aranabilir, ancak yalnızca {{done}}/{{total}} bölüm gömülü. Kalanları gömmek için yeniden deneyin.",
+    "knowledgeRetry": "Yeniden dene",
+    "knowledgeError": "Bilgi bankası kullanılamıyor.",
+    "knowledgeSupportedTypes": "Desteklenen: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Yenile",
+    "knowledgeOpenOriginal": "Özgün dosyayı aç",
+    "knowledgeDeleteFile": "Dosyayı sil",
+    "knowledgeDeleteConfirm": "\"{{fileName}}\" çöp kutusuna taşınsın mı? Bilgi tabanından da kaldırılır.",
+    "knowledgeFolderHint": "Dosyalar proje klasörünün içindeki \"Knowledge Base\" klasöründe bulunur. Oraya koyduğunuz her şey otomatik olarak dizinlenir.",
+    "knowledgeFolderMissingTitle": "Knowledge Base klasörü bulunamadı",
+    "knowledgeFolderMissingBody": "Taşınmış, yeniden adlandırılmış veya silinmiş olabilir. Dizinlenmiş bilgileriniz korunuyor — klasörü geri getirin ya da projeyi yeniden bağlayın, sonra yenileyin.",
+    "knowledgePreviewNote": "Bu, asistanın aradığı dizinlenmiş metindir; özgün sayfa düzeni değildir.",
+    "knowledgePreviewTruncated": "Ön izleme kısaltıldı. Belgenin tamamı için özgün dosyayı açın.",
+    "knowledgePreviewError": "Bu dosyanın dizinlenmiş metni yüklenemedi.",
+    "knowledgePreviewNotReady": "Açılacak dizinlenmiş metin henüz yok.",
+    "knowledgeCitationMissing": "Bu dosya artık bilgi bankasında değil.",
+    "knowledgeOcrTag": "Yazıya döküldü (OCR)",
+    "knowledgeOcrDetail": "{{model}} tarafından bir taramadan yazıya döküldü. Atlanan sayfalar: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "yok"
+  },
   "history": {
+    "moreActions": "Diğer işlemler",
     "recents": "Son",
     "today": "Bugün",
     "yesterday": "Dün",
@@ -80,6 +166,8 @@
     "removeProject": "Projeyi kaldır",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Bu projede yeni konuşma",
+    "expandProjectChats": "Proje sohbetlerini genişlet",
+    "collapseProjectChats": "Proje sohbetlerini daralt",
     "deleting": "Siliniyor...",
     "reorderPinned": "Sabitlenmiş sohbetin sırasını değiştirmek için sürükleyin",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Proje kaldırılamadı. Projeyi yeniden açıp tekrar deneyin; klasördeki dosyalar silinmedi.",
+    "removeProjectChatDetachFailed": "Bazı sohbetlerin bu projeyle bağlantısı kesilemedi. Proje korundu; kaldırmayı yeniden deneyin.",
+    "removeProjectStateChanged": "Proje listesi kaldırma işleminden önce değişti. Yenileyip tekrar deneyin.",
+    "removeProjectStorageFailed": "Proje değişiklikleri kaydedilemedi. WePrompt'un uygulama verilerine erişebildiğini kontrol edip yeniden deneyin.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -349,6 +440,9 @@
   },
   "workspace": {
     "title": "Proje",
+    "projectMenu": {
+      "trigger": "Proje"
+    },
     "pasteConfirm_title": "Dosyaları yapıştır",
     "pasteConfirm_message": "'{{name}}' dosyasını seçili klasöre ({{target}}) yapıştırmak istediğinizden emin misiniz?",
     "pasteConfirm_paste": "Yapıştır",
@@ -430,9 +524,6 @@
       "vscode": "VS Code",
       "terminal": "Terminal",
       "explorer": "Dosya Gezgini"
-    },
-    "projectMenu": {
-      "trigger": "Proje"
     }
   },
   "minimap": {
@@ -446,6 +537,7 @@
     "noModelSelected": "Mevcut oturum için model seçilmedi, mesaj gönderilemiyor",
     "sendMessageTo": "{{model}} modeline mesaj gönder",
     "processing": "İşleniyor...",
+    "stopGenerating": "Üretimi durdur",
     "quotaExceededTitle": "Model kotasına ulaşıldı",
     "quotaExceededBody": "Mevcut model kotası tükendi. Devam etmek için {{model}} modeline geçilsin mi?",
     "quotaExceededNoFallback": "Model kotasına ulaşıldı. Lütfen başka bir uygun modele geçin.",
@@ -532,7 +624,9 @@
     "today": "Bugün",
     "weekToDate": "Bu hafta",
     "monthToDate": "Bu ay",
-    "triggerLabel": "Bağlam kullanımını göster"
+    "triggerLabel": "Bağlam kullanımını göster",
+    "estimated": "Tahmini",
+    "unavailable": "Bağlam kullanımı kullanılamıyor"
   },
   "skill_generator": {
     "title": "Yetenek/Kural Oluştur",
@@ -618,36 +712,109 @@
     }
   },
   "notFound": "Konuşma bulunamadı veya silinmiş",
-  "projectHeader": {
-    "label": "Proje {{name}}",
-    "eyebrow": "PROJE",
-    "tabs": {
-      "label": "Proje görünümleri",
-      "chat": "Sohbet",
-      "files": "Dosyalar",
-      "context": "Bağlam",
-      "artifacts": "Çıktılar"
-    }
-  },
   "emptyModelReply": "Model, görünür bir yanıt üretmeden turu sonlandırdı. İsteği yeniden gönderin; büyük çıktılar için sonucu daha küçük parçalar halinde isteyin.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "İş değerlendirmesi",
+        "description": "Çeyreklik sonuç sunumu — KPI özeti, segment detayı, görünüm. Lacivert ve amber."
+      },
+      "project-kickoff": {
+        "name": "Proje başlangıcı",
+        "description": "Başlangıç sunumu — kapsam, ekip, takvim, sonraki adımlar. Temiz turkuaz."
+      },
+      "monthly-steerco": {
+        "name": "Aylık yönlendirme kurulu",
+        "description": "Yönlendirme kurulu raporu — portföy durumu, riskler, gereken kararlar. Serif ve altın."
+      },
+      "connected-ops": {
+        "name": "Bağlı operasyonlar",
+        "description": "Operasyon değerlendirmesi — saha metrikleri, çalışma süresi, olaylar. Endüstriyel yeşil."
+      },
+      "editorial-field-report": {
+        "name": "Editoryal saha raporu",
+        "description": "Uzun okuma raporu — serif yazı, madde yerine düz metin, tek kırmızı vurgu."
+      },
+      "market-trends-report": {
+        "name": "Pazar trendleri raporu",
+        "description": "Veri odaklı kaydırmalı rapor — kaynak notlu grafikler."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Minimal açık sunum — slayt başına tek fikir, tek mavi vurgu."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Teknik sunumlar için minimal koyu sunum — koda uygun, yeşil vurgu."
+      },
+      "business-report": {
+        "name": "İş raporu",
+        "description": "Uzun biçimli resmî rapor — kapak, içindekiler, veri tabloları, lacivert serif başlıklar."
+      },
+      "decision-memo": {
+        "name": "Karar notu",
+        "description": "Kısa karar notu — KİME/KİMDEN/KONU bloğu, öneri başta, kapak yok."
+      },
+      "operations-guide": {
+        "name": "Operasyon kılavuzu",
+        "description": "Derli toplu prosedür — numaralı adımlar, not kutuları, kontrol listeleri, turkuaz vurgu."
+      },
+      "proposal-sow": {
+        "name": "Teklif / SOW",
+        "description": "Müşteri teklifi — kapsam, takvim, fiyat tablosu, imza bloğu."
+      }
+    },
     "title": "Şablonlar",
     "columnPptx": "Sunumlar · PPTX",
-    "columnHtml": "Raporlar · HTML",
+    "columnHtml": "Web · HTML",
+    "columnDocx": "Belgeler · DOCX",
     "selected": "Seçildi",
-    "buttonTooltip": "Sunum şablonları",
-    "slashDescription": "Sunum şablonu seçin",
-    "importCard": "Tema içe aktar (.md)",
+    "buttonTooltip": "Şablonlar",
+    "slashDescription": "Bir şablon seçin",
+    "importCard": "Şablon içe aktar (.md)",
     "empty": "Kullanılabilir şablon yok",
     "chipTooltip": "Bu mesaj şablonu kullanacak",
+    "scratch": {
+      "prepareError": "Geçici çıktı alanı hazırlanamadı: {{error}}",
+      "retained": "Geçici çıktı dosyaları kurtarma için {{path}} konumunda tutuldu.",
+      "cleanup": "Temizle",
+      "cleanupSuccess": "Geçici çıktı dosyaları kaldırıldı",
+      "cleanupError": "Temizleme başarısız oldu: {{error}}"
+    },
     "importSuccess": "Şablon içe aktarıldı",
     "importError": "İçe aktarma başarısız: {{error}}",
     "removeError": "Silme başarısız: {{error}}",
     "deleteTooltip": "Şablonu sil",
-    "deleteConfirm": "Bu şablon silinsin mi?"
+    "deleteConfirm": "Bu şablon silinsin mi?",
+    "sources": {
+      "reselectRequired": "Ekli dosyaları bu PPTX şablonuyla kullanmak için yeniden seçin.",
+      "reselectAction": "Dosyaları yeniden seç"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Sunum adayının incelenmesi gerekiyor.",
+        "reviewRequiredAfterFailure": "Oluşturma durdu; saklanan sunum adayının yine de incelenmesi gerekiyor.",
+        "trackingRequired": "Sunum çalışmasının izlenmesi gerekiyor.",
+        "dispatchUncertain": "Sunum çalışmasının sonucu doğrulanmadı. Operatörün ilgilenmesi gerekiyor."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Sistem uygulamasında aç",
+        "discard": "Kaydı sil"
+      },
+      "loadError": "Sunum kurtarma durumu yüklenemedi.",
+      "invalidResponse": "Sunum kurtarma durumu doğrulanamadı.",
+      "openError": "Geçerli sunum adayının açılıp açılmadığı doğrulanamadı.",
+      "discardError": "Sunum kaydının silindiği doğrulanamadı."
+    }
   },
   "status": {
-    "waitingApproval": "Onayınızı bekliyor"
+    "waitingApproval": "Onayınızı bekliyor",
+    "running": "Çalışıyor",
+    "done": "Tamamlandı",
+    "doneIdle": "Tamamlandı — boşta",
+    "stopped": "Durduruldu",
+    "failed": "Başarısız"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -710,8 +877,488 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Kaydet ve kapat",
+      "discard": "Değişiklikleri at ve kapat",
+      "cancel": "İptal",
+      "unsavedMessage": "{{count}} sahnede kaydedilmemiş düzenleme var. Kapatmadan önce kaydedilsin mi?",
+      "unsavedMessage_one": "{{count}} sahnede kaydedilmemiş düzenleme var. Kapatmadan önce kaydedilsin mi?",
+      "unsavedMessage_other": "{{count}} sahnede kaydedilmemiş düzenleme var. Kapatmadan önce kaydedilsin mi?",
+      "unavailableMessage": "Yaratıcı Stüdyo yanıt vermedi. Şimdi kapatmak kaydedilmemiş sahne düzenlemelerini silebilir."
+    },
+    "phase": {
+      "nav": {
+        "label": "Yaratıcı iş akışı",
+        "brief": "Özet",
+        "write": "Yaz",
+        "produce": "Üret",
+        "review": "İncele",
+        "saved": "Kaydedildi",
+        "saving": "Değişiklikler kaydediliyor..."
+      },
+      "shared": {
+        "backToLibrary": "Proje kitaplığına dön",
+        "noMediaGeneration": "Bu adımda görüntü veya video oluşturulmaz."
+      },
+      "brief": {
+        "title": "Özet",
+        "description": "Yazmaya başlamadan önce proje hedefini, biçimini ve süresini belirleyin.",
+        "nameLabel": "Proje adı",
+        "intentLabel": "Yaratıcı amaç",
+        "durationLabel": "Hedef süre",
+        "aspectRatioLabel": "En boy oranı",
+        "startWriting": "Yazmaya başla",
+        "saved": "Özetteki tüm değişiklikler kaydedildi.",
+        "saving": "Özet değişiklikleri kaydediliyor...",
+        "unsaved": "Özet değişiklikleri henüz kaydedilmedi.",
+        "invalidName": "Devam etmeden önce bir proje adı girin.",
+        "aspectLocked": "En boy oranı kilitli",
+        "aspectLockedHelp": "Oluşturulan medya eklendikten sonra en boy oranı değiştirilemez."
+      },
+      "write": {
+        "title": "Yaz",
+        "continueToProduce": "Üretime devam et",
+        "askAssistant": "Asistana sor",
+        "assistantTitle": "Yazım asistanı",
+        "assistantDescription": "Hikâye yapısını, çekim fikirlerini ve istemleri geliştirmek için asistanı kullanın.",
+        "textChargeDisclosure": "Hikâye panosu taslağı yapılandırdığınız metin modelini kullanır. Sağlayıcınız model kullanımı için ücret alabilir.",
+        "draftStoryboard": "Hikâye panosu taslağı oluştur",
+        "addShot": "Çekim ekle",
+        "fitToGoal": "Hedefe uydur",
+        "noScenes": "Başlamak için bir çekim ekleyin veya hikâye panosu taslağı oluşturun.",
+        "scriptTableTitle": "Senaryo",
+        "scriptTableHelp": "Her çekim için tek satırda metni, görseli, süreyi ve çıktıyı birlikte şekillendirin.",
+        "shotColumn": "Çekim",
+        "scriptColumn": "Senaryo",
+        "visualColumn": "Görsel",
+        "outputColumn": "Çıktı",
+        "visualPlaceholder": "Ekranda ne gördüğümüzü açıklayın…",
+        "suggestVisual": "Görsel öner",
+        "addReference": "Referans ekle",
+        "moreDetails": "Daha fazla ayrıntı",
+        "invalidTitle": "Kaydetmeden önce bir çekim başlığı girin.",
+        "placeholder": {
+          "opening": "Açılış çekimi",
+          "middle": "Ortadaki çekim",
+          "closing": "Kapanış çekimi"
+        },
+        "needsTitle": "Başlık gerekli",
+        "pacingTitle": "Tempo",
+        "pacingSummary": "Toplam {{total}} sn · Hedef {{target}} sn",
+        "goalMarker": "{{seconds}} sn hedef"
+      },
+      "produce": {
+        "connectEngine": "Bir motor bağlayın — yaklaşık bir dakika, tüm çalışma alanı için yalnızca bir kez",
+        "askTeammate": "Bir ekip arkadaşına sor",
+        "askTeammateCopy": "Bu çalışma alanı için WePrompt Model Ayarları'nda bir görüntü veya video motoru bağlayabilir misin?",
+        "renderingWith": "İşleme motoru —",
+        "engineSummary": "{{model}} · {{kind}} · en fazla {{seconds}} sn",
+        "changeEngines": "Motorları değiştir",
+        "takeRatio": "Çekim {{current}} / {{total}}",
+        "noVisualYet": "HENÜZ GÖRSEL YOK",
+        "writeVisual": "Görseli yaz",
+        "render": "İşle",
+        "renderAnother": "Yeniden işle",
+        "openPreview": "{{title}} önizlemesini aç",
+        "reviewCut": "Kurguyu incele",
+        "modelsTitle": "Modeller",
+        "activityTitle": "Oluşturma etkinliği",
+        "activityEmpty": "Çalışan bir oluşturma işi yok.",
+        "jobsRunning": "{{count}} oluşturma işi çalışıyor",
+        "jobsRunning_one": "{{count}} oluşturma işi çalışıyor",
+        "jobsRunning_other": "{{count}} oluşturma işi çalışıyor"
+      },
+      "review": {
+        "title": "İncele",
+        "description": "Seçilen medyayı kontrol edin, eksik slaytları tamamlayın ve devri hazırlayın.",
+        "handoff": "Devri hazırla",
+        "noAssets": "Devir için hazır seçilmiş medya yok.",
+        "selectedTake": "Kurguda",
+        "slateLabel": "Slayt",
+        "slateDescription": "İşlenmiş medya seçilmediğinde slayt, çekimin sırada kalmasını sağlar.",
+        "excludedFromHandoff": "Seçilmiş medyası olmayan sahneler devirden çıkarılır. İnceleme slaytları dışa aktarılmaz.",
+        "renderedShots": "İşlenmiş {{count}} çekim",
+        "renderedShots_one": "İşlenmiş {{count}} çekim",
+        "renderedShots_other": "İşlenmiş {{count}} çekim",
+        "missingSlates": "Eksik {{count}} slayt",
+        "missingSlates_one": "Eksik {{count}} slayt",
+        "missingSlates_other": "Eksik {{count}} slayt",
+        "openProduce": "Üretimi aç",
+        "handoffDescription": "Devir yalnızca hikâye panosu bildirim dosyasını ve seçilen medyayı içerir. İnceleme slaytları dışa aktarılmaz.",
+        "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir.",
+        "render": {
+          "action": "Videoyu işle",
+          "progress": "Video işleniyor… {{percent}}%",
+          "cancel": "İşlemeyi iptal et",
+          "missingScenes": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "missingScenes_one": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "missingScenes_other": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
+          "resultLabel": "İşlenmiş video",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg yüklü değil. Videoyu işlemek için FFmpeg'i yükleyin.",
+            "busy": "Bu proje zaten işleniyor.",
+            "noRenderableScenes": "İşlenecek çekimi olan sahne yok.",
+            "failed": "Video işlenemedi.",
+            "cancelled": "Video işleme iptal edildi."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Düzenlemeleriniz hâlâ kaydediliyor — kısa bir süre sonra tekrar deneyin."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Hikâyeler planlayın, her sahneyi gözden geçirin ve görsel ya da video varlıkları oluşturun.",
+      "sectionLabel": "Veya kaldığınız yerden devam edin",
+      "loading": "Projeler yükleniyor...",
+      "retry": "Tekrar dene",
+      "readinessLabel": "Taslak storyboard",
+      "readinessSetupRequired": "Model kurulumu gerekli",
+      "openProject": "Projeyi aç",
+      "deleteProject": "Projeyi sil",
+      "deleteConfirmTitle": "Bu proje silinsin mi?",
+      "deleteConfirmBody": "“{{name}}” ve yerel olarak yönetilen varlıkları silinsin mi? Bu işlem geri alınamaz.",
+      "deleteActiveWork": "Bu projede etkin oluşturma işleri var. Projeyi silmeden önce işleri iptal edin veya tamamlanmalarını bekleyin.",
+      "composer": {
+        "label": "Ne hazırlıyoruz?",
+        "placeholder": "Hikâye fikrini tek cümleyle yazın…",
+        "aspectRatioLabel": "En-boy oranı",
+        "durationLabel": "Tahmini uzunluk",
+        "durationGuess": "Yaklaşık {{seconds}} sn",
+        "attachBrief": "Bir özet belgesi ekle",
+        "attachBriefUnavailable": "Özet belgesi ekleri henüz kullanılamıyor.",
+        "submit": "Özetimi oku →",
+        "empty": "Bir cümle yeter — ne hazırladığımızı söyleyin."
+      },
+      "shape": {
+        "title": "Bir yapıyla başla",
+        "label": "{{name}} · {{count}} çekim · {{seconds}} sn",
+        "sceneTitle": "Çekim {{number}}",
+        "productStory": {
+          "name": "Ürün hikâyesi",
+          "starter": "Bizi hiç duymamış kişiler için, dört bölümlü ve marka yazısıyla biten bir ürün hikâyesi."
+        },
+        "featureTeaser": {
+          "name": "Özellik tanıtımı",
+          "starter": "Ürünü zaten kullanan müşterilere yönelik yeni bir özellik için kısa bir tanıtım."
+        },
+        "recapReel": {
+          "name": "Çeyrek özeti",
+          "starter": "Tüm şirket için sıcak ve biraz gururlu bir çeyrek özeti videosu."
+        }
+      },
+      "scriptOnly": "YALNIZCA SENARYO",
+      "posterBadge": "Deneme {{take}} · Çekim {{scene}}",
+      "status": {
+        "partiallyRendered": "{{total}} çekimin {{rendered}} tanesi oluşturuldu",
+        "handedOff": "Teslim edildi · {{seconds}} sn",
+        "scriptOnly": "{{count}} çekim yazıldı, hiçbiri oluşturulmadı"
+      },
+      "meta": "{{shots}} · {{seconds}} sn · {{relative}}",
+      "shotCount": "{{count}} çekim",
+      "shotCount_one": "{{count}} çekim",
+      "shotCount_other": "{{count}} çekim",
+      "projectCount": "{{count}} proje",
+      "projectCount_one": "{{count}} proje",
+      "projectCount_other": "{{count}} proje",
+      "deleteConfirm": "Sil"
+    },
+    "empty": {
+      "title": "İlk hikâyenizi oluşturun",
+      "body": "Bir yaratıcı özetle başlayın, ardından ücretli oluşturma başlamadan önce storyboard'u şekillendirin.",
+      "create": "Proje oluştur"
+    },
+    "create": {
+      "title": "Creative Studio projesi oluştur",
+      "nameLabel": "Proje adı",
+      "namePlaceholder": "Ürün lansmanı hikâyesi",
+      "aspectRatio16x9": "Yatay (16:9)",
+      "aspectRatio9x16": "Dikey (9:16)",
+      "aspectRatio1x1": "Kare (1:1)",
+      "aspectRatio4x3": "Klasik yatay (4:3)",
+      "aspectRatio3x4": "Klasik dikey (3:4)",
+      "invalidDuration": "5 ile 60 saniye arasında bir tam sayı girin.",
+      "cancel": "İptal"
+    },
+    "project": {
+      "loading": "Proje yükleniyor...",
+      "notFound": "Bu Creative Studio projesi bulunamadı.",
+      "title": "Projeye genel bakış",
+      "brief": "Yaratıcı özet",
+      "aspectRatio": "En-boy oranı",
+      "targetDuration": "Hedef uzunluk",
+      "resolution": "Çözünürlük",
+      "sceneCount": "Sahneler",
+      "readiness": "Taslak oluşturma durumu"
+    },
+    "storyboard": {
+      "title": "Storyboard",
+      "addScene": "Sahne ekle",
+      "noScenes": "Bu hikâyeyi şekillendirmeye başlamak için bir sahne ekleyin.",
+      "sceneLimit": "Bir storyboard en fazla 24 sahne içerebilir.",
+      "durationTotal": "Storyboard zamanlaması: {{target}} saniyenin {{total}} saniyesi",
+      "durationMatches": "Sahne zamanlaması proje hedefiyle eşleşiyor.",
+      "durationMismatch": "Toplu oluşturmadan önce sahne zamanlaması proje hedefiyle eşleşmelidir.",
+      "fitToTarget": "{{seconds}} sn'ye uyarla",
+      "fitUnlockedOnly": "Yalnızca işlenmemiş çekimlerin süresini değiştirir.",
+      "fitUnreachable": {
+        "route_unavailable": "İşlenmemiş şu çekimler için uyumlu bir model seçin: {{scenes}}.",
+        "affectedSceneCount": "Etkilenen çekimler: {{count}}",
+        "no_adjustable_scenes": "Tüm çekimler işlendi veya etkin ve toplam süre {{fixedTotalSeconds}} saniye. Hedefi değiştirin ya da işlenmemiş bir çekimi düzenleyin.",
+        "target_out_of_bounds": "Seçilen modeller için tam proje hedefini {{minimumTotalSeconds}} ile {{maximumTotalSeconds}} saniye arasında ayarlayın."
+      },
+      "durationOver": "Hedefin {{seconds}} saniye üzerindesiniz",
+      "durationRemaining": "{{seconds}} saniye kaldı",
+      "increaseTarget": "Hedefi {{seconds}} saniyeye çıkar",
+      "shortenBeforeAdding": "Başka bir sahne eklemeden önce mevcut sahneleri kısaltın.",
+      "dragScene": "Yeniden sıralamak için sahneyi sürükleyin",
+      "removeScene": "Sahneyi kaldır",
+      "dragSceneAccessible": "{{number}}. sahneyi sürükleyin: {{title}}",
+      "moveSceneUpAccessible": "{{number}}. sahneyi yukarı taşıyın: {{title}}",
+      "moveSceneDownAccessible": "{{number}}. sahneyi aşağı taşıyın: {{title}}",
+      "removeSceneAccessible": "{{number}}. sahneyi kaldırın: {{title}}",
+      "removeConfirmTitle": "Bu sahne kaldırılsın mı?",
+      "removeConfirmBody": "İçe aktarılmış veya oluşturulmuş medyası ya da oluşturma geçmişi olan sahneler kaldırılamaz.",
+      "removeBlocked": "İçe aktarılmış veya oluşturulmuş medyası ya da oluşturma geçmişi olan sahneler kaldırılamaz.",
+      "retry": "Değişikliği tekrar dene",
+      "discard": "Yerel değişiklikleri at"
+    },
+    "scene": {
+      "accessibleName": "Sahne {{number}}: {{title}}",
+      "number": "Sahne {{number}}",
+      "status": {
+        "needs_title": "Başlık gerekli",
+        "needs_prompt": "İstem gerekiyor",
+        "ready": "Oluşturmaya hazır",
+        "generating": "Oluşturuluyor",
+        "needs_selection": "Bir varyasyon seçin",
+        "generated": "Oluşturuldu",
+        "needs_attention": "Dikkat gerekiyor"
+      },
+      "image": "Görsel",
+      "video": "Video",
+      "duration": "Süre",
+      "durationSeconds": "{{seconds}} saniye",
+      "durationSeconds_one": "{{seconds}} saniye",
+      "durationSeconds_other": "{{seconds}} saniye",
+      "selected": "Seçili sahne"
+    },
+    "inspector": {
+      "title": "Sahne yönlendirmesi",
+      "sectionsLabel": "Sahne düzenleme bölümleri",
+      "directionTab": "Görsel",
+      "scriptTab": "Senaryo",
+      "titleLabel": "Sahne başlığı",
+      "purposeLabel": "Sahne hedefi",
+      "purposePlaceholder": "Bu sahne neyi başarmalı?",
+      "visualPromptLabel": "Görsel prompt",
+      "visualPromptPlaceholder": "Çekimi, özneyi, ortamı, ışığı ve hareketi açıklayın.",
+      "narrationLabel": "Anlatım",
+      "onScreenTextLabel": "Ekran metni",
+      "mediaKindLabel": "Çıktı türü",
+      "durationLabel": "Saniye cinsinden sahne süresi",
+      "invalidDuration": "1 ile 60 saniye arasında bir tam sayı girin.",
+      "saving": "Sahne kaydediliyor...",
+      "saved": "Sahne kaydedildi",
+      "saveFailed": "Sahne kaydedilemedi.",
+      "unsavedChanges": "Kaydedilmemiş değişiklikleriniz korundu."
+    },
+    "draft": {
+      "title": "Storyboard taslağı oluştur",
+      "body": "WePrompt incelemeniz için sahneler, anlatım, ekran metni ve zamanlama önerecek.",
+      "checking": "Seçilen hikâye panosu modeli kontrol ediliyor...",
+      "ready": "Taslak oluşturmaya hazır",
+      "setupRequired": "Yapay zekâ ile taslak oluşturmak için bir hikâye panosu modeli seçip yapılandırın.",
+      "unavailable": "Storyboard taslağı oluşturma şu anda kullanılamıyor.",
+      "providerLabel": "Hikâye panosu sağlayıcısı",
+      "modelLabel": "Hikâye panosu modeli",
+      "chargeNotice": "Taslak, projede seçilen modeli kullanır ve sağlayıcı ücreti doğurabilir.",
+      "replaceTitle": "Mevcut storyboard değiştirilsin mi?",
+      "replaceBody": "Yeniden taslak oluşturmak, yalnızca geçerli bir öneri döndürüldükten sonra tüm mevcut sahneleri değiştirir.",
+      "confirm": "Storyboard taslağı oluştur",
+      "cancel": "İptal",
+      "configureModel": "Model ayarlarını aç",
+      "manualFallback": "Elle düzenlemeye devam et",
+      "failed": "Storyboard taslağı oluşturulamadı. Mevcut sahneleriniz değiştirilmedi."
+    },
+    "routing": {
+      "title": "Oluşturma rotası",
+      "modelLabel": "Model",
+      "missingRoute": "Uyumlu bir oluşturma rotası seçin.",
+      "invalidRoute": "Bu rota artık geçerli değil. Oluşturmadan önce gözden geçirin."
+    },
+    "review": {
+      "generateReadyScenes": "{{count}} hazır sahne oluştur",
+      "generateReadyScenes_one": "{{count}} hazır sahne oluştur",
+      "generateReadyScenes_other": "{{count}} hazır sahne oluştur",
+      "noReadyScenes": "Oluşturulmaya hazır sahne yok.",
+      "generateScene": "Sahneyi oluştur",
+      "regenerateScene": "Başka bir varyasyon oluştur",
+      "title": "Oluşturmayı gözden geçir",
+      "sceneCount": "{{count}} sahne seçildi",
+      "videoSeconds": "{{seconds}} saniye video istendi",
+      "selectedDurationFull": "Seçili süre: {{seconds}} saniye",
+      "selectedDurationFull_one": "Seçili süre: {{seconds}} saniye",
+      "selectedDurationFull_other": "Seçili süre: {{seconds}} saniye",
+      "targetDurationFull": "Hedef süre: {{seconds}} saniye",
+      "targetDurationFull_one": "Hedef süre: {{seconds}} saniye",
+      "targetDurationFull_other": "Hedef süre: {{seconds}} saniye",
+      "providerLabel": "Sağlayıcı",
+      "modelLabel": "Model",
+      "aspectRatio": "En-boy oranı",
+      "resolution": "Çözünürlük",
+      "watermarkOff": "Filigran devre dışı",
+      "audioOff": "Sessiz çıktı; ses oluşturma devre dışı",
+      "missingRoute": "En az bir sahnenin oluşturma rotası yok.",
+      "invalidRoute": "Seçilen rotalardan en az biri geçersiz.",
+      "durationMismatch": "Storyboard zamanlaması proje hedefiyle eşleşmiyor.",
+      "chargeNotice": "Oluşturma, seçtiğiniz sağlayıcı hesabını kullanır ve ücrete tabi olabilir.",
+      "confirm": "Onayla ve oluştur",
+      "cancel": "İptal",
+      "disabledMissingRoutes": "Seçili her sahne için geçerli bir rota seçin.",
+      "audioOn": "Bu işleme oluşturulmuş ses içerir; varsa sessiz rotalar sessiz kalır."
+    },
+    "jobs": {
+      "progress": "%{{percent}} tamamlandı",
+      "cancel": "İşi iptal et",
+      "retry": "Oluşturmayı tekrar dene",
+      "retryConfirmationTitle": "Oluşturma tekrar denensin mi?",
+      "retryConfirmationBody": "Tekrar denemek, bu oluşturmayı sağlayıcıya yeniden gönderir ve sağlayıcı ücretine tabi olabilir.",
+      "retryConfirmationConfirm": "Onayla ve tekrar dene",
+      "retryDownload": "İndirmeyi tekrar dene",
+      "retryChargeTitle": "Olası mükerrer ücretle tekrar denensin mi?",
+      "retryChargeBody": "Önceki gönderimin sonucu bilinmiyor. Tekrar denemek başka bir sağlayıcı ücretine yol açabilir.",
+      "retryChargeConfirm": "Kabul et ve tekrar dene",
+      "status": {
+        "queuedLocal": "Gönderim bekleniyor",
+        "submitting": "Gönderiliyor",
+        "queuedRemote": "Sağlayıcı kuyruğunda",
+        "running": "Oluşturuluyor",
+        "needsAttention": "İlgilenilmesi gerekiyor",
+        "succeeded": "Tamamlandı",
+        "failed": "Başarısız",
+        "cancelled": "İptal edildi"
+      },
+      "errors": {
+        "invalidRequest": "Oluşturma isteği geçersiz.",
+        "auth": "Sağlayıcı kimlik bilgilerini reddetti.",
+        "quota": "Sağlayıcı hesabında yeterli kota yok.",
+        "rateLimited": "Sağlayıcının istek sınırına ulaşıldı. Daha sonra tekrar deneyin.",
+        "providerUnavailable": "Oluşturma sağlayıcısı kullanılamıyor.",
+        "timeout": "Sağlayıcı zamanında yanıt vermedi.",
+        "pollDeadline": "Motor ilerleme bildirmeyi durdurdu. Yeniden denemeden önce sağlayıcıyla durumu kontrol edin.",
+        "noOutput": "Sağlayıcı kullanılabilir bir çıktı olmadan tamamladı.",
+        "submissionUnknown": "Gönderimin sonucu bilinmiyor. Tekrar denemeden önce mükerrer ücret uyarısını gözden geçirin.",
+        "downloadFailed": "Oluşturma tamamlandı ancak çıktı indirilemedi.",
+        "unsupported": "Bu sağlayıcı istenen işlemi desteklemiyor.",
+        "unknown": "Oluşturma işi bilinmeyen bir nedenle başarısız oldu."
+      }
+    },
+    "preview": {
+      "title": "Önizleme",
+      "noAssetTitle": "Oluşturulan varlık seçilmedi",
+      "noAssetBody": "Önizlemek için bir sahne oluşturun veya mevcut bir varyasyonu seçin.",
+      "imageAlt": "Oluşturulan sahne görseli",
+      "videoLabel": "Oluşturulan sahne videosu",
+      "loadFailed": "Bu yönetilen varlık yüklenemedi.",
+      "versions": "Varyasyonlar",
+      "versionLabel": "Varyasyon {{number}}",
+      "selectVersion": "Bu varyasyonu seç",
+      "selectVersionAccessible": "{{number}}. varyasyonu seç",
+      "importReference": "İlk kare görselini içe aktar",
+      "importing": "Referans içe aktarılıyor...",
+      "missingVisualPrompt": "Bu sahneyi oluşturmadan önce görsel bir istem ekleyin.",
+      "missingModel": "Bu sahneyi oluşturmadan önce uyumlu bir proje modeli seçin.",
+      "generateThisScene": "Bu sahneyi oluştur",
+      "videoReady": "Video hazır"
+    },
+    "timeline": {
+      "title": "Sahne şeridi",
+      "selectScene": "Sahneyi seç",
+      "totalDuration": "Toplam storyboard süresi",
+      "totalDurationFull": "Toplam süre: {{seconds}} saniye",
+      "totalDurationFull_one": "Toplam süre: {{seconds}} saniye",
+      "totalDurationFull_other": "Toplam süre: {{seconds}} saniye",
+      "selectSceneAccessible": "{{number}}. sahneyi seç: {{title}}, {{seconds}} saniye",
+      "selectSceneAccessible_one": "{{number}}. sahneyi seç: {{title}}, {{seconds}} saniye",
+      "selectSceneAccessible_other": "{{number}}. sahneyi seç: {{title}}, {{seconds}} saniye",
+      "noScenes": "Gösterilecek sahne yok"
+    },
+    "export": {
+      "title": "Varlıkları dışa aktar",
+      "body": "Storyboard bildirim dosyasını ve her sahnenin seçili varlığını dışa aktarın.",
+      "gapWarning": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
+      "gapWarning_one": "{{shots}} numaralı çekim hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
+      "gapWarning_other": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
+      "confirmSelectedCount": "{{count}} çekim dışa aktarılsın mı?",
+      "confirmSelectedCount_one": "{{count}} çekim dışa aktarılsın mı?",
+      "confirmSelectedCount_other": "{{count}} çekim dışa aktarılsın mı?",
+      "includeReferences": "İçe aktarılan referans görsellerini dahil et",
+      "confirm": "Varlıkları dışa aktar",
+      "cancel": "İptal",
+      "choosing": "Dışa aktarma klasörü seçiliyor...",
+      "successTitle": "Varlıklar dışa aktarıldı",
+      "successBody": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
+      "successBody_one": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
+      "successBody_other": "Seçilen {{count}} sahne “{{folderName}}” klasörüne devredildi.",
+      "partialTitle": "Varlıklar eksik sahnelerle dışa aktarıldı",
+      "partialBody": "Kullanılabilir varlıklar “{{folderName}}” klasörüne dışa aktarıldı.",
+      "failed": "Varlıklar dışa aktarılamadı.",
+      "noSelectedAssets": "Dışa aktarmaya hazır seçili sahne varlığı yok.",
+      "folderLabel": "Dışa aktarma klasörü"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio bu derlemede devre dışıdır.",
+      "invalidPayload": "İstek geçersiz veya eksik bilgiler içeriyor.",
+      "projectNotFound": "Creative Studio projesi artık mevcut değil.",
+      "storyboardExists": "Bu projede zaten bir storyboard var. Yeniden taslak oluşturmadan önce değiştirmeyi onaylayın.",
+      "staleProject": "Proje başka bir yerde değiştirildi. Tekrar denemeden önce yenileyin.",
+      "planningUnavailable": "Storyboard taslağı oluşturma kullanılamıyor. Elle düzenlemeye devam edebilirsiniz.",
+      "invalidRoute": "Seçilen oluşturma rotası geçersiz veya kullanılamıyor.",
+      "cancellationRefused": "Sağlayıcı artık çalışan bu işi iptal edemiyor.",
+      "duplicateChargeAcknowledgementRequired": "Tekrar denemeden önce olası mükerrer sağlayıcı ücretini kabul edin.",
+      "busy": "Bu projede etkin oluşturma işleri var.",
+      "provider": "Sağlayıcı isteği tamamlayamadı.",
+      "storage": "Creative Studio yerel verilerini güncelleyemedi."
+    },
+    "models": {
+      "storyboard": "Hikâye panosu modeli",
+      "selectionRequired": "Bir model seçin",
+      "unavailable": "Seçilen model kullanılamıyor",
+      "openSettings": "Model Ayarlarını Aç",
+      "refresh": "Modelleri yenile",
+      "loading": "Modeller yükleniyor...",
+      "updateFailed": "Proje model seçimi güncellenemedi."
+    }
+  },
   "artifact": {
     "emptyTitle": "Açık artefakt yok",
     "emptyHint": "Oluşturulan dosyalar ve belgeler burada açılır."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Devam etmek için onayınız bekleniyor.",
+    "running": "Bu sohbet üzerinde çalışılıyor.",
+    "doneUnseen": "Tamamlandı, ancak henüz görüntülemediniz.",
+    "doneSeen": "Yakın zamanda tamamlandı ve görüntülendi.",
+    "doneIdle": "En az bir dakika önce tamamlandı ve görüntülendi.",
+    "stopped": "Tamamlanmadan önce durduruldu.",
+    "failed": "Bir hata nedeniyle tamamlanamadı."
+  },
+  "staleKnowledgeHint": {
+    "body": "Bu sohbet projenin bilgi tabanında arama yapamaz — dosyalar eklenmeden önce başlatıldı.",
+    "action": "Yeni sohbet başlat"
+  },
+  "emptyChat": "Başlamak için bir mesaj gönderin.",
+  "presentationSubmission": {
+    "pending": "Sunum gönderimi bekliyor",
+    "restore": "Geri yükle",
+    "persistenceFailure": "Sunum gönderimi kaydedilemedi.",
+    "queued": "Sunum kuyruğa alındı",
+    "uncertainTracking": "Gönderim durumu belirsiz. Mevcut çalışmayı izleyin; yeniden göndermeyin."
   }
 }

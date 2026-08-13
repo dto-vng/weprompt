@@ -62,6 +62,7 @@
       "installFailed": "officecli otomatik olarak yüklenemedi. Arka uç günlüklerini kontrol edip yeniden deneyin.",
       "portTimeout": "Önizleme servisi başladı ancak zamanında hazır olmadı. Yeniden deneyin.",
       "startFailed": "Office önizleme servisi başlatılamadı.",
+      "invalidArtifact": "Bu Office dosyası bozuk veya geçersiz ve güvenli biçimde teslim edilemez.",
       "outsideSandbox": "Bu dosya geçerli çalışma alanı sandbox'ının dışında.",
       "originalSafe": "Çalışma alanındaki özgün dosya değiştirilmedi."
     },

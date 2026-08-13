@@ -17,7 +17,6 @@
     "quickActionStar": "¿Te gusta? ¡Danos una estrella!",
     "skillsMarket": "Mercado de habilidades de WePrompt",
     "skillsMarketDesc": "Busca y activa habilidades de la comunidad según sea necesario. Configúralo una vez, disponible para todos los asistentes.",
-    "skillsMarketDetails": "Ver más >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "Proyecto {{name}}",
+    "eyebrow": "PROYECTO",
+    "tabs": {
+      "label": "Vistas del proyecto",
+      "chat": "Chat",
+      "files": "Archivos",
+      "context": "Contexto",
+      "artifacts": "Artefactos"
+    }
+  },
+  "projectHome": {
+    "newChat": "Nuevo chat",
+    "composerPlaceholder": "Inicia un nuevo chat en este proyecto…",
+    "scopedHint": "— limitado a este proyecto",
+    "chats": "Chats",
+    "showAll": "Mostrar todo",
+    "showLess": "Mostrar menos",
+    "emptyChatsTitle": "Aún no hay chats",
+    "emptyChatsBody": "Inicia uno arriba para empezar a trabajar en este proyecto.",
+    "instructions": "Instrucciones",
+    "instructionsApplies": "Se aplica a los nuevos chats de este proyecto.",
+    "instructionsEmpty": "Añade instrucciones para guiar cada chat de este proyecto.",
+    "addInstructions": "Añadir instrucciones",
+    "edit": "Editar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "instructionsSaved": "Instrucciones guardadas",
+    "instructionsSaveFailed": "No se pudieron guardar las instrucciones",
+    "files": "Archivos",
+    "revealInFolder": "Mostrar en carpeta",
+    "filesReadonly": "Solo lectura · se gestiona en la carpeta",
+    "filesEmpty": "La carpeta de este proyecto está vacía.",
+    "folderMissingTitle": "Carpeta no encontrada",
+    "folderMissingRelink": "Volver a vincular carpeta",
+    "folderMissingBody": "El resto de la página sigue funcionando.",
+    "metaChats": "{{count}} chats",
+    "metaActive": "activo {{time}}",
+    "notFoundTitle": "Proyecto no encontrado",
+    "notFoundBody": "Es posible que este proyecto se haya eliminado o que su enlace esté desactualizado.",
+    "backHome": "Volver al inicio",
+    "rename": "Renombrar",
+    "relink": "Volver a vincular carpeta",
+    "reveal": "Mostrar en carpeta",
+    "remove": "Quitar",
+    "knowledge": "Conocimiento",
+    "knowledgeAdd": "Añadir archivos",
+    "knowledgeDropFolderMissing": "Vuelve a conectar la carpeta Knowledge Base antes de añadir archivos.",
+    "knowledgeDropUnsupported": "Ninguno de esos archivos es compatible. Compatibles: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "No se pudo actualizar la base de conocimiento.",
+    "knowledgeRelinkFailed": "No se pudo volver a vincular la carpeta del proyecto.",
+    "knowledgeRetryFailed": "No se pudo poner ese archivo en la cola de indexación.",
+    "knowledgeDeleteFailed": "No se pudo mover ese archivo a la papelera.",
+    "knowledgeAddFailed": "No se pudieron añadir esos archivos a la base de conocimiento.",
+    "knowledgeEmpty": "Añade documentos para crear la base de conocimientos de este proyecto. El asistente los busca automáticamente en todos los chats del proyecto.",
+    "knowledgeSemanticOff": "búsqueda semántica desactivada — no hay modelo de embedding configurado",
+    "knowledgeSemanticOffAction": "Añadir un modelo de embedding",
+    "knowledgeEmbedAll": "Incrustar todo",
+    "knowledgePassagesTooltip": "Este archivo se divide en fragmentos consultables y el asistente usa los más relevantes al responder.",
+    "knowledgeStatusIndexing": "Indexando…",
+    "knowledgeProgressReading": "Leyendo la página {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Transcribiendo la página {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Incrustando {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "Falló",
+    "knowledgeStatusUnsupported": "No compatible",
+    "knowledgeStatusNotEmbedded": "Solo palabras clave",
+    "knowledgeNotEmbeddedDetail": "Se puede buscar por palabras clave, pero solo {{done}}/{{total}} fragmentos están incrustados. Reintenta para incrustar el resto.",
+    "knowledgeRetry": "Reintentar",
+    "knowledgeError": "La base de conocimientos no está disponible.",
+    "knowledgeSupportedTypes": "Compatible con: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Actualizar",
+    "knowledgeOpenOriginal": "Abrir archivo original",
+    "knowledgeDeleteFile": "Eliminar archivo",
+    "knowledgeDeleteConfirm": "¿Mover «{{fileName}}» a la papelera? También se quitará de la base de conocimiento.",
+    "knowledgeFolderHint": "Los archivos están en la carpeta «Knowledge Base» dentro de la carpeta del proyecto. Todo lo que pongas ahí se indexa automáticamente.",
+    "knowledgeFolderMissingTitle": "No se encuentra la carpeta Knowledge Base",
+    "knowledgeFolderMissingBody": "Puede que se haya movido, renombrado o eliminado. Tu conocimiento indexado se conserva: restaura la carpeta o vuelve a vincular el proyecto y luego actualiza.",
+    "knowledgePreviewNote": "Este es el texto indexado que busca el asistente, no el diseño original.",
+    "knowledgePreviewTruncated": "Vista previa recortada. Abre el archivo original para ver el documento completo.",
+    "knowledgePreviewError": "No se pudo cargar el texto indexado de este archivo.",
+    "knowledgePreviewNotReady": "Todavía no hay texto indexado que abrir.",
+    "knowledgeCitationMissing": "Este archivo ya no está en la base de conocimientos.",
+    "knowledgeOcrTag": "Transcrito (OCR)",
+    "knowledgeOcrDetail": "Transcrito de un escaneo por {{model}}. Páginas omitidas: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "ninguna"
+  },
   "history": {
+    "moreActions": "Más acciones",
     "recents": "Recientes",
     "noHistory": "Sin historial de chats",
     "deleteTitle": "Eliminar",
@@ -80,6 +166,8 @@
     "removeProject": "Quitar proyecto",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Nuevo chat en este proyecto",
+    "expandProjectChats": "Expandir chats del proyecto",
+    "collapseProjectChats": "Contraer chats del proyecto",
     "deleting": "Eliminando...",
     "reorderPinned": "Arrastra para reordenar la conversación fijada",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "No se pudo quitar el proyecto. Vuelve a abrirlo e inténtalo de nuevo; los archivos de la carpeta no se eliminaron.",
+    "removeProjectChatDetachFailed": "No se pudieron desvincular algunos chats de este proyecto. El proyecto se conservó; intenta quitarlo de nuevo.",
+    "removeProjectStateChanged": "La lista de proyectos cambió antes de quitarlo. Actualízala e inténtalo de nuevo.",
+    "removeProjectStorageFailed": "No se pudieron guardar los cambios del proyecto. Comprueba que WePrompt pueda acceder a los datos de la aplicación y vuelve a intentarlo.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "Proyecto",
+    "projectMenu": {
+      "trigger": "Proyecto"
+    },
     "pasteConfirm_title": "Pegar archivos",
     "pasteConfirm_message": "¿Estás seguro de que deseas pegar '{{name}}' en la carpeta seleccionada ({{target}})?",
     "pasteConfirm_paste": "Pegar",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "Terminal",
       "explorer": "Explorador de archivos"
-    },
-    "projectMenu": {
-      "trigger": "Proyecto"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "No hay modelo seleccionado para la sesión actual, no se puede enviar el mensaje",
     "sendMessageTo": "Enviar mensaje a {{model}}",
     "processing": "Procesando...",
+    "stopGenerating": "Detener generación",
     "quotaExceededTitle": "Cuota del modelo alcanzada",
     "quotaExceededBody": "La cuota del modelo actual se agotó. ¿Cambiar a {{model}} para continuar?",
     "quotaExceededNoFallback": "Cuota del modelo alcanzada. Por favor cambia a otro modelo disponible.",
@@ -548,7 +640,9 @@
     "today": "Hoy",
     "weekToDate": "Semana hasta la fecha",
     "monthToDate": "Mes hasta la fecha",
-    "triggerLabel": "Mostrar uso del contexto"
+    "triggerLabel": "Mostrar uso del contexto",
+    "estimated": "Estimado",
+    "unavailable": "Uso del contexto no disponible"
   },
   "skill_generator": {
     "title": "Generar habilidad/regla",
@@ -617,36 +711,109 @@
     }
   },
   "notFound": "Conversación no encontrada o ha sido eliminada",
-  "projectHeader": {
-    "label": "Proyecto {{name}}",
-    "eyebrow": "PROYECTO",
-    "tabs": {
-      "label": "Vistas del proyecto",
-      "chat": "Chat",
-      "files": "Archivos",
-      "context": "Contexto",
-      "artifacts": "Artefactos"
-    }
-  },
   "emptyModelReply": "El modelo terminó el turno sin producir una respuesta visible. Envía la solicitud de nuevo; para salidas grandes, pide el resultado en partes más pequeñas.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Revisión de negocio",
+        "description": "Presentación de resultados trimestrales — resumen de KPI, detalle por segmento, perspectivas. Azul marino y ámbar."
+      },
+      "project-kickoff": {
+        "name": "Arranque de proyecto",
+        "description": "Presentación de arranque — alcance, equipo, calendario, próximos pasos. Verde azulado limpio."
+      },
+      "monthly-steerco": {
+        "name": "Comité de dirección mensual",
+        "description": "Informe para el comité de dirección — estado de la cartera, riesgos, decisiones pendientes. Serif y dorado."
+      },
+      "connected-ops": {
+        "name": "Operaciones conectadas",
+        "description": "Revisión de operaciones — métricas por planta, disponibilidad, incidencias. Verde industrial."
+      },
+      "editorial-field-report": {
+        "name": "Informe de campo editorial",
+        "description": "Informe de lectura larga — tipografía serif, prosa en lugar de viñetas, un acento rojo."
+      },
+      "market-trends-report": {
+        "name": "Informe de tendencias de mercado",
+        "description": "Informe de desplazamiento centrado en datos — gráficos con notas y fuentes."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Presentación clara y minimalista — una idea por diapositiva, un acento azul."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Presentación oscura y minimalista para charlas técnicas — apta para código, acento verde."
+      },
+      "business-report": {
+        "name": "Informe de negocio",
+        "description": "Informe formal extenso — portada, índice, tablas de datos, títulos serif azul marino."
+      },
+      "decision-memo": {
+        "name": "Memorando de decisión",
+        "description": "Memorando breve de decisión — bloque PARA/DE/ASUNTO, recomendación al principio, sin portada."
+      },
+      "operations-guide": {
+        "name": "Guía de operaciones",
+        "description": "Procedimiento compacto — pasos numerados, cuadros de nota, listas de verificación, acento verde azulado."
+      },
+      "proposal-sow": {
+        "name": "Propuesta / SOW",
+        "description": "Propuesta para cliente — alcance, calendario, tabla de precios, bloque de firma."
+      }
+    },
     "title": "Plantillas",
     "columnPptx": "Presentaciones · PPTX",
-    "columnHtml": "Informes · HTML",
+    "columnHtml": "Web · HTML",
+    "columnDocx": "Documentos · DOCX",
     "selected": "Seleccionado",
-    "buttonTooltip": "Plantillas de presentación",
-    "slashDescription": "Elegir una plantilla de presentación",
-    "importCard": "Importar tema (.md)",
+    "buttonTooltip": "Plantillas",
+    "slashDescription": "Elegir una plantilla",
+    "importCard": "Importar plantilla (.md)",
     "empty": "No hay plantillas disponibles",
     "chipTooltip": "Este mensaje usará la plantilla",
+    "scratch": {
+      "prepareError": "No se pudo preparar el espacio temporal del artefacto: {{error}}",
+      "retained": "Los archivos temporales del artefacto se conservaron para recuperación en {{path}}.",
+      "cleanup": "Limpiar",
+      "cleanupSuccess": "Archivos temporales del artefacto eliminados",
+      "cleanupError": "Error al limpiar: {{error}}"
+    },
     "importSuccess": "Plantilla importada",
     "importError": "Error al importar: {{error}}",
     "removeError": "Error al eliminar: {{error}}",
     "deleteTooltip": "Eliminar plantilla",
-    "deleteConfirm": "¿Eliminar esta plantilla?"
+    "deleteConfirm": "¿Eliminar esta plantilla?",
+    "sources": {
+      "reselectRequired": "Vuelve a seleccionar los archivos adjuntos para usarlos con esta plantilla PPTX.",
+      "reselectAction": "Volver a seleccionar archivos"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "El candidato de presentación requiere revisión.",
+        "reviewRequiredAfterFailure": "La generación se detuvo; el candidato de presentación conservado todavía requiere revisión.",
+        "trackingRequired": "La ejecución de la presentación requiere seguimiento.",
+        "dispatchUncertain": "El resultado de la ejecución de la presentación no está confirmado. Requiere la atención de un operador."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Abrir en la aplicación del sistema",
+        "discard": "Descartar registro"
+      },
+      "loadError": "No se pudo cargar el estado de recuperación de la presentación.",
+      "invalidResponse": "No se pudo verificar el estado de recuperación de la presentación.",
+      "openError": "No se pudo confirmar si se abrió el candidato de presentación actual.",
+      "discardError": "No se pudo confirmar que se descartó el registro de la presentación."
+    }
   },
   "status": {
-    "waitingApproval": "Esperando tu aprobación"
+    "waitingApproval": "Esperando tu aprobación",
+    "running": "Trabajando",
+    "done": "Finalizado",
+    "doneIdle": "Finalizado — inactivo",
+    "stopped": "Detenido",
+    "failed": "Fallido"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -709,8 +876,503 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Guardar y cerrar",
+      "discard": "Descartar y cerrar",
+      "cancel": "Cancelar",
+      "unsavedMessage": "{{count}} escenas tienen cambios sin guardar. ¿Quieres guardarlos antes de cerrar?",
+      "unsavedMessage_one": "{{count}} escena tiene cambios sin guardar. ¿Quieres guardarlos antes de cerrar?",
+      "unsavedMessage_many": "{{count}} escenas tienen cambios sin guardar. ¿Quieres guardarlos antes de cerrar?",
+      "unsavedMessage_other": "{{count}} escenas tienen cambios sin guardar. ¿Quieres guardarlos antes de cerrar?",
+      "unavailableMessage": "El Estudio creativo no respondió. Cerrar ahora puede descartar cambios de escena sin guardar."
+    },
+    "phase": {
+      "nav": {
+        "label": "Flujo creativo",
+        "brief": "Briefing",
+        "write": "Escribir",
+        "produce": "Producir",
+        "review": "Revisar",
+        "saved": "Guardado",
+        "saving": "Guardando cambios..."
+      },
+      "shared": {
+        "backToLibrary": "Volver a la biblioteca de proyectos",
+        "noMediaGeneration": "Este paso no genera imágenes ni vídeos."
+      },
+      "brief": {
+        "title": "Briefing",
+        "description": "Define el objetivo, el formato y la duración del proyecto antes de escribir.",
+        "nameLabel": "Nombre del proyecto",
+        "intentLabel": "Intención creativa",
+        "durationLabel": "Duración objetivo",
+        "aspectRatioLabel": "Relación de aspecto",
+        "startWriting": "Empezar a escribir",
+        "saved": "Todos los cambios del briefing están guardados.",
+        "saving": "Guardando cambios del briefing...",
+        "unsaved": "Los cambios del briefing aún no se han guardado.",
+        "invalidName": "Introduce un nombre de proyecto antes de continuar.",
+        "aspectLocked": "La relación de aspecto está bloqueada",
+        "aspectLockedHelp": "La relación de aspecto no se puede cambiar después de añadir contenido generado."
+      },
+      "write": {
+        "title": "Escribir",
+        "continueToProduce": "Continuar a Producir",
+        "askAssistant": "Preguntar al asistente",
+        "assistantTitle": "Asistente de escritura",
+        "assistantDescription": "Usa el asistente para desarrollar la estructura de la historia, ideas de planos y prompts.",
+        "textChargeDisclosure": "El borrador del guion gráfico usa el modelo de texto configurado. El proveedor puede cobrar por el uso del modelo.",
+        "draftStoryboard": "Crear borrador del guion gráfico",
+        "addShot": "Añadir plano",
+        "fitToGoal": "Ajustar al objetivo",
+        "noScenes": "Añade un plano o crea un borrador del guion gráfico para empezar.",
+        "scriptTableTitle": "Guion",
+        "scriptTableHelp": "Una fila por plano para ajustar juntos el texto, la imagen, la duración y la salida.",
+        "shotColumn": "Plano",
+        "scriptColumn": "Guion",
+        "visualColumn": "Imagen",
+        "outputColumn": "Salida",
+        "visualPlaceholder": "Describe lo que vemos…",
+        "suggestVisual": "Sugerir una imagen",
+        "addReference": "Añadir referencia",
+        "moreDetails": "Más detalles",
+        "invalidTitle": "Escribe un título para el plano antes de guardar.",
+        "placeholder": {
+          "opening": "Plano de apertura",
+          "middle": "Plano intermedio",
+          "closing": "Plano de cierre"
+        },
+        "needsTitle": "Falta el título",
+        "pacingTitle": "Ritmo",
+        "pacingSummary": "{{total}} s en total · objetivo de {{target}} s",
+        "goalMarker": "Objetivo de {{seconds}} s"
+      },
+      "produce": {
+        "connectEngine": "Conecta un motor — aproximadamente un minuto, una sola vez para todo el espacio de trabajo",
+        "askTeammate": "Pedir ayuda a un compañero",
+        "askTeammateCopy": "¿Puedes conectar un motor de imagen o vídeo para este espacio de trabajo en la configuración de modelos de WePrompt?",
+        "renderingWith": "Renderizando con —",
+        "engineSummary": "{{model}} · {{kind}} · hasta {{seconds}} s",
+        "changeEngines": "Cambiar motores",
+        "takeRatio": "Toma {{current}} / {{total}}",
+        "noVisualYet": "AÚN NO HAY VISUAL",
+        "writeVisual": "Escribir el visual",
+        "render": "Renderizar",
+        "renderAnother": "Renderizar otra vez",
+        "openPreview": "Abrir vista previa de {{title}}",
+        "reviewCut": "Revisar montaje",
+        "modelsTitle": "Modelos",
+        "activityTitle": "Actividad de generación",
+        "activityEmpty": "No hay trabajos de generación en curso.",
+        "jobsRunning": "{{count}} trabajos de generación en curso",
+        "jobsRunning_one": "{{count}} trabajo de generación en curso",
+        "jobsRunning_many": "{{count}} trabajos de generación en curso",
+        "jobsRunning_other": "{{count}} trabajos de generación en curso"
+      },
+      "review": {
+        "title": "Revisar",
+        "description": "Comprueba el contenido seleccionado, completa las claquetas que faltan y prepara la entrega.",
+        "handoff": "Preparar entrega",
+        "noAssets": "No hay contenido seleccionado listo para entregar.",
+        "selectedTake": "En el montaje",
+        "slateLabel": "Claqueta",
+        "slateDescription": "Una claqueta mantiene un plano en la secuencia cuando no hay contenido renderizado seleccionado.",
+        "excludedFromHandoff": "Los planos sin contenido seleccionado se excluyen de la entrega. Las claquetas de revisión no se exportan.",
+        "renderedShots": "{{count}} planos renderizados",
+        "renderedShots_one": "{{count}} plano renderizado",
+        "renderedShots_many": "{{count}} planos renderizados",
+        "renderedShots_other": "{{count}} planos renderizados",
+        "missingSlates": "{{count}} claquetas ausentes",
+        "missingSlates_one": "{{count}} claqueta ausente",
+        "missingSlates_many": "{{count}} claquetas ausentes",
+        "missingSlates_other": "{{count}} claquetas ausentes",
+        "openProduce": "Abrir Producir",
+        "handoffDescription": "La entrega contiene únicamente el manifiesto del guion gráfico y el contenido seleccionado. Las claquetas de revisión no se exportan.",
+        "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado.",
+        "render": {
+          "action": "Renderizar vídeo",
+          "progress": "Renderizando vídeo… {{percent}}%",
+          "cancel": "Cancelar renderizado",
+          "missingScenes": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
+          "missingScenes_one": "{{count}} escena no tiene toma y no aparecerá en el vídeo.",
+          "missingScenes_other": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
+          "resultLabel": "Vídeo renderizado",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg no está instalado. Instala FFmpeg para renderizar el vídeo.",
+            "busy": "Este proyecto ya se está renderizando.",
+            "noRenderableScenes": "Ninguna escena tiene una toma para renderizar.",
+            "failed": "No se pudo renderizar el vídeo.",
+            "cancelled": "Renderizado de vídeo cancelado."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Tus cambios todavía se están guardando; inténtalo de nuevo en un momento."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Planifica historias, revisa cada escena y genera recursos de imagen o vídeo.",
+      "sectionLabel": "O retoma desde donde lo dejaste",
+      "loading": "Cargando proyectos...",
+      "retry": "Intentar de nuevo",
+      "readinessLabel": "Borrador del guion gráfico",
+      "readinessSetupRequired": "Es necesario configurar el modelo",
+      "openProject": "Abrir proyecto",
+      "deleteProject": "Eliminar proyecto",
+      "deleteConfirmTitle": "¿Eliminar este proyecto?",
+      "deleteConfirmBody": "¿Eliminar «{{name}}» y sus recursos gestionados localmente? Esta acción no se puede deshacer.",
+      "deleteActiveWork": "Este proyecto tiene tareas de generación activas. Cancélalas o espera a que finalicen antes de eliminarlo.",
+      "composer": {
+        "label": "¿Qué vamos a crear?",
+        "placeholder": "La idea de la historia en una frase…",
+        "aspectRatioLabel": "Relación de aspecto",
+        "durationLabel": "Duración estimada",
+        "durationGuess": "Unos {{seconds}} s",
+        "attachBrief": "Adjuntar documento de briefing",
+        "attachBriefUnavailable": "Todavía no se pueden adjuntar documentos de briefing.",
+        "submit": "Leer mi briefing →",
+        "empty": "Una frase es suficiente: dinos qué vamos a crear."
+      },
+      "shape": {
+        "title": "Empezar con una estructura",
+        "label": "{{name}} · {{count}} planos · {{seconds}} s",
+        "sceneTitle": "Plano {{number}}",
+        "productStory": {
+          "name": "Historia de producto",
+          "starter": "Una historia de producto para quienes nunca han oído hablar de nosotros: cuatro momentos que terminan en la marca denominativa."
+        },
+        "featureTeaser": {
+          "name": "Avance de función",
+          "starter": "Un avance breve de una función nueva, dirigido a clientes que ya utilizan el producto."
+        },
+        "recapReel": {
+          "name": "Reel de recapitulación",
+          "starter": "Un reel de recapitulación del trimestre para toda la empresa, cálido y con un toque de orgullo."
+        }
+      },
+      "scriptOnly": "SOLO GUION",
+      "posterBadge": "Toma {{take}} · Plano {{scene}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} de {{total}} planos renderizados",
+        "handedOff": "Entregado · {{seconds}} s",
+        "scriptOnly": "{{count}} planos escritos, ninguno renderizado"
+      },
+      "meta": "{{shots}} · {{seconds}} s · {{relative}}",
+      "shotCount": "{{count}} planos",
+      "shotCount_one": "{{count}} plano",
+      "shotCount_many": "{{count}} planos",
+      "shotCount_other": "{{count}} planos",
+      "projectCount": "{{count}} proyectos",
+      "projectCount_one": "{{count}} proyecto",
+      "projectCount_many": "{{count}} proyectos",
+      "projectCount_other": "{{count}} proyectos",
+      "deleteConfirm": "Eliminar"
+    },
+    "empty": {
+      "title": "Crea tu primera historia",
+      "body": "Empieza con un briefing y después da forma al guion gráfico antes de iniciar cualquier generación de pago.",
+      "create": "Crear proyecto"
+    },
+    "create": {
+      "title": "Crear un proyecto de Creative Studio",
+      "nameLabel": "Nombre del proyecto",
+      "namePlaceholder": "Historia de lanzamiento de producto",
+      "aspectRatio16x9": "Horizontal (16:9)",
+      "aspectRatio9x16": "Vertical (9:16)",
+      "aspectRatio1x1": "Cuadrado (1:1)",
+      "aspectRatio4x3": "Horizontal clásico (4:3)",
+      "aspectRatio3x4": "Vertical clásico (3:4)",
+      "invalidDuration": "Introduce un número entero entre 5 y 60 segundos.",
+      "cancel": "Cancelar"
+    },
+    "project": {
+      "loading": "Cargando proyecto...",
+      "notFound": "No se ha encontrado este proyecto de Creative Studio.",
+      "title": "Resumen del proyecto",
+      "brief": "Briefing",
+      "aspectRatio": "Relación de aspecto",
+      "targetDuration": "Duración objetivo",
+      "resolution": "Resolución",
+      "sceneCount": "Escenas",
+      "readiness": "Disponibilidad del borrador"
+    },
+    "storyboard": {
+      "title": "Guion gráfico",
+      "addScene": "Añadir escena",
+      "noScenes": "Añade una escena para empezar a dar forma a esta historia.",
+      "sceneLimit": "Un guion gráfico puede contener hasta 24 escenas.",
+      "durationTotal": "Duración del guion gráfico: {{total}} de {{target}} segundos",
+      "durationMatches": "La duración de las escenas coincide con el objetivo del proyecto.",
+      "durationMismatch": "La duración de las escenas debe coincidir con el objetivo del proyecto antes de la generación por lotes.",
+      "fitToTarget": "Ajustar a {{seconds}} s",
+      "fitUnlockedOnly": "Solo reajusta las tomas sin renderizar.",
+      "fitUnreachable": {
+        "route_unavailable": "Selecciona un modelo compatible para estas tomas sin renderizar: {{scenes}}.",
+        "affectedSceneCount": "Tomas afectadas: {{count}}",
+        "no_adjustable_scenes": "Todas las tomas están renderizadas o activas y suman {{fixedTotalSeconds}} segundos. Cambia el objetivo o edita una toma sin renderizar.",
+        "target_out_of_bounds": "Define el objetivo del proyecto completo entre {{minimumTotalSeconds}} y {{maximumTotalSeconds}} segundos para los modelos seleccionados."
+      },
+      "durationOver": "{{seconds}} segundos por encima del objetivo",
+      "durationRemaining": "{{seconds}} segundos restantes",
+      "increaseTarget": "Aumentar el objetivo a {{seconds}} segundos",
+      "shortenBeforeAdding": "Acorta las escenas existentes antes de añadir otra.",
+      "dragScene": "Arrastra la escena para reordenarla",
+      "removeScene": "Eliminar escena",
+      "dragSceneAccessible": "Arrastrar escena {{number}}: {{title}}",
+      "moveSceneUpAccessible": "Mover escena {{number}}: {{title}} hacia arriba",
+      "moveSceneDownAccessible": "Mover escena {{number}}: {{title}} hacia abajo",
+      "removeSceneAccessible": "Eliminar escena {{number}}: {{title}}",
+      "removeConfirmTitle": "¿Eliminar esta escena?",
+      "removeConfirmBody": "No se pueden eliminar las escenas con contenido importado o generado, ni con historial de generación.",
+      "removeBlocked": "No se pueden eliminar las escenas con contenido importado o generado, ni con historial de generación.",
+      "retry": "Reintentar el cambio",
+      "discard": "Descartar cambios locales"
+    },
+    "scene": {
+      "accessibleName": "Escena {{number}}: {{title}}",
+      "number": "Escena {{number}}",
+      "status": {
+        "needs_title": "Falta el título",
+        "needs_prompt": "Falta el prompt",
+        "ready": "Lista para generar",
+        "generating": "Generando",
+        "needs_selection": "Selecciona una variación",
+        "generated": "Generada",
+        "needs_attention": "Requiere atención"
+      },
+      "image": "Imagen",
+      "video": "Vídeo",
+      "duration": "Duración",
+      "durationSeconds": "{{seconds}} segundos",
+      "durationSeconds_one": "{{seconds}} segundo",
+      "durationSeconds_many": "{{seconds}} segundos",
+      "durationSeconds_other": "{{seconds}} segundos",
+      "selected": "Escena seleccionada"
+    },
+    "inspector": {
+      "title": "Dirección de la escena",
+      "sectionsLabel": "Secciones de edición de la escena",
+      "directionTab": "Visual",
+      "scriptTab": "Guion",
+      "titleLabel": "Título de la escena",
+      "purposeLabel": "Objetivo de la escena",
+      "purposePlaceholder": "¿Qué debe lograr esta escena?",
+      "visualPromptLabel": "Prompt visual",
+      "visualPromptPlaceholder": "Describe el plano, el sujeto, el entorno, la iluminación y el movimiento.",
+      "narrationLabel": "Narración",
+      "onScreenTextLabel": "Texto en pantalla",
+      "mediaKindLabel": "Tipo de salida",
+      "durationLabel": "Duración de la escena en segundos",
+      "invalidDuration": "Introduce un número entero entre 1 y 60 segundos.",
+      "saving": "Guardando escena...",
+      "saved": "Escena guardada",
+      "saveFailed": "No se ha podido guardar la escena.",
+      "unsavedChanges": "Tus cambios sin guardar se conservan."
+    },
+    "draft": {
+      "title": "Crear un borrador del guion gráfico",
+      "body": "WePrompt propondrá escenas, narración, texto en pantalla y tiempos para que los revises.",
+      "checking": "Comprobando el modelo de guion gráfico seleccionado...",
+      "ready": "Listo para crear el borrador",
+      "setupRequired": "Selecciona y configura un modelo de guion gráfico para crear con IA.",
+      "unavailable": "La creación del borrador del guion gráfico no está disponible en este momento.",
+      "providerLabel": "Proveedor del guion gráfico",
+      "modelLabel": "Modelo de guion gráfico",
+      "chargeNotice": "El borrador usa el modelo seleccionado en el proyecto y puede generar cargos del proveedor.",
+      "replaceTitle": "¿Sustituir el guion gráfico actual?",
+      "replaceBody": "Al crear otro borrador, las escenas actuales solo se sustituyen cuando se recibe una propuesta válida.",
+      "confirm": "Crear borrador",
+      "cancel": "Cancelar",
+      "configureModel": "Abrir configuración del modelo",
+      "manualFallback": "Continuar con la edición manual",
+      "failed": "No se ha podido crear un borrador del guion gráfico. Las escenas actuales no se han modificado."
+    },
+    "routing": {
+      "title": "Ruta de generación",
+      "modelLabel": "Modelo",
+      "missingRoute": "Elige una ruta de generación compatible.",
+      "invalidRoute": "Esta ruta ya no es válida. Revísala antes de generar."
+    },
+    "review": {
+      "generateReadyScenes": "Generar {{count}} escenas listas",
+      "generateReadyScenes_one": "Generar {{count}} escena lista",
+      "generateReadyScenes_many": "Generar {{count}} escenas listas",
+      "generateReadyScenes_other": "Generar {{count}} escenas listas",
+      "noReadyScenes": "No hay escenas listas para generar.",
+      "generateScene": "Generar escena",
+      "regenerateScene": "Generar otra variante",
+      "title": "Revisar generación",
+      "sceneCount": "{{count}} escenas seleccionadas",
+      "videoSeconds": "{{seconds}} segundos de vídeo solicitados",
+      "selectedDurationFull": "Duración seleccionada: {{seconds}} segundos",
+      "selectedDurationFull_one": "Duración seleccionada: {{seconds}} segundo",
+      "selectedDurationFull_many": "Duración seleccionada: {{seconds}} segundos",
+      "selectedDurationFull_other": "Duración seleccionada: {{seconds}} segundos",
+      "targetDurationFull": "Duración objetivo: {{seconds}} segundos",
+      "targetDurationFull_one": "Duración objetivo: {{seconds}} segundo",
+      "targetDurationFull_many": "Duración objetivo: {{seconds}} segundos",
+      "targetDurationFull_other": "Duración objetivo: {{seconds}} segundos",
+      "providerLabel": "Proveedor",
+      "modelLabel": "Modelo",
+      "aspectRatio": "Relación de aspecto",
+      "resolution": "Resolución",
+      "watermarkOff": "Marca de agua desactivada",
+      "audioOff": "Salida sin sonido; generación de audio desactivada",
+      "missingRoute": "Al menos una escena no tiene ruta de generación.",
+      "invalidRoute": "Al menos una ruta seleccionada no es válida.",
+      "durationMismatch": "La duración del guion gráfico no coincide con el objetivo del proyecto.",
+      "chargeNotice": "La generación usa la cuenta del proveedor seleccionado y puede generar cargos.",
+      "confirm": "Confirmar y generar",
+      "cancel": "Cancelar",
+      "disabledMissingRoutes": "Elige una ruta válida para cada escena seleccionada.",
+      "audioOn": "Este renderizado incluye audio generado; las rutas silenciosas, si las hay, permanecen sin sonido."
+    },
+    "jobs": {
+      "progress": "{{percent}} % completado",
+      "cancel": "Cancelar tarea",
+      "retry": "Reintentar generación",
+      "retryConfirmationTitle": "¿Reintentar la generación?",
+      "retryConfirmationBody": "Al reintentar, esta generación se vuelve a enviar al proveedor y puede generar cargos del proveedor.",
+      "retryConfirmationConfirm": "Confirmar y reintentar",
+      "retryDownload": "Reintentar descarga",
+      "retryChargeTitle": "¿Reintentar con un posible cargo duplicado?",
+      "retryChargeBody": "Se desconoce el resultado del envío anterior. Si lo reintentas, el proveedor podría aplicar otro cargo.",
+      "retryChargeConfirm": "Aceptar y reintentar",
+      "status": {
+        "queuedLocal": "Esperando para enviar",
+        "submitting": "Enviando",
+        "queuedRemote": "En cola del proveedor",
+        "running": "Generando",
+        "needsAttention": "Requiere atención",
+        "succeeded": "Completada",
+        "failed": "Fallida",
+        "cancelled": "Cancelada"
+      },
+      "errors": {
+        "invalidRequest": "La solicitud de generación no es válida.",
+        "auth": "El proveedor ha rechazado las credenciales.",
+        "quota": "La cuenta del proveedor no tiene cuota suficiente.",
+        "rateLimited": "Se ha alcanzado el límite de solicitudes del proveedor. Inténtalo más tarde.",
+        "providerUnavailable": "El proveedor de generación no está disponible.",
+        "timeout": "El proveedor no ha respondido a tiempo.",
+        "pollDeadline": "El motor dejó de informar el progreso. Consulte al proveedor antes de volver a intentarlo.",
+        "noOutput": "El proveedor ha finalizado sin una salida utilizable.",
+        "submissionUnknown": "Se desconoce el resultado del envío. Revisa la advertencia de cargo duplicado antes de reintentarlo.",
+        "downloadFailed": "La generación ha finalizado, pero no se ha podido descargar la salida.",
+        "unsupported": "Este proveedor no admite la operación solicitada.",
+        "unknown": "La tarea de generación ha fallado por un motivo desconocido."
+      }
+    },
+    "preview": {
+      "title": "Vista previa",
+      "noAssetTitle": "No hay ningún recurso generado seleccionado",
+      "noAssetBody": "Genera una escena o selecciona una variante existente para previsualizarla.",
+      "imageAlt": "Imagen de escena generada",
+      "videoLabel": "Vídeo de escena generado",
+      "loadFailed": "No se ha podido cargar este recurso gestionado.",
+      "versions": "Variantes",
+      "versionLabel": "Variante {{number}}",
+      "selectVersion": "Seleccionar esta variante",
+      "selectVersionAccessible": "Seleccionar variante {{number}}",
+      "importReference": "Importar imagen del primer fotograma",
+      "importing": "Importando referencia...",
+      "missingVisualPrompt": "Añade una indicación visual antes de generar esta escena.",
+      "missingModel": "Selecciona un modelo de proyecto compatible antes de generar esta escena.",
+      "generateThisScene": "Generar esta escena",
+      "videoReady": "Vídeo listo"
+    },
+    "timeline": {
+      "title": "Tira de escenas",
+      "selectScene": "Seleccionar escena",
+      "totalDuration": "Duración total del guion gráfico",
+      "totalDurationFull": "Duración total: {{seconds}} segundos",
+      "totalDurationFull_one": "Duración total: {{seconds}} segundo",
+      "totalDurationFull_many": "Duración total: {{seconds}} segundos",
+      "totalDurationFull_other": "Duración total: {{seconds}} segundos",
+      "selectSceneAccessible": "Seleccionar escena {{number}}: {{title}}, {{seconds}} segundos",
+      "selectSceneAccessible_one": "Seleccionar escena {{number}}: {{title}}, {{seconds}} segundo",
+      "selectSceneAccessible_many": "Seleccionar escena {{number}}: {{title}}, {{seconds}} segundos",
+      "selectSceneAccessible_other": "Seleccionar escena {{number}}: {{title}}, {{seconds}} segundos",
+      "noScenes": "No hay escenas que mostrar"
+    },
+    "export": {
+      "title": "Exportar recursos",
+      "body": "Exporta el manifiesto del guion gráfico y el recurso seleccionado de cada escena.",
+      "gapWarning": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
+      "gapWarning_one": "El plano {{shots}} sigue siendo una claqueta y no se incluirá.",
+      "gapWarning_many": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
+      "gapWarning_other": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
+      "confirmSelectedCount": "¿Exportar {{count}} planos?",
+      "confirmSelectedCount_one": "¿Exportar {{count}} plano?",
+      "confirmSelectedCount_many": "¿Exportar {{count}} planos?",
+      "confirmSelectedCount_other": "¿Exportar {{count}} planos?",
+      "includeReferences": "Incluir imágenes de referencia importadas",
+      "confirm": "Exportar recursos",
+      "cancel": "Cancelar",
+      "choosing": "Eligiendo una carpeta de exportación...",
+      "successTitle": "Recursos exportados",
+      "successBody": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
+      "successBody_one": "Se entregó {{count}} escena seleccionada en «{{folderName}}».",
+      "successBody_many": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
+      "successBody_other": "Se entregaron {{count}} escenas seleccionadas en «{{folderName}}».",
+      "partialTitle": "Recursos exportados con escenas ausentes",
+      "partialBody": "Los recursos disponibles se han exportado a «{{folderName}}».",
+      "failed": "No se han podido exportar los recursos.",
+      "noSelectedAssets": "No hay recursos de escenas seleccionados listos para exportar.",
+      "folderLabel": "Carpeta de exportación"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio está deshabilitado en esta compilación.",
+      "invalidPayload": "La solicitud contiene información no válida o incompleta.",
+      "projectNotFound": "El proyecto de Creative Studio ya no existe.",
+      "storyboardExists": "Este proyecto ya tiene un guion gráfico. Confirma que deseas sustituirlo antes de crear otro borrador.",
+      "staleProject": "El proyecto se ha modificado en otro lugar. Actualízalo antes de reintentarlo.",
+      "planningUnavailable": "La creación del borrador del guion gráfico no está disponible. Puedes continuar editando manualmente.",
+      "invalidRoute": "La ruta de generación seleccionada no es válida o no está disponible.",
+      "cancellationRefused": "El proveedor ya no puede cancelar esta tarea en curso.",
+      "duplicateChargeAcknowledgementRequired": "Acepta el posible cargo duplicado del proveedor antes de reintentarlo.",
+      "busy": "Este proyecto tiene tareas de generación activas.",
+      "provider": "El proveedor no ha podido completar la solicitud.",
+      "storage": "Creative Studio no ha podido actualizar sus datos locales."
+    },
+    "models": {
+      "storyboard": "Modelo de guion gráfico",
+      "selectionRequired": "Selecciona un modelo",
+      "unavailable": "El modelo seleccionado no está disponible",
+      "openSettings": "Abrir ajustes de modelos",
+      "refresh": "Actualizar modelos",
+      "loading": "Cargando modelos...",
+      "updateFailed": "No se pudo actualizar la selección de modelo del proyecto."
+    }
+  },
   "artifact": {
     "emptyTitle": "Sin artefactos abiertos",
     "emptyHint": "Los archivos y documentos generados se abren aquí."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Esperando tu aprobación para continuar.",
+    "running": "Trabajando en este chat.",
+    "doneUnseen": "Finalizado, pero todavía no lo has visto.",
+    "doneSeen": "Finalizado recientemente y ya visto.",
+    "doneIdle": "Finalizado hace al menos un minuto y ya visto.",
+    "stopped": "Detenido antes de finalizar.",
+    "failed": "No se pudo finalizar debido a un error."
+  },
+  "staleKnowledgeHint": {
+    "body": "Este chat no puede buscar en la base de conocimiento del proyecto: se inició antes de que se añadieran archivos.",
+    "action": "Iniciar un chat nuevo"
+  },
+  "emptyChat": "Envía un mensaje para empezar.",
+  "presentationSubmission": {
+    "pending": "Envío de presentación pendiente",
+    "restore": "Restaurar",
+    "persistenceFailure": "No se pudo guardar el envío de la presentación.",
+    "queued": "Presentación añadida a la cola",
+    "uncertainTracking": "El estado del envío es incierto. Sigue la ejecución existente; no vuelvas a enviarla."
   }
 }

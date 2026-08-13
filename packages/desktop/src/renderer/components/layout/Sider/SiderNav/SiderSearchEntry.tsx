@@ -36,7 +36,9 @@ const SiderSearchEntry: React.FC<SiderSearchEntryProps> = ({
             onSessionClick={onSessionClick}
             onConversationSelect={onConversationSelect}
             label={t('conversation.historySearch.shortTitle')}
-            buttonClassName='!w-full !h-32px !py-0 !px-0 !justify-center !rd-8px !hover:bg-fill-3 !active:bg-fill-4'
+            // No height override: the trigger's own h-34px matches the rest of the
+            // collapsed rail. This forced 32px, giving the rail three row heights.
+            buttonClassName='!w-full !py-0 !px-0 !justify-center !rd-8px !hover:bg-fill-3 !active:bg-fill-4'
           />
         </div>
       </Tooltip>

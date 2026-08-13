@@ -65,6 +65,7 @@ type GuidActionRowProps = {
   // File handling
   files: string[];
   onFilesUploaded: (paths: string[]) => void;
+  onManagedFilePicker?: () => void | Promise<void>;
 
   // Model selector node (rendered by parent for the desktop layout)
   modelSelectorNode: React.ReactNode;
@@ -103,6 +104,7 @@ type GuidActionRowProps = {
   // Send button
   loading: boolean;
   isButtonDisabled: boolean;
+  managedPresentationPending?: boolean;
   speechInputNode?: React.ReactNode;
   onSend: () => void;
 };
@@ -110,6 +112,7 @@ type GuidActionRowProps = {
 const GuidActionRow: React.FC<GuidActionRowProps> = ({
   files,
   onFilesUploaded,
+  onManagedFilePicker,
   modelSelectorNode,
   isGeminiMode,
   modelList,
@@ -134,6 +137,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
   onToggleMcpServer,
   loading,
   isButtonDisabled,
+  managedPresentationPending = false,
   speechInputNode,
   onSend,
 }) => {
@@ -162,6 +166,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
 
   const handleLocalFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (managedPresentationPending) return;
       const fileList = e.target.files;
       if (!fileList || fileList.length === 0) return;
       setUploading(true);
@@ -178,7 +183,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       // Reset so the same file can be re-selected
       e.target.value = '';
     },
-    [onFilesUploaded, t]
+    [managedPresentationPending, onFilesUploaded, t]
   );
 
   const getModeDisplayLabel = (mode: AgentModeOption): string =>
@@ -211,6 +216,15 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       })
       .catch((error) => console.error('Failed to open file dialog:', error));
   }, [onFilesUploaded]);
+
+  const openDesktopFilePicker = useCallback(() => {
+    if (managedPresentationPending) return;
+    if (!isWebUI && onManagedFilePicker) {
+      void onManagedFilePicker();
+      return;
+    }
+    openHostFilePicker();
+  }, [isWebUI, managedPresentationPending, onManagedFilePicker, openHostFilePicker]);
 
   // Build the mobile action sheet entries: model / thought level / permission
   // (single-select), attach (action), skills / MCP (multi-select checkboxes).
@@ -313,7 +327,11 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       label: t('common.fileAttach.addFiles', { defaultValue: 'Add files' }),
       variant: 'muted',
       dividerBefore: true,
-      onClick: () => (isWebUI ? fileInputRef.current?.click() : openHostFilePicker()),
+      onClick: () => {
+        if (managedPresentationPending) return;
+        if (isWebUI) fileInputRef.current?.click();
+        else openDesktopFilePicker();
+      },
     });
 
     // Skills (multi-select).
@@ -394,7 +412,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
     activeSkillCount,
     activeMcpCount,
     isWebUI,
-    openHostFilePicker,
+    openDesktopFilePicker,
     t,
   ]);
 
@@ -403,16 +421,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
       className='min-w-200px'
       onClickMenuItem={(key) => {
         if (key === 'file') {
-          ipcBridge.dialog.showOpen
-            .invoke({ properties: ['openFile', 'multiSelections'] })
-            .then((uploadedFiles) => {
-              if (uploadedFiles && uploadedFiles.length > 0) {
-                onFilesUploaded(uploadedFiles);
-              }
-            })
-            .catch((error) => {
-              console.error('Failed to open file dialog:', error);
-            });
+          openDesktopFilePicker();
         } else if (key === 'device') {
           fileInputRef.current?.click();
         }
@@ -543,7 +552,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
                 shape='circle'
                 icon={<Plus theme='outline' size='14' strokeWidth={2} fill={iconColors.primary} />}
                 loading={uploading}
-                disabled={uploading}
+                disabled={uploading || managedPresentationPending}
                 data-testid='file-upload-btn'
                 onClick={() => setIsSheetOpen(true)}
               />
@@ -565,7 +574,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
                   className={isPlusDropdownOpen ? styles.plusButtonRotate : ''}
                   icon={<Plus theme='outline' size='14' strokeWidth={2} fill={iconColors.primary} />}
                   loading={uploading}
-                  disabled={uploading}
+                  disabled={uploading || managedPresentationPending}
                   data-testid='file-upload-btn'
                 />
                 {files.length > 0 && (
@@ -624,14 +633,16 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
           shape='circle'
           type='primary'
           loading={loading}
-          disabled={isButtonDisabled}
+          disabled={isButtonDisabled || managedPresentationPending}
           className='send-button-custom'
           style={{
             backgroundColor: isButtonDisabled ? undefined : '#000000',
             borderColor: isButtonDisabled ? undefined : '#000000',
           }}
           icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-          onClick={onSend}
+          onClick={() => {
+            if (!managedPresentationPending) onSend();
+          }}
           data-testid='guid-send-btn'
         />
       </div>

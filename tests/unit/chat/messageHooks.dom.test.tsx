@@ -46,6 +46,15 @@ const existingTextMessage: TMessage = {
   },
 };
 
+const segment = (id: string, msgId: string, content: string): IMessageText => ({
+  id,
+  msg_id: msgId,
+  conversation_id: 'conv-1',
+  type: 'text',
+  position: 'left',
+  content: { content },
+});
+
 const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ message, add = false }) => {
   const addOrUpdateMessage = useAddOrUpdateMessage();
   const messages = useMessageList();
@@ -57,6 +66,7 @@ const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ mess
   const acpMessage = messages.find((item): item is IMessageAcpToolCall => item.type === 'acp_tool_call');
   const rawOutput = acpMessage?.content.update.rawOutput;
   const leftTexts = messages.filter((item): item is IMessageText => item.type === 'text' && item.position === 'left');
+  const tips = messages.filter((item) => item.type === 'tips');
 
   return (
     <div>
@@ -66,6 +76,7 @@ const MessageListProbe: React.FC<{ message: TMessage; add?: boolean }> = ({ mess
       <div data-testid='image-path'>{rawOutput?.image?.path ?? ''}</div>
       <div data-testid='left-text-count'>{leftTexts.length}</div>
       <div data-testid='left-text-contents'>{leftTexts.map((item) => item.content.content).join('')}</div>
+      <div data-testid='tip-count'>{tips.length}</div>
     </div>
   );
 };
@@ -152,14 +163,14 @@ describe('conversation message hooks ACP sanitization', () => {
   });
 
   it('collapses streamed reply segments when a replace snapshot arrives after tool calls', () => {
-    const segment = (id: string, content: string): IMessageText => ({
-      id,
-      msg_id: 'reply-1',
+    const userMessage: IMessageText = {
+      id: 'user-1',
+      msg_id: 'user-1',
       conversation_id: 'conv-1',
       type: 'text',
-      position: 'left',
-      content: { content },
-    });
+      position: 'right',
+      content: { content: 'Write a greeting' },
+    };
     const toolCall: TMessage = {
       id: 'tool-1',
       msg_id: 'tool-1',
@@ -169,8 +180,8 @@ describe('conversation message hooks ACP sanitization', () => {
       content: { call_id: 'tool-1', name: 'Write', status: 'finish' },
     } as TMessage;
     const snapshot: IMessageText = {
-      id: 'snapshot-1',
-      msg_id: 'reply-1',
+      id: 'persisted-answer',
+      msg_id: 'persisted-reply',
       conversation_id: 'conv-1',
       type: 'text',
       position: 'left',
@@ -178,7 +189,12 @@ describe('conversation message hooks ACP sanitization', () => {
     };
 
     renderMessageListProbe(snapshot, {
-      initial: [segment('seg-1', 'Hello '), toolCall, segment('seg-2', 'world')],
+      initial: [
+        userMessage,
+        segment('seg-1', 'live-reply', 'Hello '),
+        toolCall,
+        segment('seg-2', 'live-reply', 'world'),
+      ],
     });
 
     flushNextMessageUpdate();
@@ -186,7 +202,80 @@ describe('conversation message hooks ACP sanitization', () => {
     const textContents = screen.getByTestId('left-text-contents').textContent;
     expect(textContents).toBe('Hello world');
     expect(screen.getByTestId('left-text-count')).toHaveTextContent('1');
-    expect(screen.getByTestId('message-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('message-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('last-message-type')).toHaveTextContent('tool_call');
+  });
+
+  it.each([
+    ['empty', ''],
+    ['whitespace-only', ' \n\t'],
+  ])('preserves the full same-ID tool-split aggregate for an %s replacement', (_label, replacementContent) => {
+    const userMessage: IMessageText = {
+      id: 'user-aggregate',
+      msg_id: 'user-aggregate',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'right',
+      content: { content: 'Write a greeting' },
+    };
+    const toolCall: TMessage = {
+      id: 'tool-aggregate',
+      msg_id: 'tool-aggregate',
+      conversation_id: 'conv-1',
+      type: 'tool_call',
+      position: 'left',
+      content: { call_id: 'tool-aggregate', name: 'Write', status: 'finish' },
+    } as TMessage;
+    const snapshot: IMessageText = {
+      id: 'snapshot-aggregate',
+      msg_id: 'live-aggregate',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'left',
+      content: { content: replacementContent, replace: true },
+    };
+
+    renderMessageListProbe(snapshot, {
+      initial: [
+        userMessage,
+        segment('seg-aggregate-1', 'live-aggregate', 'Hello '),
+        toolCall,
+        segment('seg-aggregate-2', 'live-aggregate', 'world'),
+      ],
+    });
+
+    flushNextMessageUpdate();
+
+    expect(screen.getByTestId('left-text-contents')).toHaveTextContent('Hello world');
+    expect(screen.getByTestId('left-text-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('message-count')).toHaveTextContent('3');
+  });
+
+  it('retracts a premature empty-reply tip when valid replacement content arrives', () => {
+    const emptyReplyTip: TMessage = {
+      id: 'tip-1',
+      msg_id: 'empty-reply-reply-recovered',
+      conversation_id: 'conv-1',
+      type: 'tips',
+      position: 'center',
+      content: { content: 'Empty reply', type: 'error' },
+    } as TMessage;
+    const snapshot: IMessageText = {
+      id: 'snapshot-recovered',
+      msg_id: 'reply-recovered',
+      conversation_id: 'conv-1',
+      type: 'text',
+      position: 'left',
+      content: { content: 'Recovered answer', replace: true },
+    };
+
+    renderMessageListProbe(snapshot, { initial: [emptyReplyTip] });
+
+    flushNextMessageUpdate();
+
+    expect(screen.getByTestId('tip-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('message-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('left-text-contents')).toHaveTextContent('Recovered answer');
   });
 
   it('appends a replace snapshot as a new message when no segment exists', () => {

@@ -21,8 +21,9 @@ import TeamMemberDraftList, { type TeamMemberDraft } from './memberPicker/TeamMe
 // [E2E SYNC] 修改此组件的 DOM 结构（class、标题、关闭按钮等）时，
 // 必须同步更新 tests/e2e/cases/teams/team-create.e2e.ts、team-whitelist.e2e.ts、
 // team-name-validation.e2e.ts 中的 selector，并立即向上汇报改动情况。
-// 注意：迁移到 AionModal variant='standard' 后，关闭按钮为 button[aria-label="Close"]，
-// 不再是 .arco-btn-text / .arco-modal-close-icon。
+// 注意：迁移到 AionModal variant='standard' 后，关闭按钮是 header 里的 button，
+// 不再是 .arco-btn-text / .arco-modal-close-icon。其 aria-label 取 t('common.close')，
+// 会随语言变化，所以测试里请用 helpers 的 modalCloseButton()，不要写死 "Close"。
 // 窄屏（layout.isMobile，<768px）改为单栏：布局根为 team-create-layout-mobile，
 // 助手选择器是锚在 team-create-add-member-btn 上的下拉（选中即关，助手随即出现在下方列表）；
 // 桌面双栏为 team-create-layout。
@@ -145,7 +146,7 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
   const assistantPicker = (
     <>
       {allAssistants.length === 0 ? (
-        <div className='flex min-h-112px items-center justify-center rounded-8px border border-dashed border-border-2 bg-fill-1 py-14px text-13px text-t-tertiary'>
+        <div className='flex min-h-112px items-center justify-center rounded-8px border border-dashed border-[var(--color-border-2)] bg-fill-1 py-14px text-13px text-t-tertiary'>
           {t('team.create.noSupportedAgents', { defaultValue: 'No supported assistants available' })}
         </div>
       ) : (
@@ -204,7 +205,7 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
       style={{ height: 'min(54vh, 470px)', minHeight: 390 }}
     >
       <section
-        className='flex min-h-0 flex-col border-r border-border-3 px-20px pb-18px pt-12px'
+        className='flex min-h-0 flex-col border-r border-[var(--color-border-3)] px-20px pb-18px pt-12px'
         data-testid='team-create-assistant-pane'
       >
         <div className='mb-12px text-15px font-600 leading-22px text-t-secondary'>
@@ -223,7 +224,7 @@ const TeamCreateModal: React.FC<Props> = ({ visible, onClose, onCreated }) => {
           onLeaderChange={setLeaderSelectionId}
           onRemove={handleRemoveDraft}
         />
-        <div className='mt-14px shrink-0 border-t border-border-2 pt-14px'>{teamFields}</div>
+        <div className='mt-14px shrink-0 border-t border-[var(--color-border-2)] pt-14px'>{teamFields}</div>
       </section>
     </div>
   );

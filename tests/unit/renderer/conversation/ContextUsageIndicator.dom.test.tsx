@@ -27,6 +27,12 @@ vi.mock('react-i18next', () => ({
         'conversation.contextUsage.weekToDate': 'Week to date',
         'conversation.contextUsage.monthToDate': 'Month to date',
         'conversation.contextUsage.triggerLabel': 'Show context usage',
+        'conversation.contextUsage.estimated': 'Estimated',
+        'conversation.contextUsage.unavailable': 'Context usage unavailable',
+        'conversation.contextHandoff.budget.healthy': 'Context {{percent}}',
+        'conversation.contextHandoff.budget.watch': 'Context watch {{percent}}',
+        'conversation.contextHandoff.budget.compress': 'Compress soon {{percent}}',
+        'conversation.contextHandoff.budget.too_large': 'Context large {{percent}}',
       };
 
       return (translations[key] ?? key).replace(
@@ -49,7 +55,7 @@ describe('ContextUsageIndicator', () => {
       <ContextUsageIndicator tokenUsage={{ total_tokens: 122_700 }} context_limit={1_000_000} localUsage={localUsage} />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Show context usage' });
+    const trigger = screen.getByRole('button', { name: 'Show context usage: 12% used' });
     fireEvent.focus(trigger);
 
     expect(await screen.findByText('Context window')).toBeInTheDocument();
@@ -72,7 +78,7 @@ describe('ContextUsageIndicator', () => {
       />
     );
 
-    const trigger = screen.getByRole('button', { name: 'Show context usage' });
+    const trigger = screen.getByRole('button', { name: 'Show context usage: 125% used' });
     fireEvent.mouseEnter(trigger);
 
     expect(await screen.findByText('125% used')).toBeInTheDocument();
@@ -82,16 +88,16 @@ describe('ContextUsageIndicator', () => {
   });
 
   it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
-    'renders no meter for invalid context usage %s',
+    'renders the unknown-state meter for invalid context usage %s',
     (totalTokens) => {
       render(<ContextUsageIndicator tokenUsage={{ total_tokens: totalTokens }} localUsage={localUsage} />);
 
-      expect(screen.queryByRole('button', { name: 'Show context usage' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Show context usage: Context usage unavailable' })).toBeInTheDocument();
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     }
   );
 
-  it('renders no meter when finite inputs would produce a non-finite percentage', () => {
+  it('renders the unknown-state meter when finite inputs would produce a non-finite percentage', () => {
     render(
       <ContextUsageIndicator
         tokenUsage={{ total_tokens: Number.MAX_VALUE }}
@@ -100,12 +106,12 @@ describe('ContextUsageIndicator', () => {
       />
     );
 
-    expect(screen.queryByRole('button', { name: 'Show context usage' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show context usage: Context usage unavailable' })).toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it.each([undefined, 0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
-    'renders no meter for an unknown or invalid context limit %s',
+    'renders the unknown-state meter for an unknown or invalid context limit %s',
     (contextLimit) => {
       render(
         <ContextUsageIndicator
@@ -115,12 +121,12 @@ describe('ContextUsageIndicator', () => {
         />
       );
 
-      expect(screen.queryByRole('button', { name: 'Show context usage' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Show context usage: Context usage unavailable' })).toBeInTheDocument();
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     }
   );
 
-  it('renders no meter trigger when context usage is unavailable', () => {
+  it('keeps the unknown-state trigger when context usage is unavailable', () => {
     render(
       <>
         <ContextUsageIndicator tokenUsage={null} localUsage={localUsage} />
@@ -128,7 +134,51 @@ describe('ContextUsageIndicator', () => {
       </>
     );
 
-    expect(screen.queryByRole('button', { name: 'Show context usage' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show context usage: Context usage unavailable' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+  });
+
+  it('keeps an accessible unknown-state circle when the context limit is unavailable', async () => {
+    render(
+      <ContextUsageIndicator
+        tokenUsage={null}
+        localUsage={localUsage}
+        budget={{
+          source: 'estimated',
+          totalTokens: 10_000,
+          contextLimit: undefined,
+          ratio: null,
+          status: 'healthy',
+        }}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Show context usage: Context usage unavailable' });
+    fireEvent.focus(trigger);
+
+    expect(await screen.findAllByText('Context usage unavailable')).toHaveLength(2);
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('labels estimated usage in the trigger, popover, and polite status announcement', async () => {
+    render(
+      <ContextUsageIndicator
+        tokenUsage={null}
+        localUsage={localUsage}
+        budget={{
+          source: 'estimated',
+          totalTokens: 5_000,
+          contextLimit: 100_000,
+          ratio: 0.05,
+          status: 'healthy',
+        }}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Show context usage: Estimated · 5% used' });
+    fireEvent.focus(trigger);
+
+    expect(await screen.findByText('Estimated · 5% used')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Context 5%');
   });
 });

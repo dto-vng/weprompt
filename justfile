@@ -113,8 +113,14 @@ install:
 install-update:
     bun install
 
-# Full setup: install deps + rebuild native modules
-setup: install rebuild-native
+# Full setup: install deps + rebuild native modules + git config
+setup: install rebuild-native git-setup
+
+# One-time per-clone git config: locale merge driver + reuse recorded conflict resolutions
+git-setup:
+    git config merge.locale-json.name "key-level locale JSON merge"
+    git config merge.locale-json.driver "node packages/shared-scripts/src/merge-locale-json.mjs %O %A %B %P"
+    git config rerere.enabled true
 
 # Rebuild native modules for Electron (critical step!)
 # On Windows, ensure MSVC build tools are installed via:
@@ -313,8 +319,9 @@ fmt:
 fmt-check:
     bun run format:check
 
-# Type check
+# Type check (i18n key types are generated, not tracked — produce them first)
 typecheck:
+    bun run i18n:types
     bunx tsc --noEmit
 
 # Run i18n type generation and validation

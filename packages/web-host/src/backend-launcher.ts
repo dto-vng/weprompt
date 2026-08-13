@@ -9,6 +9,7 @@
  */
 
 import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { connect, createServer, type Socket } from 'node:net';
 import { cleanupRegisteredAgentProcesses } from './agent-process-registry.js';
@@ -164,6 +165,11 @@ export type BackendStartOptions = {
   onHealthTimeout?: (error: BackendStartupError) => Promise<void> | void;
   onPendingExit?: (error: BackendStartupError) => Promise<void> | void;
   onReady?: (port: number) => Promise<void> | void;
+  /**
+   * Browser origins allowed to call the local API. The caller knows these; a
+   * packaged renderer loads over `file://` and so sends `Origin: null`.
+   */
+  allowedOrigins?: string[];
 };
 
 export class BackendStartupError extends Error {
@@ -213,13 +219,43 @@ export function buildSpawnArgs(config: SpawnConfig): string[] {
  * backend's `/api/system/info` matches what Electron main persists in
  * ProcessEnv('aionui.dir').
  */
-export function buildSpawnEnv(dirs: BackendDirConfig): NodeJS.ProcessEnv {
+export function buildSpawnEnv(dirs?: BackendDirConfig, security?: BackendSecurityConfig): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    AIONUI_CACHE_DIR: dirs.cacheDir,
-    AIONUI_WORK_DIR: dirs.workDir,
-    AIONUI_LOG_DIR: dirs.logDir,
+    ...(dirs
+      ? {
+          AIONUI_CACHE_DIR: dirs.cacheDir,
+          AIONUI_WORK_DIR: dirs.workDir,
+          AIONUI_LOG_DIR: dirs.logDir,
+        }
+      : {}),
+    ...(security?.localToken ? { AIONUI_LOCAL_TOKEN: security.localToken } : {}),
+    ...(security?.allowedOrigins?.length ? { AIONUI_LOCAL_ALLOWED_ORIGINS: security.allowedOrigins.join(',') } : {}),
   };
+}
+
+/**
+ * Secret and origin allow-list handed to a `--local` backend.
+ *
+ * In local mode the backend skips JWT verification, so without these it answers
+ * any process — or any page a browser renders — that reaches its loopback port.
+ * Passed through the environment rather than argv: process arguments are
+ * world-readable via `ps`.
+ */
+export type BackendSecurityConfig = {
+  localToken?: string;
+  allowedOrigins?: string[];
+};
+
+/**
+ * Mint the per-launch secret the renderer must present on every backend call.
+ *
+ * Regenerated on every spawn and never persisted — a leaked token dies with the
+ * process. Hex keeps it safe to carry in a query string, which `/ws` upgrades
+ * and iframe navigations need because they cannot set a header.
+ */
+export function createLocalToken(): string {
+  return randomBytes(32).toString('hex');
 }
 
 const FETCH_FORBIDDEN_PORTS = new Set([
@@ -484,6 +520,7 @@ async function probeHealthCheckTcpConnect(port: number, timeoutMs = 1_000): Prom
 export class BackendLifecycleManager {
   private childProcess: ChildProcess | null = null;
   private _port = 0;
+  private _localToken = '';
   private _status: BackendStatus = 'stopped';
   private _lastDbPath = '';
   private _lastLogDir?: string;
@@ -501,6 +538,16 @@ export class BackendLifecycleManager {
 
   get port(): number {
     return this._port;
+  }
+
+  /**
+   * Per-launch secret every caller must present to the `--local` backend.
+   *
+   * Empty until the first `start()`. Hand it only to the app's own renderer —
+   * anything else holding it can drive the whole local API.
+   */
+  get localToken(): string {
+    return this._localToken;
   }
 
   get status(): BackendStatus {
@@ -624,6 +671,11 @@ export class BackendLifecycleManager {
       );
     };
 
+    // Local mode skips JWT verification, so the backend is only as private as
+    // this secret. Mint a fresh one per spawn so a restart invalidates whatever
+    // the previous renderer held.
+    this._localToken = createLocalToken();
+
     const args = buildSpawnArgs({
       port: this._port,
       dbPath,
@@ -651,7 +703,10 @@ export class BackendLifecycleManager {
     try {
       this.childProcess = spawn(binaryPath, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: dirs ? buildSpawnEnv(dirs) : process.env,
+        env: buildSpawnEnv(dirs, {
+          localToken: this._localToken,
+          allowedOrigins: options?.allowedOrigins,
+        }),
         cwd: dirs?.workDir ?? dbPath,
         detached: process.platform !== 'win32',
       });

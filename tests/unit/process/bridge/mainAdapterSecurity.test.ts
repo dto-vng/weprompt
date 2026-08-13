@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ADAPTER_BRIDGE_EVENT_KEY } from '@/common/adapter/native/constants';
+import { ADAPTER_BRIDGE_EVENT_KEY, type RendererBridgeQueryKey } from '@/common/adapter/native/constants';
 import { initMainAdapterWithWindow } from '@/common/adapter/main';
 
 type FakeWebContents = {
@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   bridgeEmitter: {
     emit: vi.fn(),
   },
+  hasListener: vi.fn(),
   handlers: new Map<string, InvokeHandler>(),
 }));
 
@@ -44,6 +45,7 @@ vi.mock('electron', () => ({
 
 vi.mock('@/common/platform/bridge', () => ({
   bridge: {
+    hasListener: mocks.hasListener,
     adapter: (config: { on: (emitter: typeof mocks.bridgeEmitter) => void }) => {
       config.on(mocks.bridgeEmitter);
     },
@@ -82,8 +84,15 @@ function createRequest(name: string, data: unknown = undefined): string {
   });
 }
 
+function createRendererQueryResponse(key: RendererBridgeQueryKey, data: unknown, suffix = 'a1b2c3d4'): string {
+  const name = `subscribe.callback-${key}${key}${suffix}`;
+  return JSON.stringify({ name, data });
+}
+
 beforeEach(() => {
   mocks.bridgeEmitter.emit.mockReset();
+  mocks.hasListener.mockReset();
+  mocks.hasListener.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -105,6 +114,32 @@ describe('main adapter IPC security boundary', () => {
     });
   });
 
+  it('accepts a strict has-unsaved-work response for an outstanding renderer query', async () => {
+    const sender = createRegisteredSender();
+    const response = createRendererQueryResponse('creative-studio.has-unsaved-work', { dirtySceneCount: 3 });
+    mocks.hasListener.mockReturnValue(true);
+
+    await getInvokeHandler()({ sender }, response);
+
+    expect(mocks.bridgeEmitter.emit).toHaveBeenCalledWith(
+      'subscribe.callback-creative-studio.has-unsaved-workcreative-studio.has-unsaved-worka1b2c3d4',
+      { dirtySceneCount: 3 }
+    );
+  });
+
+  it('accepts a strict flush response for an outstanding renderer query', async () => {
+    const sender = createRegisteredSender();
+    const response = createRendererQueryResponse('creative-studio.flush-unsaved-work', { saved: false });
+    mocks.hasListener.mockReturnValue(true);
+
+    await getInvokeHandler()({ sender }, response);
+
+    expect(mocks.bridgeEmitter.emit).toHaveBeenCalledWith(
+      'subscribe.callback-creative-studio.flush-unsaved-workcreative-studio.flush-unsaved-worka1b2c3d4',
+      { saved: false }
+    );
+  });
+
   it('rejects calls from a renderer that is not registered with the adapter', async () => {
     const sender: FakeWebContents = {
       isDestroyed: () => false,
@@ -117,12 +152,100 @@ describe('main adapter IPC security boundary', () => {
     expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
   });
 
+  it('rejects renderer query responses from an unregistered renderer', async () => {
+    const sender: FakeWebContents = {
+      isDestroyed: () => false,
+      send: vi.fn(),
+    };
+    mocks.hasListener.mockReturnValue(true);
+
+    await expect(
+      getInvokeHandler()(
+        { sender },
+        createRendererQueryResponse('creative-studio.has-unsaved-work', { dirtySceneCount: 1 })
+      )
+    ).rejects.toThrow(/sender is not registered/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
   it('rejects provider names that are absent from the native channel manifest', async () => {
     const sender = createRegisteredSender();
 
     await expect(getInvokeHandler()({ sender }, createRequest('subscribe-unknown.privileged-action'))).rejects.toThrow(
       /operation is not allowed/i
     );
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a renderer attempting to invoke a renderer-owned query', async () => {
+    const sender = createRegisteredSender();
+
+    await expect(
+      getInvokeHandler()({ sender }, createRequest('subscribe-creative-studio.has-unsaved-work'))
+    ).rejects.toThrow(/operation is not allowed/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a renderer query response without an exact outstanding callback listener', async () => {
+    const sender = createRegisteredSender();
+
+    await expect(
+      getInvokeHandler()(
+        { sender },
+        createRendererQueryResponse('creative-studio.has-unsaved-work', { dirtySceneCount: 2 })
+      )
+    ).rejects.toThrow(/operation is not allowed/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a renderer query response whose callback id is not an eight-character lowercase hex suffix', async () => {
+    const sender = createRegisteredSender();
+    mocks.hasListener.mockReturnValue(true);
+
+    await expect(
+      getInvokeHandler()(
+        { sender },
+        createRendererQueryResponse('creative-studio.has-unsaved-work', { dirtySceneCount: 2 }, 'NOT-HEX')
+      )
+    ).rejects.toThrow(/operation is not allowed/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown renderer query callback names', async () => {
+    const sender = createRegisteredSender();
+    mocks.hasListener.mockReturnValue(true);
+    const response = JSON.stringify({
+      name: 'subscribe.callback-creative-studio.unknowncreative-studio.unknowna1b2c3d4',
+      data: { dirtySceneCount: 2 },
+    });
+
+    await expect(getInvokeHandler()({ sender }, response)).rejects.toThrow(/operation is not allowed/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed renderer query response data', async () => {
+    const sender = createRegisteredSender();
+    mocks.hasListener.mockReturnValue(true);
+
+    await expect(
+      getInvokeHandler()(
+        { sender },
+        createRendererQueryResponse('creative-studio.has-unsaved-work', { dirtySceneCount: '2' })
+      )
+    ).rejects.toThrow(/invalid operation payload/i);
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown fields in renderer query response data', async () => {
+    const sender = createRegisteredSender();
+    mocks.hasListener.mockReturnValue(true);
+
+    await expect(
+      getInvokeHandler()(
+        { sender },
+        createRendererQueryResponse('creative-studio.flush-unsaved-work', { saved: true, token: 'secret' })
+      )
+    ).rejects.toThrow(/invalid operation payload/i);
     expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
   });
 

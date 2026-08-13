@@ -41,11 +41,13 @@ export const useAionrsMessage = (
   options?: {
     onError?: (message: IResponseMessage) => void;
     onConfigChanged?: (capabilities: Record<string, unknown>) => void;
+    onTerminal?: (event: { turnId?: string; outcome: 'completed' | 'failed' }) => void;
   }
 ) => {
   const onError = options?.onError;
   const onConfigChanged = options?.onConfigChanged;
   const onConfigChangedRef = useRef(onConfigChanged);
+  const onTerminalRef = useRef(options?.onTerminal);
   const { t } = useTranslation();
   const tRef = useRef(t);
   const mergeLiveMessage = useMergeLiveMessage();
@@ -83,6 +85,9 @@ export const useAionrsMessage = (
   useEffect(() => {
     onConfigChangedRef.current = onConfigChanged;
   }, [onConfigChanged]);
+  useEffect(() => {
+    onTerminalRef.current = options?.onTerminal;
+  }, [options?.onTerminal]);
   useEffect(() => {
     tRef.current = t;
   }, [t]);
@@ -241,6 +246,12 @@ export const useAionrsMessage = (
       }
 
       if (isErrorTipMessage(message)) {
+        onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'failed' });
+        emitter.emit('artifact.scratch.terminal', {
+          conversationId: conversation_id,
+          turnId: message.turn_id,
+          outcome: 'failed',
+        });
         setStreamRunning(false);
         streamRunningRef.current = false;
         setWaitingResponse(false);
@@ -277,9 +288,9 @@ export const useAionrsMessage = (
               ? ((payload as { content: string }).content ?? '')
               : '';
 
-        if (chunk) {
+        if (message.replace === true || chunk) {
           const previous = messageBufferRef.current.get(message.msg_id) ?? '';
-          messageBufferRef.current.set(message.msg_id, previous + chunk);
+          messageBufferRef.current.set(message.msg_id, message.replace === true ? chunk : previous + chunk);
         }
       }
 
@@ -299,6 +310,12 @@ export const useAionrsMessage = (
           break;
         case 'finish':
           {
+            onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'completed' });
+            emitter.emit('artifact.scratch.terminal', {
+              conversationId: conversation_id,
+              turnId: message.turn_id,
+              outcome: 'completed',
+            });
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
             // aionrs stream_end carries usage in data field
             const usageData = message.data as TokenUsage | undefined;
@@ -438,6 +455,12 @@ export const useAionrsMessage = (
           break;
         default: {
           if (message.type === 'error') {
+            onTerminalRef.current?.({ turnId: message.turn_id, outcome: 'failed' });
+            emitter.emit('artifact.scratch.terminal', {
+              conversationId: conversation_id,
+              turnId: message.turn_id,
+              outcome: 'failed',
+            });
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
             setStreamRunning(false);
             streamRunningRef.current = false;
@@ -454,8 +477,11 @@ export const useAionrsMessage = (
               setWaitingResponse(false);
               waitingResponseRef.current = false;
             }
-            // Auto-recover streamRunning if content arrives after finish
-            if (!streamRunningRef.current) {
+            // Auto-recover streamRunning if content arrives after finish, except
+            // for a final replacement snapshot that reconciles an already-ended turn.
+            const isFinalReplacementSnapshot =
+              (message.type === 'content' || message.type === 'text') && message.replace === true;
+            if (!streamRunningRef.current && !isFinalReplacementSnapshot) {
               setStreamRunning(true);
               streamRunningRef.current = true;
             }

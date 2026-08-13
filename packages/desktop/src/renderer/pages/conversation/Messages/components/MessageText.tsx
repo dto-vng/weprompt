@@ -7,20 +7,21 @@
 import type { IMessageText } from '@/common/chat/chatLib';
 import { AIONUI_FILES_MARKER } from '@/common/config/constants';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
+import { useKnowledgeCitationsSafe } from '@/renderer/pages/conversation/knowledge/KnowledgeCitationsContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useLocalFilePreview } from '@/renderer/pages/conversation/Preview/hooks/useLocalFilePreview';
 import { iconColors } from '@/renderer/styles/colors';
-import { Alert, Message, Tooltip } from '@arco-design/web-react';
-import { Copy } from '@icon-park/react';
+import { Alert, Button, Message, Tooltip } from '@arco-design/web-react';
+import { Copy, Brain, Right } from '@icon-park/react';
 import classNames from 'classnames';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import CollapsibleContent from '@renderer/components/chat/CollapsibleContent';
 import FilePreview from '@renderer/components/media/FilePreview';
 import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
-import { stripThinkTags, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
+import { splitThinkContent, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
 import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
 import { TemplateMessageCard } from '@/renderer/components/chat/TemplateGallery';
@@ -51,13 +52,11 @@ import MessageCronBadge from './MessageCronBadge';
 import { resolveAgentLogo, useAgentLogos } from '@/renderer/utils/model/agentLogo';
 import TeammateMessageAvatar from './TeammateMessageAvatar';
 import { useTeammateColor } from '@/renderer/pages/team/identity/TeamIdentityContext';
+import { nextRevealLength } from './progressiveText';
 
 const CODE_STYLE = { marginTop: 4, marginBlock: 4 };
-const STREAM_REVEAL_INTERVAL_MS = 16;
-const STREAM_REVEAL_MIN_DURATION_MS = 80;
-const STREAM_REVEAL_MAX_DURATION_MS = 280;
-const STREAM_REVEAL_MS_PER_CHARACTER = 4;
-
+const REASONING_COLLAPSED_HEIGHT = 160;
+const REASONING_MASK = 'linear-gradient(#000 0%, #000 60%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)';
 const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
@@ -66,12 +65,16 @@ const prefersReducedMotion = (): boolean =>
 const useProgressiveText = (text: string, isStreaming: boolean) => {
   const [displayedText, setDisplayedText] = useState(() => (isStreaming && !prefersReducedMotion() ? '' : text));
   const displayedTextRef = React.useRef(displayedText);
+  const targetTextRef = React.useRef(text);
+  const rafRef = React.useRef<number | null>(null);
   const wasStreamingRef = React.useRef(isStreaming);
 
   useEffect(() => {
+    targetTextRef.current = text;
     const wasStreaming = wasStreamingRef.current;
     wasStreamingRef.current = isStreaming;
     const currentText = displayedTextRef.current;
+
     const canReveal =
       !prefersReducedMotion() &&
       (isStreaming || wasStreaming) &&
@@ -79,6 +82,10 @@ const useProgressiveText = (text: string, isStreaming: boolean) => {
       currentText.length < text.length;
 
     if (!canReveal) {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       if (currentText !== text) {
         displayedTextRef.current = text;
         setDisplayedText(text);
@@ -86,27 +93,33 @@ const useProgressiveText = (text: string, isStreaming: boolean) => {
       return;
     }
 
-    const additionalCharacterCount = text.length - currentText.length;
-    const duration = Math.min(
-      STREAM_REVEAL_MAX_DURATION_MS,
-      Math.max(STREAM_REVEAL_MIN_DURATION_MS, additionalCharacterCount * STREAM_REVEAL_MS_PER_CHARACTER)
-    );
-    const stepCount = Math.ceil(duration / STREAM_REVEAL_INTERVAL_MS);
-    const charactersPerStep = Math.max(1, Math.ceil(additionalCharacterCount / stepCount));
-    let revealLength = currentText.length;
+    // One persistent rAF loop eases the shown text toward the latest target. New
+    // chunks only raise the target (above); the loop is never torn down mid-reveal,
+    // so text flows continuously instead of restarting a typewriter each chunk.
+    if (rafRef.current !== null) return;
 
-    const interval = window.setInterval(() => {
-      revealLength = Math.min(text.length, revealLength + charactersPerStep);
-      const nextText = text.slice(0, revealLength);
+    const tick = () => {
+      const target = targetTextRef.current;
+      const revealedLength = displayedTextRef.current.length;
+      const nextLength = nextRevealLength(revealedLength, target.length);
+      if (nextLength <= revealedLength) {
+        rafRef.current = null;
+        return;
+      }
+      const nextText = target.slice(0, nextLength);
       displayedTextRef.current = nextText;
       setDisplayedText(nextText);
-      if (revealLength === text.length) {
-        window.clearInterval(interval);
-      }
-    }, STREAM_REVEAL_INTERVAL_MS);
-
-    return () => window.clearInterval(interval);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
   }, [isStreaming, text]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    []
+  );
 
   return { displayedText, isRevealing: displayedText !== text };
 };
@@ -209,25 +222,23 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
   isStreaming = false,
 }) => {
   const logos = useAgentLogos();
-  // Filter think tags from content before rendering
-  // 在渲染前过滤 think 标签
-  const contentToRender = useMemo(() => {
-    let content = message.content.content;
-    if (typeof content === 'string') {
-      if (hasThinkTags(content)) {
-        content = stripThinkTags(content);
-      }
-      // Strip any inline [SKILL_SUGGEST] blocks (now handled via separate skill_suggest message type)
-      if (hasSkillSuggest(content)) {
-        content = stripSkillSuggest(content);
-      }
-      return content;
+  // Split the model's reasoning from its visible answer so we can show the
+  // reasoning as distinct grey text instead of erasing it once the reply lands.
+  // 将模型的思考过程与正式回答分离，用灰色文字展示思考而非在回答出现后抹除
+  const { reasoning, contentToRender } = useMemo(() => {
+    const raw = message.content.content;
+    if (typeof raw !== 'string') {
+      return { reasoning: '', contentToRender: raw };
     }
-    return content;
+    const { reasoning: split, answer } = hasThinkTags(raw) ? splitThinkContent(raw) : { reasoning: '', answer: raw };
+    // Strip any inline [SKILL_SUGGEST] blocks (now handled via separate skill_suggest message type)
+    return { reasoning: split, contentToRender: hasSkillSuggest(answer) ? stripSkillSuggest(answer) : answer };
   }, [message.content.content]);
 
   const { t } = useTranslation();
   const [showCopyAlert, setShowCopyAlert] = useState(false);
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
+  const reasoningBodyId = useId();
   const isUserMessage = message.position === 'right';
   const isTeammateMessage = message.position === 'left' && message.content.teammateMessage === true;
   const { text, files } = useMemo(
@@ -255,6 +266,15 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     () => visibleFiles.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
     [conversationContext?.workspace, visibleFiles]
   );
+  const citations = useKnowledgeCitationsSafe();
+  // Citation linkify runs on the exact string MarkdownView receives (post
+  // progressive-reveal): pure and memoized; partially revealed names simply
+  // don't match until the stream completes them.
+  const markdownSource = shouldRevealStream || isRevealing ? displayedText : data;
+  const linkifiedMarkdown = useMemo(() => {
+    if (!citations || isUserMessage || json || typeof markdownSource !== 'string') return markdownSource;
+    return citations.linkify(markdownSource);
+  }, [citations, isUserMessage, json, markdownSource]);
 
   // 过滤空内容，避免渲染空DOM
   if (!message.content.content || (typeof message.content.content === 'string' && !message.content.content.trim())) {
@@ -275,15 +295,22 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
       });
   };
 
+  // A real focusable Button, so `focus-visible:opacity-100` can actually fire. The div this
+  // replaces carried `focus-within:` variants that could never match — it had no focusable
+  // descendant and was not focusable itself — plus `pointer-events-none`, which would have
+  // blocked activation even once focused. Both are gone.
+  const copyLabel = t('common.copy', { defaultValue: 'Copy' });
   const copyButton = (
-    <Tooltip content={t('common.copy', { defaultValue: 'Copy' })}>
-      <div
-        className='p-4px rd-4px cursor-pointer hover:bg-3 transition-colors opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+    <Tooltip content={copyLabel}>
+      <Button
+        type='text'
+        size='mini'
+        shape='circle'
+        aria-label={copyLabel}
+        className='!p-4px !h-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity'
         onClick={handleCopy}
-        style={{ lineHeight: 0 }}
-      >
-        <Copy theme='outline' size='16' fill={iconColors.secondary} />
-      </div>
+        icon={<Copy theme='outline' size='16' fill={iconColors.secondary} />}
+      />
     </Tooltip>
   );
 
@@ -337,6 +364,53 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
           </div>
         )}
         {templatedSend && <TemplateMessageCard templateId={templatedSend.templateId} />}
+        {/* The model's reasoning, kept and shown in grey above the answer (never erased). */}
+        {!isUserMessage && !json && reasoning.trim() && (
+          <div className='w-full mb-8px' data-testid='message-reasoning'>
+            {/* Collapsed by default and clamped: an unbounded chain-of-thought pushed the actual
+                answer arbitrarily far down the scroller. Mirrors MessageThinking, the sibling
+                surface for the same content class, rather than using CollapsibleContent —
+                measured in the running app, that component leaves this content clipped behind a
+                fade with NO expand control, because its ResizeObserver watches an element whose
+                box is already pinned to maxHeight. */}
+            <Button
+              type='text'
+              size='mini'
+              // `.arco-btn` brings its own display and paddings, which would reflow this row.
+              className='!flex items-center gap-4px !h-auto !p-0 mb-4px !text-12px !text-t-tertiary hover:!text-t-secondary'
+              aria-expanded={reasoningExpanded}
+              aria-controls={reasoningBodyId}
+              onClick={() => setReasoningExpanded((value) => !value)}
+            >
+              <Brain theme='outline' size='13' fill='var(--bg-6)' />
+              <span>{t('messages.reasoning')}</span>
+              <Right
+                theme='outline'
+                size='12'
+                className='transition-transform'
+                style={reasoningExpanded ? { transform: 'rotate(90deg)' } : undefined}
+              />
+            </Button>
+            <div
+              id={reasoningBodyId}
+              className='pl-12px text-13px text-t-secondary whitespace-pre-wrap [word-break:break-word]'
+              style={{
+                borderLeft: '2px solid var(--color-border-2)',
+                lineHeight: 1.6,
+                ...(reasoningExpanded
+                  ? undefined
+                  : {
+                      maxHeight: REASONING_COLLAPSED_HEIGHT,
+                      overflow: 'hidden',
+                      maskImage: REASONING_MASK,
+                      WebkitMaskImage: REASONING_MASK,
+                    }),
+              }}
+            >
+              {reasoning}
+            </div>
+          </div>
+        )}
         <div
           className={classNames('min-w-0 [&>p:first-child]:mt-0px [&>p:last-child]:mb-0px', {
             // User messages get a subtle warm bubble; cron/teammate keep their box.
@@ -375,8 +449,12 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
             </CollapsibleContent>
           ) : (
             <div data-testid='message-text-content'>
-              <MarkdownView codeStyle={CODE_STYLE} onLocalFileLink={handleLocalFileLink}>
-                {shouldRevealStream || isRevealing ? displayedText : data}
+              <MarkdownView
+                codeStyle={CODE_STYLE}
+                onLocalFileLink={handleLocalFileLink}
+                onKbCitationClick={citations?.openCitation}
+              >
+                {linkifiedMarkdown}
               </MarkdownView>
             </div>
           )}

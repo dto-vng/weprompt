@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getAgentMcpConfigsInvoke = vi.fn();
 const getManagedAgents = vi.fn();
+const messageError = vi.fn();
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -107,6 +108,7 @@ vi.mock('@arco-design/web-react', () => {
   return {
     Button,
     Select,
+    Message: { error: (...args: unknown[]) => messageError(...args) },
     Spin: () => <span>spin</span>,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -133,6 +135,79 @@ describe('MCP import flows', () => {
     getAgentMcpConfigsInvoke.mockResolvedValue([]);
     getManagedAgents.mockReset();
     getManagedAgents.mockResolvedValue([]);
+    messageError.mockReset();
+  });
+
+  /** Step 1 -> step 2 runs the scan. */
+  const advanceToScan = () => fireEvent.click(screen.getByText('settings.mcpNextStep'));
+
+  it('reports a failed CLI scan as a failure with a retry, not as "no servers found"', async () => {
+    getAgentMcpConfigsInvoke.mockRejectedValue(new Error('claude: command not found'));
+
+    render(<OneClickImportModal visible existingServerNames={[]} onCancel={vi.fn()} onBatchImport={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('select-value')).toHaveTextContent('claude');
+    });
+    advanceToScan();
+
+    await waitFor(() => {
+      expect(screen.getByText('settings.mcpImportFailed')).toBeInTheDocument();
+    });
+    // The real reason reaches the user, and the reassuring empty-result copy does not.
+    expect(screen.getByText('claude: command not found')).toBeInTheDocument();
+    expect(screen.getByText('common.retry')).toBeInTheDocument();
+    expect(screen.queryByText('settings.mcpNoServersFound')).toBeNull();
+
+    // Retrying re-runs the scan; a success clears the error state.
+    getAgentMcpConfigsInvoke.mockResolvedValue([{ source: 'claude', servers: [] }]);
+    fireEvent.click(screen.getByText('common.retry'));
+
+    await waitFor(() => {
+      expect(screen.getByText('settings.mcpNoServersFound')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('settings.mcpImportFailed')).toBeNull();
+  });
+
+  it('still reports a genuine zero-server scan as "no servers found"', async () => {
+    getAgentMcpConfigsInvoke.mockResolvedValue([{ source: 'claude', servers: [] }]);
+
+    render(<OneClickImportModal visible existingServerNames={[]} onCancel={vi.fn()} onBatchImport={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('select-value')).toHaveTextContent('claude');
+    });
+    advanceToScan();
+
+    await waitFor(() => {
+      expect(screen.getByText('settings.mcpNoServersFound')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('settings.mcpImportFailed')).toBeNull();
+  });
+
+  it('tells the user when the batch import itself fails', async () => {
+    getAgentMcpConfigsInvoke.mockResolvedValue([
+      {
+        source: 'claude',
+        servers: [{ name: 'srv', description: 'd', importable: true, transport: { type: 'stdio', command: 'x' } }],
+      },
+    ]);
+    const onBatchImport = vi.fn().mockRejectedValue(new Error('write failed'));
+
+    render(<OneClickImportModal visible existingServerNames={[]} onCancel={vi.fn()} onBatchImport={onBatchImport} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('select-value')).toHaveTextContent('claude');
+    });
+    advanceToScan();
+    await waitFor(() => {
+      expect(screen.getByText('srv')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('settings.mcpImportButton'));
+
+    await waitFor(() => {
+      expect(messageError).toHaveBeenCalledWith('settings.mcpImportFailed');
+    });
+    // The step must not advance to the success page after a failure.
+    expect(screen.queryByText('settings.mcpConfirmButton')).toBeNull();
   });
 
   it('opens the requested one-click import modal without probing managed agents first', async () => {

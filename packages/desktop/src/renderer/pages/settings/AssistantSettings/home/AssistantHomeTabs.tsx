@@ -90,10 +90,14 @@ const AssistantHomeTabs: React.FC<AssistantHomeTabsProps> = ({
   return (
     <div data-testid='assistant-home-shell' className='flex h-full min-h-0 flex-col overflow-hidden bg-transparent'>
       <div
-        className={`border-b border-border-2 bg-bg-0 ${isMobile ? 'px-16px pt-14px' : 'px-12px pt-24px md:px-40px md:pt-32px'}`}
+        className={`border-b border-[var(--color-border-2)] bg-base ${isMobile ? 'px-16px pt-14px' : 'px-12px pt-24px md:px-40px md:pt-32px'}`}
       >
         <div className='mx-auto w-full max-w-800px'>
           <SettingsPageHeader
+            // This header sits in its own fixed block above the scroll body, so it
+            // must not stick — and must not paint a background only as wide as the
+            // 800px content column it lives in.
+            sticky={false}
             data-testid='assistants-header'
             title={t('settings.assistants', { defaultValue: 'Assistants' })}
             description={t('settings.assistantHomeLeadShort', {

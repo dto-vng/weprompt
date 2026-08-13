@@ -28,6 +28,7 @@ type OfficeWatchErrorCode =
   | 'OFFICECLI_INSTALL_FAILED'
   | 'OFFICECLI_PORT_TIMEOUT'
   | 'OFFICECLI_START_FAILED'
+  | 'INVALID_OFFICE_ARTIFACT'
   | 'PATH_OUTSIDE_SANDBOX';
 
 const BRIDGE = {
@@ -75,6 +76,7 @@ const OFFICE_ERROR_I18N_KEYS: Record<OfficeWatchErrorCode, string> = {
   OFFICECLI_INSTALL_FAILED: 'preview.office.errors.installFailed',
   OFFICECLI_PORT_TIMEOUT: 'preview.office.errors.portTimeout',
   OFFICECLI_START_FAILED: 'preview.office.errors.startFailed',
+  INVALID_OFFICE_ARTIFACT: 'preview.office.errors.invalidArtifact',
   PATH_OUTSIDE_SANDBOX: 'preview.office.errors.outsideSandbox',
 };
 
@@ -174,6 +176,7 @@ function normalizeOfficeWatchErrorCode(error?: string | null): OfficeWatchErrorC
     case 'OFFICECLI_INSTALL_FAILED':
     case 'OFFICECLI_PORT_TIMEOUT':
     case 'OFFICECLI_START_FAILED':
+    case 'INVALID_OFFICE_ARTIFACT':
     case 'PATH_OUTSIDE_SANDBOX':
       return error;
     case 'OFFICECLI_FAILED':
@@ -356,20 +359,37 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
         setError(null);
       }
       try {
-        if (docType !== 'ppt' && isElectronDesktop()) {
+        if (isElectronDesktop()) {
           const preview = await ipcBridge.officeArtifact.preparePreview.invoke({
             conversationId,
             workspace: workspace ?? '',
             filePath: file_path,
           });
-          if (preview.ok === false) throw new Error(t(keys.startFailed));
+          if (preview.ok === false) {
+            const previewErrorCode = normalizeOfficeWatchErrorCode(preview.code);
+            if (previewErrorCode) {
+              const nextError = {
+                code: previewErrorCode,
+                message: t(OFFICE_ERROR_I18N_KEYS[previewErrorCode]),
+              };
+              if (isRefresh) {
+                setRefreshing(false);
+                notifyRefreshState('refreshFailed');
+              } else {
+                setError(nextError);
+                setInitialLoading(false);
+              }
+              return;
+            }
+            throw new Error(t(keys.startFailed));
+          }
           previewLeaseId = preview.leaseId;
           watchedFilePath = preview.filePath;
           watchedWorkspace = preview.workspace;
           if (cancelled) return;
         }
 
-        const usesMainProcessWatch = docType === 'excel' && isElectronDesktop() && previewLeaseId;
+        const usesMainProcessWatch = docType !== 'word' && isElectronDesktop() && previewLeaseId;
         let result = usesMainProcessWatch
           ? await ipcBridge.officeArtifact.startPreview.invoke({ leaseId: previewLeaseId })
           : await bridge.start.invoke({ file_path: watchedFilePath, workspace: watchedWorkspace });
@@ -487,7 +507,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
     const desktopFallbackPath = docType !== 'ppt' && isElectronDesktop() ? file_path : undefined;
 
     return (
-      <div className='h-full w-full flex items-center justify-center bg-bg-1'>
+      <div className='h-full w-full flex items-center justify-center bg-1'>
         <Alert
           type='error'
           className='max-w-400px'
@@ -550,7 +570,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
   }
 
   return (
-    <div className='relative h-full w-full overflow-hidden bg-bg-1'>
+    <div className='relative h-full w-full overflow-hidden bg-1'>
       {[
         ...(watchView ? [{ active: true, view: watchView }] : []),
         ...(refreshView ? [{ active: false, view: refreshView }] : []),
@@ -563,7 +583,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           {isElectronDesktop() ? (
             <WebviewHost
               url={view.url}
-              className='bg-bg-1'
+              className='bg-1'
               showViewerControls={docType === 'word' || docType === 'excel'}
               partition={docType === 'ppt' ? undefined : OFFICE_PREVIEW_PARTITION}
               injectedScript={guestScript}
@@ -575,7 +595,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
           ) : (
             <iframe
               src={view.url}
-              className='w-full h-full border-0 bg-bg-1'
+              className='w-full h-full border-0 bg-1'
               title={IFRAME_TITLE[docType]}
               onLoad={active ? handlePreviewLoaded : () => handleRefreshLoaded(view)}
               onError={active ? handlePreviewLoadFailed : () => handleRefreshLoadFailed(view)}
@@ -587,7 +607,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       {initialLoading && (
         <div
           data-testid='office-preview-loading'
-          className='absolute inset-0 z-10 flex items-center justify-center bg-bg-1'
+          className='absolute inset-0 z-10 flex items-center justify-center bg-1'
         >
           <div className='flex flex-col items-center gap-12px'>
             <Spin size={32} />
@@ -601,7 +621,7 @@ const OfficeWatchViewer: React.FC<OfficeWatchViewerProps> = ({
       {refreshing && (
         <div
           data-testid='office-preview-refreshing'
-          className='pointer-events-none absolute right-12px top-12px z-10 flex items-center gap-6px rounded-6px bg-bg-2 px-8px py-6px text-12px text-t-secondary shadow-sm'
+          className='pointer-events-none absolute right-12px top-12px z-10 flex items-center gap-6px rounded-6px bg-2 px-8px py-6px text-12px text-t-secondary shadow-sm'
         >
           <Spin size={14} />
           <span>{t(keys.loading)}</span>

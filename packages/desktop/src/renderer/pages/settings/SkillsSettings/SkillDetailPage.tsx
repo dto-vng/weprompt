@@ -60,7 +60,10 @@ const SectionCard: React.FC<{
   children: React.ReactNode;
   'data-testid'?: string;
 }> = ({ title, extra, children, 'data-testid': dataTestId }) => (
-  <section data-testid={dataTestId} className='rounded-16px border border-border-2 bg-base px-20px py-18px'>
+  <section
+    data-testid={dataTestId}
+    className='rounded-16px border border-[var(--color-border-2)] bg-base px-20px py-18px'
+  >
     <div className='mb-14px flex items-center justify-between gap-12px'>
       <h2 className='m-0 text-14px font-600 text-t-primary'>{title}</h2>
       {extra}
@@ -176,7 +179,7 @@ const SkillDetailPage: React.FC = () => {
         ) : !skill ? (
           <div
             data-testid='skill-detail-not-found'
-            className='rounded-12px border border-dashed border-border-1 bg-fill-1 px-16px py-40px text-center text-13px text-t-tertiary'
+            className='rounded-12px border border-dashed border-[var(--color-border-1)] bg-fill-1 px-16px py-40px text-center text-13px text-t-tertiary'
           >
             {t('settings.skillsHub.detailNotFound', { defaultValue: 'Skill not found. It may have been deleted.' })}
           </div>
@@ -196,7 +199,7 @@ const SkillDetailPage: React.FC = () => {
                 <div className='min-w-0 flex flex-col gap-6px'>
                   <div className='flex items-center gap-8px'>
                     <span className='text-16px font-600 text-t-primary'>{skill.name}</span>
-                    <span className='rounded-4px border border-border-2 bg-fill-1 px-6px py-1px text-11px text-t-secondary'>
+                    <span className='rounded-4px border border-[var(--color-border-2)] bg-fill-1 px-6px py-1px text-11px text-t-secondary'>
                       {sourceLabel(skill)}
                     </span>
                   </div>
@@ -274,7 +277,7 @@ const SkillDetailPage: React.FC = () => {
                           {assistantLabel(assistant)}
                         </Typography.Text>
                         {isReadonly ? (
-                          <span className='rounded-4px border border-border-2 bg-fill-1 px-6px py-1px text-11px text-t-tertiary'>
+                          <span className='rounded-4px border border-[var(--color-border-2)] bg-fill-1 px-6px py-1px text-11px text-t-tertiary'>
                             {t('settings.skillsHub.detailBuiltinAssistant', { defaultValue: 'Built-in' })}
                           </span>
                         ) : (

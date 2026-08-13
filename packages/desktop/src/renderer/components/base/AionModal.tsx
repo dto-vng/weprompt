@@ -4,6 +4,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * 弹窗外壳选型规则（已定，勿再反复讨论）/ Which modal chrome to use (settled — please stop re-litigating)
+ *
+ * - 表单型 / 多步骤弹窗 → `AionModal`（本文件）。
+ * - 简短确认弹窗 → 原生 Arco `Modal` / `Modal.confirm`。
+ *
+ * - Form and multi-step dialogs → `AionModal` (this file).
+ * - Short confirmation dialogs → raw Arco `Modal` / `Modal.confirm`.
+ *
+ * 两套外壳并存是有意的，不是待清理的技术债。`Modal.confirm` 没有 AionModal 等价物，
+ * 迁移确认弹窗需要新造一个 `AionModal.confirm`（尚不存在），或把命令式调用改写成声明式组件，
+ * 同时还要保住这些弹窗依赖的 z-index 叠放（有一个嵌套弹窗特意坐在 10050/10040）
+ * 和 DOM 测试选择的 `data-testid` / `wrapClassName` —— 而用户什么也看不出变化。
+ * 两者唯一的差异是外观：确认弹窗少了这里统一的 header/footer 内边距、分隔线与 dialog 底色。
+ *
+ * The split is deliberate, not debt awaiting cleanup. `Modal.confirm` has no AionModal
+ * equivalent, so migrating confirms would mean inventing an `AionModal.confirm` helper or
+ * rewriting imperative call sites as declarative components — while preserving the z-index
+ * stacking they rely on (one nested modal deliberately sits at 10050/10040) and the
+ * `data-testid` / `wrapClassName` hooks existing DOM tests select on — for no user-visible
+ * gain. The only cost of the split is cosmetic: confirms miss the header/footer padding,
+ * divider and dialog fill standardised here.
+ *
+ * 确认弹窗要统一的是行为而不是外壳：删除类操作一律 `status: 'danger'`，
+ * 文案带上被删对象的名字。Migration 以后仍然可以做，这条规则没有关上任何门。
+ *
+ * What confirms must standardise is behaviour, not chrome: every destructive confirm uses
+ * `status: 'danger'` and names the thing it is about to delete. Migration stays possible
+ * later; this rule forecloses nothing.
+ *
+ * 注 / Note: `components/base/ModalWrapper.tsx` 是第三套外壳，只被 `pages/TestShowcase.tsx`
+ * 使用，且带有本文件已修掉的同一个硬编码 `fill='#86909c'` 问题。它不属于本规则的任何一档，
+ * 诚实的处理是单独一次改动里删掉它。
+ * `components/base/ModalWrapper.tsx` is a third chrome, consumed only by
+ * `pages/TestShowcase.tsx`, and still carries the hardcoded `fill='#86909c'` this file just
+ * fixed. It fits neither tier above; the honest resolution is deleting it in its own change.
+ */
+
 import type { ModalProps } from '@arco-design/web-react';
 import { Modal, Button } from '@arco-design/web-react';
 import { Close } from '@icon-park/react';
@@ -113,11 +151,23 @@ export interface AionModalProps extends Omit<ModalProps, 'title' | 'footer'> {
 
 const HEADER_BASE_CLASS = 'flex items-center justify-between pb-20px';
 const TITLE_BASE_CLASS = 'text-18px font-500 text-t-primary m-0';
+/**
+ * 关闭按钮：图标用 currentColor，故这里必须显式给 text-t-secondary，
+ * 否则会继承弹窗正文色（暗色下 #e6ecf5），关闭图标变成刺眼的亮色。与 STD_CLOSE_BTN_CLASS 一致。
+ * The close icon uses currentColor, so this class must set text-t-secondary itself —
+ * otherwise it inherits modal body text colour (#e6ecf5 in dark) and the X reads far too
+ * bright for a secondary affordance. Matches STD_CLOSE_BTN_CLASS.
+ */
 const CLOSE_BUTTON_CLASS =
-  'w-32px h-32px flex items-center justify-center rd-8px transition-colors duration-200 cursor-pointer border-0 bg-transparent p-0 hover:bg-2 focus:outline-none';
+  'w-32px h-32px flex items-center justify-center rd-8px transition-colors duration-200 cursor-pointer border-0 bg-transparent p-0 text-t-secondary hover:bg-2 focus:outline-none';
 const FOOTER_BASE_CLASS = 'flex-shrink-0 bg-transparent';
-/** 任务型弹窗 footer 的统一分隔线 + 内边距（内容↔按钮区）。 */
-const FOOTER_DIVIDER_CLASS = 'flex-shrink-0 border-t border-solid border-[var(--bg-3)] px-24px py-16px';
+/**
+ * 任务型弹窗 footer 的统一分隔线 + 内边距（内容↔按钮区）。
+ * 分隔线用 --bg-4：--bg-3 在暗色下等于 --dialog-fill-0（都是 #1e2536），画在弹窗底色上等于不存在。
+ * Divider uses --bg-4: in dark, --bg-3 equals --dialog-fill-0 (both #1e2536), so a --bg-3
+ * hairline drawn on the dialog fill is invisible.
+ */
+const FOOTER_DIVIDER_CLASS = 'flex-shrink-0 border-t border-solid border-[var(--bg-4)] px-24px py-16px';
 
 // ===== standard 变体：统一三段式布局 =====
 /** 标题区：上 20 / 左右 24 / 下 16，底部一条贯穿全宽的分隔线。 */
@@ -377,7 +427,7 @@ const AionModal: React.FC<AionModalProps> = ({
             {headerConfig.subtitle ? <p className={STD_SUBTITLE_CLASS}>{headerConfig.subtitle}</p> : null}
           </div>
           {headerConfig.showClose && (
-            <button onClick={onCancel} className={STD_CLOSE_BTN_CLASS} aria-label='Close'>
+            <button onClick={onCancel} className={STD_CLOSE_BTN_CLASS} aria-label={t('common.close')}>
               {headerConfig.closeIcon || <Close size={20} fill='currentColor' />}
             </button>
           )}
@@ -389,7 +439,9 @@ const AionModal: React.FC<AionModalProps> = ({
     const headerClassName = classNames(HEADER_BASE_CLASS, headerConfig.className);
 
     const headerStyle: CSSProperties = {
-      borderBottom: '1px solid var(--bg-3)',
+      // 见 FOOTER_DIVIDER_CLASS：暗色下 --bg-3 与弹窗底色同色，故用 --bg-4
+      // See FOOTER_DIVIDER_CLASS: --bg-3 matches the dialog fill in dark, so use --bg-4
+      borderBottom: '1px solid var(--bg-4)',
       ...headerConfig.style,
     };
 
@@ -397,8 +449,8 @@ const AionModal: React.FC<AionModalProps> = ({
       <div className={headerClassName} style={headerStyle}>
         {headerConfig.title && <h3 className={TITLE_BASE_CLASS}>{headerConfig.title}</h3>}
         {headerConfig.showClose && (
-          <button onClick={onCancel} className={CLOSE_BUTTON_CLASS} aria-label='Close'>
-            {headerConfig.closeIcon || <Close size={20} fill='#86909c' />}
+          <button onClick={onCancel} className={CLOSE_BUTTON_CLASS} aria-label={t('common.close')}>
+            {headerConfig.closeIcon || <Close size={20} fill='currentColor' />}
           </button>
         )}
       </div>

@@ -9,12 +9,14 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TokenUsageData } from '@/common/config/storage';
+import type { ContextUsageSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import type { LocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
 type ContextUsageIndicatorProps = {
-  tokenUsage: TokenUsageData | null;
+  tokenUsage?: TokenUsageData | null;
   localUsage: LocalTokenUsageSummary;
   context_limit?: number;
+  budget?: ContextUsageSnapshot;
   className?: string;
   size?: number;
 };
@@ -25,71 +27,102 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   tokenUsage,
   localUsage,
   context_limit,
+  budget,
   className = '',
   size = 24,
 }) => {
   const { t } = useTranslation();
 
-  const contextUsage = useMemo(() => {
+  const legacyBudget = useMemo<ContextUsageSnapshot>(() => {
     const total = tokenUsage?.total_tokens;
-    if (typeof total !== 'number' || !Number.isFinite(total) || total < 0) return null;
-    if (typeof context_limit !== 'number' || !Number.isFinite(context_limit) || context_limit <= 0) return null;
-
-    const pct = (total / context_limit) * 100;
-    if (!Number.isFinite(pct)) return null;
+    const validTotal = typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : null;
+    const validLimit =
+      typeof context_limit === 'number' && Number.isFinite(context_limit) && context_limit > 0
+        ? context_limit
+        : undefined;
+    const rawRatio = validTotal !== null && validLimit ? validTotal / validLimit : null;
+    const ratio = rawRatio !== null && Number.isFinite(rawRatio) ? rawRatio : null;
+    const status =
+      ratio === null
+        ? 'healthy'
+        : ratio >= 0.9
+          ? 'too_large'
+          : ratio >= 0.5
+            ? 'compress'
+            : ratio >= 0.35
+              ? 'watch'
+              : 'healthy';
 
     return {
-      percentage: pct,
-      displayTotal: formatTokenCount(total),
-      displayLimit: formatTokenCount(context_limit, true),
-      isWarning: pct > 70,
-      isDanger: pct > 90,
+      source: validTotal === null ? 'unknown' : 'runtime',
+      totalTokens: validTotal,
+      contextLimit: validLimit,
+      ratio,
+      status,
     };
   }, [tokenUsage, context_limit]);
-
-  if (!contextUsage) return null;
-
-  const { percentage, displayTotal, displayLimit, isWarning, isDanger } = contextUsage;
+  const contextUsage = budget ?? legacyBudget;
+  const percentage =
+    typeof contextUsage.ratio === 'number' && Number.isFinite(contextUsage.ratio) ? contextUsage.ratio * 100 : null;
+  const displayTotal = typeof contextUsage.totalTokens === 'number' ? formatTokenCount(contextUsage.totalTokens) : null;
+  const displayLimit = contextUsage.contextLimit ? formatTokenCount(contextUsage.contextLimit, true) : null;
+  const isWarning = contextUsage.status === 'compress';
+  const isDanger = contextUsage.status === 'too_large';
 
   const strokeWidth = 2.5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const visualPercentage = Math.min(Math.max(percentage, 0), 100);
+  const visualPercentage = percentage === null ? 0 : Math.min(Math.max(percentage, 0), 100);
   const strokeDashoffset = circumference - (visualPercentage / 100) * circumference;
 
   const getStrokeColor = () => {
+    if (percentage === null) return 'var(--color-text-3)';
     if (isDanger) return 'rgb(var(--danger-6))';
     if (isWarning) return 'rgb(var(--warning-6))';
     return 'rgb(var(--primary-6))';
   };
 
-  const percentageLabel = t('conversation.contextUsage.percentUsed', {
-    percent: Math.round(percentage),
-  });
+  const percentageLabel =
+    percentage === null
+      ? t('conversation.contextUsage.unavailable')
+      : t('conversation.contextUsage.percentUsed', { percent: Math.round(percentage) });
+  const usageLabel =
+    contextUsage.source === 'estimated' && percentage !== null
+      ? `${t('conversation.contextUsage.estimated')} · ${percentageLabel}`
+      : percentageLabel;
+  const triggerLabel = `${t('conversation.contextUsage.triggerLabel')}: ${usageLabel}`;
+  const statusAnnouncement =
+    percentage === null
+      ? t('conversation.contextUsage.unavailable')
+      : t(`conversation.contextHandoff.budget.${contextUsage.status}`, { percent: `${Math.round(percentage)}%` });
 
   const popoverContent = (
     <div className='min-w-240px p-12px'>
       <div className='flex items-baseline justify-between gap-12px'>
         <span className='text-13px text-t-secondary'>{t('conversation.contextUsage.contextWindow')}</span>
-        <span className='text-13px font-medium text-t-primary whitespace-nowrap'>{percentageLabel}</span>
+        <span className='text-13px font-medium text-t-primary whitespace-nowrap'>{usageLabel}</span>
       </div>
-      <div className='mt-3px text-12px text-t-secondary'>
-        {t('conversation.contextUsage.tokenCount', { used: displayTotal, limit: displayLimit })}
-      </div>
-      <div
-        aria-label={percentageLabel}
-        aria-valuemax={100}
-        aria-valuemin={0}
-        aria-valuenow={visualPercentage}
-        className='mt-8px h-5px overflow-hidden rounded-full bg-3'
-        role='progressbar'
-      >
+      {displayTotal && displayLimit && (
+        <div className='mt-3px text-12px text-t-secondary'>
+          {t('conversation.contextUsage.tokenCount', { used: displayTotal, limit: displayLimit })}
+        </div>
+      )}
+      {percentage !== null && (
         <div
-          className='h-full rounded-full'
-          data-testid='context-usage-progress'
-          style={{ backgroundColor: getStrokeColor(), width: `${visualPercentage}%` }}
-        />
-      </div>
+          aria-label={usageLabel}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={visualPercentage}
+          className='mt-8px h-5px overflow-hidden rounded-full bg-3'
+          role='progressbar'
+        >
+          <div
+            className='h-full rounded-full'
+            data-testid='context-usage-progress'
+            style={{ backgroundColor: getStrokeColor(), width: `${visualPercentage}%` }}
+          />
+        </div>
+      )}
       <Divider className='my-12px!' />
       <div className='text-12px text-t-secondary'>{t('conversation.contextUsage.localTokenUsage')}</div>
       <UsageRow label={t('conversation.contextUsage.today')} value={localUsage.today} />
@@ -107,7 +140,7 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
       className='context-usage-popover'
     >
       <Button
-        aria-label={t('conversation.contextUsage.triggerLabel')}
+        aria-label={triggerLabel}
         className={`context-usage-indicator flex items-center justify-center ${className}`}
         shape='circle'
         size='mini'
@@ -137,11 +170,14 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
             stroke={getStrokeColor()}
             strokeWidth={strokeWidth}
             strokeLinecap='round'
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
+            strokeDasharray={percentage === null ? '2 3' : circumference}
+            strokeDashoffset={percentage === null ? undefined : strokeDashoffset}
             style={{ transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease' }}
           />
         </svg>
+        <span className='sr-only' role='status' aria-live='polite'>
+          {statusAnnouncement}
+        </span>
       </Button>
     </Popover>
   );

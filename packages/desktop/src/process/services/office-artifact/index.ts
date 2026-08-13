@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { OfficeArtifactService } from './OfficeArtifactService';
+import { OfficeArtifactService } from './service/OfficeArtifactService';
 import { hashOfficeArtifact, resolveOfficeArtifactPath } from './officeArtifactPath';
 import { OfficeArtifactSnapshotStore } from './officeArtifactSnapshots';
 import { OfficeArtifactWorkingFiles } from './officeArtifactWorkingFiles';
@@ -31,11 +31,11 @@ export async function disposeOfficeArtifactService(): Promise<void> {
   await officeArtifactService.dispose();
 }
 
-export * from './OfficeArtifactService';
 export * from './docxArtifactStrategy';
 export * from './officeArtifactPath';
 export * from './officeArtifactSnapshots';
 export * from './officeArtifactWorkingFiles';
 export * from './officeCliJson';
 export * from './officeCliRunner';
+export * from './service';
 export * from './xlsxArtifactStrategy';

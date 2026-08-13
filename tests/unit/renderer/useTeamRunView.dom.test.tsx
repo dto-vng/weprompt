@@ -216,6 +216,51 @@ describe('useTeamRunView', () => {
     expect(result.current.state.sessionStopped).toBe(false);
   });
 
+  // Older aioncore builds (≤ v0.1.44) omit `slot_work` and `session_generation`
+  // from run payloads entirely — `GET /run-state` answers a bare
+  // `{"active_run":null}`. ipcBridge normalizes those away, but the view must
+  // survive an un-normalized payload rather than unmounting the whole app.
+  describe('payloads missing slot_work', () => {
+    it('reconcile_keeps_the_view_alive_when_the_snapshot_omits_slot_work', async () => {
+      teamEventMocks.invoke.getRunState.mockResolvedValue({ active_run: null });
+
+      const { result } = renderHook(() => useTeamRunView('team-1'));
+
+      await waitFor(() => expect(teamEventMocks.invoke.getRunState).toHaveBeenCalled());
+      expect(result.current.state.slotWorkBySlot).toEqual({});
+    });
+
+    it('reconcile_keeps_the_view_alive_when_the_snapshot_is_empty', async () => {
+      teamEventMocks.invoke.getRunState.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useTeamRunView('team-1'));
+
+      await waitFor(() => expect(teamEventMocks.invoke.getRunState).toHaveBeenCalled());
+      expect(result.current.state.slotWorkBySlot).toEqual({});
+    });
+
+    it('active_run_event_without_slot_work_still_applies', () => {
+      const { result } = renderHook(() => useTeamRunView('team-1'));
+      const runUpdated = teamEventMocks.handlers.runUpdated as TeamRunHandler;
+      const event = runEvent({ slot_work: undefined as unknown as ITeamSlotWork[] });
+
+      act(() => runUpdated(event));
+
+      expect(result.current.state.activeRun).toEqual(event);
+      expect(result.current.state.slotWorkBySlot).toEqual({});
+    });
+
+    it('terminal_event_without_slot_work_still_clears_the_active_run', () => {
+      const { result } = renderHook(() => useTeamRunView('team-1'));
+      const runCompleted = teamEventMocks.handlers.runCompleted as TeamRunHandler;
+
+      act(() => runCompleted(runEvent({ status: 'completed', slot_work: undefined as unknown as ITeamSlotWork[] })));
+
+      expect(result.current.state.activeRun).toBeUndefined();
+      expect(result.current.state.slotWorkBySlot).toEqual({});
+    });
+  });
+
   it('applied_active_run_event_self_heals_the_session_stopped_flag', () => {
     const { result } = renderHook(() => useTeamRunView('team-1'));
     const sessionStatus = teamEventMocks.handlers.sessionStatusChanged as SessionStatusHandler;

@@ -1,0 +1,59 @@
+.page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  overflow: auto;
+  padding: clamp(16px, 3vw, 28px) clamp(16px, 3.5vw, 36px);
+  background: var(--studio-page-background);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: var(--fw-regular);
+}
+
+.page :global(.arco-btn-primary) {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  letter-spacing: normal;
+}
+
+.page :global(.arco-btn-primary:not(.arco-btn-disabled)) {
+  color: var(--text-white);
+}
+
+.centered {
+  display: flex;
+  min-height: 60vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-2);
+  text-align: center;
+}
+
+.projectShell {
+  display: flex;
+  width: min(100%, 1560px);
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.projectAlert {
+  border: 1px solid var(--color-danger-light-3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--color-danger-6);
+  background: var(--color-danger-light-1);
+  overflow-wrap: anywhere;
+}
+
+.modalSurface {
+  composes: surface from './StudioTypography.module.css';
+}

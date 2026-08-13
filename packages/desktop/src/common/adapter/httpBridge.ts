@@ -13,7 +13,69 @@
 declare global {
   interface Window {
     __backendPort?: number;
+    __backendLocalToken?: string;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Local-mode shared secret
+// ---------------------------------------------------------------------------
+
+/**
+ * Header carrying the local-mode secret. Must match AionCore's
+ * `LOCAL_TOKEN_HEADER` (crates/aionui-auth/src/middleware.rs).
+ */
+export const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
+
+/** Query parameter carrying the same secret, for callers that cannot set headers. */
+export const LOCAL_TOKEN_QUERY = 'local_token';
+
+/**
+ * Resolve the local-mode secret for the current context.
+ *
+ * Mirrors {@link getBackendPort}: the preload bridge writes
+ * `window.__backendLocalToken` for the renderer, and `src/index.ts` writes
+ * `globalThis.__backendLocalToken` for main-process callers. Empty in WebUI
+ * browser mode, where the backend runs with real authentication instead.
+ */
+export function getLocalToken(): string {
+  if (typeof window !== 'undefined' && (window as Window).__backendLocalToken) {
+    return (window as Window).__backendLocalToken as string;
+  }
+  const g = globalThis as typeof globalThis & { __backendLocalToken?: string };
+  return g.__backendLocalToken ?? '';
+}
+
+/**
+ * Add the local-mode secret to a header bag.
+ *
+ * Every `fetch`/`XMLHttpRequest` aimed at the backend must go through this —
+ * without the secret the backend answers 401.
+ *
+ * aioncore authenticates the per-launch secret from `Authorization: Bearer`
+ * (crates/aionui-auth/src/extract.rs `extract_token_from_headers`); it never
+ * reads the legacy `X-AionUI-Local-Token` header, so only `Authorization: Bearer`
+ * is sent — the value the backend validates.
+ */
+export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
+  const token = getLocalToken();
+  if (!token) return headers;
+  // aioncore reads the loopback token from `Authorization: Bearer`
+  // (extract_token_from_headers), not the legacy `X-AionUI-Local-Token` header.
+  return { ...headers, Authorization: `Bearer ${token}` };
+}
+
+/**
+ * Add the local-mode secret to a URL's query string.
+ *
+ * For request kinds that cannot carry a header: `WebSocket`, `EventSource`, and
+ * URLs handed to `<img src>` or an iframe.
+ */
+export function withLocalTokenQuery(url: string): string {
+  const token = getLocalToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${LOCAL_TOKEN_QUERY}=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -64,6 +126,22 @@ function getWsUrl(): string {
     return `${proto}//${window.location.host}/ws`;
   }
   return `ws://127.0.0.1:${getBackendPort()}/ws`;
+}
+
+/**
+ * WebSocket subprotocols carrying the local-mode secret for the direct-backend
+ * (Electron) connection.
+ *
+ * A browser `WebSocket` cannot set request headers, so the per-launch secret must
+ * ride in the first `Sec-WebSocket-Protocol` value — NOT the query string, which
+ * aioncore never reads for auth. The backend extracts it via
+ * `extract_token_from_ws_headers` (crates/aionui-auth/src/extract.rs) and echoes
+ * the protocol back so the handshake completes. Empty in WebUI browser mode,
+ * where the session cookie authenticates the same-origin upgrade instead.
+ */
+export function getWsProtocols(): string[] {
+  const token = getLocalToken();
+  return token ? [token] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +228,87 @@ export function isBackendHttpError(error: unknown): error is BackendHttpError {
  */
 export type HttpRequestOptions = {
   silentStatuses?: number[];
+  signal?: AbortSignal;
 };
+
+export type MainHttpRequestOptions = {
+  port: number;
+  token: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  body?: unknown;
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
+};
+
+/** Body-free error for main-owned lifecycle calls where request details are sensitive. */
+export class MainBackendHttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string) {
+    super(`Main backend request failed (${status})`);
+    this.name = 'MainBackendHttpError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function assertMainHttpRequestOptions(options: MainHttpRequestOptions): void {
+  if (
+    !Number.isSafeInteger(options.port) ||
+    options.port < 1 ||
+    options.port > 65_535 ||
+    typeof options.token !== 'string' ||
+    options.token.length < 1 ||
+    options.token.length > 4_096 ||
+    options.token.includes('\u0000') ||
+    typeof options.path !== 'string' ||
+    !options.path.startsWith('/') ||
+    options.path.startsWith('//') ||
+    options.path.includes('\u0000')
+  ) {
+    throw new Error('Invalid main backend request configuration');
+  }
+}
+
+/**
+ * Main-process-only HTTP seam with explicit lifecycle credentials.
+ *
+ * Deliberately does not use globals, fallback ports, or logging. Error bodies
+ * are consumed only to retain a bounded machine code and are never exposed.
+ */
+export async function mainHttpRequest<T>(options: MainHttpRequestOptions): Promise<T> {
+  assertMainHttpRequestOptions(options);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${options.token}`,
+    [LOCAL_TOKEN_HEADER]: options.token,
+  };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const response = await (options.fetchImpl ?? fetch)(`http://127.0.0.1:${options.port}${options.path}`, {
+    method: options.method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    let code = '';
+    try {
+      const body: unknown = await response.json();
+      if (body !== null && typeof body === 'object' && 'code' in body) {
+        const candidate = (body as { code?: unknown }).code;
+        if (typeof candidate === 'string' && candidate.length <= 128) code = candidate;
+      }
+    } catch {
+      // A body is not required for the body-free error contract.
+    }
+    throw new MainBackendHttpError(response.status, code);
+  }
+  if (!response.headers.get('Content-Type')?.includes('application/json')) return undefined as T;
+  const json: unknown = await response.json();
+  if (json !== null && typeof json === 'object' && 'data' in json) return (json as { data: T }).data;
+  return json as T;
+}
 
 const SENSITIVE_LOG_KEY_PATTERN = /api[_-]?key|authorization|auth[_-]?token|access[_-]?token|refresh[_-]?token|secret/i;
 
@@ -177,22 +335,37 @@ export async function httpRequest<T>(
   options?: HttpRequestOptions
 ): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = withLocalTokenHeaders();
 
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
 
-  console.debug(
-    `[httpBridge] ${method} ${path}`,
-    body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
-  );
+  const requestLog = () =>
+    console.debug(
+      `[httpBridge] ${method} ${path}`,
+      body !== undefined ? JSON.stringify(redactForLog(body)).slice(0, 500) : '(no body)'
+    );
+  const deferRequestLog = options?.silentStatuses !== undefined && options.silentStatuses.length > 0;
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  if (!deferRequestLog) {
+    requestLog();
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: options?.signal,
+    });
+  } catch (error) {
+    if (deferRequestLog) {
+      requestLog();
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     // Response body can only be consumed once — read as text, then try JSON
@@ -203,14 +376,18 @@ export async function httpRequest<T>(
     } catch {
       errorBody = rawText;
     }
-    if (options?.silentStatuses?.includes(response.status)) {
-      console.debug(`[httpBridge] ${method} ${path} → ${response.status} (silenced)`, errorBody);
-    } else {
+    if (!options?.silentStatuses?.includes(response.status)) {
+      if (deferRequestLog) {
+        requestLog();
+      }
       console.error(`[httpBridge] ${method} ${path} → ${response.status}`, errorBody);
     }
     throw new BackendHttpError({ method, path, status: response.status, body: errorBody });
   }
 
+  if (deferRequestLog) {
+    requestLog();
+  }
   console.debug(`[httpBridge] ${method} ${path} → ${response.status} OK`);
 
   const contentType = response.headers.get('Content-Type');
@@ -232,7 +409,7 @@ export async function httpRequest<T>(
 
 type ProviderLike<Data, Params> = {
   provider: (handler: (params: Params) => Promise<Data>) => void;
-  invoke: Params extends undefined ? () => Promise<Data> : (params: Params) => Promise<Data>;
+  invoke: [Params] extends [undefined] ? () => Promise<Data> : (params: Params) => Promise<Data>;
 };
 
 export function withResponseMap<Raw, Mapped, Params>(
@@ -364,9 +541,10 @@ function ensureWs(): void {
   }
 
   const url = getWsUrl();
+  const protocols = getWsProtocols();
   console.debug('[ensureWs] connecting to', url);
   try {
-    ws = new WebSocket(url);
+    ws = protocols.length > 0 ? new WebSocket(url, protocols) : new WebSocket(url);
   } catch (e) {
     console.error('[ensureWs] WebSocket constructor threw:', e);
     scheduleWsReconnect();

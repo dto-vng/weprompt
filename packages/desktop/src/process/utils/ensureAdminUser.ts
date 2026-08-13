@@ -13,6 +13,7 @@
  * Failure policy: log and swallow. Next boot retries. Must not block startup.
  */
 
+import { withLocalTokenHeaders } from '@/common/adapter/httpBridge';
 import { loadUserWebUIConfig, saveUserWebUIConfig } from './webuiConfig';
 
 type AuthStatusResponse = {
@@ -25,7 +26,9 @@ type AuthStatusResponse = {
 export async function ensureAdminUser(backendPort: number): Promise<void> {
   try {
     // 1. Ask backend whether SQLite already has a real user.
-    const statusRes = await fetch(`http://127.0.0.1:${backendPort}/api/auth/status`);
+    const statusRes = await fetch(`http://127.0.0.1:${backendPort}/api/auth/status`, {
+      headers: withLocalTokenHeaders(),
+    });
     if (!statusRes.ok) {
       console.error(`[WebUI Migration] /api/auth/status returned ${statusRes.status}; skipping`);
       return;
@@ -55,7 +58,7 @@ export async function ensureAdminUser(backendPort: number): Promise<void> {
     });
     const seedRes = await fetch(`http://127.0.0.1:${backendPort}/api/auth/internal/users/system/credentials`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withLocalTokenHeaders({ 'Content-Type': 'application/json' }),
       body,
     });
     if (!seedRes.ok) {

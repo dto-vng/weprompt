@@ -16,6 +16,7 @@
   "downloadFailed": "İndirme başarısız",
   "imageLoadFailed": "Görüntü yüklenemedi",
   "scrollToBottom": "Aşağı kaydır",
+  "reasoning": "Akıl yürütme",
   "availableCommands": "{{count}} Kullanılabilir Komut",
   "atFile.hint": "Dosya aramak için yazın",
   "atFile.menuLabel": "Dosya bahsetmeleri",
@@ -50,12 +51,25 @@
   "unknownMessageType": "Bilinmeyen mesaj türü: {{type}}",
   "permissionRequest": "İzin İsteği",
   "agentRequestingPermission": "Ajan izin istiyor.",
+  "permission": {
+    "intent": {
+      "run": "Bir komut çalıştırmak istiyorum",
+      "edit": "Bir dosyayı düzenlemek istiyorum",
+      "read": "Bir dosyayı okumak istiyorum",
+      "fetch": "Web'den bir şey almak istiyorum",
+      "tool": "Bir araç kullanmak istiyorum",
+      "destructive": "Dosyaları silmek veya kaldırmak istiyorum",
+      "generic": "Onayınızı gerektiren bir şey yapmak istiyorum"
+    },
+    "destructiveWarning": "Bu işlem dosyaları kalıcı olarak silebilir veya üzerine yazabilir — geri alınamaz."
+  },
   "command": "Komut:",
   "chooseAction": "Bir işlem seçin:",
   "option": "Seçenek",
   "noOptionsAvailable": "Seçenek yok",
   "processing": "İşleniyor...",
   "responseSentSuccessfully": "Yanıt başarıyla gönderildi",
+  "permissionResponseFailed": "Yanıtınız gönderilemedi. Lütfen tekrar deneyin.",
   "confirmation": {
     "applyChange": "Bu değişikliği uygula?",
     "allowExecution": "Yürütmeye izin ver?",
@@ -106,6 +120,28 @@
         "failed": "Planlanan çalışmayı tamamlayamadım. Planlanan: {{total, number}}. Yeniden denenmesi gereken: {{failed, number}}.",
         "failedWithCanceled": "Planlanan çalışmayı tamamlayamadım. Planlanan: {{total, number}}. Yeniden denenmesi gereken: {{failed, number}}. Durdurulan: {{canceled, number}}.",
         "canceled": "Planlanan çalışma tamamlanmadan bu turu durdurdum. Planlanan: {{total, number}}. Tamamlanmayan: {{unfinished, number}}. Durdurulan: {{canceled, number}}."
+      }
+    },
+    "close": {
+      "completed": {
+        "v1": "Her şey tamam — planlandığı gibi ilerledi. Şimdi ne yapmak istediğinizi söyleyin.",
+        "v2": "Bu iş tamamlandı ve sorunsuz çalışıyor. Buradan nasıl devam etmek istediğinizi bana bildirin.",
+        "v3": "Tamamlandı — her şey yerli yerine oturdu. Siz hazır olduğunuzda bir sonraki adım için hazırım."
+      },
+      "recovered": {
+        "v1": "Tamamlandı — bir adım ikinci bir deneme gerektirdi, ama artık her şey yolunda.",
+        "v2": "Bitti — yol boyunca kısa bir yeniden deneme gerekti, ama artık her şey yerinde."
+      },
+      "partial": {
+        "v1": "Bunun büyük bölümünü hallettim. Birkaç şey hâlâ bir gözden geçirme daha istiyor — ayrıntılar hemen aşağıda.",
+        "v2": "İyi ilerleme — çoğu tamamlandı, yine de bir kısmı bir deneme daha gerektiriyor. Ayrıntıları aşağıda bulacaksınız."
+      },
+      "failed": {
+        "v1": "Bunu bitiremedim. Ayrıntılar aşağıda; hazır olduğunuzda benden yeniden denememi isteyebilirsiniz.",
+        "v2": "Bu iş sonuçlanmadı. Aşağıdaki ayrıntılara bir göz atın ya da bir kez daha denememi söylemeniz yeterli."
+      },
+      "canceled": {
+        "v1": "Burada durdum. Kaldığı yerden devam etmemi isterseniz bana bildirin."
       }
     },
     "attempt": "({{n}}. deneme)",
@@ -205,5 +241,8 @@
         "failedTitle": "Tamamlanmış dosyayı hazırlayamadım"
       }
     }
+  },
+  "plan": {
+    "title": "Yapılacaklar listesi"
   }
 }

@@ -16,21 +16,15 @@ import type { RefTextAreaType } from '@arco-design/web-react/es/Input/textarea';
 import { useTranslation } from 'react-i18next';
 import {
   type FeedbackAttachment,
-  type FeedbackEventExtra,
   type FeedbackEventTags,
   submitFeedbackReport,
 } from '@/renderer/services/feedback/submitFeedbackReport';
-import type {
-  FeedbackDiagnosticsExplicitContext,
-  FeedbackDiagnosticsProfile,
-} from '@/common/types/feedbackDiagnostics';
-import { captureFeedbackRoute } from '@/renderer/services/feedback/routeContext';
 
-export type { FeedbackEventExtra, FeedbackEventTags } from '@/renderer/services/feedback/submitFeedbackReport';
+export type { FeedbackEventTags } from '@/renderer/services/feedback/submitFeedbackReport';
 
 const DESCRIPTION_MAX_LENGTH = 2000;
 const MAX_SCREENSHOTS = 3;
-const ACCEPTED_IMAGE_TYPES = '.png,.jpg,.jpeg,.gif';
+const ACCEPTED_IMAGE_TYPES = '.png,.jpg,.jpeg';
 
 const getUploadItemKey = (item: Pick<UploadItem, 'name' | 'originFile'>) =>
   `${item.originFile?.name ?? item.name}_${item.originFile?.size ?? 0}`;
@@ -57,12 +51,6 @@ type FeedbackReportModalProps = {
   defaultModule?: string;
   prefilledScreenshots?: PrefilledScreenshot[];
   feedbackTags?: FeedbackEventTags;
-  feedbackExtra?: FeedbackEventExtra;
-  feedbackDiagnosticsContext?: {
-    explicitContext?: FeedbackDiagnosticsExplicitContext;
-    explicitProfiles?: FeedbackDiagnosticsProfile[];
-    routeAtOpen?: string;
-  };
 };
 
 const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
@@ -71,8 +59,6 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
   defaultModule,
   prefilledScreenshots,
   feedbackTags,
-  feedbackExtra,
-  feedbackDiagnosticsContext,
 }) => {
   const { t } = useTranslation();
   const talkToButler = useTalkToButler();
@@ -150,56 +136,46 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
               return null;
             }
 
+            const contentType = item.originFile.type;
+            if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
+              throw new Error('Unsupported screenshot type');
+            }
             const buffer = await item.originFile.arrayBuffer();
-            const ext = item.originFile.name.split('.').pop() || 'png';
             return {
               filename: `screenshot-${index + 1}-${item.originFile.name}`,
               data: new Uint8Array(buffer),
-              contentType: item.originFile.type || `image/${ext}`,
+              contentType,
             };
           })
         )
       ).filter((item): item is FeedbackAttachment => item !== null);
 
-      await submitFeedbackReport({
+      const result = await submitFeedbackReport({
         attachments,
-        collectDbDiagnostics: {
-          explicitContext: feedbackDiagnosticsContext?.explicitContext,
-          explicitProfiles: feedbackDiagnosticsContext?.explicitProfiles,
-          routeAtOpen: feedbackDiagnosticsContext?.routeAtOpen,
-          routeAtSubmit: captureFeedbackRoute(),
-          selectedModule: module,
-        },
         collectLogs: true,
         description,
-        extra: feedbackExtra,
         module,
         moduleLabel: t(selectedModule?.i18nKey ?? 'settings.bugReportModuleOther'),
         tags: feedbackTags,
       });
 
-      Message.success(t('settings.bugReportSuccess'));
-      resetForm();
-      onCancel();
+      if (result.status === 'saved') {
+        Message.success(t('settings.bugReportSuccess'));
+        resetForm();
+        onCancel();
+      } else if (result.status === 'cancelled') {
+        setError(t('settings.bugReportCancelled'));
+      } else {
+        setError(t('settings.bugReportError'));
+      }
     } catch {
       setError(t('settings.bugReportError'));
     } finally {
       setSubmitting(false);
     }
-  }, [
-    module,
-    description,
-    screenshots,
-    t,
-    onCancel,
-    resetForm,
-    selectedModule,
-    feedbackExtra,
-    feedbackTags,
-    feedbackDiagnosticsContext,
-  ]);
+  }, [module, description, screenshots, t, onCancel, resetForm, selectedModule, feedbackTags]);
 
-  // "Solve via chat": hand the report to the AionUi Butler for on-the-spot
+  // "Solve via chat": hand the report to the WePrompt Butler for on-the-spot
   // diagnosis instead of submitting to the team. The typed description + module
   // become a structured prompt; screenshots are uploaded to disk so they ride
   // along in the chat input (reusing the same upload path as pasted images).
@@ -224,8 +200,6 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
 
       const moduleLabel = t(selectedModule?.i18nKey ?? 'settings.bugReportModuleOther');
       const prompt = t('settings.talkToButler.prompt.diagnose', {
-        defaultValue:
-          'I ran into a problem with AionUi, please help me diagnose it.\n\n[Module] {{module}}\n[Description] {{description}}\n[Attachments] see the screenshots in the input.\n\nPlease diagnose the cause and tell me how to fix it.',
         module: moduleLabel,
         description: description.trim(),
       });
@@ -343,7 +317,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
               data-testid='btn-feedback-diagnose'
               className='!text-primary-6 hover:!text-primary-5'
             >
-              {t('settings.talkToButler.solveViaChat', { defaultValue: 'Solve via chat' })}
+              {t('settings.talkToButler.solveViaChat')}
             </Button>
             <div className='flex items-center gap-8px'>
               <Button onClick={handleCancel} className='px-20px min-w-80px' style={{ borderRadius: 8 }}>

@@ -70,6 +70,7 @@ import UpdateModal from '@/renderer/components/settings/UpdateModal';
 
 describe('UpdateModal manual install fallback', () => {
   beforeEach(() => {
+    process.env.WEPROMPT_UPDATE_BASE_URL = 'https://updates.weprompt.test/releases';
     vi.stubGlobal('__APP_VERSION__', '2.1.15');
     mocks.manualProgressHandler = null;
     mocks.autoStatusHandler = null;
@@ -85,14 +86,14 @@ describe('UpdateModal manual install fallback', () => {
           version: '2.1.14',
           name: 'v2.1.14',
           body: 'notes',
-          htmlUrl: 'https://github.com/iOfficeAI/AionUi/releases/tag/v2.1.14',
+          htmlUrl: '',
           prerelease: false,
           draft: false,
           assets: [],
           recommendedAsset: {
-            name: 'AionUi-2.1.14-mac-arm64.dmg',
-            url: 'https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac-arm64.dmg',
-            fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.1.14/AionUi-2.1.14-mac-arm64.dmg',
+            name: 'WePrompt-2.1.14-mac-arm64.dmg',
+            url: 'https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac-arm64.dmg',
+            fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.1.14-mac-arm64.dmg',
             size: 123,
           },
         },
@@ -106,19 +107,20 @@ describe('UpdateModal manual install fallback', () => {
         receivedBytes: 123,
         totalBytes: 123,
         percent: 100,
-        file_path: '/tmp/AionUi-2.1.14-mac-arm64.dmg',
+        file_path: '/tmp/WePrompt-2.1.14-mac-arm64.dmg',
       });
       return {
         success: true,
         data: {
           downloadId,
-          file_path: '/tmp/AionUi-2.1.14-mac-arm64.dmg',
+          file_path: '/tmp/WePrompt-2.1.14-mac-arm64.dmg',
         },
       };
     });
   });
 
   afterEach(() => {
+    delete process.env.WEPROMPT_UPDATE_BASE_URL;
     cleanup();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
@@ -141,9 +143,9 @@ describe('UpdateModal manual install fallback', () => {
 
     expect(mocks.updateDownloadMock).toHaveBeenCalledWith({
       downloadId: expect.any(String),
-      url: 'https://static.aionui.com/releases/2.1.14/AionUi-2.1.14-mac-arm64.dmg',
-      fallbackUrl: 'https://github.com/iOfficeAI/AionUi/releases/download/v2.1.14/AionUi-2.1.14-mac-arm64.dmg',
-      file_name: 'AionUi-2.1.14-mac-arm64.dmg',
+      url: 'https://updates.weprompt.test/releases/2.1.14/WePrompt-2.1.14-mac-arm64.dmg',
+      fallbackUrl: 'https://updates.weprompt.test/releases/fallback/WePrompt-2.1.14-mac-arm64.dmg',
+      file_name: 'WePrompt-2.1.14-mac-arm64.dmg',
     });
     expect(screen.queryByText('update.manualInstall')).not.toBeInTheDocument();
   });

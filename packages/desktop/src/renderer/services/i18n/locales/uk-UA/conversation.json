@@ -17,7 +17,6 @@
     "quickActionStar": "Подобається? Поставте нам зірку!",
     "skillsMarket": "Маркет навичок WePrompt",
     "skillsMarketDesc": "Шукайте та активуйте навички спільноти за запитом. Налаштуйте один раз — доступно для всіх агентів.",
-    "skillsMarketDetails": "Докладніше >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "Проєкт {{name}}",
+    "eyebrow": "ПРОЄКТ",
+    "tabs": {
+      "label": "Подання проєкту",
+      "chat": "Чат",
+      "files": "Файли",
+      "context": "Контекст",
+      "artifacts": "Артефакти"
+    }
+  },
+  "projectHome": {
+    "newChat": "Новий чат",
+    "composerPlaceholder": "Почніть новий чат у цьому проєкті…",
+    "scopedHint": "— лише в межах цього проєкту",
+    "chats": "Чати",
+    "showAll": "Показати всі",
+    "showLess": "Показати менше",
+    "emptyChatsTitle": "Поки що немає чатів",
+    "emptyChatsBody": "Почніть чат вище, щоб розпочати роботу над цим проєктом.",
+    "instructions": "Інструкції",
+    "instructionsApplies": "Застосовується до нових чатів у цьому проєкті.",
+    "instructionsEmpty": "Додайте інструкції, які скеровуватимуть кожен чат у цьому проєкті.",
+    "addInstructions": "Додати інструкції",
+    "edit": "Редагувати",
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "instructionsSaved": "Інструкції збережено",
+    "instructionsSaveFailed": "Не вдалося зберегти інструкції",
+    "files": "Файли",
+    "revealInFolder": "Показати в папці",
+    "filesReadonly": "Лише читання · керування в папці",
+    "filesEmpty": "Папка цього проєкту порожня.",
+    "folderMissingTitle": "Папку не знайдено",
+    "folderMissingRelink": "Повторно прив'язати папку",
+    "folderMissingBody": "Решта сторінки продовжує працювати.",
+    "metaChats": "{{count}} чат(ів)",
+    "metaActive": "активний {{time}}",
+    "notFoundTitle": "Проєкт не знайдено",
+    "notFoundBody": "Можливо, цей проєкт видалено або посилання на нього застаріло.",
+    "backHome": "Повернутися на головну",
+    "rename": "Перейменувати",
+    "relink": "Повторно прив'язати папку",
+    "reveal": "Показати в папці",
+    "remove": "Видалити",
+    "knowledge": "Знання",
+    "knowledgeAdd": "Додати файли",
+    "knowledgeDropFolderMissing": "Перед додаванням файлів повторно підключіть теку Knowledge Base.",
+    "knowledgeDropUnsupported": "Жоден із цих файлів не підтримується. Підтримуються: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Не вдалося оновити базу знань.",
+    "knowledgeRelinkFailed": "Не вдалося повторно звʼязати теку проєкту.",
+    "knowledgeRetryFailed": "Не вдалося поставити файл у чергу індексації.",
+    "knowledgeDeleteFailed": "Не вдалося перемістити файл до смітника.",
+    "knowledgeAddFailed": "Не вдалося додати ці файли до бази знань.",
+    "knowledgeEmpty": "Додайте документи, щоб створити базу знань цього проєкту. Асистент автоматично шукає в них у кожному чаті цього проєкту.",
+    "knowledgeSemanticOff": "семантичний пошук вимкнено — модель ембеддингу не налаштована",
+    "knowledgeSemanticOffAction": "Додати модель ембеддингу",
+    "knowledgeEmbedAll": "Векторизувати все",
+    "knowledgePassagesTooltip": "Цей файл розбито на фрагменти для пошуку, і асистент використовує найдоречніші з них у відповіді.",
+    "knowledgeStatusIndexing": "Індексація…",
+    "knowledgeProgressReading": "Читання сторінки {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Розпізнавання сторінки {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Векторизація {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "Помилка",
+    "knowledgeStatusUnsupported": "Не підтримується",
+    "knowledgeStatusNotEmbedded": "Лише ключові слова",
+    "knowledgeNotEmbeddedDetail": "Файл знаходиться за ключовими словами, але вбудовано лише {{done}}/{{total}} фрагментів. Повторіть, щоб вбудувати решту.",
+    "knowledgeRetry": "Повторити",
+    "knowledgeError": "База знань недоступна.",
+    "knowledgeSupportedTypes": "Підтримується: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Оновити",
+    "knowledgeOpenOriginal": "Відкрити початковий файл",
+    "knowledgeDeleteFile": "Видалити файл",
+    "knowledgeDeleteConfirm": "Перемістити «{{fileName}}» у кошик? Файл також буде вилучено з бази знань.",
+    "knowledgeFolderHint": "Файли зберігаються в теці «Knowledge Base» у теці проєкту. Усе, що ви туди покладете, індексується автоматично.",
+    "knowledgeFolderMissingTitle": "Теку Knowledge Base не знайдено",
+    "knowledgeFolderMissingBody": "Можливо, її перемістили, перейменували або видалили. Проіндексовані знання збережено — відновіть теку або повторно привʼяжіть проєкт, а потім оновіть.",
+    "knowledgePreviewNote": "Це проіндексований текст, за яким шукає асистент, а не початкове оформлення.",
+    "knowledgePreviewTruncated": "Попередній перегляд скорочено. Відкрийте початковий файл, щоб побачити весь документ.",
+    "knowledgePreviewError": "Не вдалося завантажити проіндексований текст цього файлу.",
+    "knowledgePreviewNotReady": "Проіндексованого тексту для відкриття ще немає.",
+    "knowledgeCitationMissing": "Цього файлу більше немає в базі знань.",
+    "knowledgeOcrTag": "Розпізнано (OCR)",
+    "knowledgeOcrDetail": "Розпізнано зі сканованого документа моделлю {{model}}. Пропущені сторінки: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "немає"
+  },
   "history": {
+    "moreActions": "Інші дії",
     "recents": "Недавні",
     "noHistory": "Немає історії чатів",
     "deleteTitle": "Видалити",
@@ -80,6 +166,8 @@
     "removeProject": "Видалити проєкт",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Нова розмова в цьому проєкті",
+    "expandProjectChats": "Розгорнути чати проєкту",
+    "collapseProjectChats": "Згорнути чати проєкту",
     "deleting": "Видалення...",
     "reorderPinned": "Перетягніть, щоб змінити порядок закріплених розмов",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Не вдалося видалити проєкт. Відкрийте його знову та повторіть спробу; файли в папці не видалено.",
+    "removeProjectChatDetachFailed": "Не вдалося від’єднати деякі чати від цього проєкту. Проєкт збережено; повторіть видалення.",
+    "removeProjectStateChanged": "Список проєктів змінився до видалення. Оновіть його та повторіть спробу.",
+    "removeProjectStorageFailed": "Не вдалося зберегти зміни проєкту. Перевірте доступ WePrompt до даних програми та повторіть спробу.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "Проєкт",
+    "projectMenu": {
+      "trigger": "Проєкт"
+    },
     "pasteConfirm_title": "Вставка файлів",
     "pasteConfirm_message": "Ви впевнені, що хочете вставити «{{name}}» у вибрану папку ({{target}})?",
     "pasteConfirm_paste": "Вставити",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "Термінал",
       "explorer": "Провідник"
-    },
-    "projectMenu": {
-      "trigger": "Проєкт"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "Модель для поточної сесії не вибрана, неможливо надіслати повідомлення",
     "sendMessageTo": "Надіслати повідомлення {{model}}",
     "processing": "Обробка...",
+    "stopGenerating": "Зупинити генерацію",
     "quotaExceededTitle": "Ліміт моделі вичерпано",
     "quotaExceededBody": "Ліміт поточної моделі вичерпано. Переключитися на {{model}}, щоб продовжити?",
     "quotaExceededNoFallback": "Ліміт моделі вичерпано. Будь ласка, переключіться на іншу доступну модель.",
@@ -547,7 +639,9 @@
     "today": "Сьогодні",
     "weekToDate": "З початку тижня",
     "monthToDate": "З початку місяця",
-    "triggerLabel": "Показати використання контексту"
+    "triggerLabel": "Показати використання контексту",
+    "estimated": "Орієнтовно",
+    "unavailable": "Дані про використання контексту недоступні"
   },
   "skill_generator": {
     "title": "Створити Навичку/Правило",
@@ -616,36 +710,109 @@
     }
   },
   "notFound": "Розмову не знайдено або її видалено",
-  "projectHeader": {
-    "label": "Проєкт {{name}}",
-    "eyebrow": "ПРОЄКТ",
-    "tabs": {
-      "label": "Подання проєкту",
-      "chat": "Чат",
-      "files": "Файли",
-      "context": "Контекст",
-      "artifacts": "Артефакти"
-    }
-  },
   "emptyModelReply": "Модель завершила хід, не сформувавши видимої відповіді. Надішліть запит ще раз; для великих результатів запитуйте їх частинами.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Бізнес-огляд",
+        "description": "Презентація квартальних результатів — зведення KPI, деталі за сегментами, прогноз. Темно-синій і бурштиновий."
+      },
+      "project-kickoff": {
+        "name": "Запуск проєкту",
+        "description": "Презентація запуску — обсяг, команда, графік, наступні кроки. Чистий бірюзовий."
+      },
+      "monthly-steerco": {
+        "name": "Щомісячний керівний комітет",
+        "description": "Звіт керівному комітету — стан портфеля, ризики, потрібні рішення. Антиква й золото."
+      },
+      "connected-ops": {
+        "name": "Зʼєднані операції",
+        "description": "Огляд операцій — показники майданчиків, час роботи, інциденти. Промисловий зелений."
+      },
+      "editorial-field-report": {
+        "name": "Редакційний звіт з місця",
+        "description": "Розгорнутий звіт — антиква, суцільний текст замість списків, один червоний акцент."
+      },
+      "market-trends-report": {
+        "name": "Звіт про тренди ринку",
+        "description": "Звіт із прокруткою на основі даних — графіки з посиланнями на джерела."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Мінімалістична світла презентація — одна думка на слайд, один синій акцент."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Мінімалістична темна презентація для технічних доповідей — зручна для коду, зелений акцент."
+      },
+      "business-report": {
+        "name": "Бізнес-звіт",
+        "description": "Обʼємний офіційний звіт — обкладинка, зміст, таблиці даних, темно-сині заголовки антиквою."
+      },
+      "decision-memo": {
+        "name": "Службова записка про рішення",
+        "description": "Коротка записка про рішення — блок КОМУ/ВІД/ТЕМА, рекомендація на початку, без обкладинки."
+      },
+      "operations-guide": {
+        "name": "Посібник з операцій",
+        "description": "Компактний регламент — нумеровані кроки, блоки приміток, контрольні списки, бірюзовий акцент."
+      },
+      "proposal-sow": {
+        "name": "Пропозиція / SOW",
+        "description": "Пропозиція клієнту — обсяг, графік, таблиця цін, блок підпису."
+      }
+    },
     "title": "Шаблони",
     "columnPptx": "Презентації · PPTX",
-    "columnHtml": "Звіти · HTML",
+    "columnHtml": "Веб · HTML",
+    "columnDocx": "Документи · DOCX",
     "selected": "Вибрано",
-    "buttonTooltip": "Шаблони презентацій",
-    "slashDescription": "Вибрати шаблон презентації",
-    "importCard": "Імпорт теми (.md)",
+    "buttonTooltip": "Шаблони",
+    "slashDescription": "Вибрати шаблон",
+    "importCard": "Імпорт шаблону (.md)",
     "empty": "Немає доступних шаблонів",
     "chipTooltip": "Це повідомлення використає шаблон",
+    "scratch": {
+      "prepareError": "Не вдалося підготувати тимчасову область артефакту: {{error}}",
+      "retained": "Тимчасові файли артефакту збережено для відновлення в {{path}}.",
+      "cleanup": "Очистити",
+      "cleanupSuccess": "Тимчасові файли артефакту видалено",
+      "cleanupError": "Не вдалося очистити: {{error}}"
+    },
     "importSuccess": "Шаблон імпортовано",
     "importError": "Помилка імпорту: {{error}}",
     "removeError": "Помилка видалення: {{error}}",
     "deleteTooltip": "Видалити шаблон",
-    "deleteConfirm": "Видалити цей шаблон?"
+    "deleteConfirm": "Видалити цей шаблон?",
+    "sources": {
+      "reselectRequired": "Повторно виберіть прикріплені файли, щоб використати їх із цим шаблоном PPTX.",
+      "reselectAction": "Вибрати файли повторно"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Кандидат презентації потребує перевірки.",
+        "reviewRequiredAfterFailure": "Створення зупинено; збережений кандидат презентації все ще потребує перевірки.",
+        "trackingRequired": "Потрібне відстеження запуску презентації.",
+        "dispatchUncertain": "Результат запуску презентації не підтверджено. Потрібна увага оператора."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Відкрити в системній програмі",
+        "discard": "Видалити запис"
+      },
+      "loadError": "Не вдалося завантажити стан відновлення презентації.",
+      "invalidResponse": "Не вдалося перевірити стан відновлення презентації.",
+      "openError": "Не вдалося підтвердити, чи було відкрито поточного кандидата презентації.",
+      "discardError": "Не вдалося підтвердити видалення запису презентації."
+    }
   },
   "status": {
-    "waitingApproval": "Очікує вашого підтвердження"
+    "waitingApproval": "Очікує вашого підтвердження",
+    "running": "Виконується",
+    "done": "Завершено",
+    "doneIdle": "Завершено — неактивно",
+    "stopped": "Зупинено",
+    "failed": "Помилка"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -708,8 +875,518 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Зберегти й закрити",
+      "discard": "Не зберігати й закрити",
+      "cancel": "Скасувати",
+      "unsavedMessage": "У {{count}} сценах є незбережені зміни. Зберегти їх перед закриттям?",
+      "unsavedMessage_one": "{{count}} сцена містить незбережені зміни. Зберегти її перед закриттям?",
+      "unsavedMessage_few": "{{count}} сцени містять незбережені зміни. Зберегти їх перед закриттям?",
+      "unsavedMessage_many": "{{count}} сцен містять незбережені зміни. Зберегти їх перед закриттям?",
+      "unsavedMessage_other": "У {{count}} сцени є незбережені зміни. Зберегти їх перед закриттям?",
+      "unavailableMessage": "Творча студія не відповідає. Якщо закрити зараз, незбережені зміни сцен можуть бути втрачені."
+    },
+    "phase": {
+      "nav": {
+        "label": "Творчий процес",
+        "brief": "Бриф",
+        "write": "Сценарій",
+        "produce": "Створення",
+        "review": "Перевірка",
+        "saved": "Збережено",
+        "saving": "Зміни зберігаються..."
+      },
+      "shared": {
+        "backToLibrary": "Повернутися до бібліотеки проєктів",
+        "noMediaGeneration": "На цьому етапі зображення та відео не створюються."
+      },
+      "brief": {
+        "title": "Бриф",
+        "description": "Визначте мету, формат і тривалість проєкту до роботи над сценарієм.",
+        "nameLabel": "Назва проєкту",
+        "intentLabel": "Творчий задум",
+        "durationLabel": "Цільова тривалість",
+        "aspectRatioLabel": "Співвідношення сторін",
+        "startWriting": "Почати сценарій",
+        "saved": "Усі зміни брифа збережено.",
+        "saving": "Зміни брифа зберігаються...",
+        "unsaved": "Зміни брифа ще не збережено.",
+        "invalidName": "Введіть назву проєкту, перш ніж продовжити.",
+        "aspectLocked": "Співвідношення сторін заблоковано",
+        "aspectLockedHelp": "Після додавання створених матеріалів співвідношення сторін змінити не можна."
+      },
+      "write": {
+        "title": "Сценарій",
+        "continueToProduce": "Перейти до створення",
+        "askAssistant": "Запитати помічника",
+        "assistantTitle": "Помічник зі сценарію",
+        "assistantDescription": "Використовуйте помічника для розвитку структури історії, ідей кадрів і промптів.",
+        "textChargeDisclosure": "Для чернетки розкадрування використовується налаштована текстова модель. Провайдер може стягувати плату за її використання.",
+        "draftStoryboard": "Створити чернетку розкадрування",
+        "addShot": "Додати кадр",
+        "fitToGoal": "Підігнати під мету",
+        "noScenes": "Щоб почати, додайте кадр або створіть чернетку розкадрування.",
+        "scriptTableTitle": "Сценарій",
+        "scriptTableHelp": "Один кадр — один рядок: разом налаштуйте текст, зображення, тривалість і формат результату.",
+        "shotColumn": "Кадр",
+        "scriptColumn": "Сценарій",
+        "visualColumn": "Зображення",
+        "outputColumn": "Результат",
+        "visualPlaceholder": "Опишіть, що ми бачимо…",
+        "suggestVisual": "Запропонувати зображення",
+        "addReference": "Додати референс",
+        "moreDetails": "Докладніше",
+        "invalidTitle": "Введіть назву кадру перед збереженням.",
+        "placeholder": {
+          "opening": "Початковий кадр",
+          "middle": "Проміжний кадр",
+          "closing": "Фінальний кадр"
+        },
+        "needsTitle": "Потрібна назва",
+        "pacingTitle": "Темп",
+        "pacingSummary": "Усього {{total}} с · ціль {{target}} с",
+        "goalMarker": "Ціль {{seconds}} с"
+      },
+      "produce": {
+        "connectEngine": "Підключіть рушій — близько хвилини, один раз для всього робочого простору",
+        "askTeammate": "Попросити колегу",
+        "askTeammateCopy": "Підключіть, будь ласка, рушій зображень або відео для цього робочого простору в налаштуваннях моделей WePrompt.",
+        "renderingWith": "Рендеринг за допомогою —",
+        "engineSummary": "{{model}} · {{kind}} · до {{seconds}} с",
+        "changeEngines": "Змінити рушії",
+        "takeRatio": "Дубль {{current}} / {{total}}",
+        "noVisualYet": "ВІЗУАЛУ ЩЕ НЕМАЄ",
+        "writeVisual": "Описати візуал",
+        "render": "Рендерити",
+        "renderAnother": "Рендерити ще",
+        "openPreview": "Відкрити попередній перегляд {{title}}",
+        "reviewCut": "Перевірити монтаж",
+        "modelsTitle": "Моделі",
+        "activityTitle": "Хід генерації",
+        "activityEmpty": "Зараз немає активних завдань генерації.",
+        "jobsRunning": "Активних завдань генерації: {{count}}",
+        "jobsRunning_one": "Виконується {{count}} завдання генерації",
+        "jobsRunning_few": "Виконуються {{count}} завдання генерації",
+        "jobsRunning_many": "Виконуються {{count}} завдань генерації",
+        "jobsRunning_other": "Виконується {{count}} завдання генерації"
+      },
+      "review": {
+        "title": "Перевірка",
+        "description": "Перевірте вибрані матеріали, додайте відсутні заставки й підготуйте передачу.",
+        "handoff": "Підготувати передачу",
+        "noAssets": "Немає вибраних матеріалів, готових до передачі.",
+        "selectedTake": "У монтажі",
+        "slateLabel": "Заставка",
+        "slateDescription": "Заставка зберігає кадр у послідовності, якщо візуальний матеріал не вибрано.",
+        "excludedFromHandoff": "Сцени без вибраного матеріалу не включаються до передачі. Заставки з режиму перевірки не експортуються.",
+        "renderedShots": "Відтворених кадрів: {{count}}",
+        "renderedShots_one": "{{count}} відтворений кадр",
+        "renderedShots_few": "{{count}} відтворені кадри",
+        "renderedShots_many": "{{count}} відтворених кадрів",
+        "renderedShots_other": "{{count}} відтвореного кадру",
+        "missingSlates": "Бракує заставок: {{count}}",
+        "missingSlates_one": "Бракує {{count}} заставки",
+        "missingSlates_few": "Відсутні {{count}} заставки",
+        "missingSlates_many": "Бракує {{count}} заставок",
+        "missingSlates_other": "Бракує {{count}} заставки",
+        "openProduce": "Відкрити створення",
+        "handoffDescription": "Передача містить лише маніфест розкадрування та вибрані матеріали. Заставки з режиму перевірки не експортуються.",
+        "partialHandoff": "Передача неповна, оскільки в деяких сценах не вибрано матеріал.",
+        "render": {
+          "action": "Зібрати відео",
+          "progress": "Збирання відео… {{percent}}%",
+          "cancel": "Скасувати збирання",
+          "missingScenes": "У {{count}} сценах немає дубля, тому вони не увійдуть до відео.",
+          "missingScenes_one": "У {{count}} сцені немає дубля, тому вона не увійде до відео.",
+          "missingScenes_other": "У {{count}} сценах немає дубля, тому вони не увійдуть до відео.",
+          "resultLabel": "Готове відео",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg не встановлено. Встановіть FFmpeg, щоб зібрати відео.",
+            "busy": "Цей проєкт уже збирається.",
+            "noRenderableScenes": "Немає сцен із дублем для збирання.",
+            "failed": "Не вдалося зібрати відео.",
+            "cancelled": "Збирання відео скасовано."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Зміни все ще зберігаються — повторіть спробу за кілька секунд."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Плануйте історії, перевіряйте кожну сцену та створюйте зображення чи відео.",
+      "sectionLabel": "Або продовжте з того місця, де зупинилися",
+      "loading": "Завантаження проєктів...",
+      "retry": "Спробувати ще раз",
+      "readinessLabel": "Створення чернетки розкадрування",
+      "readinessSetupRequired": "Потрібно налаштувати модель",
+      "openProject": "Відкрити проєкт",
+      "deleteProject": "Видалити проєкт",
+      "deleteConfirmTitle": "Видалити цей проєкт?",
+      "deleteConfirmBody": "Видалити «{{name}}» і пов’язані з ним локально керовані матеріали? Цю дію неможливо скасувати.",
+      "deleteActiveWork": "У цьому проєкті є активні завдання генерації. Скасуйте їх або дочекайтеся завершення, перш ніж видаляти проєкт.",
+      "composer": {
+        "label": "Що ми створюємо?",
+        "placeholder": "Ідея історії одним реченням…",
+        "aspectRatioLabel": "Співвідношення сторін",
+        "durationLabel": "Орієнтовна тривалість",
+        "durationGuess": "Близько {{seconds}} с",
+        "attachBrief": "Прикріпити документ із брифом",
+        "attachBriefUnavailable": "Прикріплення документів із брифом поки недоступне.",
+        "submit": "Прочитати мій бриф →",
+        "empty": "Одного речення достатньо — скажіть, що ми створюємо."
+      },
+      "shape": {
+        "title": "Почати зі структури",
+        "label": "{{name}} · {{count}} кадрів · {{seconds}} с",
+        "sceneTitle": "Кадр {{number}}",
+        "productStory": {
+          "name": "Історія продукту",
+          "starter": "Історія продукту для тих, хто ще про нас не чув: чотири епізоди із завершенням на логотипі."
+        },
+        "featureTeaser": {
+          "name": "Тизер функції",
+          "starter": "Короткий тизер нової функції для клієнтів, які вже користуються продуктом."
+        },
+        "recapReel": {
+          "name": "Підсумки кварталу",
+          "starter": "Ролик із підсумками кварталу для всієї компанії — теплий і трохи гордий."
+        }
+      },
+      "scriptOnly": "ЛИШЕ СЦЕНАРІЙ",
+      "posterBadge": "Дубль {{take}} · Кадр {{scene}}",
+      "status": {
+        "partiallyRendered": "Створено кадрів: {{rendered}} з {{total}}",
+        "handedOff": "Передано · {{seconds}} с",
+        "scriptOnly": "Написано кадрів: {{count}}, нічого не створено"
+      },
+      "meta": "{{shots}} · {{seconds}} с · {{relative}}",
+      "shotCount": "{{count}} кадрів",
+      "shotCount_one": "{{count}} кадр",
+      "shotCount_few": "{{count}} кадри",
+      "shotCount_many": "{{count}} кадрів",
+      "shotCount_other": "{{count}} кадру",
+      "projectCount": "{{count}} проєктів",
+      "projectCount_one": "{{count}} проєкт",
+      "projectCount_few": "{{count}} проєкти",
+      "projectCount_many": "{{count}} проєктів",
+      "projectCount_other": "{{count}} проєкту",
+      "deleteConfirm": "Видалити"
+    },
+    "empty": {
+      "title": "Створіть свою першу історію",
+      "body": "Почніть із брифу, а потім сформуйте розкадрування до запуску платної генерації.",
+      "create": "Створити проєкт"
+    },
+    "create": {
+      "title": "Створити проєкт Creative Studio",
+      "nameLabel": "Назва проєкту",
+      "namePlaceholder": "Історія запуску продукту",
+      "aspectRatio16x9": "Альбомна орієнтація (16:9)",
+      "aspectRatio9x16": "Портретна орієнтація (9:16)",
+      "aspectRatio1x1": "Квадрат (1:1)",
+      "aspectRatio4x3": "Класична альбомна (4:3)",
+      "aspectRatio3x4": "Класична портретна (3:4)",
+      "invalidDuration": "Введіть ціле число від 5 до 60 секунд.",
+      "cancel": "Скасувати"
+    },
+    "project": {
+      "loading": "Завантаження проєкту...",
+      "notFound": "Цей проєкт Creative Studio не знайдено.",
+      "title": "Огляд проєкту",
+      "brief": "Бриф",
+      "aspectRatio": "Співвідношення сторін",
+      "targetDuration": "Цільова тривалість",
+      "resolution": "Роздільна здатність",
+      "sceneCount": "Сцени",
+      "readiness": "Готовність до створення чернетки"
+    },
+    "storyboard": {
+      "title": "Розкадрування",
+      "addScene": "Додати сцену",
+      "noScenes": "Додайте сцену, щоб почати формувати цю історію.",
+      "sceneLimit": "Розкадрування може містити до 24 сцен.",
+      "durationTotal": "Хронометраж розкадрування: {{total}} із {{target}} секунд",
+      "durationMatches": "Хронометраж сцен відповідає цілі проєкту.",
+      "durationMismatch": "Перед пакетною генерацією хронометраж сцен має відповідати цілі проєкту.",
+      "fitToTarget": "Підігнати до {{seconds}} с",
+      "fitUnlockedOnly": "Змінює хронометраж лише невідрендерених кадрів.",
+      "fitUnreachable": {
+        "route_unavailable": "Виберіть сумісну модель для цих невідрендерених кадрів: {{scenes}}.",
+        "affectedSceneCount": "Зачеплено кадрів: {{count}}",
+        "no_adjustable_scenes": "Усі кадри відрендерені або активні; їхня загальна тривалість — {{fixedTotalSeconds}} с. Змініть ціль або відредагуйте невідрендерений кадр.",
+        "target_out_of_bounds": "Установіть ціль усього проєкту від {{minimumTotalSeconds}} до {{maximumTotalSeconds}} секунд відповідно до вибраних моделей."
+      },
+      "durationOver": "Перевищення цілі на {{seconds}} с",
+      "durationRemaining": "Залишилося {{seconds}} с",
+      "increaseTarget": "Збільшити ціль до {{seconds}} с",
+      "shortenBeforeAdding": "Скоротіть наявні сцени, перш ніж додавати ще одну.",
+      "dragScene": "Перетягніть сцену, щоб змінити порядок",
+      "removeScene": "Видалити сцену",
+      "dragSceneAccessible": "Перетягнути сцену {{number}}: {{title}}",
+      "moveSceneUpAccessible": "Перемістити сцену {{number}} «{{title}}» вгору",
+      "moveSceneDownAccessible": "Перемістити сцену {{number}} «{{title}}» вниз",
+      "removeSceneAccessible": "Видалити сцену {{number}}: {{title}}",
+      "removeConfirmTitle": "Видалити цю сцену?",
+      "removeConfirmBody": "Не можна видалити сцени з імпортованими чи створеними медіафайлами або з історією генерації.",
+      "removeBlocked": "Не можна видалити сцени з імпортованими чи створеними медіафайлами або з історією генерації.",
+      "retry": "Повторити зміну",
+      "discard": "Відкинути локальні зміни"
+    },
+    "scene": {
+      "accessibleName": "Сцена {{number}}: {{title}}",
+      "number": "Сцена {{number}}",
+      "status": {
+        "needs_title": "Потрібна назва",
+        "needs_prompt": "Потрібен промпт",
+        "ready": "Готово до генерації",
+        "generating": "Генерація",
+        "needs_selection": "Виберіть варіант",
+        "generated": "Згенеровано",
+        "needs_attention": "Потрібна увага"
+      },
+      "image": "Зображення",
+      "video": "Відео",
+      "duration": "Тривалість",
+      "durationSeconds": "{{seconds}} секунд",
+      "durationSeconds_one": "{{seconds}} секунда",
+      "durationSeconds_few": "{{seconds}} секунди",
+      "durationSeconds_many": "{{seconds}} секунд",
+      "durationSeconds_other": "{{seconds}} секунди",
+      "selected": "Вибрана сцена"
+    },
+    "inspector": {
+      "title": "Режисура сцени",
+      "sectionsLabel": "Розділи редагування сцени",
+      "directionTab": "Візуал",
+      "scriptTab": "Сценарій",
+      "titleLabel": "Назва сцени",
+      "purposeLabel": "Мета сцени",
+      "purposePlaceholder": "Якої мети має досягти ця сцена?",
+      "visualPromptLabel": "Візуальний промпт",
+      "visualPromptPlaceholder": "Опишіть кадр, об'єкт, середовище, освітлення та рух.",
+      "narrationLabel": "Закадровий текст",
+      "onScreenTextLabel": "Текст на екрані",
+      "mediaKindLabel": "Тип результату",
+      "durationLabel": "Тривалість сцени в секундах",
+      "invalidDuration": "Введіть ціле число від 1 до 60 секунд.",
+      "saving": "Збереження сцени...",
+      "saved": "Сцену збережено",
+      "saveFailed": "Не вдалося зберегти сцену.",
+      "unsavedChanges": "Незбережені зміни не втрачено."
+    },
+    "draft": {
+      "title": "Створити чернетку розкадрування",
+      "body": "WePrompt запропонує сцени, закадровий і екранний текст, а також хронометраж для вашої перевірки.",
+      "checking": "Перевірка вибраної моделі розкадрування...",
+      "ready": "Готово до створення чернетки",
+      "setupRequired": "Виберіть і налаштуйте модель розкадрування для створення чернетки з ШІ.",
+      "unavailable": "Створення чернетки розкадрування зараз недоступне.",
+      "providerLabel": "Постачальник розкадрування",
+      "modelLabel": "Модель розкадрування",
+      "chargeNotice": "Чернетка використовує вибрану модель проєкту; постачальник може стягувати плату.",
+      "replaceTitle": "Замінити наявне розкадрування?",
+      "replaceBody": "Новий чернетковий варіант замінить усі поточні сцени лише після отримання коректної пропозиції.",
+      "confirm": "Створити чернетку",
+      "cancel": "Скасувати",
+      "configureModel": "Відкрити налаштування моделі",
+      "manualFallback": "Продовжити редагування вручну",
+      "failed": "Не вдалося створити чернетку розкадрування. Поточні сцени не змінено."
+    },
+    "routing": {
+      "title": "Маршрут генерації",
+      "modelLabel": "Модель",
+      "missingRoute": "Виберіть сумісний маршрут генерації.",
+      "invalidRoute": "Цей маршрут більше не дійсний. Перевірте його перед генерацією."
+    },
+    "review": {
+      "generateReadyScenes": "Згенерувати готові сцени: {{count}}",
+      "generateReadyScenes_one": "Згенерувати {{count}} готову сцену",
+      "generateReadyScenes_few": "Згенерувати {{count}} готові сцени",
+      "generateReadyScenes_many": "Згенерувати {{count}} готових сцен",
+      "generateReadyScenes_other": "Згенерувати {{count}} готової сцени",
+      "noReadyScenes": "Немає сцен, готових до генерації.",
+      "generateScene": "Згенерувати сцену",
+      "regenerateScene": "Згенерувати інший варіант",
+      "title": "Перевірка генерації",
+      "sceneCount": "Вибрано сцен: {{count}}",
+      "videoSeconds": "Запитано секунд відео: {{seconds}}",
+      "selectedDurationFull": "Вибрана тривалість: {{seconds}} секунд",
+      "selectedDurationFull_one": "Вибрана тривалість: {{seconds}} секунда",
+      "selectedDurationFull_few": "Вибрана тривалість: {{seconds}} секунди",
+      "selectedDurationFull_many": "Вибрана тривалість: {{seconds}} секунд",
+      "selectedDurationFull_other": "Вибрана тривалість: {{seconds}} секунди",
+      "targetDurationFull": "Цільова тривалість: {{seconds}} секунд",
+      "targetDurationFull_one": "Цільова тривалість: {{seconds}} секунда",
+      "targetDurationFull_few": "Цільова тривалість: {{seconds}} секунди",
+      "targetDurationFull_many": "Цільова тривалість: {{seconds}} секунд",
+      "targetDurationFull_other": "Цільова тривалість: {{seconds}} секунди",
+      "providerLabel": "Постачальник",
+      "modelLabel": "Модель",
+      "aspectRatio": "Співвідношення сторін",
+      "resolution": "Роздільна здатність",
+      "watermarkOff": "Водяний знак вимкнено",
+      "audioOff": "Виведення без звуку; генерацію аудіо вимкнено",
+      "missingRoute": "Принаймні одна сцена не має маршруту генерації.",
+      "invalidRoute": "Принаймні один вибраний маршрут недійсний.",
+      "durationMismatch": "Хронометраж розкадрування не відповідає цілі проєкту.",
+      "chargeNotice": "Генерація використовує вибраний обліковий запис постачальника й може призвести до витрат.",
+      "confirm": "Підтвердити й згенерувати",
+      "cancel": "Скасувати",
+      "disabledMissingRoutes": "Виберіть дійсний маршрут для кожної вибраної сцени.",
+      "audioOn": "Цей рендер містить згенероване аудіо; маршрути без звуку, якщо вони є, залишаться без звуку."
+    },
+    "jobs": {
+      "progress": "Виконано: {{percent}} %",
+      "cancel": "Скасувати завдання",
+      "retry": "Повторити генерацію",
+      "retryConfirmationTitle": "Повторити генерацію?",
+      "retryConfirmationBody": "Під час повторної спроби цей запит на генерацію буде знову надіслано постачальнику, що може призвести до стягнення плати.",
+      "retryConfirmationConfirm": "Підтвердити й повторити",
+      "retryDownload": "Повторити завантаження",
+      "retryChargeTitle": "Повторити з ризиком подвійного списання?",
+      "retryChargeBody": "Результат попереднього надсилання невідомий. Повторна спроба може призвести до додаткового списання в постачальника.",
+      "retryChargeConfirm": "Підтвердити й повторити",
+      "status": {
+        "queuedLocal": "Очікує надсилання",
+        "submitting": "Надсилання",
+        "queuedRemote": "У черзі постачальника",
+        "running": "Генерація",
+        "needsAttention": "Потребує уваги",
+        "succeeded": "Завершено",
+        "failed": "Помилка",
+        "cancelled": "Скасовано"
+      },
+      "errors": {
+        "invalidRequest": "Запит генерації недійсний.",
+        "auth": "Постачальник відхилив облікові дані.",
+        "quota": "В обліковому записі постачальника недостатньо квоти.",
+        "rateLimited": "Досягнуто ліміту запитів постачальника. Спробуйте пізніше.",
+        "providerUnavailable": "Постачальник генерації недоступний.",
+        "timeout": "Постачальник не відповів вчасно.",
+        "pollDeadline": "Система перестала повідомляти про перебіг виконання. Перед повторною спробою уточніть статус у постачальника.",
+        "noOutput": "Постачальник завершив роботу без придатного результату.",
+        "submissionUnknown": "Результат надсилання невідомий. Перед повторною спробою перегляньте попередження про подвійне списання.",
+        "downloadFailed": "Генерацію завершено, але результат не вдалося завантажити.",
+        "unsupported": "Цей постачальник не підтримує запитану операцію.",
+        "unknown": "Завдання генерації завершилося помилкою з невідомої причини."
+      }
+    },
+    "preview": {
+      "title": "Попередній перегляд",
+      "noAssetTitle": "Створений матеріал не вибрано",
+      "noAssetBody": "Згенеруйте сцену або виберіть наявний варіант для попереднього перегляду.",
+      "imageAlt": "Згенероване зображення сцени",
+      "videoLabel": "Згенероване відео сцени",
+      "loadFailed": "Не вдалося завантажити цей керований матеріал.",
+      "versions": "Варіанти",
+      "versionLabel": "Варіант {{number}}",
+      "selectVersion": "Вибрати цей варіант",
+      "selectVersionAccessible": "Вибрати варіант {{number}}",
+      "importReference": "Імпортувати зображення першого кадру",
+      "importing": "Імпортування референсу...",
+      "missingVisualPrompt": "Додайте візуальний запит перед генерацією цієї сцени.",
+      "missingModel": "Виберіть сумісну модель проєкту перед генерацією цієї сцени.",
+      "generateThisScene": "Згенерувати цю сцену",
+      "videoReady": "Відео готове"
+    },
+    "timeline": {
+      "title": "Стрічка сцен",
+      "selectScene": "Вибрати сцену",
+      "totalDuration": "Загальна тривалість розкадрування",
+      "totalDurationFull": "Загальна тривалість: {{seconds}} секунд",
+      "totalDurationFull_one": "Загальна тривалість: {{seconds}} секунда",
+      "totalDurationFull_few": "Загальна тривалість: {{seconds}} секунди",
+      "totalDurationFull_many": "Загальна тривалість: {{seconds}} секунд",
+      "totalDurationFull_other": "Загальна тривалість: {{seconds}} секунди",
+      "selectSceneAccessible": "Вибрати сцену {{number}}: {{title}}, {{seconds}} секунд",
+      "selectSceneAccessible_one": "Вибрати сцену {{number}}: {{title}}, {{seconds}} секунда",
+      "selectSceneAccessible_few": "Вибрати сцену {{number}}: {{title}}, {{seconds}} секунди",
+      "selectSceneAccessible_many": "Вибрати сцену {{number}}: {{title}}, {{seconds}} секунд",
+      "selectSceneAccessible_other": "Вибрати сцену {{number}}: {{title}}, {{seconds}} секунди",
+      "noScenes": "Немає сцен для відображення"
+    },
+    "export": {
+      "title": "Експорт матеріалів",
+      "body": "Експортуйте маніфест розкадрування та вибраний матеріал кожної сцени.",
+      "gapWarning": "Кадри {{shots}} досі є заставками й не будуть включені.",
+      "gapWarning_one": "Кадр {{shots}} досі є заставкою й не буде включений.",
+      "gapWarning_few": "Кадри {{shots}} досі є заставками й не будуть включені.",
+      "gapWarning_many": "Кадри {{shots}} досі залишаються заставками й не будуть включені.",
+      "gapWarning_other": "Кадри {{shots}} досі є заставками й не будуть включені.",
+      "confirmSelectedCount": "Експортувати {{count}} кадрів?",
+      "confirmSelectedCount_one": "Експортувати {{count}} кадр?",
+      "confirmSelectedCount_few": "Експортувати {{count}} кадри?",
+      "confirmSelectedCount_many": "Експортувати {{count}} кадрів?",
+      "confirmSelectedCount_other": "Експортувати {{count}} кадра?",
+      "includeReferences": "Додати імпортовані референсні зображення",
+      "confirm": "Експортувати матеріали",
+      "cancel": "Скасувати",
+      "choosing": "Вибір папки для експорту...",
+      "successTitle": "Матеріали експортовано",
+      "successBody": "До «{{folderName}}» передано {{count}} вибраних сцен.",
+      "successBody_one": "До «{{folderName}}» передано {{count}} вибрану сцену.",
+      "successBody_few": "До «{{folderName}}» передано {{count}} вибрані сцени.",
+      "successBody_many": "До «{{folderName}}» передано {{count}} вибраних сцен.",
+      "successBody_other": "До «{{folderName}}» передано вибраних сцен: {{count}}.",
+      "partialTitle": "Матеріали експортовано, але деякі сцени відсутні",
+      "partialBody": "Доступні матеріали експортовано до «{{folderName}}».",
+      "failed": "Не вдалося експортувати матеріали.",
+      "noSelectedAssets": "Немає вибраних матеріалів сцен, готових до експорту.",
+      "folderLabel": "Папка експорту"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio вимкнено в цій збірці.",
+      "invalidPayload": "Запит містить недійсні або неповні дані.",
+      "projectNotFound": "Проєкт Creative Studio більше не існує.",
+      "storyboardExists": "У цьому проєкті вже є розкадрування. Підтвердьте заміну перед створенням нової чернетки.",
+      "staleProject": "Проєкт змінено в іншому місці. Оновіть його перед повторною спробою.",
+      "planningUnavailable": "Створення чернетки розкадрування недоступне. Можна продовжити редагування вручну.",
+      "invalidRoute": "Вибраний маршрут генерації недійсний або недоступний.",
+      "cancellationRefused": "Постачальник більше не може скасувати це активне завдання.",
+      "duplicateChargeAcknowledgementRequired": "Підтвердьте ризик подвійного списання в постачальника перед повторною спробою.",
+      "busy": "У цьому проєкті є активні завдання генерації.",
+      "provider": "Постачальник не зміг виконати запит.",
+      "storage": "Creative Studio не вдалося оновити локальні дані."
+    },
+    "models": {
+      "storyboard": "Модель розкадрування",
+      "selectionRequired": "Виберіть модель",
+      "unavailable": "Вибрана модель недоступна",
+      "openSettings": "Відкрити налаштування моделей",
+      "refresh": "Оновити моделі",
+      "loading": "Завантаження моделей...",
+      "updateFailed": "Не вдалося оновити вибір моделі проєкту."
+    }
+  },
   "artifact": {
     "emptyTitle": "Немає відкритих артефактів",
     "emptyHint": "Створені файли та документи відкриваються тут."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Очікується ваше підтвердження для продовження.",
+    "running": "Триває робота над цим чатом.",
+    "doneUnseen": "Завершено, але ви ще не переглянули результат.",
+    "doneSeen": "Нещодавно завершено та вже переглянуто.",
+    "doneIdle": "Завершено щонайменше хвилину тому та вже переглянуто.",
+    "stopped": "Зупинено до завершення.",
+    "failed": "Не вдалося завершити через помилку."
+  },
+  "staleKnowledgeHint": {
+    "body": "Цей чат не може шукати в базі знань проєкту — його розпочато до додавання файлів.",
+    "action": "Почати новий чат"
+  },
+  "emptyChat": "Надішліть повідомлення, щоб почати.",
+  "presentationSubmission": {
+    "pending": "Надсилання презентації очікує завершення",
+    "restore": "Відновити",
+    "persistenceFailure": "Не вдалося зберегти надсилання презентації.",
+    "queued": "Презентацію додано до черги",
+    "uncertainTracking": "Статус надсилання невідомий. Відстежуйте наявний запуск і не надсилайте повторно."
   }
 }

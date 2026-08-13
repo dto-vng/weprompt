@@ -6,6 +6,7 @@
 
 import MarkdownView from '@/renderer/components/Markdown';
 import { useFeedback } from '@/renderer/hooks/context/FeedbackContext';
+import { isUpdateFeatureEnabled } from '@/common/update/updatePolicy';
 import { Button, Modal, Progress } from '@arco-design/web-react';
 import { CheckOne, Close, Download, Minus } from '@icon-park/react';
 import React from 'react';
@@ -21,10 +22,11 @@ const renderNotificationLayer = (node: React.ReactElement) => {
   return createPortal(node, document.body);
 };
 
-const UpdateNotificationCard: React.FC = () => {
+const UpdateNotificationCardContent: React.FC = () => {
   const { t } = useTranslation();
+  const updatesEnabled = isUpdateFeatureEnabled();
   const { state, versionLabel, actions } = useUpdateNotificationController();
-  const { openFeedback } = useFeedback();
+  const { isFeedbackAvailable, openFeedback } = useFeedback();
   const [releaseLogVisible, setReleaseLogVisible] = React.useState(false);
 
   if (!state.visible) return null;
@@ -202,34 +204,35 @@ const UpdateNotificationCard: React.FC = () => {
     if (state.status === 'installer-last-failure') {
       return (
         <>
-          <Button size='small' className={ACTION_BTN_CLASS} onClick={() => void actions.checkForUpdates()}>
-            {t('update.installerLastFailure.retryUpdate')}
-          </Button>
+          {updatesEnabled ? (
+            <Button size='small' className={ACTION_BTN_CLASS} onClick={() => void actions.checkForUpdates()}>
+              {t('update.installerLastFailure.retryUpdate')}
+            </Button>
+          ) : null}
           {state.installerLastFailure?.logPath && (
             <Button size='small' className={ACTION_BTN_CLASS} onClick={actions.viewInstallerLastFailureLog}>
               {t('update.installerLastFailure.viewLog')}
             </Button>
           )}
-          <Button
-            type='primary'
-            size='small'
-            className={ACTION_BTN_CLASS}
-            onClick={() =>
-              void openFeedback({
-                module: 'installer-update',
-                autoScreenshot: true,
-                tags: {
-                  kind: 'app-cannot-be-closed',
-                  message: 'installer-last-failure',
-                },
-                extra: {
-                  installerLastFailure: state.installerLastFailure,
-                },
-              })
-            }
-          >
-            {t('settings.oneClickFeedback')}
-          </Button>
+          {updatesEnabled && isFeedbackAvailable ? (
+            <Button
+              type='primary'
+              size='small'
+              className={ACTION_BTN_CLASS}
+              onClick={() =>
+                void openFeedback({
+                  module: 'installer-update',
+                  autoScreenshot: true,
+                  tags: {
+                    kind: 'app-cannot-be-closed',
+                    message: 'installer-last-failure',
+                  },
+                })
+              }
+            >
+              {t('settings.oneClickFeedback')}
+            </Button>
+          ) : null}
         </>
       );
     }
@@ -258,7 +261,7 @@ const UpdateNotificationCard: React.FC = () => {
     <>
       <section
         data-testid='update-notification-card'
-        className='fixed right-24px bottom-24px z-1000 w-max min-w-300px max-w-[calc(100vw-32px)] bg-1 border border-border-2 rd-8px shadow-[0_2px_16px_rgba(0,0,0,0.12)] overflow-hidden'
+        className='fixed right-24px bottom-24px z-1000 w-max min-w-300px max-w-[calc(100vw-32px)] bg-1 border border-[var(--color-border-2)] rd-8px shadow-[0_2px_16px_rgba(0,0,0,0.12)] overflow-hidden'
       >
         <div className='flex items-center gap-10px px-16px pt-12px pb-6px min-w-0'>
           <Download
@@ -337,6 +340,10 @@ const UpdateNotificationCard: React.FC = () => {
       </Modal>
     </>
   );
+};
+
+const UpdateNotificationCard: React.FC = () => {
+  return <UpdateNotificationCardContent />;
 };
 
 export default UpdateNotificationCard;

@@ -17,7 +17,6 @@
     "quickActionStar": "Нравится? Поставьте нам звезду!",
     "skillsMarket": "Маркет навыков WePrompt",
     "skillsMarketDesc": "Находите и активируйте навыки сообщества по запросу. Настройте один раз — доступно для всех агентов.",
-    "skillsMarketDetails": "Подробнее >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "Проект {{name}}",
+    "eyebrow": "ПРОЕКТ",
+    "tabs": {
+      "label": "Представления проекта",
+      "chat": "Чат",
+      "files": "Файлы",
+      "context": "Контекст",
+      "artifacts": "Артефакты"
+    }
+  },
+  "projectHome": {
+    "newChat": "Новый чат",
+    "composerPlaceholder": "Начните новый чат в этом проекте…",
+    "scopedHint": "— только в этом проекте",
+    "chats": "Чаты",
+    "showAll": "Показать все",
+    "showLess": "Показать меньше",
+    "emptyChatsTitle": "Пока нет чатов",
+    "emptyChatsBody": "Начните чат выше, чтобы приступить к работе над этим проектом.",
+    "instructions": "Инструкции",
+    "instructionsApplies": "Применяется к новым чатам в этом проекте.",
+    "instructionsEmpty": "Добавьте инструкции, которые будут направлять каждый чат в этом проекте.",
+    "addInstructions": "Добавить инструкции",
+    "edit": "Изменить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "instructionsSaved": "Инструкции сохранены",
+    "instructionsSaveFailed": "Не удалось сохранить инструкции",
+    "files": "Файлы",
+    "revealInFolder": "Показать в папке",
+    "filesReadonly": "Только чтение · управление в папке",
+    "filesEmpty": "Папка этого проекта пуста.",
+    "folderMissingTitle": "Папка не найдена",
+    "folderMissingRelink": "Перепривязать папку",
+    "folderMissingBody": "Остальная часть страницы продолжает работать.",
+    "metaChats": "{{count}} чат(ов)",
+    "metaActive": "активен {{time}}",
+    "notFoundTitle": "Проект не найден",
+    "notFoundBody": "Возможно, этот проект был удалён или ссылка на него устарела.",
+    "backHome": "Вернуться на главную",
+    "rename": "Переименовать",
+    "relink": "Перепривязать папку",
+    "reveal": "Показать в папке",
+    "remove": "Удалить",
+    "knowledge": "Знания",
+    "knowledgeAdd": "Добавить файлы",
+    "knowledgeDropFolderMissing": "Перед добавлением файлов заново подключите папку Knowledge Base.",
+    "knowledgeDropUnsupported": "Ни один из этих файлов не поддерживается. Поддерживаются: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefreshFailed": "Не удалось обновить базу знаний.",
+    "knowledgeRelinkFailed": "Не удалось повторно связать папку проекта.",
+    "knowledgeRetryFailed": "Не удалось поставить файл в очередь на индексацию.",
+    "knowledgeDeleteFailed": "Не удалось переместить файл в корзину.",
+    "knowledgeAddFailed": "Не удалось добавить эти файлы в базу знаний.",
+    "knowledgeEmpty": "Добавьте документы, чтобы создать базу знаний этого проекта. Ассистент автоматически ищет по ним в любом чате этого проекта.",
+    "knowledgeSemanticOff": "семантический поиск выключен — модель эмбеддинга не настроена",
+    "knowledgeSemanticOffAction": "Добавить модель эмбеддинга",
+    "knowledgeEmbedAll": "Векторизовать все",
+    "knowledgePassagesTooltip": "Этот файл разбит на фрагменты для поиска, и ассистент использует наиболее подходящие из них при ответе.",
+    "knowledgeStatusIndexing": "Индексация…",
+    "knowledgeProgressReading": "Чтение страницы {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "Распознавание страницы {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "Векторизация {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "Ошибка",
+    "knowledgeStatusUnsupported": "Не поддерживается",
+    "knowledgeStatusNotEmbedded": "Только ключевые слова",
+    "knowledgeNotEmbeddedDetail": "Файл находится по ключевым словам, но встроено только {{done}}/{{total}} фрагментов. Повторите, чтобы встроить остальные.",
+    "knowledgeRetry": "Повторить",
+    "knowledgeError": "База знаний недоступна.",
+    "knowledgeSupportedTypes": "Поддерживаются: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "Обновить",
+    "knowledgeOpenOriginal": "Открыть исходный файл",
+    "knowledgeDeleteFile": "Удалить файл",
+    "knowledgeDeleteConfirm": "Переместить «{{fileName}}» в корзину? Файл также будет удалён из базы знаний.",
+    "knowledgeFolderHint": "Файлы хранятся в папке «Knowledge Base» внутри папки проекта. Всё, что вы туда положите, индексируется автоматически.",
+    "knowledgeFolderMissingTitle": "Папка Knowledge Base не найдена",
+    "knowledgeFolderMissingBody": "Возможно, её переместили, переименовали или удалили. Проиндексированные знания сохранены — восстановите папку или заново привяжите проект, затем обновите.",
+    "knowledgePreviewNote": "Это проиндексированный текст, по которому ищет ассистент, а не исходное оформление.",
+    "knowledgePreviewTruncated": "Предпросмотр сокращён. Откройте исходный файл, чтобы увидеть весь документ.",
+    "knowledgePreviewError": "Не удалось загрузить проиндексированный текст этого файла.",
+    "knowledgePreviewNotReady": "Проиндексированного текста для открытия пока нет.",
+    "knowledgeCitationMissing": "Этот файл больше не находится в базе знаний.",
+    "knowledgeOcrTag": "Распознано (OCR)",
+    "knowledgeOcrDetail": "Распознано из сканированного документа моделью {{model}}. Пропущенные страницы: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "нет"
+  },
   "history": {
+    "moreActions": "Другие действия",
     "recents": "Недавние",
     "noHistory": "Нет истории чатов",
     "deleteTitle": "Удалить",
@@ -80,6 +166,8 @@
     "removeProject": "Удалить проект",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "Новая беседа в этом проекте",
+    "expandProjectChats": "Развернуть чаты проекта",
+    "collapseProjectChats": "Свернуть чаты проекта",
     "deleting": "Удаление...",
     "reorderPinned": "Перетащите, чтобы изменить порядок закреплённых бесед",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "Не удалось удалить проект. Откройте его снова и повторите попытку; файлы в папке не удалены.",
+    "removeProjectChatDetachFailed": "Некоторые чаты не удалось отсоединить от этого проекта. Проект сохранён; повторите удаление.",
+    "removeProjectStateChanged": "Список проектов изменился до удаления. Обновите его и повторите попытку.",
+    "removeProjectStorageFailed": "Не удалось сохранить изменения проекта. Проверьте доступ WePrompt к данным приложения и повторите попытку.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "Проект",
+    "projectMenu": {
+      "trigger": "Проект"
+    },
     "pasteConfirm_title": "Вставка файлов",
     "pasteConfirm_message": "Вы уверены, что хотите вставить «{{name}}» в выбранную папку ({{target}})?",
     "pasteConfirm_paste": "Вставить",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "Терминал",
       "explorer": "Проводник"
-    },
-    "projectMenu": {
-      "trigger": "Проект"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "Модель для текущей сессии не выбрана, невозможно отправить сообщение",
     "sendMessageTo": "Отправить сообщение {{model}}",
     "processing": "Обработка...",
+    "stopGenerating": "Остановить генерацию",
     "quotaExceededTitle": "Лимит модели исчерпан",
     "quotaExceededBody": "Лимит текущей модели исчерпан. Переключиться на {{model}}?",
     "quotaExceededNoFallback": "Лимит модели исчерпан. Переключитесь на другую доступную модель.",
@@ -547,7 +639,9 @@
     "today": "Сегодня",
     "weekToDate": "С начала недели",
     "monthToDate": "С начала месяца",
-    "triggerLabel": "Показать использование контекста"
+    "triggerLabel": "Показать использование контекста",
+    "estimated": "Оценка",
+    "unavailable": "Данные об использовании контекста недоступны"
   },
   "skill_generator": {
     "title": "Создать навык/правило",
@@ -616,36 +710,109 @@
     }
   },
   "notFound": "Беседа не найдена или была удалена",
-  "projectHeader": {
-    "label": "Проект {{name}}",
-    "eyebrow": "ПРОЕКТ",
-    "tabs": {
-      "label": "Представления проекта",
-      "chat": "Чат",
-      "files": "Файлы",
-      "context": "Контекст",
-      "artifacts": "Артефакты"
-    }
-  },
   "emptyModelReply": "Модель завершила ход, не сформировав видимый ответ. Отправьте запрос ещё раз; для больших результатов запрашивайте их по частям.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "Бизнес-обзор",
+        "description": "Презентация квартальных результатов — сводка KPI, детализация по сегментам, прогноз. Тёмно-синий и янтарный."
+      },
+      "project-kickoff": {
+        "name": "Запуск проекта",
+        "description": "Презентация запуска — объём работ, команда, сроки, следующие шаги. Чистый бирюзовый."
+      },
+      "monthly-steerco": {
+        "name": "Ежемесячный управляющий комитет",
+        "description": "Отчёт управляющему комитету — статус портфеля, риски, требуемые решения. Антиква и золото."
+      },
+      "connected-ops": {
+        "name": "Связанные операции",
+        "description": "Обзор операций — показатели площадок, время работы, инциденты. Промышленный зелёный."
+      },
+      "editorial-field-report": {
+        "name": "Редакционный отчёт с места",
+        "description": "Развёрнутый отчёт — антиква, связный текст вместо списков, один красный акцент."
+      },
+      "market-trends-report": {
+        "name": "Отчёт о трендах рынка",
+        "description": "Отчёт с прокруткой на основе данных — графики со ссылками на источники."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "Минималистичная светлая презентация — одна мысль на слайд, один синий акцент."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "Минималистичная тёмная презентация для технических докладов — удобна для кода, зелёный акцент."
+      },
+      "business-report": {
+        "name": "Бизнес-отчёт",
+        "description": "Объёмный официальный отчёт — обложка, содержание, таблицы данных, тёмно-синие заголовки антиквой."
+      },
+      "decision-memo": {
+        "name": "Памятка о решении",
+        "description": "Короткая памятка о решении — блок КОМУ/ОТ/ТЕМА, рекомендация в начале, без обложки."
+      },
+      "operations-guide": {
+        "name": "Руководство по операциям",
+        "description": "Компактный регламент — нумерованные шаги, блоки примечаний, чек-листы, бирюзовый акцент."
+      },
+      "proposal-sow": {
+        "name": "Предложение / SOW",
+        "description": "Предложение клиенту — объём работ, сроки, таблица цен, блок подписи."
+      }
+    },
     "title": "Шаблоны",
     "columnPptx": "Презентации · PPTX",
-    "columnHtml": "Отчёты · HTML",
+    "columnHtml": "Веб · HTML",
+    "columnDocx": "Документы · DOCX",
     "selected": "Выбрано",
-    "buttonTooltip": "Шаблоны презентаций",
-    "slashDescription": "Выбрать шаблон презентации",
-    "importCard": "Импорт темы (.md)",
+    "buttonTooltip": "Шаблоны",
+    "slashDescription": "Выбрать шаблон",
+    "importCard": "Импорт шаблона (.md)",
     "empty": "Нет доступных шаблонов",
     "chipTooltip": "Это сообщение использует шаблон",
+    "scratch": {
+      "prepareError": "Не удалось подготовить временную область артефакта: {{error}}",
+      "retained": "Временные файлы артефакта сохранены для восстановления в {{path}}.",
+      "cleanup": "Очистить",
+      "cleanupSuccess": "Временные файлы артефакта удалены",
+      "cleanupError": "Не удалось очистить: {{error}}"
+    },
     "importSuccess": "Шаблон импортирован",
     "importError": "Ошибка импорта: {{error}}",
     "removeError": "Ошибка удаления: {{error}}",
     "deleteTooltip": "Удалить шаблон",
-    "deleteConfirm": "Удалить этот шаблон?"
+    "deleteConfirm": "Удалить этот шаблон?",
+    "sources": {
+      "reselectRequired": "Повторно выберите прикреплённые файлы, чтобы использовать их с этим шаблоном PPTX.",
+      "reselectAction": "Выбрать файлы повторно"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "Кандидат презентации требует проверки.",
+        "reviewRequiredAfterFailure": "Создание остановлено; сохранённый кандидат презентации всё ещё требует проверки.",
+        "trackingRequired": "Требуется отслеживание запуска презентации.",
+        "dispatchUncertain": "Результат запуска презентации не подтверждён. Требуется внимание оператора."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "Открыть в системном приложении",
+        "discard": "Удалить запись"
+      },
+      "loadError": "Не удалось загрузить состояние восстановления презентации.",
+      "invalidResponse": "Не удалось проверить состояние восстановления презентации.",
+      "openError": "Не удалось подтвердить, был ли открыт текущий кандидат презентации.",
+      "discardError": "Не удалось подтвердить удаление записи презентации."
+    }
   },
   "status": {
-    "waitingApproval": "Ожидает вашего подтверждения"
+    "waitingApproval": "Ожидает вашего подтверждения",
+    "running": "Выполняется",
+    "done": "Завершено",
+    "doneIdle": "Завершено — неактивно",
+    "stopped": "Остановлено",
+    "failed": "Ошибка"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -708,8 +875,518 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "Creative Studio"
+    },
+    "close": {
+      "saveAndClose": "Сохранить и закрыть",
+      "discard": "Не сохранять и закрыть",
+      "cancel": "Отмена",
+      "unsavedMessage": "В {{count}} сценах есть несохранённые изменения. Сохранить их перед закрытием?",
+      "unsavedMessage_one": "{{count}} сцена содержит несохранённые изменения. Сохранить её перед закрытием?",
+      "unsavedMessage_few": "{{count}} сцены содержат несохранённые изменения. Сохранить их перед закрытием?",
+      "unsavedMessage_many": "{{count}} сцен содержат несохранённые изменения. Сохранить их перед закрытием?",
+      "unsavedMessage_other": "В {{count}} сцены есть несохранённые изменения. Сохранить их перед закрытием?",
+      "unavailableMessage": "Творческая студия не отвечает. При закрытии сейчас несохранённые изменения сцен могут быть потеряны."
+    },
+    "phase": {
+      "nav": {
+        "label": "Творческий процесс",
+        "brief": "Бриф",
+        "write": "Сценарий",
+        "produce": "Создание",
+        "review": "Проверка",
+        "saved": "Сохранено",
+        "saving": "Изменения сохраняются..."
+      },
+      "shared": {
+        "backToLibrary": "Вернуться к библиотеке проектов",
+        "noMediaGeneration": "На этом этапе изображения и видео не создаются."
+      },
+      "brief": {
+        "title": "Бриф",
+        "description": "Определите цель, формат и длительность проекта до работы над сценарием.",
+        "nameLabel": "Название проекта",
+        "intentLabel": "Творческий замысел",
+        "durationLabel": "Целевая длительность",
+        "aspectRatioLabel": "Соотношение сторон",
+        "startWriting": "Начать сценарий",
+        "saved": "Все изменения брифа сохранены.",
+        "saving": "Изменения брифа сохраняются...",
+        "unsaved": "Изменения брифа ещё не сохранены.",
+        "invalidName": "Введите название проекта, прежде чем продолжить.",
+        "aspectLocked": "Соотношение сторон заблокировано",
+        "aspectLockedHelp": "После добавления созданных материалов соотношение сторон изменить нельзя."
+      },
+      "write": {
+        "title": "Сценарий",
+        "continueToProduce": "Перейти к созданию",
+        "askAssistant": "Спросить помощника",
+        "assistantTitle": "Помощник по сценарию",
+        "assistantDescription": "Используйте помощника для развития структуры истории, идей кадров и промптов.",
+        "textChargeDisclosure": "Для черновика раскадровки используется настроенная текстовая модель. Провайдер может взимать плату за её использование.",
+        "draftStoryboard": "Создать черновик раскадровки",
+        "addShot": "Добавить кадр",
+        "fitToGoal": "Подогнать под цель",
+        "noScenes": "Чтобы начать, добавьте кадр или создайте черновик раскадровки.",
+        "scriptTableTitle": "Сценарий",
+        "scriptTableHelp": "Один кадр — одна строка: вместе настройте текст, изображение, длительность и формат результата.",
+        "shotColumn": "Кадр",
+        "scriptColumn": "Сценарий",
+        "visualColumn": "Изображение",
+        "outputColumn": "Результат",
+        "visualPlaceholder": "Опишите, что мы видим…",
+        "suggestVisual": "Предложить изображение",
+        "addReference": "Добавить референс",
+        "moreDetails": "Подробнее",
+        "invalidTitle": "Введите название кадра перед сохранением.",
+        "placeholder": {
+          "opening": "Начальный кадр",
+          "middle": "Промежуточный кадр",
+          "closing": "Финальный кадр"
+        },
+        "needsTitle": "Нужно название",
+        "pacingTitle": "Темп",
+        "pacingSummary": "Всего {{total}} с · цель {{target}} с",
+        "goalMarker": "Цель {{seconds}} с"
+      },
+      "produce": {
+        "connectEngine": "Подключите движок — около минуты, один раз для всего рабочего пространства",
+        "askTeammate": "Попросить коллегу",
+        "askTeammateCopy": "Подключите, пожалуйста, движок изображений или видео для этого рабочего пространства в настройках моделей WePrompt.",
+        "renderingWith": "Рендеринг с помощью —",
+        "engineSummary": "{{model}} · {{kind}} · до {{seconds}} с",
+        "changeEngines": "Сменить движки",
+        "takeRatio": "Дубль {{current}} / {{total}}",
+        "noVisualYet": "ВИЗУАЛА ПОКА НЕТ",
+        "writeVisual": "Описать визуал",
+        "render": "Рендерить",
+        "renderAnother": "Рендерить ещё",
+        "openPreview": "Открыть предпросмотр {{title}}",
+        "reviewCut": "Проверить монтаж",
+        "modelsTitle": "Модели",
+        "activityTitle": "Ход генерации",
+        "activityEmpty": "Сейчас нет выполняющихся заданий генерации.",
+        "jobsRunning": "Выполняется заданий генерации: {{count}}",
+        "jobsRunning_one": "Выполняется {{count}} задание генерации",
+        "jobsRunning_few": "Выполняются {{count}} задания генерации",
+        "jobsRunning_many": "Выполняются {{count}} заданий генерации",
+        "jobsRunning_other": "Выполняется {{count}} задания генерации"
+      },
+      "review": {
+        "title": "Проверка",
+        "description": "Проверьте выбранные материалы, добавьте недостающие заставки и подготовьте передачу.",
+        "handoff": "Подготовить передачу",
+        "noAssets": "Нет выбранных материалов, готовых к передаче.",
+        "selectedTake": "В монтаже",
+        "slateLabel": "Заставка",
+        "slateDescription": "Заставка сохраняет кадр в последовательности, если визуальный материал не выбран.",
+        "excludedFromHandoff": "Сцены без выбранного материала исключаются из передачи. Заставки из режима проверки не экспортируются.",
+        "renderedShots": "Отрисованных кадров: {{count}}",
+        "renderedShots_one": "{{count}} отрисованный кадр",
+        "renderedShots_few": "{{count}} отрисованных кадра",
+        "renderedShots_many": "{{count}} отрисованных кадров",
+        "renderedShots_other": "{{count}} отрисованного кадра",
+        "missingSlates": "Не хватает заставок: {{count}}",
+        "missingSlates_one": "Не хватает {{count}} заставки",
+        "missingSlates_few": "Отсутствуют {{count}} заставки",
+        "missingSlates_many": "Не хватает {{count}} заставок",
+        "missingSlates_other": "Не хватает {{count}} заставки",
+        "openProduce": "Открыть создание",
+        "handoffDescription": "Передача содержит только манифест раскадровки и выбранные материалы. Заставки из режима проверки не экспортируются.",
+        "partialHandoff": "Передача неполная, поскольку в некоторых сценах не выбран материал.",
+        "render": {
+          "action": "Собрать видео",
+          "progress": "Сборка видео… {{percent}}%",
+          "cancel": "Отменить сборку",
+          "missingScenes": "В {{count}} сценах нет дубля, поэтому они не войдут в видео.",
+          "missingScenes_one": "В {{count}} сцене нет дубля, поэтому она не войдёт в видео.",
+          "missingScenes_other": "В {{count}} сценах нет дубля, поэтому они не войдут в видео.",
+          "resultLabel": "Готовое видео",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg не установлен. Установите FFmpeg, чтобы собрать видео.",
+            "busy": "Этот проект уже собирается.",
+            "noRenderableScenes": "Нет сцен с дублем для сборки.",
+            "failed": "Не удалось собрать видео.",
+            "cancelled": "Сборка видео отменена."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "Изменения всё ещё сохраняются — повторите попытку через несколько секунд."
+    },
+    "library": {
+      "title": "Creative Studio",
+      "subtitle": "Планируйте истории, проверяйте каждую сцену и создавайте изображения или видео.",
+      "sectionLabel": "Или продолжите с того места, где остановились",
+      "loading": "Загрузка проектов...",
+      "retry": "Повторить",
+      "readinessLabel": "Создание черновика раскадровки",
+      "readinessSetupRequired": "Требуется настройка модели",
+      "openProject": "Открыть проект",
+      "deleteProject": "Удалить проект",
+      "deleteConfirmTitle": "Удалить этот проект?",
+      "deleteConfirmBody": "Удалить «{{name}}» и связанные с ним локальные материалы? Это действие нельзя отменить.",
+      "deleteActiveWork": "В этом проекте есть активные задачи генерации. Отмените их или дождитесь завершения, прежде чем удалять проект.",
+      "composer": {
+        "label": "Что мы создаём?",
+        "placeholder": "Идея истории одним предложением…",
+        "aspectRatioLabel": "Соотношение сторон",
+        "durationLabel": "Примерная длительность",
+        "durationGuess": "Около {{seconds}} с",
+        "attachBrief": "Прикрепить документ с брифом",
+        "attachBriefUnavailable": "Прикрепление документов с брифом пока недоступно.",
+        "submit": "Прочитать мой бриф →",
+        "empty": "Одного предложения достаточно — расскажите, что мы создаём."
+      },
+      "shape": {
+        "title": "Начать со структуры",
+        "label": "{{name}} · {{count}} кадров · {{seconds}} с",
+        "sceneTitle": "Кадр {{number}}",
+        "productStory": {
+          "name": "История продукта",
+          "starter": "История продукта для тех, кто о нас ещё не слышал: четыре эпизода с завершением на логотипе."
+        },
+        "featureTeaser": {
+          "name": "Тизер функции",
+          "starter": "Короткий тизер новой функции для клиентов, которые уже пользуются продуктом."
+        },
+        "recapReel": {
+          "name": "Итоги квартала",
+          "starter": "Ролик с итогами квартала для всей компании — тёплый и немного гордый."
+        }
+      },
+      "scriptOnly": "ТОЛЬКО СЦЕНАРИЙ",
+      "posterBadge": "Дубль {{take}} · Кадр {{scene}}",
+      "status": {
+        "partiallyRendered": "Создано кадров: {{rendered}} из {{total}}",
+        "handedOff": "Передано · {{seconds}} с",
+        "scriptOnly": "Написано кадров: {{count}}, ничего не создано"
+      },
+      "meta": "{{shots}} · {{seconds}} с · {{relative}}",
+      "shotCount": "{{count}} кадров",
+      "shotCount_one": "{{count}} кадр",
+      "shotCount_few": "{{count}} кадра",
+      "shotCount_many": "{{count}} кадров",
+      "shotCount_other": "{{count}} кадра",
+      "projectCount": "{{count}} проектов",
+      "projectCount_one": "{{count}} проект",
+      "projectCount_few": "{{count}} проекта",
+      "projectCount_many": "{{count}} проектов",
+      "projectCount_other": "{{count}} проекта",
+      "deleteConfirm": "Удалить"
+    },
+    "empty": {
+      "title": "Создайте свою первую историю",
+      "body": "Начните с брифа, а затем подготовьте раскадровку до запуска платной генерации.",
+      "create": "Создать проект"
+    },
+    "create": {
+      "title": "Создать проект Creative Studio",
+      "nameLabel": "Название проекта",
+      "namePlaceholder": "История запуска продукта",
+      "aspectRatio16x9": "Альбомная ориентация (16:9)",
+      "aspectRatio9x16": "Портретная ориентация (9:16)",
+      "aspectRatio1x1": "Квадрат (1:1)",
+      "aspectRatio4x3": "Классическая альбомная (4:3)",
+      "aspectRatio3x4": "Классическая портретная (3:4)",
+      "invalidDuration": "Введите целое число от 5 до 60 секунд.",
+      "cancel": "Отмена"
+    },
+    "project": {
+      "loading": "Загрузка проекта...",
+      "notFound": "Этот проект Creative Studio не найден.",
+      "title": "Обзор проекта",
+      "brief": "Бриф",
+      "aspectRatio": "Соотношение сторон",
+      "targetDuration": "Целевая длительность",
+      "resolution": "Разрешение",
+      "sceneCount": "Сцены",
+      "readiness": "Готовность к созданию черновика"
+    },
+    "storyboard": {
+      "title": "Раскадровка",
+      "addScene": "Добавить сцену",
+      "noScenes": "Добавьте сцену, чтобы начать формировать эту историю.",
+      "sceneLimit": "Раскадровка может содержать до 24 сцен.",
+      "durationTotal": "Хронометраж раскадровки: {{total}} из {{target}} секунд",
+      "durationMatches": "Хронометраж сцен соответствует цели проекта.",
+      "durationMismatch": "Перед пакетной генерацией хронометраж сцен должен соответствовать цели проекта.",
+      "fitToTarget": "Подогнать до {{seconds}} с",
+      "fitUnlockedOnly": "Меняет хронометраж только неотрендеренных кадров.",
+      "fitUnreachable": {
+        "route_unavailable": "Выберите совместимую модель для этих неотрендеренных кадров: {{scenes}}.",
+        "affectedSceneCount": "Затронуто кадров: {{count}}",
+        "no_adjustable_scenes": "Все кадры отрендерены или активны; их общая длительность — {{fixedTotalSeconds}} сек. Измените цель или отредактируйте неотрендеренный кадр.",
+        "target_out_of_bounds": "Установите цель всего проекта от {{minimumTotalSeconds}} до {{maximumTotalSeconds}} секунд в соответствии с выбранными моделями."
+      },
+      "durationOver": "Превышение цели на {{seconds}} с",
+      "durationRemaining": "Осталось {{seconds}} с",
+      "increaseTarget": "Увеличить цель до {{seconds}} с",
+      "shortenBeforeAdding": "Сократите существующие сцены, прежде чем добавлять новую.",
+      "dragScene": "Перетащите сцену, чтобы изменить порядок",
+      "removeScene": "Удалить сцену",
+      "dragSceneAccessible": "Перетащить сцену {{number}}: {{title}}",
+      "moveSceneUpAccessible": "Переместить сцену {{number}} «{{title}}» вверх",
+      "moveSceneDownAccessible": "Переместить сцену {{number}} «{{title}}» вниз",
+      "removeSceneAccessible": "Удалить сцену {{number}}: {{title}}",
+      "removeConfirmTitle": "Удалить эту сцену?",
+      "removeConfirmBody": "Нельзя удалить сцены с импортированными или созданными медиафайлами либо с историей генерации.",
+      "removeBlocked": "Нельзя удалить сцены с импортированными или созданными медиафайлами либо с историей генерации.",
+      "retry": "Повторить изменение",
+      "discard": "Отменить локальные изменения"
+    },
+    "scene": {
+      "accessibleName": "Сцена {{number}}: {{title}}",
+      "number": "Сцена {{number}}",
+      "status": {
+        "needs_title": "Нужно название",
+        "needs_prompt": "Нужен промпт",
+        "ready": "Готово к генерации",
+        "generating": "Генерация",
+        "needs_selection": "Выберите вариант",
+        "generated": "Сгенерировано",
+        "needs_attention": "Требуется внимание"
+      },
+      "image": "Изображение",
+      "video": "Видео",
+      "duration": "Длительность",
+      "durationSeconds": "{{seconds}} секунд",
+      "durationSeconds_one": "{{seconds}} секунда",
+      "durationSeconds_few": "{{seconds}} секунды",
+      "durationSeconds_many": "{{seconds}} секунд",
+      "durationSeconds_other": "{{seconds}} секунды",
+      "selected": "Выбранная сцена"
+    },
+    "inspector": {
+      "title": "Режиссура сцены",
+      "sectionsLabel": "Разделы редактирования сцены",
+      "directionTab": "Визуал",
+      "scriptTab": "Сценарий",
+      "titleLabel": "Название сцены",
+      "purposeLabel": "Цель сцены",
+      "purposePlaceholder": "Какую задачу должна решить эта сцена?",
+      "visualPromptLabel": "Визуальный промпт",
+      "visualPromptPlaceholder": "Опишите кадр, объект, обстановку, освещение и движение.",
+      "narrationLabel": "Закадровый текст",
+      "onScreenTextLabel": "Текст на экране",
+      "mediaKindLabel": "Тип результата",
+      "durationLabel": "Длительность сцены в секундах",
+      "invalidDuration": "Введите целое число от 1 до 60 секунд.",
+      "saving": "Сохранение сцены...",
+      "saved": "Сцена сохранена",
+      "saveFailed": "Не удалось сохранить сцену.",
+      "unsavedChanges": "Несохранённые изменения не потеряны."
+    },
+    "draft": {
+      "title": "Создать черновик раскадровки",
+      "body": "WePrompt предложит сцены, закадровый и экранный текст, а также хронометраж для вашей проверки.",
+      "checking": "Проверка выбранной модели раскадровки...",
+      "ready": "Готово к созданию черновика",
+      "setupRequired": "Выберите и настройте модель раскадровки для создания черновика с ИИ.",
+      "unavailable": "Создание черновика раскадровки сейчас недоступно.",
+      "providerLabel": "Провайдер раскадровки",
+      "modelLabel": "Модель раскадровки",
+      "chargeNotice": "Черновик использует выбранную модель проекта; провайдер может взимать плату.",
+      "replaceTitle": "Заменить существующую раскадровку?",
+      "replaceBody": "Новый черновик заменит все текущие сцены только после получения корректного предложения.",
+      "confirm": "Создать черновик",
+      "cancel": "Отмена",
+      "configureModel": "Открыть настройки модели",
+      "manualFallback": "Продолжить редактирование вручную",
+      "failed": "Не удалось создать черновик раскадровки. Текущие сцены не изменены."
+    },
+    "routing": {
+      "title": "Маршрут генерации",
+      "modelLabel": "Модель",
+      "missingRoute": "Выберите совместимый маршрут генерации.",
+      "invalidRoute": "Этот маршрут больше не действует. Проверьте его перед генерацией."
+    },
+    "review": {
+      "generateReadyScenes": "Сгенерировать готовые сцены: {{count}}",
+      "generateReadyScenes_one": "Сгенерировать {{count}} готовую сцену",
+      "generateReadyScenes_few": "Сгенерировать {{count}} готовые сцены",
+      "generateReadyScenes_many": "Сгенерировать {{count}} готовых сцен",
+      "generateReadyScenes_other": "Сгенерировать {{count}} готовой сцены",
+      "noReadyScenes": "Нет сцен, готовых к генерации.",
+      "generateScene": "Сгенерировать сцену",
+      "regenerateScene": "Сгенерировать другой вариант",
+      "title": "Проверка генерации",
+      "sceneCount": "Выбрано сцен: {{count}}",
+      "videoSeconds": "Запрошено секунд видео: {{seconds}}",
+      "selectedDurationFull": "Выбранная длительность: {{seconds}} секунд",
+      "selectedDurationFull_one": "Выбранная длительность: {{seconds}} секунда",
+      "selectedDurationFull_few": "Выбранная длительность: {{seconds}} секунды",
+      "selectedDurationFull_many": "Выбранная длительность: {{seconds}} секунд",
+      "selectedDurationFull_other": "Выбранная длительность: {{seconds}} секунды",
+      "targetDurationFull": "Целевая длительность: {{seconds}} секунд",
+      "targetDurationFull_one": "Целевая длительность: {{seconds}} секунда",
+      "targetDurationFull_few": "Целевая длительность: {{seconds}} секунды",
+      "targetDurationFull_many": "Целевая длительность: {{seconds}} секунд",
+      "targetDurationFull_other": "Целевая длительность: {{seconds}} секунды",
+      "providerLabel": "Провайдер",
+      "modelLabel": "Модель",
+      "aspectRatio": "Соотношение сторон",
+      "resolution": "Разрешение",
+      "watermarkOff": "Водяной знак отключён",
+      "audioOff": "Вывод без звука; генерация аудио отключена",
+      "missingRoute": "Хотя бы у одной сцены нет маршрута генерации.",
+      "invalidRoute": "Хотя бы один выбранный маршрут недействителен.",
+      "durationMismatch": "Хронометраж раскадровки не соответствует цели проекта.",
+      "chargeNotice": "Генерация использует выбранную учётную запись провайдера и может привести к расходам.",
+      "confirm": "Подтвердить и запустить",
+      "cancel": "Отмена",
+      "disabledMissingRoutes": "Выберите действительный маршрут для каждой выбранной сцены.",
+      "audioOn": "Этот рендер включает сгенерированное аудио; маршруты без звука, если они есть, останутся без звука."
+    },
+    "jobs": {
+      "progress": "Выполнено: {{percent}} %",
+      "cancel": "Отменить задачу",
+      "retry": "Повторить генерацию",
+      "retryConfirmationTitle": "Повторить генерацию?",
+      "retryConfirmationBody": "При повторной попытке этот запрос на генерацию будет заново отправлен провайдеру, что может повлечь плату.",
+      "retryConfirmationConfirm": "Подтвердить и повторить",
+      "retryDownload": "Повторить загрузку",
+      "retryChargeTitle": "Повторить с риском двойного списания?",
+      "retryChargeBody": "Результат предыдущей отправки неизвестен. Повторная попытка может привести к дополнительному списанию у провайдера.",
+      "retryChargeConfirm": "Подтвердить и повторить",
+      "status": {
+        "queuedLocal": "Ожидает отправки",
+        "submitting": "Отправка",
+        "queuedRemote": "В очереди у провайдера",
+        "running": "Генерация",
+        "needsAttention": "Требует внимания",
+        "succeeded": "Завершено",
+        "failed": "Ошибка",
+        "cancelled": "Отменено"
+      },
+      "errors": {
+        "invalidRequest": "Запрос генерации недействителен.",
+        "auth": "Провайдер отклонил учётные данные.",
+        "quota": "В учётной записи провайдера недостаточно квоты.",
+        "rateLimited": "Достигнут лимит запросов провайдера. Повторите попытку позже.",
+        "providerUnavailable": "Провайдер генерации недоступен.",
+        "timeout": "Провайдер не ответил вовремя.",
+        "pollDeadline": "Система перестала сообщать о ходе выполнения. Перед повторной попыткой уточните статус у провайдера.",
+        "noOutput": "Провайдер завершил работу без пригодного результата.",
+        "submissionUnknown": "Результат отправки неизвестен. Перед повторной попыткой ознакомьтесь с предупреждением о двойном списании.",
+        "downloadFailed": "Генерация завершена, но результат не удалось загрузить.",
+        "unsupported": "Этот провайдер не поддерживает запрошенную операцию.",
+        "unknown": "Задача генерации завершилась ошибкой по неизвестной причине."
+      }
+    },
+    "preview": {
+      "title": "Предпросмотр",
+      "noAssetTitle": "Созданный материал не выбран",
+      "noAssetBody": "Сгенерируйте сцену или выберите существующий вариант для предпросмотра.",
+      "imageAlt": "Сгенерированное изображение сцены",
+      "videoLabel": "Сгенерированное видео сцены",
+      "loadFailed": "Не удалось загрузить этот управляемый материал.",
+      "versions": "Варианты",
+      "versionLabel": "Вариант {{number}}",
+      "selectVersion": "Выбрать этот вариант",
+      "selectVersionAccessible": "Выбрать вариант {{number}}",
+      "importReference": "Импортировать изображение первого кадра",
+      "importing": "Импорт референса...",
+      "missingVisualPrompt": "Добавьте визуальный запрос перед генерацией этой сцены.",
+      "missingModel": "Выберите совместимую модель проекта перед генерацией этой сцены.",
+      "generateThisScene": "Сгенерировать эту сцену",
+      "videoReady": "Видео готово"
+    },
+    "timeline": {
+      "title": "Лента сцен",
+      "selectScene": "Выбрать сцену",
+      "totalDuration": "Общая длительность раскадровки",
+      "totalDurationFull": "Общая длительность: {{seconds}} секунд",
+      "totalDurationFull_one": "Общая длительность: {{seconds}} секунда",
+      "totalDurationFull_few": "Общая длительность: {{seconds}} секунды",
+      "totalDurationFull_many": "Общая длительность: {{seconds}} секунд",
+      "totalDurationFull_other": "Общая длительность: {{seconds}} секунды",
+      "selectSceneAccessible": "Выбрать сцену {{number}}: {{title}}, {{seconds}} секунд",
+      "selectSceneAccessible_one": "Выбрать сцену {{number}}: {{title}}, {{seconds}} секунда",
+      "selectSceneAccessible_few": "Выбрать сцену {{number}}: {{title}}, {{seconds}} секунды",
+      "selectSceneAccessible_many": "Выбрать сцену {{number}}: {{title}}, {{seconds}} секунд",
+      "selectSceneAccessible_other": "Выбрать сцену {{number}}: {{title}}, {{seconds}} секунды",
+      "noScenes": "Нет сцен для отображения"
+    },
+    "export": {
+      "title": "Экспорт материалов",
+      "body": "Экспортируйте манифест раскадровки и выбранный материал каждой сцены.",
+      "gapWarning": "Кадры {{shots}} всё ещё являются заставками и не будут включены.",
+      "gapWarning_one": "Кадр {{shots}} всё ещё является заставкой и не будет включён.",
+      "gapWarning_few": "Кадры {{shots}} всё ещё являются заставками и не будут включены.",
+      "gapWarning_many": "Кадры {{shots}} всё ещё остаются заставками и не будут включены.",
+      "gapWarning_other": "Кадры {{shots}} всё ещё являются заставками и не будут включены.",
+      "confirmSelectedCount": "Экспортировать {{count}} кадров?",
+      "confirmSelectedCount_one": "Экспортировать {{count}} кадр?",
+      "confirmSelectedCount_few": "Экспортировать {{count}} кадра?",
+      "confirmSelectedCount_many": "Экспортировать {{count}} кадров?",
+      "confirmSelectedCount_other": "Экспортировать {{count}} кадра?",
+      "includeReferences": "Включить импортированные референсные изображения",
+      "confirm": "Экспортировать материалы",
+      "cancel": "Отмена",
+      "choosing": "Выбор папки для экспорта...",
+      "successTitle": "Материалы экспортированы",
+      "successBody": "В «{{folderName}}» передано {{count}} выбранных сцен.",
+      "successBody_one": "В «{{folderName}}» передана {{count}} выбранная сцена.",
+      "successBody_few": "В «{{folderName}}» переданы {{count}} выбранные сцены.",
+      "successBody_many": "В «{{folderName}}» передано {{count}} выбранных сцен.",
+      "successBody_other": "В «{{folderName}}» передано выбранных сцен: {{count}}.",
+      "partialTitle": "Материалы экспортированы, но некоторые сцены отсутствуют",
+      "partialBody": "Доступные материалы экспортированы в «{{folderName}}».",
+      "failed": "Не удалось экспортировать материалы.",
+      "noSelectedAssets": "Нет выбранных материалов сцен, готовых к экспорту.",
+      "folderLabel": "Папка экспорта"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio отключена в этой сборке.",
+      "invalidPayload": "Запрос содержит недействительные или неполные данные.",
+      "projectNotFound": "Проект Creative Studio больше не существует.",
+      "storyboardExists": "В этом проекте уже есть раскадровка. Подтвердите замену перед созданием нового черновика.",
+      "staleProject": "Проект был изменён в другом месте. Обновите его перед повторной попыткой.",
+      "planningUnavailable": "Создание черновика раскадровки недоступно. Можно продолжить редактирование вручную.",
+      "invalidRoute": "Выбранный маршрут генерации недействителен или недоступен.",
+      "cancellationRefused": "Провайдер больше не может отменить эту выполняемую задачу.",
+      "duplicateChargeAcknowledgementRequired": "Подтвердите риск двойного списания у провайдера перед повторной попыткой.",
+      "busy": "В этом проекте есть активные задачи генерации.",
+      "provider": "Провайдер не смог выполнить запрос.",
+      "storage": "Creative Studio не удалось обновить локальные данные."
+    },
+    "models": {
+      "storyboard": "Модель раскадровки",
+      "selectionRequired": "Выберите модель",
+      "unavailable": "Выбранная модель недоступна",
+      "openSettings": "Открыть настройки моделей",
+      "refresh": "Обновить модели",
+      "loading": "Загрузка моделей...",
+      "updateFailed": "Не удалось обновить выбор модели проекта."
+    }
+  },
   "artifact": {
     "emptyTitle": "Нет открытых артефактов",
     "emptyHint": "Созданные файлы и документы открываются здесь."
+  },
+  "statusTooltip": {
+    "waitingApproval": "Ожидается ваше подтверждение для продолжения.",
+    "running": "Идёт работа над этим чатом.",
+    "doneUnseen": "Завершено, но вы ещё не просмотрели результат.",
+    "doneSeen": "Недавно завершено и уже просмотрено.",
+    "doneIdle": "Завершено не менее минуты назад и уже просмотрено.",
+    "stopped": "Остановлено до завершения.",
+    "failed": "Не удалось завершить из-за ошибки."
+  },
+  "staleKnowledgeHint": {
+    "body": "Этот чат не может искать в базе знаний проекта — он был начат до добавления файлов.",
+    "action": "Начать новый чат"
+  },
+  "emptyChat": "Отправьте сообщение, чтобы начать.",
+  "presentationSubmission": {
+    "pending": "Отправка презентации ожидает завершения",
+    "restore": "Восстановить",
+    "persistenceFailure": "Не удалось сохранить отправку презентации.",
+    "queued": "Презентация добавлена в очередь",
+    "uncertainTracking": "Статус отправки неизвестен. Отслеживайте существующий запуск и не отправляйте повторно."
   }
 }

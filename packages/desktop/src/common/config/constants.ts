@@ -62,8 +62,55 @@ export const TEAM_MODE_ENABLED = true;
 
 // ===== Feature flags =====
 
+/** Creative Studio release gate. Explicitly opt in for development with AIONUI_ENABLE_CREATIVE_STUDIO=1. */
+export const CREATIVE_STUDIO_ENABLED = process.env.AIONUI_ENABLE_CREATIVE_STUDIO === '1';
+
 /** Desktop Pet feature flag: when false, the pet is hidden from all UI entry points (settings tab, route, tray menu, startup). Backend code stays dormant. */
 export const DESKTOP_PET_ENABLED = false;
+
+export const PRESENTATION_RUN_V2_ENABLED = false;
+
+export const PRESENTATION_RUN_DIRECTIVE_PREFIX = 'Create a presentation from the request below.';
+
+export const PRESENTATION_RUN_DISPATCH_STATUSES = [
+  'allocating',
+  'committed',
+  'dispatching',
+  'bound',
+  'terminal_verified',
+  'retained',
+  'failed_retained',
+  'dispatch_uncertain',
+  'discarded',
+] as const;
+
+export const PRESENTATION_RUN_ARTIFACT_PHASES = [
+  'none',
+  'sources_snapshotted',
+  'sources_extracted',
+  'candidate_retained',
+  'candidate_copied',
+  'structurally_valid',
+  'ooxml_inspected',
+  'rendered_exact_hash',
+] as const;
+
+export const PRESENTATION_RUN_DISPOSITIONS = ['TRACKING_REQUIRED', 'REVIEW_REQUIRED'] as const;
+
+export const PRESENTATION_RUN_FAILURE_STATES = [
+  'preflight',
+  'lookup',
+  'draft_expired',
+  'draft_active',
+  'grant_validation',
+  'grant_expired',
+  'committed',
+  'dispatch_uncertain',
+  'bound',
+  'retained',
+] as const;
+
+export { PRESENTATION_RUN_LIMITS } from '@/common/types/office/presentationRunPolicy';
 
 /**
  * Builtin (official) skills hidden from the app UI.

@@ -54,7 +54,7 @@ export function renderThemeThumbnailSvg(input: {
     .map((color, index) => `<rect x="${20 + index * 34}" y="150" width="26" height="26" rx="4" fill="${color}"/>`)
     .join('');
   const fontLine = escapeXml(input.fonts.slice(0, 3).join(' · ') || 'System fonts');
-  const badge = input.format === 'pptx' ? 'PPTX' : 'HTML';
+  const badge = input.format.toUpperCase();
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">`,

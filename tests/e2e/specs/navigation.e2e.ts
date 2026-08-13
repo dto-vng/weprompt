@@ -5,7 +5,15 @@
  * settings sub-pages without errors.
  */
 import { test, expect } from '../fixtures';
-import { goToGuid, goToSettings, ROUTES, expectUrlContains, takeScreenshot, type SettingsTab } from '../helpers';
+import {
+  goToGuid,
+  goToSettings,
+  ROUTES,
+  expectUrlContains,
+  settingsSiderItemById,
+  takeScreenshot,
+  type SettingsTab,
+} from '../helpers';
 
 // ── Guid Page ────────────────────────────────────────────────────────────────
 
@@ -41,14 +49,14 @@ test.describe('Guid Page', () => {
 
 test.describe('Settings Pages', () => {
   const tabs: { tab: SettingsTab; name: string }[] = [
-    { tab: 'gemini', name: 'Gemini Settings' },
+    { tab: 'profile', name: 'Profile Settings' },
     { tab: 'model', name: 'Model Settings' },
     { tab: 'agent', name: 'Agent/ACP Settings' },
+    { tab: 'skills', name: 'Skills Settings' },
     { tab: 'tools', name: 'Tools/MCP Settings' },
-    { tab: 'display', name: 'Display Settings' },
+    { tab: 'appearance', name: 'Appearance Settings' },
     { tab: 'webui', name: 'WebUI Settings' },
     { tab: 'system', name: 'System Settings' },
-    { tab: 'about', name: 'About Page' },
   ];
 
   for (const { tab, name } of tabs) {
@@ -67,6 +75,22 @@ test.describe('Settings Pages', () => {
       await takeScreenshot(page, `settings-${tab}`);
     }
   });
+
+  test('legacy About route redirects to the live System settings surface', async ({ page }) => {
+    await goToSettings(page, 'system');
+    await page.evaluate((hash) => window.location.assign(hash), ROUTES.legacySettings.about);
+
+    await page.waitForFunction((hash) => window.location.hash === hash, ROUTES.settings.system, {
+      timeout: 10_000,
+    });
+    await expectUrlContains(page, 'system');
+    await expect(page.locator(settingsSiderItemById('system')).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator(settingsSiderItemById('about'))).toHaveCount(0);
+    await expect(page.locator('[data-settings-path="about"]')).toHaveCount(0);
+    await expect(page.locator('.settings-page-wrapper')).toBeVisible();
+    const body = await page.locator('.settings-page-wrapper').textContent();
+    expect(body?.length ?? 0).toBeGreaterThan(10);
+  });
 });
 
 // ── Cross-page navigation ────────────────────────────────────────────────────
@@ -76,8 +100,8 @@ test.describe('Sidebar Navigation', () => {
     await goToGuid(page);
     expect(page.url()).toContain('guid');
 
-    await goToSettings(page, 'about');
-    expect(page.url()).toContain('about');
+    await goToSettings(page, 'system');
+    expect(page.url()).toContain('system');
 
     await goToGuid(page);
     expect(page.url()).toContain('guid');

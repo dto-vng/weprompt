@@ -18,11 +18,14 @@ import MessageList from '@/renderer/pages/conversation/Messages/MessageList';
 import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Messages/types';
 import { CHAT_MESSAGE_JUMP_EVENT } from '@/renderer/utils/chat/chatMinimapEvents';
 
-const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissionMock } = vi.hoisted(() => ({
-  scrollElementIntoViewMock: vi.fn(),
-  useConversationArtifactsMock: vi.fn(),
-  useTeamPermissionMock: vi.fn(),
-}));
+const { scrollElementIntoViewMock, useConversationArtifactsMock, useTeamPermissionMock, autoScrollState } = vi.hoisted(
+  () => ({
+    scrollElementIntoViewMock: vi.fn(),
+    useConversationArtifactsMock: vi.fn(),
+    useTeamPermissionMock: vi.fn(),
+    autoScrollState: { showScrollButton: false, scrollToBottom: vi.fn() },
+  })
+);
 const workSummaryMessagesMock = vi.hoisted(() => vi.fn());
 const loadConversationMessagePageMock = vi.hoisted(() => vi.fn());
 
@@ -48,6 +51,17 @@ vi.mock('@arco-design/web-react', () => ({
   Image: {
     PreviewGroup: ({ children }: PropsWithChildren) => <>{children}</>,
   },
+  Button: ({
+    children,
+    icon,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; shape?: string }) => (
+    <button type='button' {...props}>
+      {icon}
+      {children}
+    </button>
+  ),
+  Tooltip: ({ children }: PropsWithChildren) => <>{children}</>,
 }));
 
 vi.mock('@/renderer/hooks/context/ConversationContext', () => ({
@@ -78,8 +92,10 @@ vi.mock('@/renderer/pages/conversation/Messages/useAutoScroll', () => ({
     handleScroll: () => {},
     handleWheel: () => {},
     handlePointerDown: () => {},
-    showScrollButton: false,
-    scrollToBottom: () => {},
+    get showScrollButton() {
+      return autoScrollState.showScrollButton;
+    },
+    scrollToBottom: autoScrollState.scrollToBottom,
     scrollElementIntoView: scrollElementIntoViewMock,
     hideScrollButton: () => {},
   }),
@@ -146,14 +162,6 @@ vi.mock('@/renderer/pages/conversation/Messages/components/MessageToolGroupSumma
       </div>
     );
   },
-}));
-
-vi.mock('@/renderer/pages/conversation/Messages/components/toolActivity/ToolActivityError', () => ({
-  default: ({ step }: { step: { key: string } }) => (
-    <div data-testid='tool-activity-error' data-tool-key={step.key}>
-      tool error
-    </div>
-  ),
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/MessageFileChanges', () => ({
@@ -768,7 +776,7 @@ describe('MessageList', () => {
     expect(screen.getByText('permission').compareDocumentPosition(summaries[0])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it('retires an error card when later tool work succeeds, keeping the step in the work summary', () => {
+  it('folds a terminal tool error into the same work summary as later work, with no standalone error banner', () => {
     const messages = [
       {
         id: 'tool-error-1',
@@ -791,78 +799,18 @@ describe('MessageList', () => {
       wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
     });
 
-    // The agent recovered (a different call succeeded afterwards), so the
-    // standalone error card is suppressed; the failed step stays inspectable
-    // inside the work summary.
+    // The red per-step failure banner is retired: a failed step no longer breaks
+    // out on its own, it folds into the same turn work summary as later work.
     expect(screen.queryByTestId('tool-activity-error')).not.toBeInTheDocument();
-    expect(screen.getByTestId('work-summary')).toBeInTheDocument();
+    const permission = screen.getByText('permission');
+    const summary = screen.getByTestId('work-summary');
+    expect(permission.compareDocumentPosition(summary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ id: 'tool-error-1' }),
         expect.objectContaining({ id: 'tool-success-1' }),
       ])
     );
-  });
-
-  it('keeps a terminal tool error visible when the turn ends on it', () => {
-    const messages = [
-      {
-        id: 'tool-success-1',
-        type: 'tool_call',
-        position: 'left',
-        content: { call_id: 'call-success-1', name: 'Write', status: 'completed', output: 'Saved' },
-        created_at: 1,
-      },
-      { id: 'permission-1', type: 'permission', position: 'left', content: {}, created_at: 2 },
-      {
-        id: 'tool-error-1',
-        type: 'tool_call',
-        position: 'left',
-        content: { call_id: 'call-error-1', name: 'Read', status: 'error', error: 'Access denied' },
-        created_at: 3,
-      },
-    ] as unknown as TMessage[];
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
-    });
-
-    const error = screen.getByTestId('tool-activity-error');
-    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(1);
-    expect(error).toHaveAttribute('data-tool-key', 'call-error-1');
-    expect(workSummaryMessagesMock).toHaveBeenLastCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'tool-success-1' }),
-        expect.objectContaining({ id: 'tool-error-1' }),
-      ])
-    );
-  });
-
-  it('shows only the last error of a failing streak with no recovery', () => {
-    const messages = [
-      {
-        id: 'tool-error-1',
-        type: 'tool_call',
-        position: 'left',
-        content: { call_id: 'call-error-1', name: 'Read', status: 'error', error: 'Shape 18 not found' },
-        created_at: 1,
-      },
-      {
-        id: 'tool-error-2',
-        type: 'tool_call',
-        position: 'left',
-        content: { call_id: 'call-error-2', name: 'Read', status: 'error', error: 'Unsupported selector' },
-        created_at: 2,
-      },
-    ] as unknown as TMessage[];
-
-    render(<MessageList />, {
-      wrapper: ({ children }) => <Wrapper messages={messages}>{children}</Wrapper>,
-    });
-
-    // Both errors are pending (no recovery), so both stay visible — a retry
-    // of the SAME call key is the only same-streak supersession.
-    expect(screen.getAllByTestId('tool-activity-error')).toHaveLength(2);
   });
 
   it('keeps visible tools in one work summary across a hidden diagnostic', () => {
@@ -1072,5 +1020,32 @@ describe('MessageList', () => {
 
     expect(screen.getByTestId('message-list-skeleton')).toBeInTheDocument();
     expect(screen.queryByText('empty state')).not.toBeInTheDocument();
+  });
+
+  describe('scroll-to-bottom control', () => {
+    afterEach(() => {
+      autoScrollState.showScrollButton = false;
+      autoScrollState.scrollToBottom.mockClear();
+    });
+
+    it('is a real button with an accessible name and no dead gradient div beside it', () => {
+      autoScrollState.showScrollButton = true;
+
+      const { container } = render(<MessageList />, {
+        wrapper: ({ children }) => <Wrapper>{children}</Wrapper>,
+      });
+
+      const control = screen.getByRole('button', { name: 'messages.scrollToBottom' });
+      fireEvent.click(control);
+      expect(autoScrollState.scrollToBottom).toHaveBeenCalled();
+
+      // `!b` paints the width and `!border-4` the colour. Both need the important prefix:
+      // `border-4` is colour-only, the Uno preflight zeroes border-width, and `.arco-btn`'s own
+      // `border-color: transparent` beats an unprefixed utility (measured in the running app).
+      expect(control.className).toContain('!border-4');
+      expect(control.className).toMatch(/(^|\s)!b(\s|$)/);
+      expect(control.className).not.toContain('border-3');
+      expect(container.querySelector('.h-100px.pointer-events-none')).toBeNull();
+    });
   });
 });

@@ -62,6 +62,7 @@
       "installFailed": "Error al instalar officecli automáticamente. Revisa los registros del backend y reintenta.",
       "portTimeout": "El servicio de vista previa inició pero no estuvo listo a tiempo. Reintenta.",
       "startFailed": "Error al iniciar el servicio de vista previa de Office.",
+      "invalidArtifact": "Este archivo de Office está dañado o no es válido y no se puede entregar de forma segura.",
       "outsideSandbox": "Este archivo está fuera del sandbox del proyecto actual.",
       "originalSafe": "El archivo original del espacio de trabajo no se modificó."
     },

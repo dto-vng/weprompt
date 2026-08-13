@@ -11,6 +11,7 @@ import { useConversationHistoryContext } from '@/renderer/hooks/context/Conversa
 import type { TimelineSection } from '../types';
 import {
   dispatchWorkspaceExpansionChange,
+  hasStoredWorkspaceExpansionPreference,
   readExpandedWorkspaces,
   WORKSPACE_EXPANSION_STORAGE_KEY,
 } from './useWorkspaceExpansionState';
@@ -57,14 +58,25 @@ export const useConversations = () => {
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<string[]>(() => readExpandedWorkspaces());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => readCollapsedSections());
   const { id } = useParams();
-  const { conversations, isConversationGenerating, getRecentCompletionAt, refreshConversationRuntime, groupedHistory } =
-    useConversationHistoryContext();
+  const {
+    conversations,
+    hasLoadedConversations,
+    isConversationGenerating,
+    getCompletion,
+    getRecentFailureAt,
+    getRecentStoppedAt,
+    markCompletionSeen,
+    refreshConversationRuntime,
+    groupedHistory,
+  } = useConversationHistoryContext();
 
   const { pinnedConversations, timelineSections } = groupedHistory;
+  const activeCompletion = id ? getCompletion(id) : undefined;
 
   // Track whether auto-expand has already been performed to avoid
   // re-expanding workspaces after a user manually collapses them (#1156)
   const hasAutoExpandedRef = useRef(false);
+  const hasStoredExpansionPreferenceRef = useRef(hasStoredWorkspaceExpansionPreference());
   // Guard so the auto-expand + scroll for a given active id runs only once.
   // Reset when the active id changes so navigating back to a conversation
   // re-triggers, but manual collapses afterwards are not fought.
@@ -84,6 +96,11 @@ export const useConversations = () => {
       refreshConversationRuntime(id);
     }
   }, [id, refreshConversationRuntime]);
+
+  useEffect(() => {
+    if (!id || !activeCompletion || activeCompletion.seenAt !== undefined) return;
+    markCompletionSeen(id);
+  }, [activeCompletion, id, markCompletionSeen]);
 
   // Reveal + scroll the active conversation into view.
   // Depends on the grouped data because on a cold start (opening the app
@@ -158,6 +175,10 @@ export const useConversations = () => {
   // Auto-expand all workspaces on first load only (#1156)
   useEffect(() => {
     if (hasAutoExpandedRef.current) return;
+    if (hasStoredExpansionPreferenceRef.current) {
+      hasAutoExpandedRef.current = true;
+      return;
+    }
     if (expandedWorkspaces.length > 0) {
       hasAutoExpandedRef.current = true;
       return;
@@ -204,8 +225,11 @@ export const useConversations = () => {
 
   return {
     conversations,
+    hasLoadedConversations,
     isConversationGenerating,
-    getRecentCompletionAt,
+    getCompletion,
+    getRecentFailureAt,
+    getRecentStoppedAt,
     expandedWorkspaces,
     pinnedConversations,
     timelineSections,

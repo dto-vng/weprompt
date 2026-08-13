@@ -28,22 +28,30 @@ const TemplateGalleryExpanded: React.FC<{
   return (
     <section
       data-testid='template-gallery-expanded'
-      className='mt-18px w-full box-border animate-fade-in bg-dialog-fill-0 b b-solid b-1 rd-12px p-12px'
+      className='mt-18px w-full box-border animate-fade-in bg-dialog-fill-0 b-1 b-solid border-4 rd-12px p-12px'
       aria-label={t('conversation.presentationTemplates.title')}
     >
-      <div className='flex items-center justify-between mb-8px'>
-        <span className='text-14px font-medium'>{t('conversation.presentationTemplates.title')}</span>
-        <div className='flex items-center gap-8px'>
-          <Button size='mini' onClick={onImport} icon={<Upload size='12' />}>
-            {t('conversation.presentationTemplates.importCard')}
+      <div className='flex items-center justify-between gap-8px mb-8px'>
+        <span className='text-14px font-semibold text-t-primary'>{t('conversation.presentationTemplates.title')}</span>
+        <div className='flex items-center gap-4px shrink-0'>
+          {/* Text-weight so importing (the rarest action here) doesn't outweigh the
+              title, and so it matches the borderless close button beside it. Arco
+              colours text buttons with the brand orange, which read louder than the
+              heading — force the neutral pair instead. */}
+          <Button size='small' type='text' onClick={onImport} className='!text-t-secondary hover:!text-t-primary'>
+            <span className='flex items-center gap-6px'>
+              <Upload size='14' />
+              {t('conversation.presentationTemplates.importCard')}
+            </span>
           </Button>
           <Button
-            size='mini'
+            size='small'
+            type='text'
             shape='circle'
             icon={<Close size='14' />}
             onClick={onClose}
             data-testid='template-gallery-expanded-close'
-            aria-label={t('common.close', { defaultValue: 'Close' })}
+            aria-label={t('common.close')}
           />
         </div>
       </div>

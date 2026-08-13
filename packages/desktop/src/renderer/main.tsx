@@ -90,6 +90,7 @@ import { bootstrapRendererConfig } from '@renderer/services/bootstrapRenderer';
 // Components and utilities
 import Layout from './components/layout/Layout';
 import Router from './components/layout/Router';
+import { useKnowledgeFolderWatchers } from './pages/conversation/projects/useKnowledgeFolderWatchers';
 import Sider from './components/layout/Sider';
 import { useAuth } from './hooks/context/AuthContext';
 import { ConversationHistoryProvider } from './hooks/context/ConversationHistoryContext';
@@ -99,9 +100,9 @@ import type { IRuntimeStatusEvent, RuntimeFailureKind } from '@/common/adapter/i
 import {
   InstallationIntegrityContent,
   InstallationIntegrityModalHost,
+  PackageArchitectureMismatchFooter,
   type InstallationIntegrityDiagnostics,
   getBackendStartupInstallationDescription,
-  getDownloadLatestModalActionProps,
   getRuntimeComponentInstallationDescription,
   showInstallationIntegrityModal,
 } from './components/layout/InstallationIntegrityDialog';
@@ -275,6 +276,10 @@ const Main = () => {
   const { ready } = useAuth();
   const [configReady, setConfigReady] = useState(false);
 
+  // The project registry lives in renderer localStorage, so main cannot
+  // enumerate projects at boot — this is what gets knowledge folders watched.
+  useKnowledgeFolderWatchers();
+
   useEffect(() => {
     if (!ready) return;
     void bootstrapRendererConfig().finally(() => setConfigReady(true));
@@ -336,7 +341,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
 
   if (!isIncompatibleRuntime && !isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <InstallationIntegrityModalHost
           description={description}
           diagnosticsKind={
@@ -364,13 +369,13 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
 
   if (isPackageArchitectureMismatch) {
     return (
-      <div className='min-h-screen bg-bg-1'>
+      <div className='min-h-screen bg-1'>
         <Modal
           visible
           closable={false}
           maskClosable={false}
+          footer={<PackageArchitectureMismatchFooter />}
           title={t('common.backendStartup.packageArchitectureMismatch.title')}
-          {...getDownloadLatestModalActionProps(t)}
         >
           <InstallationIntegrityContent description={description} />
         </Modal>
@@ -379,7 +384,7 @@ const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo
   }
 
   return (
-    <div className='min-h-screen bg-bg-1'>
+    <div className='min-h-screen bg-1'>
       <Modal visible closable={false} maskClosable={false} footer={null} title={title}>
         <div className='text-t-1'>
           <Typography.Paragraph className='mb-0 text-t-secondary'>{description}</Typography.Paragraph>

@@ -1,0 +1,347 @@
+.library {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header,
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  composes: pageHeading from '../../StudioTypography.module.css';
+  margin: 0;
+}
+
+.subtitle {
+  composes: body from '../../StudioTypography.module.css';
+}
+
+.emptyTitle {
+  composes: body from '../../StudioTypography.module.css';
+}
+
+.subtitle {
+  margin: 6px 0 0;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: start;
+  gap: 8px 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 14px;
+  background: transparent;
+}
+
+.composerLabel {
+  composes: body from '../../StudioTypography.module.css';
+  grid-column: 1 / -1;
+  color: var(--text-primary);
+}
+
+.composerInput {
+  min-height: 32px;
+  border-color: transparent;
+  background-color: transparent;
+  resize: none;
+}
+
+.composerInput:hover {
+  background-color: var(--color-fill-1);
+}
+
+.composerInput:focus,
+.composerInput:focus-visible,
+.composerInput:global(.arco-textarea-focus) {
+  border-color: var(--brand);
+  background-color: var(--color-bg-2);
+  box-shadow: var(--ring-focus);
+}
+
+.composerActions,
+.guesses {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.composerActions {
+  grid-column: 1 / -1;
+  align-self: start;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.guessSelect {
+  width: auto;
+  min-width: 96px;
+}
+
+.guessSelect:global(.arco-select.arco-select-size-small.arco-select-single) :global(.arco-select-view) {
+  height: auto;
+  padding: 6px 11px;
+  border: 1px solid var(--studio-library-control-border);
+  border-radius: 8px;
+  background: var(--studio-library-control-surface);
+  color: var(--studio-library-chip-text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: normal;
+}
+
+.disabledTooltipTarget {
+  display: inline-flex;
+}
+
+.composerPill {
+  composes: body from '../../StudioTypography.module.css';
+}
+
+.composerPill:global(.arco-btn-secondary),
+.composerPill:global(.arco-btn-secondary.arco-btn-disabled) {
+  height: auto;
+  padding: 6px 11px;
+  border: 1px solid var(--studio-library-control-border);
+  border-radius: 8px;
+  background: var(--studio-library-control-surface);
+  color: var(--studio-library-attach-text);
+  font-size: 12.5px;
+}
+
+.composerShortcut {
+  composes: meta from '../../StudioTypography.module.css';
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid var(--studio-library-control-border);
+  border-radius: 5px;
+  color: var(--studio-plate-text);
+}
+
+.composerSubmit {
+  composes: primaryAction from '../../StudioTypography.module.css';
+}
+
+.shapes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  composes: meta from '../../StudioTypography.module.css';
+  margin: 0;
+  color: var(--studio-plate-text);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.shapeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alert {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-danger-6);
+}
+
+.loading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.projectsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding-top: 2px;
+}
+
+.projectSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.projectSectionLabel,
+.projectCount {
+  composes: meta from '../../StudioTypography.module.css';
+  color: var(--studio-plate-text);
+}
+
+.projectSectionLabel {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.projectSectionHairline {
+  height: 1px;
+  flex: 1;
+  background: var(--studio-library-hairline);
+}
+
+.projectCard {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.poster {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  aspect-ratio: 16 / 9;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 8px;
+  background: var(--color-fill-2);
+}
+
+.posterImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scriptPoster {
+  position: absolute;
+  inset: 0;
+  background: var(--studio-slate-surface);
+}
+
+.posterBadge {
+  composes: eyebrow from '../../StudioTypography.module.css';
+  z-index: 1;
+}
+
+.posterBadge:global(.arco-tag.arco-tag-checked) {
+  height: auto;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--studio-take-chip);
+  color: var(--studio-take-text);
+  line-height: normal;
+}
+
+.posterLabel {
+  composes: eyebrow from '../../StudioTypography.module.css';
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  border-color: transparent;
+  background: var(--studio-plate-surface);
+  color: var(--studio-plate-text);
+}
+
+.projectName {
+  composes: cardName inkTextAction from '../../StudioTypography.module.css';
+  min-width: 0;
+  height: auto;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteButton {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.projectCard:hover .deleteButton,
+.projectCard:focus-within .deleteButton {
+  opacity: 1;
+}
+
+/* The status text carries the same signal as its dot, so it takes the same
+   colour — a grey sentence next to a green dot reads as two different states. */
+.statusLine {
+  composes: cardStatus from '../../StudioTypography.module.css';
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+}
+
+.statusLine[data-status='complete'] {
+  color: var(--success);
+}
+
+.statusLine[data-status='partial'] {
+  color: var(--danger);
+}
+
+.projectMeta {
+  composes: meta from '../../StudioTypography.module.css';
+  margin: 7px 0 0;
+}
+
+.empty {
+  padding: 48px 0;
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.shapeChip {
+  composes: body from '../../StudioTypography.module.css';
+}
+
+.shapeChip:global(.arco-btn-secondary):not(:global(.arco-btn-disabled)),
+.shapeChip:global(.arco-btn-secondary):not(:global(.arco-btn-disabled)):not(:global(.arco-btn-loading)):hover,
+.shapeChip:global(.arco-btn-secondary):not(:global(.arco-btn-disabled)):focus,
+.shapeChip:global(.arco-btn-secondary):not(:global(.arco-btn-disabled)):focus-visible,
+.shapeChip:global(.arco-btn-secondary):not(:global(.arco-btn-disabled)):not(:global(.arco-btn-loading)):active,
+.shapeChip:global(.arco-btn-secondary.arco-btn-disabled) {
+  height: auto;
+  padding: 6px 11px;
+  border: 1px solid var(--studio-library-shape-border);
+  border-radius: 8px;
+  background: var(--studio-library-shape-surface);
+  color: var(--studio-library-chip-text);
+  font-size: 12.5px;
+}
+
+.modalSurface {
+  composes: surface from '../../StudioTypography.module.css';
+}
+
+@media (max-width: 760px) {
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .composer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .composerActions {
+    flex-wrap: wrap;
+  }
+}

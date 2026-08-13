@@ -43,6 +43,8 @@ const STORAGE_PATH = {
   assistants: 'assistants',
   skills: 'skills',
   cronSkills: 'cron-skills',
+  projectKb: 'project-kb',
+  creativeStudio: 'creative-studio',
 };
 
 /** Legacy builtin-skills cache directory, cleaned up at startup after the
@@ -307,6 +309,19 @@ const getCronSkillsDir = () => {
 };
 
 /**
+ * Root directory for per-project knowledge-base stores.
+ * Each project gets {getProjectKbRootDir()}/{projectId}/ (see common/knowledge/store.ts).
+ */
+const getProjectKbRootDir = () => {
+  return path.join(cacheDir, STORAGE_PATH.projectKb);
+};
+
+/** Root directory for durable Creative Studio manifests and managed assets. */
+const getCreativeStudioRootDir = () => {
+  return path.join(cacheDir, STORAGE_PATH.creativeStudio);
+};
+
+/**
  * Best-effort cleanup of the legacy `{cacheDir}/builtin-skills/` directory
  * left behind by versions prior to the backend taking ownership of the skill
  * corpus. Failures are swallowed — at worst a stale copy lingers on disk.
@@ -451,6 +466,14 @@ export const getSystemDir = () => {
  * 获取助手规则目录路径（供其他模块使用）
  * Get assistant rules directory path (for use by other modules)
  */
-export { getAssistantsDir, getSkillsDir, getCronSkillsDir, BUILTIN_IMAGE_GEN_ID, getBuiltinMcpScriptPath };
+export {
+  getAssistantsDir,
+  getSkillsDir,
+  getCronSkillsDir,
+  getProjectKbRootDir,
+  getCreativeStudioRootDir,
+  BUILTIN_IMAGE_GEN_ID,
+  getBuiltinMcpScriptPath,
+};
 
 export default initStorage;

@@ -5,6 +5,11 @@
  */
 
 import { ipcBridge } from '@/common';
+import type {
+  ManagedPresentationSubmission,
+  PresentationSubmissionProgress,
+  PresentationSubmissionSnapshot,
+} from '@/common/types/platform/presentationSubmission';
 import AtFileMenu from '@/renderer/components/chat/AtFileMenu';
 import BtwOverlay from '@/renderer/components/chat/BtwOverlay';
 import { useInputFocusRing } from '@/renderer/hooks/chat/useInputFocusRing';
@@ -23,7 +28,7 @@ import type { FileOrFolderItem } from '@/renderer/utils/file/fileTypes';
 import { filterWorkspaceMentionItems } from '@/renderer/utils/file/workspaceMentions';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 import { blurActiveElement, shouldBlockMobileInputFocus } from '@/renderer/utils/ui/focus';
-import { Button, Input, Message, Tag } from '@arco-design/web-react';
+import { Button, Input, Message, Tag, Tooltip } from '@arco-design/web-react';
 import { ArrowUp, CloseSmall, Plus, Quote } from '@icon-park/react';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import { buildSkillSlashCommands, mergeSlashCommands } from '@/common/chat/slash/mergeSlashCommands';
@@ -53,6 +58,19 @@ const constVoid = (): void => undefined;
 const MAX_SINGLE_LINE_CHARACTERS = 800;
 const BTW_COMMAND_RE = /^\/btw(?:\s+([\s\S]*))?$/i;
 const AT_FILE_HIGHLIGHT_COLOR = 'var(--primary)';
+const PRESENTATION_SUBMISSION_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const createPresentationSubmissionUuid = (): string => {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi === undefined || typeof cryptoApi.randomUUID !== 'function') {
+    throw new Error('A secure UUID generator is unavailable');
+  }
+  const value = cryptoApi.randomUUID();
+  if (!PRESENTATION_SUBMISSION_UUID_RE.test(value)) {
+    throw new Error('The secure UUID generator returned an invalid identifier');
+  }
+  return value;
+};
 
 const getSelectedItemMatchKeys = (item: FileSelectionItem): string[] => {
   if (typeof item === 'string') {
@@ -166,6 +184,7 @@ const SendBox: React.FC<{
   prefix?: React.ReactNode;
   placeholder?: string;
   onFilesAdded?: (files: FileMetadata[]) => void;
+  onManagedDrop?: (files: readonly File[]) => Promise<void> | void;
   supportedExts?: string[];
   defaultMultiLine?: boolean;
   lockMultiLine?: boolean;
@@ -190,6 +209,8 @@ const SendBox: React.FC<{
   onOpenTemplateGallery?: () => void;
   /** Gallery panel node; non-null means the gallery overlay is open. */
   templateGalleryNode?: React.ReactNode;
+  /** Opt-in durable presentation submission contract. Unmanaged sends do not use it. */
+  managedPresentationSubmission?: ManagedPresentationSubmission;
 }> = ({
   onSend,
   onStop,
@@ -203,6 +224,7 @@ const SendBox: React.FC<{
   value: input = '',
   onChange: setInput = constVoid,
   onFilesAdded,
+  onManagedDrop,
   supportedExts = allSupportedExts,
   defaultMultiLine = false,
   lockMultiLine = false,
@@ -220,6 +242,7 @@ const SendBox: React.FC<{
   onMobilePlusClick,
   onOpenTemplateGallery,
   templateGalleryNode,
+  managedPresentationSubmission,
 }) => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
@@ -231,6 +254,47 @@ const SendBox: React.FC<{
   const conversationContext = useConversationContextSafe();
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingPresentationSubmission, setPendingPresentationSubmission] = useState<{
+    snapshot: PresentationSubmissionSnapshot;
+    progress: PresentationSubmissionProgress;
+  } | null>(null);
+  const [isRestoringPresentationSubmission, setIsRestoringPresentationSubmission] = useState(false);
+  const isRestoringPresentationSubmissionRef = useRef(false);
+  const pendingPresentationSubmissionRef = useRef(pendingPresentationSubmission);
+  const cleanedPresentationSubmissionQueueItemIdRef = useRef<string | null>(null);
+  const commitPendingPresentationSubmission = useCallback(
+    (
+      value: {
+        snapshot: PresentationSubmissionSnapshot;
+        progress: PresentationSubmissionProgress;
+      } | null
+    ): void => {
+      if (pendingPresentationSubmissionRef.current?.snapshot.queueItemId !== value?.snapshot.queueItemId) {
+        cleanedPresentationSubmissionQueueItemIdRef.current = null;
+      }
+      pendingPresentationSubmissionRef.current = value;
+      setPendingPresentationSubmission(value);
+    },
+    []
+  );
+  useEffect(() => {
+    const observation = managedPresentationSubmission?.progress;
+    const pending = pendingPresentationSubmissionRef.current;
+    if (
+      observation === undefined ||
+      observation === null ||
+      pending === null ||
+      observation.queueItemId !== pending.snapshot.queueItemId
+    ) {
+      return;
+    }
+    const { progress } = observation;
+    if (progress.state === 'queued' || progress.state === 'bound') {
+      commitPendingPresentationSubmission(null);
+      return;
+    }
+    commitPendingPresentationSubmission({ ...pending, progress });
+  }, [commitPendingPresentationSubmission, managedPresentationSubmission?.progress]);
   const [isSingleLine, setIsSingleLine] = useState(!effectiveDefaultMultiLine);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const isInputActive = isInputFocused;
@@ -384,6 +448,7 @@ const SendBox: React.FC<{
   const { isFileDragging, dragHandlers } = useDragUpload({
     supportedExts,
     onFilesAdded,
+    onManagedDrop,
     conversation_id: conversationContext?.conversation_id,
   });
 
@@ -1226,6 +1291,9 @@ const SendBox: React.FC<{
     if (!input.trim() && domSnippets.length === 0) {
       return;
     }
+    if (managedPresentationSubmission && pendingPresentationSubmissionRef.current !== null) {
+      return;
+    }
     console.info('[sendbox]', {
       event: 'submit',
       allowSendWhileLoading,
@@ -1256,6 +1324,45 @@ const SendBox: React.FC<{
         .map((s) => `\n\n---\nDOM Snippet (${s.tag}):\n\`\`\`html\n${s.html}\n\`\`\``)
         .join('');
       finalMessage = input + snippetsHtml;
+    }
+
+    if (managedPresentationSubmission) {
+      let snapshot: PresentationSubmissionSnapshot;
+      try {
+        snapshot = Object.freeze({
+          queueItemId: createPresentationSubmissionUuid(),
+          clientRequestId: createPresentationSubmissionUuid(),
+          input: finalMessage,
+          selectedTemplateId: managedPresentationSubmission.selectedTemplateId,
+          sources: Object.freeze(managedPresentationSubmission.sources.map((source) => Object.freeze({ ...source }))),
+          capturedAt: new Date().toISOString(),
+        });
+      } catch {
+        setIsLoading(false);
+        message.error(t('conversation.presentationSubmission.persistenceFailure'));
+        return;
+      }
+      commitPendingPresentationSubmission({ snapshot, progress: { state: 'persisting' } });
+      setInput('');
+      clearDomSnippets();
+      setReplyQuote(null);
+
+      Promise.resolve()
+        .then(() => managedPresentationSubmission.onSubmit(snapshot))
+        .then((progress) => {
+          const pending = pendingPresentationSubmissionRef.current;
+          if (pending?.snapshot.queueItemId !== snapshot.queueItemId) return;
+          if (progress.state === 'queued' || progress.state === 'bound') {
+            commitPendingPresentationSubmission(null);
+            return;
+          }
+          commitPendingPresentationSubmission({ snapshot, progress });
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsLoading(false);
+        });
+      return;
     }
 
     // 立即清空输入框，避免异步 onSend 完成后覆盖用户新输入
@@ -1310,28 +1417,39 @@ const SendBox: React.FC<{
   const isButtonDisabled = disabled || isUploading || (!input.trim() && domSnippets.length === 0);
 
   // Reusable send button component
+  const sendLabel = t('common.send', { defaultValue: 'Send' });
+  const stopLabel = t('conversation.chat.stopGenerating', { defaultValue: 'Stop generating' });
+
   const sendButton = (
-    <Button
-      shape='circle'
-      type='primary'
-      disabled={isButtonDisabled}
-      className='send-button-custom'
-      icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
-      onClick={() => {
-        sendMessageHandler();
-      }}
-      data-testid='sendbox-send-btn'
-    />
+    <Tooltip content={sendLabel} mini>
+      <Button
+        shape='circle'
+        type='primary'
+        disabled={isButtonDisabled}
+        className='send-button-custom'
+        aria-label={sendLabel}
+        icon={<ArrowUp theme='filled' size='14' fill='white' strokeWidth={5} />}
+        onClick={() => {
+          sendMessageHandler();
+        }}
+        data-testid='sendbox-send-btn'
+      />
+    </Tooltip>
   );
 
   const stopButton = (
-    <Button
-      shape='circle'
-      type='secondary'
-      className='bg-animate sendbox-stop-button'
-      icon={<div className='mx-auto size-12px bg-6'></div>}
-      onClick={stopHandler}
-    ></Button>
+    <Tooltip content={stopLabel} mini>
+      <Button
+        shape='circle'
+        type='secondary'
+        className='bg-animate sendbox-stop-button'
+        aria-label={stopLabel}
+        // The glyph is a bare square div, so the button has no text to fall back on.
+        icon={<div className='mx-auto size-12px bg-6'></div>}
+        onClick={stopHandler}
+        data-testid='sendbox-stop-btn'
+      ></Button>
+    </Tooltip>
   );
 
   const renderActionButtons = () => {
@@ -1417,11 +1535,79 @@ const SendBox: React.FC<{
     return segments;
   }, [allAtFileQueries, input]);
 
+  const restorePendingPresentationSubmission = useCallback(async () => {
+    const pending = pendingPresentationSubmissionRef.current;
+    if (
+      pending?.progress.state !== 'preflight_failed' ||
+      latestInputRef.current.length !== 0 ||
+      isRestoringPresentationSubmissionRef.current
+    ) {
+      return;
+    }
+    const cleanup = managedPresentationSubmission?.onRestore;
+    if (cleanup !== undefined && cleanedPresentationSubmissionQueueItemIdRef.current !== pending.snapshot.queueItemId) {
+      isRestoringPresentationSubmissionRef.current = true;
+      setIsRestoringPresentationSubmission(true);
+      try {
+        await cleanup(pending.snapshot);
+        cleanedPresentationSubmissionQueueItemIdRef.current = pending.snapshot.queueItemId;
+      } catch {
+        isRestoringPresentationSubmissionRef.current = false;
+        setIsRestoringPresentationSubmission(false);
+        return;
+      }
+      isRestoringPresentationSubmissionRef.current = false;
+      setIsRestoringPresentationSubmission(false);
+    }
+    const current = pendingPresentationSubmissionRef.current;
+    if (current?.snapshot.queueItemId !== pending.snapshot.queueItemId || latestInputRef.current.length !== 0) return;
+    setInput(pending.snapshot.input);
+    commitPendingPresentationSubmission(null);
+  }, [commitPendingPresentationSubmission, latestInputRef, managedPresentationSubmission?.onRestore, setInput]);
+
+  const pendingPresentationCopy = (() => {
+    const state = pendingPresentationSubmission?.progress.state;
+    if (state === 'preflight_failed') {
+      return t('conversation.presentationSubmission.persistenceFailure');
+    }
+    if (state === 'dispatch_uncertain') {
+      return t('conversation.presentationSubmission.uncertainTracking');
+    }
+    if (state === 'queued' || state === 'bound') {
+      return t('conversation.presentationSubmission.queued');
+    }
+    return t('conversation.presentationSubmission.pending');
+  })();
+
   return (
     <div className={className}>
+      {pendingPresentationSubmission && (
+        <div
+          aria-live='polite'
+          className='mb-8px flex items-center justify-between gap-8px text-12px text-t-secondary'
+          data-testid='presentation-pending-submission'
+          role='status'
+        >
+          <span>{pendingPresentationCopy}</span>
+          {pendingPresentationSubmission.progress.state === 'preflight_failed' && (
+            <Button
+              disabled={input.length !== 0 || isRestoringPresentationSubmission}
+              onClick={() => void restorePendingPresentationSubmission()}
+              size='mini'
+              type='text'
+            >
+              {t('conversation.presentationSubmission.restore')}
+            </Button>
+          )}
+        </div>
+      )}
       <div
         ref={containerRef}
-        className={`sendbox-panel relative p-16px border-3 b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
+        // No border-colour utility here on purpose: the inline `borderColor` below is set in
+        // every state (from useInputFocusRing, or the drag highlight), so a class-level colour
+        // never paints. `border-3` used to sit here and read as if the edge were themed by
+        // --bg-3 — it was not, in either theme.
+        className={`sendbox-panel relative p-16px b bg-dialog-fill-0 b-solid rd-20px flex flex-col ${isOverlayOpen ? 'overflow-visible' : 'overflow-hidden'} ${isFileDragging ? 'b-dashed sendbox-panel--dragging' : ''}`}
         style={{
           transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
           ...(isFileDragging

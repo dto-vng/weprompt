@@ -15,7 +15,7 @@ import { OfficeArtifactError } from './officeCliJson';
 export type ResolvedOfficeArtifact = {
   workspace: string;
   filePath: string;
-  kind: 'word' | 'excel';
+  kind: 'word' | 'excel' | 'presentation';
 };
 
 export async function resolveOfficeArtifactPath(workspace: string, filePath: string): Promise<ResolvedOfficeArtifact> {
@@ -34,7 +34,9 @@ export async function resolveOfficeArtifactPath(workspace: string, filePath: str
   }
 
   const extension = extname(canonicalFile).toLowerCase();
-  if (extension !== '.docx' && extension !== '.xlsx') throw new OfficeArtifactError('UNSUPPORTED_FILE_TYPE');
+  if (extension !== '.docx' && extension !== '.xlsx' && extension !== '.pptx') {
+    throw new OfficeArtifactError('UNSUPPORTED_FILE_TYPE');
+  }
 
   try {
     if (!(await stat(canonicalFile)).isFile()) throw new OfficeArtifactError('UNSUPPORTED_CONTENT');
@@ -46,7 +48,7 @@ export async function resolveOfficeArtifactPath(workspace: string, filePath: str
   return {
     workspace: canonicalWorkspace,
     filePath: canonicalFile,
-    kind: extension === '.docx' ? 'word' : 'excel',
+    kind: extension === '.docx' ? 'word' : extension === '.xlsx' ? 'excel' : 'presentation',
   };
 }
 

@@ -6,7 +6,9 @@
 
 import type { IMessageAcpPermission } from '@/common/chat/chatLib';
 import { conversation } from '@/common/adapter/ipcBridge';
-import { Button, Card, Typography } from '@arco-design/web-react';
+import { iconColors } from '@/renderer/styles/colors';
+import { Button, Card, Message, Typography } from '@arco-design/web-react';
+import { Bookmark, CheckOne, Earth, Edit, Lightning, Lock } from '@icon-park/react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,6 +17,8 @@ const { Text } = Typography;
 interface MessageAcpPermissionProps {
   message: IMessageAcpPermission;
 }
+
+const ICON_SIZE = '18';
 
 const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ message }) => {
   const { options = [], tool_call } = message.content || {};
@@ -26,33 +30,55 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
       return {
         title: t('messages.permissionRequest'),
         description: t('messages.agentRequestingPermission'),
-        icon: '🔐',
+        icon: (
+          <Lock
+            theme='outline'
+            size={ICON_SIZE}
+            fill={iconColors.secondary}
+            data-testid='acp-permission-icon-generic'
+          />
+        ),
       };
     }
 
     const displayTitle = tool_call.title || tool_call.raw_input?.description || t('messages.permissionRequest');
 
     // 简单的图标映射
-    const kindIcons: Record<string, string> = {
-      edit: '✏️',
-      read: '📖',
-      fetch: '🌐',
-      execute: '⚡',
+    const kindIcons: Record<string, React.ReactNode> = {
+      edit: (
+        <Edit theme='outline' size={ICON_SIZE} fill={iconColors.secondary} data-testid='acp-permission-icon-edit' />
+      ),
+      read: (
+        <Bookmark theme='outline' size={ICON_SIZE} fill={iconColors.secondary} data-testid='acp-permission-icon-read' />
+      ),
+      fetch: (
+        <Earth theme='outline' size={ICON_SIZE} fill={iconColors.secondary} data-testid='acp-permission-icon-fetch' />
+      ),
+      execute: (
+        <Lightning
+          theme='outline'
+          size={ICON_SIZE}
+          fill={iconColors.secondary}
+          data-testid='acp-permission-icon-execute'
+        />
+      ),
     };
 
     return {
       title: displayTitle,
-      icon: kindIcons[tool_call.kind || 'execute'] || '⚡',
+      icon: kindIcons[tool_call.kind || 'execute'] || kindIcons.execute,
     };
   };
   const { title, icon } = getToolInfo();
-  const [isResponding, setIsResponding] = useState(false);
+  // Which option is in flight, rather than a bare boolean: the pressed button gets Arco's
+  // spinner while its siblings only grey out, so a slow confirm shows WHICH answer is pending.
+  const [pendingOptionId, setPendingOptionId] = useState<string | null>(null);
   const [hasResponded, setHasResponded] = useState(false);
 
   const handleConfirm = async (selected: string) => {
-    if (hasResponded || isResponding) return;
+    if (hasResponded || pendingOptionId !== null) return;
 
-    setIsResponding(true);
+    setPendingOptionId(selected);
     try {
       const invokeData = {
         confirm_key: selected,
@@ -64,10 +90,12 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
       await conversation.confirmMessage.invoke(invokeData);
       setHasResponded(true);
     } catch (error) {
-      // Handle error case - could add error logging here
+      // Without a toast the card silently snapped back to un-answered while the agent stayed
+      // blocked forever, so surface it and leave the options clickable for a retry.
+      Message.error(t('messages.permissionResponseFailed'));
       console.error('Error confirming permission:', error);
     } finally {
-      setIsResponding(false);
+      setPendingOptionId(null);
     }
   };
 
@@ -85,7 +113,7 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
       <div className='space-y-4'>
         {/* Header with icon and title */}
         <div className='flex items-center space-x-2'>
-          <span className='text-2xl'>{icon}</span>
+          <span className='flex-shrink-0 flex items-center'>{icon}</span>
           <Text className='block'>{title}</Text>
         </div>
         {!hasResponded && (
@@ -102,7 +130,8 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
                       key={option_id}
                       type={isDeny ? 'secondary' : 'primary'}
                       size='small'
-                      disabled={isResponding}
+                      disabled={pendingOptionId !== null && pendingOptionId !== option_id}
+                      loading={pendingOptionId === option_id}
                       onClick={() => void handleConfirm(option_id)}
                       data-testid={`message-acp-permission-option-${option_id}`}
                     >
@@ -122,8 +151,14 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
             className='mt-10px p-2 rounded-md border'
             style={{ backgroundColor: 'var(--color-success-light-1)', borderColor: 'rgb(var(--success-3))' }}
           >
-            <Text className='text-sm' style={{ color: 'rgb(var(--success-6))' }}>
-              ✓ {t('messages.responseSentSuccessfully')}
+            <Text className='text-sm inline-flex items-center gap-6px' style={{ color: 'rgb(var(--success-6))' }}>
+              <CheckOne
+                theme='filled'
+                size='14'
+                fill={iconColors.success}
+                data-testid='acp-permission-icon-responded'
+              />
+              {t('messages.responseSentSuccessfully')}
             </Text>
           </div>
         )}

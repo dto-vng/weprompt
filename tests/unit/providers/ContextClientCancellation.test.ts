@@ -1,6 +1,6 @@
 import { AnthropicRotatingClient } from '@/common/api/AnthropicRotatingClient';
 import { GeminiRotatingClient } from '@/common/api/GeminiRotatingClient';
-import { AuthType } from '@office-ai/aioncli-core';
+import { AuthType } from '@/common/types/provider/authType';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({

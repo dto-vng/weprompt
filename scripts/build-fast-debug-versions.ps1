@@ -6,22 +6,29 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Resolve-SentryDsn {
-  if ($env:SENTRY_DSN) {
-    Write-Host 'Using SENTRY_DSN from the current environment.'
-    return $env:SENTRY_DSN.Trim()
+$InternalReleaseForbiddenVariables = @(
+  'WEPROMPT_UPDATE_BASE_URL',
+  'SENTRY_DSN',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_UPLOAD_SOURCE_MAPS',
+  'SENTRY_ORG',
+  'SENTRY_PROJECT',
+  'SENTRY_RELEASE'
+)
+
+function Assert-InternalReleaseEnvironment {
+  if (-not [string]::IsNullOrWhiteSpace($SentryDsnFile)) {
+    throw 'SentryDsnFile is not supported for internal WePrompt builds.'
   }
 
-  if ($SentryDsnFile) {
-    if (-not (Test-Path -LiteralPath $SentryDsnFile)) {
-      throw "SENTRY_DSN file not found: $SentryDsnFile"
+  foreach ($Name in $InternalReleaseForbiddenVariables) {
+    $Value = [Environment]::GetEnvironmentVariable($Name, 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($Value)) {
+      throw "$Name must be unset for internal WePrompt builds."
     }
-    Write-Host "Using SENTRY_DSN from file: $SentryDsnFile"
-    return (Get-Content -LiteralPath $SentryDsnFile -Raw).Trim()
   }
 
-  Write-Warning 'SENTRY_DSN is not set. Building without installer/app Sentry reporting.'
-  return ''
+  $env:WEPROMPT_INTERNAL_RELEASE = '1'
 }
 
 function Get-PackageVersion([string]$RepoRoot) {
@@ -34,7 +41,7 @@ function Get-PackageVersion([string]$RepoRoot) {
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$env:SENTRY_DSN = Resolve-SentryDsn
+Assert-InternalReleaseEnvironment
 $env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '1'
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 $buildVersions = @($Versions | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -53,8 +60,8 @@ foreach ($version in $buildVersions) {
       throw "build $version failed with exit code $LASTEXITCODE"
     }
 
-    $source = Join-Path $repoRoot "out\AionUi-$version-win-x64.exe"
-    $target = Join-Path $OutputDir "AionUi-$version-win-x64.exe"
+    $source = Join-Path $repoRoot "out\WePrompt-$version-win-x64.exe"
+    $target = Join-Path $OutputDir "WePrompt-$version-win-x64.exe"
     if (-not (Test-Path -LiteralPath $source)) {
       throw "Expected artifact was not produced: $source"
     }

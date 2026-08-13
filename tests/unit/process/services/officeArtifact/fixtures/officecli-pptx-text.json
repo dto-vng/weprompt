@@ -1,0 +1,116 @@
+{
+  "success": true,
+  "data": {
+    "totalSlides": 8,
+    "slides": [
+      {
+        "index": 1,
+        "path": "/slide[1]",
+        "texts": [
+          "Q3",
+          "QUARTERLY BUSINESS REVIEW",
+          "Q3 FY26 Business Review",
+          "Acme Corp — Jordan Lee, CFO — 14 October FY26",
+          "Confidential — prepared for the board"
+        ]
+      },
+      {
+        "index": 2,
+        "path": "/slide[2]",
+        "texts": [
+          "Executive Summary",
+          "1",
+          "Revenue beat plan by 18%",
+          "Enterprise renewals and the EMEA launch drove the beat; NRR held at 118%.",
+          "2",
+          "Margin expanded 1.9pp",
+          "Support automation and infra renegotiation offset the FX headwind.",
+          "3",
+          "Two decisions requested today",
+          "Approve the EMEA headcount plan and the FY27 pricing change (slide 7).",
+          "QUARTER IN ONE NUMBER",
+          "+18%",
+          "Revenue vs plan",
+          "Third consecutive quarter above plan; guidance raised for Q4."
+        ]
+      },
+      {
+        "index": 3,
+        "path": "/slide[3]",
+        "texts": [
+          "KPI Scorecard",
+          "$84.2",
+          "Revenue, $M",
+          "+18% vs plan",
+          "62.4%",
+          "Gross margin",
+          "+1.9pp QoQ",
+          "118%",
+          "Net revenue retention",
+          "+3pp YoY",
+          "4.2",
+          "CAC payback, years",
+          "-0.3 vs Q2",
+          "Every metric carries a period-over-period delta — replace all four cards with this quarter’s headline numbers."
+        ]
+      },
+      {
+        "index": 4,
+        "path": "/slide[4]",
+        "texts": [
+          "Revenue vs Plan",
+          "Key insight",
+          "EMEA contributed 12pp of the 18pp beat. The gap to plan widened every month of the quarter."
+        ]
+      },
+      {
+        "index": 5,
+        "path": "/slide[5]",
+        "texts": [
+          "Segment Results",
+          "Enterprise — $38M, +24%",
+          "Driver: multi-year renewals. Action: extend the renewal playbook to mid-market.",
+          "Mid-market — $29M, +11%",
+          "Driver: pricing change. Action: hold discounting at the 8% ceiling.",
+          "SMB — $17M, +4%",
+          "Driver: self-serve funnel. Action: decision on paid acquisition in Q4."
+        ]
+      },
+      {
+        "index": 6,
+        "path": "/slide[6]",
+        "texts": ["02", "SECTION 02", "Priorities & Outlook"]
+      },
+      {
+        "index": 7,
+        "path": "/slide[7]",
+        "texts": [
+          "Priorities & Decisions",
+          "1",
+          "Approve EMEA headcount plan",
+          "12 quota-carrying hires in H1; payback modeled at 14 months.",
+          "J. LEE · 30 NOV",
+          "2",
+          "FY27 pricing change",
+          "Move the SMB tier to usage-based pricing; grandfather current contracts.",
+          "A. KIM · 15 DEC",
+          "3",
+          "Support automation phase 2",
+          "Extends the margin gain by an estimated 0.8pp in FY27.",
+          "R. SHAH · 31 JAN"
+        ]
+      },
+      {
+        "index": 8,
+        "path": "/slide[8]",
+        "texts": [
+          "Outlook & Next Steps",
+          "Q4 guidance raised to $88-90M on EMEA momentum.",
+          "Watch item: CAC payback trend in SMB — review at the January board.",
+          "Decisions logged today circulate within 48 hours with owners and dates.",
+          "Prepared by Finance — data as of 30 September"
+        ]
+      }
+    ]
+  }
+}

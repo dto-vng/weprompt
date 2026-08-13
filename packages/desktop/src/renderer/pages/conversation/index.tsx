@@ -63,7 +63,11 @@ const ChatConversationIndex: React.FC = () => {
     navigate('/', { replace: true });
   }, [id, isLoading, data, navigate, t]);
 
-  if (isLoading) return <Spin loading></Spin>;
+  // Unwrapped, this painted a small spinner in the top-left of the content area and read as a
+  // broken layout. Deliberately a neutral spinner rather than the message-shaped skeleton: this
+  // phase is fetching the conversation *record*, and it can resolve into not-found → toast →
+  // redirect home (above), so a fake conversation would be shown and then yanked.
+  if (isLoading) return <Spin loading className='flex flex-1 items-center justify-center h-full' />;
   return <ChatConversation conversation={data ?? undefined}></ChatConversation>;
 };
 

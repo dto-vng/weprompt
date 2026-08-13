@@ -10,10 +10,17 @@ import React from 'react';
 import GuidActionRow from '@/renderer/pages/guid/components/GuidActionRow';
 import type { IMcpServer } from '@/common/config/storage';
 
+const { MockIcon, isElectronDesktopMock, isMobileMock, showOpenInvokeMock } = vi.hoisted(() => ({
+  MockIcon: () => null,
+  isElectronDesktopMock: vi.fn(() => true),
+  isMobileMock: vi.fn(() => false),
+  showOpenInvokeMock: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('@/common', () => ({
   ipcBridge: {
     dialog: {
-      showOpen: { invoke: vi.fn().mockResolvedValue([]) },
+      showOpen: { invoke: showOpenInvokeMock },
     },
   },
 }));
@@ -25,7 +32,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
-  useLayoutContext: () => ({ isMobile: false }),
+  useLayoutContext: () => ({ isMobile: isMobileMock() }),
 }));
 
 vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
@@ -33,7 +40,17 @@ vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
 }));
 
 vi.mock('@/renderer/components/chat/MobileActionSheet', () => ({
-  default: () => null,
+  default: ({ entries }: { entries: Array<{ key: string; label: string; onClick?: () => void }> }) => (
+    <div>
+      {entries
+        .filter((entry) => entry.key === 'attach')
+        .map((entry) => (
+          <button key={entry.key} type='button' data-testid='mobile-attach-action' onClick={entry.onClick}>
+            {entry.label}
+          </button>
+        ))}
+    </div>
+  ),
 }));
 
 vi.mock('@/renderer/services/FileService', () => ({
@@ -42,27 +59,46 @@ vi.mock('@/renderer/services/FileService', () => ({
 }));
 
 vi.mock('@/renderer/utils/platform', () => ({
-  isElectronDesktop: () => true,
+  isElectronDesktop: () => isElectronDesktopMock(),
 }));
 
 vi.mock('@icon-park/react', () => {
-  const Icon = () => <span aria-hidden='true' />;
   return {
-    ArrowUp: Icon,
-    Brain: Icon,
-    FolderUpload: Icon,
-    Lightning: Icon,
-    Plus: Icon,
-    Search: Icon,
-    Shield: Icon,
-    UploadOne: Icon,
+    ArrowUp: MockIcon,
+    Brain: MockIcon,
+    FolderUpload: MockIcon,
+    Lightning: MockIcon,
+    Plus: MockIcon,
+    Search: MockIcon,
+    Shield: MockIcon,
+    UploadOne: MockIcon,
   };
 });
 
 vi.mock('@arco-design/web-react', () => {
   const Menu = Object.assign(
-    ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-      <div data-testid='dropdown-menu' className={className}>
+    ({
+      children,
+      className,
+      onClickMenuItem,
+    }: {
+      children?: React.ReactNode;
+      className?: string;
+      onClickMenuItem?: (key: string) => void;
+    }) => (
+      <div
+        data-testid='dropdown-menu'
+        className={className}
+        onClick={(event) => {
+          const menuItem = (event.target as HTMLElement).closest('[role="menuitem"]');
+          if (menuItem?.textContent?.includes('common.fileAttach.addFiles')) {
+            onClickMenuItem?.('file');
+          }
+          if (menuItem?.textContent?.includes('common.fileAttach.myDevice')) {
+            onClickMenuItem?.('device');
+          }
+        }}
+      >
         {children}
       </div>
     ),
@@ -169,6 +205,9 @@ const renderActionRow = (overrides: Partial<React.ComponentProps<typeof GuidActi
 describe('GuidActionRow skill/MCP submenu search', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isElectronDesktopMock.mockReturnValue(true);
+    isMobileMock.mockReturnValue(false);
+    showOpenInvokeMock.mockResolvedValue([]);
   });
 
   it('shows both search boxes when skills and MCP servers exceed the threshold', () => {
@@ -233,5 +272,74 @@ describe('GuidActionRow skill/MCP submenu search', () => {
     fireEvent.click(screen.getByText('skill-3').closest('[role="menuitem"]')!);
 
     expect(onToggleSkill).toHaveBeenCalledWith('skill-3', false);
+  });
+
+  it('routes the desktop attach action through the managed picker when provided', () => {
+    const onManagedFilePicker = vi.fn();
+    renderActionRow({ onManagedFilePicker });
+
+    fireEvent.click(screen.getByText('common.fileAttach.addFiles').closest('[role="menuitem"]')!);
+
+    expect(onManagedFilePicker).toHaveBeenCalledTimes(1);
+    expect(showOpenInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('routes the mobile Electron attach action through the managed picker when provided', () => {
+    isMobileMock.mockReturnValue(true);
+    const onManagedFilePicker = vi.fn();
+    renderActionRow({ onManagedFilePicker });
+
+    fireEvent.click(screen.getByTestId('mobile-attach-action'));
+
+    expect(onManagedFilePicker).toHaveBeenCalledTimes(1);
+    expect(showOpenInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the mobile WebUI attach action on the hidden browser input', () => {
+    isMobileMock.mockReturnValue(true);
+    isElectronDesktopMock.mockReturnValue(false);
+    const inputClickSpy = vi.spyOn(HTMLInputElement.prototype, 'click');
+    const onManagedFilePicker = vi.fn();
+    renderActionRow({ onManagedFilePicker });
+
+    fireEvent.click(screen.getByTestId('mobile-attach-action'));
+
+    expect(inputClickSpy).toHaveBeenCalledTimes(1);
+    expect(onManagedFilePicker).not.toHaveBeenCalled();
+    expect(showOpenInvokeMock).not.toHaveBeenCalled();
+    inputClickSpy.mockRestore();
+  });
+
+  it('keeps the legacy desktop dialog when no managed picker is provided', () => {
+    renderActionRow();
+
+    fireEvent.click(screen.getByText('common.fileAttach.addFiles').closest('[role="menuitem"]')!);
+
+    expect(showOpenInvokeMock).toHaveBeenCalledWith({ properties: ['openFile', 'multiSelections'] });
+  });
+
+  it('does not replace the WebUI attach path with the desktop managed picker', () => {
+    isElectronDesktopMock.mockReturnValue(false);
+    const onManagedFilePicker = vi.fn();
+    renderActionRow({ onManagedFilePicker });
+
+    fireEvent.click(screen.getByText('common.fileAttach.addFiles').closest('[role="menuitem"]')!);
+
+    expect(onManagedFilePicker).not.toHaveBeenCalled();
+    expect(showOpenInvokeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks managed source selection and duplicate send while the durable Guid handoff is pending', () => {
+    const onManagedFilePicker = vi.fn();
+    const onSend = vi.fn();
+    renderActionRow({ onManagedFilePicker, onSend, managedPresentationPending: true });
+
+    fireEvent.click(screen.getByText('common.fileAttach.addFiles').closest('[role="menuitem"]')!);
+    fireEvent.click(screen.getByTestId('guid-send-btn'));
+
+    expect(onManagedFilePicker).not.toHaveBeenCalled();
+    expect(showOpenInvokeMock).not.toHaveBeenCalled();
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByTestId('guid-send-btn')).toBeDisabled();
   });
 });

@@ -4,7 +4,7 @@ executableName: WePrompt
 copyright: Copyright © 2026 VNG Corporation
 
 protocols:
-  - name: Forge Protocol
+  - name: WePrompt Protocol
     schemes:
       - aionui
 
@@ -114,8 +114,11 @@ extraResources:
     to: bundled-aioncore
   - from: resources/hub
     to: hub
-  # built-in presentation template reference decks
-  - from: resources/presentation-templates
+  # built-in presentation template reference decks. Source lives under the
+  # desktop package (where the reference-deck generators write and dev resolves
+  # it), NOT the repo-root resources/ dir the other extraResources use — so this
+  # entry must be package-qualified or electron-builder finds nothing (WP #24093).
+  - from: packages/desktop/resources/presentation-templates
     to: presentation-templates
   # vendored MCP bridge (mcp-remote) so OAuth MCP servers need no npx/PATH lookup
   - from: resources/mcp-bundled
@@ -183,9 +186,9 @@ linux:
   description: ${description}
   desktop:
     entry:
-      Name: Forge
+      Name: WePrompt
       Comment: ${description}
-      Icon: Forge
+      Icon: WePrompt
       Categories: Office;Utility;
       MimeType: x-scheme-handler/aionui;
 
@@ -222,10 +225,3 @@ compression: normal
 removePackageScripts: true
 electronDownload:
   cache: ${env.ELECTRON_CACHE}
-
-publish:
-  provider: github
-  owner: iOfficeAI
-  repo: AionUi
-  publishAutoUpdate: true
-  releaseType: release

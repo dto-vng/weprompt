@@ -255,6 +255,19 @@ const createInitStyle = (
     padding: 0.5em 0;
   }
 
+  /* Focus ring for CodeBlock's copy / collapse / view-more controls.
+   *
+   * The colour is a literal on purpose. UnoCSS output never crosses the shadow boundary, so a
+   * utility class is not an option, and \`--primary-6\` cannot be forwarded through the cssVars
+   * map below either: it is defined on <body> by Arco, not on <html>, which is what
+   * updateStyles reads. A theme-derived neutral is the same approach the scrollbar rules above
+   * already take in this stylesheet. */
+  .markdown-code-control:focus-visible {
+    outline: 2px solid ${currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.55)'};
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   .loading {
     animation: loading 1s linear infinite;
   }

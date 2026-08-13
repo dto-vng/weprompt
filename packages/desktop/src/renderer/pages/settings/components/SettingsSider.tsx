@@ -9,13 +9,13 @@ import {
   Communication,
   Computer,
   Earth,
-  Info,
   Lightning,
   LinkCloud,
   Puzzle,
   Speed,
   System,
   Toolkit,
+  User,
 } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useMemo } from 'react';
@@ -26,6 +26,7 @@ import { getSiderTooltipProps } from '@/renderer/utils/ui/siderTooltip';
 
 /** Builtin settings tab IDs in display order (must match router paths). */
 export const BUILTIN_TAB_IDS = [
+  'profile',
   'agent',
   'model',
   'skills',
@@ -34,7 +35,6 @@ export const BUILTIN_TAB_IDS = [
   'webui',
   'pet',
   'system',
-  'about',
 ] as const;
 
 /**
@@ -54,9 +54,9 @@ export const LEGACY_ANCHOR_REMAP: Record<string, string> = {
  * Extension tabs anchored between these builtins inherit the enclosing group visually.
  */
 const GROUP_HEADER_BEFORE: Record<string, string> = {
+  profile: 'settings.groupProfile',
   agent: 'settings.groupAiCore',
   appearance: 'settings.groupApp',
-  about: 'settings.groupAbout',
 };
 
 type SiderItem = {
@@ -83,6 +83,7 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
   const { menus, groupHeaderAt } = useMemo(() => {
     // Build builtin items
     const builtinMap: Record<string, SiderItem> = {
+      profile: { id: 'profile', label: t('settings.profile'), icon: <User />, path: 'profile' },
       model: { id: 'model', label: t('settings.model'), icon: <LinkCloud />, path: 'model' },
       agent: {
         id: 'agent',
@@ -111,7 +112,6 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
       },
       pet: { id: 'pet', label: t('pet.desktopPet'), icon: <Cat />, path: 'pet' },
       system: { id: 'system', label: t('settings.system'), icon: <System />, path: 'system' },
-      about: { id: 'about', label: t('settings.about'), icon: <Info />, path: 'about' },
     };
 
     // Start with ordered builtin IDs, hiding desktop-only tabs in browser mode
@@ -217,6 +217,7 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
               <div
                 data-settings-id={item.id}
                 data-settings-path={item.path}
+                aria-current={isSelected ? 'page' : undefined}
                 className={classNames(
                   'settings-sider__item h-34px rd-8px flex items-center gap-8px group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-2px transition-colors',
                   collapsed ? 'w-full justify-center px-0' : 'justify-start px-10px',

@@ -1,5 +1,6 @@
 {
   "sider": {
+    "empty": "Henüz ekip yok",
     "title": "Teams",
     "createTeam": "New Team",
     "pin": "Sabitle",

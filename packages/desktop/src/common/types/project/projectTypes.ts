@@ -11,11 +11,13 @@ export type ForgeProject = {
   created_at: number;
   updated_at: number;
   last_opened_at?: number;
+  instructions?: string;
 };
 
 export type CreateForgeProjectInput = {
   name: string;
   workspace: string;
+  instructions?: string;
 };
 
 export type UpdateForgeProjectInput = {
@@ -23,6 +25,7 @@ export type UpdateForgeProjectInput = {
   name?: string;
   workspace?: string;
   last_opened_at?: number;
+  instructions?: string;
 };
 
 export type ProjectConversationExtra = {

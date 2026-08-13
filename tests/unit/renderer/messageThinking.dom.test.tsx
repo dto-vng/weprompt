@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IMessageThinking } from '@/common/chat/chatLib';
 import MessageThinking from '@/renderer/pages/conversation/Messages/components/MessageThinking';
@@ -54,5 +54,23 @@ describe('MessageThinking', () => {
     render(<MessageThinking message={createThinkingMessage(createdAt)} />);
 
     expect(screen.getByText('Thinking... · 7s')).toBeInTheDocument();
+  });
+
+  it('exposes the summary row as a keyboard-operable button', () => {
+    vi.setSystemTime(new Date('2026-05-26T09:00:10.000Z'));
+    render(<MessageThinking message={createThinkingMessage(Date.now())} />);
+
+    const header = screen.getByRole('button', { expanded: true });
+    expect(header).toHaveAttribute('tabindex', '0');
+    // aria-controls must point at the body, which keeps `ref` for the streaming auto-scroll.
+    const bodyId = header.getAttribute('aria-controls');
+    expect(bodyId).toBeTruthy();
+    expect(document.getElementById(bodyId!)).toBeTruthy();
+
+    fireEvent.keyDown(header, { key: 'Enter' });
+    expect(screen.getByRole('button', { expanded: false })).toBe(header);
+
+    fireEvent.keyDown(header, { key: ' ' });
+    expect(screen.getByRole('button', { expanded: true })).toBe(header);
   });
 });

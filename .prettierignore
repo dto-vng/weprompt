@@ -1,1 +1,6 @@
 mobile/
+
+# Dashboard template artifacts embed FACTS as strict JSON, which the pack reader
+# extracts with JSON.parse. Formatting unquotes the object keys and breaks that
+# contract, so these ship exactly as authored.
+packages/desktop/src/process/resources/dashboard-templates/**/template.html

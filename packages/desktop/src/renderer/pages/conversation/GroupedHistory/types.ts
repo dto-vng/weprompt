@@ -6,6 +6,7 @@
 
 import type { TChatConversation } from '@/common/config/storage';
 import type { ReactNode } from 'react';
+import type { TConversationCompletionRecord } from './utils/conversationStatus';
 
 export type WorkspaceGroup = {
   workspace: string;
@@ -46,7 +47,9 @@ export type ExportTask =
 export type ConversationRowProps = {
   conversation: TChatConversation;
   isGenerating: boolean;
-  recentCompletionAt?: number;
+  completion?: TConversationCompletionRecord;
+  recentFailureAt?: number;
+  recentStoppedAt?: number;
   collapsed: boolean;
   tooltipEnabled: boolean;
   batchMode: boolean;

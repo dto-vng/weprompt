@@ -25,8 +25,10 @@ const { verifyBundledAioncoreResources } = require('./verify-bundled-aioncore-re
 const aioncoreChecksums = require('./aioncore-checksums');
 const aioncoreTrust = require('./aioncore-trust');
 
-const GITHUB_OWNER = 'iOfficeAI';
-const GITHUB_REPO = 'AionCore';
+// Security-patched fork (D-01 loopback token, MCP OAuth discovery/DCR fix).
+// The upstream iOfficeAI/AionCore is unpatched; the desktop app ships the fork.
+const GITHUB_OWNER = 'khoapnt-vng';
+const GITHUB_REPO = 'aioncore';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
 // artifacts (see aioncore-trust.js). Overridable via env for other mirrors.
@@ -102,7 +104,7 @@ function copyFileSafe(sourcePath, targetPath) {
 
 function copyDirectorySafe(sourcePath, targetPath) {
   ensureDirectory(path.dirname(targetPath));
-  fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+  fs.cpSync(sourcePath, targetPath, { recursive: true, force: true, verbatimSymlinks: true });
 }
 
 function ensureExecutableMode(filePath) {
@@ -130,6 +132,76 @@ function assertHttpsUrl(url) {
 
 function getBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+}
+
+// ---------------------------------------------------------------------------
+// OfficeCli bundling
+// ---------------------------------------------------------------------------
+// officecli (iOfficeAI/OfficeCli) is a separate CLI the office document
+// features shell out to. Upstream installs it lazily at runtime from
+// d.officecli.ai, which fails on machines that block that download. We bundle
+// it into managed-resources so aioncore resolves it from
+// <managed-resources>/office/officecli[.exe] offline.
+const OFFICECLI_VERSION = 'v1.0.143';
+// Pinned SHA-256 digests — verified before the binary is bundled and executed
+// (same trust model as aioncore-checksums.js). Source: the release's
+// SHA256SUMS at
+// https://github.com/iOfficeAI/OfficeCli/releases/download/v1.0.143/SHA256SUMS
+const OFFICECLI_CHECKSUMS = {
+  'v1.0.143': {
+    'officecli-win-x64.exe': 'd4d4c10fced307e209744cf98a56b003a6e613424fd651b08469274704afd2c6',
+    'officecli-win-arm64.exe': '51baf511fe136ee216fcc13cf0da9d18078da42212b22805c3a81f4163a4d7b9',
+    'officecli-mac-arm64': '2f158d46f9b6c5eb0dfe4eb02038114001e17acc47b67347417c56dcf9659096',
+    'officecli-mac-x64': '693d243db616c74705fec9d92fdfc8a3db36acfcea378edb7264c2a30d339d9c',
+    'officecli-linux-x64': '6a29c598a789b57c92c03e560907d3f131a4bd0a068785b1d338a86fc31a58a7',
+    'officecli-linux-arm64': 'c50298e4698fcd1b15fe1a0f096405ad260b5c84d4440882582d0bba1e57bd49',
+  },
+};
+
+/**
+ * Map internal platform/arch to the OfficeCli release asset name.
+ * OfficeCli uses win/mac/linux (not aioncore's pc-windows-msvc/...) and only
+ * appends `.exe` on Windows.
+ * @param {string} platform - 'win32' | 'darwin' | 'linux'
+ * @param {string} arch - 'x64' | 'arm64'
+ * @returns {string}
+ */
+function officecliAssetName(platform, arch) {
+  const os = platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : 'linux';
+  const ext = platform === 'win32' ? '.exe' : '';
+  return `officecli-${os}-${arch}${ext}`;
+}
+
+/**
+ * Download officecli into `<managed-resources>/office` and verify its pinned
+ * digest before bundling. Fail-closed: an unknown asset or a digest mismatch
+ * aborts the build (never bundle an unverified binary that will be executed).
+ * @param {string} bundledManagedResourcesDir
+ * @param {string} platform
+ * @param {string} arch
+ */
+function prepareBundledOfficecli(bundledManagedResourcesDir, platform, arch) {
+  const assetName = officecliAssetName(platform, arch);
+  const pinned = (OFFICECLI_CHECKSUMS[OFFICECLI_VERSION] || {})[assetName];
+  if (!pinned) {
+    throw makeIntegrityError(`No pinned OfficeCli digest for ${assetName} @ ${OFFICECLI_VERSION}; refusing to bundle.`);
+  }
+
+  const officeDir = path.join(bundledManagedResourcesDir, 'office');
+  ensureDirectory(officeDir);
+  const targetPath = path.join(officeDir, platform === 'win32' ? 'officecli.exe' : 'officecli');
+  const url = `https://github.com/iOfficeAI/OfficeCli/releases/download/${OFFICECLI_VERSION}/${assetName}`;
+
+  downloadFile(url, targetPath);
+
+  const actual = computeSha256(targetPath);
+  if (actual !== pinned) {
+    fs.rmSync(targetPath, { force: true });
+    throw makeIntegrityError(`OfficeCli digest mismatch for ${assetName}: expected ${pinned}, got ${actual}`);
+  }
+
+  ensureExecutableMode(targetPath);
+  console.log(`  Bundled officecli ${OFFICECLI_VERSION} (${assetName}) -> ${targetPath}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -956,6 +1028,10 @@ function prepareAioncore(options) {
 
     writeJson(path.join(targetDir, 'manifest.json'), manifest);
     verifyPreparedAioncoreBundle(projectRoot, platform, arch);
+    // Bundle officecli into the verified managed-resources tree so the office
+    // features work offline (no runtime PowerShell/curl install). Runs after the
+    // contract verify so we only ever add it to a known-good bundle.
+    prepareBundledOfficecli(bundledManagedResourcesDir, platform, arch);
     console.log(
       `  Bundled aioncore prepared: resources/bundled-aioncore/${runtimeKey}/${binaryName} [source=${sourceType}]`
     );
@@ -972,6 +1048,7 @@ module.exports = {
   assertHttpsUrl,
   computeSha256,
   cosign,
+  officecliAssetName,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
   getAioncoreSource,

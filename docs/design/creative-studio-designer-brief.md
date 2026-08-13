@@ -1,0 +1,221 @@
+# Designer Brief — Creative Studio: models panel, prototype drift, divergence UX
+
+**Date:** 2026-08-06 · **Author:** engineering
+**Prototype referenced:** `Creative Studio - Prototype with project list.html`
+**Related:** [fidelity pass 3 prep](creative-studio-fidelity-pass3-prep.md), [cut model design](creative-studio-cut-model-design.md)
+
+---
+
+## 0. What we need from you
+
+Three asks, in descending urgency. They are independent — take them in any order, or decline any one.
+
+| #     | Ask                                                                   | Size                           | Blocking                         |
+| ----- | --------------------------------------------------------------------- | ------------------------------ | -------------------------------- |
+| **A** | One interaction decision on the Produce **Project models** panel (§3) | Small — one state to resolve   | Blocks UI fidelity pass 3        |
+| **B** | Confirm which prototype screens are still current (§4)                | Small — a checklist reply      | Blocks nothing, prevents waste   |
+| **C** | **Divergence UX** for the cut editor (§5)                             | Real design work — new surface | Blocks cut-editor implementation |
+
+We are **not** asking for a redraw of Produce. The framing is settled (§3.1); one state inside it is not.
+
+---
+
+## 1. TL;DR
+
+Produce has moved on since the prototype was drawn. It gained automatic route selection, an unconfigured "connect an engine" state, and honest per-model capability limits — none of which existed in the drawing. We want to adopt the prototype's **collapsible, inspectable "Project models" panel**, but _not_ its inline model-cycling control, because cycling a model the app just chose for you is a confusing affordance.
+
+That leaves exactly one state undesigned, and it turns out to be a real bug rather than a cosmetic gap: **partial readiness** — some model roles configured, others not. Today that renders a surface where certain shots silently have no action at all.
+
+---
+
+## 2. Context: what changed since the prototype
+
+Three capabilities landed after the prototype was drawn.
+
+**Automatic route selection.** Opening a project with no image model configured now selects one automatically, if the choice is unambiguous. Verified live: it selected `gemini-3-pro-image` on its own. The user did not pick it.
+
+**An unconfigured state.** `ConnectEngineCard` — a full-surface takeover offering _Open Model Settings_ and _Ask a teammate_ (which copies a message to the clipboard). The prototype had no such state; it assumed models were always configured.
+
+**Per-model capability limits.** The engine bar states real constraints — `up to 15s`, `up to 60s` — read from the model catalog. The prototype's buttons showed a model name only.
+
+### What Produce looks like today
+
+A single static strip above the shot grid:
+
+> `RENDERING WITH` — `bytedance/seedance-2.0-fast · Video · up to 15s` · `google/gemini-3-pro-image · Image · up to 60s` **[Change engines]**
+
+Read-only, always expanded, one line, with a text button into Model Settings.
+
+### What the prototype has instead
+
+A **collapsible panel**, collapsed by default:
+
+- Header is a button with `aria-expanded`: a `PROJECT MODELS` mono eyebrow, a truncating summary line, and a chevron.
+- A sibling **`Open Model Settings`** action in rust.
+- Expanded: a **three-column grid, one column per model role**, each with a role label above a button carrying a status dot, the current value, and a `▾` — cycling that role **inline**.
+
+Measured type/colour specs are in the [pass 3 prep doc](creative-studio-fidelity-pass3-prep.md) §2 — please don't re-derive them.
+
+---
+
+## 3. Ask A — the Project models panel
+
+### 3.1 Already decided — please don't redesign these
+
+- **Adopt the collapsible framing.** Collapsed by default, expandable to a per-role view. Better than a permanent one-line strip.
+- **Drop the inline cycling.** Model Settings stays the single place selection changes. Two controls that can disagree about who owns the choice is worse than one extra click.
+- **Keep `Open Model Settings`** as the panel's action.
+
+> **[Designer, 2026-08-06] Confirmed, with a requirement attached.** The cycler was not load-bearing — its value was _compression_, and compression is the panel's job rather than the control's. But the cycler also carried a signal: that models are **per-project and changeable**. The panel must keep that signal by naming the roles and keeping one clear route out to Settings. Removing the control must not turn model choice into something that reads as fixed or global.
+
+### 3.2 The question we need you to answer
+
+**How should the panel and the unconfigured state coexist?**
+
+Today they are mutually exclusive, and crudely so. `ConnectEngineCard` replaces the _entire_ Produce surface — but only when **no** role is ready. There is no design for partial readiness, and the current behaviour is bad:
+
+> **Measured, not theorised:** with the image model ready and the video model not, the shot grid renders normally, the engine bar names only the image model, and every **video** shot loses its generate button entirely — it is conditionally rendered, so it does not appear at all. No disabled state, no tooltip, no explanation. The shot simply has no action and nothing says why.
+>
+> Confirmed 2026-08-06 against the real renderer modules in a running build: an image shot in the same project kept its button, and flipping only the video role's status back to ready restored it — so role status is the sole cause. Recorded as **BUG-024**; it is a defect on its own and does not wait on this brief.
+
+The per-role panel is the natural place to fix this, because it already shows one row per role. Three candidate shapes, for you to pick between or replace:
+
+1. **Panel absorbs it.** No more full-surface takeover. A not-ready role shows its state in its own row with a repair action; when _no_ role is ready the panel auto-expands and the shot grid shows an empty state.
+2. **Panel above, card below.** Keep `ConnectEngineCard` for the zero-ready case; the panel handles partial readiness on its own.
+3. **Panel plus per-shot messaging.** Panel reports role state; the affected shot cards carry their own "video model not configured" treatment where the button is today.
+
+Our weak preference is **(1)** — one place that answers "what will render this, and can it?" — but this is your call, and the per-shot half of (3) may be needed regardless, since a user looking at a shot with no button will look at the _shot_ first.
+
+> **[Designer, 2026-08-06] Resolved — it is not either/or.** The cheap fix we offered as an alternative (a disabled control with a tooltip) is _"not the worse answer, it is the incomplete one."_ Ship it **as part of** this rather than instead of it — the per-shot treatment and the panel state are **one deliverable**, specified as **state 7**.
+>
+> This settles the question BUG-024 deferred: the fix is both surfaces, not a choice between them. A user looking at a shot with no action looks at the shot first, so the shot must answer; the panel is where the same fact is explained once for the whole project.
+
+### 3.3 Constraints that shape the answer
+
+- **Availability is four states, not two:** `ready`, `selection_required`, `setup_required`, `unavailable`. The status dot needs to express these, and `selection_required` ("several options, none chosen") differs meaningfully from `setup_required` ("no credentials"). Today all four collapse to a binary.
+- **There are three roles, not two.** The catalog carries `storyboard` (a text model) alongside `image` and `video`; the current engine bar shows only the two media roles. Whether a text model belongs in a panel about _render engines_ is an open question — we lean toward excluding it, but the data is there if you want it.
+
+  > **[Designer, 2026-08-06] Resolved — exclude it, and say so in the name.** The panel's title must signal that its scope is render engines, so a user does not read a missing text model as a missing panel entry. **And excluding it here is not the same as it having nowhere to fail** — the storyboard model can be unconfigured or unavailable exactly as the media roles can, and that failure needs a home in **Write**, where the text model is actually used. That is a separate surface, not an omission.
+
+- **Capability text is real content.** `up to 15s` is a genuine limit that changes what a user can ask for. It should survive into the role rows; the prototype's value-only buttons had nowhere to put it.
+- **Auto-selection is invisible today.** A user may never learn the app picked their model. Whether the panel should say so is worth a thought — we have not decided this either way.
+
+### 3.4 Deliverable
+
+Annotated states for the panel — collapsed and expanded, across all-ready / partial / none-ready — plus whatever per-shot treatment (3) implies if you go that way. Existing tokens and type scale; no new colours needed unless the four status states demand them.
+
+---
+
+## 4. Ask B — the prototype has drifted
+
+This matters beyond Produce.
+
+We deviated from the drawing here because the product moved. That drift almost certainly is not confined to one screen, and we do not want to discover it one screen at a time. **Review in particular we have never measured against the prototype at all** — and it is the screen most affected by recent work, since it now has to accommodate the cut editor (§5).
+
+**The ask:** tell us which prototype screens you still consider current, which you know are stale, and which you would want to revisit before we build against them. A checklist reply is fine — we are not asking for redrawn screens, just a reliability map so we know which drawings to trust.
+
+---
+
+## 5. Ask C — divergence UX (cut editor)
+
+This is genuine new design work, and it is the one open question left in an otherwise-settled model. It is recorded as open question #2 in the [cut model design](creative-studio-cut-model-design.md) §11.
+
+### 5.1 The model, briefly
+
+The **storyboard** is authoritative for structure — shots, their intent, their intended durations. The **cut** is a _projection_ of it: initialised one-to-one from the storyboard's shot order and each shot's selected take, then independently editable (reorder, trim, crop, colour filters).
+
+Because the cut is editable, it can **diverge** from the storyboard. The design requires that divergence be **a visible state, not an invisible one** — and it deliberately does not say what that looks like.
+
+### 5.2 The specific rules that need a UI
+
+- A cut carries **`orderMode: 'storyboard' | 'manual'`**. It flips to `manual` the first time the user reorders the cut directly, and **only the user can return it to `storyboard`**. Structural equality is not enough to infer intent: a hand-ordered cut that happens to match the storyboard is not the same as one that follows it.
+- **While in `storyboard` mode**, reordering shots in the storyboard reorders the cut.
+- **While in `manual` mode**, storyboard reordering does _not_ touch the cut.
+- **A shot that gains its first take after the cut went manual is appended to the end**, not inserted at its storyboard position — chosen so we never overwrite a hand-ordering to satisfy a storyboard the user has already departed from. This is defensible but will surprise people, and it is the moment where divergence most needs to be legible.
+- A shot with no selected take produces **no clip** — it exists in the storyboard, is absent from the cut, and appears in Review's slate treatment.
+- Deleting a shot removes its clips.
+
+### 5.3 The questions
+
+1. **How is divergence shown?** A persistent state on the cut, a per-clip marker, or something that only appears at the moment it happens?
+2. **Can a user re-sync?** The model permits returning to `storyboard` mode, but that discards the hand-ordering. If we offer it, it needs to be clearly destructive — and possibly previewable.
+3. **How does an appended shot announce itself?** It arrives at the end, away from where the user is looking, potentially long after they last touched the cut.
+4. **Is divergence a warning or a neutral fact?** Our position: **neutral**. A user hand-ordering a cut is doing their job, not making a mistake — consistent with a decision already taken on this branch that timing is advisory and never blocks. Please do not design it as an error state unless you disagree and can say why.
+
+> **[Designer, 2026-08-06] Confirmed, no dissent.** Divergence is neutral throughout. The single exception is the **appended clip**, which is emphatic — but that emphasis is about **location, not fault**. It answers "your new shot went to the end" rather than "something is wrong." Any implementation that borrows warning styling for it has misread this.
+
+### 5.4 Deliverable
+
+Whatever expresses states 1–4 on the Review surface. Note that Review does not currently have a cut editor at all, so this may imply structure, not just a badge — which is part of why §4 matters.
+
+---
+
+## 6. Constraints for anything you hand back
+
+These are hard, and they apply to all three asks.
+
+- **Semantic tokens only.** Colours come from `uno.config.ts` or CSS variables. No hardcoded hex in implementation — if a state needs a colour we do not have, call it out explicitly so we can add a token rather than inline a value.
+- **Arco Design components.** No raw interactive HTML. This constrains some interactions more than a drawing implies — Arco's text buttons in particular fight custom backgrounds, and one such override has already cost us a defect.
+- **Twelve locales.** Every new string is translated twelve ways. Text that only works at English length is a problem; German and Ukrainian run long. Truncation behaviour needs to be specified, not assumed.
+- **Keyboard and screen-reader parity.** The prototype's panel header is already a real button with `aria-expanded` — keep that. Status conveyed by a coloured dot alone is not sufficient; it needs an accessible text equivalent.
+- **Both themes.** Light and dark.
+
+---
+
+## 7. What is explicitly not in scope
+
+- Poster frames and generation-cost copy — both shipped; the old fidelity list is stale on these.
+- Model Settings itself — unchanged, and it remains the only place selection changes.
+- The render pipeline, transitions, audio editing, text overlays — all non-goals for this version.
+
+---
+
+## Assumptions in this brief — all four answered
+
+Stated so they could be corrected rather than inherited. **Designer response received 2026-08-06; all four agreed, two with corrections that change the work.**
+
+| #   | Assumption                                                                           | Outcome                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Collapsible framing **without** the inline cycler                                    | **Agreed.** Cycler not load-bearing — but the panel must inherit its signal that models are _per-project and changeable_ (§3.1) |
+| 2   | Partial readiness is a design problem, and disabled-plus-tooltip is the worse answer | **Agreed with correction.** Not the worse answer — the **incomplete** one. Both surfaces ship together as **state 7** (§3.2)    |
+| 3   | Exclude the storyboard text model                                                    | **Agreed, extended.** Say it in the panel's name, and give the text model a failure surface in **Write** (§3.3)                 |
+| 4   | Divergence reads as neutral                                                          | **Agreed, no dissent.** Sole exception: the appended clip is emphatic about _location, not fault_ (§5.3)                        |
+
+Net effect on scope: assumptions 2 and 3 each **added** work rather than removing it. The per-shot treatment is now in scope alongside the panel, and Write needs a model-failure state it does not have today.
+
+## 8. Full response received and reviewed — 2026-08-06
+
+**Source:** `Creative Studio - Model & Divergence States.dc.html`, in the claude.ai/design project `WePrompt`. Three sections: **1a** answers Ask A (panel shape (1) plus the per-shot half of (3)), **1b** answers Ask C (divergence), **1c** answers Ask B (the reliability map). `support.js` is the design-doc runtime, not content.
+
+### 8.1 What the response settles
+
+- **Ask A** — nine annotated states: four availability states (dot **plus text**, never dot alone), three collapsed cases, a German truncation spec, four expanded cases, the per-shot treatment, a grid empty state, and dark theme. `ConnectEngineCard`'s full-surface takeover is removed; its two actions move into the panel and the grid empty state, and its clipboard behaviour is preserved as a secondary action.
+- **Ask B** — the reliability map, including two answers we needed: **Produce activity tray and batch confirm are TRUST**, which closes the last open item in the [pass 3 prep](creative-studio-fidelity-pass3-prep.md) §3; and **Review is STALE by omission** — drawn as a player plus a read-only strip before the cut existed, with trim, crop, filters and per-clip selection undrawn. Model Settings has never been drawn and is now load-bearing for two repair paths.
+- **Ask C** — divergence stated once on the cut's order control, never per clip; the chip changes wording not colour (`Follows the storyboard` → `Yours · edited by hand`); re-sync is a previewed, destructive dialog that quotes a count rather than an adjective.
+
+### 8.2 Blocking — three drawn states need data the model cannot express
+
+Verified against code. Filed as **EPIC-005-G1/G2/G3** in `TASKS.md`; details there, summary here.
+
+| Gap                                  | Blocks                             | Why                                                                                                         |
+| ------------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **G1** Model-selection provenance    | `CHOSEN FOR YOU` (panel state 4)   | Auto-adoption writes through the same CAS command a person uses; the store cannot tell auto from deliberate |
+| **G2** Appended-clip acknowledgement | Appended-shot notice (cut state 3) | No per-clip unseen marker, and the design rightly rejects a toast — so it must persist                      |
+| **G3** Undo                          | `Undo the move` (cut state 2)      | No undo exists in the Studio renderer at all                                                                |
+
+### 8.3 Scope gap — state 7 covers one cause of nine
+
+The generate button is absent today for **role status not ready** (the case state 7 addresses), and also for: `routing[kind]` null, the selected route missing from the catalog, and every `routeSupportsScene` failure — aspect ratio, resolution, **duration out of range**, a reference image on a model without first-frame support, and health `unavailable` — plus transient editor and catalog-loading states.
+
+The duration case is the sharp one: the panel advertises `UP TO 15S`, so a 20-second video shot loses its button while the model **is** configured, and `Needs a video model` would be flatly wrong. **State 7 needs a reason vocabulary, not one string.**
+
+### 8.4 Smaller corrections
+
+- **Slates have no position in a manual cut.** Cut states 1–2 render `04 SLATE` between 03 and 05. In `storyboard` mode that derives from `sceneOrder`; in `manual` mode `clipOrder` holds only clip ids and bears no relation to `sceneOrder`, so the slot is undefined. Grouping slates after the clips once the order is manual stays consistent with "absent from the cut".
+- **`5 clips` counts a slate.** Cut states 1–2 show four draggable clips plus one slate under a `5 clips` header, while the same page says a slate "holds a place without pretending to be a clip". Separately `0:24 → 0:28` on gaining a 4-second take implies the slate's duration was never in the total, though it visually occupies width. Resolve before it becomes a pluralised string in twelve locales.
+- **`--status-decide` is a new token, not an alias.** The app ships `--success`, `--warning`, `--danger`, `--brand` (rust) plus a `--studio-*` set with no status colours and no navy. Navy may exist in the design system's `tokens/colors.css`; it is not in the app. Adding one token is fine — it is just not free.
+- **"Contact your workspace admin"** (state 6, `unavailable`) assumes an admin who is not the user. Check it against how models are actually provisioned for our users before translating it.
+
+### 8.5 Recommended next step
+
+The response ends with an offer worth taking: a **30-minute pass through the running app with the prototype open**, screen by screen, if we supply a build. Every `REVISIT` in the map is explicitly unmeasured rather than known-good, and this converts the whole map into measured answers for almost nothing. It is also the cheapest way to catch the same drift on surfaces nobody has looked at yet.

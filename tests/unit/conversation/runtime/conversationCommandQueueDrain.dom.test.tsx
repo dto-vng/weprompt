@@ -8,15 +8,19 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { Message } from '@arco-design/web-react';
 import { BackendHttpError } from '@/common/adapter/httpBridge';
 import type { TConversationRuntimeSummary } from '@/common/config/storage';
-import { createElement, type PropsWithChildren } from 'react';
+import { createElement, useEffect, type PropsWithChildren } from 'react';
 import { SWRConfig } from 'swr';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as commandQueueModule from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
 import {
   type ConversationCommandQueueRuntimeGate,
   resetConversationCommandQueueBackgroundRunnerForTest,
   useConversationCommandQueue,
 } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
-import { resetConversationRuntimeViewStoreForTest } from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
+import {
+  resetConversationRuntimeViewStoreForTest,
+  turnCompleted,
+} from '@/renderer/pages/conversation/runtime/conversationRuntimeViewStore';
 
 const turnCompletedListeners = vi.hoisted(() => ({
   current: [] as Array<
@@ -119,17 +123,83 @@ const runtimeUnavailableError = () =>
   });
 
 const storageKey = (conversationId: string) => `conversation-command-queue/${conversationId}`;
+let completedTurnSequence = 0;
+
+type ManagedQueueController = {
+  enqueue: (input: {
+    queueItemId: string;
+    clientRequestId: string;
+    input: string;
+    selectedTemplateId: string;
+    sources: [];
+    sourceOwner: null;
+    expectedOwnerRevision: null;
+  }) => Promise<unknown>;
+  claimHead: (queueItemId: string) => Promise<unknown>;
+  allocateClaimed: (
+    queueItemId: string,
+    start: () => Promise<{ ok: true; run: { runId: string; revision: number } }>
+  ) => Promise<unknown>;
+  transition: (queueItemId: string, execution: Record<string, unknown>) => Promise<unknown>;
+  runCommittedHead: (execute: (item: unknown) => Promise<void>) => Promise<'executed' | 'busy' | 'not_runnable'>;
+};
+
+class ManagedQueueMemoryStorage {
+  private readonly values = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+}
+
+const createManagedQueue = (conversationId: string, storage: ManagedQueueMemoryStorage): ManagedQueueController => {
+  const factory = Reflect.get(commandQueueModule, 'createPresentationCommandQueueController');
+  expect(factory).toBeTypeOf('function');
+  return Reflect.apply(factory as (...args: unknown[]) => unknown, undefined, [
+    {
+      conversationId,
+      storage,
+      confirmQueuedSources: vi.fn(),
+      now: () => new Date('2026-08-05T00:00:00.000Z'),
+    },
+  ]) as ManagedQueueController;
+};
+
+const prepareCommittedManagedQueue = async (
+  conversationId: string,
+  queueItemId: string,
+  storage: ManagedQueueMemoryStorage
+): Promise<ManagedQueueController> => {
+  const controller = createManagedQueue(conversationId, storage);
+  await controller.enqueue({
+    queueItemId,
+    clientRequestId: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8',
+    input: 'Create a board deck',
+    selectedTemplateId: 'business-review',
+    sources: [],
+    sourceOwner: null,
+    expectedOwnerRevision: null,
+  });
+  await controller.claimHead(queueItemId);
+  await controller.allocateClaimed(queueItemId, async () => ({
+    ok: true,
+    run: { runId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed', revision: 4 },
+  }));
+  return controller;
+};
 
 const emitTurnCompleted = (conversationId: string): void => {
   act(() => {
-    turnCompletedListeners.current.forEach((listener) => {
-      listener({
-        session_id: conversationId,
-        turn_id: 'turn-1',
-        state: 'ai_waiting_input',
-        runtime: runtime(),
-      });
-    });
+    completedTurnSequence += 1;
+    turnCompleted(conversationId, `turn-${completedTurnSequence}`, runtime());
   });
 };
 
@@ -162,6 +232,7 @@ const renderQueue = ({
 describe('useConversationCommandQueue drain', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    completedTurnSequence = 0;
     turnCompletedListeners.current = [];
     resetConversationRuntimeViewStoreForTest();
     resetConversationCommandQueueBackgroundRunnerForTest();
@@ -274,7 +345,7 @@ describe('useConversationCommandQueue drain', () => {
     });
   });
 
-  it('shares the background listener across active queues and releases it after the last runner unmounts', () => {
+  it('observes completed store transitions without installing a competing transport listener', () => {
     const firstExecute = vi.fn().mockResolvedValue(undefined);
     const secondExecute = vi.fn().mockResolvedValue(undefined);
     const firstQueue = renderQueue({
@@ -288,7 +359,7 @@ describe('useConversationCommandQueue drain', () => {
       onExecute: secondExecute,
     });
 
-    expect(turnCompletedListeners.current).toHaveLength(1);
+    expect(turnCompletedListeners.current).toHaveLength(0);
 
     emitTurnCompleted('conv-active-two');
 
@@ -296,7 +367,7 @@ describe('useConversationCommandQueue drain', () => {
     expect(secondExecute).not.toHaveBeenCalled();
 
     firstQueue.unmount();
-    expect(turnCompletedListeners.current).toHaveLength(1);
+    expect(turnCompletedListeners.current).toHaveLength(0);
 
     secondQueue.unmount();
     expect(turnCompletedListeners.current).toHaveLength(0);
@@ -491,5 +562,50 @@ describe('useConversationCommandQueue drain', () => {
 
     await waitFor(() => expect(onExecute).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(sessionStorage.getItem(storageKey('conv-background-busy'))).toBeNull());
+  });
+
+  it('keeps one managed committed drain in flight across unmount and remount', async () => {
+    const conversationId = '2be7b8fc-6af5-42b8-aed5-03644735c730';
+    const queueItemId = '37f0a614-3e7f-41b5-87fd-49076fcf078d';
+    const storage = new ManagedQueueMemoryStorage();
+    const firstController = await prepareCommittedManagedQueue(conversationId, queueItemId, storage);
+    let releaseExecution: (() => void) | undefined;
+    const execute = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseExecution = resolve;
+        })
+    );
+    const firstHook = renderHook(() => {
+      useEffect(() => {
+        void firstController.runCommittedHead(execute);
+      }, []);
+    });
+
+    await waitFor(() => expect(execute).toHaveBeenCalledOnce());
+    firstHook.unmount();
+
+    const remountedController = createManagedQueue(conversationId, storage);
+    const remountedResult = await remountedController.runCommittedHead(execute);
+
+    expect(remountedResult).toBe('busy');
+    expect(execute).toHaveBeenCalledOnce();
+    releaseExecution?.();
+  });
+
+  it.each([
+    { state: 'dispatching', runId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed', revision: 5 },
+    { state: 'bound', runId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed', revision: 6 },
+    { state: 'dispatch_uncertain', runId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed', revision: null },
+  ])('does not background-drain managed $state work', async (execution) => {
+    const conversationId = `2be7b8fc-6af5-42b8-aed5-03644735c73${execution.state === 'bound' ? '1' : execution.state === 'dispatching' ? '0' : '2'}`;
+    const queueItemId = '37f0a614-3e7f-41b5-87fd-49076fcf078d';
+    const storage = new ManagedQueueMemoryStorage();
+    const controller = await prepareCommittedManagedQueue(conversationId, queueItemId, storage);
+    await controller.transition(queueItemId, execution);
+    const execute = vi.fn(async () => undefined);
+
+    await expect(controller.runCommittedHead(execute)).resolves.toBe('not_runnable');
+    expect(execute).not.toHaveBeenCalled();
   });
 });

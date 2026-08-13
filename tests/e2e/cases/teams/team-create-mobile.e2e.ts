@@ -64,9 +64,7 @@ test.describe('Team Create - mobile (narrow screen)', () => {
     await expect(createBtn).toBeVisible({ timeout: 15_000 });
     await createBtn.click();
 
-    await expect(
-      page.locator('.arco-modal h3').filter({ hasText: /Create Team|创建团队|New Team|新建团队/ })
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.arco-modal.team-create-modal')).toBeVisible({ timeout: 5_000 });
 
     // Shrink below the breakpoint — the open modal re-renders into its mobile layout.
     await setWindowContentSize(electronApp, MOBILE_WIDTH, MOBILE_HEIGHT);

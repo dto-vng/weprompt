@@ -9,6 +9,21 @@ import type { IDirOrFile, IWorkspaceFlatFile } from './ipcBridge';
 type RawFsEntry = { name: string; type: string };
 export type RawWorkspaceFlatFile = { name: string; full_path: string; relative_path: string };
 
+/**
+ * Wire shape of aioncore's `DirOrFileResponse` (the `/api/fs/dir` response).
+ * Unlike `BrowseEntry`, this DTO is NOT `#[serde(rename_all = "camelCase")]`, so
+ * it serializes with literal snake_case field names. `children` is omitted for
+ * leaf nodes (serde `skip_serializing_if = "Option::is_none"`).
+ */
+export type RawDirOrFile = {
+  name: string;
+  full_path: string;
+  relative_path: string;
+  is_dir: boolean;
+  is_file: boolean;
+  children?: RawDirOrFile[];
+};
+
 // ── Path helpers ───────────────────────────────────────────────────────
 
 function normalizeSlashes(p: string): string {
@@ -86,4 +101,30 @@ export function fromBackendWorkspaceFlatFiles(raw: RawWorkspaceFlatFile[]): IWor
     fullPath: item.full_path,
     relativePath: item.relative_path,
   }));
+}
+
+/**
+ * Maps one `/api/fs/dir` node (`DirOrFileResponse`) from the backend's
+ * snake_case wire format into the camelCase `IDirOrFile` contract the renderer
+ * consumes, recursing into `children`. Sibling of `fromBackendWorkspaceFlatFiles`
+ * — without it, `.fullPath`/`.relativePath`/`.isDir`/`.isFile` read `undefined`
+ * against a real backend. `children` stays absent for leaves (the backend omits
+ * it), matching the optional field on `IDirOrFile`.
+ */
+export function fromBackendDirOrFile(item: RawDirOrFile): IDirOrFile {
+  const mapped: IDirOrFile = {
+    name: item.name,
+    fullPath: item.full_path,
+    relativePath: item.relative_path,
+    isDir: item.is_dir,
+    isFile: item.is_file,
+  };
+  if (Array.isArray(item.children)) {
+    mapped.children = item.children.map(fromBackendDirOrFile);
+  }
+  return mapped;
+}
+
+export function fromBackendDirOrFiles(raw: RawDirOrFile[]): IDirOrFile[] {
+  return raw.map(fromBackendDirOrFile);
 }

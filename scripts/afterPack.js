@@ -18,11 +18,29 @@ const { verifyBundledAioncoreResources } = require('../packages/shared-scripts/s
 function resolveResourcesDir(electronPlatformName, appOutDir, packager) {
   if (electronPlatformName !== 'darwin') return path.join(appOutDir, 'resources');
 
-  const appName = packager?.appInfo?.productFilename || 'AionUi';
+  const appName = packager?.appInfo?.productFilename || 'WePrompt';
   return path.join(appOutDir, `${appName}.app`, 'Contents', 'Resources');
 }
 
+function assertBundledRuntimeIsolation(resourcesDir, electronPlatformName, targetArch) {
+  const expectedRuntimeKey = `${electronPlatformName}-${targetArch}`;
+  const bundledRoot = path.join(resourcesDir, 'bundled-aioncore');
+  const entries = fs.existsSync(bundledRoot) ? fs.readdirSync(bundledRoot, { withFileTypes: true }) : [];
+  const isExactTarget = entries.length === 1 && entries[0].isDirectory() && entries[0].name === expectedRuntimeKey;
+
+  if (!isExactTarget) {
+    const actualEntries =
+      entries.map((entry) => `${entry.name}${entry.isDirectory() ? '/' : ''}`).join(', ') || '(none)';
+    throw new Error(
+      `Packaged app must contain exactly one bundled AionCore runtime (${expectedRuntimeKey}); found: ${actualEntries}`
+    );
+  }
+
+  return expectedRuntimeKey;
+}
+
 function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) {
+  assertBundledRuntimeIsolation(resourcesDir, electronPlatformName, targetArch);
   const result = verifyBundledAioncoreResources({
     resourcesDir,
     electronPlatformName,
@@ -37,7 +55,7 @@ function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) 
   console.log(`   ✓ Bundled resources verified for ${result.runtimeKey} (${result.checked.length} checks)`);
 }
 
-module.exports = async function afterPack(context) {
+async function afterPack(context) {
   const { arch, electronPlatformName, appOutDir, packager } = context;
   const targetArch = normalizeArch(typeof arch === 'string' ? arch : Arch[arch] || process.arch);
   const buildArch = normalizeArch(os.arch());
@@ -223,4 +241,8 @@ module.exports = async function afterPack(context) {
   }
 
   console.log(`✅ All native modules rebuilt successfully for ${targetArch}\n`);
-};
+}
+
+module.exports = afterPack;
+module.exports.assertBundledRuntimeIsolation = assertBundledRuntimeIsolation;
+module.exports.resolveResourcesDir = resolveResourcesDir;

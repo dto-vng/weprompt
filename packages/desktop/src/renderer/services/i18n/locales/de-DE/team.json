@@ -1,5 +1,6 @@
 {
   "sider": {
+    "empty": "Noch keine Teams",
     "title": "Teams",
     "createTeam": "Neues Team",
     "pin": "Anheften",

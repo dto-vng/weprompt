@@ -123,19 +123,6 @@ const MessageTips: React.FC<{ message: IMessageTips }> = ({ message }) => {
     if (structuredError.resolution?.kind) {
       feedbackTags.agent_error_resolution = structuredError.resolution.kind;
     }
-    const feedbackExtra = {
-      agent_error: {
-        ...(errorCode ? { code: errorCode } : {}),
-        ...(ownership ? { ownership } : {}),
-        ...(structuredError.retryable !== undefined ? { retryable: structuredError.retryable } : {}),
-        ...(structuredError.feedback_recommended !== undefined
-          ? { feedback_recommended: structuredError.feedback_recommended }
-          : {}),
-        ...(structuredError.resolution ? { resolution: structuredError.resolution } : {}),
-        ...(structuredError.rawError ? { rawError: structuredError.rawError } : {}),
-      },
-    };
-
     return (
       <div className='w-full'>
         <div className='bg-message-tips rd-8px p-x-12px p-y-10px flex flex-col gap-8px'>
@@ -180,13 +167,7 @@ const MessageTips: React.FC<{ message: IMessageTips }> = ({ message }) => {
           {shouldShowButler && (
             <div className='flex justify-end'>
               <ButlerDiagnoseButton errorText={[title, body, ...detailParts].filter(Boolean).join('\n')} />
-              {shouldShowFeedback && (
-                <FeedbackButton
-                  module='conversation-session'
-                  feedbackTags={feedbackTags}
-                  feedbackExtra={feedbackExtra}
-                />
-              )}
+              {shouldShowFeedback && <FeedbackButton module='conversation-session' feedbackTags={feedbackTags} />}
             </div>
           )}
         </div>

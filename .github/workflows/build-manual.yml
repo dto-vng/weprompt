@@ -92,4 +92,5 @@ jobs:
       aioncore_run_id: ${{ inputs.aioncore_run_id }}
       append_commit_hash: true
       upload_installers_only: true
+      internal_release: true
     secrets: inherit

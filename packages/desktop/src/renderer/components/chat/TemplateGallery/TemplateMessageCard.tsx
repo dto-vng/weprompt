@@ -8,6 +8,7 @@ import React from 'react';
 import useSWR from 'swr';
 import { Tag } from '@arco-design/web-react';
 import { ipcBridge } from '@/common';
+import { useTemplateLabels } from './usePresentationTemplates';
 
 /** kebab-case template id → display name for templates no longer installed. */
 const idToName = (id: string): string =>
@@ -24,6 +25,7 @@ const idToName = (id: string): string =>
 const TemplateMessageCard: React.FC<{ templateId: string }> = ({ templateId }) => {
   const { data: templates } = useSWR('presentation-templates', () => ipcBridge.presentationTemplates.list.invoke());
   const template = templates?.find((item) => item.manifest.id === templateId);
+  const labelsOf = useTemplateLabels();
 
   return (
     <div
@@ -32,13 +34,9 @@ const TemplateMessageCard: React.FC<{ templateId: string }> = ({ templateId }) =
     >
       {template ? (
         <>
-          <img
-            src={template.previewDataUrl}
-            alt={template.manifest.name}
-            className='w-84px h-52px object-cover rd-6px shrink-0'
-          />
+          <img src={template.previewDataUrl} alt='' className='w-84px h-52px object-cover rd-6px shrink-0' />
           <div className='flex flex-col gap-2px min-w-0'>
-            <span className='text-12px font-medium truncate'>{template.manifest.name}</span>
+            <span className='text-12px font-medium truncate'>{labelsOf(template).name}</span>
             <Tag size='small' className='w-fit'>
               {template.manifest.format.toUpperCase()}
             </Tag>

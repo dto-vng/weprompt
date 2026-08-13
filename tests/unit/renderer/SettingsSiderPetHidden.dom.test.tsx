@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import SettingsSider from '@/renderer/pages/settings/components/SettingsSider';
+import SettingsSider, { LEGACY_ANCHOR_REMAP } from '@/renderer/pages/settings/components/SettingsSider';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -36,5 +36,10 @@ describe('SettingsSider — Desktop Pet feature flag', () => {
     expect(screen.getByText('settings.system')).toBeInTheDocument();
     // Pet tab is gone
     expect(screen.queryByText('pet.desktopPet')).not.toBeInTheDocument();
+  });
+
+  it('keeps legacy extension anchors mapped to their current settings hosts', () => {
+    expect(LEGACY_ANCHOR_REMAP.capabilities).toBe('skills');
+    expect(LEGACY_ANCHOR_REMAP.display).toBe('appearance');
   });
 });

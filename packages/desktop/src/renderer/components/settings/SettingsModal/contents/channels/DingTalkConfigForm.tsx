@@ -331,7 +331,7 @@ const DingTalkConfigForm: React.FC<DingTalkConfigFormProps> = ({ pluginStatus, m
                 openExternalUrl(DINGTALK_DEV_DOCS_URL).catch(console.error);
               }}
             >
-              {t('settings.dingtalk.devConsoleLink', 'DingTalk Open Platform')}
+              {t('settings.upstreamAionUiDocumentation')}
             </a>{' '}
             {t('settings.dingtalk.clientIdDescSuffix', 'to get your Client ID')}
           </span>
@@ -389,7 +389,7 @@ const DingTalkConfigForm: React.FC<DingTalkConfigFormProps> = ({ pluginStatus, m
                 openExternalUrl(DINGTALK_DEV_DOCS_URL).catch(console.error);
               }}
             >
-              {t('settings.dingtalk.devConsoleLink', 'DingTalk Open Platform')}
+              {t('settings.upstreamAionUiDocumentation')}
             </a>{' '}
             {t('settings.dingtalk.clientSecretDescSuffix', 'to get Client Secret')}
           </span>

@@ -6,7 +6,7 @@
  * Cleanup uses invokeBridge (test data teardown is permitted).
  */
 import { test, expect } from '../../fixtures';
-import { TEAM_SUPPORTED_BACKENDS, cleanupTeamsByName } from '../../helpers';
+import { TEAM_SUPPORTED_BACKENDS, TEAM_CREATE_TITLE_LABELS, cleanupTeamsByName, labelPattern } from '../../helpers';
 
 const TEAM_NAME = 'E2E Test Team 001';
 
@@ -29,10 +29,10 @@ test.describe('Team Create - Full UI Flow', () => {
     await createBtn.click();
 
     // Step 3: Verify modal opened
-    const modal = page.locator('.arco-modal').last();
+    const modal = page.locator('.arco-modal.team-create-modal');
     await expect(modal).toBeVisible({ timeout: 5_000 });
 
-    const modalTitle = modal.locator('h3').filter({ hasText: /Create Team|创建团队/ });
+    const modalTitle = modal.locator('h3').filter({ hasText: labelPattern(TEAM_CREATE_TITLE_LABELS) });
     await expect(modalTitle).toBeVisible({ timeout: 5_000 });
 
     await page.screenshot({ path: 'tests/e2e/results/team-ui-02-modal.png' });

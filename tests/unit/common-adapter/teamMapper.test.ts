@@ -8,6 +8,9 @@ import { describe, expect, it } from 'vitest';
 import {
   fromBackendAssistant,
   fromBackendTeam,
+  fromBackendTeamRunAck,
+  fromBackendTeamRunEvent,
+  fromBackendTeamRunState,
   normalizeTeamStatus,
   toBackendAssistant,
 } from '@/common/adapter/teamMapper';
@@ -168,5 +171,102 @@ describe('teamMapper', () => {
         model: 'claude',
       })
     ).toThrow('assistant_id is required');
+  });
+
+  // Older aioncore builds omit `slot_work` / `session_generation` from run
+  // payloads entirely, so these fields arrive absent rather than empty.
+  describe('run payload normalization', () => {
+    const slotWork = {
+      slot_id: 'lead',
+      role: 'lead',
+      state: 'running',
+      queued_foreground_count: 0,
+      queued_background_count: 0,
+      active_turn_id: null,
+      active_turn_started_at_ms: null,
+      active_turn_elapsed_ms: null,
+      active_turn_slow: null,
+      active_turn_slow_threshold_ms: null,
+      blocked_reason: null,
+      team_run_id: 'run-1',
+    };
+
+    describe('fromBackendTeamRunState', () => {
+      it('fills in slot work and session generation the backend never sent', () => {
+        expect(fromBackendTeamRunState({ active_run: null })).toEqual({
+          session_generation: null,
+          active_run: null,
+          slot_work: [],
+        });
+      });
+
+      it('preserves slot work the backend did send', () => {
+        const snapshot = fromBackendTeamRunState({
+          session_generation: 'generation-2',
+          active_run: null,
+          slot_work: [slotWork],
+        });
+
+        expect(snapshot.slot_work).toEqual([slotWork]);
+        expect(snapshot.session_generation).toBe('generation-2');
+      });
+
+      it('normalizes slot work nested inside an active run', () => {
+        const snapshot = fromBackendTeamRunState({ active_run: { team_id: 'team-1', team_run_id: 'run-1' } });
+
+        expect(snapshot.active_run?.slot_work).toEqual([]);
+        expect(snapshot.active_run?.team_run_id).toBe('run-1');
+      });
+
+      it.each([
+        ['an empty response body', undefined],
+        ['a null response body', null],
+        ['a non-array slot_work', { active_run: null, slot_work: 'unexpected' }],
+      ])('yields a usable snapshot for %s', (_label, raw) => {
+        expect(fromBackendTeamRunState(raw)).toEqual({
+          session_generation: null,
+          active_run: null,
+          slot_work: [],
+        });
+      });
+    });
+
+    describe('fromBackendTeamRunEvent', () => {
+      it('defaults absent slot work to an empty array', () => {
+        expect(fromBackendTeamRunEvent({ team_id: 'team-1', status: 'running' })).toEqual({
+          team_id: 'team-1',
+          status: 'running',
+          slot_work: [],
+        });
+      });
+
+      it.each([
+        ['null', null],
+        ['undefined', undefined],
+      ])('defaults %s slot work to an empty array', (_label, slot_work) => {
+        expect(fromBackendTeamRunEvent({ team_id: 'team-1', slot_work }).slot_work).toEqual([]);
+      });
+
+      it('keeps slot work the backend did send', () => {
+        expect(fromBackendTeamRunEvent({ team_id: 'team-1', slot_work: [slotWork] }).slot_work).toEqual([slotWork]);
+      });
+    });
+
+    describe('fromBackendTeamRunAck', () => {
+      it('normalizes the run nested in an ack', () => {
+        const ack = fromBackendTeamRunAck({
+          enqueue_status: 'queued',
+          message_id: 'message-1',
+          run: { team_id: 'team-1', team_run_id: 'run-1' },
+        });
+
+        expect(ack.run.slot_work).toEqual([]);
+        expect(ack.enqueue_status).toBe('queued');
+      });
+
+      it('yields a run object even when the ack has no run at all', () => {
+        expect(fromBackendTeamRunAck({ enqueue_status: 'accepted' }).run.slot_work).toEqual([]);
+      });
+    });
   });
 });

@@ -17,7 +17,6 @@
     "quickActionStar": "خوشتان آمد؟ به ما ستاره بدهید!",
     "skillsMarket": "بازار مهارت‌های WePrompt",
     "skillsMarketDesc": "مهارت‌های جامعه را جستجو و فعال کنید. یک‌بار پیکربندی کنید، برای همه ایجنت‌ها در دسترس باشد.",
-    "skillsMarketDetails": "مشاهده بیشتر >>",
     "projectTitle": "What's next in {{name}}?",
     "projectPill": "Project · {{name}}",
     "projectModeEyebrow": "You are in a Project workspace",
@@ -26,7 +25,94 @@
     "projectModeBadgeChats": "Project chats",
     "projectModeBadgeFiles": "File-aware work"
   },
+  "projectHeader": {
+    "label": "پروژه {{name}}",
+    "eyebrow": "پروژه",
+    "tabs": {
+      "label": "نماهای پروژه",
+      "chat": "گفتگو",
+      "files": "فایل‌ها",
+      "context": "زمینه",
+      "artifacts": "خروجی‌ها"
+    }
+  },
+  "projectHome": {
+    "newChat": "چت جدید",
+    "composerPlaceholder": "چت جدیدی در این پروژه شروع کنید…",
+    "scopedHint": "— محدود به این پروژه",
+    "chats": "چت‌ها",
+    "showAll": "نمایش همه",
+    "showLess": "نمایش کمتر",
+    "emptyChatsTitle": "هنوز چتی وجود ندارد",
+    "emptyChatsBody": "برای شروع کار در این پروژه، یکی را در بالا آغاز کنید.",
+    "instructions": "دستورالعمل‌ها",
+    "instructionsApplies": "برای چت‌های جدید در این پروژه اعمال می‌شود.",
+    "instructionsEmpty": "برای هدایت هر چت در این پروژه، دستورالعملی اضافه کنید.",
+    "addInstructions": "افزودن دستورالعمل",
+    "edit": "ویرایش",
+    "save": "ذخیره",
+    "cancel": "لغو",
+    "instructionsSaved": "دستورالعمل‌ها ذخیره شد",
+    "instructionsSaveFailed": "ذخیرهٔ دستورالعمل‌ها ممکن نشد",
+    "files": "فایل‌ها",
+    "revealInFolder": "نمایش در پوشه",
+    "filesReadonly": "فقط خواندنی · مدیریت در پوشه",
+    "filesEmpty": "پوشه این پروژه خالی است.",
+    "folderMissingTitle": "پوشه یافت نشد",
+    "folderMissingRelink": "اتصال مجدد پوشه",
+    "folderMissingBody": "بقیه صفحه همچنان کار می‌کند.",
+    "metaChats": "{{count}} چت",
+    "metaActive": "فعال {{time}}",
+    "notFoundTitle": "پروژه یافت نشد",
+    "notFoundBody": "ممکن است این پروژه حذف شده باشد یا پیوند آن قدیمی باشد.",
+    "backHome": "بازگشت به خانه",
+    "rename": "تغییر نام",
+    "relink": "اتصال مجدد پوشه",
+    "reveal": "نمایش در پوشه",
+    "remove": "حذف",
+    "knowledge": "دانش",
+    "knowledgeAdd": "افزودن فایل",
+    "knowledgeDropFolderMissing": "پیش از افزودن فایل، پوشه Knowledge Base را دوباره وصل کنید.",
+    "knowledgeDropUnsupported": "هیچ‌کدام از این فایل‌ها پشتیبانی نمی‌شوند. پشتیبانی‌شده: .md، .txt، .docx، .xlsx، .pdf",
+    "knowledgeRefreshFailed": "بازخوانی پایگاه دانش ممکن نشد.",
+    "knowledgeRelinkFailed": "پیوند دوباره پوشه پروژه ممکن نشد.",
+    "knowledgeRetryFailed": "قرار دادن این فایل در صف نمایه‌سازی ممکن نشد.",
+    "knowledgeDeleteFailed": "انتقال این فایل به سطل زباله ممکن نشد.",
+    "knowledgeAddFailed": "افزودن این فایل‌ها به پایگاه دانش ممکن نشد.",
+    "knowledgeEmpty": "برای ساخت پایگاه دانش این پروژه، سند اضافه کنید. دستیار این محتوا را در هر چت این پروژه به‌طور خودکار جستجو می‌کند.",
+    "knowledgeSemanticOff": "جستجوی معنایی غیرفعال — مدل امبدینگ پیکربندی نشده است",
+    "knowledgeSemanticOffAction": "افزودن مدل امبدینگ",
+    "knowledgeEmbedAll": "جاسازی همه",
+    "knowledgePassagesTooltip": "این فایل به بخش‌های قابل جست‌وجو تقسیم می‌شود و دستیار هنگام پاسخ مرتبط‌ترین بخش‌ها را به کار می‌گیرد.",
+    "knowledgeStatusIndexing": "در حال نمایه‌سازی…",
+    "knowledgeProgressReading": "در حال خواندن صفحهٔ {{done}}/{{total}}",
+    "knowledgeProgressTranscribing": "در حال بازنویسی صفحهٔ {{done}}/{{total}}",
+    "knowledgeProgressEmbedding": "در حال جاسازی {{done}}/{{total}}…",
+    "knowledgeStatusFailed": "ناموفق",
+    "knowledgeStatusUnsupported": "پشتیبانی نمی‌شود",
+    "knowledgeStatusNotEmbedded": "فقط کلیدواژه",
+    "knowledgeNotEmbeddedDetail": "با کلیدواژه یافت می‌شود، اما فقط {{done}}/{{total}} بخش امبد شده است. برای امبد کردن بقیه، تلاش مجدد کنید.",
+    "knowledgeRetry": "تلاش مجدد",
+    "knowledgeError": "پایگاه دانش در دسترس نیست.",
+    "knowledgeSupportedTypes": "فرمت‌های پشتیبانی‌شده: .md, .txt, .docx, .xlsx, .pdf",
+    "knowledgeRefresh": "به‌روزرسانی",
+    "knowledgeOpenOriginal": "باز کردن فایل اصلی",
+    "knowledgeDeleteFile": "حذف فایل",
+    "knowledgeDeleteConfirm": "«{{fileName}}» به سطل زباله منتقل شود؟ از پایگاه دانش هم حذف می‌شود.",
+    "knowledgeFolderHint": "فایل‌ها در پوشهٔ «Knowledge Base» داخل پوشهٔ پروژه قرار دارند. هر چه در آن بگذارید به‌طور خودکار نمایه‌سازی می‌شود.",
+    "knowledgeFolderMissingTitle": "پوشهٔ Knowledge Base پیدا نشد",
+    "knowledgeFolderMissingBody": "ممکن است جابه‌جا، تغییرنام یا حذف شده باشد. دانش نمایه‌شدهٔ شما حفظ می‌شود — پوشه را بازگردانید یا پروژه را دوباره پیوند دهید، سپس به‌روزرسانی کنید.",
+    "knowledgePreviewNote": "این متنِ نمایه‌شده است که دستیار در آن جست‌وجو می‌کند، نه چیدمان اصلی.",
+    "knowledgePreviewTruncated": "پیش‌نمایش کوتاه شده است. برای دیدن کل سند فایل اصلی را باز کنید.",
+    "knowledgePreviewError": "متن نمایه‌شدهٔ این فایل بارگیری نشد.",
+    "knowledgePreviewNotReady": "هنوز متن نمایه‌شده‌ای برای باز کردن وجود ندارد.",
+    "knowledgeCitationMissing": "این فایل دیگر در پایگاه دانش نیست.",
+    "knowledgeOcrTag": "بازنویسی‌شده (OCR)",
+    "knowledgeOcrDetail": "توسط {{model}} از یک نسخهٔ اسکن‌شده بازنویسی شد. صفحات نادیده‌گرفته‌شده: {{pages}}",
+    "knowledgeOcrNoSkippedPages": "هیچ"
+  },
   "history": {
+    "moreActions": "اقدامات بیشتر",
     "recents": "اخیر",
     "noHistory": "تاریخچه چتی وجود ندارد",
     "deleteTitle": "حذف",
@@ -80,6 +166,8 @@
     "removeProject": "حذف پروژه",
     "removeProjectConfirm": "Remove project \"{{name}}\" from WePrompt? Its {{count}} chat(s) and folder files will stay where they are.",
     "newConversationInProject": "چت جدید در این پروژه",
+    "expandProjectChats": "گسترش گفتگوهای پروژه",
+    "collapseProjectChats": "جمع کردن گفتگوهای پروژه",
     "deleting": "در حال حذف...",
     "reorderPinned": "برای تغییر ترتیب گفتگوی سنجاق‌شده بکشید",
     "newProject": "New project",
@@ -101,7 +189,10 @@
     "relinkProjectFolder": "Relink folder",
     "convertWorkspaceToProject": "Save as project",
     "removeProjectSuccess": "Project removed. Chats and files were kept.",
-    "removeProjectFailed": "Project could not be removed",
+    "removeProjectFailed": "پروژه حذف نشد. آن را دوباره باز کنید و دوباره امتحان کنید؛ فایل‌های پوشه حذف نشده‌اند.",
+    "removeProjectChatDetachFailed": "برخی گفت‌وگوها از این پروژه جدا نشدند. پروژه حفظ شد؛ حذف را دوباره امتحان کنید.",
+    "removeProjectStateChanged": "فهرست پروژه‌ها پیش از حذف تغییر کرد. آن را تازه‌سازی کنید و دوباره امتحان کنید.",
+    "removeProjectStorageFailed": "تغییرات پروژه ذخیره نشد. بررسی کنید WePrompt به داده‌های برنامه دسترسی دارد، سپس دوباره امتحان کنید.",
     "projectActions": "Project actions"
   },
   "historySearch": {
@@ -366,6 +457,9 @@
   },
   "workspace": {
     "title": "پروژه",
+    "projectMenu": {
+      "trigger": "پروژه"
+    },
     "pasteConfirm_title": "جای‌گذاری فایل‌ها",
     "pasteConfirm_message": "آیا مطمئن هستید که می‌خواهید «{{name}}» را در پوشه انتخاب‌شده ({{target}}) جای‌گذاری کنید؟",
     "pasteConfirm_paste": "جای‌گذاری",
@@ -445,9 +539,6 @@
       "vscode": "VS Code",
       "terminal": "ترمینال",
       "explorer": "فایل اکسپلورر"
-    },
-    "projectMenu": {
-      "trigger": "پروژه"
     }
   },
   "minimap": {
@@ -461,6 +552,7 @@
     "noModelSelected": "مدلی برای جلسه فعلی انتخاب نشده، امکان ارسال پیام وجود ندارد",
     "sendMessageTo": "ارسال پیام به {{model}}",
     "processing": "در حال پردازش...",
+    "stopGenerating": "توقف تولید",
     "quotaExceededTitle": "سهمیه مدل تمام شد",
     "quotaExceededBody": "سهمیه مدل فعلی تمام شده است. برای ادامه به {{model}} تغییر دهید؟",
     "quotaExceededNoFallback": "سهمیه مدل تمام شد. لطفاً به مدل موجود دیگری تغییر دهید.",
@@ -547,7 +639,9 @@
     "today": "امروز",
     "weekToDate": "از ابتدای هفته",
     "monthToDate": "از ابتدای ماه",
-    "triggerLabel": "نمایش استفاده از زمینه"
+    "triggerLabel": "نمایش استفاده از زمینه",
+    "estimated": "تخمینی",
+    "unavailable": "میزان استفاده از زمینه در دسترس نیست"
   },
   "skill_generator": {
     "title": "ساخت مهارت/قانون",
@@ -616,36 +710,109 @@
     }
   },
   "notFound": "مکالمه یافت نشد یا حذف شده است",
-  "projectHeader": {
-    "label": "پروژه {{name}}",
-    "eyebrow": "پروژه",
-    "tabs": {
-      "label": "نماهای پروژه",
-      "chat": "گفتگو",
-      "files": "فایل‌ها",
-      "context": "زمینه",
-      "artifacts": "خروجی‌ها"
-    }
-  },
   "emptyModelReply": "مدل نوبت را بدون تولید پاسخ قابل مشاهده به پایان رساند. درخواست را دوباره ارسال کنید؛ برای خروجی‌های بزرگ، نتیجه را در بخش‌های کوچک‌تر درخواست کنید.",
   "presentationTemplates": {
+    "catalog": {
+      "business-review": {
+        "name": "بازبینی کسب‌وکار",
+        "description": "ارائه نتایج فصلی — خلاصه شاخص‌ها، جزئیات بخش‌ها، چشم‌انداز. سرمه‌ای و کهربایی."
+      },
+      "project-kickoff": {
+        "name": "شروع پروژه",
+        "description": "ارائه شروع پروژه — دامنه، تیم، زمان‌بندی، گام‌های بعدی. فیروزه‌ای ساده."
+      },
+      "monthly-steerco": {
+        "name": "کمیته راهبری ماهانه",
+        "description": "گزارش کمیته راهبری — وضعیت سبد، ریسک‌ها، تصمیم‌های لازم. سریف و طلایی."
+      },
+      "connected-ops": {
+        "name": "عملیات متصل",
+        "description": "بازبینی عملیات — شاخص‌های سایت، زمان کارکرد، رخدادها. سبز صنعتی."
+      },
+      "editorial-field-report": {
+        "name": "گزارش میدانی تحریریه",
+        "description": "گزارش بلند — قلم سریف، متن پیوسته به جای فهرست، یک تأکید قرمز."
+      },
+      "market-trends-report": {
+        "name": "گزارش روند بازار",
+        "description": "گزارش داده‌محور پیمایشی — نمودارها همراه با منابع."
+      },
+      "simple-light": {
+        "name": "Simple Light",
+        "description": "ارائه روشن و مینیمال — یک ایده در هر اسلاید، یک تأکید آبی."
+      },
+      "simple-dark": {
+        "name": "Simple Dark",
+        "description": "ارائه تیره و مینیمال برای گفتگوهای فنی — مناسب کد، تأکید سبز."
+      },
+      "business-report": {
+        "name": "گزارش کسب‌وکار",
+        "description": "گزارش رسمی و بلند — جلد، فهرست، جدول‌های داده، عناوین سریف سرمه‌ای."
+      },
+      "decision-memo": {
+        "name": "یادداشت تصمیم",
+        "description": "یادداشت کوتاه تصمیم — بخش به/از/موضوع، توصیه در ابتدا، بدون جلد."
+      },
+      "operations-guide": {
+        "name": "راهنمای عملیات",
+        "description": "رویه فشرده — گام‌های شماره‌دار، کادرهای یادآوری، چک‌لیست، تأکید فیروزه‌ای."
+      },
+      "proposal-sow": {
+        "name": "پیشنهاد / SOW",
+        "description": "پیشنهاد به مشتری — دامنه، زمان‌بندی، جدول قیمت، بخش امضا."
+      }
+    },
     "title": "قالب‌ها",
     "columnPptx": "ارائه‌ها · PPTX",
-    "columnHtml": "گزارش‌ها · HTML",
+    "columnHtml": "وب · HTML",
+    "columnDocx": "اسناد · DOCX",
     "selected": "انتخاب‌شده",
-    "buttonTooltip": "قالب‌های ارائه",
-    "slashDescription": "انتخاب قالب ارائه",
-    "importCard": "وارد کردن تم (.md)",
+    "buttonTooltip": "قالب‌ها",
+    "slashDescription": "یک قالب انتخاب کنید",
+    "importCard": "وارد کردن قالب (.md)",
     "empty": "قالبی موجود نیست",
     "chipTooltip": "این پیام از قالب استفاده می‌کند",
+    "scratch": {
+      "prepareError": "فضای موقت خروجی آماده نشد: {{error}}",
+      "retained": "فایل‌های موقت خروجی برای بازیابی در {{path}} نگه‌داری شدند.",
+      "cleanup": "پاک‌سازی",
+      "cleanupSuccess": "فایل‌های موقت خروجی حذف شدند",
+      "cleanupError": "پاک‌سازی ناموفق بود: {{error}}"
+    },
     "importSuccess": "قالب وارد شد",
     "importError": "خطا در وارد کردن: {{error}}",
     "removeError": "خطا در حذف: {{error}}",
     "deleteTooltip": "حذف قالب",
-    "deleteConfirm": "این قالب حذف شود؟"
+    "deleteConfirm": "این قالب حذف شود؟",
+    "sources": {
+      "reselectRequired": "برای استفاده از فایل‌های پیوست با این قالب PPTX، آن‌ها را دوباره انتخاب کنید.",
+      "reselectAction": "انتخاب دوباره فایل‌ها"
+    },
+    "recovery": {
+      "status": {
+        "reviewRequired": "نسخهٔ پیشنهادی ارائه نیاز به بازبینی دارد.",
+        "reviewRequiredAfterFailure": "تولید متوقف شد؛ نسخهٔ پیشنهادی ارائه که نگه‌داری شده همچنان نیاز به بازبینی دارد.",
+        "trackingRequired": "اجرای ارائه نیاز به پیگیری دارد.",
+        "dispatchUncertain": "نتیجهٔ اجرای ارائه تأیید نشده است. رسیدگی اپراتور لازم است."
+      },
+      "hash": "SHA-256: {{sha256}}",
+      "actions": {
+        "open": "باز کردن در برنامهٔ سیستم",
+        "discard": "کنار گذاشتن رکورد"
+      },
+      "loadError": "وضعیت بازیابی ارائه بارگیری نشد.",
+      "invalidResponse": "وضعیت بازیابی ارائه قابل تأیید نبود.",
+      "openError": "تأیید نشد که نسخهٔ پیشنهادی فعلی ارائه باز شده است یا نه.",
+      "discardError": "کنار گذاشته شدن رکورد ارائه تأیید نشد."
+    }
   },
   "status": {
-    "waitingApproval": "در انتظار تأیید شما"
+    "waitingApproval": "در انتظار تأیید شما",
+    "running": "در حال کار",
+    "done": "پایان یافت",
+    "doneIdle": "پایان یافته — غیرفعال",
+    "stopped": "متوقف شد",
+    "failed": "ناموفق"
   },
   "contextHandoff": {
     "activeFileDescription": "Active handoff",
@@ -708,8 +875,488 @@
       }
     }
   },
+  "creativeStudio": {
+    "nav": {
+      "title": "استودیوی خلاقیت"
+    },
+    "close": {
+      "saveAndClose": "ذخیره و بستن",
+      "discard": "نادیده گرفتن تغییرات و بستن",
+      "cancel": "لغو",
+      "unsavedMessage": "{{count}} صحنه ویرایش ذخیره‌نشده دارند. پیش از بستن ذخیره شوند؟",
+      "unsavedMessage_one": "{{count}} صحنه ویرایش ذخیره‌نشده دارد. پیش از بستن ذخیره شود؟",
+      "unsavedMessage_other": "{{count}} صحنه ویرایش ذخیره‌نشده دارند. پیش از بستن ذخیره شوند؟",
+      "unavailableMessage": "استودیوی خلاقیت پاسخ نداد. بستن در این لحظه ممکن است ویرایش‌های ذخیره‌نشدهٔ صحنه‌ها را از بین ببرد."
+    },
+    "phase": {
+      "nav": {
+        "label": "روند خلاقانه",
+        "brief": "خلاصه",
+        "write": "نگارش",
+        "produce": "تولید",
+        "review": "بازبینی",
+        "saved": "ذخیره شد",
+        "saving": "در حال ذخیره تغییرات..."
+      },
+      "shared": {
+        "backToLibrary": "بازگشت به کتابخانه پروژه‌ها",
+        "noMediaGeneration": "در این مرحله تصویر یا ویدیو تولید نمی‌شود."
+      },
+      "brief": {
+        "title": "خلاصه",
+        "description": "پیش از نگارش، هدف، قالب و زمان پروژه را مشخص کنید.",
+        "nameLabel": "نام پروژه",
+        "intentLabel": "هدف خلاقانه",
+        "durationLabel": "زمان هدف",
+        "aspectRatioLabel": "نسبت تصویر",
+        "startWriting": "شروع نگارش",
+        "saved": "همه تغییرات خلاصه ذخیره شده‌اند.",
+        "saving": "در حال ذخیره تغییرات خلاصه...",
+        "unsaved": "تغییرات خلاصه هنوز ذخیره نشده‌اند.",
+        "invalidName": "پیش از ادامه، نام پروژه را وارد کنید.",
+        "aspectLocked": "نسبت تصویر قفل است",
+        "aspectLockedHelp": "پس از افزودن رسانه تولیدشده، نسبت تصویر قابل تغییر نیست."
+      },
+      "write": {
+        "title": "نگارش",
+        "continueToProduce": "ادامه به تولید",
+        "askAssistant": "پرسش از دستیار",
+        "assistantTitle": "دستیار نگارش",
+        "assistantDescription": "برای گسترش ساختار داستان، ایده‌های نما و پرامپت‌ها از دستیار استفاده کنید.",
+        "textChargeDisclosure": "پیش‌نویس استوری‌بورد از مدل متنی پیکربندی‌شده استفاده می‌کند. ارائه‌دهنده ممکن است برای استفاده از مدل هزینه دریافت کند.",
+        "draftStoryboard": "پیش‌نویس استوری‌بورد",
+        "addShot": "افزودن نما",
+        "fitToGoal": "تطبیق با هدف",
+        "noScenes": "برای شروع یک نما اضافه کنید یا پیش‌نویس استوری‌بورد بسازید.",
+        "scriptTableTitle": "فیلم‌نامه",
+        "scriptTableHelp": "برای هر نما یک ردیف داشته باشید و متن، تصویر، زمان‌بندی و خروجی را کنار هم تنظیم کنید.",
+        "shotColumn": "نما",
+        "scriptColumn": "فیلم‌نامه",
+        "visualColumn": "تصویر",
+        "outputColumn": "خروجی",
+        "visualPlaceholder": "آنچه می‌بینیم را توصیف کنید…",
+        "suggestVisual": "پیشنهاد تصویر",
+        "addReference": "افزودن مرجع",
+        "moreDetails": "جزئیات بیشتر",
+        "invalidTitle": "پیش از ذخیره، عنوان نما را وارد کنید.",
+        "placeholder": {
+          "opening": "نمای آغازین",
+          "middle": "نمای میانی",
+          "closing": "نمای پایانی"
+        },
+        "needsTitle": "عنوان لازم است",
+        "pacingTitle": "ریتم",
+        "pacingSummary": "مجموع {{total}} ثانیه · هدف {{target}} ثانیه",
+        "goalMarker": "هدف {{seconds}} ثانیه"
+      },
+      "produce": {
+        "connectEngine": "یک موتور متصل کنید — حدود یک دقیقه، فقط یک‌بار برای کل فضای کاری",
+        "askTeammate": "از هم‌تیمی کمک بخواهید",
+        "askTeammateCopy": "لطفاً در تنظیمات مدل WePrompt یک موتور تصویر یا ویدیو برای این فضای کاری متصل کنید.",
+        "renderingWith": "در حال رندر با —",
+        "engineSummary": "{{model}} · {{kind}} · تا {{seconds}} ثانیه",
+        "changeEngines": "تغییر موتورها",
+        "takeRatio": "برداشت {{current}} / {{total}}",
+        "noVisualYet": "هنوز تصویری نیست",
+        "writeVisual": "نوشتن تصویر",
+        "render": "رندر",
+        "renderAnother": "رندر دوباره",
+        "openPreview": "باز کردن پیش‌نمایش {{title}}",
+        "reviewCut": "بازبینی تدوین",
+        "modelsTitle": "مدل‌ها",
+        "activityTitle": "فعالیت تولید",
+        "activityEmpty": "هیچ کار تولیدی در حال اجرا نیست.",
+        "jobsRunning": "{{count}} کار تولیدی در حال اجراست",
+        "jobsRunning_one": "{{count}} کار تولیدی در حال اجراست",
+        "jobsRunning_other": "{{count}} کار تولیدی در حال اجراست"
+      },
+      "review": {
+        "title": "بازبینی",
+        "description": "رسانه منتخب را بررسی کنید، اسلیت‌های جاافتاده را تکمیل و تحویل را آماده کنید.",
+        "handoff": "آماده‌سازی تحویل",
+        "noAssets": "هیچ رسانه منتخبی برای تحویل آماده نیست.",
+        "selectedTake": "در برش",
+        "slateLabel": "اسلیت",
+        "slateDescription": "وقتی رسانه رندرشده‌ای انتخاب نشده باشد، اسلیت نما را در توالی نگه می‌دارد.",
+        "excludedFromHandoff": "صحنه‌های بدون رسانه منتخب از تحویل کنار گذاشته می‌شوند. اسلیت‌های بازبینی خروجی گرفته نمی‌شوند.",
+        "renderedShots": "{{count}} نمای رندرشده",
+        "renderedShots_one": "{{count}} نمای رندرشده",
+        "renderedShots_other": "{{count}} نمای رندرشده",
+        "missingSlates": "{{count}} اسلیت جاافتاده",
+        "missingSlates_one": "{{count}} اسلیت جاافتاده",
+        "missingSlates_other": "{{count}} اسلیت جاافتاده",
+        "openProduce": "باز کردن تولید",
+        "handoffDescription": "تحویل فقط شامل فهرست استوری‌بورد و رسانه‌های منتخب است. اسلیت‌های بازبینی خروجی گرفته نمی‌شوند.",
+        "partialHandoff": "این تحویل ناقص است، چون بعضی صحنه‌ها رسانه منتخب ندارند.",
+        "render": {
+          "action": "رندر ویدیو",
+          "progress": "در حال رندر ویدیو… {{percent}}٪",
+          "cancel": "لغو رندر",
+          "missingScenes": "{{count}} صحنه برداشت ندارد و در ویدیو نخواهد بود.",
+          "missingScenes_one": "{{count}} صحنه برداشت ندارد و در ویدیو نخواهد بود.",
+          "missingScenes_other": "{{count}} صحنه برداشت ندارد و در ویدیو نخواهد بود.",
+          "resultLabel": "ویدیوی رندرشده",
+          "errors": {
+            "ffmpegUnavailable": "FFmpeg نصب نیست. برای رندر ویدیو، FFmpeg را نصب کنید.",
+            "busy": "این پروژه هم‌اکنون در حال رندر است.",
+            "noRenderableScenes": "هیچ صحنه‌ای برداشت قابل رندر ندارد.",
+            "failed": "رندر ویدیو انجام نشد.",
+            "cancelled": "رندر ویدیو لغو شد."
+          }
+        }
+      }
+    },
+    "transition": {
+      "savingBlocked": "ویرایش‌های شما هنوز در حال ذخیره شدن هستند — چند لحظه دیگر دوباره تلاش کنید."
+    },
+    "library": {
+      "title": "استودیوی خلاقیت",
+      "subtitle": "داستان‌ها را برنامه‌ریزی کنید، هر صحنه را بازبینی کنید و دارایی تصویری یا ویدیویی بسازید.",
+      "sectionLabel": "یا از جایی که رها کردید ادامه دهید",
+      "loading": "در حال بارگذاری پروژه‌ها...",
+      "retry": "تلاش دوباره",
+      "readinessLabel": "تهیه پیش‌نویس استوری‌بورد",
+      "readinessSetupRequired": "راه‌اندازی مدل لازم است",
+      "openProject": "باز کردن پروژه",
+      "deleteProject": "حذف پروژه",
+      "deleteConfirmTitle": "این پروژه حذف شود؟",
+      "deleteConfirmBody": "«{{name}}» و دارایی‌های مدیریت‌شده محلی آن حذف شوند؟ این کار قابل بازگشت نیست.",
+      "deleteActiveWork": "این پروژه کار تولید فعال دارد. پیش از حذف، آن را لغو کنید یا تا پایان کار منتظر بمانید.",
+      "composer": {
+        "label": "چه چیزی می‌سازیم؟",
+        "placeholder": "ایدهٔ داستان را در یک جمله بنویسید…",
+        "aspectRatioLabel": "نسبت تصویر",
+        "durationLabel": "زمان تقریبی",
+        "durationGuess": "حدود {{seconds}} ثانیه",
+        "attachBrief": "پیوست کردن سند بریف",
+        "attachBriefUnavailable": "پیوست سند بریف هنوز در دسترس نیست.",
+        "submit": "خواندن بریف من →",
+        "empty": "یک جمله کافی است — بگویید چه چیزی می‌سازیم."
+      },
+      "shape": {
+        "title": "شروع از یک ساختار",
+        "label": "{{name}} · {{count}} نما · {{seconds}} ثانیه",
+        "sceneTitle": "نمای {{number}}",
+        "productStory": {
+          "name": "داستان محصول",
+          "starter": "داستانی از محصول برای کسانی که هرگز نام ما را نشنیده‌اند؛ در چهار بخش و با پایان روی نشان‌نوشت."
+        },
+        "featureTeaser": {
+          "name": "تیزر قابلیت",
+          "starter": "تیزری کوتاه برای یک قابلیت جدید، ویژهٔ مشتریانی که از قبل از محصول استفاده می‌کنند."
+        },
+        "recapReel": {
+          "name": "ویدیوی مرور فصل",
+          "starter": "ویدیوی مرور فصل برای کل شرکت، با حسی گرم و کمی افتخارآمیز."
+        }
+      },
+      "scriptOnly": "فقط فیلمنامه",
+      "posterBadge": "برداشت {{take}} · نمای {{scene}}",
+      "status": {
+        "partiallyRendered": "{{rendered}} از {{total}} نما ساخته شده",
+        "handedOff": "تحویل شد · {{seconds}} ثانیه",
+        "scriptOnly": "{{count}} نما نوشته شده، هیچ‌کدام ساخته نشده"
+      },
+      "meta": "{{shots}} · {{seconds}} ثانیه · {{relative}}",
+      "shotCount": "{{count}} نما",
+      "shotCount_one": "{{count}} نما",
+      "shotCount_other": "{{count}} نما",
+      "projectCount": "{{count}} پروژه",
+      "projectCount_one": "{{count}} پروژه",
+      "projectCount_other": "{{count}} پروژه",
+      "deleteConfirm": "حذف"
+    },
+    "empty": {
+      "title": "نخستین داستان خود را بسازید",
+      "body": "با یک شرح کوتاه شروع کنید و پیش از هر تولید پولی، استوری‌بورد را شکل دهید.",
+      "create": "ساخت پروژه"
+    },
+    "create": {
+      "title": "ساخت پروژه استودیوی خلاقیت",
+      "nameLabel": "نام پروژه",
+      "namePlaceholder": "داستان معرفی محصول",
+      "aspectRatio16x9": "افقی (16:9)",
+      "aspectRatio9x16": "عمودی (9:16)",
+      "aspectRatio1x1": "مربع (1:1)",
+      "aspectRatio4x3": "افقی کلاسیک (4:3)",
+      "aspectRatio3x4": "عمودی کلاسیک (3:4)",
+      "invalidDuration": "یک عدد صحیح بین 5 تا 60 ثانیه وارد کنید.",
+      "cancel": "انصراف"
+    },
+    "project": {
+      "loading": "در حال بارگذاری پروژه...",
+      "notFound": "این پروژه استودیوی خلاقیت پیدا نشد.",
+      "title": "نمای کلی پروژه",
+      "brief": "شرح",
+      "aspectRatio": "نسبت تصویر",
+      "targetDuration": "طول هدف",
+      "resolution": "وضوح",
+      "sceneCount": "تعداد صحنه‌ها",
+      "readiness": "آمادگی پیش‌نویس"
+    },
+    "storyboard": {
+      "title": "استوری‌بورد",
+      "addScene": "افزودن صحنه",
+      "noScenes": "برای شکل دادن به این داستان یک صحنه اضافه کنید.",
+      "sceneLimit": "هر استوری‌بورد می‌تواند حداکثر 24 صحنه داشته باشد.",
+      "durationTotal": "زمان‌بندی استوری‌بورد: {{total}} از {{target}} ثانیه",
+      "durationMatches": "زمان صحنه‌ها با هدف پروژه برابر است.",
+      "durationMismatch": "پیش از تولید گروهی، زمان صحنه‌ها باید با هدف پروژه برابر باشد.",
+      "fitToTarget": "تنظیم روی {{seconds}} ثانیه",
+      "fitUnlockedOnly": "فقط زمان نماهای رندرنشده را تنظیم می‌کند.",
+      "fitUnreachable": {
+        "route_unavailable": "برای این نماهای رندرنشده یک مدل سازگار انتخاب کنید: {{scenes}}.",
+        "affectedSceneCount": "نماهای تحت تأثیر: {{count}}",
+        "no_adjustable_scenes": "همه نماها رندر شده‌اند یا فعال هستند و مجموع آن‌ها {{fixedTotalSeconds}} ثانیه است. هدف را تغییر دهید یا یک نمای رندرنشده را ویرایش کنید.",
+        "target_out_of_bounds": "برای مدل‌های انتخابی، هدف کل پروژه را بین {{minimumTotalSeconds}} و {{maximumTotalSeconds}} ثانیه تنظیم کنید."
+      },
+      "durationOver": "{{seconds}} ثانیه بیش از زمان هدف",
+      "durationRemaining": "{{seconds}} ثانیه باقی مانده",
+      "increaseTarget": "افزایش زمان هدف به {{seconds}} ثانیه",
+      "shortenBeforeAdding": "پیش از افزودن صحنه دیگر، صحنه‌های موجود را کوتاه کنید.",
+      "dragScene": "برای تغییر ترتیب، صحنه را بکشید",
+      "removeScene": "حذف صحنه",
+      "dragSceneAccessible": "کشیدن صحنه {{number}}: {{title}}",
+      "moveSceneUpAccessible": "انتقال صحنه {{number}}: {{title}} به بالا",
+      "moveSceneDownAccessible": "انتقال صحنه {{number}}: {{title}} به پایین",
+      "removeSceneAccessible": "حذف صحنه {{number}}: {{title}}",
+      "removeConfirmTitle": "این صحنه حذف شود؟",
+      "removeConfirmBody": "صحنه‌های دارای رسانه واردشده یا تولیدشده، یا سابقه تولید، قابل حذف نیستند.",
+      "removeBlocked": "صحنه‌های دارای رسانه واردشده یا تولیدشده، یا سابقه تولید، قابل حذف نیستند.",
+      "retry": "تلاش دوباره برای تغییر",
+      "discard": "نادیده گرفتن تغییرات محلی"
+    },
+    "scene": {
+      "accessibleName": "صحنه {{number}}: {{title}}",
+      "number": "صحنه {{number}}",
+      "status": {
+        "needs_title": "عنوان لازم است",
+        "needs_prompt": "به دستور نیاز دارد",
+        "ready": "آماده تولید",
+        "generating": "در حال تولید",
+        "needs_selection": "یک نسخه را انتخاب کنید",
+        "generated": "تولید شد",
+        "needs_attention": "نیازمند توجه"
+      },
+      "image": "تصویر",
+      "video": "ویدیو",
+      "duration": "مدت",
+      "durationSeconds": "{{seconds}} ثانیه",
+      "durationSeconds_one": "{{seconds}} ثانیه",
+      "durationSeconds_other": "{{seconds}} ثانیه",
+      "selected": "صحنه انتخاب‌شده"
+    },
+    "inspector": {
+      "title": "هدایت صحنه",
+      "sectionsLabel": "بخش‌های ویرایش صحنه",
+      "directionTab": "بصری",
+      "scriptTab": "متن",
+      "titleLabel": "عنوان صحنه",
+      "purposeLabel": "هدف صحنه",
+      "purposePlaceholder": "این صحنه باید به چه چیزی برسد؟",
+      "visualPromptLabel": "دستور بصری",
+      "visualPromptPlaceholder": "نما، سوژه، محیط، نورپردازی و حرکت را توصیف کنید.",
+      "narrationLabel": "روایت",
+      "onScreenTextLabel": "متن روی تصویر",
+      "mediaKindLabel": "نوع خروجی",
+      "durationLabel": "مدت صحنه بر حسب ثانیه",
+      "invalidDuration": "یک عدد صحیح بین 1 تا 60 ثانیه وارد کنید.",
+      "saving": "در حال ذخیره صحنه...",
+      "saved": "صحنه ذخیره شد",
+      "saveFailed": "صحنه ذخیره نشد.",
+      "unsavedChanges": "تغییرات ذخیره‌نشده شما نگه داشته شده‌اند."
+    },
+    "draft": {
+      "title": "ساخت پیش‌نویس استوری‌بورد",
+      "body": "WePrompt صحنه‌ها، روایت، متن روی تصویر و زمان‌بندی را برای بازبینی شما پیشنهاد می‌کند.",
+      "checking": "در حال بررسی مدل استوری‌بورد انتخاب‌شده...",
+      "ready": "آماده تهیه پیش‌نویس",
+      "setupRequired": "برای پیش‌نویس با هوش مصنوعی یک مدل استوری‌بورد انتخاب و پیکربندی کنید.",
+      "unavailable": "تهیه پیش‌نویس استوری‌بورد اکنون در دسترس نیست.",
+      "providerLabel": "ارائه‌دهنده استوری‌بورد",
+      "modelLabel": "مدل استوری‌بورد",
+      "chargeNotice": "پیش‌نویس از مدل انتخاب‌شده پروژه استفاده می‌کند و ممکن است هزینه ارائه‌دهنده داشته باشد.",
+      "replaceTitle": "استوری‌بورد فعلی جایگزین شود؟",
+      "replaceBody": "تهیه دوباره پیش‌نویس تنها پس از دریافت یک پیشنهاد معتبر، همه صحنه‌های فعلی را جایگزین می‌کند.",
+      "confirm": "ساخت پیش‌نویس استوری‌بورد",
+      "cancel": "انصراف",
+      "configureModel": "باز کردن تنظیمات مدل",
+      "manualFallback": "ادامه ویرایش دستی",
+      "failed": "پیش‌نویس استوری‌بورد ساخته نشد. صحنه‌های فعلی تغییر نکردند."
+    },
+    "routing": {
+      "title": "مسیر تولید",
+      "modelLabel": "مدل",
+      "missingRoute": "یک مسیر تولید سازگار انتخاب کنید.",
+      "invalidRoute": "این مسیر دیگر معتبر نیست. پیش از تولید آن را بازبینی کنید."
+    },
+    "review": {
+      "generateReadyScenes": "تولید {{count}} صحنه آماده",
+      "generateReadyScenes_one": "تولید {{count}} صحنه آماده",
+      "generateReadyScenes_other": "تولید {{count}} صحنه آماده",
+      "noReadyScenes": "هیچ صحنه‌ای برای تولید آماده نیست.",
+      "generateScene": "تولید صحنه",
+      "regenerateScene": "تولید نسخه متفاوت",
+      "title": "بازبینی تولید",
+      "sceneCount": "{{count}} صحنه انتخاب شده",
+      "videoSeconds": "{{seconds}} ثانیه ویدیوی درخواستی",
+      "selectedDurationFull": "مدت انتخاب‌شده: {{seconds}} ثانیه",
+      "selectedDurationFull_one": "مدت انتخاب‌شده: {{seconds}} ثانیه",
+      "selectedDurationFull_other": "مدت انتخاب‌شده: {{seconds}} ثانیه",
+      "targetDurationFull": "مدت هدف: {{seconds}} ثانیه",
+      "targetDurationFull_one": "مدت هدف: {{seconds}} ثانیه",
+      "targetDurationFull_other": "مدت هدف: {{seconds}} ثانیه",
+      "providerLabel": "ارائه‌دهنده",
+      "modelLabel": "مدل",
+      "aspectRatio": "نسبت تصویر",
+      "resolution": "وضوح",
+      "watermarkOff": "نشان آب غیرفعال است",
+      "audioOff": "خروجی بی‌صدا؛ تولید صدا غیرفعال است",
+      "missingRoute": "حداقل یک صحنه مسیر تولید ندارد.",
+      "invalidRoute": "حداقل یکی از مسیرهای انتخابی نامعتبر است.",
+      "durationMismatch": "زمان استوری‌بورد با هدف پروژه برابر نیست.",
+      "chargeNotice": "تولید از حساب ارائه‌دهنده انتخابی شما استفاده می‌کند و ممکن است هزینه داشته باشد.",
+      "confirm": "تأیید و تولید",
+      "cancel": "انصراف",
+      "disabledMissingRoutes": "برای هر صحنه انتخابی یک مسیر معتبر برگزینید.",
+      "audioOn": "این رندر شامل صدای تولیدشده است؛ مسیرهای بی‌صدا، در صورت وجود، بی‌صدا می‌مانند."
+    },
+    "jobs": {
+      "progress": "{{percent}}٪ تکمیل",
+      "cancel": "لغو کار",
+      "retry": "تلاش دوباره برای تولید",
+      "retryConfirmationTitle": "تولید دوباره امتحان شود؟",
+      "retryConfirmationBody": "تلاش دوباره، این درخواست تولید را مجدداً برای ارائه‌دهنده ارسال می‌کند و ممکن است هزینه ارائه‌دهنده داشته باشد.",
+      "retryConfirmationConfirm": "تأیید و تلاش دوباره",
+      "retryDownload": "تلاش دوباره برای بارگیری",
+      "retryChargeTitle": "با احتمال هزینه تکراری دوباره تلاش شود؟",
+      "retryChargeBody": "نتیجه ارسال قبلی نامعلوم است. تلاش دوباره ممکن است هزینه دیگری از ارائه‌دهنده ایجاد کند.",
+      "retryChargeConfirm": "پذیرش و تلاش دوباره",
+      "status": {
+        "queuedLocal": "در انتظار ارسال",
+        "submitting": "در حال ارسال",
+        "queuedRemote": "در صف ارائه‌دهنده",
+        "running": "در حال تولید",
+        "needsAttention": "نیازمند بررسی",
+        "succeeded": "تکمیل شد",
+        "failed": "ناموفق",
+        "cancelled": "لغو شد"
+      },
+      "errors": {
+        "invalidRequest": "درخواست تولید نامعتبر است.",
+        "auth": "ارائه‌دهنده اطلاعات ورود را رد کرد.",
+        "quota": "سهمیه حساب ارائه‌دهنده کافی نیست.",
+        "rateLimited": "محدودیت نرخ ارائه‌دهنده فعال شد. بعداً دوباره تلاش کنید.",
+        "providerUnavailable": "ارائه‌دهنده تولید در دسترس نیست.",
+        "timeout": "ارائه‌دهنده در زمان مقرر پاسخ نداد.",
+        "pollDeadline": "موتور دیگر پیشرفتی گزارش نمی‌کند. پیش از تلاش دوباره، وضعیت را با ارائه‌دهنده بررسی کنید.",
+        "noOutput": "ارائه‌دهنده کار را تمام کرد، اما خروجی قابل استفاده‌ای نداد.",
+        "submissionUnknown": "نتیجه ارسال نامعلوم است. پیش از تلاش دوباره، هشدار هزینه تکراری را بررسی کنید.",
+        "downloadFailed": "تولید کامل شد، اما خروجی بارگیری نشد.",
+        "unsupported": "این ارائه‌دهنده از عملیات درخواستی پشتیبانی نمی‌کند.",
+        "unknown": "کار تولید به دلیل نامعلومی شکست خورد."
+      }
+    },
+    "preview": {
+      "title": "پیش‌نمایش",
+      "noAssetTitle": "هیچ دارایی تولیدشده‌ای انتخاب نشده است",
+      "noAssetBody": "برای پیش‌نمایش، صحنه‌ای تولید کنید یا یک نسخه موجود را انتخاب کنید.",
+      "imageAlt": "تصویر صحنه تولیدشده",
+      "videoLabel": "ویدیوی صحنه تولیدشده",
+      "loadFailed": "این دارایی مدیریت‌شده بارگذاری نشد.",
+      "versions": "نسخه‌ها",
+      "versionLabel": "نسخه {{number}}",
+      "selectVersion": "انتخاب این نسخه",
+      "selectVersionAccessible": "انتخاب نسخه {{number}}",
+      "importReference": "وارد کردن تصویر فریم نخست",
+      "importing": "در حال وارد کردن تصویر مرجع...",
+      "missingVisualPrompt": "پیش از تولید این صحنه، یک دستور بصری اضافه کنید.",
+      "missingModel": "پیش از تولید این صحنه، یک مدل سازگار برای پروژه انتخاب کنید.",
+      "generateThisScene": "تولید این صحنه",
+      "videoReady": "ویدیو آماده است"
+    },
+    "timeline": {
+      "title": "نوار صحنه‌ها",
+      "selectScene": "انتخاب صحنه",
+      "totalDuration": "مدت کل استوری‌بورد",
+      "totalDurationFull": "مدت کل: {{seconds}} ثانیه",
+      "totalDurationFull_one": "مدت کل: {{seconds}} ثانیه",
+      "totalDurationFull_other": "مدت کل: {{seconds}} ثانیه",
+      "selectSceneAccessible": "انتخاب صحنه {{number}}: {{title}}، {{seconds}} ثانیه",
+      "selectSceneAccessible_one": "انتخاب صحنه {{number}}: {{title}}، {{seconds}} ثانیه",
+      "selectSceneAccessible_other": "انتخاب صحنه {{number}}: {{title}}، {{seconds}} ثانیه",
+      "noScenes": "صحنه‌ای برای نمایش وجود ندارد"
+    },
+    "export": {
+      "title": "خروجی گرفتن از دارایی‌ها",
+      "body": "فهرست استوری‌بورد و دارایی انتخاب‌شده هر صحنه را خروجی بگیرید.",
+      "gapWarning": "نماهای {{shots}} هنوز اسلیت هستند و در خروجی گنجانده نمی‌شوند.",
+      "gapWarning_one": "نمای {{shots}} هنوز اسلیت است و در خروجی گنجانده نمی‌شود.",
+      "gapWarning_other": "نماهای {{shots}} هنوز اسلیت هستند و در خروجی گنجانده نمی‌شوند.",
+      "confirmSelectedCount": "{{count}} نما خروجی گرفته شود؟",
+      "confirmSelectedCount_one": "{{count}} نما خروجی گرفته شود؟",
+      "confirmSelectedCount_other": "{{count}} نما خروجی گرفته شود؟",
+      "includeReferences": "تصاویر مرجع واردشده نیز افزوده شوند",
+      "confirm": "خروجی گرفتن از دارایی‌ها",
+      "cancel": "انصراف",
+      "choosing": "یک پوشه برای خروجی انتخاب کنید...",
+      "successTitle": "دارایی‌ها خروجی گرفته شدند",
+      "successBody": "{{count}} صحنه منتخب در «{{folderName}}» تحویل داده شد.",
+      "successBody_one": "{{count}} صحنه منتخب در «{{folderName}}» تحویل داده شد.",
+      "successBody_other": "{{count}} صحنه منتخب در «{{folderName}}» تحویل داده شد.",
+      "partialTitle": "دارایی‌ها با چند صحنه ناقص خروجی گرفته شدند",
+      "partialBody": "دارایی‌های موجود در «{{folderName}}» ذخیره شدند.",
+      "failed": "از دارایی‌ها خروجی گرفته نشد.",
+      "noSelectedAssets": "هیچ دارایی انتخاب‌شده‌ای برای خروجی آماده نیست.",
+      "folderLabel": "پوشه خروجی"
+    },
+    "errors": {
+      "featureDisabled": "Creative Studio در این نسخه غیرفعال است.",
+      "invalidPayload": "درخواست شامل اطلاعات نامعتبر یا ناقص است.",
+      "projectNotFound": "این پروژه استودیوی خلاقیت دیگر وجود ندارد.",
+      "storyboardExists": "این پروژه از قبل استوری‌بورد دارد. پیش از تهیه دوباره پیش‌نویس، جایگزینی را تأیید کنید.",
+      "staleProject": "پروژه در جای دیگری تغییر کرده است. پیش از تلاش دوباره آن را تازه‌سازی کنید.",
+      "planningUnavailable": "تهیه پیش‌نویس استوری‌بورد در دسترس نیست. می‌توانید ویرایش دستی را ادامه دهید.",
+      "invalidRoute": "مسیر تولید انتخابی نامعتبر یا در دسترس نیست.",
+      "cancellationRefused": "ارائه‌دهنده دیگر نمی‌تواند این کار در حال اجرا را لغو کند.",
+      "duplicateChargeAcknowledgementRequired": "پیش از تلاش دوباره، احتمال هزینه تکراری ارائه‌دهنده را بپذیرید.",
+      "busy": "این پروژه کار تولید فعال دارد.",
+      "provider": "ارائه‌دهنده نتوانست درخواست را کامل کند.",
+      "storage": "استودیوی خلاقیت نتوانست داده‌های محلی را به‌روزرسانی کند."
+    },
+    "models": {
+      "storyboard": "مدل استوری‌بورد",
+      "selectionRequired": "یک مدل انتخاب کنید",
+      "unavailable": "مدل انتخاب‌شده در دسترس نیست",
+      "openSettings": "باز کردن تنظیمات مدل",
+      "refresh": "تازه‌سازی مدل‌ها",
+      "loading": "در حال بارگیری مدل‌ها...",
+      "updateFailed": "انتخاب مدل پروژه به‌روزرسانی نشد."
+    }
+  },
   "artifact": {
     "emptyTitle": "آرتیفکتی باز نیست",
     "emptyHint": "فایل‌ها و اسناد تولیدشده اینجا باز می‌شوند."
+  },
+  "statusTooltip": {
+    "waitingApproval": "برای ادامه، منتظر تأیید شماست.",
+    "running": "در حال کار روی این گفت‌وگو.",
+    "doneUnseen": "تمام شده است، اما هنوز آن را ندیده‌اید.",
+    "doneSeen": "به‌تازگی تمام شده و مشاهده شده است.",
+    "doneIdle": "حداقل یک دقیقه پیش تمام شده و مشاهده شده است.",
+    "stopped": "پیش از پایان متوقف شد.",
+    "failed": "به‌دلیل خطا کامل نشد."
+  },
+  "staleKnowledgeHint": {
+    "body": "این گفتگو نمی‌تواند در پایگاه دانش پروژه جست‌وجو کند — پیش از افزودن فایل‌ها آغاز شده است.",
+    "action": "شروع گفتگوی جدید"
+  },
+  "emptyChat": "برای شروع پیامی بفرستید.",
+  "presentationSubmission": {
+    "pending": "ارسال ارائه در انتظار است",
+    "restore": "بازیابی",
+    "persistenceFailure": "ذخیره ارسال ارائه ممکن نشد.",
+    "queued": "ارائه در صف قرار گرفت",
+    "uncertainTracking": "وضعیت ارسال نامشخص است. اجرای موجود را پیگیری کنید و دوباره ارسال نکنید."
   }
 }

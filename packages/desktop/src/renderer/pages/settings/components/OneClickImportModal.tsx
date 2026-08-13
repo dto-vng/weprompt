@@ -1,6 +1,6 @@
 import type { IMcpServer, IMcpTool } from '@/common/config/storage';
 import { mcpService } from '@/common/adapter/ipcBridge';
-import { Button, Select, Spin, Tag, Tooltip } from '@arco-design/web-react';
+import { Button, Message, Select, Spin, Tag, Tooltip } from '@arco-design/web-react';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check } from '@icon-park/react';
@@ -71,6 +71,13 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
   const [detectedAgents, setDetectedAgents] = useState<Array<{ backend: string; name: string }>>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [fetchedServers, setFetchedServers] = useState<DetectedMcpServer[]>([]);
+  /**
+   * 扫描 CLI 配置失败时的错误文案。必须和「扫到了但是 0 个」区分开：
+   * CLI 没装、读配置被拒、配置文件格式错误，以前全都显示成安心的「未找到 MCP 服务器」。
+   * Why this is separate from "scanned fine, found none": a missing CLI, a permission-denied
+   * read and a malformed config all used to render as the reassuring "No MCP servers found".
+   */
+  const [importError, setImportError] = useState<string | null>(null);
   const [importedServers, setImportedServers] = useState<IMcpServer[]>([]);
   const [loadingImport, setLoadingImport] = useState(false);
   const [submittingImport, setSubmittingImport] = useState(false);
@@ -164,6 +171,7 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
       setDetectedAgents([...IMPORTABLE_AGENTS]);
       setLoadingImport(false);
       setSubmittingImport(false);
+      setImportError(null);
     }
   }, [visible]);
 
@@ -186,6 +194,10 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
         setCurrentStep(3);
       } catch (error) {
         console.error('Failed to batch import MCP servers:', error);
+        // 以前只 console.error：按钮停转、步骤不前进、界面一句话都没有。
+        // Previously only logged: the button stopped spinning, the step never advanced, and the
+        // user was told nothing at all.
+        Message.error(t('settings.mcpImportFailed'));
       } finally {
         setSubmittingImport(false);
       }
@@ -197,11 +209,13 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
       setCurrentStep(1);
       setFetchedServers([]);
       setLoadingImport(false);
+      setImportError(null);
     }
   };
 
   const handleImportFromCLI = async () => {
     setLoadingImport(true);
+    setImportError(null);
     try {
       const mcpConfigs = await mcpService.getAgentMcpConfigs.invoke();
       const selectedConfig = mcpConfigs.find((agentConfig) => agentConfig.source === selectedAgent);
@@ -210,6 +224,10 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
     } catch (error) {
       console.error('Failed to import from CLI:', error);
       setFetchedServers([]);
+      // 把真实原因带到界面上：CLI 未安装、权限不足、配置损坏，用户看到才知道该修什么。
+      // Surface the real reason — CLI not installed, permission denied, broken config — so the
+      // user knows there is something to fix rather than believing there is nothing to import.
+      setImportError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoadingImport(false);
     }
@@ -287,6 +305,16 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
             <div className='text-t-secondary text-sm'>{t('settings.mcpLoadingTools')}</div>
           </div>
         </div>
+      ) : /* 必须排在 length 判断之前：扫描失败和「扫到 0 个」是两件事。
+             Must come before the length check — a failed scan is not an empty result. */
+      importError ? (
+        <div className='py-8 text-center'>
+          <div className='text-danger text-sm'>{t('settings.mcpImportFailed')}</div>
+          <div className='text-t-secondary text-13px mt-4px break-words'>{importError}</div>
+          <Button size='small' className='mt-12px' onClick={() => void handleImportFromCLI()}>
+            {t('common.retry')}
+          </Button>
+        </div>
       ) : fetchedServers.length > 0 ? (
         <div>
           <div className='mb-3 flex items-center gap-2'>
@@ -305,7 +333,7 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
                   key={index}
                   className='p-3'
                   style={
-                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-3)' } : undefined
+                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-4)' } : undefined
                   }
                 >
                   <div className='flex items-center justify-between gap-3'>
@@ -347,7 +375,7 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
                   key={index}
                   className='p-3'
                   style={
-                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-3)' } : undefined
+                    index < orderedFetchedServers.length - 1 ? { borderBottom: '1px solid var(--bg-4)' } : undefined
                   }
                 >
                   <div className='flex items-center justify-between gap-3'>
@@ -425,11 +453,11 @@ const OneClickImportModal: React.FC<OneClickImportModalProps> = ({
           <AionSteps current={currentStep} size='small'>
             <AionSteps.Step
               title={t('settings.mcpStepSelectAgent')}
-              icon={currentStep > 1 ? <Check theme='filled' size={16} fill='#165dff' /> : undefined}
+              icon={currentStep > 1 ? <Check theme='filled' size={16} fill={iconColors.brand} /> : undefined}
             />
             <AionSteps.Step
               title={t('settings.mcpStepFetchTools')}
-              icon={currentStep > 2 ? <Check theme='filled' size={16} fill='#165dff' /> : undefined}
+              icon={currentStep > 2 ? <Check theme='filled' size={16} fill={iconColors.brand} /> : undefined}
             />
             <AionSteps.Step title={t('settings.mcpStepImportSuccess')} />
           </AionSteps>

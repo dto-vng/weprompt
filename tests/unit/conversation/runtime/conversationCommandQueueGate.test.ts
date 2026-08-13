@@ -5,7 +5,31 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getCommandQueueExecutionGate } from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import * as commandQueueModule from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+import {
+  createQueuedCommandItem,
+  getCommandQueueExecutionGate,
+  normalizeQueueState,
+} from '@/renderer/pages/conversation/platforms/useConversationCommandQueue';
+
+describe('artifact scratch queue metadata', () => {
+  it('survives creation and persisted-state normalization for delayed execution', () => {
+    const item = createQueuedCommandItem({
+      input: 'Create the deck',
+      files: [],
+      artifactScratchRunId: '5a68fccc-7b90-49b4-88f9-d78bb88255ed',
+    });
+
+    expect(item.artifactScratchRunId).toBe('5a68fccc-7b90-49b4-88f9-d78bb88255ed');
+    expect(
+      normalizeQueueState({
+        items: [item],
+        isPaused: false,
+        mode: 'auto',
+      }).items[0]?.artifactScratchRunId
+    ).toBe('5a68fccc-7b90-49b4-88f9-d78bb88255ed');
+  });
+});
 
 describe('getCommandQueueExecutionGate', () => {
   it('keeps the legacy path gated by hydration and busy state', () => {
@@ -88,5 +112,17 @@ describe('getCommandQueueExecutionGate', () => {
       canExecute: true,
       isProcessing: false,
     });
+  });
+});
+
+describe('managed presentation queue execution gate', () => {
+  it('runs only committed work with durable proof that POST has not begun', () => {
+    const isRunnable = Reflect.get(commandQueueModule, 'isPresentationCommandExecutionRunnable');
+    expect(isRunnable).toBeTypeOf('function');
+
+    expect(isRunnable({ state: 'committed', runId: 'run-1', revision: 4, postInvoked: false })).toBe(true);
+    expect(isRunnable({ state: 'dispatching', runId: 'run-1', revision: 5 })).toBe(false);
+    expect(isRunnable({ state: 'bound', runId: 'run-1', revision: 6 })).toBe(false);
+    expect(isRunnable({ state: 'dispatch_uncertain', runId: 'run-1', revision: null })).toBe(false);
   });
 });

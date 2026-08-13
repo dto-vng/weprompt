@@ -29,6 +29,10 @@
   "download": "Завантажити",
   "close": "Закрити",
   "retry": "Повторити",
+  "routeError": {
+    "title": "Не вдалося показати цю сторінку",
+    "description": "Під час відкриття сторінки сталася помилка. Решта програми працює — повторіть спробу або виберіть інший елемент на бічній панелі."
+  },
   "reload": "Оновити",
   "technical_details": "Технічні деталі",
   "error_details": "Деталі помилки",
@@ -82,59 +86,60 @@
       "title": "Встановлення WePrompt неповне",
       "description": "У цьому встановленні бракує потрібних локальних ресурсів, тому AionCore не може запуститися. Завантажте та перевстановіть останню версію WePrompt. Якщо проблема повториться після перевстановлення, перевірте, чи захисне або антивірусне ПЗ не помістило AionCore у карантин.",
       "downloadLatest": "Завантажити останню версію",
-      "sendDiagnostics": "Надіслати діагностику",
-      "diagnosticsSent": "Діагностику надіслано",
-      "diagnosticsReportSuccess": "Діагностичний звіт надіслано",
-      "diagnosticsReportFailed": "Не вдалося надіслати діагностичний звіт",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет",
       "runtimeComponentDescription": "У цій інсталяції бракує потрібних вбудованих компонентів середовища виконання, тому {{resource}} не може запуститися. Перевстановіть найновіший пакет WePrompt. Якщо проблема повториться після перевстановлення, перевірте, чи не помістило програмне забезпечення безпеки або антивірус компоненти WePrompt у карантин."
     },
     "packageArchitectureMismatch": {
-      "title": "WePrompt package architecture mismatch",
-      "description": "This WePrompt package is for {{packageArch}}, but this Mac is {{deviceArch}}. You may have downloaded the wrong package. Please download and install the {{expectedArch}} package."
+      "title": "Архітектура пакета WePrompt не збігається",
+      "description": "Цей пакет WePrompt призначений для {{packageArch}}, а цей Mac використовує {{deviceArch}}. Отримайте інсталятор {{expectedArch}} через схвалений внутрішній канал розповсюдження, закрийте WePrompt і встановіть цей пакет.",
+      "closeApplication": "Закрити WePrompt"
     },
     "dataMigration": {
       "title": "Local data migration failed",
-      "description": "WePrompt opened, but AionCore stopped while initializing local data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database migration can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt відкрився, але AionCore зупинився під час ініціалізації локальних даних. Повторне встановлення WePrompt може не вирішити проблему. Збережіть діагностичний пакет локально, щоб можна було перевірити міграцію бази даних.",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет"
     },
     "localDataRepair": {
       "title": "Local data repair failed",
-      "description": "WePrompt opened, but AionCore stopped while repairing local agent cache data. Reinstalling WePrompt may not fix this. Send a diagnostics report or contact support so the local database can be inspected.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt відкрився, але AionCore зупинився під час відновлення даних кешу локального агента. Повторне встановлення WePrompt може не вирішити проблему. Збережіть діагностичний пакет локально, щоб можна було перевірити локальну базу даних.",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет"
     },
     "startupDirectory": {
       "title": "Startup directory is unavailable",
-      "description": "AionUi opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart AionUi.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report"
+      "description": "WePrompt opened, but AionCore could not start because the configured work or log directory is missing, unavailable, or blocked by permissions. Check that the configured directories exist and are writable, then restart WePrompt.",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет"
     },
     "recoverableDatabaseCorruption": {
       "title": "Локальні дані пошкоджено",
       "description": "WePrompt виявив пошкодження локальної бази даних і не може продовжити запуск. Після підтвердження стару базу даних буде збережено як резервну копію, а для продовження запуску буде створено нову локальну базу даних. Історичні локальні дані поки не відображатимуться, стара база даних збережеться як резервна копія.",
       "confirmRebuild": "Зберегти стару БД і створити нову",
-      "sendDiagnostics": "Надіслати діагностику",
-      "diagnosticsHint": "Надсилання діагностики не змінить локальну базу даних.",
-      "diagnosticsSent": "Діагностику надіслано",
-      "diagnosticsReportSuccess": "Діагностичний звіт надіслано",
-      "diagnosticsReportFailed": "Не вдалося надіслати діагностичний звіт",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsHint": "Збереження діагностики не змінює локальну базу даних.",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет",
       "rebuildFailed": "Не вдалося зберегти стару БД і створити нову"
     },
     "transientConcurrentStartup": {
-      "title": "AionUi запускається",
-      "description": "Коли це вікно відкрилося, інший процес запуску AionUi усе ще використовував локальні дані. Це тимчасово, і ваші дані в безпеці — перевстановлення не потрібне. Зачекайте трохи та повторіть спробу або перезапустіть AionUi.",
-      "sendDiagnostics": "Send diagnostics",
-      "diagnosticsSent": "Diagnostics sent",
-      "diagnosticsReportSuccess": "Diagnostics report sent",
-      "diagnosticsReportFailed": "Failed to send diagnostics report",
-      "diagnosticsHint": "Якщо це повторюється, ви можете надіслати звіт діагностики."
+      "title": "WePrompt запускається",
+      "description": "Коли це вікно відкрилося, інший процес запуску WePrompt усе ще використовував локальні дані. Це тимчасово, і ваші дані в безпеці — перевстановлення не потрібне. Зачекайте трохи та повторіть спробу або перезапустіть WePrompt.",
+      "sendDiagnostics": "Зберегти діагностику",
+      "diagnosticsSent": "Діагностику збережено",
+      "diagnosticsReportSuccess": "Діагностичний пакет збережено",
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет",
+      "diagnosticsHint": "Збереження діагностики не змінює локальну базу даних."
     }
   },
   "fileAttach.addFiles": "Додати файли",
@@ -159,5 +164,15 @@
     "second_short": "с"
   },
   "selectedCount": "Вибрано {{count}}",
-  "selectedSkills": "Вибрані навички"
+  "selectedSkills": "Вибрані навички",
+  "chrome": {
+    "minimize": "Згорнути",
+    "maximize": "Розгорнути",
+    "restore": "Відновити",
+    "collapseSidebar": "Згорнути бічну панель",
+    "expandSidebar": "Розгорнути бічну панель",
+    "toggleProjectPanel": "Показати або сховати панель проєкту",
+    "expandProjectPanel": "Розгорнути панель проєкту",
+    "collapseProjectPanel": "Згорнути панель проєкту"
+  }
 }
