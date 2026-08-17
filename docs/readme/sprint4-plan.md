@@ -69,7 +69,30 @@ selectors, written back via `setConfigOption`, resumed from conversation `extra`
 (`session_mode`, `current_model_id`, `cached_config_options`, `pending_config_options`).
 
 If AionRS advertised a reasoning option under id or category `thought_level` / `reasoning_effort`,
-**the existing WePrompt UI would render it with no client change.**
+**the existing in-conversation UI would render it with no client change** — `AionrsSendBox.tsx:1321`
+and `AionrsModelSelector.tsx` both read it from session config options.
+
+### Finding 3a — but the pre-chat surfaces cannot render it for aionrs
+
+Corrected 2026-08-17, after an earlier draft of this plan overclaimed "no client change at all".
+
+`GuidModelSelector` has two returns. The `isGeminiMode` branch opens at line 115 and returns its own
+JSX at line 143 with **no** thought-level control; the control exists only in the second return
+(line 206, the ACP path, label at line 232). And `isGeminiMode` is
+`resolvedBackend === 'gemini' || resolvedBackend === 'aionrs'` — so it covers the runtime our users
+actually use. `GuidPage.tsx:908,952` additionally passes `thoughtLevelOption={isGeminiMode ? null : …}`,
+nulling it deliberately.
+
+So for aionrs the split is:
+
+| Surface                                                          | Renders a thinking level?                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| In-conversation (`AionrsSendBox`, `AionrsModelSelector`)         | **Yes** — would light up on advertisement with no client change           |
+| Pre-chat (Guid)                                                  | **No** — not rendered in the `isGeminiMode` branch, and explicitly nulled |
+| Scheduled tasks (`CreateTaskDialog`, reuses `GuidModelSelector`) | **No** — same branch, and it never writes `config_options`                |
+
+Stream A therefore carries a real client task for the pre-chat surfaces (A6), not just a backend
+advertisement. It remains small, but it is not zero.
 
 Two pieces of schema are already shipped inside the 001–027 baseline:
 
@@ -172,7 +195,15 @@ that an invalid value never reaches the provider.
       control ever writes it, so a scheduled task cannot carry a level. `resolveCronAgentConfig`
       already forwards `config_options` and `TaskDetailPage.tsx:581` already renders a heading for
       it — the persistence and display halves exist and are currently dead.
-- [ ] Pass the derived option in; write the choice into `config_options`.
+- [ ] Per Finding 3a, this needs `GuidModelSelector`'s `isGeminiMode` branch to render the control
+      too, and `GuidPage`'s deliberate `null` reconsidered. Do both surfaces together or Guid and
+      cron will disagree about whether the setting exists.
+- [ ] Carry the value in `agent_config.config_options` — `ICronAgentConfigWrite` (`ipcBridge.ts:1855`)
+      has no `thought_level` field, unlike the Guid send path which uses an assistant override
+      (`useGuidSend.ts:607`). Do not add one without deciding which carrier is canonical.
+- [ ] **Verify the backend actually applies it at fire time.** Persisting `config_options` on the job
+      is not the same as the runtime honouring it when the task fires. If aioncore ignores it for
+      cron, A6 becomes a backend task and must be re-planned rather than shipped as a UI change.
 - [ ] **When the agent advertises no levels, render no control** — consistent with every existing
       chat surface. Do not invent a disabled control for a capability that cannot exist.
 - [ ] On the task detail page, when no level was chosen, **show the effective level** marked as the
