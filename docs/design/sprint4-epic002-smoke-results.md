@@ -41,18 +41,38 @@ confused with "it was already there".
 
 ## Results
 
-| #   | Case                                   | Backend              | Language                | Outcome       | Evidence                                                                                                                        |
-| --- | -------------------------------------- | -------------------- | ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Creation happy path                    | aionrs (`kimi-k2.6`) | English                 | **fail — F1** | conversation `f90e8348`: directive fired, `THEME.md` written (12,517 B), marker correct, card rendered, **install unreachable** |
-| 2   | Creation happy path                    | aionrs               | Vietnamese (accented)   | _not yet run_ |                                                                                                                                 |
-| 3   | Intent match                           | aionrs               | Vietnamese (unaccented) | _not yet run_ |                                                                                                                                 |
-| 4   | Deliberate non-trigger (`mau nay dep`) | aionrs               | Vietnamese              | _not yet run_ |                                                                                                                                 |
-| 5   | Creation happy path                    | ACP (OpenCode)       | English                 | _not yet run_ |                                                                                                                                 |
-| 6   | Creation happy path                    | ACP (OpenCode)       | Vietnamese              | _not yet run_ |                                                                                                                                 |
-| 7   | Hash-binding refusal after tamper      | either               | —                       | _not yet run_ |                                                                                                                                 |
+| #   | Case                                   | Backend              | Language                | Outcome                  | Evidence                                                 |
+| --- | -------------------------------------- | -------------------- | ----------------------- | ------------------------ | -------------------------------------------------------- |
+| 1   | Creation happy path                    | aionrs (`kimi-k2.6`) | English                 | **PASS** (after 5 fixes) | conversation `f90e8348`; see "Case 1 — end to end" below |
+| 2   | Creation happy path                    | aionrs               | Vietnamese (accented)   | _not yet run_            |                                                          |
+| 3   | Intent match                           | aionrs               | Vietnamese (unaccented) | _not yet run_            |                                                          |
+| 4   | Deliberate non-trigger (`mau nay dep`) | aionrs               | Vietnamese              | _not yet run_            |                                                          |
+| 5   | Creation happy path                    | ACP (OpenCode)       | English                 | _not yet run_            |                                                          |
+| 6   | Creation happy path                    | ACP (OpenCode)       | Vietnamese              | _not yet run_            |                                                          |
+| 7   | Hash-binding refusal after tamper      | either               | —                       | _not yet run_            |                                                          |
 
 Outcome vocabulary: **pass**, **fail**, **blocked**. Blocked is a valid outcome; silent omission is
 not.
+
+## Case 1 — end to end, after five fixes
+
+Verified 2026-08-18 on a build carrying BUG-046, BUG-049 and BUG-050 (`177b35f40`), with the bundle
+timestamp confirmed newer than every fixed source file before the walk. **This is the first time the
+path has ever completed.**
+
+| Step                               | Evidence                                                                                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Intent fires on the real send path | the persisted user message carries the appended `Template creation instructions:` directive                                              |
+| Assistant obeys the directive      | wrote `THEME.md` (12,517 B) into the conversation workspace; emitted exactly one marker, final line, outside any fence, nothing after it |
+| Parser + card                      | `data-testid="template-review-card"` mounted; the raw marker is stripped from the visible body                                           |
+| Card reaches the actionable state  | renders the theme name, the retention disclosure, and an **Install in Template Gallery** button                                          |
+| One click installs                 | card advances to `Installed in Template Gallery` — the exact en-US string for `messages.templateReview.installed`                        |
+| Gallery gains exactly one entry    | `diff` against the 12-entry baseline: `10a11 > reusable-html-template-specification-clean-repor`                                         |
+| The installed pack is real         | `THEME.md` 12,517 B (matching the source byte count), `preview.svg` 1,165 B, `template.json` 385 B                                       |
+
+**Five separate defects stood between "merged" and "works":** BUG-046 (three UUID layers), BUG-049
+(`team.user_id` absent from the wire), BUG-050 (lexical containment vs a symlinked data directory).
+None was reachable from the test suite; every one needed the running app.
 
 ## Findings
 
