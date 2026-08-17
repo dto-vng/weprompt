@@ -33,6 +33,13 @@
   - Types cannot catch it: `teamTypes.ts:33-42` declares `user_id` (and `workspace_mode`) required while the wire omits both. Tests build team fixtures from the type, not from a real response.
   - Decision needed: dropping the check removes defence-in-depth that has never passed (the request is already server-filtered by `?user_id=`); adding the field to the DTO needs an AionCore change and therefore a backend release, which is parked.
 
+- [ ] **[BUG-050][P1][EPIC-002] Workspace containment is lexical, so a symlinked data directory rejects files that are inside the workspace** — found 2026-08-18 by re-walking the smoke past BUG-049
+  - Actual: `PresentationTemplateService.candidateRelativePath:613-633` computes `path.relative(workspaceRoot, filePath)` and rejects a `..` prefix. Both inputs only satisfy `path.resolve(x) === x`, which normalizes but does **not** follow symlinks. The conversation record stores the workspace via the symlink (`~/.aionui-dev/...`) while the assistant's marker reports the resolved path (`~/Library/Application Support/Forge-Dev/aionui/...`), so `path.relative` yields `../../../../../../Library/...` and the install is refused with "The theme file is outside this chat workspace."
+  - **Not dev-only:** production `~/.aionui` is equally a symlink (→ `~/Library/Application Support/Forge/aionui`), verified with `os.path.islink`. Same layout, same failure for real users.
+  - **Model-dependent, so it presents as flaky:** the directive says "Resolve the file's absolute path for the marker", so a model that resolves through the symlink fails while one that echoes the symlink path succeeds — identical code and prompt, different outcome by model.
+  - Expected: canonicalize both sides before comparing. Executed check: after `realpath` on both, `path.relative` is `"THEME.md"` and the file is correctly contained.
+  - **Possible security upside:** lexical comparison would _accept_ a symlink inside the workspace pointing outside it (the string looks contained). Canonicalizing first would close that. Being verified as part of the fix.
+
 - [ ] **[BUG-048][P2][Integrity] The same UUID-shaped `conversation_id` assumption is live across the runs and sources features** — found 2026-08-18 by the independent review of the BUG-046 fix
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
