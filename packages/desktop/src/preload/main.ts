@@ -146,12 +146,20 @@ const initialLanguage = ipcRenderer.sendSync('get-initial-language') as string |
 const backendStartupFailed = ipcRenderer.sendSync('get-backend-startup-failed') as boolean;
 const backendStartupFailure = ipcRenderer.sendSync('get-backend-startup-failure') as unknown;
 const backendLocalToken = ipcRenderer.sendSync('get-backend-local-token') as string;
+const ssoAccount = ipcRenderer.sendSync('get-sso-account') as {
+  username: string;
+  name?: string;
+  homeAccountId: string;
+} | null;
 contextBridge.exposeInMainWorld('__backendPort', backendPort > 0 ? backendPort : 0);
 // Secret the `--local` backend requires on every call. Exposed to the app's own
 // renderer only — webviews and iframes get their own preload (or none), so page
 // content rendered inside the app never sees it.
 contextBridge.exposeInMainWorld('__backendLocalToken', backendLocalToken || '');
 contextBridge.exposeInMainWorld('__initialLanguage', initialLanguage ?? null);
+// Signed-in Microsoft SSO account (WP 24045) so the renderer can show who is logged
+// in. Null when SSO is not configured.
+contextBridge.exposeInMainWorld('__ssoAccount', ssoAccount ?? null);
 contextBridge.exposeInMainWorld('__aionuiE2ETest', process.env.AIONUI_E2E_TEST === '1');
 contextBridge.exposeInMainWorld('__backendStartupFailed', backendStartupFailed === true);
 contextBridge.exposeInMainWorld('__backendStartupFailure', backendStartupFailure ?? null);

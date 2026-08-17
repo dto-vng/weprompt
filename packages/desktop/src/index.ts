@@ -54,6 +54,7 @@ import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
 import i18n, { setInitialLanguage } from '@process/services/i18n';
 import { runSsoGateForApp } from '@process/auth/ssoGate';
+import type { SsoAccount } from '@process/auth/msalAuthService';
 import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
 import {
@@ -370,6 +371,9 @@ let backendStartedOk = false;
 let backendStartupFailed = false;
 let backendStartupFailureInfo: BackendStartupFailureInfo | null = null;
 let rendererInitialLanguage: string | null = null;
+// Microsoft SSO account of the signed-in user (WP 24045), surfaced to the renderer
+// so the UI can show who is logged in. Null when SSO is not configured.
+let rendererSsoAccount: SsoAccount | null = null;
 let backendMigrationsScheduled = false;
 let ensureAdminUserPromise: Promise<void> | null = null;
 
@@ -392,6 +396,10 @@ ipcMain.on('get-backend-local-token', (event) => {
 
 ipcMain.on('get-initial-language', (event) => {
   event.returnValue = rendererInitialLanguage;
+});
+
+ipcMain.on('get-sso-account', (event) => {
+  event.returnValue = rendererSsoAccount;
 });
 
 ipcMain.on('get-backend-startup-failed', (event) => {
@@ -1306,6 +1314,7 @@ const handleAppReady = async (): Promise<void> => {
       app.quit();
       return;
     }
+    rendererSsoAccount = ssoOutcome.account;
 
     const showMainWindowOnReady = !(wasLaunchedAtLogin() && getCloseToTrayEnabled());
 

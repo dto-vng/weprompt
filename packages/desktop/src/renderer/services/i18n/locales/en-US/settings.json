@@ -7,6 +7,7 @@
   "profileInstructionsLabel": "Instructions",
   "profileInstructionsPlaceholder": "e.g. I work in HR at VNG. Prefer concise, formal Vietnamese. Ask before assuming a template.",
   "profileScopeNote": "Applies to your chats. Specialized assistants follow their own rules.",
+  "signedInAs": "Signed in as {{name}}",
   "title": "Settings",
   "skillsHub": {
     "title": "Skills Hub",

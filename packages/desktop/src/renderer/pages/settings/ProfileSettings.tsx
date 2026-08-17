@@ -16,9 +16,27 @@ const ProfileSettings: React.FC = () => {
   const enabled = ctx?.enabled ?? true;
   const instructions = ctx?.instructions ?? '';
 
+  // Microsoft SSO account (WP 24045), exposed by the preload; null when SSO is off.
+  const ssoAccount =
+    (globalThis as typeof globalThis & { __ssoAccount?: { username: string; name?: string } | null }).__ssoAccount ??
+    null;
+  const ssoName = ssoAccount?.name?.trim() || ssoAccount?.username;
+  const showSsoEmail = Boolean(ssoAccount?.name?.trim() && ssoAccount.name.trim() !== ssoAccount.username);
+
   return (
     <SettingsPageWrapper>
       <div className='flex flex-col gap-24px'>
+        {ssoAccount && (
+          <div className='flex flex-col gap-2px'>
+            <Typography.Text className='!font-medium'>{t('settings.signedInAs', { name: ssoName })}</Typography.Text>
+            {showSsoEmail && (
+              <Typography.Text type='secondary' className='text-12px'>
+                {ssoAccount.username}
+              </Typography.Text>
+            )}
+          </div>
+        )}
+
         <div className='flex flex-col gap-6px'>
           <Typography.Title heading={5} className='!mb-0'>
             {t('settings.profileTitle')}
