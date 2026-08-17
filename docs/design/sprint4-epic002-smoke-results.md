@@ -103,6 +103,42 @@ full renderer reload.
 > Its test fixture at `PresentationTemplateService.test.ts:238` is also a hand-written UUID, which is
 > why this layer stayed green too. Three layers, three UUID fixtures, one dead feature.
 
+### F4 — P1: scope resolution requires a team field the backend never sends
+
+Found 2026-08-18 by re-walking case 1 against the fixed build. **The three UUID layers were real and are
+fixed — the hang is gone and the promise now settles — but the install still fails**, now with the
+honest error "This chat workspace is unavailable. Nothing was installed." (`SCOPE_UNAVAILABLE`).
+
+`PresentationScopeResolver.resolveTeamScope:78` bails with
+`if (!isRecord(team) || team.user_id !== teamUserId) return null;`
+
+The live `GET /api/teams?user_id=system_default_user` returns **200 OK** with one team whose keys are
+exactly `id, name, workspace, assistants, leader_assistant_id, created_at, updated_at` — **there is no
+`user_id` field**. So the comparison is `undefined !== 'system_default_user'`, the function returns
+`null`, and every scope resolution fails closed.
+
+**This is a different defect class from F1** and is independent of id format: it breaks the feature for
+**any user who has at least one team**. A user with zero teams skips the loop, reaches
+`membershipCount === 0`, resolves `'individual'`, and would work. This dev profile has one team
+("Video Crew"), which is why the smoke hits it.
+
+**The codebase already knows the field is absent.** `teamMapper.ts:104` reads
+`user_id: (r.user_id as string | undefined) ?? ''` — it defensively defaults it. `ipcBridge.ts:2334`
+casts it (`raw.user_id as string`), which yields `undefined` at runtime. `PresentationScopeResolver.ts:78`
+is the **only** consumer in the tree that treats the field as authoritative. That asymmetry is the
+evidence: the resolver's expectation is wrong, not the backend.
+
+Why types did not catch it: `teamTypes.ts:33-42` declares `TTeam.user_id: string` as **required**, and
+`ipcBridge.ts:2431` types the endpoint as returning `TTeam[]`. The declared type is aspirational
+relative to the wire — `workspace_mode` is likewise declared required and likewise absent. This is the
+wire-contract-skew class: TypeScript cannot see it, and no test does either, because tests construct
+team fixtures from the type rather than from a real response.
+
+**Open decision.** Fixing this means dropping (or reworking) a fail-closed check that has never once
+passed in production. The request is already server-filtered by `?user_id=`, so the client-side
+equality test is defence-in-depth against a backend that ignores its own filter. Adding `user_id` to the
+backend DTO instead would require an AionCore change and therefore a backend release, which is parked.
+
 ### F3 — P2: the same wrong id assumption is live across the runs and sources features
 
 Found while reviewing the F1 fix; **not** fixed, and deliberately out of that commit's scope. The same

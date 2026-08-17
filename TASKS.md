@@ -26,6 +26,13 @@
   - Impact: this is not template-specific. It applies to every `buildProvider` channel in the app, and it is why BUG-046 presented as an invisible hang instead of a loud error for nine days.
   - Scope note: fixing it changes shared IPC behaviour for every provider, so it was deliberately kept out of the BUG-046 fix and needs its own change, review, and full-suite run.
 
+- [ ] **[BUG-049][P1][EPIC-002] Template scope resolution requires a team field the backend never sends** — found 2026-08-18 by re-walking the smoke against the fixed build
+  - Actual: `PresentationScopeResolver.resolveTeamScope:78` returns `null` unless `team.user_id === 'system_default_user'`. The live `GET /api/teams?user_id=system_default_user` returns 200 with team keys `id, name, workspace, assistants, leader_assistant_id, created_at, updated_at` — **no `user_id`**. So it is `undefined !== 'system_default_user'`, scope resolution fails closed, and the card shows "This chat workspace is unavailable. Nothing was installed."
+  - Independent of BUG-046: this breaks the feature for **any user with ≥1 team**, whatever the id format. A user with zero teams resolves `individual` and works.
+  - The tree already treats the field as absent: `teamMapper.ts:104` defaults it to `''` and `ipcBridge.ts:2334` casts it. `PresentationScopeResolver.ts:78` is the only consumer treating it as authoritative — the resolver's expectation is wrong, not the backend.
+  - Types cannot catch it: `teamTypes.ts:33-42` declares `user_id` (and `workspace_mode`) required while the wire omits both. Tests build team fixtures from the type, not from a real response.
+  - Decision needed: dropping the check removes defence-in-depth that has never passed (the request is already server-filtered by `?user_id=`); adding the field to the DTO needs an AionCore change and therefore a backend release, which is parked.
+
 - [ ] **[BUG-048][P2][Integrity] The same UUID-shaped `conversation_id` assumption is live across the runs and sources features** — found 2026-08-18 by the independent review of the BUG-046 fix
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
