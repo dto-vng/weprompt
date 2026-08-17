@@ -96,16 +96,19 @@ async function createPptxPack(
 describe('PresentationTemplateService', () => {
   let rootDir: string;
   let workspaceDir: string;
+  let symlinkedBases: string[];
 
   beforeEach(async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), 'ptpl-'));
     workspaceDir = await mkdtemp(path.join(tmpdir(), 'ptpl-workspace-'));
+    symlinkedBases = [];
   });
 
   afterEach(async () => {
     await Promise.all([
       rm(rootDir, { recursive: true, force: true }),
       rm(workspaceDir, { recursive: true, force: true }),
+      ...symlinkedBases.map((base) => rm(base, { recursive: true, force: true })),
     ]);
   });
 
@@ -300,6 +303,100 @@ describe('PresentationTemplateService', () => {
       await expect(
         service.describeThemeSpec({ conversationId: badConversationId, workspaceRoot: workspaceDir, filePath })
       ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+    });
+
+    /**
+     * Mirrors the real data-directory layout: `~/.aionui` is a symlink to
+     * `~/Library/Application Support/Forge/aionui` (dev uses `~/.aionui-dev` → `Forge-Dev/aionui`).
+     * The conversation record reports the workspace through the link while the assistant resolves
+     * the file's absolute path through the real directory, so the two sides disagree lexically. A
+     * plain temp dir cannot reproduce this and would pass either way.
+     */
+    const createSymlinkedWorkspace = async (): Promise<{ linkedRoot: string; realRoot: string }> => {
+      const base = await mkdtemp(path.join(tmpdir(), 'ptpl-symlinked-'));
+      const realRoot = path.join(base, 'real');
+      const linkedRoot = path.join(base, 'link');
+      await mkdir(realRoot, { recursive: true });
+      await symlink(realRoot, linkedRoot);
+      symlinkedBases.push(base);
+      return { linkedRoot, realRoot };
+    };
+
+    it('installs a theme when the workspace is reached through a symlinked data directory', async () => {
+      const service = createBoundService();
+      const { linkedRoot, realRoot } = await createSymlinkedWorkspace();
+      const themeBytes = Buffer.from('# Symlinked Theme\n\n--accent: #c8341e', 'utf-8');
+      await writeFile(path.join(realRoot, 'THEME.md'), themeBytes);
+
+      // Workspace via the link, file via the real path — exactly what the live walk captured.
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: linkedRoot,
+        filePath: path.join(realRoot, 'THEME.md'),
+      });
+      const installed = await service.importThemeSpecBound({
+        conversationId: shortConversationId,
+        workspaceRoot: linkedRoot,
+        filePath: path.join(realRoot, 'THEME.md'),
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({ name: 'Symlinked Theme', sha256: sha256(themeBytes) });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    it('still refuses a directory symlink that escapes the workspace after canonicalization', async () => {
+      const service = createBoundService();
+      const outsideDir = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-dir-'));
+      const escapeDir = path.join(workspaceDir, 'escape');
+      await writeFile(path.join(outsideDir, 'THEME.md'), '# Escaped Theme\n#112233', 'utf-8');
+      await symlink(outsideDir, escapeDir);
+
+      try {
+        await expect(
+          service.describeThemeSpec({
+            conversationId: shortConversationId,
+            workspaceRoot: workspaceDir,
+            filePath: path.join(escapeDir, 'THEME.md'),
+          })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      } finally {
+        await rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('maps an unreadable candidate directory to a candidate failure rather than a raw fs error', async () => {
+      const service = createBoundService();
+
+      await expect(
+        service.describeThemeSpec({
+          conversationId: shortConversationId,
+          workspaceRoot: workspaceDir,
+          filePath: path.join(workspaceDir, 'no-such-directory', 'THEME.md'),
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+    });
+
+    it('maps a candidate deleted between describe and install to a candidate failure', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Vanishing Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+      });
+      await rm(filePath);
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId: shortConversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: described.sha256,
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      expect(await service.list()).toEqual([]);
     });
 
     it('refuses content swapped after describe without creating a partial pack', async () => {

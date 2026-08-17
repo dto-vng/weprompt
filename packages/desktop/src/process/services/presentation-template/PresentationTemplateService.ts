@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 import { constants, type BigIntStats } from 'node:fs';
-import { lstat, mkdir, mkdtemp, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, open, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
@@ -610,7 +610,24 @@ export class PresentationTemplateService {
     }
   }
 
-  private candidateRelativePath(input: CandidateInput): string {
+  /**
+   * Decides workspace containment on canonicalized paths, because the two sides legitimately
+   * disagree lexically: the data directory is a symlink (`~/.aionui` → `~/Library/Application
+   * Support/Forge/aionui`), so a conversation record can report the workspace through the link
+   * while the assistant reports the file through the real directory. `path.resolve` normalizes but
+   * does not follow symlinks, so comparing those two lexically yielded a `..` prefix and refused
+   * every such candidate.
+   *
+   * Only the file's PARENT is canonicalized, never its final segment — the same rule
+   * `resolveStableSourcePath` follows — so a symlinked file stays visible as a symlink and is still
+   * rejected downstream by the authorizer's lstat check.
+   *
+   * Canonicalizing here and reading afterwards opens a TOCTOU window, deliberately left open: the
+   * bytes are hashed at describe time and the install refuses anything whose digest no longer
+   * matches the minted confirmation, so a swap between the two is caught as CANDIDATE_CHANGED
+   * rather than silently installed. No new locking is warranted.
+   */
+  private async candidateRelativePath(input: CandidateInput): Promise<string> {
     if (
       !isBoundedConversationId(input.conversationId) ||
       !path.isAbsolute(input.workspaceRoot) ||
@@ -621,7 +638,17 @@ export class PresentationTemplateService {
     ) {
       throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE');
     }
-    const relativePath = path.relative(input.workspaceRoot, input.filePath);
+    let canonicalWorkspaceRoot: string;
+    let canonicalFileParent: string;
+    try {
+      canonicalWorkspaceRoot = await realpath(input.workspaceRoot);
+      canonicalFileParent = await realpath(path.dirname(input.filePath));
+    } catch (error) {
+      // A missing or unreadable workspace or parent directory is not a usable candidate.
+      throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE', { cause: error });
+    }
+    const canonicalFilePath = path.join(canonicalFileParent, path.basename(input.filePath));
+    const relativePath = path.relative(canonicalWorkspaceRoot, canonicalFilePath);
     if (
       relativePath.length === 0 ||
       path.isAbsolute(relativePath) ||
@@ -637,7 +664,7 @@ export class PresentationTemplateService {
     file: ResolvedPresentationTemplateFile;
     authorization: PresentationSourcePathAuthorization;
   }> {
-    const relativePath = this.candidateRelativePath(input);
+    const relativePath = await this.candidateRelativePath(input);
     if (this.workspaceSourceAuthorizer === null) {
       throw new PresentationTemplateCandidateError('CANDIDATE_OUTSIDE_WORKSPACE');
     }
