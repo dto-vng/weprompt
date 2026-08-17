@@ -6,8 +6,9 @@
 
 import path from 'node:path';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_PRINCIPAL_LENGTH = 256;
+/** Conversation ids are short ids, bounded exactly like the transport `identifierSchema`. */
+const MAX_CONVERSATION_LENGTH = 256;
 const MAX_RUNTIME_LENGTH = 64;
 const MAX_WORKSPACE_LENGTH = 4096;
 
@@ -83,7 +84,12 @@ function resolveTeamScope(value: unknown, conversationId: string, teamUserId: st
     for (const assistant of assistants) {
       if (!isRecord(assistant) || typeof assistant.conversation_id !== 'string') return null;
       const normalizedConversationId = assistant.conversation_id.toLowerCase();
-      if (!UUID_RE.test(normalizedConversationId) || seenConversationIds.has(normalizedConversationId)) return null;
+      if (
+        !isBoundedIdentifier(normalizedConversationId, MAX_CONVERSATION_LENGTH) ||
+        seenConversationIds.has(normalizedConversationId)
+      ) {
+        return null;
+      }
       seenConversationIds.add(normalizedConversationId);
       if (normalizedConversationId === conversationId) membershipCount += 1;
     }
@@ -104,7 +110,7 @@ export class PresentationScopeResolver {
   async resolve(input: { conversationId: string; principalId: string }): Promise<PresentationScopeResolution> {
     const conversationId = input.conversationId.toLowerCase();
     if (
-      !UUID_RE.test(conversationId) ||
+      !isBoundedIdentifier(conversationId, MAX_CONVERSATION_LENGTH) ||
       !isBoundedIdentifier(input.principalId, MAX_PRINCIPAL_LENGTH) ||
       !isBoundedIdentifier(this.options.teamUserId, MAX_PRINCIPAL_LENGTH)
     ) {

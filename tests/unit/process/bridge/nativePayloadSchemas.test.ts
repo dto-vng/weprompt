@@ -88,12 +88,13 @@ const VALID_PAYLOADS = {
   },
   'presentation-templates.list': undefined,
   'presentation-templates.import-spec': { file_path: '/tmp/theme.json' },
+  // Conversation ids minted by the running app are short ids, never RFC-4122 uuids.
   'presentation-templates.describe-spec': {
-    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    conversation_id: 'f90e8348',
     file_path: '/tmp/workspace/THEME.md',
   },
   'presentation-templates.import-spec-bound': {
-    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    conversation_id: 'f90e8348',
     file_path: '/tmp/workspace/THEME.md',
     expected_sha256: 'a'.repeat(64),
   },
@@ -1719,6 +1720,35 @@ describe('native bridge payload schemas', () => {
       ).not.toThrow();
     }
   );
+
+  // Regression: the template review card sends the id of the conversation it renders in, and those
+  // ids are short ids. A uuid-shaped schema rejected every real payload and hung the card forever.
+  it.each([
+    ['presentation-templates.describe-spec', 'f9e26b84'],
+    ['presentation-templates.describe-spec', 'df17cd9c'],
+    ['presentation-templates.import-spec-bound', 'fb5ff0cc'],
+    ['presentation-templates.import-spec-bound', 'ede9a3b7'],
+  ] as const)(
+    'accepts the short conversation id shape the app actually mints for %s',
+    (providerKey, conversationId) => {
+      const payload = { ...VALID_PAYLOADS[providerKey], conversation_id: conversationId };
+
+      expect(() => parseNativeBridgePayload(providerKey as NativeBridgeProviderKey, payload)).not.toThrow();
+    }
+  );
+
+  it.each([
+    ['presentation-templates.describe-spec', 'empty', ''],
+    ['presentation-templates.describe-spec', 'over-length', 'a'.repeat(257)],
+    ['presentation-templates.import-spec-bound', 'empty', ''],
+    ['presentation-templates.import-spec-bound', 'over-length', 'a'.repeat(257)],
+  ] as const)('still rejects %s with an %s conversation id', (providerKey, _reason, conversationId) => {
+    const payload = { ...VALID_PAYLOADS[providerKey], conversation_id: conversationId };
+
+    expect(() => parseNativeBridgePayload(providerKey as NativeBridgeProviderKey, payload)).toThrow(
+      INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE
+    );
+  });
 
   it('has exactly one request and response schema for every renderer-owned query', () => {
     expect(Object.keys(rendererBridgeQuerySchemas)).toEqual(RENDERER_BRIDGE_QUERY_KEYS);

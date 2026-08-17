@@ -15,6 +15,9 @@ import {
 
 const CONVERSATION_ID = '22222222-2222-4222-8222-222222222222';
 const OTHER_CONVERSATION_ID = '33333333-3333-4333-8333-333333333333';
+// Ids the running app actually mints for conversations: 8-hex short ids, never RFC-4122 uuids.
+const SHORT_CONVERSATION_ID = 'f90e8348';
+const OTHER_SHORT_CONVERSATION_ID = 'df17cd9c';
 const PRINCIPAL_ID = 'desktop-local-principal';
 const TEAM_USER_ID = 'system_default_user';
 
@@ -72,6 +75,51 @@ describe('PresentationScopeResolver', () => {
       workspace: '/workspace',
     });
     expect(harness.listTeams).toHaveBeenCalledWith({ userId: TEAM_USER_ID });
+  });
+
+  it('resolves an individual conversation whose id is a short id rather than a uuid', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toEqual({
+      ok: true,
+      conversationId: SHORT_CONVERSATION_ID,
+      principalId: PRINCIPAL_ID,
+      scope: 'individual',
+      runtime: 'aionrs',
+      workspace: '/workspace',
+    });
+  });
+
+  it('keeps individual scope when enumerated teams bind short-id conversations', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [team([OTHER_SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'individual',
+    });
+  });
+
+  it('proves team membership from a short-id assistant conversation', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [team([SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'team',
+    });
   });
 
   it('classifies team ownership only from authoritative assistants membership', async () => {
@@ -134,7 +182,7 @@ describe('PresentationScopeResolver', () => {
       'ambiguous assistants and agents aliases',
       async () => [{ ...team([CONVERSATION_ID]), agents: team([CONVERSATION_ID]).assistants }],
     ],
-    ['malformed assistant conversation id', async () => [team(['../foreign'])]],
+    ['blank assistant conversation id', async () => [team([''])]],
     [
       'ambiguous duplicate membership',
       async () => [team([CONVERSATION_ID]), { ...team([CONVERSATION_ID]), id: 'team-2' }],
