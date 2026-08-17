@@ -22,5 +22,14 @@
     "networkError": "Connection failed, please try again",
     "serverError": "Server error, please try again later",
     "unknown": "Sign-in failed, please try again"
+  },
+  "sso": {
+    "signingIn": "Signing in with Microsoft",
+    "signingInHint": "Complete sign-in in the browser window that just opened, then return to WePrompt.",
+    "failedTitle": "Microsoft sign-in failed",
+    "failedMessage": "We couldn't sign you in. Please try again.",
+    "domainNotAllowed": "This Microsoft account is not allowed to use WePrompt. Please sign in with your organization account.",
+    "retry": "Try again",
+    "quit": "Quit"
   }
 }

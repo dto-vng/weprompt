@@ -35,7 +35,9 @@ export type SsoConfig = {
   allowedEmailDomains: string[];
 };
 
-type SsoConfigFile = Partial<Pick<SsoConfig, 'tenantId' | 'clientId' | 'redirectUri' | 'scopes' | 'allowedEmailDomains'>>;
+type SsoConfigFile = Partial<
+  Pick<SsoConfig, 'tenantId' | 'clientId' | 'redirectUri' | 'scopes' | 'allowedEmailDomains'>
+>;
 
 function readConfigFile(userDataDir: string): SsoConfigFile {
   try {
@@ -85,7 +87,10 @@ export function loadSsoConfig(userDataDir: string, env: NodeJS.ProcessEnv = proc
  * domain allowlist. When the allowlist is empty this returns true — access is then
  * governed solely by the Entra tenant restriction. Belt-and-suspenders only.
  */
-export function isEmailDomainAllowed(email: string | undefined, config: Pick<SsoConfig, 'allowedEmailDomains'>): boolean {
+export function isEmailDomainAllowed(
+  email: string | undefined,
+  config: Pick<SsoConfig, 'allowedEmailDomains'>
+): boolean {
   if (config.allowedEmailDomains.length === 0) return true;
   const domain = email?.split('@')[1]?.trim().toLowerCase();
   return Boolean(domain && config.allowedEmailDomains.includes(domain));

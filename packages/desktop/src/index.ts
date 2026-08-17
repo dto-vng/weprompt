@@ -53,6 +53,7 @@ import {
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
 import i18n, { setInitialLanguage } from '@process/services/i18n';
+import { runSsoGateForApp } from '@process/auth/ssoGate';
 import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
 import {
@@ -1287,6 +1288,23 @@ const handleAppReady = async (): Promise<void> => {
       } catch {
         // Ignore storage read errors, default to false
       }
+    }
+
+    // Microsoft SSO gate (WP 24045, Hướng B): when the install is configured with a
+    // tenant + client id, require a Microsoft sign-in before the main window opens.
+    // It is a no-op (returns immediately) when SSO is not configured. Initialize the
+    // saved UI language first so the gate's status window and dialogs are localized.
+    try {
+      const savedLanguageForGate = await ProcessConfig.get('language');
+      await setInitialLanguage(savedLanguageForGate);
+    } catch (error) {
+      console.error('[SSO] Failed to initialize language before gate:', error);
+    }
+    const ssoOutcome = await runSsoGateForApp();
+    if (!ssoOutcome.proceed) {
+      console.log('[SSO] Sign-in was not completed; quitting.');
+      app.quit();
+      return;
     }
 
     const showMainWindowOnReady = !(wasLaunchedAtLogin() && getCloseToTrayEnabled());

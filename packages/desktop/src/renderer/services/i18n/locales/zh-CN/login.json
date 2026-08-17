@@ -22,5 +22,14 @@
     "networkError": "连接失败，请稍后重试",
     "serverError": "服务器开小差了，请稍后重试",
     "unknown": "登录失败，请稍后再试"
+  },
+  "sso": {
+    "signingIn": "正在使用 Microsoft 登录",
+    "signingInHint": "请在刚打开的浏览器窗口中完成登录，然后返回 WePrompt。",
+    "failedTitle": "Microsoft 登录失败",
+    "failedMessage": "登录未成功，请重试。",
+    "domainNotAllowed": "该 Microsoft 账号无权使用 WePrompt，请使用公司账号登录。",
+    "retry": "重试",
+    "quit": "退出"
   }
 }
