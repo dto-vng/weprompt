@@ -13,7 +13,22 @@
 
 ## Sprint 4 — found by the EPIC-002 live creation smoke (2026-08-17/18)
 
-- [ ] **[BUG-046][P1][EPIC-002] The in-chat template install path is unreachable, so the review card hangs forever** — found 2026-08-17 by the first live execution of the A0+ path; **root cause proven at three layers, fix in progress**
+> **EPIC-002 Epic A is verified working as of 2026-08-18** — the first time the path has ever run.
+> All seven smoke cases pass on both backends in both languages, with an exact gallery accounting
+> (12-entry baseline → 16, four installs for four creation cases, nothing from the intent-only,
+> non-trigger, or tamper cases). Evidence:
+> [docs/design/sprint4-epic002-smoke-results.md](docs/design/sprint4-epic002-smoke-results.md).
+>
+> **It took five defects to get there** (BUG-046, BUG-049, BUG-050), none of which the 8,200-test suite
+> could see. The unifying cause is a testing method, not a coding mistake: **fixtures were derived from
+> types and schemas instead of captured from reality**. `TTeam` declares `user_id` and `workspace_mode`
+> required while the wire carries neither; three separate guards were pinned by hand-written UUID
+> fixtures for a field that is always an 8-hex short id; containment was proven against tidy temp dirs
+> when the real data directory is a symlink. BUG-047 turned all of it into silence rather than errors.
+> Treat any "green suite" claim about an unexecuted feature accordingly — and see BUG-048, which
+> predicts the same class in the runs and sources features.
+
+- [x] **[BUG-046][P1][EPIC-002] The in-chat template install path is unreachable, so the review card hangs forever** — found 2026-08-17 by the first live execution of the A0+ path; **fixed 2026-08-18 (`8e932a0dc`, `69012de4f`), verified live**
   - Actual: the assistant writes a valid `THEME.md` and emits a correct marker, the review card renders — and then sits on "Reviewing the theme…" permanently. No error, no retry, no install. The feature merged 2026-08-08 (`!87`, `!90`, `!94`) and had never been executed until this smoke.
   - Root cause: `conversation_id` is validated as an RFC-4122 UUID at three independent layers, while real conversation ids are 8-hex short ids (`f90e8348`, verified across 35 live conversations). (1) `native/payloadSchemas.ts:538,541`; (2) `PresentationScopeResolver.ts:107` and `:86`; (3) `PresentationTemplateService.ts:603` (`candidateRelativePath`, on the unconditional path from both channels).
   - Why it hung rather than errored: see BUG-047. Layers 1–2 fixed by `8e932a0dc`, which converts the hang into a visible `CANDIDATE_OUTSIDE_WORKSPACE`; layer 3 still blocks the install.
@@ -26,14 +41,14 @@
   - Impact: this is not template-specific. It applies to every `buildProvider` channel in the app, and it is why BUG-046 presented as an invisible hang instead of a loud error for nine days.
   - Scope note: fixing it changes shared IPC behaviour for every provider, so it was deliberately kept out of the BUG-046 fix and needs its own change, review, and full-suite run.
 
-- [ ] **[BUG-049][P1][EPIC-002] Template scope resolution requires a team field the backend never sends** — found 2026-08-18 by re-walking the smoke against the fixed build
+- [x] **[BUG-049][P1][EPIC-002] Template scope resolution requires a team field the backend never sends** — found 2026-08-18 by re-walking the smoke; **fixed 2026-08-18 (`86947e62f`), verified live**
   - Actual: `PresentationScopeResolver.resolveTeamScope:78` returns `null` unless `team.user_id === 'system_default_user'`. The live `GET /api/teams?user_id=system_default_user` returns 200 with team keys `id, name, workspace, assistants, leader_assistant_id, created_at, updated_at` — **no `user_id`**. So it is `undefined !== 'system_default_user'`, scope resolution fails closed, and the card shows "This chat workspace is unavailable. Nothing was installed."
   - Independent of BUG-046: this breaks the feature for **any user with ≥1 team**, whatever the id format. A user with zero teams resolves `individual` and works.
   - The tree already treats the field as absent: `teamMapper.ts:104` defaults it to `''` and `ipcBridge.ts:2334` casts it. `PresentationScopeResolver.ts:78` is the only consumer treating it as authoritative — the resolver's expectation is wrong, not the backend.
   - Types cannot catch it: `teamTypes.ts:33-42` declares `user_id` (and `workspace_mode`) required while the wire omits both. Tests build team fixtures from the type, not from a real response.
   - Decision needed: dropping the check removes defence-in-depth that has never passed (the request is already server-filtered by `?user_id=`); adding the field to the DTO needs an AionCore change and therefore a backend release, which is parked.
 
-- [ ] **[BUG-050][P1][EPIC-002] Workspace containment is lexical, so a symlinked data directory rejects files that are inside the workspace** — found 2026-08-18 by re-walking the smoke past BUG-049
+- [x] **[BUG-050][P1][EPIC-002] Workspace containment is lexical, so a symlinked data directory rejects files that are inside the workspace** — found 2026-08-18 by re-walking the smoke past BUG-049; **fixed 2026-08-18 (`177b35f40`), verified live**
   - Actual: `PresentationTemplateService.candidateRelativePath:613-633` computes `path.relative(workspaceRoot, filePath)` and rejects a `..` prefix. Both inputs only satisfy `path.resolve(x) === x`, which normalizes but does **not** follow symlinks. The conversation record stores the workspace via the symlink (`~/.aionui-dev/...`) while the assistant's marker reports the resolved path (`~/Library/Application Support/Forge-Dev/aionui/...`), so `path.relative` yields `../../../../../../Library/...` and the install is refused with "The theme file is outside this chat workspace."
   - **Not dev-only:** production `~/.aionui` is equally a symlink (→ `~/Library/Application Support/Forge/aionui`), verified with `os.path.islink`. Same layout, same failure for real users.
   - **Model-dependent, so it presents as flaky:** the directive says "Resolve the file's absolute path for the marker", so a model that resolves through the symlink fails while one that echoes the symlink path succeeds — identical code and prompt, different outcome by model.
