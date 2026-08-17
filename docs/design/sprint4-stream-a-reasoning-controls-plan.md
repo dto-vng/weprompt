@@ -14,7 +14,9 @@
 
 ## Immutable base
 
-- Branch `sprint4`, base commit `15c5fafcb` (cut from `sprint3` @ `ee265dba4`).
+- Branch `sprint4`, cut from `sprint3` @ `ee265dba4`. Anchor work to that commit, not to this plan's
+  own commit — the plan commits were rewritten once already (to strip a trailer) and any SHA above
+  `ee265dba4` on this branch is not stable enough to cite.
 - WePrompt worktree: `/Users/lap16603/Projects/WePrompt/.worktrees/sprint4`.
 - Record the base and head commit in every acceptance report. If `sprint4` moves under you, stop and re-confirm rather than rebasing silently.
 
