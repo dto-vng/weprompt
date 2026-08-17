@@ -684,6 +684,12 @@
     },
     "selected": "已选 MCP"
   },
+  "capability": {
+    "appliesHint": "已保存到该预设。将在该预设的新会话中生效（当前会话在重置前保持原有配置）。",
+    "saveToPreset": "保存到预设",
+    "saved": "已保存到预设",
+    "saveFailed": "保存到预设失败"
+  },
   "runtimePreparing": {
     "sendboxHint": "正在准备运行环境。首次启动可能会稍慢一些。"
   },

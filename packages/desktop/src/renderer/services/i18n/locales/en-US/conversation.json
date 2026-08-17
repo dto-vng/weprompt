@@ -684,6 +684,12 @@
     },
     "selected": "Selected MCP"
   },
+  "capability": {
+    "appliesHint": "Saved to the preset. Takes effect in new chats of this preset (this chat keeps its current setup until reset).",
+    "saveToPreset": "Save to preset",
+    "saved": "Saved to preset",
+    "saveFailed": "Could not save to preset"
+  },
   "runtimePreparing": {
     "sendboxHint": "Preparing the runtime environment. First startup can take a little longer."
   },

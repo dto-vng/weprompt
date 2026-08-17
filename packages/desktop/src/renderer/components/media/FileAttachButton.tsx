@@ -5,9 +5,9 @@
  */
 
 import type { IConversationMcpStatus, IConversationMcpStatusKind } from '@/common/config/storage';
-import { ipcBridge } from '@/common';
-import { Button, Message, Trigger } from '@arco-design/web-react';
+import { Button, Checkbox, Message, Trigger } from '@arco-design/web-react';
 import { FolderOpen, Lightning, Paperclip, Plus, Right, Shield } from '@icon-park/react';
+import { useAssistantCapabilityEditor } from '@/renderer/hooks/assistant';
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { iconColors } from '@/renderer/styles/colors';
 import { isElectronDesktop } from '@/renderer/utils/platform';
@@ -17,7 +17,6 @@ import { emitter } from '@/renderer/utils/emitter';
 import React, { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import useSWR from 'swr';
 
 interface FileAttachButtonProps {
   openFileSelector: () => void;
@@ -87,15 +86,14 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [mcpOpen, setMcpOpen] = useState(false);
 
+  const capEditor = useAssistantCapabilityEditor(conversationContext?.assistantId);
+  const canEditCaps = capEditor.canEdit;
+
   const skillNames = loadedSkills ?? conversationContext?.loadedSkills ?? [];
   const mcpStatuses = buildLoadedMcpStatuses(
     loadedMcpStatuses ?? conversationContext?.loadedMcpStatuses,
     conversationContext?.loadedMcpServers
   );
-  const { data: skillIndex } = useSWR(skillNames.length > 0 ? 'skills-index' : null, () =>
-    ipcBridge.fs.listAvailableSkills.invoke()
-  );
-  const descriptionByName = new Map((skillIndex ?? []).map((s) => [s.name, s.description]));
 
   const handleSkillClick = useCallback((name: string) => {
     setOpen(false);
@@ -108,6 +106,19 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
     setMcpOpen(false);
     void navigate('/settings/tools');
   }, [navigate]);
+
+  const handleSaveToPreset = useCallback(async () => {
+    try {
+      const ok = await capEditor.save();
+      if (ok) {
+        Message.success(t('conversation.capability.saved', { defaultValue: 'Saved to preset' }));
+      } else {
+        Message.error(t('conversation.capability.saveFailed', { defaultValue: 'Could not save to preset' }));
+      }
+    } catch {
+      Message.error(t('conversation.capability.saveFailed', { defaultValue: 'Could not save to preset' }));
+    }
+  }, [capEditor, t]);
 
   const handleLocalFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,9 +141,13 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
   const isDesktop = isElectronDesktop();
   const hasSkills = skillNames.length > 0;
   const hasMcpServers = mcpStatuses.length > 0;
+  // When bound to an editable preset, always surface the skill/MCP sections so the
+  // selection can be changed mid-chat, not only when the session snapshot has them.
+  const showSkillsSection = hasSkills || canEditCaps;
+  const showMcpSection = hasMcpServers || canEditCaps;
   const plusIcon = <Plus theme='outline' size='14' strokeWidth={2} fill={iconColors.primary} />;
 
-  if (isDesktop && !hasSkills && !hasMcpServers) {
+  if (isDesktop && !showSkillsSection && !showMcpSection) {
     return (
       <Button
         type='secondary'
@@ -154,7 +169,52 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
     zIndex: 1050,
   };
 
-  const skillsPanel = (
+  const savePresetFooter = (
+    <>
+      <div style={{ margin: '4px 12px', height: 1, backgroundColor: 'var(--color-border-1, #e5e6eb)' }} />
+      <div className='px-12px py-8px flex flex-col gap-6px'>
+        <div className='text-12px leading-16px text-t-secondary whitespace-normal break-words'>
+          {t('conversation.capability.appliesHint', {
+            defaultValue:
+              'Saved to the preset. Takes effect in new chats of this preset (this chat keeps its current setup until reset).',
+          })}
+        </div>
+        <Button
+          type='primary'
+          size='mini'
+          loading={capEditor.saving}
+          disabled={!capEditor.dirty || capEditor.saving}
+          onClick={() => void handleSaveToPreset()}
+        >
+          {t('conversation.capability.saveToPreset', { defaultValue: 'Save to preset' })}
+        </Button>
+      </div>
+    </>
+  );
+
+  const skillsPanel = canEditCaps ? (
+    <div
+      style={{ ...cardStyle, minWidth: 220, maxHeight: 360, overflowY: 'auto' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {capEditor.allSkills.map((skill) => (
+        <div
+          key={skill.name}
+          className='mx-6px flex items-center gap-8px px-12px py-8px rounded-8px cursor-pointer hover:bg-fill-2'
+          onClick={() => capEditor.toggleSkill(skill.name, skill.isAuto)}
+        >
+          <Checkbox
+            checked={capEditor.isSkillChecked(skill)}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            onChange={() => capEditor.toggleSkill(skill.name, skill.isAuto)}
+          >
+            <span className='text-13px text-t-primary'>{skill.name}</span>
+          </Checkbox>
+        </div>
+      ))}
+      {savePresetFooter}
+    </div>
+  ) : (
     <div style={{ ...cardStyle, minWidth: 180 }} onClick={(e) => e.stopPropagation()}>
       {skillNames.map((name) => (
         <MenuItem
@@ -168,7 +228,54 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
     </div>
   );
 
-  const mcpPanel = (
+  const mcpPanel = canEditCaps ? (
+    <div
+      style={{
+        ...cardStyle,
+        minWidth: 220,
+        width: 'min(320px, calc(100vw - 96px))',
+        maxWidth: 320,
+        maxHeight: 380,
+        overflowY: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {capEditor.mcpServers.map((server) => (
+        <div
+          key={server.id}
+          className='mx-6px flex items-center gap-8px px-12px py-8px rounded-8px cursor-pointer hover:bg-fill-2'
+          onClick={() => capEditor.toggleMcp(server.id)}
+        >
+          <Checkbox
+            checked={capEditor.isMcpChecked(server.id)}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            onChange={() => capEditor.toggleMcp(server.id)}
+          >
+            <span className='text-13px text-t-primary'>
+              {server.name}
+              {server.tools?.length ? ` (${server.tools.length} ${t('mcp.tools')})` : ''}
+            </span>
+          </Checkbox>
+        </div>
+      ))}
+      {savePresetFooter}
+      <div className='px-12px pb-8px'>
+        <Button
+          type='text'
+          size='mini'
+          className='h-auto! px-0! text-12px! inline-flex! items-center! gap-4px!'
+          onClick={handleOpenMcpSettings}
+        >
+          <span className='leading-none'>
+            {t('conversation.mcp.openSettings', { defaultValue: 'Open Tools settings' })}
+          </span>
+          <span className='inline-flex h-12px w-12px flex-shrink-0 items-center justify-center'>
+            <Right theme='outline' size={12} strokeWidth={3} className='block' />
+          </span>
+        </Button>
+      </div>
+    </div>
+  ) : (
     <div
       style={{
         ...cardStyle,
@@ -224,9 +331,9 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
   const menu = (
     <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
       {/* Loaded items stay above file actions so the session snapshot is visible */}
-      {(hasMcpServers || hasSkills) && (
+      {(showMcpSection || showSkillsSection) && (
         <>
-          {hasMcpServers && (
+          {showMcpSection && (
             <div className='px-6px'>
               <Trigger
                 popup={() => mcpPanel}
@@ -240,14 +347,14 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
                 <div>
                   <MenuItem
                     icon={<Shield theme='outline' size={15} strokeWidth={2.5} />}
-                    label={`${t('conversation.mcp.selected', { defaultValue: 'Selected MCP' })} · ${mcpStatuses.length}`}
+                    label={`${t('conversation.mcp.selected', { defaultValue: 'Selected MCP' })} · ${canEditCaps ? capEditor.activeMcpCount : mcpStatuses.length}`}
                     suffix={<Right theme='outline' size={12} strokeWidth={3} style={{ color: '#c9cdd4' }} />}
                   />
                 </div>
               </Trigger>
             </div>
           )}
-          {hasSkills && (
+          {showSkillsSection && (
             <div className='px-6px'>
               <Trigger
                 popup={() => skillsPanel}
@@ -261,7 +368,7 @@ const FileAttachButton: React.FC<FileAttachButtonProps> = ({
                 <div>
                   <MenuItem
                     icon={<Lightning theme='outline' size={15} strokeWidth={2.5} />}
-                    label={`${t('common.selectedSkills', { defaultValue: 'Selected skills' })} · ${skillNames.length}`}
+                    label={`${t('common.selectedSkills', { defaultValue: 'Selected skills' })} · ${canEditCaps ? capEditor.activeSkillCount : skillNames.length}`}
                     suffix={<Right theme='outline' size={12} strokeWidth={3} style={{ color: '#c9cdd4' }} />}
                   />
                 </div>
