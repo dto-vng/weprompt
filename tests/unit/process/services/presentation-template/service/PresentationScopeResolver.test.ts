@@ -36,6 +36,56 @@ const team = (conversationIds: readonly string[], userId: string = TEAM_USER_ID)
   })),
 });
 
+/**
+ * Key sets captured verbatim from a live `GET /api/teams?user_id=system_default_user` 200 response
+ * on 2026-08-18. Values are neutralized; the KEY SET is the point. The wire carries no `user_id`
+ * and no `workspace_mode` on a team, even though `TTeam` declares both as required — so do not
+ * "complete" this fixture from the type. Every bug this feature shipped was hidden by a fixture
+ * built from a type or a schema instead of a real response.
+ */
+const WIRE_TEAM_KEYS = [
+  'assistants',
+  'created_at',
+  'id',
+  'leader_assistant_id',
+  'name',
+  'updated_at',
+  'workspace',
+] as const;
+const WIRE_ASSISTANT_KEYS = [
+  'assistant_backend',
+  'assistant_id',
+  'assistant_name',
+  'backend',
+  'conversation_id',
+  'model',
+  'name',
+  'pending_confirmations',
+  'role',
+  'slot_id',
+] as const;
+
+const wireTeam = (conversationIds: readonly string[]) => ({
+  assistants: conversationIds.map((conversation_id, index) => ({
+    assistant_backend: 'aionrs',
+    assistant_id: `assistant-${index}`,
+    assistant_name: `Assistant ${index}`,
+    backend: 'aionrs',
+    conversation_id,
+    model: 'default',
+    name: `Assistant ${index}`,
+    pending_confirmations: 0,
+    role: index === 0 ? 'leader' : 'teammate',
+    slot_id: `slot-${index}`,
+  })),
+  created_at: 1_755_000_000,
+  id: 'team-1',
+  leader_assistant_id: 'assistant-0',
+  name: 'Wire Team',
+  updated_at: 1_755_000_000,
+  workspace: '/workspace',
+});
+
 function createHarness(overrides: Partial<PresentationScopeResolverOptions> = {}) {
   const getConversation = vi.fn(async () => conversation());
   const listTeams = vi.fn(async () => []);
@@ -122,6 +172,41 @@ describe('PresentationScopeResolver', () => {
     });
   });
 
+  it('pins the team fixture to the captured wire key set', () => {
+    const wire = wireTeam([SHORT_CONVERSATION_ID]);
+
+    expect(Object.keys(wire).toSorted()).toEqual([...WIRE_TEAM_KEYS]);
+    expect(Object.keys(wire.assistants[0]).toSorted()).toEqual([...WIRE_ASSISTANT_KEYS]);
+  });
+
+  it('resolves an individual conversation against the real /api/teams payload shape', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [wireTeam([OTHER_SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'individual',
+    });
+  });
+
+  it('proves team membership from the real /api/teams payload shape', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [wireTeam([SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'team',
+    });
+  });
+
   it('classifies team ownership only from authoritative assistants membership', async () => {
     const harness = createHarness({
       getConversation: async () => ({ ...conversation(), isTeamSend: false, team_id: null }),
@@ -176,7 +261,9 @@ describe('PresentationScopeResolver', () => {
   it.each([
     ['enumeration rejection', async () => Promise.reject(new Error('offline'))],
     ['non-array enumeration', async () => ({})],
-    ['foreign principal enumeration', async () => [team([], 'another-user')]],
+    // A 'foreign principal enumeration' row lived here. It asserted the `team.user_id` equality
+    // check, which is deliberately gone: the field is absent from the wire, so the check rejected
+    // every real payload. Ownership of the enumeration is the server's, via the `?user_id=` filter.
     ['missing assistants enumeration', async () => [{ id: 'team-1', user_id: TEAM_USER_ID }]],
     [
       'ambiguous assistants and agents aliases',

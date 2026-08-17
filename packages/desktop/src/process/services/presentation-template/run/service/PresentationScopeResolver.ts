@@ -29,7 +29,7 @@ export type PresentationScopeResolverOptions = {
   getConversation: (input: { conversationId: string }) => Promise<unknown>;
   listTeams: (input: { userId: string }) => Promise<unknown>;
   classifyLookupError: (error: unknown) => Exclude<PresentationScopeFailureCode, 'SCOPE_UNAVAILABLE'> | null;
-  /** Authoritative backend user whose TTeam.assistants records define desktop team ownership. */
+  /** Backend user the team enumeration is filtered by, server-side. Not re-checked per record. */
   teamUserId: string;
 };
 
@@ -70,12 +70,21 @@ function parseConversation(value: unknown, conversationId: string): Conversation
   };
 }
 
-function resolveTeamScope(value: unknown, conversationId: string, teamUserId: string): 'individual' | 'team' | null {
+/**
+ * Ownership of the enumeration is the server's: the request is filtered by `?user_id=`, so this
+ * function only classifies membership within an already-scoped list. It deliberately does NOT
+ * re-check `team.user_id` — that field is not on the wire (a live `/api/teams` team carries only
+ * assistants, created_at, id, leader_assistant_id, name, updated_at, workspace), so the check was
+ * always `undefined !== teamUserId` and failed every real payload closed. `TTeam` declaring
+ * `user_id` as required is aspirational, which is why `teamMapper` defaults it to `''`. Do not
+ * restore the comparison.
+ */
+function resolveTeamScope(value: unknown, conversationId: string): 'individual' | 'team' | null {
   if (!Array.isArray(value)) return null;
   const seenConversationIds = new Set<string>();
   let membershipCount = 0;
   for (const team of value) {
-    if (!isRecord(team) || team.user_id !== teamUserId) return null;
+    if (!isRecord(team)) return null;
     const hasAssistants = Object.hasOwn(team, 'assistants');
     const hasAgents = Object.hasOwn(team, 'agents');
     if (hasAssistants === hasAgents) return null;
@@ -144,7 +153,7 @@ export class PresentationScopeResolver {
     } catch {
       return { ok: false, code: 'SCOPE_UNAVAILABLE' };
     }
-    const scope = resolveTeamScope(rawTeams, conversationId, this.options.teamUserId);
+    const scope = resolveTeamScope(rawTeams, conversationId);
     if (scope === null) return { ok: false, code: 'SCOPE_UNAVAILABLE' };
 
     return {
