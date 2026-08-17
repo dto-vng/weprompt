@@ -41,18 +41,32 @@ confused with "it was already there".
 
 ## Results
 
-| #   | Case                                   | Backend              | Language                | Outcome                  | Evidence                                                 |
-| --- | -------------------------------------- | -------------------- | ----------------------- | ------------------------ | -------------------------------------------------------- |
-| 1   | Creation happy path                    | aionrs (`kimi-k2.6`) | English                 | **PASS** (after 5 fixes) | conversation `f90e8348`; see "Case 1 — end to end" below |
-| 2   | Creation happy path                    | aionrs               | Vietnamese (accented)   | _not yet run_            |                                                          |
-| 3   | Intent match                           | aionrs               | Vietnamese (unaccented) | _not yet run_            |                                                          |
-| 4   | Deliberate non-trigger (`mau nay dep`) | aionrs               | Vietnamese              | _not yet run_            |                                                          |
-| 5   | Creation happy path                    | ACP (OpenCode)       | English                 | _not yet run_            |                                                          |
-| 6   | Creation happy path                    | ACP (OpenCode)       | Vietnamese              | _not yet run_            |                                                          |
-| 7   | Hash-binding refusal after tamper      | either               | —                       | _not yet run_            |                                                          |
+| #   | Case                                   | Backend              | Language                | Outcome                  | Evidence                                                                                |
+| --- | -------------------------------------- | -------------------- | ----------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| 1   | Creation happy path                    | aionrs (`kimi-k2.6`) | English                 | **PASS** (after 5 fixes) | conversation `f90e8348`; see "Case 1 — end to end" below                                |
+| 2   | Creation happy path                    | aionrs               | Vietnamese (accented)   | **PASS**                 | conv `1ecc4cf0`; installed `html-report-template-specification-navy-cream`              |
+| 3   | Intent match                           | aionrs               | Vietnamese (unaccented) | **PASS**                 | conv `0e915f21`; 47 chars, directive appended via BUG-041's unaccented branch           |
+| 4   | Deliberate non-trigger (`mau nay dep`) | aionrs               | Vietnamese              | **PASS**                 | conv `ed98fc76`; `directiveAppended: false` — no false positive                         |
+| 5   | Creation happy path                    | ACP (OpenCode)       | English                 | **PASS**                 | conv `22d07ba8`, `type: acp`; installed `minimal-editorial-html-template-specification` |
+| 6   | Creation happy path                    | ACP (OpenCode)       | Vietnamese              | **PASS**                 | conv `96d2a67c`, `type: acp`; installed `warm-gray-minimalist-template-specification`   |
+| 7   | Hash-binding refusal after tamper      | aionrs               | —                       | **PASS**                 | stale digest → `CANDIDATE_CHANGED`, gallery byte-identical                              |
 
 Outcome vocabulary: **pass**, **fail**, **blocked**. Blocked is a valid outcome; silent omission is
 not.
+
+**All seven cases pass, and the gallery accounting is exact.** The final listing holds **16** entries
+against a **12**-entry baseline — precisely four installs, one per creation case (1, 2, 5, 6), with
+nothing added by the intent-only case (3), the deliberate non-trigger (4), or the tamper refusal (7):
+
+```text
+5a6  > html-report-template-specification-navy-cream        (case 2, aionrs / Vietnamese)
+6a8  > minimal-editorial-html-template-specification         (case 5, ACP / English)
+10a13 > reusable-html-template-specification-clean-repor     (case 1, aionrs / English)
+12a16 > warm-gray-minimalist-template-specification          (case 6, ACP / Vietnamese)
+```
+
+That accounting is the point of measuring by `diff` rather than by eye: four creation cases produced
+exactly four packs, and the three cases that must install nothing installed nothing.
 
 ## Case 1 — end to end, after five fixes
 
