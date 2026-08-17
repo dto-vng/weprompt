@@ -83,8 +83,34 @@ full renderer reload.
    forever — no error branch is reachable, so the UI shows neither a failure nor a retry.
 6. Independently, `PresentationScopeResolver.resolve` (`run/service/PresentationScopeResolver.ts:105-112`)
    enforces the same UUID assumption via `UUID_RE` and returns `SCOPE_UNAVAILABLE`. **So even if the
-   payload were delivered, the feature would still fail** — the wrong assumption is encoded at two
-   independent layers.
+   payload were delivered, the feature would still fail.**
+
+> **Correction, 2026-08-18.** An earlier version of this section said the assumption was encoded at
+> "two independent layers". That was wrong — there are **three**, and the third was found only by an
+> independent review of the first fix, not by this investigation:
+>
+> 7. `PresentationTemplateService.candidateRelativePath` (`PresentationTemplateService.ts:603`) applies
+>    `UUID_RE` a third time. It is on a straight-line unconditional path from both channels —
+>    `describeThemeSpec` (`:675`) → `readCandidate` (`:628`) → `candidateRelativePath` (`:603`), and
+>    `importThemeSpecBound` (`:709`) takes the same route. Runtime proof against the real service, with
+>    only the id varied: a UUID returns `OK name=Probe Theme`, while `f90e8348` throws
+>    `CANDIDATE_OUTSIDE_WORKSPACE`.
+>
+> Consequence: fixing layers 1 and 2 alone converts the silent hang into a visible
+> `CANDIDATE_OUTSIDE_WORKSPACE` error. That is progress — the promise settles — but the user still
+> cannot install. **Do not describe the transport fix as resolving F1.**
+>
+> Its test fixture at `PresentationTemplateService.test.ts:238` is also a hand-written UUID, which is
+> why this layer stayed green too. Three layers, three UUID fixtures, one dead feature.
+
+### F3 — P2: the same wrong id assumption is live across the runs and sources features
+
+Found while reviewing the F1 fix; **not** fixed, and deliberately out of that commit's scope. The same
+UUID-shaped `conversation_id` assumption appears at `payloadSchemas.ts:228, 249-250, 562, 571, 595,
+608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`,
+`presentation-template/bridge.ts:444`, and `preload/main.ts:46`. Each is a candidate for the same
+class of silent failure. Whether each is reachable in production needs the same live check EPIC-002
+just received — none of them should be assumed working on the strength of a green suite.
 
 **Measured evidence (all via the app's own wired bridge, in the running renderer):**
 
