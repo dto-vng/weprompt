@@ -32,4 +32,28 @@ describe('buildDefaultMcpServers', () => {
     expect(chrome).toBeDefined();
     expect(chrome?.enabled).toBe(true);
   });
+
+  it('seeds the fixed VNG MCP servers enabled and editable (WP 24111)', () => {
+    for (const name of ['atlassian', 'Outlook VNG', 'fdl-datahub']) {
+      const s = byName.get(name);
+      expect(s, name).toBeDefined();
+      expect(s?.enabled, name).toBe(true);
+      // Non-builtin so the edit/delete controls stay available to users.
+      expect(s?.builtin, name).toBe(false);
+    }
+  });
+
+  it('uses an http transport for Outlook VNG and mcp-remote stdio for atlassian/fdl-datahub', () => {
+    const outlook = byName.get('Outlook VNG');
+    expect(outlook?.transport.type).toBe('http');
+    expect(outlook?.transport.type === 'http' && outlook.transport.url).toContain('agentbase-runtime');
+
+    const atlassian = byName.get('atlassian');
+    expect(atlassian?.transport.type).toBe('stdio');
+    expect(atlassian?.transport.type === 'stdio' && atlassian.transport.args).toContain('mcp-remote@latest');
+
+    const datahub = byName.get('fdl-datahub');
+    expect(datahub?.transport.type).toBe('stdio');
+    expect(datahub?.transport.type === 'stdio' && datahub.transport.args).toContain('--silent');
+  });
 });

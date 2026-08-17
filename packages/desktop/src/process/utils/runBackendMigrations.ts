@@ -259,6 +259,60 @@ function isSameStdioTransport(left: IMcpServer['transport'], right: IMcpServer['
   );
 }
 
+/**
+ * Pre-configured ("fixed") MCP servers requested by VNG IT (WP 24111): Atlassian,
+ * Microsoft 365 Outlook (VNG), and TSE Datahub. Shipped enabled by default so they
+ * are pre-installed for everyone, and seeded as NON-builtin so users keep the edit
+ * and delete controls (the ticket asks for these to stay editable). They are
+ * OAuth-protected — people sign in on first use; no credentials are baked in.
+ */
+function buildFixedMcpServers(): McpImportServer[] {
+  const fixed: Array<Pick<IMcpServer, 'name' | 'description' | 'transport'>> = [
+    {
+      name: 'atlassian',
+      description: 'Atlassian (Jira & Confluence). Sign in on first use.',
+      transport: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', 'mcp-remote@latest', 'https://mcp.atlassian.com/v1/mcp', '--transport', 'http-only'],
+      },
+    },
+    {
+      name: 'Outlook VNG',
+      description: 'Microsoft 365 Outlook (VNG). Sign in on first use.',
+      transport: {
+        type: 'http',
+        url: 'https://endpoint-925cccd9-2872-47a0-9641-c044d071dab9.agentbase-runtime.aiplatform.vngcloud.vn/mcp',
+      },
+    },
+    {
+      name: 'fdl-datahub',
+      description: 'TSE Datahub. Sign in on first use.',
+      transport: {
+        type: 'stdio',
+        command: 'npx',
+        args: [
+          '-y',
+          'mcp-remote@latest',
+          'https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4',
+          '--transport',
+          'http-only',
+          '--silent',
+        ],
+      },
+    },
+  ];
+
+  return fixed.map((server) => ({
+    name: server.name,
+    description: server.description,
+    enabled: true,
+    builtin: false,
+    transport: server.transport,
+    original_json: buildOriginalJsonFromTransport(server),
+  }));
+}
+
 export function buildDefaultMcpServers(): McpImportServer[] {
   const chromeConfig = {
     command: 'npx',
@@ -286,6 +340,7 @@ export function buildDefaultMcpServers(): McpImportServer[] {
     },
     ...capabilityServers,
     ...buildBuiltinHttpMcpServers(),
+    ...buildFixedMcpServers(),
   ];
 }
 
