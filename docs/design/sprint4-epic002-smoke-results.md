@@ -139,6 +139,40 @@ passed in production. The request is already server-filtered by `?user_id=`, so 
 equality test is defence-in-depth against a backend that ignores its own filter. Adding `user_id` to the
 backend DTO instead would require an AionCore change and therefore a backend release, which is parked.
 
+### F5 — P1: workspace containment is lexical, and the data directory is a symlink
+
+Found 2026-08-18 by re-walking case 1 against the build carrying all four earlier fixes. Scope
+resolution now succeeds; the install fails one step later with "The theme file is outside this chat
+workspace. Nothing was installed." (`CANDIDATE_OUTSIDE_WORKSPACE`).
+
+`PresentationTemplateService.candidateRelativePath:613-633` decides containment with
+`path.relative(workspaceRoot, filePath)` and rejects anything starting with `..`. Both inputs are only
+required to satisfy `path.resolve(x) === x`, which **normalises but does not follow symlinks**.
+
+- workspace, from the conversation record: `/Users/lap16603/.aionui-dev/conversations/…/aionrs-temp-f90e8348`
+- file, from the assistant's marker: `/Users/lap16603/Library/Application Support/Forge-Dev/aionui/conversations/…/aionrs-temp-f90e8348/THEME.md`
+
+Computed both ways:
+
+```text
+lexical:              path.relative(ws, file) = "../../../../../../Library/Application Support/…/THEME.md"  -> rejected
+after realpath(both): path.relative(ws, file) = "THEME.md"                                                  -> contained
+```
+
+**Not a dev-only artifact.** `~/.aionui-dev` is a symlink to `~/Library/Application Support/Forge-Dev/aionui`,
+and **production's `~/.aionui` is equally a symlink** to `~/Library/Application Support/Forge/aionui`
+(verified with `os.path.islink`). The layouts are identical, so real users hit the same rejection.
+
+**It is also model-dependent, which makes it intermittent by nature.** The directive instructs the
+assistant to "Resolve the file's absolute path for the marker" — a model that resolves through the
+symlink produces the failing form, while one that echoes the symlink path would pass. The same prompt
+can therefore succeed or fail depending on the model's path handling, which is the worst kind of bug to
+diagnose from a user report.
+
+The fix is to compare canonical paths (`realpath` both sides) rather than lexical ones. That touches a
+security boundary, so it needs deliberate handling of the TOCTOU window — mitigated here because A0+
+already re-reads and re-hashes the file at install time.
+
 ### F3 — P2: the same wrong id assumption is live across the runs and sources features
 
 Found while reviewing the F1 fix; **not** fixed, and deliberately out of that commit's scope. The same
