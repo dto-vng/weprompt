@@ -182,7 +182,8 @@ describe('PresentationScopeResolver', () => {
       'ambiguous assistants and agents aliases',
       async () => [{ ...team([CONVERSATION_ID]), agents: team([CONVERSATION_ID]).assistants }],
     ],
-    ['blank assistant conversation id', async () => [team([''])]],
+    // Hostile shape kept visible: bounded-identifier validation still rejects it, on the NUL.
+    ['traversal-shaped assistant conversation id', async () => [team(['../foreign\0'])]],
     [
       'ambiguous duplicate membership',
       async () => [team([CONVERSATION_ID]), { ...team([CONVERSATION_ID]), id: 'team-2' }],
@@ -214,8 +215,10 @@ describe('PresentationScopeResolver', () => {
     expect(harness.listTeams).not.toHaveBeenCalled();
   });
 
+  // Replaces a 'path-shaped request id' row that the bounded-identifier guard no longer rejects on
+  // shape: it had become an exact duplicate of the foreign-response row below. The guard itself is
+  // covered directly, including its fail-fast ordering, by the request-id test that follows.
   it.each([
-    ['path-shaped request id', '../foreign', conversation()],
     ['foreign conversation response', CONVERSATION_ID, { ...conversation(), id: OTHER_CONVERSATION_ID }],
     ['missing conversation runtime', CONVERSATION_ID, { id: CONVERSATION_ID, extra: { workspace: '/workspace' } }],
     ['non-object conversation extra', CONVERSATION_ID, { id: CONVERSATION_ID, type: 'aionrs', extra: null }],
@@ -226,5 +229,20 @@ describe('PresentationScopeResolver', () => {
       ok: false,
       code: 'SCOPE_UNAVAILABLE',
     });
+  });
+
+  it.each([
+    ['blank', ''],
+    ['NUL-bearing', 'f90e8348\0forged'],
+    ['over-length', 'f'.repeat(257)],
+  ] as const)('rejects a %s request id before any authoritative lookup', async (_reason, conversationId) => {
+    const harness = createHarness();
+
+    await expect(harness.resolver.resolve({ conversationId, principalId: PRINCIPAL_ID })).resolves.toEqual({
+      ok: false,
+      code: 'SCOPE_UNAVAILABLE',
+    });
+    expect(harness.getConversation).not.toHaveBeenCalled();
+    expect(harness.listTeams).not.toHaveBeenCalled();
   });
 });

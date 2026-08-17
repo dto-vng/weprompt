@@ -32,7 +32,19 @@ const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
 const DIRECTORY_ONLY = constants.O_DIRECTORY ?? 0;
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
 const SHA256_RE = /^[0-9a-f]{64}$/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_CONVERSATION_ID_LENGTH = 256;
+
+/**
+ * Bounds a conversation id without constraining its shape. The bound is deliberate and must not be
+ * tightened back into a uuid or character-class guard: real ids are short ids, and a uuid guard here
+ * rejected every one of them as CANDIDATE_OUTSIDE_WORKSPACE. Workspace containment does not depend
+ * on this value — it is never interpolated into a filesystem path, and `candidateRelativePath` plus
+ * the workspace authorizer enforce that separately. The NUL rejection is load-bearing: confirmation
+ * keys join their segments with NUL, so a NUL-bearing id could forge another candidate's key.
+ */
+function isBoundedConversationId(value: string): boolean {
+  return value.length > 0 && value.length <= MAX_CONVERSATION_ID_LENGTH && !value.includes('\0');
+}
 
 type WorkspaceSourceAuthorizer = {
   authorizeWorkspaceSourcePath: (
@@ -600,7 +612,7 @@ export class PresentationTemplateService {
 
   private candidateRelativePath(input: CandidateInput): string {
     if (
-      !UUID_RE.test(input.conversationId) ||
+      !isBoundedConversationId(input.conversationId) ||
       !path.isAbsolute(input.workspaceRoot) ||
       path.resolve(input.workspaceRoot) !== input.workspaceRoot ||
       !path.isAbsolute(input.filePath) ||

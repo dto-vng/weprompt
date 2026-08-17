@@ -106,7 +106,14 @@ export class PresentationScopeResolver {
     this.options = options;
   }
 
-  /** Fails closed whenever conversation ownership or complete team enumeration cannot be proven. */
+  /**
+   * Fails closed whenever conversation ownership or complete team enumeration cannot be proven.
+   *
+   * The id check below bounds length and rejects NUL without constraining shape, and that is
+   * deliberate: real conversation ids are short ids, and a uuid guard here rejected every one of
+   * them. Do not tighten it back. Ownership is proven by the authoritative record whose `id` must
+   * equal the request, not by the id's shape, and no filesystem path is derived from this value.
+   */
   async resolve(input: { conversationId: string; principalId: string }): Promise<PresentationScopeResolution> {
     const conversationId = input.conversationId.toLowerCase();
     if (

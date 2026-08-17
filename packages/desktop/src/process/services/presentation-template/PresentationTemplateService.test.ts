@@ -236,6 +236,8 @@ describe('PresentationTemplateService', () => {
 
   describe('hash-bound workspace imports', () => {
     const conversationId = '2be7b8fc-6af5-42b8-aed5-03644735c730';
+    // The ids the running app actually mints are 8-hex short ids, never RFC-4122 uuids.
+    const shortConversationId = 'f90e8348';
 
     it('installs the exact bytes described by the main process', async () => {
       const service = createBoundService();
@@ -258,6 +260,46 @@ describe('PresentationTemplateService', () => {
         byte_length: themeBytes.byteLength,
       });
       expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    // Regression: a uuid-shaped guard on this path rejected every real conversation id as
+    // CANDIDATE_OUTSIDE_WORKSPACE, so no user could ever install a theme from chat.
+    it('installs a theme for the short conversation id the app actually mints', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Short Id Theme\n\n--accent: #c8341e\nfamily=Fraunces&display=swap', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+      });
+      const installed = await service.importThemeSpecBound({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({ name: 'Short Id Theme', sha256: sha256(themeBytes) });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    // The bound stays meaningful: a blank id carries no ownership, and a NUL-bearing id could
+    // forge a confirmation key, whose segments are NUL-joined.
+    it.each([
+      ['blank', ''],
+      ['NUL-bearing', 'f90e8348\0forged'],
+      ['over-length', 'f'.repeat(257)],
+    ] as const)('refuses a %s conversation id on the bound candidate path', async (_reason, badConversationId) => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Rejected Theme\n#112233', 'utf-8');
+
+      await expect(
+        service.describeThemeSpec({ conversationId: badConversationId, workspaceRoot: workspaceDir, filePath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
     });
 
     it('refuses content swapped after describe without creating a partial pack', async () => {
