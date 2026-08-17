@@ -11,6 +11,25 @@
 > - Every active epic records its current boundary and next admission gate. Do not infer whole-sprint progress from raw checkbox count: epics and bugs differ materially in size.
 > - Update this file after every accepted merge, blocker decision, scope change, and code-freeze checkpoint. Preserve evidence links and move completed items to **Done** instead of deleting them.
 
+## Sprint 4 — found by the EPIC-002 live creation smoke (2026-08-17/18)
+
+- [ ] **[BUG-046][P1][EPIC-002] The in-chat template install path is unreachable, so the review card hangs forever** — found 2026-08-17 by the first live execution of the A0+ path; **root cause proven at three layers, fix in progress**
+  - Actual: the assistant writes a valid `THEME.md` and emits a correct marker, the review card renders — and then sits on "Reviewing the theme…" permanently. No error, no retry, no install. The feature merged 2026-08-08 (`!87`, `!90`, `!94`) and had never been executed until this smoke.
+  - Root cause: `conversation_id` is validated as an RFC-4122 UUID at three independent layers, while real conversation ids are 8-hex short ids (`f90e8348`, verified across 35 live conversations). (1) `native/payloadSchemas.ts:538,541`; (2) `PresentationScopeResolver.ts:107` and `:86`; (3) `PresentationTemplateService.ts:603` (`candidateRelativePath`, on the unconditional path from both channels).
+  - Why it hung rather than errored: see BUG-047. Layers 1–2 fixed by `8e932a0dc`, which converts the hang into a visible `CANDIDATE_OUTSIDE_WORKSPACE`; layer 3 still blocks the install.
+  - **Why the suite was green:** all three layers are covered by tests whose fixtures are hand-written UUIDs — `nativePayloadSchemas.test.ts:91`, `PresentationScopeResolver.test.ts`, `PresentationTemplateService.test.ts:238`. Each test proves the code accepts a shape production never produces. Three layers, three UUID fixtures, one dead feature.
+  - Evidence: [docs/design/sprint4-epic002-smoke-results.md](docs/design/sprint4-epic002-smoke-results.md).
+
+- [ ] **[BUG-047][P2][Platform] `bridge.invoke` turns every main-process throw into a permanently pending promise** — found 2026-08-17 while root-causing BUG-046
+  - Actual: `packages/desktop/src/common/platform/bridge.ts:186-197` builds its Promise with **only** a `resolve` parameter and fires `emit` without a `catch`. Any main-side exception — including every native payload-validation rejection thrown at `common/adapter/main.ts:91` — can therefore never settle the caller. The renderer waits forever.
+  - Contrast `invokeWithTimeout` (`:199-227`), used by `buildRendererQuery`, which has a timeout, a reject, and a try/catch around `emit`. The safe pattern already exists in the same file.
+  - Impact: this is not template-specific. It applies to every `buildProvider` channel in the app, and it is why BUG-046 presented as an invisible hang instead of a loud error for nine days.
+  - Scope note: fixing it changes shared IPC behaviour for every provider, so it was deliberately kept out of the BUG-046 fix and needs its own change, review, and full-suite run.
+
+- [ ] **[BUG-048][P2][Integrity] The same UUID-shaped `conversation_id` assumption is live across the runs and sources features** — found 2026-08-18 by the independent review of the BUG-046 fix
+  - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
+  - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
+
 ## Carryover after Sprint 2 code freeze
 
 - [ ] **[BUG-042][P2][Test infrastructure] 25 updater tests fail under `CI=true` because production deliberately disables updates in CI** — found 2026-08-10 by the first CI run in this repo's history; **root cause established by controlled experiment the same day**
