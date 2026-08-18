@@ -24,6 +24,7 @@ import {
   WorkspaceFilesPaneProvider,
   type WorkspacePaneView,
 } from '@/renderer/pages/conversation/Workspace/filesPaneContext';
+import WorkspaceOpenButton from './WorkspaceOpenButton';
 import './chat-layout.css';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
@@ -339,7 +340,8 @@ const ChatLayout: React.FC<{
               by the single Workspace instance (see filesPaneContext) rather than built here,
               which is why this is an empty container.
             */}
-            <div className='shrink-0 flex items-center gap-2px px-10px pt-8px' role='tablist'>
+            <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
+              <div className='flex items-center gap-2px' role='tablist'>
               {(['files', 'changes', 'preview'] as const).map((view) => (
                 <Button
                   key={view}
@@ -361,6 +363,13 @@ const ChatLayout: React.FC<{
                       : t('conversation.workspace.changes.previewTab')}
                 </Button>
               ))}
+              </div>
+              {/*
+                Same VS Code / Terminal / File Explorer control the `panel` presentation gets via
+                WorkspacePanelHeader. It was missing here only because this pane has no header —
+                the component already existed.
+              */}
+              {workspacePath && <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />}
             </div>
             <div
               className='flex-1 min-h-0 overflow-hidden'

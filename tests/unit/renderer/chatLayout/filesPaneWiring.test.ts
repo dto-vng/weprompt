@@ -47,6 +47,13 @@ describe('C-01 files pane wiring', () => {
     expect(CHAT_LAYOUT).toMatch(/const revealPreview = \(\) => setArtifactPaneView\('preview'\)/);
   });
 
+  it('offers the external-tool control the panel presentation already had', () => {
+    // VS Code / Terminal / File Explorer. WorkspaceOpenButton already existed and is rendered
+    // by WorkspacePanelHeader, which only mounts in the `panel` presentation — so this pane
+    // was missing it purely because it has no header.
+    expect(CHAT_LAYOUT).toMatch(/<WorkspaceOpenButton workspacePath=\{workspacePath\} isTemporary=\{isTemporaryWorkspace\} \/>/);
+  });
+
   it('provides the pane container to the Workspace', () => {
     expect(CHAT_LAYOUT).toMatch(
       /<WorkspaceFilesPaneProvider activeView=\{artifactPaneView\} containers=\{panePortalTargets\}>/
