@@ -39,6 +39,12 @@
      a field in either theme, independently of how close the fill sits to the page. */
   --input-surface: #faf6ee;
   --input-border: #d8cbb6;
+  /* Tile behind a vendor logo image. Light: none needed — the page is already near-white,
+     which is what these logos are drawn for. Dark: a near-white tile, because several are
+     bare dark glyphs (Amp, Autohand, Copilot's mark) with no self-contained background,
+     and they disappear against the #0b0e14 page. */
+  --agent-logo-surface: transparent;
+  --agent-logo-border: transparent;
   --bg-artifact-surface: #fffdf9;
   --studio-page-background: #e9e3d6;
   --studio-slate-surface: #f0eadd;
@@ -145,6 +151,8 @@
   --md-inline-code-bg: var(--bg-3); /* raised, not heaviest, in dark — keep as-is */
   --input-surface: #161c27; /* raised above the #0b0e14 page, unlike --bg-base */
   --input-border: #2a3344;
+  --agent-logo-surface: #f4f4f5;
+  --agent-logo-border: #2a3344;
   --bg-artifact-surface: var(--bg-1);
   --studio-page-background: var(--bg-base);
   --studio-slate-surface: var(--color-fill-2);

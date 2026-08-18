@@ -363,6 +363,32 @@ live verification in the running app.
   identity in both themes, so neither fill has to fight its page.
 
 
+### C-18 — Dark agent logos are invisible in dark mode
+
+- **Surface:** Settings → Agents, the 32px logo beside each agent. Screenshot supplied 2026-08-18,
+  dark theme.
+- **Actual:** several logos read as faint smudges or nothing at all — **Amp**, **Autohand Code**,
+  **Copilot**'s mark and **Cortex Code** are bare dark glyphs with no self-contained background, and
+  the page behind them is `#0b0e14`.
+- **Expected:** the logos should be visible.
+- **Kind:** bug — a genuine dark-mode visibility failure, not polish.
+- **Reported as:** "visibility issue with some back icon" (black icon).
+- **Root cause:** `AgentCard.tsx:132` hardcoded `backgroundColor: avatar.kind === 'image' ?
+  'transparent' : 'var(--color-fill-2)'`. Image logos therefore had nothing behind them in either
+  theme; in light that is fine, because the near-white page *is* what these logos are drawn for.
+- **Fixed:** `--agent-logo-surface` / `--agent-logo-border`, theme-scoped — `transparent` in light,
+  `#f4f4f5` with a `#2a3344` hairline in dark. Light is unchanged **by construction**, confirmed by
+  measurement (transparent before and after).
+- **Checked for the inverse regression.** A light tile could in principle hide a *white* glyph. All
+  sampled logos were screenshotted in dark after the change: Kimi, Amp, Auggie, Autohand, Claude
+  Code, CodeBuddy, Codex CLI, Copilot and Cortex Code are all legible, and none regressed. No
+  white-on-transparent logo appeared in the set — worth re-checking if a new agent is added with one.
+- **Scope left deliberately narrow.** Logos also render in `AgentBadge`, the model selectors and the
+  sidebar. Those may have the same defect, but only the reported surface was changed. **Filed as a
+  follow-up rather than swept in**, since each of those surfaces has its own background and needs its
+  own look.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
