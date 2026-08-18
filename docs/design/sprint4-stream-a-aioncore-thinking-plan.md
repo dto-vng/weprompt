@@ -490,3 +490,43 @@ not differ, stop — the control is inert and must not ship**, whatever the unit
 - [ ] The selection survives a reload.
 - [ ] No new migration; `aioncore-migration-lineage.json` unchanged.
 - [ ] AionRS unchanged — no fork, no re-pin.
+
+## Task 3 — provider half PASSED 2026-08-18, assembled half still open
+
+**Moonshot honours `thinking.type` on `kimi-k2.6`.** Measured live against
+`https://api.moonshot.ai/v1` with the dev profile's configured key (used inside the renderer, never
+printed), same prompt and `max_tokens: 2000`, all `finish_reason: stop`:
+
+| Variant                        | `reasoning_tokens` | `reasoning_content` |
+| ------------------------------ | ------------------ | ------------------- |
+| `thinking: {type: "disabled"}` | **1**              | **absent**          |
+| `thinking: {type: "enabled"}`  | 128                | present             |
+| no `thinking` field            | 151                | present             |
+
+Disabling collapses reasoning by two orders of magnitude and removes the reasoning content entirely.
+This is the discriminating measurement `reasoning_effort` failed — there, `low`, `high` and a nonsense
+value were indistinguishable. **The control is real, and the redesign was correct.**
+
+### What is proven, link by link
+
+| Link                                                    | Evidence                                            |
+| ------------------------------------------------------- | --------------------------------------------------- |
+| Provider honours `thinking.type`                        | the live measurement above                          |
+| AionRS emits `body["thinking"]` from `request.thinking` | `projector.rs:205-215` at `shipped-v0.2.6`, ungated |
+| `apply_config_update` accepts `"enabled"`/`"disabled"`  | `engine.rs:1132-1146`                               |
+| AionCore advertises, validates and applies              | mutation-proven tests in `27c832f4b`                |
+| Capability gated per exact model                        | mutation-proven integration test in `533375cec`     |
+| Selection survives a rebuild                            | mutation-proven tests in `e9a83ac64`                |
+
+### The one link still untested
+
+**Nobody has watched the assembled system put `thinking` on the wire.** Every link is proven
+individually; the composition is not. That requires running the custom binary against a profile with a
+keyed provider — and after the 2026-08-18 dev-profile incident
+([record](sprint4-dev-profile-encryption-incident.md)) the rule is that a locally built aioncore never
+touches `~/.aionui-dev`. Closing it needs a scratch profile with a real provider key, which is the
+owner's decision, not something to improvise.
+
+A cheap way to close it when someone does: aionrs supports a prompt dump
+(`AionrsFinalInputDumpContext` / `prompt_dump_dir`), so the projected request body can be inspected
+directly instead of inferred from token counts.
