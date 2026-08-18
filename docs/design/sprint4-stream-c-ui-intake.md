@@ -426,6 +426,35 @@ of orange. `bg-[rgba(var(--primary-6),…)]` works elsewhere only because `bg-` 
 Use `text-primary`. Both facts are now pinned by mutation-tested guards.
 
 
+### C-07 reproduced on slot 2 — and it is a sizing bug, not a truncation bug
+
+Reproduced by seeding two `source: 'user'` templates into
+`Forge-Dev-2/presentation-templates/`, using the reporter's own two names verbatim rather than an
+invented long string. Template metadata was copied from a real `template.json` (`editorial-field-report`)
+so the fixture comes from reality — the habit this sprint's BUG-046/049/050 postmortem asks for.
+
+**Measured card widths, same row:**
+
+| template name                                                       | card width |
+| ------------------------------------------------------------------- | ---------- |
+| `Minimal Editorial HTML Template Specification`                      | **281px**  |
+| `Reusable HTML Template Specification — Clean Report (Navy & Cream)` | **417px**  |
+| short builtin names (`Simple Dark`, `Project Kickoff`, …)            | uniform    |
+
+**So the card sizes itself to its title.** The caption element does carry `white-space: nowrap` and
+`overflow: hidden` and truncates *within* the card — but an ancestor with `overflow: visible` and
+`white-space: normal` has already been widened to fit the full string, so truncation never gets the
+chance to constrain anything. The row then overflows its container and the last card is sliced by
+the panel edge — exactly the reporter's screenshot, now reproduced from a clean profile.
+
+**Consequence for the fix:** adding an ellipsis alone will not work; the grid item needs a width
+constraint (`min-width: 0` on the flex/grid child, or a fixed card width) *before* truncation has any
+effect. That is a different change from the one C-07's intake entry assumed.
+
+**Still unverified:** whether the in-chat panel (C-06) shows the same or a different failure — that
+needs a conversation, which needs a configured provider.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
