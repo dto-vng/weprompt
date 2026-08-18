@@ -880,16 +880,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",
     "setupNeedsAttention": "Die Einrichtung muss geprüft werden.",
-    "overload": { "action": "Der Anbieter ist vorübergehend überlastet. Versuchen Sie es später erneut." },
-    "rateLimit": { "action": "Warten Sie, bis das Anbieterlimit zurückgesetzt ist, und versuchen Sie es erneut." },
-    "setup": { "action": "Prüfen Sie die Anmeldedaten und Konfiguration des Anbieters und versuchen Sie es erneut." },
-    "connectivity": { "action": "Prüfen Sie Netzwerk, Proxy und Base URL und versuchen Sie es erneut." },
+    "overload": {
+      "action": "Der Anbieter ist vorübergehend überlastet. Versuchen Sie es später erneut."
+    },
+    "rateLimit": {
+      "action": "Warten Sie, bis das Anbieterlimit zurückgesetzt ist, und versuchen Sie es erneut."
+    },
+    "setup": {
+      "action": "Prüfen Sie die Anmeldedaten und Konfiguration des Anbieters und versuchen Sie es erneut."
+    },
+    "connectivity": {
+      "action": "Prüfen Sie Netzwerk, Proxy und Base URL und versuchen Sie es erneut."
+    },
     "provider": {
       "action": "Der Anbieter konnte die Inferenzprüfung nicht abschließen. Versuchen Sie es später erneut."
     }
   },
-  "clearStatus": "Status löschen",
-  "healthStatusCleared": "Gesundheitsstatus gelöscht",
   "latency": "Latenz",
   "customAcpAgent": "Benutzerdefinierte ACP-Agenten",
   "addCustomAgent": "Hinzufügen",
@@ -1361,6 +1367,7 @@
   "appOperationsModel": {
     "title": "Modell für App-Vorgänge",
     "panelLabel": "App-Vorgänge",
+    "panelInfo": "Führt Hintergrundarbeit mit einem eigenen Modell aus, unabhängig vom Modell der jeweiligen Unterhaltung.",
     "popoverSubtitle": "Nur für Hintergrundarbeit. Eine Änderung wirkt sich nicht auf Ihre Unterhaltungen aus.",
     "selectionLabel": "Auswahl",
     "auto": "Automatisch",
@@ -1378,8 +1385,10 @@
     "setupRequiredImpact": "Es ist kein geeignetes Textmodell konfiguriert. Bis dahin greift die Kontextkomprimierung auf eine regelbasierte Zusammenfassung zurück.",
     "loadFailed": "Die Einstellungen für App-Vorgänge konnten nicht geladen werden.",
     "saveFailed": "Das Modell für App-Vorgänge konnte nicht gespeichert werden.",
+    "saveFailedToast": "Speichern fehlgeschlagen. Wählen Sie erneut, um es nochmals zu versuchen.",
     "checkFailed": "Die Integritätsprüfung für App-Vorgänge ist fehlgeschlagen.",
     "backendUpdateRequired": "Aktualisieren Sie WePrompt, um das Modell für App-Vorgänge zu konfigurieren.",
+    "backendUpdateRequiredDetail": "Das Backend dieses Builds stellt die Einstellung nicht bereit. Unterhaltungen sind nicht betroffen.",
     "checkTime": {
       "never": "Noch nicht geprüft",
       "justNow": "Gerade geprüft",

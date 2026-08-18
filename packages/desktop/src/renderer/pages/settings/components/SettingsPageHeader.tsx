@@ -7,9 +7,11 @@
 /**
  * SettingsPageHeader — the shared header paradigm for settings pages.
  *
- * Layout (top to bottom):
- *   1. Title row: page title + description on the left, action slot on the right.
- *   2. Status panel (optional): a full-width row under the title row.
+ * Layout:
+ *   1. Title block: page title + description, with the action slot on its right.
+ *   2. Status panel (optional): a fixed-width card BESIDE the title block on wide
+ *      viewports, wrapping to its own full-width row below it when there is not
+ *      room for both. It is never squeezed into the leftover width.
  *   3. Tabs (optional): underline tabs with an optional count badge.
  *
  * Pages own everything below the header (their list/content). This keeps the
@@ -34,12 +36,15 @@ type SettingsPageHeaderProps = {
   /** Right-aligned action slot (search, create button, dropdowns, …). */
   actions?: React.ReactNode;
   /**
-   * Slot under the title row, inside the sticky header. Use it for a status panel
-   * that must stay glanceable while the body scrolls. It gets its own row rather
-   * than joining `actions`, whose `shrink-0` sizing would force the whole header
-   * to the panel's max-content width and overflow the page. Rendered unwrapped:
-   * the slot owns its own top margin and alignment, so a panel that renders
-   * nothing leaves no empty row behind.
+   * Status-panel slot inside the sticky header, for a panel that must stay
+   * glanceable while the body scrolls. It sits in its own column beside the title
+   * block — not in `actions`, whose `shrink-0` sizing would force the whole header
+   * to the panel's max-content width and overflow the page.
+   *
+   * The slot owns the column width, not the panel: the panel renders `w-full` and
+   * the column caps it at the card width once there is room for both. The column
+   * is `empty:hidden`, so a panel component that renders `null` (this prop is a
+   * live element either way) leaves no phantom column behind to squeeze the title.
    */
   statusPanel?: React.ReactNode;
   tabs?: SettingsPageTab[];
@@ -71,12 +76,23 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
       // instead of the full page width.
       className={classNames(sticky && 'bg-1 sticky top-0 z-10 -mt-14px pt-14px md:-mt-32px md:pt-32px')}
     >
-      <div className='flex items-center justify-between gap-12px sm:gap-16px'>
-        <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>{title}</h1>
-        {actions ? <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div> : null}
+      <div className='flex flex-col gap-14px min-[1080px]:flex-row min-[1080px]:items-start min-[1080px]:gap-28px'>
+        <div className='min-w-0 min-[1080px]:flex-1'>
+          <div className='flex items-center justify-between gap-12px sm:gap-16px'>
+            <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>
+              {title}
+            </h1>
+            {actions ? <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div> : null}
+          </div>
+          {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
+        </div>
+        <div
+          data-testid='settings-header-status-panel'
+          className='empty:hidden w-full min-w-0 min-[1080px]:w-330px min-[1080px]:shrink-0'
+        >
+          {statusPanel}
+        </div>
       </div>
-      {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
-      {statusPanel}
 
       {tabs && tabs.length > 0 ? (
         <div className='mt-18px flex gap-26px border-b border-[var(--color-border-2)]' role='tablist'>

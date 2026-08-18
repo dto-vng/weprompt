@@ -118,10 +118,23 @@ const renderCard = (overrides: Partial<React.ComponentProps<typeof AppOperations
 };
 
 const panel = () => screen.getByTestId('app-operations-panel');
+/** Band 1 — label, info affordance, mode pill, gear. */
+const headerBand = () => screen.getByTestId('app-operations-header');
+/** Band 2 — logo tile, provider name over model id. Absent in several states. */
+const identityBand = () => screen.queryByTestId('app-operations-identity');
+/** Band 3 — status dot/spinner, status word, last check, consumer. */
 const statusLine = () => screen.getByTestId('app-operations-status-line');
 const statusWord = () => screen.getByTestId('app-operations-status');
 const openPopover = async () => {
   fireEvent.click(screen.getByTestId('app-operations-popover-trigger'));
+  return screen.findByTestId('app-operations-popover');
+};
+/**
+ * A kept-but-dead Fixed pair has no gear — the card carries the two actions that
+ * fix it instead, and Pick another is the way back into the picker.
+ */
+const openPopoverViaPickAnother = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'settings.appOperationsModel.pickAnother' }));
   return screen.findByTestId('app-operations-popover');
 };
 const getFixedSelect = () => screen.getByLabelText('settings.selectModel');
@@ -193,6 +206,57 @@ describe('AppOperationsModelCard', () => {
       expect(screen.getByText('settings.appOperationsModel.panelLabel')).toBeVisible();
     });
 
+    it('stacks the card into three bands rather than one horizontal row', async () => {
+      renderCard();
+      await screen.findByText('Provider A');
+
+      // Band 1 carries the identity of the block and the way in — never the status.
+      const header = headerBand();
+      expect(within(header).getByText('settings.appOperationsModel.panelLabel')).toBeVisible();
+      expect(within(header).getByTestId('app-operations-info')).toBeVisible();
+      expect(within(header).getByTestId('app-operations-mode')).toBeVisible();
+      expect(within(header).getByTestId('app-operations-popover-trigger')).toBeVisible();
+      expect(within(header).queryByTestId('app-operations-status')).not.toBeInTheDocument();
+
+      // Band 2 is its own row: logo tile plus two stacked lines.
+      const identity = identityBand();
+      expect(identity).not.toBeNull();
+      expect(within(identity as HTMLElement).getByTestId('app-operations-avatar')).toBeVisible();
+      expect(within(identity as HTMLElement).getByTestId('app-operations-provider')).toHaveTextContent('Provider A');
+      expect(within(identity as HTMLElement).getByTestId('app-operations-model')).toHaveTextContent('model-a');
+      expect(within(identity as HTMLElement).queryByTestId('app-operations-status')).not.toBeInTheDocument();
+
+      // Band 3 is the footer, divided from band 2 by a visible keyline.
+      expect(within(statusLine()).getByTestId('app-operations-status')).toBeVisible();
+      expect(statusLine()).toHaveClass('border-t');
+      expect(statusLine()).toHaveClass('border-arco-2');
+      expect(statusLine().className).not.toMatch(/border-b-base/);
+    });
+
+    it('keeps both identity lines recoverable when they are too long to fit', async () => {
+      renderCard();
+      await screen.findByText('Provider A');
+
+      // jsdom cannot measure truncation, so this asserts the two things that make
+      // an ellipsis survivable: the class that clips and the title that recovers.
+      const provider = screen.getByTestId('app-operations-provider');
+      expect(provider).toHaveClass('truncate');
+      expect(provider).toHaveAttribute('title', 'Provider A');
+      const model = screen.getByTestId('app-operations-model');
+      expect(model).toHaveClass('truncate');
+      expect(model).toHaveAttribute('title', 'model-a');
+    });
+
+    it('explains what the block is through an info affordance, not the label alone', async () => {
+      renderCard();
+      await screen.findByText('Provider A');
+
+      expect(screen.getByTestId('app-operations-info')).toHaveAttribute(
+        'aria-label',
+        'settings.appOperationsModel.panelInfo'
+      );
+    });
+
     it('states status as a dot plus a word, never colour alone', async () => {
       renderCard();
 
@@ -211,7 +275,7 @@ describe('AppOperationsModelCard', () => {
       expect(statusWord().closest('[aria-live="polite"]')).not.toBeNull();
     });
 
-    it('shows an em dash when Auto resolves no model', async () => {
+    it('drops the identity band entirely when Auto resolves no model', async () => {
       getMock.mockResolvedValue({
         setting: { mode: 'auto' },
         health: 'setup_required',
@@ -219,7 +283,14 @@ describe('AppOperationsModelCard', () => {
       });
       renderCard({ providers: ineligibleProviders });
 
-      expect(await screen.findByText('—')).toBeVisible();
+      await screen.findByTestId('app-operations-panel');
+      // Nothing resolved, so there is no provider or model to state — and no
+      // placeholder standing in for one.
+      expect(identityBand()).toBeNull();
+      expect(screen.queryByTestId('app-operations-avatar')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-model')).not.toBeInTheDocument();
+      // Without band 2 above it, band 3 is not divided from anything.
+      expect(statusLine()).not.toHaveClass('border-t');
     });
   });
 
@@ -230,8 +301,32 @@ describe('AppOperationsModelCard', () => {
 
       await screen.findByText('Provider A');
       expect(screen.getByTestId('app-operations-mode')).toHaveTextContent('settings.appOperationsModel.fixed');
-      expect(screen.getByTestId('app-operations-identity')).not.toHaveClass('line-through');
+      expect(screen.getByTestId('app-operations-model')).not.toHaveClass('line-through');
       expect(screen.queryByTestId('app-operations-kept')).not.toBeInTheDocument();
+    });
+
+    it('renders the pinned model id in mono, ellipsized, on its own line', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard();
+
+      await screen.findByText('Provider A');
+      const model = screen.getByTestId('app-operations-model');
+      expect(model).toHaveClass('font-mono');
+      expect(model).toHaveClass('truncate');
+      // Provider name and model id are siblings in the stacked column, not one line.
+      expect(model.parentElement).not.toBe(screen.getByTestId('app-operations-provider'));
+      expect(identityBand()).toContainElement(model);
+    });
+
+    it('stays a quiet card — the same shape as ready, with no keyline escalation', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard();
+
+      await screen.findByText('Provider A');
+      expect(panel()).toHaveClass('border-arco-2');
+      expect(panel().className).not.toMatch(/border-l-3px/);
+      expect(screen.getByTestId('app-operations-consumer')).toBeVisible();
+      expect(screen.queryByTestId('app-operations-actions')).not.toBeInTheDocument();
     });
 
     it('turns the popover model row into the picker without echoing what it resolved to', async () => {
@@ -287,6 +382,37 @@ describe('AppOperationsModelCard', () => {
       await screen.findByText('model-b');
     });
 
+    it('swaps the dot for a spinner, drops the timestamp and keeps the consumer', async () => {
+      checkMock.mockImplementation(() => new Promise<AppOperationsModelResponse>(() => undefined));
+      getMock.mockResolvedValue({ ...autoReady, checked_at: Date.now() });
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' }));
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.checking'));
+      expect(within(statusWord()).getByTestId('app-operations-status-spinner')).toBeVisible();
+      expect(within(statusWord()).queryByTestId('app-operations-status-dot')).not.toBeInTheDocument();
+      // A stale "checked at" next to Checking would date the wrong thing.
+      expect(screen.queryByTestId('app-operations-checked')).not.toBeInTheDocument();
+      expect(screen.getByTestId('app-operations-consumer')).toBeVisible();
+      // Quiet state: no keyline escalation while a check is merely in flight.
+      expect(panel()).toHaveClass('border-arco-2');
+    });
+
+    it('mutes the gear while checking instead of removing it', async () => {
+      checkMock.mockImplementation(() => new Promise<AppOperationsModelResponse>(() => undefined));
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' }));
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.checking'));
+      expect(screen.getByTestId('app-operations-popover-trigger')).toBeDisabled();
+    });
+
     it('disables Check now when nothing resolves and enables it when a resolved model is unhealthy', async () => {
       getMock.mockResolvedValue({
         setting: { mode: 'auto' },
@@ -295,10 +421,10 @@ describe('AppOperationsModelCard', () => {
       });
       renderCard({ providers: ineligibleProviders });
       await screen.findByTestId('app-operations-panel');
-      const disabledPopover = await openPopover();
-      expect(
-        within(disabledPopover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' })
-      ).toBeDisabled();
+      // Setup required has no gear at all — Add Model is the only way forward, so
+      // Check now is not merely disabled, it is unreachable.
+      expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'settings.appOperationsModel.checkNow' })).not.toBeInTheDocument();
 
       cleanup();
       getMock.mockResolvedValue({ ...autoReady, health: 'unavailable', reason_code: 'health_check_failed' });
@@ -335,12 +461,55 @@ describe('AppOperationsModelCard', () => {
 
       await screen.findByTestId('app-operations-panel');
       expect(panel()).toHaveAttribute('data-tone', 'warning');
-      expect(panel()).toHaveClass('border-warning-6');
+      // A 3px left keyline in the warning tone. `border-l-warning-6` compiles to
+      // nothing, so the tone colour is set once for all four sides and only the
+      // left WIDTH is raised — asserting both halves keeps that pairing honest.
+      expect(panel()).toHaveClass('border-warning');
+      expect(panel()).toHaveClass('border-l-3px');
+      expect(panel().className).not.toMatch(/border-b-base/);
       expect(screen.getByText('settings.appOperationsModel.setupRequiredImpact')).toBeVisible();
       expect(screen.getByText('settings.appOperationsModel.reason.noEligibleModel')).toBeVisible();
 
       fireEvent.click(screen.getByRole('button', { name: 'settings.addModel' }));
       expect(onAddModel).toHaveBeenCalledTimes(1);
+    });
+
+    it('replaces the whole card body with cause then action — no identity, no consumer, no gear', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
+      });
+      renderCard({ providers: ineligibleProviders });
+
+      await screen.findByTestId('app-operations-panel');
+      // Band 1 keeps only the label, the info affordance and the mode pill.
+      expect(within(headerBand()).getByTestId('app-operations-mode')).toHaveTextContent(
+        'settings.appOperationsModel.auto'
+      );
+      expect(within(headerBand()).queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
+      expect(identityBand()).toBeNull();
+      expect(screen.queryByTestId('app-operations-consumer')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-checked')).not.toBeInTheDocument();
+      expect(within(statusWord()).getByTestId('app-operations-status-dot')).toBeVisible();
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.setupRequired');
+    });
+
+    it('gives Add Model the full width of the card as the one action that fixes it', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
+      });
+      renderCard({ providers: ineligibleProviders });
+
+      await screen.findByTestId('app-operations-panel');
+      const actions = screen.getByTestId('app-operations-actions');
+      const addModel = within(actions).getByRole('button', { name: 'settings.addModel' });
+      // Arco's `long` prop is what makes a Button span its container.
+      expect(addModel).toHaveClass('arco-btn-long');
+      expect(addModel).toHaveClass('arco-btn-primary');
+      expect(within(actions).getAllByRole('button')).toHaveLength(1);
     });
 
     it('describes the compaction fallback truthfully as a rules-based summary, not trimming', () => {
@@ -373,13 +542,40 @@ describe('AppOperationsModelCard', () => {
 
       await screen.findByText('Provider A');
       expect(panel()).toHaveAttribute('data-tone', 'danger');
-      expect(panel()).toHaveClass('border-danger-6');
-      expect(screen.getByTestId('app-operations-identity')).toHaveClass('line-through');
+      expect(panel()).toHaveClass('border-danger');
+      expect(panel()).toHaveClass('border-l-3px');
+      expect(panel().className).not.toMatch(/border-b-base/);
+      // Only the model id is struck through — the provider is merely muted, since
+      // the provider still exists; it is the pair that stopped working.
+      expect(screen.getByTestId('app-operations-model')).toHaveClass('line-through');
+      expect(screen.getByTestId('app-operations-provider')).toHaveClass('text-t-secondary');
+      expect(screen.getByTestId('app-operations-provider')).not.toHaveClass('line-through');
       expect(screen.getByTestId('app-operations-kept')).toHaveTextContent('settings.appOperationsModel.kept');
       expect(screen.getByTestId('app-operations-model')).toHaveTextContent('model-a');
+      // The Kept badge belongs to the model line, not to the status footer.
+      expect(identityBand()).toContainElement(screen.getByTestId('app-operations-kept'));
     });
 
-    it('offers Switch to Auto and Pick another', async () => {
+    it('states the cause, drops the timestamp and the consumer, and hides the gear', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+        health: 'unavailable',
+        checked_at: Date.now(),
+        reason_code: 'model_disabled',
+      });
+      renderCard();
+
+      await screen.findByText('Provider A');
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.unavailable');
+      expect(screen.getByText('settings.appOperationsModel.reason.modelDisabled')).toBeVisible();
+      expect(screen.queryByTestId('app-operations-checked')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-consumer')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
+      // Band 2 still stands, so band 3 is still divided from it.
+      expect(statusLine()).toHaveClass('border-t');
+    });
+
+    it('offers Switch to Auto and Pick another as two equal-width actions', async () => {
       getMock.mockResolvedValue({
         setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
         health: 'unavailable',
@@ -388,8 +584,12 @@ describe('AppOperationsModelCard', () => {
       renderCard();
       await screen.findByText('Provider A');
 
-      fireEvent.click(screen.getByRole('button', { name: 'settings.appOperationsModel.pickAnother' }));
-      const popover = await screen.findByTestId('app-operations-popover');
+      const actions = screen.getByTestId('app-operations-actions');
+      const buttons = within(actions).getAllByRole('button');
+      expect(buttons).toHaveLength(2);
+      for (const button of buttons) expect(button).toHaveClass('flex-1');
+
+      const popover = await openPopoverViaPickAnother();
       expect(within(popover).getByLabelText('settings.selectModel')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'settings.appOperationsModel.switchToAuto' }));
@@ -404,7 +604,7 @@ describe('AppOperationsModelCard', () => {
       });
       renderCard();
       await screen.findByTestId('app-operations-panel');
-      await openPopover();
+      await openPopoverViaPickAnother();
 
       const synthetic = await screen.findByRole('option', { name: 'missing-provider / missing-model' });
       expect(synthetic).toBeDisabled();
@@ -419,7 +619,7 @@ describe('AppOperationsModelCard', () => {
       });
       renderCard();
       await screen.findByTestId('app-operations-panel');
-      await openPopover();
+      await openPopoverViaPickAnother();
 
       const synthetic = await screen.findAllByRole('option', { name: 'missing-model' });
       expect(synthetic).toHaveLength(1);
@@ -450,6 +650,34 @@ describe('AppOperationsModelCard', () => {
       await waitFor(() => expect(statusWord()).not.toHaveTextContent('settings.appOperationsModel.status.saving'));
     });
 
+    it('dims the card to a spinner and no identity while the save is in flight', async () => {
+      let resolveUpdate: (response: AppOperationsModelResponse) => void = () => undefined;
+      updateMock.mockImplementation(
+        () =>
+          new Promise<AppOperationsModelResponse>((resolve) => {
+            resolveUpdate = resolve;
+          })
+      );
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.saving'));
+      expect(panel()).toHaveClass('opacity-94');
+      // The identity on screen would be the one being replaced, so it goes away.
+      expect(identityBand()).toBeNull();
+      expect(within(statusWord()).getByTestId('app-operations-status-spinner')).toBeVisible();
+      expect(within(statusWord()).queryByTestId('app-operations-status-dot')).not.toBeInTheDocument();
+      // Saving is not bold and stays a quiet card.
+      expect(statusWord().className).not.toMatch(/font-700/);
+      expect(panel()).toHaveClass('border-arco-2');
+
+      resolveUpdate(autoReady);
+      await waitFor(() => expect(statusWord()).not.toHaveTextContent('settings.appOperationsModel.status.saving'));
+    });
+
     it('reverts to the last confirmed value and offers a retry that re-attempts the save', async () => {
       updateMock.mockRejectedValueOnce(new Error('secret backend error'));
       renderCard();
@@ -471,10 +699,27 @@ describe('AppOperationsModelCard', () => {
       );
       await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.ready'));
     });
+
+    it('escalates a failed save onto the card as an inline toast, not only a message', async () => {
+      updateMock.mockRejectedValueOnce(new Error('secret backend error'));
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      const toast = await screen.findByTestId('app-operations-save-failed-toast');
+      expect(within(toast).getByText('settings.appOperationsModel.saveFailedToast')).toBeVisible();
+      // The retry lives in the toast, so the one thing to do is where the problem is.
+      expect(within(toast).getByTestId('app-operations-retry')).toBeVisible();
+      expect(panel()).toHaveAttribute('data-status', 'save_failed');
+      expect(panel()).toHaveAttribute('data-tone', 'danger');
+      expect(identityBand()).toBeNull();
+    });
   });
 
   describe('state 7 — backend update required', () => {
-    it('replaces the panel with the alert and leaves no live control stack behind it', async () => {
+    it('replaces the panel with the notice and leaves no live control stack behind it', async () => {
       getMock.mockRejectedValueOnce(
         new BackendHttpError({ method: 'GET', path: '/api/app-operations/model', status: 404, body: {} })
       );
@@ -485,6 +730,26 @@ describe('AppOperationsModelCard', () => {
       expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'settings.appOperationsModel.auto' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'settings.appOperationsModel.fixed' })).not.toBeInTheDocument();
+    });
+
+    it('is a different block entirely — a titled notice, none of the three bands', async () => {
+      getMock.mockRejectedValueOnce(
+        new BackendHttpError({ method: 'GET', path: '/api/app-operations/model', status: 404, body: {} })
+      );
+      renderCard();
+
+      await screen.findByText('settings.appOperationsModel.backendUpdateRequired');
+      expect(panel()).toHaveAttribute('data-status', 'backend_update_required');
+      expect(panel()).toHaveAttribute('data-tone', 'warning');
+      expect(screen.getByTestId('app-operations-backend-title')).toHaveTextContent(
+        'settings.appOperationsModel.backendUpdateRequired'
+      );
+      // The notice says what the user can do about it and what it does not break.
+      expect(screen.getByText('settings.appOperationsModel.backendUpdateRequiredDetail')).toBeVisible();
+      expect(screen.queryByTestId('app-operations-header')).not.toBeInTheDocument();
+      expect(identityBand()).toBeNull();
+      expect(screen.queryByTestId('app-operations-mode')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-consumer')).not.toBeInTheDocument();
     });
   });
 
@@ -498,11 +763,32 @@ describe('AppOperationsModelCard', () => {
       expect(panel()).toHaveAttribute('data-tone', 'danger');
       expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.loadFailed');
       expect(screen.queryByText('hidden error')).not.toBeInTheDocument();
+      // Actionable, so it takes the keyline, a cause and one full-width action.
+      expect(panel()).toHaveClass('border-danger');
+      expect(panel()).toHaveClass('border-l-3px');
+      expect(screen.getByTestId('app-operations-cause')).toHaveTextContent('settings.appOperationsModel.loadFailed');
+      expect(identityBand()).toBeNull();
+      expect(screen.getByTestId('app-operations-retry')).toHaveClass('arco-btn-long');
 
       fireEvent.click(screen.getByTestId('app-operations-retry'));
 
       await screen.findByText('Provider A');
       expect(getMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('state 0 — loading', () => {
+    it('states Loading with no identity and no keyline escalation', async () => {
+      getMock.mockImplementation(() => new Promise<AppOperationsModelResponse>(() => undefined));
+      renderCard();
+
+      await screen.findByTestId('app-operations-panel');
+      expect(panel()).toHaveAttribute('data-status', 'loading');
+      expect(panel()).toHaveAttribute('data-tone', 'neutral');
+      expect(panel()).toHaveClass('border-arco-2');
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.loading');
+      expect(identityBand()).toBeNull();
+      expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
     });
   });
 
@@ -576,11 +862,10 @@ describe('AppOperationsModelCard', () => {
     });
 
     it('opens model setup instead of saving when no selectable pair exists', async () => {
-      getMock.mockResolvedValue({
-        setting: { mode: 'auto' },
-        health: 'setup_required',
-        reason_code: 'no_eligible_model',
-      });
+      // The card only keeps its gear while the state is quiet, so this drives the
+      // no-selectable-pair path through a healthy response whose providers have
+      // since become ineligible — the same branch the popover's Fixed button hits.
+      getMock.mockResolvedValue(autoReady);
       const { onAddModel } = renderCard({ providers: ineligibleProviders });
       await screen.findByTestId('app-operations-panel');
       const popover = await openPopover();
@@ -589,6 +874,21 @@ describe('AppOperationsModelCard', () => {
 
       expect(onAddModel).toHaveBeenCalledTimes(1);
       expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps an open popover mounted when choosing a model turns the card to Saving', async () => {
+      // The gear is gone in `saving`, but unmounting the anchor would take the
+      // picker with it the instant the user chose — mid-save, from under them.
+      updateMock.mockImplementation(() => new Promise<AppOperationsModelResponse>(() => undefined));
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.saving'));
+      expect(screen.getByTestId('app-operations-popover')).toBeVisible();
+      expect(screen.getByTestId('app-operations-popover-trigger')).toBeInTheDocument();
     });
 
     it('states the last check and the consumer in the footer', async () => {

@@ -888,14 +888,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "Configured · inference unavailable.",
     "setupNeedsAttention": "Setup needs attention.",
-    "overload": { "action": "The provider is temporarily overloaded. Try again later." },
-    "rateLimit": { "action": "Wait for the provider limit to reset, then try again." },
-    "setup": { "action": "Review the provider credentials and configuration, then try again." },
-    "connectivity": { "action": "Check the network, proxy, and Base URL, then try again." },
-    "provider": { "action": "The provider could not complete the inference check. Try again later." }
+    "overload": {
+      "action": "The provider is temporarily overloaded. Try again later."
+    },
+    "rateLimit": {
+      "action": "Wait for the provider limit to reset, then try again."
+    },
+    "setup": {
+      "action": "Review the provider credentials and configuration, then try again."
+    },
+    "connectivity": {
+      "action": "Check the network, proxy, and Base URL, then try again."
+    },
+    "provider": {
+      "action": "The provider could not complete the inference check. Try again later."
+    }
   },
-  "clearStatus": "Clear status",
-  "healthStatusCleared": "Health status cleared",
   "latency": "Latency",
   "customAcpAgent": "Custom ACP Agents",
   "addCustomAgent": "Add",
@@ -1359,6 +1367,7 @@
   "appOperationsModel": {
     "title": "App operations model",
     "panelLabel": "App operations",
+    "panelInfo": "Runs background work with its own model, independently of the model each chat uses.",
     "popoverSubtitle": "Background work only. Changing it does not affect your conversations.",
     "selectionLabel": "Selection",
     "auto": "Auto",
@@ -1376,8 +1385,10 @@
     "setupRequiredImpact": "No eligible text model is configured. Context compaction falls back to a rules-based summary until one is.",
     "loadFailed": "App operations settings could not be loaded.",
     "saveFailed": "App operations model could not be saved.",
+    "saveFailedToast": "Couldn't save. Choose again to retry.",
     "checkFailed": "The app operations health check failed.",
     "backendUpdateRequired": "Update WePrompt to configure the app operations model.",
+    "backendUpdateRequiredDetail": "This build's backend does not serve the setting. Chats are unaffected.",
     "checkTime": {
       "never": "Not checked yet",
       "justNow": "Checked just now",

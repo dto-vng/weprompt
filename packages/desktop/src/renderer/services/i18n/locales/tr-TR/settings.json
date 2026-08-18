@@ -876,14 +876,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",
     "setupNeedsAttention": "Kurulumun kontrol edilmesi gerekiyor.",
-    "overload": { "action": "Sağlayıcı geçici olarak aşırı yüklü. Daha sonra tekrar deneyin." },
-    "rateLimit": { "action": "Sağlayıcı sınırının sıfırlanmasını bekleyip tekrar deneyin." },
-    "setup": { "action": "Sağlayıcı kimlik bilgilerini ve yapılandırmasını kontrol edip tekrar deneyin." },
-    "connectivity": { "action": "Ağı, proxy'yi ve Base URL'yi kontrol edip tekrar deneyin." },
-    "provider": { "action": "Sağlayıcı çıkarım kontrolünü tamamlayamadı. Daha sonra tekrar deneyin." }
+    "overload": {
+      "action": "Sağlayıcı geçici olarak aşırı yüklü. Daha sonra tekrar deneyin."
+    },
+    "rateLimit": {
+      "action": "Sağlayıcı sınırının sıfırlanmasını bekleyip tekrar deneyin."
+    },
+    "setup": {
+      "action": "Sağlayıcı kimlik bilgilerini ve yapılandırmasını kontrol edip tekrar deneyin."
+    },
+    "connectivity": {
+      "action": "Ağı, proxy'yi ve Base URL'yi kontrol edip tekrar deneyin."
+    },
+    "provider": {
+      "action": "Sağlayıcı çıkarım kontrolünü tamamlayamadı. Daha sonra tekrar deneyin."
+    }
   },
-  "clearStatus": "Durumu Temizle",
-  "healthStatusCleared": "Sağlık durumu temizlendi",
   "latency": "Gecikme",
   "customAcpAgent": "Özel ACP Ajanları",
   "addCustomAgent": "Ekle",
@@ -1359,6 +1367,7 @@
   "appOperationsModel": {
     "title": "Uygulama işlemleri modeli",
     "panelLabel": "Uygulama işlemleri",
+    "panelInfo": "Arka plan işlerini, her sohbetin kullandığı modelden bağımsız olarak kendi modeliyle yürütür.",
     "popoverSubtitle": "Yalnızca arka plan işleri için. Bunu değiştirmek sohbetlerinizi etkilemez.",
     "selectionLabel": "Seçim",
     "auto": "Otomatik",
@@ -1376,8 +1385,10 @@
     "setupRequiredImpact": "Uygun bir metin modeli yapılandırılmadı. Yapılandırılana kadar bağlam sıkıştırma kural tabanlı bir özete geri döner.",
     "loadFailed": "Uygulama işlemleri ayarları yüklenemedi.",
     "saveFailed": "Uygulama işlemleri modeli kaydedilemedi.",
+    "saveFailedToast": "Kaydedilemedi. Yeniden seçerek tekrar deneyin.",
     "checkFailed": "Uygulama işlemleri durum denetimi başarısız oldu.",
     "backendUpdateRequired": "Uygulama işlemleri modelini yapılandırmak için WePrompt'u güncelleyin.",
+    "backendUpdateRequiredDetail": "Bu sürümün arka ucu bu ayarı sunmuyor. Sohbetler etkilenmez.",
     "checkTime": {
       "never": "Henüz denetlenmedi",
       "justNow": "Az önce denetlendi",

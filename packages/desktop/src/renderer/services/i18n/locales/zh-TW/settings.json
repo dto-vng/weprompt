@@ -888,14 +888,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",
     "setupNeedsAttention": "設定需要處理。",
-    "overload": { "action": "服務供應商暫時過載，請稍後再試。" },
-    "rateLimit": { "action": "請等待服務供應商限額重設後再試。" },
-    "setup": { "action": "請檢查服務供應商憑證和設定後再試。" },
-    "connectivity": { "action": "請檢查網路、代理和 Base URL 後再試。" },
-    "provider": { "action": "服務供應商未能完成推論檢測，請稍後再試。" }
+    "overload": {
+      "action": "服務供應商暫時過載，請稍後再試。"
+    },
+    "rateLimit": {
+      "action": "請等待服務供應商限額重設後再試。"
+    },
+    "setup": {
+      "action": "請檢查服務供應商憑證和設定後再試。"
+    },
+    "connectivity": {
+      "action": "請檢查網路、代理和 Base URL 後再試。"
+    },
+    "provider": {
+      "action": "服務供應商未能完成推論檢測，請稍後再試。"
+    }
   },
-  "clearStatus": "清除狀態",
-  "healthStatusCleared": "健康狀態已清除",
   "latency": "延遲",
   "customAcpAgent": "自訂 ACP 代理",
   "addCustomAgent": "新增",
@@ -1361,6 +1369,7 @@
   "appOperationsModel": {
     "title": "應用程式操作模型",
     "panelLabel": "應用程式操作",
+    "panelInfo": "使用自己的模型執行背景工作，與每個對話使用的模型互不影響。",
     "popoverSubtitle": "僅用於背景工作。變更它不會影響你的對話。",
     "selectionLabel": "選擇",
     "auto": "自動",
@@ -1378,8 +1387,10 @@
     "setupRequiredImpact": "尚未設定符合條件的文字模型。在設定之前，上下文壓縮會回退到基於規則的摘要。",
     "loadFailed": "無法載入應用程式操作設定。",
     "saveFailed": "無法儲存應用程式操作模型。",
+    "saveFailedToast": "儲存失敗。重新選擇即可重試。",
     "checkFailed": "應用程式操作健康狀態檢查失敗。",
     "backendUpdateRequired": "請更新 WePrompt 以設定應用程式操作模型。",
+    "backendUpdateRequiredDetail": "此版本的後端未提供該設定。對話不受影響。",
     "checkTime": {
       "never": "尚未檢查",
       "justNow": "剛剛檢查",

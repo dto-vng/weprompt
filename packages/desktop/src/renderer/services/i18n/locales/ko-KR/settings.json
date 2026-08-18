@@ -876,14 +876,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",
     "setupNeedsAttention": "설정을 확인해야 합니다.",
-    "overload": { "action": "공급자가 일시적으로 과부하 상태입니다. 나중에 다시 시도하세요." },
-    "rateLimit": { "action": "공급자 한도가 재설정된 후 다시 시도하세요." },
-    "setup": { "action": "공급자 자격 증명과 구성을 확인한 후 다시 시도하세요." },
-    "connectivity": { "action": "네트워크, 프록시 및 Base URL을 확인한 후 다시 시도하세요." },
-    "provider": { "action": "공급자가 추론 확인을 완료하지 못했습니다. 나중에 다시 시도하세요." }
+    "overload": {
+      "action": "공급자가 일시적으로 과부하 상태입니다. 나중에 다시 시도하세요."
+    },
+    "rateLimit": {
+      "action": "공급자 한도가 재설정된 후 다시 시도하세요."
+    },
+    "setup": {
+      "action": "공급자 자격 증명과 구성을 확인한 후 다시 시도하세요."
+    },
+    "connectivity": {
+      "action": "네트워크, 프록시 및 Base URL을 확인한 후 다시 시도하세요."
+    },
+    "provider": {
+      "action": "공급자가 추론 확인을 완료하지 못했습니다. 나중에 다시 시도하세요."
+    }
   },
-  "clearStatus": "상태 지우기",
-  "healthStatusCleared": "상태가 초기화되었습니다",
   "latency": "지연 시간",
   "customAcpAgent": "사용자 정의 ACP 에이전트",
   "addCustomAgent": "추가",
@@ -1361,6 +1369,7 @@
   "appOperationsModel": {
     "title": "앱 작업 모델",
     "panelLabel": "앱 작업",
+    "panelInfo": "백그라운드 작업은 각 대화에서 사용하는 모델과 무관하게 자체 모델로 실행됩니다.",
     "popoverSubtitle": "백그라운드 작업에만 사용됩니다. 변경해도 대화에는 영향을 주지 않습니다.",
     "selectionLabel": "선택",
     "auto": "자동",
@@ -1378,8 +1387,10 @@
     "setupRequiredImpact": "사용할 수 있는 텍스트 모델이 구성되지 않았습니다. 구성될 때까지 컨텍스트 압축은 규칙 기반 요약으로 대체됩니다.",
     "loadFailed": "앱 작업 설정을 불러올 수 없습니다.",
     "saveFailed": "앱 작업 모델을 저장할 수 없습니다.",
+    "saveFailedToast": "저장하지 못했습니다. 다시 선택하면 재시도합니다.",
     "checkFailed": "앱 작업 상태 확인에 실패했습니다.",
     "backendUpdateRequired": "앱 작업 모델을 구성하려면 WePrompt를 업데이트하세요.",
+    "backendUpdateRequiredDetail": "이 빌드의 백엔드는 해당 설정을 제공하지 않습니다. 대화에는 영향이 없습니다.",
     "checkTime": {
       "never": "아직 확인하지 않음",
       "justNow": "방금 확인함",

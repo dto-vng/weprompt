@@ -876,14 +876,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",
     "setupNeedsAttention": "設定を確認してください。",
-    "overload": { "action": "プロバイダーが一時的に過負荷です。しばらくしてから再試行してください。" },
-    "rateLimit": { "action": "プロバイダーの上限がリセットされてから再試行してください。" },
-    "setup": { "action": "プロバイダーの認証情報と設定を確認してから再試行してください。" },
-    "connectivity": { "action": "ネットワーク、プロキシ、Base URL を確認してから再試行してください。" },
-    "provider": { "action": "プロバイダーは推論チェックを完了できませんでした。しばらくしてから再試行してください。" }
+    "overload": {
+      "action": "プロバイダーが一時的に過負荷です。しばらくしてから再試行してください。"
+    },
+    "rateLimit": {
+      "action": "プロバイダーの上限がリセットされてから再試行してください。"
+    },
+    "setup": {
+      "action": "プロバイダーの認証情報と設定を確認してから再試行してください。"
+    },
+    "connectivity": {
+      "action": "ネットワーク、プロキシ、Base URL を確認してから再試行してください。"
+    },
+    "provider": {
+      "action": "プロバイダーは推論チェックを完了できませんでした。しばらくしてから再試行してください。"
+    }
   },
-  "clearStatus": "ステータスをクリア",
-  "healthStatusCleared": "ヘルスステータスがクリアされました",
   "latency": "レイテンシ",
   "customAcpAgent": "カスタム ACP エージェント",
   "addCustomAgent": "追加",
@@ -1361,6 +1369,7 @@
   "appOperationsModel": {
     "title": "アプリ操作モデル",
     "panelLabel": "アプリ操作",
+    "panelInfo": "バックグラウンド処理は専用のモデルで実行され、各チャットが使うモデルとは独立しています。",
     "popoverSubtitle": "バックグラウンド処理専用です。変更してもチャットには影響しません。",
     "selectionLabel": "選択",
     "auto": "自動",
@@ -1378,8 +1387,10 @@
     "setupRequiredImpact": "条件を満たすテキストモデルが未設定です。設定されるまで、コンテキスト圧縮はルールベースの要約にフォールバックします。",
     "loadFailed": "アプリ操作の設定を読み込めませんでした。",
     "saveFailed": "アプリ操作モデルを保存できませんでした。",
+    "saveFailedToast": "保存できませんでした。もう一度選択すると再試行します。",
     "checkFailed": "アプリ操作のヘルスチェックに失敗しました。",
     "backendUpdateRequired": "アプリ操作モデルを設定するには、WePrompt を更新してください。",
+    "backendUpdateRequiredDetail": "このビルドのバックエンドはこの設定を提供していません。チャットには影響しません。",
     "checkTime": {
       "never": "未確認",
       "justNow": "たった今確認",

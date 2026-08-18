@@ -323,33 +323,6 @@ const ModelModalContent: React.FC = () => {
     }
   };
 
-  const clearAllHealthData = () => {
-    if (!data) return;
-    const nextArray: IProvider[] = data.map((platform: IProvider) => ({
-      ...platform,
-      model_health: undefined as IProvider['model_health'],
-    }));
-    void mutate(nextArray, false);
-
-    Promise.all(
-      (data || []).map((platform) => ipcBridge.mode.updateProvider.invoke({ id: platform.id, model_health: {} }))
-    )
-      .then(() => {
-        signalProviderPersisted();
-        void mutate();
-        markProviderCatalogChanged();
-        Message.success({
-          content: t('settings.healthStatusCleared'),
-          duration: 2000,
-        });
-      })
-      .catch((error) => {
-        void mutate();
-        console.error('Failed to clear health status:', error);
-        message.error(t('settings.saveModelConfigFailed'));
-      });
-  };
-
   const [addPlatformModalCtrl, addPlatformModalContext] = AddPlatformModal.useModal({
     onSubmit(platform) {
       updatePlatform(platform, () => {
@@ -384,9 +357,6 @@ const ModelModalContent: React.FC = () => {
 
   const headerActions = (
     <>
-      <Button type='text' size='small' onClick={clearAllHealthData} className='!text-t-secondary hover:!text-t-primary'>
-        {t('settings.clearStatus')}
-      </Button>
       <TalkToButlerButton
         label={t('settings.addModel')}
         chatLabel={t('settings.talkToButler.addViaChat', { defaultValue: 'Add via chat' })}
@@ -399,12 +369,13 @@ const ModelModalContent: React.FC = () => {
     </>
   );
 
-  // The app operations block is a status panel in the header, not a body card, so
-  // the page body starts with providers immediately. It takes its own row under
-  // the header actions: right-aligned and compact at >=900px, a full-width
-  // one-line strip below that (the panel owns those width rules). It must not
-  // join `headerActions` — that slot is `shrink-0`, so a wide panel there sizes
-  // the whole header to its max-content width and overflows the page.
+  // The app operations block is a status card in the header, not a body card, so
+  // the page body starts with providers immediately. It renders `w-full` and lets
+  // its container decide the width: `SettingsPageHeader`'s status column caps it at
+  // the card width beside the title on wide viewports and wraps it full-width
+  // below otherwise, and the modal header stacks it full-width. It must not join
+  // `headerActions` — that slot is `shrink-0`, so a wide panel there sizes the
+  // whole header to its max-content width and overflows the page.
   const appOperationsPanel = (
     <AppOperationsModelCard
       providers={data ?? []}

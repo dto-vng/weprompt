@@ -888,14 +888,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferência indisponível.",
     "setupNeedsAttention": "A configuração precisa de atenção.",
-    "overload": { "action": "O provedor está temporariamente sobrecarregado. Tente novamente mais tarde." },
-    "rateLimit": { "action": "Aguarde o limite do provedor ser redefinido e tente novamente." },
-    "setup": { "action": "Revise as credenciais e a configuração do provedor e tente novamente." },
-    "connectivity": { "action": "Verifique a rede, o proxy e a Base URL e tente novamente." },
-    "provider": { "action": "O provedor não concluiu a verificação de inferência. Tente novamente mais tarde." }
+    "overload": {
+      "action": "O provedor está temporariamente sobrecarregado. Tente novamente mais tarde."
+    },
+    "rateLimit": {
+      "action": "Aguarde o limite do provedor ser redefinido e tente novamente."
+    },
+    "setup": {
+      "action": "Revise as credenciais e a configuração do provedor e tente novamente."
+    },
+    "connectivity": {
+      "action": "Verifique a rede, o proxy e a Base URL e tente novamente."
+    },
+    "provider": {
+      "action": "O provedor não concluiu a verificação de inferência. Tente novamente mais tarde."
+    }
   },
-  "clearStatus": "Limpar status",
-  "healthStatusCleared": "Status de saúde limpo",
   "latency": "Latência",
   "customAcpAgent": "Agentes ACP Personalizados",
   "addCustomAgent": "Adicionar",
@@ -1362,6 +1370,7 @@
   "appOperationsModel": {
     "title": "Modelo para operações do aplicativo",
     "panelLabel": "Operações do aplicativo",
+    "panelInfo": "Executa o trabalho em segundo plano com o próprio modelo, independentemente do modelo usado por cada conversa.",
     "popoverSubtitle": "Apenas para trabalho em segundo plano. Alterar isso não afeta suas conversas.",
     "selectionLabel": "Seleção",
     "auto": "Automático",
@@ -1379,8 +1388,10 @@
     "setupRequiredImpact": "Nenhum modelo de texto elegível está configurado. Até que haja um, a compactação de contexto recorre a um resumo baseado em regras.",
     "loadFailed": "Não foi possível carregar as configurações de operações do aplicativo.",
     "saveFailed": "Não foi possível salvar o modelo para operações do aplicativo.",
+    "saveFailedToast": "Não foi possível salvar. Escolha novamente para tentar de novo.",
     "checkFailed": "A verificação de integridade das operações do aplicativo falhou.",
     "backendUpdateRequired": "Atualize o WePrompt para configurar o modelo para operações do aplicativo.",
+    "backendUpdateRequiredDetail": "O backend desta versão não fornece essa configuração. As conversas não são afetadas.",
     "checkTime": {
       "never": "Ainda não verificado",
       "justNow": "Verificado agora",

@@ -878,14 +878,22 @@
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",
     "setupNeedsAttention": "La configuración requiere atención.",
-    "overload": { "action": "El proveedor está sobrecargado temporalmente. Inténtalo de nuevo más tarde." },
-    "rateLimit": { "action": "Espera a que se restablezca el límite del proveedor e inténtalo de nuevo." },
-    "setup": { "action": "Revisa las credenciales y la configuración del proveedor e inténtalo de nuevo." },
-    "connectivity": { "action": "Revisa la red, el proxy y la Base URL e inténtalo de nuevo." },
-    "provider": { "action": "El proveedor no pudo completar la comprobación de inferencia. Inténtalo más tarde." }
+    "overload": {
+      "action": "El proveedor está sobrecargado temporalmente. Inténtalo de nuevo más tarde."
+    },
+    "rateLimit": {
+      "action": "Espera a que se restablezca el límite del proveedor e inténtalo de nuevo."
+    },
+    "setup": {
+      "action": "Revisa las credenciales y la configuración del proveedor e inténtalo de nuevo."
+    },
+    "connectivity": {
+      "action": "Revisa la red, el proxy y la Base URL e inténtalo de nuevo."
+    },
+    "provider": {
+      "action": "El proveedor no pudo completar la comprobación de inferencia. Inténtalo más tarde."
+    }
   },
-  "clearStatus": "Limpiar estado",
-  "healthStatusCleared": "Estado de salud limpiado",
   "latency": "Latencia",
   "customAcpAgent": "Agentes ACP personalizados",
   "addCustomAgent": "Agregar",
@@ -1359,6 +1367,7 @@
   "appOperationsModel": {
     "title": "Modelo para operaciones de la aplicación",
     "panelLabel": "Operaciones de la aplicación",
+    "panelInfo": "Ejecuta el trabajo en segundo plano con su propio modelo, independientemente del modelo que use cada conversación.",
     "popoverSubtitle": "Solo para trabajo en segundo plano. Cambiarlo no afecta a tus conversaciones.",
     "selectionLabel": "Selección",
     "auto": "Automático",
@@ -1376,8 +1385,10 @@
     "setupRequiredImpact": "No hay ningún modelo de texto apto configurado. Hasta que lo haya, la compactación de contexto recurre a un resumen basado en reglas.",
     "loadFailed": "No se pudo cargar la configuración de operaciones de la aplicación.",
     "saveFailed": "No se pudo guardar el modelo para operaciones de la aplicación.",
+    "saveFailedToast": "No se pudo guardar. Vuelve a elegir para reintentarlo.",
     "checkFailed": "La comprobación de estado de las operaciones de la aplicación falló.",
     "backendUpdateRequired": "Actualiza WePrompt para configurar el modelo para operaciones de la aplicación.",
+    "backendUpdateRequiredDetail": "El backend de esta versión no ofrece este ajuste. Las conversaciones no se ven afectadas.",
     "checkTime": {
       "never": "Sin comprobar todavía",
       "justNow": "Comprobado ahora mismo",

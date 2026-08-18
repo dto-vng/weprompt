@@ -5,20 +5,26 @@
  */
 
 /**
- * AppOperationsModelCard — the app operations status panel.
+ * AppOperationsModelCard — the app operations status card.
  *
- * The block lives in the Settings > Models page header (and in the modal
- * header's action row) so the page body can start with providers immediately.
- * It carries only what is worth glancing at — mode, resolved model, health and
- * consumer — while everything mutable lives one click deeper in a popover.
+ * The block lives beside the Settings > Models page title (and in the modal
+ * header) so the page body can start with providers immediately. It carries only
+ * what is worth glancing at — mode, resolved model, health and consumer — while
+ * everything mutable lives one click deeper in a popover.
  *
- * There is ONE component, ONE state machine and THREE widths, not three views:
- * the panel, the narrow full-width strip and every status are the same block.
- * Only the keyline colour, the status line and the action row change.
+ * The card is a THREE-BAND vertical block, never a one-line strip: a header row
+ * (label + info + mode pill + gear), an identity row (provider logo, provider
+ * name over model id) and a status footer (dot + word + last check + consumer).
+ * Every label gets its own line so nothing has to be truncated to fit.
+ *
+ * There is still ONE component and ONE state machine. Quiet states (ready,
+ * checking) render the three bands and nothing else; actionable states escalate
+ * the card with a keyline, a plain-language cause and the one action that fixes
+ * it, and drop the bands that no longer say anything true.
  */
 
-import { Alert, Button, Message, Popover, Tag } from '@arco-design/web-react';
-import { LinkCloud, Refresh, SettingTwo } from '@icon-park/react';
+import { Button, Message, Popover, Tooltip } from '@arco-design/web-react';
+import { Caution, Info, LinkCloud, LoadingFour, Refresh, SettingTwo } from '@icon-park/react';
 import classNames from 'classnames';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { appOperationsModel } from '@/common/adapter/ipcBridge';
@@ -125,18 +131,36 @@ const TONE_DOT_CLASS: Record<StatusTone, string> = {
   danger: 'bg-danger',
 };
 
+/** The status word is tinted to match its dot so the pair reads as one signal. */
+const TONE_TEXT_CLASS: Record<StatusTone, string> = {
+  neutral: 'text-t-secondary',
+  success: 'text-success-6',
+  warning: 'text-warning-7',
+  danger: 'text-danger-6',
+};
+
 /**
- * Only warning and danger escalate the panel keyline; quiet states stay quiet.
+ * Only warning and danger escalate the card, and they escalate it with a 3px left
+ * keyline on top of the tone-coloured hairline. Quiet states stay quiet.
  *
- * Use `border-arco-2`, never `border-b-base`: UnoCSS parses the latter as the
- * side utility `border-b-*` and compiles it to `border-bottom-color: var(--bg-base)`
- * — one edge only, painted in the page background, i.e. an invisible keyline.
+ * Two UnoCSS traps are load-bearing here, both verified by generating the CSS:
+ *
+ * 1. Use `border-arco-2`, never `border-b-base`: UnoCSS parses the latter as the
+ *    side utility `border-b-*` and compiles it to
+ *    `border-bottom-color: var(--bg-base)` — one edge only, painted in the page
+ *    background, i.e. an invisible keyline.
+ * 2. `border-l-warning-6` compiles to NOTHING (the numeric Arco scale rule only
+ *    matches `border-<tone>-<n>`, and presetWind3 cannot resolve `warning-6` as a
+ *    theme colour for a side). Combining a side colour with the four-side
+ *    shorthand does not work either: `border-warning-3` is emitted AFTER
+ *    `border-l-warning`, so the shorthand wins and repaints the left edge. So the
+ *    tone colour is applied once, to all four sides, and only the WIDTH differs.
  */
 const TONE_KEYLINE_CLASS: Record<StatusTone, string> = {
   neutral: 'border-arco-2',
   success: 'border-arco-2',
-  warning: 'border-warning-6',
-  danger: 'border-danger-6',
+  warning: 'border-warning border-l-3px',
+  danger: 'border-danger border-l-3px',
 };
 
 const REASON_KEYS: Record<AppOperationsModelReasonCode, string> = {
@@ -151,36 +175,92 @@ const REASON_KEYS: Record<AppOperationsModelReasonCode, string> = {
 
 const JUST_CHECKED_MS = 60_000;
 
+/** Section labels inside the popover — unchanged. */
 const SECTION_LABEL_CLASS = 'text-10px font-600 uppercase tracking-wide text-t-tertiary';
 
-const StatusIndicator: React.FC<{ status: PanelStatus; label: string }> = ({ status, label }) => {
+/**
+ * Band 1's own label: mono, wider tracking, smaller than the popover's. `shrink-0`
+ * is the point of the whole rework — this label must never be the thing that gives
+ * way to fit a row.
+ */
+const PANEL_LABEL_CLASS = 'shrink-0 font-mono text-10px font-600 uppercase tracking-[0.12em] text-t-tertiary';
+
+/**
+ * The card surface. `bg-fill-0` is the same raised surface the provider rows on
+ * this settings page use (white in light, a translucent lift in dark), so the
+ * card matches its siblings instead of inventing a surface.
+ */
+const CARD_SURFACE_CLASS =
+  'flex w-full min-w-0 flex-col rounded-12px border border-solid bg-fill-0 px-16px py-14px shadow-[var(--shadow-card)]';
+
+/** A 12px spinner. Used wherever a status is in flight instead of settled. */
+const StatusSpinner: React.FC<{ className?: string }> = ({ className }) => (
+  <LoadingFour
+    theme='outline'
+    size='12'
+    aria-hidden='true'
+    data-testid='app-operations-status-spinner'
+    className={classNames('flex shrink-0 animate-spin', className)}
+  />
+);
+
+/**
+ * Band 3's leading signal plus its word. Settled statuses get a 7px dot, statuses
+ * still resolving get the spinner — never colour alone, and never a bare glyph.
+ */
+const StatusIndicator: React.FC<{ status: PanelStatus; label: string; className?: string; spinning?: boolean }> = ({
+  status,
+  label,
+  className,
+  spinning = false,
+}) => {
   const tone = STATUS_TONES[status];
   return (
     <span
       data-testid='app-operations-status'
       data-tone={tone}
-      className='flex shrink-0 items-center gap-4px text-t-primary'
+      className={classNames('flex min-w-0 items-center gap-8px', className)}
     >
-      <span
-        aria-hidden='true'
-        data-testid='app-operations-status-dot'
-        className={classNames('h-6px w-6px shrink-0 rounded-999px', TONE_DOT_CLASS[tone])}
-      />
-      {label}
+      {spinning ? (
+        <StatusSpinner />
+      ) : (
+        <span
+          aria-hidden='true'
+          data-testid='app-operations-status-dot'
+          className={classNames('h-7px w-7px shrink-0 rounded-999px', TONE_DOT_CLASS[tone])}
+        />
+      )}
+      <span className='truncate'>{label}</span>
     </span>
   );
 };
 
+/**
+ * Band 2's 26px logo tile. Falls back to the provider's initial on a neutral fill
+ * so the tile always occupies the same box and the two text lines never shift.
+ */
 const ProviderAvatar: React.FC<{ provider?: IProvider; name: string }> = ({ provider, name }) => {
   const logo = getProviderLogo({
     name: provider?.name ?? name,
     base_url: provider?.base_url,
     platform: provider?.platform,
   });
-  if (logo) {
-    return <img src={logo} alt='' aria-hidden='true' className='h-14px w-14px shrink-0 object-contain' />;
-  }
-  return <LinkCloud theme='outline' size='14' aria-hidden='true' className='flex shrink-0 text-t-tertiary' />;
+  const initial = name.trim().charAt(0).toUpperCase();
+  return (
+    <span
+      aria-hidden='true'
+      data-testid='app-operations-avatar'
+      className='grid h-26px w-26px shrink-0 place-items-center overflow-hidden rounded-6px border border-solid border-arco-2 bg-fill-1'
+    >
+      {logo ? (
+        <img src={logo} alt='' className='h-16px w-16px object-contain' />
+      ) : initial ? (
+        <span className='text-11px font-800 leading-none text-t-secondary'>{initial}</span>
+      ) : (
+        <LinkCloud theme='outline' size='14' className='flex text-t-tertiary' />
+      )}
+    </span>
+  );
 };
 
 export default function AppOperationsModelCard({
@@ -410,13 +490,42 @@ export default function AppOperationsModelCard({
     [t]
   );
 
+  /**
+   * Band 3 states the last check only on the settled card. A stale timestamp next
+   * to Checking, Unavailable or Setup required would date the wrong thing.
+   */
   const panelCheckedLabel =
-    phase === 'ready' && response?.checked_at !== undefined && panelStatus !== 'checking'
-      ? formatCheckedAt(response.checked_at)
-      : undefined;
+    panelStatus === 'ready' && response?.checked_at !== undefined ? formatCheckedAt(response.checked_at) : undefined;
 
-  const modeLabel =
-    draft?.mode === 'fixed' ? t('settings.appOperationsModel.fixed') : t('settings.appOperationsModel.auto');
+  const isFixedMode = draft?.mode === 'fixed';
+  const modeLabel = isFixedMode ? t('settings.appOperationsModel.fixed') : t('settings.appOperationsModel.auto');
+
+  /**
+   * Band 2 only renders where an identity is both known and still true. In
+   * setup_required nothing resolved, and while a save is in flight the identity on
+   * screen is the one being replaced — showing either would state a falsehood.
+   */
+  const showIdentity =
+    responseIdentity !== undefined &&
+    identityProviderName !== undefined &&
+    (panelStatus === 'ready' || panelStatus === 'checking' || panelStatus === 'unavailable');
+
+  /** The consumer is context, not status: it belongs to the quiet card only. */
+  const showConsumer = panelStatus === 'ready' || panelStatus === 'checking';
+
+  /**
+   * The gear disappears wherever the card already carries the one action that
+   * matters, so there are never two competing ways in. `popoverOpen` keeps it
+   * mounted for a popover the user already opened — otherwise choosing a model
+   * would unmount the picker mid-save, the moment the status turns to `saving`.
+   */
+  const gearAllowed =
+    phase === 'ready' &&
+    panelStatus !== 'setup_required' &&
+    panelStatus !== 'saving' &&
+    panelStatus !== 'save_failed' &&
+    !keptUnavailable;
+  const showGear = phase === 'ready' && (gearAllowed || popoverOpen);
 
   const popoverContent = (
     <div data-testid='app-operations-popover' className='flex w-300px max-w-full flex-col gap-14px'>
@@ -516,52 +625,52 @@ export default function AppOperationsModelCard({
     </div>
   );
 
+  /**
+   * The plain-language cause. Escalated states say what happened in a sentence
+   * before they offer anything to click — never a status word on its own.
+   */
+  const causeSentence = ((): string | undefined => {
+    if (panelStatus === 'load_error') return t('settings.appOperationsModel.loadFailed');
+    if (showAddModelAction) return t('settings.appOperationsModel.setupRequiredImpact');
+    return undefined;
+  })();
+
+  /**
+   * The one action that fixes the state, full width — or, for a kept-but-dead
+   * Fixed pair, the two that do (leave Fixed, or stay in Fixed and repick).
+   */
   const actionRow = ((): React.ReactNode => {
     if (panelStatus === 'load_error') {
       return (
-        <>
-          <span>{t('settings.appOperationsModel.loadFailed')}</span>
-          <Button data-testid='app-operations-retry' size='mini' type='secondary' onClick={() => void load()}>
-            {t('common.retry')}
-          </Button>
-        </>
-      );
-    }
-    if (panelStatus === 'save_failed') {
-      return (
-        <>
-          <span>{t('settings.appOperationsModel.saveFailed')}</span>
-          <Button
-            data-testid='app-operations-retry'
-            size='mini'
-            type='secondary'
-            onClick={() => failedSetting && void save(failedSetting)}
-          >
-            {t('common.retry')}
-          </Button>
-        </>
+        <Button data-testid='app-operations-retry' long type='primary' size='small' onClick={() => void load()}>
+          {t('common.retry')}
+        </Button>
       );
     }
     if (showAddModelAction) {
       return (
-        <>
-          <span>{t('settings.appOperationsModel.setupRequiredImpact')}</span>
-          <Button size='mini' type='secondary' onClick={onAddModel}>
-            {t('settings.addModel')}
-          </Button>
-        </>
+        <Button long type='primary' size='small' onClick={onAddModel}>
+          {t('settings.addModel')}
+        </Button>
       );
     }
-    if (keptUnavailable) {
+    if (keptUnavailable && panelStatus === 'unavailable') {
       return (
-        <>
-          <Button size='mini' type='secondary' disabled={!canMutate} onClick={() => handleModeChange('auto')}>
+        // Equal widths side by side, but `flex-wrap` + a floor lets a long
+        // translation take a row of its own rather than clip inside the button.
+        <div className='flex flex-wrap gap-8px'>
+          <Button
+            className='min-w-120px flex-1'
+            size='small'
+            disabled={!canMutate}
+            onClick={() => handleModeChange('auto')}
+          >
             {t('settings.appOperationsModel.switchToAuto')}
           </Button>
-          <Button size='mini' type='secondary' onClick={() => setPopoverOpen(true)}>
+          <Button className='min-w-120px flex-1' size='small' onClick={() => setPopoverOpen(true)}>
             {t('settings.appOperationsModel.pickAnother')}
           </Button>
-        </>
+        </div>
       );
     }
     return null;
@@ -573,119 +682,224 @@ export default function AppOperationsModelCard({
   // the panel visible in SETUP REQUIRED.
   if (providers.length === 0) return null;
 
+  // State 7 — the backend does not serve the setting. This is not a status of the
+  // card, it is the absence of one, so it replaces the card with a notice rather
+  // than leaving a live control stack behind an unsupported backend.
+  if (panelStatus === 'backend_update_required') {
+    return (
+      <section
+        aria-label={t('settings.appOperationsModel.title')}
+        data-testid='app-operations-panel'
+        data-status={panelStatus}
+        data-tone={tone}
+        className='w-full min-w-0'
+      >
+        {messageContext}
+        {/* The notice is the inner box so the Message context holder can never
+            become a flex item and claim a gap of its own. */}
+        <div className='flex min-w-0 items-start gap-11px rounded-12px border border-solid border-warning-3 bg-warning-light-1 px-16px py-14px'>
+          <Caution theme='outline' size='16' aria-hidden='true' className='mt-1px flex shrink-0 text-warning' />
+          <div className='min-w-0'>
+            <div
+              data-testid='app-operations-backend-title'
+              className='text-13px font-700 leading-[1.35] text-warning-7'
+            >
+              {t('settings.appOperationsModel.backendUpdateRequired')}
+            </div>
+            <div className='mt-4px text-12px leading-relaxed text-t-secondary'>
+              {t('settings.appOperationsModel.backendUpdateRequiredDetail')}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label={t('settings.appOperationsModel.title')}
       data-testid='app-operations-panel'
       data-status={panelStatus}
       data-tone={tone}
-      className={classNames(
-        'mt-10px flex w-full min-w-0 flex-col gap-6px rounded-8px border border-solid px-10px py-6px min-[900px]:ms-auto min-[900px]:w-auto min-[900px]:max-w-560px',
-        TONE_KEYLINE_CLASS[tone]
-      )}
+      className={classNames(CARD_SURFACE_CLASS, TONE_KEYLINE_CLASS[tone], panelStatus === 'saving' && 'opacity-94')}
     >
       {messageContext}
-      {panelStatus === 'backend_update_required' ? (
-        // The alert REPLACES the panel: leaving a live control stack behind an
-        // unsupported backend would offer changes that cannot be saved.
-        <Alert type='warning' content={t('settings.appOperationsModel.backendUpdateRequired')} />
-      ) : (
-        <>
-          <div className='flex min-w-0 flex-nowrap items-center gap-8px overflow-hidden'>
-            <span className={classNames(SECTION_LABEL_CLASS, 'shrink-0')}>
-              {t('settings.appOperationsModel.panelLabel')}
-            </span>
+
+      {/* Band 1 — what this block is, which mode it runs in, and the way in. */}
+      <div data-testid='app-operations-header' className='flex min-w-0 items-center gap-8px'>
+        <span className={PANEL_LABEL_CLASS}>{t('settings.appOperationsModel.panelLabel')}</span>
+        <Tooltip content={t('settings.appOperationsModel.panelInfo')}>
+          <span
+            data-testid='app-operations-info'
+            aria-label={t('settings.appOperationsModel.panelInfo')}
+            className='flex shrink-0 cursor-help text-t-tertiary'
+          >
+            <Info theme='outline' size='13' />
+          </span>
+        </Tooltip>
+        <span
+          data-testid='app-operations-mode'
+          className={classNames(
+            'ml-auto shrink-0 rounded-5px border border-solid px-7px py-2px text-10px font-700 uppercase tracking-wide',
+            isFixedMode ? 'border-arco-2 bg-fill-1 text-t-secondary' : 'border-aou-3 bg-aou-2 text-aou-7'
+          )}
+        >
+          {modeLabel}
+        </span>
+        {showGear && (
+          <Popover
+            trigger='click'
+            position='br'
+            popupVisible={popoverOpen}
+            onVisibleChange={setPopoverOpen}
+            content={popoverContent}
+          >
+            <Button
+              data-testid='app-operations-popover-trigger'
+              aria-label={t('settings.appOperationsModel.openSettings')}
+              size='mini'
+              type='text'
+              disabled={panelStatus === 'checking'}
+              className='!h-24px !w-24px !min-w-24px shrink-0 !rounded-6px'
+              icon={<SettingTwo theme='outline' size='14' />}
+            />
+          </Popover>
+        )}
+      </div>
+
+      {/* Band 2 — who is doing the work. Two full lines, both ellipsized with a
+          title so a long provider or model id is recoverable on hover. */}
+      {showIdentity && responseIdentity && identityProviderName && (
+        <div data-testid='app-operations-identity' className='mt-10px flex min-w-0 items-center gap-9px'>
+          <ProviderAvatar provider={identityProvider} name={identityProviderName} />
+          <div className='min-w-0 flex-1'>
             <div
-              aria-live='polite'
-              data-testid='app-operations-status-line'
-              className='flex min-w-0 flex-1 flex-nowrap items-center gap-6px overflow-hidden text-12px text-t-secondary'
+              data-testid='app-operations-provider'
+              title={identityProviderName}
+              className={classNames(
+                'truncate text-15px font-700 leading-[1.25]',
+                keptUnavailable ? 'text-t-secondary' : 'text-t-primary'
+              )}
             >
-              {panelStatus === 'loading' || panelStatus === 'load_error' ? (
-                <StatusIndicator status={panelStatus} label={t(STATUS_KEYS[panelStatus])} />
-              ) : (
-                <>
-                  <Tag size='small' data-testid='app-operations-mode' className='shrink-0 uppercase'>
-                    {modeLabel}
-                  </Tag>
-                  {responseIdentity && identityProviderName ? (
-                    <span
-                      data-testid='app-operations-identity'
-                      className={classNames(
-                        'flex min-w-0 flex-nowrap items-center gap-4px overflow-hidden',
-                        keptUnavailable && 'line-through'
-                      )}
-                    >
-                      <ProviderAvatar provider={identityProvider} name={identityProviderName} />
-                      <span data-testid='app-operations-provider' className='truncate text-t-primary'>
-                        {identityProviderName}
-                      </span>
-                      <span aria-hidden='true' className='shrink-0'>
-                        ·
-                      </span>
-                      <span data-testid='app-operations-model' className='truncate font-mono text-t-primary'>
-                        {responseIdentity.model_id}
-                      </span>
-                    </span>
-                  ) : (
-                    <span data-testid='app-operations-identity'>—</span>
-                  )}
-                  {keptUnavailable && (
-                    <Tag size='small' data-testid='app-operations-kept' className='shrink-0 uppercase'>
-                      {t('settings.appOperationsModel.kept')}
-                    </Tag>
-                  )}
-                  <StatusIndicator status={panelStatus} label={t(STATUS_KEYS[panelStatus])} />
-                  {panelCheckedLabel && (
-                    <>
-                      <span aria-hidden='true' className='shrink-0'>
-                        ·
-                      </span>
-                      <span data-testid='app-operations-checked' className='truncate'>
-                        {panelCheckedLabel}
-                      </span>
-                    </>
-                  )}
-                  <Tag size='small' data-testid='app-operations-consumer' className='shrink-0'>
-                    {t('settings.appOperationsModel.contextCompaction')}
-                  </Tag>
-                </>
+              {identityProviderName}
+            </div>
+            <div className='flex min-w-0 items-center gap-7px'>
+              <span
+                data-testid='app-operations-model'
+                title={responseIdentity.model_id}
+                className={classNames(
+                  'truncate font-mono text-12px text-t-secondary',
+                  keptUnavailable && 'line-through'
+                )}
+              >
+                {responseIdentity.model_id}
+              </span>
+              {keptUnavailable && (
+                <span
+                  data-testid='app-operations-kept'
+                  className='shrink-0 rounded-4px border border-solid border-danger-3 bg-danger-1 px-6px py-1px font-mono text-[9.5px] uppercase tracking-wide text-danger-6'
+                >
+                  {t('settings.appOperationsModel.kept')}
+                </span>
               )}
             </div>
-            {phase === 'ready' && (
-              <Popover
-                trigger='click'
-                position='br'
-                popupVisible={popoverOpen}
-                onVisibleChange={setPopoverOpen}
-                content={popoverContent}
-              >
-                <Button
-                  data-testid='app-operations-popover-trigger'
-                  aria-label={t('settings.appOperationsModel.openSettings')}
-                  size='mini'
-                  type='text'
-                  className='shrink-0'
-                  icon={<SettingTwo theme='outline' size='14' />}
-                />
-              </Popover>
-            )}
           </div>
+        </div>
+      )}
 
-          {reasonCode && (
-            <div className='text-12px leading-relaxed text-t-tertiary' data-testid='app-operations-reason'>
-              {t(REASON_KEYS[reasonCode])}
-            </div>
-          )}
+      {/* Band 3 — the status footer. The keyline above it only exists when band 2
+          does; without an identity to divide from, it would be a line to nowhere. */}
+      <div
+        aria-live='polite'
+        data-testid='app-operations-status-line'
+        className={classNames(
+          'flex min-w-0 items-center gap-8px',
+          showIdentity ? 'mt-11px border-t border-solid border-arco-2 pt-11px' : 'mt-11px'
+        )}
+      >
+        {panelStatus === 'checking' ? (
+          <StatusIndicator
+            status={panelStatus}
+            label={t(STATUS_KEYS[panelStatus])}
+            spinning
+            className='text-[12.5px] font-700 text-aou-7'
+          />
+        ) : panelStatus === 'saving' ? (
+          <StatusIndicator
+            status={panelStatus}
+            label={t(STATUS_KEYS[panelStatus])}
+            spinning
+            className='text-[12.5px] text-t-secondary'
+          />
+        ) : (
+          <StatusIndicator
+            status={panelStatus}
+            label={t(STATUS_KEYS[panelStatus])}
+            className={classNames(
+              'font-700',
+              panelStatus === 'setup_required' ? 'text-[13.5px]' : 'text-[12.5px]',
+              TONE_TEXT_CLASS[tone]
+            )}
+          />
+        )}
+        {panelCheckedLabel && (
+          <span data-testid='app-operations-checked' className='min-w-0 truncate text-[11.5px] text-t-tertiary'>
+            {`· ${panelCheckedLabel}`}
+          </span>
+        )}
+        {showConsumer && (
+          <span data-testid='app-operations-consumer' className='ml-auto shrink-0 text-[11.5px] text-t-tertiary'>
+            {t('settings.appOperationsModel.contextCompaction')}
+          </span>
+        )}
+      </div>
 
-          {actionRow && (
-            <div
-              data-testid='app-operations-actions'
-              className='flex flex-wrap items-center gap-8px text-12px text-t-secondary'
-            >
-              {actionRow}
-            </div>
+      {causeSentence && (
+        <div data-testid='app-operations-cause' className='mt-5px text-[12.5px] leading-relaxed text-t-secondary'>
+          {causeSentence}
+        </div>
+      )}
+
+      {reasonCode && (
+        <div
+          className={classNames(
+            'mt-5px leading-relaxed',
+            // An escalated card has to be readable, not merely present: the reason
+            // is the cause the user acts on, so it takes the cause type there.
+            tone === 'warning' || tone === 'danger' ? 'text-[12.5px] text-t-secondary' : 'text-12px text-t-tertiary'
           )}
-        </>
+          data-testid='app-operations-reason'
+        >
+          {t(REASON_KEYS[reasonCode])}
+        </div>
+      )}
+
+      {actionRow && (
+        <div data-testid='app-operations-actions' className='mt-11px'>
+          {actionRow}
+        </div>
+      )}
+
+      {/* A failed save is the one thing the card cannot state as a status: the
+          setting did not change, so the card still describes the old truth. The
+          toast sits on top of it instead of rewriting it. */}
+      {panelStatus === 'save_failed' && (
+        <div
+          data-testid='app-operations-save-failed-toast'
+          className='mt-12px flex items-center gap-9px rounded-9px bg-[var(--color-tooltip-bg)] px-12px py-9px'
+        >
+          <Caution theme='outline' size='14' aria-hidden='true' className='flex shrink-0 text-warning' />
+          <span className='min-w-0 text-12px text-white'>{t('settings.appOperationsModel.saveFailedToast')}</span>
+          <Button
+            data-testid='app-operations-retry'
+            className='ml-auto shrink-0'
+            size='mini'
+            type='primary'
+            onClick={() => failedSetting && void save(failedSetting)}
+          >
+            {t('common.retry')}
+          </Button>
+        </div>
       )}
     </section>
   );
