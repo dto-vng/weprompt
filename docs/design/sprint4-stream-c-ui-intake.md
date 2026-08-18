@@ -587,6 +587,25 @@ side by side, not a broken grid.
 `large` scrolls horizontally when it is not.
 
 
+### C-11 fixed on both backends — and the reported labels belong to only one of them
+
+Measured on a live AionRS prompt. Before: `Yes, allow once` and `Yes, allow always` solid orange
+`rgb(240,90,34)`; `No (esc)` a pale `rgb(242,243,245)` fill with a **transparent** border. After: the
+deny button carries `rgb(216,203,182)` (`--bg-4`) at 1px and keeps its quieter fill — DC-4 exactly.
+
+**The reporter's screenshot is the ACP prompt, not the one most reachable in dev.** Its labels are
+`Allow once` / `Always allow` / `Reject`; AionRS says `Yes, allow once` / `Yes, allow always` /
+`No (esc)`. Same decision, two components, different copy — the triage note that C-11 touches **two**
+files is confirmed, and fixing only the reported one would have left the other backend broken.
+
+Both now read the border from one shared constant (`permissionButtonStyles.ts`), so they cannot
+drift. Colour only, no width: Arco already supplies the 1px, and numeric border utilities in this
+repo set colour and never width.
+
+**Also confirmed:** `MessagePermission` already de-emphasises `always allow` for *destructive*
+actions, so this fix did not disturb an existing safety behaviour.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
