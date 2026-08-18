@@ -131,6 +131,50 @@ not the evidence that opens it. Close it here:
       but not `reasoning`. Harmless for a connectivity probe, but it is a divergence — decide deliberately
       whether to mirror it there.
 
+### Status 2026-08-18 — Tasks 1, 1b and 2 are DONE on `feat/aionrs-thinking`
+
+| Commit      | Task                                                             |
+| ----------- | ---------------------------------------------------------------- |
+| `27c832f4b` | 1 — advertise + accept `thought_level`, gated, lock-free UI read |
+| `533375cec` | 1b — pin thinking support from per-exact-model evidence          |
+| `e9a83ac64` | 2 — restore the selection across a session rebuild               |
+
+Gates: `aionui-ai-agent`, `aionui-conversation` and `aionui-api-types` suites all green;
+`cargo clippy --all-targets -- -D warnings` clean on all three; `cargo check --workspace --all-targets`
+clean. `cargo fmt --check` still reports only the pre-existing `aionui-mcp/src/oauth_service.rs` drift
+inherited from `c310353d4`. Every new test was mutation-proven.
+
+**Correction to this plan's Task 2 brief (my error, propagated from the spike).** It asserted that
+`CliArgs` "has no thinking field". It does — `thinking: Option<String>` and `thinking_budget` at aionrs
+`config.rs:315-317`, consumed at `:416`. The operative half of the note still holds: AionCore hardcodes
+both to `None` (`agent.rs:198-199`), and routing through `CliArgs` remains wrong because `Config::resolve`
+runs before `supports_thinking` is known. But the stated reason was false — verify a field's absence
+before building an instruction on it.
+
+**The model-switch hazard is smaller than Task 0 described, and lands elsewhere.** An aionrs model switch
+never reaches `apply_config_update` with a model at all: `ConversationService::update` kills the task on
+`model_changed` (`service.rs:1948-1956`) and the agent is rebuilt. `apply_config_update` has exactly one
+caller repo-wide. So the hazard falls on the **restore** path Task 2 introduces, where it is now gated on
+the freshly resolved `supports_thinking`.
+
+**A second gate was needed that nobody anticipated.** `resolved_thought_level_value` is written by _both_
+the `thought_level` and `reasoning_effort` categories, so an assistant last used on **ACP** can persist
+`"high"` — a value `apply_config_update` silently ignores. The restore path now rejects effort-shaped
+values rather than handing them to a function that discards them quietly.
+
+**`services/provider_health.rs` deliberately not mirrored.** `build_probe_engine` passes
+`CliArgs.thinking: None`, the probe serves no `config_options`, and `supports_thinking` gates nothing on
+the request path (the OpenAI projector emits `body["thinking"]` purely from `request.thinking`). Mirroring
+would be a provable no-op that falsely implies the probe measures thinking capability.
+
+**Registry shape.** `assets/model-capabilities/thinking_models.json`, mirroring `image_input_models.json`
+(`schema_version: 1`, `providers → { api, models }`), with `moonshot-cn` and `moonshot-global` buckets each
+listing `kimi-k2.5`, `kimi-k2.6`, `kimi-k2.7-code`; `kimi-k3` deliberately absent (it uses
+`reasoning_effort`, a different capability). Bucket selection is by API root or provider-plus-official-host,
+then exact model id — **no provider-name or family branching in logic**. Aggregator endpoints (OpenRouter,
+Novita, SiliconFlow, PPIO) list these ids but were deliberately excluded: whether they pass `thinking`
+through is untested.
+
 ### Implementation note for Task 1's gate
 
 Follow `image_input`'s pattern: extend the per-model capability resolution behind
