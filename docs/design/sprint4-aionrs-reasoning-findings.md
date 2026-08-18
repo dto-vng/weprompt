@@ -119,7 +119,51 @@ errors first. **The persistence half is already built; it just serves a backend 
    `engine.rs:1158-1167` appends `"effort: not supported…"` / `"effort: invalid level…"` to a returned
    change list. So A1 must validate **before** calling it, or an invalid selection silently no-ops.
 
-## 6. Still unverified
+## 6. Live Moonshot probe — the parameter is NOT demonstrably honoured
+
+Run 2026-08-18 against `https://api.moonshot.ai/v1`, model `kimi-k2.6`, using the key already configured
+in the dev profile. The credential was used only inside the renderer and never printed.
+
+**Fact 1 — the API validates parameters it understands, and did not validate this one.**
+`temperature: 0` is rejected with a precise `400 invalid temperature: only 1 is allowed for this model`.
+`reasoning_effort: "banana"` returns **200**. An API that strictly validates a known field while
+silently accepting nonsense in another is describing that other field as unknown.
+
+**Fact 2 — `low` does not curtail reasoning.** With `max_tokens: 4000` on a deliberately hard prompt,
+`low` and `high` both ran to the cap (`finish: "length"`, 3999 reasoning tokens), twice each. An honoured
+`low` should have stopped early at least once.
+
+**Fact 3 — at a natural stop, the nonsense value behaves like a valid one.** Prompt "What is 17 times 23?",
+`max_tokens: 2000`, all runs `finish: "stop"`:
+
+| variant        | reasoning_tokens |
+| -------------- | ---------------- |
+| `low`          | 103, 125, 114    |
+| `high`         | 128, 142, 190    |
+| `banana`       | 141, 129         |
+| (no parameter) | 116              |
+
+`high` trends above `low`, which taken alone would look like an effect — but **`banana` sits inside
+`high`'s range** and the no-parameter control sits inside `low`'s. If the field were parsed as an enum,
+an invalid value would error or fall back to the default; it does neither distinguishably. With
+`temperature` forced to 1 and n=2–3, this is underpowered.
+
+**Verdict: INCONCLUSIVE, leaning ignored.** There is no positive evidence Moonshot honours
+`reasoning_effort` for `kimi-k2.6`, and one strong indication it does not.
+
+**Why this matters more than it looks.** The GO in §1 rests on `supports_effort()` being true — but that
+comes from `openai_defaults()` in **AionRS**, an assumption about the OpenAI _family_, not a fact about
+Moonshot. AionRS's only per-model rule table has no Kimi entry. So the chain can be wired perfectly and
+still produce a control that changes nothing: the user picks "high", the field goes over the wire, and
+the provider discards it. That is the same failure shape as EPIC-002 — a feature that looks wired, passes
+every test, and does nothing — which this sprint has already paid to learn once.
+
+**Do not build the AionCore slice on the assumption that Kimi honours this** until it is settled by
+vendor documentation or a properly powered comparison. If it turns out to be ignored, the honest product
+answer is to advertise the control only for providers with evidence, which is what the epic's
+capability-driven design was always for.
+
+## 7. Still unverified
 
 - Whether Moonshot honours `reasoning_effort` for `kimi-k2.6`/`k2.5`, and with which values (§5.2). No
   live provider call was made.
