@@ -39,6 +39,13 @@ const ProfileSettings: React.FC = () => {
             placeholder={t('settings.profileInstructionsPlaceholder')}
             onChange={(value) => void setCtx({ enabled, instructions: value })}
             autoSize={{ minRows: 6, maxRows: 16 }}
+            /*
+              C-17: Arco fills its textarea with --color-fill-2 (#f0e9db), which reads as a
+              heavy warm block on the near-white settings page. Scoped to this field rather
+              than retuning --color-fill-2, which every Arco fill in the app shares.
+              `!` is required: Arco's own selector outranks a bare utility class.
+            */
+            className='!bg-base'
           />
         </label>
 

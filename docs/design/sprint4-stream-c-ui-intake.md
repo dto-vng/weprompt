@@ -328,6 +328,27 @@ live verification in the running app.
   the known `SettingsPageHeader` bg/`sticky` coupling in this repo.
 
 
+### C-17 — The Profile "Instructions" textarea fills with a heavy warm shade
+
+- **Surface:** Settings → Profile, the global user-instructions `Input.TextArea` (helper text
+  "Applies to your chats. Specialized assistants follow their own rules."). Screenshot supplied
+  2026-08-18.
+- **Actual:** the field fills with Arco's `--color-fill-2`, measured at **`#f0e9db`** — the same warm
+  cream as `--bg-2` — which reads as a heavy block on the near-white settings page.
+- **Expected:** "make it with a light shade".
+- **Kind:** polish. Same family as C-02, C-04, C-13 and C-16.
+- **Fixed:** `ProfileSettings.tsx` sets `className='!bg-base'` (`#faf6ee`), matching the composer
+  surface C-13 settled on. **Scoped to this field deliberately** — `--color-fill-2` is Arco's shared
+  fill token and retuning it would repaint every Arco input, select and fill in the app. `!` is
+  required because Arco's own selector outranks a bare utility class.
+- **⚠ NOT verified.** The reporter was working in a conversation when this landed and navigating the
+  shared dev instance to Settings → Profile would have interrupted them. Typecheck is clean; the
+  rendered result was not observed.
+- **Risk to check when it is verified:** `#faf6ee` on a `#fffdf9` page is a small difference and the
+  field currently has no border. If it now reads flat rather than like an input, it needs a hairline
+  (`--bg-4`, as C-11 used) rather than a darker fill — reaching back for fill would undo the ask.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
