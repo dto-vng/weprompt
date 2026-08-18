@@ -20,7 +20,10 @@ import { ExpandLeft, ExpandRight } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { WorkspaceFilesPaneProvider } from '@/renderer/pages/conversation/Workspace/filesPaneContext';
+import {
+  WorkspaceFilesPaneProvider,
+  type WorkspacePaneView,
+} from '@/renderer/pages/conversation/Workspace/filesPaneContext';
 import './chat-layout.css';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
@@ -151,8 +154,13 @@ const ChatLayout: React.FC<{
   // C-01: the right pane shows either the workspace file tree or the artifact preview.
   // Both stay mounted and are toggled by visibility, so switching tabs never discards
   // preview state or re-fetches the tree.
-  const [artifactPaneView, setArtifactPaneView] = useState<'files' | 'preview'>('preview');
+  const [artifactPaneView, setArtifactPaneView] = useState<WorkspacePaneView>('preview');
   const [filesPaneEl, setFilesPaneEl] = useState<HTMLElement | null>(null);
+  const [changesPaneEl, setChangesPaneEl] = useState<HTMLElement | null>(null);
+  const panePortalTargets = React.useMemo(
+    () => ({ files: filesPaneEl, changes: changesPaneEl }),
+    [filesPaneEl, changesPaneEl]
+  );
   const [mobileActionsSlot, setMobileActionsSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!layout?.isMobile) {
@@ -233,7 +241,7 @@ const ChatLayout: React.FC<{
         // fontFamily: `cursive,"anthropicSans","anthropicSans Fallback",system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif`,
       }}
     >
-      <WorkspaceFilesPaneProvider container={filesPaneEl}>
+      <WorkspaceFilesPaneProvider activeView={artifactPaneView} containers={panePortalTargets}>
       <div ref={containerRef} className='flex flex-1 relative w-full overflow-hidden'>
         {workspaceEnabled && workspacePresentation === 'project-menu' && (
           <div className='workspace-project-controller'>{props.sider}</div>
@@ -322,7 +330,7 @@ const ChatLayout: React.FC<{
               which is why this is an empty container.
             */}
             <div className='shrink-0 flex items-center gap-2px px-10px pt-8px' role='tablist'>
-              {(['files', 'preview'] as const).map((view) => (
+              {(['files', 'changes', 'preview'] as const).map((view) => (
                 <Button
                   key={view}
                   type='text'
@@ -338,7 +346,9 @@ const ChatLayout: React.FC<{
                 >
                   {view === 'files'
                     ? t('conversation.workspace.changes.filesTab')
-                    : t('conversation.workspace.changes.previewTab')}
+                    : view === 'changes'
+                      ? t('conversation.workspace.changes.tab')
+                      : t('conversation.workspace.changes.previewTab')}
                 </Button>
               ))}
             </div>
@@ -348,6 +358,13 @@ const ChatLayout: React.FC<{
               hidden={artifactPaneView !== 'files'}
             >
               <div ref={setFilesPaneEl} className='h-full overflow-hidden' />
+            </div>
+            <div
+              className='flex-1 min-h-0 overflow-hidden'
+              data-testid='artifact-pane-changes'
+              hidden={artifactPaneView !== 'changes'}
+            >
+              <div ref={setChangesPaneEl} className='h-full overflow-hidden' />
             </div>
             <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
               <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPane} />

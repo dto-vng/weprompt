@@ -32,19 +32,31 @@ describe('C-01 files pane wiring', () => {
     // The testid is built from a template literal, so assert the template and the two
     // values it can take rather than the resolved strings.
     expect(CHAT_LAYOUT).toMatch(/artifact-pane-tab-\$\{view\}/);
-    expect(CHAT_LAYOUT).toMatch(/\['files', 'preview'\] as const/);
+    expect(CHAT_LAYOUT).toMatch(/\['files', 'changes', 'preview'\] as const/);
     // `hidden` keeps both mounted; unmounting would discard preview state on every toggle.
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'files'\}/);
+    expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'changes'\}/);
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'preview'\}/);
   });
 
   it('provides the pane container to the Workspace', () => {
-    expect(CHAT_LAYOUT).toMatch(/<WorkspaceFilesPaneProvider container=\{filesPaneEl\}>/);
+    expect(CHAT_LAYOUT).toMatch(
+      /<WorkspaceFilesPaneProvider activeView=\{artifactPaneView\} containers=\{panePortalTargets\}>/
+    );
     expect(CHAT_LAYOUT).toMatch(/ref=\{setFilesPaneEl\}/);
+    expect(CHAT_LAYOUT).toMatch(/ref=\{setChangesPaneEl\}/);
+  });
+
+  it('builds the changes panel when EITHER surface shows changes', () => {
+    // This gate read flyout state alone, so a pane tab could never have had content — and
+    // the changes refresh effect is gated on the same flag. Verified live: the pane's
+    // Changes tab listed 2 real git changes.
+    expect(WORKSPACE).toMatch(/\(projectMenuOpen && activeProjectPanel === 'changes'\) \|\| paneActiveView === 'changes'/);
+    expect(WORKSPACE).toMatch(/createPortal\(changesPanel, paneContainers\.changes\)/);
   });
 
   it('portals the existing filesPanel instead of building a second tree', () => {
-    expect(WORKSPACE).toMatch(/createPortal\(filesPanel, filesPaneContainer\)/);
+    expect(WORKSPACE).toMatch(/createPortal\(filesPanel, paneContainers\.files\)/);
     // A second useWorkspaceTree in the Workspace file would mean a duplicated tree.
     expect(WORKSPACE.match(/useWorkspaceTree\(/g)?.length ?? 0).toBe(1);
     expect(CONTEXT).toMatch(/useWorkspaceFilesPane/);

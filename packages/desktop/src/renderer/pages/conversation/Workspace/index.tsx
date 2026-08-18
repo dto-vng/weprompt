@@ -81,7 +81,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { openPreview } = usePreviewContext();
-  const { container: filesPaneContainer } = useWorkspaceFilesPane();
+  const { activeView: paneActiveView, containers: paneContainers } = useWorkspaceFilesPane();
   const conversationContext = useConversationContextSafe();
   const loadedSkills = conversationContext?.loadedSkills ?? [];
   const loadedMcpStatuses =
@@ -201,7 +201,12 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // public contract. Default to false when the prop is unavailable (e.g.
   // tests that render the panel outside a conversation).
   const isTemporaryWorkspace = isTemporaryWorkspaceProp ?? false;
-  const isChangesPanelActive = projectMenuOpen && activeProjectPanel === 'changes';
+  // Built when changes are on screen in EITHER surface. This used to read flyout state
+  // alone, which meant the pane's Changes tab could never have had anything to show —
+  // and the refresh effect below is gated on the same flag, so it would not have
+  // refreshed for the pane either.
+  const isChangesPanelActive =
+    (projectMenuOpen && activeProjectPanel === 'changes') || paneActiveView === 'changes';
 
   // Get workspace display name using shared utility
   const workspaceDisplayName = useMemo(
@@ -552,12 +557,15 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // truth — expansion, selection and file operations all stay owned by this instance, so
   // the two surfaces can never disagree. `filesPanel` is presentational, so rendering it
   // twice is safe.
-  const filesPanePortal = filesPaneContainer ? createPortal(filesPanel, filesPaneContainer) : null;
+  const filesPanePortal = paneContainers.files ? createPortal(filesPanel, paneContainers.files) : null;
+  const changesPanePortal =
+    paneContainers.changes && changesPanel ? createPortal(changesPanel, paneContainers.changes) : null;
 
   return (
     <>
       {shouldRenderLocalMessageContext && messageContext}
       {filesPanePortal}
+      {changesPanePortal}
       <div
         className='chat-workspace size-full flex flex-col relative'
         tabIndex={0}

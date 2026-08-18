@@ -799,6 +799,27 @@ preview, there may be no direct control for it at all on this platform. Worth it
 than being folded into C-01.
 
 
+### C-01 extended — the pane now carries Files, Changes and Preview
+
+**Reporter, after seeing the Files/Preview version working:** "i want to use the original preview
+pane, with file and changes". Decided: **Files | Changes | Preview** — the original pane's two views
+plus the artifact preview, which the reporter was actively using.
+
+**One non-obvious blocker.** `changesPanel` was gated on
+`projectMenuOpen && activeProjectPanel === 'changes'` — pure **flyout** state. A pane tab could
+therefore never have had anything to show, and the changes *refresh* effect is gated on the same flag,
+so it would not have refreshed for the pane either. The gate now also honours the pane's active view,
+which meant the context had to carry `activeView` and not just a container.
+
+**Verified live** with real content: the pane listed `2 file(s) changed`, `A NEW_UNTRACKED.txt`,
+`M README.md`, tabs reading `Files | Changes* | Preview`, flyout still present.
+
+**A first measurement showed the Changes tab empty, and that was the fixture's fault, not the code's.**
+The seeded project was not a git repository, so there were no changes to list and no way to tell a
+working panel from a broken one. `git init` plus one modified and one untracked file turned a vacuous
+check into a real one — the same fixtures-from-reality lesson this sprint's postmortem is about.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
