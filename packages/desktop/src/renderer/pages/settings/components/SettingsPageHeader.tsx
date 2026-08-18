@@ -36,6 +36,13 @@ type SettingsPageHeaderProps = {
   /** Right-aligned action slot (search, create button, dropdowns, …). */
   actions?: React.ReactNode;
   /**
+   * Where `actions` sits. `title-row` (default) right-aligns them beside the
+   * title. `below-description` stacks them under the description instead, so a
+   * page carrying a status panel does not leave a button stranded in the gap
+   * between the title block and the panel column.
+   */
+  actionsPlacement?: 'title-row' | 'below-description';
+  /**
    * Status-panel slot inside the sticky header, for a panel that must stay
    * glanceable while the body scrolls. It sits in its own column beside the title
    * block — not in `actions`, whose `shrink-0` sizing would force the whole header
@@ -60,6 +67,7 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
   title,
   description,
   actions,
+  actionsPlacement = 'title-row',
   statusPanel,
   tabs,
   activeTab,
@@ -82,9 +90,14 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
             <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>
               {title}
             </h1>
-            {actions ? <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div> : null}
+            {actions && actionsPlacement === 'title-row' ? (
+              <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div>
+            ) : null}
           </div>
           {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
+          {actions && actionsPlacement === 'below-description' ? (
+            <div className='mt-18px flex flex-wrap items-center gap-8px'>{actions}</div>
+          ) : null}
         </div>
         <div
           data-testid='settings-header-status-panel'

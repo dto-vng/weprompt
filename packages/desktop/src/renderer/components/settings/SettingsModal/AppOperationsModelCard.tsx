@@ -191,7 +191,7 @@ const PANEL_LABEL_CLASS = 'shrink-0 font-mono text-10px font-600 uppercase track
  * card matches its siblings instead of inventing a surface.
  */
 const CARD_SURFACE_CLASS =
-  'flex w-full min-w-0 flex-col rounded-12px border border-solid bg-fill-0 px-16px py-14px shadow-[var(--shadow-card)]';
+  'box-border flex w-full min-w-0 flex-col rounded-12px border border-solid bg-fill-0 px-16px py-14px shadow-[var(--shadow-card)]';
 
 /** A 12px spinner. Used wherever a status is in flight instead of settled. */
 const StatusSpinner: React.FC<{ className?: string }> = ({ className }) => (

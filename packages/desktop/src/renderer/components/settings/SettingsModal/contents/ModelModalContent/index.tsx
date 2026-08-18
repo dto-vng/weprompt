@@ -419,6 +419,7 @@ const ModelModalContent: React.FC = () => {
             defaultValue: 'Configure providers and API keys for text, image, and video models.',
           })}
           actions={headerActions}
+          actionsPlacement='below-description'
           statusPanel={appOperationsPanel}
         />
       ) : (
