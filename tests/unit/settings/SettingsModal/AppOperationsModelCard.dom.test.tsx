@@ -6,10 +6,11 @@
 
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { IProvider } from '@/common/config/storage';
 import { BackendHttpError } from '@/common/adapter/httpBridge';
 import type { AppOperationsModelReasonCode, AppOperationsModelResponse } from '@/common/types/appOperations';
+import enUsSettings from '@renderer/services/i18n/locales/en-US/settings.json';
 
 const { checkMock, getMock, messageErrorMock, updateMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -21,10 +22,9 @@ const { checkMock, getMock, messageErrorMock, updateMock } = vi.hoisted(() => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
-      if (key === 'settings.appOperationsModel.checkResult.checkedJustNow') return 'checked just now';
-      if (key === 'settings.appOperationsModel.checkResult.checkedAt') return `checked ${String(options?.time)}`;
-      if (key.startsWith('settings.appOperationsModel.checkResult.') && options?.checked) {
-        return `${key} · ${String(options.checked)}`;
+      if (key === 'settings.appOperationsModel.checkTime.today') return `checkedToday:${String(options?.time)}`;
+      if (key === 'settings.appOperationsModel.checkTime.date') {
+        return `checkedOn:${String(options?.date)}:${String(options?.time)}`;
       }
       return key;
     },
@@ -88,8 +88,17 @@ const providers: IProvider[] = [
   },
 ];
 
+/** Providers exist but none is eligible — the panel must stay visible in SETUP REQUIRED. */
+const ineligibleProviders: IProvider[] = [{ ...providers[0], enabled: false }];
+
 const autoReady: AppOperationsModelResponse = {
   setting: { mode: 'auto' },
+  resolved_model: { provider_id: 'provider-a', model_id: 'model-a' },
+  health: 'ready',
+};
+
+const fixedReady: AppOperationsModelResponse = {
+  setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
   resolved_model: { provider_id: 'provider-a', model_id: 'model-a' },
   health: 'ready',
 };
@@ -108,7 +117,16 @@ const renderCard = (overrides: Partial<React.ComponentProps<typeof AppOperations
   return { onAddModel, rerender };
 };
 
+const panel = () => screen.getByTestId('app-operations-panel');
+const statusLine = () => screen.getByTestId('app-operations-status-line');
+const statusWord = () => screen.getByTestId('app-operations-status');
+const openPopover = async () => {
+  fireEvent.click(screen.getByTestId('app-operations-popover-trigger'));
+  return screen.findByTestId('app-operations-popover');
+};
 const getFixedSelect = () => screen.getByLabelText('settings.selectModel');
+const timeOf = (ts: number) => new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const dateOf = (ts: number) => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 const reasonCases: Array<[AppOperationsModelReasonCode, string]> = [
   ['no_eligible_model', 'settings.appOperationsModel.reason.noEligibleModel'],
@@ -133,447 +151,592 @@ describe('AppOperationsModelCard', () => {
     cleanup();
   });
 
-  it('loads and presents the planned labels, auto resolution, and compaction scope', async () => {
-    renderCard();
+  describe('state 8 — no providers', () => {
+    it('hides the panel entirely when no provider is configured', async () => {
+      renderCard({ providers: [] });
 
-    await screen.findByText('Provider A');
-
-    expect(getMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('radio', { name: 'settings.appOperationsModel.auto' })).toBeChecked();
-    expect(screen.getByText('Provider A')).toBeVisible();
-    expect(screen.getByText('model-a')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.status.ready')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.description')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.selectionLabel')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.resolvedModelLabel')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.healthLabel')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.usedByLabel')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.contextCompaction')).toBeVisible();
-  });
-
-  it('refreshes server-owned resolution only after changed providers persist', async () => {
-    let requestCount = 0;
-    getMock.mockImplementation(async () => {
-      requestCount += 1;
-      return requestCount === 1
-        ? autoReady
-        : {
-            setting: { mode: 'auto' },
-            health: 'setup_required',
-            reason_code: 'no_eligible_model',
-          };
+      await waitFor(() => expect(getMock).toHaveBeenCalled());
+      expect(screen.queryByTestId('app-operations-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
     });
-    const { rerender } = renderCard();
-    await screen.findByText('model-a');
 
-    rerender(
-      <AppOperationsModelCard
-        providers={[{ ...providers[0], enabled: false }]}
-        providersLoading={false}
-        persistedProvidersRevision={0}
-        onAddModel={vi.fn()}
-      />
-    );
-
-    expect(getMock).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <AppOperationsModelCard
-        providers={[{ ...providers[0], enabled: false }]}
-        providersLoading={false}
-        persistedProvidersRevision={1}
-        onAddModel={vi.fn()}
-      />
-    );
-
-    expect(await screen.findByText('settings.appOperationsModel.status.setupRequired')).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.reason.noEligibleModel')).toBeVisible();
-    expect(screen.queryByText('model-a')).not.toBeInTheDocument();
-    expect(getMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('coalesces provider refreshes until an in-flight model save settles', async () => {
-    let resolveUpdate: ((response: AppOperationsModelResponse) => void) | undefined;
-    updateMock.mockImplementation(
-      () =>
-        new Promise<AppOperationsModelResponse>((resolve) => {
-          resolveUpdate = resolve;
-        })
-    );
-    let requestCount = 0;
-    getMock.mockImplementation(async () => {
-      requestCount += 1;
-      return requestCount === 1
-        ? autoReady
-        : {
-            setting: { mode: 'auto' },
-            health: 'setup_required',
-            reason_code: 'no_eligible_model',
-          };
-    });
-    const { rerender } = renderCard();
-    await screen.findByText('model-a');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' }));
-    expect(screen.getByText('settings.appOperationsModel.saving')).toBeVisible();
-
-    rerender(
-      <AppOperationsModelCard
-        providers={providers}
-        providersLoading={false}
-        persistedProvidersRevision={1}
-        onAddModel={vi.fn()}
-      />
-    );
-    rerender(
-      <AppOperationsModelCard
-        providers={providers}
-        providersLoading={false}
-        persistedProvidersRevision={2}
-        onAddModel={vi.fn()}
-      />
-    );
-
-    expect(getMock).toHaveBeenCalledTimes(1);
-
-    resolveUpdate?.(autoReady);
-
-    expect(await screen.findByText('settings.appOperationsModel.status.setupRequired')).toBeVisible();
-    expect(getMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('uses the planned setup-required status key', async () => {
-    getMock.mockResolvedValue({ ...autoReady, health: 'setup_required' });
-    renderCard();
-
-    expect(await screen.findByText('settings.appOperationsModel.status.setupRequired')).toBeVisible();
-  });
-
-  it.each(reasonCases)('uses the planned locale key for %s', async (reasonCode, reasonKey) => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
-      health: 'unavailable',
-      reason_code: reasonCode,
-    });
-    renderCard();
-
-    expect(await screen.findByText(reasonKey)).toBeVisible();
-  });
-
-  it('switches from auto to the resolved fixed pair', async () => {
-    renderCard();
-    await screen.findByText('Provider A');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' }));
-
-    await waitFor(() => {
-      expect(updateMock).toHaveBeenCalledWith({
-        mode: 'fixed',
-        provider_id: 'provider-a',
-        model_id: 'model-a',
+    it('keeps the panel visible when providers exist but none is eligible', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
       });
+      renderCard({ providers: ineligibleProviders });
+
+      expect(await screen.findByTestId('app-operations-panel')).toBeVisible();
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.setupRequired');
     });
   });
 
-  it('switches from fixed to auto', async () => {
-    getMock.mockResolvedValue({
-      ...autoReady,
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+  describe('state 1 — ready', () => {
+    it('states mode, provider, model, status and consumer at a glance', async () => {
+      renderCard();
+
+      await screen.findByText('Provider A');
+      expect(getMock).toHaveBeenCalledTimes(1);
+      expect(panel()).toHaveAttribute('data-status', 'ready');
+      // A quiet keyline still has to be visible on all four sides: `border-b-base`
+      // compiles to `border-bottom-color: var(--bg-base)` — one edge, page background.
+      expect(panel()).toHaveClass('border-arco-2');
+      expect(panel().className).not.toMatch(/border-b-base/);
+      expect(screen.getByTestId('app-operations-mode')).toHaveTextContent('settings.appOperationsModel.auto');
+      expect(screen.getByTestId('app-operations-model')).toHaveTextContent('model-a');
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.ready');
+      expect(screen.getByTestId('app-operations-consumer')).toHaveTextContent(
+        'settings.appOperationsModel.contextCompaction'
+      );
+      expect(screen.getByText('settings.appOperationsModel.panelLabel')).toBeVisible();
     });
-    renderCard();
-    await screen.findByText('Provider A');
 
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.auto' }));
+    it('states status as a dot plus a word, never colour alone', async () => {
+      renderCard();
 
-    await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ mode: 'auto' }));
-  });
-
-  it('allows fixed to auto while providers are loading but keeps fixed selection disabled', async () => {
-    getMock.mockResolvedValue({
-      ...autoReady,
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+      await screen.findByText('Provider A');
+      const dot = within(statusWord()).getByTestId('app-operations-status-dot');
+      expect(dot).toHaveAttribute('aria-hidden', 'true');
+      expect(statusWord()).toHaveAttribute('data-tone', 'success');
+      expect(statusWord().textContent?.trim()).toBe('settings.appOperationsModel.status.ready');
     });
-    renderCard({ providersLoading: true });
-    await screen.findByText('Provider A');
 
-    expect(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.auto' }));
+    it('keeps the polite announcement region around the status line', async () => {
+      renderCard();
 
-    await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ mode: 'auto' }));
-  });
-
-  it('updates a fixed selection using the serialized provider and model pair', async () => {
-    getMock.mockResolvedValue({
-      ...autoReady,
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+      await screen.findByText('Provider A');
+      expect(statusLine()).toHaveAttribute('aria-live', 'polite');
+      expect(statusWord().closest('[aria-live="polite"]')).not.toBeNull();
     });
-    renderCard();
-    await screen.findByText('Provider A');
 
-    fireEvent.change(getFixedSelect(), { target: { value: JSON.stringify(['provider-a', 'model-b']) } });
-
-    await waitFor(() => {
-      expect(updateMock).toHaveBeenCalledWith({
-        mode: 'fixed',
-        provider_id: 'provider-a',
-        model_id: 'model-b',
+    it('shows an em dash when Auto resolves no model', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
       });
+      renderCard({ providers: ineligibleProviders });
+
+      expect(await screen.findByText('—')).toBeVisible();
     });
   });
 
-  it('opens model setup instead of saving when no selectable pair exists', async () => {
-    const { onAddModel } = renderCard({ providers: [] });
-    await screen.findByText('settings.appOperationsModel.status.ready');
+  describe('state 2 — fixed and pinned', () => {
+    it('reads FIXED in the mode chip without marking the pair as kept', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' }));
-
-    expect(onAddModel).toHaveBeenCalledTimes(1);
-    expect(updateMock).not.toHaveBeenCalled();
-  });
-
-  it('restores auto and notifies with localized save-failure copy after a rejected update', async () => {
-    updateMock.mockRejectedValueOnce(new Error('secret backend error'));
-    renderCard();
-    await screen.findByText('Provider A');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' }));
-
-    await waitFor(() => expect(messageErrorMock).toHaveBeenCalledWith('settings.appOperationsModel.saveFailed'));
-    expect(screen.getByRole('radio', { name: 'settings.appOperationsModel.auto' })).toBeChecked();
-    expect(screen.queryByText('secret backend error')).not.toBeInTheDocument();
-  });
-
-  it('shows saving copy while a model update is pending', async () => {
-    let resolveUpdate: (response: AppOperationsModelResponse) => void = () => undefined;
-    updateMock.mockImplementation(
-      () =>
-        new Promise<AppOperationsModelResponse>((resolve) => {
-          resolveUpdate = resolve;
-        })
-    );
-    renderCard();
-    await screen.findByText('Provider A');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'settings.appOperationsModel.fixed' }));
-
-    expect(screen.getByText('settings.appOperationsModel.saving')).toBeVisible();
-    resolveUpdate(autoReady);
-    await waitFor(() => expect(screen.queryByText('settings.appOperationsModel.saving')).not.toBeInTheDocument());
-  });
-
-  it('keeps a missing fixed pair visible as a disabled synthetic selection', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'fixed', provider_id: 'missing-provider', model_id: 'missing-model' },
-      health: 'unavailable',
-      reason_code: 'provider_missing',
+      await screen.findByText('Provider A');
+      expect(screen.getByTestId('app-operations-mode')).toHaveTextContent('settings.appOperationsModel.fixed');
+      expect(screen.getByTestId('app-operations-identity')).not.toHaveClass('line-through');
+      expect(screen.queryByTestId('app-operations-kept')).not.toBeInTheDocument();
     });
-    renderCard();
 
-    const synthetic = await screen.findByRole('option', { name: 'missing-provider / missing-model' });
-    expect(synthetic).toBeDisabled();
-    expect(getFixedSelect()).toHaveValue(JSON.stringify(['missing-provider', 'missing-model']));
-  });
+    it('turns the popover model row into the picker without echoing what it resolved to', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard();
 
-  it('renders a synthetic fixed option exactly once under its existing provider', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'missing-model' },
-      health: 'unavailable',
-      reason_code: 'model_missing',
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).getByLabelText('settings.selectModel')).toBeInTheDocument();
+      expect(within(popover).queryByTestId('app-operations-managed-by-auto')).not.toBeInTheDocument();
+      expect(within(popover).queryByTestId('app-operations-popover-resolved')).not.toBeInTheDocument();
     });
-    renderCard();
 
-    const synthetic = await screen.findAllByRole('option', { name: 'missing-model' });
-    expect(synthetic).toHaveLength(1);
-    expect(synthetic[0]).toBeDisabled();
-  });
+    it('shows Managed by Auto instead of a picker in auto mode', async () => {
+      renderCard();
 
-  it('shows Add Model for an auto setup-required no-eligible-model response', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'auto' },
-      health: 'setup_required',
-      reason_code: 'no_eligible_model',
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).getByTestId('app-operations-managed-by-auto')).toHaveTextContent(
+        'settings.appOperationsModel.managedByAuto'
+      );
+      expect(within(popover).queryByLabelText('settings.selectModel')).not.toBeInTheDocument();
+      expect(within(popover).getByText('settings.appOperationsModel.autoExplainer')).toBeVisible();
     });
-    const { onAddModel } = renderCard({ providers: [] });
-
-    const addModel = await screen.findByRole('button', { name: 'settings.addModel' });
-    fireEvent.click(addModel);
-    expect(onAddModel).toHaveBeenCalledTimes(1);
   });
 
-  it('disables Health Check when Auto requires setup and has no resolved model', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'auto' },
-      health: 'setup_required',
-      reason_code: 'no_eligible_model',
+  describe('state 3 — checking', () => {
+    it('retains identity, states Checking, and refuses a duplicate check', async () => {
+      let resolveCheck: (response: AppOperationsModelResponse) => void = () => undefined;
+      checkMock.mockImplementation(
+        () =>
+          new Promise<AppOperationsModelResponse>((resolve) => {
+            resolveCheck = resolve;
+          })
+      );
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      const checkNow = within(popover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' });
+      fireEvent.click(checkNow);
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.checking'));
+      expect(screen.getByText('Provider A')).toBeVisible();
+      expect(screen.getByTestId('app-operations-model')).toHaveTextContent('model-a');
+      expect(checkNow).toBeDisabled();
+      fireEvent.click(checkNow);
+      expect(checkMock).toHaveBeenCalledTimes(1);
+
+      resolveCheck({ ...autoReady, resolved_model: { provider_id: 'provider-a', model_id: 'model-b' } });
+      await screen.findByText('model-b');
     });
-    renderCard({ providers: [] });
 
-    expect(await screen.findByRole('button', { name: 'settings.healthCheck' })).toBeDisabled();
-  });
+    it('disables Check now when nothing resolves and enables it when a resolved model is unhealthy', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
+      });
+      renderCard({ providers: ineligibleProviders });
+      await screen.findByTestId('app-operations-panel');
+      const disabledPopover = await openPopover();
+      expect(
+        within(disabledPopover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' })
+      ).toBeDisabled();
 
-  it('enables Health Check when Auto is unavailable but still has a resolved model', async () => {
-    getMock.mockResolvedValue({
-      ...autoReady,
-      health: 'unavailable',
-      reason_code: 'health_check_failed',
+      cleanup();
+      getMock.mockResolvedValue({ ...autoReady, health: 'unavailable', reason_code: 'health_check_failed' });
+      renderCard();
+      await screen.findByText('Provider A');
+      const enabledPopover = await openPopover();
+      expect(
+        within(enabledPopover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' })
+      ).toBeEnabled();
     });
-    renderCard();
 
-    expect(await screen.findByRole('button', { name: 'settings.healthCheck' })).toBeEnabled();
-  });
+    it('restores the prior response and localized copy after a rejected check', async () => {
+      checkMock.mockRejectedValueOnce(new Error('secret check error'));
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
 
-  it('shows an em dash beside Resolved model when Auto resolves no model', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'auto' },
-      health: 'setup_required',
-      reason_code: 'no_eligible_model',
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' }));
+
+      await waitFor(() => expect(messageErrorMock).toHaveBeenCalledWith('settings.appOperationsModel.checkFailed'));
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.ready');
+      expect(screen.queryByText('secret check error')).not.toBeInTheDocument();
     });
-    renderCard({ providers: [] });
-
-    expect(await screen.findByText('settings.appOperationsModel.resolvedModelLabel')).toBeVisible();
-    expect(screen.getByText('—')).toBeVisible();
   });
 
-  it('shows checking immediately, disables duplicate checks, and accepts a changed auto resolution', async () => {
-    let resolveCheck: (response: AppOperationsModelResponse) => void = () => undefined;
-    checkMock.mockImplementation(
-      () =>
-        new Promise<AppOperationsModelResponse>((resolve) => {
-          resolveCheck = resolve;
-        })
-    );
-    renderCard();
-    await screen.findByText('Provider A');
+  describe('state 4 — setup required', () => {
+    it('escalates the keyline, states what is affected and offers Add Model', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
+      });
+      const { onAddModel } = renderCard({ providers: ineligibleProviders });
 
-    const checkButton = screen.getByRole('button', { name: 'settings.healthCheck' });
-    fireEvent.click(checkButton);
+      await screen.findByTestId('app-operations-panel');
+      expect(panel()).toHaveAttribute('data-tone', 'warning');
+      expect(panel()).toHaveClass('border-warning-6');
+      expect(screen.getByText('settings.appOperationsModel.setupRequiredImpact')).toBeVisible();
+      expect(screen.getByText('settings.appOperationsModel.reason.noEligibleModel')).toBeVisible();
 
-    expect(screen.getByText('settings.appOperationsModel.status.checking')).toBeVisible();
-    expect(checkButton).toBeDisabled();
-    fireEvent.click(checkButton);
-    expect(checkMock).toHaveBeenCalledTimes(1);
-
-    resolveCheck({
-      ...autoReady,
-      resolved_model: { provider_id: 'provider-a', model_id: 'model-b' },
+      fireEvent.click(screen.getByRole('button', { name: 'settings.addModel' }));
+      expect(onAddModel).toHaveBeenCalledTimes(1);
     });
-    await screen.findByText('model-b');
-  });
 
-  it('shows and politely announces a completed ready result with the checked model', async () => {
-    checkMock.mockResolvedValue({ ...autoReady, checked_at: Date.now() });
-    renderCard();
-    await screen.findByText('Provider A');
+    it('describes the compaction fallback truthfully as a rules-based summary, not trimming', () => {
+      const impact = enUsSettings.appOperationsModel.setupRequiredImpact;
 
-    const checkButton = screen.getByRole('button', { name: 'settings.healthCheck' });
-    expect(checkButton).toHaveClass('self-start');
-    expect(checkButton).toHaveClass('!min-h-36px');
-    fireEvent.click(checkButton);
-
-    const result = await screen.findByText('settings.appOperationsModel.checkResult.ready · checked just now');
-    expect(result.closest('[aria-live="polite"]')).not.toBeNull();
-    expect(screen.getByText('Provider A')).toBeVisible();
-    expect(screen.getByText('model-a')).toBeVisible();
-  });
-
-  it('restores a prior check timestamp when Settings is reopened', async () => {
-    const checkedAt = Date.UTC(2026, 6, 31, 7, 30);
-    getMock.mockResolvedValue({ ...autoReady, checked_at: checkedAt });
-    renderCard();
-
-    expect(
-      await screen.findByText(
-        `settings.appOperationsModel.checkResult.ready · checked ${new Date(checkedAt).toLocaleString()}`
-      )
-    ).toBeVisible();
-  });
-
-  it('shows the failed health result and its actionable reason after a completed check', async () => {
-    checkMock.mockResolvedValue({
-      ...autoReady,
-      health: 'unavailable',
-      reason_code: 'health_check_failed',
-      checked_at: Date.now(),
+      expect(impact).toMatch(/rules-based/i);
+      expect(impact).not.toMatch(/trim/i);
     });
-    renderCard();
-    await screen.findByText('Provider A');
 
-    fireEvent.click(screen.getByRole('button', { name: 'settings.healthCheck' }));
+    it.each(reasonCases)('uses the planned locale key for %s', async (reasonCode, reasonKey) => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+        health: 'unavailable',
+        reason_code: reasonCode,
+      });
+      renderCard();
 
-    expect(
-      await screen.findByText('settings.appOperationsModel.checkResult.unavailable · checked just now')
-    ).toBeVisible();
-    expect(screen.getByText('settings.appOperationsModel.reason.healthCheckFailed')).toBeVisible();
-  });
-
-  it('replaces the persisted completion time after a repeated check', async () => {
-    const previousCheckedAt = Date.UTC(2026, 6, 30, 7, 30);
-    const nextCheckedAt = Date.UTC(2026, 6, 31, 8, 45);
-    getMock.mockResolvedValue({ ...autoReady, checked_at: previousCheckedAt });
-    checkMock.mockResolvedValue({ ...autoReady, checked_at: nextCheckedAt });
-    renderCard();
-
-    expect(
-      await screen.findByText(
-        `settings.appOperationsModel.checkResult.ready · checked ${new Date(previousCheckedAt).toLocaleString()}`
-      )
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'settings.healthCheck' }));
-
-    expect(
-      await screen.findByText(
-        `settings.appOperationsModel.checkResult.ready · checked ${new Date(nextCheckedAt).toLocaleString()}`
-      )
-    ).toBeVisible();
-    const previousTime = new Date(previousCheckedAt).toLocaleString();
-    expect(
-      screen.queryByText((content, element) => element?.tagName === 'SPAN' && content.includes(previousTime))
-    ).not.toBeInTheDocument();
-  });
-
-  it('keeps a fixed health-check failure without resolution visible and retryable', async () => {
-    getMock.mockResolvedValue({
-      setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
-      health: 'unavailable',
-      reason_code: 'health_check_failed',
+      expect(await screen.findByText(reasonKey)).toBeVisible();
     });
-    renderCard();
-
-    await screen.findByText('Provider A');
-    expect(screen.getByRole('button', { name: 'settings.healthCheck' })).toBeEnabled();
   });
 
-  it('restores the prior response and notifies with localized check-failure copy after a rejected check', async () => {
-    checkMock.mockRejectedValueOnce(new Error('secret check error'));
-    renderCard();
-    await screen.findByText('Provider A');
+  describe('state 5 — fixed model unavailable', () => {
+    it('keeps the saved pair on screen, struck through and marked KEPT', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+        health: 'unavailable',
+        reason_code: 'model_disabled',
+      });
+      renderCard();
 
-    fireEvent.click(screen.getByRole('button', { name: 'settings.healthCheck' }));
+      await screen.findByText('Provider A');
+      expect(panel()).toHaveAttribute('data-tone', 'danger');
+      expect(panel()).toHaveClass('border-danger-6');
+      expect(screen.getByTestId('app-operations-identity')).toHaveClass('line-through');
+      expect(screen.getByTestId('app-operations-kept')).toHaveTextContent('settings.appOperationsModel.kept');
+      expect(screen.getByTestId('app-operations-model')).toHaveTextContent('model-a');
+    });
 
-    await waitFor(() => expect(messageErrorMock).toHaveBeenCalledWith('settings.appOperationsModel.checkFailed'));
-    expect(screen.getByText('settings.appOperationsModel.status.ready')).toBeVisible();
-    expect(screen.queryByText('secret check error')).not.toBeInTheDocument();
+    it('offers Switch to Auto and Pick another', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+        health: 'unavailable',
+        reason_code: 'model_disabled',
+      });
+      renderCard();
+      await screen.findByText('Provider A');
+
+      fireEvent.click(screen.getByRole('button', { name: 'settings.appOperationsModel.pickAnother' }));
+      const popover = await screen.findByTestId('app-operations-popover');
+      expect(within(popover).getByLabelText('settings.selectModel')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'settings.appOperationsModel.switchToAuto' }));
+      await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ mode: 'auto' }));
+    });
+
+    it('never silently swaps a missing pair — it stays a disabled synthetic option', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'missing-provider', model_id: 'missing-model' },
+        health: 'unavailable',
+        reason_code: 'provider_missing',
+      });
+      renderCard();
+      await screen.findByTestId('app-operations-panel');
+      await openPopover();
+
+      const synthetic = await screen.findByRole('option', { name: 'missing-provider / missing-model' });
+      expect(synthetic).toBeDisabled();
+      expect(getFixedSelect()).toHaveValue(JSON.stringify(['missing-provider', 'missing-model']));
+    });
+
+    it('renders a synthetic fixed option exactly once under its existing provider', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'missing-model' },
+        health: 'unavailable',
+        reason_code: 'model_missing',
+      });
+      renderCard();
+      await screen.findByTestId('app-operations-panel');
+      await openPopover();
+
+      const synthetic = await screen.findAllByRole('option', { name: 'missing-model' });
+      expect(synthetic).toHaveLength(1);
+      expect(synthetic[0]).toBeDisabled();
+    });
   });
 
-  it('renders the backend update requirement and disables mutations for a missing endpoint', async () => {
-    getMock.mockRejectedValueOnce(
-      new BackendHttpError({ method: 'GET', path: '/api/app-operations/model', status: 404, body: {} })
-    );
-    renderCard();
+  describe('state 6 — saving then failed', () => {
+    it('disables the selection in place while a save is pending', async () => {
+      let resolveUpdate: (response: AppOperationsModelResponse) => void = () => undefined;
+      updateMock.mockImplementation(
+        () =>
+          new Promise<AppOperationsModelResponse>((resolve) => {
+            resolveUpdate = resolve;
+          })
+      );
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
 
-    await screen.findByText('settings.appOperationsModel.backendUpdateRequired');
-    expect(screen.getByRole('radio', { name: 'settings.appOperationsModel.auto' })).toBeDisabled();
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.saving'));
+      expect(within(popover).getByRole('button', { name: 'settings.appOperationsModel.auto' })).toBeDisabled();
+      expect(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' })).toBeDisabled();
+
+      resolveUpdate(autoReady);
+      await waitFor(() => expect(statusWord()).not.toHaveTextContent('settings.appOperationsModel.status.saving'));
+    });
+
+    it('reverts to the last confirmed value and offers a retry that re-attempts the save', async () => {
+      updateMock.mockRejectedValueOnce(new Error('secret backend error'));
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      await waitFor(() => expect(messageErrorMock).toHaveBeenCalledWith('settings.appOperationsModel.saveFailed'));
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.saveFailed');
+      expect(screen.getByTestId('app-operations-mode')).toHaveTextContent('settings.appOperationsModel.auto');
+      expect(screen.queryByText('secret backend error')).not.toBeInTheDocument();
+
+      updateMock.mockResolvedValueOnce(fixedReady);
+      fireEvent.click(screen.getByTestId('app-operations-retry'));
+
+      await waitFor(() =>
+        expect(updateMock).toHaveBeenLastCalledWith({ mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' })
+      );
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.ready'));
+    });
   });
 
-  it('renders a retry action for other load failures', async () => {
-    getMock.mockRejectedValueOnce(new Error('hidden error')).mockResolvedValueOnce(autoReady);
-    renderCard();
+  describe('state 7 — backend update required', () => {
+    it('replaces the panel with the alert and leaves no live control stack behind it', async () => {
+      getMock.mockRejectedValueOnce(
+        new BackendHttpError({ method: 'GET', path: '/api/app-operations/model', status: 404, body: {} })
+      );
+      renderCard();
 
-    const retry = await screen.findByRole('button', { name: 'common.retry' });
-    expect(screen.getByText('settings.appOperationsModel.loadFailed')).toBeVisible();
-    fireEvent.click(retry);
+      await screen.findByText('settings.appOperationsModel.backendUpdateRequired');
+      expect(screen.queryByTestId('app-operations-status-line')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('app-operations-popover-trigger')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'settings.appOperationsModel.auto' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'settings.appOperationsModel.fixed' })).not.toBeInTheDocument();
+    });
+  });
 
-    await screen.findByText('Provider A');
-    expect(getMock).toHaveBeenCalledTimes(2);
+  describe('state 9 — load error', () => {
+    it('gives a generic load failure a home in the panel with a retry', async () => {
+      getMock.mockRejectedValueOnce(new Error('hidden error')).mockResolvedValueOnce(autoReady);
+      renderCard();
+
+      await screen.findByText('settings.appOperationsModel.loadFailed');
+      expect(panel()).toHaveAttribute('data-status', 'load_error');
+      expect(panel()).toHaveAttribute('data-tone', 'danger');
+      expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.loadFailed');
+      expect(screen.queryByText('hidden error')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('app-operations-retry'));
+
+      await screen.findByText('Provider A');
+      expect(getMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('popover', () => {
+    it('stays closed until the panel asks for it', async () => {
+      renderCard();
+      await screen.findByText('Provider A');
+
+      expect(screen.queryByTestId('app-operations-popover')).not.toBeInTheDocument();
+      await openPopover();
+      expect(screen.getByTestId('app-operations-popover')).toBeVisible();
+    });
+
+    it('saves on selection with no Save button and keeps the panel stating the outcome', async () => {
+      updateMock.mockResolvedValue(fixedReady);
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).queryByRole('button', { name: /save/i })).not.toBeInTheDocument();
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      await waitFor(() =>
+        expect(updateMock).toHaveBeenCalledWith({ mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' })
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId('app-operations-mode')).toHaveTextContent('settings.appOperationsModel.fixed')
+      );
+      expect(screen.getByTestId('app-operations-popover')).toBeVisible();
+    });
+
+    it('marks the active option with aria-pressed rather than a radio group', async () => {
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).queryAllByRole('radio')).toHaveLength(0);
+      expect(within(popover).getByRole('button', { name: 'settings.appOperationsModel.auto' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+    });
+
+    it('switches a fixed selection using the serialized provider and model pair', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard();
+      await screen.findByText('Provider A');
+      await openPopover();
+
+      fireEvent.change(getFixedSelect(), { target: { value: JSON.stringify(['provider-a', 'model-b']) } });
+
+      await waitFor(() =>
+        expect(updateMock).toHaveBeenCalledWith({ mode: 'fixed', provider_id: 'provider-a', model_id: 'model-b' })
+      );
+    });
+
+    it('keeps Fixed disabled while providers load but still allows a return to Auto', async () => {
+      getMock.mockResolvedValue(fixedReady);
+      renderCard({ providersLoading: true });
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' })).toBeDisabled();
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.auto' }));
+
+      await waitFor(() => expect(updateMock).toHaveBeenCalledWith({ mode: 'auto' }));
+    });
+
+    it('opens model setup instead of saving when no selectable pair exists', async () => {
+      getMock.mockResolvedValue({
+        setting: { mode: 'auto' },
+        health: 'setup_required',
+        reason_code: 'no_eligible_model',
+      });
+      const { onAddModel } = renderCard({ providers: ineligibleProviders });
+      await screen.findByTestId('app-operations-panel');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+
+      expect(onAddModel).toHaveBeenCalledTimes(1);
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('states the last check and the consumer in the footer', async () => {
+      const checkedAt = Date.now();
+      getMock.mockResolvedValue({ ...autoReady, checked_at: checkedAt });
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      expect(within(popover).getByTestId('app-operations-popover-checked')).toHaveTextContent(
+        'settings.appOperationsModel.checkTime.justNow'
+      );
+      expect(within(popover).getByText('settings.appOperationsModel.usedByCompaction')).toBeVisible();
+    });
+  });
+
+  describe('check time', () => {
+    it('keeps the 60s just-now shorthand', async () => {
+      getMock.mockResolvedValue({ ...autoReady, checked_at: Date.now() - 1_000 });
+      renderCard();
+
+      expect(await screen.findByTestId('app-operations-checked')).toHaveTextContent(
+        'settings.appOperationsModel.checkTime.justNow'
+      );
+    });
+
+    it('reads as a day-relative sentence for an older check made today', async () => {
+      const checkedAt = Date.now() - 5 * 60_000;
+      getMock.mockResolvedValue({ ...autoReady, checked_at: checkedAt });
+      renderCard();
+
+      expect(await screen.findByTestId('app-operations-checked')).toHaveTextContent(
+        `checkedToday:${timeOf(checkedAt)}`
+      );
+    });
+
+    it('reads as a dated sentence for a check restored from an earlier day', async () => {
+      const checkedAt = Date.UTC(2026, 6, 31, 7, 30);
+      getMock.mockResolvedValue({ ...autoReady, checked_at: checkedAt });
+      renderCard();
+
+      expect(await screen.findByTestId('app-operations-checked')).toHaveTextContent(
+        `checkedOn:${dateOf(checkedAt)}:${timeOf(checkedAt)}`
+      );
+    });
+
+    it('replaces the persisted completion time after a repeated check', async () => {
+      const previousCheckedAt = Date.UTC(2026, 6, 30, 7, 30);
+      const nextCheckedAt = Date.UTC(2026, 6, 31, 8, 45);
+      getMock.mockResolvedValue({ ...autoReady, checked_at: previousCheckedAt });
+      checkMock.mockResolvedValue({ ...autoReady, checked_at: nextCheckedAt });
+      renderCard();
+      await screen.findByText('Provider A');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.checkNow' }));
+
+      await waitFor(() =>
+        expect(screen.getByTestId('app-operations-checked')).toHaveTextContent(
+          `checkedOn:${dateOf(nextCheckedAt)}:${timeOf(nextCheckedAt)}`
+        )
+      );
+      expect(screen.getByTestId('app-operations-checked')).not.toHaveTextContent(
+        `checkedOn:${dateOf(previousCheckedAt)}:${timeOf(previousCheckedAt)}`
+      );
+    });
+  });
+
+  describe('server-owned resolution', () => {
+    it('refreshes only after changed providers persist', async () => {
+      let requestCount = 0;
+      getMock.mockImplementation(async () => {
+        requestCount += 1;
+        return requestCount === 1
+          ? autoReady
+          : { setting: { mode: 'auto' }, health: 'setup_required', reason_code: 'no_eligible_model' };
+      });
+      const { rerender } = renderCard();
+      await screen.findByText('model-a');
+
+      rerender(
+        <AppOperationsModelCard
+          providers={ineligibleProviders}
+          providersLoading={false}
+          persistedProvidersRevision={0}
+          onAddModel={vi.fn()}
+        />
+      );
+      expect(getMock).toHaveBeenCalledTimes(1);
+
+      rerender(
+        <AppOperationsModelCard
+          providers={ineligibleProviders}
+          providersLoading={false}
+          persistedProvidersRevision={1}
+          onAddModel={vi.fn()}
+        />
+      );
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.setupRequired'));
+      expect(screen.queryByText('model-a')).not.toBeInTheDocument();
+      expect(getMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('coalesces provider refreshes until an in-flight save settles', async () => {
+      let resolveUpdate: ((response: AppOperationsModelResponse) => void) | undefined;
+      updateMock.mockImplementation(
+        () =>
+          new Promise<AppOperationsModelResponse>((resolve) => {
+            resolveUpdate = resolve;
+          })
+      );
+      let requestCount = 0;
+      getMock.mockImplementation(async () => {
+        requestCount += 1;
+        return requestCount === 1
+          ? autoReady
+          : { setting: { mode: 'auto' }, health: 'setup_required', reason_code: 'no_eligible_model' };
+      });
+      const { rerender } = renderCard();
+      await screen.findByText('model-a');
+      const popover = await openPopover();
+
+      fireEvent.click(within(popover).getByRole('button', { name: 'settings.appOperationsModel.fixed' }));
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.saving'));
+
+      rerender(
+        <AppOperationsModelCard
+          providers={providers}
+          providersLoading={false}
+          persistedProvidersRevision={1}
+          onAddModel={vi.fn()}
+        />
+      );
+      rerender(
+        <AppOperationsModelCard
+          providers={providers}
+          providersLoading={false}
+          persistedProvidersRevision={2}
+          onAddModel={vi.fn()}
+        />
+      );
+      expect(getMock).toHaveBeenCalledTimes(1);
+
+      resolveUpdate?.(autoReady);
+
+      await waitFor(() => expect(statusWord()).toHaveTextContent('settings.appOperationsModel.status.setupRequired'));
+      expect(getMock).toHaveBeenCalledTimes(2);
+    });
   });
 });

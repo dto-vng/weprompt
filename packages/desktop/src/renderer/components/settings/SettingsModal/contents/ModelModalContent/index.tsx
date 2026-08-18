@@ -399,6 +399,21 @@ const ModelModalContent: React.FC = () => {
     </>
   );
 
+  // The app operations block is a status panel in the header, not a body card, so
+  // the page body starts with providers immediately. It takes its own row under
+  // the header actions: right-aligned and compact at >=900px, a full-width
+  // one-line strip below that (the panel owns those width rules). It must not
+  // join `headerActions` — that slot is `shrink-0`, so a wide panel there sizes
+  // the whole header to its max-content width and overflows the page.
+  const appOperationsPanel = (
+    <AppOperationsModelCard
+      providers={data ?? []}
+      providersLoading={data === undefined}
+      persistedProvidersRevision={persistedProvidersRevision}
+      onAddModel={() => addPlatformModalCtrl.open()}
+    />
+  );
+
   const supportNote = (
     <div
       className='rd-8px px-12px py-8px text-12px leading-5 border border-solid'
@@ -433,6 +448,7 @@ const ModelModalContent: React.FC = () => {
             defaultValue: 'Configure providers and API keys for text, image, and video models.',
           })}
           actions={headerActions}
+          statusPanel={appOperationsPanel}
         />
       ) : (
         /* Modal mode keeps its compact self-contained header. */
@@ -441,6 +457,7 @@ const ModelModalContent: React.FC = () => {
             <div className='text-20px font-600 text-t-primary leading-34px'>{t('settings.model')}</div>
             <div className='flex items-center gap-8px flex-wrap'>{headerActions}</div>
           </div>
+          {appOperationsPanel}
           {supportNote}
         </div>
       )}
@@ -448,12 +465,6 @@ const ModelModalContent: React.FC = () => {
       {/* Content Area */}
       <AionScrollArea className='flex-1 min-h-0' disableOverflow={isPageMode}>
         <div className='space-y-16px'>
-          <AppOperationsModelCard
-            providers={data ?? []}
-            providersLoading={data === undefined}
-            persistedProvidersRevision={persistedProvidersRevision}
-            onAddModel={() => addPlatformModalCtrl.open()}
-          />
           {!data || data.length === 0 ? (
             <div className='flex flex-col items-center justify-center py-40px'>
               <Info theme='outline' size='48' className='text-t-secondary mb-16px' />

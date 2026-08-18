@@ -9,7 +9,8 @@
  *
  * Layout (top to bottom):
  *   1. Title row: page title + description on the left, action slot on the right.
- *   2. Tabs (optional): underline tabs with an optional count badge.
+ *   2. Status panel (optional): a full-width row under the title row.
+ *   3. Tabs (optional): underline tabs with an optional count badge.
  *
  * Pages own everything below the header (their list/content). This keeps the
  * title sizing, description, action placement, tab styling and responsive
@@ -32,6 +33,15 @@ type SettingsPageHeaderProps = {
   description?: React.ReactNode;
   /** Right-aligned action slot (search, create button, dropdowns, …). */
   actions?: React.ReactNode;
+  /**
+   * Slot under the title row, inside the sticky header. Use it for a status panel
+   * that must stay glanceable while the body scrolls. It gets its own row rather
+   * than joining `actions`, whose `shrink-0` sizing would force the whole header
+   * to the panel's max-content width and overflow the page. Rendered unwrapped:
+   * the slot owns its own top margin and alignment, so a panel that renders
+   * nothing leaves no empty row behind.
+   */
+  statusPanel?: React.ReactNode;
   tabs?: SettingsPageTab[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
@@ -45,6 +55,7 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
   title,
   description,
   actions,
+  statusPanel,
   tabs,
   activeTab,
   onTabChange,
@@ -65,6 +76,7 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
         {actions ? <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div> : null}
       </div>
       {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
+      {statusPanel}
 
       {tabs && tabs.length > 0 ? (
         <div className='mt-18px flex gap-26px border-b border-[var(--color-border-2)]' role='tablist'>

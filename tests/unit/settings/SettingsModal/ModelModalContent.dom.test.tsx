@@ -209,6 +209,17 @@ describe('ModelModalContent', () => {
     expect(addPlatformOpenMock).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the app operations panel in the header action row, not in the scrolled body', () => {
+    providersQueryData.current = [provider];
+    render(<ModelModalContent />);
+
+    const card = screen.getByTestId('app-operations-card');
+    // The support note closes the header block, so a panel that precedes it sits
+    // inside the header actions rather than at the top of the provider list.
+    const supportNote = screen.getByText('settings.customModelSupportNote');
+    expect(card.compareDocumentPosition(supportNote) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('labels the retained upstream setup link instead of presenting it as a WePrompt destination', () => {
     render(<ModelModalContent />);
 
