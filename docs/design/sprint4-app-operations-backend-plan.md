@@ -115,11 +115,20 @@ The feature is done when, on a build pinned to a **published** tag:
 
 Until then the UI is correct and dark, and should be described that way.
 
+## Scope decision — 2026-08-18 (owner)
+
+**Only app-operations ships. Memory (031–034) does not, and neither do `028_project_bind` nor
+`029_add_mimo_code_builtin_acp_agent`.** The port is therefore exactly:
+
+- one migration, `030_app_operations_model.sql` **renumbered to `028_`**
+- the Rust that reads and writes those three `system_settings` columns
+- the two tests that prove it
+
+Lineage moves **27 → 28**. Nothing else on that fork branch crosses. The fork keeps its remaining ~90
+commits and the memory feature; that divergence is accepted, not resolved, by this plan.
+
 ## Open questions for the owner
 
-1. **Does the memory feature (031–034) also want shipping?** It is on the same branch and is a separate
-   product decision. If yes it needs its own port and lineage step; if no, it stays on the fork and the
-   fork keeps diverging.
 2. **Who reviews the port?** Sprint 3's rule was that a reviewer must be out-of-band from whoever produced
    the evidence. The original author is this machine.
 3. **Does `028_project_bind` / `029_mimo` need to reach the release line separately?** They are unrelated
