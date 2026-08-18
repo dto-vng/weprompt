@@ -569,6 +569,24 @@ scroller working as designed (`overflow-x-auto snap-x`), signalling more content
 from the original defect, where the card's *size* was wrong.
 
 
+### C-06 fixed — and the intake entry's description of it was wrong
+
+Measured in-chat, before: cards per row `{3,3,3,3,1,1}`. After: `{4,6,4}` — one row per artifact
+type, matching the group counts exactly.
+
+**The intake entry claimed the in-chat panel showed "no artifact-type grouping at all". That is
+false** — the headings were always there. The real difference is the *shelf direction*.
+`TemplateGalleryColumns` has two variants: `compact` lays each type out as a vertical column
+(`shelf: 'flex flex-col'`) and wraps the columns; `large` gives each type one horizontal,
+scrollable shelf. `TemplateGalleryExpanded` (new-chat) passed `size='large'`; `TemplateGalleryPanel`
+(in-chat) passed `size='compact'`. So the ragged grid in the screenshot is three vertical columns
+side by side, not a broken grid.
+
+**Fix is the one-word answer to C-06's open question:** both surfaces now use the same component
+*and* the same variant, so they cannot drift apart again. The panel is wide enough for shelves, and
+`large` scrolls horizontally when it is not.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
