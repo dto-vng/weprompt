@@ -337,6 +337,7 @@ live verification in the running app.
 | **DC-3** | **Background lightening is per-surface, not a token sweep.** Only the surfaces pointed at: sidebar/chrome (C-04), the assistant-mode pill bar and the chat rows (C-13). `--bg-chat-surface` is the reference value. The token ramp is **not** redefined, so dark theme is untouched by construction. C-04's "check other screens" rider stays a manual audit, reported rather than silently applied.                     |
 | **DC-5** | **C-01 removes the always-open artifact preview, and that is intended.** Switching single chat to `'panel'` stops `ChatLayout/index.tsx:296` rendering. The reporter confirmed the preview is part of what is being reverted, so its removal is a decision, not a side effect to mitigate. |
 | **DC-6** | **Stream C verifies on Electron slot 2 (`~/.aionui-dev-2`), not slot 1.** Slot 1's app belongs to peer session `46112f54`, which never answered; a second peer declined to authorize it on their behalf. Slot 2 is a fresh profile, so items needing content (C-06/C-07 templates, C-10 review card, C-11 permission prompt, C-13/C-14 project data) must be **seeded before they are reproducible** — and an item that cannot be reproduced must be reported as unverified, never as passing. |
+| **DC-9** | **C-13's chat row is left unchanged — the reported fill is a hover state, not a resting colour.** Measured on project home: at rest the row paints **no background at all** (transparent); on hover a 791×54 div appears at `rgb(240,233,219)`. So the screenshot captured a hover, and there is no warm band at rest to remove. Matching it to the composer would set the hover to `rgb(250,246,238)` against a `rgb(255,253,249)` page — a 5–11 per-channel difference, i.e. a hover the user could barely see, which is the same failure mode as C-11's invisible Reject. Decided by the reporter after seeing the measurement. **C-13 therefore closes with the pill bar (element 1) fixed and element 2 deliberately untouched.** |
 | **DC-7** | **C-05: New Chat adopts the Studio behaviour too** — grey at rest, orange on hover, matching Assistants and Scheduled Tasks. Accepted consequence: New Chat loses the permanent orange accent that currently marks it as the primary action. Decided by the reporter after seeing the measured colours. |
 | **DC-8** | **Stream C stays on Electron slot 2 for the whole sweep.** Slot 1 was offered by its owner and the reporter approved switching, but the offer was **retracted** the same minute: `~/.aionui-dev` underwent a plaintext→encrypted at-rest migration at 09:54 and its live DB is now unreadable by the app (0 conversations). Independently corroborated here read-only: live db 708,608 bytes reporting as `data`, plaintext backup 4,526,080 bytes reporting as valid SQLite, and zero processes holding the directory. Slot 1's only advantage was its real content, which is currently unreachable — so the switch was cancelled on the facts, not on preference. **Consequence to honour: items needing content or a live model turn are reported UNVERIFIED, never assumed passing** (see DC-6). |
 | **DC-4** | **Reject gets a border and stays quieter than the allow actions.** Fixes the invisibility without changing which action the prompt nudges toward. `Always allow` keeps its current prominence — noted as a deliberate choice, not an oversight.                                                                                                                                              |
@@ -671,6 +672,26 @@ naturally; until then it must not be reported as verified.
 that the mechanism is known, removing the icon would treat a symptom that recurs on the next Arco
 button anyone builds with one, and it is a content change rather than a layout fix. Say so when
 reporting, and offer removal if the icon is unwanted on its own merits.
+
+
+### C-13 closed — element 2 needed no change, and the intake warning was right
+
+The intake entry flagged: "it may be a *state*, not a resting colour… flattening it removes the hover
+feedback entirely — the same failure mode as C-11". Measured, that is exactly what it is.
+
+| state   | chat row background      |
+| ------- | ------------------------ |
+| at rest | **none** (transparent)   |
+| hovered | `rgb(240,233,219)`, 791×54 |
+
+So the reporter's screenshot captured a hovered row. There is no resting band to lighten, and the
+comparison in "make 1 and 2 the same colour as 3" does not hold: element 1 was a resting fill,
+element 2 is a hover.
+
+**Worth keeping as a method note:** this is the second item in the stream (with C-05) where the
+reported symptom was real but the *mechanism* was not what the report implied, and only a
+rest-vs-hover measurement separated them. Reading a colour off a screenshot cannot distinguish a
+resting fill from a hover; a `mouseMoved`-then-read pass can.
 
 
 ## Open questions (batched — to ask once intake closes)
