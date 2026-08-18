@@ -39,6 +39,19 @@ describe('C-01 files pane wiring', () => {
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'preview'\}/);
   });
 
+  it('does not let an empty PreviewPanel collapse the whole pane', () => {
+    // PreviewPanel calls onRequestCollapse when it has nothing to show. That was correct when
+    // this pane WAS the preview; now it also hosts Files and Changes, so honouring it
+    // unconditionally made the pane impossible to open — the toggle expanded it and an empty
+    // PreviewPanel shut it in the same tick. Found from a setter stack trace, not by reading.
+    expect(CHAT_LAYOUT).toMatch(/onRequestCollapse=\{collapseArtifactPaneFromPreview\}/);
+    expect(CHAT_LAYOUT).toMatch(/if \(artifactPaneViewRef\.current !== 'preview'\) return;/);
+  });
+
+  it('opens on Files, since an empty preview cannot hold the pane open', () => {
+    expect(CHAT_LAYOUT).toMatch(/useState<WorkspacePaneView>\('files'\)/);
+  });
+
   it('reveals the Preview tab when a preview opens', () => {
     // Without this the file opens into a hidden tab and the click looks inert — exactly how
     // it was reported ("I cannot open a file from there"). PreviewContext dispatches

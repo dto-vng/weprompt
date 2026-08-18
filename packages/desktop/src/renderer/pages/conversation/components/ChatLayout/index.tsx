@@ -91,6 +91,14 @@ const ChatLayout: React.FC<{
     }
   );
   const collapseArtifactPane = useCallback(() => setArtifactCollapsed(true), [setArtifactCollapsed]);
+  // PreviewPanel requests a collapse when it has nothing to show. That was right when this
+  // pane WAS the preview; now it also hosts Files and Changes, so honouring it unconditionally
+  // made the pane impossible to open — the toggle expanded it and an empty PreviewPanel shut it
+  // again in the same tick. Only honour the request while the preview is the visible tab.
+  const collapseArtifactPaneFromPreview = useCallback(() => {
+    if (artifactPaneViewRef.current !== 'preview') return;
+    setArtifactCollapsed(true);
+  }, [setArtifactCollapsed]);
 
   // --- Hook B: container width ---
   const { containerRef, containerWidth } = useContainerWidth();
@@ -155,9 +163,11 @@ const ChatLayout: React.FC<{
   // C-01: the right pane shows either the workspace file tree or the artifact preview.
   // Both stay mounted and are toggled by visibility, so switching tabs never discards
   // preview state or re-fetches the tree.
-  const [artifactPaneView, setArtifactPaneView] = useState<WorkspacePaneView>('preview');
+  const [artifactPaneView, setArtifactPaneView] = useState<WorkspacePaneView>('files');
   const [filesPaneEl, setFilesPaneEl] = useState<HTMLElement | null>(null);
   const [changesPaneEl, setChangesPaneEl] = useState<HTMLElement | null>(null);
+  const artifactPaneViewRef = React.useRef(artifactPaneView);
+  artifactPaneViewRef.current = artifactPaneView;
   const panePortalTargets = React.useMemo(
     () => ({ files: filesPaneEl, changes: changesPaneEl }),
     [filesPaneEl, changesPaneEl]
@@ -392,7 +402,7 @@ const ChatLayout: React.FC<{
               <div ref={setChangesPaneEl} className='h-full overflow-hidden' />
             </div>
             <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
-              <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPane} />
+              <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />
             </div>
           </div>
         )}

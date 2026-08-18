@@ -401,7 +401,18 @@ live verification in the running app.
   exactly one control. Verified rendering: `aria-label="Toggle project panel"` present on a
   conversation route, and clicking it dispatches `WORKSPACE_TOGGLE_EVENT` (confirmed with an
   instrumented listener).
-- **⚠ UNRESOLVED — the pane does not open from it.** Clicking the button, and dispatching the toggle
+- **RESOLVED — root cause was `PreviewPanel`, found by instrumenting the state setter.** A stack
+  trace on every `setRightSiderCollapsed` call showed two calls per click: `handleWorkspaceToggle`
+  expanding it, then `setArtifactCollapsed(true)` from **`PreviewPanel.tsx:345`** via
+  `onRequestCollapse` shutting it again in the same tick. `PreviewPanel` asks the pane to collapse
+  when it has nothing to preview — correct when the pane *was* the preview, wrong now that it also
+  hosts Files and Changes. It also explains why opening a file always worked: a preview tab exists,
+  so no collapse is requested.
+  **Fixed two ways:** the request is honoured only while Preview is the visible tab, and the pane now
+  opens on **Files** rather than Preview, so an empty preview can never hold it shut.
+  **Verified:** toggle opens the pane to 776px on Files, toggle again closes it, and clicking a real
+  file switches to Preview.
+- **Superseded note — what static reading got wrong.** Clicking the button, and dispatching the toggle
   and expand events directly, all leave the pane unrendered, while **opening a file does** open it.
   So `artifactVisible` stays false even though `workspace-preference-<id>` reads `expanded`.
   Ruled out: not mobile (viewport 1512, no mobile overlay, chat pane on the desktop path);
