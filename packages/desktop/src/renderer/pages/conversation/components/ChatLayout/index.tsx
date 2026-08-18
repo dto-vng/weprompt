@@ -11,7 +11,7 @@ import { useLayoutConstraints } from '@/renderer/pages/conversation/hooks/useLay
 import { useTitleRename } from '@/renderer/pages/conversation/hooks/useTitleRename';
 import { useWorkspaceCollapse } from '@/renderer/pages/conversation/hooks/useWorkspaceCollapse';
 import { PreviewPanel } from '@/renderer/pages/conversation/Preview';
-import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspaceEvents';
+import { WORKSPACE_EXPAND_EVENT, dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspaceEvents';
 import classNames from 'classnames';
 import { isMacEnvironment, isWindowsEnvironment } from '@/renderer/pages/conversation/utils/detectPlatform';
 import { calcLayoutMetrics } from '@/renderer/pages/conversation/utils/layoutCalc';
@@ -161,6 +161,16 @@ const ChatLayout: React.FC<{
     () => ({ files: filesPaneEl, changes: changesPaneEl }),
     [filesPaneEl, changesPaneEl]
   );
+
+  // Opening a preview must also REVEAL the preview. PreviewContext dispatches this event on
+  // every openPreview as an explicit "show me this" action — it is already what force-expands
+  // a collapsed pane. Without this, clicking a file in the Files tab opens it into the hidden
+  // Preview tab and the click looks like it did nothing, which is exactly how it was reported.
+  useEffect(() => {
+    const revealPreview = () => setArtifactPaneView('preview');
+    window.addEventListener(WORKSPACE_EXPAND_EVENT, revealPreview);
+    return () => window.removeEventListener(WORKSPACE_EXPAND_EVENT, revealPreview);
+  }, []);
   const [mobileActionsSlot, setMobileActionsSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!layout?.isMobile) {

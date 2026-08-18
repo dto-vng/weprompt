@@ -39,6 +39,14 @@ describe('C-01 files pane wiring', () => {
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'preview'\}/);
   });
 
+  it('reveals the Preview tab when a preview opens', () => {
+    // Without this the file opens into a hidden tab and the click looks inert — exactly how
+    // it was reported ("I cannot open a file from there"). PreviewContext dispatches
+    // WORKSPACE_EXPAND_EVENT on every openPreview as an explicit "show me this".
+    expect(CHAT_LAYOUT).toMatch(/WORKSPACE_EXPAND_EVENT/);
+    expect(CHAT_LAYOUT).toMatch(/const revealPreview = \(\) => setArtifactPaneView\('preview'\)/);
+  });
+
   it('provides the pane container to the Workspace', () => {
     expect(CHAT_LAYOUT).toMatch(
       /<WorkspaceFilesPaneProvider activeView=\{artifactPaneView\} containers=\{panePortalTargets\}>/
