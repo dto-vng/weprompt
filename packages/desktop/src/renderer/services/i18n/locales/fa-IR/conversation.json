@@ -516,6 +516,7 @@
     "changes": {
       "tab": "تغییرات",
       "filesTab": "فایل‌ها",
+      "previewTab": "پیش‌نمایش",
       "currentBranchLabel": "شاخه فعلی",
       "summary": "{{count}} فایل تغییر کرد",
       "insertions": "+{{count}} افزودن",

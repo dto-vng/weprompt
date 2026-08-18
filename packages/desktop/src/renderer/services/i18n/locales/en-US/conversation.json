@@ -516,6 +516,7 @@
     "changes": {
       "tab": "Changes",
       "filesTab": "Files",
+      "previewTab": "Preview",
       "currentBranchLabel": "Current branch",
       "summary": "{{count}} file(s) changed",
       "insertions": "+{{count}} insertions",

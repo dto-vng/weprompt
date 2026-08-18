@@ -15,11 +15,12 @@ import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspa
 import classNames from 'classnames';
 import { isMacEnvironment, isWindowsEnvironment } from '@/renderer/pages/conversation/utils/detectPlatform';
 import { calcLayoutMetrics } from '@/renderer/pages/conversation/utils/layoutCalc';
-import { Layout as ArcoLayout } from '@arco-design/web-react';
+import { Button, Layout as ArcoLayout } from '@arco-design/web-react';
 import { ExpandLeft, ExpandRight } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { WorkspaceFilesPaneProvider } from '@/renderer/pages/conversation/Workspace/filesPaneContext';
 import './chat-layout.css';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
@@ -147,6 +148,11 @@ const ChatLayout: React.FC<{
     setArtifactCollapsed,
   });
 
+  // C-01: the right pane shows either the workspace file tree or the artifact preview.
+  // Both stay mounted and are toggled by visibility, so switching tabs never discards
+  // preview state or re-fetches the tree.
+  const [artifactPaneView, setArtifactPaneView] = useState<'files' | 'preview'>('preview');
+  const [filesPaneEl, setFilesPaneEl] = useState<HTMLElement | null>(null);
   const [mobileActionsSlot, setMobileActionsSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!layout?.isMobile) {
@@ -227,6 +233,7 @@ const ChatLayout: React.FC<{
         // fontFamily: `cursive,"anthropicSans","anthropicSans Fallback",system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif`,
       }}
     >
+      <WorkspaceFilesPaneProvider container={filesPaneEl}>
       <div ref={containerRef} className='flex flex-1 relative w-full overflow-hidden'>
         {workspaceEnabled && workspacePresentation === 'project-menu' && (
           <div className='workspace-project-controller'>{props.sider}</div>
@@ -307,7 +314,42 @@ const ChatLayout: React.FC<{
             }}
           >
             {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
-            <div className='flex-1 min-h-0 overflow-hidden'>
+            {/*
+              C-01: the pane carries both the workspace file tree and the artifact preview.
+              Both stay mounted and are toggled with `hidden`, so switching tabs neither
+              discards preview state nor remounts the tree. The tree itself is portalled in
+              by the single Workspace instance (see filesPaneContext) rather than built here,
+              which is why this is an empty container.
+            */}
+            <div className='shrink-0 flex items-center gap-2px px-10px pt-8px' role='tablist'>
+              {(['files', 'preview'] as const).map((view) => (
+                <Button
+                  key={view}
+                  type='text'
+                  size='small'
+                  role='tab'
+                  aria-selected={artifactPaneView === view}
+                  data-testid={`artifact-pane-tab-${view}`}
+                  className={classNames(
+                    '!rounded-6px',
+                    artifactPaneView === view ? '!bg-fill-3 !text-t-primary' : '!text-t-secondary'
+                  )}
+                  onClick={() => setArtifactPaneView(view)}
+                >
+                  {view === 'files'
+                    ? t('conversation.workspace.changes.filesTab')
+                    : t('conversation.workspace.changes.previewTab')}
+                </Button>
+              ))}
+            </div>
+            <div
+              className='flex-1 min-h-0 overflow-hidden'
+              data-testid='artifact-pane-files'
+              hidden={artifactPaneView !== 'files'}
+            >
+              <div ref={setFilesPaneEl} className='h-full overflow-hidden' />
+            </div>
+            <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
               <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPane} />
             </div>
           </div>
@@ -338,6 +380,7 @@ const ChatLayout: React.FC<{
           <DesktopWorkspaceToggle />
         )}
       </div>
+      </WorkspaceFilesPaneProvider>
     </ArcoLayout>
   );
 };

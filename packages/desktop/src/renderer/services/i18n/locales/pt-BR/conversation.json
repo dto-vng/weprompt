@@ -522,6 +522,7 @@
     "changes": {
       "tab": "Alterações",
       "filesTab": "Arquivos",
+      "previewTab": "Visualização",
       "currentBranchLabel": "Branch atual",
       "summary": "{{count}} arquivo(s) alterado(s)",
       "insertions": "+{{count}} adições",

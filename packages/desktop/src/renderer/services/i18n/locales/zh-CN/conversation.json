@@ -516,6 +516,7 @@
     "changes": {
       "tab": "变更",
       "filesTab": "文件",
+      "previewTab": "预览",
       "currentBranchLabel": "当前分支",
       "summary": "{{count}} 个文件已变更",
       "insertions": "+{{count}} 行新增",

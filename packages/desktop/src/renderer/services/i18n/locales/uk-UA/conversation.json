@@ -516,6 +516,7 @@
     "changes": {
       "tab": "Зміни",
       "filesTab": "Файли",
+      "previewTab": "Попередній перегляд",
       "currentBranchLabel": "Поточна гілка",
       "summary": "{{count}} файл(ів) змінено",
       "insertions": "+{{count}} додано",

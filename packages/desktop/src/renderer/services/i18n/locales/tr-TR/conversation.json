@@ -500,6 +500,7 @@
     "changes": {
       "tab": "Değişiklikler",
       "filesTab": "Dosyalar",
+      "previewTab": "Önizleme",
       "currentBranchLabel": "Geçerli dal",
       "summary": "{{count}} dosya değiştirildi",
       "insertions": "+{{count}} ekleme",

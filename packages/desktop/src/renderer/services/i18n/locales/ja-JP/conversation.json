@@ -516,6 +516,7 @@
     "changes": {
       "tab": "変更",
       "filesTab": "ファイル",
+      "previewTab": "プレビュー",
       "currentBranchLabel": "現在のブランチ",
       "summary": "{{count}} 個のファイルが変更されました",
       "insertions": "+{{count}} 行追加",

@@ -25,6 +25,7 @@ import { Message } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useWorkspaceFilesPane } from './filesPaneContext';
 import { useNavigate } from 'react-router-dom';
 import FileChangeList from './components/FileChangeList';
 import PasteConfirmModal from './components/PasteConfirmModal';
@@ -80,6 +81,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { openPreview } = usePreviewContext();
+  const { container: filesPaneContainer } = useWorkspaceFilesPane();
   const conversationContext = useConversationContextSafe();
   const loadedSkills = conversationContext?.loadedSkills ?? [];
   const loadedMcpStatuses =
@@ -545,9 +547,17 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
     />
   );
 
+  // C-01: the file tree also appears in ChatLayout's right pane, alongside the Project
+  // flyout rather than instead of it. Portalling the SAME `filesPanel` keeps one source of
+  // truth — expansion, selection and file operations all stay owned by this instance, so
+  // the two surfaces can never disagree. `filesPanel` is presentational, so rendering it
+  // twice is safe.
+  const filesPanePortal = filesPaneContainer ? createPortal(filesPanel, filesPaneContainer) : null;
+
   return (
     <>
       {shouldRenderLocalMessageContext && messageContext}
+      {filesPanePortal}
       <div
         className='chat-workspace size-full flex flex-col relative'
         tabIndex={0}

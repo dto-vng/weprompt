@@ -694,6 +694,44 @@ rest-vs-hover measurement separated them. Reading a colour off a screenshot cann
 resting fill from a hover; a `mouseMoved`-then-read pass can.
 
 
+### C-01 implemented — flyout kept, file tree added to the pane — but NOT behaviourally verified
+
+**Decision (2026-08-18, revised):** keep the Project flyout **and** bring the file tree back, per the
+reporter. This supersedes DC-1 and DC-5, which assumed the flyout would be replaced.
+
+**Shape, chosen after measuring the alternatives.** The right pane is not artifact-triggered —
+`artifactVisible = workspaceEnabled && isDesktop && !artifactCollapsed` — so it is a permanent column
+already holding `PreviewPanel`. The tree therefore shares it behind a **Files / Preview** tab pair,
+with both views kept mounted and toggled via `hidden` so switching neither discards preview state nor
+remounts the tree.
+
+**Why a portal rather than a second tree.** The tree's state, event wiring and file operations all
+live in one `Workspace` instance (`useWorkspaceTree`, `useWorkspaceFileOps`, plus the modals and
+message API the latter requires). A standalone pane would have had to reproduce nearly all of
+`Workspace/index.tsx`, and the two copies could then disagree about expansion and selection.
+`filesPanel` is presentational, so the same element is rendered in both the flyout and the pane via
+`createPortal` — one source of truth. `filesPaneContext.tsx` carries the container.
+
+**i18n:** one new key, `conversation.workspace.changes.previewTab`, added to all 12 locales with
+`i18n-keys.d.ts` regenerated. `conversation.workspace.contextMenu.preview` was **not** reused: it is
+a context-menu *action* and reads as a verb phrase in several locales, which is the documented
+four-keys-say-"Report Issue" trap in this repo. `changes.filesTab` *was* reused because it is already
+a tab label.
+
+**⚠ NOT VERIFIED — this is the honest state.** The tabs were never observed rendering. The artifact
+pane **defaults to collapsed** (`useWorkspaceCollapse` starts `true`), and on macOS neither expand
+control renders: `DesktopWorkspaceToggle` is gated `!isMacRuntime && !isWindowsRuntime`, and the
+header toggle is `isWindowsRuntime` only. The documented reachable path is that *opening a preview
+force-expands the pane*, which needs a real file click; the attempt to drive that collided with the
+user working in the same app. So: typecheck clean, i18n gate green, wiring guarded by tests — and
+zero behavioural evidence. **Do not report C-01 as working until someone opens the pane and sees the
+tabs.**
+
+**Possible separate finding:** if the only way to expand that pane on macOS is to open a file
+preview, there may be no direct control for it at all on this platform. Worth its own item rather
+than being folded into C-01.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
