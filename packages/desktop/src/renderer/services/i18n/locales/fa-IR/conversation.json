@@ -517,6 +517,7 @@
       "tab": "تغییرات",
       "filesTab": "فایل‌ها",
       "previewTab": "پیش‌نمایش",
+      "browserTab": "مرورگر",
       "currentBranchLabel": "شاخه فعلی",
       "summary": "{{count}} فایل تغییر کرد",
       "insertions": "+{{count}} افزودن",

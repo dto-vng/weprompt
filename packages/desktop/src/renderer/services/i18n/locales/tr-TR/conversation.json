@@ -501,6 +501,7 @@
       "tab": "Değişiklikler",
       "filesTab": "Dosyalar",
       "previewTab": "Önizleme",
+      "browserTab": "Tarayıcı",
       "currentBranchLabel": "Geçerli dal",
       "summary": "{{count}} dosya değiştirildi",
       "insertions": "+{{count}} ekleme",

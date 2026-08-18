@@ -24,8 +24,23 @@ import {
   WorkspaceFilesPaneProvider,
   type WorkspacePaneView,
 } from '@/renderer/pages/conversation/Workspace/filesPaneContext';
+import WebviewHost from '@/renderer/components/media/WebviewHost';
 import WorkspaceOpenButton from './WorkspaceOpenButton';
 import './chat-layout.css';
+
+const PANE_TAB_LABEL_KEYS = {
+  files: 'conversation.workspace.changes.filesTab',
+  changes: 'conversation.workspace.changes.tab',
+  preview: 'conversation.workspace.changes.previewTab',
+  browser: 'conversation.workspace.changes.browserTab',
+} as const;
+
+/**
+ * Where the in-pane browser starts. Deliberately blank: picking a homepage or a search provider
+ * is a product decision (and a privacy one), not something to default silently. The URL bar is
+ * live from the first paint, so a blank start costs the user one keystroke and nothing else.
+ */
+const BROWSER_START_URL = 'about:blank';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
 const ChatLayout: React.FC<{
@@ -166,6 +181,10 @@ const ChatLayout: React.FC<{
   const [artifactPaneView, setArtifactPaneView] = useState<WorkspacePaneView>('files');
   const [filesPaneEl, setFilesPaneEl] = useState<HTMLElement | null>(null);
   const [changesPaneEl, setChangesPaneEl] = useState<HTMLElement | null>(null);
+  const browserOpenedRef = React.useRef(false);
+  // Don't pay for a webview until the user actually asks for the browser.
+  const browserEverOpened = artifactPaneView === 'browser' || browserOpenedRef.current;
+  if (artifactPaneView === 'browser') browserOpenedRef.current = true;
   const artifactPaneViewRef = React.useRef(artifactPaneView);
   artifactPaneViewRef.current = artifactPaneView;
   const panePortalTargets = React.useMemo(
@@ -358,7 +377,7 @@ const ChatLayout: React.FC<{
             */}
             <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
               <div className='flex items-center gap-2px' role='tablist'>
-              {(['files', 'changes', 'preview'] as const).map((view) => (
+              {(['files', 'changes', 'preview', 'browser'] as const).map((view) => (
                 <Button
                   key={view}
                   type='text'
@@ -375,11 +394,7 @@ const ChatLayout: React.FC<{
                   )}
                   onClick={() => setArtifactPaneView(view)}
                 >
-                  {view === 'files'
-                    ? t('conversation.workspace.changes.filesTab')
-                    : view === 'changes'
-                      ? t('conversation.workspace.changes.tab')
-                      : t('conversation.workspace.changes.previewTab')}
+                  {PANE_TAB_LABEL_KEYS[view] ? t(PANE_TAB_LABEL_KEYS[view]) : view}
                 </Button>
               ))}
               </div>
@@ -424,6 +439,26 @@ const ChatLayout: React.FC<{
             <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
               <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />
             </div>
+            {/*
+              Mounted only once the user first opens it, then kept alive so navigation history and
+              any session survive tab switches. A persistent partition keeps logins across restarts
+              and separate from the extension webviews.
+            */}
+            {browserEverOpened && (
+              <div
+                className='flex-1 min-h-0 overflow-hidden'
+                data-testid='artifact-pane-browser'
+                hidden={artifactPaneView !== 'browser'}
+              >
+                <WebviewHost
+                  url={BROWSER_START_URL}
+                  id='workspace-pane-browser'
+                  showNavBar
+                  partition='persist:workspace-pane-browser'
+                  className='h-full'
+                />
+              </div>
+            )}
           </div>
         )}
 

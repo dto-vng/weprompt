@@ -517,6 +517,7 @@
       "tab": "Änderungen",
       "filesTab": "Dateien",
       "previewTab": "Vorschau",
+      "browserTab": "Browser",
       "currentBranchLabel": "Aktueller Branch",
       "summary": "{{count}} Datei(en) geändert",
       "insertions": "+{{count}} Einfügungen",

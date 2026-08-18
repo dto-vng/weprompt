@@ -517,6 +517,7 @@
       "tab": "變更",
       "filesTab": "檔案",
       "previewTab": "預覽",
+      "browserTab": "瀏覽器",
       "currentBranchLabel": "目前分支",
       "summary": "{{count}} 個檔案已變更",
       "insertions": "+{{count}} 行新增",

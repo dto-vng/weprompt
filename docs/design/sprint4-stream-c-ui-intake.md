@@ -490,6 +490,34 @@ live verification in the running app.
   tab row would fix both and remains unbuilt.
 
 
+### C-24 — A general in-pane browser with a URL bar
+
+- **Asked for:** the Browser entry the upstream pane has (reporter's phone photo of the upstream app
+  showed `VS Code / Terminal / File Explorer / ─── Browser ✓`), specified as "general in-pane browser
+  with a URL bar".
+- **Nothing new was written for the browser itself.** `components/media/WebviewHost.tsx` already
+  provides a URL input, back/forward, reload and Escape-to-reset, behind a `showNavBar` prop, and is
+  the same component the extension-settings pages mount. This item is a tab plus a mount.
+- **Decisions taken here, both worth knowing:**
+  - **Starts at `about:blank`.** Defaulting a homepage or a search provider is a product and privacy
+    decision, not something to pick silently. The URL bar is live from first paint.
+  - **Lazily mounted, then kept alive.** No webview is created until the browser is first opened;
+    after that it persists across tab switches so history and session survive. `partition:
+    persist:workspace-pane-browser` keeps logins across restarts and separate from the extension
+    webviews.
+- **i18n:** `conversation.workspace.changes.browserTab` added to all 12 locales, types regenerated,
+  gate green.
+- **Verified live:** four tabs render (`Files | Changes | Preview | Browser`); opening Browser mounts
+  a real `<webview>` with a URL `<input>` reading `about:blank`.
+- **⚠ NOT verified: actually navigating.** A synthetic Enter on the URL input updated the field but
+  left `webview.getURL()` at `about:blank`. That is most likely the harness failing to drive the
+  component's submit path — `WebviewHost` navigation is pre-existing and exercised by extension
+  settings — but it was not demonstrated here. **One real keystroke settles it.**
+- **Note on "browse upstream":** no upstream remote is configured in this checkout (only the two
+  forks, `ghk` and `origin`), so upstream source could not be consulted. It was not needed — the
+  capability already existed locally.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
