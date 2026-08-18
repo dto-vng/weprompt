@@ -547,6 +547,28 @@ the same `absolute right-8px` strip and measured the same 241. Both are fixed; l
 have left the sider half-aligned.
 
 
+### C-07 fixed — the constraint was missing, not the truncation
+
+Every card now measures exactly **160px** (`uniqueWrapWidths: [160]`), against 281px and 417px
+before. The two long names report `nameClipped: true`; short names report `false`.
+
+**The caption already had `truncate`.** It could never engage: the card's wrapper was
+`flex flex-col shrink-0` with **no width**, so it sized itself to the caption instead of the other
+way round. Truncation has nothing to truncate against until the wrapper is bounded. Two changes:
+
+- The wrapper now carries the same `CARD_W` the thumbnail uses, hoisted into one constant so the
+  two cannot drift apart — the drift is the bug.
+- `TEMPLATE_NAME` gained `min-w-0`, without which `truncate` is inert inside a flex row.
+
+**This confirms the intake correction and refutes the original entry.** C-07 was reported and
+recorded as a truncation/overflow problem; it is a sizing problem, and an ellipsis-only fix would
+have changed nothing.
+
+**Not a bug, for the record:** the partially visible card at the row's right edge is the horizontal
+scroller working as designed (`overflow-x-auto snap-x`), signalling more content. That is distinct
+from the original defect, where the card's *size* was wrong.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
