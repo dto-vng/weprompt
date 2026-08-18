@@ -509,10 +509,11 @@ live verification in the running app.
   gate green.
 - **Verified live:** four tabs render (`Files | Changes | Preview | Browser`); opening Browser mounts
   a real `<webview>` with a URL `<input>` reading `about:blank`.
-- **⚠ NOT verified: actually navigating.** A synthetic Enter on the URL input updated the field but
-  left `webview.getURL()` at `about:blank`. That is most likely the harness failing to drive the
-  component's submit path — `WebviewHost` navigation is pre-existing and exercised by extension
-  settings — but it was not demonstrated here. **One real keystroke settles it.**
+- **Navigation VERIFIED by the reporter 2026-08-18** — "I tried, the browser works". The earlier
+  failure was the harness, not the feature: a synthetic Enter updated the field but left
+  `webview.getURL()` at `about:blank`, while a real keystroke navigates. Recorded because it is the
+  second time in this stream that a synthetic-event probe produced a false negative (the first was
+  C-19's toggle), and both times a single human interaction resolved it faster than further probing.
 - **Note on "browse upstream":** no upstream remote is configured in this checkout (only the two
   forks, `ghk` and `origin`), so upstream source could not be consulted. It was not needed — the
   capability already existed locally.
