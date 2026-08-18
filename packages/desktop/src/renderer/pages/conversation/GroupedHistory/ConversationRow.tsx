@@ -347,7 +347,10 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
         {!batchMode && (
           <div
             className={classNames(
-              'absolute right-8px top-1/2 -translate-y-1/2 items-center justify-end !collapsed-hidden',
+              // right-12px matches the sider section labels' `pr-12px`, putting these row
+              // actions on the same vertical line as the Teams/Projects/Chats `+`. At 8px
+              // they sat 5px further right — the same defect as the project row above.
+              'absolute right-12px top-1/2 -translate-y-1/2 items-center justify-end !collapsed-hidden',
               {
                 flex: isMobile || menuVisible,
                 'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,
@@ -426,7 +429,10 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
               <span
                 data-testid={`conversation-row-menu-${conversation.id}`}
                 className={classNames(
-                  'flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-20px rd-4px sider-action-btn',
+                  // size-22px, matching the sider section-label '+' buttons: a 14px icon in a
+                  // 20px box centres 3px from the edge instead of 4px, leaving the icons 1px
+                  // apart even with the containers aligned.
+                  'flex-center cursor-pointer transition-colors text-t-secondary hover:text-t-primary size-22px rd-4px sider-action-btn',
                   {
                     flex: isMobile || menuVisible,
                     'hidden group-hover:flex group-focus-within:flex': !isMobile && !menuVisible,

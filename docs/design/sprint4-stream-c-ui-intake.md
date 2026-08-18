@@ -526,6 +526,27 @@ conversation and measuring the pane. Third time in this stream that a green stat
 a completely non-functional change (see also C-05's uncompiled utility and C-08's flush icon).
 
 
+### C-12 fixed — two independent causes, both measured
+
+Every rightmost trailing icon in the sider now sits at **right=236**, verified by hovering each row
+in turn: `Teams` 236, `Projects` 236, project row 236, `Chats` 236, conversation row 236.
+
+**Cause 1 — the container inset.** The row action strips are **absolutely positioned**
+(`absolute right-8px`), so they ignore the row's padding entirely and set their own inset. The
+section labels use `pr-12px`. That 4px difference is most of the gap. This also means the intake
+doc's earlier guess — and my first fix attempt, changing `WorkspaceCollapse`'s `pr-8px` to
+`pr-12px` — were both wrong: the padding is not what positions these icons, and that edit did
+nothing at all. Reverted.
+
+**Cause 2 — the button size.** With the insets aligned the icons were still **1px** apart: a 14px
+icon centres 3px from the edge of a 20px button but 4px from a 22px one, and the section `+` uses
+22px. Row action buttons are now 22px too.
+
+**Scope grew by measurement.** C-12 was reported against the project row, but conversation rows use
+the same `absolute right-8px` strip and measured the same 241. Both are fixed; leaving one would
+have left the sider half-aligned.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
