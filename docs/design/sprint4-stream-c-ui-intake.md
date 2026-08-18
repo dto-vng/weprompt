@@ -779,7 +779,13 @@ a context-menu *action* and reads as a verb phrase in several locales, which is 
 four-keys-say-"Report Issue" trap in this repo. `changes.filesTab` *was* reused because it is already
 a tab label.
 
-**⚠ NOT VERIFIED — this is the honest state.** The tabs were never observed rendering. The artifact
+**VERIFIED 2026-08-18** by the reporter's own screenshot: the Files / Preview tabs render in the
+right pane, the Project flyout is still present, and opening `reference-notes.md` shows the preview
+with its Source / Split / Preview controls. The caveat below is retained for the record of how it was
+built, but C-01's wiring is confirmed working.
+
+**⚠ Was NOT verified at commit time — this was the honest state then.** The tabs were never observed
+rendering during implementation. The artifact
 pane **defaults to collapsed** (`useWorkspaceCollapse` starts `true`), and on macOS neither expand
 control renders: `DesktopWorkspaceToggle` is gated `!isMacRuntime && !isWindowsRuntime`, and the
 header toggle is `isWindowsRuntime` only. The documented reachable path is that *opening a preview
