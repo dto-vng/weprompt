@@ -163,6 +163,57 @@ vendor documentation or a properly powered comparison. If it turns out to be ign
 answer is to advertise the control only for providers with evidence, which is what the epic's
 capability-driven design was always for.
 
+## 6b. Vendor docs settle it — and the design was wrong
+
+`platform.moonshot.ai/docs/api/chat` (redirects to `platform.kimi.ai`), read 2026-08-18:
+
+| Model          | Reasoning knob                 | Values                                             |
+| -------------- | ------------------------------ | -------------------------------------------------- |
+| **kimi-k3**    | `reasoning_effort` (top level) | `low` \| `high` \| `max` (default `max`)           |
+| **kimi-k2.6**  | `thinking` **object**          | `type: "enabled"\|"disabled"`, `keep: "all"\|null` |
+| kimi-k2.7-code | `thinking` object              | `type` must be `"enabled"`                         |
+| kimi-k2.5      | `thinking` object              | `type: "enabled"\|"disabled"`                      |
+| moonshot-v1    | none documented                | —                                                  |
+
+So `reasoning_effort` **is** real at Moonshot — but only for **k3**. On **k2.6**, the model 34 of 34 real
+conversations use, it is simply an unknown field, which is exactly what the probe measured. The
+`["low","medium","high"]` default in AionRS is wrong twice over: `medium` is not a k3 value, and k2.x
+does not use effort at all.
+
+**The two AionRS compat flags are exactly backwards for Moonshot.** Verified at `shipped-v0.2.6`:
+
+- `projector.rs:205-211` already emits `body["thinking"] = {"type":"enabled"}` / `{"type":"disabled"}` on
+  the OpenAI-shaped path — **precisely the shape Moonshot documents for k2.x**.
+- but `compat.rs:306` — `openai_defaults()` sets `supports_thinking: Some(false)` while `:305-309` sets
+  `supports_effort: Some(true)`.
+
+Net effect: AionRS sends the parameter Moonshot **ignores** and withholds the one it **honours**. The
+"gate is already open" line in §1 is true for `reasoning_effort` and irrelevant, because that gate opens
+onto a field k2.6 discards.
+
+**This is a fail-open in the shipped defaults**, and it vindicates EPIC-003's original charter: capability
+must be established per **exact model**, not per provider family. `supports_effort: true` for the whole
+OpenAI family is precisely the provider-name-shaped assumption the epic was chartered to remove.
+
+### Revised design (supersedes §2's A1)
+
+- **kimi-k2.6 / k2.5 → advertise a thinking on/off control**, mapping to `thinking.type`. It is a
+  **boolean**, not a three-level scale. Any UI offering low/medium/high for k2.6 is fiction.
+- **kimi-k3 → advertise `reasoning_effort`** with `low`/`high`/`max`.
+- Both need a **Moonshot compat override** — `supports_thinking = true`, `supports_effort = false` for
+  k2.x. Good news: `ReasoningCompat` is **user-configurable TOML**, merged as
+  `user.supports_thinking.or(defaults…)` (`compat.rs:215`, round-trip proven in `compat_test.rs:29-30,143-144`).
+  So this remains **configuration, not an AionRS code change** — §1's headline survives, its reasoning
+  does not.
+- AionCore's side changes accordingly: `apply_config_update` takes `thinking` and `thinking_budget`
+  parameters that AionCore currently hardcodes to `None` (`agent.rs:190-191`). The k2.x path calls the
+  **thinking** setter, not the effort one.
+
+**Consequence for the sprint:** the approved "build the five edits and publish a tag" plan would have
+shipped a three-level effort control that does nothing on k2.6. The work is still small and still worth
+doing — but the control's shape, the values it offers, and which setter it calls all change. Re-plan
+before writing code.
+
 ## 7. Still unverified
 
 - Whether Moonshot honours `reasoning_effort` for `kimi-k2.6`/`k2.5`, and with which values (§5.2). No
