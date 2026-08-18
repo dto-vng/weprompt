@@ -222,7 +222,13 @@ const ChatLayout: React.FC<{
       </FlexFullContainer>
       <div className='flex items-center gap-12px shrink-0'>
         {props.headerExtra}
-        {isWindowsRuntime && workspaceEnabled && (
+        {/*
+          Renders on Windows AND macOS. DesktopWorkspaceToggle covers the remaining case
+          (`!isMac && !isWindows`, i.e. Linux), so between the two every platform has exactly
+          one control. macOS previously fell through BOTH gates and had no way to open the
+          pane at all except by opening a file, which force-expands it as a side effect.
+        */}
+        {(isWindowsRuntime || isMacRuntime) && workspaceEnabled && (
           <button
             type='button'
             className='workspace-header__toggle'

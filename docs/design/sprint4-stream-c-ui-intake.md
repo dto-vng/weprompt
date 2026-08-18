@@ -389,6 +389,31 @@ live verification in the running app.
   own look.
 
 
+### C-19 — macOS has no control to open the right pane
+
+- **Surface:** the chat header. Reported as "i need a button to toggle on the files/preview panel".
+- **Actual:** on macOS there is **no** control at all. Two complementary gates fail to cover it:
+  the header toggle renders only when `isWindowsRuntime`, and `DesktopWorkspaceToggle` renders only
+  when `!isMacRuntime && !isWindowsRuntime` (Linux). macOS falls through both, so the only way to
+  open the pane is to open a file, which force-expands it as a side effect.
+- **This is the follow-up predicted while building C-01**, where the same gap blocked verification.
+- **Changed:** the header toggle now renders on macOS as well as Windows, so each platform has
+  exactly one control. Verified rendering: `aria-label="Toggle project panel"` present on a
+  conversation route, and clicking it dispatches `WORKSPACE_TOGGLE_EVENT` (confirmed with an
+  instrumented listener).
+- **⚠ UNRESOLVED — the pane does not open from it.** Clicking the button, and dispatching the toggle
+  and expand events directly, all leave the pane unrendered, while **opening a file does** open it.
+  So `artifactVisible` stays false even though `workspace-preference-<id>` reads `expanded`.
+  Ruled out: not mobile (viewport 1512, no mobile overlay, chat pane on the desktop path);
+  `workspaceEnabled` is true (the flyout depends on it and renders); the render condition is intact;
+  and `handleHasFiles` is **not** fighting it — it early-returns when `autoExpandOnWorkspaceFiles` is
+  false, which is the case in `project-menu` presentation.
+- **Next step, cheap:** have a human click it once. Every observation here came from synthetic clicks
+  on a route this session navigated to programmatically, and the pane may simply have been remounting.
+  If it works for a real user, this is closed; if not, the collapse state's owner needs tracing with a
+  React devtools read rather than DOM probing.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
