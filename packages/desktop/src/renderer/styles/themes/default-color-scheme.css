@@ -96,7 +96,7 @@
   --fill-0: #ffffff; /* 填充色 0 */
   --fill-white-to-black: #ffffff; /* 白到黑填充色 */
   --border-special: var(--bg-3); /* 特殊边框色 */
-  --color-guid-agent-bar: #f0e9db; /* 首页 Agent 选择条背景 — warm cream */
+  --color-guid-agent-bar: #faf6ee; /* 首页 Agent 选择条背景 — matches the composer surface (C-13) */
 
   /* Document Surface - Light Mode
      The artifact editor/preview body reads as a white "page" sitting inside the
