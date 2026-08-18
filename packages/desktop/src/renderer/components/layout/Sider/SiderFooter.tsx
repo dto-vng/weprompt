@@ -54,7 +54,7 @@ const SiderFooter: React.FC<SiderFooterProps> = ({
       style={{ lineHeight: 0 }}
     />
   );
-  const showThemeToggle = isSettings && !collapsed;
+  const showThemeToggle = !collapsed;
   const themeTooltip = theme === 'dark' ? t('settings.lightMode') : t('settings.darkMode');
   const settingsLabel = isSettings ? t('common.back') : t('common.settings');
 
@@ -88,7 +88,8 @@ const SiderFooter: React.FC<SiderFooterProps> = ({
             />
           </Tooltip>
         )}
-        {/* Theme toggle — lightweight icon button, only while inside Settings page (not in collapsed mode) */}
+        {/* Theme toggle — lightweight icon button, beside Settings on every screen.
+            Hidden only in collapsed mode, where the rail has no room for a second control. */}
         {showThemeToggle && (
           <Tooltip {...siderTooltipProps} content={themeTooltip} position='right'>
             <Button
