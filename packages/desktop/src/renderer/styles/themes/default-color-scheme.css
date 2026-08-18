@@ -32,6 +32,13 @@
      Dark keeps --bg-3, where that tone is the raised surface, not the heaviest one —
      swapping the token outright would have flattened the chip against the page. */
   --md-inline-code-bg: #f0e9db;
+  /* Text-input surface + hairline (C-17). A pair, because a fill alone cannot work in
+     both themes: light wants a shade *lighter* than Arco's --color-fill-2, while dark
+     needs one *raised above* the page — the light value (--bg-base) is the page itself in
+     dark, which made the field invisible. The border is what guarantees the field reads as
+     a field in either theme, independently of how close the fill sits to the page. */
+  --input-surface: #faf6ee;
+  --input-border: #d8cbb6;
   --bg-artifact-surface: #fffdf9;
   --studio-page-background: #e9e3d6;
   --studio-slate-surface: #f0eadd;
@@ -136,6 +143,8 @@
   --bg-3: #1e2536; /* cards / raised surface / 边框分隔 */
   --bg-chat-surface: var(--bg-base);
   --md-inline-code-bg: var(--bg-3); /* raised, not heaviest, in dark — keep as-is */
+  --input-surface: #161c27; /* raised above the #0b0e14 page, unlike --bg-base */
+  --input-border: #2a3344;
   --bg-artifact-surface: var(--bg-1);
   --studio-page-background: var(--bg-base);
   --studio-slate-surface: var(--color-fill-2);

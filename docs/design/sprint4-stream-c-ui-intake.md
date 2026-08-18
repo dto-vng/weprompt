@@ -341,12 +341,26 @@ live verification in the running app.
   surface C-13 settled on. **Scoped to this field deliberately** — `--color-fill-2` is Arco's shared
   fill token and retuning it would repaint every Arco input, select and fill in the app. `!` is
   required because Arco's own selector outranks a bare utility class.
-- **⚠ NOT verified.** The reporter was working in a conversation when this landed and navigating the
-  shared dev instance to Settings → Profile would have interrupted them. Typecheck is clean; the
-  rendered result was not observed.
-- **Risk to check when it is verified:** `#faf6ee` on a `#fffdf9` page is a small difference and the
-  field currently has no border. If it now reads flat rather than like an input, it needs a hairline
-  (`--bg-4`, as C-11 used) rather than a darker fill — reaching back for fill would undo the ask.
+- **First fix was wrong, and dark is why.** Using `--bg-base` lightened light correctly but
+  **`--bg-base` IS the page colour in dark** (`#0b0e14`), so the field became completely invisible
+  there — worse than the reported problem. Reported back by screenshot the same session.
+- **Fixed properly with a token pair plus a border**, at the reporter's instruction ("fix dark mode.
+  Add a border for both light/dark"). `--input-surface` / `--input-border` per theme; dark's surface
+  is deliberately **raised above** its page rather than equal to it. Applied as an inline `style`
+  rather than utilities, for two reasons: it beats Arco's selector without an `!important` fight, and
+  this repo's numeric border utilities set colour but never width, so `border-1` would have produced
+  no border at all.
+- **Verified live in both themes**, with the app's route and theme restored afterwards:
+
+  | theme | fill | border | page behind |
+  | ----- | ---- | ------ | ----------- |
+  | light | `rgb(250,246,238)` | `rgb(216,203,182)` | `rgb(255,253,249)` |
+  | dark  | `rgb(22,28,39)` | `rgb(42,51,68)` | `rgb(11,14,20)` |
+
+- **The predicted risk was real, and it was the one I named.** The intake note said a near-page fill
+  with no border would read flat and would need a hairline rather than a darker fill. That is exactly
+  what happened — in dark it went past flat to invisible. The border is now what carries the field's
+  identity in both themes, so neither fill has to fight its page.
 
 
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)

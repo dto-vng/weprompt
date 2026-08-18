@@ -40,12 +40,17 @@ const ProfileSettings: React.FC = () => {
             onChange={(value) => void setCtx({ enabled, instructions: value })}
             autoSize={{ minRows: 6, maxRows: 16 }}
             /*
-              C-17: Arco fills its textarea with --color-fill-2 (#f0e9db), which reads as a
-              heavy warm block on the near-white settings page. Scoped to this field rather
-              than retuning --color-fill-2, which every Arco fill in the app shares.
-              `!` is required: Arco's own selector outranks a bare utility class.
+              C-17: Arco fills its textarea with --color-fill-2 (#f0e9db), a heavy warm block
+              on the near-white settings page. Scoped to this field rather than retuning
+              --color-fill-2, which every Arco fill in the app shares.
+              Inline style, not a utility class, for two reasons: it beats Arco's own selector
+              without an `!important` fight, and this repo's numeric border utilities set
+              colour but never width, so `border-1` would silently produce no border at all.
             */
-            className='!bg-base'
+            style={{
+              background: 'var(--input-surface)',
+              border: '1px solid var(--input-border)',
+            }}
           />
         </label>
 
