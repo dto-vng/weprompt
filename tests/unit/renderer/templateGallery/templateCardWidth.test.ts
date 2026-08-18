@@ -31,3 +31,21 @@ describe('template card width is independent of its name', () => {
     expect(SRC).toMatch(/const TEMPLATE_NAME = '[^']*truncate[^']*min-w-0'/);
   });
 });
+
+// C-10 — the install button put an icon flush against its label. Arco's button computes
+// display:block with text-align:center, so the `icon` prop's glyph butts against the text
+// and `gap` alone is inert; `flex` is what makes both apply. The same markup produced the
+// same defect on the sider footer (C-08), where it was measured and screenshotted.
+//
+// NOT live-verified on this component: reproducing it needs a template review card, which
+// needs the in-chat creation path to fire, and it did not in this session. The mechanism is
+// proven, this button is not.
+describe('template install button lays its icon out with a gap', () => {
+  it('makes the Arco button a flex container', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateMessageCard.tsx'),
+      'utf8'
+    );
+    expect(src).toMatch(/className='w-fit flex items-center gap-8px'/);
+  });
+});

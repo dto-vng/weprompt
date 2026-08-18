@@ -653,6 +653,26 @@ by itself would have been a regression. Resolved by moving the affordance off co
 DC-2 holds: orange still means a real hyperlink, and nothing else acquired it.
 
 
+### C-10 fixed by mechanism — NOT live-verified
+
+`TemplateMessageCard.tsx` renders an Arco `Button` with an `icon` prop and `className='w-fit'`,
+which is the **same markup that produced the identical defect on the sider footer in C-08**: Arco's
+button computes `display: block` with `text-align: center`, so the glyph butts against the label and
+`gap` is inert until `flex` is added. The fix is the same one-line class change, and C-08's version
+of it was measured and screenshotted.
+
+**What was not done:** the card itself was never seen. Reproducing it needs the in-chat template
+creation path to fire, and two attempts in this session did not produce a card — the directive needs
+particular phrasing and, most likely, an HTML artifact already in context. So this item is fixed on a
+proven mechanism and an unproven surface. It should be re-checked the next time a review card appears
+naturally; until then it must not be reported as verified.
+
+**The reporter's suggested fix — "you can just remove the icon" — was deliberately not taken.** Now
+that the mechanism is known, removing the icon would treat a symptom that recurs on the next Arco
+button anyone builds with one, and it is a content change rather than a layout fix. Say so when
+reporting, and offer removal if the icon is unwanted on its own merits.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
