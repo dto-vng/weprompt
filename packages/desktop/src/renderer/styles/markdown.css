@@ -106,7 +106,7 @@
 
 /* Inline code (not inside a highlighted code block) */
 .aionui-markdown :where(code):not(:where(pre code)) {
-  background: var(--bg-3);
+  background: var(--md-inline-code-bg);
   color: var(--text-primary);
   padding: 2px 6px;
   border-radius: 4px;

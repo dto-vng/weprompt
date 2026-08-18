@@ -606,6 +606,35 @@ repo set colour and never width.
 actions, so this fix did not disturb an existing safety behaviour.
 
 
+### C-02 + C-03 fixed together — and C-02 alone would have shipped a regression
+
+Measured live. Inline code: `rgb(229,220,201)` → **`rgb(240,233,219)`** in light, and
+`rgb(30,37,54)` unchanged in dark. Links: `none` → **`underline`** on hover. File chip: gains a
+**`1px rgb(216,203,182)`** border.
+
+**The renderer duplication is the load-bearing discovery.** Chat replies render inside a **shadow
+root**, so `markdown.css` does not style them at all — `ShadowView.tsx` carries its own near-duplicate
+rules and those are what users see. `markdown.css` writes its copy with `:where()`, which contributes
+**zero specificity**, so even where both are in scope the shadow copy wins. Editing `markdown.css`
+alone changes nothing visible in chat, which cost a full diagnostic cycle here. Two consequences were
+invisible until measured: the chip fill, and the fact that **markdown.css's link-underline rule has
+never applied to chat at all** — chat links had colour and nothing else, which is exactly C-03.
+
+**C-02 created C-03's collision, exactly as intake predicted.** The intake entry warned that
+"whatever lighter shade C-02 lands on must still leave room for C-03's distinction". It did not:
+`.markdown-local-file-link` — the *clickable* chip — already used `--bg-2` `#f0e9db`, and C-02 moved
+inline code onto that same value, making a clickable chip and an inert one identical. Shipping C-02
+by itself would have been a regression. Resolved by moving the affordance off colour entirely:
+
+| element               | fill                | border                  | colour |
+| --------------------- | ------------------- | ----------------------- | ------ |
+| inline code (inert)   | `rgb(240,233,219)`  | none                    | dark   |
+| file chip (clickable) | `rgb(240,233,219)`  | `1px rgb(216,203,182)`  | dark   |
+| hyperlink             | none                | none                    | orange, underline on hover |
+
+DC-2 holds: orange still means a real hyperlink, and nothing else acquired it.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,

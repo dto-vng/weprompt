@@ -27,6 +27,11 @@
   --bg-2: #f0e9db; /* warm cream — panels / cards / 三级背景 */
   --bg-3: #e5dcc9; /* warm hairline border / 边框分隔 */
   --bg-chat-surface: #fffdf9;
+  /* Inline-code chip fill. Light: one step lighter than the --bg-3 it used to borrow,
+     which is the hairline-BORDER tone and read as a heavy block in dense tables (C-02).
+     Dark keeps --bg-3, where that tone is the raised surface, not the heaviest one —
+     swapping the token outright would have flattened the chip against the page. */
+  --md-inline-code-bg: #f0e9db;
   --bg-artifact-surface: #fffdf9;
   --studio-page-background: #e9e3d6;
   --studio-slate-surface: #f0eadd;
@@ -130,6 +135,7 @@
   --bg-2: #161c27; /* 三级背景 */
   --bg-3: #1e2536; /* cards / raised surface / 边框分隔 */
   --bg-chat-surface: var(--bg-base);
+  --md-inline-code-bg: var(--bg-3); /* raised, not heaviest, in dark — keep as-is */
   --bg-artifact-surface: var(--bg-1);
   --studio-page-background: var(--bg-base);
   --studio-slate-surface: var(--color-fill-2);
