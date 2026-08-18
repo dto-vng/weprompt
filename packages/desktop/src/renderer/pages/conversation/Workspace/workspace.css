@@ -369,6 +369,17 @@
 .workspace-section-scroll {
   max-height: min(420px, calc(100vh - 150px));
   overflow-y: auto;
+  /* Must be stated explicitly. Per spec, when one axis is not `visible` the other computes
+     from `visible` to `auto` — so `overflow-y: auto` alone silently enables a HORIZONTAL
+     scrollbar, and any 1px of overflow then draws a grey bar across the panel. */
+  overflow-x: hidden;
+}
+
+/* Portalled into the artifact pane rather than the flyout popover. The 420px cap above is
+   sized for that popover and leaves the panel stranded in the much taller pane. */
+.workspace-pane-section .workspace-section-scroll {
+  max-height: none;
+  height: 100%;
 }
 
 @keyframes workspace-project-menu-in {

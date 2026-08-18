@@ -425,6 +425,29 @@ live verification in the running app.
   React devtools read rather than DOM probing.
 
 
+### C-20 — A grey horizontal line crosses the Changes panel
+
+- **Surface:** the right pane's Changes tab, under the "No changes yet" empty state. Screenshot
+  supplied 2026-08-18; reported as "what is the horizontal line".
+- **What it was:** a **horizontal scrollbar**, not a divider or a border.
+- **Cause — a CSS-spec detail.** `.workspace-section-scroll` declared only
+  `overflow-y: auto`. Per spec, when one overflow axis is not `visible`, the other computes from
+  `visible` to **`auto`** — so horizontal scrolling was silently enabled, and any 1px of overflow
+  drew a bar across the panel. Nothing in the rule mentions the x axis, which is exactly why it is
+  easy to miss by reading.
+- **Second defect found in the same rule.** `max-height: min(420px, calc(100vh - 150px))` is sized
+  for the narrow flyout popover. Portalled into the pane it left the panel **124px tall inside an
+  808px slot**, which is why the empty state floated with dead space beneath it — the line marked the
+  bottom of the capped scroller, not the bottom of the pane.
+- **Fixed:** `overflow-x: hidden` stated explicitly on the shared rule, and a
+  `.workspace-pane-section` override releasing the cap for the pane only, so the flyout keeps its
+  popover sizing.
+- **Verified:** `overflow-x: hidden`, `max-height: none`, scroller height 808 matching the slot.
+- **Note:** content is still marginally wider than the container, so it now clips instead of
+  scrolling. That matches the flyout's behaviour and is not the reported defect, but it means
+  something inside is slightly over-wide and could be worth its own look.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

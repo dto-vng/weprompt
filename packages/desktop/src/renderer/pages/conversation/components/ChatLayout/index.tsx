@@ -392,14 +392,14 @@ const ChatLayout: React.FC<{
               data-testid='artifact-pane-files'
               hidden={artifactPaneView !== 'files'}
             >
-              <div ref={setFilesPaneEl} className='h-full overflow-hidden' />
+              <div ref={setFilesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
             </div>
             <div
               className='flex-1 min-h-0 overflow-hidden'
               data-testid='artifact-pane-changes'
               hidden={artifactPaneView !== 'changes'}
             >
-              <div ref={setChangesPaneEl} className='h-full overflow-hidden' />
+              <div ref={setChangesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
             </div>
             <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
               <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />
