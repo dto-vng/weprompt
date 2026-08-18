@@ -310,6 +310,24 @@ live verification in the running app.
   the *brand* colour here — in which case removing it from links is a broader identity decision that
   should be made deliberately, not per-screen.
 
+### C-16 — The settings page header renders as a warm band on the lighter page
+
+- **Surface:** settings pages — measured on `#/settings/agent`. The sticky header block holding the
+  title, search, primary action, description and tabs. Screenshot supplied 2026-08-18.
+- **Actual:** the block painted `rgb(246,240,228)` (`--bg-1`) while the content plane beneath it was
+  `rgb(255,253,249)`, so the header read as a distinct warm band floating on the page.
+- **Expected:** it should not read as a separate band.
+- **Kind:** polish — same family as C-04 and C-13.
+- **Reported:** by screenshot mid-session, after C-04 landed. Note C-04 is what *created* the
+  mismatch: lightening the content plane left this header on its old tone.
+- **Fixed the same session.** `SettingsPageHeader.tsx:61` now uses `bg-chat-surface`. Verified live:
+  band and plane both `rgb(255,253,249)` in light and both `rgb(11,14,20)` in dark.
+- **The fill could not simply be removed.** The component's own comment records that the background
+  exists to mask content scrolling underneath in `sticky` mode, and that non-sticky callers
+  deliberately have none. So the fix is to make the mask *match the page it masks*, not to drop it —
+  the known `SettingsPageHeader` bg/`sticky` coupling in this repo.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

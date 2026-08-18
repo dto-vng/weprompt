@@ -58,7 +58,11 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
       // mode. Non-sticky callers render this header outside their scroll body, and
       // painting it there leaves a panel the width of the caller's content column
       // instead of the full page width.
-      className={classNames(sticky && 'bg-1 sticky top-0 z-10 -mt-14px pt-14px md:-mt-32px md:pt-32px')}
+      //
+      // C-15: it must match the page it masks, not merely be opaque. At bg-1 it read as
+      // a warm band floating on the lighter content plane; bg-chat-surface is the plane
+      // itself, so the mask becomes invisible while still doing its job.
+      className={classNames(sticky && 'bg-chat-surface sticky top-0 z-10 -mt-14px pt-14px md:-mt-32px md:pt-32px')}
     >
       <div className='flex items-center justify-between gap-12px sm:gap-16px'>
         <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>{title}</h1>
