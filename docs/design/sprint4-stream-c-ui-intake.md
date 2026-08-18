@@ -375,6 +375,30 @@ Four consequences that change what C-05 costs:
    worth fixing in the same change or deliberately leaving alone.
 
 
+### C-08/C-09 shipped — and C-10's root cause is probably the same Arco behaviour
+
+Building C-08 reproduced **C-10's exact defect by accident**: the gear icon sat flush against the
+"Settings" label, with no gap. Diagnosed live rather than guessed:
+
+- Arco's `.arco-btn` computes **`display: block`** with **`text-align: center`**.
+- So `justify-content` and `gap` are **inert** on it — they were set and had no effect — and an icon
+  passed via the `icon` prop ends up butted against the label with `margin-right: 0`.
+- Adding `flex items-center` makes the gap and alignment apply. The sidebar nav entries
+  (`SiderStudioEntry`) already do exactly this, which is why they never showed the defect.
+
+**Therefore C-10 ("Install in Template Gallery", icon touching the label) is very likely the same
+cause, not a one-off.** That matters for DC-4's open question — *remove the icon, or add the gap?* —
+because "add the gap" is now a known one-line class fix with a proven mechanism, rather than a
+guess. Confirm on that component before deciding; if it is the same, removing the icon would be
+treating a symptom that will recur on the next Arco button someone builds with an icon.
+
+**Verified live** (slot 2, `#/guid`): Settings renders 184×34 with a visible label and an 8px gap,
+the theme toggle sits beside it at 32×32, and the collapsed rail keeps the icon-only form with the
+name on the tooltip. jsdom passed **7/7 while the button was still visually broken** — the defect
+was only visible in a screenshot, which is this stream's standing argument for not trusting unit
+tests alone on visual work.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,

@@ -95,4 +95,60 @@ describe('SiderFooter', () => {
 
     expect(screen.queryByRole('button', { name: 'Dark' })).not.toBeInTheDocument();
   });
+
+  // C-08 — the Settings/Back control was a 32x32 icon-only button with the label
+  // carried only by tooltip and aria-label. The reporter asked for it bigger and
+  // labelled. `common.back` is already "Back to Chat" in en-US, so this needs no
+  // new locale keys.
+  it('labels the Settings control in the expanded sider', () => {
+    render(
+      <SiderFooter
+        isMobile={false}
+        isSettings={false}
+        collapsed={false}
+        theme='light'
+        siderTooltipProps={{}}
+        onSettingsClick={vi.fn()}
+        onThemeToggle={vi.fn()}
+      />
+    );
+
+    const settings = screen.getByRole('button', { name: 'Settings' });
+    expect(settings).toHaveTextContent('Settings');
+  });
+
+  it('labels the control "Back to Chat" while inside Settings', () => {
+    render(
+      <SiderFooter
+        isMobile={false}
+        isSettings
+        collapsed={false}
+        theme='light'
+        siderTooltipProps={{}}
+        onSettingsClick={vi.fn()}
+        onThemeToggle={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back to Chat' })).toHaveTextContent('Back to Chat');
+  });
+
+  // Collapsed keeps the icon-only treatment the rest of the sider uses: no visible
+  // text, but the accessible name survives via aria-label.
+  it('drops the visible label when collapsed but keeps the accessible name', () => {
+    render(
+      <SiderFooter
+        isMobile={false}
+        isSettings={false}
+        collapsed
+        theme='light'
+        siderTooltipProps={{}}
+        onSettingsClick={vi.fn()}
+        onThemeToggle={vi.fn()}
+      />
+    );
+
+    const settings = screen.getByRole('button', { name: 'Settings' });
+    expect(settings).not.toHaveTextContent('Settings');
+  });
 });
