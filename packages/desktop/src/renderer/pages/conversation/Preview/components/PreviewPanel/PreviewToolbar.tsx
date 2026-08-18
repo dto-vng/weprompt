@@ -161,7 +161,10 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
 
   const toolbarBtn =
     'flex items-center gap-2px px-8px py-3px rd-4px cursor-pointer transition-colors duration-150 text-12px font-medium text-t-secondary hover:text-t-primary hover:bg-3';
-  const toolbarBtnActive = '!text-white bg-brand hover:!text-white hover:bg-brand-hover';
+  // Active segment uses the PRIMARY orange, not the navy --brand. Both are real brand colours,
+  // but everything else signalling "active" in this pane is orange — including the file tab's
+  // own underline directly above this control — so navy here read as a stray accent.
+  const toolbarBtnActive = '!text-white bg-primary hover:!text-white hover:bg-primary-7';
   const toolbarIconSize = 12;
 
   // 分段控件：Source / Split / Preview（diff 类型无 Split 段）/ Segmented control:
