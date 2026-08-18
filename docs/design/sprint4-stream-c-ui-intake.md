@@ -504,6 +504,28 @@ rest-state qualifier left the suite green. Tightened to require the selector ter
 `{`; the mutation now fails as it should. Same class as BUG-051.
 
 
+### C-01 attempted and reverted — DC-1's "two literals" estimate is wrong
+
+Switching `ChatConversation.tsx` to `workspacePresentation='panel'` at both call sites type-checks and
+changes nothing useful: measured live on a real conversation, the **Project flyout was still present**
+and the artifact pane rendered **1px wide** containing the text "Project".
+
+Cause: `Workspace/index.tsx:531-544` builds `projectMenu` and returns it **unconditionally** — the
+component has no presentation mode at all. `props.sider` therefore *is* the project menu, whichever
+branch `ChatLayout` takes. Setting `'panel'` only relocates that same flyout into the artifact pane.
+
+**So C-01 needs the Workspace component to grow a file-tree presentation**, which is what the fork
+replaced. That is a real feature-sized change, not a config flip. The intake lead and DC-1 both
+under-estimated it, and this correction supersedes them.
+
+Reverted to `'project-menu'` — the half-applied state was worse than the original, since it produced
+a 1px pane. Nothing about C-01 is shipped.
+
+**Note on how this was found:** it type-checked. The only thing that exposed it was opening a real
+conversation and measuring the pane. Third time in this stream that a green static check accompanied
+a completely non-functional change (see also C-05's uncompiled utility and C-08's flush icon).
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
