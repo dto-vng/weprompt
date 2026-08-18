@@ -11,7 +11,7 @@ Plan: [sprint4-stream-b-epic002-smoke-plan.md](sprint4-stream-b-epic002-smoke-pl
 | Fact           | Value                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Date           | 2026-08-17                                                                                                                                        |
-| Branch / head  | `sprint4` @ `916524490`                                                                                                                           |
+| Branch / head  | `sprint4` @ `916524490` at launch; cases re-walked on the fixed build (`177b35f40`, bundle 06:26)                                                 |
 | Working tree   | clean at launch                                                                                                                                   |
 | Worktree       | `/Users/lap16603/Projects/WePrompt/.worktrees/sprint4`                                                                                            |
 | Dependencies   | `bun install` — 3172 packages, exit 0 (the worktree was fresh; `node_modules` was empty)                                                          |
@@ -86,7 +86,9 @@ path has ever completed.**
 
 **Five separate defects stood between "merged" and "works":** BUG-046 (three UUID layers), BUG-049
 (`team.user_id` absent from the wire), BUG-050 (lexical containment vs a symlinked data directory).
-None was reachable from the test suite; every one needed the running app.
+None was **discoverable** from the suite as it stood — every one needed the running app to find. Each is
+now pinned by a regression test written against captured reality, so the suite would catch a recurrence;
+that is the difference between the tests that existed and the tests that exist now.
 
 ## Findings
 
@@ -270,3 +272,34 @@ into the EPIC-002 fix.
   work".
 - Test durations and app responsiveness inflate under concurrent sessions on this machine. Slowness is
   not failure.
+
+## Final gate on the fixed HEAD
+
+Run by the controller on the final tree, after all five fixes and before hand-off:
+
+| Gate                         | Result                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `bunx tsc --noEmit`          | clean, exit 0                                                            |
+| `bunx oxfmt --check`         | all 2,459 files correctly formatted                                      |
+| `node scripts/check-i18n.js` | passed, exit 0                                                           |
+| `bun run test` (full suite)  | **626 files passed / 1 skipped; 8,200 tests passed / 19 skipped** (134s) |
+
+Nothing has been pushed. `sprint4` has no upstream configured.
+
+## Known gaps in this record
+
+Recorded so the next reader does not over-trust it:
+
+- The "canonicalize the parent only" rule is documented but **not pinned by any test** — BUG-051.
+- Eleven sibling channels still declare `conversation_id` as a UUID, and
+  `nativePayloadSchemas.test.ts:635-636` actively asserts a non-UUID **must** be rejected, so the suite
+  will resist the correct fix — BUG-048. Inert today only because `PRESENTATION_RUN_V2_ENABLED = false`.
+- `resolveTeamScope`'s loosening is **not template-scoped**: the resolver is shared with the runs and
+  sources features (`bridge.ts:146`, `:159`). Every user with ≥1 team previously failed closed there and
+  now resolves for real. Inert today because those channels still require a UUID — but fixing BUG-048
+  brings three authorization paths live in a configuration these seven cases never exercised. **Sequence
+  BUG-048 with that in mind.**
+- Only 3 of 7 team fixtures in `PresentationScopeResolver.test.ts` use the wire-derived `wireTeam`; every
+  fail-closed row still runs on the type-derived shape.
+- The conversation DTO — the other authoritative wire input — has no wire-derived fixture and still uses
+  a UUID.
