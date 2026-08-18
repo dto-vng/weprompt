@@ -399,6 +399,33 @@ was only visible in a screenshot, which is this stream's standing argument for n
 tests alone on visual work.
 
 
+### C-05 shipped for two of three entries — New Chat held for a decision
+
+**Done:** Assistants and Scheduled Tasks now match Creative Studio exactly, measured live:
+rest `rgb(91,100,114)`, hover `rgb(240,90,34)` — identical to Studio's own values.
+
+**Held: New Chat.** DC-7 said it should match, but that decision was taken on my description
+"already permanently orange", which was accurate and **incomplete**. New Chat's icon is not a bare
+orange glyph — it is a deliberate 22px badge: `bg-[rgba(var(--primary-6),0.12)]`, a
+`rgba(var(--primary-6),0.24)` border, and a `group-hover` intensification of both
+(`SiderToolbar.tsx`). Flattening it to a plain grey icon removes a designed primary-action
+affordance, which is materially more than the reporter agreed to. Not done; needs a fresh decision.
+
+**Mechanism note — Studio's orange is an accident.** `StudioTypography.module.css:57-63` pins
+`bodyTextAction` to `--text-secondary` across `:hover`, `:focus` and `:active`. It loses:
+Arco's `.arco-btn-text:not(.arco-btn-disabled):hover` is the more specific selector, so the button
+turns orange anyway and only the label span holds grey via `._body`. The behaviour everyone likes is
+Studio's own CSS failing. The other rows can't inherit an accident, so `NAV_ICON_HOVER` states it
+explicitly.
+
+**Trap worth keeping — `text-[rgb(var(--primary-6))]` compiles to nothing.** The first
+implementation used it, passed `tsc` and jsdom, put the class in the DOM, and did nothing: UnoCSS
+cannot decide whether an arbitrary `text-[…]` value is a size or a colour once it wraps a `var()`,
+so it emits no rule. Live measurement caught it — the icon went to `rgb(20,24,31)` on hover instead
+of orange. `bg-[rgba(var(--primary-6),…)]` works elsewhere only because `bg-` has no such ambiguity.
+Use `text-primary`. Both facts are now pinned by mutation-tested guards.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
