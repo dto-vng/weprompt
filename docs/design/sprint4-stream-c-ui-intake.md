@@ -455,6 +455,34 @@ effect. That is a different change from the one C-07's intake entry assumed.
 needs a conversation, which needs a configured provider.
 
 
+### C-12 confirmed by measurement — 5px, and the chevron is the outlier
+
+Measured on slot 2 with a seeded project, reading `getBoundingClientRect().right` rather than
+judging by eye:
+
+| element                                  | right edge | state          |
+| ---------------------------------------- | ---------- | -------------- |
+| `Teams` `+`                              | **236.0**  | always visible |
+| `Projects` `+`                           | **236.0**  | always visible |
+| `Chats` `+`                              | **236.0**  | always visible |
+| project row chevron                      | **241.0**  | hover only     |
+| project row secondary icon (menu)        | **219.0**  | hover only     |
+
+The three section `+` icons agree exactly. The chevron sits **5px further right**, 3px from the
+sidebar's right edge (244) where the `+` icons sit 8px in. The reporter's "not aligned" is real and
+the chevron is the outlier, so it should move left to 236 rather than the three headers moving.
+
+**Hypothesis from the static pass was wrong.** Intake guessed different containers with different
+right-hand padding, pointing at `.pinnedTextSlot`'s 28px/18px rule. The measurement does not support
+that: the three headers agree perfectly across two different containers, so container nesting is not
+the cause. The chevron simply has its own offset.
+
+**Note for whoever fixes it:** the row's trailing icons are **hover-only** — at rest the project row
+has no trailing icon at all. The reporter's screenshot showed a chevron because their project was
+expanded with a child chat. So the fix must be verified in the hovered state; a screenshot at rest
+will show nothing to align.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
