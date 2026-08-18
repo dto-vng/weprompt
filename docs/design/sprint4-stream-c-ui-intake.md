@@ -468,6 +468,28 @@ live verification in the running app.
   mount-timing bug. **Not investigated further**; recorded so it is not mistaken for verified.
 
 
+### C-23 — The pane's chrome stacked four shades
+
+- **Surface:** the right pane with a file open. Reported as "too messy. different shades."
+- **Measured before:** four stacked surfaces — pane tab row `rgb(255,253,249)`, file-tab strip
+  `rgb(240,233,219)`, preview toolbar `rgb(240,233,219)`, active file tab `rgb(246,240,228)` — two
+  visible seams plus a step where the active tab met the strip, in ~114px of chrome. Plus the active
+  segment in navy `rgb(55,78,162)` (fixed separately as C-22) against orange everywhere else.
+- **Resolved by showing options rather than guessing.** Two variants were built and screenshotted
+  against the baseline: unify everything onto the pane's near-white plane, or make all the chrome
+  cream. The reporter chose the near-white plane — consistent with C-04, C-16 and C-17, where the
+  same preference was expressed each time — and then refined it: **the active pane tab loses its
+  cream pill and turns orange instead.**
+- **Shipped:** `.tabsRoot` and the preview toolbar both use the pane surface; the active pane tab is
+  `!text-primary` with `!bg-transparent`. Orange is now the only active-state signal in the stack.
+- **Deliberately left alone:** the active *file* tab keeps its cream fill and orange rule. It is a
+  different level of hierarchy from the pane tabs and was not raised.
+- **Still true, and not addressed:** the chrome is still ~114px tall in three rows, and **"Preview"
+  still appears twice** — once as a pane tab, once in the Source/Split/Preview control. Unifying the
+  shades removed the seams, not the depth or the duplication. Merging the view switcher into the pane
+  tab row would fix both and remains unbuilt.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

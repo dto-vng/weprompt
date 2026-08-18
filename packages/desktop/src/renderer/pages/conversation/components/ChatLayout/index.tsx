@@ -366,9 +366,12 @@ const ChatLayout: React.FC<{
                   role='tab'
                   aria-selected={artifactPaneView === view}
                   data-testid={`artifact-pane-tab-${view}`}
+                  // Active state is the primary orange, with NO fill. A cream pill here added a
+                  // fourth shade to a stack that already had too many; colour alone carries it,
+                  // matching how the file tab below signals active with an orange rule.
                   className={classNames(
-                    '!rounded-6px',
-                    artifactPaneView === view ? '!bg-fill-3 !text-t-primary' : '!text-t-secondary'
+                    '!rounded-6px !bg-transparent',
+                    artifactPaneView === view ? '!text-primary !font-medium' : '!text-t-secondary'
                   )}
                   onClick={() => setArtifactPaneView(view)}
                 >

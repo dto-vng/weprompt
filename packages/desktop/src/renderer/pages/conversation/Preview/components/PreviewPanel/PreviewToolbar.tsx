@@ -214,7 +214,7 @@ const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   if (officeToolbar) return <>{officeToolbar}</>;
 
   return (
-    <div className='flex items-center justify-between h-32px px-10px bg-2 flex-shrink-0 border-b border-[var(--color-border-1)] overflow-x-auto'>
+    <div className='flex items-center justify-between h-32px px-10px bg-chat-surface flex-shrink-0 border-b border-[var(--color-border-1)] overflow-x-auto'>
       <div className='flex items-center justify-between gap-8px w-full' style={{ minWidth: 'max-content' }}>
         {/* 左侧：Tabs（Markdown/HTML）+ 文件名 / Left: Tabs (Markdown/HTML) + Filename */}
         <div className='flex items-center h-full gap-8px'>

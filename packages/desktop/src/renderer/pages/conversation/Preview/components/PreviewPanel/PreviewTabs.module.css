@@ -4,7 +4,9 @@
   flex: 0 0 auto;
   min-height: 44px;
   color: var(--text-secondary);
-  background: var(--bg-2);
+  /* C-23: the pane's chrome is one continuous plane. Previously bg-2, which stacked a
+     second and third cream band under the pane's own near-white tab row. */
+  background: var(--bg-artifact-surface);
   border-bottom: 1px solid var(--border-base);
 }
 
