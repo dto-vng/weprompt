@@ -468,6 +468,21 @@ live verification in the running app.
   mount-timing bug. **Not investigated further**; recorded so it is not mistaken for verified.
 
 
+### C-22 — The active view segment used the navy brand, not the orange accent
+
+- **Surface:** the preview toolbar's `Source / Split / Preview` control, inside the right pane.
+- **Actual:** the active segment painted `rgb(55,78,162)` — `--brand` / `--aou-6`, the Forge navy —
+  while every other active-state signal in the same pane is the primary orange `#f05a22`, including
+  the file tab's own rule directly above it. Both are real brand colours; mixing them inside one
+  stack of chrome is a large part of what the reporter described as "different shades".
+- **Fixed:** `bg-primary` with a `bg-primary-7` hover.
+- **Verified:** visible as orange in the C-23 baseline screenshot.
+- **Record note:** this entry was written retroactively. The fix shipped in `cbfea2601` with a test
+  and a commit message, but no intake item — found while auditing the numbering. **There is also no
+  C-15**: the sequence jumps C-14 → C-16 because a number was skipped, not because an item is
+  missing.
+
+
 ### C-23 — The pane's chrome stacked four shades
 
 - **Surface:** the right pane with a file open. Reported as "too messy. different shades."
