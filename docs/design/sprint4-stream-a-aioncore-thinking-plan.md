@@ -57,7 +57,63 @@ field the provider does not parse.
 
 ---
 
-## Task 0: Decide the advertisement gate — **do this first, it shapes Task 1**
+## Task 0: DONE 2026-08-18 — gate decided: (a) compat-driven, per exact model
+
+**AionCore can already supply the compat user layer, and does.** It builds a `ProviderCompat` and passes
+it into the engine:
+
+- `factory/aionrs.rs:100` — `resolve_model_compat_overrides(&model_id, &row.model_settings)`
+- `:102` — `let (base_url, mut compat_overrides) = resolve_aionrs_url_and_compat_with_mode(…)`
+- `:110` — `compat_overrides.image_input = model_overrides.image_input;`
+- `:191` — `compat_overrides` passed on to construction
+
+`ProviderCompat` (aionrs `compat.rs:12-29`) flattens `reasoning: ReasoningCompat` — the struct holding
+`supports_thinking` / `supports_effort` / `effort_levels` (`:139-152`) — right next to `image_input`. So
+`compat_overrides.reasoning.supports_thinking = Some(true)` is reachable **on a struct AionCore already
+owns and already mutates**. No new plumbing, no TOML file, no fork.
+
+AionCore never references these fields today: `git grep -n "ReasoningCompat|supports_thinking|supports_effort|effort_levels" d4d8e877 -- crates` returns **zero hits**. That absence is the whole gap.
+
+**Decision: (a) compat-driven.** Advertise the thinking option iff `compat.supports_thinking()`, and set
+that flag from **per-exact-model evidence**, mirroring how `image_input` already works. Moonshot's docs
+give the evidence: `thinking.type` for `kimi-k2.5`, `kimi-k2.6`, `kimi-k2.7-code`.
+
+**Why this is the right shape rather than a convenience.** The doc comment on `image_input`
+(`compat.rs:23-26`) states the principle outright:
+
+> "Image-input support resolved for the concrete provider/model pair. `None` is treated as `Unknown`;
+> **provider presets intentionally do not supply family-level defaults.**"
+
+`image_input` obeys that rule. `reasoning` breaks it — `openai_defaults()` claims `supports_effort: true`
+for the entire OpenAI family (`compat.rs:305-309`), which is exactly how we ended up sending Kimi a field
+it discards. Fixing this aligns `reasoning` with the precedent already living in the same struct, and it
+is precisely what EPIC-003 was chartered to do: capability evidence per exact model, never a
+provider-name or family assumption.
+
+**Blast radius — the question Task 0 had to answer.** Only models with recorded evidence get
+`supports_thinking = true`, so only they are advertised, so only they can have a `thinking` field set.
+Every other provider and model is byte-identical to today. This matters because the projector emits
+`thinking` **ungated** (`projector.rs:205-215`): gating advertisement is what keeps the field off routes
+we have not evidenced.
+
+**Follow-on requirement discovered while deciding (do not skip).** Because emission is ungated and the
+engine holds thinking as session state, a mid-conversation **model switch** would carry a previously
+selected `thinking` to a model with no evidence. `apply_config_update` already handles exactly this
+hazard for image input — it resets `compat.image_input` when `model_changed` — so mirror that: on model
+change, clear thinking unless the new model also has evidence. Cover it with a test.
+
+### Implementation note for Task 1's gate
+
+Follow `image_input`'s pattern: extend the per-model capability resolution behind
+`resolve_model_compat_overrides` with a thinking capability, sourced from a registry asset alongside
+`assets/model-capabilities/image_input_models.json` (same `schema_version` + `providers → models`
+shape). Seed it from the vendor documentation: `kimi-k2.5`, `kimi-k2.6`, `kimi-k2.7-code`. Do **not**
+match on the string "moonshot".
+
+<details>
+<summary>Original Task 0 brief, retained for context</summary>
+
+### Task 0 (original): Decide the advertisement gate
 
 The projector emits `thinking` **ungated** (`projector.rs:205-215` at `shipped-v0.2.6` — contrast the
 `reasoning_effort` branch immediately above at `:194-203`, which _is_ gated on `supports_effort()`).
@@ -95,6 +151,8 @@ a `thinking` field in their request body.
 
 > **If Step 1 shows AionCore cannot influence compat at all, stop and re-plan.** Advertising a control
 > that makes unrelated providers 400 is worse than shipping nothing.
+
+</details>
 
 ---
 
