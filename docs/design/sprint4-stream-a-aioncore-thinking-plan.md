@@ -68,9 +68,16 @@ it into the engine:
 - `:191` — `compat_overrides` passed on to construction
 
 `ProviderCompat` (aionrs `compat.rs:12-29`) flattens `reasoning: ReasoningCompat` — the struct holding
-`supports_thinking` / `supports_effort` / `effort_levels` (`:139-152`) — right next to `image_input`. So
-`compat_overrides.reasoning.supports_thinking = Some(true)` is reachable **on a struct AionCore already
-owns and already mutates**. No new plumbing, no TOML file, no fork.
+`supports_thinking` / `supports_effort` / `effort_levels` (`:139-152`) — right next to `image_input`.
+
+> **Correction, 2026-08-18 (found during Task 1).** This section originally claimed
+> `compat_overrides.reasoning.supports_thinking` was directly reachable because `ProviderCompat` flattens
+> `reasoning`. **That was wrong.** AionCore's `compat_overrides` is a _bespoke_ `AionrsCompatOverrides`
+> (`crates/aionui-ai-agent/src/types.rs`), not aionrs's `ProviderCompat`, and it had no reasoning field at
+> all. Task 1 therefore added an `AionrsReasoningOverrides` sub-struct and merges it onto the resolved
+> `config.compat.reasoning` at construction. The **conclusion survives** — the gate is compat-driven, needs
+> no TOML file and no fork — but it cost one new struct rather than zero. Verify a field path compiles
+> before asserting it is reachable.
 
 AionCore never references these fields today: `git grep -n "ReasoningCompat|supports_thinking|supports_effort|effort_levels" d4d8e877 -- crates` returns **zero hits**. That absence is the whole gap.
 
@@ -101,6 +108,28 @@ engine holds thinking as session state, a mid-conversation **model switch** woul
 selected `thinking` to a model with no evidence. `apply_config_update` already handles exactly this
 hazard for image input — it resets `compat.image_input` when `model_changed` — so mirror that: on model
 change, clear thinking unless the new model also has evidence. Cover it with a test.
+
+### Task 1b — populate the capability evidence (REQUIRED; Task 1 alone ships nothing)
+
+**Task 1 is done (`27c832f4b` on `feat/aionrs-thinking`) and the option is still invisible on every real
+conversation.** The gate works, but nothing sets it: `factory/aionrs.rs` never assigns
+`compat_overrides.reasoning`, and the OpenAI-compatible preset sets `supports_thinking: Some(false)`
+(aionrs `compat.rs:306`), so `supports_thinking()` is false for Kimi and the option is omitted.
+
+This was a scoping error in the Task 1 brief, not an implementer omission — the brief listed the gate but
+not the evidence that opens it. Close it here:
+
+- [ ] Populate `compat_overrides.reasoning.supports_thinking` from **per-exact-model evidence**, set
+      alongside `compat_overrides.image_input` at `factory/aionrs.rs:110`.
+- [ ] Source the evidence from a registry asset mirroring
+      `assets/model-capabilities/image_input_models.json` (same `schema_version` + `providers → models`
+      shape), seeded from the vendor docs: `kimi-k2.5`, `kimi-k2.6`, `kimi-k2.7-code`. **Do not match on
+      the string "moonshot".**
+- [ ] Failing test first: a resolved config for `kimi-k2.6` advertises the option; one for a model with no
+      evidence does not.
+- [ ] Note for whoever does this: `services/provider_health.rs:230-241` applies the other compat overrides
+      but not `reasoning`. Harmless for a connectivity probe, but it is a divergence — decide deliberately
+      whether to mirror it there.
 
 ### Implementation note for Task 1's gate
 
