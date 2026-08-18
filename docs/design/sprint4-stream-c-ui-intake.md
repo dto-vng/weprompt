@@ -448,6 +448,26 @@ live verification in the running app.
   something inside is slightly over-wide and could be worth its own look.
 
 
+### C-21 — The panel has no close button of its own
+
+- **Surface:** the right pane. Reported as "i need a button to close this panel".
+- **Actual:** the only way to close it was the header toggle, which sits out in the chat header —
+  far from the thing it acts on, and easy to miss (the reporter's screenshot shows it as a small
+  glyph outside the pane entirely).
+- **Fixed:** a collapse button in the pane's own toolbar, beside the external-tool control. Reuses
+  the existing `common.chrome.collapseProjectPanel` label, so **no new i18n key**. It calls the
+  *unguarded* collapse deliberately — this is an explicit user action, unlike `PreviewPanel`'s
+  request, which C-19 restricted to when Preview is the visible tab.
+- **Verified:** the button renders with `aria-label="Collapse project panel"`, and clicking it closes
+  the pane (776px → absent).
+- **⚠ Toggling is not reliably idempotent, and this is unresolved.** Sequential header-toggle clicks
+  after a programmatic route change gave `null → null → 776 → null`: the **first** toggle after
+  navigation does nothing, the second opens. So the pane's collapse state appears to start out of
+  sync with what is rendered on a fresh mount. This may be an artifact of hash-navigating and
+  clicking within four seconds — a real user does not do that — but it may also be a genuine
+  mount-timing bug. **Not investigated further**; recorded so it is not mistaken for verified.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

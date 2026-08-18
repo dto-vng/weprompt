@@ -385,7 +385,24 @@ const ChatLayout: React.FC<{
                 WorkspacePanelHeader. It was missing here only because this pane has no header —
                 the component already existed.
               */}
-              {workspacePath && <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />}
+              <div className='flex items-center gap-4px'>
+                {workspacePath && <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />}
+                {/*
+                  A close affordance on the panel itself. The header toggle can also close it, but
+                  it lives out in the chat header — far from the thing it acts on, and easy to miss.
+                  Uses the unguarded collapse: this is an explicit user action, unlike
+                  PreviewPanel's request, which is only honoured while Preview is visible.
+                */}
+                <Button
+                  type='text'
+                  size='small'
+                  aria-label={t('common.chrome.collapseProjectPanel')}
+                  data-testid='artifact-pane-collapse'
+                  className='!rounded-6px !text-t-secondary hover:!text-t-primary'
+                  icon={<ExpandRight size={15} />}
+                  onClick={collapseArtifactPane}
+                />
+              </div>
             </div>
             <div
               className='flex-1 min-h-0 overflow-hidden'

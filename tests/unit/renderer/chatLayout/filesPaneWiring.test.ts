@@ -48,6 +48,15 @@ describe('C-01 files pane wiring', () => {
     expect(CHAT_LAYOUT).toMatch(/if \(artifactPaneViewRef\.current !== 'preview'\) return;/);
   });
 
+  it('puts a close affordance on the panel itself', () => {
+    // The header toggle can also close it, but it sits out in the chat header, far from the
+    // thing it acts on. Uses the UNGUARDED collapse: this is an explicit user action, unlike
+    // PreviewPanel's request which is only honoured while Preview is visible.
+    expect(CHAT_LAYOUT).toMatch(/data-testid='artifact-pane-collapse'/);
+    expect(CHAT_LAYOUT).toMatch(/aria-label=\{t\('common\.chrome\.collapseProjectPanel'\)\}/);
+    expect(CHAT_LAYOUT).toMatch(/onClick=\{collapseArtifactPane\}/);
+  });
+
   it('opens on Files, since an empty preview cannot hold the pane open', () => {
     expect(CHAT_LAYOUT).toMatch(/useState<WorkspacePaneView>\('files'\)/);
   });
