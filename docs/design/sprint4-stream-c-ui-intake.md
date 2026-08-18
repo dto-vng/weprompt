@@ -317,6 +317,8 @@ live verification in the running app.
 | **DC-1** | **C-01 means the workspace file-tree pane.** Single chat moves from `workspacePresentation='project-menu'` back to `'panel'` — the same pane Teams uses today. The Project flyout goes. Candidate change is the two literals at `ChatConversation.tsx:245,423`; the always-open artifact preview that `project-menu` carries (`ChatLayout/index.tsx:296`) is displaced by this and its fate must be decided explicitly, not by accident. |
 | **DC-2** | **Orange stays for real hyperlinks; file names become plain text.** Resolves C-03 and C-14 together. Consequence to design around: colour then distinguishes an `http(s)` link from a file entry, so the file list needs a *non-colour* affordance (hover underline or similar) or C-03's complaint simply moves to the file list.                                                                                    |
 | **DC-3** | **Background lightening is per-surface, not a token sweep.** Only the surfaces pointed at: sidebar/chrome (C-04), the assistant-mode pill bar and the chat rows (C-13). `--bg-chat-surface` is the reference value. The token ramp is **not** redefined, so dark theme is untouched by construction. C-04's "check other screens" rider stays a manual audit, reported rather than silently applied.                     |
+| **DC-5** | **C-01 removes the always-open artifact preview, and that is intended.** Switching single chat to `'panel'` stops `ChatLayout/index.tsx:296` rendering. The reporter confirmed the preview is part of what is being reverted, so its removal is a decision, not a side effect to mitigate. |
+| **DC-6** | **Stream C verifies on Electron slot 2 (`~/.aionui-dev-2`), not slot 1.** Slot 1's app belongs to peer session `46112f54`, which never answered; a second peer declined to authorize it on their behalf. Slot 2 is a fresh profile, so items needing content (C-06/C-07 templates, C-10 review card, C-11 permission prompt, C-13/C-14 project data) must be **seeded before they are reproducible** — and an item that cannot be reproduced must be reported as unverified, never as passing. |
 | **DC-4** | **Reject gets a border and stays quieter than the allow actions.** Fixes the invisibility without changing which action the prompt nudges toward. `Always allow` keeps its current prominence — noted as a deliberate choice, not an oversight.                                                                                                                                              |
 
 
@@ -334,6 +336,41 @@ treated as fact, for the reason C-11 records: jsdom cannot see Arco specificity.
 | **C-14 coupling** | `WorkspaceProjectFilesFlyout` is shared by the project-home **Files card** (`ProjectFilesCard.tsx:91`) and the chat **Project flyout**. One fix covers both — and note DC-1 deletes the flyout consumer, so sequence C-01 and C-14 deliberately. |
 | **C-11** | There are **two** permission components, not one: `Messages/components/MessagePermission.tsx` and `Messages/acp/MessageAcpPermission.tsx`. The reporter's "check other similar button" rider therefore has a concrete first answer — both must change, or the two backends will disagree. |
 | **C-11 copy** | The prompt's heading is `messages.json:88` `chooseAction`. Note the screenshot reads "Allow once" while `codex.json:84` holds "Allow Once" — different capitalisation, so the screenshot's prompt is **not** the codex key set. Identify the actual key before touching copy. |
+
+
+## Live verification — 2026-08-18, Electron slot 2 (`~/.aionui-dev-2`, CDP 9231, vite 5174)
+
+Measured with real `Input.dispatchMouseEvent` hovers (synthetic events do not match `:hover`), each
+reading taken with the cursor parked off-target first and 250ms allowed for transitions to settle.
+
+### C-05 — premise CONFIRMED, and the item is bigger than reported
+
+| sidebar entry       | icon at rest              | icon on hover             | turns orange? | hover background   |
+| ------------------- | ------------------------- | ------------------------- | ------------- | ------------------ |
+| **Creative Studio** | `rgb(91,100,114)` grey    | **`rgb(240,90,34)` orange** | **yes**     | `rgb(240,233,219)` |
+| New Chat            | `rgb(240,90,34)` **orange** | `rgb(240,90,34)` orange   | no — already orange at rest | `rgb(233,223,206)` |
+| Assistants          | `rgb(20,24,31)` near-black | `rgb(20,24,31)`          | no            | `rgb(233,223,206)` |
+| Scheduled Tasks     | `rgb(20,24,31)` near-black | `rgb(20,24,31)`          | no            | `rgb(233,223,206)` |
+
+**The reporter was right and the static triage was wrong.** My source read concluded no orange
+existed because all four use `fill='currentColor'` and `Sider.module.css` holds no colour rule; the
+orange arrives from a rule that read never traced. Recorded as a correction, not quietly fixed.
+
+Four consequences that change what C-05 costs:
+
+1. **The target behaviour is icon-only.** Studio's *label* stays `rgb(91,100,114)` through hover —
+   only the icon turns. So "same behaviour" means the icon alone, and the open question in C-05 is
+   answered: no label or background change comes along.
+2. **Studio rests at a different colour from the other three.** Studio is `rgb(91,100,114)`
+   (`--bg-8`), the others `rgb(20,24,31)` (`--bg-10`). Matching Studio therefore means *lightening
+   their rest state too*, not merely adding a hover rule. That is a visible change at rest, on every
+   screen, which the reporter has not seen yet.
+3. **New Chat's icon is already permanently orange.** Making it behave like Studio would *remove*
+   orange at rest and only restore it on hover. That may well be deliberate — New Chat is the primary
+   action — so it needs an explicit decision rather than being swept in with the other two.
+4. **The hover backgrounds already disagree** — Studio `rgb(240,233,219)` (`--bg-2`) versus
+   `rgb(233,223,206)` for the other three. A second inconsistency in the same row, not reported, and
+   worth fixing in the same change or deliberately leaving alone.
 
 
 ## Open questions (batched — to ask once intake closes)
