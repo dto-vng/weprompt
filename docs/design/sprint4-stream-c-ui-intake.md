@@ -310,6 +310,32 @@ live verification in the running app.
   the *brand* colour here — in which case removing it from links is a broader identity decision that
   should be made deliberately, not per-screen.
 
+## Decisions taken 2026-08-18 (by the reporter, after intake closed)
+
+| id       | Decision                                                                                                                                                                                                                                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **DC-1** | **C-01 means the workspace file-tree pane.** Single chat moves from `workspacePresentation='project-menu'` back to `'panel'` — the same pane Teams uses today. The Project flyout goes. Candidate change is the two literals at `ChatConversation.tsx:245,423`; the always-open artifact preview that `project-menu` carries (`ChatLayout/index.tsx:296`) is displaced by this and its fate must be decided explicitly, not by accident. |
+| **DC-2** | **Orange stays for real hyperlinks; file names become plain text.** Resolves C-03 and C-14 together. Consequence to design around: colour then distinguishes an `http(s)` link from a file entry, so the file list needs a *non-colour* affordance (hover underline or similar) or C-03's complaint simply moves to the file list.                                                                                    |
+| **DC-3** | **Background lightening is per-surface, not a token sweep.** Only the surfaces pointed at: sidebar/chrome (C-04), the assistant-mode pill bar and the chat rows (C-13). `--bg-chat-surface` is the reference value. The token ramp is **not** redefined, so dark theme is untouched by construction. C-04's "check other screens" rider stays a manual audit, reported rather than silently applied.                     |
+| **DC-4** | **Reject gets a border and stays quieter than the allow actions.** Fixes the invisibility without changing which action the prompt nudges toward. `Always allow` keeps its current prominence — noted as a deliberate choice, not an oversight.                                                                                                                                              |
+
+
+## Static triage pass — 2026-08-18 (no running app; nothing here is confirmed by observation)
+
+Everything below is read from source. Each still needs a live computed-style check before it is
+treated as fact, for the reason C-11 records: jsdom cannot see Arco specificity.
+
+| item | finding |
+| ---- | ------- |
+| **C-09** | **Exact cause found.** `SiderFooter.tsx` computes `const showThemeToggle = isSettings && !collapsed` — the theme toggle renders **only on the settings screen**. That is precisely why the moon appears beside the back arrow and never on home. The fix is this one condition. |
+| **C-08** | Both footer buttons are `!h-32px !w-32px !p-0` — a 32×32 icon-only target. **The labels already exist**: `settingsLabel = isSettings ? t('common.back') : t('common.settings')`, already wired to `aria-label` and the tooltip. So rendering visible text needs **no new i18n keys** — but the reporter's suggested wording *"Back to Chat"* is not `common.back` ("Back"), and adopting it **would** need all 12 locales in the same task. |
+| **C-01** | Confirmed. The `panel` branch (`ChatLayout/index.tsx:267`) renders `WorkspacePanelHeader` + `props.sider` — the file-tree pane DC-1 asks for. Switching to it **stops the `!isWorkspacePanePresentation && artifactVisible` branch at `:296` from rendering**, i.e. the always-open artifact preview goes away with the flyout. DC-1 already flags this must be decided, not absorbed silently. |
+| **C-14** | **Root cause is not a link style at all.** Each file row is an Arco `<Button type='text'>` (`WorkspaceProjectFilesFlyout.tsx:62-63`) and `.workspace-project-files-name` (`workspace.css:294`) sets **no colour**. The orange is Arco's default text-button colour bleeding through — the known `.arco-btn-text:not(.arco-btn-disabled)` trap. So these names were never deliberately styled as links; they leak the primary. That makes C-14 a smaller and better-founded fix than "change the link colour", and it means **DC-2 needs no new link colour for this surface** — just stop leaking. |
+| **C-14 coupling** | `WorkspaceProjectFilesFlyout` is shared by the project-home **Files card** (`ProjectFilesCard.tsx:91`) and the chat **Project flyout**. One fix covers both — and note DC-1 deletes the flyout consumer, so sequence C-01 and C-14 deliberately. |
+| **C-11** | There are **two** permission components, not one: `Messages/components/MessagePermission.tsx` and `Messages/acp/MessageAcpPermission.tsx`. The reporter's "check other similar button" rider therefore has a concrete first answer — both must change, or the two backends will disagree. |
+| **C-11 copy** | The prompt's heading is `messages.json:88` `chooseAction`. Note the screenshot reads "Allow once" while `codex.json:84` holds "Allow Once" — different capitalisation, so the screenshot's prompt is **not** the codex key set. Identify the actual key before touching copy. |
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
