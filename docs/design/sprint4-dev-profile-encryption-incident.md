@@ -1,7 +1,7 @@
 # Incident — dev profile database became unreadable, 2026-08-18
 
-**Status: contained, not resolved.** No data is lost. The dev profile's live database cannot be opened
-by any binary; a verified-good plaintext backup holds the content and is untouched.
+**Status: RESOLVED 2026-08-18 10:25.** No data was lost. Restored from the verified plaintext backup with
+the owner's approval; all 41 conversations and all three keyed providers are back and the app boots clean.
 
 **Scope: the development profile only.** `~/.aionui-dev`. The packaged app's data (`~/.aionui`) and the
 second dev profile (`~/.aionui-dev-2`, in use by another session) are unaffected.
@@ -75,3 +75,28 @@ The Task 3 live acceptance gate — proving the thinking control materially chan
 `reasoning_tokens` — **cannot run until this is resolved**, and when it does it must run against an
 isolated profile. Tasks 1, 1b and 2 are unaffected: they are committed on `feat/aionrs-thinking` with all
 suites green, and nothing about this incident touches their correctness.
+
+## Resolution — 2026-08-18 10:25
+
+The owner approved the swap; it was executed exactly as proposed, deleting nothing:
+
+- `aionui-backend.db` (unreadable, 708,608 B) preserved as
+  `aionui-backend.db.unreadable-encrypted-20260818-102447`
+- `aionui-backend.db.plaintext-backup.1787022393207` copied into place as `aionui-backend.db`
+- the original backup left untouched
+
+Relaunched with the bundled 0.1.53. Verified against the running backend:
+
+| Check         | Result                                                        |
+| ------------- | ------------------------------------------------------------- |
+| Bootstrap     | clean — no `BOOTSTRAP_DATA_INIT_FAILED`                       |
+| Conversations | **41 / 41**, including today's smoke conversations            |
+| Providers     | Moonshot (Global), OpenRouter, Custom — all enabled and keyed |
+
+Both the unreadable database and the original backup remain on disk, so the recovery is still reversible.
+
+**One state change to be aware of:** the at-rest encryption migration did **not** re-run on this boot —
+the profile is currently the 4.5 MB plaintext database with a WAL, and no new
+`plaintext-backup.*` was written. That matches how the profile looked before 09:54 today and the app works
+normally, but it differs from the encrypted state it had reached, and it is a difference someone should
+notice deliberately rather than discover later.
