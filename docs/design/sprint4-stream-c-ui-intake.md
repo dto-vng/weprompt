@@ -483,6 +483,27 @@ expanded with a child chat. So the fix must be verified in the hovered state; a 
 will show nothing to align.
 
 
+### C-14 fixed — the colours were already right, only the specificity was wrong
+
+Measured before: all 7 file rows `rgb(240,90,34)`. After: `rgb(78,89,105)` at rest,
+`rgb(29,33,41)` with a `rgb(246,241,232)` background on hover.
+
+`workspace.css:256-275` already declared `color: var(--color-text-2)` at rest and
+`var(--color-text-1)` on hover. It never applied: the rows are Arco text Buttons, and
+`.arco-btn-text:not(.arco-btn-disabled)` scores **(0,3,0)** against the bare
+`.workspace-project-files-row` at **(0,1,0)**. The fix adds the qualifier so the existing intent
+wins; no colour value was chosen or changed.
+
+**DC-2's affordance condition is met without adding one.** The concern was that removing the colour
+would leave clickable file names unmarked. It doesn't: the row already responds on hover with both a
+text-colour shift and a background, so clickability is signalled by more than colour alone.
+
+**The first guard test was vacuous and mutation testing caught it.** It asserted the rest-state
+selector with `toContain`, which the `:hover` rule satisfies as a prefix — so deleting the
+rest-state qualifier left the suite green. Tightened to require the selector terminated by `,` or
+`{`; the mutation now fails as it should. Same class as BUG-051.
+
+
 ## Open questions (batched — to ask once intake closes)
 
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,

@@ -253,7 +253,13 @@
   min-width: 0;
 }
 
-.workspace-project-files-row {
+/* The `.arco-btn-text:not(.arco-btn-disabled)` qualifier is not decoration: these rows
+   are Arco text Buttons, and Arco's own selector scores (0,3,0) against this rule's
+   (0,1,0). Without it the colours below are silently overridden and every file name
+   renders in the brand orange — which read as an alert on a plain directory listing.
+   Same reason on the :hover rule, which must outscore Arco's (0,4,0) hover selector. */
+.workspace-project-files-row,
+.workspace-project-files-row.arco-btn-text:not(.arco-btn-disabled) {
   display: grid;
   grid-template-columns: 13px 16px minmax(0, 1fr) 6px;
   column-gap: 9px;
@@ -269,7 +275,9 @@
 }
 
 .workspace-project-files-row:hover,
-.workspace-project-files-row-context {
+.workspace-project-files-row-context,
+.workspace-project-files-row.arco-btn-text:not(.arco-btn-disabled):hover,
+.workspace-project-files-row-context.arco-btn-text:not(.arco-btn-disabled) {
   color: var(--color-text-1);
   background: var(--color-fill-1);
 }
