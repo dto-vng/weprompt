@@ -116,7 +116,13 @@ describe('ChatLayout artifact pane', () => {
   it('mounts a single-bar, full-bleed PreviewPanel for the single-chat (project-menu) pane', () => {
     renderLayout('project-menu');
 
-    expect(mocks.resizableSplitOptions).toHaveLength(1);
+    // Assert the split's CONFIGURATION, not the number of hook invocations. The pane resolves
+    // its portal containers through ref callbacks, so it legitimately renders more than once and
+    // an invocation count measures renders rather than splits. What matters is that exactly one
+    // split is configured, on the artifact key rather than the workspace one.
+    expect(new Set(mocks.resizableSplitOptions.map((o: { storageKey: string }) => o.storageKey))).toEqual(
+      new Set(['chat-artifact-split-ratio'])
+    );
     expect(mocks.resizableSplitOptions[0]).toEqual(
       expect.objectContaining({ unit: 'ratio', defaultWidth: 50, storageKey: 'chat-artifact-split-ratio' })
     );
