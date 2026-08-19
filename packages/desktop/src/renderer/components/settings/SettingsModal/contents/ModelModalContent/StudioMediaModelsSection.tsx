@@ -14,13 +14,17 @@ import type {
   StudioRendererConnectionCapabilities,
   StudioSaveConnectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
-import { Alert, AutoComplete, Button, Modal, Popconfirm, Select, Spin, Tag } from '@arco-design/web-react';
-import { Delete, Refresh } from '@icon-park/react';
+import { Alert, AutoComplete, Button, Modal, Popconfirm, Select, Spin, Tag, Tooltip } from '@arco-design/web-react';
+import { Delete, Refresh, Write } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import '../../model-provider.css';
 
 type SafeCandidate = Pick<StudioConnectionCandidate, 'providerId' | 'providerName' | 'models'>;
 type SafeIntegration = StudioConnectionIntegration;
+
+/** Borderless 28px icon button, identical to the provider rows' action icons. */
+const ACTION_BTN_CLASS = 'model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary';
 type SafeBinding = StudioConnectionRecord;
 type SafeValidation = StudioConnectionValidationResult;
 type EditorState = {
@@ -444,32 +448,49 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
                     </time>
                   </div>
 
-                  <div className='flex shrink-0 items-center gap-6px'>
-                    <Button size='mini' disabled={rowBusy} onClick={() => openEdit(binding)}>
-                      {t('settings.mediaModels.edit')}
-                    </Button>
-                    <Button
-                      size='mini'
-                      shape='square'
-                      aria-label={`${t('settings.mediaModels.revalidate')} — ${binding.model}`}
-                      icon={<Refresh theme='outline' size='14' />}
-                      loading={rowBusy}
-                      disabled={rowBusy}
-                      onClick={() => void revalidate(binding)}
-                    />
+                  {/* Same treatment as the provider rows above: bare 28px icon buttons on
+                      `model-provider-action-btn`, which forces a transparent background and
+                      border and paints only on hover. A filled Edit pill next to those read
+                      as a different control system on the same screen. */}
+                  <div className='flex shrink-0 items-center gap-4px'>
+                    <Tooltip content={t('settings.mediaModels.edit')}>
+                      <Button
+                        size='mini'
+                        aria-label={`${t('settings.mediaModels.edit')} — ${binding.model}`}
+                        className={ACTION_BTN_CLASS}
+                        icon={<Write theme='outline' size='14' />}
+                        disabled={rowBusy}
+                        onClick={() => openEdit(binding)}
+                      />
+                    </Tooltip>
+                    <Tooltip content={t('settings.mediaModels.revalidate')}>
+                      <Button
+                        size='mini'
+                        aria-label={`${t('settings.mediaModels.revalidate')} — ${binding.model}`}
+                        className={ACTION_BTN_CLASS}
+                        icon={<Refresh theme='outline' size='14' />}
+                        loading={rowBusy}
+                        disabled={rowBusy}
+                        onClick={() => void revalidate(binding)}
+                      />
+                    </Tooltip>
                     <Popconfirm
                       title={t('settings.mediaModels.removeConfirm')}
                       onOk={() => void remove(binding.bindingId)}
                     >
-                      {/* Destructive action stays last, never between two safe ones. */}
-                      <Button
-                        size='mini'
-                        shape='square'
-                        status='danger'
-                        aria-label={`${t('settings.mediaModels.remove')} — ${binding.model}`}
-                        icon={<Delete theme='outline' size='14' />}
-                        disabled={rowBusy}
-                      />
+                      {/* Destructive action stays last, never between two safe ones. It keeps
+                          the danger status so the glyph reads red, but the shared class strips
+                          the filled background so it matches its neighbours in shape. */}
+                      <Tooltip content={t('settings.mediaModels.remove')}>
+                        <Button
+                          size='mini'
+                          status='danger'
+                          aria-label={`${t('settings.mediaModels.remove')} — ${binding.model}`}
+                          className={ACTION_BTN_CLASS}
+                          icon={<Delete theme='outline' size='14' />}
+                          disabled={rowBusy}
+                        />
+                      </Tooltip>
                     </Popconfirm>
                   </div>
                 </div>
