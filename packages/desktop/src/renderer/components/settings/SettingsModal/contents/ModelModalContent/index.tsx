@@ -38,6 +38,7 @@ import { useSettingsViewMode } from '../../settingsViewContext';
 import SettingsPageHeader from '@/renderer/pages/settings/components/SettingsPageHeader';
 import { consumePendingDeepLink } from '@/renderer/hooks/system/useDeepLink';
 import { StudioMediaModelsSection } from './StudioMediaModelsSection';
+import { getApiKeyCount } from './providerRowSummary';
 import '../../model-provider.css';
 
 /**
@@ -72,12 +73,6 @@ const getNextProtocol = (current: string): string => {
   const idx = NEW_API_PROTOCOL_OPTIONS.findIndex((p) => p.value === current);
   const nextIdx = (idx + 1) % NEW_API_PROTOCOL_OPTIONS.length;
   return NEW_API_PROTOCOL_OPTIONS[nextIdx].value;
-};
-
-// Calculate API Key count
-const getApiKeyCount = (api_key: string): number => {
-  if (!api_key) return 0;
-  return api_key.split(/[,\n]/).filter((k) => k.trim().length > 0).length;
 };
 
 /**
