@@ -631,6 +631,26 @@ live verification in the running app.
   the file itself cannot show. That is the whole reason the tab was restored in C-25.
 
 
+### C-30 — The Browser tab is invisible at the pane's default width
+
+- **Reported:** "by default size, I won't see the Browser".
+- **Measured, and it was not marginal.** The pane's default width is **340px**, which is exactly
+  `MIN_ARTIFACT_PANEL_PX` — it opens at its own minimum. Five text labels needed **412px**, so
+  Browser's right edge sat at 1575 against a pane edge of 1492, and the open-in and close controls
+  were pushed off too: 170px of overflow in total. Tightening padding would have recovered ~20px
+  against a ~85px shortfall, so it was never a spacing tweak.
+- **Fixed by dropping the labels.** Each tab is now a 28px icon — 140px for all five, inside 340px,
+  with the close control still visible. Files, Changes and Context reuse the icons the **Project
+  flyout** used (`FolderOpen`, `BranchOne`, `FileText`), so their meaning carries over from the UI
+  the pane replaced; Preview and Browser use `PreviewOpen` and `Earth`, both already in use in this
+  codebase rather than guessed at.
+- **The name is still reachable** through a tooltip and an `aria-label` — an icon-only control with
+  no accessible name is unusable by screen reader and unguessable by everyone else.
+- **Rejected:** a horizontal scroller (Browser would still be hidden, which is the actual complaint)
+  and raising `MIN_ARTIFACT_PANEL_PX` to ~430 (permanently takes ~90px from the chat on narrow
+  windows). Chosen from measurements rather than taste.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

@@ -15,8 +15,8 @@ import { WORKSPACE_EXPAND_EVENT, dispatchWorkspaceToggleEvent } from '@/renderer
 import classNames from 'classnames';
 import { isMacEnvironment, isWindowsEnvironment } from '@/renderer/pages/conversation/utils/detectPlatform';
 import { calcLayoutMetrics } from '@/renderer/pages/conversation/utils/layoutCalc';
-import { Button, Layout as ArcoLayout } from '@arco-design/web-react';
-import { ExpandLeft, ExpandRight } from '@icon-park/react';
+import { Button, Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
+import { BranchOne, Earth, ExpandLeft, ExpandRight, FileText, FolderOpen, PreviewOpen } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +49,20 @@ const BROWSER_START_URL = 'about:blank';
  * that can only ever be empty is worse than no tab.
  */
 const PANE_TAB_ORDER = ['files', 'changes', 'context', 'preview', 'browser'] as const;
+
+/**
+ * Icons, not words. Five text labels need 412px and the pane's minimum width is 340 — Browser
+ * fell off the right edge at the default size, along with the open-in and close controls.
+ * Files, Changes and Context keep the icons the Project flyout used, so the meaning carries over
+ * from the UI this replaced. Every tab still exposes its name via tooltip and aria-label.
+ */
+const PANE_TAB_ICONS: Record<WorkspacePaneView, React.ReactNode> = {
+  files: <FolderOpen theme='outline' size='16' fill='currentColor' />,
+  changes: <BranchOne theme='outline' size='16' fill='currentColor' />,
+  context: <FileText theme='outline' size='16' fill='currentColor' />,
+  preview: <PreviewOpen theme='outline' size='16' fill='currentColor' />,
+  browser: <Earth theme='outline' size='16' fill='currentColor' />,
+};
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
 const ChatLayout: React.FC<{
@@ -387,24 +401,25 @@ const ChatLayout: React.FC<{
             <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
               <div className='flex items-center gap-2px' role='tablist'>
               {PANE_TAB_ORDER.filter((view) => view !== 'context' || backend === 'aionrs').map((view) => (
-                <Button
-                  key={view}
-                  type='text'
-                  size='small'
-                  role='tab'
-                  aria-selected={artifactPaneView === view}
-                  data-testid={`artifact-pane-tab-${view}`}
-                  // Active state is the primary orange, with NO fill. A cream pill here added a
-                  // fourth shade to a stack that already had too many; colour alone carries it,
-                  // matching how the file tab below signals active with an orange rule.
-                  className={classNames(
-                    '!rounded-6px !bg-transparent',
-                    artifactPaneView === view ? '!text-primary !font-medium' : '!text-t-secondary'
-                  )}
-                  onClick={() => setArtifactPaneView(view)}
-                >
-                  {PANE_TAB_LABEL_KEYS[view] ? t(PANE_TAB_LABEL_KEYS[view]) : view}
-                </Button>
+                <Tooltip key={view} content={t(PANE_TAB_LABEL_KEYS[view])} position='bottom'>
+                  <Button
+                    type='text'
+                    size='small'
+                    role='tab'
+                    aria-selected={artifactPaneView === view}
+                    aria-label={t(PANE_TAB_LABEL_KEYS[view])}
+                    data-testid={`artifact-pane-tab-${view}`}
+                    // Active state is the primary orange, with NO fill. A cream pill here added a
+                    // fourth shade to a stack that already had too many; colour alone carries it,
+                    // matching how the file tab below signals active with an orange rule.
+                    className={classNames(
+                      '!rounded-6px !bg-transparent',
+                      artifactPaneView === view ? '!text-primary' : '!text-t-secondary'
+                    )}
+                    icon={PANE_TAB_ICONS[view]}
+                    onClick={() => setArtifactPaneView(view)}
+                  />
+                </Tooltip>
               ))}
               </div>
               {/*

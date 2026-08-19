@@ -41,3 +41,30 @@ describe('artifact pane browser tab', () => {
     expect(CHAT_LAYOUT).toMatch(/const BROWSER_START_URL = 'about:blank'/);
   });
 });
+
+// C-30 — five text labels needed 412px against a 340px minimum pane width, so Browser fell off
+// the right edge at the default size along with the open-in and close controls. The tabs are now
+// icons. Files, Changes and Context reuse the icons the Project flyout used, so their meaning
+// carries over from the UI the pane replaced.
+//
+// Measured after: every tab 28px, 140px total, all five inside a 340px pane with the close
+// control still visible.
+describe('pane tabs fit the minimum pane width', () => {
+  it('renders icons rather than labels', () => {
+    expect(CHAT_LAYOUT).toMatch(/const PANE_TAB_ICONS: Record<WorkspacePaneView, React\.ReactNode>/);
+    expect(CHAT_LAYOUT).toMatch(/icon=\{PANE_TAB_ICONS\[view\]\}/);
+  });
+
+  it('keeps the name reachable without a visible label', () => {
+    // An icon-only control with no accessible name is unusable by screen reader and unguessable
+    // by anyone else.
+    expect(CHAT_LAYOUT).toMatch(/<Tooltip key=\{view\} content=\{t\(PANE_TAB_LABEL_KEYS\[view\]\)\}/);
+    expect(CHAT_LAYOUT).toMatch(/aria-label=\{t\(PANE_TAB_LABEL_KEYS\[view\]\)\}/);
+  });
+
+  it('reuses the flyout icons for the panels it inherited', () => {
+    expect(CHAT_LAYOUT).toMatch(/files: <FolderOpen/);
+    expect(CHAT_LAYOUT).toMatch(/changes: <BranchOne/);
+    expect(CHAT_LAYOUT).toMatch(/context: <FileText/);
+  });
+});

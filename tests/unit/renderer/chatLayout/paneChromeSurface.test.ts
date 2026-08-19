@@ -27,7 +27,8 @@ describe('artifact pane chrome is one surface', () => {
 
   it('signals the active pane tab with colour, not a fill', () => {
     expect(CHAT_LAYOUT).toMatch(/'!rounded-6px !bg-transparent'/);
-    expect(CHAT_LAYOUT).toMatch(/artifactPaneView === view \? '!text-primary !font-medium'/);
+    // Weight dropped when the tabs became icons in C-30; colour still carries active state.
+    expect(CHAT_LAYOUT).toMatch(/artifactPaneView === view \? '!text-primary'/);
     // A pill here would reintroduce the fourth shade this item removed.
     expect(CHAT_LAYOUT).not.toMatch(/artifactPaneView === view \? '!bg-fill-3/);
   });
