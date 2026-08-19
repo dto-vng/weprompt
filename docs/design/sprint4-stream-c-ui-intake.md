@@ -460,12 +460,13 @@ live verification in the running app.
   request, which C-19 restricted to when Preview is the visible tab.
 - **Verified:** the button renders with `aria-label="Collapse project panel"`, and clicking it closes
   the pane (776px → absent).
-- **⚠ Toggling is not reliably idempotent, and this is unresolved.** Sequential header-toggle clicks
-  after a programmatic route change gave `null → null → 776 → null`: the **first** toggle after
-  navigation does nothing, the second opens. So the pane's collapse state appears to start out of
-  sync with what is rendered on a fresh mount. This may be an artifact of hash-navigating and
-  clicking within four seconds — a real user does not do that — but it may also be a genuine
-  mount-timing bug. **Not investigated further**; recorded so it is not mistaken for verified.
+- **VERIFIED by the reporter 2026-08-18, including the toggle.** The suspected flakiness did not
+  reproduce for a human: sequential header-toggle clicks after a *programmatic* route change had given
+  `null → null → 776 → null`, but that was the harness — hash-navigating and clicking within four
+  seconds is not something a real user does. Recorded rather than deleted, because it is the **third**
+  false negative this stream produced from synthetic interaction, after C-19's toggle and C-24's URL
+  bar. In all three the code was fine and the probe was wrong, and in all three one human interaction
+  settled it faster than further automated digging.
 
 
 ### C-22 — The active view segment used the navy brand, not the orange accent
@@ -868,11 +869,11 @@ button computes `display: block` with `text-align: center`, so the glyph butts a
 `gap` is inert until `flex` is added. The fix is the same one-line class change, and C-08's version
 of it was measured and screenshotted.
 
-**What was not done:** the card itself was never seen. Reproducing it needs the in-chat template
-creation path to fire, and two attempts in this session did not produce a card — the directive needs
-particular phrasing and, most likely, an HTML artifact already in context. So this item is fixed on a
-proven mechanism and an unproven surface. It should be re-checked the next time a review card appears
-naturally; until then it must not be reported as verified.
+**VERIFIED by the reporter 2026-08-18.** During implementation the card was never seen — two attempts
+to trigger the in-chat creation path produced no card, so the fix shipped on a proven mechanism and an
+unproven surface, labelled accordingly. The reporter has since exercised it in the running app and
+confirmed the button renders correctly. The mechanism (Arco's `display: block` defeating `gap` until
+`flex` is added) is now confirmed on both surfaces it was applied to, C-08 and C-10.
 
 **The reporter's suggested fix — "you can just remove the icon" — was deliberately not taken.** Now
 that the mechanism is known, removing the icon would treat a symptom that recurs on the next Arco
