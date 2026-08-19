@@ -29,9 +29,13 @@ vi.mock('@/common', () => ({ ipcBridge: { creativeStudio: bridge } }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+// Every icon the component imports must appear here: a missing entry renders as
+// `undefined` and takes down the whole file at render, not just the test that
+// touches the icon.
 vi.mock('@icon-park/react', () => ({
-  Plus: () => <span aria-hidden='true'>+</span>,
+  Delete: () => <span aria-hidden='true'>🗑</span>,
   Refresh: () => <span aria-hidden='true'>↻</span>,
+  Write: () => <span aria-hidden='true'>✎</span>,
 }));
 vi.mock('@arco-design/web-react', async () => {
   const ReactModule = await import('react');
@@ -105,6 +109,9 @@ vi.mock('@arco-design/web-react', async () => {
     Alert: ({ content, type }: { content?: React.ReactNode; type?: string }) => (
       <div role={type === 'error' ? 'alert' : 'status'}>{content}</div>
     ),
+    // Passthrough: the real Tooltip only wraps its child, and rendering it here
+    // would put the label text in the tree twice and break text queries.
+    Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
     AutoComplete: ({
       value,
       onChange,
@@ -458,7 +465,7 @@ describe('StudioMediaModelsSection', () => {
     });
     render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
     const row = await screen.findByRole('listitem', { name: 'open-sora' });
-    fireEvent.click(within(row).getByRole('button', { name: 'settings.mediaModels.edit' }));
+    fireEvent.click(within(row).getByRole('button', { name: new RegExp('^settings\\.mediaModels\\.edit — ') }));
     const dialog = screen.getByRole('dialog', { name: 'settings.mediaModels.editTitle' });
     expect(within(dialog).getByRole('combobox', { name: 'settings.mediaModels.model' })).toHaveValue('open-sora');
     fireEvent.change(within(dialog).getByRole('combobox', { name: 'settings.mediaModels.model' }), {
@@ -476,7 +483,7 @@ describe('StudioMediaModelsSection', () => {
     bridge.saveConnection.invoke.mockResolvedValue(ok(binding({ bindingId: 'binding_revalidated' })));
     render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
     const row = await screen.findByRole('listitem', { name: 'open-sora' });
-    fireEvent.click(within(row).getByRole('button', { name: 'settings.mediaModels.revalidate' }));
+    fireEvent.click(within(row).getByRole('button', { name: new RegExp('^settings\\.mediaModels\\.revalidate — ') }));
     const request = {
       providerId: 'provider_safe',
       integrationId: GATEWAY_INTEGRATION_ID,
@@ -492,7 +499,7 @@ describe('StudioMediaModelsSection', () => {
     bridge.saveConnection.invoke.mockResolvedValue(ok(binding({ bindingId: 'binding_edited' })));
     render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
     const row = await screen.findByRole('listitem', { name: 'open-sora' });
-    fireEvent.click(within(row).getByRole('button', { name: 'settings.mediaModels.edit' }));
+    fireEvent.click(within(row).getByRole('button', { name: new RegExp('^settings\\.mediaModels\\.edit — ') }));
     const dialog = screen.getByRole('dialog', { name: 'settings.mediaModels.editTitle' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'settings.mediaModels.validate' }));
     const save = within(dialog).getByRole('button', { name: 'settings.mediaModels.save' });
@@ -505,7 +512,7 @@ describe('StudioMediaModelsSection', () => {
   it('removes a binding with only its safe connection ID', async () => {
     render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
     const row = await screen.findByRole('listitem', { name: 'open-sora' });
-    fireEvent.click(within(row).getByRole('button', { name: 'settings.mediaModels.remove' }));
+    fireEvent.click(within(row).getByRole('button', { name: new RegExp('^settings\\.mediaModels\\.remove — ') }));
 
     await waitFor(() =>
       expect(bridge.removeConnection.invoke).toHaveBeenCalledExactlyOnceWith({
@@ -524,7 +531,7 @@ describe('StudioMediaModelsSection', () => {
     bridge.removeConnection.invoke.mockResolvedValue(failure('settings.mediaModels.validationFailed'));
     render(<StudioMediaModelsSection providerRefreshToken={0} onAddProvider={vi.fn()} />);
     const row = await screen.findByRole('listitem', { name: 'open-sora' });
-    fireEvent.click(within(row).getByRole('button', { name: 'settings.mediaModels.edit' }));
+    fireEvent.click(within(row).getByRole('button', { name: new RegExp('^settings\\.mediaModels\\.edit — ') }));
     const dialog = screen.getByRole('dialog', { name: 'settings.mediaModels.editTitle' });
     fireEvent.change(within(dialog).getByRole('combobox', { name: 'settings.mediaModels.model' }), {
       target: { value: 'replacement' },

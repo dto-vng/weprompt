@@ -638,10 +638,6 @@
     "contextWindow": "コンテキストウィンドウ",
     "percentUsed": "{{percent}}% 使用済み",
     "tokenCount": "{{used}} / {{limit}} トークン",
-    "localTokenUsage": "ローカルのトークン使用量",
-    "today": "今日",
-    "weekToDate": "今週の合計",
-    "monthToDate": "今月の合計",
     "triggerLabel": "コンテキストの使用状況を表示",
     "estimated": "推定",
     "unavailable": "コンテキスト使用量を取得できません"

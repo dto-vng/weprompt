@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAcpMessage } from '@/renderer/pages/conversation/platforms/acp/useAcpMessage';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { resetEnsureConversationRuntimeStateForTests } from '@/renderer/pages/conversation/utils/ensureConversationRuntime';
-import { getLocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 
 const {
@@ -334,7 +333,7 @@ describe('useAcpMessage', () => {
     }
   );
 
-  it('persists ACP occupancy and records authoritative provider usage once per turn', async () => {
+  it('persists ACP occupancy and persists it once per turn', async () => {
     vi.mocked(getConversationOrNull).mockResolvedValue(null);
     const { result } = renderHook(() => useAcpMessage('conv-usage'));
     const occurredAt = Date.now();
@@ -371,12 +370,9 @@ describe('useAcpMessage', () => {
       },
       merge_extra: true,
     });
-    expect(JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events).toEqual([
-      expect.objectContaining({ id: 'conv-usage:turn-1', inputTokens: 10, outputTokens: 5 }),
-    ]);
   });
 
-  it('restores persisted ACP occupancy and local totals after a remount', async () => {
+  it('restores persisted ACP occupancy after a remount', async () => {
     vi.mocked(getConversationOrNull).mockResolvedValue(null);
     const occurredAt = Date.now();
     const firstMount = renderHook(() => useAcpMessage('conv-restart'));
@@ -421,7 +417,6 @@ describe('useAcpMessage', () => {
       expect(restarted.result.current.tokenUsage).toEqual({ total_tokens: 12_000 });
       expect(restarted.result.current.context_limit).toBe(32_000);
     });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
   });
 
   it('loads initial slash commands after runtime ensure without legacy warmup', async () => {

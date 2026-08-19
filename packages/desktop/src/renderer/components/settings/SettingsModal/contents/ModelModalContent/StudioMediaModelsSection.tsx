@@ -474,14 +474,17 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
                         onClick={() => void revalidate(binding)}
                       />
                     </Tooltip>
-                    <Popconfirm
-                      title={t('settings.mediaModels.removeConfirm')}
-                      onOk={() => void remove(binding.bindingId)}
-                    >
-                      {/* Destructive action stays last, never between two safe ones. It keeps
-                          the danger status so the glyph reads red, but the shared class strips
-                          the filled background so it matches its neighbours in shape. */}
-                      <Tooltip content={t('settings.mediaModels.remove')}>
+                    {/* Destructive action stays last, never between two safe ones. It keeps
+                        the danger status so the glyph reads red, but the shared class strips
+                        the filled background so it matches its neighbours in shape.
+                        Tooltip wraps Popconfirm, not the other way round: Popconfirm attaches
+                        its trigger by cloning its DIRECT child, so a Tooltip in between
+                        swallows the handler and the confirm never opens. */}
+                    <Tooltip content={t('settings.mediaModels.remove')}>
+                      <Popconfirm
+                        title={t('settings.mediaModels.removeConfirm')}
+                        onOk={() => void remove(binding.bindingId)}
+                      >
                         <Button
                           size='mini'
                           status='danger'
@@ -490,8 +493,8 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
                           icon={<Delete theme='outline' size='14' />}
                           disabled={rowBusy}
                         />
-                      </Tooltip>
-                    </Popconfirm>
+                      </Popconfirm>
+                    </Tooltip>
                   </div>
                 </div>
                 {supportsSilentGatewayOutput(binding) && binding.labelKey === 'selfHostedVideoGateway' && (

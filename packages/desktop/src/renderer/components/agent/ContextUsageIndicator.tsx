@@ -13,11 +13,9 @@ import {
   contextUsagePercent,
   type ContextUsageSnapshot,
 } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
-import type { LocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
 type ContextUsageIndicatorProps = {
   tokenUsage?: TokenUsageData | null;
-  localUsage: LocalTokenUsageSummary;
   context_limit?: number;
   budget?: ContextUsageSnapshot;
   className?: string;
@@ -28,7 +26,6 @@ const CONTEXT_TRACK_COLOR = 'var(--color-fill-3)';
 
 const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   tokenUsage,
-  localUsage,
   context_limit,
   budget,
   className = '',
@@ -127,11 +124,6 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
           />
         </div>
       )}
-      <Divider className='my-12px!' />
-      <div className='text-12px text-t-secondary'>{t('conversation.contextUsage.localTokenUsage')}</div>
-      <UsageRow label={t('conversation.contextUsage.today')} value={localUsage.today} />
-      <UsageRow label={t('conversation.contextUsage.weekToDate')} value={localUsage.weekToDate} />
-      <UsageRow label={t('conversation.contextUsage.monthToDate')} value={localUsage.monthToDate} />
     </div>
   );
 
@@ -186,20 +178,6 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
     </Popover>
   );
 };
-
-type UsageRowProps = {
-  label: string;
-  value: number;
-};
-
-function UsageRow({ label, value }: UsageRowProps): React.ReactNode {
-  return (
-    <div className='mt-10px flex items-baseline justify-between gap-12px'>
-      <span className='text-12px text-t-secondary'>{label}</span>
-      <span className='text-12px font-medium text-t-primary whitespace-nowrap'>{formatTokenCount(value)}</span>
-    </div>
-  );
-}
 
 /**
  * 格式化 token 数量显示

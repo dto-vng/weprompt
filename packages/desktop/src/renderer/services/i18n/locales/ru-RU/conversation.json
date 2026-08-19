@@ -638,10 +638,6 @@
     "contextWindow": "Контекстное окно",
     "percentUsed": "Использовано {{percent}}%",
     "tokenCount": "{{used}} из {{limit}} токенов",
-    "localTokenUsage": "Локальное использование токенов",
-    "today": "Сегодня",
-    "weekToDate": "С начала недели",
-    "monthToDate": "С начала месяца",
     "triggerLabel": "Показать использование контекста",
     "estimated": "Оценка",
     "unavailable": "Данные об использовании контекста недоступны"

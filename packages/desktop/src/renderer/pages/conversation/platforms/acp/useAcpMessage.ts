@@ -16,7 +16,6 @@ import { logStreamTerminalObserved } from '@/renderer/pages/conversation/runtime
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { isConversationProcessing } from '@/renderer/pages/conversation/utils/conversationRuntime';
 import { ensureConversationRuntime } from '@/renderer/pages/conversation/utils/ensureConversationRuntime';
-import { recordLocalTokenUsage } from '@/renderer/pages/conversation/utils/localTokenUsage';
 import type { ThoughtData } from '@/renderer/components/chat/ThoughtDisplay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { emitter } from '@/renderer/utils/emitter';
@@ -98,7 +97,6 @@ export const useAcpMessage = (
   const [aiProcessing, setAiProcessing] = useState(false); // New loading state for AI response
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const [context_limit, setContextLimit] = useState<number>(0);
-  const processedProviderUsageIdsRef = useRef(new Set<string>());
   const persistedContextUsageFramesRef = useRef(new Set<string>());
   const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
   const onTerminalRef = useRef(options?.onTerminal);
@@ -175,32 +173,6 @@ export const useAcpMessage = (
       const turnIdentity = message.turn_id || message.msg_id;
       const usageEventId = turnIdentity ? `${conversation_id}:${turnIdentity}` : null;
       const providerUsage = message.provider_usage;
-      const hasProviderUsage =
-        usageEventId !== null &&
-        providerUsage !== undefined &&
-        Number.isSafeInteger(providerUsage.input_tokens) &&
-        providerUsage.input_tokens >= 0 &&
-        Number.isSafeInteger(providerUsage.output_tokens) &&
-        providerUsage.output_tokens >= 0;
-      const occurredAt =
-        typeof message.created_at === 'number' && Number.isSafeInteger(message.created_at) && message.created_at >= 0
-          ? message.created_at
-          : Date.now();
-      if (
-        hasProviderUsage &&
-        usageEventId !== null &&
-        providerUsage !== undefined &&
-        !processedProviderUsageIdsRef.current.has(usageEventId)
-      ) {
-        processedProviderUsageIdsRef.current.add(usageEventId);
-        recordLocalTokenUsage({
-          id: usageEventId,
-          inputTokens: providerUsage.input_tokens,
-          outputTokens: providerUsage.output_tokens,
-          occurredAt,
-        });
-      }
-
       const frameIdentity = `${usageEventId ?? message.msg_id}:${usedTokens}:${contextLimit ?? 'unknown'}:${
         providerUsage?.input_tokens ?? 'absent'
       }:${providerUsage?.output_tokens ?? 'absent'}`;
@@ -580,7 +552,6 @@ export const useAcpMessage = (
     setTokenUsage(null);
     setContextLimit(0);
     setSlashCommands([]);
-    processedProviderUsageIdsRef.current.clear();
     persistedContextUsageFramesRef.current.clear();
     hasContentInTurnRef.current = false;
     turnFinishedRef.current = false;

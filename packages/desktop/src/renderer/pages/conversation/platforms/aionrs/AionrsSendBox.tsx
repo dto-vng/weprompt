@@ -50,7 +50,6 @@ import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/cha
 import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useSendBoxFiles';
 import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hooks/file/selection';
-import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import {
@@ -222,7 +221,6 @@ const AionrsSendBox: React.FC<{
       },
     }
   );
-  const localUsage = useLocalTokenUsage();
   const messages = useMessageList();
   const contextBudget = useMemo(
     () =>
@@ -1551,7 +1549,7 @@ const AionrsSendBox: React.FC<{
               beforeRuntimeSet={teamPermission?.warmupSession}
               loadConfigOptions={teamPermission?.loadConfigOptions}
             />
-            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
+            <ContextUsageIndicator budget={contextBudget} />
           </div>
         }
         prefix={

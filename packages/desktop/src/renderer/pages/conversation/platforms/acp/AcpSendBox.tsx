@@ -43,7 +43,6 @@ import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useS
 import { useConversationContextSafe } from '@/renderer/hooks/context/ConversationContext';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hooks/file/selection';
-import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
@@ -211,7 +210,6 @@ const AcpSendBox: React.FC<{
     slashCommands,
     fetchSlashCommands,
   } = messageState;
-  const localUsage = useLocalTokenUsage();
   const { t } = useTranslation();
   const teamPermission = useTeamPermission();
   // In team mode, all agents show the permission mode selector (members don't propagate)
@@ -1497,7 +1495,7 @@ Please check your local CLI tool authentication status`,
                 loadConfigOptions={teamPermission?.loadConfigOptions}
               />
             )}
-            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
+            <ContextUsageIndicator budget={contextBudget} />
           </div>
         }
         prefix={

@@ -15,7 +15,6 @@ import { logStreamTerminalObserved } from '@/renderer/pages/conversation/runtime
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { isConversationProcessing } from '@/renderer/pages/conversation/utils/conversationRuntime';
 import { emitter } from '@/renderer/utils/emitter';
-import { recordLocalTokenUsage } from '@/renderer/pages/conversation/utils/localTokenUsage';
 import { isThinkOnlyContent } from '@/renderer/utils/chat/thinkTagFilter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +81,6 @@ export const useAionrsMessage = (
   });
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const tokenUsageRef = useRef<TokenUsageData | null>(null);
-  const processedProviderUsageIdsRef = useRef(new Set<string>());
   // Current active message ID to filter out events from old requests (prevents aborted request events from interfering with new ones)
   const activeMsgIdRef = useRef<string | null>(null);
   const messageBufferRef = useRef(new Map<string, string>());
@@ -186,28 +184,6 @@ export const useAionrsMessage = (
       enqueueUsageWrite(conversation_id, { last_token_usage: nextTokenUsage } as TChatConversation['extra'], () =>
         emitter.emit('aionrs.context-usage.refresh', conversation_id)
       );
-    },
-    [conversation_id]
-  );
-
-  const persistProviderUsage = useCallback(
-    (message: IResponseMessage, usage: { input_tokens: number; output_tokens: number }) => {
-      const turnIdentity = message.turn_id || message.msg_id;
-      if (!turnIdentity) return;
-      const usageEventId = `${conversation_id}:${turnIdentity}`;
-      if (processedProviderUsageIdsRef.current.has(usageEventId)) return;
-      processedProviderUsageIdsRef.current.add(usageEventId);
-
-      const occurredAt =
-        typeof message.created_at === 'number' && Number.isSafeInteger(message.created_at) && message.created_at >= 0
-          ? message.created_at
-          : Date.now();
-      recordLocalTokenUsage({
-        id: usageEventId,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        occurredAt,
-      });
     },
     [conversation_id]
   );
@@ -348,16 +324,6 @@ export const useAionrsMessage = (
               outcome: 'completed',
             });
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
-            // aionrs stream_end carries usage in data field
-            const usageData = message.provider_usage ?? (message.data as TokenUsage | undefined);
-            const hasValidInputTokens = isValidTokenCount(usageData?.input_tokens);
-            const hasValidOutputTokens = isValidTokenCount(usageData?.output_tokens);
-            if (hasValidInputTokens && hasValidOutputTokens) {
-              persistProviderUsage(message, {
-                input_tokens: usageData.input_tokens,
-                output_tokens: usageData.output_tokens,
-              });
-            }
             setStreamRunning(false);
             streamRunningRef.current = false;
             setWaitingResponse(false);
@@ -504,14 +470,7 @@ export const useAionrsMessage = (
       }
     });
     // Note: hasActiveTools and streamRunning are accessed via refs to avoid re-subscription
-  }, [
-    conversation_id,
-    mergeLiveMessage,
-    onError,
-    persistContextOccupancy,
-    persistProviderUsage,
-    processCompletedAssistantMessage,
-  ]);
+  }, [conversation_id, mergeLiveMessage, onError, persistContextOccupancy, processCompletedAssistantMessage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -519,7 +478,6 @@ export const useAionrsMessage = (
     setThought({ subject: '', description: '' });
     setTokenUsage(null);
     tokenUsageRef.current = null;
-    processedProviderUsageIdsRef.current.clear();
     hasContentInTurnRef.current = false;
     turnHadToolActivityRef.current = false;
     setHasHydratedRunningState(false);

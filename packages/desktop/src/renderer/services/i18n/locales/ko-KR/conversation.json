@@ -638,10 +638,6 @@
     "contextWindow": "컨텍스트 창",
     "percentUsed": "{{percent}}% 사용됨",
     "tokenCount": "{{used}} / {{limit}} 토큰",
-    "localTokenUsage": "로컬 토큰 사용량",
-    "today": "오늘",
-    "weekToDate": "이번 주 누적",
-    "monthToDate": "이번 달 누적",
     "triggerLabel": "컨텍스트 사용량 표시",
     "estimated": "예상",
     "unavailable": "컨텍스트 사용량을 확인할 수 없음"

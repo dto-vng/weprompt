@@ -148,13 +148,11 @@ const {
         ratio: number | null;
         status: 'healthy' | 'watch' | 'compress' | 'too_large';
       };
-      localUsage: { today: number; weekToDate: number; monthToDate: number };
     } | null,
   },
   sendBoxProps: {
     current: null as {
       tokenUsage?: unknown;
-      localUsage?: unknown;
       context_limit?: unknown;
       prefix?: React.ReactNode;
       tools?: React.ReactNode;
@@ -316,7 +314,6 @@ vi.mock('@/renderer/components/agent/ContextUsageIndicator', () => ({
       ratio: number | null;
       status: 'healthy' | 'watch' | 'compress' | 'too_large';
     };
-    localUsage: { today: number; weekToDate: number; monthToDate: number };
   }) => {
     contextUsageIndicatorProps.current = props;
     return <span data-testid='context-usage-indicator' />;
@@ -407,9 +404,6 @@ vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
 }));
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: false }),
-}));
-vi.mock('@/renderer/hooks/useLocalTokenUsage', () => ({
-  useLocalTokenUsage: () => ({ today: 120, weekToDate: 560, monthToDate: 1_240 }),
 }));
 vi.mock('@/renderer/hooks/chat/useAutoTitle', () => ({
   useAutoTitle: () => ({
@@ -2120,7 +2114,6 @@ describe('AionrsSendBox', () => {
         ratio: 12_000 / 204_800,
         status: 'healthy',
       },
-      localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
     expect(screen.getByRole('button', { name: 'send' })).toBeInTheDocument();
     expect(sendBoxProps.current).not.toHaveProperty('tokenUsage');

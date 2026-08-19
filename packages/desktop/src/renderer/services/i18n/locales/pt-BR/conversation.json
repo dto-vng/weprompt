@@ -644,10 +644,6 @@
     "contextWindow": "Janela de contexto",
     "percentUsed": "{{percent}}% usado",
     "tokenCount": "{{used}} de {{limit}} tokens",
-    "localTokenUsage": "Uso local de tokens",
-    "today": "Hoje",
-    "weekToDate": "Semana até hoje",
-    "monthToDate": "Mês até hoje",
     "triggerLabel": "Mostrar uso do contexto",
     "estimated": "Estimado",
     "unavailable": "Uso de contexto indisponível"

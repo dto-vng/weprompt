@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import { useAionrsMessage } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsMessage';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
-import { getLocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
 const {
   mergeLiveMessageMock,
@@ -305,37 +304,7 @@ describe('useAionrsMessage runtime state', () => {
     });
   });
 
-  it('records explicit completed-turn usage once with a stable event id', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
-
-    await waitFor(() => {
-      expect(responseStreamHandlerRef.current).toBeDefined();
-    });
-
-    const completedTurn: IResponseMessage = {
-      type: 'finish',
-      data: { input_tokens: 10, output_tokens: 5 },
-      msg_id: 'message-1',
-      turn_id: 'turn-1',
-      conversation_id: 'conv-1',
-    };
-
-    act(() => {
-      responseStreamHandlerRef.current?.(completedTurn);
-      responseStreamHandlerRef.current?.(completedTurn);
-    });
-
-    const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      id: 'conv-1:turn-1',
-      inputTokens: 10,
-      outputTokens: 5,
-    });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
-  });
-
-  it('persists AionRS occupancy and records canonical provider usage once per turn', async () => {
+  it('persists AionRS occupancy and persists it once per turn', async () => {
     const { result } = renderHook(() => useAionrsMessage('conv-canonical'));
     const occurredAt = Date.now();
 
@@ -379,12 +348,9 @@ describe('useAionrsMessage runtime state', () => {
       },
       merge_extra: true,
     });
-    expect(JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events).toEqual([
-      expect.objectContaining({ id: 'conv-canonical:turn-1', inputTokens: 10, outputTokens: 5 }),
-    ]);
   });
 
-  it('restores AionRS occupancy and local totals after a remount', async () => {
+  it('restores AionRS occupancy after a remount', async () => {
     const occurredAt = Date.now();
     const firstMount = renderHook(() => useAionrsMessage('conv-restart'));
 
@@ -435,7 +401,6 @@ describe('useAionrsMessage runtime state', () => {
     await waitFor(() => {
       expect(restarted.result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
     });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
   });
 
   it('uses diagnostic estimates only for occupancy when completed turns omit provider usage', async () => {
@@ -481,7 +446,6 @@ describe('useAionrsMessage runtime state', () => {
     });
 
     expect(result.current.tokenUsage).toEqual({ total_tokens: 37_034 });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 0, weekToDate: 0, monthToDate: 0 });
   });
 
   it('accepts a lower later occupancy snapshot after context compaction', async () => {
@@ -538,26 +502,6 @@ describe('useAionrsMessage runtime state', () => {
     });
 
     expect(result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
-  });
-
-  it('does not record a completed turn without explicit usage', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
-
-    await waitFor(() => {
-      expect(responseStreamHandlerRef.current).toBeDefined();
-    });
-
-    act(() => {
-      responseStreamHandlerRef.current?.({
-        type: 'finish',
-        data: {},
-        msg_id: 'message-1',
-        conversation_id: 'conv-1',
-      });
-    });
-
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 0, weekToDate: 0, monthToDate: 0 });
   });
 
   it('does not invent missing input usage for an output-only report', async () => {
@@ -576,8 +520,6 @@ describe('useAionrsMessage runtime state', () => {
       });
     });
 
-    const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-    expect(events).toHaveLength(0);
     expect(updateConversationInvokeMock).not.toHaveBeenCalled();
   });
 
@@ -599,8 +541,6 @@ describe('useAionrsMessage runtime state', () => {
         });
       });
 
-      const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-      expect(events).toEqual([]);
       expect(updateConversationInvokeMock).not.toHaveBeenCalled();
     }
   );
@@ -712,8 +652,6 @@ describe('useAionrsMessage runtime state', () => {
         });
       });
 
-      const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-      expect(events).toEqual([]);
       expect(updateConversationInvokeMock).not.toHaveBeenCalled();
     }
   );

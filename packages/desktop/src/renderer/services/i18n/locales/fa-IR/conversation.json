@@ -638,10 +638,6 @@
     "contextWindow": "پنجره زمینه",
     "percentUsed": "{{percent}}٪ استفاده‌شده",
     "tokenCount": "{{used}} از {{limit}} توکن",
-    "localTokenUsage": "استفاده محلی از توکن‌ها",
-    "today": "امروز",
-    "weekToDate": "از ابتدای هفته",
-    "monthToDate": "از ابتدای ماه",
     "triggerLabel": "نمایش استفاده از زمینه",
     "estimated": "تخمینی",
     "unavailable": "میزان استفاده از زمینه در دسترس نیست"

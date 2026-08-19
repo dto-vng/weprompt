@@ -639,10 +639,6 @@
     "contextWindow": "Kontextfenster",
     "percentUsed": "{{percent}} % verwendet",
     "tokenCount": "{{used}} von {{limit}} Token",
-    "localTokenUsage": "Lokale Tokennutzung",
-    "today": "Heute",
-    "weekToDate": "Woche bis heute",
-    "monthToDate": "Monat bis heute",
     "triggerLabel": "Kontextnutzung anzeigen",
     "estimated": "Geschätzt",
     "unavailable": "Kontextnutzung nicht verfügbar"

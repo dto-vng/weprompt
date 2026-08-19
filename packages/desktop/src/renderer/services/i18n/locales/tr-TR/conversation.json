@@ -622,10 +622,6 @@
     "contextWindow": "Bağlam penceresi",
     "percentUsed": "%{{percent}} kullanıldı",
     "tokenCount": "{{used}} / {{limit}} belirteç",
-    "localTokenUsage": "Yerel belirteç kullanımı",
-    "today": "Bugün",
-    "weekToDate": "Bu hafta",
-    "monthToDate": "Bu ay",
     "triggerLabel": "Bağlam kullanımını göster",
     "estimated": "Tahmini",
     "unavailable": "Bağlam kullanımı kullanılamıyor"

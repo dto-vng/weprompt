@@ -638,10 +638,6 @@
     "contextWindow": "上下文窗口",
     "percentUsed": "已使用 {{percent}}%",
     "tokenCount": "{{used}} / {{limit}} 个令牌",
-    "localTokenUsage": "本地令牌用量",
-    "today": "今天",
-    "weekToDate": "本周至今",
-    "monthToDate": "本月至今",
     "triggerLabel": "显示上下文用量",
     "estimated": "估算",
     "unavailable": "上下文用量不可用"
