@@ -7,7 +7,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import { Button, Tag } from '@arco-design/web-react';
-import { AddOne, CheckOne } from '@icon-park/react';
+import { CheckOne } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 import { ipcBridge } from '@/common';
 import type {
@@ -140,16 +140,14 @@ export const TemplateReviewCard: React.FC<{ conversationId: string; filePath: st
             <Button
               type='primary'
               size='small'
-              // C-10: `flex items-center gap-8px` is load-bearing, not decoration. Arco's
-              // button computes display:block with text-align:center, so an `icon` prop sits
-              // flush against the label and `gap` alone does nothing. Same mechanism proved
-              // on the sider footer (C-08), where the identical markup rendered the glyph
-              // touching the text.
-              className='w-fit flex items-center gap-8px'
+              // No icon here by design, so no flex override: Arco's button computes
+              // display:block with text-align:center, which centres the label on its own.
+              // (The former `flex items-center gap-8px` existed only to stop an `icon` prop
+              // rendering flush against the text — C-10.)
+              className='w-fit'
               loading={state.status === 'installing'}
               disabled={state.status === 'installing'}
               onClick={() => void confirm()}
-              icon={<AddOne theme='outline' size='16' />}
             >
               {state.status === 'installing'
                 ? t('messages.templateReview.installing')

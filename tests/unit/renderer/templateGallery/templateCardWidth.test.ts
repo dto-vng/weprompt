@@ -35,23 +35,31 @@ describe('template card width is independent of its name', () => {
   });
 });
 
-// C-10 — the install button put an icon flush against its label. Arco's button computes
-// display:block with text-align:center, so the `icon` prop's glyph butts against the text
-// and `gap` alone is inert; `flex` is what makes both apply. The same markup produced the
-// same defect on the sider footer (C-08), where it was measured and screenshotted.
+// The install button carries no icon: it is a single centred label. Arco's button computes
+// display:block with text-align:center, so the label centres on its own and any `flex`
+// override would defeat that. The earlier C-10 guard required the opposite — `flex
+// items-center gap-8px` — because the button then had an `icon` prop whose glyph rendered
+// flush against the text. The icon was removed on request, so the guard is inverted here
+// rather than deleted: it now pins the absence that makes native centring work.
 //
-// NOT live-verified on this component: reproducing it needs a template review card, which
-// needs the in-chat creation path to fire, and it did not in this session. The mechanism is
-// proven, this button is not.
-describe('template install button lays its icon out with a gap', () => {
-  it('makes the Arco button a flex container', () => {
-    const src = readFileSync(
-      resolve(
-        __dirname,
-        '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateMessageCard.tsx'
-      ),
-      'utf8'
-    );
-    expect(src).toMatch(/className='w-fit flex items-center gap-8px'/);
+// jsdom resolves no UnoCSS and lays nothing out, so this asserts the source contract, not
+// the rendered result.
+describe('template install button is a centred label with no icon', () => {
+  const src = readFileSync(
+    resolve(
+      __dirname,
+      '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateMessageCard.tsx'
+    ),
+    'utf8'
+  );
+
+  it('passes no icon to the button', () => {
+    expect(src).not.toMatch(/icon=\{<AddOne/);
+    expect(src).not.toMatch(/\bAddOne\b/);
+  });
+
+  it('does not override Arco own centring with a flex container', () => {
+    expect(src).toMatch(/className='w-fit'/);
+    expect(src).not.toMatch(/className='w-fit flex items-center gap-8px'/);
   });
 });
