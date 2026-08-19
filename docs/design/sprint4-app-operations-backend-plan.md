@@ -143,14 +143,14 @@ scratch data dir. `~/.aionui-dev` was never a target — only a read-only copy s
 
 ### API contract: 6/6 pass
 
-| Check | Result |
-| ----- | ------ |
-| `GET /api/app-operations/model` | 200 `{"setting":{"mode":"auto"},"health":"setup_required","reason_code":"no_eligible_model"}` |
-| `PUT` with empty ids | **422** "Fixed App Operations provider and model ids must not be empty" — the branch the port had no test for |
-| `PUT` with absent provider | **422** "App Operations provider does not exist" |
-| `PUT {"mode":"auto"}` | 200, persisted across a process restart |
-| `POST /api/app-operations/model/check` | 200 — the route lives in `aionui-ai-agent`, not `aionui-system` |
-| no bearer token | **401** — the D-01 loopback token is enforced |
+| Check                                  | Result                                                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `GET /api/app-operations/model`        | 200 `{"setting":{"mode":"auto"},"health":"setup_required","reason_code":"no_eligible_model"}`                 |
+| `PUT` with empty ids                   | **422** "Fixed App Operations provider and model ids must not be empty" — the branch the port had no test for |
+| `PUT` with absent provider             | **422** "App Operations provider does not exist"                                                              |
+| `PUT {"mode":"auto"}`                  | 200, persisted across a process restart                                                                       |
+| `POST /api/app-operations/model/check` | 200 — the route lives in `aionui-ai-agent`, not `aionui-system`                                               |
+| no bearer token                        | **401** — the D-01 loopback token is enforced                                                                 |
 
 ### Migration 028 against a populated database: NOT verified, and why
 
@@ -166,12 +166,12 @@ encryption-capable binary meeting a plaintext database starts fresh.**
 
 ### Migration version collision — decision needed before the port lands
 
-| version | dev profile / feature branch | ported release line |
-| ------- | ---------------------------- | ------------------- |
-| 028 | `project_bind` | **`app_operations_model`** |
-| 029 | `mimo_code_builtin_acp_agent` | — |
-| 030 | `app_operations_model` | — |
-| 031-034 | memory | — |
+| version | dev profile / feature branch  | ported release line        |
+| ------- | ----------------------------- | -------------------------- |
+| 028     | `project_bind`                | **`app_operations_model`** |
+| 029     | `mimo_code_builtin_acp_agent` | —                          |
+| 030     | `app_operations_model`        | —                          |
+| 031-034 | memory                        | —                          |
 
 The dev profile has 1-34 applied. `DB_MIGRATOR = sqlx::migrate!()` (`database.rs:28`) carries **no
 `set_ignore_missing`**, so such a profile meeting the ported set fails twice over: version 28 is applied
