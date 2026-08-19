@@ -36,6 +36,19 @@ describe('workspace section scroll behaves in the artifact pane', () => {
 // content-box sizing, so the margin alone pushed the field into overflow rather than
 // shrinking it. Measured after: 415px wide, inset 13px, no overflow.
 describe('file search is inset rather than full-bleed', () => {
+  it('gives the pane sections horizontal padding so content clears the border', () => {
+    const css = readFileSync(
+      resolve(__dirname, '../../../../packages/desktop/src/renderer/pages/conversation/Workspace/workspace.css'),
+      'utf8'
+    );
+    // The flyout popover supplied this; the pane's portal slot did not, so panel content sat
+    // 1px from the pane border. Measured after: 13px.
+    expect(css).toMatch(/\.workspace-pane-section\s*\{[^}]*padding:\s*0 12px/s);
+    // ...and the search must not add its own inset on top of that, or it falls out of line
+    // with the tree beneath it.
+    expect(css).toMatch(/\.workspace-pane-section \.workspace-project-files-search\s*\{[^}]*margin-left:\s*0/s);
+  });
+
   it('insets the field and overrides the Arco width', () => {
     const css = readFileSync(
       resolve(__dirname, '../../../../packages/desktop/src/renderer/pages/conversation/Workspace/workspace.css'),

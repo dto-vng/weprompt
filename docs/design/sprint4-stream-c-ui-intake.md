@@ -599,6 +599,23 @@ live verification in the running app.
   reported there, but consistency is the point of sharing the component.
 
 
+### C-28 — Panel content sits against the pane border
+
+- **Surface:** the pane's panels, reported against Context. Measured: content started **1px** from
+  the pane's left border.
+- **Cause is mine, from C-01.** The Project flyout's popover supplied the panels' horizontal
+  breathing room. When the same panels were portalled into the pane, the portal slot had no padding,
+  so they rendered flush against the border. Files and Changes had the same defect; only Context made
+  it obvious, because its Budget row and progress bar run the full width with no leading icon to
+  disguise the gap.
+- **Fixed:** `padding: 0 12px` on `.workspace-pane-section`, which covers all three panels in one
+  place rather than each inventing its own inset. Content now sits 13px from the border.
+- **Also de-duplicated C-27's inset.** The search field carries its own margin for the project-home
+  card, which is not inside a pane section. Inside the pane that margin would stack with the new
+  container padding and push the field out of line with the tree beneath it, so it is zeroed there.
+  The project-home card keeps its narrowing.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
