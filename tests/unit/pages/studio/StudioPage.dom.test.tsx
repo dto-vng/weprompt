@@ -273,7 +273,16 @@ const selectStudioPhase = async (router: StudioTestRouter, phase: StudioPhase): 
 };
 
 const fitStoryboardToGoal = async (): Promise<void> => {
-  fireEvent.click(await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' }));
+  const fit = await screen.findByRole('button', { name: 'conversation.creativeStudio.phase.write.fitToGoal' });
+  // `findByRole` resolves as soon as the button EXISTS. It necessarily renders disabled first:
+  // `fitDisabled` includes `models.catalog === null`, and the catalog fetch is kicked off from a
+  // post-commit effect, so the enabling `setCatalog` cannot run before the commit that paints it.
+  // A click landing in that window is discarded three times over — React does not dispatch to a
+  // disabled host element, Arco's Button early-returns, and WritePhase's own guard returns — with
+  // no retry. That makes the wait below unsatisfiable rather than merely slow, which is why the
+  // symptom surfaces as a 1000ms timeout on the bridge instead of a missing button.
+  await waitFor(() => expect(fit).toBeEnabled());
+  fireEvent.click(fit);
   await waitFor(() => expect(bridge.fitStoryboard.invoke).toHaveBeenCalledTimes(1));
   await act(async () => {});
 };
