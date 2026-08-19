@@ -15,7 +15,7 @@ import type {
   StudioSaveConnectionRequest,
 } from '@/common/types/project/creativeStudioTypes';
 import { Alert, AutoComplete, Button, Modal, Popconfirm, Select, Spin, Tag } from '@arco-design/web-react';
-import { Plus, Refresh } from '@icon-park/react';
+import { Delete, Refresh } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -375,7 +375,7 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
           </h2>
           <p className='mb-0 mt-4px text-13px text-t-secondary'>{t('settings.mediaModels.description')}</p>
         </div>
-        <Button type='primary' icon={<Plus />} onClick={openAdd}>
+        <Button type='primary' onClick={openAdd}>
           {t('settings.mediaModels.add')}
         </Button>
       </div>
@@ -410,46 +410,66 @@ export const StudioMediaModelsSection: React.FC<StudioMediaModelsSectionProps> =
               <li
                 key={binding.bindingId}
                 aria-label={binding.model}
-                className='rounded-8px border border-border-2 bg-fill-1 p-12px'
+                // Matches the provider rows above: same surface, radius and borderless card,
+                // so the two lists read as one screen rather than two visual systems.
+                className='box-border rounded-12px bg-[var(--color-bg-2)] px-14px py-12px'
               >
-                <div className='flex flex-wrap items-start justify-between gap-12px'>
-                  <dl className='m-0 grid min-w-0 flex-1 grid-cols-[max-content_minmax(0,1fr)] gap-x-10px gap-y-5px'>
-                    <dt className='text-11px text-t-tertiary'>{t('settings.mediaModels.outputType')}</dt>
-                    <dd className='m-0 text-12px text-t-primary'>{t(`settings.mediaModels.${kind}`)}</dd>
-                    <dt className='text-11px text-t-tertiary'>{t('settings.mediaModels.provider')}</dt>
-                    <dd className='m-0 break-all text-12px text-t-primary'>
-                      {candidate?.providerName ?? binding.providerId}
-                      {!candidate && (
-                        <Tag className='ml-6px' color='orange'>
-                          {t('settings.mediaModels.unavailable')}
-                        </Tag>
-                      )}
-                    </dd>
-                    <dt className='text-11px text-t-tertiary'>{t('settings.mediaModels.integrationLabel')}</dt>
-                    <dd className='m-0 text-12px text-t-primary'>
-                      {t(`settings.mediaModels.integration.${binding.labelKey}`)}
-                    </dd>
-                    <dt className='text-11px text-t-tertiary'>{t('settings.mediaModels.model')}</dt>
-                    <dd className='m-0 break-all text-12px text-t-primary'>{binding.model}</dd>
-                    <dt className='text-11px text-t-tertiary'>{t('settings.mediaModels.validatedAt')}</dt>
-                    <dd className='m-0 text-12px text-t-secondary'>
-                      <time dateTime={binding.validatedAt}>{new Date(binding.validatedAt).toLocaleString()}</time>
-                    </dd>
-                  </dl>
-                  <div className='flex flex-wrap gap-6px'>
+                {/* One line per binding: kind, provider + model, integration, validation age,
+                    actions. The five-row definition list this replaces stated the same fields
+                    but cost five lines each, so two bindings filled the section. */}
+                <div className='grid items-center gap-16px grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[74px_minmax(0,1fr)_minmax(0,180px)_minmax(0,150px)_auto]'>
+                  <span className='hidden md:inline-flex shrink-0 justify-center rounded-5px border border-solid border-aou-3 bg-aou-2 px-8px py-3px font-mono text-10px font-600 uppercase tracking-wide text-aou-7'>
+                    {t(`settings.mediaModels.${kind}`)}
+                  </span>
+
+                  <div className='min-w-0'>
+                    <div className='flex min-w-0 items-center gap-6px'>
+                      <span className='truncate text-[13.5px] font-600 text-t-primary'>
+                        {candidate?.providerName ?? binding.providerId}
+                      </span>
+                      {!candidate && <Tag color='orange'>{t('settings.mediaModels.unavailable')}</Tag>}
+                    </div>
+                    <div title={binding.model} className='truncate font-mono text-[11.5px] text-t-secondary'>
+                      {binding.model}
+                    </div>
+                  </div>
+
+                  <div className='hidden md:block truncate text-[12.5px] text-t-secondary'>
+                    {t(`settings.mediaModels.integration.${binding.labelKey}`)}
+                  </div>
+
+                  <div className='hidden md:block truncate text-[11.5px] text-t-tertiary'>
+                    <time dateTime={binding.validatedAt} title={new Date(binding.validatedAt).toLocaleString()}>
+                      {t('settings.mediaModels.validated')} {new Date(binding.validatedAt).toLocaleDateString()}
+                    </time>
+                  </div>
+
+                  <div className='flex shrink-0 items-center gap-6px'>
                     <Button size='mini' disabled={rowBusy} onClick={() => openEdit(binding)}>
                       {t('settings.mediaModels.edit')}
                     </Button>
-                    <Button size='mini' loading={rowBusy} disabled={rowBusy} onClick={() => void revalidate(binding)}>
-                      {t('settings.mediaModels.revalidate')}
-                    </Button>
+                    <Button
+                      size='mini'
+                      shape='square'
+                      aria-label={`${t('settings.mediaModels.revalidate')} — ${binding.model}`}
+                      icon={<Refresh theme='outline' size='14' />}
+                      loading={rowBusy}
+                      disabled={rowBusy}
+                      onClick={() => void revalidate(binding)}
+                    />
                     <Popconfirm
                       title={t('settings.mediaModels.removeConfirm')}
                       onOk={() => void remove(binding.bindingId)}
                     >
-                      <Button size='mini' status='danger' disabled={rowBusy}>
-                        {t('settings.mediaModels.remove')}
-                      </Button>
+                      {/* Destructive action stays last, never between two safe ones. */}
+                      <Button
+                        size='mini'
+                        shape='square'
+                        status='danger'
+                        aria-label={`${t('settings.mediaModels.remove')} — ${binding.model}`}
+                        icon={<Delete theme='outline' size='14' />}
+                        disabled={rowBusy}
+                      />
                     </Popconfirm>
                   </div>
                 </div>
