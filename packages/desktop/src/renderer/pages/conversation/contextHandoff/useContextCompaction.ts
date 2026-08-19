@@ -508,6 +508,30 @@ const updateContextTurnStreamEvidence = (
   return next;
 };
 
+/**
+ * "The turn is over and the user can type again."
+ *
+ * `state: 'ai_waiting_input'` is one way a backend says this, and the only one this
+ * predicate used to accept — but the running backend sends no top-level `state` at all
+ * (`ipcBridge` only forwards one when the payload already has it), so the check was
+ * unsatisfiable and no turn ever counted. Auto-compaction could therefore never fire:
+ * not on the 8-turn rule, not on budget escalation.
+ *
+ * The same condition is described semantically in `runtime`, so fall back to that rather
+ * than to a spelling: nothing in flight, composer unlocked, nothing awaiting approval.
+ * Matching on meaning instead of on an enum value is what keeps this working across the
+ * backend-version skew that broke it in the first place.
+ */
+const turnHasSettled = (event: IConversationTurnCompletedEvent): boolean => {
+  if (event.state === 'ai_waiting_input') return true;
+  if (event.state !== undefined) return false;
+  const runtime = event.runtime;
+  if (!runtime) return false;
+  return (
+    runtime.is_processing === false && runtime.can_send_message === true && (runtime.pending_confirmations ?? 0) === 0
+  );
+};
+
 export const isMeaningfulContextTurn = (
   event: IConversationTurnCompletedEvent,
   streamEvidence?: {
@@ -515,7 +539,7 @@ export const isMeaningfulContextTurn = (
     terminal: 'finish' | 'error' | null;
   }
 ): boolean => {
-  if (event.status !== 'finished' || event.state !== 'ai_waiting_input') return false;
+  if (event.status !== 'finished' || !turnHasSettled(event)) return false;
   if (streamEvidence?.terminal === 'error') return false;
   if (event.last_message) {
     if (event.last_message.type && event.last_message.type !== 'text') return false;
